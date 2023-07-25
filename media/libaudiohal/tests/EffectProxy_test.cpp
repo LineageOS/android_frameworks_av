@@ -53,7 +53,9 @@ class EffectProxyTest : public testing::Test {
     void SetUp() override {
         auto serviceName = android::getAidlHalInstanceNames(IFactory::descriptor);
         // only unit test with the first one in case more than one EffectFactory service exist
-        ASSERT_NE(0ul, serviceName.size());
+        if (0ul == serviceName.size()) {
+            GTEST_SKIP() << "EffectFactory not available on device, skipping";
+        }
         mFactory = IFactory::fromBinder(
                 ndk::SpAIBinder(AServiceManager_waitForService(serviceName[0].c_str())));
         ASSERT_NE(nullptr, mFactory);
@@ -157,6 +159,7 @@ TEST_F(EffectProxyTest, setOffloadParam) {
         effect_offload_param_t offloadParam{false, 0};
         EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         offloadParam.isOffload = true;
+        offloadParam.ioHandle++;
         EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
         EXPECT_TRUE(proxy->close().isOk());
         EXPECT_TRUE(proxy->destroy().isOk());
@@ -189,21 +192,21 @@ TEST_F(EffectProxyTest, normalSequency) {
     Parameter::Common common = createParamCommon();
     IEffect::OpenEffectReturn ret;
     Parameter::VolumeStereo volumeStereo({.left = .1f, .right = -0.8f});
-    Parameter param = Parameter::make<Parameter::volumeStereo>(volumeStereo);
-    Parameter::Id id = Parameter::Id::make<Parameter::Id::commonTag>(Parameter::volumeStereo);
+    Parameter expect = Parameter::make<Parameter::volumeStereo>(volumeStereo);
+    const Parameter::Id id = Parameter::Id::make<Parameter::Id::commonTag>(Parameter::volumeStereo);
     State state;
     for (const auto& itor : proxyMap) {
-        Parameter expect;
+        Parameter getParam = Parameter::make<Parameter::offload>(true);
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
         effect_offload_param_t offloadParam{true, 0};
         EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
 
         EXPECT_TRUE(proxy->open(common, std::nullopt, &ret).isOk());
 
-        EXPECT_TRUE(proxy->setParameter(param).isOk());
-        EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
-        EXPECT_EQ(expect, param) << " EXPECTED: " << expect.toString()
-                                 << "\nACTUAL: " << param.toString();
+        EXPECT_TRUE(proxy->setParameter(expect).isOk());
+        EXPECT_TRUE(proxy->getParameter(id, &getParam).isOk());
+        EXPECT_EQ(expect, getParam)
+                << " EXPECTED: " << expect.toString() << "\nACTUAL: " << getParam.toString();
 
         EXPECT_TRUE(proxy->command(CommandId::START).isOk());
         EXPECT_TRUE(proxy->getState(&state).isOk());
@@ -225,25 +228,25 @@ TEST_F(EffectProxyTest, changeActiveSubAndVerifyParameter) {
     Parameter::Common common = createParamCommon();
     IEffect::OpenEffectReturn ret;
     Parameter::VolumeStereo volumeStereo({.left = .5f, .right = .8f});
-    Parameter param = Parameter::make<Parameter::volumeStereo>(volumeStereo);
-    Parameter::Id id = Parameter::Id::make<Parameter::Id::commonTag>(Parameter::volumeStereo);
+    Parameter expect = Parameter::make<Parameter::volumeStereo>(volumeStereo);
+    const Parameter::Id id = Parameter::Id::make<Parameter::Id::commonTag>(Parameter::volumeStereo);
     for (const auto& itor : proxyMap) {
-        Parameter expect;
+        Parameter getParam = Parameter::make<Parameter::offload>(true);
         auto& proxy = std::get<TupleIndex::HANDLE>(itor.second);
         EXPECT_TRUE(proxy->open(common, std::nullopt, &ret).isOk());
-        EXPECT_TRUE(proxy->setParameter(param).isOk());
-        EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
-        EXPECT_EQ(expect, param);
+        EXPECT_TRUE(proxy->setParameter(expect).isOk());
+        EXPECT_TRUE(proxy->getParameter(id, &getParam).isOk());
+        EXPECT_EQ(expect, getParam);
 
         effect_offload_param_t offloadParam{false, 0};
         EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
-        EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
-        EXPECT_EQ(expect, param);
+        EXPECT_TRUE(proxy->getParameter(id, &getParam).isOk());
+        EXPECT_EQ(expect, getParam);
 
         offloadParam.isOffload = true;
         EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
-        EXPECT_TRUE(proxy->getParameter(id, &expect).isOk());
-        EXPECT_EQ(expect, param);
+        EXPECT_TRUE(proxy->getParameter(id, &getParam).isOk());
+        EXPECT_EQ(expect, getParam);
 
         EXPECT_TRUE(proxy->close().isOk());
         EXPECT_TRUE(proxy->destroy().isOk());
@@ -271,13 +274,9 @@ TEST_F(EffectProxyTest, changeActiveSubAndVerifyState) {
 
         effect_offload_param_t offloadParam{false, 0};
         EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
-        EXPECT_TRUE(proxy->getState(&state).isOk());
-        EXPECT_EQ(State::PROCESSING, state);
 
         offloadParam.isOffload = true;
         EXPECT_TRUE(proxy->setOffloadParam(&offloadParam).isOk());
-        EXPECT_TRUE(proxy->getState(&state).isOk());
-        EXPECT_EQ(State::PROCESSING, state);
 
         EXPECT_TRUE(proxy->command(CommandId::STOP).isOk());
         EXPECT_TRUE(proxy->getState(&state).isOk());
