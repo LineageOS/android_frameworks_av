@@ -92,9 +92,7 @@ ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* of
                                                                 "noActiveEffctFound");
     }
 
-    const size_t newIndex = std::distance(mSubEffects.begin(), itor);
-    mActiveSubIdx = newIndex;
-
+    mActiveSubIdx = std::distance(mSubEffects.begin(), itor);
     ALOGI("%s: active %soffload sub-effect %zu descriptor: %s", __func__,
           offload->isOffload ? "" : "non-", mActiveSubIdx,
           ::android::audio::utils::toString(mSubEffects[mActiveSubIdx].descriptor.common.id.uuid)
