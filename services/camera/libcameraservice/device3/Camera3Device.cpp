@@ -4014,8 +4014,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 sp<Camera3Device> parent = mParent.promote();
                 if (parent != nullptr) {
                     const std::string& streamCameraId = outputStream->getPhysicalCameraId();
+                    // Consider the case where clients are sending a single logical camera request
+                    // to physical output/outputs
+                    bool singleRequest = captureRequest->mSettingsList.size() == 1;
                     for (const auto& settings : captureRequest->mSettingsList) {
-                        if ((streamCameraId.empty() &&
+                        if (((streamCameraId.empty() || singleRequest) &&
                                 parent->getId() == settings.cameraId) ||
                                 streamCameraId == settings.cameraId) {
                             outputStream->fireBufferRequestForFrameNumber(
