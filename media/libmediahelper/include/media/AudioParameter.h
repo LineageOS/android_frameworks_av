@@ -69,6 +69,22 @@ public:
     static const char * const keyBtHfpSamplingRate;
     static const char * const keyBtHfpVolume;
 
+#ifndef __ANDROID_VNDK__
+    // These static fields are not used by vendor code, they were added to make
+    // the framework code consistent. There is no plan to expose them to vendors
+    // because they were used by HIDL get/setParameters interface which does not
+    // exist in the AIDL HAL interface.
+    static const char * const keyTtyMode;
+    static const char * const valueTtyModeOff;
+    static const char * const valueTtyModeFull;
+    static const char * const valueTtyModeHco;
+    static const char * const valueTtyModeVco;
+
+    static const char * const keyHacSetting;
+    static const char * const valueHacOff;
+    static const char * const valueHacOn;
+#endif  // __ANDROID_VNDK__
+
     //  keyHwAvSync: get HW synchronization source identifier from a device
     //  keyMonoOutput: Enable mono audio playback
     //  keyStreamHwAvSync: set HW synchronization source identifier on a stream
