@@ -526,6 +526,7 @@ protected:
 
         /**
          * @brief setOutputDevices change the route of the specified output.
+         * @param caller of the method
          * @param outputDesc to be considered
          * @param device to be considered to route the output
          * @param force if true, force the routing even if no change.
@@ -539,7 +540,8 @@ protected:
          * @return the number of ms we have slept to allow new routing to take effect in certain
          *        cases.
          */
-        uint32_t setOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,
+        uint32_t setOutputDevices(const char *caller,
+                                  const sp<SwAudioOutputDescriptor>& outputDesc,
                                   const DeviceVector &device,
                                   bool force = false,
                                   int delayMs = 0,

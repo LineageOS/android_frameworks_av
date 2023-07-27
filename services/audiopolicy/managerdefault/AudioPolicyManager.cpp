@@ -337,7 +337,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                     outputsToReopenWithDevices.emplace(mOutputs.keyAt(i), newDevices);
                     continue;
                 }
-                setOutputDevices(desc, newDevices, force, 0);
+                setOutputDevices(__func__, desc, newDevices, force, 0);
             }
             if (!desc->isDuplicated() && desc->mProfile->hasDynamicAudioProfile() &&
                     !activeMediaDevices.empty() && desc->devices() != activeMediaDevices &&
@@ -728,7 +728,7 @@ status_t AudioPolicyManager::updateCallRoutingInternal(
     // Use legacy routing method for voice calls via setOutputDevice() on primary output.
     // Otherwise, create two audio patches for TX and RX path.
     if (!createRxPatch) {
-        muteWaitMs = setOutputDevices(mPrimaryOutput, rxDevices, true, delayMs);
+        muteWaitMs = setOutputDevices(__func__, mPrimaryOutput, rxDevices, true, delayMs);
     } else { // create RX path audio patch
         connectTelephonyRxAudioSource();
         // If the TX device is on the primary HW module but RX device is
@@ -888,7 +888,7 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
                 disconnectTelephonyAudioSource(mCallRxSourceClient);
                 disconnectTelephonyAudioSource(mCallTxSourceClient);
             }
-            setOutputDevices(mPrimaryOutput, rxDevices, force, 0);
+            setOutputDevices(__func__, mPrimaryOutput, rxDevices, force, 0);
         }
     }
 
@@ -906,7 +906,7 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
                 outputsToReopen.emplace(mOutputs.keyAt(i), newDevices);
                 continue;
             }
-            setOutputDevices(desc, newDevices, forceRouting, 0 /*delayMs*/, nullptr,
+            setOutputDevices(__func__, desc, newDevices, forceRouting, 0 /*delayMs*/, nullptr,
                              true /*requiresMuteCheck*/, !forceRouting /*requiresVolumeCheck*/);
         }
     }
@@ -2339,7 +2339,8 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
             return DEAD_OBJECT;
         }
         const uint32_t muteWaitMs =
-                setOutputDevices(outputDesc, devices, force, 0, nullptr, requiresMuteCheck);
+                setOutputDevices(__func__, outputDesc, devices, force, 0, nullptr,
+                                 requiresMuteCheck);
 
         // apply volume rules for current stream and device if necessary
         auto &curves = getVolumeCurves(client->attributes());
@@ -2422,7 +2423,7 @@ void AudioPolicyManager::checkLeBroadcastRoutes(bool wasUnicastActive,
                     outputsToReopen.emplace(mOutputs.keyAt(i), newDevices);
                     continue;
                 }
-                setOutputDevices(desc, newDevices, force, delayMs);
+                setOutputDevices(__func__, desc, newDevices, force, delayMs);
                 // re-apply device specific volume if not done by setOutputDevice()
                 if (!force) {
                     applyStreamVolumes(desc, newDevices.types(), delayMs);
@@ -2524,7 +2525,7 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
             // still contain data that needs to be drained. The latency only covers the audio HAL
             // and kernel buffers. Also the latency does not always include additional delay in the
             // audio path (audio DSP, CODEC ...)
-            setOutputDevices(outputDesc, newDevices, false, outputDesc->latency()*2,
+            setOutputDevices(__func__, outputDesc, newDevices, false, outputDesc->latency()*2,
                              nullptr, true /*requiresMuteCheck*/, requiresVolumeCheck);
 
             // force restoring the device selection on other active outputs if it differs from the
@@ -2547,7 +2548,7 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
                         outputsToReopen.emplace(mOutputs.keyAt(i), newDevices2);
                         continue;
                     }
-                    setOutputDevices(desc, newDevices2, force, delayMs);
+                    setOutputDevices(__func__, desc, newDevices2, force, delayMs);
 
                     // re-apply device specific volume if not done by setOutputDevice()
                     if (!force) {
@@ -3951,8 +3952,9 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
                 outputsToReopen.emplace(mOutputs.keyAt(i), newDevices);
                 continue;
             }
-            waitMs = setOutputDevices(outputDesc, newDevices, forceRouting, delayMs, nullptr,
-                                      !skipDelays /*requiresMuteCheck*/,
+
+            waitMs = setOutputDevices(__func__, outputDesc, newDevices, forceRouting, delayMs,
+                                       nullptr, !skipDelays /*requiresMuteCheck*/,
                                       !forceRouting /*requiresVolumeCheck*/, skipDelays);
             // Only apply special touch sound delay once
             delayMs = 0;
@@ -4939,7 +4941,7 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
         // TODO: reconfigure output format and channels here
         ALOGV("%s setting device %s on output %d",
               __func__, dumpDeviceTypes(devices.types()).c_str(), outputDesc->mIoHandle);
-        setOutputDevices(outputDesc, devices, true, 0, handle);
+        setOutputDevices(__func__, outputDesc, devices, true, 0, handle);
         index = mAudioPatches.indexOfKey(*handle);
         if (index >= 0) {
             if (patchDesc != 0 && patchDesc != mAudioPatches.valueAt(index)) {
@@ -5198,7 +5200,7 @@ status_t AudioPolicyManager::releaseAudioPatchInternal(audio_patch_handle_t hand
             return BAD_VALUE;
         }
 
-        setOutputDevices(outputDesc,
+        setOutputDevices(__func__, outputDesc,
                          getNewOutputDevices(outputDesc, true /*fromCache*/),
                          true,
                          0,
@@ -5252,7 +5254,7 @@ status_t AudioPolicyManager::releaseAudioPatchInternal(audio_patch_handle_t hand
             //      3 / Inactive Output previously hosting SwBridge that can be closed.
             bool updateDevice = outputDesc->isActive() || !sourceDesc->useSwBridge() ||
                     sourceDesc->canCloseOutput();
-            setOutputDevices(outputDesc,
+            setOutputDevices(__func__, outputDesc,
                              updateDevice ? getNewOutputDevices(outputDesc, true /*fromCache*/) :
                                             outputDesc->devices(),
                              force,
@@ -5389,7 +5391,7 @@ void AudioPolicyManager::checkStrategyRoute(product_strategy_t ps, audio_io_hand
                 outputsToReopen.emplace(mOutputs.keyAt(j), newDevices);
                 continue;
             }
-            setOutputDevices(outputDesc, newDevices, false);
+            setOutputDevices(__func__, outputDesc, newDevices, false);
         }
     }
     reopenOutputsWithDevices(outputsToReopen);
@@ -6267,7 +6269,7 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                 outputDesc->close();
             } else {
                 addOutput(output, outputDesc);
-                setOutputDevices(outputDesc,
+                setOutputDevices(__func__, outputDesc,
                                  DeviceVector(supportedDevice),
                                  true,
                                  0,
@@ -6467,8 +6469,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                 if (device_distinguishes_on_address(deviceType)) {
                     ALOGV("checkOutputsForDevice(): setOutputDevices %s",
                             device->toString().c_str());
-                    setOutputDevices(desc, DeviceVector(device), true/*force*/, 0/*delay*/,
-                                     NULL/*patch handle*/);
+                    setOutputDevices(__func__, desc, DeviceVector(device), true/*force*/,
+                                      0/*delay*/, NULL/*patch handle*/);
                 }
                 ALOGV("checkOutputsForDevice(): adding output %d", output);
             }
@@ -7351,7 +7353,7 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
                 if (!desc->supportedDevices().containsAtLeastOne(outputDesc->supportedDevices())) {
                     continue;
                 }
-                ALOGVV("%s() %s (curDevice %s)", __func__,
+                ALOGVV("%s() output %s %s (curDevice %s)", __func__, desc->info().c_str(),
                       mute ? "muting" : "unmuting", curDevices.toString().c_str());
                 setStrategyMute(productStrategy, mute, desc, mute ? 0 : delayMs);
                 if (desc->isStrategyActive(productStrategy)) {
@@ -7404,7 +7406,8 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
     return 0;
 }
 
-uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,
+uint32_t AudioPolicyManager::setOutputDevices(const char *caller,
+                                              const sp<SwAudioOutputDescriptor>& outputDesc,
                                               const DeviceVector &devices,
                                               bool force,
                                               int delayMs,
@@ -7413,13 +7416,15 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
                                               bool skipMuteDelay)
 {
     // TODO(b/262404095): Consider if the output need to be reopened.
-    ALOGV("%s device %s delayMs %d", __func__, devices.toString().c_str(), delayMs);
+    std::string logPrefix = std::string("caller ") + caller + outputDesc->info();
+    ALOGV("%s %s device %s delayMs %d", __func__, logPrefix.c_str(),
+          devices.toString().c_str(), delayMs);
     uint32_t muteWaitMs;
 
     if (outputDesc->isDuplicated()) {
-        muteWaitMs = setOutputDevices(outputDesc->subOutput1(), devices, force, delayMs,
+        muteWaitMs = setOutputDevices(__func__, outputDesc->subOutput1(), devices, force, delayMs,
                 nullptr /* patchHandle */, requiresMuteCheck, skipMuteDelay);
-        muteWaitMs += setOutputDevices(outputDesc->subOutput2(), devices, force, delayMs,
+        muteWaitMs += setOutputDevices(__func__, outputDesc->subOutput2(), devices, force, delayMs,
                 nullptr /* patchHandle */, requiresMuteCheck, skipMuteDelay);
         return muteWaitMs;
     }
@@ -7429,7 +7434,8 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     DeviceVector prevDevices = outputDesc->devices();
     DeviceVector availPrevDevices = mAvailableOutputDevices.filter(prevDevices);
 
-    ALOGV("setOutputDevices() prevDevice %s", prevDevices.toString().c_str());
+    ALOGV("%s %s prevDevice %s", __func__, logPrefix.c_str(),
+          prevDevices.toString().c_str());
 
     if (!filteredDevices.isEmpty()) {
         outputDesc->setDevices(filteredDevices);
@@ -7439,7 +7445,8 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     if (requiresMuteCheck) {
         muteWaitMs = checkDeviceMuteStrategies(outputDesc, prevDevices, delayMs);
     } else {
-        ALOGV("%s: suppressing checkDeviceMuteStrategies", __func__);
+        ALOGV("%s: %s suppressing checkDeviceMuteStrategies", __func__,
+              logPrefix.c_str());
         muteWaitMs = 0;
     }
 
@@ -7449,7 +7456,8 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     // output profile or if new device is not supported AND previous device(s) is(are) still
     // available (otherwise reset device must be done on the output)
     if (!devices.isEmpty() && filteredDevices.isEmpty() && !availPrevDevices.empty()) {
-        ALOGV("%s: unsupported device %s for output", __func__, devices.toString().c_str());
+        ALOGV("%s: %s unsupported device %s for output", __func__, logPrefix.c_str(),
+              devices.toString().c_str());
         // restore previous device after evaluating strategy mute state
         outputDesc->setDevices(prevDevices);
         return muteWaitMs;
@@ -7462,16 +7470,19 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     //  AND the output is connected by a valid audio patch.
     // Doing this check here allows the caller to call setOutputDevices() without conditions
     if ((filteredDevices.isEmpty() || filteredDevices == prevDevices) && !force && outputRouted) {
-        ALOGV("%s setting same device %s or null device, force=%d, patch handle=%d", __func__,
-              filteredDevices.toString().c_str(), force, outputDesc->getPatchHandle());
+        ALOGV("%s %s setting same device %s or null device, force=%d, patch handle=%d",
+              __func__, logPrefix.c_str(), filteredDevices.toString().c_str(), force,
+              outputDesc->getPatchHandle());
         if (requiresVolumeCheck && !filteredDevices.isEmpty()) {
-            ALOGV("%s setting same device on routed output, force apply volumes", __func__);
+            ALOGV("%s %s setting same device on routed output, force apply volumes",
+                  __func__, logPrefix.c_str());
             applyStreamVolumes(outputDesc, filteredDevices.types(), delayMs, true /*force*/);
         }
         return muteWaitMs;
     }
 
-    ALOGV("%s changing device to %s", __func__, filteredDevices.toString().c_str());
+    ALOGV("%s %s changing device to %s", __func__, logPrefix.c_str(),
+          filteredDevices.toString().c_str());
 
     // do the routing
     if (filteredDevices.isEmpty() || mAvailableOutputDevices.filter(filteredDevices).empty()) {
