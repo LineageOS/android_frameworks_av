@@ -21,6 +21,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class FrameReleaseQueue {
     private static final String TAG = "FrameReleaseQueue";
@@ -28,7 +29,7 @@ public class FrameReleaseQueue {
     private MediaCodec mCodec;
     private LinkedBlockingQueue<FrameInfo> mFrameInfoQueue;
     private ReleaseThread mReleaseThread;
-    private boolean doFrameRelease = false;
+    private AtomicBoolean doFrameRelease = new AtomicBoolean(false);
     private boolean mRender = false;
     private int mWaitTime = 40; // milliseconds per frame
     private int mWaitTimeCorrection = 0;
@@ -49,19 +50,19 @@ public class FrameReleaseQueue {
 
     private class ReleaseThread extends Thread {
         public void run() {
-            int nextReleaseTime = 0;
+            long nextReleaseTime = 0;
             int loopCount = 0;
-            while (doFrameRelease || mFrameInfoQueue.size() > 0) {
+            while (doFrameRelease.get() || mFrameInfoQueue.size() > 0) {
                 FrameInfo curFrameInfo = mFrameInfoQueue.peek();
                 if (curFrameInfo == null) {
                     nextReleaseTime += mWaitTime;
                 } else {
-                    if (curFrameInfo.displayTime == 0) {
+                    if (firstReleaseTime == -1 || curFrameInfo.displayTime <= 0) {
                         // first frame of loop
                         firstReleaseTime = getCurSysTime();
                         nextReleaseTime = firstReleaseTime + mWaitTime;
                         popAndRelease(curFrameInfo, true);
-                    } else if (!doFrameRelease && mFrameInfoQueue.size() == 1) {
+                    } else if (!doFrameRelease.get() && mFrameInfoQueue.size() == 1) {
                         // EOS
                         Log.i(TAG, "EOS");
                         popAndRelease(curFrameInfo, false);
@@ -83,12 +84,13 @@ public class FrameReleaseQueue {
                         }
                         if (curFrameInfo != null && curFrameInfo.displayTime > curMediaTime) {
                             if ((curFrameInfo.displayTime - curMediaTime) < THRESHOLD_TIME) {
+                                // release the frame now as we are already there
                                 popAndRelease(curFrameInfo, true);
                             }
                         }
                     }
                 }
-                int sleepTime = nextReleaseTime - getCurSysTime();
+                long sleepTime = nextReleaseTime - getCurSysTime();
                 if (sleepTime > 0) {
                     try {
                         mReleaseThread.sleep(sleepTime);
@@ -109,7 +111,7 @@ public class FrameReleaseQueue {
     public FrameReleaseQueue(boolean render, int frameRate) {
         this.mFrameInfoQueue = new LinkedBlockingQueue();
         this.mReleaseThread = new ReleaseThread();
-        this.doFrameRelease = true;
+        this.doFrameRelease.set(true);
         this.mRender = render;
         this.mWaitTime = 1000 / frameRate; // wait time in milliseconds per frame
         int waitTimeRemainder = 1000 % frameRate;
@@ -163,7 +165,7 @@ public class FrameReleaseQueue {
     }
 
     public void stopFrameRelease() {
-        doFrameRelease = false;
+        doFrameRelease.set(false);
         try {
             mReleaseThread.join();
             Log.i(TAG, "Joined frame release thread");

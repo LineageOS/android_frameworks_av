@@ -322,7 +322,7 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
             ByteBuffer inputCodecBuffer = mediaCodec.getInputBuffer(inputBufferId);
             BufferInfo bufInfo;
             if (mNumInFramesProvided >= mNumInFramesRequired) {
-                Log.i(TAG, "Input frame limit reached");
+                Log.i(TAG, "Input frame limit reached provided: " + mNumInFramesProvided);
                 mIndex = mInputBufferInfo.size() - 1;
                 bufInfo = mInputBufferInfo.get(mIndex);
                 if ((bufInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) == 0) {
