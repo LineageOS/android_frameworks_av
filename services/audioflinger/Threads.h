@@ -916,7 +916,8 @@ public:
                                 audio_port_handle_t portId,
                                 const sp<media::IAudioTrackCallback>& callback,
                                 bool isSpatialized,
-                                bool isBitPerfect) final;
+                                bool isBitPerfect,
+                                audio_output_flags_t* afTrackFlags) final;
 
     bool isTrackActive(const sp<IAfTrack>& track) const final {
         return mActiveTracks.indexOf(track) >= 0;

@@ -2299,7 +2299,8 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
         audio_port_handle_t portId,
         const sp<media::IAudioTrackCallback>& callback,
         bool isSpatialized,
-        bool isBitPerfect)
+        bool isBitPerfect,
+        audio_output_flags_t *afTrackFlags)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -2617,6 +2618,7 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
         if (mType == DIRECT) {
             trackFlags = static_cast<audio_output_flags_t>(trackFlags | AUDIO_OUTPUT_FLAG_DIRECT);
         }
+        *afTrackFlags = trackFlags;
 
         track = IAfTrack::create(this, client, streamType, attr, sampleRate, format,
                           channelMask, frameCount,

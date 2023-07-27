@@ -43,6 +43,7 @@ parcelable CreateTrackResponse {
     AudioChannelLayout afChannelMask;
     AudioFormatDescription afFormat;
     int afLatencyMs;
+    int afTrackFlags;
     /** Interpreted as audio_io_handle_t. */
     int outputId;
     /** Interpreted as audio_port_handle_t. */
