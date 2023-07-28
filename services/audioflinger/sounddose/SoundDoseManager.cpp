@@ -299,6 +299,25 @@ binder::Status SoundDoseManager::SoundDose::setCsdEnabled(bool enabled) {
     return binder::Status::ok();
 }
 
+binder::Status SoundDoseManager::SoundDose::initCachedAudioDeviceCategories(
+        const std::vector<media::ISoundDose::AudioDeviceCategory>& btDeviceCategories) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->initCachedAudioDeviceCategories(btDeviceCategories);
+    }
+    return binder::Status::ok();
+}
+binder::Status SoundDoseManager::SoundDose::setAudioDeviceCategory(
+        const media::ISoundDose::AudioDeviceCategory& btAudioDevice) {
+    ALOGV("%s", __func__);
+    auto soundDoseManager = mSoundDoseManager.promote();
+    if (soundDoseManager != nullptr) {
+        soundDoseManager->setAudioDeviceCategory(btAudioDevice);
+    }
+    return binder::Status::ok();
+}
+
 binder::Status SoundDoseManager::SoundDose::getOutputRs2UpperBound(float* value) {
     ALOGV("%s", __func__);
     auto soundDoseManager = mSoundDoseManager.promote();
@@ -356,7 +375,9 @@ void SoundDoseManager::updateAttenuation(float attenuationDB, audio_devices_t de
         auto melProcessor = mp.second.promote();
         if (melProcessor != nullptr) {
             auto deviceId = melProcessor->getDeviceId();
-            if (mActiveDeviceTypes[deviceId] == deviceType) {
+            const auto deviceTypeIt = mActiveDeviceTypes.find(deviceId);
+            if (deviceTypeIt != mActiveDeviceTypes.end() &&
+                deviceTypeIt->second == deviceType) {
                 ALOGV("%s: set attenuation for deviceId %d to %f",
                         __func__, deviceId, attenuationDB);
                 melProcessor->setAttenuation(attenuationDB);
@@ -386,6 +407,103 @@ void SoundDoseManager::setCsdEnabled(bool enabled) {
 bool SoundDoseManager::isCsdEnabled() {
     std::lock_guard _l(mLock);
     return mEnabledCsd;
+}
+
+void SoundDoseManager::initCachedAudioDeviceCategories(
+        const std::vector<media::ISoundDose::AudioDeviceCategory>& deviceCategories) {
+    ALOGV("%s", __func__);
+    {
+        const std::lock_guard _l(mLock);
+        mBluetoothDevicesWithCsd.clear();
+    }
+    for (const auto& btDeviceCategory : deviceCategories) {
+        setAudioDeviceCategory(btDeviceCategory);
+    }
+}
+
+void SoundDoseManager::setAudioDeviceCategory(
+        const media::ISoundDose::AudioDeviceCategory& audioDevice) {
+    ALOGV("%s: set BT audio device type with address %s to headphone %d", __func__,
+          audioDevice.address.c_str(), audioDevice.csdCompatible);
+
+    std::vector<audio_port_handle_t> devicesToStart;
+    std::vector<audio_port_handle_t> devicesToStop;
+    {
+        const std::lock_guard _l(mLock);
+        const auto deviceIt = mBluetoothDevicesWithCsd.find(
+                std::make_pair(audioDevice.address,
+                               static_cast<audio_devices_t>(audioDevice.internalAudioType)));
+        if (deviceIt != mBluetoothDevicesWithCsd.end()) {
+            deviceIt->second = audioDevice.csdCompatible;
+        } else {
+            mBluetoothDevicesWithCsd.emplace(
+                    std::make_pair(audioDevice.address,
+                                   static_cast<audio_devices_t>(audioDevice.internalAudioType)),
+                    audioDevice.csdCompatible);
+        }
+
+        for (const auto &activeDevice: mActiveDevices) {
+            if (activeDevice.first.address() == audioDevice.address &&
+                activeDevice.first.mType ==
+                static_cast<audio_devices_t>(audioDevice.internalAudioType)) {
+                if (audioDevice.csdCompatible) {
+                    devicesToStart.push_back(activeDevice.second);
+                } else {
+                    devicesToStop.push_back(activeDevice.second);
+                }
+            }
+        }
+    }
+
+    for (const auto& deviceToStart : devicesToStart) {
+        mMelReporterCallback->startMelComputationForDeviceId(deviceToStart);
+    }
+    for (const auto& deviceToStop : devicesToStop) {
+        mMelReporterCallback->stopMelComputationForDeviceId(deviceToStop);
+    }
+}
+
+bool SoundDoseManager::shouldComputeCsdForDeviceType(audio_devices_t device) {
+    if (!isCsdEnabled()) {
+        ALOGV("%s csd is disabled", __func__);
+        return false;
+    }
+    if (forceComputeCsdOnAllDevices()) {
+        return true;
+    }
+
+    switch (device) {
+        case AUDIO_DEVICE_OUT_WIRED_HEADSET:
+        case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
+        // TODO(b/278265907): enable A2DP when we can distinguish A2DP headsets
+        // case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
+        case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
+        case AUDIO_DEVICE_OUT_USB_HEADSET:
+        case AUDIO_DEVICE_OUT_BLE_HEADSET:
+        case AUDIO_DEVICE_OUT_BLE_BROADCAST:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool SoundDoseManager::shouldComputeCsdForDeviceWithAddress(const audio_devices_t type,
+                                                            const std::string& deviceAddress) {
+    if (!isCsdEnabled()) {
+        ALOGV("%s csd is disabled", __func__);
+        return false;
+    }
+    if (forceComputeCsdOnAllDevices()) {
+        return true;
+    }
+
+    if (!audio_is_ble_out_device(type) && !audio_is_a2dp_device(type)) {
+        return shouldComputeCsdForDeviceType(type);
+    }
+
+    const std::lock_guard _l(mLock);
+    const auto deviceIt = mBluetoothDevicesWithCsd.find(std::make_pair(deviceAddress, type));
+    return deviceIt != mBluetoothDevicesWithCsd.end() && deviceIt->second;
 }
 
 void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
