@@ -2137,7 +2137,7 @@ void CCodec::signalResume() {
     }
 
     std::map<size_t, sp<MediaCodecBuffer>> clientInputBuffers;
-    status_t err = mChannel->prepareInitialInputBuffers(&clientInputBuffers);
+    status_t err = mChannel->prepareInitialInputBuffers(&clientInputBuffers, true);
     if (err != OK) {
         if (err == NO_MEMORY) {
             // NO_MEMORY happens here when all the buffers are still
@@ -2160,7 +2160,6 @@ void CCodec::signalResume() {
         const std::unique_ptr<Config> &config = *configLocked;
         return config->mBuffersBoundToCodec;
     }());
-
     {
         Mutexed<State>::Locked state(mState);
         if (state->get() != RESUMING) {

@@ -140,7 +140,8 @@ public:
      *                                  initial input buffers.
      */
     status_t prepareInitialInputBuffers(
-            std::map<size_t, sp<MediaCodecBuffer>> *clientInputBuffers);
+            std::map<size_t, sp<MediaCodecBuffer>> *clientInputBuffers,
+            bool retry = false);
 
     /**
      * Request initial input buffers as prepared in clientInputBuffers.
