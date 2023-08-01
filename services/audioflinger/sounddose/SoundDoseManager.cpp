@@ -497,8 +497,7 @@ bool SoundDoseManager::shouldComputeCsdForDeviceType(audio_devices_t device) {
     switch (device) {
         case AUDIO_DEVICE_OUT_WIRED_HEADSET:
         case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
-        // TODO(b/278265907): enable A2DP when we can distinguish A2DP headsets
-        // case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
+        case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
         case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
         case AUDIO_DEVICE_OUT_USB_HEADSET:
         case AUDIO_DEVICE_OUT_BLE_HEADSET:
