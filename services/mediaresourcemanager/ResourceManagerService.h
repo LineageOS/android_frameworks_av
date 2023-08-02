@@ -22,15 +22,13 @@
 #include <set>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include <aidl/android/media/BnResourceManagerService.h>
-#include <arpa/inet.h>
 #include <media/MediaResource.h>
 #include <utils/Errors.h>
-#include <utils/KeyedVector.h>
 #include <utils/String8.h>
 #include <utils/threads.h>
-#include <utils/Vector.h>
 
 namespace android {
 
@@ -66,9 +64,8 @@ struct ResourceInfo {
 // vector of <PID, UID>
 typedef std::vector<std::pair<int32_t, uid_t>> PidUidVector;
 
-// TODO: convert these to std::map
-typedef KeyedVector<int64_t, ResourceInfo> ResourceInfos;
-typedef KeyedVector<int, ResourceInfos> PidResourceInfosMap;
+typedef std::map<int64_t, ResourceInfo> ResourceInfos;
+typedef std::map<int, ResourceInfos> PidResourceInfosMap;
 
 class ResourceManagerService : public BnResourceManagerService {
 public:
@@ -136,14 +133,15 @@ private:
 
     // Reclaims resources from |clients|. Returns true if reclaim succeeded
     // for all clients.
-    bool reclaimUnconditionallyFrom(const Vector<std::shared_ptr<IResourceManagerClient>> &clients);
+    bool reclaimUnconditionallyFrom(
+        const std::vector<std::shared_ptr<IResourceManagerClient>>& clients);
 
     // Gets the list of all the clients who own the specified resource type.
     // Returns false if any client belongs to a process with higher priority than the
     // calling process. The clients will remain unchanged if returns false.
     bool getAllClients_l(int callingPid, MediaResource::Type type, MediaResource::SubType subType,
             PidUidVector* idList,
-            Vector<std::shared_ptr<IResourceManagerClient>> *clients);
+            std::vector<std::shared_ptr<IResourceManagerClient>>* clients);
 
     // Gets the client who owns specified resource type from lowest possible priority process.
     // Returns false if the calling process priority is not higher than the lowest process
@@ -174,7 +172,7 @@ private:
     // the result client to the given Vector.
     void getClientForResource_l(int callingPid, const MediaResourceParcel *res,
             PidUidVector* idList,
-            Vector<std::shared_ptr<IResourceManagerClient>> *clients);
+            std::vector<std::shared_ptr<IResourceManagerClient>>* clients);
 
     void onFirstAdded(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
     void onLastRemoved(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
@@ -194,7 +192,7 @@ private:
                                  uintptr_t cookie);
 
     void pushReclaimAtom(const ClientInfoParcel& clientInfo,
-                         const Vector<std::shared_ptr<IResourceManagerClient>>& clients,
+                         const std::vector<std::shared_ptr<IResourceManagerClient>>& clients,
                          const PidUidVector& idList, bool reclaimed);
 
     // Get the peak concurrent pixel count (associated with the video codecs) for the process.
@@ -202,7 +200,7 @@ private:
     // Get the current concurrent pixel count (associated with the video codecs) for the process.
     long getCurrentConcurrentPixelCount(int pid) const;
 
-    mutable Mutex mLock;
+    mutable std::mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
     sp<SystemCallbackInterface> mSystemCB;
     sp<ServiceLog> mServiceLog;
