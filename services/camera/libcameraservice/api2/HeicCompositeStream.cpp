@@ -451,15 +451,27 @@ void HeicCompositeStream::onHeicFormatChanged(sp<AMessage>& newFormat) {
         newFormat->setString(KEY_MIME, mimeHeic);
         newFormat->setInt32(KEY_WIDTH, mOutputWidth);
         newFormat->setInt32(KEY_HEIGHT, mOutputHeight);
-        if (mUseGrid) {
+    }
+
+    if (mUseGrid || mUseHeic) {
+        int32_t gridRows, gridCols, tileWidth, tileHeight;
+        if (newFormat->findInt32(KEY_GRID_ROWS, &gridRows) &&
+                newFormat->findInt32(KEY_GRID_COLUMNS, &gridCols) &&
+                newFormat->findInt32(KEY_TILE_WIDTH, &tileWidth) &&
+                newFormat->findInt32(KEY_TILE_HEIGHT, &tileHeight)) {
+            mGridWidth = tileWidth;
+            mGridHeight = tileHeight;
+            mGridRows = gridRows;
+            mGridCols = gridCols;
+        } else {
             newFormat->setInt32(KEY_TILE_WIDTH, mGridWidth);
             newFormat->setInt32(KEY_TILE_HEIGHT, mGridHeight);
             newFormat->setInt32(KEY_GRID_ROWS, mGridRows);
             newFormat->setInt32(KEY_GRID_COLUMNS, mGridCols);
-            int32_t left, top, right, bottom;
-            if (newFormat->findRect("crop", &left, &top, &right, &bottom)) {
-                newFormat->setRect("crop", 0, 0, mOutputWidth - 1, mOutputHeight - 1);
-            }
+        }
+        int32_t left, top, right, bottom;
+        if (newFormat->findRect("crop", &left, &top, &right, &bottom)) {
+            newFormat->setRect("crop", 0, 0, mOutputWidth - 1, mOutputHeight - 1);
         }
     }
     newFormat->setInt32(KEY_IS_DEFAULT, 1 /*isPrimary*/);
