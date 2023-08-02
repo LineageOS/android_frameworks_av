@@ -56,6 +56,7 @@ using ::aidl::android::aidl_utils::statusTFromBinderStatus;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::IEffect;
 using ::aidl::android::hardware::audio::effect::IFactory;
+using ::aidl::android::hardware::audio::effect::State;
 
 namespace android {
 namespace effect {
@@ -165,13 +166,20 @@ status_t EffectHalAidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer)
 
 // write to input FMQ here, wait for statusMQ STATUS_OK, and read from output FMQ
 status_t EffectHalAidl::process() {
+    State state = State::INIT;
+    if (mConversion->isBypassing() || !mEffect->getState(&state).isOk() ||
+        state != State::PROCESSING) {
+        ALOGI("%s skipping %s process because it's %s", __func__, mDesc.common.name.c_str(),
+              mConversion->isBypassing()
+                      ? "bypassing"
+                      : aidl::android::hardware::audio::effect::toString(state).c_str());
+        return OK;
+    }
+
     auto statusQ = mConversion->getStatusMQ();
     auto inputQ = mConversion->getInputMQ();
     auto outputQ = mConversion->getOutputMQ();
     auto efGroup = mConversion->getEventFlagGroup();
-    if (mConversion->isBypassing()) {
-        return OK;
-    }
     if (!statusQ || !statusQ->isValid() || !inputQ || !inputQ->isValid() || !outputQ ||
         !outputQ->isValid() || !efGroup) {
         ALOGE("%s invalid FMQ [Status %d I %d O %d] efGroup %p", __func__,
