@@ -166,11 +166,6 @@ cc_library_shared {
     include_dirs: [
         "system/media/private/camera/include",
     ],
-    product_variables: {
-        pdk: {
-            enabled: false,
-        },
-    },
 }
 
 cc_test {

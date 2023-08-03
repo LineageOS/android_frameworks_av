@@ -161,11 +161,6 @@ cc_library_shared {
         "libgui",
     ],
 
-    product_variables: {
-        pdk: {
-            enabled: false,
-        },
-    },
     version_script: "libmediandk.map.txt",
     stubs: {
         symbol_file: "libmediandk.map.txt",
