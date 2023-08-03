@@ -398,7 +398,8 @@ public:
             audio_port_handle_t portId,
             const sp<media::IAudioTrackCallback>& callback,
             bool isSpatialized,
-            bool isBitPerfect) = 0;
+            bool isBitPerfect,
+            audio_output_flags_t* afTrackFlags) = 0;
 
     virtual status_t addTrack_l(const sp<IAfTrack>& track) = 0;
     virtual bool destroyTrack_l(const sp<IAfTrack>& track) = 0;

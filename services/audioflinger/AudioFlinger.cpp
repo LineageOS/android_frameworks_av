@@ -1096,7 +1096,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
                                       input.sharedBuffer, sessionId, &output.flags,
                                       callingPid, adjAttributionSource, input.clientInfo.clientTid,
                                       &lStatus, portId, input.audioTrackCallback, isSpatialized,
-                                      isBitPerfect);
+                                      isBitPerfect, &output.afTrackFlags);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
 

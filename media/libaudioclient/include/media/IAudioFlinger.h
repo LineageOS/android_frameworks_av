@@ -119,6 +119,7 @@ public:
         uint32_t afLatencyMs;
         audio_channel_mask_t afChannelMask;
         audio_format_t afFormat;
+        audio_output_flags_t afTrackFlags;
         audio_io_handle_t outputId;
         audio_port_handle_t portId;
         sp<media::IAudioTrack> audioTrack;
