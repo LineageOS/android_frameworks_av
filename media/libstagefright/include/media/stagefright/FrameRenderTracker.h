@@ -32,61 +32,59 @@ struct ANativeWindowBuffer;
 
 namespace android {
 
-// Tracks the render information about a frame. Frames go through several states while
-// the render information is tracked:
-//
-// 1. queued frame: mMediaTime and mGraphicBuffer are set for the frame. mFence is the
-// queue fence (read fence). mIndex is negative, and mRenderTimeNs is invalid.
-// Key characteristics: mFence is not NULL and mIndex is negative.
-//
-// 2. dequeued frame: mFence is updated with the dequeue fence (write fence). mIndex is set.
-// Key characteristics: mFence is not NULL and mIndex is non-negative. mRenderTime is still
-// invalid.
-//
-// 3. rendered frame or frame: mFence is cleared, mRenderTimeNs is set.
-// Key characteristics: mFence is NULL.
-//
-struct RenderedFrameInfo {
-    // set by client during onFrameQueued or onFrameRendered
-    int64_t getMediaTimeUs() const  { return mMediaTimeUs; }
-
-    // -1 if frame is not yet rendered
-    nsecs_t getRenderTimeNs() const { return mRenderTimeNs; }
-
-    // set by client during updateRenderInfoForDequeuedBuffer; -1 otherwise
-    ssize_t getIndex() const        { return mIndex; }
-
-    // creates information for a queued frame
-    RenderedFrameInfo(int64_t mediaTimeUs, const sp<GraphicBuffer> &graphicBuffer,
-            const sp<Fence> &fence)
-        : mMediaTimeUs(mediaTimeUs),
-          mRenderTimeNs(-1),
-          mIndex(-1),
-          mGraphicBuffer(graphicBuffer),
-          mFence(fence) {
-    }
-
-    // creates information for a frame rendered on a tunneled surface
-    RenderedFrameInfo(int64_t mediaTimeUs, nsecs_t renderTimeNs)
-        : mMediaTimeUs(mediaTimeUs),
-          mRenderTimeNs(renderTimeNs),
-          mIndex(-1),
-          mGraphicBuffer(NULL),
-          mFence(NULL) {
-    }
-
-private:
-    int64_t mMediaTimeUs;
-    nsecs_t mRenderTimeNs;
-    ssize_t mIndex;         // to be used by client
-    sp<GraphicBuffer> mGraphicBuffer;
-    sp<Fence> mFence;
-
-    friend struct FrameRenderTracker;
-};
-
 struct FrameRenderTracker {
-    typedef RenderedFrameInfo Info;
+    // Tracks the render information about a frame. Frames go through several states while
+    // the render information is tracked:
+    //
+    // 1. queued frame: mMediaTime and mGraphicBuffer are set for the frame. mFence is the
+    // queue fence (read fence). mIndex is negative, and mRenderTimeNs is invalid.
+    // Key characteristics: mFence is not NULL and mIndex is negative.
+    //
+    // 2. dequeued frame: mFence is updated with the dequeue fence (write fence). mIndex is set.
+    // Key characteristics: mFence is not NULL and mIndex is non-negative. mRenderTime is still
+    // invalid.
+    //
+    // 3. rendered frame or frame: mFence is cleared, mRenderTimeNs is set.
+    // Key characteristics: mFence is NULL.
+    //
+    struct Info {
+        // set by client during onFrameQueued or onFrameRendered
+        int64_t getMediaTimeUs() const  { return mMediaTimeUs; }
+
+        // -1 if frame is not yet rendered
+        nsecs_t getRenderTimeNs() const { return mRenderTimeNs; }
+
+        // set by client during updateRenderInfoForDequeuedBuffer; -1 otherwise
+        ssize_t getIndex() const        { return mIndex; }
+
+        // creates information for a queued frame
+        Info(int64_t mediaTimeUs, const sp<GraphicBuffer> &graphicBuffer,
+                const sp<Fence> &fence)
+          : mMediaTimeUs(mediaTimeUs),
+            mRenderTimeNs(-1),
+            mIndex(-1),
+            mGraphicBuffer(graphicBuffer),
+            mFence(fence) {
+        }
+
+        // creates information for a frame rendered on a tunneled surface
+        Info(int64_t mediaTimeUs, nsecs_t renderTimeNs)
+            : mMediaTimeUs(mediaTimeUs),
+            mRenderTimeNs(renderTimeNs),
+            mIndex(-1),
+            mGraphicBuffer(NULL),
+            mFence(NULL) {
+        }
+
+    private:
+        int64_t mMediaTimeUs;
+        nsecs_t mRenderTimeNs;
+        ssize_t mIndex;         // to be used by client
+        sp<GraphicBuffer> mGraphicBuffer;
+        sp<Fence> mFence;
+
+        friend struct FrameRenderTracker;
+    };
 
     FrameRenderTracker();
 
