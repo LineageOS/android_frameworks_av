@@ -41,7 +41,7 @@ class BufferChannelBase;
 struct BufferProducerWrapper;
 class MediaCodecBuffer;
 struct PersistentSurface;
-struct RenderedFrameInfo;
+class RenderedFrameInfo;
 class Surface;
 struct ICrypto;
 class IMemory;
