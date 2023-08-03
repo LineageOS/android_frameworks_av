@@ -58,7 +58,7 @@ private:
 
     sp<PlayAudioOpCallback> mOpCallback;
     // called by PlayAudioOpCallback when OP_PLAY_AUDIO is updated in AppOp callback
-    void checkPlayAudioForUsage();
+    void checkPlayAudioForUsage(bool doBroadcast);
 
     wp<IAfThreadBase> mThread;
     std::atomic_bool mHasOpPlayAudio;
