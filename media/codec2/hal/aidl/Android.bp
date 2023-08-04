@@ -1,0 +1,149 @@
+package {
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+// DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-aidl-client-defaults instead
+cc_library {
+    name: "libcodec2_aidl_client",
+
+    srcs: [
+        "ParamTypes.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_hal_common",
+        "libcodec2_internal", // private
+        "libgui_headers",
+    ],
+
+    shared_libs: [
+        "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.c2-V1-ndk",
+        "libbinder_ndk",
+        "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
+        "libcutils",
+        "liblog",
+        "libnativewindow",
+        "libutils",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
+        "libcodec2",
+    ],
+}
+
+// DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-hidl-defaults instead
+//cc_library {
+//    name: "libcodec2_hidl@1.0",
+//    vendor_available: true,
+//    min_sdk_version: "29",
+//    apex_available: [
+//        "//apex_available:platform",
+//        "com.android.media.swcodec",
+//    ],
+//
+//    defaults: ["hidl_defaults"],
+//
+//    srcs: [
+//        "Component.cpp",
+//        "ComponentInterface.cpp",
+//        "ComponentStore.cpp",
+//        "Configurable.cpp",
+//        "InputBufferManager.cpp",
+//        "InputSurface.cpp",
+//        "InputSurfaceConnection.cpp",
+//        "types.cpp",
+//    ],
+//
+//    header_libs: [
+//        "libbinder_headers",
+//        "libcodec2_hal_common",
+//        "libcodec2_internal", // private
+//        "libsystem_headers",
+//    ],
+//
+//    shared_libs: [
+//        "android.hardware.graphics.bufferqueue@1.0",
+//        "android.hardware.graphics.bufferqueue@2.0",
+//        "android.hardware.graphics.common@1.0",
+//        "android.hardware.media@1.0",
+//        "android.hardware.media.bufferpool@2.0",
+//        "android.hardware.media.c2@1.0",
+//        "android.hardware.media.omx@1.0",
+//        "libbase",
+//        "libcodec2",
+//        "libcodec2_vndk",
+//        "libcodec2_hidl_plugin_stub",
+//        "libcutils",
+//        "libhidlbase",
+//        "liblog",
+//        "libstagefright_bufferpool@2.0.1",
+//        "libstagefright_bufferqueue_helper_novndk",
+//        "libui",
+//        "libutils",
+//    ],
+//
+//    target: {
+//        vendor: {
+//            exclude_shared_libs: [
+//                "libstagefright_bufferqueue_helper_novndk",
+//                "libcodec2_hidl_plugin_stub",
+//            ],
+//            shared_libs: [
+//                "libstagefright_bufferqueue_helper",
+//                "libcodec2_hidl_plugin",
+//            ],
+//        },
+//        apex: {
+//            exclude_shared_libs: [
+//                "libcodec2_hidl_plugin",
+//                "libcodec2_hidl_plugin_stub",
+//            ],
+//        },
+//    },
+//
+//    export_include_dirs: [
+//        "include",
+//    ],
+//
+//    export_shared_lib_headers: [
+//        "android.hardware.media.c2@1.0",
+//        "libcodec2",
+//        "libcodec2_vndk",
+//        "libhidlbase",
+//        "libstagefright_bufferpool@2.0.1",
+//        "libui",
+//    ],
+//}
+//
+//// public dependency for Codec 2.0 HAL service implementations
+//cc_defaults {
+//    name: "libcodec2-hidl-defaults@1.0",
+//    defaults: ["libcodec2-impl-defaults"],
+//
+//    shared_libs: [
+//        "android.hardware.media.c2@1.0",
+//        "libcodec2_hidl@1.0",
+//    ],
+//}
+
+// public dependency for Codec 2.0 HAL client
+cc_defaults {
+    name: "libcodec2-aidl-client-defaults",
+    min_sdk_version: "34",
+    defaults: ["libcodec2-impl-defaults"],
+
+    shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
+        "libcodec2_aidl_client",
+    ],
+}
