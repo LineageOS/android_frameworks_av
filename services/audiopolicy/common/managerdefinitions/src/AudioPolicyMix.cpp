@@ -289,12 +289,20 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             continue; // skip the mix
         }
 
-        if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) && is_mix_loopback(policyMix->mRouteFlags)) {
-            // AAudio MMAP_NOIRQ streams cannot be routed to loopback/loopback+render
-            // using dynamic audio policy.
-            ALOGD("%s: Rejecting MMAP_NOIRQ request matched to loopback dynamic audio policy mix.",
-                __func__);
-            return INVALID_OPERATION;
+        if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
+            if (is_mix_loopback(policyMix->mRouteFlags)) {
+                // AAudio MMAP_NOIRQ streams cannot be routed to loopback/loopback+render
+                // using dynamic audio policy.
+                ALOGD("%s: Rejecting MMAP_NOIRQ request matched to loopback dynamic "
+                      "audio policy mix.", __func__);
+                return INVALID_OPERATION;
+            }
+            if (mixDevice != nullptr && !mixDevice->isMmap()) {
+                ALOGD("%s: Rejecting MMAP_NOIRQ request matched to dynamic audio policy "
+                      "mix pointing to device %s which doesn't support mmap", __func__,
+                      mixDevice->toString(false).c_str());
+                return INVALID_OPERATION;
+            }
         }
 
         if (mixDevice != nullptr && mixDevice->equals(requestedDevice)) {
