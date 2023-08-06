@@ -32,6 +32,15 @@ namespace android {
 
 using aidl::android::hardware::audio::core::sounddose::ISoundDose;
 
+class IMelReporterCallback : public virtual RefBase {
+public:
+    IMelReporterCallback() {};
+    virtual ~IMelReporterCallback() {};
+
+    virtual void stopMelComputationForDeviceId(audio_port_handle_t deviceId) = 0;
+    virtual void startMelComputationForDeviceId(audio_port_handle_t deviceId) = 0;
+};
+
 class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
 public:
     /** CSD is computed with a rolling window of 7 days. */
@@ -39,8 +48,9 @@ public:
     /** Default RS2 upper bound in dBA as defined in IEC 62368-1 3rd edition. */
     static constexpr float kDefaultRs2UpperBound = 100.f;
 
-    SoundDoseManager()
-        : mMelAggregator(sp<audio_utils::MelAggregator>::make(kCsdWindowSeconds)),
+    explicit SoundDoseManager(const sp<IMelReporterCallback>& melReporterCallback)
+        : mMelReporterCallback(melReporterCallback),
+          mMelAggregator(sp<audio_utils::MelAggregator>::make(kCsdWindowSeconds)),
           mRs2UpperBound(kDefaultRs2UpperBound) {};
 
     /**
@@ -104,6 +114,21 @@ public:
     /** Returns true if CSD is enabled. */
     bool isCsdEnabled();
 
+    void initCachedAudioDeviceCategories(
+            const std::vector<media::ISoundDose::AudioDeviceCategory>& deviceCategories);
+
+    void setAudioDeviceCategory(
+            const media::ISoundDose::AudioDeviceCategory& audioDevice);
+
+    /**
+     * Returns true if the type can compute CSD. For bluetooth devices we rely on whether we
+     * categorized the address as headphones/headsets, only in this case we return true.
+     */
+    bool shouldComputeCsdForDeviceWithAddress(const audio_devices_t type,
+                                              const std::string& deviceAddress);
+    /** Returns true for all device types which could support CSD computation. */
+    bool shouldComputeCsdForDeviceType(audio_devices_t device);
+
     std::string dump() const;
 
     // used for testing only
@@ -138,6 +163,13 @@ private:
         binder::Status updateAttenuation(float attenuationDB, int device) override;
         binder::Status getOutputRs2UpperBound(float* value) override;
         binder::Status setCsdEnabled(bool enabled) override;
+
+        binder::Status initCachedAudioDeviceCategories(
+                const std::vector<media::ISoundDose::AudioDeviceCategory> &btDeviceCategories)
+                override;
+
+        binder::Status setAudioDeviceCategory(
+                const media::ISoundDose::AudioDeviceCategory& btAudioDevice) override;
 
         binder::Status getCsd(float* value) override;
         binder::Status forceUseFrameworkMel(bool useFrameworkMel) override;
@@ -179,6 +211,8 @@ private:
 
     mutable std::mutex mLock;
 
+    const sp<IMelReporterCallback> mMelReporterCallback;
+
     // no need for lock since MelAggregator is thread-safe
     const sp<audio_utils::MelAggregator> mMelAggregator;
 
@@ -190,6 +224,17 @@ private:
     // or GAME stream).
     std::map<AudioDeviceTypeAddr, audio_port_handle_t> mActiveDevices GUARDED_BY(mLock);
     std::unordered_map<audio_port_handle_t, audio_devices_t> mActiveDeviceTypes GUARDED_BY(mLock);
+
+    struct bt_device_type_hash {
+        std::size_t operator() (const std::pair<std::string, audio_devices_t> &deviceType) const {
+            return std::hash<std::string>()(deviceType.first) ^
+                   std::hash<audio_devices_t>()(deviceType.second);
+        }
+    };
+    // storing the BT cached information as received from the java side
+    // see SoundDoseManager::setCachedAudioDeviceCategories
+    std::unordered_map<std::pair<std::string, audio_devices_t>, bool, bt_device_type_hash>
+            mBluetoothDevicesWithCsd GUARDED_BY(mLock);
 
     float mRs2UpperBound GUARDED_BY(mLock);
     std::unordered_map<audio_devices_t, float> mMelAttenuationDB GUARDED_BY(mLock);
