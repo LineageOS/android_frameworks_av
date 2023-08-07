@@ -1157,7 +1157,6 @@ class Camera3Device :
         camera_metadata_enum_android_control_autoframing_t mAutoframingOverride;
         bool               mComposerOutput;
         int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
-        bool               mCameraMuteChanged;
         int32_t            mSettingsOverride; // -1 = use original, otherwise
                                               // the settings override to use.
 
