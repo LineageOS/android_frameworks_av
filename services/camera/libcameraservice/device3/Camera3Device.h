@@ -1088,7 +1088,6 @@ class Camera3Device :
         camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
         bool               mComposerOutput;
         int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
-        bool               mCameraMuteChanged;
 
         int64_t            mRepeatingLastFrameNumber;
 

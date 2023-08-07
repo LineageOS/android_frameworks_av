@@ -2937,7 +2937,6 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
         mComposerOutput(false),
         mCameraMute(ANDROID_SENSOR_TEST_PATTERN_MODE_OFF),
-        mCameraMuteChanged(false),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
         mPrepareVideoStream(false),
@@ -4106,7 +4105,6 @@ status_t Camera3Device::RequestThread::setCameraMute(int32_t muteMode) {
     Mutex::Autolock l(mTriggerMutex);
     if (muteMode != mCameraMute) {
         mCameraMute = muteMode;
-        mCameraMuteChanged = true;
     }
     return OK;
 }
