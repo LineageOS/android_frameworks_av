@@ -5912,22 +5912,26 @@ bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
         }
     }
 
+    // The caller can have the audio config criteria ignored by either passing a null ptr or
+    // the AUDIO_CONFIG_INITIALIZER value.
+    // If an audio config is specified, current policy is to only allow spatialization for
+    // some positional channel masks and PCM format
+
+    if (config != nullptr && *config != AUDIO_CONFIG_INITIALIZER) {
+        if (!audio_is_channel_mask_spatialized(config->channel_mask)) {
+            return false;
+        }
+        if (!audio_is_linear_pcm(config->format)) {
+            return false;
+        }
+    }
+
     sp<IOProfile> profile =
             getSpatializerOutputProfile(config, devices);
     if (profile == nullptr) {
         return false;
     }
 
-    // The caller can have the audio config criteria ignored by either passing a null ptr or
-    // the AUDIO_CONFIG_INITIALIZER value.
-    // If an audio config is specified, current policy is to only allow spatialization for
-    // some positional channel masks.
-
-    if (config != nullptr && *config != AUDIO_CONFIG_INITIALIZER) {
-        if (!audio_is_channel_mask_spatialized(config->channel_mask)) {
-            return false;
-        }
-    }
     return true;
 }
 
