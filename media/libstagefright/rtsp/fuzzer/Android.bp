@@ -62,3 +62,28 @@ cc_fuzz {
         "libcutils",
     ],
 }
+
+cc_fuzz {
+    name: "packet_source_fuzzer",
+    srcs: [
+        "packet_source_fuzzer.cpp",
+    ],
+    defaults: [
+        "libstagefright_rtsp_fuzzer_defaults",
+    ],
+}
+
+cc_fuzz {
+    name: "rtsp_connection_fuzzer",
+    srcs: [
+        "rtsp_connection_fuzzer.cpp",
+    ],
+    shared_libs: [
+        "libcrypto",
+        "libcutils",
+        "libnetd_client",
+    ],
+    defaults: [
+        "libstagefright_rtsp_fuzzer_defaults",
+    ],
+}
