@@ -275,23 +275,29 @@ void EffectDescriptorCollection::moveEffects(audio_session_t session,
                 session, dstIo);
         effectsToMove = getOrphanEffectsForSession(session);
     } else {
-        ALOGV("%s: moving effects for session %d from io=%d to io=%d", __func__,
-                session, srcIo, dstIo);
-        sp<AudioInputDescriptor> previousInputDesc = inputs->valueFor(srcIo);
-        effectsToMove = getEffectsForIo(srcIo);
-        for (size_t i = 0; i < effectsToMove.size(); ++i) {
-            sp<EffectDescriptor> effect = effectsToMove.valueAt(i);
-            effect->mEnabledWhenMoved = effect->mEnabled;
-            previousInputDesc->trackEffectEnabled(effect, false);
+        ALOGV("%s: moving effects for session %d from io=%d to io=%d", __func__, session, srcIo,
+              dstIo);
+        if (const sp<AudioInputDescriptor>& previousInputDesc = inputs->valueFor(srcIo)) {
+            effectsToMove = getEffectsForIo(srcIo);
+            for (size_t i = 0; i < effectsToMove.size(); ++i) {
+                const sp<EffectDescriptor>& effect = effectsToMove.valueAt(i);
+                effect->mEnabledWhenMoved = effect->mEnabled;
+                previousInputDesc->trackEffectEnabled(effect, false);
+            }
+        } else {
+            ALOGW("%s: no effect descriptor for srcIo %d", __func__, srcIo);
         }
     }
     moveEffects(session, srcIo, dstIo, clientInterface);
 
     if (dstIo != AUDIO_IO_HANDLE_NONE) {
-        sp<AudioInputDescriptor> inputDesc = inputs->valueFor(dstIo);
-        for (size_t i = 0; i < effectsToMove.size(); ++i) {
-            sp<EffectDescriptor> effect = effectsToMove.valueAt(i);
-            inputDesc->trackEffectEnabled(effect, effect->mEnabledWhenMoved);
+        if (const sp<AudioInputDescriptor>& inputDesc = inputs->valueFor(dstIo)) {
+            for (size_t i = 0; i < effectsToMove.size(); ++i) {
+                const sp<EffectDescriptor>& effect = effectsToMove.valueAt(i);
+                inputDesc->trackEffectEnabled(effect, effect->mEnabledWhenMoved);
+            }
+        } else {
+            ALOGW("%s: no effect descriptor for dstIo %d", __func__, dstIo);
         }
     }
 }
