@@ -1948,16 +1948,40 @@ TEST_P(AudioPolicyManagerTestMMapPlaybackRerouting,
 }
 
 TEST_F(AudioPolicyManagerTestMMapPlaybackRerouting,
-        MmapPlaybackStreamMatchingRenderDapMixSucceeds) {
-      // Add render-only mix matching the test uid.
+        MmapPlaybackStreamMatchingRenderDapMixSupportingMmapSucceeds) {
+    // Add render-only mix matching the test uid.
     const int testUid = 12345;
-    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER, AUDIO_DEVICE_OUT_SPEAKER,
-                                /*mixAddress=*/"", audioConfig, {createUidCriterion(testUid)});
+    // test_audio_policy_configuration.xml declares mmap-capable mix port
+    // for AUDIO_DEVICE_OUT_USB_DEVICE.
+    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+                                AUDIO_DEVICE_OUT_USB_DEVICE, /*mixAddress=*/"",
+                                audioConfig, {createUidCriterion(testUid)});
     ASSERT_EQ(NO_ERROR, ret);
 
-    // Geting output for matching uid should succeed for mmaped stream.
+    // Geting output for matching uid should succeed for mmaped stream, because matched mix
+    // redirects to mmap capable device.
     audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
     ASSERT_EQ(NO_ERROR,
+              mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
+                                         createAttributionSourceState(testUid), &audioConfig,
+                                         &outputFlags, &mSelectedDeviceId, &mPortId, {},
+                                         &mOutputType, &mIsSpatialized, &mIsBitPerfect));
+}
+
+TEST_F(AudioPolicyManagerTestMMapPlaybackRerouting,
+        MmapPlaybackStreamMatchingRenderDapMixNotSupportingMmapFails) {
+    // Add render-only mix matching the test uid.
+    const int testUid = 12345;
+    // Per test_audio_policy_configuration.xml AUDIO_DEVICE_OUT_SPEAKER doesn't support mmap.
+    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+                                AUDIO_DEVICE_OUT_SPEAKER, /*mixAddress=*/"", audioConfig,
+                                {createUidCriterion(testUid)});
+    ASSERT_EQ(NO_ERROR, ret);
+
+    // Geting output for matching uid should fail for mmaped stream, because
+    // matched mix redirects to device which doesn't support mmap.
+    audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
+    ASSERT_EQ(INVALID_OPERATION,
               mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
                                          createAttributionSourceState(testUid), &audioConfig,
                                          &outputFlags, &mSelectedDeviceId, &mPortId, {},
