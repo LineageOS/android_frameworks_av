@@ -604,6 +604,9 @@ public:
         static int kMaxIgbpRetryDelayUs = 10000;
 
         std::unique_lock<std::mutex> lock(mMutex);
+        if (mInvalidated) {
+            return C2_BAD_STATE;
+        }
         if (mLastDqLogTs == 0) {
             mLastDqLogTs = getTimestampNow();
         } else {
@@ -749,6 +752,11 @@ public:
         *consumeUsage = mConsumerUsage;
     }
 
+    void invalidate() {
+        std::scoped_lock<std::mutex> lock(mMutex);
+        mInvalidated = true;
+    }
+
 private:
     friend struct C2BufferQueueBlockPoolData;
 
@@ -786,6 +794,7 @@ private:
     // if the token has been expired, the buffers will not call IGBP::cancelBuffer()
     // when they are no longer used.
     std::shared_ptr<int> mIgbpValidityToken;
+    bool mInvalidated{false};
 };
 
 C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
@@ -1104,6 +1113,12 @@ void C2BufferQueueBlockPool::setRenderCallback(const OnRenderCallback &renderCal
 void C2BufferQueueBlockPool::getConsumerUsage(uint64_t *consumeUsage) {
     if (mImpl) {
         mImpl->getConsumerUsage(consumeUsage);
+    }
+}
+
+void C2BufferQueueBlockPool::invalidate() {
+    if (mImpl) {
+        mImpl->invalidate();
     }
 }
 
