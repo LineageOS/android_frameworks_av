@@ -438,6 +438,7 @@ void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
                    std::ifstream& eleStream, android::Vector<FrameInfo>* Info, int offset,
                    int range, bool signalEOS = true) {
     typedef std::unique_lock<std::mutex> ULock;
+    static const size_t kPageSize = getpagesize();
     int frameID = offset;
     int maxRetry = 0;
     while (1) {
@@ -479,7 +480,7 @@ void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         ASSERT_EQ(eleStream.gcount(), size);
 
         work->input.buffers.clear();
-        auto alignedSize = ALIGN(size, PAGE_SIZE);
+        auto alignedSize = ALIGN(size, kPageSize);
         if (size) {
             std::shared_ptr<C2LinearBlock> block;
             ASSERT_EQ(C2_OK, linearPool->fetchLinearBlock(
