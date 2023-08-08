@@ -239,6 +239,7 @@ void Codec2Fuzzer::deInitDecoder() {
 }
 
 void Codec2Fuzzer::decodeFrames(const uint8_t* data, size_t size) {
+  static const size_t kPageSize = getpagesize();
   std::unique_ptr<BufferSource> bufferSource = std::make_unique<BufferSource>(data, size);
   if (!bufferSource) {
     return;
@@ -270,7 +271,7 @@ void Codec2Fuzzer::decodeFrames(const uint8_t* data, size_t size) {
     work->input.ordinal.timestamp = 0;
     work->input.ordinal.frameIndex = ++numFrames;
     work->input.buffers.clear();
-    int32_t alignedSize = C2FUZZER_ALIGN(frameSize, PAGE_SIZE);
+    int32_t alignedSize = C2FUZZER_ALIGN(frameSize, kPageSize);
 
     std::shared_ptr<C2LinearBlock> block;
     status = mLinearPool->fetchLinearBlock(
