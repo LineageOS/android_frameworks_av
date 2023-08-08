@@ -743,8 +743,9 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
             });
 
             if (!ret.isOk()) {
-                ALOGE("%s: Transaction error getting physical camera %s characteristics for %s: %s",
-                        __FUNCTION__, id.c_str(), id.c_str(), ret.description().c_str());
+                ALOGE("%s: Transaction error getting physical camera %s characteristics for"
+                        " logical id %s: %s", __FUNCTION__, id.c_str(), mId.c_str(),
+                        ret.description().c_str());
                 return;
             }
             if (status != Status::OK) {
