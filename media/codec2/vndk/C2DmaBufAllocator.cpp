@@ -170,6 +170,7 @@ class C2DmaBufAllocation : public C2LinearAllocation {
 
 c2_status_t C2DmaBufAllocation::map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence* fence,
                                     void** addr) {
+    static const size_t kPageSize = getpagesize();
     (void)fence;  // TODO: wait for fence
     *addr = nullptr;
     if (!mMappings.lock()->empty()) {
@@ -192,7 +193,7 @@ c2_status_t C2DmaBufAllocation::map(size_t offset, size_t size, C2MemoryUsage us
         prot |= PROT_WRITE;
     }
 
-    size_t alignmentBytes = offset % PAGE_SIZE;
+    size_t alignmentBytes = offset % kPageSize;
     size_t mapOffset = offset - alignmentBytes;
     size_t mapSize = size + alignmentBytes;
     Mapping map = {nullptr, alignmentBytes, mapSize};

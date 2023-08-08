@@ -179,6 +179,7 @@ public:
     static Impl *Alloc(int ionFd, size_t size, size_t align, unsigned heapMask, unsigned flags, C2Allocator::id_t id);
 
     c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {
+        static const size_t kPageSize = getpagesize();
         (void)fence; // TODO: wait for fence
         *addr = nullptr;
         if (!mMappings.lock()->empty()) {
@@ -201,7 +202,7 @@ public:
             prot |= PROT_WRITE;
         }
 
-        size_t alignmentBytes = offset % PAGE_SIZE;
+        size_t alignmentBytes = offset % kPageSize;
         size_t mapOffset = offset - alignmentBytes;
         size_t mapSize = size + alignmentBytes;
         Mapping map = { nullptr, alignmentBytes, mapSize };
