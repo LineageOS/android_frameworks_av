@@ -70,7 +70,9 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
                 cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
                 clientUid, servicePid, overrideForPerfClass, overrideToPortrait,
                 /*legacyClient*/ true),
-        mParameters(api1CameraId, cameraFacing)
+        mParameters(api1CameraId, cameraFacing),
+        mLatestRequestIds(kMaxRequestIds),
+        mLatestFailedRequestIds(kMaxRequestIds)
 {
     ATRACE_CALL();
 
@@ -1843,7 +1845,7 @@ void Camera2Client::notifyError(int32_t errorCode,
                     (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT == errorCode)) {
                 Mutex::Autolock al(mLatestRequestMutex);
 
-                mLatestFailedRequestId = resultExtras.requestId;
+                mLatestFailedRequestIds.add(resultExtras.requestId);
                 mLatestRequestSignal.signal();
             }
             mCaptureSequencer->notifyError(errorCode, resultExtras);
@@ -2418,7 +2420,10 @@ status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
 
 status_t Camera2Client::waitUntilRequestIdApplied(int32_t requestId, nsecs_t timeout) {
     Mutex::Autolock l(mLatestRequestMutex);
-    while ((mLatestRequestId != requestId) && (mLatestFailedRequestId != requestId)) {
+    while ((std::find(mLatestRequestIds.begin(), mLatestRequestIds.end(), requestId) ==
+            mLatestRequestIds.end()) &&
+           (std::find(mLatestFailedRequestIds.begin(), mLatestFailedRequestIds.end(), requestId) ==
+            mLatestFailedRequestIds.end())) {
         nsecs_t startTime = systemTime();
 
         auto res = mLatestRequestSignal.waitRelative(mLatestRequestMutex, timeout);
@@ -2427,13 +2432,14 @@ status_t Camera2Client::waitUntilRequestIdApplied(int32_t requestId, nsecs_t tim
         timeout -= (systemTime() - startTime);
     }
 
-    return (mLatestRequestId == requestId) ? OK : DEAD_OBJECT;
+    return (std::find(mLatestRequestIds.begin(), mLatestRequestIds.end(), requestId) !=
+             mLatestRequestIds.end()) ? OK : DEAD_OBJECT;
 }
 
 void Camera2Client::notifyRequestId(int32_t requestId) {
     Mutex::Autolock al(mLatestRequestMutex);
 
-    mLatestRequestId = requestId;
+    mLatestRequestIds.add(requestId);
     mLatestRequestSignal.signal();
 }
 
