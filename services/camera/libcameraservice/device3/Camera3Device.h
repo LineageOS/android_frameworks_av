@@ -1142,6 +1142,7 @@ class Camera3Device :
         Condition          mLatestRequestSignal;
         // android.request.id for latest process_capture_request
         int32_t            mLatestRequestId;
+        int32_t            mLatestFailedRequestId;
         CameraMetadata     mLatestRequest;
         std::unordered_map<std::string, CameraMetadata> mLatestPhysicalRequest;
 
