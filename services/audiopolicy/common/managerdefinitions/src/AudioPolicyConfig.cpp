@@ -89,7 +89,12 @@ status_t aidl2legacy_AudioHwModule_HwModule(const media::AudioHwModule& aidl,
         if (aidlPort.ext.getTag() == AudioPortExt::mix) {
             auto mixPort = sp<IOProfile>::make("", AUDIO_PORT_ROLE_NONE);
             RETURN_STATUS_IF_ERROR(mixPort->readFromParcelable(fwPort));
-            sortAudioProfiles(mixPort->getAudioProfiles());
+            auto& profiles = mixPort->getAudioProfiles();
+            if (profiles.empty()) {
+                profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
+            } else {
+                sortAudioProfiles(mixPort->getAudioProfiles());
+            }
             mixPorts.add(mixPort);
             ports.emplace(aidlPort.id, mixPort);
         } else if (aidlPort.ext.getTag() == AudioPortExt::device) {
