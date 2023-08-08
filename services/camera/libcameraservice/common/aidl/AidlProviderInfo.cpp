@@ -607,8 +607,9 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
             aidl::android::hardware::camera::device::CameraMetadata pChars;
             status = interface->getPhysicalCameraCharacteristics(id, &pChars);
             if (!status.isOk()) {
-                ALOGE("%s: Transaction error getting physical camera %s characteristics for %s: %s",
-                        __FUNCTION__, id.c_str(), id.c_str(), status.getMessage());
+                ALOGE("%s: Transaction error getting physical camera %s characteristics for "
+                        "logical id %s: %s", __FUNCTION__, id.c_str(), mId.c_str(),
+                        status.getMessage());
                 return;
             }
             std::vector<uint8_t> &pMetadata = pChars.metadata;
