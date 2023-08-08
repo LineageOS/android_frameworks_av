@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <map>
 #include <memory>
+#include <string>
 
 #define LOG_TAG "DevicesFactoryHalAidl"
 //#define LOG_NDEBUG 0
@@ -75,6 +78,21 @@ status_t DevicesFactoryHalAidl::getDeviceNames(std::vector<std::string> *names) 
                 if (strcmp(instance, "default") == 0) instance = "primary";
                 static_cast<decltype(names)>(context)->push_back(instance);
             });
+    std::sort(names->begin(), names->end(), [](const std::string& lhs,
+                    const std::string& rhs) {
+        // This order corresponds to the canonical order of modules as specified in
+        // the reference 'audio_policy_configuration_7_0.xml' file.
+        static const std::map<std::string, int> kPriorities{
+            { "primary", 0 }, { "a2dp", 1 }, { "usb", 2 }, { "r_submix", 3 },
+            { "bluetooth", 4 }, { "hearing_aid", 5 }, { "msd", 6 }, { "stub", 7 }
+        };
+        auto lhsIt = kPriorities.find(lhs);
+        auto rhsIt = kPriorities.find(rhs);
+        if (lhsIt != kPriorities.end() && rhsIt != kPriorities.end()) {
+            return lhsIt->second < rhsIt->second;
+        }
+        return lhsIt != kPriorities.end();
+    });
     return OK;
 }
 
