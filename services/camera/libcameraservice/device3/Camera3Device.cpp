@@ -3030,6 +3030,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mNotifyPipelineDrain(false),
         mFrameNumber(0),
         mLatestRequestId(NAME_NOT_FOUND),
+        mLatestFailedRequestId(NAME_NOT_FOUND),
         mCurrentAfTriggerId(0),
         mCurrentPreCaptureTriggerId(0),
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
@@ -3281,7 +3282,7 @@ status_t Camera3Device::RequestThread::waitUntilRequestProcessed(
     ATRACE_CALL();
     Mutex::Autolock l(mLatestRequestMutex);
     status_t res;
-    while (mLatestRequestId != requestId) {
+    while (mLatestRequestId != requestId && mLatestFailedRequestId != requestId) {
         nsecs_t startTime = systemTime();
 
         res = mLatestRequestSignal.waitRelative(mLatestRequestMutex, timeout);
@@ -4358,6 +4359,12 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
                 listener->notifyError(
                         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST,
                         captureRequest->mResultExtras);
+            }
+            {
+                Mutex::Autolock al(mLatestRequestMutex);
+
+                mLatestFailedRequestId = captureRequest->mResultExtras.requestId;
+                mLatestRequestSignal.signal();
             }
         }
 
