@@ -23,6 +23,8 @@ namespace android {
 
 bool isAtLeastT();
 
+bool isAtLeastU();
+
 bool isVendorApiOrFirstApiAtLeastT();
 
 /**
