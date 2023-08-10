@@ -833,7 +833,7 @@ Status CameraService::remapCameraIds(const hardware::CameraIdRemapping& cameraId
                 "Permission Denial: no permission to configure camera id mapping");
     }
     TCameraIdRemapping cameraIdRemappingMap{};
-    binder::Status parseStatus = parseCameraIdRemapping(cameraIdRemapping, cameraIdRemappingMap);
+    binder::Status parseStatus = parseCameraIdRemapping(cameraIdRemapping, &cameraIdRemappingMap);
     if (!parseStatus.isOk()) {
         return parseStatus;
     }
@@ -843,25 +843,36 @@ Status CameraService::remapCameraIds(const hardware::CameraIdRemapping& cameraId
 
 Status CameraService::parseCameraIdRemapping(
         const hardware::CameraIdRemapping& cameraIdRemapping,
-        TCameraIdRemapping cameraIdRemappingMap) {
+        /* out */ TCameraIdRemapping* cameraIdRemappingMap) {
     std::string packageName;
     std::string cameraIdToReplace, updatedCameraId;
-    for(const auto& packageIdRemapping: cameraIdRemapping.packageIdRemapping) {
+    for(const auto& packageIdRemapping: cameraIdRemapping.packageIdRemappings) {
         packageName = packageIdRemapping.packageName;
-        if (packageName == "") {
+        if (packageName.empty()) {
             return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT,
                     "CameraIdRemapping: Package name cannot be empty");
         }
-        if (packageIdRemapping.cameraIdToReplace.size()
-            != packageIdRemapping.updatedCameraId.size()) {
+        if (packageIdRemapping.cameraIdsToReplace.size()
+            != packageIdRemapping.updatedCameraIds.size()) {
             return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT,
                     "CameraIdRemapping: Mismatch in CameraId Remapping lists sizes for package %s",
                     packageName.c_str());
         }
-        for(size_t i = 0; i < packageIdRemapping.cameraIdToReplace.size(); i++) {
-            cameraIdToReplace = std::string(packageIdRemapping.cameraIdToReplace[i]);
-            updatedCameraId = std::string(packageIdRemapping.updatedCameraId[i]);
-            cameraIdRemappingMap[packageName][cameraIdToReplace] = updatedCameraId;
+        for(size_t i = 0; i < packageIdRemapping.cameraIdsToReplace.size(); i++) {
+            cameraIdToReplace = packageIdRemapping.cameraIdsToReplace[i];
+            updatedCameraId = packageIdRemapping.updatedCameraIds[i];
+            if (cameraIdToReplace.empty() || updatedCameraId.empty()) {
+                return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT,
+                        "CameraIdRemapping: Camera Id cannot be empty for package %s",
+                        packageName.c_str());
+            }
+            if (cameraIdToReplace == updatedCameraId) {
+                return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT,
+                        "CameraIdRemapping: CameraIdToReplace cannot be the same"
+                        " as updatedCameraId for %s",
+                        packageName.c_str());
+            }
+            (*cameraIdRemappingMap)[packageName][cameraIdToReplace] = updatedCameraId;
         }
     }
     return Status::ok();
