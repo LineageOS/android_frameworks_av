@@ -206,12 +206,19 @@ public:
         mNode = new C2OMXNode(comp);
         mOmxNode = new hardware::media::omx::V1_0::utils::TWOmxNode(mNode);
         mNode->setFrameSize(mWidth, mHeight);
-
         // Usage is queried during configure(), so setting it beforehand.
-        OMX_U32 usage = mConfig.mUsage & 0xFFFFFFFF;
-        (void)mNode->setParameter(
-                (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
-                &usage, sizeof(usage));
+        // 64 bit set parameter is existing only in C2OMXNode.
+        OMX_U64 usage64 = mConfig.mUsage;
+        status_t res = mNode->setParameter(
+                (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits64,
+                &usage64, sizeof(usage64));
+
+        if (res != OK) {
+            OMX_U32 usage = mConfig.mUsage & 0xFFFFFFFF;
+            (void)mNode->setParameter(
+                    (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
+                    &usage, sizeof(usage));
+        }
 
         return GetStatus(mSource->configure(
                 mOmxNode, static_cast<hardware::graphics::common::V1_0::Dataspace>(mDataSpace)));
