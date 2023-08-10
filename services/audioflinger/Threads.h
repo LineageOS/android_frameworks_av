@@ -15,11 +15,9 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
 
-public: // TODO(b/288339104) extract out of AudioFlinger class
+namespace android {
 
 class AsyncCallbackThread;
 
@@ -30,6 +28,8 @@ class ThreadBase : public virtual IAfThreadBase, public Thread {
     friend class TrackBase;
 public:
     static const char *threadTypeToString(type_t type);
+
+    AudioFlinger* audioFlinger() const final { return mAudioFlinger.get(); }
 
     ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
                type_t type, bool systemReady, bool isOut);
@@ -294,6 +294,7 @@ public:
     audio_format_t format() const final { return mHALFormat; }
     uint32_t channelCount() const final { return mChannelCount; }
     audio_channel_mask_t hapticChannelMask() const override { return AUDIO_CHANNEL_NONE; }
+    uint32_t hapticChannelCount() const override { return 0; }
     uint32_t latency_l() const override { return 0; }
     void setVolumeForOutput_l(float /* left */, float /* right */) const override {}
 
@@ -543,7 +544,7 @@ protected:
                 // occurs when all suspend requests are cancelled.
                 void setEffectSuspended_l(const effect_uuid_t *type,
                                           bool suspend,
-                                          audio_session_t sessionId);
+                                          audio_session_t sessionId) final;
                 // updated mSuspendedSessions when an effect is suspended or restored
                 void        updateSuspendedSessions_l(const effect_uuid_t *type,
                                                       bool suspend,
@@ -725,7 +726,7 @@ protected:
                     bool            isEmpty() const {
                         return mActiveTracks.isEmpty();
                     }
-                    ssize_t         indexOf(const sp<T>& item) {
+                    ssize_t indexOf(const sp<T>& item) const {
                         return mActiveTracks.indexOf(item);
                     }
                     sp<T>           operator[](size_t index) const {
@@ -789,11 +790,14 @@ private:
 // --- PlaybackThread ---
 class PlaybackThread : public ThreadBase, public virtual IAfPlaybackThread,
                        public StreamOutHalInterfaceCallback,
-                       public VolumeInterface, public StreamOutHalInterfaceEventCallback {
+                       public virtual VolumeInterface, public StreamOutHalInterfaceEventCallback {
     // TODO(b/288339104) remove friends
     friend class OutputTrack;
     friend class Track;
 public:
+    sp<IAfPlaybackThread> asIAfPlaybackThread() final {
+        return sp<IAfPlaybackThread>::fromExisting(this);
+    }
 
     // retry count before removing active track in case of underrun on offloaded thread:
     // we need to make sure that AudioTrack client has enough time to send large buffers
@@ -801,7 +805,6 @@ public:
     // handled for offloaded tracks
     static const int8_t kMaxTrackRetriesOffload = 20;
     static const int8_t kMaxTrackStartupRetriesOffload = 100;
-    static const int8_t kMaxTrackStopRetriesOffload = 2;
     static constexpr uint32_t kMaxTracksPerUid = 40;
     static constexpr size_t kMaxTracks = 256;
 
@@ -824,6 +827,10 @@ public:
 
     status_t checkEffectCompatibility_l(
             const effect_descriptor_t* desc, audio_session_t sessionId) final;
+
+    void addOutputTrack_l(const sp<IAfTrack>& track) final {
+        mTracks.add(track);
+    }
 
 protected:
     // Code snippets that were lifted up out of threadLoop()
@@ -848,15 +855,18 @@ protected:
     virtual     void        onDrainReady();
     virtual     void        onError();
 
+public: // AsyncCallbackThread
                 void        resetWriteBlocked(uint32_t sequence);
                 void        resetDraining(uint32_t sequence);
+protected:
 
     virtual     bool        waitingAsyncCallback();
     virtual     bool        waitingAsyncCallback_l();
     virtual     bool        shouldStandby_l();
     virtual     void        onAddNewTrack_l();
+public:  // AsyncCallbackThread
                 void        onAsyncError(); // error reported by AsyncCallbackThread
-
+protected:
     // StreamHalInterfaceCodecFormatCallback implementation
                 void        onCodecFormatChanged(
             const std::basic_string<uint8_t>& metadataBs) final;
@@ -918,6 +928,11 @@ public:
                                 bool isSpatialized,
                                 bool isBitPerfect) final;
 
+    bool isTrackActive(const sp<IAfTrack>& track) const final {
+        return mActiveTracks.indexOf(track) >= 0;
+    }
+
+    AudioStreamOut* getOutput_l() const final { return mOutput; }
     AudioStreamOut* getOutput() const final;
     AudioStreamOut* clearOutput() final;
     sp<StreamHalInterface> stream() const final;
@@ -968,7 +983,7 @@ public:
                 // the given set if the corresponding track is found and invalidated.
     void invalidateTracks(std::set<audio_port_handle_t>& portIds) override;
 
-    size_t frameCount() const final{ return mNormalFrameCount; }
+    size_t frameCount() const final { return mNormalFrameCount; }
 
     audio_channel_mask_t mixerChannelMask() const final {
                     return mMixerChannelMask;
@@ -1005,6 +1020,11 @@ public:
     audio_channel_mask_t hapticChannelMask() const final {
                                          return mHapticChannelMask;
                                      }
+
+    uint32_t hapticChannelCount() const final {
+        return mHapticChannelCount;
+    }
+
     bool supportsHapticPlayback() const final {
                     return (mHapticChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE;
                 }
@@ -1162,7 +1182,6 @@ protected:
 
     audio_channel_mask_t            mMixerChannelMask = AUDIO_CHANNEL_NONE;
 
-private:
     // mMasterMute is in both PlaybackThread and in AudioFlinger.  When a
     // PlaybackThread needs to find out if master-muted, it checks it's local
     // copy rather than the one in AudioFlinger.  This optimization saves a lock.
@@ -1176,7 +1195,6 @@ private:
                             : mTimestampVerifier.DISCONTINUITY_MODE_CONTINUOUS;
                 }
 
-protected:
     ActiveTracks<IAfTrack> mActiveTracks;
 
     // Time to sleep between cycles when:
@@ -1205,7 +1223,7 @@ protected:
                                    audio_patch_handle_t *handle);
     virtual     status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
 
-                bool        usesHwAvSync() const { return (mType == DIRECT) && (mOutput != NULL)
+    bool usesHwAvSync() const final { return mType == DIRECT && mOutput != nullptr
                                     && mHwSupportsPause
                                     && (mOutput->flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC); }
 
@@ -1216,14 +1234,13 @@ protected:
                                 ThreadBase::invalidateTracksForAudioSession_l(sessionId, mTracks);
                             }
 
-private:
-
     friend class AudioFlinger;      // for numerous
 
     DISALLOW_COPY_AND_ASSIGN(PlaybackThread);
 
-    status_t    addTrack_l(const sp<IAfTrack>& track);
-    bool        destroyTrack_l(const sp<IAfTrack>& track);
+    status_t addTrack_l(const sp<IAfTrack>& track) final;
+    bool destroyTrack_l(const sp<IAfTrack>& track) final;
+
     void        removeTrack_l(const sp<IAfTrack>& track);
 
     void        readOutputParameters_l();
@@ -1285,6 +1302,7 @@ private:
     Tracks<IAfTrack>                   mTracks;
 
     stream_type_t                   mStreamTypes[AUDIO_STREAM_CNT];
+
     AudioStreamOut                  *mOutput;
 
     float                           mMasterVolume;
@@ -1339,19 +1357,20 @@ private:
     // Bit 0 is reset by the async callback thread calling resetDraining(). Out of sequence
     // callbacks are ignored.
     uint32_t                        mDrainSequence;
+
     sp<AsyncCallbackThread>         mCallbackThread;
 
     Mutex                                    mAudioTrackCbLock;
     // Record of IAudioTrackCallback
     std::map<sp<IAfTrack>, sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
-private:
     // The HAL output sink is treated as non-blocking, but current implementation is blocking
     sp<NBAIO_Sink>          mOutputSink;
     // If a fast mixer is present, the blocking pipe sink, otherwise clear
     sp<NBAIO_Sink>          mPipeSink;
     // The current sink for the normal mixer to write it's (sub)mix, mOutputSink or mPipeSink
     sp<NBAIO_Sink>          mNormalSink;
+
     uint32_t                mScreenState;   // cached copy of gScreenState
     // TODO: add comment and adjust size as needed
     static const size_t     kFastMixerLogSize = 8 * 1024;
@@ -1375,7 +1394,8 @@ public:
 
 protected:
                 // accessed by both binder threads and within threadLoop(), lock on mutex needed
-                unsigned    mFastTrackAvailMask;    // bit i set if fast track [i] is available
+     uint32_t& fastTrackAvailMask_l() final { return mFastTrackAvailMask; }
+     uint32_t mFastTrackAvailMask;  // bit i set if fast track [i] is available
                 bool        mHwSupportsPause;
                 bool        mHwPaused;
                 bool        mFlushPending;
@@ -1549,8 +1569,12 @@ protected:
                 void       setHalLatencyMode_l() override;
 };
 
-class DirectOutputThread : public PlaybackThread {
+class DirectOutputThread : public PlaybackThread, public virtual IAfDirectOutputThread {
 public:
+
+    sp<IAfDirectOutputThread> asIAfDirectOutputThread() final {
+        return sp<IAfDirectOutputThread>::fromExisting(this);
+    }
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
                        audio_io_handle_t id, bool systemReady,
@@ -1559,7 +1583,7 @@ public:
 
     virtual                 ~DirectOutputThread();
 
-                status_t    selectPresentation(int presentationId, int programId);
+    status_t selectPresentation(int presentationId, int programId) final;
 
     // Thread virtuals
 
@@ -1659,10 +1683,7 @@ private:
 
 class AsyncCallbackThread : public Thread {
 public:
-
     explicit AsyncCallbackThread(const wp<PlaybackThread>& playbackThread);
-
-    virtual             ~AsyncCallbackThread();
 
     // Thread virtuals
     virtual bool        threadLoop();
@@ -1692,16 +1713,20 @@ private:
     bool                       mAsyncError;
 };
 
-class DuplicatingThread : public MixerThread {
+class DuplicatingThread : public MixerThread, public IAfDuplicatingThread {
 public:
-    DuplicatingThread(const sp<AudioFlinger>& audioFlinger, MixerThread* mainThread,
+    DuplicatingThread(const sp<AudioFlinger>& audioFlinger, IAfPlaybackThread* mainThread,
                       audio_io_handle_t id, bool systemReady);
-    virtual                 ~DuplicatingThread();
+    ~DuplicatingThread() override;
+
+    sp<IAfDuplicatingThread> asIAfDuplicatingThread() final {
+        return sp<IAfDuplicatingThread>::fromExisting(this);
+    }
 
     // Thread virtuals
-                void        addOutputTrack(MixerThread* thread);
-                void        removeOutputTrack(MixerThread* thread);
-                uint32_t    waitTimeMs() const { return mWaitTimeMs; }
+    void addOutputTrack(IAfPlaybackThread* thread) final;
+    void removeOutputTrack(IAfPlaybackThread* thread) final;
+    uint32_t waitTimeMs() const final { return mWaitTimeMs; }
 
                 void        sendMetadataToBackend_l(
                         const StreamOutHalInterface::SourceMetadata& metadata) override;
@@ -1777,14 +1802,16 @@ private:
 };
 
 // record thread
-class RecordThread : public ThreadBase
+class RecordThread : public IAfRecordThread, public ThreadBase
 {
     // TODO(b/288339104) remove friends
     friend class PassthruPatchRecord;
     friend class RecordTrack;
     friend class ResamplerBufferProvider;
 public:
-
+    sp<IAfRecordThread> asIAfRecordThread() final {
+        return sp<IAfRecordThread>::fromExisting(this);
+    }
 
             RecordThread(const sp<AudioFlinger>& audioFlinger,
                     AudioStreamIn *input,
@@ -1794,8 +1821,8 @@ public:
     ~RecordThread() override;
 
     // no addTrack_l ?
-    void        destroyTrack_l(const sp<IAfRecordTrack>& track);
-    void        removeTrack_l(const sp<IAfRecordTrack>& track);
+    void destroyTrack_l(const sp<IAfRecordTrack>& track) final;
+    void removeTrack_l(const sp<IAfRecordTrack>& track) final;
 
     // Thread virtuals
     bool threadLoop() final;
@@ -1810,7 +1837,7 @@ public:
 
     sp<IMemory> pipeMemory() const final { return mPipeMemory; }
 
-            sp<IAfRecordTrack> createRecordTrack_l(
+    sp<IAfRecordTrack> createRecordTrack_l(
                     const sp<Client>& client,
                     const audio_attributes_t& attr,
                     uint32_t *pSampleRate,
@@ -1825,17 +1852,19 @@ public:
                     pid_t tid,
                     status_t *status /*non-NULL*/,
                     audio_port_handle_t portId,
-                    int32_t maxSharedAudioHistoryMs);
+                    int32_t maxSharedAudioHistoryMs) final;
 
             status_t start(IAfRecordTrack* recordTrack,
                               AudioSystem::sync_event_t event,
-                              audio_session_t triggerSession);
+                              audio_session_t triggerSession) final;
 
             // ask the thread to stop the specified track, and
             // return true if the caller should then do it's part of the stopping process
-            bool stop(IAfRecordTrack* recordTrack);
+    bool stop(IAfRecordTrack* recordTrack) final;
+    AudioStreamIn* getInput() const final { return mInput; }
+    AudioStreamIn* clearInput() final;
 
-            AudioStreamIn* clearInput();
+            // TODO(b/288339104) Unify with IAfThreadBase
             virtual sp<StreamHalInterface> stream() const;
 
 
@@ -1843,19 +1872,19 @@ public:
                                                status_t& status);
     virtual void        cacheParameters_l() {}
     virtual String8     getParameters(const String8& keys);
-    virtual void        ioConfigChanged(audio_io_config_event_t event, pid_t pid = 0,
-                                        audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
+    void ioConfigChanged(audio_io_config_event_t event, pid_t pid = 0,
+            audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE) final;
     virtual status_t    createAudioPatch_l(const struct audio_patch *patch,
                                            audio_patch_handle_t *handle);
     virtual status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
             void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices) override;
             void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs) override;
 
-            void        addPatchTrack(const sp<IAfPatchRecord>& record);
-            void        deletePatchTrack(const sp<IAfPatchRecord>& record);
+    void addPatchTrack(const sp<IAfPatchRecord>& record) final;
+    void deletePatchTrack(const sp<IAfPatchRecord>& record) final;
 
             void        readInputParameters_l();
-    virtual uint32_t    getInputFramesLost();
+    uint32_t getInputFramesLost() const final;
 
     virtual status_t addEffectChain_l(const sp<IAfEffectChain>& chain);
     virtual size_t removeEffectChain_l(const sp<IAfEffectChain>& chain);
@@ -1874,7 +1903,7 @@ public:
     static void syncStartEventCallback(const wp<audioflinger::SyncEvent>& event);
 
     virtual size_t      frameCount() const { return mFrameCount; }
-            bool        hasFastCapture() const { return mFastCapture != 0; }
+    bool hasFastCapture() const final { return mFastCapture != 0; }
     virtual void        toAudioPortConfig(struct audio_port_config *config);
 
     virtual status_t    checkEffectCompatibility_l(const effect_descriptor_t *desc,
@@ -1885,20 +1914,20 @@ public:
                             mActiveTracks.updatePowerState(this, true /* force */);
                         }
 
-            void        checkBtNrec();
+    void checkBtNrec() final;
 
             // Sets the UID records silence
-            void        setRecordSilenced(audio_port_handle_t portId, bool silenced);
+    void setRecordSilenced(audio_port_handle_t portId, bool silenced) final;
 
-            status_t    getActiveMicrophones(
-                    std::vector<media::MicrophoneInfoFw>* activeMicrophones);
-
-            status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
-            status_t    setPreferredMicrophoneFieldDimension(float zoom);
+    status_t getActiveMicrophones(
+            std::vector<media::MicrophoneInfoFw>* activeMicrophones) const final;
+    status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction) final;
+    status_t setPreferredMicrophoneFieldDimension(float zoom) final;
 
             MetadataUpdate        updateMetadata_l() override;
 
-            bool        fastTrackAvailable() const { return mFastTrackAvail; }
+    bool fastTrackAvailable() const final { return mFastTrackAvail; }
+    void setFastTrackAvailable(bool available) final { mFastTrackAvail = available; }
 
             bool        isTimestampCorrectionEnabled() const override {
                             // checks popcount for exactly one device.
@@ -1908,13 +1937,13 @@ public:
                                     && inDeviceType() == mTimestampCorrectedDevice;
                         }
 
-            status_t    shareAudioHistory(const std::string& sharedAudioPackageName,
+    status_t shareAudioHistory(const std::string& sharedAudioPackageName,
                                           audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
-                                          int64_t sharedAudioStartMs = -1);
+            int64_t sharedAudioStartMs = -1) final;
             status_t    shareAudioHistory_l(const std::string& sharedAudioPackageName,
                                           audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
                                           int64_t sharedAudioStartMs = -1);
-            void        resetAudioHistory_l();
+    void resetAudioHistory_l() final;
 
     bool isStreamInitialized() const final {
                             return !(mInput == nullptr || mInput->stream == nullptr);
@@ -2008,34 +2037,32 @@ private:
             audio_session_t                     mSharedAudioSessionId = AUDIO_SESSION_NONE;
 };
 
-class MmapThread : public ThreadBase
+class MmapThread : public ThreadBase, public virtual IAfMmapThread
 {
  public:
     MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
                AudioHwDevice *hwDev, const sp<StreamHalInterface>& stream, bool systemReady,
                bool isOut);
-    ~MmapThread() override;
 
-    virtual     void        configure(const audio_attributes_t *attr,
+    void configure(const audio_attributes_t* attr,
                                       audio_stream_type_t streamType,
                                       audio_session_t sessionId,
                                       const sp<MmapStreamCallback>& callback,
                                       audio_port_handle_t deviceId,
-                                      audio_port_handle_t portId);
+                                      audio_port_handle_t portId) override;
 
-                void        disconnect();
+    void disconnect() final;
 
     // MmapStreamInterface for adapter.
-    virtual status_t createMmapBuffer(int32_t minSizeFrames,
-                                      struct audio_mmap_buffer_info *info);
-    virtual status_t getMmapPosition(struct audio_mmap_position* position);
-    virtual status_t start(const AudioClient& client,
+    status_t createMmapBuffer(int32_t minSizeFrames, struct audio_mmap_buffer_info* info) final;
+    status_t getMmapPosition(struct audio_mmap_position* position) const override;
+    status_t start(const AudioClient& client,
                    const audio_attributes_t *attr,
-                   audio_port_handle_t *handle);
-    virtual status_t stop(audio_port_handle_t handle);
-    virtual status_t standby();
-    virtual status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
-    virtual status_t reportData(const void* buffer, size_t frameCount);
+            audio_port_handle_t* handle) final;
+    status_t stop(audio_port_handle_t handle) final;
+    status_t standby() final;
+    status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
+    status_t reportData(const void* buffer, size_t frameCount) override;
 
     // RefBase
     void onFirstRef() final;
@@ -2082,11 +2109,11 @@ class MmapThread : public ThreadBase
     // Not in ThreadBase
     virtual audio_stream_type_t streamType() const { return AUDIO_STREAM_DEFAULT; }
     virtual void invalidateTracks(audio_stream_type_t /* streamType */) {}
-    virtual void invalidateTracks(std::set<audio_port_handle_t>& /* portIds */) {}
+    void invalidateTracks(std::set<audio_port_handle_t>& /* portIds */) override {}
 
                 // Sets the UID records silence
-    virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
-                                              bool silenced __unused) {}
+    void setRecordSilenced(
+            audio_port_handle_t /* portId */, bool /* silenced */) override {}
 
     bool isStreamInitialized() const override { return false; }
 
@@ -2135,11 +2162,15 @@ class MmapThread : public ThreadBase
      static     constexpr int32_t       kMaxNoCallbackWarnings = 5;
 };
 
-class MmapPlaybackThread : public MmapThread, public VolumeInterface
-{
+class MmapPlaybackThread : public MmapThread, public IAfMmapPlaybackThread,
+        public virtual VolumeInterface {
 public:
     MmapPlaybackThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
                        AudioHwDevice *hwDev, AudioStreamOut *output, bool systemReady);
+
+    sp<IAfMmapPlaybackThread> asIAfMmapPlaybackThread() final {
+        return sp<IAfMmapPlaybackThread>::fromExisting(this);
+    }
 
     void configure(const audio_attributes_t* attr,
                                       audio_stream_type_t streamType,
@@ -2148,7 +2179,7 @@ public:
                                       audio_port_handle_t deviceId,
                                       audio_port_handle_t portId) final;
 
-                AudioStreamOut* clearOutput();
+    AudioStreamOut* clearOutput() final;
 
                 // VolumeInterface
     void setMasterVolume(float value) final;
@@ -2195,13 +2226,17 @@ protected:
                 mediautils::atomic_sp<audio_utils::MelProcessor> mMelProcessor;
 };
 
-class MmapCaptureThread : public MmapThread
+class MmapCaptureThread : public MmapThread, public IAfMmapCaptureThread
 {
 public:
     MmapCaptureThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
                       AudioHwDevice *hwDev, AudioStreamIn *input, bool systemReady);
 
-                AudioStreamIn* clearInput();
+    sp<IAfMmapCaptureThread> asIAfMmapCaptureThread() final {
+        return sp<IAfMmapCaptureThread>::fromExisting(this);
+    }
+
+    AudioStreamIn* clearInput() final;
 
     status_t exitStandby_l() REQUIRES(mLock) final;
 
@@ -2237,4 +2272,4 @@ private:
     float mVolumeRight = 0.f;
 };
 
-private:
+} // namespace android

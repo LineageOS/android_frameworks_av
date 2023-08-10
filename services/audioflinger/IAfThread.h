@@ -20,6 +20,13 @@
 
 namespace android {
 
+class IAfDirectOutputThread;
+class IAfDuplicatingThread;
+class IAfMmapCaptureThread;
+class IAfMmapPlaybackThread;
+class IAfPlaybackThread;
+class IAfRecordThread;
+
 class IAfThreadBase : public virtual RefBase {
 public:
     enum type_t {
@@ -52,6 +59,7 @@ public:
     // and returns the [normal mix] buffer's frame count.
     virtual size_t frameCount() const = 0;
     virtual audio_channel_mask_t hapticChannelMask() const = 0;
+    virtual uint32_t hapticChannelCount() const = 0;
     virtual uint32_t latency_l() const = 0;
     virtual void setVolumeForOutput_l(float left, float right) const = 0;
 
@@ -233,10 +241,42 @@ public:
     virtual void stopMelComputation_l() = 0;
 
     virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) const = 0;
+
+    virtual void setEffectSuspended_l(
+            const effect_uuid_t* type, bool suspend, audio_session_t sessionId) = 0;
+
+    // Dynamic cast to derived interface
+    virtual sp<IAfDirectOutputThread> asIAfDirectOutputThread() { return nullptr; }
+    virtual sp<IAfDuplicatingThread> asIAfDuplicatingThread() { return nullptr; }
+    virtual sp<IAfPlaybackThread> asIAfPlaybackThread() { return nullptr; }
+    virtual sp<IAfRecordThread> asIAfRecordThread() { return nullptr; }
+    virtual AudioFlinger* audioFlinger() const = 0;
 };
 
-class IAfPlaybackThread : public virtual IAfThreadBase {
+class IAfPlaybackThread : public virtual IAfThreadBase, public virtual VolumeInterface {
 public:
+    static sp<IAfPlaybackThread> createBitPerfectThread(
+            const sp<AudioFlinger>& audioflinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady);
+
+    static sp<IAfPlaybackThread> createDirectOutputThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, const audio_offload_info_t& offloadInfo);
+
+    static sp<IAfPlaybackThread> createMixerThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, type_t type = MIXER, audio_config_base_t* mixerConfig = nullptr);
+
+    static sp<IAfPlaybackThread> createOffloadThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, const audio_offload_info_t& offloadInfo);
+
+    static sp<IAfPlaybackThread> createSpatializerThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, audio_config_base_t* mixerConfig);
+
+    static constexpr int8_t kMaxTrackStopRetriesOffload = 2;
+
     enum mixer_state {
         MIXER_IDLE,            // no active tracks
         MIXER_TRACKS_ENABLED,  // at least one active track, but no track has any data ready
@@ -249,6 +289,8 @@ public:
 
     // return estimated latency in milliseconds, as reported by HAL
     virtual uint32_t latency() const = 0;  // should be in IAfThreadBase?
+
+    virtual uint32_t& fastTrackAvailMask_l() = 0;
 
     virtual sp<IAfTrack> createTrack_l(
             const sp<Client>& client,
@@ -273,9 +315,14 @@ public:
             bool isSpatialized,
             bool isBitPerfect) = 0;
 
+    virtual status_t addTrack_l(const sp<IAfTrack>& track) = 0;
+    virtual bool destroyTrack_l(const sp<IAfTrack>& track) = 0;
+    virtual bool isTrackActive(const sp<IAfTrack>& track) const = 0;
+    virtual void addOutputTrack_l(const sp<IAfTrack>& track) = 0;
+
+    virtual AudioStreamOut* getOutput_l() const = 0;
     virtual AudioStreamOut* getOutput() const = 0;
     virtual AudioStreamOut* clearOutput() = 0;
-    virtual sp<StreamHalInterface> stream() const = 0;
 
     // a very large number of suspend() will eventually wraparound, but unlikely
     virtual void suspend() = 0;
@@ -329,6 +376,142 @@ public:
     virtual bool hasFastMixer() const = 0;
     virtual FastTrackUnderruns getFastTrackUnderruns(size_t fastIndex) const = 0;
     virtual const std::atomic<int64_t>& framesWritten() const = 0;
+
+    virtual bool usesHwAvSync() const = 0;
+};
+
+class IAfDirectOutputThread : public virtual IAfPlaybackThread {
+public:
+    virtual status_t selectPresentation(int presentationId, int programId) = 0;
+};
+
+class IAfDuplicatingThread : public virtual IAfPlaybackThread {
+public:
+    static sp<IAfDuplicatingThread> create(
+            const sp<AudioFlinger>& audioFlinger, IAfPlaybackThread* mainThread,
+            audio_io_handle_t id, bool systemReady);
+
+    virtual void addOutputTrack(IAfPlaybackThread* thread) = 0;
+    virtual uint32_t waitTimeMs() const = 0;
+    virtual void removeOutputTrack(IAfPlaybackThread* thread) = 0;
+};
+
+class IAfRecordThread : public virtual IAfThreadBase {
+public:
+    static sp<IAfRecordThread> create(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamIn* input, audio_io_handle_t id,
+            bool systemReady);
+
+    virtual sp<IAfRecordTrack> createRecordTrack_l(
+            const sp<Client>& client,
+            const audio_attributes_t& attr,
+            uint32_t* pSampleRate,
+            audio_format_t format,
+            audio_channel_mask_t channelMask,
+            size_t* pFrameCount,
+            audio_session_t sessionId,
+            size_t* pNotificationFrameCount,
+            pid_t creatorPid,
+            const AttributionSourceState& attributionSource,
+            audio_input_flags_t* flags,
+            pid_t tid,
+            status_t* status /*non-NULL*/,
+            audio_port_handle_t portId,
+            int32_t maxSharedAudioHistoryMs) = 0;
+    virtual void destroyTrack_l(const sp<IAfRecordTrack>& track) = 0;
+    virtual void removeTrack_l(const sp<IAfRecordTrack>& track) = 0;
+
+    virtual status_t start(
+            IAfRecordTrack* recordTrack, AudioSystem::sync_event_t event,
+            audio_session_t triggerSession) = 0;
+
+    // ask the thread to stop the specified track, and
+    // return true if the caller should then do it's part of the stopping process
+    virtual bool stop(IAfRecordTrack* recordTrack) = 0;
+
+    virtual AudioStreamIn* getInput() const = 0;
+    virtual AudioStreamIn* clearInput() = 0;
+
+    virtual status_t getActiveMicrophones(
+            std::vector<media::MicrophoneInfoFw>* activeMicrophones) const = 0;
+    virtual status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction) = 0;
+    virtual status_t setPreferredMicrophoneFieldDimension(float zoom) = 0;
+
+    virtual void addPatchTrack(const sp<IAfPatchRecord>& record) = 0;
+    virtual void deletePatchTrack(const sp<IAfPatchRecord>& record) = 0;
+    virtual bool fastTrackAvailable() const = 0;
+    virtual void setFastTrackAvailable(bool available) = 0;
+
+    virtual void setRecordSilenced(audio_port_handle_t portId, bool silenced) = 0;
+    virtual bool hasFastCapture() const = 0;
+
+    virtual void checkBtNrec() = 0;
+    virtual uint32_t getInputFramesLost() const = 0;
+
+    virtual status_t shareAudioHistory(
+            const std::string& sharedAudioPackageName,
+            audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
+            int64_t sharedAudioStartMs = -1) = 0;
+    virtual void resetAudioHistory_l() = 0;
+};
+
+class IAfMmapThread : public virtual IAfThreadBase {
+public:
+    // createIAudioTrackAdapter() is a static constructor which creates an
+    // MmapStreamInterface AIDL interface adapter from the MmapThread object that
+    // may be passed back to the client.
+    //
+    // Only one AIDL MmapStreamInterface interface adapter should be created per MmapThread.
+    static sp<MmapStreamInterface> createMmapStreamInterfaceAdapter(
+            const sp<IAfMmapThread>& mmapThread);
+
+    virtual void configure(
+            const audio_attributes_t* attr,
+            audio_stream_type_t streamType,
+            audio_session_t sessionId,
+            const sp<MmapStreamCallback>& callback,
+            audio_port_handle_t deviceId,
+            audio_port_handle_t portId) = 0;
+    virtual void disconnect() = 0;
+
+    // MmapStreamInterface handling (see adapter)
+    virtual status_t createMmapBuffer(
+            int32_t minSizeFrames, struct audio_mmap_buffer_info* info) = 0;
+    virtual status_t getMmapPosition(struct audio_mmap_position* position) const = 0;
+    virtual status_t start(
+            const AudioClient& client, const audio_attributes_t* attr,
+            audio_port_handle_t* handle) = 0;
+    virtual status_t stop(audio_port_handle_t handle) = 0;
+    virtual status_t standby() = 0;
+    virtual status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
+    virtual status_t reportData(const void* buffer, size_t frameCount) = 0;
+
+    // TODO(b/288339104)  move to IAfThreadBase?
+    virtual void invalidateTracks(std::set<audio_port_handle_t>& portIds) = 0;
+
+    // Sets the UID records silence - TODO(b/288339104)  move to IAfMmapCaptureThread
+    virtual void setRecordSilenced(audio_port_handle_t portId, bool silenced) = 0;
+
+    virtual sp<IAfMmapPlaybackThread> asIAfMmapPlaybackThread() { return nullptr; }
+    virtual sp<IAfMmapCaptureThread> asIAfMmapCaptureThread() { return nullptr; }
+};
+
+class IAfMmapPlaybackThread : public virtual IAfMmapThread, public virtual VolumeInterface {
+public:
+    static sp<IAfMmapPlaybackThread> create(
+            const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id, AudioHwDevice* hwDev,
+            AudioStreamOut* output, bool systemReady);
+
+    virtual AudioStreamOut* clearOutput() = 0;
+};
+
+class IAfMmapCaptureThread : public virtual IAfMmapThread {
+public:
+    static sp<IAfMmapCaptureThread> create(
+            const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id, AudioHwDevice* hwDev,
+            AudioStreamIn* input, bool systemReady);
+
+    virtual AudioStreamIn* clearInput() = 0;
 };
 
 }  // namespace android
