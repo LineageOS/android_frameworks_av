@@ -2204,7 +2204,7 @@ ssize_t OutputTrack::write(void* data, uint32_t frames)
 {
     if (!mActive && frames != 0) {
         sp<AudioFlinger::ThreadBase> thread = mThread.promote();
-        if (thread != nullptr && thread->standby()) {
+        if (thread != nullptr && thread->inStandby()) {
             // preload one silent buffer to trigger mixer on start()
             ClientProxy::Buffer buf { .mFrameCount = mClientProxy->getStartThresholdInFrames() };
             status_t status = mClientProxy->obtainBuffer(&buf);
@@ -2312,7 +2312,7 @@ ssize_t OutputTrack::write(void* data, uint32_t frames)
     // If we could not write all frames, allocate a buffer and queue it for next time.
     if (inBuffer.frameCount) {
         sp<AudioFlinger::ThreadBase> thread = mThread.promote();
-        if (thread != 0 && !thread->standby()) {
+        if (thread != nullptr && !thread->inStandby()) {
             queueBuffer(inBuffer);
         }
     }
