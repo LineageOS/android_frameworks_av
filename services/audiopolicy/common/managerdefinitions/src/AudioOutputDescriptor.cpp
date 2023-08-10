@@ -987,7 +987,7 @@ std::string SwAudioOutputDescriptor::info() const {
     result.append("[io:" );
     result.append(android::internal::ToString(mIoHandle));
     result.append(", " );
-    result.append(mProfile->getTagName());
+    result.append(isDuplicated() ? "duplicating" : mProfile->getTagName());
     result.append("]]");
     return result;
 }
