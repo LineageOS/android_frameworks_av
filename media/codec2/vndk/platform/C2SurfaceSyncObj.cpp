@@ -278,6 +278,12 @@ c2_status_t C2SyncVariables::waitForChange(uint32_t waitId, c2_nsecs_t timeoutNs
     return C2_BAD_VALUE;
 }
 
+void C2SyncVariables::notifyAll() {
+    this->lock();
+    this->broadcast();
+    this->unlock();
+}
+
 int C2SyncVariables::signal() {
     mCond++;
 
