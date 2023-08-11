@@ -145,7 +145,7 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
         //         C2AndroidMemoryUsage(C2MemoryUsage(usage.value)).
         //         asGrallocUsage();
 
-        uint64_t grallocUsage =
+        uint32_t grallocUsage =
                 mSinkName.compare(0, 11, "c2.android.") == 0 ?
                 GRALLOC_USAGE_SW_READ_OFTEN :
                 GRALLOC_USAGE_HW_VIDEO_ENCODER;
