@@ -21,6 +21,7 @@
 #include <iterator>
 #include <optional>
 #include <regex>
+#include <vector>
 #include "AudioPolicyMix.h"
 #include "TypeConverter.h"
 #include "HwModule.h"
@@ -222,6 +223,31 @@ status_t AudioPolicyMixCollection::unregisterMix(const AudioMix& mix)
 
     ALOGE("unregisterMix(): mix not registered for dev=0x%x addr=%s",
             mix.mDeviceType, mix.mDeviceAddress.c_str());
+    return BAD_VALUE;
+}
+
+status_t AudioPolicyMixCollection::updateMix(
+        const AudioMix& mix, const std::vector<AudioMixMatchCriterion>& updatedCriteria) {
+    if (!areMixCriteriaConsistent(mix.mCriteria)) {
+        ALOGE("updateMix(): updated criteria are not consistent "
+              "(MATCH & EXCLUDE criteria of the same type)");
+        return BAD_VALUE;
+    }
+
+    for (size_t i = 0; i < size(); i++) {
+        const sp<AudioPolicyMix>& registeredMix = itemAt(i);
+        if (mix.mDeviceType == registeredMix->mDeviceType &&
+            mix.mDeviceAddress.compare(registeredMix->mDeviceAddress) == 0 &&
+            mix.mRouteFlags == registeredMix->mRouteFlags) {
+            registeredMix->mCriteria = updatedCriteria;
+            ALOGV("updateMix(): updated mix for dev=0x%x addr=%s", mix.mDeviceType,
+                  mix.mDeviceAddress.string());
+            return NO_ERROR;
+        }
+    }
+
+    ALOGE("updateMix(): mix not registered for dev=0x%x addr=%s", mix.mDeviceType,
+          mix.mDeviceAddress.string());
     return BAD_VALUE;
 }
 

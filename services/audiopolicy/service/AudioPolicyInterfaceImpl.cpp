@@ -1764,6 +1764,22 @@ Status AudioPolicyService::registerPolicyMixes(const std::vector<media::AudioMix
     }
 }
 
+Status AudioPolicyService::updatePolicyMixes(
+        const ::std::vector<::android::media::AudioMixUpdate>& updates) {
+    Mutex::Autolock _l(mLock);
+    for (const auto& update : updates) {
+        AudioMix mix = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_AudioMix(update.audioMix));
+        std::vector<AudioMixMatchCriterion> newCriteria =
+                VALUE_OR_RETURN_BINDER_STATUS(convertContainer<std::vector<AudioMixMatchCriterion>>(
+                        update.newCriteria, aidl2legacy_AudioMixMatchCriterion));
+        int status;
+        if((status = mAudioPolicyManager->updatePolicyMix(mix, newCriteria)) != NO_ERROR) {
+            return binderStatusFromStatusT(status);
+        }
+    }
+    return binderStatusFromStatusT(NO_ERROR);
+}
+
 Status AudioPolicyService::setUidDeviceAffinities(
         int32_t uidAidl,
         const std::vector<AudioDevice>& devicesAidl) {

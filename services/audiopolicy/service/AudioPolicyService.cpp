@@ -120,6 +120,7 @@ BINDER_METHOD_ENTRY(acquireSoundTriggerSession) \
 BINDER_METHOD_ENTRY(releaseSoundTriggerSession) \
 BINDER_METHOD_ENTRY(getPhoneState) \
 BINDER_METHOD_ENTRY(registerPolicyMixes) \
+BINDER_METHOD_ENTRY(updatePolicyMixes) \
 BINDER_METHOD_ENTRY(setUidDeviceAffinities) \
 BINDER_METHOD_ENTRY(removeUidDeviceAffinities) \
 BINDER_METHOD_ENTRY(setUserIdDeviceAffinities) \
@@ -1307,6 +1308,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_isStreamActiveRemotely:
         case TRANSACTION_isSourceActive:
         case TRANSACTION_registerPolicyMixes:
+        case TRANSACTION_updatePolicyMixes:
         case TRANSACTION_setMasterMono:
         case TRANSACTION_getSurroundFormats:
         case TRANSACTION_getReportedSurroundFormats:

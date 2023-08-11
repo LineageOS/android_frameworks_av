@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <android/media/IAudioPolicyService.h>
+#include <android/media/AudioMixUpdate.h>
 #include <android/media/BnCaptureStateListener.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
@@ -1840,6 +1841,27 @@ status_t AudioSystem::registerPolicyMixes(const Vector<AudioMix>& mixes, bool re
             convertRange(mixes.begin(), mixes.begin() + mixesSize, std::back_inserter(mixesAidl),
                          legacy2aidl_AudioMix));
     return statusTFromBinderStatus(aps->registerPolicyMixes(mixesAidl, registration));
+}
+
+status_t AudioSystem::updatePolicyMixes(
+        const std::vector<std::pair<AudioMix, std::vector<AudioMixMatchCriterion>>>&
+                mixesWithUpdates) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    std::vector<media::AudioMixUpdate> updatesAidl;
+    updatesAidl.reserve(mixesWithUpdates.size());
+
+    for (const auto& update : mixesWithUpdates) {
+        media::AudioMixUpdate updateAidl;
+        updateAidl.audioMix = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioMix(update.first));
+        RETURN_STATUS_IF_ERROR(convertRange(update.second.begin(), update.second.end(),
+                                            std::back_inserter(updateAidl.newCriteria),
+                                            legacy2aidl_AudioMixMatchCriterion));
+        updatesAidl.emplace_back(updateAidl);
+    }
+
+    return statusTFromBinderStatus(aps->updatePolicyMixes(updatesAidl));
 }
 
 status_t AudioSystem::setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices) {

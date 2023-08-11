@@ -198,6 +198,8 @@ public:
     binder::Status getPhoneState(AudioMode* _aidl_return) override;
     binder::Status registerPolicyMixes(const std::vector<media::AudioMix>& mixes,
                                        bool registration) override;
+    binder::Status updatePolicyMixes(
+        const ::std::vector<::android::media::AudioMixUpdate>& updates) override;
     binder::Status setUidDeviceAffinities(int32_t uid,
                                           const std::vector<AudioDevice>& devices) override;
     binder::Status removeUidDeviceAffinities(int32_t uid) override;
