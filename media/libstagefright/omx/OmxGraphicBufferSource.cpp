@@ -85,7 +85,7 @@ status_t OmxGraphicBufferSource::configure(
         int32_t bufferCount,
         uint32_t frameWidth,
         uint32_t frameHeight,
-        uint64_t consumerUsage) {
+        uint32_t consumerUsage) {
     if (omxNode == NULL) {
         return BAD_VALUE;
     }

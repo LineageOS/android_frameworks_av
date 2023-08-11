@@ -1683,8 +1683,8 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     uint64_t consumerUsage = kDefaultConsumerUsage;
     {
         if (surface) {
-            uint64_t usage = 0;
-            status_t err = surface->getConsumerUsage(&usage);
+            int usage = 0;
+            status_t err = surface->query(NATIVE_WINDOW_CONSUMER_USAGE_BITS, &usage);
             if (err != NO_ERROR) {
                 ALOGD("setOutputSurface -- failed to get consumer usage bits (%d/%s). ignoring",
                         err, asString(err));
@@ -1697,7 +1697,8 @@ c2_status_t Codec2Client::Component::setOutputSurface(
                 // they do not exist inside of C2 scope. Any buffer usage shall be communicated
                 // through the sideband channel.
 
-                consumerUsage = usage | kDefaultConsumerUsage;
+                // do an unsigned conversion as bit-31 may be 1
+                consumerUsage = (uint32_t)usage | kDefaultConsumerUsage;
             }
         }
 
