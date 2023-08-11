@@ -540,6 +540,7 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_CONTROL_AUTOFRAMING:
         case ACAMERA_EDGE_MODE:
         case ACAMERA_FLASH_MODE:
+        case ACAMERA_FLASH_STRENGTH_LEVEL:
         case ACAMERA_HOT_PIXEL_MODE:
         case ACAMERA_JPEG_GPS_COORDINATES:
         case ACAMERA_JPEG_GPS_PROCESSING_METHOD:
