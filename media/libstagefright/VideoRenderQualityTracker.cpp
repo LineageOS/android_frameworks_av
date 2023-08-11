@@ -154,7 +154,7 @@ VideoRenderQualityTracker::Configuration
 }
 
 VideoRenderQualityTracker::Configuration::Configuration() {
-    enabled = true;
+    enabled = false;
 
     // Assume that the app is skipping frames because it's detected that the frame couldn't be
     // rendered in time.
