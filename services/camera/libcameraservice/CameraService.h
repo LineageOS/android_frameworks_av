@@ -964,8 +964,8 @@ private:
 
     /** Parses cameraIdRemapping parcelable into the native cameraIdRemappingMap. */
     binder::Status parseCameraIdRemapping(
-        const hardware::CameraIdRemapping& cameraIdRemapping,
-        TCameraIdRemapping cameraIdRemappingMap);
+            const hardware::CameraIdRemapping& cameraIdRemapping,
+            /* out */ TCameraIdRemapping* cameraIdRemappingMap);
 
     /**
      * Resolve the (potentially remapped) camera Id to use for packageName.
