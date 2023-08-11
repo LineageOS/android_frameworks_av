@@ -610,7 +610,9 @@ OpPlayAudioMonitor::~OpPlayAudioMonitor()
 
 void OpPlayAudioMonitor::onFirstRef()
 {
-    checkPlayAudioForUsage();
+    // make sure not to broadcast the initial state since it is not needed and could
+    // cause a deadlock since this method can be called with the mThread->mLock held
+    checkPlayAudioForUsage(/*doBroadcast=*/false);
     if (mAttributionSource.packageName.has_value()) {
         mOpCallback = new PlayAudioOpCallback(this);
         mAppOpsManager.startWatchingMode(AppOpsManager::OP_PLAY_AUDIO,
@@ -625,7 +627,7 @@ bool OpPlayAudioMonitor::hasOpPlayAudio() const {
 // Note this method is never called (and never to be) for audio server / patch record track
 // - not called from constructor due to check on UID,
 // - not called from PlayAudioOpCallback because the callback is not installed in this case
-void OpPlayAudioMonitor::checkPlayAudioForUsage()
+void OpPlayAudioMonitor::checkPlayAudioForUsage(bool doBroadcast)
 {
     const bool hasAppOps = mAttributionSource.packageName.has_value()
         && mAppOpsManager.checkAudioOpNoThrow(
@@ -635,11 +637,13 @@ void OpPlayAudioMonitor::checkPlayAudioForUsage()
     bool shouldChange = !hasAppOps;  // check if we need to update.
     if (mHasOpPlayAudio.compare_exchange_strong(shouldChange, hasAppOps)) {
         ALOGD("OpPlayAudio: track:%d usage:%d %smuted", mId, mUsage, hasAppOps ? "not " : "");
-        auto thread = mThread.promote();
-        if (thread != nullptr && thread->type() == IAfThreadBase::OFFLOAD) {
-            // Wake up Thread if offloaded, otherwise it may be several seconds for update.
-            Mutex::Autolock _l(thread->mutex());
-            thread->broadcast_l();
+        if (doBroadcast) {
+            auto thread = mThread.promote();
+            if (thread != nullptr && thread->type() == IAfThreadBase::OFFLOAD) {
+                // Wake up Thread if offloaded, otherwise it may be several seconds for update.
+                Mutex::Autolock _l(thread->mutex());
+                thread->broadcast_l();
+            }
         }
     }
 }
@@ -657,7 +661,7 @@ void OpPlayAudioMonitor::PlayAudioOpCallback::opChanged(int32_t op,
     }
     sp<OpPlayAudioMonitor> monitor = mMonitor.promote();
     if (monitor != NULL) {
-        monitor->checkPlayAudioForUsage();
+        monitor->checkPlayAudioForUsage(/*doBroadcast=*/true);
     }
 }
 
