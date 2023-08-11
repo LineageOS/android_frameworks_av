@@ -789,7 +789,7 @@ status_t Harness::testAll() {
     for (List<IOMX::ComponentInfo>::iterator it = componentInfos.begin();
          it != componentInfos.end(); ++it) {
         const IOMX::ComponentInfo &info = *it;
-        const char *componentName = info.mName.string();
+        const char *componentName = info.mName.c_str();
 
         if (strncmp(componentName, "OMX.google.", 11)) {
             continue;
@@ -797,7 +797,7 @@ status_t Harness::testAll() {
 
         for (List<String8>::const_iterator role_it = info.mRoles.begin();
              role_it != info.mRoles.end(); ++role_it) {
-            const char *componentRole = (*role_it).string();
+            const char *componentRole = (*role_it).c_str();
 
             err = test(componentName, componentRole);
 

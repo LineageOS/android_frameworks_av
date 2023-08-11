@@ -67,7 +67,7 @@ status_t MetadataRetrieverClient::dump(int fd, const Vector<String16>& /*args*/)
     result.append(" MetadataRetrieverClient\n");
     snprintf(buffer, 255, "  pid(%d)\n", mPid);
     result.append(buffer);
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
     write(fd, "\n", 1);
     return NO_ERROR;
 }

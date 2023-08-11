@@ -166,7 +166,7 @@ void OMXStore::addPlugin(OMXPluginBase *plugin) {
 
         if (mPluginByComponentName.indexOfKey(name8) >= 0) {
             ALOGE("A component of name '%s' already exists, ignoring this one.",
-                 name8.string());
+                 name8.c_str());
 
             continue;
         }
@@ -262,7 +262,7 @@ OMX_ERRORTYPE OMXStore::enumerateComponents(
     const String8 &name8 = mPluginByComponentName.keyAt(index);
 
     CHECK(size >= 1 + name8.size());
-    strcpy(name, name8.string());
+    strcpy(name, name8.c_str());
 
     return OMX_ErrorNone;
 }

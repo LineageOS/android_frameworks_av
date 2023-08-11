@@ -155,7 +155,7 @@ static void displayAVCProfileLevelIfPossible(const sp<MetaData>& meta) {
 }
 
 static void dumpSource(const sp<MediaSource> &source, const String8 &filename) {
-    FILE *out = fopen(filename.string(), "wb");
+    FILE *out = fopen(filename.c_str(), "wb");
 
     CHECK_EQ((status_t)OK, source->start());
 
@@ -538,9 +538,9 @@ static void writeSourcesToMP4(
         Vector<sp<MediaSource> > &sources, bool syncInfoPresent) {
 #if 0
     sp<MPEG4Writer> writer =
-        new MPEG4Writer(gWriteMP4Filename.string());
+        new MPEG4Writer(gWriteMP4Filename.c_str());
 #else
-    int fd = open(gWriteMP4Filename.string(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    int fd = open(gWriteMP4Filename.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
     if (fd < 0) {
         fprintf(stderr, "couldn't open file");
         return;

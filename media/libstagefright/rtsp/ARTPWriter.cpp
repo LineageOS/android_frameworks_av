@@ -1647,11 +1647,11 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
         memset(&mRTCPAddr6, 0, sizeof(mRTCPAddr6));
 
         mLocalAddr6.sin6_family = AF_INET6;
-        inet_pton(AF_INET6, localIp.string(), &mLocalAddr6.sin6_addr);
+        inet_pton(AF_INET6, localIp.c_str(), &mLocalAddr6.sin6_addr);
         mLocalAddr6.sin6_port = htons((uint16_t)localPort);
 
         mRTPAddr6.sin6_family = AF_INET6;
-        inet_pton(AF_INET6, remoteIp.string(), &mRTPAddr6.sin6_addr);
+        inet_pton(AF_INET6, remoteIp.c_str(), &mRTPAddr6.sin6_addr);
         mRTPAddr6.sin6_port = htons((uint16_t)remotePort);
 
         mRTCPAddr6 = mRTPAddr6;
@@ -1662,11 +1662,11 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
         memset(&mRTCPAddr, 0, sizeof(mRTCPAddr));
 
         mLocalAddr.sin_family = AF_INET;
-        mLocalAddr.sin_addr.s_addr = inet_addr(localIp.string());
+        mLocalAddr.sin_addr.s_addr = inet_addr(localIp.c_str());
         mLocalAddr.sin_port = htons((uint16_t)localPort);
 
         mRTPAddr.sin_family = AF_INET;
-        mRTPAddr.sin_addr.s_addr = inet_addr(remoteIp.string());
+        mRTPAddr.sin_addr.s_addr = inet_addr(remoteIp.c_str());
         mRTPAddr.sin_port = htons((uint16_t)remotePort);
 
         mRTCPAddr = mRTPAddr;
@@ -1679,9 +1679,9 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
     int sizeSockSt = mIsIPv6 ? sizeof(mLocalAddr6) : sizeof(mLocalAddr);
 
     if (bind(mRTPSocket, localAddr, sizeSockSt) == -1) {
-        ALOGE("failed to bind rtp %s:%d err=%s", localIp.string(), localPort, strerror(errno));
+        ALOGE("failed to bind rtp %s:%d err=%s", localIp.c_str(), localPort, strerror(errno));
     } else {
-        ALOGD("succeed to bind rtp %s:%d", localIp.string(), localPort);
+        ALOGD("succeed to bind rtp %s:%d", localIp.c_str(), localPort);
     }
 
     if (mIsIPv6)
@@ -1690,9 +1690,9 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
         mLocalAddr.sin_port = htons((uint16_t)(localPort + 1));
 
     if (bind(mRTCPSocket, localAddr, sizeSockSt) == -1) {
-        ALOGE("failed to bind rtcp %s:%d err=%s", localIp.string(), localPort + 1, strerror(errno));
+        ALOGE("failed to bind rtcp %s:%d err=%s", localIp.c_str(), localPort + 1, strerror(errno));
     } else {
-        ALOGD("succeed to bind rtcp %s:%d", localIp.string(), localPort + 1);
+        ALOGD("succeed to bind rtcp %s:%d", localIp.c_str(), localPort + 1);
     }
 }
 

@@ -153,7 +153,7 @@ float TextRenderer::computeScaledStringWidth(const String8& str8) const {
     // just convert to char* -- but String8 doesn't document what it does
     // with values outside 0-255.  So just convert to char* and use strlen()
     // to see what we get.
-    const char* str = str8.string();
+    const char* str = str8.c_str();
     return computeScaledStringWidth(str, strlen(str));
 }
 
@@ -180,13 +180,13 @@ float TextRenderer::computeScaledStringWidth(const char* str,
 
 void TextRenderer::drawString(const Program& program, const float* texMatrix,
         float x, float y, const String8& str8) const {
-    ALOGV("drawString %.3f,%.3f '%s' (scale=%.3f)", x, y, str8.string(),mScale);
+    ALOGV("drawString %.3f,%.3f '%s' (scale=%.3f)", x, y, str8.c_str(),mScale);
     initOnce();
 
     // We want to draw the entire string with a single GLES call.  We
     // generate two arrays, one with screen coordinates, one with texture
     // coordinates.  Need two triangles per character.
-    const char* str = str8.string();
+    const char* str = str8.c_str();
     size_t len = strlen(str);       // again, unsure about String8 handling
 
     const size_t quadCoords =
@@ -252,7 +252,7 @@ void TextRenderer::drawString(const Program& program, const float* texMatrix,
 
 float TextRenderer::drawWrappedString(const Program& texRender,
         float xpos, float ypos, const String8& str) {
-    ALOGV("drawWrappedString %.3f,%.3f '%s'", xpos, ypos, str.string());
+    ALOGV("drawWrappedString %.3f,%.3f '%s'", xpos, ypos, str.c_str());
     initOnce();
 
     if (mScreenWidth == 0 || mScreenHeight == 0) {
@@ -283,7 +283,7 @@ float TextRenderer::drawWrappedString(const Program& texRender,
     } else {
         // We need to break the string into pieces, ideally at whitespace
         // boundaries.
-        char* mangle = strdup(str.string());
+        char* mangle = strdup(str.c_str());
         char* start = mangle;
         while (start != NULL) {
             float xposAdj = (start == mangle) ? xpos : xpos + indentWidth;

@@ -604,7 +604,7 @@ status_t MPEG4Writer::dump(
     result.append(buffer);
     snprintf(buffer, SIZE, "     mStarted: %s\n", mStarted? "true": "false");
     result.append(buffer);
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
     for (List<Track *>::iterator it = mTracks.begin();
          it != mTracks.end(); ++it) {
         (*it)->dump(fd, args);
@@ -626,7 +626,7 @@ status_t MPEG4Writer::Track::dump(
     result.append(buffer);
     snprintf(buffer, SIZE, "       duration encoded : %" PRId64 " us\n", mTrackDurationUs);
     result.append(buffer);
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
     return OK;
 }
 

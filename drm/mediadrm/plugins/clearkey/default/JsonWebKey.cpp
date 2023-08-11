@@ -83,12 +83,12 @@ bool JsonWebKey::extractKeysFromJsonWebKeySet(const String8& jsonWebKeySet,
             }
 
             if (!decodeBase64String(encodedKeyId, &decodedKeyId)) {
-                ALOGE("Failed to decode key id(%s)", encodedKeyId.string());
+                ALOGE("Failed to decode key id(%s)", encodedKeyId.c_str());
                 continue;
             }
 
             if (!decodeBase64String(encodedKey, &decodedKey)) {
-                ALOGE("Failed to decode key(%s)", encodedKey.string());
+                ALOGE("Failed to decode key(%s)", encodedKey.c_str());
                 continue;
             }
 
@@ -119,7 +119,7 @@ bool JsonWebKey::decodeBase64String(const String8& encodedText,
     }
 
     android::sp<ABuffer> buffer =
-            android::decodeBase64(AString(paddedText.string()));
+            android::decodeBase64(AString(paddedText.c_str()));
     if (buffer == NULL) {
         ALOGE("Malformed base64 encoded content found.");
         return false;
@@ -159,7 +159,7 @@ void JsonWebKey::findValue(const String8 &key, String8* value) {
         if (0 == (*nextToken).compare(key)) {
             if (nextToken + 1 == mTokens.end())
                 break;
-            valueToken = (*(nextToken + 1)).string();
+            valueToken = (*(nextToken + 1)).c_str();
             value->setTo(valueToken);
             nextToken++;
             break;
@@ -186,7 +186,7 @@ bool JsonWebKey::parseJsonObject(const String8& jsonObject,
 
     jsmn_init(&parser);
     int numTokens = jsmn_parse(&parser,
-        jsonObject.string(), jsonObject.size(), NULL, 0);
+        jsonObject.c_str(), jsonObject.size(), NULL, 0);
     if (numTokens < 0) {
         ALOGE("Parser returns error code=%d", numTokens);
         return false;
@@ -197,7 +197,7 @@ bool JsonWebKey::parseJsonObject(const String8& jsonObject,
     mJsmnTokens.setCapacity(jsmnTokensSize);
 
     jsmn_init(&parser);
-    int status = jsmn_parse(&parser, jsonObject.string(),
+    int status = jsmn_parse(&parser, jsonObject.c_str(),
         jsonObject.size(), mJsmnTokens.editArray(), numTokens);
     if (status < 0) {
         ALOGE("Parser returns error code=%d", status);
@@ -208,7 +208,7 @@ bool JsonWebKey::parseJsonObject(const String8& jsonObject,
     String8 token;
     const char *pjs;
     for (int j = 0; j < numTokens; ++j) {
-        pjs = jsonObject.string() + mJsmnTokens[j].start;
+        pjs = jsonObject.c_str() + mJsmnTokens[j].start;
         if (mJsmnTokens[j].type == JSMN_STRING ||
                 mJsmnTokens[j].type == JSMN_PRIMITIVE) {
             token.setTo(pjs, mJsmnTokens[j].end - mJsmnTokens[j].start);
@@ -237,7 +237,7 @@ bool JsonWebKey::parseJsonWebKeySet(const String8& jsonWebKeySet,
     // the original string.
     jsmn_init(&parser);
     int numTokens = jsmn_parse(&parser,
-            jsonWebKeySet.string(), jsonWebKeySet.size(), NULL, 0);
+            jsonWebKeySet.c_str(), jsonWebKeySet.size(), NULL, 0);
     if (numTokens < 0) {
         ALOGE("Parser returns error code=%d", numTokens);
         return false;
@@ -247,7 +247,7 @@ bool JsonWebKey::parseJsonWebKeySet(const String8& jsonWebKeySet,
     mJsmnTokens.setCapacity(jsmnTokensSize);
 
     jsmn_init(&parser);
-    int status = jsmn_parse(&parser, jsonWebKeySet.string(),
+    int status = jsmn_parse(&parser, jsonWebKeySet.c_str(),
             jsonWebKeySet.size(), mJsmnTokens.editArray(), numTokens);
     if (status < 0) {
         ALOGE("Parser returns error code=%d", status);
@@ -257,7 +257,7 @@ bool JsonWebKey::parseJsonWebKeySet(const String8& jsonWebKeySet,
     String8 token;
     const char *pjs;
     for (int i = 0; i < numTokens; ++i) {
-        pjs = jsonWebKeySet.string() + mJsmnTokens[i].start;
+        pjs = jsonWebKeySet.c_str() + mJsmnTokens[i].start;
         if (mJsmnTokens[i].type == JSMN_OBJECT) {
             token.setTo(pjs, mJsmnTokens[i].end - mJsmnTokens[i].start);
             jsonObjects->add(token);
