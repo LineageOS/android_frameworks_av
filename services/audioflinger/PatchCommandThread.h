@@ -15,9 +15,9 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
+
+namespace android {
 
 class Command;
 
@@ -100,3 +100,5 @@ private:
     std::mutex mListenerLock;
     std::vector<wp<PatchCommandListener>> mListeners GUARDED_BY(mListenerLock);
 };
+
+}  // namespace android
