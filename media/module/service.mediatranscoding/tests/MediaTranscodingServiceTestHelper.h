@@ -76,7 +76,7 @@ static status_t getUidForPackage(String16 packageName, userid_t userId, /*inout*
     PermissionController pc;
     uid = pc.getPackageUid(packageName, 0);
     if (uid <= 0) {
-        ALOGE("Unknown package: '%s'", String8(packageName).string());
+        ALOGE("Unknown package: '%s'", String8(packageName).c_str());
         return BAD_VALUE;
     }
 
