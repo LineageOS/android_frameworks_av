@@ -77,7 +77,7 @@ HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
                 break;
             default:
                 ALOGE("Get camera characteristics from camera service failed: %s",
-                      serviceRet.toString8().string());
+                      serviceRet.toString8().c_str());
                 status = B2HStatus(serviceRet);
           }
         _hidl_cb(status, hidlMetadata);
@@ -306,7 +306,7 @@ Return<void> HidlCameraService::getCameraVendorTagSections(getCameraVendorTagSec
         }
         hVendorTagSections.resize(numSections);
         for (size_t s = 0; s < numSections; s++) {
-            hVendorTagSections[s].sectionName = (*sectionNames)[s].string();
+            hVendorTagSections[s].sectionName = (*sectionNames)[s].c_str();
             hVendorTagSections[s].tags = tagsBySection[s];
         }
         HProviderIdAndVendorTagSections &hProviderIdAndVendorTagSections =
