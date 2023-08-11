@@ -35,16 +35,16 @@ parcelable CameraIdRemapping {
          * Ordered list of Camera Ids to replace. Only Camera Ids present in this list will be
          * affected.
          */
-        @utf8InCpp String[] cameraIdToReplace;
+        @utf8InCpp List<String> cameraIdsToReplace;
         /**
-         *  Ordered list of updated Camera Ids, where updatedCameraId[i] corresponds to
-         *  the updated camera id for cameraIdToReplace[i].
+         *  Ordered list of updated Camera Ids, where updatedCameraIds[i] corresponds to
+         *  the updated camera id for cameraIdsToReplace[i].
          */
-        @utf8InCpp String[] updatedCameraId;
+        @utf8InCpp List<String> updatedCameraIds;
     }
 
     /**
      * List of Camera Id remappings to perform.
      */
-    List<PackageIdRemapping> packageIdRemapping;
+    List<PackageIdRemapping> packageIdRemappings;
 }
