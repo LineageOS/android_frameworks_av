@@ -258,10 +258,13 @@ private:
     int32_t mNodeGeneration;
     sp<TAllocator> mAllocator[2];
 
-    bool mUsingNativeWindow;
-    sp<ANativeWindow> mNativeWindow;
+    std::deque<TrackedFrame> mTrackedFrames; // render information for buffers sent to a window
+    bool mAreRenderMetricsEnabled;
     bool mIsWindowToDisplay;
     bool mHasPresentFenceTimes;
+
+    bool mUsingNativeWindow;
+    sp<ANativeWindow> mNativeWindow;
     int mNativeWindowUsageBits;
     android_native_rect_t mLastNativeWindowCrop;
     int32_t mLastNativeWindowDataSpace;
@@ -276,7 +279,6 @@ private:
     // format updates. This will equal to mOutputFormat until the first actual frame is received.
     sp<AMessage> mBaseOutputFormat;
 
-    std::deque<TrackedFrame> mTrackedFrames; // render information for buffers sent to a window
     std::vector<BufferInfo> mBuffers[2];
     bool mPortEOS[2];
     status_t mInputEOSResult;

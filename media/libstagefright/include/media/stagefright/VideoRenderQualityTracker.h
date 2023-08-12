@@ -38,6 +38,9 @@ struct VideoRenderQualityMetrics {
     // The render time of the first video frame.
     int64_t firstRenderTimeUs;
 
+    // The render time of the last video frame.
+    int64_t lastRenderTimeUs;
+
     // The number of frames released to be rendered.
     int64_t frameReleasedCount;
 

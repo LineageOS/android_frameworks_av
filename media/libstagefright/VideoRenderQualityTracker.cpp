@@ -154,7 +154,7 @@ VideoRenderQualityTracker::Configuration
 }
 
 VideoRenderQualityTracker::Configuration::Configuration() {
-    enabled = true;
+    enabled = false;
 
     // Assume that the app is skipping frames because it's detected that the frame couldn't be
     // rendered in time.
@@ -455,6 +455,8 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     if (mMetrics.firstRenderTimeUs == 0) {
         mMetrics.firstRenderTimeUs = actualRenderTimeUs;
     }
+    // Capture the timestamp at which the last frame was rendered
+    mMetrics.lastRenderTimeUs = actualRenderTimeUs;
 
     mMetrics.frameRenderedCount++;
 

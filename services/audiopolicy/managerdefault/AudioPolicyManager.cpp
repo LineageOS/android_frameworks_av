@@ -7836,8 +7836,8 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
         volumeDb = 0.0f;
     }
     const bool muted = (index == 0) && (volumeDb != 0.0f);
-    outputDesc->setVolume(
-            volumeDb, muted, volumeSource, curves.getStreamTypes(), deviceTypes, delayMs, force);
+    outputDesc->setVolume(volumeDb, muted, volumeSource, curves.getStreamTypes(),
+            deviceTypes, delayMs, force, isVoiceVolSrc);
 
     if (outputDesc == mPrimaryOutput && (isVoiceVolSrc || isBtScoVolSrc)) {
         float voiceVolume;
