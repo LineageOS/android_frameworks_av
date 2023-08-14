@@ -147,7 +147,7 @@ public:
         virtual bool        needsTrailingPadding() { return true; }
 
         virtual status_t    setParameters(const String8& /* keyValuePairs */) { return NO_ERROR; }
-        virtual String8     getParameters(const String8& /* keys */) { return String8::empty(); }
+        virtual String8     getParameters(const String8& /* keys */) { return String8(); }
 
         virtual media::VolumeShaper::Status applyVolumeShaper(
                                     const sp<media::VolumeShaper::Configuration>& configuration,
