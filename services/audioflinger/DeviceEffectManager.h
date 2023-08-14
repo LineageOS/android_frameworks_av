@@ -19,12 +19,24 @@
 
 namespace android {
 
+class IAfDeviceEffectManagerCallback : public virtual RefBase {
+public:
+    virtual bool isAudioPolicyReady() const = 0;
+    virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
+    virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
+    virtual status_t addEffectToHal(
+            const struct audio_port_config* device, const sp<EffectHalInterface>& effect) = 0;
+    virtual status_t removeEffectFromHal(
+            const struct audio_port_config* device, const sp<EffectHalInterface>& effect) = 0;
+};
+
 class DeviceEffectManagerCallback;
 
 // DeviceEffectManager is concealed within AudioFlinger, their lifetimes are the same.
 class DeviceEffectManager : public PatchCommandThread::PatchCommandListener {
 public:
-    explicit DeviceEffectManager(AudioFlinger& audioFlinger);
+    explicit DeviceEffectManager(
+            const sp<IAfDeviceEffectManagerCallback>& afDeviceEffectManagerCallback);
 
     void onFirstRef() override;
 
@@ -47,7 +59,7 @@ public:
     status_t removeEffectFromHal(const struct audio_port_config *device,
             const sp<EffectHalInterface>& effect);
 
-    AudioFlinger& audioFlinger() const { return mAudioFlinger; }
+    const auto& afDeviceEffectManagerCallback() const { return mAfDeviceEffectManagerCallback; }
 
     void dump(int fd);
 
@@ -61,7 +73,7 @@ private:
     status_t checkEffectCompatibility(const effect_descriptor_t *desc);
 
     Mutex mLock;
-    AudioFlinger &mAudioFlinger;
+    const sp<IAfDeviceEffectManagerCallback> mAfDeviceEffectManagerCallback;
     const sp<DeviceEffectManagerCallback> mMyCallback;
     std::map<AudioDeviceTypeAddr, sp<IAfDeviceEffectProxy>> mDeviceEffects;
 };
