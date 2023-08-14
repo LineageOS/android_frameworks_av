@@ -169,12 +169,6 @@ Descriptor::Common EffectProxy::buildDescriptorCommon(
             common.flags.hwAcceleratorMode = Flags::HardwareAccelerator::TUNNEL;
         }
 
-        // initial flag values before we know which sub-effect to active (with setOffloadParam)
-        // same as HIDL EffectProxy flags
-        common.flags.type = Flags::Type::INSERT;
-        common.flags.insert = Flags::Insert::LAST;
-        common.flags.volume = Flags::Volume::NONE;
-
         // set indication if any sub-effect indication was set
         common.flags.offloadIndication |= desc.common.flags.offloadIndication;
         common.flags.deviceIndication |= desc.common.flags.deviceIndication;
