@@ -928,7 +928,7 @@ void AudioFlinger::PatchPanel::dump(int fd) const
         }
     }
 
-    if (!patchPanelDump.isEmpty()) {
+    if (!patchPanelDump.empty()) {
         write(fd, patchPanelDump.c_str(), patchPanelDump.size());
     }
 }
