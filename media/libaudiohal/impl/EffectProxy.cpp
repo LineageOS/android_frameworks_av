@@ -238,7 +238,10 @@ ndk::ScopedAStatus EffectProxy::runWithActiveSubEffectThenOthers(
     }
 
     // proceed with others
-    for (size_t i = 0; i < mSubEffects.size() && i != mActiveSubIdx; i++) {
+    for (size_t i = 0; i < mSubEffects.size(); i++) {
+        if (i == mActiveSubIdx) {
+            continue;
+        }
         if (!mSubEffects[i].handle) {
             ALOGE("%s null sub-effect interface for %s", __func__,
                   mSubEffects[i].descriptor.common.id.uuid.toString().c_str());
