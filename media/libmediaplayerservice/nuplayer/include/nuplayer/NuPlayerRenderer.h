@@ -179,6 +179,9 @@ private:
     float mVideoFpsHint;
 
     int64_t mAudioFirstAnchorTimeMediaUs;
+    // previous audio anchor timestamp, in media time base.
+    int64_t mAudioAnchorTimeMediaUs;
+    // previous anchor timestamp (audio or video), in media time base.
     int64_t mAnchorTimeMediaUs;
     int64_t mAnchorNumFramesWritten;
     int64_t mVideoLateByUs;
