@@ -1035,7 +1035,7 @@ sp<Client> AudioFlinger::registerPid(pid_t pid)
     // (for which promote() is always != 0), otherwise create a new entry and Client.
     sp<Client> client = mClients.valueFor(pid).promote();
     if (client == 0) {
-        client = new Client(this, pid);
+        client = sp<Client>::make(sp<IAfClientCallback>::fromExisting(this), pid);
         mClients.add(pid, client);
     }
 
@@ -2310,16 +2310,16 @@ sp<IAfThreadBase> AudioFlinger::getEffectThread_l(audio_session_t sessionId,
 
 // ----------------------------------------------------------------------------
 
-Client::Client(const sp<AudioFlinger>& audioFlinger, pid_t pid)
+Client::Client(const sp<IAfClientCallback>& afClientCallback, pid_t pid)
     :   RefBase(),
-        mAudioFlinger(audioFlinger),
+        mAfClientCallback(afClientCallback),
         mPid(pid),
         mClientAllocator(AllocatorFactory::getClientAllocator()) {}
 
 // Client destructor must be called with AudioFlinger::mClientLock held
 Client::~Client()
 {
-    mAudioFlinger->removeClient_l(mPid);
+    mAfClientCallback->removeClient_l(mPid);
 }
 
 AllocatorFactory::ClientAllocator& Client::allocator()
