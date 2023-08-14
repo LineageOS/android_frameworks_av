@@ -347,6 +347,45 @@ TEST_P(libAudioHalEffectParamTest, setAndGetParam) {
     }
 }
 
+TEST_P(libAudioHalEffectParamTest, deviceIndicationUpdate) {
+    for (auto& interface : mHalInterfaces) {
+        EXPECT_NO_FATAL_FAILURE(initEffect(interface));
+
+        // output device
+        uint32_t deviceTypes = AUDIO_DEVICE_OUT_SPEAKER | AUDIO_DEVICE_OUT_BLE_SPEAKER;
+        status_t cmdStatus;
+        uint32_t replySize = sizeof(cmdStatus);
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_DEVICE, sizeof(uint32_t), &deviceTypes,
+                                         &replySize, &cmdStatus));
+        // input device
+        deviceTypes = AUDIO_DEVICE_IN_WIRED_HEADSET | AUDIO_DEVICE_IN_BLUETOOTH_BLE;
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_DEVICE, sizeof(uint32_t), &deviceTypes,
+                                         &replySize, &cmdStatus));
+    }
+}
+
+TEST_P(libAudioHalEffectParamTest, audioModeIndicationUpdate) {
+    for (auto& interface : mHalInterfaces) {
+        EXPECT_NO_FATAL_FAILURE(initEffect(interface));
+        uint32_t mode = AUDIO_MODE_IN_CALL;
+        status_t cmdStatus;
+        uint32_t replySize = sizeof(cmdStatus);
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_AUDIO_MODE, sizeof(uint32_t), &mode,
+                                         &replySize, &cmdStatus));
+    }
+}
+
+TEST_P(libAudioHalEffectParamTest, audioSourceIndicationUpdate) {
+    for (auto& interface : mHalInterfaces) {
+        EXPECT_NO_FATAL_FAILURE(initEffect(interface));
+        uint32_t source = AUDIO_SOURCE_MIC;
+        status_t cmdStatus;
+        uint32_t replySize = sizeof(cmdStatus);
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_AUDIO_SOURCE, sizeof(uint32_t), &source,
+                                         &replySize, &cmdStatus));
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(
         libAudioHalEffectParamTest, libAudioHalEffectParamTest, ::testing::ValuesIn(testPairs),
         [](const testing::TestParamInfo<libAudioHalEffectParamTest::ParamType>& info) {
