@@ -17,6 +17,8 @@
 #ifndef ANDROID_AUDIO_THREADMETRICS_H
 #define ANDROID_AUDIO_THREADMETRICS_H
 
+#include <media/MediaMetricsItem.h>
+
 #include <mutex>
 
 namespace android {
