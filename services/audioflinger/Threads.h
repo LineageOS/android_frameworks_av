@@ -170,7 +170,7 @@ public:
             mKeyValuePairs(keyValuePairs) {}
 
         virtual  void dump(char *buffer, size_t size) {
-            snprintf(buffer, size, "- KeyValue: %s\n", mKeyValuePairs.string());
+            snprintf(buffer, size, "- KeyValue: %s\n", mKeyValuePairs.c_str());
         }
 
         const String8 mKeyValuePairs;
