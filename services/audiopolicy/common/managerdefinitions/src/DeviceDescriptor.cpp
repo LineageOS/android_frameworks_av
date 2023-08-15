@@ -185,7 +185,7 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, bool verbose) const
     }
 
     std::string descBaseDumpStr;
-    DeviceDescriptorBase::dump(&descBaseDumpStr, spaces, extraInfo.string(), verbose);
+    DeviceDescriptorBase::dump(&descBaseDumpStr, spaces, extraInfo.c_str(), verbose);
     dst->append(descBaseDumpStr.c_str());
 }
 
@@ -325,7 +325,7 @@ sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8
         }
     }
     ALOGV("DeviceVector::%s() for type %08x address \"%s\" found %p format %08x",
-            __func__, type, address.string(), device.get(), format);
+            __func__, type, address.c_str(), device.get(), format);
     return device;
 }
 
@@ -448,7 +448,7 @@ void DeviceVector::dump(String8 *dst, const String8 &tag, int spaces, bool verbo
     if (isEmpty()) {
         return;
     }
-    dst->appendFormat("%*s%s devices (%zu):\n", spaces, "", tag.string(), size());
+    dst->appendFormat("%*s%s devices (%zu):\n", spaces, "", tag.c_str(), size());
     for (size_t i = 0; i < size(); i++) {
         const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
         dst->appendFormat("%s", prefix.c_str());
