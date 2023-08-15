@@ -806,7 +806,7 @@ void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
         result.appendFormat("  %7d %4d %7d %6u  %s\n", r->mSessionid, r->mCnt, r->mPid,
                 r->mUid, info.package.c_str());
     }
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 
@@ -822,7 +822,7 @@ void AudioFlinger::dumpInternals(int fd, const Vector<String16>& args __unused)
                             hardwareStatus,
                             (uint32_t)(mStandbyTimeInNsecs / 1000000));
     result.append(buffer);
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 void AudioFlinger::dumpPermissionDenial(int fd, const Vector<String16>& args __unused)
@@ -835,7 +835,7 @@ void AudioFlinger::dumpPermissionDenial(int fd, const Vector<String16>& args __u
             IPCThreadState::self()->getCallingPid(),
             IPCThreadState::self()->getCallingUid());
     result.append(buffer);
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 bool AudioFlinger::dumpTryLock(Mutex& mutex)
@@ -854,7 +854,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
         bool hardwareLocked = dumpTryLock(mHardwareLock);
         if (!hardwareLocked) {
             String8 result(kHardwareLockedString);
-            write(fd, result.string(), result.size());
+            write(fd, result.c_str(), result.size());
         } else {
             mHardwareLock.unlock();
         }
@@ -864,20 +864,20 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
         // failed to lock - AudioFlinger is probably deadlocked
         if (!locked) {
             String8 result(kDeadlockedString);
-            write(fd, result.string(), result.size());
+            write(fd, result.c_str(), result.size());
         }
 
         bool clientLocked = dumpTryLock(mClientLock);
         if (!clientLocked) {
             String8 result(kClientLockedString);
-            write(fd, result.string(), result.size());
+            write(fd, result.c_str(), result.size());
         }
 
         if (mEffectsFactoryHal != 0) {
             mEffectsFactoryHal->dumpEffects(fd);
         } else {
             String8 result(kNoEffectsFactory);
-            write(fd, result.string(), result.size());
+            write(fd, result.c_str(), result.size());
         }
 
         dumpClients(fd, args);
@@ -1871,7 +1871,7 @@ void AudioFlinger::logFilteredParameters(size_t originalKVPSize, const String8& 
 status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs)
 {
     ALOGV("setParameters(): io %d, keyvalue %s, calling pid %d calling uid %d",
-            ioHandle, keyValuePairs.string(),
+            ioHandle, keyValuePairs.c_str(),
             IPCThreadState::self()->getCallingPid(), IPCThreadState::self()->getCallingUid());
 
     // check calling permissions
@@ -1882,7 +1882,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
     String8 filteredKeyValuePairs = keyValuePairs;
     filterReservedParameters(filteredKeyValuePairs, IPCThreadState::self()->getCallingUid());
 
-    ALOGV("%s: filtered keyvalue %s", __func__, filteredKeyValuePairs.string());
+    ALOGV("%s: filtered keyvalue %s", __func__, filteredKeyValuePairs.c_str());
 
     // AUDIO_IO_HANDLE_NONE means the parameters are global to the audio hardware interface
     if (ioHandle == AUDIO_IO_HANDLE_NONE) {
@@ -1957,7 +1957,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
 String8 AudioFlinger::getParameters(audio_io_handle_t ioHandle, const String8& keys) const
 {
     ALOGVV("getParameters() io %d, keys %s, calling pid %d",
-            ioHandle, keys.string(), IPCThreadState::self()->getCallingPid());
+            ioHandle, keys.c_str(), IPCThreadState::self()->getCallingPid());
 
     Mutex::Autolock _l(mLock);
 
@@ -2970,7 +2970,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             deviceType,
             flags,
             halConfig,
-            address.string());
+            address.c_str());
 
     mHardwareStatus = AUDIO_HW_IDLE;
 

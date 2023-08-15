@@ -86,7 +86,7 @@ static sp<IBinder> gAudioFlingerBinder = nullptr;
 void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
     if (audioFlinger->getInterfaceDescriptor() != media::IAudioFlingerService::descriptor) {
         ALOGE("setAudioFlingerBinder: received a binder of type %s",
-              String8(audioFlinger->getInterfaceDescriptor()).string());
+              String8(audioFlinger->getInterfaceDescriptor()).c_str());
         return;
     }
     Mutex::Autolock _l(gLock);

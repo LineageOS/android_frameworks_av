@@ -278,14 +278,14 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         } else if (args[i] == prefixOption) {
             ++i;
             if (i < n) {
-                prefix = String8(args[i]).string();
+                prefix = String8(args[i]).c_str();
             }
         } else if (args[i] == sinceOption) {
             ++i;
             if (i < n) {
                 String8 value(args[i]);
                 char *endp;
-                const char *p = value.string();
+                const char *p = value.c_str();
                 const auto sec = (int64_t)strtoll(p, &endp, 10);
                 if (endp == p || *endp != '\0' || sec == 0) {
                     sinceNs = 0;

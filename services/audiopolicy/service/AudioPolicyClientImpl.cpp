@@ -194,7 +194,7 @@ void AudioPolicyService::AudioPolicyClient::setParameters(audio_io_handle_t io_h
                    const String8& keyValuePairs,
                    int delay_ms)
 {
-    mAudioPolicyService->setParameters(io_handle, keyValuePairs.string(), delay_ms);
+    mAudioPolicyService->setParameters(io_handle, keyValuePairs.c_str(), delay_ms);
 }
 
 String8 AudioPolicyService::AudioPolicyClient::getParameters(audio_io_handle_t io_handle,

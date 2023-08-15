@@ -456,7 +456,7 @@ void AudioPolicyService::doOnAudioVolumeGroupChanged(volume_group_t group, int f
 void AudioPolicyService::onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state)
 {
     ALOGV("AudioPolicyService::onDynamicPolicyMixStateUpdate(%s, %d)",
-            regId.string(), state);
+            regId.c_str(), state);
     mOutputCommandThread->dynamicPolicyMixStateUpdateCommand(regId, state);
 }
 
@@ -800,7 +800,7 @@ status_t AudioPolicyService::dumpInternals(int fd)
     msg << std::endl;
     result.append(msg.str().c_str());
 
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 
     mUidPolicy->dumpInternals(fd);
     return NO_ERROR;
@@ -1207,19 +1207,19 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
         const bool locked = dumpTryLock(mLock);
         if (!locked) {
             String8 result(kDeadlockedString);
-            write(fd, result.string(), result.size());
+            write(fd, result.c_str(), result.size());
         }
 
         dumpInternals(fd);
 
         String8 actPtr = String8::format("AudioCommandThread: %p\n", mAudioCommandThread.get());
-        write(fd, actPtr.string(), actPtr.size());
+        write(fd, actPtr.c_str(), actPtr.size());
         if (mAudioCommandThread != 0) {
             mAudioCommandThread->dump(fd);
         }
 
         String8 octPtr = String8::format("OutputCommandThread: %p\n", mOutputCommandThread.get());
-        write(fd, octPtr.string(), octPtr.size());
+        write(fd, octPtr.c_str(), octPtr.size());
         if (mOutputCommandThread != 0) {
             mOutputCommandThread->dump(fd);
         }
@@ -1228,7 +1228,7 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
             mAudioPolicyManager->dump(fd);
         } else {
             String8 apmPtr = String8::format("AudioPolicyManager: %p\n", mAudioPolicyManager);
-            write(fd, apmPtr.string(), apmPtr.size());
+            write(fd, apmPtr.c_str(), apmPtr.size());
         }
 
         mPackageManager.dump(fd);
@@ -1262,7 +1262,7 @@ status_t AudioPolicyService::dumpPermissionDenial(int fd)
             IPCThreadState::self()->getCallingPid(),
             IPCThreadState::self()->getCallingUid());
     result.append(buffer);
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
     return NO_ERROR;
 }
 
@@ -1437,8 +1437,8 @@ static status_t getUidForPackage(String16 packageName, int userId, /*inout*/uid_
     PermissionController pc;
     uid = pc.getPackageUid(packageName, 0);
     if (uid <= 0) {
-        ALOGE("Unknown package: '%s'", String8(packageName).string());
-        dprintf(err, "Unknown package: '%s'\n", String8(packageName).string());
+        ALOGE("Unknown package: '%s'", String8(packageName).c_str());
+        dprintf(err, "Unknown package: '%s'\n", String8(packageName).c_str());
         return BAD_VALUE;
     }
 
@@ -1457,7 +1457,7 @@ status_t AudioPolicyService::handleSetUidState(Vector<String16>& args, int err) 
     if (args[2] == String16("active")) {
         active = true;
     } else if ((args[2] != String16("idle"))) {
-        ALOGE("Expected active or idle but got: '%s'", String8(args[2]).string());
+        ALOGE("Expected active or idle but got: '%s'", String8(args[2]).c_str());
         return BAD_VALUE;
     }
 
@@ -1827,7 +1827,7 @@ void AudioPolicyService::UidPolicy::dumpInternals(int fd) {
     snprintf(buffer, SIZE, "\tIs RTT Enabled: %s\n", (mRttEnabled ? "True":"False"));
     result.append(buffer);
 
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 // -----------  AudioPolicyService::SensorPrivacyService implementation ----------
@@ -1971,14 +1971,14 @@ AudioPolicyService::AudioCommandThread::AudioCommandThread(String8 name,
 AudioPolicyService::AudioCommandThread::~AudioCommandThread()
 {
     if (!mAudioCommands.isEmpty()) {
-        release_wake_lock(mName.string());
+        release_wake_lock(mName.c_str());
     }
     mAudioCommands.clear();
 }
 
 void AudioPolicyService::AudioCommandThread::onFirstRef()
 {
-    run(mName.string(), ANDROID_PRIORITY_AUDIO);
+    run(mName.c_str(), ANDROID_PRIORITY_AUDIO);
 }
 
 bool AudioPolicyService::AudioCommandThread::threadLoop()
@@ -2015,7 +2015,7 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                 case SET_PARAMETERS: {
                     ParametersData *data = (ParametersData *)command->mParam.get();
                     ALOGV("AudioCommandThread() processing set parameters string %s, io %d",
-                            data->mKeyValuePairs.string(), data->mIO);
+                            data->mKeyValuePairs.c_str(), data->mIO);
                     mLock.unlock();
                     command->mStatus = AudioSystem::setParameters(data->mIO, data->mKeyValuePairs);
                     mLock.lock();
@@ -2124,7 +2124,7 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     DynPolicyMixStateUpdateData *data =
                             (DynPolicyMixStateUpdateData *)command->mParam.get();
                     ALOGV("AudioCommandThread() processing dyn policy mix state update %s %d",
-                            data->mRegId.string(), data->mState);
+                            data->mRegId.c_str(), data->mState);
                     svc = mService.promote();
                     if (svc == 0) {
                         break;
@@ -2249,7 +2249,7 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
         // release delayed commands wake lock as many times as we made the  queue is
         // empty during popping.
         while (numTimesBecameEmpty--) {
-            release_wake_lock(mName.string());
+            release_wake_lock(mName.c_str());
         }
 
         // At this stage we have either an empty command queue or the first command in the queue
@@ -2265,7 +2265,7 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
     }
     // release delayed commands wake lock before quitting
     if (!mAudioCommands.isEmpty()) {
-        release_wake_lock(mName.string());
+        release_wake_lock(mName.c_str());
     }
     mLock.unlock();
     return false;
@@ -2280,7 +2280,7 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
     const bool locked = dumpTryLock(mLock);
     if (!locked) {
         String8 result2(kCmdDeadlockedString);
-        write(fd, result2.string(), result2.size());
+        write(fd, result2.c_str(), result2.size());
     }
 
     snprintf(buffer, SIZE, "- Commands:\n");
@@ -2298,7 +2298,7 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
         result.append("     none\n");
     }
 
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 
     dumpReleaseLock(mLock, locked);
 
@@ -2485,7 +2485,7 @@ void AudioPolicyService::AudioCommandThread::dynamicPolicyMixStateUpdateCommand(
     data->mState = state;
     command->mParam = data;
     ALOGV("AudioCommandThread() sending dynamic policy mix (id=%s) state update to %d",
-            regId.string(), state);
+            regId.c_str(), state);
     sendCommand(command);
 }
 
@@ -2582,7 +2582,7 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
 
     // acquire wake lock to make sure delayed commands are processed
     if (mAudioCommands.isEmpty()) {
-        acquire_wake_lock(PARTIAL_WAKE_LOCK, mName.string());
+        acquire_wake_lock(PARTIAL_WAKE_LOCK, mName.c_str());
     }
 
     // check same pending commands with later time stamps and eliminate them
@@ -2607,7 +2607,7 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
             ParametersData *data2 = (ParametersData *)command2->mParam.get();
             if (data->mIO != data2->mIO) break;
             ALOGV("Comparing parameter command %s to new command %s",
-                    data2->mKeyValuePairs.string(), data->mKeyValuePairs.string());
+                    data2->mKeyValuePairs.c_str(), data->mKeyValuePairs.c_str());
             AudioParameter param = AudioParameter(data->mKeyValuePairs);
             AudioParameter param2 = AudioParameter(data2->mKeyValuePairs);
             for (size_t j = 0; j < param.size(); j++) {
@@ -2620,7 +2620,7 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
                     param2.getAt(k, key2, value2);
                     if (key2 == key) {
                         param2.remove(key2);
-                        ALOGV("Filtering out parameter %s", key2.string());
+                        ALOGV("Filtering out parameter %s", key2.c_str());
                         break;
                     }
                 }
