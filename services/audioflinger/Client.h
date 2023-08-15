@@ -16,6 +16,11 @@
 
 #pragma once
 
+#include <afutils/AllocatorFactory.h>
+#include <android-base/macros.h>  // DISALLOW_COPY_AND_ASSIGN
+#include <utils/Mutex.h>
+#include <utils/RefBase.h>        // avoid transitive dependency
+
 // TODO(b/291318727) Move to nested namespace
 namespace android {
 
@@ -29,7 +34,7 @@ public:
     virtual status_t moveAuxEffectToIo(
             int effectId,
             const sp<IAfPlaybackThread>& dstThread,
-            sp<IAfPlaybackThread>* srcThread) = 0;
+            sp<IAfPlaybackThread>* srcThread) = 0;  // used by indirectly by clients.
 };
 
 class Client : public RefBase {
