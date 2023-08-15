@@ -25,19 +25,19 @@ FileOutput::FileOutput(String8 path) : mFp(NULL), mPath(path), mOpen(false) {}
 
 FileOutput::~FileOutput() {
     if (mOpen) {
-        ALOGW("%s: Destructor called with %s still open.", __FUNCTION__, mPath.string());
+        ALOGW("%s: Destructor called with %s still open.", __FUNCTION__, mPath.c_str());
         close();
     }
 }
 
 status_t FileOutput::open() {
     if (mOpen) {
-        ALOGW("%s: Open called when file %s already open.", __FUNCTION__, mPath.string());
+        ALOGW("%s: Open called when file %s already open.", __FUNCTION__, mPath.c_str());
         return OK;
     }
     mFp = ::fopen(mPath, "wb");
     if (!mFp) {
-        ALOGE("%s: Could not open file %s", __FUNCTION__, mPath.string());
+        ALOGE("%s: Could not open file %s", __FUNCTION__, mPath.c_str());
         return BAD_VALUE;
     }
     mOpen = true;
@@ -46,7 +46,7 @@ status_t FileOutput::open() {
 
 status_t FileOutput::write(const uint8_t* buf, size_t offset, size_t count) {
     if (!mOpen) {
-        ALOGE("%s: Could not write file %s, file not open.", __FUNCTION__, mPath.string());
+        ALOGE("%s: Could not write file %s, file not open.", __FUNCTION__, mPath.c_str());
         return BAD_VALUE;
     }
 
@@ -54,7 +54,7 @@ status_t FileOutput::write(const uint8_t* buf, size_t offset, size_t count) {
 
     int error = ::ferror(mFp);
     if (error != 0) {
-        ALOGE("%s: Error %d occurred while writing file %s.", __FUNCTION__, error, mPath.string());
+        ALOGE("%s: Error %d occurred while writing file %s.", __FUNCTION__, error, mPath.c_str());
         return BAD_VALUE;
     }
     return OK;
@@ -62,13 +62,13 @@ status_t FileOutput::write(const uint8_t* buf, size_t offset, size_t count) {
 
 status_t FileOutput::close() {
     if(!mOpen) {
-        ALOGW("%s: Close called when file %s already close.", __FUNCTION__, mPath.string());
+        ALOGW("%s: Close called when file %s already close.", __FUNCTION__, mPath.c_str());
         return OK;
     }
 
     status_t ret = OK;
     if(::fclose(mFp) != 0) {
-        ALOGE("%s: Failed to close file %s.", __FUNCTION__, mPath.string());
+        ALOGE("%s: Failed to close file %s.", __FUNCTION__, mPath.c_str());
         ret = BAD_VALUE;
     }
     mOpen = false;

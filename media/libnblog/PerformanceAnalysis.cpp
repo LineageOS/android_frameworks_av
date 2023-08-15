@@ -409,7 +409,7 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
 
 // Writes a string into specified file descriptor
 void dumpLine(int fd, int indent, const String8 &body) {
-    dprintf(fd, "%.*s%s \n", indent, "", body.string());
+    dprintf(fd, "%.*s%s \n", indent, "", body.c_str());
 }
 
 } // namespace ReportPerformance
