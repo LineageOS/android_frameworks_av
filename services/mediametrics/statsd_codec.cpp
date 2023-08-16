@@ -187,10 +187,12 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     const nsecs_t timestampNanos = MediaMetricsService::roundTime(item->getTimestamp());
     AStatsEvent_writeInt64(event, timestampNanos);
 
-    std::string packageName = item->getPkgName();
+    // packageName deprecated for calling_uid and statsd support as of U-QPR2
+    std::string packageName = "";
     AStatsEvent_writeString(event, packageName.c_str());
 
-    int64_t packageVersionCode = item->getPkgVersionCode();
+    // packageVersion depreccated for calling_uid and statsd support as of U-QPR2
+    int64_t packageVersionCode = 0;
     AStatsEvent_writeInt64(event, packageVersionCode);
 
     int64_t mediaApexVersion = 0;
@@ -654,6 +656,10 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt32(event, componentColorFormat);
 
+    uid_t app_uid = item->getUid();
+    metrics_proto.set_caller_uid(app_uid);
+    AStatsEvent_writeInt32(event, app_uid);
+
     int64_t firstRenderTimeUs = -1;
     item->getInt64("android.media.mediacodec.first-render-time-us", &firstRenderTimeUs);
     int64_t framesReleased = -1;
@@ -854,6 +860,7 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
             << " original_qp_p_max:" << qpPMaxOri
             << " original_qp_b_min:" << qpBMinOri
             << " original_qp_b_max:" << qpBMaxOri
+            << " app_uid:" << app_uid
             << " }";
     statsdLog->log(stats::media_metrics::MEDIAMETRICS_CODEC_REPORTED, log.str());
 
