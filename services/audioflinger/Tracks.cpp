@@ -506,11 +506,12 @@ Status AudioFlinger::TrackHandle::setPlaybackRateParameters(
 // static
 sp<AudioFlinger::PlaybackThread::OpPlayAudioMonitor>
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
+            AudioFlinger::ThreadBase* thread,
             const AttributionSourceState& attributionSource, const audio_attributes_t& attr, int id,
             audio_stream_type_t streamType)
 {
-    Vector <String16> packages;
-    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
+    Vector<String16> packages;
+    const uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
     getPackagesForUid(uid, packages);
     if (isServiceUid(uid)) {
         if (packages.isEmpty()) {
@@ -532,15 +533,21 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
             id, attr.flags);
         return nullptr;
     }
-    return new OpPlayAudioMonitor(attributionSource, attr.usage, id);
+    return sp<OpPlayAudioMonitor>::make(thread, attributionSource, attr.usage, id, uid);
 }
 
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(
-        const AttributionSourceState& attributionSource, audio_usage_t usage, int id)
-        : mHasOpPlayAudio(true), mAttributionSource(attributionSource), mUsage((int32_t) usage),
-        mId(id)
-{
-}
+        AudioFlinger::ThreadBase* thread,
+        const AttributionSourceState& attributionSource,
+        audio_usage_t usage, int id, uid_t uid)
+    : mThread(wp<AudioFlinger::ThreadBase>::fromExisting(thread)),
+      mHasOpPlayAudio(true),
+      mAttributionSource(attributionSource),
+      mUsage((int32_t)usage),
+      mId(id),
+      mUid(uid),
+      mPackageName(VALUE_OR_FATAL(aidl2legacy_string_view_String16(
+                  attributionSource.packageName.value_or("")))) {}
 
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::~OpPlayAudioMonitor()
 {
@@ -552,13 +559,13 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::~OpPlayAudioMonitor()
 
 void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::onFirstRef()
 {
-    checkPlayAudioForUsage();
+    // make sure not to broadcast the initial state since it is not needed and could
+    // cause a deadlock since this method can be called with the mThread->mLock held
+    checkPlayAudioForUsage(/*doBroadcast=*/false);
     if (mAttributionSource.packageName.has_value()) {
         mOpCallback = new PlayAudioOpCallback(this);
         mAppOpsManager.startWatchingMode(AppOpsManager::OP_PLAY_AUDIO,
-            VALUE_OR_FATAL(aidl2legacy_string_view_String16(
-            mAttributionSource.packageName.value_or("")))
-            , mOpCallback);
+                mPackageName, mOpCallback);
     }
 }
 
@@ -569,18 +576,24 @@ bool AudioFlinger::PlaybackThread::OpPlayAudioMonitor::hasOpPlayAudio() const {
 // Note this method is never called (and never to be) for audio server / patch record track
 // - not called from constructor due to check on UID,
 // - not called from PlayAudioOpCallback because the callback is not installed in this case
-void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::checkPlayAudioForUsage()
+void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::checkPlayAudioForUsage(bool doBroadcast)
 {
-    if (!mAttributionSource.packageName.has_value()) {
-        mHasOpPlayAudio.store(false);
-    } else {
-        uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mAttributionSource.uid));
-        String16 packageName = VALUE_OR_FATAL(
-            aidl2legacy_string_view_String16(mAttributionSource.packageName.value_or("")));
-        bool hasIt = mAppOpsManager.checkAudioOpNoThrow(AppOpsManager::OP_PLAY_AUDIO,
-                    mUsage, uid, packageName) == AppOpsManager::MODE_ALLOWED;
-        ALOGD("OpPlayAudio: track:%d usage:%d %smuted", mId, mUsage, hasIt ? "not " : "");
-        mHasOpPlayAudio.store(hasIt);
+    const bool hasAppOps = mAttributionSource.packageName.has_value()
+        && mAppOpsManager.checkAudioOpNoThrow(
+                AppOpsManager::OP_PLAY_AUDIO, mUsage, mUid, mPackageName) ==
+                        AppOpsManager::MODE_ALLOWED;
+
+    bool shouldChange = !hasAppOps;  // check if we need to update.
+    if (mHasOpPlayAudio.compare_exchange_strong(shouldChange, hasAppOps)) {
+        ALOGD("OpPlayAudio: track:%d usage:%d %smuted", mId, mUsage, hasAppOps ? "not " : "");
+        if (doBroadcast) {
+            auto thread = mThread.promote();
+            if (thread != nullptr && thread->type() == AudioFlinger::ThreadBase::OFFLOAD) {
+                // Wake up Thread if offloaded, otherwise it may be several seconds for update.
+                Mutex::Autolock _l(thread->mLock);
+                thread->broadcast_l();
+            }
+        }
     }
 }
 
@@ -597,7 +610,7 @@ void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::PlayAudioOpCallback::opCh
     }
     sp<OpPlayAudioMonitor> monitor = mMonitor.promote();
     if (monitor != NULL) {
-        monitor->checkPlayAudioForUsage();
+        monitor->checkPlayAudioForUsage(/*doBroadcast=*/true);
     }
 }
 
@@ -658,7 +671,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mAuxEffectId(0), mHasVolumeController(false),
     mFrameMap(16 /* sink-frame-to-track-frame map memory */),
     mVolumeHandler(new media::VolumeHandler(sampleRate)),
-    mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(attributionSource, attr, id(),
+    mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(thread, attributionSource, attr, id(),
         streamType)),
     // mSinkTimestamp
     mFastIndex(-1),
