@@ -354,7 +354,7 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
         result.append(buffer);
     }
 
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 bool TranscodingClientManager::isTrustedCaller(pid_t pid, uid_t uid) {
