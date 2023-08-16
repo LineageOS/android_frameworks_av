@@ -539,6 +539,22 @@ enum {
      * Available since API level 29.
      */
     AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE = 10,
+
+    /**
+     * Use this preset for an echo canceller to capture the reference signal.
+     * Reserved for system components.
+     * Requires CAPTURE_AUDIO_OUTPUT permission
+     * Available since API level 35.
+     */
+    AAUDIO_INPUT_PRESET_SYSTEM_ECHO_REFERENCE = 1997,
+
+    /**
+     * Use this preset for preemptible, low-priority software hotword detection.
+     * Reserved for system components.
+     * Requires CAPTURE_AUDIO_HOTWORD permission.
+     * Available since API level 35.
+     */
+    AAUDIO_INPUT_PRESET_SYSTEM_HOTWORD = 1999,
 };
 typedef int32_t aaudio_input_preset_t;
 
