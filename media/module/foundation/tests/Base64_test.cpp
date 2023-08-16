@@ -49,7 +49,7 @@ void verifyDecode(const AString* expected, const AString* in) {
                 paddedText.append(kBase64Padding);
             }
         }
-        sp<ABuffer> result = decodeBase64(AString(paddedText.string()));
+        sp<ABuffer> result = decodeBase64(AString(paddedText.c_str()));
 
         ASSERT_EQ(AStringUtils::Compare(expected[i].c_str(),
                 reinterpret_cast<char*>(result->data()),
