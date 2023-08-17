@@ -1100,7 +1100,8 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                                 states.nextShutterFrameNum, msg.frame_number);
                         return;
                     }
-                    states.nextShutterFrameNum = msg.frame_number + 1;
+                    if (gClientPackageName != "com.motorola.camera3" && !(msg.frame_number - states.nextShutterFrameNum > 1))
+                        states.nextShutterFrameNum = msg.frame_number + 1;
                 }
             }
 
