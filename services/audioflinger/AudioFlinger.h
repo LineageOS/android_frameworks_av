@@ -121,6 +121,7 @@
 
 // include AudioFlinger component interfaces
 #include "IAfEffect.h"
+#include "IAfTrack.h"
 
 namespace android {
 
@@ -397,7 +398,7 @@ public:
                                         audio_session_t triggerSession,
                                         audio_session_t listenerSession,
                                         const audioflinger::SyncEventCallback& callBack,
-                                        const wp<RefBase>& cookie);
+                                        const wp<IAfTrackBase>& cookie);
 
     bool        btNrecIsOff() const { return mBtNrecIsOff.load(); }
 
@@ -729,7 +730,7 @@ private:
               ThreadBase *hapticPlaybackThread_l() const;
 
               void updateSecondaryOutputsForTrack_l(
-                      PlaybackThread::Track* track,
+                      IAfTrack* track,
                       PlaybackThread* thread,
                       const std::vector<audio_io_handle_t>& secondaryOutputs) const;
 
