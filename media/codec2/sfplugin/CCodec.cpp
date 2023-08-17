@@ -431,6 +431,10 @@ public:
         return mNode->getDataspace();
     }
 
+    uint32_t getPixelFormat() override {
+        return mNode->getPixelFormat();
+    }
+
 private:
     sp<HGraphicBufferSource> mSource;
     sp<C2OMXNode> mNode;
@@ -2510,6 +2514,8 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                 uint32_t pf = PIXEL_FORMAT_UNKNOWN;
                 if (!config->mInputSurface) {
                     pf = mChannel->getBuffersPixelFormat(config->mDomain & Config::IS_ENCODER);
+                } else {
+                    pf = config->mInputSurface->getPixelFormat();
                 }
                 if (pf != PIXEL_FORMAT_UNKNOWN) {
                     mMetrics->setInt64(kCodecPixelFormat, pf);
