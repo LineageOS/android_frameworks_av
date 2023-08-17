@@ -248,8 +248,7 @@ TEST_F(SoundDoseManagerTest, GetDefaultForceComputeCsdOnAllDevices) {
 }
 
 TEST_F(SoundDoseManagerTest, GetDefaultForceUseFrameworkMel) {
-    // TODO: for now dogfooding with internal MEL. Revert to false when using the HAL MELs
-    EXPECT_TRUE(mSoundDoseManager->forceUseFrameworkMel());
+    EXPECT_FALSE(mSoundDoseManager->forceUseFrameworkMel());
 }
 
 TEST_F(SoundDoseManagerTest, SetAudioDeviceCategoryStopsNonHeadphone) {
