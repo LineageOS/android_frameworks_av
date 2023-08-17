@@ -59,6 +59,7 @@ using namespace android::hardware::camera;
 namespace flags = com::android::internal::camera::flags;
 
 namespace android {
+extern volatile bool MotoCamera;
 namespace camera3 {
 
 status_t fixupMonochromeTags(
@@ -1055,7 +1056,8 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                                 states.nextShutterFrameNum, msg.frame_number);
                         return;
                     }
-                    states.nextShutterFrameNum = msg.frame_number + 1;
+                    if (!MotoCamera && !(msg.frame_number - states.nextShutterFrameNum > 1))
+                        states.nextShutterFrameNum = msg.frame_number + 1;
                 }
             }
 
