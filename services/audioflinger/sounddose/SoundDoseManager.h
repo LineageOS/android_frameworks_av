@@ -244,7 +244,7 @@ private:
     std::shared_ptr<ISoundDose> mHalSoundDose GUARDED_BY(mLock);
     std::shared_ptr<HalSoundDoseCallback> mHalSoundDoseCallback GUARDED_BY(mLock);
 
-    bool mUseFrameworkMel GUARDED_BY(mLock) = true;
+    bool mUseFrameworkMel GUARDED_BY(mLock) = false;
     bool mComputeCsdOnAllDevices GUARDED_BY(mLock) = false;
 
     bool mEnabledCsd GUARDED_BY(mLock) = true;
