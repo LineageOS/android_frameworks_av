@@ -570,7 +570,7 @@ void CpuStats::sample(const String8 &title
                 "  us per mix loop: mean=%.0f stddev=%.0f min=%.0f max=%.0f\n"
                 "  %% of wall: mean=%.1f stddev=%.1f min=%.1f max=%.1f\n"
                 "  MHz: mean=%.1f, stddev=%.1f, min=%.1f max=%.1f",
-                    title.string(),
+                    title.c_str(),
                     elapsed * .000000001, n, perLoop * .000001,
                     mean * .001,
                     stddev * .001,
@@ -696,7 +696,7 @@ void ThreadBase::exit()
 
 status_t ThreadBase::setParameters(const String8& keyValuePairs)
 {
-    ALOGV("ThreadBase::setParameters() %s", keyValuePairs.string());
+    ALOGV("ThreadBase::setParameters() %s", keyValuePairs.c_str());
     Mutex::Autolock _l(mLock);
 
     return sendSetParameterConfigEvent_l(keyValuePairs);
@@ -881,7 +881,7 @@ void ThreadBase::processConfigEvents_l()
             if (checkForNewParameter_l(data->mKeyValuePairs, event->mStatus)) {
                 configChanged = true;
                 mLocalLog.log("CFG_EVENT_SET_PARAMETER: (%s) configuration changed",
-                        data->mKeyValuePairs.string());
+                        data->mKeyValuePairs.c_str());
             }
         } break;
         case CFG_EVENT_CREATE_AUDIO_PATCH: {
@@ -1069,7 +1069,7 @@ void ThreadBase::dumpBase_l(int fd, const Vector<String16>& /* args */)
     dprintf(fd, "  HAL buffer size: %zu bytes\n", mBufferSize);
     dprintf(fd, "  Channel count: %u\n", mChannelCount);
     dprintf(fd, "  Channel mask: 0x%08x (%s)\n", mChannelMask,
-            channelMaskToString(mChannelMask, mType != RECORD).string());
+            channelMaskToString(mChannelMask, mType != RECORD).c_str());
     dprintf(fd, "  Processing format: 0x%x (%s)\n", mFormat,
             IAfThreadBase::formatToString(mFormat).c_str());
     dprintf(fd, "  Processing frame size: %zu bytes\n", mFrameSize);
@@ -2005,7 +2005,7 @@ void ThreadBase::ActiveTracks<T>::logTrack(
     if (mLocalLog != nullptr) {
         String8 result;
         track->appendDump(result, false /* active */);
-        mLocalLog->log("AT::%-10s(%p) %s", funcName, track.get(), result.string());
+        mLocalLog->log("AT::%-10s(%p) %s", funcName, track.get(), result.c_str());
     }
 }
 
@@ -2272,7 +2272,7 @@ void PlaybackThread::dumpTracks_l(int fd, const Vector<String16>& /* args */)
         }
     }
     result.append("\n");
-    write(fd, result.string(), result.length());
+    write(fd, result.c_str(), result.length());
     result.clear();
 
     // These values are "raw"; they will wrap around.  See prepareTracks_l() for a better way.
@@ -2318,7 +2318,7 @@ void PlaybackThread::dumpTracks_l(int fd, const Vector<String16>& /* args */)
         }
     }
 
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 void PlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
@@ -2964,7 +2964,7 @@ void PlaybackThread::removeTrack_l(const sp<IAfTrack>& track)
 
     String8 result;
     track->appendDump(result, false /* active */);
-    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
+    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.c_str());
 
     mTracks.remove(track);
     {
@@ -4073,9 +4073,9 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
                     releaseWakeLock_l();
                     // wait until we have something to do...
-                    ALOGV("%s going to sleep", myName.string());
+                    ALOGV("%s going to sleep", myName.c_str());
                     mWaitWorkCV.wait(mLock);
-                    ALOGV("%s waking up", myName.string());
+                    ALOGV("%s waking up", myName.c_str());
                     acquireWakeLock_l();
 
                     mMixerStatus = MIXER_IDLE;
@@ -9176,7 +9176,7 @@ void RecordThread::removeTrack_l(const sp<IAfRecordTrack>& track)
 {
     String8 result;
     track->appendDump(result, false /* active */);
-    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
+    mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.c_str());
 
     mTracks.remove(track);
     // need anything related to effects here?
@@ -9255,7 +9255,7 @@ void RecordThread::dumpTracks_l(int fd, const Vector<String16>& /* args */)
         }
 
     }
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 void RecordThread::setRecordSilenced(audio_port_handle_t portId, bool silenced)
@@ -10343,9 +10343,9 @@ bool MmapThread::threadLoop()
                 }
 
                 // wait until we have something to do...
-                ALOGV("%s going to sleep", myName.string());
+                ALOGV("%s going to sleep", myName.c_str());
                 mWaitWorkCV.wait(mLock);
-                ALOGV("%s waking up", myName.string());
+                ALOGV("%s waking up", myName.c_str());
 
                 checkSilentMode_l();
 
@@ -10719,7 +10719,7 @@ void MmapThread::dumpTracks_l(int fd, const Vector<String16>& /* args */)
     } else {
         dprintf(fd, "\n");
     }
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 /* static */
