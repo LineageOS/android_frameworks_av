@@ -302,6 +302,17 @@ void EffectDescriptorCollection::moveEffects(audio_session_t session,
     }
 }
 
+void EffectDescriptorCollection::putOrphanEffectsForIo(audio_io_handle_t srcIo)
+{
+    for (size_t i = 0; i < size(); i++) {
+        sp<EffectDescriptor> effect = valueAt(i);
+        if (effect->mIo == srcIo) {
+            effect->mIo = AUDIO_IO_HANDLE_NONE;
+            effect->mIsOrphan = true;
+        }
+    }
+}
+
 void EffectDescriptorCollection::putOrphanEffects(audio_session_t session,
         audio_io_handle_t srcIo, const AudioInputCollection *inputs,
         AudioPolicyClientInterface *clientInterface)

@@ -26,7 +26,9 @@
 #define LOG_TAG "APM_Test"
 #include <Serializer.h>
 #include <android-base/file.h>
+#include <android-base/properties.h>
 #include <android/content/AttributionSourceState.h>
+#include <hardware/audio_effect.h>
 #include <media/AudioPolicy.h>
 #include <media/PatchBuilder.h>
 #include <media/RecordingActivityTracker.h>
@@ -185,6 +187,7 @@ class AudioPolicyManagerTest : public testing::Test {
             bool* isBitPerfect = nullptr);
     void getInputForAttr(
             const audio_attributes_t &attr,
+            audio_io_handle_t *input,
             audio_session_t session,
             audio_unique_id_t riid,
             audio_port_handle_t *selectedDeviceId,
@@ -296,6 +299,7 @@ void AudioPolicyManagerTest::getOutputForAttr(
 
 void AudioPolicyManagerTest::getInputForAttr(
         const audio_attributes_t &attr,
+        audio_io_handle_t *input,
         const audio_session_t session,
         audio_unique_id_t riid,
         audio_port_handle_t *selectedDeviceId,
@@ -304,7 +308,6 @@ void AudioPolicyManagerTest::getInputForAttr(
         int sampleRate,
         audio_input_flags_t flags,
         audio_port_handle_t *portId) {
-    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
     audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
     config.sample_rate = sampleRate;
     config.channel_mask = channelMask;
@@ -315,7 +318,7 @@ void AudioPolicyManagerTest::getInputForAttr(
     AudioPolicyInterface::input_type_t inputType;
     AttributionSourceState attributionSource = createAttributionSourceState(/*uid=*/ 0);
     ASSERT_EQ(OK, mManager->getInputForAttr(
-            &attr, &input, riid, session, attributionSource, &config, flags,
+            &attr, input, riid, session, attributionSource, &config, flags,
             selectedDeviceId, &inputType, portId));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }
@@ -945,10 +948,13 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, ListAudioPortsHasFlags) {
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
     audio_port_handle_t mixPortId = AUDIO_PORT_HANDLE_NONE;
     audio_source_t source = AUDIO_SOURCE_VOICE_COMMUNICATION;
-    audio_attributes_t attr = {
-        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, source, AUDIO_FLAG_NONE, ""};
-    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
-     AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO, 8000, AUDIO_INPUT_FLAG_VOIP_TX, &mixPortId));
+    audio_attributes_t attr = {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, source,
+                               AUDIO_FLAG_NONE, ""};
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, AUDIO_SESSION_NONE, 1,
+                                            &selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT,
+                                            AUDIO_CHANNEL_IN_MONO, 8000, AUDIO_INPUT_FLAG_VOIP_TX,
+                                            &mixPortId));
 
     std::vector<audio_port_v7> ports;
     ASSERT_NO_FATAL_FAILURE(
@@ -1708,10 +1714,11 @@ void AudioPolicyManagerTestDPPlaybackReRouting::SetUp() {
     audio_attributes_t attr = {
         AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, source, AUDIO_FLAG_NONE, ""};
     std::string tags = "addr=" + mMixAddress;
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
     strncpy(attr.tags, tags.c_str(), AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1);
-    getInputForAttr(attr, param.session, mTracker->getRiid(), &selectedDeviceId,
-                    AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO, k48000SamplingRate,
-                    AUDIO_INPUT_FLAG_NONE, &mPortId);
+    getInputForAttr(attr, &input, param.session, mTracker->getRiid(),
+                    &selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                    k48000SamplingRate, AUDIO_INPUT_FLAG_NONE, &mPortId);
     ASSERT_EQ(NO_ERROR, mManager->startInput(mPortId));
     ASSERT_EQ(extractionPort.id, selectedDeviceId);
 
@@ -2051,9 +2058,10 @@ TEST_P(AudioPolicyManagerTestDPMixRecordInjection, RecordingInjection) {
 
     audio_port_handle_t captureRoutedPortId = AUDIO_PORT_HANDLE_NONE;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
-    getInputForAttr(param.attributes, param.session, mTracker->getRiid(), &captureRoutedPortId,
-        AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO, k48000SamplingRate,
-        AUDIO_INPUT_FLAG_NONE, &portId);
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    getInputForAttr(param.attributes, &input, param.session, mTracker->getRiid(),
+                    &captureRoutedPortId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                    k48000SamplingRate, AUDIO_INPUT_FLAG_NONE, &portId);
     if (param.expected_match) {
         EXPECT_EQ(mExtractionPort.id, captureRoutedPortId);
     } else {
@@ -2236,9 +2244,10 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, ExplicitlyRoutingAfterConnection)
                 k48000SamplingRate, AUDIO_OUTPUT_FLAG_NONE);
     } else if (audio_is_input_device(type)) {
         RecordingActivityTracker tracker;
-        getInputForAttr({}, AUDIO_SESSION_NONE, tracker.getRiid(), &routedPortId,
-         AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO, k48000SamplingRate,
-         AUDIO_INPUT_FLAG_NONE);
+        audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+        getInputForAttr({}, &input, AUDIO_SESSION_NONE, tracker.getRiid(), &routedPortId,
+                        AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO, k48000SamplingRate,
+                        AUDIO_INPUT_FLAG_NONE);
     }
     ASSERT_EQ(devicePort.id, routedPortId);
 
@@ -2985,7 +2994,8 @@ TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, PreferredDeviceUsedFor
     audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
     attr.source = source;
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
                                             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
                                             48000));
     auto selectedDevice = availableDevices.getDeviceFromId(selectedDeviceId);
@@ -3005,7 +3015,8 @@ TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, PreferredDeviceUsedFor
               mManager->setDevicesRoleForCapturePreset(source, role,
                                                        {preferredDevice->getDeviceTypeAddr()}));
     selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+    input = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
                                             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
                                             48000));
     ASSERT_EQ(preferredDevice, availableDevices.getDeviceFromId(selectedDeviceId));
@@ -3015,7 +3026,8 @@ TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, PreferredDeviceUsedFor
     ASSERT_EQ(NO_ERROR,
               mManager->clearDevicesRoleForCapturePreset(source, role));
     selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+    input = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
                                             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
                                             48000));
     ASSERT_EQ(selectedDevice, availableDevices.getDeviceFromId(selectedDeviceId));
@@ -3040,7 +3052,8 @@ TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, DisabledDeviceNotUsedF
     audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
     attr.source = source;
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
                                             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
                                             48000));
     auto selectedDevice = availableDevices.getDeviceFromId(selectedDeviceId);
@@ -3052,9 +3065,10 @@ TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, DisabledDeviceNotUsedF
               mManager->setDevicesRoleForCapturePreset(source, role,
                                                        {selectedDevice->getDeviceTypeAddr()}));
     selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
-                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
-                                            48000));
+    input = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, AUDIO_SESSION_NONE, 1,
+                                            &selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT,
+                                            AUDIO_CHANNEL_IN_STEREO, 48000));
     ASSERT_NE(selectedDevice, availableDevices.getDeviceFromId(selectedDeviceId));
 
     // After clearing disabled device for capture preset, the selected device for input should be
@@ -3062,7 +3076,8 @@ TEST_F(AudioPolicyManagerDevicesRoleForCapturePresetTest, DisabledDeviceNotUsedF
     ASSERT_EQ(NO_ERROR,
               mManager->clearDevicesRoleForCapturePreset(source, role));
     selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
+    input = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, AUDIO_SESSION_NONE, 1, &selectedDeviceId,
                                             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
                                             48000));
     ASSERT_EQ(selectedDevice, availableDevices.getDeviceFromId(selectedDeviceId));
@@ -3098,3 +3113,77 @@ INSTANTIATE_TEST_CASE_P(
                 DevicesRoleForCapturePresetParam({AUDIO_SOURCE_HOTWORD, DEVICE_ROLE_PREFERRED})
                 )
         );
+
+
+const effect_descriptor_t TEST_EFFECT_DESC = {
+        {0xf2a4bb20, 0x0c3c, 0x11e3, 0x8b07, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}, // type
+        {0xff93e360, 0x0c3c, 0x11e3, 0x8a97, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}, // uuid
+        EFFECT_CONTROL_API_VERSION,
+        EFFECT_FLAG_TYPE_PRE_PROC,
+        0,
+        1,
+        "APM test Effect",
+        "The Android Open Source Project",
+};
+
+class AudioPolicyManagerPreProcEffectTest : public AudioPolicyManagerTestWithConfigurationFile {
+};
+
+TEST_F(AudioPolicyManagerPreProcEffectTest, DeviceDisconnectWhileClientActive) {
+    const audio_source_t source = AUDIO_SOURCE_MIC;
+    const std::string address = "BUS00_MIC";
+    const std::string deviceName = "randomName";
+    audio_port_handle_t portId;
+    audio_devices_t type = AUDIO_DEVICE_IN_BUS;
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(type,
+            AUDIO_POLICY_DEVICE_STATE_AVAILABLE, address.c_str(), deviceName.c_str(),
+            AUDIO_FORMAT_DEFAULT));
+    auto availableDevices = mManager->getAvailableInputDevices();
+    ASSERT_GT(availableDevices.size(), 1);
+
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = source;
+    audio_session_t session = TEST_SESSION_ID;
+    audio_io_handle_t inputClientHandle = 777;
+    int effectId = 666;
+    audio_port_v7 devicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, type, address, &devicePort));
+
+    audio_port_handle_t routedPortId = devicePort.id;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &inputClientHandle, session, 1, &routedPortId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000, AUDIO_INPUT_FLAG_NONE, &portId));
+    ASSERT_EQ(devicePort.id, routedPortId);
+    auto selectedDevice = availableDevices.getDeviceFromId(routedPortId);
+    ASSERT_NE(nullptr, selectedDevice);
+
+    // Add a pre processing effect on the input client session
+    ASSERT_EQ(NO_ERROR, mManager->registerEffect(&TEST_EFFECT_DESC, inputClientHandle,
+            PRODUCT_STRATEGY_NONE, session, effectId));
+
+    ASSERT_EQ(NO_ERROR, mManager->startInput(portId));
+
+    // Force a device disconnection to close the input, no crash expected of APM
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            address.c_str(), deviceName.c_str(), AUDIO_FORMAT_DEFAULT));
+
+    // Reconnect the device
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            address.c_str(), deviceName.c_str(), AUDIO_FORMAT_DEFAULT));
+
+    inputClientHandle += 1;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, type, address, &devicePort));
+    routedPortId = devicePort.id;
+
+    // Reconnect the client changing voluntarily the io, but keeping the session to get the
+    // effect attached again
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &inputClientHandle, session, 1, &routedPortId,
+                                            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
+                                            48000));
+
+    // unregister effect should succeed since effect shall have been restore on the client session
+    ASSERT_EQ(NO_ERROR, mManager->unregisterEffect(effectId));
+}
