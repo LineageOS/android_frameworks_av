@@ -71,6 +71,7 @@
 namespace android {
 
 extern volatile int32_t gLogLevel;
+extern volatile bool MotoCamera;
 
 class MemoryHeapBase;
 class MediaPlayer;
