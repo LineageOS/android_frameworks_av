@@ -280,7 +280,7 @@ void DumpReader::dump(int fd, size_t indent)
             break;
         }
         if (!body.isEmpty()) {
-            dprintf(fd, "%.*s%s %s\n", (int)indent, "", timestamp.string(), body.string());
+            dprintf(fd, "%.*s%s %s\n", (int)indent, "", timestamp.c_str(), body.c_str());
             body.clear();
         }
         timestamp.clear();

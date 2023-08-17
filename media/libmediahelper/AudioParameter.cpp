@@ -96,7 +96,7 @@ AudioParameter::AudioParameter(const String8& keyValuePairs)
     mKeyValuePairs = keyValuePairs;
     char *last;
 
-    strcpy(str, keyValuePairs.string());
+    strcpy(str, keyValuePairs.c_str());
     char *pair = strtok_r(str, ";", &last);
     while (pair != NULL) {
         if (strlen(pair) != 0) {
@@ -208,7 +208,7 @@ status_t AudioParameter::getInt(const String8& key, int& value) const
     value = 0;
     if (result == NO_ERROR) {
         int val;
-        if (sscanf(str8.string(), "%d", &val) == 1) {
+        if (sscanf(str8.c_str(), "%d", &val) == 1) {
             value = val;
         } else {
             result = INVALID_OPERATION;
@@ -224,7 +224,7 @@ status_t AudioParameter::getFloat(const String8& key, float& value) const
     value = 0;
     if (result == NO_ERROR) {
         float val;
-        if (sscanf(str8.string(), "%f", &val) == 1) {
+        if (sscanf(str8.c_str(), "%f", &val) == 1) {
             value = val;
         } else {
             result = INVALID_OPERATION;
