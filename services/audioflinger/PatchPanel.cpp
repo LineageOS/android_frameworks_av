@@ -920,7 +920,7 @@ void AudioFlinger::PatchPanel::dump(int fd) const
             patchPanelDump += "\nPatches:\n";
             headerPrinted = true;
         }
-        patchPanelDump.appendFormat("%s%s\n", indent, iter.second.dump(iter.first).string());
+        patchPanelDump.appendFormat("%s%s\n", indent, iter.second.dump(iter.first).c_str());
     }
 
     headerPrinted = false;
@@ -938,12 +938,12 @@ void AudioFlinger::PatchPanel::dump(int fd) const
             for (const auto& patch : module.second.sw_patches) {
                 moduleDump.appendFormat("%d ", patch);
             }
-            patchPanelDump.appendFormat("%s%s\n", indent, moduleDump.string());
+            patchPanelDump.appendFormat("%s%s\n", indent, moduleDump.c_str());
         }
     }
 
     if (!patchPanelDump.isEmpty()) {
-        write(fd, patchPanelDump.string(), patchPanelDump.size());
+        write(fd, patchPanelDump.c_str(), patchPanelDump.size());
     }
 }
 

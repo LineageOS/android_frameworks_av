@@ -527,7 +527,7 @@ NO_THREAD_SAFETY_ANALYSIS // conditional try lock
     result.appendFormat("\t\t- apiVersion: %08X\n\t\t- flags: %08X (%s)\n",
             mDescriptor.apiVersion,
             mDescriptor.flags,
-            effectFlagsToString(mDescriptor.flags).string());
+            effectFlagsToString(mDescriptor.flags).c_str());
     result.appendFormat("\t\t- name: %s\n",
             mDescriptor.name);
 
@@ -548,7 +548,7 @@ NO_THREAD_SAFETY_ANALYSIS // conditional try lock
         mLock.unlock();
     }
 
-    write(fd, result.string(), result.length());
+    write(fd, result.c_str(), result.length());
 }
 
 // ----------------------------------------------------------------------------
@@ -1656,7 +1656,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             dumpInOutBuffer(false /* isInput */, mOutBuffer).c_str(),
             dumpInOutBuffer(false /* isInput */, mOutConversionBuffer).c_str());
 
-    write(fd, result.string(), result.length());
+    write(fd, result.c_str(), result.length());
 
     if (mEffectInterface != 0) {
         dprintf(fd, "\tEffect ID %d HAL dump:\n", mId);
@@ -2666,7 +2666,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
                 (int)outBufferStr.size(), "Out buffer      ");
         result.appendFormat("\t%s   %s   %d\n",
                 inBufferStr.c_str(), outBufferStr.c_str(), mActiveTrackCnt);
-        write(fd, result.string(), result.size());
+        write(fd, result.c_str(), result.size());
 
         for (size_t i = 0; i < numEffects; ++i) {
             sp<IAfEffectModule> effect = mEffects[i];
@@ -2679,7 +2679,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             mLock.unlock();
         }
     } else {
-        write(fd, result.string(), result.size());
+        write(fd, result.c_str(), result.size());
     }
 }
 
@@ -3492,7 +3492,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     const bool locked = AudioFlinger::dumpTryLock(mProxyLock);
     if (!locked) {
         String8 result("DeviceEffectProxy may be deadlocked\n");
-        write(fd, result.string(), result.size());
+        write(fd, result.c_str(), result.size());
     }
 
     String8 outStr;
@@ -3501,16 +3501,16 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     } else {
         outStr.appendFormat("%*sNO HAL Effect\n", spaces, "");
     }
-    write(fd, outStr.string(), outStr.size());
+    write(fd, outStr.c_str(), outStr.size());
     outStr.clear();
 
     outStr.appendFormat("%*sSub Effects:\n", spaces, "");
-    write(fd, outStr.string(), outStr.size());
+    write(fd, outStr.c_str(), outStr.size());
     outStr.clear();
 
     for (const auto& iter : mEffectHandles) {
         outStr.appendFormat("%*sEffect for patch handle %d:\n", spaces + 2, "", iter.first);
-        write(fd, outStr.string(), outStr.size());
+        write(fd, outStr.c_str(), outStr.size());
         outStr.clear();
         sp<IAfEffectBase> effect = iter.second->effect().promote();
         if (effect != nullptr) {
