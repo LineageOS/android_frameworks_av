@@ -403,7 +403,7 @@ std::optional<bool> MediaPackageManager::doIsAllowed(uid_t uid) {
     PermissionController{}.getPackagesForUid(uid, str16PackageNames);
     std::vector<std::string> packageNames;
     for (const auto& str16PackageName : str16PackageNames) {
-        packageNames.emplace_back(String8(str16PackageName).string());
+        packageNames.emplace_back(String8(str16PackageName).c_str());
     }
     if (packageNames.empty()) {
         ALOGW("%s: Playback capture for uid %u is denied as no package name could be retrieved "
