@@ -43,6 +43,8 @@ class EffectConversionHelperAidl {
     std::shared_ptr<android::hardware::EventFlag> getEventFlagGroup() { return mEfGroup; }
     bool isBypassing() const;
 
+    ::aidl::android::hardware::audio::effect::Descriptor getDescriptor() const;
+
   protected:
     const int32_t mSessionId;
     const int32_t mIoId;
@@ -134,7 +136,6 @@ class EffectConversionHelperAidl {
     virtual status_t visualizerMeasure(uint32_t* replySize __unused, void* pReplyData __unused) {
         return BAD_VALUE;
     }
-
 };
 
 }  // namespace effect

@@ -72,7 +72,6 @@ class EffectHalAidl : public EffectHalInterface {
     const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
     const int32_t mSessionId;
     const int32_t mIoId;
-    const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
     const bool mIsProxyEffect;
 
     std::unique_ptr<EffectConversionHelperAidl> mConversion;
