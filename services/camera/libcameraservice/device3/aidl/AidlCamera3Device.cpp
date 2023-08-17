@@ -424,8 +424,8 @@ int32_t AidlCamera3Device::getCaptureResultFMQSize() {
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mCompatInfo, mActivePhysicalId}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mPrivilegedClient, mMinExpectedDuration,
+        mIsFixedFps, mCompatInfo, mActivePhysicalId}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -466,8 +466,8 @@ int32_t AidlCamera3Device::getCaptureResultFMQSize() {
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
-        *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mCompatInfo, mActivePhysicalId}, mResultMetadataQueue
+        *this, *(mInterface), mLegacyClient, mPrivilegedClient, mMinExpectedDuration,
+        mIsFixedFps, mCompatInfo, mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg, mSensorReadoutTimestampSupported);
