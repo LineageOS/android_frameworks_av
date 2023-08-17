@@ -112,8 +112,14 @@ public:
      */
     virtual android_dataspace getDataspace() { return mDataSpace; }
 
+    /**
+     * Returns pixel format information from GraphicBufferSource.
+     */
+    virtual uint32_t getPixelFormat() { return mPixelFormat; }
+
 protected:
     android_dataspace mDataSpace;
+    uint32_t mPixelFormat;
 };
 
 }  // namespace android
