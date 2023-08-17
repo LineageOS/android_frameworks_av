@@ -241,7 +241,11 @@ cc_library {
         "-Wextra",
         "-Werror",
         "-Wno-ignored-qualifiers",
-    ],
+    ] + select(soong_config_variable("libcameraservice", "cam_skip_invalid_frames_pkg"), {
+        any @ cam_skip_invalid_frames_pkg: ["-DCAM_SKIP_INVALID_FRAMES_PKG=" + cam_skip_invalid_frames_pkg],
+        default: ["-DCAM_SKIP_INVALID_FRAMES_PKG=none"],
+    }),
+
 }
 
 cc_library_static {
