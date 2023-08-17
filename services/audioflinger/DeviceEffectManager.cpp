@@ -166,16 +166,16 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     const bool locked = dumpTryLock(mLock);
     if (!locked) {
         String8 result("DeviceEffectManager may be deadlocked\n");
-        write(fd, result.string(), result.size());
+        write(fd, result.c_str(), result.size());
     }
 
     String8 heading("\nDevice Effects:\n");
-    write(fd, heading.string(), heading.size());
+    write(fd, heading.c_str(), heading.size());
     for (const auto& iter : mDeviceEffects) {
         String8 outStr;
         outStr.appendFormat("%*sEffect for device %s address %s:\n", 2, "",
                 ::android::toString(iter.first.mType).c_str(), iter.first.getAddress());
-        write(fd, outStr.string(), outStr.size());
+        write(fd, outStr.c_str(), outStr.size());
         iter.second->dump(fd, 4);
     }
 

@@ -340,7 +340,7 @@ AImageReader::init() {
     }
 
     mCbLooper = new ALooper;
-    mCbLooper->setName(consumerName.string());
+    mCbLooper->setName(consumerName.c_str());
     res = mCbLooper->start(
             /*runOnCallingThread*/false,
             /*canCallJava*/       true,

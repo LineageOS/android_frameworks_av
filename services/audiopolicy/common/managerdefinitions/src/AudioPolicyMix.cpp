@@ -126,7 +126,7 @@ void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
 
     dst->appendFormat("%*s- device type: %s\n", spaces, "", toString(mDeviceType).c_str());
 
-    dst->appendFormat("%*s- device address: %s\n", spaces, "", mDeviceAddress.string());
+    dst->appendFormat("%*s- device address: %s\n", spaces, "", mDeviceAddress.c_str());
 
     dst->appendFormat("%*s- output: %d\n", spaces, "",
             mOutput == nullptr ? 0 : mOutput->mIoHandle);
@@ -170,7 +170,7 @@ status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
         if (mix.mDeviceType == registeredMix->mDeviceType
                 && mix.mDeviceAddress.compare(registeredMix->mDeviceAddress) == 0) {
             ALOGE("registerMix(): mix already registered for dev=0x%x addr=%s",
-                    mix.mDeviceType, mix.mDeviceAddress.string());
+                    mix.mDeviceType, mix.mDeviceAddress.c_str());
             return BAD_VALUE;
         }
     }
@@ -182,7 +182,7 @@ status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
     sp<AudioPolicyMix> policyMix = sp<AudioPolicyMix>::make(mix);
     add(policyMix);
     ALOGD("registerMix(): adding mix for dev=0x%x addr=%s",
-            policyMix->mDeviceType, policyMix->mDeviceAddress.string());
+            policyMix->mDeviceType, policyMix->mDeviceAddress.c_str());
 
     if (desc != nullptr) {
         desc->mPolicyMix = policyMix;
@@ -198,14 +198,14 @@ status_t AudioPolicyMixCollection::unregisterMix(const AudioMix& mix)
         if (mix.mDeviceType == registeredMix->mDeviceType
                 && mix.mDeviceAddress.compare(registeredMix->mDeviceAddress) == 0) {
             ALOGD("unregisterMix(): removing mix for dev=0x%x addr=%s",
-                    mix.mDeviceType, mix.mDeviceAddress.string());
+                    mix.mDeviceType, mix.mDeviceAddress.c_str());
             removeAt(i);
             return NO_ERROR;
         }
     }
 
     ALOGE("unregisterMix(): mix not registered for dev=0x%x addr=%s",
-            mix.mDeviceType, mix.mDeviceAddress.string());
+            mix.mDeviceType, mix.mDeviceAddress.c_str());
     return BAD_VALUE;
 }
 
@@ -213,20 +213,20 @@ status_t AudioPolicyMixCollection::getAudioPolicyMix(audio_devices_t deviceType,
         const String8& address, sp<AudioPolicyMix> &policyMix) const
 {
 
-    ALOGV("getAudioPolicyMix() for dev=0x%x addr=%s", deviceType, address.string());
+    ALOGV("getAudioPolicyMix() for dev=0x%x addr=%s", deviceType, address.c_str());
     for (ssize_t i = 0; i < size(); i++) {
         // Workaround: when an in audio policy is registered, it opens an output
         // that tries to find the audio policy, thus the device must be ignored.
         if (itemAt(i)->mDeviceAddress.compare(address) == 0) {
             policyMix = itemAt(i);
             ALOGV("getAudioPolicyMix: found mix %zu match (devType=0x%x addr=%s)",
-                    i, deviceType, address.string());
+                    i, deviceType, address.c_str());
             return NO_ERROR;
         }
     }
 
     ALOGE("getAudioPolicyMix(): mix not registered for dev=0x%x addr=%s",
-            deviceType, address.string());
+            deviceType, address.c_str());
     return BAD_VALUE;
 }
 
@@ -326,7 +326,7 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
         // if there is an address match, prioritize that match
         if (strncmp(attributes.tags, "addr=", strlen("addr=")) == 0 &&
                 strncmp(attributes.tags + strlen("addr="),
-                        mix->mDeviceAddress.string(),
+                        mix->mDeviceAddress.c_str(),
                         AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - strlen("addr=") - 1) == 0) {
             ALOGV("\tgetOutputForAttr will use mix %zu", mixIndex);
             return MixMatchStatus::MATCH;
@@ -340,7 +340,7 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
         if (attributes.usage == AUDIO_USAGE_VIRTUAL_SOURCE &&
                 strncmp(attributes.tags, "addr=", strlen("addr=")) == 0 &&
                 strncmp(attributes.tags + strlen("addr="),
-                        mix->mDeviceAddress.string(),
+                        mix->mDeviceAddress.c_str(),
                         AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - strlen("addr=") - 1) == 0) {
             return MixMatchStatus::MATCH;
         }
@@ -402,10 +402,10 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(
 
 #ifdef LOG_NDEBUG
     ALOGV("getInputMixForAttr looking for address %s for source %d\n  mixes available:",
-            address.string(), attr.source);
+            address.c_str(), attr.source);
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioPolicyMix> audioPolicyMix = itemAt(i);
-        ALOGV("\tmix %zu address=%s", i, audioPolicyMix->mDeviceAddress.string());
+        ALOGV("\tmix %zu address=%s", i, audioPolicyMix->mDeviceAddress.c_str());
     }
 #endif
 
@@ -414,18 +414,18 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(
         const sp<AudioPolicyMix>& registeredMix = itemAt(index);
         if (registeredMix->mDeviceAddress.compare(address) == 0) {
             ALOGD("getInputMixForAttr found addr=%s dev=0x%x",
-                    registeredMix->mDeviceAddress.string(), registeredMix->mDeviceType);
+                    registeredMix->mDeviceAddress.c_str(), registeredMix->mDeviceType);
             break;
         }
     }
     if (index == size()) {
-        ALOGW("getInputMixForAttr() no policy for address %s", address.string());
+        ALOGW("getInputMixForAttr() no policy for address %s", address.c_str());
         return BAD_VALUE;
     }
     const sp<AudioPolicyMix> audioPolicyMix = itemAt(index);
 
     if (audioPolicyMix->mMixType != MIX_TYPE_PLAYERS) {
-        ALOGW("getInputMixForAttr() bad policy mix type for address %s", address.string());
+        ALOGW("getInputMixForAttr() bad policy mix type for address %s", address.c_str());
         return BAD_VALUE;
     }
     if (policyMix != nullptr) {
@@ -463,7 +463,7 @@ status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
         }
         // check if this mix goes to a device in the list of devices
         bool deviceMatch = false;
-        const AudioDeviceTypeAddr mixDevice(mix->mDeviceType, mix->mDeviceAddress.string());
+        const AudioDeviceTypeAddr mixDevice(mix->mDeviceType, mix->mDeviceAddress.c_str());
         for (size_t j = 0; j < devices.size(); j++) {
             if (mixDevice.equals(devices[j])) {
                 deviceMatch = true;
@@ -519,7 +519,7 @@ status_t AudioPolicyMixCollection::getDevicesForUid(uid_t uid,
             }
         }
         if (ruleAllowsUid) {
-            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.string()));
+            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.c_str()));
         }
     }
     return NO_ERROR;
@@ -554,7 +554,7 @@ status_t AudioPolicyMixCollection::setUserIdDeviceAffinities(int userId,
         }
         // check if this mix goes to a device in the list of devices
         bool deviceMatch = false;
-        const AudioDeviceTypeAddr mixDevice(mix->mDeviceType, mix->mDeviceAddress.string());
+        const AudioDeviceTypeAddr mixDevice(mix->mDeviceType, mix->mDeviceAddress.c_str());
         for (size_t j = 0; j < devices.size(); j++) {
             if (mixDevice.equals(devices[j])) {
                 deviceMatch = true;
@@ -611,7 +611,7 @@ status_t AudioPolicyMixCollection::getDevicesForUserId(int userId,
             }
         }
         if (ruleAllowsUserId) {
-            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.string()));
+            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.c_str()));
         }
     }
     return NO_ERROR;

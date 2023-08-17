@@ -142,7 +142,7 @@ const char* AMediaFormat_toString(AMediaFormat *mData) {
     }
     ret.append("}");
     mData->mDebug = ret;
-    return mData->mDebug.string();
+    return mData->mDebug.c_str();
 }
 
 EXPORT
@@ -238,7 +238,7 @@ bool AMediaFormat_getString(AMediaFormat* mData, const char *name, const char **
         return false;
     }
     for (size_t i = 0; i < mData->mStringCache.size(); i++) {
-        if (strcmp(mData->mStringCache.keyAt(i).string(), name) == 0) {
+        if (strcmp(mData->mStringCache.keyAt(i).c_str(), name) == 0) {
             mData->mStringCache.removeItemsAt(i, 1);
             break;
         }
@@ -251,7 +251,7 @@ bool AMediaFormat_getString(AMediaFormat* mData, const char *name, const char **
         if (i < 0) {
             return false;
         }
-        *out = mData->mStringCache.valueAt(i).string();
+        *out = mData->mStringCache.valueAt(i).c_str();
         return true;
     }
     return false;
