@@ -376,7 +376,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult_3_4(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mCompatInfo,
+        *mInterface, mLegacyClient, mPrivilegedClient, mMinExpectedDuration, mIsFixedFps, mCompatInfo,
         mActivePhysicalId}, mResultMetadataQueue
     };
 
@@ -439,7 +439,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mCompatInfo,
+        *mInterface, mLegacyClient, mPrivilegedClient, mMinExpectedDuration, mIsFixedFps, mCompatInfo,
         mActivePhysicalId}, mResultMetadataQueue
     };
 
@@ -487,7 +487,7 @@ hardware::Return<void> HidlCamera3Device::notifyHelper(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mCompatInfo,
+        *mInterface, mLegacyClient, mPrivilegedClient, mMinExpectedDuration, mIsFixedFps, mCompatInfo,
         mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {

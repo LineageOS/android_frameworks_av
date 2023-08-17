@@ -153,6 +153,7 @@ namespace camera3 {
         InflightRequestUpdateInterface& inflightIntf;
         BufferRecordsInterface& bufferRecordsIntf;
         bool legacyClient;
+        const bool privilegedClient;
         nsecs_t& minFrameDuration;
         bool& isFixedFps;
         const content::res::CameraCompatibilityInfo& compatInfo;
