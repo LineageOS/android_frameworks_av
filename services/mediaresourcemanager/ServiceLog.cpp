@@ -35,14 +35,14 @@ void ServiceLog::add(const String8 &log) {
     time_t now = time(0);
     char buf[64];
     strftime(buf, sizeof(buf), "%m-%d %T", localtime(&now));
-    mLogs.add(String8::format("%s %s", buf, log.string()));
+    mLogs.add(String8::format("%s %s", buf, log.c_str()));
 }
 
 String8 ServiceLog::toString(const char *linePrefix) const {
     Mutex::Autolock lock(mLock);
     String8 result;
     for (const auto& log : mLogs) {
-        addLine(log.string(), linePrefix, &result);
+        addLine(log.c_str(), linePrefix, &result);
     }
     if (mLogs.size() == mMaxNum) {
         addLine("...", linePrefix, &result);

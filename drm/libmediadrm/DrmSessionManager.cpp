@@ -172,7 +172,7 @@ void DrmSessionManager::addSession(int pid,
         const std::shared_ptr<IResourceManagerClient>& drm, const Vector<uint8_t> &sessionId) {
     uid_t uid = AIBinder_getCallingUid();
     ALOGV("addSession(pid %d, uid %d, drm %p, sessionId %s)", pid, uid, drm.get(),
-            GetSessionIdString(sessionId).string());
+            GetSessionIdString(sessionId).c_str());
 
     Mutex::Autolock lock(mLock);
     if (mService == NULL) {
@@ -188,7 +188,7 @@ void DrmSessionManager::addSession(int pid,
 }
 
 void DrmSessionManager::useSession(const Vector<uint8_t> &sessionId) {
-    ALOGV("useSession(%s)", GetSessionIdString(sessionId).string());
+    ALOGV("useSession(%s)", GetSessionIdString(sessionId).c_str());
 
     Mutex::Autolock lock(mLock);
     auto it = mSessionMap.find(toStdVec(sessionId));
@@ -205,7 +205,7 @@ void DrmSessionManager::useSession(const Vector<uint8_t> &sessionId) {
 }
 
 void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
-    ALOGV("removeSession(%s)", GetSessionIdString(sessionId).string());
+    ALOGV("removeSession(%s)", GetSessionIdString(sessionId).c_str());
 
     Mutex::Autolock lock(mLock);
     auto it = mSessionMap.find(toStdVec(sessionId));

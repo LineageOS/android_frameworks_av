@@ -472,7 +472,7 @@ const char *StagefrightMetadataRetriever::extractMetadata(int keyCode) {
         return NULL;
     }
 
-    return mMetaData.valueAt(index).string();
+    return mMetaData.valueAt(index).c_str();
 }
 
 void StagefrightMetadataRetriever::parseColorAspects(const sp<MetaData>& meta) {

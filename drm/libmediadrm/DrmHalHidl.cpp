@@ -121,7 +121,7 @@ static String8 toString8(const hidl_string& string) {
 }
 
 static hidl_string toHidlString(const String8& string) {
-    return hidl_string(string.string());
+    return hidl_string(string.c_str());
 }
 
 static DrmPlugin::SecurityLevel toSecurityLevel(SecurityLevel level) {
@@ -353,7 +353,7 @@ sp<IDrmPlugin> DrmHalHidl::makeDrmPlugin(const sp<IDrmFactory>& factory, const u
 
     sp<IDrmPlugin> plugin;
     Return<void> hResult = factory->createPlugin(
-            uuid, appPackageName.string(), [&](Status status, const sp<IDrmPlugin>& hPlugin) {
+            uuid, appPackageName.c_str(), [&](Status status, const sp<IDrmPlugin>& hPlugin) {
                 if (status != Status::OK) {
                     DrmUtils::LOG2BE(uuid, "Failed to make drm plugin: %d", status);
                     return;
@@ -517,7 +517,7 @@ DrmStatus DrmHalHidl::matchMimeTypeAndSecurityLevel(const sp<IDrmFactory>& facto
             return DrmStatus(OK);
         }
         // isCryptoSchemeSupported(uuid, mimeType)
-        auto hResult = factory->isContentTypeSupported(mimeType.string());
+        auto hResult = factory->isContentTypeSupported(mimeType.c_str());
         if (!hResult.isOk()) {
             return DrmStatus(DEAD_OBJECT);
         }
@@ -531,7 +531,7 @@ DrmStatus DrmHalHidl::matchMimeTypeAndSecurityLevel(const sp<IDrmFactory>& facto
     if (factoryV1_2 == NULL) {
         return DrmStatus(ERROR_UNSUPPORTED);
     } else {
-        auto hResult = factoryV1_2->isCryptoSchemeSupported_1_2(uuid, mimeType.string(),
+        auto hResult = factoryV1_2->isCryptoSchemeSupported_1_2(uuid, mimeType.c_str(),
                                                                 toHidlSecurityLevel(level));
         if (!hResult.isOk()) {
             return DrmStatus(DEAD_OBJECT);
