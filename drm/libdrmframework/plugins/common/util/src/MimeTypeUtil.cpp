@@ -128,7 +128,7 @@ String8 MimeTypeUtil::convertMimeType(String8& mimeType) {
     struct MimeGroup* pGroup;
     struct MimeTypeList* pMimeItem;
     int len;
-    pMimeType = mimeType.string();
+    pMimeType = mimeType.c_str();
     if (NULL != pMimeType) {
         if ((0 == strncmp(pMimeType, mime_group_audio, (sizeof mime_group_audio) - 1)) ||
             (0 == strncmp(pMimeType, mime_group_video, (sizeof mime_group_video) - 1))) {
@@ -159,7 +159,7 @@ String8 MimeTypeUtil::convertMimeType(String8& mimeType) {
             result = String8(mime_type_unsupported);
         }
         LOG_DEBUG("convertMimeType got mimetype %s, converted into mimetype %s",
-                pMimeType, result.string());
+                pMimeType, result.c_str());
     }
     return result;
 }
