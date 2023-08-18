@@ -304,7 +304,7 @@ String8 ExtractorInstance::toString() const {
     }
     for (size_t i = 0; i < tracks.size(); i++) {
         const String8 desc = trackDescriptions.itemAt(i);
-        str.appendFormat("    track {%s} ", desc.string());
+        str.appendFormat("    track {%s} ", desc.c_str());
         wp<IMediaSource> wSource = tracks.itemAt(i);
         if (wSource == NULL) {
             str.append(": null\n");
@@ -386,7 +386,7 @@ status_t dumpExtractors(int fd, const Vector<String16>&) {
             }
         }
     }
-    write(fd, out.string(), out.size());
+    write(fd, out.c_str(), out.size());
     return OK;
 }
 

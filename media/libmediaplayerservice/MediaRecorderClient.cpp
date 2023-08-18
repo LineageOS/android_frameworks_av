@@ -245,7 +245,7 @@ status_t MediaRecorderClient::setVideoFrameRate(int frames_per_second)
 }
 
 status_t MediaRecorderClient::setParameters(const String8& params) {
-    ALOGV("setParameters(%s)", params.string());
+    ALOGV("setParameters(%s)", params.c_str());
     Mutex::Autolock lock(mLock);
     if (mRecorder == NULL) {
         ALOGE("recorder is not initialized");
@@ -519,7 +519,7 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
 }
 
 status_t MediaRecorderClient::setClientName(const String16& clientName) {
-    ALOGV("setClientName(%s)", String8(clientName).string());
+    ALOGV("setClientName(%s)", String8(clientName).c_str());
     Mutex::Autolock lock(mLock);
     if (mRecorder == NULL) {
         ALOGE("recorder is not initialized");
