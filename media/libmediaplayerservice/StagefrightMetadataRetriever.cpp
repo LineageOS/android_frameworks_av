@@ -672,6 +672,18 @@ void StagefrightMetadataRetriever::parseMetaData() {
                     if (trackMeta->findInt32(kKeyWidth, &imageWidth)
                         && trackMeta->findInt32(kKeyHeight, &imageHeight)) {
                         imagePrimary = imageCount;
+                        int32_t displayLeft;
+                        int32_t displayTop;
+                        int32_t displayRight;
+                        int32_t displayBottom;
+                        if (trackMeta->findRect(kKeyCropRect, &displayLeft, &displayTop,
+                                                &displayRight, &displayBottom)
+                            && displayLeft >= 0 && displayTop >= 0 && displayRight < imageWidth
+                            && displayBottom < imageHeight && displayLeft <= displayRight
+                            && displayTop <= displayBottom) {
+                            imageWidth = displayRight - displayLeft + 1;
+                            imageHeight = displayBottom - displayTop + 1;
+                        }
                     } else {
                         ALOGE("primary image track ignored for missing dimensions");
                     }
