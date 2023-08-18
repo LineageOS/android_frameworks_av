@@ -544,7 +544,7 @@ status_t FwdLockEngine::onOpenDecryptSession(int uniqueId,
         String8 uriTag = String8(uri);
         uriTag.toLower();
 
-        if (0 == strncmp(uriTag.string(), fileTag, sizeof(fileTag) - 1)) {
+        if (0 == strncmp(uriTag.c_str(), fileTag, sizeof(fileTag) - 1)) {
             const char *filePath = strchr(uri + sizeof(fileTag) - 1, '/');
             if (NULL != filePath && onCanHandle(uniqueId, String8(filePath))) {
                 int fd = open(filePath, O_RDONLY);
