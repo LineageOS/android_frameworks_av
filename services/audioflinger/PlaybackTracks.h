@@ -29,13 +29,13 @@ public:
     bool hasOpPlayAudio() const;
 
     static sp<OpPlayAudioMonitor> createIfNeeded(
-            AudioFlinger::ThreadBase* thread,
+            IAfThreadBase* thread,
             const AttributionSourceState& attributionSource,
             const audio_attributes_t& attr, int id,
             audio_stream_type_t streamType);
 
 private:
-    OpPlayAudioMonitor(AudioFlinger::ThreadBase* thread,
+    OpPlayAudioMonitor(IAfThreadBase* thread,
                        const AttributionSourceState& attributionSource,
                        audio_usage_t usage, int id, uid_t uid);
     void onFirstRef() override;
@@ -56,7 +56,7 @@ private:
     // called by PlayAudioOpCallback when OP_PLAY_AUDIO is updated in AppOp callback
     void checkPlayAudioForUsage(bool doBroadcast);
 
-    wp<AudioFlinger::ThreadBase> mThread;
+    wp<IAfThreadBase> mThread;
     std::atomic_bool mHasOpPlayAudio;
     const AttributionSourceState mAttributionSource;
     const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
@@ -68,7 +68,7 @@ private:
 // playback track
 class Track : public TrackBase, public virtual IAfTrack, public VolumeProvider {
 public:
-                        Track(AudioFlinger::PlaybackThread* thread,
+    Track(IAfPlaybackThread* thread,
                                 const sp<Client>& client,
                                 audio_stream_type_t streamType,
                                 const audio_attributes_t& attr,
@@ -310,7 +310,7 @@ protected:
     mutable FillingStatus mFillingStatus;
     int8_t              mRetryCount;
 
-    // see comment at AudioFlinger::PlaybackThread::Track::~Track for why this can't be const
+    // see comment at ~Track for why this can't be const
     sp<IMemory>         mSharedBuffer;
 
     bool                mResetDone;
@@ -410,8 +410,8 @@ public:
         void *mBuffer;
     };
 
-                        OutputTrack(AudioFlinger::PlaybackThread* thread,
-                                AudioFlinger::DuplicatingThread* sourceThread,
+    OutputTrack(IAfPlaybackThread* thread,
+            IAfDuplicatingThread* sourceThread,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
@@ -456,7 +456,7 @@ private:
     Vector < Buffer* >          mBufferQueue;
     AudioBufferProvider::Buffer mOutBuffer;
     bool                        mActive;
-    AudioFlinger::DuplicatingThread* const mSourceThread; // for waitTimeMs() in write()
+    IAfDuplicatingThread* const mSourceThread; // for waitTimeMs() in write()
     sp<AudioTrackClientProxy>   mClientProxy;
 
     /** Attributes of the source tracks.
@@ -478,7 +478,7 @@ private:
 // playback track, used by PatchPanel
 class PatchTrack : public Track, public PatchTrackBase, public IAfPatchTrack {
 public:
-                        PatchTrack(AudioFlinger::PlaybackThread* playbackThread,
+    PatchTrack(IAfPlaybackThread* playbackThread,
                                    audio_stream_type_t streamType,
                                    uint32_t sampleRate,
                                    audio_channel_mask_t channelMask,
