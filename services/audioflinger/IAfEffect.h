@@ -350,7 +350,7 @@ public:
             const IAfPatchPanel::Patch& patch) = 0;
     virtual void onReleasePatch(audio_patch_handle_t patchHandle) = 0;
 
-    virtual void dump2(int fd, int spaces) const = 0; // TODO(b/288339104) naming?
+    virtual void dump2(int fd, int spaces) const = 0; // TODO(b/291319101) naming?
 
 private:
     // used by DeviceEffectProxy
