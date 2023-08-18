@@ -370,7 +370,7 @@ status_t NuPlayer::setBufferingSettings(const BufferingSettings& buffering) {
 }
 
 void NuPlayer::setDataSourceAsync(const String8& rtpParams) {
-    ALOGD("setDataSourceAsync for RTP = %s", rtpParams.string());
+    ALOGD("setDataSourceAsync for RTP = %s", rtpParams.c_str());
     sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
 
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);

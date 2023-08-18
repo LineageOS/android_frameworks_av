@@ -64,7 +64,7 @@ DrmConstraints* DrmPassthruPlugIn::onGetConstraints(
     String8 value("dummy_available_time");
     char* charValue = NULL;
     charValue = new char[value.length() + 1];
-    strncpy(charValue, value.string(), value.length());
+    strncpy(charValue, value.c_str(), value.length());
     charValue[value.length()] = '\0';
 
     //Just add dummy available time for verification
@@ -95,7 +95,7 @@ DrmInfoStatus* DrmPassthruPlugIn::onProcessDrmInfo(int uniqueId, const DrmInfo* 
             const int bufferSize = licenseString.size();
             char* data = NULL;
             data = new char[bufferSize];
-            memcpy(data, licenseString.string(), bufferSize);
+            memcpy(data, licenseString.c_str(), bufferSize);
             const DrmBuffer* buffer = new DrmBuffer(data, bufferSize);
             drmInfoStatus = new DrmInfoStatus(DrmInfoStatus::STATUS_OK,
                     DrmInfoRequest::TYPE_RIGHTS_ACQUISITION_INFO, buffer, drmInfo->getMimeType());
@@ -150,7 +150,7 @@ DrmInfo* DrmPassthruPlugIn::onAcquireDrmInfo(int uniqueId, const DrmInfoRequest*
         int length = dataString.length();
         char* data = NULL;
         data = new char[length];
-        memcpy(data, dataString.string(), length);
+        memcpy(data, dataString.c_str(), length);
         drmInfo = new DrmInfo(drmInfoRequest->getInfoType(),
             DrmBuffer(data, length), drmInfoRequest->getMimeType());
     }
@@ -158,7 +158,7 @@ DrmInfo* DrmPassthruPlugIn::onAcquireDrmInfo(int uniqueId, const DrmInfoRequest*
 }
 
 bool DrmPassthruPlugIn::onCanHandle(int /*uniqueId*/, const String8& path) {
-    ALOGV("DrmPassthruPlugIn::canHandle: %s ", path.string());
+    ALOGV("DrmPassthruPlugIn::canHandle: %s ", path.c_str());
     String8 extension = path.getPathExtension();
     extension.toLower();
     return (String8(".passthru") == extension);

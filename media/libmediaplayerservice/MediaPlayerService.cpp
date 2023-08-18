@@ -237,7 +237,7 @@ void unmarshallAudioAttributes(const Parcel& parcel, audio_attributes_t *attribu
     if (hasFlattenedTag) {
         // the tags are UTF16, convert to UTF8
         String16 tags = parcel.readString16();
-        ssize_t realTagSize = utf16_to_utf8_length(tags.string(), tags.size());
+        ssize_t realTagSize = utf16_to_utf8_length(tags.c_str(), tags.size());
         if (realTagSize <= 0) {
             strcpy(attributes->tags, "");
         } else {
@@ -245,7 +245,7 @@ void unmarshallAudioAttributes(const Parcel& parcel, audio_attributes_t *attribu
             // copying array size -1, array for tags was calloc'd, no need to NULL-terminate it
             size_t tagSize = realTagSize > AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1 ?
                     AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1 : realTagSize;
-            utf16_to_utf8(tags.string(), tagSize, attributes->tags,
+            utf16_to_utf8(tags.c_str(), tagSize, attributes->tags,
                     sizeof(attributes->tags) / sizeof(attributes->tags[0]));
         }
     } else {
@@ -434,7 +434,7 @@ static void dumpCodecDetails(int fd, const sp<IMediaCodecList> &codecList, bool 
         }
     }
     result.append("\n");
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
 }
 
 
@@ -549,7 +549,7 @@ status_t MediaPlayerService::AudioOutput::dump(int fd, const Vector<String16>& a
             mAuxEffectId, mSendLevel);
     result.append(buffer);
 
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
     if (mTrack != 0) {
         mTrack->dump(fd, args);
     }
@@ -584,7 +584,7 @@ status_t MediaPlayerService::Client::dump(int fd, const Vector<String16>& args)
     } else {
         result.append("  lock is taken, no dump from player and audio output\n");
     }
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 
     if (p != NULL) {
         p->dump(fd, args);
@@ -644,7 +644,7 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
                 snprintf(buffer, 255, " MediaRecorderClient pid(%d)\n",
                         c->mAttributionSource.pid);
                 result.append(buffer);
-                write(fd, result.string(), result.size());
+                write(fd, result.c_str(), result.size());
                 result = "\n";
                 c->dump(fd, args);
 
@@ -746,7 +746,7 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
             result.append(s.c_str(), s.size());
         }
     }
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 
     return NO_ERROR;
 }
@@ -1249,7 +1249,7 @@ status_t MediaPlayerService::Client::setBufferingSettings(
         const BufferingSettings& buffering)
 {
     ALOGV("[%d] setBufferingSettings{%s}",
-            mConnId, buffering.toString().string());
+            mConnId, buffering.toString().c_str());
     sp<MediaPlayerBase> p = getPlayer();
     if (p == 0) return UNKNOWN_ERROR;
     return p->setBufferingSettings(buffering);
@@ -1264,7 +1264,7 @@ status_t MediaPlayerService::Client::getBufferingSettings(
     status_t ret = p->getBufferingSettings(buffering);
     if (ret == NO_ERROR) {
         ALOGV("[%d] getBufferingSettings{%s}",
-                mConnId, buffering->toString().string());
+                mConnId, buffering->toString().c_str());
     } else {
         ALOGE("[%d] getBufferingSettings returned %d", mConnId, ret);
     }

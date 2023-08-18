@@ -91,14 +91,14 @@ namespace android {
         }
         mSessions.add(sessionId);
 
-        ALOGD("MockDrmPlugin::openSession() -> %s", vectorToString(sessionId).string());
+        ALOGD("MockDrmPlugin::openSession() -> %s", vectorToString(sessionId).c_str());
         return OK;
     }
 
     status_t MockDrmPlugin::closeSession(Vector<uint8_t> const &sessionId)
     {
         Mutex::Autolock lock(mLock);
-        ALOGD("MockDrmPlugin::closeSession(%s)", vectorToString(sessionId).string());
+        ALOGD("MockDrmPlugin::closeSession(%s)", vectorToString(sessionId).c_str());
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
             ALOGD("Invalid sessionId");
@@ -119,8 +119,8 @@ namespace android {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::getKeyRequest(sessionId=%s, initData=%s, mimeType=%s"
               ", keyType=%d, optionalParameters=%s))",
-              vectorToString(sessionId).string(), vectorToString(initData).string(), mimeType.string(),
-              keyType, stringMapToString(optionalParameters).string());
+              vectorToString(sessionId).c_str(), vectorToString(initData).c_str(), mimeType.c_str(),
+              keyType, stringMapToString(optionalParameters).c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -144,8 +144,8 @@ namespace android {
         String8 params;
         for (size_t i = 0; i < optionalParameters.size(); i++) {
             params.appendFormat("%s{%s,%s}", i ? "," : "",
-                                optionalParameters.keyAt(i).string(),
-                                optionalParameters.valueAt(i).string());
+                                optionalParameters.keyAt(i).c_str(),
+                                optionalParameters.valueAt(i).c_str());
         }
         mStringProperties.add(String8("mock-optparams"), params);
 
@@ -176,7 +176,7 @@ namespace android {
             return BAD_VALUE;
         } else {
             *keyRequestType = static_cast<KeyRequestType>(
-                atoi(mStringProperties.valueAt(index).string()));
+                atoi(mStringProperties.valueAt(index).c_str()));
         }
 
         return OK;
@@ -188,7 +188,7 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::provideKeyResponse(sessionId=%s, response=%s)",
-              vectorToString(sessionId).string(), vectorToString(response).string());
+              vectorToString(sessionId).c_str(), vectorToString(response).c_str());
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
             ALOGD("Invalid sessionId");
@@ -217,7 +217,7 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::removeKeys(keySetId=%s)",
-              vectorToString(keySetId).string());
+              vectorToString(keySetId).c_str());
 
         ssize_t index = findKeySet(keySetId);
         if (index == kNotFound) {
@@ -234,8 +234,8 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::restoreKeys(sessionId=%s, keySetId=%s)",
-              vectorToString(sessionId).string(),
-              vectorToString(keySetId).string());
+              vectorToString(sessionId).c_str(),
+              vectorToString(keySetId).c_str());
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
             ALOGD("Invalid sessionId");
@@ -255,7 +255,7 @@ namespace android {
                                                KeyedVector<String8, String8> &infoMap) const
     {
         ALOGD("MockDrmPlugin::queryKeyStatus(sessionId=%s)",
-              vectorToString(sessionId).string());
+              vectorToString(sessionId).c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -304,7 +304,7 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::provideProvisionResponse(%s)",
-              vectorToString(response).string());
+              vectorToString(response).c_str());
 
         // Properties used in mock test, set by mock plugin and verifed cts test app
         //   byte[] response            -> mock-response
@@ -367,7 +367,7 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::releaseSecureStops(%s)",
-              vectorToString(ssRelease).string());
+              vectorToString(ssRelease).c_str());
 
         // Properties used in mock test, set by mock plugin and verifed cts test app
         //   byte[] secure-stop-release  -> mock-ssrelease
@@ -385,10 +385,10 @@ namespace android {
 
     status_t MockDrmPlugin::getPropertyString(String8 const &name, String8 &value) const
     {
-        ALOGD("MockDrmPlugin::getPropertyString(name=%s)", name.string());
+        ALOGD("MockDrmPlugin::getPropertyString(name=%s)", name.c_str());
         ssize_t index = mStringProperties.indexOfKey(name);
         if (index < 0) {
-            ALOGD("no property for '%s'", name.string());
+            ALOGD("no property for '%s'", name.c_str());
             return BAD_VALUE;
         }
         value = mStringProperties.valueAt(index);
@@ -398,10 +398,10 @@ namespace android {
     status_t MockDrmPlugin::getPropertyByteArray(String8 const &name,
                                                  Vector<uint8_t> &value) const
     {
-        ALOGD("MockDrmPlugin::getPropertyByteArray(name=%s)", name.string());
+        ALOGD("MockDrmPlugin::getPropertyByteArray(name=%s)", name.c_str());
         ssize_t index = mByteArrayProperties.indexOfKey(name);
         if (index < 0) {
-            ALOGD("no property for '%s'", name.string());
+            ALOGD("no property for '%s'", name.c_str());
             return BAD_VALUE;
         }
         value = mByteArrayProperties.valueAt(index);
@@ -413,11 +413,11 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::setPropertyString(name=%s, value=%s)",
-              name.string(), value.string());
+              name.c_str(), value.c_str());
 
         if (name == "mock-send-event") {
             unsigned code, extra;
-            sscanf(value.string(), "%d %d", &code, &extra);
+            sscanf(value.c_str(), "%d %d", &code, &extra);
             DrmPlugin::EventType eventType = (DrmPlugin::EventType)code;
 
             Vector<uint8_t> const *pSessionId = NULL;
@@ -438,7 +438,7 @@ namespace android {
             sendEvent(eventType, extra, pSessionId, pData);
         } else if (name == "mock-send-expiration-update") {
             int64_t expiryTimeMS;
-            sscanf(value.string(), "%jd", &expiryTimeMS);
+            sscanf(value.c_str(), "%jd", &expiryTimeMS);
 
             Vector<uint8_t> const *pSessionId = NULL;
             ssize_t index = mByteArrayProperties.indexOfKey(String8("mock-event-session-id"));
@@ -504,7 +504,7 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::setPropertyByteArray(name=%s, value=%s)",
-              name.string(), vectorToString(value).string());
+              name.c_str(), vectorToString(value).c_str());
         mByteArrayProperties.add(name, value);
         return OK;
     }
@@ -515,7 +515,7 @@ namespace android {
         Mutex::Autolock lock(mLock);
 
         ALOGD("MockDrmPlugin::setCipherAlgorithm(sessionId=%s, algorithm=%s)",
-              vectorToString(sessionId).string(), algorithm.string());
+              vectorToString(sessionId).c_str(), algorithm.c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -535,7 +535,7 @@ namespace android {
         Mutex::Autolock lock(mLock);
 
         ALOGD("MockDrmPlugin::setMacAlgorithm(sessionId=%s, algorithm=%s)",
-              vectorToString(sessionId).string(), algorithm.string());
+              vectorToString(sessionId).c_str(), algorithm.c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -557,10 +557,10 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::encrypt(sessionId=%s, keyId=%s, input=%s, iv=%s)",
-              vectorToString(sessionId).string(),
-              vectorToString(keyId).string(),
-              vectorToString(input).string(),
-              vectorToString(iv).string());
+              vectorToString(sessionId).c_str(),
+              vectorToString(keyId).c_str(),
+              vectorToString(input).c_str(),
+              vectorToString(iv).c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -596,10 +596,10 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::decrypt(sessionId=%s, keyId=%s, input=%s, iv=%s)",
-              vectorToString(sessionId).string(),
-              vectorToString(keyId).string(),
-              vectorToString(input).string(),
-              vectorToString(iv).string());
+              vectorToString(sessionId).c_str(),
+              vectorToString(keyId).c_str(),
+              vectorToString(input).c_str(),
+              vectorToString(iv).c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -634,9 +634,9 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::sign(sessionId=%s, keyId=%s, message=%s)",
-              vectorToString(sessionId).string(),
-              vectorToString(keyId).string(),
-              vectorToString(message).string());
+              vectorToString(sessionId).c_str(),
+              vectorToString(keyId).c_str(),
+              vectorToString(message).c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -670,10 +670,10 @@ namespace android {
     {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::verify(sessionId=%s, keyId=%s, message=%s, signature=%s)",
-              vectorToString(sessionId).string(),
-              vectorToString(keyId).string(),
-              vectorToString(message).string(),
-              vectorToString(signature).string());
+              vectorToString(sessionId).c_str(),
+              vectorToString(keyId).c_str(),
+              vectorToString(message).c_str(),
+              vectorToString(signature).c_str());
 
         ssize_t index = findSession(sessionId);
         if (index == kNotFound) {
@@ -696,7 +696,7 @@ namespace android {
             ALOGD("Missing 'mock-request' parameter for mock");
             return BAD_VALUE;
         } else {
-            match = atol(mStringProperties.valueAt(index).string());
+            match = atol(mStringProperties.valueAt(index).c_str());
         }
         return OK;
     }
@@ -710,11 +710,11 @@ namespace android {
         Mutex::Autolock lock(mLock);
         ALOGD("MockDrmPlugin::signRSA(sessionId=%s, algorithm=%s, keyId=%s, "
               "message=%s, signature=%s)",
-              vectorToString(sessionId).string(),
-              algorithm.string(),
-              vectorToString(message).string(),
-              vectorToString(wrappedKey).string(),
-              vectorToString(signature).string());
+              vectorToString(sessionId).c_str(),
+              algorithm.c_str(),
+              vectorToString(message).c_str(),
+              vectorToString(wrappedKey).c_str(),
+              vectorToString(signature).c_str());
 
         // Properties used in mock test, set by mock plugin and verifed cts test app
         //   byte[] wrappedKey         -> mock-wrappedkey
@@ -772,7 +772,7 @@ namespace android {
         String8 result("{ ");
         for (size_t i = 0; i < map.size(); i++) {
             result.appendFormat("%s{name=%s, value=%s}", i > 0 ? ", " : "",
-                                map.keyAt(i).string(), map.valueAt(i).string());
+                                map.keyAt(i).c_str(), map.valueAt(i).c_str());
         }
         return result + " }";
     }
@@ -802,10 +802,10 @@ namespace android {
               "pattern:{encryptBlocks=%d, skipBlocks=%d} src=%p, "
               "subSamples=%s, dst=%p)",
               (int)secure,
-              arrayToString(key, DECRYPT_KEY_SIZE).string(),
-              arrayToString(iv, DECRYPT_KEY_SIZE).string(),
+              arrayToString(key, DECRYPT_KEY_SIZE).c_str(),
+              arrayToString(iv, DECRYPT_KEY_SIZE).c_str(),
               (int)mode, pattern.mEncryptBlocks, pattern.mSkipBlocks, srcPtr,
-              subSamplesToString(subSamples, numSubSamples).string(),
+              subSamplesToString(subSamples, numSubSamples).c_str(),
               dstPtr);
         return OK;
     }

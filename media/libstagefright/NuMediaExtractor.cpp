@@ -164,7 +164,7 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
 
 const char* NuMediaExtractor::getName() const {
     Mutex::Autolock autoLock(mLock);
-    return mImpl == nullptr ? nullptr : mName.string();
+    return mImpl == nullptr ? nullptr : mName.c_str();
 }
 
 static String8 arrayToString(const std::vector<uint8_t> &array) {

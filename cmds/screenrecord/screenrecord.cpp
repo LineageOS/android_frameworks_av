@@ -989,7 +989,7 @@ static status_t notifyMediaScanner(const char* fileName) {
             "-a",
             "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
             "-d",
-            fileUrl.string(),
+            fileUrl.c_str(),
             NULL
     };
     if (gVerbose) {

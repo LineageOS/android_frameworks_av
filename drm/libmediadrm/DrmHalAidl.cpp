@@ -117,7 +117,7 @@ static String8 toString8(const std::string& string) {
 }
 
 static std::string toStdString(const String8& string8) {
-    return std::string(string8.string());
+    return std::string(string8.c_str());
 }
 
 static std::vector<KeyValue> toKeyValueVector(const KeyedVector<String8, String8>& keyedVector) {
@@ -415,7 +415,7 @@ DrmStatus DrmHalAidl::isCryptoSchemeSupported(const uint8_t uuid[16], const Stri
     *isSupported = false;
     Uuid uuidAidl = DrmUtils::toAidlUuid(uuid);
     SecurityLevel levelAidl = toAidlSecurityLevel(level);
-    std::string mimeTypeStr = mimeType.string();
+    std::string mimeTypeStr = mimeType.c_str();
 
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
         CryptoSchemes schemes{};
