@@ -209,12 +209,12 @@ public:
 
     /**
      * For RecordTrack
-     * TODO(b/288339104) either use this or add asRecordTrack or asTrack etc.
+     * TODO(b/291317964) either use this or add asRecordTrack or asTrack etc.
      */
     virtual void handleSyncStartEvent(const sp<audioflinger::SyncEvent>& event __unused){};
 
     // For Thread use, fast tracks and offloaded tracks only
-    // TODO(b/288339104) rearrange to IAfTrack.
+    // TODO(b/291317964) rearrange to IAfTrack.
     virtual bool isStopped() const = 0;
     virtual bool isStopping() const = 0;
     virtual bool isStopping_1() const = 0;
@@ -388,7 +388,7 @@ public:
     virtual ExtendedAudioBufferProvider* asExtendedAudioBufferProvider() = 0;
     virtual VolumeProvider* asVolumeProvider() = 0;
 
-    // TODO(b/288339104) split into getter/setter
+    // TODO(b/291317964) split into getter/setter
     virtual FillingStatus& fillingStatus() = 0;
     virtual int8_t& retryCount() = 0;
     virtual FastTrackUnderruns& fastTrackUnderruns() = 0;
@@ -397,7 +397,6 @@ public:
 // playback track, used by DuplicatingThread
 class IAfOutputTrack : public virtual IAfTrack {
 public:
-    // TODO(b/288339104) void*
     static sp<IAfOutputTrack> create(
             IAfPlaybackThread* playbackThread,
             IAfDuplicatingThread* sourceThread, uint32_t sampleRate,
@@ -416,7 +415,6 @@ public:
 
 class IAfMmapTrack : public virtual IAfTrackBase {
 public:
-    // TODO(b/288339104) void*
     static sp<IAfMmapTrack> create(IAfThreadBase* thread,
             const audio_attributes_t& attr,
             uint32_t sampleRate,
@@ -454,7 +452,6 @@ public:
     // Only one AIDL IAudioRecord interface adapter should be created per RecordTrack.
     static sp<media::IAudioRecord> createIAudioRecordAdapter(const sp<IAfRecordTrack>& recordTrack);
 
-    // TODO(b/288339104) void*
     static sp<IAfRecordTrack> create(IAfRecordThread* thread,
             const sp<Client>& client,
             const audio_attributes_t& attr,
@@ -477,7 +474,7 @@ public:
     // set the buffer overflow flag and return previous value
     virtual bool setOverflow() = 0;
 
-    // TODO(b/288339104) handleSyncStartEvent in IAfTrackBase should move here.
+    // TODO(b/291317964) handleSyncStartEvent in IAfTrackBase should move here.
     virtual void clearSyncStartEvent() = 0;
     virtual void updateTrackFrameInfo(
             int64_t trackFramesReleased, int64_t sourceFramesRead, uint32_t halSampleRate,
