@@ -137,7 +137,7 @@ public:
 
         PlugInContainer* pPlugInContainer = new PlugInContainer();
 
-        pPlugInContainer->hHandle = dlopen(rsPlugInPath.string(), RTLD_LAZY);
+        pPlugInContainer->hHandle = dlopen(rsPlugInPath.c_str(), RTLD_LAZY);
 
         if (NULL == pPlugInContainer->hHandle) {
             delete pPlugInContainer;
@@ -201,7 +201,7 @@ private:
      */
     Vector<String8> getPlugInPathList(const String8& rsDirPath) {
         Vector<String8> fileList;
-        DIR* pDir = opendir(rsDirPath.string());
+        DIR* pDir = opendir(rsDirPath.c_str());
         struct dirent* pEntry;
 
         while (NULL != pDir && NULL != (pEntry = readdir(pDir))) {

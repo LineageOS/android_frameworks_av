@@ -225,7 +225,7 @@ NuCachedSource2::NuCachedSource2(
     // IMediaHTTPConnection::readAt and therefore call back into JAVA.
     mLooper->start(false /* runOnCallingThread */, true /* canCallJava */);
 
-    mName = String8::format("NuCachedSource2(%s)", mSource->toString().string());
+    mName = String8::format("NuCachedSource2(%s)", mSource->toString().c_str());
 }
 
 NuCachedSource2::~NuCachedSource2() {
@@ -765,7 +765,7 @@ void NuCachedSource2::RemoveCacheSpecificHeaders(
 
         headers->removeItemsAt(index);
 
-        ALOGV("Using special cache config '%s'", cacheConfig->string());
+        ALOGV("Using special cache config '%s'", cacheConfig->c_str());
     }
 
     if ((index = headers->indexOfKey(

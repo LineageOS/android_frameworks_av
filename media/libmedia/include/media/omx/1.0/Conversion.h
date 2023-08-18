@@ -811,11 +811,11 @@ inline bool convertTo(OMXBuffer* l, CodecBuffer const& t) {
  */
 // convert: IOMX::ComponentInfo -> IOmx::ComponentInfo
 inline bool convertTo(IOmx::ComponentInfo* t, IOMX::ComponentInfo const& l) {
-    t->mName = l.mName.string();
+    t->mName = l.mName.c_str();
     t->mRoles.resize(l.mRoles.size());
     size_t i = 0;
     for (auto& role : l.mRoles) {
-        t->mRoles[i++] = role.string();
+        t->mRoles[i++] = role.c_str();
     }
     return true;
 }
