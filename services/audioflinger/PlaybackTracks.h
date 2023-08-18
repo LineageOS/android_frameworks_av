@@ -62,8 +62,8 @@ private:
 
     wp<IAfThreadBase> mThread;
     std::atomic_bool mHasOpPlayAudio;
-    const AttributionSourceState mAttributionSource;
-    const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
+    const int32_t mUsage;  // on purpose not audio_usage_t because always checked in appOps as
+                           // int32_t
     const int mId; // for logging purposes only
     const uid_t mUid;
     const String16 mPackageName;
