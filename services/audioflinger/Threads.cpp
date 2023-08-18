@@ -3898,11 +3898,12 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             // Here, we try for the AF lock, but do not block on it as the latency
             // is more informational.
             if (mAudioFlinger->mLock.tryLock() == NO_ERROR) {
-                std::vector<AudioFlinger::PatchPanel::SoftwarePatch> swPatches;
+                std::vector<SoftwarePatch> swPatches;
                 double latencyMs = 0.; // not required; initialized for clang-tidy
                 status_t status = INVALID_OPERATION;
                 audio_patch_handle_t downstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-                if (mAudioFlinger->mPatchPanel.getDownstreamSoftwarePatches(id(), &swPatches) == OK
+                if (mAudioFlinger->mPatchPanel->getDownstreamSoftwarePatches(
+                                id(), &swPatches) == OK
                         && swPatches.size() > 0) {
                         status = swPatches[0].getLatencyMs_l(&latencyMs);
                         downstreamPatchHandle = swPatches[0].getPatchHandle();

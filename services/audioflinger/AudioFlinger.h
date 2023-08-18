@@ -123,6 +123,7 @@
 #include "ResamplerBufferProvider.h"
 
 // include AudioFlinger component interfaces
+#include "IAfPatchPanel.h"  // this should be listed before other IAf* interfaces.
 #include "IAfEffect.h"
 #include "IAfThread.h"
 #include "IAfTrack.h"
@@ -873,7 +874,8 @@ private:
     nsecs_t mGlobalEffectEnableTime;  // when a global effect was last enabled
 
     // protected by mLock
-    PatchPanel mPatchPanel;
+    const sp<IAfPatchPanel> mPatchPanel = IAfPatchPanel::create(this);
+
 public:
     // TODO(b/288339104) access by getter.
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
