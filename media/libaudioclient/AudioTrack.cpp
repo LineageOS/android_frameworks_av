@@ -3478,7 +3478,7 @@ String8 AudioTrack::getParameters(const String8& keys)
     if (output != AUDIO_IO_HANDLE_NONE) {
         return AudioSystem::getParameters(output, keys);
     } else {
-        return String8::empty();
+        return String8();
     }
 }
 

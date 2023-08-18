@@ -339,7 +339,7 @@ void registerMediaSource(
             if (source != NULL) {
                 instance.trackDescriptions.push_front(source->getFormat()->toString());
             } else {
-                instance.trackDescriptions.push_front(String8::empty());
+                instance.trackDescriptions.push_front(String8());
             }
             break;
         }
