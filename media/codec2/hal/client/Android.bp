@@ -28,6 +28,10 @@ cc_library {
         "output.cpp",
     ],
 
+    defaults: [
+        "libcodec2-aidl-client-defaults",
+    ],
+
     header_libs: [
         "libcodec2_internal", // private
     ],

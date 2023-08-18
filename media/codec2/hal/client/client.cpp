@@ -45,6 +45,7 @@
 
 #include <android-base/properties.h>
 #include <bufferpool/ClientManager.h>
+#include <codec2/aidl/ParamTypes.h>
 #include <codec2/hidl/1.0/types.h>
 #include <codec2/hidl/1.1/types.h>
 #include <codec2/hidl/1.2/types.h>
@@ -585,33 +586,202 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
         const std::vector<C2Param::Index> &heapParamIndices,
         c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
-    (void)stackParams, (void)heapParamIndices, (void)mayBlock, (void)heapParams;
-    // TODO: implementation
-    return C2_OMITTED;
+    std::vector<int> indices(
+            stackParams.size() + heapParamIndices.size());
+    size_t numIndices = 0;
+    for (C2Param* const& stackParam : stackParams) {
+        if (!stackParam) {
+            LOG(WARNING) << "query -- null stack param encountered.";
+            continue;
+        }
+        indices[numIndices++] = int(stackParam->index());
+    }
+    size_t numStackIndices = numIndices;
+    for (const C2Param::Index& index : heapParamIndices) {
+        indices[numIndices++] = int(static_cast<uint32_t>(index));
+    }
+    indices.resize(numIndices);
+    if (heapParams) {
+        heapParams->reserve(heapParams->size() + numIndices);
+    }
+    c2_aidl::Params result;
+    ndk::ScopedAStatus transStatus = mBase->query(indices, (mayBlock == C2_MAY_BLOCK), &result);
+    if (!transStatus.isOk()) {
+        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
+            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
+            LOG(DEBUG) << "query -- call failed: " << status << ".";
+            return status;
+        } else {
+            LOG(ERROR) << "query -- transaction failed.";
+            return C2_TRANSACTION_FAILED;
+        }
+    }
+
+    c2_status_t status = C2_OK;
+    std::vector<C2Param*> paramPointers;
+    if (!c2_aidl::utils::ParseParamsBlob(&paramPointers, result)) {
+        LOG(ERROR) << "query -- error while parsing params.";
+        return C2_CORRUPTED;
+    }
+    size_t i = 0;
+    for (auto it = paramPointers.begin();
+            it != paramPointers.end(); ) {
+        C2Param* paramPointer = *it;
+        if (numStackIndices > 0) {
+            --numStackIndices;
+            if (!paramPointer) {
+                LOG(DEBUG) << "query -- null stack param.";
+                ++it;
+                continue;
+            }
+            for (; i < stackParams.size() && !stackParams[i]; ) {
+                ++i;
+            }
+            if (i >= stackParams.size()) {
+                LOG(ERROR) << "query -- unexpected error.";
+                status = C2_CORRUPTED;
+                break;
+            }
+            if (stackParams[i]->index() != paramPointer->index()) {
+                LOG(DEBUG) << "query -- param skipped: "
+                              "index = "
+                           << stackParams[i]->index() << ".";
+                stackParams[i++]->invalidate();
+                // this means that the param could not be queried.
+                // signalling C2_BAD_INDEX to the client.
+                status = C2_BAD_INDEX;
+                continue;
+            }
+            if (!stackParams[i++]->updateFrom(*paramPointer)) {
+                LOG(WARNING) << "query -- param update failed: "
+                                "index = "
+                             << paramPointer->index() << ".";
+            }
+        } else {
+            if (!paramPointer) {
+                LOG(DEBUG) << "query -- null heap param.";
+                ++it;
+                continue;
+            }
+            if (!heapParams) {
+                LOG(WARNING) << "query -- "
+                                "unexpected extra stack param.";
+            } else {
+                heapParams->emplace_back(C2Param::Copy(*paramPointer));
+            }
+        }
+        ++it;
+    }
+    return status;
 }
 
 c2_status_t Codec2ConfigurableClient::AidlImpl::config(
         const std::vector<C2Param*> &params,
         c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
-    (void)params, (void)mayBlock, (void)failures;
-    // TODO: implementation
-    return C2_OMITTED;
+    c2_aidl::Params aidlParams;
+    if (!c2_aidl::utils::CreateParamsBlob(&aidlParams, params)) {
+        LOG(ERROR) << "config -- bad input.";
+        return C2_TRANSACTION_FAILED;
+    }
+    c2_aidl::IConfigurable::ConfigResult result;
+    ndk::ScopedAStatus transStatus = mBase->config(aidlParams, (mayBlock == C2_MAY_BLOCK), &result);
+    if (!transStatus.isOk()) {
+        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
+            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
+            LOG(DEBUG) << "config -- call failed: " << status << ".";
+            return status;
+        } else {
+            LOG(ERROR) << "config -- transaction failed.";
+            return C2_TRANSACTION_FAILED;
+        }
+    }
+    c2_status_t status = C2_OK;
+    size_t i = failures->size();
+    failures->resize(i + result.failures.size());
+    for (const c2_aidl::SettingResult& sf : result.failures) {
+        if (!c2_aidl::utils::FromAidl(&(*failures)[i++], sf)) {
+            LOG(ERROR) << "config -- invalid SettingResult returned.";
+            return C2_CORRUPTED;
+        }
+    }
+    if (!c2_aidl::utils::UpdateParamsFromBlob(params, result.params)) {
+        LOG(ERROR) << "config -- "
+                   << "failed to parse returned params.";
+        status = C2_CORRUPTED;
+    }
+    return status;
 }
 
 c2_status_t Codec2ConfigurableClient::AidlImpl::querySupportedParams(
         std::vector<std::shared_ptr<C2ParamDescriptor>>* const params) const {
-    (void)params;
-    // TODO: implementation
-    return C2_OMITTED;
+    // TODO: Cache and query properly!
+    std::vector<c2_aidl::ParamDescriptor> result;
+    ndk::ScopedAStatus transStatus = mBase->querySupportedParams(
+            std::numeric_limits<uint32_t>::min(),
+            std::numeric_limits<uint32_t>::max(),
+            &result);
+    if (!transStatus.isOk()) {
+        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
+            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
+            LOG(DEBUG) << "querySupportedParams -- call failed: " << status << ".";
+            return status;
+        } else {
+            LOG(ERROR) << "querySupportedParams -- transaction failed.";
+            return C2_TRANSACTION_FAILED;
+        }
+    }
+    c2_status_t status = C2_OK;
+    size_t i = params->size();
+    params->resize(i + result.size());
+    for (const c2_aidl::ParamDescriptor& sp : result) {
+        if (!c2_aidl::utils::FromAidl(&(*params)[i++], sp)) {
+            LOG(ERROR) << "querySupportedParams -- invalid returned ParamDescriptor.";
+            return C2_CORRUPTED;
+        }
+    }
+    return status;
 }
 
 c2_status_t Codec2ConfigurableClient::AidlImpl::querySupportedValues(
         std::vector<C2FieldSupportedValuesQuery>& fields,
         c2_blocking_t mayBlock) const {
-    (void)fields, (void)mayBlock;
-    // TODO: implementation
-    return C2_OMITTED;
+    std::vector<c2_aidl::FieldSupportedValuesQuery> inFields(fields.size());
+    for (size_t i = 0; i < fields.size(); ++i) {
+        if (!c2_aidl::utils::ToAidl(&inFields[i], fields[i])) {
+            LOG(ERROR) << "querySupportedValues -- bad input";
+            return C2_TRANSACTION_FAILED;
+        }
+    }
+
+    std::vector<c2_aidl::FieldSupportedValuesQueryResult> result;
+    ndk::ScopedAStatus transStatus = mBase->querySupportedValues(
+            inFields, (mayBlock == C2_MAY_BLOCK), &result);
+    if (!transStatus.isOk()) {
+        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
+            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
+            LOG(DEBUG) << "querySupportedValues -- call failed: " << status << ".";
+            return status;
+        } else {
+            LOG(ERROR) << "querySupportedValues -- transaction failed.";
+            return C2_TRANSACTION_FAILED;
+        }
+    }
+    c2_status_t status = C2_OK;
+    if (result.size() != fields.size()) {
+        LOG(ERROR) << "querySupportedValues -- "
+                      "input and output lists "
+                      "have different sizes.";
+        return C2_CORRUPTED;
+    }
+    for (size_t i = 0; i < fields.size(); ++i) {
+        if (!c2_aidl::utils::FromAidl(&fields[i], inFields[i], result[i])) {
+            LOG(ERROR) << "querySupportedValues -- "
+                          "invalid returned value.";
+            return C2_CORRUPTED;
+        }
+    }
+    return status;
 }
 
 // Codec2ConfigurableClient
