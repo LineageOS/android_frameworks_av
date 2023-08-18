@@ -35,13 +35,13 @@ using detail::AudioHalVersionInfo;
 using media::IEffectClient;
 
 void AudioFlinger::DeviceEffectManager::onCreateAudioPatch(audio_patch_handle_t handle,
-        const PatchPanel::Patch& patch) {
+        const IAfPatchPanel::Patch& patch) {
     ALOGV("%s handle %d mHalHandle %d device sink %08x",
             __func__, handle, patch.mHalHandle,
             patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
     Mutex::Autolock _l(mLock);
     for (auto& effect : mDeviceEffects) {
-        status_t status = effect.second->onCreatePatch(handle, &patch); // TODO(b/288339104) void*
+        status_t status = effect.second->onCreatePatch(handle, patch);
         ALOGV("%s Effect onCreatePatch status %d", __func__, status);
         ALOGW_IF(status == BAD_VALUE, "%s onCreatePatch error %d", __func__, status);
     }
@@ -61,7 +61,7 @@ sp<IAfEffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l(
         const AudioDeviceTypeAddr& device,
         const sp<Client>& client,
         const sp<IEffectClient>& effectClient,
-        const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches,
+        const std::map<audio_patch_handle_t, IAfPatchPanel::Patch>& patches,
         int *enabled,
         status_t *status,
         bool probe,
@@ -93,7 +93,7 @@ sp<IAfEffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l(
         if (lStatus == NO_ERROR) {
             lStatus = effect->addHandle(handle.get());
             if (lStatus == NO_ERROR) {
-                lStatus = effect->init(&patches); // TODO(b/288339104) void*
+                lStatus = effect->init(patches);
                 if (lStatus == NAME_NOT_FOUND) {
                     lStatus = NO_ERROR;
                 }
