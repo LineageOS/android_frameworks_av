@@ -315,15 +315,15 @@ status_t TrackBase::setSyncEvent(
 }
 
 PatchTrackBase::PatchTrackBase(const sp<ClientProxy>& proxy,
-        const IAfThreadBase& thread, const Timeout& timeout)
+        IAfThreadBase* thread, const Timeout& timeout)
     : mProxy(proxy)
 {
     if (timeout) {
         setPeerTimeout(*timeout);
     } else {
         // Double buffer mixer
-        uint64_t mixBufferNs = ((uint64_t)2 * thread.frameCount() * 1000000000) /
-                                              thread.sampleRate();
+        uint64_t mixBufferNs = ((uint64_t)2 * thread->frameCount() * 1000000000) /
+                                              thread->sampleRate();
         setPeerTimeout(std::chrono::nanoseconds{mixBufferNs});
     }
 }
@@ -2453,7 +2453,7 @@ PatchTrack::PatchTrack(IAfPlaybackThread* playbackThread,
               TYPE_PATCH, AUDIO_PORT_HANDLE_NONE, frameCountToBeReady),
         PatchTrackBase(mCblk ? new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true)
                         : nullptr,
-                       *playbackThread, timeout)
+                       playbackThread, timeout)
 {
     ALOGV("%s(%d): sampleRate %d mPeerTimeout %d.%03d sec",
                                       __func__, mId, sampleRate,
@@ -3127,7 +3127,7 @@ PatchRecord::PatchRecord(IAfRecordThread* recordThread,
                 audioServerAttributionSource(getpid()), flags, TYPE_PATCH),
         PatchTrackBase(mCblk ? new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true)
                         : nullptr,
-                       *recordThread, timeout)
+                       recordThread, timeout)
 {
     ALOGV("%s(%d): sampleRate %d mPeerTimeout %d.%03d sec",
                                       __func__, mId, sampleRate,
