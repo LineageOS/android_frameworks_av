@@ -3999,7 +3999,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
         patchTrack->setPeerProxy(patchRecord, true /* holdReference */);
         patchRecord->setPeerProxy(patchTrack, false /* holdReference */);
     }
-    track->setTeePatchesToUpdate(&teePatches);  // TODO(b/288339104) void* to std::move()
+    track->setTeePatchesToUpdate(std::move(teePatches));
 }
 
 sp<audioflinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_event_t type,
