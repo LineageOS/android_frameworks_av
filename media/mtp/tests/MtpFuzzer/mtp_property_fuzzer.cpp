@@ -101,7 +101,7 @@ void MtpPropertyFuzzer::process() {
                     std::string str = mFdp.ConsumeRandomLengthString(kMaxLength);
                     android::String16 s(str.c_str());
                     if (mFdp.ConsumeBool()) {
-                        data = const_cast<char16_t*>(s.string());
+                        data = const_cast<char16_t*>(s.c_str());
                     }
 
                     if (mFdp.ConsumeBool()) {
