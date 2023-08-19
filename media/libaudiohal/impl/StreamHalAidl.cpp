@@ -267,7 +267,11 @@ status_t StreamHalAidl::getLatency(uint32_t *latency) {
     if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
         return status;
     }
-    *latency = std::max<int32_t>(0, reply.latencyMs);
+
+    *latency = std::clamp(std::max<int32_t>(0, reply.latencyMs), 1, 3000);
+    ALOGW_IF(reply.latencyMs != static_cast<int32_t>(*latency),
+             "Suspicious latency value reported by HAL: %d, clamped to %u", reply.latencyMs,
+             *latency);
     return OK;
 }
 
