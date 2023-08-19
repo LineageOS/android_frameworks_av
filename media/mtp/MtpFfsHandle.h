@@ -60,6 +60,10 @@ protected:
     bool mCanceled;
     bool mBatchCancel;
 
+    std::mutex m;
+    std::condition_variable cv;
+    std::atomic<int> child_threads{0};
+
     android::base::unique_fd mControl;
     // "in" from the host's perspective => sink for mtp server
     android::base::unique_fd mBulkIn;
