@@ -69,7 +69,6 @@ EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
       mEffect(effect),
       mSessionId(sessionId),
       mIoId(ioId),
-      mDesc(desc),
       mIsProxyEffect(isProxyEffect) {
     createAidlConversion(effect, sessionId, ioId, desc);
 }
@@ -169,7 +168,8 @@ status_t EffectHalAidl::process() {
     State state = State::INIT;
     if (mConversion->isBypassing() || !mEffect->getState(&state).isOk() ||
         state != State::PROCESSING) {
-        ALOGI("%s skipping %s process because it's %s", __func__, mDesc.common.name.c_str(),
+        ALOGI("%s skipping %s process because it's %s", __func__,
+              mConversion->getDescriptor().common.name.c_str(),
               mConversion->isBypassing()
                       ? "bypassing"
                       : aidl::android::hardware::audio::effect::toString(state).c_str());
@@ -225,8 +225,8 @@ status_t EffectHalAidl::process() {
         return INVALID_OPERATION;
     }
 
-    ALOGD("%s %s consumed %zu produced %zu", __func__, mDesc.common.name.c_str(), floatsToWrite,
-          floatsToRead);
+    ALOGD("%s %s consumed %zu produced %zu", __func__,
+          mConversion->getDescriptor().common.name.c_str(), floatsToWrite, floatsToRead);
     return OK;
 }
 

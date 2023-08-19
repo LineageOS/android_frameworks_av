@@ -26,6 +26,7 @@
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionNdk.h>
 #include <media/AidlConversionEffect.h>
+#include <media/AudioContainers.h>
 #include <system/audio_effects/effect_visualizer.h>
 
 #include <utils/Log.h>
@@ -62,6 +63,7 @@ const std::map<uint32_t /* effect_command_e */, EffectConversionHelperAidl::Comm
                 {EFFECT_CMD_RESET, &EffectConversionHelperAidl::handleReset},
                 {EFFECT_CMD_ENABLE, &EffectConversionHelperAidl::handleEnable},
                 {EFFECT_CMD_DISABLE, &EffectConversionHelperAidl::handleDisable},
+                {EFFECT_CMD_SET_AUDIO_MODE, &EffectConversionHelperAidl::handleSetAudioMode},
                 {EFFECT_CMD_SET_AUDIO_SOURCE, &EffectConversionHelperAidl::handleSetAudioSource},
                 {EFFECT_CMD_SET_DEVICE, &EffectConversionHelperAidl::handleSetDevice},
                 {EFFECT_CMD_SET_INPUT_DEVICE, &EffectConversionHelperAidl::handleSetDevice},
@@ -280,6 +282,10 @@ status_t EffectConversionHelperAidl::handleSetAudioSource(uint32_t cmdSize, cons
               pReplyData);
         return BAD_VALUE;
     }
+    if (!getDescriptor().common.flags.audioSourceIndication) {
+        ALOGW("%s parameter no audioSourceIndication, skipping", __func__);
+        return OK;
+    }
 
     audio_source_t source = *(audio_source_t*)pCmdData;
     AudioSource aidlSource =
@@ -296,6 +302,10 @@ status_t EffectConversionHelperAidl::handleSetAudioMode(uint32_t cmdSize, const 
               pReplyData);
         return BAD_VALUE;
     }
+    if (!getDescriptor().common.flags.audioModeIndication) {
+        ALOGW("%s parameter no audioModeIndication, skipping", __func__);
+        return OK;
+    }
     audio_mode_t mode = *(audio_mode_t *)pCmdData;
     AudioMode aidlMode =
             VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_audio_mode_t_AudioMode(mode));
@@ -311,9 +321,26 @@ status_t EffectConversionHelperAidl::handleSetDevice(uint32_t cmdSize, const voi
               pReplyData);
         return BAD_VALUE;
     }
-    // TODO: convert from audio_devices_t to std::vector<AudioDeviceDescription>
-    // const auto& legacyDevice = *(uint32_t*)(pCmdData);
+    if (!getDescriptor().common.flags.deviceIndication) {
+        ALOGW("%s parameter no deviceIndication, skipping", __func__);
+        return OK;
+    }
+    // convert from bitmask of audio_devices_t to std::vector<AudioDeviceDescription>
+    auto legacyDevices = *(uint32_t*)(pCmdData);
+    // extract the input bit and remove it from bitmasks
+    const auto inputBit = legacyDevices & AUDIO_DEVICE_BIT_IN;
+    legacyDevices &= ~AUDIO_DEVICE_BIT_IN;
     std::vector<AudioDeviceDescription> aidlDevices;
+    while (legacyDevices) {
+        // get audio_devices_t represented by the last true bit and convert to AIDL
+        const auto lowestBitDevice = legacyDevices & -legacyDevices;
+        AudioDeviceDescription deviceDesc = VALUE_OR_RETURN_STATUS(
+                ::aidl::android::legacy2aidl_audio_devices_t_AudioDeviceDescription(
+                        static_cast<audio_devices_t>(lowestBitDevice | inputBit)));
+        aidlDevices.emplace_back(deviceDesc);
+        legacyDevices -= lowestBitDevice;
+    }
+
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mEffect->setParameter(Parameter::make<Parameter::deviceDescription>(aidlDevices))));
     return *static_cast<int32_t*>(pReplyData) = OK;
@@ -434,6 +461,20 @@ bool EffectConversionHelperAidl::isBypassing() const {
     return mEffect &&
            (mDesc.common.flags.bypass ||
             (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isBypassing()));
+}
+
+Descriptor EffectConversionHelperAidl::getDescriptor() const {
+    if (!mIsProxyEffect) {
+        return mDesc;
+    }
+
+    Descriptor desc;
+    if (const auto status = mEffect->getDescriptor(&desc); !status.isOk()) {
+        ALOGE("%s failed to get proxy descriptor (%d:%s), using default", __func__,
+              status.getStatus(), status.getMessage());
+        return mDesc;
+    }
+    return desc;
 }
 
 }  // namespace effect
