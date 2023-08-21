@@ -17,7 +17,10 @@
 
 #pragma once
 
+#include "TrackBase.h"
+
 #include <android/content/AttributionSourceState.h>
+#include <datapath/AudioStreamIn.h> // struct Source
 
 namespace android {
 
