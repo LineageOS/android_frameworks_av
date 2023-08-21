@@ -94,6 +94,7 @@
 #include <fastpath/AutoPark.h>
 
 #include <pthread.h>
+#include <afutils/DumpTryLock.h>
 #include <afutils/TypedLogger.h>
 
 // ----------------------------------------------------------------------------
@@ -949,7 +950,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     dprintf(fd, "\n%s thread %p, name %s, tid %d, type %d (%s):\n", isOutput() ? "Output" : "Input",
             this, mThreadName, getTid(), type(), threadTypeToString(type()));
 
-    bool locked = AudioFlinger::dumpTryLock(mLock);
+    const bool locked = afutils::dumpTryLock(mLock);
     if (!locked) {
         dprintf(fd, "  Thread may be deadlocked\n");
     }
