@@ -4721,6 +4721,55 @@ bool AudioFlinger::updateOrphanEffectChains(const sp<IAfEffectModule>& effect)
     return false;
 }
 
+// ----------------------------------------------------------------------------
+// from PatchPanel
+
+/* List connected audio ports and their attributes */
+status_t AudioFlinger::listAudioPorts(unsigned int* num_ports,
+        struct audio_port* ports) const
+{
+    Mutex::Autolock _l(mLock);
+    return mPatchPanel->listAudioPorts(num_ports, ports);
+}
+
+/* Get supported attributes for a given audio port */
+status_t AudioFlinger::getAudioPort(struct audio_port_v7* port) const {
+    const status_t status = AudioValidator::validateAudioPort(*port);
+    if (status != NO_ERROR) {
+        return status;
+    }
+
+    Mutex::Autolock _l(mLock);
+    return mPatchPanel->getAudioPort(port);
+}
+
+/* Connect a patch between several source and sink ports */
+status_t AudioFlinger::createAudioPatch(
+        const struct audio_patch* patch, audio_patch_handle_t* handle)
+{
+    const status_t status = AudioValidator::validateAudioPatch(*patch);
+    if (status != NO_ERROR) {
+        return status;
+    }
+
+    Mutex::Autolock _l(mLock);
+    return mPatchPanel->createAudioPatch(patch, handle);
+}
+
+/* Disconnect a patch */
+status_t AudioFlinger::releaseAudioPatch(audio_patch_handle_t handle)
+{
+    Mutex::Autolock _l(mLock);
+    return mPatchPanel->releaseAudioPatch(handle);
+}
+
+/* List connected audio ports and they attributes */
+status_t AudioFlinger::listAudioPatches(
+        unsigned int* num_patches, struct audio_patch* patches) const
+{
+    Mutex::Autolock _l(mLock);
+    return mPatchPanel->listAudioPatches(num_patches, patches);
+}
 
 // ----------------------------------------------------------------------------
 
