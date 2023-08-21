@@ -18,12 +18,14 @@
 
 namespace android {
 
+class IAfMmapThread;
 class IAfPatchPanel;
 class IAfPatchRecord;
 class IAfPatchTrack;
 class IAfPlaybackThread;
 class IAfRecordThread;
 class IAfThreadBase;
+class PatchCommandThread;
 
 class SoftwarePatch {
 public:
@@ -51,9 +53,44 @@ private:
     const audio_io_handle_t mRecordThreadHandle;
 };
 
+class IAfPatchPanelCallback : public virtual RefBase {
+public:
+    virtual void closeThreadInternal_l(const sp<IAfPlaybackThread>& thread) = 0;
+    virtual void closeThreadInternal_l(const sp<IAfRecordThread>& thread) = 0;
+    virtual IAfPlaybackThread* primaryPlaybackThread_l() const = 0;
+    virtual IAfPlaybackThread* checkPlaybackThread_l(audio_io_handle_t output) const = 0;
+    virtual IAfRecordThread* checkRecordThread_l(audio_io_handle_t input) const = 0;
+    virtual IAfMmapThread* checkMmapThread_l(audio_io_handle_t io) const = 0;
+    virtual sp<IAfThreadBase> openInput_l(audio_module_handle_t module,
+            audio_io_handle_t* input,
+            audio_config_t* config,
+            audio_devices_t device,
+            const char* address,
+            audio_source_t source,
+            audio_input_flags_t flags,
+            audio_devices_t outputDevice,
+            const String8& outputDeviceAddress) = 0;
+    virtual sp<IAfThreadBase> openOutput_l(audio_module_handle_t module,
+            audio_io_handle_t* output,
+            audio_config_t* halConfig,
+            audio_config_base_t* mixerConfig,
+            audio_devices_t deviceType,
+            const String8& address,
+            audio_output_flags_t flags) = 0;
+    virtual void lock() const = 0;
+    virtual void unlock() const = 0;
+    virtual const DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*>&
+            getAudioHwDevs_l() const = 0;
+    virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
+    virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
+    virtual void updateDownStreamPatches_l(
+            const struct audio_patch* patch, const std::set<audio_io_handle_t>& streams) = 0;
+    virtual void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices) = 0;
+};
+
 class IAfPatchPanel : public virtual RefBase {
 public:
-    static sp<IAfPatchPanel> create(AudioFlinger* audioFlinger);
+    static sp<IAfPatchPanel> create(const sp<IAfPatchPanelCallback>& afPatchPanelCallback);
 
     // Extraction of inner Endpoint and Patch classes would require interfaces
     // (in the Endpoint case a templated interface) but that seems
