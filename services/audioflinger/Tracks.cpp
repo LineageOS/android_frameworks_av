@@ -276,7 +276,7 @@ TrackBase::~TrackBase()
     mCblkMemory.clear();    // free the shared memory before releasing the heap it belongs to
     if (mClient != 0) {
         // Client destructor must run with AudioFlinger client mutex locked
-        Mutex::Autolock _l(mClient->audioFlinger()->mClientLock);
+        Mutex::Autolock _l(mClient->afClientCallback()->clientMutex());
         // If the client's reference count drops to zero, the associated destructor
         // must run with AudioFlinger lock held. Thus the explicit clear() rather than
         // relying on the automatic clear() at end of scope.
@@ -1680,7 +1680,7 @@ status_t Track::attachAuxEffect(int EffectId)
     auto dstThread = thread->asIAfPlaybackThread();
     // srcThread is initialized by call to moveAuxEffectToIo()
     sp<IAfPlaybackThread> srcThread;
-    sp<AudioFlinger> af = mClient->audioFlinger();
+    const auto& af = mClient->afClientCallback();
     status_t status = af->moveAuxEffectToIo(EffectId, dstThread, &srcThread);
 
     if (EffectId != 0 && status == NO_ERROR) {
