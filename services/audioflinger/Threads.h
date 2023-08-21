@@ -25,9 +25,9 @@ class ThreadBase : public virtual IAfThreadBase, public Thread {
 public:
     static const char *threadTypeToString(type_t type);
 
-    AudioFlinger* audioFlinger() const final { return mAudioFlinger.get(); }
+    IAfThreadCallback* afThreadCallback() const final { return mAfThreadCallback.get(); }
 
-    ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
+    ThreadBase(const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
                type_t type, bool systemReady, bool isOut);
     ~ThreadBase() override;
 
@@ -582,7 +582,7 @@ protected:
                 // Used by parameters, config events, addTrack_l, exit
                 Condition               mWaitWorkCV;
 
-                const sp<AudioFlinger>  mAudioFlinger;
+                const sp<IAfThreadCallback>  mAfThreadCallback;
                 ThreadMetrics           mThreadMetrics;
                 const bool              mIsOut;
 
@@ -806,7 +806,7 @@ public:
     // for initial conditions or large delays.
     static const nsecs_t kMaxNextBufferDelayNs = 100000000;
 
-    PlaybackThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
+    PlaybackThread(const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
                    audio_io_handle_t id, type_t type, bool systemReady,
                    audio_config_base_t *mixerConfig = nullptr);
     ~PlaybackThread() override;
@@ -1436,7 +1436,7 @@ protected:
 class MixerThread : public PlaybackThread,
                     public StreamOutHalInterfaceLatencyModeCallback  {
 public:
-    MixerThread(const sp<AudioFlinger>& audioFlinger,
+    MixerThread(const sp<IAfThreadCallback>& afThreadCallback,
                 AudioStreamOut* output,
                 audio_io_handle_t id,
                 bool systemReady,
@@ -1566,10 +1566,10 @@ public:
         return sp<IAfDirectOutputThread>::fromExisting(this);
     }
 
-    DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
+    DirectOutputThread(const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
                        audio_io_handle_t id, bool systemReady,
                        const audio_offload_info_t& offloadInfo)
-        : DirectOutputThread(audioFlinger, output, id, DIRECT, systemReady, offloadInfo) { }
+        : DirectOutputThread(afThreadCallback, output, id, DIRECT, systemReady, offloadInfo) { }
 
     virtual                 ~DirectOutputThread();
 
@@ -1606,7 +1606,7 @@ protected:
     audioflinger::MonotonicFrameCounter mMonotonicFrameCounter;  // for VolumeShaper
     bool mVolumeShaperActive = false;
 
-    DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
+    DirectOutputThread(const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
                        audio_io_handle_t id, ThreadBase::type_t type, bool systemReady,
                        const audio_offload_info_t& offloadInfo);
     void processVolume_l(IAfTrack *track, bool lastTrack);
@@ -1647,7 +1647,7 @@ public:
 class OffloadThread : public DirectOutputThread {
 public:
 
-    OffloadThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
+    OffloadThread(const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
                   audio_io_handle_t id, bool systemReady,
                   const audio_offload_info_t& offloadInfo);
     virtual                 ~OffloadThread() {};
@@ -1705,7 +1705,8 @@ private:
 
 class DuplicatingThread : public MixerThread, public IAfDuplicatingThread {
 public:
-    DuplicatingThread(const sp<AudioFlinger>& audioFlinger, IAfPlaybackThread* mainThread,
+    DuplicatingThread(const sp<IAfThreadCallback>& afThreadCallback,
+            IAfPlaybackThread* mainThread,
                       audio_io_handle_t id, bool systemReady);
     ~DuplicatingThread() override;
 
@@ -1767,7 +1768,7 @@ public:
 
 class SpatializerThread : public MixerThread {
 public:
-    SpatializerThread(const sp<AudioFlinger>& audioFlinger,
+    SpatializerThread(const sp<IAfThreadCallback>& afThreadCallback,
                            AudioStreamOut* output,
                            audio_io_handle_t id,
                            bool systemReady,
@@ -1800,7 +1801,7 @@ public:
         return sp<IAfRecordThread>::fromExisting(this);
     }
 
-            RecordThread(const sp<AudioFlinger>& audioFlinger,
+            RecordThread(const sp<IAfThreadCallback>& afThreadCallback,
                     AudioStreamIn *input,
                     audio_io_handle_t id,
                     bool systemReady
@@ -2027,7 +2028,7 @@ private:
 class MmapThread : public ThreadBase, public virtual IAfMmapThread
 {
  public:
-    MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
+    MmapThread(const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
                AudioHwDevice *hwDev, const sp<StreamHalInterface>& stream, bool systemReady,
                bool isOut);
 
@@ -2152,7 +2153,7 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
 class MmapPlaybackThread : public MmapThread, public IAfMmapPlaybackThread,
         public virtual VolumeInterface {
 public:
-    MmapPlaybackThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
+    MmapPlaybackThread(const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
                        AudioHwDevice *hwDev, AudioStreamOut *output, bool systemReady);
 
     sp<IAfMmapPlaybackThread> asIAfMmapPlaybackThread() final {
@@ -2216,7 +2217,7 @@ protected:
 class MmapCaptureThread : public MmapThread, public IAfMmapCaptureThread
 {
 public:
-    MmapCaptureThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
+    MmapCaptureThread(const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
                       AudioHwDevice *hwDev, AudioStreamIn *input, bool systemReady);
 
     sp<IAfMmapCaptureThread> asIAfMmapCaptureThread() final {
@@ -2246,7 +2247,7 @@ protected:
 
 class BitPerfectThread : public MixerThread {
 public:
-    BitPerfectThread(const sp<AudioFlinger>& audioflinger, AudioStreamOut *output,
+    BitPerfectThread(const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut *output,
                      audio_io_handle_t id, bool systemReady);
 
 protected:
