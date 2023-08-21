@@ -1168,10 +1168,10 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
         if (isOffloaded()) {
-            Mutex::Autolock _laf(thread->audioFlinger()->mLock);
+            Mutex::Autolock _laf(thread->afThreadCallback()->mutex());
             Mutex::Autolock _lth(thread->mutex());
             sp<IAfEffectChain> ec = thread->getEffectChain_l(mSessionId);
-            if (thread->audioFlinger()->isNonOffloadableGlobalEffectEnabled_l() ||
+            if (thread->afThreadCallback()->isNonOffloadableGlobalEffectEnabled_l() ||
                     (ec != 0 && ec->isNonOffloadableEnabled())) {
                 invalidate();
                 return PERMISSION_DENIED;
@@ -1276,7 +1276,8 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
         forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
 
         // send format to AudioManager for playback activity monitoring
-        const sp<IAudioManager> audioManager = thread->audioFlinger()->getOrCreateAudioManager();
+        const sp<IAudioManager> audioManager =
+                thread->afThreadCallback()->getOrCreateAudioManager();
         if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
             std::unique_ptr<os::PersistableBundle> bundle =
                     std::make_unique<os::PersistableBundle>();
