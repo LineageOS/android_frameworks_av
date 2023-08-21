@@ -88,6 +88,7 @@
 //#define BUFLOG_NDEBUG 0
 #include <afutils/DumpTryLock.h>
 #include <afutils/BufLog.h>
+#include <afutils/Permission.h>
 #include <afutils/TypedLogger.h>
 
 // ----------------------------------------------------------------------------
@@ -267,33 +268,6 @@ class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
         notifier.detach();
     }
 };
-
-// TODO b/182392769: use attribution source util
-/* static */
-AttributionSourceState AudioFlinger::checkAttributionSourcePackage(
-        const AttributionSourceState& attributionSource) {
-    Vector<String16> packages;
-    PermissionController{}.getPackagesForUid(attributionSource.uid, packages);
-
-    AttributionSourceState checkedAttributionSource = attributionSource;
-    if (!attributionSource.packageName.has_value()
-            || attributionSource.packageName.value().size() == 0) {
-        if (!packages.isEmpty()) {
-            checkedAttributionSource.packageName =
-                std::move(legacy2aidl_String16_string(packages[0]).value());
-        }
-    } else {
-        String16 opPackageLegacy = VALUE_OR_FATAL(
-            aidl2legacy_string_view_String16(attributionSource.packageName.value_or("")));
-        if (std::find_if(packages.begin(), packages.end(),
-                [&opPackageLegacy](const auto& package) {
-                return opPackageLegacy == package; }) == packages.end()) {
-            ALOGW("The package name(%s) provided does not correspond to the uid %d",
-                    attributionSource.packageName.value_or("").c_str(), attributionSource.uid);
-        }
-    }
-    return checkedAttributionSource;
-}
 
 // ----------------------------------------------------------------------------
 
@@ -638,7 +612,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                  __func__, callingUid, callingPid, clientPid);
         adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
     }
-    adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(
+    adjAttributionSource = afutils::checkAttributionSourcePackage(
             adjAttributionSource);
 
     if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
@@ -1138,7 +1112,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         clientPid = callingPid;
         adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
     }
-    adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(
+    adjAttributionSource = afutils::checkAttributionSourcePackage(
             adjAttributionSource);
 
     audio_session_t sessionId = input.sessionId;
@@ -2397,7 +2371,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                  __func__, callingUid, callingPid, currentPid);
         adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
     }
-    adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(
+    adjAttributionSource = afutils::checkAttributionSourcePackage(
             adjAttributionSource);
     // we don't yet support anything other than linear PCM
     if (!audio_is_valid_format(input.config.format) || !audio_is_linear_pcm(input.config.format)) {
@@ -4141,7 +4115,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
         adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
         currentPid = callingPid;
     }
-    adjAttributionSource = AudioFlinger::checkAttributionSourcePackage(adjAttributionSource);
+    adjAttributionSource = afutils::checkAttributionSourcePackage(adjAttributionSource);
 
     ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d, factory %p",
           adjAttributionSource.pid, effectClient.get(), priority, sessionId, io,
