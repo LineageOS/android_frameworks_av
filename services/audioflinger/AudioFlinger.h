@@ -158,7 +158,8 @@ struct stream_type_t {
     bool mute = false;
 };
 
-class AudioFlinger : public AudioFlingerServerAdapter::Delegate
+class AudioFlinger
+    : public AudioFlingerServerAdapter::Delegate  // IAudioFlinger client interface
 {
     friend class sp<AudioFlinger>;
     // TODO(b/291319167) Create interface and remove friends.
@@ -182,186 +183,184 @@ public:
     static AttributionSourceState checkAttributionSourcePackage(
         const AttributionSourceState& attributionSource);
 
-    status_t dump(int fd, const Vector<String16>& args) override;
+    // ---- begin IAudioFlinger interface
 
-    // IAudioFlinger interface, in binder opcode order
+    status_t dump(int fd, const Vector<String16>& args) final;
+
     status_t createTrack(const media::CreateTrackRequest& input,
-                         media::CreateTrackResponse& output) override;
+                         media::CreateTrackResponse& output) final;
 
     status_t createRecord(const media::CreateRecordRequest& input,
-                          media::CreateRecordResponse& output) override;
+                          media::CreateRecordResponse& output) final;
 
-    virtual     uint32_t    sampleRate(audio_io_handle_t ioHandle) const;
-    virtual     audio_format_t format(audio_io_handle_t output) const;
-    virtual     size_t      frameCount(audio_io_handle_t ioHandle) const;
-    virtual     size_t      frameCountHAL(audio_io_handle_t ioHandle) const;
-    virtual     uint32_t    latency(audio_io_handle_t output) const;
+    uint32_t sampleRate(audio_io_handle_t ioHandle) const final;
+    audio_format_t format(audio_io_handle_t output) const final;
+    size_t frameCount(audio_io_handle_t ioHandle) const final;
+    size_t frameCountHAL(audio_io_handle_t ioHandle) const final;
+    uint32_t latency(audio_io_handle_t output) const final;
 
-    virtual     status_t    setMasterVolume(float value);
-    virtual     status_t    setMasterMute(bool muted);
-
-    virtual     float       masterVolume() const;
-    virtual     bool        masterMute() const;
+    status_t setMasterVolume(float value) final;
+    status_t setMasterMute(bool muted) final;
+    float masterVolume() const final;
+    bool masterMute() const final;
 
     // Balance value must be within -1.f (left only) to 1.f (right only) inclusive.
-                status_t    setMasterBalance(float balance) override;
-                status_t    getMasterBalance(float *balance) const override;
+    status_t setMasterBalance(float balance) final;
+    status_t getMasterBalance(float* balance) const final;
 
-    virtual     status_t    setStreamVolume(audio_stream_type_t stream, float value,
-                                            audio_io_handle_t output);
-    virtual     status_t    setStreamMute(audio_stream_type_t stream, bool muted);
+    status_t setStreamVolume(audio_stream_type_t stream, float value,
+            audio_io_handle_t output) final;
+    status_t setStreamMute(audio_stream_type_t stream, bool muted) final;
 
-    virtual     float       streamVolume(audio_stream_type_t stream,
-                                         audio_io_handle_t output) const;
-    virtual     bool        streamMute(audio_stream_type_t stream) const;
+    float streamVolume(audio_stream_type_t stream,
+            audio_io_handle_t output) const final;
+    bool streamMute(audio_stream_type_t stream) const final;
 
-    virtual     status_t    setMode(audio_mode_t mode);
+    status_t setMode(audio_mode_t mode) final;
 
-    virtual     status_t    setMicMute(bool state);
-    virtual     bool        getMicMute() const;
+    status_t setMicMute(bool state) final;
+    bool getMicMute() const final;
 
-    virtual     void        setRecordSilenced(audio_port_handle_t portId, bool silenced);
+    void setRecordSilenced(audio_port_handle_t portId, bool silenced) final;
 
-    virtual     status_t    setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs);
-    virtual     String8     getParameters(audio_io_handle_t ioHandle, const String8& keys) const;
+    status_t setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs) final;
+    String8 getParameters(audio_io_handle_t ioHandle, const String8& keys) const final;
 
-    virtual     void        registerClient(const sp<media::IAudioFlingerClient>& client);
+    void registerClient(const sp<media::IAudioFlingerClient>& client) final;
+    size_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
+            audio_channel_mask_t channelMask) const final;
 
-    virtual     size_t      getInputBufferSize(uint32_t sampleRate, audio_format_t format,
-                                               audio_channel_mask_t channelMask) const;
+    status_t openOutput(const media::OpenOutputRequest& request,
+            media::OpenOutputResponse* response) final;
 
-    virtual status_t openOutput(const media::OpenOutputRequest& request,
-                                media::OpenOutputResponse* response);
+    audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
+            audio_io_handle_t output2) final;
 
-    virtual audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
-                                                  audio_io_handle_t output2);
+    status_t closeOutput(audio_io_handle_t output) final;
 
-    virtual status_t closeOutput(audio_io_handle_t output);
+    status_t suspendOutput(audio_io_handle_t output) final;
 
-    virtual status_t suspendOutput(audio_io_handle_t output);
+    status_t restoreOutput(audio_io_handle_t output) final;
 
-    virtual status_t restoreOutput(audio_io_handle_t output);
+    status_t openInput(const media::OpenInputRequest& request,
+            media::OpenInputResponse* response) final;
 
-    virtual status_t openInput(const media::OpenInputRequest& request,
-                               media::OpenInputResponse* response);
+    status_t closeInput(audio_io_handle_t input) final;
 
-    virtual status_t closeInput(audio_io_handle_t input);
+    status_t setVoiceVolume(float volume) final;
 
-    virtual status_t setVoiceVolume(float volume);
+    status_t getRenderPosition(uint32_t* halFrames, uint32_t* dspFrames,
+            audio_io_handle_t output) const final;
 
-    virtual status_t getRenderPosition(uint32_t *halFrames, uint32_t *dspFrames,
-                                       audio_io_handle_t output) const;
-
-    virtual uint32_t getInputFramesLost(audio_io_handle_t ioHandle) const;
+    uint32_t getInputFramesLost(audio_io_handle_t ioHandle) const final;
 
     // This is the binder API.  For the internal API see nextUniqueId().
-    virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use);
+    audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use) final;
 
-    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) override;
+    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) final;
 
-    virtual void releaseAudioSessionId(audio_session_t audioSession, pid_t pid);
+    void releaseAudioSessionId(audio_session_t audioSession, pid_t pid) final;
 
-    virtual status_t queryNumberEffects(uint32_t *numEffects) const;
+    status_t queryNumberEffects(uint32_t* numEffects) const final;
 
-    virtual status_t queryEffect(uint32_t index, effect_descriptor_t *descriptor) const;
+    status_t queryEffect(uint32_t index, effect_descriptor_t* descriptor) const final;
 
-    virtual status_t getEffectDescriptor(const effect_uuid_t *pUuid,
-                                         const effect_uuid_t *pTypeUuid,
-                                         uint32_t preferredTypeFlag,
-                                         effect_descriptor_t *descriptor) const;
+    status_t getEffectDescriptor(const effect_uuid_t* pUuid,
+            const effect_uuid_t* pTypeUuid,
+            uint32_t preferredTypeFlag,
+            effect_descriptor_t* descriptor) const final;
 
-    virtual status_t createEffect(const media::CreateEffectRequest& request,
-                                  media::CreateEffectResponse* response);
+    status_t createEffect(const media::CreateEffectRequest& request,
+            media::CreateEffectResponse* response) final;
 
-    virtual status_t moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,
-                        audio_io_handle_t dstOutput);
+    status_t moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,
+            audio_io_handle_t dstOutput) final;
 
-            void setEffectSuspended(int effectId,
-                                    audio_session_t sessionId,
-                                    bool suspended) override;
+    void setEffectSuspended(int effectId,
+            audio_session_t sessionId,
+            bool suspended) final;
 
-    virtual audio_module_handle_t loadHwModule(const char *name);
+    audio_module_handle_t loadHwModule(const char* name) final;
 
-    virtual uint32_t getPrimaryOutputSamplingRate();
-    virtual size_t getPrimaryOutputFrameCount();
+    uint32_t getPrimaryOutputSamplingRate() const final;
+    size_t getPrimaryOutputFrameCount() const final;
 
-    virtual status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
-
-    /* List available audio ports and their attributes */
-    virtual status_t listAudioPorts(unsigned int *num_ports,
-                                    struct audio_port *ports);
+    status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) final;
 
     /* Get attributes for a given audio port */
-    virtual status_t getAudioPort(struct audio_port_v7 *port);
+    status_t getAudioPort(struct audio_port_v7* port) const final;
 
     /* Create an audio patch between several source and sink ports */
-    virtual status_t createAudioPatch(const struct audio_patch *patch,
-                                       audio_patch_handle_t *handle);
+    status_t createAudioPatch(const struct audio_patch *patch,
+            audio_patch_handle_t* handle) final;
 
     /* Release an audio patch */
-    virtual status_t releaseAudioPatch(audio_patch_handle_t handle);
+    status_t releaseAudioPatch(audio_patch_handle_t handle) final;
 
     /* List existing audio patches */
-    virtual status_t listAudioPatches(unsigned int *num_patches,
-                                      struct audio_patch *patches);
+    status_t listAudioPatches(unsigned int* num_patches,
+            struct audio_patch* patches) const final;
 
     /* Set audio port configuration */
-    virtual status_t setAudioPortConfig(const struct audio_port_config *config);
+    status_t setAudioPortConfig(const struct audio_port_config* config) final;
 
     /* Get the HW synchronization source used for an audio session */
-    virtual audio_hw_sync_t getAudioHwSyncForSession(audio_session_t sessionId);
+    audio_hw_sync_t getAudioHwSyncForSession(audio_session_t sessionId) final;
 
     /* Indicate JAVA services are ready (scheduling, power management ...) */
-    virtual status_t systemReady();
-    virtual status_t audioPolicyReady() { mAudioPolicyReady.store(true); return NO_ERROR; }
-            bool isAudioPolicyReady() const { return mAudioPolicyReady.load(); }
+    status_t systemReady() final;
+    status_t audioPolicyReady() final { mAudioPolicyReady.store(true); return NO_ERROR; }
 
+    status_t getMicrophones(std::vector<media::MicrophoneInfoFw>* microphones) const final;
 
-    virtual status_t getMicrophones(std::vector<media::MicrophoneInfoFw> *microphones);
+    status_t setAudioHalPids(const std::vector<pid_t>& pids) final;
 
-    virtual status_t setAudioHalPids(const std::vector<pid_t>& pids);
+    status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) final;
 
-    virtual status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
+    status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs) final;
 
-    virtual status_t updateSecondaryOutputs(
-            const TrackSecondaryOutputsMap& trackSecondaryOutputs);
-
-    virtual status_t getMmapPolicyInfos(
+    status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType,
-            std::vector<media::audio::common::AudioMMapPolicyInfo> *policyInfos);
+            std::vector<media::audio::common::AudioMMapPolicyInfo>* policyInfos) override;
 
-    virtual int32_t getAAudioMixerBurstCount();
+    int32_t getAAudioMixerBurstCount() const final;
 
-    virtual int32_t getAAudioHardwareBurstMinUsec();
+    int32_t getAAudioHardwareBurstMinUsec() const final;
 
-    virtual status_t setDeviceConnectedState(const struct audio_port_v7 *port,
-                                             media::DeviceConnectedState state);
+    status_t setDeviceConnectedState(const struct audio_port_v7* port,
+            media::DeviceConnectedState state) final;
 
-    virtual status_t setSimulateDeviceConnections(bool enabled);
+    status_t setSimulateDeviceConnections(bool enabled) final;
 
-    virtual status_t setRequestedLatencyMode(
-            audio_io_handle_t output, audio_latency_mode_t mode);
+    status_t setRequestedLatencyMode(
+            audio_io_handle_t output, audio_latency_mode_t mode) final;
 
-    virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
-            std::vector<audio_latency_mode_t>* modes);
+    status_t getSupportedLatencyModes(audio_io_handle_t output,
+            std::vector<audio_latency_mode_t>* modes) const final;
 
-    virtual status_t setBluetoothVariableLatencyEnabled(bool enabled);
+    status_t setBluetoothVariableLatencyEnabled(bool enabled) final;
 
-    virtual status_t isBluetoothVariableLatencyEnabled(bool* enabled);
+    status_t isBluetoothVariableLatencyEnabled(bool* enabled) const final;
 
-    virtual status_t supportsBluetoothVariableLatency(bool* support);
+    status_t supportsBluetoothVariableLatency(bool* support) const final;
 
-    virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
-                                           sp<media::ISoundDose>* soundDose);
+    status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+            sp<media::ISoundDose>* soundDose) const final;
 
-    status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
+    status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) final;
 
-    virtual status_t getAudioPolicyConfig(media::AudioPolicyConfig* config);
+    status_t getAudioPolicyConfig(media::AudioPolicyConfig* config) final;
 
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
-        const std::function<status_t()>& delegate) override;
+            const std::function<status_t()>& delegate) final;
 
-    // end of IAudioFlinger interface
+    // ---- end of IAudioFlinger interface
+
+    bool isAudioPolicyReady() const { return mAudioPolicyReady.load(); }
+
+    /* List available audio ports and their attributes */
+    status_t listAudioPorts(unsigned int* num_ports, struct audio_port* ports) const;
 
     sp<NBLog::Writer>   newWriter_l(size_t size, const char *name);
     void                unregisterWriter(const sp<NBLog::Writer>& writer);
@@ -436,14 +435,14 @@ private:
                audio_mode_t getMode() const { return mMode; }
 
                             AudioFlinger() ANDROID_API;
-    virtual                 ~AudioFlinger();
+    ~AudioFlinger() override;
 
     // call in any IAudioFlinger method that accesses mPrimaryHardwareDev
     status_t                initCheck() const { return mPrimaryHardwareDev == NULL ?
                                                         NO_INIT : NO_ERROR; }
 
     // RefBase
-    virtual     void        onFirstRef();
+    void onFirstRef() override;
 
     AudioHwDevice*          findSuitableHwDev_l(audio_module_handle_t module,
                                                 audio_devices_t deviceType);
