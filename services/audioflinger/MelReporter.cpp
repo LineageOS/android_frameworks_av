@@ -77,7 +77,7 @@ void MelReporter::activateInternalSoundDoseComputation() {
 }
 
 void MelReporter::onFirstRef() {
-    mAudioFlinger.mPatchCommandThread->addListener(this);
+    mAfMelReporterCallback->getPatchCommandThread()->addListener(this);
 }
 
 bool MelReporter::shouldComputeMelForDeviceType(audio_devices_t device) {
@@ -111,7 +111,7 @@ void MelReporter::updateMetadataForCsd(audio_io_handle_t streamHandle,
         return;
     }
 
-    std::lock_guard _laf(mAudioFlinger.mLock);
+    std::lock_guard _laf(mAfMelReporterCallback->mutex());
     std::lock_guard _l(mLock);
     auto activeMelPatchId = activePatchStreamHandle_l(streamHandle);
     if (!activeMelPatchId) {
@@ -171,7 +171,7 @@ void MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
     }
 
     if (!newPatch.deviceHandles.empty()) {
-        std::lock_guard _afl(mAudioFlinger.mLock);
+        std::lock_guard _afl(mAfMelReporterCallback->mutex());
         std::lock_guard _l(mLock);
         ALOGV("%s add patch handle %d to active devices", __func__, handle);
         startMelComputationForActivePatch_l(newPatch);
@@ -183,7 +183,7 @@ void MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
 void MelReporter::startMelComputationForActivePatch_l(const ActiveMelPatch& patch)
 NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
 {
-    auto outputThread = mAudioFlinger.checkOutputThread_l(patch.streamHandle);
+    auto outputThread = mAfMelReporterCallback->checkOutputThread_l(patch.streamHandle);
     if (outputThread == nullptr) {
         ALOGE("%s cannot find thread for stream handle %d", __func__, patch.streamHandle);
         return;
@@ -226,7 +226,7 @@ void MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle) {
         mActiveMelPatches.erase(patchIt);
     }
 
-    std::lock_guard _afl(mAudioFlinger.mLock);
+    std::lock_guard _afl(mAfMelReporterCallback->mutex());
     std::lock_guard _l(mLock);
     stopMelComputationForPatch_l(melPatch);
 }
@@ -252,7 +252,7 @@ NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
         return;
     }
 
-    auto outputThread = mAudioFlinger.checkOutputThread_l(patch.streamHandle);
+    auto outputThread = mAfMelReporterCallback->checkOutputThread_l(patch.streamHandle);
 
     ALOGV("%s: stop MEL for stream id: %d", __func__, patch.streamHandle);
     for (const auto& deviceId : patch.deviceHandles) {
