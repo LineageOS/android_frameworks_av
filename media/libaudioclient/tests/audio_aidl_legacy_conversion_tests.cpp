@@ -143,7 +143,8 @@ AudioDeviceDescription make_ADD_MicIn() {
 }
 
 AudioDeviceDescription make_ADD_RSubmixIn() {
-    return make_AudioDeviceDescription(AudioDeviceType::IN_SUBMIX);
+    return make_AudioDeviceDescription(AudioDeviceType::IN_SUBMIX,
+                                       AudioDeviceDescription::CONNECTION_VIRTUAL());
 }
 
 AudioDeviceDescription make_ADD_DefaultOut() {
