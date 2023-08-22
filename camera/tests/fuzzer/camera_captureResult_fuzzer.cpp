@@ -32,8 +32,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     if (fdp.ConsumeBool()) {
         physicalCaptureResultInfo = new PhysicalCaptureResultInfo();
     } else {
-        string camId = fdp.ConsumeRandomLengthString();
-        String16 cameraId(camId.c_str());
+        string cameraId = fdp.ConsumeRandomLengthString();
         CameraMetadata cameraMetadata = CameraMetadata();
         physicalCaptureResultInfo = new PhysicalCaptureResultInfo(cameraId, cameraMetadata);
     }
@@ -47,9 +46,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     }
     if (fdp.ConsumeBool()) {
         captureResult->mResultExtras = CaptureResultExtras();
-        string errCamId = fdp.ConsumeRandomLengthString();
-        String16 errCameraId(errCamId.c_str());
-        captureResult->mResultExtras.errorPhysicalCameraId = errCameraId;
+        captureResult->mResultExtras.errorPhysicalCameraId = fdp.ConsumeRandomLengthString();
         captureResult->mResultExtras.isValid();
         invokeReadWriteNullParcel<CaptureResultExtras>(&(captureResult->mResultExtras));
     }

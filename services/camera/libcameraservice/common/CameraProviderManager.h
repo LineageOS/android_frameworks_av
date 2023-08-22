@@ -179,15 +179,15 @@ public:
     struct StatusListener : virtual public RefBase {
         ~StatusListener() {}
 
-        virtual void onDeviceStatusChanged(const String8 &cameraId,
+        virtual void onDeviceStatusChanged(const std::string &cameraId,
                 CameraDeviceStatus newStatus) = 0;
-        virtual void onDeviceStatusChanged(const String8 &cameraId,
-                const String8 &physicalCameraId,
+        virtual void onDeviceStatusChanged(const std::string &cameraId,
+                const std::string &physicalCameraId,
                 CameraDeviceStatus newStatus) = 0;
-        virtual void onTorchStatusChanged(const String8 &cameraId,
+        virtual void onTorchStatusChanged(const std::string &cameraId,
                 TorchModeStatus newStatus,
                 SystemCameraKind kind) = 0;
-        virtual void onTorchStatusChanged(const String8 &cameraId,
+        virtual void onTorchStatusChanged(const std::string &cameraId,
                 TorchModeStatus newStatus) = 0;
         virtual void onNewProviderRegistered() = 0;
     };
@@ -784,7 +784,7 @@ private:
         void torchModeStatusChangeInternal(const std::string& cameraDeviceName,
                 TorchModeStatus newStatus);
 
-        void removeDevice(std::string id);
+        void removeDevice(const std::string &id);
 
     };
 

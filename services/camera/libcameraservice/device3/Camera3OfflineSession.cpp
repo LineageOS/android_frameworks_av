@@ -27,7 +27,9 @@
 
 #include <inttypes.h>
 
+#include <android-base/stringprintf.h>
 #include <utils/Trace.h>
+#include <camera/StringUtils.h>
 
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
 
@@ -42,7 +44,7 @@ using namespace android::hardware::camera;
 
 namespace android {
 
-Camera3OfflineSession::Camera3OfflineSession(const String8 &id,
+Camera3OfflineSession::Camera3OfflineSession(const std::string &id,
         const sp<camera3::Camera3Stream>& inputStream,
         const camera3::StreamSet& offlineStreamSet,
         camera3::BufferRecords&& bufferRecords,
@@ -75,15 +77,15 @@ Camera3OfflineSession::Camera3OfflineSession(const String8 &id,
         mRotateAndCropMappers(offlineStates.mRotateAndCropMappers),
         mStatus(STATUS_UNINITIALIZED) {
     ATRACE_CALL();
-    ALOGV("%s: Created offline session for camera %s", __FUNCTION__, mId.string());
+    ALOGV("%s: Created offline session for camera %s", __FUNCTION__, mId.c_str());
 }
 
 Camera3OfflineSession::~Camera3OfflineSession() {
     ATRACE_CALL();
-    ALOGV("%s: Tearing down offline session for camera id %s", __FUNCTION__, mId.string());
+    ALOGV("%s: Tearing down offline session for camera id %s", __FUNCTION__, mId.c_str());
 }
 
-const String8& Camera3OfflineSession::getId() const {
+const std::string& Camera3OfflineSession::getId() const {
     return mId;
 }
 
@@ -109,7 +111,7 @@ status_t Camera3OfflineSession::disconnectImpl() {
             return OK; // don't close twice
         } else if (mStatus == STATUS_ERROR) {
             ALOGE("%s: offline session %s shutting down in error state",
-                    __FUNCTION__, mId.string());
+                    __FUNCTION__, mId.c_str());
         }
         listener = mListener.promote();
     }
@@ -217,8 +219,9 @@ void Camera3OfflineSession::setErrorStateLocked(const char *fmt, ...) {
 
 void Camera3OfflineSession::setErrorStateLockedV(const char *fmt, va_list args) {
     // Print out all error messages to log
-    String8 errorCause = String8::formatV(fmt, args);
-    ALOGE("Camera %s: %s", mId.string(), errorCause.string());
+    std::string errorCause;
+    base::StringAppendV(&errorCause, fmt, args);
+    ALOGE("Camera %s: %s", mId.c_str(), errorCause.c_str());
 
     // But only do error state transition steps for the first error
     if (mStatus == STATUS_ERROR || mStatus == STATUS_UNINITIALIZED) return;

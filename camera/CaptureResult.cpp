@@ -18,6 +18,7 @@
 #include <utils/Log.h>
 
 #include <camera/CaptureResult.h>
+#include <camera/StringUtils.h>
 #include <binder/Parcel.h>
 
 namespace android {
@@ -47,7 +48,7 @@ status_t CaptureResultExtras::readFromParcel(const android::Parcel *parcel) {
             ALOGE("%s: Failed to read camera id: %d", __FUNCTION__, res);
             return res;
         }
-        errorPhysicalCameraId = cameraId;
+        errorPhysicalCameraId = toStdString(cameraId);
     }
     parcel->readInt64(&lastCompletedRegularFrameNumber);
     parcel->readInt64(&lastCompletedReprocessFrameNumber);
@@ -75,7 +76,7 @@ status_t CaptureResultExtras::writeToParcel(android::Parcel *parcel) const {
     if (errorPhysicalCameraId.size() > 0) {
         parcel->writeBool(true);
         status_t res = OK;
-        if ((res = parcel->writeString16(errorPhysicalCameraId)) != OK) {
+        if ((res = parcel->writeString16(toString16(errorPhysicalCameraId))) != OK) {
             ALOGE("%s: Failed to write physical camera ID to parcel: %d", __FUNCTION__, res);
             return res;
         }
@@ -96,13 +97,15 @@ status_t CaptureResultExtras::writeToParcel(android::Parcel *parcel) const {
 status_t PhysicalCaptureResultInfo::readFromParcel(const android::Parcel* parcel) {
     status_t res;
 
-    mPhysicalCameraId.setTo(u"");
+    mPhysicalCameraId = "";
     mPhysicalCameraMetadata.clear();
 
-    if ((res = parcel->readString16(&mPhysicalCameraId)) != OK) {
+    String16 physicalCameraId;
+    if ((res = parcel->readString16(&physicalCameraId)) != OK) {
         ALOGE("%s: Failed to read camera id: %d", __FUNCTION__, res);
         return res;
     }
+    mPhysicalCameraId = toStdString(physicalCameraId);
 
     if ((res = mPhysicalCameraMetadata.readFromParcel(parcel)) != OK) {
         ALOGE("%s: Failed to read metadata from parcel: %d", __FUNCTION__, res);
@@ -113,7 +116,7 @@ status_t PhysicalCaptureResultInfo::readFromParcel(const android::Parcel* parcel
 
 status_t PhysicalCaptureResultInfo::writeToParcel(android::Parcel* parcel) const {
     status_t res;
-    if ((res = parcel->writeString16(mPhysicalCameraId)) != OK) {
+    if ((res = parcel->writeString16(toString16(mPhysicalCameraId))) != OK) {
         ALOGE("%s: Failed to write physical camera ID to parcel: %d",
                 __FUNCTION__, res);
         return res;
@@ -187,7 +190,8 @@ status_t CaptureResult::readFromParcel(android::Parcel *parcel) {
             return res;
         }
 
-        mPhysicalMetadatas.emplace(mPhysicalMetadatas.end(), cameraId, physicalMetadata);
+        mPhysicalMetadatas.emplace(mPhysicalMetadatas.end(), toStdString(cameraId),
+                physicalMetadata);
     }
     ALOGV("%s: Read physical metadata from parcel", __FUNCTION__);
 
@@ -228,7 +232,7 @@ status_t CaptureResult::writeToParcel(android::Parcel *parcel) const {
         return BAD_VALUE;
     }
     for (const auto& physicalMetadata : mPhysicalMetadatas) {
-        if ((res = parcel->writeString16(physicalMetadata.mPhysicalCameraId)) != OK) {
+        if ((res = parcel->writeString16(toString16(physicalMetadata.mPhysicalCameraId))) != OK) {
             ALOGE("%s: Failed to write physical camera ID to parcel: %d",
                     __FUNCTION__, res);
             return res;
