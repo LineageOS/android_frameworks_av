@@ -19,7 +19,6 @@
 #define LOG_TAG "Camera"
 #include <utils/Log.h>
 #include <utils/threads.h>
-#include <utils/String16.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/IMemory.h>
@@ -70,7 +69,7 @@ Camera::~Camera()
     // deadlock if we call any method of ICamera here.
 }
 
-sp<Camera> Camera::connect(int cameraId, const String16& clientPackageName,
+sp<Camera> Camera::connect(int cameraId, const std::string& clientPackageName,
         int clientUid, int clientPid, int targetSdkVersion, bool overrideToPortrait,
         bool forceSlowJpegMode)
 {

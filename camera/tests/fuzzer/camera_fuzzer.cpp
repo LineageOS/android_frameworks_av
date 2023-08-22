@@ -149,7 +149,7 @@ bool CameraFuzzer::initCamera() {
     sp<IBinder> binder = sm->getService(String16("media.camera"));
     mCameraService = interface_cast<ICameraService>(binder);
     mCameraService->connect(this, mFDP->ConsumeIntegral<int32_t>() /* cameraId */,
-                            String16("CAMERAFUZZ"), hardware::ICameraService::USE_CALLING_UID,
+                            "CAMERAFUZZ", hardware::ICameraService::USE_CALLING_UID,
                             hardware::ICameraService::USE_CALLING_PID,
                             /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
                             /*overrideToPortrait*/false, /*forceSlowJpegMode*/false, &cameraDevice);
@@ -294,18 +294,15 @@ void CameraFuzzer::invokeCameraBase() {
         cameraStatus = new CameraStatus();
     } else {
         string cid = mFDP->ConsumeRandomLengthString();
-        String8 id(cid.c_str());
         int32_t status = mFDP->ConsumeIntegral<int32_t>();
         size_t unavailSubIdsSize = mFDP->ConsumeIntegralInRange<size_t>(kSizeMin, kSizeMax);
-        vector<String8> unavailSubIds;
+        vector<std::string> unavailSubIds;
         for (size_t idx = 0; idx < unavailSubIdsSize; ++idx) {
             string subId = mFDP->ConsumeRandomLengthString();
-            String8 unavailSubId(subId.c_str());
-            unavailSubIds.push_back(unavailSubId);
+            unavailSubIds.push_back(subId);
         }
-        string clientPkg = mFDP->ConsumeRandomLengthString();
-        String8 clientPackage(clientPkg.c_str());
-        cameraStatus = new CameraStatus(id, status, unavailSubIds, clientPackage);
+        string clientPackage = mFDP->ConsumeRandomLengthString();
+        cameraStatus = new CameraStatus(cid, status, unavailSubIds, clientPackage);
     }
 
     invokeReadWriteParcel<CameraStatus>(cameraStatus);

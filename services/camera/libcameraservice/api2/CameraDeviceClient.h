@@ -50,10 +50,10 @@ struct CameraDeviceClientBase :
 protected:
     CameraDeviceClientBase(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
-            const String16& clientPackageName,
+            const std::string& clientPackageName,
             bool systemNativeClient,
-            const std::optional<String16>& clientFeatureId,
-            const String8& cameraId,
+            const std::optional<std::string>& clientFeatureId,
+            const std::string& cameraId,
             int api1CameraId,
             int cameraFacing,
             int sensorOrientation,
@@ -181,10 +181,10 @@ public:
     CameraDeviceClient(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
-            const String16& clientPackageName,
+            const std::string& clientPackageName,
             bool clientPackageOverride,
-            const std::optional<String16>& clientFeatureId,
-            const String8& cameraId,
+            const std::optional<std::string>& clientFeatureId,
+            const std::string& cameraId,
             int cameraFacing,
             int sensorOrientation,
             int clientPid,
@@ -192,11 +192,11 @@ public:
             int servicePid,
             bool overrideForPerfClass,
             bool overrideToPortrait,
-            const String8& originalCameraId);
+            const std::string& originalCameraId);
     virtual ~CameraDeviceClient();
 
     virtual status_t      initialize(sp<CameraProviderManager> manager,
-            const String8& monitorTags) override;
+            const std::string& monitorTags) override;
 
     virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop) override;
 
@@ -212,7 +212,7 @@ public:
 
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
 
-    virtual status_t      startWatchingTags(const String8 &tags, int out);
+    virtual status_t      startWatchingTags(const std::string &tags, int out);
     virtual status_t      stopWatchingTags(int out);
     virtual status_t      dumpWatchedEventsToVector(std::vector<std::string> &out);
 
@@ -246,12 +246,12 @@ protected:
     // Calculate the ANativeWindow transform from android.sensor.orientation
     status_t              getRotationTransformLocked(int mirrorMode, /*out*/int32_t* transform);
 
-    bool supportsUltraHighResolutionCapture(const String8 &cameraId);
+    bool supportsUltraHighResolutionCapture(const std::string &cameraId);
 
     bool isSensorPixelModeConsistent(const std::list<int> &streamIdList,
             const CameraMetadata &settings);
 
-    const CameraMetadata &getStaticInfo(const String8 &cameraId);
+    const CameraMetadata &getStaticInfo(const std::string &cameraId);
 
 private:
     // StreamSurfaceId encapsulates streamId + surfaceId for a particular surface.
@@ -290,7 +290,7 @@ private:
     std::vector<int32_t> mSupportedPhysicalRequestKeys;
 
     template<typename TProviderPtr>
-    status_t      initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
+    status_t      initializeImpl(TProviderPtr providerPtr, const std::string& monitorTags);
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
@@ -371,7 +371,7 @@ private:
     int mVideoStabilizationMode = -1;
 
     // This only exists in case of camera ID Remapping.
-    String8 mOriginalCameraId;
+    std::string mOriginalCameraId;
 };
 
 }; // namespace android

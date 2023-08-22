@@ -30,17 +30,17 @@ parcelable CameraIdRemapping {
      */
     parcelable PackageIdRemapping {
         /** Package Name (e.g. com.android.xyz). */
-        String packageName;
+        @utf8InCpp String packageName;
         /**
          * Ordered list of Camera Ids to replace. Only Camera Ids present in this list will be
          * affected.
          */
-        List<String> cameraIdsToReplace;
+        @utf8InCpp List<String> cameraIdsToReplace;
         /**
          *  Ordered list of updated Camera Ids, where updatedCameraIds[i] corresponds to
          *  the updated camera id for cameraIdsToReplace[i].
          */
-        List<String> updatedCameraIds;
+        @utf8InCpp List<String> updatedCameraIds;
     }
 
     /**

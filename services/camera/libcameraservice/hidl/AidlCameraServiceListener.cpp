@@ -16,6 +16,7 @@
 
 #include <hidl/AidlCameraServiceListener.h>
 #include <hidl/Utils.h>
+#include <camera/StringUtils.h>
 
 namespace android {
 namespace frameworks {
@@ -28,11 +29,11 @@ using hardware::cameraservice::utils::conversion::convertToHidlCameraDeviceStatu
 typedef frameworks::cameraservice::service::V2_1::ICameraServiceListener HCameraServiceListener2_1;
 
 binder::Status H2BCameraServiceListener::onStatusChanged(
-    int32_t status, const ::android::String16& cameraId) {
+    int32_t status, const std::string& cameraId) {
   HCameraDeviceStatus hCameraDeviceStatus = convertToHidlCameraDeviceStatus(status);
   CameraStatusAndId cameraStatusAndId;
   cameraStatusAndId.deviceStatus = hCameraDeviceStatus;
-  cameraStatusAndId.cameraId = String8(cameraId).string();
+  cameraStatusAndId.cameraId = cameraId;
   auto ret = mBase->onStatusChanged(cameraStatusAndId);
   if (!ret.isOk()) {
       ALOGE("%s OnStatusChanged callback failed due to %s",__FUNCTION__,
@@ -42,8 +43,8 @@ binder::Status H2BCameraServiceListener::onStatusChanged(
 }
 
 binder::Status H2BCameraServiceListener::onPhysicalCameraStatusChanged(
-    int32_t status, const ::android::String16& cameraId,
-    const ::android::String16& physicalCameraId) {
+    int32_t status, const std::string& cameraId,
+    const std::string& physicalCameraId) {
   auto cast2_1 = HCameraServiceListener2_1::castFrom(mBase);
   sp<HCameraServiceListener2_1> interface2_1 = nullptr;
   if (cast2_1.isOk()) {
@@ -52,8 +53,8 @@ binder::Status H2BCameraServiceListener::onPhysicalCameraStatusChanged(
       HCameraDeviceStatus hCameraDeviceStatus = convertToHidlCameraDeviceStatus(status);
       V2_1::PhysicalCameraStatusAndId cameraStatusAndId;
       cameraStatusAndId.deviceStatus = hCameraDeviceStatus;
-      cameraStatusAndId.cameraId = String8(cameraId).string();
-      cameraStatusAndId.physicalCameraId = String8(physicalCameraId).string();
+      cameraStatusAndId.cameraId = cameraId;
+      cameraStatusAndId.physicalCameraId = physicalCameraId;
       auto ret = interface2_1->onPhysicalCameraStatusChanged(cameraStatusAndId);
       if (!ret.isOk()) {
         ALOGE("%s OnPhysicalCameraStatusChanged callback failed due to %s",__FUNCTION__,
@@ -65,13 +66,13 @@ binder::Status H2BCameraServiceListener::onPhysicalCameraStatusChanged(
 }
 
 ::android::binder::Status H2BCameraServiceListener::onTorchStatusChanged(
-    int32_t, const ::android::String16&) {
+    int32_t, const std::string&) {
   // We don't implement onTorchStatusChanged
   return binder::Status::ok();
 }
 
 ::android::binder::Status H2BCameraServiceListener::onTorchStrengthLevelChanged(
-    const ::android::String16&, int32_t) {
+    const std::string&, int32_t) {
   return binder::Status::ok();
 }
 
