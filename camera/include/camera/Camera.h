@@ -56,9 +56,9 @@ struct CameraTraits<Camera>
     typedef CameraListener                     TCamListener;
     typedef ::android::hardware::ICamera       TCamUser;
     typedef ::android::hardware::ICameraClient TCamCallbacks;
-    typedef ::android::binder::Status(::android::hardware::ICameraService::*TCamConnectService)
+    typedef ::android::binder::Status (::android::hardware::ICameraService::*TCamConnectService)
         (const sp<::android::hardware::ICameraClient>&,
-        int, const String16&, int, int, int, bool, bool,
+        int, const std::string&, int, int, int, bool, bool,
         /*out*/
         sp<::android::hardware::ICamera>*);
     static TCamConnectService     fnConnectService;
@@ -80,7 +80,7 @@ public:
             // construct a camera client from an existing remote
     static  sp<Camera>  create(const sp<::android::hardware::ICamera>& camera);
     static  sp<Camera>  connect(int cameraId,
-                                const String16& clientPackageName,
+                                const std::string& clientPackageName,
                                 int clientUid, int clientPid, int targetSdkVersion,
                                 bool overrideToPortrait, bool forceSlowJpegMode);
 

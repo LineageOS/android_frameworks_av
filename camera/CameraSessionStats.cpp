@@ -20,6 +20,7 @@
 #include <utils/String16.h>
 
 #include <camera/CameraSessionStats.h>
+#include <camera/StringUtils.h>
 
 #include <binder/Parcel.h>
 
@@ -282,8 +283,8 @@ CameraSessionStats::CameraSessionStats() :
         mSessionIndex(0),
         mCameraExtensionSessionStats() {}
 
-CameraSessionStats::CameraSessionStats(const String16& cameraId,
-        int facing, int newCameraState, const String16& clientName,
+CameraSessionStats::CameraSessionStats(const std::string& cameraId,
+        int facing, int newCameraState, const std::string& clientName,
         int apiLevel, bool isNdk, int32_t latencyMs, int64_t logId) :
                 mCameraId(cameraId),
                 mFacing(facing),
@@ -425,10 +426,10 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
-    mCameraId = id;
+    mCameraId = toStdString(id);
     mFacing = facing;
     mNewCameraState = newCameraState;
-    mClientName = clientName;
+    mClientName = toStdString(clientName);
     mApiLevel = apiLevel;
     mIsNdk = isNdk;
     mLatencyMs = latencyMs;
@@ -440,7 +441,7 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
     mResultErrorCount = resultErrorCount;
     mDeviceError = deviceError;
     mStreamStats = std::move(streamStats);
-    mUserTag = userTag;
+    mUserTag = toStdString(userTag);
     mVideoStabilizationMode = videoStabilizationMode;
     mSessionIndex = sessionIdx;
     mCameraExtensionSessionStats = extStats;
@@ -456,7 +457,7 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
 
     status_t err = OK;
 
-    if ((err = parcel->writeString16(mCameraId)) != OK) {
+    if ((err = parcel->writeString16(toString16(mCameraId))) != OK) {
         ALOGE("%s: Failed to write camera id!", __FUNCTION__);
         return err;
     }
@@ -471,7 +472,7 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
         return err;
     }
 
-    if ((err = parcel->writeString16(mClientName)) != OK) {
+    if ((err = parcel->writeString16(toString16(mClientName))) != OK) {
         ALOGE("%s: Failed to write client name!", __FUNCTION__);
         return err;
     }
@@ -531,7 +532,7 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
         return err;
     }
 
-    if ((err = parcel->writeString16(mUserTag)) != OK) {
+    if ((err = parcel->writeString16(toString16(mUserTag))) != OK) {
         ALOGE("%s: Failed to write user tag!", __FUNCTION__);
         return err;
     }

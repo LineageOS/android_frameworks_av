@@ -302,15 +302,15 @@ struct TestStatusListener : public CameraProviderManager::StatusListener {
 
     ~TestStatusListener() {}
 
-    void onDeviceStatusChanged(const String8 &,
+    void onDeviceStatusChanged(const std::string &,
             CameraDeviceStatus) override {}
-    void onDeviceStatusChanged(const String8 &, const String8 &,
+    void onDeviceStatusChanged(const std::string &, const std::string &,
             CameraDeviceStatus) override {
         mPhysicalCameraStatusChangeCount++;
     }
-    void onTorchStatusChanged(const String8 &,
+    void onTorchStatusChanged(const std::string &,
             TorchModeStatus) override {}
-    void onTorchStatusChanged(const String8 &,
+    void onTorchStatusChanged(const std::string &,
             TorchModeStatus, SystemCameraKind) override {}
     void onNewProviderRegistered() override {}
 };

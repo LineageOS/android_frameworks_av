@@ -22,6 +22,7 @@
 #include <device3/Camera3StreamInterface.h>
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <mediautils/AImageReaderUtils.h>
+#include <camera/StringUtils.h>
 
 namespace android::hardware::cameraservice::utils::conversion::aidl {
 
@@ -80,9 +81,8 @@ UOutputConfiguration convertFromAidl(const SOutputConfiguration &src) {
         iGBPs.push_back(new H2BGraphicBufferProducer(AImageReader_getHGBPFromHandle(nh)));
         native_handle_delete(nh);
     }
-    String16 physicalCameraId16(src.physicalCameraId.c_str());
     UOutputConfiguration outputConfiguration(
-        iGBPs, convertFromAidl(src.rotation), physicalCameraId16,
+        iGBPs, convertFromAidl(src.rotation), src.physicalCameraId,
         src.windowGroupId, OutputConfiguration::SURFACE_TYPE_UNKNOWN, 0, 0,
         (windowHandles.size() > 1));
     return outputConfiguration;
@@ -175,7 +175,7 @@ SCaptureResultExtras convertToAidl(const UCaptureResultExtras &src) {
     dst.frameNumber = src.frameNumber;
     dst.partialResultCount = src.partialResultCount;
     dst.errorStreamId = src.errorStreamId;
-    dst.errorPhysicalCameraId = String8(src.errorPhysicalCameraId).string();
+    dst.errorPhysicalCameraId = src.errorPhysicalCameraId;
     return dst;
 }
 
@@ -217,7 +217,7 @@ std::vector<SPhysicalCaptureResultInfo> convertToAidl(
 SPhysicalCaptureResultInfo convertToAidl(const UPhysicalCaptureResultInfo & src,
                                          std::shared_ptr<CaptureResultMetadataQueue> & fmq) {
     SPhysicalCaptureResultInfo dst;
-    dst.physicalCameraId = String8(src.mPhysicalCameraId).string();
+    dst.physicalCameraId = src.mPhysicalCameraId;
 
     const camera_metadata_t *rawMetadata = src.mPhysicalCameraMetadata.getAndLock();
     // Try using fmq at first.
@@ -242,12 +242,12 @@ void convertToAidl(const std::vector<hardware::CameraStatus> &src,
     size_t i = 0;
     for (const auto &statusAndId : src) {
         auto &a = (*dst)[i++];
-        a.cameraId = statusAndId.cameraId.c_str();
+        a.cameraId = statusAndId.cameraId;
         a.deviceStatus = convertCameraStatusToAidl(statusAndId.status);
         size_t numUnvailPhysicalCameras = statusAndId.unavailablePhysicalIds.size();
         a.unavailPhysicalCameraIds.resize(numUnvailPhysicalCameras);
         for (size_t j = 0; j < numUnvailPhysicalCameras; j++) {
-            a.unavailPhysicalCameraIds[j] = statusAndId.unavailablePhysicalIds[j].c_str();
+            a.unavailPhysicalCameraIds[j] = statusAndId.unavailablePhysicalIds[j];
         }
     }
 }

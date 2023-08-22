@@ -73,7 +73,7 @@ struct CameraStatus : public android::Parcelable {
     /**
      * The name of the camera device
      */
-    String8 cameraId;
+    std::string cameraId;
 
     /**
      * Its current status, one of the ICameraService::STATUS_* fields
@@ -83,18 +83,18 @@ struct CameraStatus : public android::Parcelable {
     /**
      * Unavailable physical camera names for a multi-camera device
      */
-    std::vector<String8> unavailablePhysicalIds;
+    std::vector<std::string> unavailablePhysicalIds;
 
     /**
      * Client package name if camera is open, otherwise not applicable
      */
-    String8 clientPackage;
+    std::string clientPackage;
 
     virtual status_t writeToParcel(android::Parcel* parcel) const;
     virtual status_t readFromParcel(const android::Parcel* parcel);
 
-    CameraStatus(String8 id, int32_t s, const std::vector<String8>& unavailSubIds,
-            const String8& clientPkg) : cameraId(id), status(s),
+    CameraStatus(std::string id, int32_t s, const std::vector<std::string>& unavailSubIds,
+            const std::string& clientPkg) : cameraId(id), status(s),
             unavailablePhysicalIds(unavailSubIds), clientPackage(clientPkg) {}
     CameraStatus() : status(ICameraServiceListener::STATUS_PRESENT) {}
 };
@@ -118,7 +118,7 @@ public:
     typedef typename TCamTraits::TCamConnectService TCamConnectService;
 
     static sp<TCam>      connect(int cameraId,
-                                 const String16& clientPackageName,
+                                 const std::string& clientPackageName,
                                  int clientUid, int clientPid, int targetSdkVersion,
                                  bool overrideToPortrait, bool forceSlowJpegMode);
     virtual void         disconnect();

@@ -15,6 +15,7 @@
  */
 
 #include <CameraMetadata.h>
+#include <camera/StringUtils.h>
 #include <camera2/CaptureRequest.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <gui/Surface.h>
@@ -45,7 +46,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     for (size_t idx = 0; idx < physicalCameraSettingsSize; ++idx) {
         string id = fdp.ConsumeRandomLengthString();
         if (fdp.ConsumeBool()) {
-            parcelCamCaptureReq.writeString16(String16(id.c_str()));
+            parcelCamCaptureReq.writeString16(toString16(id));
         }
         CameraMetadata cameraMetadata;
         if (fdp.ConsumeBool()) {
