@@ -94,12 +94,15 @@ public:
     sp<media::ISoundDose> getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback);
 
     /**
-     * Sets the HAL sound dose interface to use for the MEL computation. Use nullptr
-     * for using the internal MEL computation.
+     * Sets the HAL sound dose interface for a specific module to use for the MEL computation.
      *
      * @return true if setting the HAL sound dose value was successful, false otherwise.
      */
-    bool setHalSoundDoseInterface(const std::shared_ptr<ISoundDose>& halSoundDose);
+    bool setHalSoundDoseInterface(const std::string &module,
+                                  const std::shared_ptr<ISoundDose> &halSoundDose);
+
+    /** Reset all the stored HAL sound dose interface. */
+    void resetHalSoundDoseInterfaces();
 
     /** Returns the cached audio port id from the active devices. */
     audio_port_handle_t getIdForAudioDevice(
@@ -193,6 +196,7 @@ private:
                 const aidl::android::media::audio::common::AudioDevice& in_audioDevice) override;
 
         wp<SoundDoseManager> mSoundDoseManager;
+        std::mutex mCbLock;
     };
 
     void resetSoundDose();
@@ -206,8 +210,11 @@ private:
     void setUseFrameworkMel(bool useFrameworkMel);
     void setComputeCsdOnAllDevices(bool computeCsdOnAllDevices);
     bool isSoundDoseHalSupported() const;
-    /** Returns the HAL sound dose interface or null if internal MEL computation is used. */
-    void getHalSoundDose(std::shared_ptr<ISoundDose>* halSoundDose) const;
+    /**
+     * Returns true if there is one active HAL sound dose interface or null if internal MEL
+     * computation is used.
+     **/
+    bool useHalSoundDose() const;
 
     mutable std::mutex mLock;
 
@@ -241,7 +248,7 @@ private:
 
     sp<SoundDose> mSoundDose GUARDED_BY(mLock);
 
-    std::shared_ptr<ISoundDose> mHalSoundDose GUARDED_BY(mLock);
+    std::unordered_map<std::string, std::shared_ptr<ISoundDose>> mHalSoundDose GUARDED_BY(mLock);
     std::shared_ptr<HalSoundDoseCallback> mHalSoundDoseCallback GUARDED_BY(mLock);
 
     bool mUseFrameworkMel GUARDED_BY(mLock) = false;
