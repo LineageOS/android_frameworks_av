@@ -500,62 +500,9 @@ private:
     AudioHwDevice*          findSuitableHwDev_l(audio_module_handle_t module,
                                                 audio_devices_t deviceType);
 
-    // Set kEnableExtendedChannels to true to enable greater than stereo output
-    // for the MixerThread and device sink.  Number of channels allowed is
-    // FCC_2 <= channels <= AudioMixer::MAX_NUM_CHANNELS.
-    static const bool kEnableExtendedChannels = true;
-
 public:
     // Remove this when Oboeservice is updated to obtain handle directly.
     static inline std::atomic<AudioFlinger*> gAudioFlinger = nullptr;
-
-    // Returns true if channel mask is permitted for the PCM sink in the MixerThread
-    static inline bool isValidPcmSinkChannelMask(audio_channel_mask_t channelMask) {
-        switch (audio_channel_mask_get_representation(channelMask)) {
-        case AUDIO_CHANNEL_REPRESENTATION_POSITION: {
-            // Haptic channel mask is only applicable for channel position mask.
-            const uint32_t channelCount = audio_channel_count_from_out_mask(
-                    static_cast<audio_channel_mask_t>(channelMask & ~AUDIO_CHANNEL_HAPTIC_ALL));
-            const uint32_t maxChannelCount = kEnableExtendedChannels
-                    ? AudioMixer::MAX_NUM_CHANNELS : FCC_2;
-            if (channelCount < FCC_2 // mono is not supported at this time
-                    || channelCount > maxChannelCount) {
-                return false;
-            }
-            // check that channelMask is the "canonical" one we expect for the channelCount.
-            return audio_channel_position_mask_is_out_canonical(channelMask);
-            }
-        case AUDIO_CHANNEL_REPRESENTATION_INDEX:
-            if (kEnableExtendedChannels) {
-                const uint32_t channelCount = audio_channel_count_from_out_mask(channelMask);
-                if (channelCount >= FCC_2 // mono is not supported at this time
-                        && channelCount <= AudioMixer::MAX_NUM_CHANNELS) {
-                    return true;
-                }
-            }
-            return false;
-        default:
-            return false;
-        }
-    }
-
-    // Set kEnableExtendedPrecision to true to use extended precision in MixerThread
-    static const bool kEnableExtendedPrecision = true;
-
-    // Returns true if format is permitted for the PCM sink in the MixerThread
-    static inline bool isValidPcmSinkFormat(audio_format_t format) {
-        switch (format) {
-        case AUDIO_FORMAT_PCM_16_BIT:
-            return true;
-        case AUDIO_FORMAT_PCM_FLOAT:
-        case AUDIO_FORMAT_PCM_24_BIT_PACKED:
-        case AUDIO_FORMAT_PCM_32_BIT:
-        case AUDIO_FORMAT_PCM_8_24_BIT:
-            return kEnableExtendedPrecision;
-        default:
-            return false;
-        }
-    }
 
 private:
 
