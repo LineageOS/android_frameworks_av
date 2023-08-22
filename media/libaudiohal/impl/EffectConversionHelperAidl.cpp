@@ -354,14 +354,22 @@ status_t EffectConversionHelperAidl::handleSetVolume(uint32_t cmdSize, const voi
     }
 
     constexpr uint32_t unityGain = 1 << 24;
-    Parameter::VolumeStereo volume = {.left = (float)(*(uint32_t*)pCmdData) / unityGain,
+    Parameter::VolumeStereo requestedVolume = {.left = (float)(*(uint32_t*)pCmdData) / unityGain,
                                       .right = (float)(*(uint32_t*)pCmdData + 1) / unityGain};
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mEffect->setParameter(Parameter::make<Parameter::volumeStereo>(volume))));
 
-    // write unity gain back if volume was successfully set
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            mEffect->setParameter(Parameter::make<Parameter::volumeStereo>(requestedVolume))));
+
+    // get volume from effect and set if changed.
+    Parameter::Id id = Parameter::Id::make<Parameter::Id::commonTag>(Parameter::volumeStereo);
+    Parameter volParam;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &volParam)));
+    Parameter::VolumeStereo appliedVolume = volParam.get<Parameter::volumeStereo>();
+
     if (replySize && *replySize == 2 * sizeof(uint32_t) && pReplyData) {
-        constexpr uint32_t vol_ret[2] = {unityGain, unityGain};
+        uint32_t vl = (uint32_t)(appliedVolume.left * unityGain);
+        uint32_t vr = (uint32_t)(appliedVolume.right * unityGain);
+        uint32_t vol_ret[2] = {vl, vr};
         memcpy(pReplyData, vol_ret, sizeof(vol_ret));
     }
     return OK;
