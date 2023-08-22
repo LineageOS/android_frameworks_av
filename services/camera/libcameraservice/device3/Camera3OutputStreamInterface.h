@@ -94,7 +94,7 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
     /**
      * Query the physical camera id for the output stream.
      */
-    virtual const String8& getPhysicalCameraId() const = 0;
+    virtual const std::string& getPhysicalCameraId() const = 0;
 
     /**
      * Set the batch size for buffer operations. The output stream will request

@@ -20,10 +20,9 @@
 #include <android/hardware/ICameraServiceProxy.h>
 
 #include <utils/Mutex.h>
-#include <utils/String8.h>
-#include <utils/String16.h>
 #include <utils/StrongPointer.h>
 #include <utils/Timers.h>
+#include <string>
 
 #include <camera/CameraSessionStats.h>
 
@@ -40,8 +39,8 @@ private:
         hardware::CameraSessionStats mSessionStats;
         Mutex mLock; // lock for per camera session stats
 
-        CameraSessionStatsWrapper(const String16& cameraId, int facing, int newCameraState,
-                const String16& clientName, int apiLevel, bool isNdk, int32_t latencyMs) :
+        CameraSessionStatsWrapper(const std::string& cameraId, int facing, int newCameraState,
+                const std::string& clientName, int apiLevel, bool isNdk, int32_t latencyMs) :
             mSessionStats(cameraId, facing, newCameraState, clientName, apiLevel, isNdk, latencyMs)
             {}
 
@@ -57,7 +56,7 @@ private:
     // Lock for camera session stats map
     static Mutex mLock;
     // Map from camera id to the camera's session statistics
-    static std::map<String8, std::shared_ptr<CameraSessionStatsWrapper>> mSessionStatsMap;
+    static std::map<std::string, std::shared_ptr<CameraSessionStatsWrapper>> mSessionStatsMap;
 
     /**
      * Update the session stats of a given camera device (open/close/active/idle) with
@@ -70,22 +69,22 @@ private:
 
 public:
     // Open
-    static void logOpen(const String8& id, int facing,
-            const String16& clientPackageName, int apiLevel, bool isNdk,
+    static void logOpen(const std::string& id, int facing,
+            const std::string& clientPackageName, int apiLevel, bool isNdk,
             int32_t latencyMs);
 
     // Close
-    static void logClose(const String8& id, int32_t latencyMs);
+    static void logClose(const std::string& id, int32_t latencyMs);
 
     // Stream configuration
-    static void logStreamConfigured(const String8& id, int operatingMode, bool internalReconfig,
+    static void logStreamConfigured(const std::string& id, int operatingMode, bool internalReconfig,
             int32_t latencyMs);
 
     // Session state becomes active
-    static void logActive(const String8& id, float maxPreviewFps);
+    static void logActive(const std::string& id, float maxPreviewFps);
 
     // Session state becomes idle
-    static void logIdle(const String8& id,
+    static void logIdle(const std::string& id,
             int64_t requestCount, int64_t resultErrorCount, bool deviceError,
             const std::string& userTag, int32_t videoStabilizationMode,
             const std::vector<hardware::CameraStreamStats>& streamStats);
@@ -94,7 +93,7 @@ public:
     static void pingCameraServiceProxy();
 
     // Return the current top activity rotate and crop override.
-    static int getRotateAndCropOverride(String16 packageName, int lensFacing, int userId);
+    static int getRotateAndCropOverride(const std::string &packageName, int lensFacing, int userId);
 
     // Detect if the camera is disabled by device policy.
     static bool isCameraDisabled(int userId);

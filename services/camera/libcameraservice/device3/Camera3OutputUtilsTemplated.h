@@ -296,7 +296,7 @@ void returnStreamBuffersT(ReturnBufferStates& states,
         const VecStreamBufferType& buffers) {
     if (!states.useHalBufManager) {
         ALOGE("%s: Camera %s does not support HAL buffer managerment",
-                __FUNCTION__, states.cameraId.string());
+                __FUNCTION__, states.cameraId.c_str());
         return;
     }
 

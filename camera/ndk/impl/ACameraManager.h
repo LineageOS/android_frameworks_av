@@ -62,7 +62,7 @@ class CameraManagerGlobal final : public RefBase {
     /**
      * Return camera IDs that support camera2
      */
-    void getCameraIdList(std::vector<String8> *cameraIds);
+    void getCameraIdList(std::vector<std::string> *cameraIds);
 
   private:
     sp<hardware::ICameraService> mCameraService;
@@ -87,23 +87,23 @@ class CameraManagerGlobal final : public RefBase {
     class CameraServiceListener final : public hardware::BnCameraServiceListener {
       public:
         explicit CameraServiceListener(CameraManagerGlobal* cm) : mCameraManager(cm) {}
-        virtual binder::Status onStatusChanged(int32_t status, const String16& cameraId);
+        virtual binder::Status onStatusChanged(int32_t status, const std::string& cameraId);
         virtual binder::Status onPhysicalCameraStatusChanged(int32_t status,
-                const String16& cameraId, const String16& physicalCameraId);
+                const std::string& cameraId, const std::string& physicalCameraId);
 
         // Torch API not implemented yet
-        virtual binder::Status onTorchStatusChanged(int32_t, const String16&) {
+        virtual binder::Status onTorchStatusChanged(int32_t, const std::string&) {
             return binder::Status::ok();
         }
-        virtual binder::Status onTorchStrengthLevelChanged(const String16&, int32_t) {
+        virtual binder::Status onTorchStrengthLevelChanged(const std::string&, int32_t) {
             return binder::Status::ok();
         }
 
         virtual binder::Status onCameraAccessPrioritiesChanged();
-        virtual binder::Status onCameraOpened(const String16&, const String16&) {
+        virtual binder::Status onCameraOpened(const std::string&, const std::string&) {
             return binder::Status::ok();
         }
-        virtual binder::Status onCameraClosed(const String16&) {
+        virtual binder::Status onCameraClosed(const std::string&) {
             return binder::Status::ok();
         }
 
@@ -203,20 +203,20 @@ class CameraManagerGlobal final : public RefBase {
 
     sp<hardware::ICameraService> getCameraServiceLocked();
     void onCameraAccessPrioritiesChanged();
-    void onStatusChanged(int32_t status, const String8& cameraId);
-    void onStatusChangedLocked(int32_t status, const String8& cameraId);
-    void onStatusChanged(int32_t status, const String8& cameraId, const String8& physicalCameraId);
-    void onStatusChangedLocked(int32_t status, const String8& cameraId,
-           const String8& physicalCameraId);
+    void onStatusChanged(int32_t status, const std::string& cameraId);
+    void onStatusChangedLocked(int32_t status, const std::string& cameraId);
+    void onStatusChanged(int32_t status, const std::string& cameraId, const std::string& physicalCameraId);
+    void onStatusChangedLocked(int32_t status, const std::string& cameraId,
+           const std::string& physicalCameraId);
     // Utils for status
     static bool validStatus(int32_t status);
     static bool isStatusAvailable(int32_t status);
-    bool supportsCamera2ApiLocked(const String8 &cameraId);
+    bool supportsCamera2ApiLocked(const std::string &cameraId);
 
     // The sort logic must match the logic in
     // libcameraservice/common/CameraProviderManager.cpp::getAPI1CompatibleCameraDeviceIds
     struct CameraIdComparator {
-        bool operator()(const String8& a, const String8& b) const {
+        bool operator()(const std::string& a, const std::string& b) const {
             uint32_t aUint = 0, bUint = 0;
             bool aIsUint = base::ParseUint(a.c_str(), &aUint);
             bool bIsUint = base::ParseUint(b.c_str(), &bUint);
@@ -238,22 +238,22 @@ class CameraManagerGlobal final : public RefBase {
       private:
         int32_t status = hardware::ICameraServiceListener::STATUS_NOT_PRESENT;
         mutable std::mutex mLock;
-        std::set<String8> unavailablePhysicalIds;
+        std::set<std::string> unavailablePhysicalIds;
       public:
         const bool supportsHAL3 = false;
         StatusAndHAL3Support(int32_t st, bool HAL3support):
                 status(st), supportsHAL3(HAL3support) { };
         StatusAndHAL3Support() = default;
 
-        bool addUnavailablePhysicalId(const String8& physicalCameraId);
-        bool removeUnavailablePhysicalId(const String8& physicalCameraId);
+        bool addUnavailablePhysicalId(const std::string& physicalCameraId);
+        bool removeUnavailablePhysicalId(const std::string& physicalCameraId);
         int32_t getStatus();
         void updateStatus(int32_t newStatus);
-        std::set<String8> getUnavailablePhysicalIds();
+        std::set<std::string> getUnavailablePhysicalIds();
     };
 
     // Map camera_id -> status
-    std::map<String8, StatusAndHAL3Support, CameraIdComparator> mDeviceStatusMap;
+    std::map<std::string, StatusAndHAL3Support, CameraIdComparator> mDeviceStatusMap;
 
     // For the singleton instance
     static Mutex sLock;

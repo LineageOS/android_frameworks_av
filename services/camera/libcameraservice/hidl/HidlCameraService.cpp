@@ -64,7 +64,7 @@ HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
     android::CameraMetadata cameraMetadata;
     HStatus status = HStatus::NO_ERROR;
     binder::Status serviceRet =
-        mAidlICameraService->getCameraCharacteristics(String16(cameraId.c_str()),
+        mAidlICameraService->getCameraCharacteristics(cameraId,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
                 &cameraMetadata);
     HCameraMetadata hidlMetadata;
@@ -115,7 +115,7 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
     }
     sp<hardware::camera2::ICameraDeviceCallbacks> callbacks = hybridCallbacks;
     binder::Status serviceRet = mAidlICameraService->connectDevice(
-            callbacks, String16(cameraId.c_str()), String16(""), {},
+            callbacks, cameraId, std::string(), {},
             hardware::ICameraService::USE_CALLING_UID, 0/*oomScoreOffset*/,
             /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
             /*out*/&deviceRemote);
@@ -241,7 +241,7 @@ HStatus HidlCameraService::addListenerInternal(const sp<T>& hCsListener,
             [this](const hardware::CameraStatus& s) {
                 bool supportsHAL3 = false;
                 binder::Status sRet =
-                            mAidlICameraService->supportsCameraApi(String16(s.cameraId),
+                            mAidlICameraService->supportsCameraApi(s.cameraId,
                                     hardware::ICameraService::API_VERSION_2, &supportsHAL3);
                 return !sRet.isOk() || !supportsHAL3;
             }), cameraStatusAndIds->end());
