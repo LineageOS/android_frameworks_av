@@ -20,6 +20,8 @@
 
 #include <inttypes.h>
 #include <utils/Log.h>
+#include <utils/String16.h>
+#include <camera/StringUtils.h>
 #include <binder/IServiceManager.h>
 
 #include "CameraServiceProxyWrapper.h"
@@ -33,7 +35,7 @@ Mutex CameraServiceProxyWrapper::sProxyMutex;
 sp<hardware::ICameraServiceProxy> CameraServiceProxyWrapper::sCameraServiceProxy;
 
 Mutex CameraServiceProxyWrapper::mLock;
-std::map<String8, std::shared_ptr<CameraServiceProxyWrapper::CameraSessionStatsWrapper>>
+std::map<std::string, std::shared_ptr<CameraServiceProxyWrapper::CameraSessionStatsWrapper>>
         CameraServiceProxyWrapper::mSessionStatsMap;
 
 /**
@@ -88,7 +90,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
     mSessionStats.mRequestCount = requestCount;
     mSessionStats.mResultErrorCount = resultErrorCount;
     mSessionStats.mDeviceError = deviceError;
-    mSessionStats.mUserTag = String16(userTag.c_str());
+    mSessionStats.mUserTag = userTag;
     mSessionStats.mVideoStabilizationMode = videoStabilizationMode;
     mSessionStats.mStreamStats = streamStats;
     updateProxyDeviceState(mSessionStats);
@@ -124,12 +126,13 @@ void CameraServiceProxyWrapper::pingCameraServiceProxy() {
     proxyBinder->pingForUserUpdate();
 }
 
-int CameraServiceProxyWrapper::getRotateAndCropOverride(String16 packageName, int lensFacing,
-        int userId) {
+int CameraServiceProxyWrapper::getRotateAndCropOverride(const std::string &packageName,
+        int lensFacing, int userId) {
     sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     if (proxyBinder == nullptr) return true;
     int ret = 0;
-    auto status = proxyBinder->getRotateAndCropOverride(packageName, lensFacing, userId, &ret);
+    auto status = proxyBinder->getRotateAndCropOverride(packageName, lensFacing,
+            userId, &ret);
     if (!status.isOk()) {
         ALOGE("%s: Failed during top activity orientation query: %s", __FUNCTION__,
                 status.exceptionMessage().c_str());
@@ -144,7 +147,7 @@ void CameraServiceProxyWrapper::updateProxyDeviceState(const CameraSessionStats&
     proxyBinder->notifyCameraState(sessionStats);
 }
 
-void CameraServiceProxyWrapper::logStreamConfigured(const String8& id,
+void CameraServiceProxyWrapper::logStreamConfigured(const std::string& id,
         int operatingMode, bool internalConfig, int32_t latencyMs) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
@@ -162,7 +165,7 @@ void CameraServiceProxyWrapper::logStreamConfigured(const String8& id,
     sessionStats->onStreamConfigured(operatingMode, internalConfig, latencyMs);
 }
 
-void CameraServiceProxyWrapper::logActive(const String8& id, float maxPreviewFps) {
+void CameraServiceProxyWrapper::logActive(const std::string& id, float maxPreviewFps) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
@@ -178,7 +181,7 @@ void CameraServiceProxyWrapper::logActive(const String8& id, float maxPreviewFps
     sessionStats->onActive(maxPreviewFps);
 }
 
-void CameraServiceProxyWrapper::logIdle(const String8& id,
+void CameraServiceProxyWrapper::logIdle(const std::string& id,
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::string& userTag, int32_t videoStabilizationMode,
         const std::vector<hardware::CameraStreamStats>& streamStats) {
@@ -209,8 +212,8 @@ void CameraServiceProxyWrapper::logIdle(const String8& id,
             videoStabilizationMode, streamStats);
 }
 
-void CameraServiceProxyWrapper::logOpen(const String8& id, int facing,
-            const String16& clientPackageName, int effectiveApiLevel, bool isNdk,
+void CameraServiceProxyWrapper::logOpen(const std::string& id, int facing,
+            const std::string& clientPackageName, int effectiveApiLevel, bool isNdk,
             int32_t latencyMs) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
@@ -226,7 +229,7 @@ void CameraServiceProxyWrapper::logOpen(const String8& id, int facing,
             apiLevel = CameraSessionStats::CAMERA_API_LEVEL_2;
         }
 
-        sessionStats = std::make_shared<CameraSessionStatsWrapper>(String16(id), facing,
+        sessionStats = std::make_shared<CameraSessionStatsWrapper>(id, facing,
                 CameraSessionStats::CAMERA_STATE_OPEN, clientPackageName,
                 apiLevel, isNdk, latencyMs);
         mSessionStatsMap.emplace(id, sessionStats);
@@ -238,7 +241,7 @@ void CameraServiceProxyWrapper::logOpen(const String8& id, int facing,
     sessionStats->onOpen();
 }
 
-void CameraServiceProxyWrapper::logClose(const String8& id, int32_t latencyMs) {
+void CameraServiceProxyWrapper::logClose(const std::string& id, int32_t latencyMs) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);

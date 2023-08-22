@@ -16,8 +16,9 @@
 
 #define LOG_TAG "CameraLatencyHistogram"
 #include <inttypes.h>
+#include <android-base/stringprintf.h>
 #include <utils/Log.h>
-#include <utils/String8.h>
+#include <camera/StringUtils.h>
 
 #include "LatencyHistogram.h"
 
@@ -55,18 +56,18 @@ void CameraLatencyHistogram::dump(int fd, const char* name) const {
         return;
     }
 
-    String8 lines;
-    lines.appendFormat("%s (%" PRId64 ") samples\n", name, mTotalCount);
+    std::string lines;
+    lines += fmt::sprintf("%s (%" PRId64 ") samples\n", name, mTotalCount);
 
-    String8 lineBins, lineBinCounts;
+    std::string lineBins, lineBinCounts;
     formatHistogramText(lineBins, lineBinCounts);
 
-    lineBins.append("\n");
-    lineBinCounts.append("\n");
-    lines.append(lineBins);
-    lines.append(lineBinCounts);
+    lineBins += ("\n");
+    lineBinCounts += ("\n");
+    lines += lineBins;
+    lines += lineBinCounts;
 
-    write(fd, lines.string(), lines.size());
+    write(fd, lines.c_str(), lines.size());
 }
 
 void CameraLatencyHistogram::log(const char* fmt, ...) {
@@ -76,11 +77,12 @@ void CameraLatencyHistogram::log(const char* fmt, ...) {
 
     va_list args;
     va_start(args, fmt);
-    String8 histogramName = String8::formatV(fmt, args);
-    ALOGI("%s (%" PRId64 ") samples:", histogramName.string(), mTotalCount);
+    std::string histogramName;
+    base::StringAppendV(&histogramName, fmt, args);
+    ALOGI("%s (%" PRId64 ") samples:", histogramName.c_str(), mTotalCount);
     va_end(args);
 
-    String8 lineBins, lineBinCounts;
+    std::string lineBins, lineBinCounts;
     formatHistogramText(lineBins, lineBinCounts);
 
     ALOGI("%s", lineBins.c_str());
@@ -88,19 +90,19 @@ void CameraLatencyHistogram::log(const char* fmt, ...) {
 }
 
 void CameraLatencyHistogram::formatHistogramText(
-        String8& lineBins, String8& lineBinCounts) const {
+        std::string& lineBins, std::string& lineBinCounts) const {
     lineBins = "  ";
     lineBinCounts = "  ";
 
     for (int32_t i = 0; i < mBinCount; i++) {
         if (i == mBinCount - 1) {
-            lineBins.append("    inf (max ms)");
+            lineBins += "    inf (max ms)";
         } else {
-            lineBins.appendFormat("%7d", mBinSizeMs*(i+1));
+            lineBins += fmt::sprintf("%7d", mBinSizeMs*(i+1));
         }
-        lineBinCounts.appendFormat("   %02.2f", 100.0*mBins[i]/mTotalCount);
+        lineBinCounts += fmt::sprintf("   %02.2f", 100.0*mBins[i]/mTotalCount);
     }
-    lineBinCounts.append(" (%)");
+    lineBinCounts += " (%)";
 }
 
 }; //namespace android

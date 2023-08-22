@@ -108,7 +108,7 @@ bool HidlCameraDeviceUser::copyPhysicalCameraSettings(
         physicalCameraSettings->emplace_back();
         CaptureRequest::PhysicalCameraSettings &physicalCameraSetting =
             physicalCameraSettings->back();
-        physicalCameraSetting.id = e.id.c_str();
+        physicalCameraSetting.id = e.id;
 
         // Read the settings either from the fmq or straightaway from the
         // request. We don't need any synchronization, since submitRequestList

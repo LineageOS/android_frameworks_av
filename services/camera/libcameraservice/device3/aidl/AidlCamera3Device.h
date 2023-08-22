@@ -39,7 +39,7 @@ class AidlCamera3Device :
     using AidlRequestMetadataQueue = AidlMessageQueue<int8_t, SynchronizedReadWrite>;
     class AidlCameraDeviceCallbacks;
     friend class AidlCameraDeviceCallbacks;
-    explicit AidlCamera3Device(const String8& id, bool overrideForPerfClass, bool overrideToPortrait,
+    explicit AidlCamera3Device(const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
             bool legacyClient = false);
 
     virtual ~AidlCamera3Device() { }
@@ -69,7 +69,7 @@ class AidlCamera3Device :
     virtual status_t switchToOffline(const std::vector<int32_t>& /*streamsToKeep*/,
             /*out*/ sp<CameraOfflineSessionBase>* /*session*/) override;
 
-    status_t initialize(sp<CameraProviderManager> manager, const String8& monitorTags) override;
+    status_t initialize(sp<CameraProviderManager> manager, const std::string& monitorTags) override;
     class AidlHalInterface : public Camera3Device::HalInterface {
      public:
         AidlHalInterface(std::shared_ptr<
@@ -191,7 +191,7 @@ class AidlCamera3Device :
      public:
         // Initialize the injection camera and generate an hal interface.
         status_t injectionInitialize(
-                const String8& injectedCamId, sp<CameraProviderManager> manager,
+                const std::string& injectedCamId, sp<CameraProviderManager> manager,
                 const std::shared_ptr<
                     aidl::android::hardware::camera::device::ICameraDeviceCallback>&
                     callback);
@@ -252,7 +252,7 @@ class AidlCamera3Device :
     };
 
   private:
-    virtual status_t injectionCameraInitialize(const String8 &injectCamId,
+    virtual status_t injectionCameraInitialize(const std::string &injectCamId,
             sp<CameraProviderManager> manager) override;
 
     virtual sp<RequestThread> createNewRequestThread(wp<Camera3Device> parent,

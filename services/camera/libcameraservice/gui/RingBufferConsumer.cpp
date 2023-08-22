@@ -23,6 +23,7 @@
 #include <utils/Log.h>
 
 #include <gui/RingBufferConsumer.h>
+#include <camera/StringUtils.h>
 
 #define BI_LOGV(x, ...) ALOGV("[%s] " x, mName.string(), ##__VA_ARGS__)
 #define BI_LOGD(x, ...) ALOGD("[%s] " x, mName.string(), ##__VA_ARGS__)
@@ -53,10 +54,10 @@ RingBufferConsumer::RingBufferConsumer(const sp<IGraphicBufferConsumer>& consume
 RingBufferConsumer::~RingBufferConsumer() {
 }
 
-void RingBufferConsumer::setName(const String8& name) {
+void RingBufferConsumer::setName(const std::string& name) {
     Mutex::Autolock _l(mMutex);
-    mName = name;
-    mConsumer->setConsumerName(name);
+    mName = toString8(name);
+    mConsumer->setConsumerName(mName);
 }
 
 sp<PinnedBufferItem> RingBufferConsumer::pinSelectedBuffer(

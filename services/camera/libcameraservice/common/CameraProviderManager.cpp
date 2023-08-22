@@ -40,6 +40,7 @@
 #include <cutils/properties.h>
 #include <hwbinder/IPCThreadState.h>
 #include <utils/Trace.h>
+#include <camera/StringUtils.h>
 
 #include "api2/HeicCompositeStream.h"
 #include "device3/ZoomRatioMapper.h"
@@ -138,7 +139,7 @@ status_t CameraProviderManager::tryToAddAidlProvidersLocked() {
             String16(aidlHalServiceDescriptor));
     for (const auto &aidlInstance : aidlProviders) {
         std::string aidlServiceName =
-                getFullAidlProviderName(std::string(String8(aidlInstance).c_str()));
+                getFullAidlProviderName(toStdString(aidlInstance));
         auto res = sm->registerForNotifications(String16(aidlServiceName.c_str()), this);
         if (res != OK) {
             ALOGE("%s Unable to register for notifications with AIDL service manager",
@@ -757,14 +758,14 @@ void CameraProviderManager::saveRef(DeviceMode usageType, const std::string &cam
         primaryMap = &mCameraProviderByCameraId;
         alternateMap = &mTorchProviderByCameraId;
     }
-    auto id = cameraId.c_str();
-    (*primaryMap)[id] = provider;
-    auto search = alternateMap->find(id);
+
+    (*primaryMap)[cameraId] = provider;
+    auto search = alternateMap->find(cameraId);
     if (search != alternateMap->end()) {
         ALOGW("%s: Camera device %s is using both torch mode and camera mode simultaneously. "
-                "That should not be possible", __FUNCTION__, id);
+                "That should not be possible", __FUNCTION__, cameraId.c_str());
     }
-    ALOGV("%s: Camera device %s connected", __FUNCTION__, id);
+    ALOGV("%s: Camera device %s connected", __FUNCTION__, cameraId.c_str());
 }
 
 void CameraProviderManager::removeRef(DeviceMode usageType, const std::string &cameraId) {
@@ -779,7 +780,7 @@ void CameraProviderManager::removeRef(DeviceMode usageType, const std::string &c
         providerMap = &mCameraProviderByCameraId;
     }
     std::lock_guard<std::mutex> lock(mProviderInterfaceMapLock);
-    auto search = providerMap->find(cameraId.c_str());
+    auto search = providerMap->find(cameraId);
     if (search != providerMap->end()) {
         // Drop the reference to this ICameraProvider. This is safe to do immediately (without an
         // added delay) because hwservicemanager guarantees to hold the reference for at least five
@@ -788,7 +789,7 @@ void CameraProviderManager::removeRef(DeviceMode usageType, const std::string &c
         // restart it. An example when this could happen is switching from a front-facing to a
         // rear-facing camera. If the HAL were to exit during the camera switch, the camera could
         // appear janky to the user.
-        providerMap->erase(cameraId.c_str());
+        providerMap->erase(cameraId);
         IPCThreadState::self()->flushCommands();
     } else {
         ALOGE("%s: Asked to remove reference for camera %s, but no reference to it was found. This "
@@ -806,7 +807,7 @@ void CameraProviderManager::onServiceRegistration(const String16 &name, const sp
     {
         std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-        res = addAidlProviderLocked(String8(name).c_str());
+        res = addAidlProviderLocked(toStdString(name));
     }
 
     sp<StatusListener> listener = getStatusListener();
@@ -1797,14 +1798,14 @@ status_t CameraProviderManager::addHidlProviderLocked(const std::string& newProv
 status_t CameraProviderManager::removeProvider(const std::string& provider) {
     std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
     std::unique_lock<std::mutex> lock(mInterfaceMutex);
-    std::vector<String8> removedDeviceIds;
+    std::vector<std::string> removedDeviceIds;
     status_t res = NAME_NOT_FOUND;
     std::string removedProviderName;
     for (auto it = mProviders.begin(); it != mProviders.end(); it++) {
         if ((*it)->mProviderInstance == provider) {
             removedDeviceIds.reserve((*it)->mDevices.size());
             for (auto& deviceInfo : (*it)->mDevices) {
-                removedDeviceIds.push_back(String8(deviceInfo->mId.c_str()));
+                removedDeviceIds.push_back(deviceInfo->mId);
             }
             removedProviderName = (*it)->mProviderName;
             mProviders.erase(it);
@@ -1944,7 +1945,7 @@ status_t CameraProviderManager::ProviderInfo::addDevice(
     return OK;
 }
 
-void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
+void CameraProviderManager::ProviderInfo::removeDevice(const std::string &id) {
     for (auto it = mDevices.begin(); it != mDevices.end(); it++) {
         if ((*it)->mId == id) {
             mUniqueCameraIds.erase(id);
@@ -1984,8 +1985,7 @@ void CameraProviderManager::ProviderInfo::removeAllDevices() {
             ALOGV("%s: notify device not_present: %s",
                   __FUNCTION__,
                   deviceName.c_str());
-            listener->onDeviceStatusChanged(String8(id.c_str()),
-                                            CameraDeviceStatus::NOT_PRESENT);
+            listener->onDeviceStatusChanged(id, CameraDeviceStatus::NOT_PRESENT);
             mLock.lock();
         }
     }
@@ -2086,8 +2086,7 @@ void CameraProviderManager::ProviderInfo::cameraDeviceStatusChangeInternal(
     CameraDeviceStatus internalNewStatus = newStatus;
     if (!mInitialized) {
         mCachedStatus.emplace_back(false /*isPhysicalCameraStatus*/,
-                cameraDeviceName.c_str(), std::string().c_str(),
-                internalNewStatus);
+                cameraDeviceName, std::string(), internalNewStatus);
         return;
     }
 
@@ -2101,7 +2100,7 @@ void CameraProviderManager::ProviderInfo::cameraDeviceStatusChangeInternal(
 
     // Call without lock held to allow reentrancy into provider manager
     if (listener != nullptr) {
-        listener->onDeviceStatusChanged(String8(id.c_str()), internalNewStatus);
+        listener->onDeviceStatusChanged(id, internalNewStatus);
     }
 }
 
@@ -2177,8 +2176,7 @@ void CameraProviderManager::ProviderInfo::physicalCameraDeviceStatusChangeIntern
     }
     // Call without lock held to allow reentrancy into provider manager
     if (listener != nullptr) {
-        listener->onDeviceStatusChanged(String8(id.c_str()),
-                String8(physicalId.c_str()), newStatus);
+        listener->onDeviceStatusChanged(id, physicalId, newStatus);
     }
     return;
 }
@@ -2229,7 +2227,7 @@ status_t CameraProviderManager::ProviderInfo::physicalCameraDeviceStatusChangeLo
     }
 
     *id = cameraId;
-    *physicalId = physicalCameraDeviceName.c_str();
+    *physicalId = physicalCameraDeviceName;
     return OK;
 }
 
@@ -2273,7 +2271,7 @@ void CameraProviderManager::ProviderInfo::torchModeStatusChangeInternal(
     // findDeviceInfo, which should be holding mLock while iterating through
     // each provider's devices).
     if (listener != nullptr) {
-        listener->onTorchStatusChanged(String8(id.c_str()), newStatus, systemCameraKind);
+        listener->onTorchStatusChanged(id, newStatus, systemCameraKind);
     }
     return;
 }

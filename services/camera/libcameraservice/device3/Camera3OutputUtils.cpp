@@ -43,6 +43,7 @@
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
 
 #include <camera/CameraUtils.h>
+#include <camera/StringUtils.h>
 #include <camera_metadata_hidden.h>
 
 #include "device3/Camera3OutputUtils.h"
@@ -189,16 +190,16 @@ void sendPartialCaptureResult(CaptureOutputStates& states,
     // and RotationAndCrop mappers.
     std::set<uint32_t> keysToRemove;
 
-    auto iter = states.distortionMappers.find(states.cameraId.c_str());
+    auto iter = states.distortionMappers.find(states.cameraId);
     if (iter != states.distortionMappers.end()) {
         const auto& remappedKeys = iter->second.getRemappedKeys();
         keysToRemove.insert(remappedKeys.begin(), remappedKeys.end());
     }
 
-    const auto& remappedKeys = states.zoomRatioMappers[states.cameraId.c_str()].getRemappedKeys();
+    const auto& remappedKeys = states.zoomRatioMappers[states.cameraId].getRemappedKeys();
     keysToRemove.insert(remappedKeys.begin(), remappedKeys.end());
 
-    auto mapper = states.rotateAndCropMappers.find(states.cameraId.c_str());
+    auto mapper = states.rotateAndCropMappers.find(states.cameraId);
     if (mapper != states.rotateAndCropMappers.end()) {
         const auto& remappedKeys = iter->second.getRemappedKeys();
         keysToRemove.insert(remappedKeys.begin(), remappedKeys.end());
@@ -282,14 +283,14 @@ void sendCaptureResult(
                 physicalMetadata.mPhysicalCameraMetadata.find(ANDROID_SENSOR_TIMESTAMP);
         if (timestamp.count == 0) {
             SET_ERR("No timestamp provided by HAL for physical camera %s frame %d!",
-                    String8(physicalMetadata.mPhysicalCameraId).c_str(), frameNumber);
+                    physicalMetadata.mPhysicalCameraId.c_str(), frameNumber);
             return;
         }
     }
 
     // Fix up some result metadata to account for HAL-level distortion correction
     status_t res = OK;
-    auto iter = states.distortionMappers.find(states.cameraId.c_str());
+    auto iter = states.distortionMappers.find(states.cameraId);
     if (iter != states.distortionMappers.end()) {
         res = iter->second.correctCaptureResult(&captureResult.mMetadata);
         if (res != OK) {
@@ -301,8 +302,8 @@ void sendCaptureResult(
 
     // Fix up result metadata to account for zoom ratio availabilities between
     // HAL and app.
-    bool zoomRatioIs1 = cameraIdsWithZoom.find(states.cameraId.c_str()) == cameraIdsWithZoom.end();
-    res = states.zoomRatioMappers[states.cameraId.c_str()].updateCaptureResult(
+    bool zoomRatioIs1 = cameraIdsWithZoom.find(states.cameraId) == cameraIdsWithZoom.end();
+    res = states.zoomRatioMappers[states.cameraId].updateCaptureResult(
             &captureResult.mMetadata, zoomRatioIs1);
     if (res != OK) {
         SET_ERR("Failed to update capture result zoom ratio metadata for frame %d: %s (%d)",
@@ -312,7 +313,7 @@ void sendCaptureResult(
 
     // Fix up result metadata to account for rotateAndCrop in AUTO mode
     if (rotateAndCropAuto) {
-        auto mapper = states.rotateAndCropMappers.find(states.cameraId.c_str());
+        auto mapper = states.rotateAndCropMappers.find(states.cameraId);
         if (mapper != states.rotateAndCropMappers.end()) {
             res = mapper->second.updateCaptureResult(
                     &captureResult.mMetadata);
@@ -325,8 +326,8 @@ void sendCaptureResult(
     }
 
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
-        String8 cameraId8(physicalMetadata.mPhysicalCameraId);
-        auto mapper = states.distortionMappers.find(cameraId8.c_str());
+        const std::string cameraId = physicalMetadata.mPhysicalCameraId;
+        auto mapper = states.distortionMappers.find(cameraId);
         if (mapper != states.distortionMappers.end()) {
             res = mapper->second.correctCaptureResult(
                     &physicalMetadata.mPhysicalCameraMetadata);
@@ -337,12 +338,12 @@ void sendCaptureResult(
             }
         }
 
-        zoomRatioIs1 = cameraIdsWithZoom.find(cameraId8.c_str()) == cameraIdsWithZoom.end();
-        res = states.zoomRatioMappers[cameraId8.c_str()].updateCaptureResult(
+        zoomRatioIs1 = cameraIdsWithZoom.find(cameraId) == cameraIdsWithZoom.end();
+        res = states.zoomRatioMappers[cameraId].updateCaptureResult(
                 &physicalMetadata.mPhysicalCameraMetadata, zoomRatioIs1);
         if (res != OK) {
             SET_ERR("Failed to update camera %s's physical zoom ratio metadata for "
-                    "frame %d: %s(%d)", cameraId8.c_str(), frameNumber, strerror(-res), res);
+                    "frame %d: %s(%d)", cameraId.c_str(), frameNumber, strerror(-res), res);
             return;
         }
     }
@@ -354,9 +355,9 @@ void sendCaptureResult(
         return;
     }
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
-        String8 cameraId8(physicalMetadata.mPhysicalCameraId);
+        const std::string &cameraId = physicalMetadata.mPhysicalCameraId;
         res = fixupMonochromeTags(states,
-                states.physicalDeviceInfoMap.at(cameraId8.c_str()),
+                states.physicalDeviceInfoMap.at(cameraId),
                 physicalMetadata.mPhysicalCameraMetadata);
         if (res != OK) {
             SET_ERR("Failed to override result metadata: %s (%d)", strerror(-res), res);
@@ -366,7 +367,7 @@ void sendCaptureResult(
 
     std::unordered_map<std::string, CameraMetadata> monitoredPhysicalMetadata;
     for (auto& m : physicalMetadatas) {
-        monitoredPhysicalMetadata.emplace(String8(m.mPhysicalCameraId).string(),
+        monitoredPhysicalMetadata.emplace(m.mPhysicalCameraId,
                 CameraMetadata(m.mPhysicalCameraMetadata));
     }
     states.tagMonitor.monitorMetadata(TagMonitor::RESULT,
@@ -452,7 +453,7 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
 
 // Erase the subset of physicalCameraIds that contains id
 bool erasePhysicalCameraIdSet(
-        std::set<std::set<String8>>& physicalCameraIds, const String8& id) {
+        std::set<std::set<std::string>>& physicalCameraIds, const std::string& id) {
     bool found = false;
     for (auto iter = physicalCameraIds.begin(); iter != physicalCameraIds.end(); iter++) {
         if (iter->count(id) == 1) {
@@ -610,7 +611,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                 return;
             }
             for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
-                String8 physicalId(result->physcam_ids[i]);
+                const std::string physicalId = result->physcam_ids[i];
                 bool validPhysicalCameraMetadata =
                         erasePhysicalCameraIdSet(request.physicalCameraIds, physicalId);
                 if (!validPhysicalCameraMetadata) {
@@ -666,7 +667,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
             for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
                 CameraMetadata physicalMetadata;
                 physicalMetadata.append(result->physcam_metadata[i]);
-                request.physicalMetadatas.push_back({String16(result->physcam_ids[i]),
+                request.physicalMetadatas.push_back({result->physcam_ids[i],
                         physicalMetadata});
             }
             if (shutterTimestamp == 0) {
@@ -892,7 +893,7 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
             }
             if (r.hasCallback) {
                 ALOGVV("Camera %s: %s: Shutter fired for frame %d (id %d) at %" PRId64,
-                    states.cameraId.string(), __FUNCTION__,
+                    states.cameraId.c_str(), __FUNCTION__,
                     msg.frame_number, r.resultExtras.requestId, msg.timestamp);
                 // Call listener, if any
                 if (states.listener != nullptr) {
@@ -947,15 +948,15 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
             hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_INVALID_ERROR;
 
     int streamId = 0;
-    String16 physicalCameraId;
+    std::string physicalCameraId;
     if (msg.error_stream != nullptr) {
         Camera3Stream *stream =
                 Camera3Stream::cast(msg.error_stream);
         streamId = stream->getId();
-        physicalCameraId = String16(stream->physicalCameraId());
+        physicalCameraId = stream->physicalCameraId();
     }
     ALOGV("Camera %s: %s: HAL error, frame %d, stream %d: %d",
-            states.cameraId.string(), __FUNCTION__, msg.frame_number,
+            states.cameraId.c_str(), __FUNCTION__, msg.frame_number,
             streamId, msg.error_code);
 
     CaptureResultExtras resultExtras;
@@ -977,13 +978,12 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
                     if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT ==
                             errorCode) {
                         if (physicalCameraId.size() > 0) {
-                            String8 cameraId(physicalCameraId);
                             bool validPhysicalCameraId =
-                                    erasePhysicalCameraIdSet(r.physicalCameraIds, cameraId);
+                                    erasePhysicalCameraIdSet(r.physicalCameraIds, physicalCameraId);
                             if (!validPhysicalCameraId) {
                                 ALOGE("%s: Reported result failure for physical camera device: %s "
                                         " which is not part of the respective request!",
-                                        __FUNCTION__, cameraId.string());
+                                        __FUNCTION__, physicalCameraId.c_str());
                                 break;
                             }
                             resultExtras.errorPhysicalCameraId = physicalCameraId;
@@ -1008,7 +1008,7 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
                 } else {
                     resultExtras.frameNumber = msg.frame_number;
                     ALOGE("Camera %s: %s: cannot find in-flight request on "
-                            "frame %" PRId64 " error", states.cameraId.string(), __FUNCTION__,
+                            "frame %" PRId64 " error", states.cameraId.c_str(), __FUNCTION__,
                             resultExtras.frameNumber);
                 }
             }
@@ -1017,7 +1017,7 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
                 states.listener->notifyError(errorCode, resultExtras);
             } else {
                 ALOGE("Camera %s: %s: no listener available",
-                        states.cameraId.string(), __FUNCTION__);
+                        states.cameraId.c_str(), __FUNCTION__);
             }
             break;
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER:

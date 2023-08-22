@@ -20,7 +20,6 @@
 #include <list>
 
 #include <utils/RefBase.h>
-#include <utils/String8.h>
 #include <utils/String16.h>
 #include <utils/Vector.h>
 #include <utils/KeyedVector.h>
@@ -99,11 +98,12 @@ class CameraDeviceBase : public virtual FrameProducer {
      */
     virtual metadata_vendor_id_t getVendorTagId() const = 0;
 
-    virtual status_t initialize(sp<CameraProviderManager> manager, const String8& monitorTags) = 0;
+    virtual status_t initialize(sp<CameraProviderManager> manager,
+            const std::string& monitorTags) = 0;
     virtual status_t disconnect() = 0;
 
     virtual status_t dump(int fd, const Vector<String16> &args) = 0;
-    virtual status_t startWatchingTags(const String8 &tags) = 0;
+    virtual status_t startWatchingTags(const std::string &tags) = 0;
     virtual status_t stopWatchingTags() = 0;
     virtual status_t dumpWatchedEventsToVector(std::vector<std::string> &out) = 0;
 
@@ -111,7 +111,7 @@ class CameraDeviceBase : public virtual FrameProducer {
      * The physical camera device's static characteristics metadata buffer, or
      * the logical camera's static characteristics if physical id is empty.
      */
-    virtual const CameraMetadata& infoPhysical(const String8& physicalId) const = 0;
+    virtual const CameraMetadata& infoPhysical(const std::string& physicalId) const = 0;
 
     struct PhysicalCameraSettings {
         std::string cameraId;
@@ -183,7 +183,7 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
-            const String8& physicalCameraId,
+            const std::string& physicalCameraId,
             const std::unordered_set<int32_t>  &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
@@ -204,7 +204,7 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
-            const String8& physicalCameraId,
+            const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
@@ -476,7 +476,7 @@ class CameraDeviceBase : public virtual FrameProducer {
      * The injection camera session to replace the internal camera
      * session.
      */
-    virtual status_t injectCamera(const String8& injectedCamId,
+    virtual status_t injectCamera(const std::string& injectedCamId,
             sp<CameraProviderManager> manager) = 0;
 
     /**

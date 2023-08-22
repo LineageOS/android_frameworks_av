@@ -30,6 +30,7 @@
 #include <ui/GraphicBuffer.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
+#include <camera/StringUtils.h>
 
 #include <common/CameraDeviceBase.h>
 #include "api1/client2/JpegProcessor.h"
@@ -52,7 +53,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
-        nsecs_t timestampOffset, const String8& physicalCameraId,
+        nsecs_t timestampOffset, const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
@@ -87,7 +88,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, size_t maxSize, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
-        nsecs_t timestampOffset, const String8& physicalCameraId,
+        nsecs_t timestampOffset, const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
@@ -127,7 +128,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
         camera_stream_rotation_t rotation, nsecs_t timestampOffset,
-        const String8& physicalCameraId,
+        const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
@@ -163,7 +164,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mState = STATE_ERROR;
     }
 
-    mConsumerName = String8("Deferred");
+    mConsumerName = "Deferred";
     bool needsReleaseNotify = setId > CAMERA3_STREAM_SET_ID_INVALID;
     mBufferProducerListener = new BufferProducerListener(this, needsReleaseNotify);
 }
@@ -173,7 +174,7 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
                                          int format,
                                          android_dataspace dataSpace,
                                          camera_stream_rotation_t rotation,
-                                         const String8& physicalCameraId,
+                                         const std::string& physicalCameraId,
                                          const std::unordered_set<int32_t> &sensorPixelModesUsed,
                                          IPCTransport transport,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
@@ -522,10 +523,10 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
 }
 
 void Camera3OutputStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
-    String8 lines;
-    lines.appendFormat("    Stream[%d]: Output\n", mId);
-    lines.appendFormat("      Consumer name: %s\n", mConsumerName.string());
-    write(fd, lines.string(), lines.size());
+    std::string lines;
+    lines += fmt::sprintf("    Stream[%d]: Output\n", mId);
+    lines += fmt::sprintf("      Consumer name: %s\n", mConsumerName);
+    write(fd, lines.c_str(), lines.size());
 
     Camera3IOStreamBase::dump(fd, args);
 
@@ -709,7 +710,8 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
             // service. So update mMaxCachedBufferCount.
             mMaxCachedBufferCount = 1;
             mTotalBufferCount += mMaxCachedBufferCount;
-            res = mPreviewFrameSpacer->run(String8::format("PreviewSpacer-%d", mId).string());
+            res = mPreviewFrameSpacer->run((std::string("PreviewSpacer-")
+                    + std::to_string(mId)).c_str());
             if (res != OK) {
                 ALOGE("%s: Unable to start preview spacer", __FUNCTION__);
                 return res;
@@ -1236,7 +1238,7 @@ status_t Camera3OutputStream::dropBuffers(bool dropping) {
     return OK;
 }
 
-const String8& Camera3OutputStream::getPhysicalCameraId() const {
+const std::string& Camera3OutputStream::getPhysicalCameraId() const {
     Mutex::Autolock l(mLock);
     return physicalCameraId();
 }
@@ -1340,7 +1342,7 @@ void Camera3OutputStream::dumpImageToDisk(nsecs_t timestamp,
     // Output image data to file
     std::string filePath = "/data/misc/cameraserver/";
     filePath += imageFileName;
-    std::ofstream imageFile(filePath.c_str(), std::ofstream::binary);
+    std::ofstream imageFile(filePath, std::ofstream::binary);
     if (!imageFile.is_open()) {
         ALOGE("%s: Unable to create file %s", __FUNCTION__, filePath.c_str());
         graphicBuffer->unlock();
