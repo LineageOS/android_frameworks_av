@@ -17,6 +17,25 @@
 
 #pragma once
 
+// ADD_BATTERY_DATA AUDIO_WATCHDOG FAST_THREAD_STATISTICS STATE_QUEUE_DUMP TEE_SINK
+#include "Configuration.h"
+#include "IAfThread.h"
+#include "IAfTrack.h"
+
+#include <android-base/macros.h>  // DISALLOW_COPY_AND_ASSIGN
+#include <android/os/IPowerManager.h>
+#include <afutils/AudioWatchdog.h>
+#include <afutils/NBAIO_Tee.h>
+#include <audio_utils/Balance.h>
+#include <audio_utils/SimpleLog.h>
+#include <datapath/ThreadMetrics.h>
+#include <fastpath/FastCapture.h>
+#include <fastpath/FastMixer.h>
+#include <mediautils/Synchronization.h>
+#include <mediautils/ThreadSnapshot.h>
+#include <timing/MonotonicFrameCounter.h>
+#include <utils/Log.h>
+
 namespace android {
 
 class AsyncCallbackThread;
