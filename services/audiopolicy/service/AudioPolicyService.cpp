@@ -226,7 +226,6 @@ int getTargetSdkForPackageName(std::string_view packageName) {
         if (pm != nullptr) {
             const auto status = pm->getTargetSdkVersionForPackage(
                     String16{packageName.data(), packageName.size()}, &targetSdk);
-            ALOGI("Capy check package %s, sdk %d", packageName.data(), targetSdk);
             return status.isOk() ? targetSdk : -1;
         }
     }
