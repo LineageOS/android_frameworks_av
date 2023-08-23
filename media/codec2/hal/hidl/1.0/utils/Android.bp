@@ -19,7 +19,6 @@ cc_library {
     ],
 
     header_libs: [
-        "libcodec2_hal_common",
         "libcodec2_internal", // private
     ],
 
@@ -28,6 +27,7 @@ cc_library {
         "android.hardware.media.c2@1.0",
         "libbase",
         "libcodec2",
+        "libcodec2_hal_common",
         "libcodec2_vndk",
         "libcutils",
         "libgui",
@@ -45,6 +45,7 @@ cc_library {
     export_shared_lib_headers: [
         "android.hardware.media.c2@1.0",
         "libcodec2",
+        "libcodec2_hal_common",
         "libgui",
         "libstagefright_bufferpool@2.0.1",
         "libui",
@@ -78,7 +79,6 @@ cc_library {
 
     header_libs: [
         "libbinder_headers",
-        "libcodec2_hal_common",
         "libcodec2_internal", // private
         "libsystem_headers",
     ],
@@ -93,8 +93,9 @@ cc_library {
         "android.hardware.media.omx@1.0",
         "libbase",
         "libcodec2",
-        "libcodec2_vndk",
+        "libcodec2_hal_common",
         "libcodec2_hidl_plugin_stub",
+        "libcodec2_vndk",
         "libcutils",
         "libhidlbase",
         "liblog",
@@ -130,6 +131,7 @@ cc_library {
     export_shared_lib_headers: [
         "android.hardware.media.c2@1.0",
         "libcodec2",
+        "libcodec2_hal_common",
         "libcodec2_vndk",
         "libhidlbase",
         "libstagefright_bufferpool@2.0.1",

@@ -173,6 +173,7 @@ cc_defaults {
         "libbase", // for C2_LOG
         "liblog", // for ALOG
         "libcodec2",
+        "libcodec2_hal_common",
         "libcodec2_vndk",
         "libutils",
     ],
