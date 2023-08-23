@@ -166,7 +166,7 @@ sp<hardware::ICameraService> CameraManagerGlobal::getCameraServiceLocked() {
                 } else {
                     VendorTagDescriptorCache::clearGlobalVendorTagCache();
                     ALOGE("%s: Failed to setup vendor tag cache: %s",
-                            __FUNCTION__, res.toString8().string());
+                            __FUNCTION__, res.toString8().c_str());
                 }
             }
         } else if (ret.serviceSpecificErrorCode() ==
@@ -176,7 +176,7 @@ sp<hardware::ICameraService> CameraManagerGlobal::getCameraServiceLocked() {
             VendorTagDescriptor::clearGlobalVendorTagDescriptor();
         } else {
             ALOGE("%s: Failed to get vendor tag descriptors: %s",
-                    __FUNCTION__, ret.toString8().string());
+                    __FUNCTION__, ret.toString8().c_str());
         }
     }
     ALOGE_IF(mCameraService == nullptr, "no CameraService!?");
@@ -707,7 +707,7 @@ camera_status_t ACameraManager::getCameraCharacteristics(
                 return ACAMERA_ERROR_INVALID_PARAMETER;
             default:
                 ALOGE("Get camera characteristics from camera service failed: %s",
-                        serviceRet.toString8().string());
+                        serviceRet.toString8().c_str());
                 return ACAMERA_ERROR_UNKNOWN; // should not reach here
         }
     }
@@ -751,7 +751,7 @@ ACameraManager::openCamera(
             targetSdkVersion, /*overrideToPortrait*/false, /*out*/&deviceRemote);
 
     if (!serviceRet.isOk()) {
-        ALOGE("%s: connect camera device failed: %s", __FUNCTION__, serviceRet.toString8().string());
+        ALOGE("%s: connect camera device failed: %s", __FUNCTION__, serviceRet.toString8().c_str());
         // Convert serviceRet to camera_status_t
         switch(serviceRet.serviceSpecificErrorCode()) {
             case hardware::ICameraService::ERROR_DISCONNECTED:
