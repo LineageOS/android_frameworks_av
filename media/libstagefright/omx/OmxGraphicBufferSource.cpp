@@ -86,6 +86,18 @@ status_t OmxGraphicBufferSource::configure(
         uint32_t frameWidth,
         uint32_t frameHeight,
         uint32_t consumerUsage) {
+    uint64_t consumerUsage64 = static_cast<uint64_t>(consumerUsage);
+    return configure(omxNode, dataSpace, bufferCount,
+                     frameWidth, frameHeight, consumerUsage64);
+}
+
+status_t OmxGraphicBufferSource::configure(
+        const sp<IOmxNodeWrapper>& omxNode,
+        int32_t dataSpace,
+        int32_t bufferCount,
+        uint32_t frameWidth,
+        uint32_t frameHeight,
+        uint64_t consumerUsage) {
     if (omxNode == NULL) {
         return BAD_VALUE;
     }

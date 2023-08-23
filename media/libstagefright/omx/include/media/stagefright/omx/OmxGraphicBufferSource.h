@@ -63,7 +63,9 @@ public:
     // ------------------------------
 
     // Configure the buffer source to be used with an OMX node with the default
-    // data space.
+    // data space.(32-bit consumerUsage flag, for vendor partition
+    // compatibility)
+    [[deprecated("use configure() with a 64-bit consumerUsage flag instead")]]
     status_t configure(
         const sp<IOmxNodeWrapper> &omxNode,
         int32_t dataSpace,
@@ -71,6 +73,16 @@ public:
         uint32_t frameWidth,
         uint32_t frameHeight,
         uint32_t consumerUsage);
+
+    // Configure the buffer source to be used with an OMX node with the default
+    // data space. (64-bit consumerUsage flag)
+    status_t configure(
+        const sp<IOmxNodeWrapper> &omxNode,
+        int32_t dataSpace,
+        int32_t bufferCount,
+        uint32_t frameWidth,
+        uint32_t frameHeight,
+        uint64_t consumerUsage);
 
     // Rest of the interface in GraphicBufferSource.
 

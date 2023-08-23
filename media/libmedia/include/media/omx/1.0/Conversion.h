@@ -606,8 +606,16 @@ inline void wrapAs(AnwBuffer* t, GraphicBuffer const& l) {
     t->attr.height = l.getHeight();
     t->attr.stride = l.getStride();
     t->attr.format = static_cast<PixelFormat>(l.getPixelFormat());
-    t->attr.layerCount = l.getLayerCount();
-    t->attr.usage = l.getUsage();
+    // HACK
+    // anwBuffer.layerCount 8 bytes : GraphicBuffer::layerCount 4 bytes
+    // anwBuffer.usage      4 bytes : GraphicBuffer::usage      8 bytes
+    // We would like to retain high part of usage with high part of layerCount
+    uint64_t usage = l.getUsage();
+    uint32_t usageHigh = (usage >> 32);
+    uint32_t usageLow = (0xFFFFFFFF & usage);
+    uint32_t layerLow = l.getLayerCount();
+    t->attr.layerCount = ((uint64_t(usageHigh) << 32) | layerLow);
+    t->attr.usage = usageLow;
     t->attr.id = l.getId();
     t->attr.generationNumber = l.getGenerationNumber();
     t->nativeHandle = hidl_handle(l.handle);
@@ -637,30 +645,37 @@ inline bool convertTo(GraphicBuffer* l, AnwBuffer const& t) {
         }
     }
 
-    size_t const numInts = 12 + (handle ? handle->numInts : 0);
+    size_t const numInts = 13 + (handle ? handle->numInts : 0);
     int32_t* ints = new int32_t[numInts];
 
     size_t numFds = static_cast<size_t>(handle ? handle->numFds : 0);
     int* fds = new int[numFds];
 
-    ints[0] = 'GBFR';
+    ints[0] = 'GB01';
     ints[1] = static_cast<int32_t>(t.attr.width);
     ints[2] = static_cast<int32_t>(t.attr.height);
     ints[3] = static_cast<int32_t>(t.attr.stride);
     ints[4] = static_cast<int32_t>(t.attr.format);
-    ints[5] = static_cast<int32_t>(t.attr.layerCount);
+    // HACK
+    // anwBuffer.layerCount 8 bytes : GraphicBuffer::layerCount 4 bytes
+    // anwBuffer.usage      4 bytes : GraphicBuffer::usage      8 bytes
+    // We would like to retain high part of usage with high part of layerCount
+    uint32_t layer = (0xFFFFFFFF & t.attr.layerCount);
+    uint32_t usageHigh = (t.attr.layerCount >> 32);
+    ints[5] = layer;
     ints[6] = static_cast<int32_t>(t.attr.usage);
     ints[7] = static_cast<int32_t>(t.attr.id >> 32);
     ints[8] = static_cast<int32_t>(t.attr.id & 0xFFFFFFFF);
     ints[9] = static_cast<int32_t>(t.attr.generationNumber);
     ints[10] = 0;
     ints[11] = 0;
+    ints[12] = usageHigh;
     if (handle) {
         ints[10] = static_cast<int32_t>(handle->numFds);
         ints[11] = static_cast<int32_t>(handle->numInts);
         int* intsStart = handle->data + handle->numFds;
         std::copy(handle->data, intsStart, fds);
-        std::copy(intsStart, intsStart + handle->numInts, &ints[12]);
+        std::copy(intsStart, intsStart + handle->numInts, &ints[13]);
     }
 
     void const* constBuffer = static_cast<void const*>(ints);
