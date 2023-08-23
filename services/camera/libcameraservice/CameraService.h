@@ -972,15 +972,13 @@ private:
      *
      * This returns the Camera Id to use in case inputCameraId was remapped to a
      * different Id for the given packageName. Otherwise, it returns the inputCameraId.
-     */
-    String8 resolveCameraId(const String8& inputCameraId, const String16& packageName);
-    /**
-     * Resolve the (potentially remapped) camera Id to use.
      *
-     * This returns the Camera Id to use in case inputCameraId was remapped to a
-     * different Id for the packageName of the client. Otherwise, it returns the inputCameraId.
+     * If the packageName is not provided, it will be inferred from the clientUid.
      */
-    String8 resolveCameraId(const String8& inputCameraId);
+    String8 resolveCameraId(
+            const String8& inputCameraId,
+            int clientUid,
+            const String16& packageName = String16(""));
 
     /**
      * Updates the state of mCameraIdRemapping, while disconnecting active clients as necessary.
