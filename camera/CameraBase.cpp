@@ -185,7 +185,7 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
         c->mStatus = NO_ERROR;
     } else {
         ALOGW("An error occurred while connecting to camera %d: %s", cameraId,
-                (cs == nullptr) ? "Service not available" : ret.toString8().string());
+                (cs == nullptr) ? "Service not available" : ret.toString8().c_str());
         c.clear();
     }
     return c;
@@ -270,7 +270,7 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
             &count);
     if (!res.isOk()) {
         ALOGE("Error reading number of cameras: %s",
-                res.toString8().string());
+                res.toString8().c_str());
         count = 0;
     }
     return count;

@@ -163,7 +163,7 @@ CameraDevice::createCaptureRequest(
             templateId);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     } else if (!remoteRet.isOk()) {
-        ALOGE("Create capture request failed: %s", remoteRet.toString8().string());
+        ALOGE("Create capture request failed: %s", remoteRet.toString8().c_str());
         return ACAMERA_ERROR_UNKNOWN;
     }
     ACaptureRequest* outReq = new ACaptureRequest();
@@ -317,22 +317,22 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
         switch (remoteRet.serviceSpecificErrorCode()) {
             case hardware::ICameraService::ERROR_INVALID_OPERATION:
                 ALOGE("Camera device %s invalid operation: %s", getId(),
-                        remoteRet.toString8().string());
+                        remoteRet.toString8().c_str());
                 return ACAMERA_ERROR_INVALID_OPERATION;
                 break;
             case hardware::ICameraService::ERROR_ALREADY_EXISTS:
                 ALOGE("Camera device %s output surface already exists: %s", getId(),
-                        remoteRet.toString8().string());
+                        remoteRet.toString8().c_str());
                 return ACAMERA_ERROR_INVALID_PARAMETER;
                 break;
             case hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT:
                 ALOGE("Camera device %s invalid input argument: %s", getId(),
-                        remoteRet.toString8().string());
+                        remoteRet.toString8().c_str());
                 return ACAMERA_ERROR_INVALID_PARAMETER;
                 break;
             default:
                 ALOGE("Camera device %s failed to add shared output: %s", getId(),
-                        remoteRet.toString8().string());
+                        remoteRet.toString8().c_str());
                 return ACAMERA_ERROR_UNKNOWN;
         }
     }
@@ -546,7 +546,7 @@ CameraDevice::stopRepeatingLocked() {
             ALOGV("Repeating request is already stopped.");
             return ACAMERA_OK;
         } else if (!remoteRet.isOk()) {
-            ALOGE("Stop repeating request fails in remote: %s", remoteRet.toString8().string());
+            ALOGE("Stop repeating request fails in remote: %s", remoteRet.toString8().c_str());
             return ACAMERA_ERROR_UNKNOWN;
         }
         checkRepeatingSequenceCompleteLocked(repeatingSequenceId, lastFrameNumber);
@@ -598,7 +598,7 @@ CameraDevice::flushLocked(ACameraCaptureSession* session) {
     int64_t lastFrameNumber;
     binder::Status remoteRet = mRemote->flush(&lastFrameNumber);
     if (!remoteRet.isOk()) {
-        ALOGE("Abort captures fails in remote: %s", remoteRet.toString8().string());
+        ALOGE("Abort captures fails in remote: %s", remoteRet.toString8().c_str());
         return ACAMERA_ERROR_UNKNOWN;
     }
     if (mRepeatingSequenceId != REQUEST_ID_NONE) {
@@ -622,7 +622,7 @@ CameraDevice::waitUntilIdleLocked() {
 
     binder::Status remoteRet = mRemote->waitUntilIdle();
     if (!remoteRet.isOk()) {
-        ALOGE("Camera device %s waitUntilIdle failed: %s", getId(), remoteRet.toString8().string());
+        ALOGE("Camera device %s waitUntilIdle failed: %s", getId(), remoteRet.toString8().c_str());
         // TODO: define a function to convert status_t -> camera_status_t
         return ACAMERA_ERROR_UNKNOWN;
     }
@@ -732,7 +732,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
 
     binder::Status remoteRet = mRemote->beginConfigure();
     if (!remoteRet.isOk()) {
-        ALOGE("Camera device %s begin configure failed: %s", getId(), remoteRet.toString8().string());
+        ALOGE("Camera device %s begin configure failed: %s", getId(), remoteRet.toString8().c_str());
         return ACAMERA_ERROR_UNKNOWN;
     }
 
@@ -741,7 +741,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         remoteRet = mRemote->deleteStream(streamId);
         if (!remoteRet.isOk()) {
             ALOGE("Camera device %s failed to remove stream %d: %s", getId(), streamId,
-                    remoteRet.toString8().string());
+                    remoteRet.toString8().c_str());
             return ACAMERA_ERROR_UNKNOWN;
         }
         mConfiguredOutputs.erase(streamId);
@@ -753,7 +753,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         remoteRet = mRemote->createStream(outputPair.second, &streamId);
         if (!remoteRet.isOk()) {
             ALOGE("Camera device %s failed to create stream: %s", getId(),
-                    remoteRet.toString8().string());
+                    remoteRet.toString8().c_str());
             return ACAMERA_ERROR_UNKNOWN;
         }
         mConfiguredOutputs.insert(std::make_pair(streamId, outputPair));
@@ -768,10 +768,10 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
             ns2ms(startTimeNs), &offlineStreamIds);
     if (remoteRet.serviceSpecificErrorCode() == hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT) {
         ALOGE("Camera device %s cannnot support app output configuration: %s", getId(),
-                remoteRet.toString8().string());
+                remoteRet.toString8().c_str());
         return ACAMERA_ERROR_STREAM_CONFIGURE_FAIL;
     } else if (!remoteRet.isOk()) {
-        ALOGE("Camera device %s end configure failed: %s", getId(), remoteRet.toString8().string());
+        ALOGE("Camera device %s end configure failed: %s", getId(), remoteRet.toString8().c_str());
         return ACAMERA_ERROR_UNKNOWN;
     }
 
@@ -918,7 +918,7 @@ CameraDevice::onCaptureErrorLocked(
         if (cbh.mIsLogicalCameraCallback) {
             if (resultExtras.errorPhysicalCameraId.size() > 0) {
                 String8 cameraId = toString8(resultExtras.errorPhysicalCameraId);
-                msg->setString(kFailingPhysicalCameraId, cameraId.string(), cameraId.size());
+                msg->setString(kFailingPhysicalCameraId, cameraId.c_str(), cameraId.size());
             }
             msg->setPointer(kCallbackFpKey, (void*) cbh.mOnLogicalCameraCaptureFailed);
         } else {
