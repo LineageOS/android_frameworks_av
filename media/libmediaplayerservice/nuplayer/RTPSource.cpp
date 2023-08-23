@@ -751,9 +751,9 @@ status_t NuPlayer::RTPSource::setParameters(const String8 &params) {
         const char *semicolon_pos = strchr(value_start, ';');
         String8 value;
         if (semicolon_pos == NULL) {
-            value.setTo(value_start);
+            value = value_start;
         } else {
-            value.setTo(value_start, semicolon_pos - value_start);
+            value = String8(value_start, semicolon_pos - value_start);
         }
         if (setParameter(key, value) != OK) {
             return BAD_VALUE;
@@ -796,7 +796,7 @@ void NuPlayer::RTPSource::TrimString(String8 *s) {
         --i;
     }
 
-    s->setTo(String8(&data[leading_space], i - leading_space));
+    *s = String8(&data[leading_space], i - leading_space);
 }
 
 }  // namespace android

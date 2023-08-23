@@ -531,7 +531,7 @@ static void TrimString(String8 *s) {
         --i;
     }
 
-    s->setTo(String8(&data[leading_space], i - leading_space));
+    *s = String8(&data[leading_space], i - leading_space);
 }
 
 status_t StagefrightRecorder::setParamAudioSamplingRate(int32_t sampleRate) {
@@ -825,7 +825,7 @@ status_t StagefrightRecorder::setParamGeoDataLatitude(
 status_t StagefrightRecorder::setParamRtpLocalIp(const String8 &localIp) {
     ALOGV("setParamVideoLocalIp: %s", localIp.c_str());
 
-    mLocalIp.setTo(localIp.c_str());
+    mLocalIp = localIp.c_str();
     return OK;
 }
 
@@ -839,7 +839,7 @@ status_t StagefrightRecorder::setParamRtpLocalPort(int32_t localPort) {
 status_t StagefrightRecorder::setParamRtpRemoteIp(const String8 &remoteIp) {
     ALOGV("setParamVideoRemoteIp: %s", remoteIp.c_str());
 
-    mRemoteIp.setTo(remoteIp.c_str());
+    mRemoteIp = remoteIp.c_str();
     return OK;
 }
 
@@ -932,7 +932,7 @@ status_t StagefrightRecorder::setLogSessionId(const String8 &log_session_id) {
     ALOGV("setLogSessionId: %s", log_session_id.c_str());
 
     // TODO: validity check that log_session_id is a 32-byte hex digit.
-    mLogSessionId.setTo(log_session_id.c_str());
+    mLogSessionId = log_session_id.c_str();
     return OK;
 }
 
@@ -1137,9 +1137,9 @@ status_t StagefrightRecorder::setParameters(const String8 &params) {
         const char *semicolon_pos = strchr(value_start, ';');
         String8 value;
         if (semicolon_pos == NULL) {
-            value.setTo(value_start);
+            value = value_start;
         } else {
-            value.setTo(value_start, semicolon_pos - value_start);
+            value = String8(value_start, semicolon_pos - value_start);
         }
         if (setParameter(key, value) != OK) {
             return BAD_VALUE;
