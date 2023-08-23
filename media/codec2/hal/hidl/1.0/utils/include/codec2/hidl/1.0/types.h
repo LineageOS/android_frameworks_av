@@ -23,6 +23,7 @@
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <android/hardware/media/c2/1.0/types.h>
 #include <android/hidl/safe_union/1.0/types.h>
+#include <codec2/common/BufferPoolSender.h>
 
 #include <C2Component.h>
 #include <C2Param.h>
@@ -42,8 +43,6 @@ namespace V1_0 {
 namespace utils {
 
 using ::android::hardware::hidl_bitfield;
-using ::android::hardware::hidl_handle;
-using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::status_t;
 using ::android::sp;
@@ -134,37 +133,14 @@ bool objcpy(
         std::unique_ptr<C2StructDescriptor>* d,
         const StructDescriptor& s);
 
-// Abstract class to be used in
-// objcpy(std::list<std::unique_ptr<C2Work>> -> WorkBundle).
-struct BufferPoolSender {
-    typedef ::android::hardware::media::bufferpool::V2_0::
-            ResultStatus ResultStatus;
-    typedef ::android::hardware::media::bufferpool::V2_0::
-            BufferStatusMessage BufferStatusMessage;
-    typedef ::android::hardware::media::bufferpool::
-            BufferPoolData BufferPoolData;
-
-    /**
-     * Send bpData and return BufferStatusMessage that can be supplied to
-     * IClientManager::receive() in the receiving process.
-     *
-     * This function will be called from within the function
-     * objcpy(std::list<std::unique_ptr<C2Work>> -> WorkBundle).
-     *
-     * \param[in] bpData BufferPoolData identifying the buffer to send.
-     * \param[out] bpMessage BufferStatusMessage of the transaction. Information
-     *    inside \p bpMessage should be passed to the receiving process by some
-     *    other means so it can call receive() properly.
-     * \return ResultStatus value that determines the success of the operation.
-     *    (See the possible values of ResultStatus in
-     *    hardware/interfaces/media/bufferpool/2.0/types.hal.)
-     */
-    virtual ResultStatus send(
-            const std::shared_ptr<BufferPoolData>& bpData,
-            BufferStatusMessage* bpMessage) = 0;
-
-    virtual ~BufferPoolSender() = default;
+struct BufferPoolTypes {
+    typedef bufferpool::BufferPoolData              BufferPoolData;
+    typedef bufferpool::V2_0::ResultStatus          BufferPoolStatus;
+    typedef bufferpool::V2_0::ResultStatus          ResultStatus;
+    typedef bufferpool::V2_0::BufferStatusMessage   BufferStatusMessage;
 };
+
+typedef ::android::BufferPoolSender<BufferPoolTypes> BufferPoolSender;
 
 // Default implementation of BufferPoolSender.
 //
@@ -198,7 +174,7 @@ struct DefaultBufferPoolSender : BufferPoolSender {
     // Implementation of BufferPoolSender::send(). send() will establish a
     // bufferpool connection if needed, then send the bufferpool data over to
     // the receiving process.
-    virtual ResultStatus send(
+    ResultStatus send(
             const std::shared_ptr<BufferPoolData>& bpData,
             BufferStatusMessage* bpMessage) override;
 
