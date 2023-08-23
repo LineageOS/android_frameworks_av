@@ -1145,7 +1145,7 @@ Status CameraService::initializeShimMetadata(int cameraId) {
             /*targetSdkVersion*/ __ANDROID_API_FUTURE__, /*overrideToPortrait*/ true,
             /*forceSlowJpegMode*/false, /*out*/ tmp)
             ).isOk()) {
-        ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
+        ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().c_str());
     }
     return ret;
 }

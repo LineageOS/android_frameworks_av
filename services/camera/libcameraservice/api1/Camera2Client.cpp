@@ -186,7 +186,7 @@ status_t Camera2Client::initializeImpl(TProviderPtr providerPtr, const std::stri
         SharedParameters::Lock l(mParameters);
         ALOGD("%s: Default parameters converted from camera %d:", __FUNCTION__,
               mCameraId);
-        ALOGD("%s", l.mParameters.paramsFlattened.string());
+        ALOGD("%s", l.mParameters.paramsFlattened.c_str());
     }
 
     return OK;
@@ -245,7 +245,7 @@ status_t Camera2Client::dumpClient(int fd, const Vector<String16>& args) {
         result << fmt::sprintf("    GPS timestamp: %" PRId64 "\n",
                 p.gpsTimestamp);
         result << fmt::sprintf("    GPS processing method: %s\n",
-                p.gpsProcessingMethod.string());
+                p.gpsProcessingMethod.c_str());
     }
 
     result << "    White balance mode: ";
