@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0ebec65e_b826cb32",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 29515
+      },
+      "writtenOn": "2023-08-23T00:45:59Z",
+      "side": 1,
+      "message": "Tested on Lenovo Legion Y70(halo) SM8475, fixed some apps video image stuck only have sound after resume paused video.",
+      "revId": "cdeb6dbfa4bc2c9499f052fc2dfe63d8c6872585",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
