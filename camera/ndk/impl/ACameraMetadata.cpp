@@ -142,7 +142,7 @@ ACameraMetadata::derivePhysicalCameraIds() {
         if (ids[i] == '\0') {
             if (start != i) {
                 mStaticPhysicalCameraIdValues.push_back(String8((const char *)ids+start));
-                mStaticPhysicalCameraIds.push_back(mStaticPhysicalCameraIdValues.back().string());
+                mStaticPhysicalCameraIds.push_back(mStaticPhysicalCameraIdValues.back().c_str());
             }
             start = i+1;
         }
