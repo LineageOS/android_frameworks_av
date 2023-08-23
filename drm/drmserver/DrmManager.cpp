@@ -39,6 +39,7 @@
 #include "ReadWriteUtils.h"
 
 #include <algorithm>
+#include <filesystem>
 
 #define DECRYPT_FILE_ERROR (-1)
 
@@ -114,7 +115,7 @@ void DrmManager::recordEngineMetrics(
     std::unique_ptr<DrmSupportInfo> info(engine.getSupportInfo(0));
 
     uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    std::string plugInId(plugInId8.getPathLeaf().getBasePath().c_str());
+    std::string plugInId = std::filesystem::path(plugInId8.c_str()).stem();
     ALOGV("%d calling %s %s", callingUid, plugInId.c_str(), func);
 
     Mutex::Autolock _l(mMetricsLock);
@@ -316,8 +317,8 @@ bool DrmManager::canHandle(int uniqueId, const String8& path, const String8& mim
             IDrmEngine& rDrmEngine = mPlugInManager.getPlugIn(plugInId);
             result = rDrmEngine.canHandle(uniqueId, path);
         } else {
-            String8 extension = path.getPathExtension();
-            if (String8("") != extension) {
+            const auto extension = std::filesystem::path(path.c_str()).extension();
+            if (!extension.empty()) {
                 result = canHandle(uniqueId, path);
             }
         }
@@ -745,7 +746,7 @@ String8 DrmManager::getSupportedPlugInId(const String8& mimeType) {
 
 String8 DrmManager::getSupportedPlugInIdFromPath(int uniqueId, const String8& path) {
     String8 plugInId("");
-    const String8 fileSuffix = path.getPathExtension();
+    const String8 fileSuffix(std::filesystem::path(path.c_str()).extension().c_str());
 
     for (size_t index = 0; index < mSupportInfoToPlugInIdMap.size(); index++) {
         const DrmSupportInfo& drmSupportInfo = mSupportInfoToPlugInIdMap.keyAt(index);
