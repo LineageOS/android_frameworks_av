@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
-#define LOG_TAG "Codec2-types"
+#ifndef CODEC2_COMMON_BUFFER_TYPES_H
+#define CODEC2_COMMON_BUFFER_TYPES_H
+
+#ifndef LOG_TAG
+#define LOG_TAG "Codec2-BufferTypes"
+#endif
 #include <android-base/logging.h>
 
-#include <codec2/hidl/1.0/types.h>
+#include <codec2/common/BufferPoolSender.h>
+#include <codec2/common/ParamTypes.h>
 #include <media/stagefright/foundation/AUtils.h>
 
 #include <C2AllocatorIon.h>
@@ -28,623 +33,50 @@
 #include <C2Component.h>
 #include <C2FenceFactory.h>
 #include <C2Param.h>
-#include <C2ParamInternal.h>
+#include <C2ParamDef.h>
 #include <C2PlatformSupport.h>
 #include <C2Work.h>
-#include <util/C2ParamUtils.h>
 
 #include <algorithm>
 #include <functional>
 #include <iomanip>
-#include <unordered_map>
+#include <map>
 
 namespace android {
-namespace hardware {
-namespace media {
-namespace c2 {
-namespace V1_0 {
-namespace utils {
 
-using ::android::hardware::Return;
-using ::android::hardware::media::bufferpool::BufferPoolData;
-using ::android::hardware::media::bufferpool::V2_0::BufferStatusMessage;
-using ::android::hardware::media::bufferpool::V2_0::ResultStatus;
-using ::android::hardware::media::bufferpool::V2_0::implementation::
-        ClientManager;
-using ::android::hardware::media::bufferpool::V2_0::implementation::
-        TransactionId;
-
-const char* asString(Status status, const char* def) {
-    return asString(static_cast<c2_status_t>(status), def);
-}
-
-namespace /* unnamed */ {
-
-template <typename EnumClass>
-typename std::underlying_type<EnumClass>::type underlying_value(
-        EnumClass x) {
-    return static_cast<typename std::underlying_type<EnumClass>::type>(x);
-}
-
-template <typename Common, typename DstVector, typename SrcVector>
-void copyVector(DstVector* d, const SrcVector& s) {
-    static_assert(sizeof(Common) == sizeof(decltype((*d)[0])),
-            "DstVector's component size does not match Common");
-    static_assert(sizeof(Common) == sizeof(decltype(s[0])),
-            "SrcVector's component size does not match Common");
-    d->resize(s.size());
-    std::copy(
-            reinterpret_cast<const Common*>(&s[0]),
-            reinterpret_cast<const Common*>(&s[0] + s.size()),
-            reinterpret_cast<Common*>(&(*d)[0]));
-}
-
-// C2ParamField -> ParamField
-bool objcpy(ParamField *d, const C2ParamField &s) {
-    d->index = static_cast<ParamIndex>(_C2ParamInspector::GetIndex(s));
-    d->fieldId.offset = static_cast<uint32_t>(_C2ParamInspector::GetOffset(s));
-    d->fieldId.size = static_cast<uint32_t>(_C2ParamInspector::GetSize(s));
-    return true;
-}
-
-struct C2ParamFieldBuilder : public C2ParamField {
-    C2ParamFieldBuilder() : C2ParamField(
-            static_cast<C2Param::Index>(static_cast<uint32_t>(0)), 0, 0) {
-    }
-    // ParamField -> C2ParamField
-    C2ParamFieldBuilder(const ParamField& s) : C2ParamField(
-            static_cast<C2Param::Index>(static_cast<uint32_t>(s.index)),
-            static_cast<uint32_t>(s.fieldId.offset),
-            static_cast<uint32_t>(s.fieldId.size)) {
-    }
+// Types of metadata for Blocks.
+struct C2Hal_Range {
+    uint32_t offset;
+    uint32_t length; // Do not use "size" because the name collides with C2Info::size().
 };
+typedef C2GlobalParam<C2Info, C2Hal_Range, 0> C2Hal_RangeInfo;
 
-// C2WorkOrdinalStruct -> WorkOrdinal
-bool objcpy(WorkOrdinal *d, const C2WorkOrdinalStruct &s) {
-    d->frameIndex = static_cast<uint64_t>(s.frameIndex.peeku());
-    d->timestampUs = static_cast<uint64_t>(s.timestamp.peeku());
-    d->customOrdinal = static_cast<uint64_t>(s.customOrdinal.peeku());
-    return true;
-}
+struct C2Hal_Rect {
+    uint32_t left;
+    uint32_t top;
+    uint32_t width;
+    uint32_t height;
+};
+typedef C2GlobalParam<C2Info, C2Hal_Rect, 1> C2Hal_RectInfo;
 
-// WorkOrdinal -> C2WorkOrdinalStruct
-bool objcpy(C2WorkOrdinalStruct *d, const WorkOrdinal &s) {
-    d->frameIndex = c2_cntr64_t(s.frameIndex);
-    d->timestamp = c2_cntr64_t(s.timestampUs);
-    d->customOrdinal = c2_cntr64_t(s.customOrdinal);
-    return true;
-}
+// Note: The handle is not cloned.
+template <typename BaseBlock>
+void SetHandle(BaseBlock *baseBlock, const C2Handle *handle);
 
-// C2FieldSupportedValues::range's type -> ValueRange
-bool objcpy(
-        ValueRange* d,
-        const decltype(C2FieldSupportedValues::range)& s) {
-    d->min = static_cast<PrimitiveValue>(s.min.u64);
-    d->max = static_cast<PrimitiveValue>(s.max.u64);
-    d->step = static_cast<PrimitiveValue>(s.step.u64);
-    d->num = static_cast<PrimitiveValue>(s.num.u64);
-    d->denom = static_cast<PrimitiveValue>(s.denom.u64);
-    return true;
-}
+template <typename BufferPoolTypes, typename BaseBlock>
+void SetPooledBlock(
+        BaseBlock *baseBlock,
+        const typename BufferPoolTypes::BufferStatusMessage &pooledBlock);
 
-// C2FieldSupportedValues -> FieldSupportedValues
-bool objcpy(FieldSupportedValues *d, const C2FieldSupportedValues &s) {
-    switch (s.type) {
-    case C2FieldSupportedValues::EMPTY: {
-            d->empty(::android::hidl::safe_union::V1_0::Monostate{});
-            break;
-        }
-    case C2FieldSupportedValues::RANGE: {
-            ValueRange range{};
-            if (!objcpy(&range, s.range)) {
-                LOG(ERROR) << "Invalid C2FieldSupportedValues::range.";
-                d->range(range);
-                return false;
-            }
-            d->range(range);
-            break;
-        }
-    case C2FieldSupportedValues::VALUES: {
-            hidl_vec<PrimitiveValue> values;
-            copyVector<uint64_t>(&values, s.values);
-            d->values(values);
-            break;
-        }
-    case C2FieldSupportedValues::FLAGS: {
-            hidl_vec<PrimitiveValue> flags;
-            copyVector<uint64_t>(&flags, s.values);
-            d->flags(flags);
-            break;
-        }
-    default:
-        LOG(DEBUG) << "Unrecognized C2FieldSupportedValues::type_t "
-                   << "with underlying value " << underlying_value(s.type)
-                   << ".";
-        return false;
-    }
-    return true;
-}
+template <typename BufferPoolTypes>
+bool GetBufferPoolData(
+        const std::shared_ptr<const _C2BlockPoolData>& blockPoolData,
+        std::shared_ptr<typename BufferPoolTypes::BufferPoolData> *bpData);
 
-// ValueRange -> C2FieldSupportedValues::range's type
-bool objcpy(
-        decltype(C2FieldSupportedValues::range)* d,
-        const ValueRange& s) {
-    d->min.u64 = static_cast<uint64_t>(s.min);
-    d->max.u64 = static_cast<uint64_t>(s.max);
-    d->step.u64 = static_cast<uint64_t>(s.step);
-    d->num.u64 = static_cast<uint64_t>(s.num);
-    d->denom.u64 = static_cast<uint64_t>(s.denom);
-    return true;
-}
-
-// FieldSupportedValues -> C2FieldSupportedValues
-bool objcpy(C2FieldSupportedValues *d, const FieldSupportedValues &s) {
-    switch (s.getDiscriminator()) {
-    case FieldSupportedValues::hidl_discriminator::empty: {
-            d->type = C2FieldSupportedValues::EMPTY;
-            break;
-        }
-    case FieldSupportedValues::hidl_discriminator::range: {
-            d->type = C2FieldSupportedValues::RANGE;
-            if (!objcpy(&d->range, s.range())) {
-                LOG(ERROR) << "Invalid FieldSupportedValues::range.";
-                return false;
-            }
-            d->values.resize(0);
-            break;
-        }
-    case FieldSupportedValues::hidl_discriminator::values: {
-            d->type = C2FieldSupportedValues::VALUES;
-            copyVector<uint64_t>(&d->values, s.values());
-            break;
-        }
-    case FieldSupportedValues::hidl_discriminator::flags: {
-            d->type = C2FieldSupportedValues::FLAGS;
-            copyVector<uint64_t>(&d->values, s.flags());
-            break;
-        }
-    default:
-        LOG(WARNING) << "Unrecognized FieldSupportedValues::getDiscriminator()";
-        return false;
-    }
-    return true;
-}
-
-} // unnamed namespace
-
-// C2FieldSupportedValuesQuery -> FieldSupportedValuesQuery
-bool objcpy(
-        FieldSupportedValuesQuery* d,
-        const C2FieldSupportedValuesQuery& s) {
-    if (!objcpy(&d->field, s.field())) {
-        LOG(ERROR) << "Invalid C2FieldSupportedValuesQuery::field.";
-        return false;
-    }
-    switch (s.type()) {
-    case C2FieldSupportedValuesQuery::POSSIBLE:
-        d->type = FieldSupportedValuesQuery::Type::POSSIBLE;
-        break;
-    case C2FieldSupportedValuesQuery::CURRENT:
-        d->type = FieldSupportedValuesQuery::Type::CURRENT;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized C2FieldSupportedValuesQuery::type_t "
-                   << "with underlying value " << underlying_value(s.type())
-                   << ".";
-        d->type = static_cast<FieldSupportedValuesQuery::Type>(s.type());
-    }
-    return true;
-}
-
-// FieldSupportedValuesQuery -> C2FieldSupportedValuesQuery
-bool objcpy(
-        C2FieldSupportedValuesQuery* d,
-        const FieldSupportedValuesQuery& s) {
-    C2FieldSupportedValuesQuery::type_t dType;
-    switch (s.type) {
-    case FieldSupportedValuesQuery::Type::POSSIBLE:
-        dType = C2FieldSupportedValuesQuery::POSSIBLE;
-        break;
-    case FieldSupportedValuesQuery::Type::CURRENT:
-        dType = C2FieldSupportedValuesQuery::CURRENT;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized FieldSupportedValuesQuery::Type "
-                   << "with underlying value " << underlying_value(s.type)
-                   << ".";
-        dType = static_cast<C2FieldSupportedValuesQuery::type_t>(s.type);
-    }
-    *d = C2FieldSupportedValuesQuery(C2ParamFieldBuilder(s.field), dType);
-    return true;
-}
-
-// C2FieldSupportedValuesQuery -> FieldSupportedValuesQueryResult
-bool objcpy(
-        FieldSupportedValuesQueryResult* d,
-        const C2FieldSupportedValuesQuery& s) {
-    d->status = static_cast<Status>(s.status);
-    return objcpy(&d->values, s.values);
-}
-
-// FieldSupportedValuesQuery, FieldSupportedValuesQueryResult ->
-// C2FieldSupportedValuesQuery
-bool objcpy(
-        C2FieldSupportedValuesQuery* d,
-        const FieldSupportedValuesQuery& sq,
-        const FieldSupportedValuesQueryResult& sr) {
-    if (!objcpy(d, sq)) {
-        LOG(ERROR) << "Invalid FieldSupportedValuesQuery.";
-        return false;
-    }
-    d->status = static_cast<c2_status_t>(sr.status);
-    if (!objcpy(&d->values, sr.values)) {
-        LOG(ERROR) << "Invalid FieldSupportedValuesQueryResult::values.";
-        return false;
-    }
-    return true;
-}
-
-// C2Component::Traits -> IComponentStore::ComponentTraits
-bool objcpy(
-        IComponentStore::ComponentTraits *d,
-        const C2Component::Traits &s) {
-    d->name = s.name;
-
-    switch (s.domain) {
-    case C2Component::DOMAIN_VIDEO:
-        d->domain = IComponentStore::ComponentTraits::Domain::VIDEO;
-        break;
-    case C2Component::DOMAIN_AUDIO:
-        d->domain = IComponentStore::ComponentTraits::Domain::AUDIO;
-        break;
-    case C2Component::DOMAIN_IMAGE:
-        d->domain = IComponentStore::ComponentTraits::Domain::IMAGE;
-        break;
-    case C2Component::DOMAIN_OTHER:
-        d->domain = IComponentStore::ComponentTraits::Domain::OTHER;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized C2Component::domain_t "
-                   << "with underlying value " << underlying_value(s.domain)
-                   << ".";
-        d->domain = static_cast<IComponentStore::ComponentTraits::Domain>(
-                s.domain);
-    }
-
-    switch (s.kind) {
-    case C2Component::KIND_DECODER:
-        d->kind = IComponentStore::ComponentTraits::Kind::DECODER;
-        break;
-    case C2Component::KIND_ENCODER:
-        d->kind = IComponentStore::ComponentTraits::Kind::ENCODER;
-        break;
-    case C2Component::KIND_OTHER:
-        d->kind = IComponentStore::ComponentTraits::Kind::OTHER;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized C2Component::kind_t "
-                   << "with underlying value " << underlying_value(s.kind)
-                   << ".";
-        d->kind = static_cast<IComponentStore::ComponentTraits::Kind>(
-                s.kind);
-    }
-
-    d->rank = static_cast<uint32_t>(s.rank);
-
-    d->mediaType = s.mediaType;
-
-    d->aliases.resize(s.aliases.size());
-    for (size_t ix = s.aliases.size(); ix > 0; ) {
-        --ix;
-        d->aliases[ix] = s.aliases[ix];
-    }
-    return true;
-}
-
-// ComponentTraits -> C2Component::Traits, std::unique_ptr<std::vector<std::string>>
-bool objcpy(
-        C2Component::Traits* d,
-        const IComponentStore::ComponentTraits& s) {
-    d->name = s.name.c_str();
-
-    switch (s.domain) {
-    case IComponentStore::ComponentTraits::Domain::VIDEO:
-        d->domain = C2Component::DOMAIN_VIDEO;
-        break;
-    case IComponentStore::ComponentTraits::Domain::AUDIO:
-        d->domain = C2Component::DOMAIN_AUDIO;
-        break;
-    case IComponentStore::ComponentTraits::Domain::IMAGE:
-        d->domain = C2Component::DOMAIN_IMAGE;
-        break;
-    case IComponentStore::ComponentTraits::Domain::OTHER:
-        d->domain = C2Component::DOMAIN_OTHER;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized ComponentTraits::Domain "
-                   << "with underlying value " << underlying_value(s.domain)
-                   << ".";
-        d->domain = static_cast<C2Component::domain_t>(s.domain);
-    }
-
-    switch (s.kind) {
-    case IComponentStore::ComponentTraits::Kind::DECODER:
-        d->kind = C2Component::KIND_DECODER;
-        break;
-    case IComponentStore::ComponentTraits::Kind::ENCODER:
-        d->kind = C2Component::KIND_ENCODER;
-        break;
-    case IComponentStore::ComponentTraits::Kind::OTHER:
-        d->kind = C2Component::KIND_OTHER;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized ComponentTraits::Kind "
-                   << "with underlying value " << underlying_value(s.kind)
-                   << ".";
-        d->kind = static_cast<C2Component::kind_t>(s.kind);
-    }
-
-    d->rank = static_cast<C2Component::rank_t>(s.rank);
-    d->mediaType = s.mediaType.c_str();
-    d->aliases.resize(s.aliases.size());
-    for (size_t i = 0; i < s.aliases.size(); ++i) {
-        d->aliases[i] = s.aliases[i];
-    }
-    return true;
-}
-
-namespace /* unnamed */ {
-
-// C2ParamFieldValues -> ParamFieldValues
-bool objcpy(ParamFieldValues *d, const C2ParamFieldValues &s) {
-    if (!objcpy(&d->paramOrField, s.paramOrField)) {
-        LOG(ERROR) << "Invalid C2ParamFieldValues::paramOrField.";
-        return false;
-    }
-    if (s.values) {
-        d->values.resize(1);
-        if (!objcpy(&d->values[0], *s.values)) {
-            LOG(ERROR) << "Invalid C2ParamFieldValues::values.";
-            return false;
-        }
-        return true;
-    }
-    d->values.resize(0);
-    return true;
-}
-
-// ParamFieldValues -> C2ParamFieldValues
-bool objcpy(C2ParamFieldValues *d, const ParamFieldValues &s) {
-    d->paramOrField = C2ParamFieldBuilder(s.paramOrField);
-    if (s.values.size() == 1) {
-        d->values = std::make_unique<C2FieldSupportedValues>();
-        if (!objcpy(d->values.get(), s.values[0])) {
-            LOG(ERROR) << "Invalid ParamFieldValues::values.";
-            return false;
-        }
-        return true;
-    } else if (s.values.size() == 0) {
-        d->values.reset();
-        return true;
-    }
-    LOG(ERROR) << "Invalid ParamFieldValues: "
-                  "Two or more FieldSupportedValues objects exist in "
-                  "ParamFieldValues. "
-                  "Only zero or one is allowed.";
-    return false;
-}
-
-} // unnamed namespace
-
-// C2SettingResult -> SettingResult
-bool objcpy(SettingResult *d, const C2SettingResult &s) {
-    switch (s.failure) {
-    case C2SettingResult::BAD_TYPE:
-        d->failure = SettingResult::Failure::BAD_TYPE;
-        break;
-    case C2SettingResult::BAD_PORT:
-        d->failure = SettingResult::Failure::BAD_PORT;
-        break;
-    case C2SettingResult::BAD_INDEX:
-        d->failure = SettingResult::Failure::BAD_INDEX;
-        break;
-    case C2SettingResult::READ_ONLY:
-        d->failure = SettingResult::Failure::READ_ONLY;
-        break;
-    case C2SettingResult::MISMATCH:
-        d->failure = SettingResult::Failure::MISMATCH;
-        break;
-    case C2SettingResult::BAD_VALUE:
-        d->failure = SettingResult::Failure::BAD_VALUE;
-        break;
-    case C2SettingResult::CONFLICT:
-        d->failure = SettingResult::Failure::CONFLICT;
-        break;
-    case C2SettingResult::UNSUPPORTED:
-        d->failure = SettingResult::Failure::UNSUPPORTED;
-        break;
-    case C2SettingResult::INFO_BAD_VALUE:
-        d->failure = SettingResult::Failure::INFO_BAD_VALUE;
-        break;
-    case C2SettingResult::INFO_CONFLICT:
-        d->failure = SettingResult::Failure::INFO_CONFLICT;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized C2SettingResult::Failure "
-                   << "with underlying value " << underlying_value(s.failure)
-                   << ".";
-        d->failure = static_cast<SettingResult::Failure>(s.failure);
-    }
-    if (!objcpy(&d->field, s.field)) {
-        LOG(ERROR) << "Invalid C2SettingResult::field.";
-        return false;
-    }
-    d->conflicts.resize(s.conflicts.size());
-    size_t i = 0;
-    for (const C2ParamFieldValues& sConflict : s.conflicts) {
-        ParamFieldValues &dConflict = d->conflicts[i++];
-        if (!objcpy(&dConflict, sConflict)) {
-            LOG(ERROR) << "Invalid C2SettingResult::conflicts["
-                       << i - 1 << "].";
-            return false;
-        }
-    }
-    return true;
-}
-
-// SettingResult -> std::unique_ptr<C2SettingResult>
-bool objcpy(std::unique_ptr<C2SettingResult> *d, const SettingResult &s) {
-    *d = std::unique_ptr<C2SettingResult>(new C2SettingResult {
-            .field = C2ParamFieldValues(C2ParamFieldBuilder()) });
-    if (!*d) {
-        LOG(ERROR) << "No memory for C2SettingResult.";
-        return false;
-    }
-
-    // failure
-    switch (s.failure) {
-    case SettingResult::Failure::BAD_TYPE:
-        (*d)->failure = C2SettingResult::BAD_TYPE;
-        break;
-    case SettingResult::Failure::BAD_PORT:
-        (*d)->failure = C2SettingResult::BAD_PORT;
-        break;
-    case SettingResult::Failure::BAD_INDEX:
-        (*d)->failure = C2SettingResult::BAD_INDEX;
-        break;
-    case SettingResult::Failure::READ_ONLY:
-        (*d)->failure = C2SettingResult::READ_ONLY;
-        break;
-    case SettingResult::Failure::MISMATCH:
-        (*d)->failure = C2SettingResult::MISMATCH;
-        break;
-    case SettingResult::Failure::BAD_VALUE:
-        (*d)->failure = C2SettingResult::BAD_VALUE;
-        break;
-    case SettingResult::Failure::CONFLICT:
-        (*d)->failure = C2SettingResult::CONFLICT;
-        break;
-    case SettingResult::Failure::UNSUPPORTED:
-        (*d)->failure = C2SettingResult::UNSUPPORTED;
-        break;
-    case SettingResult::Failure::INFO_BAD_VALUE:
-        (*d)->failure = C2SettingResult::INFO_BAD_VALUE;
-        break;
-    case SettingResult::Failure::INFO_CONFLICT:
-        (*d)->failure = C2SettingResult::INFO_CONFLICT;
-        break;
-    default:
-        LOG(DEBUG) << "Unrecognized SettingResult::Failure "
-                   << "with underlying value " << underlying_value(s.failure)
-                   << ".";
-        (*d)->failure = static_cast<C2SettingResult::Failure>(s.failure);
-    }
-
-    // field
-    if (!objcpy(&(*d)->field, s.field)) {
-        LOG(ERROR) << "Invalid SettingResult::field.";
-        return false;
-    }
-
-    // conflicts
-    (*d)->conflicts.clear();
-    (*d)->conflicts.reserve(s.conflicts.size());
-    for (const ParamFieldValues& sConflict : s.conflicts) {
-        (*d)->conflicts.emplace_back(
-                C2ParamFieldValues{ C2ParamFieldBuilder(), nullptr });
-        if (!objcpy(&(*d)->conflicts.back(), sConflict)) {
-            LOG(ERROR) << "Invalid SettingResult::conflicts.";
-            return false;
-        }
-    }
-    return true;
-}
-
-// C2ParamDescriptor -> ParamDescriptor
-bool objcpy(ParamDescriptor *d, const C2ParamDescriptor &s) {
-    d->index = static_cast<ParamIndex>(s.index());
-    d->attrib = static_cast<hidl_bitfield<ParamDescriptor::Attrib>>(
-            _C2ParamInspector::GetAttrib(s));
-    d->name = s.name();
-    copyVector<uint32_t>(&d->dependencies, s.dependencies());
-    return true;
-}
-
-// ParamDescriptor -> C2ParamDescriptor
-bool objcpy(std::shared_ptr<C2ParamDescriptor> *d, const ParamDescriptor &s) {
-    std::vector<C2Param::Index> dDependencies;
-    dDependencies.reserve(s.dependencies.size());
-    for (const ParamIndex& sDependency : s.dependencies) {
-        dDependencies.emplace_back(static_cast<uint32_t>(sDependency));
-    }
-    *d = std::make_shared<C2ParamDescriptor>(
-            C2Param::Index(static_cast<uint32_t>(s.index)),
-            static_cast<C2ParamDescriptor::attrib_t>(s.attrib),
-            C2String(s.name.c_str()),
-            std::move(dDependencies));
-    return true;
-}
-
-// C2StructDescriptor -> StructDescriptor
-bool objcpy(StructDescriptor *d, const C2StructDescriptor &s) {
-    d->type = static_cast<ParamIndex>(s.coreIndex().coreIndex());
-    d->fields.resize(s.numFields());
-    size_t i = 0;
-    for (const auto& sField : s) {
-        FieldDescriptor& dField = d->fields[i++];
-        dField.fieldId.offset = static_cast<uint32_t>(
-                _C2ParamInspector::GetOffset(sField));
-        dField.fieldId.size = static_cast<uint32_t>(
-                _C2ParamInspector::GetSize(sField));
-        dField.type = static_cast<hidl_bitfield<FieldDescriptor::Type>>(
-                sField.type());
-        dField.extent = static_cast<uint32_t>(sField.extent());
-        dField.name = static_cast<hidl_string>(sField.name());
-        const auto& sNamedValues = sField.namedValues();
-        dField.namedValues.resize(sNamedValues.size());
-        size_t j = 0;
-        for (const auto& sNamedValue : sNamedValues) {
-            FieldDescriptor::NamedValue& dNamedValue = dField.namedValues[j++];
-            dNamedValue.name = static_cast<hidl_string>(sNamedValue.first);
-            dNamedValue.value = static_cast<PrimitiveValue>(
-                    sNamedValue.second.u64);
-        }
-    }
-    return true;
-}
-
-// StructDescriptor -> C2StructDescriptor
-bool objcpy(std::unique_ptr<C2StructDescriptor> *d, const StructDescriptor &s) {
-    C2Param::CoreIndex dIndex = C2Param::CoreIndex(static_cast<uint32_t>(s.type));
-    std::vector<C2FieldDescriptor> dFields;
-    dFields.reserve(s.fields.size());
-    for (const auto &sField : s.fields) {
-        C2FieldDescriptor dField = {
-            static_cast<uint32_t>(sField.type),
-            sField.extent,
-            sField.name,
-            sField.fieldId.offset,
-            sField.fieldId.size };
-        C2FieldDescriptor::NamedValuesType namedValues;
-        namedValues.reserve(sField.namedValues.size());
-        for (const auto& sNamedValue : sField.namedValues) {
-            namedValues.emplace_back(
-                sNamedValue.name,
-                C2Value::Primitive(static_cast<uint64_t>(sNamedValue.value)));
-        }
-        _C2ParamInspector::AddNamedValues(dField, std::move(namedValues));
-        dFields.emplace_back(dField);
-    }
-    *d = std::make_unique<C2StructDescriptor>(
-            _C2ParamInspector::CreateStructDescriptor(dIndex, std::move(dFields)));
-    return true;
-}
-
-namespace /* unnamed */ {
-
-// Find or add a hidl BaseBlock object from a given C2Handle* to a list and an
+// Find or add a HAL BaseBlock object from a given C2Handle* to a list and an
 // associated map.
 // Note: The handle is not cloned.
+template <typename BaseBlock>
 bool _addBaseBlock(
         uint32_t* index,
         const C2Handle* handle,
@@ -663,20 +95,18 @@ bool _addBaseBlock(
         baseBlocks->emplace_back();
 
         BaseBlock &dBaseBlock = baseBlocks->back();
-        // This does not clone the handle.
-        dBaseBlock.nativeBlock(
-                reinterpret_cast<const native_handle_t*>(handle));
-
+        SetHandle(&dBaseBlock, handle);
     }
     return true;
 }
 
 // Find or add a hidl BaseBlock object from a given BufferPoolData to a list and
 // an associated map.
+template <typename BufferPoolTypes, typename BaseBlock>
 bool _addBaseBlock(
         uint32_t* index,
-        const std::shared_ptr<BufferPoolData> bpData,
-        BufferPoolSender* bufferPoolSender,
+        const std::shared_ptr<typename BufferPoolTypes::BufferPoolData> &bpData,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
     if (!bpData) {
@@ -694,28 +124,28 @@ bool _addBaseBlock(
         BaseBlock &dBaseBlock = baseBlocks->back();
 
         if (bufferPoolSender) {
-            BufferStatusMessage pooledBlock;
-            ResultStatus bpStatus = bufferPoolSender->send(
-                    bpData,
-                    &pooledBlock);
+            typename BufferPoolTypes::BufferStatusMessage pooledBlock;
+            typename BufferPoolTypes::BufferPoolStatus bpStatus =
+                bufferPoolSender->send(bpData, &pooledBlock);
 
-            if (bpStatus != ResultStatus::OK) {
+            if (bpStatus != BufferPoolTypes::ResultStatus::OK) {
                 LOG(ERROR) << "Failed to send buffer with BufferPool. Error: "
                            << static_cast<int32_t>(bpStatus)
                            << ".";
                 return false;
             }
-            dBaseBlock.pooledBlock(pooledBlock);
+            SetPooledBlock<BufferPoolTypes>(&dBaseBlock, pooledBlock);
         }
     }
     return true;
 }
 
+template <typename BufferPoolTypes, typename BaseBlock>
 bool addBaseBlock(
         uint32_t* index,
         const C2Handle* handle,
         const std::shared_ptr<const _C2BlockPoolData>& blockPoolData,
-        BufferPoolSender* bufferPoolSender,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
     if (!blockPoolData) {
@@ -727,9 +157,8 @@ bool addBaseBlock(
     switch (blockPoolData->getType()) {
     case _C2BlockPoolData::TYPE_BUFFERPOOL: {
             // BufferPoolData
-            std::shared_ptr<BufferPoolData> bpData;
-            if (!_C2BlockFactory::GetBufferPoolData(blockPoolData, &bpData)
-                    || !bpData) {
+            std::shared_ptr<typename BufferPoolTypes::BufferPoolData> bpData;
+            if (!GetBufferPoolData<BufferPoolTypes>(blockPoolData, &bpData) || !bpData) {
                 LOG(ERROR) << "BufferPoolData unavailable in a block.";
                 return false;
             }
@@ -756,10 +185,11 @@ bool addBaseBlock(
     }
 }
 
-// C2Fence -> hidl_handle
+// C2Fence -> Handle
 // Note: File descriptors are not duplicated. The original file descriptor must
 // not be closed before the transaction is complete.
-bool objcpy(hidl_handle* d, const C2Fence& s) {
+template <typename Handle>
+bool objcpy(Handle* d, const C2Fence& s) {
     d->setTo(nullptr);
     native_handle_t* handle = _C2FenceFactory::CreateNativeHandle(s);
     if (handle) {
@@ -775,23 +205,24 @@ bool objcpy(hidl_handle* d, const C2Fence& s) {
 // C2ConstLinearBlock -> Block
 // Note: Native handles are not duplicated. The original handles must not be
 // closed before the transaction is complete.
+template <typename Block, typename BufferPoolTypes, typename BaseBlock>
 bool objcpy(Block* d, const C2ConstLinearBlock& s,
-        BufferPoolSender* bufferPoolSender,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
     std::shared_ptr<const _C2BlockPoolData> bpData =
             _C2BlockFactory::GetLinearBlockPoolData(s);
-    if (!addBaseBlock(&d->index, s.handle(), bpData,
+    if (!addBaseBlock((uint32_t *)&d->index, s.handle(), bpData,
             bufferPoolSender, baseBlocks, baseBlockIndices)) {
         LOG(ERROR) << "Invalid block data in C2ConstLinearBlock.";
         return false;
     }
 
     // Create the metadata.
-    C2Hidl_RangeInfo dRangeInfo;
+    C2Hal_RangeInfo dRangeInfo;
     dRangeInfo.offset = static_cast<uint32_t>(s.offset());
     dRangeInfo.length = static_cast<uint32_t>(s.size());
-    if (!createParamsBlob(&d->meta, std::vector<C2Param*>{ &dRangeInfo })) {
+    if (!_createParamsBlob(&d->meta, std::vector<C2Param*>{ &dRangeInfo })) {
         LOG(ERROR) << "Invalid range info in C2ConstLinearBlock.";
         return false;
     }
@@ -807,26 +238,27 @@ bool objcpy(Block* d, const C2ConstLinearBlock& s,
 // C2ConstGraphicBlock -> Block
 // Note: Native handles are not duplicated. The original handles must not be
 // closed before the transaction is complete.
+template <typename Block, typename BufferPoolTypes, typename BaseBlock>
 bool objcpy(Block* d, const C2ConstGraphicBlock& s,
-        BufferPoolSender* bufferPoolSender,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
     std::shared_ptr<const _C2BlockPoolData> bpData =
             _C2BlockFactory::GetGraphicBlockPoolData(s);
-    if (!addBaseBlock(&d->index, s.handle(), bpData,
+    if (!addBaseBlock((uint32_t *)&d->index, s.handle(), bpData,
             bufferPoolSender, baseBlocks, baseBlockIndices)) {
         LOG(ERROR) << "Invalid block data in C2ConstGraphicBlock.";
         return false;
     }
 
     // Create the metadata.
-    C2Hidl_RectInfo dRectInfo;
+    C2Hal_RectInfo dRectInfo;
     C2Rect sRect = s.crop();
     dRectInfo.left = static_cast<uint32_t>(sRect.left);
     dRectInfo.top = static_cast<uint32_t>(sRect.top);
     dRectInfo.width = static_cast<uint32_t>(sRect.width);
     dRectInfo.height = static_cast<uint32_t>(sRect.height);
-    if (!createParamsBlob(&d->meta, std::vector<C2Param*>{ &dRectInfo })) {
+    if (!_createParamsBlob(&d->meta, std::vector<C2Param*>{ &dRectInfo })) {
         LOG(ERROR) << "Invalid rect info in C2ConstGraphicBlock.";
         return false;
     }
@@ -841,8 +273,9 @@ bool objcpy(Block* d, const C2ConstGraphicBlock& s,
 
 // C2BufferData -> Buffer
 // This function only fills in d->blocks.
+template <typename Buffer, typename BufferPoolTypes, typename BaseBlock>
 bool objcpy(Buffer* d, const C2BufferData& s,
-        BufferPoolSender* bufferPoolSender,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
     d->blocks.resize(
@@ -850,7 +283,7 @@ bool objcpy(Buffer* d, const C2BufferData& s,
             s.graphicBlocks().size());
     size_t i = 0;
     for (const C2ConstLinearBlock& linearBlock : s.linearBlocks()) {
-        Block& dBlock = d->blocks[i++];
+        auto& dBlock = d->blocks[i++];
         if (!objcpy(
                 &dBlock, linearBlock,
                 bufferPoolSender, baseBlocks, baseBlockIndices)) {
@@ -860,7 +293,7 @@ bool objcpy(Buffer* d, const C2BufferData& s,
         }
     }
     for (const C2ConstGraphicBlock& graphicBlock : s.graphicBlocks()) {
-        Block& dBlock = d->blocks[i++];
+        auto& dBlock = d->blocks[i++];
         if (!objcpy(
                 &dBlock, graphicBlock,
                 bufferPoolSender, baseBlocks, baseBlockIndices)) {
@@ -873,11 +306,12 @@ bool objcpy(Buffer* d, const C2BufferData& s,
 }
 
 // C2Buffer -> Buffer
+template <typename Buffer, typename BufferPoolTypes, typename BaseBlock>
 bool objcpy(Buffer* d, const C2Buffer& s,
-        BufferPoolSender* bufferPoolSender,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
-    if (!createParamsBlob(&d->info, s.info())) {
+    if (!_createParamsBlob(&d->info, s.info())) {
         LOG(ERROR) << "Invalid C2Buffer::info.";
         return false;
     }
@@ -889,12 +323,13 @@ bool objcpy(Buffer* d, const C2Buffer& s,
 }
 
 // C2InfoBuffer -> InfoBuffer
+template <typename InfoBuffer, typename BufferPoolTypes, typename BaseBlock>
 bool objcpy(InfoBuffer* d, const C2InfoBuffer& s,
-        BufferPoolSender* bufferPoolSender,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
-    d->index = static_cast<ParamIndex>(s.index());
-    Buffer& dBuffer = d->buffer;
+    d->index = static_cast<decltype(d->index)>(s.index());
+    auto& dBuffer = d->buffer;
     if (!objcpy(&dBuffer, s.data(), bufferPoolSender, baseBlocks, baseBlockIndices)) {
         LOG(ERROR) << "Invalid C2InfoBuffer::data";
         return false;
@@ -903,11 +338,12 @@ bool objcpy(InfoBuffer* d, const C2InfoBuffer& s,
 }
 
 // C2FrameData -> FrameData
+template <typename FrameData, typename BufferPoolTypes, typename BaseBlock>
 bool objcpy(FrameData* d, const C2FrameData& s,
-        BufferPoolSender* bufferPoolSender,
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
-    d->flags = static_cast<hidl_bitfield<FrameData::Flags>>(s.flags);
+    d->flags = static_cast<decltype(d->flags)>(s.flags);
     if (!objcpy(&d->ordinal, s.ordinal)) {
         LOG(ERROR) << "Invalid C2FrameData::ordinal.";
         return false;
@@ -916,11 +352,12 @@ bool objcpy(FrameData* d, const C2FrameData& s,
     d->buffers.resize(s.buffers.size());
     size_t i = 0;
     for (const std::shared_ptr<C2Buffer>& sBuffer : s.buffers) {
-        Buffer& dBuffer = d->buffers[i++];
+        auto& dBuffer = d->buffers[i++];
         if (!sBuffer) {
             // A null (pointer to) C2Buffer corresponds to a Buffer with empty
             // info and blocks.
-            dBuffer.info.resize(0);
+            auto *dInfo = GetBlob(&dBuffer.info);
+            dInfo->resize(0);
             dBuffer.blocks.resize(0);
             continue;
         }
@@ -933,7 +370,7 @@ bool objcpy(FrameData* d, const C2FrameData& s,
         }
     }
 
-    if (!createParamsBlob(&d->configUpdate, s.configUpdate)) {
+    if (!_createParamsBlob(&d->configUpdate, s.configUpdate)) {
         LOG(ERROR) << "Invalid C2FrameData::configUpdate.";
         return false;
     }
@@ -941,7 +378,7 @@ bool objcpy(FrameData* d, const C2FrameData& s,
     d->infoBuffers.resize(s.infoBuffers.size());
     i = 0;
     for (const C2InfoBuffer& sInfoBuffer : s.infoBuffers) {
-        InfoBuffer& dInfoBuffer = d->infoBuffers[i++];
+        auto& dInfoBuffer = d->infoBuffers[i++];
         if (!objcpy(&dInfoBuffer, sInfoBuffer,
                 bufferPoolSender, baseBlocks, baseBlockIndices)) {
             LOG(ERROR) << "Invalid C2FrameData::infoBuffers["
@@ -953,113 +390,14 @@ bool objcpy(FrameData* d, const C2FrameData& s,
     return true;
 }
 
-} // unnamed namespace
-
-// DefaultBufferPoolSender's implementation
-
-DefaultBufferPoolSender::DefaultBufferPoolSender(
-        const sp<IClientManager>& receiverManager,
-        std::chrono::steady_clock::duration refreshInterval)
-    : mReceiverManager(receiverManager),
-      mRefreshInterval(refreshInterval) {
-}
-
-void DefaultBufferPoolSender::setReceiver(
-        const sp<IClientManager>& receiverManager,
-        std::chrono::steady_clock::duration refreshInterval) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (mReceiverManager != receiverManager) {
-        mReceiverManager = receiverManager;
-        mConnections.clear();
-    }
-    mRefreshInterval = refreshInterval;
-}
-
-ResultStatus DefaultBufferPoolSender::send(
-        const std::shared_ptr<BufferPoolData>& bpData,
-        BufferStatusMessage* bpMessage) {
-    int64_t connectionId = bpData->mConnectionId;
-    if (connectionId == 0) {
-        LOG(WARNING) << "registerSender -- invalid sender connection id (0).";
-        return ResultStatus::CRITICAL_ERROR;
-    }
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mReceiverManager) {
-        LOG(ERROR) << "No access to receiver's BufferPool.";
-        return ResultStatus::NOT_FOUND;
-    }
-    if (!mSenderManager) {
-        mSenderManager = ClientManager::getInstance();
-        if (!mSenderManager) {
-            LOG(ERROR) << "Failed to retrieve local BufferPool ClientManager.";
-            return ResultStatus::CRITICAL_ERROR;
-        }
-    }
-
-    int64_t receiverConnectionId{0};
-    auto foundConnection = mConnections.find(connectionId);
-    bool isNewConnection = foundConnection == mConnections.end();
-    std::chrono::steady_clock::time_point now =
-            std::chrono::steady_clock::now();
-    if (isNewConnection ||
-            (now - foundConnection->second.lastSent > mRefreshInterval)) {
-        // Initialize the bufferpool connection.
-        ResultStatus rs =
-                mSenderManager->registerSender(mReceiverManager,
-                                               connectionId,
-                                               &receiverConnectionId);
-        if ((rs != ResultStatus::OK) && (rs != ResultStatus::ALREADY_EXISTS)) {
-            LOG(WARNING) << "registerSender -- returned error: "
-                         << static_cast<int32_t>(rs)
-                         << ".";
-            return rs;
-        } else if (receiverConnectionId == 0) {
-            LOG(WARNING) << "registerSender -- "
-                            "invalid receiver connection id (0).";
-            return ResultStatus::CRITICAL_ERROR;
-        } else {
-            if (isNewConnection) {
-                foundConnection = mConnections.try_emplace(
-                        connectionId, receiverConnectionId, now).first;
-            } else {
-                foundConnection->second.receiverConnectionId = receiverConnectionId;
-            }
-        }
-    } else {
-        receiverConnectionId = foundConnection->second.receiverConnectionId;
-    }
-
-    uint64_t transactionId;
-    int64_t timestampUs;
-    ResultStatus rs = mSenderManager->postSend(
-            receiverConnectionId, bpData, &transactionId, &timestampUs);
-    if (rs != ResultStatus::OK) {
-        LOG(ERROR) << "ClientManager::postSend -- returned error: "
-                   << static_cast<int32_t>(rs)
-                   << ".";
-        mConnections.erase(foundConnection);
-        return rs;
-    }
-    if (!bpMessage) {
-        LOG(ERROR) << "Null output parameter for BufferStatusMessage.";
-        mConnections.erase(foundConnection);
-        return ResultStatus::CRITICAL_ERROR;
-    }
-    bpMessage->connectionId = receiverConnectionId;
-    bpMessage->bufferId = bpData->mId;
-    bpMessage->transactionId = transactionId;
-    bpMessage->timestampUs = timestampUs;
-    foundConnection->second.lastSent = now;
-    return rs;
-}
-
 // std::list<std::unique_ptr<C2Work>> -> WorkBundle
+template <typename WorkBundle, typename BufferPoolTypes>
 bool objcpy(
         WorkBundle* d,
         const std::list<std::unique_ptr<C2Work>>& s,
-        BufferPoolSender* bufferPoolSender) {
+        BufferPoolSender<BufferPoolTypes>* bufferPoolSender) {
     // baseBlocks holds a list of BaseBlock objects that Blocks can refer to.
-    std::list<BaseBlock> baseBlocks;
+    std::list<typename decltype(d->baseBlocks)::value_type> baseBlocks;
 
     // baseBlockIndices maps a raw pointer to native_handle_t or BufferPoolData
     // inside baseBlocks to the corresponding index into baseBlocks. The keys
@@ -1075,7 +413,7 @@ bool objcpy(
     d->works.resize(s.size());
     size_t i = 0;
     for (const std::unique_ptr<C2Work>& sWork : s) {
-        Work &dWork = d->works[i++];
+        auto &dWork = d->works[i++];
         if (!sWork) {
             LOG(WARNING) << "Null C2Work encountered.";
             continue;
@@ -1095,7 +433,7 @@ bool objcpy(
             LOG(DEBUG) << "Work with no worklets.";
         } else {
             // Parcel the worklets.
-            hidl_vec<Worklet> &dWorklets = dWork.worklets;
+            auto &dWorklets = dWork.worklets;
             dWorklets.resize(sWork->worklets.size());
             size_t j = 0;
             for (const std::unique_ptr<C2Worklet>& sWorklet : sWork->worklets)
@@ -1105,14 +443,14 @@ bool objcpy(
                                  << j << "].";
                     continue;
                 }
-                Worklet &dWorklet = dWorklets[j++];
+                auto &dWorklet = dWorklets[j++];
 
                 // component id
                 dWorklet.componentId = static_cast<uint32_t>(
                         sWorklet->component);
 
                 // tunings
-                if (!createParamsBlob(&dWorklet.tunings, sWorklet->tunings)) {
+                if (!_createParamsBlob(&dWorklet.tunings, sWorklet->tunings)) {
                     LOG(ERROR) << "Invalid C2Work::worklets["
                                << j - 1 << "]->tunings.";
                     return false;
@@ -1151,22 +489,20 @@ bool objcpy(
         dWork.workletsProcessed = sWork->workletsProcessed;
 
         // result
-        dWork.result = static_cast<Status>(sWork->result);
+        SetStatus(&dWork.result, sWork->result);
     }
 
-    // Copy std::list<BaseBlock> to hidl_vec<BaseBlock>.
+    // Move std::list<BaseBlock> to vector<BaseBlock>.
     {
         d->baseBlocks.resize(baseBlocks.size());
         size_t i = 0;
-        for (const BaseBlock& baseBlock : baseBlocks) {
-            d->baseBlocks[i++] = baseBlock;
+        for (auto&& baseBlock : baseBlocks) {
+            d->baseBlocks[i++] = std::move(baseBlock);
         }
     }
 
     return true;
 }
-
-namespace /* unnamed */ {
 
 struct C2BaseBlock {
     enum type_t {
@@ -1178,78 +514,33 @@ struct C2BaseBlock {
     std::shared_ptr<C2GraphicBlock> graphic;
 };
 
-// hidl_handle -> C2Fence
+// Handle -> C2Fence
 // Note: File descriptors are not duplicated. The original file descriptor must
 // not be closed before the transaction is complete.
-bool objcpy(C2Fence* d, const hidl_handle& s) {
+template <typename Handle>
+bool objcpy(C2Fence* d, const Handle& s) {
     const native_handle_t* handle = s.getNativeHandle();
     *d = _C2FenceFactory::CreateFromNativeHandle(handle);
     return true;
 }
 
 // C2LinearBlock, vector<C2Param*>, C2Fence -> C2Buffer
-bool createLinearBuffer(
+bool CreateLinearBuffer(
         std::shared_ptr<C2Buffer>* buffer,
         const std::shared_ptr<C2LinearBlock>& block,
         const std::vector<C2Param*>& meta,
-        const C2Fence& fence) {
-    // Check the block meta. It should have exactly 1 C2Info:
-    // C2Hidl_RangeInfo.
-    if ((meta.size() != 1) || !meta[0]) {
-        LOG(ERROR) << "Invalid C2LinearBlock::meta.";
-        return false;
-    }
-    if (meta[0]->size() != sizeof(C2Hidl_RangeInfo)) {
-        LOG(ERROR) << "Invalid range info in C2LinearBlock.";
-        return false;
-    }
-    C2Hidl_RangeInfo *rangeInfo =
-            reinterpret_cast<C2Hidl_RangeInfo*>(meta[0]);
-
-    // Create C2Buffer from C2LinearBlock.
-    *buffer = C2Buffer::CreateLinearBuffer(block->share(
-            rangeInfo->offset, rangeInfo->length,
-            fence));
-    if (!(*buffer)) {
-        LOG(ERROR) << "CreateLinearBuffer failed.";
-        return false;
-    }
-    return true;
-}
+        const C2Fence& fence);
 
 // C2GraphicBlock, vector<C2Param*>, C2Fence -> C2Buffer
-bool createGraphicBuffer(
+bool CreateGraphicBuffer(
         std::shared_ptr<C2Buffer>* buffer,
         const std::shared_ptr<C2GraphicBlock>& block,
         const std::vector<C2Param*>& meta,
-        const C2Fence& fence) {
-    // Check the block meta. It should have exactly 1 C2Info:
-    // C2Hidl_RectInfo.
-    if ((meta.size() != 1) || !meta[0]) {
-        LOG(ERROR) << "Invalid C2GraphicBlock::meta.";
-        return false;
-    }
-    if (meta[0]->size() != sizeof(C2Hidl_RectInfo)) {
-        LOG(ERROR) << "Invalid rect info in C2GraphicBlock.";
-        return false;
-    }
-    C2Hidl_RectInfo *rectInfo =
-            reinterpret_cast<C2Hidl_RectInfo*>(meta[0]);
-
-    // Create C2Buffer from C2GraphicBlock.
-    *buffer = C2Buffer::CreateGraphicBuffer(block->share(
-            C2Rect(rectInfo->width, rectInfo->height).
-            at(rectInfo->left, rectInfo->top),
-            fence));
-    if (!(*buffer)) {
-        LOG(ERROR) << "CreateGraphicBuffer failed.";
-        return false;
-    }
-    return true;
-}
+        const C2Fence& fence);
 
 // Buffer -> C2Buffer
 // Note: The native handles will be cloned.
+template <typename Buffer>
 bool objcpy(std::shared_ptr<C2Buffer>* d, const Buffer& s,
         const std::vector<C2BaseBlock>& baseBlocks) {
     *d = nullptr;
@@ -1263,7 +554,7 @@ bool objcpy(std::shared_ptr<C2Buffer>* d, const Buffer& s,
         return false;
     }
 
-    const Block &sBlock = s.blocks[0];
+    const auto &sBlock = s.blocks[0];
     if (sBlock.index >= baseBlocks.size()) {
         LOG(ERROR) << "Invalid Buffer::blocks[0].index: "
                       "Array index out of range.";
@@ -1288,13 +579,13 @@ bool objcpy(std::shared_ptr<C2Buffer>* d, const Buffer& s,
     // Construct a block.
     switch (baseBlock.type) {
     case C2BaseBlock::LINEAR:
-        if (!createLinearBuffer(d, baseBlock.linear, sBlockMeta, dFence)) {
+        if (!CreateLinearBuffer(d, baseBlock.linear, sBlockMeta, dFence)) {
             LOG(ERROR) << "Invalid C2BaseBlock::linear.";
             return false;
         }
         break;
     case C2BaseBlock::GRAPHIC:
-        if (!createGraphicBuffer(d, baseBlock.graphic, sBlockMeta, dFence)) {
+        if (!CreateGraphicBuffer(d, baseBlock.graphic, sBlockMeta, dFence)) {
             LOG(ERROR) << "Invalid C2BaseBlock::graphic.";
             return false;
         }
@@ -1333,7 +624,10 @@ bool objcpy(std::shared_ptr<C2Buffer>* d, const Buffer& s,
 }
 
 // InfoBuffer -> C2InfoBuffer
-bool objcpy(std::vector<C2InfoBuffer> *d, const InfoBuffer& s,
+template <typename InfoBuffer>
+bool objcpy(
+        std::vector<C2InfoBuffer> *d,
+        const InfoBuffer& s,
         const std::vector<C2BaseBlock>& baseBlocks) {
 
     // Currently, a non-null C2InfoBufer must contain exactly 1 block.
@@ -1345,7 +639,7 @@ bool objcpy(std::vector<C2InfoBuffer> *d, const InfoBuffer& s,
         return false;
     }
 
-    const Block &sBlock = s.buffer.blocks[0];
+    const auto &sBlock = s.buffer.blocks[0];
     if (sBlock.index >= baseBlocks.size()) {
         LOG(ERROR) << "Invalid InfoBuffer::Buffer::blocks[0].index: "
                       "Array index out of range.";
@@ -1371,11 +665,11 @@ bool objcpy(std::vector<C2InfoBuffer> *d, const InfoBuffer& s,
     switch (baseBlock.type) {
     case C2BaseBlock::LINEAR:
         if (sBlockMeta.size() == 1 && sBlockMeta[0] != nullptr &&
-            sBlockMeta[0]->size() == sizeof(C2Hidl_RangeInfo)) {
-            C2Hidl_RangeInfo *rangeInfo =
-                    reinterpret_cast<C2Hidl_RangeInfo*>(sBlockMeta[0]);
+            sBlockMeta[0]->size() == sizeof(C2Hal_RangeInfo)) {
+            C2Hal_RangeInfo *rangeInfo =
+                    reinterpret_cast<C2Hal_RangeInfo*>(sBlockMeta[0]);
             d->emplace_back(C2InfoBuffer::CreateLinearBuffer(
-                    s.index,
+                    uint32_t(s.index),
                     baseBlock.linear->share(
                             rangeInfo->offset, rangeInfo->length, dFence)));
             return true;
@@ -1395,6 +689,7 @@ bool objcpy(std::vector<C2InfoBuffer> *d, const InfoBuffer& s,
 }
 
 // FrameData -> C2FrameData
+template <typename FrameData>
 bool objcpy(C2FrameData* d, const FrameData& s,
         const std::vector<C2BaseBlock>& baseBlocks) {
     d->flags = static_cast<C2FrameData::flags_t>(s.flags);
@@ -1404,7 +699,7 @@ bool objcpy(C2FrameData* d, const FrameData& s,
     }
     d->buffers.clear();
     d->buffers.reserve(s.buffers.size());
-    for (const Buffer& sBuffer : s.buffers) {
+    for (const auto& sBuffer : s.buffers) {
         std::shared_ptr<C2Buffer> dBuffer;
         if (!objcpy(&dBuffer, sBuffer, baseBlocks)) {
             LOG(ERROR) << "Invalid FrameData::buffers.";
@@ -1434,7 +729,7 @@ bool objcpy(C2FrameData* d, const FrameData& s,
         return true;
     }
     d->infoBuffers.reserve(s.infoBuffers.size());
-    for (const InfoBuffer &sInfoBuffer: s.infoBuffers) {
+    for (const auto &sInfoBuffer: s.infoBuffers) {
         if (!objcpy(&(d->infoBuffers), sInfoBuffer, baseBlocks)) {
             LOG(ERROR) << "Invalid Framedata::infoBuffers.";
             return false;
@@ -1444,95 +739,11 @@ bool objcpy(C2FrameData* d, const FrameData& s,
 }
 
 // BaseBlock -> C2BaseBlock
-bool objcpy(C2BaseBlock* d, const BaseBlock& s) {
-    switch (s.getDiscriminator()) {
-    case BaseBlock::hidl_discriminator::nativeBlock: {
-            if (s.nativeBlock() == nullptr) {
-                LOG(ERROR) << "Null BaseBlock::nativeBlock handle";
-                return false;
-            }
-            native_handle_t* sHandle =
-                    native_handle_clone(s.nativeBlock());
-            if (sHandle == nullptr) {
-                LOG(ERROR) << "Null BaseBlock::nativeBlock.";
-                return false;
-            }
-            const C2Handle *sC2Handle =
-                    reinterpret_cast<const C2Handle*>(sHandle);
-
-            d->linear = _C2BlockFactory::CreateLinearBlock(sC2Handle);
-            if (d->linear) {
-                d->type = C2BaseBlock::LINEAR;
-                return true;
-            }
-
-            d->graphic = _C2BlockFactory::CreateGraphicBlock(sC2Handle);
-            if (d->graphic) {
-                d->type = C2BaseBlock::GRAPHIC;
-                return true;
-            }
-
-            LOG(ERROR) << "Unknown handle type in BaseBlock::nativeBlock.";
-            if (sHandle) {
-                native_handle_close(sHandle);
-                native_handle_delete(sHandle);
-            }
-            return false;
-        }
-    case BaseBlock::hidl_discriminator::pooledBlock: {
-            const BufferStatusMessage &bpMessage =
-                    s.pooledBlock();
-            sp<ClientManager> bp = ClientManager::getInstance();
-            std::shared_ptr<BufferPoolData> bpData;
-            native_handle_t *cHandle;
-            ResultStatus bpStatus = bp->receive(
-                    bpMessage.connectionId,
-                    bpMessage.transactionId,
-                    bpMessage.bufferId,
-                    bpMessage.timestampUs,
-                    &cHandle,
-                    &bpData);
-            if (bpStatus != ResultStatus::OK) {
-                LOG(ERROR) << "Failed to receive buffer from bufferpool -- "
-                           << "resultStatus = " << underlying_value(bpStatus)
-                           << ".";
-                return false;
-            } else if (!bpData) {
-                LOG(ERROR) << "No data in bufferpool transaction.";
-                return false;
-            }
-
-            d->linear = _C2BlockFactory::CreateLinearBlock(cHandle, bpData);
-            if (d->linear) {
-                d->type = C2BaseBlock::LINEAR;
-                return true;
-            }
-
-            d->graphic = _C2BlockFactory::CreateGraphicBlock(cHandle, bpData);
-            if (d->graphic) {
-                d->type = C2BaseBlock::GRAPHIC;
-                return true;
-            }
-            if (cHandle) {
-                // Though we got cloned handle, creating block failed.
-                native_handle_close(cHandle);
-                native_handle_delete(cHandle);
-            }
-
-            LOG(ERROR) << "Unknown handle type in BaseBlock::pooledBlock.";
-            return false;
-        }
-    default:
-        LOG(ERROR) << "Unrecognized BaseBlock's discriminator with "
-                   << "underlying value "
-                   << underlying_value(s.getDiscriminator()) << ".";
-        return false;
-    }
-}
-
-} // unnamed namespace
+template <typename BaseBlock>
+bool objcpy(C2BaseBlock* d, const BaseBlock& s);
 
 // WorkBundle -> std::list<std::unique_ptr<C2Work>>
+template <typename WorkBundle>
 bool objcpy(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
     // Convert BaseBlocks to C2BaseBlocks.
     std::vector<C2BaseBlock> dBaseBlocks(s.baseBlocks.size());
@@ -1545,7 +756,7 @@ bool objcpy(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
     }
 
     d->clear();
-    for (const Work& sWork : s.works) {
+    for (const auto& sWork : s.works) {
         d->emplace_back(std::make_unique<C2Work>());
         C2Work& dWork = *d->back();
 
@@ -1559,7 +770,7 @@ bool objcpy(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
 
         // worklet(s)
         dWork.worklets.clear();
-        for (const Worklet& sWorklet : sWork.worklets) {
+        for (const auto& sWorklet : sWork.worklets) {
             std::unique_ptr<C2Worklet> dWorklet = std::make_unique<C2Worklet>();
 
             // component id
@@ -1567,7 +778,7 @@ bool objcpy(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
                     sWorklet.componentId);
 
             // tunings
-            if (!copyParamsFromBlob(&dWorklet->tunings, sWorklet.tunings)) {
+            if (!_copyParamsFromBlob(&dWorklet->tunings, sWorklet.tunings)) {
                 LOG(ERROR) << "Invalid Worklet::tunings";
                 return false;
             }
@@ -1575,7 +786,7 @@ bool objcpy(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
             // failures
             dWorklet->failures.clear();
             dWorklet->failures.reserve(sWorklet.failures.size());
-            for (const SettingResult& sFailure : sWorklet.failures) {
+            for (const auto& sFailure : sWorklet.failures) {
                 std::unique_ptr<C2SettingResult> dFailure;
                 if (!objcpy(&dFailure, sFailure)) {
                     LOG(ERROR) << "Invalid Worklet::failures.";
@@ -1597,332 +808,56 @@ bool objcpy(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
         dWork.workletsProcessed = sWork.workletsProcessed;
 
         // result
-        dWork.result = static_cast<c2_status_t>(sWork.result);
+        dWork.result = GetStatus(sWork.result);
     }
 
     return true;
 }
 
-constexpr size_t PARAMS_ALIGNMENT = 8;  // 64-bit alignment
-static_assert(PARAMS_ALIGNMENT % alignof(C2Param) == 0, "C2Param alignment mismatch");
-static_assert(PARAMS_ALIGNMENT % alignof(C2Info) == 0, "C2Param alignment mismatch");
-static_assert(PARAMS_ALIGNMENT % alignof(C2Tuning) == 0, "C2Param alignment mismatch");
+// BufferQueue-Based Block Operations
+// ==================================
 
-// Params -> std::vector<C2Param*>
-bool parseParamsBlob(std::vector<C2Param*> *params, const hidl_vec<uint8_t> &blob) {
-    // assuming blob is const here
-    size_t size = blob.size();
-    size_t ix = 0;
-    size_t old_ix = 0;
-    const uint8_t *data = blob.data();
-    C2Param *p = nullptr;
+// Call before transferring block to other processes.
+//
+// The given block is ready to transfer to other processes. This will guarantee
+// the given block data is not mutated by bufferqueue migration.
+bool BeginTransferBufferQueueBlock(const C2ConstGraphicBlock& block);
 
-    do {
-        p = C2ParamUtils::ParseFirst(data + ix, size - ix);
-        if (p) {
-            params->emplace_back(p);
-            old_ix = ix;
-            ix += p->size();
-            ix = align(ix, PARAMS_ALIGNMENT);
-            if (ix <= old_ix || ix > size) {
-                android_errorWriteLog(0x534e4554, "238083570");
-                break;
-            }
-        }
-    } while (p);
-
-    if (ix != size) {
-        LOG(ERROR) << "parseParamsBlob -- inconsistent sizes.";
-        return false;
-    }
-    return true;
-}
-
-namespace /* unnamed */ {
-
-/**
- * Concatenates a list of C2Params into a params blob. T is a container type
- * whose member type is compatible with C2Param*.
- *
- * \param[out] blob target blob
- * \param[in] params parameters to concatenate
- * \retval C2_OK if the blob was successfully created
- * \retval C2_BAD_VALUE if the blob was not successful created (this only
- *         happens if the parameters were not const)
- */
-template <typename T>
-bool _createParamsBlob(hidl_vec<uint8_t> *blob, const T &params) {
-    // assuming the parameter values are const
-    size_t size = 0;
-    for (const auto &p : params) {
-        if (!p) {
-            continue;
-        }
-        size += p->size();
-        size = align(size, PARAMS_ALIGNMENT);
-    }
-    blob->resize(size);
-    size_t ix = 0;
-    for (const auto &p : params) {
-        if (!p) {
-            continue;
-        }
-        // NEVER overwrite even if param values (e.g. size) changed
-        size_t paramSize = std::min(p->size(), size - ix);
-        std::copy(
-                reinterpret_cast<const uint8_t*>(&*p),
-                reinterpret_cast<const uint8_t*>(&*p) + paramSize,
-                &(*blob)[ix]);
-        ix += paramSize;
-        ix = align(ix, PARAMS_ALIGNMENT);
-    }
-    blob->resize(ix);
-    if (ix != size) {
-        LOG(ERROR) << "createParamsBlob -- inconsistent sizes.";
-        return false;
-    }
-    return true;
-}
-
-/**
- * Parses a params blob and create a vector of new T objects that contain copies
- * of the params in the blob. T is C2Param or its compatible derived class.
- *
- * \param[out] params the resulting vector
- * \param[in] blob parameter blob to parse
- * \retval C2_OK if the full blob was parsed and params was constructed
- * \retval C2_BAD_VALUE otherwise
- */
-template <typename T>
-bool _copyParamsFromBlob(
-        std::vector<std::unique_ptr<T>>* params,
-        Params blob) {
-
-    std::vector<C2Param*> paramPointers;
-    if (!parseParamsBlob(&paramPointers, blob)) {
-        LOG(ERROR) << "copyParamsFromBlob -- failed to parse.";
-        return false;
-    }
-
-    params->resize(paramPointers.size());
-    size_t i = 0;
-    for (C2Param* const& paramPointer : paramPointers) {
-        if (!paramPointer) {
-            LOG(ERROR) << "copyParamsFromBlob -- null paramPointer.";
-            return false;
-        }
-        (*params)[i++].reset(reinterpret_cast<T*>(
-                C2Param::Copy(*paramPointer).release()));
-    }
-    return true;
-}
-
-} // unnamed namespace
-
-// std::vector<const C2Param*> -> Params
-bool createParamsBlob(
-        hidl_vec<uint8_t> *blob,
-        const std::vector<const C2Param*> &params) {
-    return _createParamsBlob(blob, params);
-}
-
-// std::vector<C2Param*> -> Params
-bool createParamsBlob(
-        hidl_vec<uint8_t> *blob,
-        const std::vector<C2Param*> &params) {
-    return _createParamsBlob(blob, params);
-}
-
-// std::vector<std::unique_ptr<C2Param>> -> Params
-bool createParamsBlob(
-        hidl_vec<uint8_t> *blob,
-        const std::vector<std::unique_ptr<C2Param>> &params) {
-    return _createParamsBlob(blob, params);
-}
-
-// std::vector<std::unique_ptr<C2Tuning>> -> Params
-bool createParamsBlob(
-        hidl_vec<uint8_t> *blob,
-        const std::vector<std::unique_ptr<C2Tuning>> &params) {
-    return _createParamsBlob(blob, params);
-}
-
-// std::vector<std::shared_ptr<const C2Info>> -> Params
-bool createParamsBlob(
-        hidl_vec<uint8_t> *blob,
-        const std::vector<std::shared_ptr<const C2Info>> &params) {
-    return _createParamsBlob(blob, params);
-}
-
-// Params -> std::vector<std::unique_ptr<C2Param>>
-bool copyParamsFromBlob(
-        std::vector<std::unique_ptr<C2Param>>* params,
-        Params blob) {
-    return _copyParamsFromBlob(params, blob);
-}
-
-// Params -> std::vector<std::unique_ptr<C2Tuning>>
-bool copyParamsFromBlob(
-        std::vector<std::unique_ptr<C2Tuning>>* params,
-        Params blob) {
-    return _copyParamsFromBlob(params, blob);
-}
-
-// Params -> update std::vector<std::unique_ptr<C2Param>>
-bool updateParamsFromBlob(
-        const std::vector<C2Param*>& params,
-        const Params& blob) {
-    std::unordered_map<uint32_t, C2Param*> index2param;
-    for (C2Param* const& param : params) {
-        if (!param) {
-            LOG(ERROR) << "updateParamsFromBlob -- null output param.";
-            return false;
-        }
-        if (index2param.find(param->index()) == index2param.end()) {
-            index2param.emplace(param->index(), param);
-        }
-    }
-
-    std::vector<C2Param*> paramPointers;
-    if (!parseParamsBlob(&paramPointers, blob)) {
-        LOG(ERROR) << "updateParamsFromBlob -- failed to parse.";
-        return false;
-    }
-
-    for (C2Param* const& paramPointer : paramPointers) {
-        if (!paramPointer) {
-            LOG(ERROR) << "updateParamsFromBlob -- null input param.";
-            return false;
-        }
-        decltype(index2param)::iterator i = index2param.find(
-                paramPointer->index());
-        if (i == index2param.end()) {
-            LOG(DEBUG) << "updateParamsFromBlob -- index "
-                       << paramPointer->index() << " not found. Skipping...";
-            continue;
-        }
-        if (!i->second->updateFrom(*paramPointer)) {
-            LOG(ERROR) << "updateParamsFromBlob -- size mismatch: "
-                       << params.size() << " vs " << paramPointer->size()
-                       << " (index = " << i->first << ").";
-            return false;
-        }
-    }
-    return true;
-}
-
-// Convert BufferPool ResultStatus to c2_status_t.
-c2_status_t toC2Status(ResultStatus rs) {
-    switch (rs) {
-    case ResultStatus::OK:
-        return C2_OK;
-    case ResultStatus::NO_MEMORY:
-        return C2_NO_MEMORY;
-    case ResultStatus::ALREADY_EXISTS:
-        return C2_DUPLICATE;
-    case ResultStatus::NOT_FOUND:
-        return C2_NOT_FOUND;
-    case ResultStatus::CRITICAL_ERROR:
-        return C2_CORRUPTED;
-    default:
-        LOG(WARNING) << "Unrecognized BufferPool ResultStatus: "
-                     << static_cast<int32_t>(rs) << ".";
-        return C2_CORRUPTED;
-    }
-}
-
-namespace /* unnamed */ {
-
-template <typename BlockProcessor>
-void forEachBlock(C2FrameData& frameData,
-                  BlockProcessor process) {
-    for (const std::shared_ptr<C2Buffer>& buffer : frameData.buffers) {
-        if (buffer) {
-            for (const C2ConstGraphicBlock& block :
-                    buffer->data().graphicBlocks()) {
-                process(block);
-            }
-        }
-    }
-}
-
-template <typename BlockProcessor>
-void forEachBlock(const std::list<std::unique_ptr<C2Work>>& workList,
-                  BlockProcessor process,
-                  bool processInput, bool processOutput) {
-    for (const std::unique_ptr<C2Work>& work : workList) {
-        if (!work) {
-            continue;
-        }
-        if (processInput) {
-            forEachBlock(work->input, process);
-        }
-        if (processOutput) {
-            for (const std::unique_ptr<C2Worklet>& worklet : work->worklets) {
-                if (worklet) {
-                    forEachBlock(worklet->output,
-                                 process);
-                }
-            }
-        }
-    }
-}
-
-} // unnamed namespace
-
-bool beginTransferBufferQueueBlock(const C2ConstGraphicBlock& block) {
-    std::shared_ptr<_C2BlockPoolData> data =
-            _C2BlockFactory::GetGraphicBlockPoolData(block);
-    if (data && _C2BlockFactory::GetBufferQueueData(data)) {
-        _C2BlockFactory::BeginTransferBlockToClient(data);
-        return true;
-    }
-    return false;
-}
-
-void beginTransferBufferQueueBlocks(
+// Call beginTransferBufferQueueBlock() on blocks in the given workList.
+// processInput determines whether input blocks are yielded. processOutput
+// works similarly on output blocks. (The default value of processInput is
+// false while the default value of processOutput is true. This implies that in
+// most cases, only output buffers contain bufferqueue-based blocks.)
+void BeginTransferBufferQueueBlocks(
         const std::list<std::unique_ptr<C2Work>>& workList,
-        bool processInput, bool processOutput) {
-    forEachBlock(workList, beginTransferBufferQueueBlock,
-                 processInput, processOutput);
-}
+        bool processInput = false,
+        bool processOutput = true);
 
-bool endTransferBufferQueueBlock(
-        const C2ConstGraphicBlock& block,
-        bool transfer) {
-    std::shared_ptr<_C2BlockPoolData> data =
-            _C2BlockFactory::GetGraphicBlockPoolData(block);
-    if (data && _C2BlockFactory::GetBufferQueueData(data)) {
-        _C2BlockFactory::EndTransferBlockToClient(data, transfer);
-        return true;
-    }
-    return false;
-}
+// Call after transferring block is finished and make sure that
+// beginTransferBufferQueueBlock() is called before.
+//
+// The transfer of given block is finished. If transfer is successful the given
+// block is not owned by process anymore. Since transfer is finished the given
+// block data is OK to mutate by bufferqueue migration after this call.
+bool EndTransferBufferQueueBlock(const C2ConstGraphicBlock& block,
+                                 bool transfer);
 
-void endTransferBufferQueueBlocks(
+// Call endTransferBufferQueueBlock() on blocks in the given workList.
+// processInput determines whether input blocks are yielded. processOutput
+// works similarly on output blocks. (The default value of processInput is
+// false while the default value of processOutput is true. This implies that in
+// most cases, only output buffers contain bufferqueue-based blocks.)
+void EndTransferBufferQueueBlocks(
         const std::list<std::unique_ptr<C2Work>>& workList,
         bool transfer,
-        bool processInput, bool processOutput) {
-    forEachBlock(workList,
-                 std::bind(endTransferBufferQueueBlock,
-                           std::placeholders::_1, transfer),
-                 processInput, processOutput);
-}
+        bool processInput = false,
+        bool processOutput = true);
 
-bool displayBufferQueueBlock(const C2ConstGraphicBlock& block) {
-    std::shared_ptr<_C2BlockPoolData> data =
-            _C2BlockFactory::GetGraphicBlockPoolData(block);
-    if (data && _C2BlockFactory::GetBufferQueueData(data)) {
-        _C2BlockFactory::DisplayBlockToBufferQueue(data);
-        return true;
-    }
-    return false;
-}
+// The given block is ready to be rendered. the given block is not owned by
+// process anymore. If migration is in progress, this returns false in order
+// not to render.
+bool DisplayBufferQueueBlock(const C2ConstGraphicBlock& block);
 
-}  // namespace utils
-}  // namespace V1_0
-}  // namespace c2
-}  // namespace media
-}  // namespace hardware
 }  // namespace android
 
+#endif  // CODEC2_COMMON_BUFFER_TYPES_H

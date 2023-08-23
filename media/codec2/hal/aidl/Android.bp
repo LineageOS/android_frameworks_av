@@ -12,7 +12,6 @@ cc_library {
     ],
 
     header_libs: [
-        "libcodec2_hal_common",
         "libcodec2_internal", // private
         "libgui_headers",
     ],
@@ -23,6 +22,7 @@ cc_library {
         "libbinder_ndk",
         "libbase",
         "libcodec2",
+        "libcodec2_hal_common",
         "libcodec2_vndk",
         "libcutils",
         "liblog",
@@ -37,6 +37,7 @@ cc_library {
     export_shared_lib_headers: [
         "android.hardware.media.c2-V1-ndk",
         "libcodec2",
+        "libcodec2_hal_common",
     ],
 }
 

@@ -1,6 +1,6 @@
-cc_library_headers {
+cc_library {
     name: "libcodec2_hal_common",
-    export_include_dirs: ["include/"],
+    double_loadable: true,
     vendor_available: true,
     apex_available: [
         "//apex_available:platform",
@@ -8,4 +8,23 @@ cc_library_headers {
         "com.android.media.swcodec",
     ],
     min_sdk_version: "29",
+
+    srcs: [
+        "BufferTypes.cpp",
+    ],
+
+    export_include_dirs: ["include/"],
+
+    header_libs: [
+        "libcodec2_internal", // private
+        "libgui_headers",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
+        "liblog",
+        "libstagefright_foundation",
+    ],
 }
