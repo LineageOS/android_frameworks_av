@@ -61,12 +61,12 @@ namespace android {
     }
 
     inline std::string toStdString(const String8 &str) {
-        return std::string(str.string());
+        return std::string(str.c_str());
     }
 
     inline std::string toStdString(const String16 &str) {
         std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-        return convert.to_bytes(str.string());
+        return convert.to_bytes(str.c_str());
     }
 
     /**

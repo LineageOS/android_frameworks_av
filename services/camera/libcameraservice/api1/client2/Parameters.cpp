@@ -163,7 +163,7 @@ status_t Parameters::initialize(CameraDeviceBase *device) {
                     availablePreviewSizes[i].width,
                     availablePreviewSizes[i].height);
         }
-        ALOGV("Supported preview sizes are: %s", supportedPreviewSizes.string());
+        ALOGV("Supported preview sizes are: %s", supportedPreviewSizes.c_str());
         params.set(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES,
                 supportedPreviewSizes);
 
@@ -174,7 +174,7 @@ status_t Parameters::initialize(CameraDeviceBase *device) {
                     availableVideoSizes[i].width,
                     availableVideoSizes[i].height);
         }
-        ALOGV("Supported video sizes are: %s", supportedVideoSizes.string());
+        ALOGV("Supported video sizes are: %s", supportedVideoSizes.c_str());
         params.set(CameraParameters::KEY_SUPPORTED_VIDEO_SIZES,
                 supportedVideoSizes);
     }
@@ -314,7 +314,7 @@ status_t Parameters::initialize(CameraDeviceBase *device) {
                     fps);
 
             ALOGV("%s: Supported preview frame rates: %s",
-                    __FUNCTION__, supportedPreviewFrameRates.string());
+                    __FUNCTION__, supportedPreviewFrameRates.c_str());
         }
         params.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES,
                 supportedPreviewFrameRates);
@@ -2831,7 +2831,7 @@ status_t Parameters::parseAreas(const char *areasCStr,
     String8 areasStr(areasCStr);
     ssize_t areaStart = areasStr.find("(", 0) + 1;
     while (areaStart != 0) {
-        const char* area = areasStr.string() + areaStart;
+        const char* area = areasStr.c_str() + areaStart;
         char *numEnd;
         int vals[NUM_FIELDS];
         for (size_t i = 0; i < NUM_FIELDS; i++) {
