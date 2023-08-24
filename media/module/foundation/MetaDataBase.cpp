@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <mutex>
+
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
@@ -78,6 +80,7 @@ struct MetaDataBase::Rect {
 
 
 struct MetaDataBase::MetaDataInternal {
+    std::mutex mLock;
     KeyedVector<uint32_t, MetaDataBase::typed_data> mItems;
 };
 
@@ -102,10 +105,12 @@ MetaDataBase::~MetaDataBase() {
 }
 
 void MetaDataBase::clear() {
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     mInternalData->mItems.clear();
 }
 
 bool MetaDataBase::remove(uint32_t key) {
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     ssize_t i = mInternalData->mItems.indexOfKey(key);
 
     if (i < 0) {
@@ -252,6 +257,7 @@ bool MetaDataBase::setData(
         uint32_t key, uint32_t type, const void *data, size_t size) {
     bool overwrote_existing = true;
 
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     ssize_t i = mInternalData->mItems.indexOfKey(key);
     if (i < 0) {
         typed_data item;
@@ -269,6 +275,7 @@ bool MetaDataBase::setData(
 
 bool MetaDataBase::findData(uint32_t key, uint32_t *type,
                         const void **data, size_t *size) const {
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     ssize_t i = mInternalData->mItems.indexOfKey(key);
 
     if (i < 0) {
@@ -283,6 +290,7 @@ bool MetaDataBase::findData(uint32_t key, uint32_t *type,
 }
 
 bool MetaDataBase::hasData(uint32_t key) const {
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     ssize_t i = mInternalData->mItems.indexOfKey(key);
 
     if (i < 0) {
@@ -429,6 +437,7 @@ static void MakeFourCCString(uint32_t x, char *s) {
 
 String8 MetaDataBase::toString() const {
     String8 s;
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     for (int i = mInternalData->mItems.size(); --i >= 0;) {
         int32_t key = mInternalData->mItems.keyAt(i);
         char cc[5];
@@ -443,6 +452,7 @@ String8 MetaDataBase::toString() const {
 }
 
 void MetaDataBase::dumpToLog() const {
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     for (int i = mInternalData->mItems.size(); --i >= 0;) {
         int32_t key = mInternalData->mItems.keyAt(i);
         char cc[5];
@@ -455,6 +465,7 @@ void MetaDataBase::dumpToLog() const {
 #if defined(__ANDROID__) && !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 status_t MetaDataBase::writeToParcel(Parcel &parcel) {
     status_t ret;
+    std::lock_guard<std::mutex> guard(mInternalData->mLock);
     size_t numItems = mInternalData->mItems.size();
     ret = parcel.writeUint32(uint32_t(numItems));
     if (ret) {
