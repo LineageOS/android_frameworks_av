@@ -834,7 +834,7 @@ int main(int argc, char **argv) {
             case 'd':
             {
                 dumpStream = true;
-                dumpStreamFilename.setTo(optarg);
+                dumpStreamFilename = optarg;
                 break;
             }
 
@@ -842,13 +842,13 @@ int main(int argc, char **argv) {
             {
                 dumpPCMStream = true;
                 audioOnly = true;
-                dumpStreamFilename.setTo(optarg);
+                dumpStreamFilename = optarg;
                 break;
             }
 
             case 'N':
             {
-                gComponentNameOverride.setTo(optarg);
+                gComponentNameOverride = optarg;
                 break;
             }
 
@@ -886,7 +886,7 @@ int main(int argc, char **argv) {
             case 'w':
             {
                 gWriteMP4 = true;
-                gWriteMP4Filename.setTo(optarg);
+                gWriteMP4Filename = optarg;
                 break;
             }
 
