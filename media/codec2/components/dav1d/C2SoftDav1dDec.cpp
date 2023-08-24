@@ -26,19 +26,10 @@
 #include <Codec2CommonUtils.h>
 #include <Codec2Mapper.h>
 #include <SimpleC2Interface.h>
-#include <libyuv.h>
 #include <log/log.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 #include "C2SoftDav1dDec.h"
-
-// libyuv version required for I410ToAB30Matrix and I210ToAB30Matrix.
-#if LIBYUV_VERSION >= 1780
-#include <algorithm>
-#define HAVE_LIBYUV_I410_I210_TO_AB30 1
-#else
-#define HAVE_LIBYUV_I410_I210_TO_AB30 0
-#endif
 
 namespace android {
 
@@ -1114,16 +1105,6 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     // out_frameIndex that the decoded picture returns from dav1d.
     int64_t out_frameIndex = img.m.timestamp;
 
-#if LIBYUV_VERSION < 1779
-    if (!(img.p.layout != DAV1D_PIXEL_LAYOUT_I400 || img.p.layout != DAV1D_PIXEL_LAYOUT_I420)) {
-        ALOGE("image_format %d not supported", img.p.layout);
-        mSignalledError = true;
-        work->workletsProcessed = 1u;
-        work->result = C2_CORRUPTED;
-        return false;
-    }
-#endif
-
     const bool isMonochrome = img.p.layout == DAV1D_PIXEL_LAYOUT_I400;
 
     int bitdepth = img.p.bpc;
@@ -1141,17 +1122,6 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
             allowRGBA1010102 = true;
         }
         format = getHalPixelFormatForBitDepth10(allowRGBA1010102);
-#if !HAVE_LIBYUV_I410_I210_TO_AB30
-        if ((format == HAL_PIXEL_FORMAT_RGBA_1010102) &&
-            (is_img_ready ? img.p.layout == DAV1D_PIXEL_LAYOUT_I420
-                          : buffer->image_format != libgav1::kImageFormatYuv420)) {
-            ALOGE("Only YUV420 output is supported when targeting RGBA_1010102");
-            mSignalledError = true;
-            work->result = C2_OMITTED;
-            work->workletsProcessed = 1u;
-            return false;
-        }
-#endif
     }
 
     if (mHalPixelFormat != format) {
@@ -1206,6 +1176,19 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
     size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
+    CONV_FORMAT_T convFormat;
+    switch (img.p.layout) {
+        case DAV1D_PIXEL_LAYOUT_I444:
+            convFormat = CONV_FORMAT_I444;
+            break;
+        case DAV1D_PIXEL_LAYOUT_I422:
+            convFormat = CONV_FORMAT_I422;
+            break;
+        default:
+            convFormat = CONV_FORMAT_I420;
+            break;
+    }
+
     if (bitdepth == 10) {
         // TODO: b/277797541 - Investigate if we can ask DAV1D to output the required format during
         // decompression to avoid color conversion.
@@ -1217,110 +1200,56 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
         size_t srcVStride = img.stride[1] / 2;
 
         if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
-            bool processed = false;
-#if HAVE_LIBYUV_I410_I210_TO_AB30
-            if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-                libyuv::I410ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                                         dstYStride, &libyuv::kYuvV2020Constants, mWidth, mHeight);
-                processed = true;
-            } else if (img.p.layout == DAV1D_PIXEL_LAYOUT_I422) {
-                libyuv::I210ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                                         dstYStride, &libyuv::kYuvV2020Constants, mWidth, mHeight);
-                processed = true;
-            }
-#endif  // HAVE_LIBYUV_I410_I210_TO_AB30
-            if (!processed) {
-                if (isMonochrome) {
-                    const size_t tmpSize = mWidth;
-                    const bool needFill = tmpSize > mTmpFrameBufferSize;
-                    if (!allocTmpFrameBuffer(tmpSize)) {
-                        ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
-                        setError(work, C2_NO_MEMORY);
-                        return false;
-                    }
-                    srcU = srcV = mTmpFrameBuffer.get();
-                    srcUStride = srcVStride = 0;
-                    if (needFill) {
-                        std::fill_n(mTmpFrameBuffer.get(), tmpSize, 512);
-                    }
+            if (isMonochrome) {
+                const size_t tmpSize = mWidth;
+                const bool needFill = tmpSize > mTmpFrameBufferSize;
+                if (!allocTmpFrameBuffer(tmpSize)) {
+                    ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
+                    setError(work, C2_NO_MEMORY);
+                    return false;
                 }
-                convertYUV420Planar16ToY410OrRGBA1010102(
-                        (uint32_t*)dstY, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
-                        dstYStride / sizeof(uint32_t), mWidth, mHeight,
-                        std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+                srcU = srcV = mTmpFrameBuffer.get();
+                srcUStride = srcVStride = 0;
+                if (needFill) {
+                    std::fill_n(mTmpFrameBuffer.get(), tmpSize, 512);
+                }
             }
+            convertPlanar16ToY410OrRGBA1010102(
+                    dstY, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                    dstYStride, mWidth, mHeight,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects),
+                    convFormat);
         } else if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
             dstYStride /= 2;
             dstUStride /= 2;
             dstVStride /= 2;
-#if LIBYUV_VERSION >= 1779
+            size_t tmpSize = 0;
             if ((img.p.layout == DAV1D_PIXEL_LAYOUT_I444) ||
                 (img.p.layout == DAV1D_PIXEL_LAYOUT_I422)) {
-                // TODO(https://crbug.com/libyuv/952): replace this block with libyuv::I410ToP010
-                // and libyuv::I210ToP010 when they are available. Note it may be safe to alias dstY
-                // in I010ToP010, but the libyuv API doesn't make any guarantees.
-                const size_t tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
+                tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
                 if (!allocTmpFrameBuffer(tmpSize)) {
                     ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
                     setError(work, C2_NO_MEMORY);
                     return false;
                 }
-                uint16_t* const tmpY = mTmpFrameBuffer.get();
-                uint16_t* const tmpU = tmpY + dstYStride * mHeight;
-                uint16_t* const tmpV = tmpU + dstUStride * align(mHeight, 2) / 2;
-                if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-                    libyuv::I410ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
-                                       dstYStride, tmpU, dstUStride, tmpV, dstUStride, mWidth,
-                                       mHeight);
-                } else {
-                    libyuv::I210ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
-                                       dstYStride, tmpU, dstUStride, tmpV, dstUStride, mWidth,
-                                       mHeight);
-                }
-                libyuv::I010ToP010(tmpY, dstYStride, tmpU, dstUStride, tmpV, dstVStride,
-                                   (uint16_t*)dstY, dstYStride, (uint16_t*)dstU, dstUStride, mWidth,
-                                   mHeight);
-            } else {
-                convertYUV420Planar16ToP010((uint16_t*)dstY, (uint16_t*)dstU, srcY, srcU, srcV,
-                                            srcYStride, srcUStride, srcVStride, dstYStride,
-                                            dstUStride, mWidth, mHeight, isMonochrome);
             }
-#else   // LIBYUV_VERSION < 1779
-            convertYUV420Planar16ToP010((uint16_t*)dstY, (uint16_t*)dstU, srcY, srcU, srcV,
-                                        srcYStride, srcUStride, srcVStride, dstYStride, dstUStride,
-                                        mWidth, mHeight, isMonochrome);
-#endif  // LIBYUV_VERSION >= 1779
+            convertPlanar16ToP010((uint16_t*)dstY, (uint16_t*)dstU, srcY, srcU, srcV, srcYStride,
+                                  srcUStride, srcVStride, dstYStride, dstUStride, dstVStride,
+                                  mWidth, mHeight, isMonochrome, convFormat, mTmpFrameBuffer.get(),
+                                  tmpSize);
         } else {
-#if LIBYUV_VERSION >= 1779
+            size_t tmpSize = 0;
             if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-                // TODO(https://crbug.com/libyuv/950): replace this block with libyuv::I410ToI420
-                // when it's available.
-                const size_t tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
+                tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
                 if (!allocTmpFrameBuffer(tmpSize)) {
                     ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
                     setError(work, C2_NO_MEMORY);
                     return false;
                 }
-                uint16_t* const tmpY = mTmpFrameBuffer.get();
-                uint16_t* const tmpU = tmpY + dstYStride * mHeight;
-                uint16_t* const tmpV = tmpU + dstUStride * align(mHeight, 2) / 2;
-                libyuv::I410ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
-                                   dstYStride, tmpU, dstUStride, tmpV, dstVStride, mWidth, mHeight);
-                libyuv::I010ToI420(tmpY, dstYStride, tmpU, dstUStride, tmpV, dstUStride, dstY,
-                                   dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-            } else if (img.p.layout == DAV1D_PIXEL_LAYOUT_I422) {
-                libyuv::I210ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                                   dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-            } else {
-                convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride,
-                                            srcUStride, srcVStride, dstYStride, dstUStride, mWidth,
-                                            mHeight, isMonochrome);
             }
-#else   // LIBYUV_VERSION < 1779
-            convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                        srcVStride, dstYStride, dstUStride, mWidth, mHeight,
-                                        isMonochrome);
-#endif  // LIBYUV_VERSION >= 1779
+            convertPlanar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                  srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight,
+                                  isMonochrome, convFormat, mTmpFrameBuffer.get(), tmpSize);
         }
 
         // Dump the output buffer if dumping is enabled (debug only).
@@ -1401,17 +1330,9 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
             }
         }
 #endif
-        if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-            libyuv::I444ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                               dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-        } else if (img.p.layout == DAV1D_PIXEL_LAYOUT_I422) {
-            libyuv::I422ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                               dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-        } else {
-            convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                       srcVStride, dstYStride, dstUStride, dstVStride, mWidth,
-                                       mHeight, isMonochrome);
-        }
+        convertPlanar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                             dstYStride, dstUStride, dstVStride, mWidth, mHeight, isMonochrome,
+                             convFormat);
     }
 
     dav1d_picture_unref(&img);
