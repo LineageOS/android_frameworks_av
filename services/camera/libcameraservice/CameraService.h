@@ -104,6 +104,9 @@ public:
     // Event log ID
     static const int SN_EVENT_LOG_ID = 0x534e4554;
 
+    // Keep this in sync with frameworks/base/core/java/android/os/UserHandle.java
+    static const userid_t USER_SYSTEM = 0;
+
     // Register camera service
     static void instantiate();
 
@@ -655,6 +658,9 @@ private:
 
     bool hasPermissionsForSystemCamera(const std::string& cameraId, int callingPid, int callingUid)
             const;
+
+    bool hasPermissionsForCameraHeadlessSystemUser(const std::string& cameraId, int callingPid,
+            int callingUid) const;
 
    /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
