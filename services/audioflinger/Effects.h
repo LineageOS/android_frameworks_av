@@ -622,6 +622,8 @@ private:
 
     ssize_t getInsertIndex(const effect_descriptor_t& desc);
 
+    std::optional<size_t> findVolumeControl_l(size_t from, size_t to) const;
+
     mutable  Mutex mLock;        // mutex protecting effect list
              Vector<sp<IAfEffectModule>> mEffects; // list of effect modules
              audio_session_t mSessionId; // audio session ID
@@ -634,7 +636,6 @@ private:
 
              int32_t mTailBufferCount;   // current effect tail buffer count
              int32_t mMaxTailBuffers;    // maximum effect tail buffers
-             int mVolumeCtrlIdx;         // index of insert effect having control over volume
              uint32_t mLeftVolume;       // previous volume on left channel
              uint32_t mRightVolume;      // previous volume on right channel
              uint32_t mNewLeftVolume;       // new volume on left channel
@@ -647,6 +648,8 @@ private:
              KeyedVector< int, sp<SuspendedEffectDesc> > mSuspendedEffects;
 
              const sp<EffectCallback> mEffectCallback;
+
+             wp<IAfEffectModule> mVolumeControlEffect;
 };
 
 class DeviceEffectProxy : public IAfDeviceEffectProxy, public EffectBase {
