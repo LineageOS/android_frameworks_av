@@ -847,7 +847,7 @@ static bool convertTimeToDate(int64_t time_1904, String8 *s) {
     struct tm* tm = gmtime(&time_1970);
     if (tm != NULL &&
             strftime(tmp, sizeof(tmp), "%Y%m%dT%H%M%S.000Z", tm) > 0) {
-        s->setTo(tmp);
+        *s = tmp;
         return true;
     }
     return false;
@@ -4082,10 +4082,10 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
             buffer[size] = '\0';
             switch (mPath[5]) {
                 case FOURCC("mean"):
-                    mLastCommentMean.setTo((const char *)buffer + 4);
+                    mLastCommentMean = ((const char *)buffer + 4);
                     break;
                 case FOURCC("name"):
-                    mLastCommentName.setTo((const char *)buffer + 4);
+                    mLastCommentName = ((const char *)buffer + 4);
                     break;
                 case FOURCC("data"):
                     if (size < 8) {
@@ -4094,7 +4094,7 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
                         ALOGE("b/24346430");
                         return ERROR_MALFORMED;
                     }
-                    mLastCommentData.setTo((const char *)buffer + 8);
+                    mLastCommentData = ((const char *)buffer + 8);
                     break;
             }
 
