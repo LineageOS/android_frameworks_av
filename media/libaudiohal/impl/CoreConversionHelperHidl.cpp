@@ -97,7 +97,7 @@ void CoreConversionHelperHidl::parametersToHal(
     for (size_t i = 0; i < parameters.size(); ++i) {
         params.add(String8(parameters[i].key.c_str()), String8(parameters[i].value.c_str()));
     }
-    values->setTo(params.toString());
+    *values = params.toString();
 }
 
 CoreConversionHelperHidl::CoreConversionHelperHidl(std::string_view className)

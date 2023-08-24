@@ -160,7 +160,7 @@ void JsonWebKey::findValue(const String8 &key, String8* value) {
             if (nextToken + 1 == mTokens.end())
                 break;
             valueToken = (*(nextToken + 1)).c_str();
-            value->setTo(valueToken);
+            *value = valueToken;
             nextToken++;
             break;
         }
@@ -211,7 +211,7 @@ bool JsonWebKey::parseJsonObject(const String8& jsonObject,
         pjs = jsonObject.c_str() + mJsmnTokens[j].start;
         if (mJsmnTokens[j].type == JSMN_STRING ||
                 mJsmnTokens[j].type == JSMN_PRIMITIVE) {
-            token.setTo(pjs, mJsmnTokens[j].end - mJsmnTokens[j].start);
+            token = String8(pjs, mJsmnTokens[j].end - mJsmnTokens[j].start);
             tokens->add(token);
         }
     }
@@ -259,7 +259,7 @@ bool JsonWebKey::parseJsonWebKeySet(const String8& jsonWebKeySet,
     for (int i = 0; i < numTokens; ++i) {
         pjs = jsonWebKeySet.c_str() + mJsmnTokens[i].start;
         if (mJsmnTokens[i].type == JSMN_OBJECT) {
-            token.setTo(pjs, mJsmnTokens[i].end - mJsmnTokens[i].start);
+            token = String8(pjs, mJsmnTokens[i].end - mJsmnTokens[i].start);
             jsonObjects->add(token);
         }
     }
