@@ -1111,7 +1111,7 @@ bool InfeBox::parseNullTerminatedString(
         }
         buf.push_back(tmp);
         if (tmp == 0) {
-            out->setTo(buf.array());
+            *out = buf.array();
 
             *offset = newOffset;
             *size = stopOffset - newOffset;
