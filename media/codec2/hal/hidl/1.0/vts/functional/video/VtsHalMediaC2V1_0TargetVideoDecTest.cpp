@@ -459,7 +459,8 @@ void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
             ASSERT_TRUE(false) << "Wait for generating C2Work exceeded timeout";
         }
         int64_t timestamp = (*Info)[frameID].timestamp;
-        if ((*Info)[frameID].flags) flags = (1 << ((*Info)[frameID].flags - 1));
+
+        flags = ((*Info)[frameID].flags == FLAG_CONFIG_DATA) ? C2FrameData::FLAG_CODEC_CONFIG : 0;
         if (signalEOS && ((frameID == (int)Info->size() - 1) || (frameID == (offset + range - 1))))
             flags |= C2FrameData::FLAG_END_OF_STREAM;
 
