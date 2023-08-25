@@ -85,6 +85,7 @@ cc_defaults {
         "android.hardware.common.fmq-V1-ndk",
         "android.hardware.graphics.common-V4-ndk",
         "media_permission-aidl-cpp",
+        "server_configurable_flags",
     ],
 
     static_libs: [
@@ -105,12 +106,13 @@ cc_defaults {
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
         "android.hardware.camera.provider-V2-ndk",
+        "camera_platform_flags_c_lib",
         "libaidlcommonsupport",
+        "libbinderthreadstateutils",
+        "libcameraservice_device_independent",
         "libdynamic_depth",
         "libprocessinfoservice_aidl",
-        "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
-        "libcameraservice_device_independent",
     ],
 }
 
