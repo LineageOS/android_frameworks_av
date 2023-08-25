@@ -45,6 +45,8 @@ public:
     MOCK_METHOD(void, stopMelComputationForDeviceId, (audio_port_handle_t), (override));
 };
 
+constexpr char kPrimaryModule[] = "primary";
+constexpr char kSecondaryModule[] = "secondary";
 
 class SoundDoseManagerTest : public ::testing::Test {
 protected:
@@ -52,17 +54,24 @@ protected:
         mMelReporterCallback = sp<MelReporterCallback>::make();
         mSoundDoseManager = sp<SoundDoseManager>::make(mMelReporterCallback);
         mHalSoundDose = ndk::SharedRefBase::make<HalSoundDoseMock>();
+        mSecondaryHalSoundDose = ndk::SharedRefBase::make<HalSoundDoseMock>();
 
         ON_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound)
             .WillByDefault([] (float rs2) {
                 EXPECT_EQ(rs2, ISoundDose::DEFAULT_MAX_RS2);
                 return ndk::ScopedAStatus::ok();
             });
+        ON_CALL(*mSecondaryHalSoundDose.get(), setOutputRs2UpperBound)
+                .WillByDefault([] (float rs2) {
+                    EXPECT_EQ(rs2, ISoundDose::DEFAULT_MAX_RS2);
+                    return ndk::ScopedAStatus::ok();
+                });
     }
 
     sp<MelReporterCallback> mMelReporterCallback;
     sp<SoundDoseManager> mSoundDoseManager;
     std::shared_ptr<HalSoundDoseMock> mHalSoundDose;
+    std::shared_ptr<HalSoundDoseMock> mSecondaryHalSoundDose;
 };
 
 TEST_F(SoundDoseManagerTest, GetProcessorForExistingStream) {
@@ -110,7 +119,7 @@ TEST_F(SoundDoseManagerTest, NewMelValuesCacheNewRecord) {
 }
 
 TEST_F(SoundDoseManagerTest, InvalidHalInterfaceIsNotSet) {
-    EXPECT_FALSE(mSoundDoseManager->setHalSoundDoseInterface(nullptr));
+    EXPECT_FALSE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, nullptr));
 }
 
 TEST_F(SoundDoseManagerTest, SetHalSoundDoseDisablesNewMelProcessorCallbacks) {
@@ -122,7 +131,7 @@ TEST_F(SoundDoseManagerTest, SetHalSoundDoseDisablesNewMelProcessorCallbacks) {
             return ndk::ScopedAStatus::ok();
         });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
 
     EXPECT_EQ(nullptr, mSoundDoseManager->getOrCreateProcessorForDevice(/*deviceId=*/2,
             /*streamHandle=*/1,
@@ -139,8 +148,17 @@ TEST_F(SoundDoseManagerTest, SetHalSoundDoseRegistersHalCallbacks) {
             EXPECT_NE(nullptr, callback);
             return ndk::ScopedAStatus::ok();
         });
+    EXPECT_CALL(*mSecondaryHalSoundDose.get(), setOutputRs2UpperBound).Times(1);
+    EXPECT_CALL(*mSecondaryHalSoundDose.get(), registerSoundDoseCallback)
+            .Times(1)
+            .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
+                EXPECT_NE(nullptr, callback);
+                return ndk::ScopedAStatus::ok();
+        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kSecondaryModule,
+                                                            mSecondaryHalSoundDose));
 }
 
 TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalWithNoAddressIllegalArgument) {
@@ -154,7 +172,7 @@ TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalWithNoAddressIllegalArgumen
            return ndk::ScopedAStatus::ok();
        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
 
     EXPECT_NE(nullptr, halCallback);
     AudioDevice audioDevice = {};
@@ -175,9 +193,9 @@ TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalAfterInternalSelectedReturn
            return ndk::ScopedAStatus::ok();
        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
     EXPECT_NE(nullptr, halCallback);
-    EXPECT_FALSE(mSoundDoseManager->setHalSoundDoseInterface(nullptr));
+    mSoundDoseManager->resetHalSoundDoseInterfaces();
 
     AudioDevice audioDevice = {};
     audioDevice.address.set<AudioDeviceAddress::id>("test");
@@ -197,7 +215,7 @@ TEST_F(SoundDoseManagerTest, OnNewMelValuesFromHalWithNoAddressIllegalArgument) 
            return ndk::ScopedAStatus::ok();
        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
 
     EXPECT_NE(nullptr, halCallback);
     AudioDevice audioDevice = {};
