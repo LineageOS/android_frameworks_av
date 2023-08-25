@@ -598,7 +598,6 @@ status_t VendorTagDescriptor::createDescriptorFromOps(const vendor_tag_ops_t* vO
 status_t VendorTagDescriptor::setAsGlobalVendorTagDescriptor(const sp<VendorTagDescriptor>& desc) {
     status_t res = OK;
     Mutex::Autolock al(sLock);
-    sGlobalVendorTagDescriptor = desc;
 
     vendor_tag_ops_t* opsPtr = NULL;
     if (desc != NULL) {
@@ -613,6 +612,9 @@ status_t VendorTagDescriptor::setAsGlobalVendorTagDescriptor(const sp<VendorTagD
         ALOGE("%s: Could not set vendor tag descriptor, received error %s (%d)."
                 , __FUNCTION__, strerror(-res), res);
     }
+
+    sGlobalVendorTagDescriptor = desc;
+
     return res;
 }
 
@@ -631,7 +633,6 @@ status_t VendorTagDescriptorCache::setAsGlobalVendorTagCache(
         const sp<VendorTagDescriptorCache>& cache) {
     status_t res = OK;
     Mutex::Autolock al(sLock);
-    sGlobalVendorTagDescriptorCache = cache;
 
     struct vendor_tag_cache_ops* opsPtr = NULL;
     if (cache != NULL) {
@@ -646,6 +647,9 @@ status_t VendorTagDescriptorCache::setAsGlobalVendorTagCache(
         ALOGE("%s: Could not set vendor tag cache, received error %s (%d)."
                 , __FUNCTION__, strerror(-res), res);
     }
+
+    sGlobalVendorTagDescriptorCache = cache;
+
     return res;
 }
 

@@ -90,7 +90,8 @@ public:
                                   * ready as possible (aka. Buffer is full). */
                                 size_t frameCountToBeReady = SIZE_MAX,
                                 float speed = 1.0f,
-                                bool isSpatialized = false);
+                                bool isSpatialized = false,
+                                bool isBitPerfect = false);
     virtual             ~Track();
     virtual status_t    initCheck() const;
 
@@ -154,8 +155,12 @@ public:
     sp<media::VolumeHandler>   getVolumeHandler() { return mVolumeHandler; }
     /** Set the computed normalized final volume of the track.
      * !masterMute * masterVolume * streamVolume * averageLRVolume */
-    void                setFinalVolume(float volume);
+    void                setFinalVolume(float volumeLeft, float volumeRight);
     float               getFinalVolume() const { return mFinalVolume; }
+    void                getFinalVolume(float* left, float* right) const {
+                            *left = mFinalVolumeLeft;
+                            *right = mFinalVolumeRight;
+    }
 
     using SourceMetadatas = std::vector<playback_track_metadata_v7_t>;
     using MetadataInserter = std::back_insert_iterator<SourceMetadatas>;
@@ -188,7 +193,9 @@ public:
             }
             sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
 
-            void    setTeePatches(TeePatches teePatches);
+            // This function should be called with holding thread lock.
+            void    updateTeePatches();
+            void    setTeePatchesToUpdate(TeePatches teePatchesToUpdate);
 
     void tallyUnderrunFrames(size_t frames) override {
        if (isOut()) { // we expect this from output tracks only
@@ -210,6 +217,13 @@ public:
     audio_output_flags_t getOutputFlags() const { return mFlags; }
     float getSpeed() const { return mSpeed; }
     bool isSpatialized() const override { return mIsSpatialized; }
+    bool isBitPerfect() const override { return mIsBitPerfect; }
+
+    /**
+     * Updates the mute state and notifies the audio service. Call this only when holding player
+     * thread lock.
+     */
+    void processMuteEvent_l(const sp<IAudioManager>& audioManager, mute_state_t muteState);
 
 protected:
     // for numerous
@@ -354,14 +368,25 @@ private:
                                         // 'volatile' means accessed without lock or
                                         // barrier, but is read/written atomically
     float               mFinalVolume; // combine master volume, stream type volume and track volume
+    float               mFinalVolumeLeft; // combine master volume, stream type volume and track
+                                          // volume
+    float               mFinalVolumeRight; // combine master volume, stream type volume and track
+                                           // volume
     sp<AudioTrackServerProxy>  mAudioTrackServerProxy;
     bool                mResumeToStopping; // track was paused in stopping state.
     bool                mFlushHwPending; // track requests for thread flush
     bool                mPauseHwPending = false; // direct/offload track request for thread pause
     audio_output_flags_t mFlags;
     TeePatches  mTeePatches;
+    std::optional<TeePatches> mTeePatchesToUpdate;
     const float         mSpeed;
     const bool          mIsSpatialized;
+    const bool          mIsBitPerfect;
+
+    // TODO: replace PersistableBundle with own struct
+    // access these two variables only when holding player thread lock.
+    std::unique_ptr<os::PersistableBundle> mMuteEventExtras;
+    mute_state_t        mMuteState;
 };  // end of Track
 
 
@@ -411,6 +436,7 @@ public:
 private:
     status_t            obtainBuffer(AudioBufferProvider::Buffer* buffer,
                                      uint32_t waitTimeMs);
+    void                queueBuffer(Buffer& inBuffer);
     void                clearBufferQueue();
 
     void                restartIfDisabled();

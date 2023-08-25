@@ -141,6 +141,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libbinder_ndk",
         "libfmq",
         "libhidlbase",
         "libhardware",
@@ -151,15 +152,13 @@ cc_library_shared {
         "libcutils",
         "libcamera_metadata",
         "libmediandk",
-        "android.frameworks.cameraservice.device@2.0",
-        "android.frameworks.cameraservice.device@2.1",
-        "android.frameworks.cameraservice.common@2.0",
-        "android.frameworks.cameraservice.service@2.0",
-        "android.frameworks.cameraservice.service@2.1",
-        "android.frameworks.cameraservice.service@2.2",
+        "android.frameworks.cameraservice.common-V1-ndk",
+        "android.frameworks.cameraservice.device-V1-ndk",
+        "android.frameworks.cameraservice.service-V1-ndk",
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
+        "libaidlcommonsupport",
         "libarect",
     ],
     // TODO: jchowdhary@, use header_libs instead b/131165718

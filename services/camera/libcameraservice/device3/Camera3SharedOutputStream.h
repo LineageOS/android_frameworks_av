@@ -45,7 +45,9 @@ public:
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
             int timestampBase = OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
-            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO);
+            int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO,
+            int32_t colorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED,
+            bool useReadoutTimestamp = false);
 
     virtual ~Camera3SharedOutputStream();
 

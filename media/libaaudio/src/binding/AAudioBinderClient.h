@@ -17,6 +17,8 @@
 #ifndef ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 #define ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 
+#include <mutex>
+
 #include <utils/RefBase.h>
 #include <utils/Singleton.h>
 
@@ -52,69 +54,76 @@ public:
     /**
      * @param request info needed to create the stream
      * @param configuration contains resulting information about the created stream
-     * @return handle to the stream or a negative error
+     * @return an object for aaudio handle information, which includes the connected
+     *         aaudio service lifetime id to recognize the connected aaudio service
+     *         and aaudio handle to recognize the stream. If an error occurs, the
+     *         aaudio handle will be set as the negative error.
      */
-    aaudio_handle_t openStream(const AAudioStreamRequest &request,
-                               AAudioStreamConfiguration &configurationOutput) override;
+    AAudioHandleInfo openStream(const AAudioStreamRequest &request,
+                                AAudioStreamConfiguration &configurationOutput) override;
 
-    aaudio_result_t closeStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
 
     /* Get an immutable description of the in-memory queues
     * used to communicate with the underlying HAL or Service.
     */
-    aaudio_result_t getStreamDescription(aaudio_handle_t streamHandle,
+    aaudio_result_t getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                          AudioEndpointParcelable &endpointOut) override;
 
     /**
      * Start the flow of data.
      * This is asynchronous. When complete, the service will send a STARTED event.
      */
-    aaudio_result_t startStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t startStream(const AAudioHandleInfo& streamHandleInfo) override;
 
     /**
      * Stop the flow of data such that start() can resume without loss of data.
      * This is asynchronous. When complete, the service will send a PAUSED event.
      */
-    aaudio_result_t pauseStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t pauseStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t stopStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t stopStream(const AAudioHandleInfo& streamHandleInfo) override;
 
     /**
      *  Discard any data held by the underlying HAL or Service.
      * This is asynchronous. When complete, the service will send a FLUSHED event.
      */
-    aaudio_result_t flushStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t flushStream(const AAudioHandleInfo& streamHandleInfo) override;
 
     /**
      * Manage the specified thread as a low latency audio thread.
      * TODO Consider passing this information as part of the startStream() call.
      */
-    aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle,
-                                                pid_t clientThreadId,
-                                                int64_t periodNanoseconds) override;
+    aaudio_result_t registerAudioThread(const AAudioHandleInfo& streamHandleInfo,
+                                        pid_t clientThreadId,
+                                        int64_t periodNanoseconds) override;
 
-    aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
-                                                  pid_t clientThreadId) override;
+    aaudio_result_t unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
+                                          pid_t clientThreadId) override;
 
-    aaudio_result_t startClient(aaudio_handle_t streamHandle __unused,
+    aaudio_result_t startClient(const AAudioHandleInfo& streamHandleInfo __unused,
                                 const android::AudioClient& client __unused,
                                 const audio_attributes_t *attr __unused,
                                 audio_port_handle_t *clientHandle __unused) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    aaudio_result_t stopClient(aaudio_handle_t streamHandle __unused,
+    aaudio_result_t stopClient(const AAudioHandleInfo& streamHandleInfo __unused,
                                audio_port_handle_t clientHandle __unused)  override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    aaudio_result_t exitStandby(aaudio_handle_t streamHandle,
+    aaudio_result_t exitStandby(const AAudioHandleInfo& streamHandleInfo,
                                 AudioEndpointParcelable &endpointOut) override;
 
     void onStreamChange(aaudio_handle_t /*handle*/, int32_t /*opcode*/, int32_t /*value*/) {
         // TODO This is just a stub so we can have a client Binder to pass to the service.
         // TODO Implemented in a later CL.
         ALOGW("onStreamChange called!");
+    }
+
+    int32_t getServiceLifetimeId() const {
+        return mAAudioClient->getServiceLifetimeId();
     }
 
     class AAudioClient : public android::IBinder::DeathRecipient, public BnAAudioClient {
@@ -125,6 +134,7 @@ public:
 
         // implement DeathRecipient
         virtual void binderDied(const android::wp<android::IBinder>& who __unused) {
+            mServiceLifetimeId++;
             android::sp<AAudioBinderClient> client = mBinderClient.promote();
             if (client.get() != nullptr) {
                 client->dropAAudioService();
@@ -141,8 +151,13 @@ public:
             }
             return android::binder::Status::ok();
         }
+
+        int32_t getServiceLifetimeId() const {
+            return mServiceLifetimeId.load();
+        }
     private:
         android::wp<AAudioBinderClient> mBinderClient;
+        std::atomic_int                 mServiceLifetimeId{0};
     };
 
     // This adapter is used to convert the binder interface (delegate) to the AudioServiceInterface
@@ -153,8 +168,9 @@ public:
     class Adapter : public AAudioBinderAdapter {
     public:
         Adapter(const android::sp<IAAudioService>& delegate,
-                android::sp<AAudioClient> aaudioClient)
-                : AAudioBinderAdapter(delegate.get()),
+                android::sp<AAudioClient> aaudioClient,
+                int32_t serviceLifetimeId)
+                : AAudioBinderAdapter(delegate.get(), serviceLifetimeId),
                   mDelegate(delegate),
                   mAAudioClient(std::move(aaudioClient)) {}
 
@@ -165,7 +181,7 @@ public:
         }
 
         // This should never be called (call is rejected at the AudioBinderClient level).
-        aaudio_result_t startClient(aaudio_handle_t streamHandle __unused,
+        aaudio_result_t startClient(const AAudioHandleInfo& streamHandle __unused,
                                     const android::AudioClient& client __unused,
                                     const audio_attributes_t* attr __unused,
                                     audio_port_handle_t* clientHandle __unused) override {
@@ -174,7 +190,7 @@ public:
         }
 
         // This should never be called (call is rejected at the AudioBinderClient level).
-        aaudio_result_t stopClient(aaudio_handle_t streamHandle __unused,
+        aaudio_result_t stopClient(const AAudioHandleInfo& streamHandle __unused,
                                    audio_port_handle_t clientHandle __unused) override {
             LOG_ALWAYS_FATAL("Shouldn't get here");
             return AAUDIO_ERROR_UNAVAILABLE;

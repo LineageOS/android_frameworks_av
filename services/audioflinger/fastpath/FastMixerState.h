@@ -37,7 +37,7 @@ public:
     // The provider implementation is responsible for validating that the return value is in range.
     virtual gain_minifloat_packed_t getVolumeLR() = 0;
 protected:
-    VolumeProvider() { }
+    VolumeProvider() = default;
     virtual ~VolumeProvider() = default;
 };
 
@@ -63,12 +63,12 @@ static_assert(!std::is_polymorphic_v<FastTrack>);
 
 // Represents a single state of the fast mixer
 struct FastMixerState : FastThreadState {
-                FastMixerState();
+    FastMixerState();
 
     // These are the minimum, maximum, and default values for maximum number of fast tracks
-    static const unsigned kMinFastTracks = 2;
-    static const unsigned kMaxFastTracks = 32;
-    static const unsigned kDefaultFastTracks = 8;
+    static constexpr unsigned kMinFastTracks = 2;
+    static constexpr unsigned kMaxFastTracks = 32;
+    static constexpr unsigned kDefaultFastTracks = 8;
 
     static unsigned sMaxFastTracks;             // Configured maximum number of fast tracks
     static pthread_once_t sMaxFastTracksOnce;   // Protects initializer for sMaxFastTracks

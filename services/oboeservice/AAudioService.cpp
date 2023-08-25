@@ -62,7 +62,7 @@ android::AAudioService::AAudioService()
     AAudioClientTracker::getInstance().setAAudioService(this);
 }
 
-status_t AAudioService::dump(int fd, const Vector<String16>& args) {
+status_t AAudioService::dump(int fd, const Vector<String16>& /*args*/) {
     std::string result;
 
     if (!dumpAllowed()) {
@@ -83,7 +83,7 @@ status_t AAudioService::dump(int fd, const Vector<String16>& args) {
 }
 
 Status AAudioService::registerClient(const sp<IAAudioClient> &client) {
-    pid_t pid = IPCThreadState::self()->getCallingPid();
+    const pid_t pid = IPCThreadState::self()->getCallingPid();
     AAudioClientTracker::getInstance().registerClient(pid, client);
     return Status::ok();
 }
@@ -106,24 +106,24 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
     // 4) Thread A can then get the lock and also open a shared stream.
     // Without the lock. Thread A might sneak in and reallocate an exclusive stream
     // before B can open the shared stream.
-    std::unique_lock<std::recursive_mutex> lock(mOpenLock);
+    const std::unique_lock<std::recursive_mutex> lock(mOpenLock);
 
     aaudio_result_t result = AAUDIO_OK;
     sp<AAudioServiceStreamBase> serviceStream;
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
-    bool sharingModeMatchRequired = request.isSharingModeMatchRequired();
-    aaudio_sharing_mode_t sharingMode = configurationInput.getSharingMode();
+    const bool sharingModeMatchRequired = request.isSharingModeMatchRequired();
+    const aaudio_sharing_mode_t sharingMode = configurationInput.getSharingMode();
 
     // Enforce limit on client processes.
     AttributionSourceState attributionSource = request.getAttributionSource();
-    pid_t pid = IPCThreadState::self()->getCallingPid();
+    const pid_t pid = IPCThreadState::self()->getCallingPid();
     attributionSource.pid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
         legacy2aidl_pid_t_int32_t(pid));
     attributionSource.uid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
         legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
     attributionSource.token = sp<BBinder>::make();
     if (attributionSource.pid != mAudioClient.attributionSource.pid) {
-        int32_t count = AAudioClientTracker::getInstance().getStreamCount(pid);
+        const int32_t count = AAudioClientTracker::getInstance().getStreamCount(pid);
         if (count >= MAX_STREAMS_PER_PROCESS) {
             ALOGE("openStream(): exceeded max streams per process %d >= %d",
                   count,  MAX_STREAMS_PER_PROCESS);
@@ -168,7 +168,7 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
         serviceStream.clear();
         AIDL_RETURN(result);
     } else {
-        aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
+        const aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
         serviceStream->setHandle(handle);
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
         paramsOut.copyFrom(*serviceStream);
@@ -185,7 +185,7 @@ Status AAudioService::closeStream(int32_t streamHandle, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
     // Check permission and ownership first.
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGE("closeStream(0x%0x), illegal stream handle", streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
@@ -197,13 +197,13 @@ Status AAudioService::getStreamDescription(int32_t streamHandle, Endpoint* endpo
                                            int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGE("getStreamDescription(), illegal stream handle = 0x%0x", streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
     }
     AudioEndpointParcelable endpointParcelable;
-    aaudio_result_t result = serviceStream->getDescription(endpointParcelable);
+    const aaudio_result_t result = serviceStream->getDescription(endpointParcelable);
     if (result == AAUDIO_OK) {
         *endpoint = std::move(endpointParcelable).parcelable();
     }
@@ -213,7 +213,7 @@ Status AAudioService::getStreamDescription(int32_t streamHandle, Endpoint* endpo
 Status AAudioService::startStream(int32_t streamHandle, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
@@ -224,7 +224,7 @@ Status AAudioService::startStream(int32_t streamHandle, int32_t *_aidl_return) {
 Status AAudioService::pauseStream(int32_t streamHandle, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
@@ -235,7 +235,7 @@ Status AAudioService::pauseStream(int32_t streamHandle, int32_t *_aidl_return) {
 Status AAudioService::stopStream(int32_t streamHandle, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
@@ -246,7 +246,7 @@ Status AAudioService::stopStream(int32_t streamHandle, int32_t *_aidl_return) {
 Status AAudioService::flushStream(int32_t streamHandle, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
@@ -254,16 +254,16 @@ Status AAudioService::flushStream(int32_t streamHandle, int32_t *_aidl_return) {
     AIDL_RETURN(serviceStream->flush());
 }
 
-Status AAudioService::registerAudioThread(int32_t streamHandle, int32_t clientThreadId, int64_t periodNanoseconds,
-                                          int32_t *_aidl_return) {
+Status AAudioService::registerAudioThread(int32_t streamHandle, int32_t clientThreadId,
+                                          int64_t /*periodNanoseconds*/, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
     }
-    int32_t priority = isCallerInService()
+    const int32_t priority = isCallerInService()
         ? kRealTimeAudioPriorityService : kRealTimeAudioPriorityClient;
     AIDL_RETURN(serviceStream->registerAudioThread(clientThreadId, priority));
 }
@@ -272,7 +272,7 @@ Status AAudioService::unregisterAudioThread(int32_t streamHandle, int32_t client
                                             int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
@@ -283,13 +283,13 @@ Status AAudioService::unregisterAudioThread(int32_t streamHandle, int32_t client
 Status AAudioService::exitStandby(int32_t streamHandle, Endpoint* endpoint, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGE("getStreamDescription(), illegal stream handle = 0x%0x", streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
     }
     AudioEndpointParcelable endpointParcelable;
-    aaudio_result_t result = serviceStream->exitStandby(&endpointParcelable);
+    const aaudio_result_t result = serviceStream->exitStandby(&endpointParcelable);
     if (result == AAUDIO_OK) {
         *endpoint = std::move(endpointParcelable).parcelable();
     }
@@ -297,16 +297,18 @@ Status AAudioService::exitStandby(int32_t streamHandle, Endpoint* endpoint, int3
 }
 
 bool AAudioService::isCallerInService() {
-    pid_t clientPid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mAudioClient.attributionSource.pid));
-    uid_t clientUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mAudioClient.attributionSource.uid));
+    const pid_t clientPid = VALUE_OR_FATAL(
+            aidl2legacy_int32_t_pid_t(mAudioClient.attributionSource.pid));
+    const uid_t clientUid = VALUE_OR_FATAL(
+            aidl2legacy_int32_t_uid_t(mAudioClient.attributionSource.uid));
     return clientPid == IPCThreadState::self()->getCallingPid() &&
         clientUid == IPCThreadState::self()->getCallingUid();
 }
 
-aaudio_result_t AAudioService::closeStream(sp<AAudioServiceStreamBase> serviceStream) {
+aaudio_result_t AAudioService::closeStream(const sp<AAudioServiceStreamBase>& serviceStream) {
     // This is protected by a lock in AAudioClientTracker.
     // It is safe to unregister the same stream twice.
-    pid_t pid = serviceStream->getOwnerProcessId();
+    const pid_t pid = serviceStream->getOwnerProcessId();
     AAudioClientTracker::getInstance().unregisterClientStream(pid, serviceStream);
     // This is protected by a lock in mStreamTracker.
     // It is safe to remove the same stream twice.
@@ -325,10 +327,10 @@ sp<AAudioServiceStreamBase> AAudioService::convertHandleToServiceStream(
         const uid_t ownerUserId = serviceStream->getOwnerUserId();
         const uid_t clientUid = VALUE_OR_FATAL(
             aidl2legacy_int32_t_uid_t(mAudioClient.attributionSource.uid));
-        bool callerOwnsIt = callingUserId == ownerUserId;
-        bool serverCalling = callingUserId == clientUid;
-        bool serverOwnsIt = ownerUserId == clientUid;
-        bool allowed = callerOwnsIt || serverCalling || serverOwnsIt;
+        const bool callerOwnsIt = callingUserId == ownerUserId;
+        const bool serverCalling = callingUserId == clientUid;
+        const bool serverOwnsIt = ownerUserId == clientUid;
+        const bool allowed = callerOwnsIt || serverCalling || serverOwnsIt;
         if (!allowed) {
             ALOGE("AAudioService: calling uid %d cannot access stream 0x%08X owned by %d",
                   callingUserId, streamHandle, ownerUserId);
@@ -342,7 +344,7 @@ aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
                                            const android::AudioClient& client,
                                            const audio_attributes_t *attr,
                                            audio_port_handle_t *clientHandle) {
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
@@ -352,7 +354,7 @@ aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
 
 aaudio_result_t AAudioService::stopClient(aaudio_handle_t streamHandle,
                                           audio_port_handle_t portHandle) {
-    sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
@@ -364,14 +366,14 @@ aaudio_result_t AAudioService::stopClient(aaudio_handle_t streamHandle,
 // So we do not have to check permissions.
 aaudio_result_t AAudioService::disconnectStreamByPortHandle(audio_port_handle_t portHandle) {
     ALOGD("%s(%d) called", __func__, portHandle);
-    sp<AAudioServiceStreamBase> serviceStream =
+    const sp<AAudioServiceStreamBase> serviceStream =
             mStreamTracker.findStreamByPortHandle(portHandle);
     if (serviceStream.get() == nullptr) {
         ALOGE("%s(), could not find stream with portHandle = %d", __func__, portHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     // This is protected by a lock and will just return if already stopped.
-    aaudio_result_t result = serviceStream->stop();
+    const aaudio_result_t result = serviceStream->stop();
     serviceStream->disconnect();
     return result;
 }

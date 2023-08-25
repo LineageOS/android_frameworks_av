@@ -162,7 +162,7 @@ status_t MediaMuxer::setLocation(int latitude, int longitude) {
         return INVALID_OPERATION;
     }
     if (!isMp4Format(mFormat)) {
-        ALOGE("setLocation() is only supported for .mp4, .3gp or .heic output.");
+        ALOGE("setLocation() is only supported for .mp4, .3gp, .heic or .avif output.");
         return INVALID_OPERATION;
     }
 

@@ -27,8 +27,13 @@ cc_test {
         "external/dynamic_depth/internal",
     ],
 
+    header_libs: [
+        "libmedia_headers",
+    ],
+
     shared_libs: [
         "libbase",
+        "libbinder",
         "libcutils",
         "libcameraservice",
         "libhidlbase",
@@ -44,7 +49,7 @@ cc_test {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.provider-V1-ndk",
+        "android.hardware.camera.provider-V2-ndk",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.4",
@@ -57,6 +62,7 @@ cc_test {
     ],
 
     srcs: [
+        "CameraPermissionsTest.cpp",
         "CameraProviderManagerTest.cpp",
         "ClientManagerTest.cpp",
         "DepthProcessorTest.cpp",

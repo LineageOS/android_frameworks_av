@@ -130,7 +130,7 @@ private:
     std::optional<bool> doIsAllowed(uid_t uid);
     sp<content::pm::IPackageManagerNative> retrievePackageManager();
     sp<content::pm::IPackageManagerNative> mPackageManager; // To check apps manifest
-    uint_t mPackageManagerErrors = 0;
+    unsigned int mPackageManagerErrors = 0;
     struct Package {
         std::string name;
         bool playbackCaptureAllowed = false;

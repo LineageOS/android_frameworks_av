@@ -9,14 +9,13 @@ package {
 
 cc_defaults {
     name: "libmediautils_fuzzer_defaults",
+    host_supported: true,
     shared_libs: [
-        "libbatterystats_aidl",
         "libbinder",
-        "libcutils",
         "liblog",
+        "libcutils",
         "libmediautils",
         "libutils",
-        "libbinder",
         "framework-permission-aidl-cpp",
         "packagemanager_aidl-cpp",
     ],
@@ -26,11 +25,6 @@ cc_defaults {
         "-Wextra",
         "-Werror",
         "-Wno-c++2a-extensions",
-    ],
-
-    header_libs: [
-        "bionic_libc_platform_headers",
-        "libmedia_headers",
     ],
 }
 

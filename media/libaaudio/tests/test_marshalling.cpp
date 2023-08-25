@@ -109,7 +109,7 @@ TEST(test_marshalling, aaudio_shared_region) {
     sharedMemories[0].setup(fd, memSizeBytes);
     int32_t regionOffset1 = 32;
     int32_t regionSize1 = 16;
-    sharedRegionA.setup(0, regionOffset1, regionSize1);
+    sharedRegionA.setup({0, regionOffset1, regionSize1});
 
     void *region1;
     EXPECT_EQ(AAUDIO_OK, sharedRegionA.resolve(sharedMemories, &region1));

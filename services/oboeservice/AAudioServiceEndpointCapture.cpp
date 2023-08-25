@@ -90,5 +90,5 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
     }
 
     ALOGD("callbackLoop() exiting");
-    return NULL; // TODO review
+    return nullptr; // TODO review
 }

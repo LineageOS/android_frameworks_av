@@ -49,7 +49,12 @@ status_t CameraOfflineSessionClient::initialize(sp<CameraProviderManager>, const
 
     mFrameProcessor = new camera2::FrameProcessorBase(mOfflineSession);
     std::string threadName = fmt::sprintf("Offline-%s-FrameProc", mCameraIdStr.c_str());
-    mFrameProcessor->run(threadName.c_str());
+    res = mFrameProcessor->run(threadName.c_str());
+    if (res != OK) {
+        ALOGE("%s: Unable to start frame processor thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     mFrameProcessor->registerListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
                                       camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID,
@@ -81,6 +86,10 @@ status_t CameraOfflineSessionClient::setRotateAndCropOverride(uint8_t /*rotateAn
     return OK;
 }
 
+status_t CameraOfflineSessionClient::setAutoframingOverride(uint8_t) {
+    return OK;
+}
+
 bool CameraOfflineSessionClient::supportsCameraMute() {
     // Offline mode doesn't support muting
     return false;
@@ -95,6 +104,14 @@ void CameraOfflineSessionClient::setStreamUseCaseOverrides(
 }
 
 void CameraOfflineSessionClient::clearStreamUseCaseOverrides() {
+}
+
+bool CameraOfflineSessionClient::supportsZoomOverride() {
+    return false;
+}
+
+status_t CameraOfflineSessionClient::setZoomOverride(int32_t /*zoomOverride*/) {
+    return INVALID_OPERATION;
 }
 
 status_t CameraOfflineSessionClient::dump(int fd, const Vector<String16>& args) {
@@ -247,7 +264,7 @@ status_t CameraOfflineSessionClient::startCameraOps() {
     mOpsActive = true;
 
     // Transition device state to OPEN
-    sCameraService->mUidPolicy->registerMonitorUid(mClientUid);
+    sCameraService->mUidPolicy->registerMonitorUid(mClientUid, /*openCamera*/true);
 
     return OK;
 }
@@ -271,7 +288,7 @@ status_t CameraOfflineSessionClient::finishCameraOps() {
     }
     mOpsCallback.clear();
 
-    sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid);
+    sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid, /*closeCamera*/true);
 
     return OK;
 }

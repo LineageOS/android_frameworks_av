@@ -310,7 +310,7 @@ void DrmHalHidl::cleanup() {
     closeOpenSessions();
 
     Mutex::Autolock autoLock(mLock);
-    reportFrameworkMetrics(reportPluginMetrics());
+    if (mInitCheck == OK) reportFrameworkMetrics(reportPluginMetrics());
 
     setListener(NULL);
     mInitCheck = NO_INIT;

@@ -24,7 +24,6 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-#include <android/media/audio/common/AudioMMapPolicy.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <media/AudioSystem.h>
@@ -37,10 +36,10 @@
 #include "core/AudioStreamBuilder.h"
 #include "legacy/AudioStreamRecord.h"
 #include "legacy/AudioStreamTrack.h"
+#include "utility/AAudioUtilities.h"
 
 using namespace aaudio;
 
-using android::media::audio::common::AudioMMapPolicy;
 using android::media::audio::common::AudioMMapPolicyInfo;
 using android::media::audio::common::AudioMMapPolicyType;
 
@@ -95,37 +94,6 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
     return result;
 }
 
-namespace {
-
-aaudio_policy_t aidl2legacy_aaudio_policy(AudioMMapPolicy aidl) {
-    switch (aidl) {
-        case AudioMMapPolicy::NEVER:
-            return AAUDIO_POLICY_NEVER;
-        case AudioMMapPolicy::AUTO:
-            return AAUDIO_POLICY_AUTO;
-        case AudioMMapPolicy::ALWAYS:
-            return AAUDIO_POLICY_ALWAYS;
-        case AudioMMapPolicy::UNSPECIFIED:
-        default:
-            return AAUDIO_UNSPECIFIED;
-    }
-}
-
-// The aaudio policy will be ALWAYS, NEVER, UNSPECIFIED only when all policy info are
-// ALWAYS, NEVER or UNSPECIFIED. Otherwise, the aaudio policy will be AUTO.
-aaudio_policy_t getAAudioPolicy(
-        const std::vector<AudioMMapPolicyInfo>& policyInfos) {
-    if (policyInfos.empty()) return AAUDIO_POLICY_AUTO;
-    for (size_t i = 1; i < policyInfos.size(); ++i) {
-        if (policyInfos.at(i).mmapPolicy != policyInfos.at(0).mmapPolicy) {
-            return AAUDIO_POLICY_AUTO;
-        }
-    }
-    return aidl2legacy_aaudio_policy(policyInfos.at(0).mmapPolicy);
-}
-
-} // namespace
-
 // Try to open using MMAP path if that is allowed.
 // Fall back to Legacy path if MMAP not available.
 // Exact behavior is controlled by MMapPolicy.
@@ -145,12 +113,28 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     }
 
     std::vector<AudioMMapPolicyInfo> policyInfos;
-    // The API setting is the highest priority.
     aaudio_policy_t mmapPolicy = AudioGlobal_getMMapPolicy();
-    // If not specified then get from a system property.
-    if (mmapPolicy == AAUDIO_UNSPECIFIED && android::AudioSystem::getMmapPolicyInfo(
-                AudioMMapPolicyType::DEFAULT, &policyInfos) == NO_ERROR) {
-        mmapPolicy = getAAudioPolicy(policyInfos);
+    if (android::AudioSystem::getMmapPolicyInfo(
+            AudioMMapPolicyType::DEFAULT, &policyInfos) == NO_ERROR) {
+        aaudio_policy_t systemMmapPolicy = AAudio_getAAudioPolicy(policyInfos);
+        if (mmapPolicy == AAUDIO_POLICY_ALWAYS && systemMmapPolicy == AAUDIO_POLICY_NEVER) {
+            // No need to try as AAudioService is not created and the client only wants MMAP path.
+            return AAUDIO_ERROR_NO_SERVICE;
+        }
+        // Use system property for mmap policy if
+        //    1. The API setting does not specify mmap policy or
+        //    2. The system property specifies MMAP policy as never. In this case, AAudioService
+        //       will not be started, no need to try mmap path.
+        if (mmapPolicy == AAUDIO_UNSPECIFIED || systemMmapPolicy == AAUDIO_POLICY_NEVER) {
+            mmapPolicy = systemMmapPolicy;
+        }
+    } else {
+        // If it fails querying mmap policy info, it is highly possible that the AAudioService is
+        // not created. In this case, we don't try mmap path.
+        if (mmapPolicy == AAUDIO_POLICY_ALWAYS) {
+            return AAUDIO_ERROR_NO_SERVICE;
+        }
+        mmapPolicy = AAUDIO_POLICY_NEVER;
     }
     // If still not specified then use the default.
     if (mmapPolicy == AAUDIO_UNSPECIFIED) {
@@ -161,7 +145,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     aaudio_policy_t mmapExclusivePolicy = AAUDIO_UNSPECIFIED;
     if (android::AudioSystem::getMmapPolicyInfo(
             AudioMMapPolicyType::EXCLUSIVE, &policyInfos) == NO_ERROR) {
-        mmapExclusivePolicy = getAAudioPolicy(policyInfos);
+        mmapExclusivePolicy = AAudio_getAAudioPolicy(policyInfos);
     }
     if (mmapExclusivePolicy == AAUDIO_UNSPECIFIED) {
         mmapExclusivePolicy = AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT;
@@ -189,6 +173,11 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     // SessionID and Effects are only supported in Legacy mode.
     if (getSessionId() != AAUDIO_SESSION_ID_NONE) {
         ALOGD("%s() MMAP not used because sessionId specified.", __func__);
+        allowMMap = false;
+    }
+
+    if (getFormat() == AUDIO_FORMAT_IEC61937) {
+        ALOGD("%s IEC61937 format is selected, do not allow MMAP in this case.", __func__);
         allowMMap = false;
     }
 

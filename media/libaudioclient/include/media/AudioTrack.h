@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIOTRACK_H
 #define ANDROID_AUDIOTRACK_H
 
+#include <audiomanager/IAudioManager.h>
 #include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
@@ -654,6 +655,15 @@ public:
      */
             uint32_t    getOriginalSampleRate() const;
 
+    /* Return the sample rate from the AudioFlinger output thread. */
+            uint32_t    getHalSampleRate() const;
+
+    /* Return the channel count from the AudioFlinger output thread. */
+            uint32_t    getHalChannelCount() const;
+
+    /* Return the HAL format from the AudioFlinger output thread. */
+            audio_format_t    getHalFormat() const;
+
     /* Sets the Dual Mono mode presentation on the output device. */
             status_t    setDualMonoMode(audio_dual_mono_mode_t mode);
 
@@ -1148,6 +1158,8 @@ public:
             void setAudioTrackCallback(const sp<media::IAudioTrackCallback>& callback) {
                 mAudioTrackCallback->setAudioTrackCallback(callback);
             }
+ private:
+            void triggerPortIdUpdate_l();
 
  protected:
     /* copying audio tracks is not allowed */
@@ -1253,6 +1265,11 @@ public:
     audio_track_cblk_t*     mCblk;                  // re-load after mLock.unlock()
     audio_io_handle_t       mOutput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getOutputForAttr()
 
+    // A copy of shared memory and proxy between obtainBuffer and releaseBuffer to keep the
+    // shared memory valid when processing data.
+    sp<IMemory>               mCblkMemoryObtainBufferRef GUARDED_BY(mLock);
+    sp<AudioTrackClientProxy> mProxyObtainBufferRef GUARDED_BY(mLock);
+
     sp<AudioTrackThread>    mAudioTrackThread;
     bool                    mThreadCanCallJava;
 
@@ -1270,12 +1287,14 @@ public:
     size_t                  mReqFrameCount;         // frame count to request the first or next time
                                                     // a new IAudioTrack is needed, non-decreasing
 
-    // The following AudioFlinger server-side values are cached in createAudioTrack_l().
+    // The following AudioFlinger server-side values are cached in createTrack_l().
     // These values can be used for informational purposes until the track is invalidated,
     // whereupon restoreTrack_l() calls createTrack_l() to update the values.
     uint32_t                mAfLatency;             // AudioFlinger latency in ms
     size_t                  mAfFrameCount;          // AudioFlinger frame count
     uint32_t                mAfSampleRate;          // AudioFlinger sample rate
+    uint32_t                mAfChannelCount;        // AudioFlinger channel count
+    audio_format_t          mAfFormat;              // AudioFlinger format
 
     // constant after constructor or set()
     audio_format_t          mFormat;                // as requested by client, not forced to 16-bit
@@ -1414,13 +1433,16 @@ public:
 
     audio_session_t         mSessionId;
     int                     mAuxEffectId;
-    audio_port_handle_t     mPortId;                    // Id from Audio Policy Manager
+    audio_port_handle_t     mPortId = AUDIO_PORT_HANDLE_NONE; // Id from Audio Policy Manager
 
     /**
      * mPlayerIId is the player id of the AudioTrack used by AudioManager.
      * For an AudioTrack created by the Java interface, this is generally set once.
      */
     int                     mPlayerIId = -1;  // AudioManager.h PLAYER_PIID_INVALID
+
+    /** Interface for interacting with the AudioService. */
+    sp<IAudioManager>       mAudioManager;
 
     /**
      * mLogSessionId is a string identifying this AudioTrack for the metrics service.

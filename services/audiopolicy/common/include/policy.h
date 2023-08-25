@@ -218,12 +218,15 @@ static inline audio_devices_t apm_extract_one_audio_device(
         return *(deviceTypes.begin());
     } else {
         // Multiple device selection is either:
+        //  - dock + one other device: give priority to dock in this case.
         //  - speaker + one other device: give priority to speaker in this case.
         //  - one A2DP device + another device: happens with duplicated output. In this case
         // retain the device on the A2DP output as the other must not correspond to an active
         // selection if not the speaker.
         //  - HDMI-CEC system audio mode only output: give priority to available item in order.
-        if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER) != 0) {
+        if (deviceTypes.count(AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET) != 0) {
+            return AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET;
+        } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER) != 0) {
             return AUDIO_DEVICE_OUT_SPEAKER;
         } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER_SAFE) != 0) {
             return AUDIO_DEVICE_OUT_SPEAKER_SAFE;
@@ -245,4 +248,17 @@ static inline audio_devices_t apm_extract_one_audio_device(
             return a2dpDevices.empty() ? AUDIO_DEVICE_NONE : a2dpDevices[0];
         }
     }
+}
+
+/**
+ * Indicates if two given audio output flags are considered as matched, which means that
+ * 1) the `supersetFlags` and `subsetFlags` both contain or both don't contain must match flags and
+ * 2) `supersetFlags` contains all flags from `subsetFlags`.
+ */
+static inline bool audio_output_flags_is_subset(audio_output_flags_t supersetFlags,
+                                                audio_output_flags_t subsetFlags,
+                                                uint32_t mustMatchFlags)
+{
+    return ((supersetFlags ^ subsetFlags) & mustMatchFlags) == AUDIO_OUTPUT_FLAG_NONE
+            && (supersetFlags & subsetFlags) == subsetFlags;
 }

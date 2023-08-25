@@ -1306,6 +1306,7 @@ bool ToneGenerator::initAudioTrack() {
         streamType = AUDIO_STREAM_DTMF;
     }
     attr = AudioSystem::streamTypeToAttributes(streamType);
+    attr.flags = static_cast<audio_flags_mask_t>(attr.flags | AUDIO_FLAG_LOW_LATENCY);
 
     const size_t frameCount = mProcessSize;
     status_t status = mpAudioTrack->set(
@@ -1314,7 +1315,7 @@ bool ToneGenerator::initAudioTrack() {
             AUDIO_FORMAT_PCM_16_BIT,
             AUDIO_CHANNEL_OUT_MONO,
             frameCount,
-            AUDIO_OUTPUT_FLAG_FAST,
+            AUDIO_OUTPUT_FLAG_NONE,
             wp<AudioTrack::IAudioTrackCallback>::fromExisting(this),
             0,    // notificationFrames
             0,    // sharedBuffer

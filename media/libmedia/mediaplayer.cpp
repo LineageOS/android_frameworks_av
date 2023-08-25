@@ -42,8 +42,8 @@ namespace android {
 using media::VolumeShaper;
 using content::AttributionSourceState;
 
-MediaPlayer::MediaPlayer(const AttributionSourceState& attributionSource)
-        : mAttributionSource(attributionSource)
+MediaPlayer::MediaPlayer(const AttributionSourceState& attributionSource,
+    const audio_session_t sessionId) : mAttributionSource(attributionSource)
 {
     ALOGV("constructor");
     mListener = NULL;
@@ -61,7 +61,12 @@ MediaPlayer::MediaPlayer(const AttributionSourceState& attributionSource)
     mLeftVolume = mRightVolume = 1.0;
     mVideoWidth = mVideoHeight = 0;
     mLockThreadId = 0;
-    mAudioSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
+    if (sessionId == AUDIO_SESSION_ALLOCATE) {
+        mAudioSessionId = static_cast<audio_session_t>(
+            AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION));
+    } else {
+        mAudioSessionId = sessionId;
+    }
     AudioSystem::acquireAudioSessionId(mAudioSessionId, (pid_t)-1, (uid_t)-1); // always in client.
     mSendLevel = 0;
     mRetransmitEndpointValid = false;

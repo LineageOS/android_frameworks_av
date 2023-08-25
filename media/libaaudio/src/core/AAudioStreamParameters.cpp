@@ -49,6 +49,9 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mOpPackageName        = other.mOpPackageName;
     mAttributionTag       = other.mAttributionTag;
     mChannelMask          = other.mChannelMask;
+    mHardwareSamplesPerFrame = other.mHardwareSamplesPerFrame;
+    mHardwareSampleRate   = other.mHardwareSampleRate;
+    mHardwareAudioFormat  = other.mHardwareAudioFormat;
 }
 
 static aaudio_result_t isFormatValid(audio_format_t format) {
@@ -58,6 +61,7 @@ static aaudio_result_t isFormatValid(audio_format_t format) {
         case AUDIO_FORMAT_PCM_32_BIT:
         case AUDIO_FORMAT_PCM_FLOAT:
         case AUDIO_FORMAT_PCM_24_BIT_PACKED:
+        case AUDIO_FORMAT_IEC61937:
             break; // valid
         default:
             ALOGD("audioFormat not valid, audio_format_t = 0x%08x", format);
@@ -202,7 +206,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
     return validateChannelMask();
 }
 
-bool AAudioStreamParameters::validateChannelMask() const {
+aaudio_result_t AAudioStreamParameters::validateChannelMask() const {
     if (mChannelMask == AAUDIO_UNSPECIFIED) {
         return AAUDIO_OK;
     }
@@ -310,4 +314,7 @@ void AAudioStreamParameters::dump() const {
         "(null)" : mOpPackageName.value().c_str());
     ALOGD("mAttributionTag       = %s", !mAttributionTag.has_value() ?
         "(null)" : mAttributionTag.value().c_str());
+    ALOGD("mHardwareSamplesPerFrame = %6d", mHardwareSamplesPerFrame);
+    ALOGD("mHardwareSampleRate   = %6d", mHardwareSampleRate);
+    ALOGD("mHardwareAudioFormat  = %6d", (int)mHardwareAudioFormat);
 }

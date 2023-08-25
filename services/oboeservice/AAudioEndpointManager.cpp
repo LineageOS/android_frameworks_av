@@ -162,7 +162,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
         const aaudio::AAudioStreamRequest &request,
         sp<AAudioServiceEndpoint> &endpointToSteal) {
 
-    std::lock_guard<std::mutex> lock(mExclusiveLock);
+    const std::lock_guard<std::mutex> lock(mExclusiveLock);
 
     const AAudioStreamConfiguration &configuration = request.getConstantConfiguration();
 
@@ -183,19 +183,20 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
             // and START calls. This will help preserve app compatibility.
             // An app can avoid having this happen by closing their streams when
             // the app is paused.
-            pid_t pid = VALUE_OR_FATAL(
+            const pid_t pid = VALUE_OR_FATAL(
                 aidl2legacy_int32_t_pid_t(request.getAttributionSource().pid));
             AAudioClientTracker::getInstance().setExclusiveEnabled(pid, false);
             endpointToSteal = endpoint; // return it to caller
         }
         return nullptr;
     } else {
-        sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP(aaudioService);
+        const sp<AAudioServiceEndpointMMAP> endpointMMap =
+                new AAudioServiceEndpointMMAP(aaudioService);
         ALOGV("%s(), no match so try to open MMAP %p for dev %d",
               __func__, endpointMMap.get(), configuration.getDeviceId());
         endpoint = endpointMMap;
 
-        aaudio_result_t result = endpoint->open(request);
+        const aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
             endpoint.clear();
         } else {
@@ -217,10 +218,10 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
         AAudioService &aaudioService,
         const aaudio::AAudioStreamRequest &request) {
 
-    std::lock_guard<std::mutex> lock(mSharedLock);
+    const std::lock_guard<std::mutex> lock(mSharedLock);
 
     const AAudioStreamConfiguration &configuration = request.getConstantConfiguration();
-    aaudio_direction_t direction = configuration.getDirection();
+    const aaudio_direction_t direction = configuration.getDirection();
 
     // Try to find an existing endpoint.
     sp<AAudioServiceEndpointShared> endpoint = findSharedEndpoint_l(configuration);
@@ -228,7 +229,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
     // If we can't find an existing one then open a new one.
     if (endpoint.get() == nullptr) {
         // we must call openStream with audioserver identity
-        int64_t token = IPCThreadState::self()->clearCallingIdentity();
+        const int64_t token = IPCThreadState::self()->clearCallingIdentity();
         switch (direction) {
             case AAUDIO_DIRECTION_INPUT:
                 endpoint = new AAudioServiceEndpointCapture(aaudioService);
@@ -241,7 +242,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
         }
 
         if (endpoint.get() != nullptr) {
-            aaudio_result_t result = endpoint->open(request);
+            const aaudio_result_t result = endpoint->open(request);
             if (result != AAUDIO_OK) {
                 endpoint.clear();
             } else {
@@ -261,7 +262,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openSharedEndpoint(
     return endpoint;
 }
 
-void AAudioEndpointManager::closeEndpoint(sp<AAudioServiceEndpoint>serviceEndpoint) {
+void AAudioEndpointManager::closeEndpoint(const sp<AAudioServiceEndpoint>& serviceEndpoint) {
     if (serviceEndpoint->getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
         return closeExclusiveEndpoint(serviceEndpoint);
     } else {
@@ -269,14 +270,15 @@ void AAudioEndpointManager::closeEndpoint(sp<AAudioServiceEndpoint>serviceEndpoi
     }
 }
 
-void AAudioEndpointManager::closeExclusiveEndpoint(sp<AAudioServiceEndpoint> serviceEndpoint) {
+void AAudioEndpointManager::closeExclusiveEndpoint(
+        const sp<AAudioServiceEndpoint>& serviceEndpoint) {
     if (serviceEndpoint.get() == nullptr) {
         return;
     }
 
     // Decrement the reference count under this lock.
-    std::lock_guard<std::mutex> lock(mExclusiveLock);
-    int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
+    const std::lock_guard<std::mutex> lock(mExclusiveLock);
+    const int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
 
     // If no longer in use then actually close it.
@@ -292,14 +294,14 @@ void AAudioEndpointManager::closeExclusiveEndpoint(sp<AAudioServiceEndpoint> ser
     }
 }
 
-void AAudioEndpointManager::closeSharedEndpoint(sp<AAudioServiceEndpoint> serviceEndpoint) {
+void AAudioEndpointManager::closeSharedEndpoint(const sp<AAudioServiceEndpoint>& serviceEndpoint) {
     if (serviceEndpoint.get() == nullptr) {
         return;
     }
 
     // Decrement the reference count under this lock.
-    std::lock_guard<std::mutex> lock(mSharedLock);
-    int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
+    const std::lock_guard<std::mutex> lock(mSharedLock);
+    const int32_t newRefCount = serviceEndpoint->getOpenCount() - 1;
     serviceEndpoint->setOpenCount(newRefCount);
 
     // If no longer in use then actually close it.

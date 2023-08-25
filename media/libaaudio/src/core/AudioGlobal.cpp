@@ -82,6 +82,7 @@ const char* AudioGlobal_convertFormatToText(aaudio_format_t format) {
         AAUDIO_CASE_ENUM(AAUDIO_FORMAT_PCM_FLOAT);
         AAUDIO_CASE_ENUM(AAUDIO_FORMAT_PCM_I24_PACKED);
         AAUDIO_CASE_ENUM(AAUDIO_FORMAT_PCM_I32);
+        AAUDIO_CASE_ENUM(AAUDIO_FORMAT_IEC61937);
     }
     return "Unrecognized";
 }

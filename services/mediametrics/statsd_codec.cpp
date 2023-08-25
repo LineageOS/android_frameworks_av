@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <pwd.h>
 #include <stdint.h>
+#include <string>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -32,13 +33,148 @@
 #include <stats_media_metrics.h>
 #include <stats_event.h>
 
-#include "cleaner.h"
-#include "MediaMetricsService.h"
-#include "ValidateId.h"
-#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
-#include "iface_statsd.h"
+#include <frameworks/proto_logging/stats/message/mediametrics_message.pb.h>
+#include <mediametricsservice/cleaner.h>
+#include <mediametricsservice/iface_statsd.h>
+#include <mediametricsservice/MediaMetricsService.h>
+#include <mediametricsservice/StringUtils.h>
+#include <mediametricsservice/ValidateId.h>
 
 namespace android {
+
+using stats::media_metrics::stats_write;
+using stats::media_metrics::MEDIA_CODEC_RENDERED;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_UNKNOWN;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_INVALID;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_ZERO;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_UNKNOWN;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_UNDETERMINED;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_24_3_2_PULLDOWN;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_NONE;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_HLG;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_HDR10;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_HDR10_PLUS;
+using stats::media_metrics::MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_DOLBY_VISION;
+
+static const int BITRATE_UNKNOWN =
+        stats::media_metrics::MEDIA_CODEC_RENDERED__BITRATE__BITRATE_UNKNOWN;
+
+static const std::pair<char const *, int> CODEC_LOOKUP[] = {
+    { "avc", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_AVC },
+    { "h264", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_AVC },
+    { "hevc", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_HEVC },
+    { "h265", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_HEVC },
+    { "vp8", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_VP8 },
+    { "vp9", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_VP9 },
+    { "av1", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_AV1 },
+    { "av01", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_AV1 },
+    { "dolby-vision", stats::media_metrics::MEDIA_CODEC_RENDERED__CODEC__CODEC_HEVC },
+};
+
+static const int32_t RESOLUTION_LOOKUP[] = {
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_MAX_SIZE,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_32K,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_16K,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_8K_UHD,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_8K_UHD_ALMOST,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_4K_UHD_ALMOST,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_1440X2560,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_1080X2400,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_1080X2340,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_1080P_FHD,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_1080P_FHD_ALMOST,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_720P_HD,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_720P_HD_ALMOST,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_576X1024,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_540X960,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_480X854,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_480X640,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_360X640,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_352X640,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_VERY_LOW,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_SMALLEST,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_ZERO,
+};
+
+static const int32_t FRAMERATE_LOOKUP[] = {
+    stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_24,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_25,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_30,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_50,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_60,
+    stats::media_metrics::MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_120,
+};
+
+static int32_t getMetricsCodecEnum(const std::string &mime, const std::string &componentName) {
+    for (const auto & codecStrAndEnum : CODEC_LOOKUP) {
+        if (strcasestr(mime.c_str(), codecStrAndEnum.first) != nullptr ||
+            strcasestr(componentName.c_str(), codecStrAndEnum.first) != nullptr) {
+            return codecStrAndEnum.second;
+        }
+    }
+    return MEDIA_CODEC_RENDERED__CODEC__CODEC_UNKNOWN;
+}
+
+static int32_t getMetricsResolutionEnum(int32_t width, int32_t height) {
+    if (width == 0 || height == 0) {
+        return MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_ZERO;
+    }
+    int64_t pixels = int64_t(width) * height / 1000;
+    if (width < 0 || height < 0 || pixels > RESOLUTION_LOOKUP[0]) {
+        return MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_INVALID;
+    }
+    for (int32_t resolutionEnum : RESOLUTION_LOOKUP) {
+        if (pixels > resolutionEnum) {
+            return resolutionEnum;
+        }
+    }
+    return MEDIA_CODEC_RENDERED__RESOLUTION__RESOLUTION_ZERO;
+}
+
+static int32_t getMetricsFramerateEnum(float inFramerate) {
+    if (inFramerate == -1.0f) {
+        return MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_UNDETERMINED;
+    }
+    if (inFramerate == -2.0f) {
+        return MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_24_3_2_PULLDOWN;
+    }
+    int framerate = int(inFramerate * 100); // Table is in hundredths of frames per second
+    static const int framerateTolerance = 40; // Tolerance is 0.4 frames per second - table is 100s
+    for (int32_t framerateEnum : FRAMERATE_LOOKUP) {
+        if (abs(framerate - framerateEnum) < framerateTolerance) {
+            return framerateEnum;
+        }
+    }
+    return MEDIA_CODEC_RENDERED__CONTENT_FRAMERATE__FRAMERATE_UNKNOWN;
+}
+
+static int32_t getMetricsHdrFormatEnum(std::string &mime, std::string &componentName,
+                                       int32_t configColorTransfer, int32_t parsedColorTransfer,
+                                       int32_t hdr10StaticInfo, int32_t hdr10PlusInfo) {
+    if (hdr10PlusInfo) {
+        return MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_HDR10_PLUS;
+    }
+    if (hdr10StaticInfo) {
+        return MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_HDR10;
+    }
+    // 7 = COLOR_TRANSFER_HLG in MediaCodecConstants.h
+    if (configColorTransfer == 7 || parsedColorTransfer == 7) {
+        return MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_HLG;
+    }
+    if (strcasestr(mime.c_str(), "dolby-vision") != nullptr ||
+        strcasestr(componentName.c_str(), "dvhe") != nullptr ||
+        strcasestr(componentName.c_str(), "dvav") != nullptr ||
+        strcasestr(componentName.c_str(), "dav1") != nullptr) {
+        return MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_DOLBY_VISION;
+    }
+    return MEDIA_CODEC_RENDERED__HDR_FORMAT__HDR_FORMAT_NONE;
+}
+
+static void parseVector(const std::string &str, std::vector<int32_t> *vector) {
+    if (!mediametrics::stringutils::parseVector(str, vector)) {
+        ALOGE("failed to parse integer vector from '%s'", str.c_str());
+    }
+}
 
 bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
         const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
@@ -48,17 +184,17 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     AStatsEvent* event = AStatsEvent_obtain();
     AStatsEvent_setAtomId(event, stats::media_metrics::MEDIA_CODEC_REPORTED);
 
-    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
-    AStatsEvent_writeInt64(event, timestamp_nanos);
+    const nsecs_t timestampNanos = MediaMetricsService::roundTime(item->getTimestamp());
+    AStatsEvent_writeInt64(event, timestampNanos);
 
-    std::string package_name = item->getPkgName();
-    AStatsEvent_writeString(event, package_name.c_str());
+    std::string packageName = item->getPkgName();
+    AStatsEvent_writeString(event, packageName.c_str());
 
-    int64_t package_version_code = item->getPkgVersionCode();
-    AStatsEvent_writeInt64(event, package_version_code);
+    int64_t packageVersionCode = item->getPkgVersionCode();
+    AStatsEvent_writeInt64(event, packageVersionCode);
 
-    int64_t media_apex_version = 0;
-    AStatsEvent_writeInt64(event, media_apex_version);
+    int64_t mediaApexVersion = 0;
+    AStatsEvent_writeInt64(event, mediaApexVersion);
 
     // the rest into our own proto
     //
@@ -84,17 +220,25 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeString(event, mode.c_str());
 
-    int32_t encoder = -1;
-    if (item->getInt32("android.media.mediacodec.encoder", &encoder)) {
-        metrics_proto.set_encoder(encoder);
+    int32_t isEncoder = -1;
+    if (item->getInt32("android.media.mediacodec.encoder", &isEncoder)) {
+        metrics_proto.set_encoder(isEncoder);
     }
-    AStatsEvent_writeInt32(event, encoder);
+    AStatsEvent_writeInt32(event, isEncoder);
 
-    int32_t secure = -1;
-    if (item->getInt32("android.media.mediacodec.secure", &secure)) {
-        metrics_proto.set_secure(secure);
+    int32_t isSecure = -1;
+    if (item->getInt32("android.media.mediacodec.secure", &isSecure)) {
+        metrics_proto.set_secure(isSecure);
     }
-    AStatsEvent_writeInt32(event, secure);
+    AStatsEvent_writeInt32(event, isSecure);
+
+    int32_t isHardware = -1;
+    item->getInt32("android.media.mediacodec.hardware", &isHardware);
+    // not logged to MediaCodecReported or MediametricsCodecReported
+
+    int32_t isTunneled = -1;
+    item->getInt32("android.media.mediacodec.tunneled", &isTunneled);
+    // not logged to MediaCodecReported or MediametricsCodecReported
 
     int32_t width = -1;
     if (item->getInt32("android.media.mediacodec.width", &width)) {
@@ -133,79 +277,78 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     AStatsEvent_writeInt32(event, level);
 
 
-    int32_t max_width = -1;
-    if ( item->getInt32("android.media.mediacodec.maxwidth", &max_width)) {
-        metrics_proto.set_max_width(max_width);
+    int32_t maxWidth = -1;
+    if ( item->getInt32("android.media.mediacodec.maxwidth", &maxWidth)) {
+        metrics_proto.set_max_width(maxWidth);
     }
-    AStatsEvent_writeInt32(event, max_width);
+    AStatsEvent_writeInt32(event, maxWidth);
 
-    int32_t max_height = -1;
-    if ( item->getInt32("android.media.mediacodec.maxheight", &max_height)) {
-        metrics_proto.set_max_height(max_height);
+    int32_t maxHeight = -1;
+    if ( item->getInt32("android.media.mediacodec.maxheight", &maxHeight)) {
+        metrics_proto.set_max_height(maxHeight);
     }
-    AStatsEvent_writeInt32(event, max_height);
+    AStatsEvent_writeInt32(event, maxHeight);
 
-    int32_t error_code = -1;
-    if ( item->getInt32("android.media.mediacodec.errcode", &error_code)) {
-        metrics_proto.set_error_code(error_code);
+    int32_t errorCode = -1;
+    if ( item->getInt32("android.media.mediacodec.errcode", &errorCode)) {
+        metrics_proto.set_error_code(errorCode);
     }
-    AStatsEvent_writeInt32(event, error_code);
+    AStatsEvent_writeInt32(event, errorCode);
 
-    std::string error_state;
-    if ( item->getString("android.media.mediacodec.errstate", &error_state)) {
-        metrics_proto.set_error_state(error_state);
+    std::string errorState;
+    if ( item->getString("android.media.mediacodec.errstate", &errorState)) {
+        metrics_proto.set_error_state(errorState);
     }
-    AStatsEvent_writeString(event, error_state.c_str());
+    AStatsEvent_writeString(event, errorState.c_str());
 
-    int64_t latency_max = -1;
-    if (item->getInt64("android.media.mediacodec.latency.max", &latency_max)) {
-        metrics_proto.set_latency_max(latency_max);
+    int64_t latencyMax = -1;
+    if (item->getInt64("android.media.mediacodec.latency.max", &latencyMax)) {
+        metrics_proto.set_latency_max(latencyMax);
     }
-    AStatsEvent_writeInt64(event, latency_max);
+    AStatsEvent_writeInt64(event, latencyMax);
 
-    int64_t latency_min = -1;
-    if (item->getInt64("android.media.mediacodec.latency.min", &latency_min)) {
-        metrics_proto.set_latency_min(latency_min);
+    int64_t latencyMin = -1;
+    if (item->getInt64("android.media.mediacodec.latency.min", &latencyMin)) {
+        metrics_proto.set_latency_min(latencyMin);
     }
-    AStatsEvent_writeInt64(event, latency_min);
+    AStatsEvent_writeInt64(event, latencyMin);
 
-    int64_t latency_avg = -1;
-    if (item->getInt64("android.media.mediacodec.latency.avg", &latency_avg)) {
-        metrics_proto.set_latency_avg(latency_avg);
+    int64_t latencyAvg = -1;
+    if (item->getInt64("android.media.mediacodec.latency.avg", &latencyAvg)) {
+        metrics_proto.set_latency_avg(latencyAvg);
     }
-    AStatsEvent_writeInt64(event, latency_avg);
+    AStatsEvent_writeInt64(event, latencyAvg);
 
-    int64_t latency_count = -1;
-    if (item->getInt64("android.media.mediacodec.latency.n", &latency_count)) {
-        metrics_proto.set_latency_count(latency_count);
+    int64_t latencyCount = -1;
+    if (item->getInt64("android.media.mediacodec.latency.n", &latencyCount)) {
+        metrics_proto.set_latency_count(latencyCount);
     }
-    AStatsEvent_writeInt64(event, latency_count);
+    AStatsEvent_writeInt64(event, latencyCount);
 
-    int64_t latency_unknown = -1;
-    if (item->getInt64("android.media.mediacodec.latency.unknown", &latency_unknown)) {
-        metrics_proto.set_latency_unknown(latency_unknown);
+    int64_t latencyUnknown = -1;
+    if (item->getInt64("android.media.mediacodec.latency.unknown", &latencyUnknown)) {
+        metrics_proto.set_latency_unknown(latencyUnknown);
     }
-    AStatsEvent_writeInt64(event, latency_unknown);
+    AStatsEvent_writeInt64(event, latencyUnknown);
 
-    int32_t queue_secure_input_buffer_error = -1;
+    int32_t queueSecureInputBufferError = -1;
     if (item->getInt32("android.media.mediacodec.queueSecureInputBufferError",
-            &queue_secure_input_buffer_error)) {
-        metrics_proto.set_queue_secure_input_buffer_error(queue_secure_input_buffer_error);
+            &queueSecureInputBufferError)) {
+        metrics_proto.set_queue_secure_input_buffer_error(queueSecureInputBufferError);
     }
-    AStatsEvent_writeInt32(event, queue_secure_input_buffer_error);
+    AStatsEvent_writeInt32(event, queueSecureInputBufferError);
 
-    int32_t queue_input_buffer_error = -1;
-    if (item->getInt32("android.media.mediacodec.queueInputBufferError",
-            &queue_input_buffer_error)) {
-        metrics_proto.set_queue_input_buffer_error(queue_input_buffer_error);
+    int32_t queueInputBufferError = -1;
+    if (item->getInt32("android.media.mediacodec.queueInputBufferError", &queueInputBufferError)) {
+        metrics_proto.set_queue_input_buffer_error(queueInputBufferError);
     }
-    AStatsEvent_writeInt32(event, queue_input_buffer_error);
+    AStatsEvent_writeInt32(event, queueInputBufferError);
 
-    std::string bitrate_mode;
-    if (item->getString("android.media.mediacodec.bitrate_mode", &bitrate_mode)) {
-        metrics_proto.set_bitrate_mode(bitrate_mode);
+    std::string bitrateMode;
+    if (item->getString("android.media.mediacodec.bitrate_mode", &bitrateMode)) {
+        metrics_proto.set_bitrate_mode(bitrateMode);
     }
-    AStatsEvent_writeString(event, bitrate_mode.c_str());
+    AStatsEvent_writeString(event, bitrateMode.c_str());
 
     int32_t bitrate = -1;
     if (item->getInt32("android.media.mediacodec.bitrate", &bitrate)) {
@@ -213,18 +356,18 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt32(event, bitrate);
 
-    int64_t lifetime_millis = -1;
-    if (item->getInt64("android.media.mediacodec.lifetimeMs", &lifetime_millis)) {
-        lifetime_millis = mediametrics::bucket_time_minutes(lifetime_millis);
-        metrics_proto.set_lifetime_millis(lifetime_millis);
+    int64_t lifetimeMillis = -1;
+    if (item->getInt64("android.media.mediacodec.lifetimeMs", &lifetimeMillis)) {
+        lifetimeMillis = mediametrics::bucket_time_minutes(lifetimeMillis);
+        metrics_proto.set_lifetime_millis(lifetimeMillis);
     }
-    AStatsEvent_writeInt64(event, lifetime_millis);
+    AStatsEvent_writeInt64(event, lifetimeMillis);
 
-    int64_t playback_duration_sec = -1;
-    item->getInt64("android.media.mediacodec.playback-duration-sec", &playback_duration_sec);
+    int64_t playbackDurationSec = -1;
+    item->getInt64("android.media.mediacodec.playback-duration-sec", &playbackDurationSec);
     // DO NOT record  playback-duration in the metrics_proto - it should only
     // exist in the flattened atom
-    AStatsEvent_writeInt64(event, playback_duration_sec);
+    AStatsEvent_writeInt64(event, playbackDurationSec);
 
     std::string sessionId;
     if (item->getString("android.media.mediacodec.log-session-id", &sessionId)) {
@@ -438,7 +581,7 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt32(event, hdr10PlusInfo);
 
-    int32_t hdrFormat= -1;
+    int32_t hdrFormat = -1;
     if (item->getInt32("android.media.mediacodec.hdr-format", &hdrFormat)) {
         metrics_proto.set_hdr_format(hdrFormat);
     }
@@ -450,61 +593,243 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
     }
     AStatsEvent_writeInt64(event, codecId);
 
+    int32_t arrayMode = -1;
+    if (item->getInt32("android.media.mediacodec.array-mode", &arrayMode)) {
+        metrics_proto.set_array_mode(arrayMode);
+    }
+    AStatsEvent_writeInt32(event, arrayMode);
+
+    int32_t operationMode = -1;
+    if (item->getInt32("android.media.mediacodec.operation-mode", &operationMode)) {
+        metrics_proto.set_operation_mode(operationMode);
+    }
+    AStatsEvent_writeInt32(event, operationMode);
+
+    int32_t outputSurface = -1;
+    if (item->getInt32("android.media.mediacodec.output-surface", &outputSurface)) {
+        metrics_proto.set_output_surface(outputSurface);
+    }
+    AStatsEvent_writeInt32(event, outputSurface);
+
+    int32_t appMaxInputSize = -1;
+    if (item->getInt32("android.media.mediacodec.app-max-input-size", &appMaxInputSize)) {
+        metrics_proto.set_app_max_input_size(appMaxInputSize);
+    }
+    AStatsEvent_writeInt32(event, appMaxInputSize);
+
+    int32_t usedMaxInputSize = -1;
+    if (item->getInt32("android.media.mediacodec.used-max-input-size", &usedMaxInputSize)) {
+        metrics_proto.set_used_max_input_size(usedMaxInputSize);
+    }
+    AStatsEvent_writeInt32(event, usedMaxInputSize);
+
+    int32_t codecMaxInputSize = -1;
+    if (item->getInt32("android.media.mediacodec.codec-max-input-size", &codecMaxInputSize)) {
+        metrics_proto.set_codec_max_input_size(codecMaxInputSize);
+    }
+    AStatsEvent_writeInt32(event, codecMaxInputSize);
+
+    int32_t flushCount = -1;
+    if (item->getInt32("android.media.mediacodec.flush-count", &flushCount)) {
+        metrics_proto.set_flush_count(flushCount);
+    }
+    AStatsEvent_writeInt32(event, flushCount);
+
+    int32_t setSurfaceCount = -1;
+    if (item->getInt32("android.media.mediacodec.set-surface-count", &setSurfaceCount)) {
+        metrics_proto.set_set_surface_count(setSurfaceCount);
+    }
+    AStatsEvent_writeInt32(event, setSurfaceCount);
+
+    int32_t resolutionChangeCount = -1;
+    if (item->getInt32("android.media.mediacodec.resolution-change-count",
+            &resolutionChangeCount)) {
+        metrics_proto.set_resolution_change_count(resolutionChangeCount);
+    }
+    AStatsEvent_writeInt32(event, resolutionChangeCount);
+
+    int32_t componentColorFormat = -1;
+    if (item->getInt32("android.media.mediacodec.component-color-format", &componentColorFormat)) {
+        metrics_proto.set_component_color_format(componentColorFormat);
+    }
+    AStatsEvent_writeInt32(event, componentColorFormat);
+
+    int64_t firstRenderTimeUs = -1;
+    item->getInt64("android.media.mediacodec.first-render-time-us", &firstRenderTimeUs);
+    int64_t framesReleased = -1;
+    item->getInt64("android.media.mediacodec.frames-released", &framesReleased);
+    int64_t framesRendered = -1;
+    item->getInt64("android.media.mediacodec.frames-rendered", &framesRendered);
+    int64_t framesDropped = -1;
+    item->getInt64("android.media.mediacodec.frames-dropped", &framesDropped);
+    int64_t framesSkipped = -1;
+    item->getInt64("android.media.mediacodec.frames-skipped", &framesSkipped);
+    double framerateContent = -1;
+    item->getDouble("android.media.mediacodec.framerate-content", &framerateContent);
+    double framerateActual = -1;
+    item->getDouble("android.media.mediacodec.framerate-actual", &framerateActual);
+    int64_t freezeScore = -1;
+    item->getInt64("android.media.mediacodec.freeze-score", &freezeScore);
+    double freezeRate = -1;
+    item->getDouble("android.media.mediacodec.freeze-rate", &freezeRate);
+    std::string freezeScoreHistogramStr;
+    item->getString("android.media.mediacodec.freeze-score-histogram", &freezeScoreHistogramStr);
+    std::string freezeScoreHistogramBucketsStr;
+    item->getString("android.media.mediacodec.freeze-score-histogram-buckets",
+                    &freezeScoreHistogramBucketsStr);
+    std::string freezeDurationMsHistogramStr;
+    item->getString("android.media.mediacodec.freeze-duration-ms-histogram",
+                    &freezeDurationMsHistogramStr);
+    std::string freezeDurationMsHistogramBucketsStr;
+    item->getString("android.media.mediacodec.freeze-duration-ms-histogram-buckets",
+                    &freezeDurationMsHistogramBucketsStr);
+    std::string freezeDistanceMsHistogramStr;
+    item->getString("android.media.mediacodec.freeze-distance-ms-histogram",
+                    &freezeDistanceMsHistogramStr);
+    std::string freezeDistanceMsHistogramBucketsStr;
+    item->getString("android.media.mediacodec.freeze-distance-ms-histogram-buckets",
+                    &freezeDistanceMsHistogramBucketsStr);
+    int64_t judderScore = -1;
+    item->getInt64("android.media.mediacodec.judder-score", &judderScore);
+    double judderRate = -1;
+    item->getDouble("android.media.mediacodec.judder-rate", &judderRate);
+    std::string judderScoreHistogramStr;
+    item->getString("android.media.mediacodec.judder-score-histogram", &judderScoreHistogramStr);
+    std::string judderScoreHistogramBucketsStr;
+    item->getString("android.media.mediacodec.judder-score-histogram-buckets",
+                    &judderScoreHistogramBucketsStr);
+
     int err = AStatsEvent_write(event);
     if (err < 0) {
       ALOGE("Failed to write codec metrics to statsd (%d)", err);
     }
     AStatsEvent_release(event);
 
+    if (framesRendered > 0) {
+        int32_t statsUid = item->getUid();
+        int64_t statsCodecId = codecId;
+        char const *statsLogSessionId = sessionId.c_str();
+        int32_t statsIsHardware = isHardware;
+        int32_t statsIsSecure = isSecure;
+        int32_t statsIsTunneled = isTunneled;
+        int32_t statsCodec = getMetricsCodecEnum(mime, codec);
+        int32_t statsResolution = getMetricsResolutionEnum(width, height);
+        int32_t statsBitrate = BITRATE_UNKNOWN;
+        int32_t statsContentFramerate = getMetricsFramerateEnum(framerateContent);
+        int32_t statsActualFramerate = getMetricsFramerateEnum(framerateActual);
+        int32_t statsHdrFormat = getMetricsHdrFormatEnum(mime, codec, configColorTransfer,
+                                                         parsedColorTransfer, hdrStaticInfo,
+                                                         hdr10PlusInfo);
+        int64_t statsFirstRenderTimeUs = firstRenderTimeUs;
+        int64_t statsPlaybackDurationSeconds = playbackDurationSec;
+        int64_t statsFramesTotal = framesReleased + framesSkipped;
+        int64_t statsFramesReleased = framesReleased;
+        int64_t statsFramesRendered = framesRendered;
+        int64_t statsFramesDropped = framesDropped;
+        int64_t statsFramesSkipped = framesSkipped;
+        float statsFrameDropRate = float(double(framesDropped) / statsFramesTotal);
+        float statsFrameSkipRate = float(double(framesSkipped) / statsFramesTotal);
+        float statsFrameSkipDropRate = float(double(framesSkipped + framesDropped) /
+                                             statsFramesTotal);
+        int64_t statsFreezeScore = freezeScore;
+        float statsFreezeRate = freezeRate;
+        std::vector<int32_t> statsFreezeDurationMsHistogram;
+        parseVector(freezeDurationMsHistogramStr, &statsFreezeDurationMsHistogram);
+        std::vector<int32_t> statsFreezeDurationMsHistogramBuckets;
+        parseVector(freezeDurationMsHistogramBucketsStr, &statsFreezeDurationMsHistogramBuckets);
+        std::vector<int32_t> statsFreezeDistanceMsHistogram;
+        parseVector(freezeDistanceMsHistogramStr, &statsFreezeDistanceMsHistogram);
+        std::vector<int32_t> statsFreezeDistanceMsHistogramBuckets;
+        parseVector(freezeDistanceMsHistogramBucketsStr, &statsFreezeDistanceMsHistogramBuckets);
+        int64_t statsJudderScore = judderScore;
+        float statsJudderRate = judderRate;
+        std::vector<int32_t> statsJudderScoreHistogram;
+        parseVector(judderScoreHistogramStr, &statsJudderScoreHistogram);
+        std::vector<int32_t> statsJudderScoreHistogramBuckets;
+        parseVector(judderScoreHistogramBucketsStr, &statsJudderScoreHistogramBuckets);
+        int result = stats_write(
+            MEDIA_CODEC_RENDERED,
+            statsUid,
+            statsCodecId,
+            statsLogSessionId,
+            statsIsHardware,
+            statsIsSecure,
+            statsIsTunneled,
+            statsCodec,
+            statsResolution,
+            statsBitrate,
+            statsContentFramerate,
+            statsActualFramerate,
+            statsHdrFormat,
+            statsFirstRenderTimeUs,
+            statsPlaybackDurationSeconds,
+            statsFramesTotal,
+            statsFramesReleased,
+            statsFramesRendered,
+            statsFramesDropped,
+            statsFramesSkipped,
+            statsFrameDropRate,
+            statsFrameSkipRate,
+            statsFrameSkipDropRate,
+            statsFreezeScore,
+            statsFreezeRate,
+            statsFreezeDurationMsHistogram,
+            statsFreezeDurationMsHistogramBuckets,
+            statsFreezeDistanceMsHistogram,
+            statsFreezeDistanceMsHistogramBuckets,
+            statsJudderScore,
+            statsJudderRate,
+            statsJudderScoreHistogram,
+            statsJudderScoreHistogramBuckets);
+        ALOGE_IF(result < 0, "Failed to record MEDIA_CODEC_RENDERED atom (%d)", result);
+    }
+
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
         ALOGE("Failed to serialize codec metrics");
         return false;
     }
-    const stats::media_metrics::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    const stats::media_metrics::BytesField bf_serialized(serialized.c_str(), serialized.size());
     const int result = stats::media_metrics::stats_write(stats::media_metrics::MEDIAMETRICS_CODEC_REPORTED,
-                               timestamp_nanos, package_name.c_str(), package_version_code,
-                               media_apex_version,
+                               timestampNanos, packageName.c_str(), packageVersionCode,
+                               mediaApexVersion,
                                bf_serialized);
 
     std::stringstream log;
     log << "result:" << result << " {"
             << " mediametrics_codec_reported:"
             << stats::media_metrics::MEDIAMETRICS_CODEC_REPORTED
-            << " timestamp_nanos:" << timestamp_nanos
-            << " package_name:" << package_name
-            << " package_version_code:" << package_version_code
-            << " media_apex_version:" << media_apex_version
-
+            << " timestamp_nanos:" << timestampNanos
+            << " package_name:" << packageName
+            << " package_version_code:" << packageVersionCode
+            << " media_apex_version:" << mediaApexVersion
             << " codec:" << codec
             << " mime:" << mime
             << " mode:" << mode
-            << " encoder:" << encoder
-            << " secure:" << secure
+            << " encoder:" << isEncoder
+            << " secure:" << isSecure
             << " width:" << width
             << " height:" << height
             << " rotation:" << rotation
             << " crypto:" << crypto
             << " profile:" << profile
-
             << " level:" << level
-            << " max_width:" << max_width
-            << " max_height:" << max_height
-            << " error_code:" << error_code
-            << " error_state:" << error_state
-            << " latency_max:" << latency_max
-            << " latency_min:" << latency_min
-            << " latency_avg:" << latency_avg
-            << " latency_count:" << latency_count
-            << " latency_unknown:" << latency_unknown
-
-            << " queue_input_buffer_error:" << queue_input_buffer_error
-            << " queue_secure_input_buffer_error:" << queue_secure_input_buffer_error
-            << " bitrate_mode:" << bitrate_mode
+            << " max_width:" << maxWidth
+            << " max_height:" << maxHeight
+            << " error_code:" << errorCode
+            << " error_state:" << errorState
+            << " latency_max:" << latencyMax
+            << " latency_min:" << latencyMin
+            << " latency_avg:" << latencyAvg
+            << " latency_count:" << latencyCount
+            << " latency_unknown:" << latencyUnknown
+            << " queue_input_buffer_error:" << queueInputBufferError
+            << " queue_secure_input_buffer_error:" << queueSecureInputBufferError
+            << " bitrate_mode:" << bitrateMode
             << " bitrate:" << bitrate
             << " original_bitrate:" << originalBitrate
-            << " lifetime_millis:" << lifetime_millis
-            << " playback_duration_seconds:" << playback_duration_sec
+            << " lifetime_millis:" << lifetimeMillis
+            << " playback_duration_seconds:" << playbackDurationSec
             << " log_session_id:" << sessionId
             << " channel_count:" << channelCount
             << " sample_rate:" << sampleRate
@@ -517,7 +842,6 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
             << " operating_rate:" << operatingRate
             << " priority:" << priority
             << " shaping_enhanced:" << shapingEnhanced
-
             << " qp_i_min:" << qpIMin
             << " qp_i_max:" << qpIMax
             << " qp_p_min:" << qpPMin

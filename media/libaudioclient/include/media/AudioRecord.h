@@ -325,6 +325,15 @@ public:
      */
             uint32_t    getSampleRate() const   { return mSampleRate; }
 
+    /* Return the sample rate from the AudioFlinger input thread. */
+            uint32_t    getHalSampleRate() const;
+
+    /* Return the channel count from the AudioFlinger input thread. */
+            uint32_t    getHalChannelCount() const;
+
+    /* Return the HAL format from the AudioFlinger input thread. */
+            audio_format_t    getHalFormat() const;
+
     /* Sets marker position. When record reaches the number of frames specified,
      * a callback with event type EVENT_MARKER is called. Calling setMarkerPosition
      * with marker == 0 cancels marker notification callback.
@@ -770,6 +779,9 @@ private:
     size_t                  mServerSampleSize;
     std::unique_ptr<uint8_t[]> mFormatConversionBufRaw;
     Buffer                  mFormatConversionBuffer;
+    uint32_t                mHalSampleRate;          // AudioFlinger thread sample rate
+    uint32_t                mHalChannelCount;        // AudioFlinger thread channel count
+    audio_format_t          mHalFormat;              // AudioFlinger thread format
 
 private:
     class DeathNotifier : public IBinder::DeathRecipient {

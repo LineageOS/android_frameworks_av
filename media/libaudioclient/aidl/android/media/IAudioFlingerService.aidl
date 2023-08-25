@@ -37,6 +37,8 @@ import android.media.EffectDescriptor;
 import android.media.IAudioFlingerClient;
 import android.media.IAudioRecord;
 import android.media.IAudioTrack;
+import android.media.ISoundDose;
+import android.media.ISoundDoseCallback;
 import android.media.MicrophoneInfoFw;
 import android.media.RenderPosition;
 import android.media.TrackSecondaryOutputInfo;
@@ -133,8 +135,6 @@ interface IAudioFlingerService {
 
     OpenInputResponse openInput(in OpenInputRequest request);
     void closeInput(int /* audio_io_handle_t */ input);
-
-    void invalidateStream(AudioStreamType stream);
 
     void setVoiceVolume(float volume);
 
@@ -270,6 +270,17 @@ interface IAudioFlingerService {
      * Indicates if the variable Bluetooth latency control mechanism is enabled or disabled.
      */
     boolean isBluetoothVariableLatencyEnabled();
+
+    /**
+     * Registers the sound dose callback and returns the interface for executing
+     * sound dose methods on the audio server.
+     */
+    ISoundDose getSoundDoseInterface(in ISoundDoseCallback callback);
+
+    /**
+     * Invalidate all tracks with given port ids.
+     */
+    void invalidateTracks(in int[] /* audio_port_handle_t[] */ portIds);
 
     /**
      * Only implemented for AIDL. Provides the APM configuration which

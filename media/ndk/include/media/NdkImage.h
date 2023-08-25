@@ -583,7 +583,7 @@ void AImage_delete(AImage* image) __INTRODUCED_IN(24);
  * Available since API level 24.
  *
  * @param image the {@link AImage} of interest.
- * @param width the width of the image will be filled here if the method call succeeeds.
+ * @param width the width of the image will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -599,7 +599,7 @@ media_status_t AImage_getWidth(const AImage* image, /*out*/int32_t* width) __INT
  * Available since API level 24.
  *
  * @param image the {@link AImage} of interest.
- * @param height the height of the image will be filled here if the method call succeeeds.
+ * @param height the height of the image will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -617,7 +617,7 @@ media_status_t AImage_getHeight(const AImage* image, /*out*/int32_t* height) __I
  * Available since API level 24.
  *
  * @param image the {@link AImage} of interest.
- * @param format the format of the image will be filled here if the method call succeeeds.
+ * @param format the format of the image will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -636,7 +636,7 @@ media_status_t AImage_getFormat(const AImage* image, /*out*/int32_t* format) __I
  * Available since API level 24.
  *
  * @param image the {@link AImage} of interest.
- * @param rect the cropped rectangle of the image will be filled here if the method call succeeeds.
+ * @param rect the cropped rectangle of the image will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -662,7 +662,7 @@ media_status_t AImage_getCropRect(const AImage* image, /*out*/AImageCropRect* re
  * Available since API level 24.
  *
  * @param image the {@link AImage} of interest.
- * @param timestampNs the timestamp of the image will be filled here if the method call succeeeds.
+ * @param timestampNs the timestamp of the image will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -682,7 +682,7 @@ media_status_t AImage_getTimestamp(const AImage* image, /*out*/int64_t* timestam
  *
  * @param image the {@link AImage} of interest.
  * @param numPlanes the number of planes of the image will be filled here if the method call
- *         succeeeds.
+ *         succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -706,7 +706,7 @@ media_status_t AImage_getNumberOfPlanes(const AImage* image, /*out*/int32_t* num
  *
  * @param image the {@link AImage} of interest.
  * @param planeIdx the index of the plane. Must be less than the number of planes of input image.
- * @param pixelStride the pixel stride of the image will be filled here if the method call succeeeds.
+ * @param pixelStride the pixel stride of the image will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -735,7 +735,7 @@ media_status_t AImage_getPlanePixelStride(
  *
  * @param image the {@link AImage} of interest.
  * @param planeIdx the index of the plane. Must be less than the number of planes of input image.
- * @param rowStride the row stride of the image will be filled here if the method call succeeeds.
+ * @param rowStride the row stride of the image will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -762,8 +762,8 @@ media_status_t AImage_getPlaneRowStride(
  *
  * @param image the {@link AImage} of interest.
  * @param planeIdx the index of the plane. Must be less than the number of planes of input image.
- * @param data the data pointer of the image will be filled here if the method call succeeeds.
- * @param dataLength the valid length of data will be filled here if the method call succeeeds.
+ * @param data the data pointer of the image will be filled here if the method call succeeds.
+ * @param dataLength the valid length of data will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -825,6 +825,25 @@ void AImage_deleteAsync(AImage* image, int releaseFenceFd) __INTRODUCED_IN(26);
  * @see AImageReader_ImageCallback
  */
 media_status_t AImage_getHardwareBuffer(const AImage* image, /*out*/AHardwareBuffer** buffer) __INTRODUCED_IN(26);
+
+/**
+ * Query the dataspace of the input {@link AImage}.
+ *
+ * Available since API level 34.
+ *
+ * @param image the {@link AImage} of interest.
+ * @param dataSpace the dataspace of the image will be filled here if the method call succeeds.
+ *                  This must be one of the ADATASPACE_* enum value defined in
+ *                  {@link ADataSpace}.
+ *
+ * @return <ul>
+ *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
+ *         <li>{@link AMEDIA_ERROR_INVALID_PARAMETER} if image or dataSpace is NULL.</li>
+ *         <li>{@link AMEDIA_ERROR_INVALID_OBJECT} if the {@link AImageReader} generated this
+ *                 image has been deleted.</li></ul>
+ */
+media_status_t AImage_getDataSpace(const AImage* image,
+                                   /*out*/int32_t* dataSpace) __INTRODUCED_IN(34);
 
 __END_DECLS
 

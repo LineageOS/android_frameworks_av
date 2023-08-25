@@ -19,6 +19,7 @@
 #include <utils/String16.h>
 #include <android/log.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <mediautils/TidWrapper.h>
 #include "fuzzer/FuzzedDataProvider.h"
 using android::IBatteryStats;
 using android::IBinder;
@@ -55,7 +56,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     int32_t priority = data_provider.ConsumeIntegral<int32_t>();
     bool is_for_app = data_provider.ConsumeBool();
     bool async = data_provider.ConsumeBool();
-    requestPriority(getpid(), gettid(), priority, is_for_app, async);
+    requestPriority(getpid(), android::mediautils::getThreadIdWrapper(), priority, is_for_app,
+                    async);
     // TODO: Verify and re-enable in AOSP (R).
     // bool enable = data_provider.ConsumeBool();
     // We are just using batterystats to avoid the need

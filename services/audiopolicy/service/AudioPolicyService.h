@@ -36,6 +36,7 @@
 #include <media/ToneGenerator.h>
 #include <media/AudioEffect.h>
 #include <media/AudioPolicy.h>
+#include <media/UsecaseValidator.h>
 #include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
 #include "CaptureStateNotifier.h"
@@ -225,6 +226,7 @@ public:
     binder::Status setCurrentImeUid(int32_t uid) override;
     binder::Status isHapticPlaybackSupported(bool* _aidl_return) override;
     binder::Status isUltrasoundSupported(bool* _aidl_return) override;
+    binder::Status isHotwordStreamSupported(bool lookbackAudio, bool* _aidl_return) override;
     binder::Status listAudioProductStrategies(
             std::vector<media::AudioProductStrategy>* _aidl_return) override;
     binder::Status getProductStrategyFromAudioAttributes(
@@ -242,7 +244,12 @@ public:
     binder::Status setDevicesRoleForStrategy(
             int32_t strategy, media::DeviceRole role,
             const std::vector<AudioDevice>& devices) override;
-    binder::Status removeDevicesRoleForStrategy(int32_t strategy, media::DeviceRole role) override;
+    binder::Status removeDevicesRoleForStrategy(
+            int32_t strategy, media::DeviceRole role,
+            const std::vector<AudioDevice>& devices) override;
+    binder::Status clearDevicesRoleForStrategy(
+            int32_t strategy,
+            media::DeviceRole role) override;
     binder::Status getDevicesForRoleAndStrategy(
             int32_t strategy, media::DeviceRole role,
             std::vector<AudioDevice>* _aidl_return) override;
@@ -281,6 +288,22 @@ public:
 
     binder::Status getDirectProfilesForAttributes(const media::audio::common::AudioAttributes& attr,
                         std::vector<media::audio::common::AudioProfile>* _aidl_return) override;
+
+    binder::Status getSupportedMixerAttributes(
+            int32_t portId,
+            std::vector<media::AudioMixerAttributesInternal>* _aidl_return) override;
+    binder::Status setPreferredMixerAttributes(
+            const media::audio::common::AudioAttributes& attr,
+            int32_t portId,
+            int32_t uid,
+            const media::AudioMixerAttributesInternal& mixerAttr) override;
+    binder::Status getPreferredMixerAttributes(
+            const media::audio::common::AudioAttributes& attr,
+            int32_t portId,
+            std::optional<media::AudioMixerAttributesInternal>* _aidl_return) override;
+    binder::Status clearPreferredMixerAttributes(const media::audio::common::AudioAttributes& attr,
+                                                 int32_t portId,
+                                                 int32_t uid) override;
 
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 
@@ -420,6 +443,11 @@ private:
      */
     static bool isAppOpSource(audio_source_t source);
 
+    status_t registerOutput(audio_io_handle_t output,
+                            const audio_config_base_t& config,
+                            const audio_output_flags_t flags);
+    status_t unregisterOutput(audio_io_handle_t output);
+
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
     // transitions to an active state we will start reporting buffers with data. This approach
@@ -459,7 +487,7 @@ private:
         void onUidIdle(uid_t uid, bool disabled) override;
         void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
                 int32_t capability) override;
-        void onUidProcAdjChanged(uid_t uid) override;
+        void onUidProcAdjChanged(uid_t uid, int32_t adj) override;
 
         void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
         void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
@@ -767,9 +795,6 @@ private:
         // for each output (destination device) it is attached to.
         virtual status_t setStreamVolume(audio_stream_type_t stream, float volume, audio_io_handle_t output, int delayMs = 0);
 
-        // invalidate a stream type, causing a reroute to an unspecified new output
-        virtual status_t invalidateStream(audio_stream_type_t stream);
-
         // function enabling to send proprietary informations directly from audio policy manager to audio hardware interface.
         virtual void setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs, int delayMs = 0);
         // function enabling to receive proprietary informations directly from audio hardware interface to audio policy manager.
@@ -828,6 +853,8 @@ private:
 
         status_t setDeviceConnectedState(
                 const struct audio_port_v7 *port, media::DeviceConnectedState state) override;
+
+        status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 
      private:
         AudioPolicyService *mAudioPolicyService;
@@ -894,7 +921,7 @@ private:
 
         const audio_attributes_t attributes; // source, flags ...
         const audio_io_handle_t io;          // audio HAL stream IO handle
-        const AttributionSourceState& attributionSource; //client attributionsource
+        const AttributionSourceState attributionSource; //client attributionsource
         const audio_session_t session;       // audio session ID
         const audio_port_handle_t portId;
         const audio_port_handle_t deviceId;  // selected input device port ID
@@ -1073,6 +1100,7 @@ private:
     void *mLibraryHandle = nullptr;
     CreateAudioPolicyManagerInstance mCreateAudioPolicyManager;
     DestroyAudioPolicyManagerInstance mDestroyAudioPolicyManager;
+    std::unique_ptr<media::UsecaseValidator> mUsecaseValidator;
 };
 
 } // namespace android

@@ -31,7 +31,7 @@ namespace aaudio {
 class TimestampScheduler
 {
 public:
-    TimestampScheduler() {};
+    TimestampScheduler() = default;
     virtual ~TimestampScheduler() = default;
 
     /**

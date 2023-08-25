@@ -1,0 +1,54 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_base_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_services_audioflinger_license"],
+}
+
+cc_test {
+    name: "sounddosemanager_tests",
+
+    srcs: [
+        "sounddosemanager_tests.cpp"
+    ],
+
+    defaults: [
+        "latest_android_media_audio_common_types_ndk_static",
+        "latest_android_hardware_audio_core_sounddose_ndk_static",
+        "latest_android_hardware_audio_sounddose_ndk_static",
+    ],
+
+    shared_libs: [
+        "audioflinger-aidl-cpp",
+        "libaudiofoundation",
+        "libaudioutils",
+        "libbase",
+        "libbinder_ndk",
+        "liblog",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libaudio_aidl_conversion_common_ndk",
+        "libgmock",
+        "libsounddose",
+    ],
+
+    header_libs: [
+        "libaudioutils_headers",
+        "libsounddose_headers",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+        "-DBACKEND_NDK",
+    ],
+
+    test_suites: [
+        "general-tests",
+    ],
+}

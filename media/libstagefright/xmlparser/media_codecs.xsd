@@ -74,6 +74,7 @@
         <xs:attribute name="domain" type="xs:string"/>
         <xs:attribute name="variant" type="xs:string"/>
         <xs:attribute name="enabled" type="xs:string"/>
+        <xs:attribute name="minsdk" type="xs:string"/>
     </xs:complexType>
     <xs:complexType name="Quirk">
         <xs:attribute name="name" type="xs:string"/>

@@ -100,10 +100,17 @@ public:
                                        int64_t *timeNanoseconds) = 0;
 
     /**
-     * Update state machine.()
-     * @return
+     * Update state machine.
+     * @return result of the operation.
      */
-    virtual aaudio_result_t updateStateMachine() = 0;
+    aaudio_result_t updateStateMachine() {
+        if (isDataCallbackActive()) {
+            return AAUDIO_OK; // state is getting updated by the callback thread read/write call
+        }
+        return processCommands();
+    };
+
+    virtual aaudio_result_t processCommands() = 0;
 
     // =========== End ABSTRACT methods ===========================
 
@@ -184,8 +191,10 @@ public:
     // ============== Queries ===========================
 
     aaudio_stream_state_t getState() const {
-        return mState;
+        return mState.load();
     }
+
+    aaudio_stream_state_t getStateExternal() const;
 
     virtual int32_t getBufferSize() const {
         return AAUDIO_ERROR_UNIMPLEMENTED;
@@ -215,12 +224,24 @@ public:
         return mSampleRate;
     }
 
+    aaudio_result_t getHardwareSampleRate() const {
+        return mHardwareSampleRate;
+    }
+
     audio_format_t getFormat()  const {
         return mFormat;
     }
 
+    audio_format_t getHardwareFormat()  const {
+        return mHardwareFormat;
+    }
+
     aaudio_result_t getSamplesPerFrame() const {
         return mSamplesPerFrame;
+    }
+
+    aaudio_result_t getHardwareSamplesPerFrame() const {
+        return mHardwareSamplesPerFrame;
     }
 
     virtual int32_t getPerformanceMode() const {
@@ -403,7 +424,7 @@ public:
      * This should only be called for client streams and not for streams
      * that run in the service.
      */
-    void registerPlayerBase() {
+    virtual void registerPlayerBase() {
         if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
             mPlayerBase->registerWithAudioManager(this);
         }
@@ -521,6 +542,11 @@ protected:
     }
 
     // This should not be called after the open() call.
+    void setHardwareSampleRate(int32_t hardwareSampleRate) {
+        mHardwareSampleRate = hardwareSampleRate;
+    }
+
+    // This should not be called after the open() call.
     void setFramesPerBurst(int32_t framesPerBurst) {
         mFramesPerBurst = framesPerBurst;
     }
@@ -541,6 +567,16 @@ protected:
     }
 
     // This should not be called after the open() call.
+    void setHardwareFormat(audio_format_t format) {
+        mHardwareFormat = format;
+    }
+
+    // This should not be called after the open() call.
+    void setHardwareSamplesPerFrame(int32_t hardwareSamplesPerFrame) {
+        mHardwareSamplesPerFrame = hardwareSamplesPerFrame;
+    }
+
+    // This should not be called after the open() call.
     void setDeviceFormat(audio_format_t format) {
         mDeviceFormat = format;
     }
@@ -550,6 +586,11 @@ protected:
     }
 
     void setState(aaudio_stream_state_t state);
+
+    bool isDisconnected() const {
+        return mDisconnected.load();
+    }
+    void setDisconnected();
 
     void setDeviceId(int32_t deviceId) {
         mDeviceId = deviceId;
@@ -657,6 +698,8 @@ protected:
 
     std::mutex                 mStreamLock;
 
+    const android::sp<MyPlayerBase>   mPlayerBase;
+
 private:
 
     aaudio_result_t safeStop_l() REQUIRES(mStreamLock);
@@ -672,17 +715,21 @@ private:
         close_l();
     }
 
-    const android::sp<MyPlayerBase>   mPlayerBase;
+    std::atomic<aaudio_stream_state_t>          mState{AAUDIO_STREAM_STATE_UNINITIALIZED};
+
+    std::atomic_bool            mDisconnected{false};
 
     // These do not change after open().
     int32_t                     mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                     mHardwareSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_channel_mask_t       mChannelMask = AAUDIO_UNSPECIFIED;
     int32_t                     mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                     mHardwareSampleRate = AAUDIO_UNSPECIFIED;
     int32_t                     mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     bool                        mSharingModeMatchRequired = false; // must match sharing mode requested
     audio_format_t              mFormat = AUDIO_FORMAT_DEFAULT;
-    aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+    audio_format_t              mHardwareFormat = AUDIO_FORMAT_DEFAULT;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
     int32_t                     mFramesPerBurst = 0;
     int32_t                     mBufferCapacity = 0;

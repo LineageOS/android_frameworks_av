@@ -171,6 +171,30 @@ public:
         mSamplesPerFrame = AAudioConvert_channelMaskToCount(channelMask);
     }
 
+    int32_t getHardwareSamplesPerFrame() const {
+        return mHardwareSamplesPerFrame;
+    }
+
+    void setHardwareSamplesPerFrame(int32_t hardwareSamplesPerFrame) {
+        mHardwareSamplesPerFrame = hardwareSamplesPerFrame;
+    }
+
+    int32_t getHardwareSampleRate() const {
+        return mHardwareSampleRate;
+    }
+
+    void setHardwareSampleRate(int32_t hardwareSampleRate) {
+        mHardwareSampleRate = hardwareSampleRate;
+    }
+
+    audio_format_t getHardwareFormat() const {
+        return mHardwareAudioFormat;
+    }
+
+    void setHardwareFormat(audio_format_t hardwareAudioFormat) {
+        mHardwareAudioFormat = hardwareAudioFormat;
+    }
+
     /**
      * @return bytes per frame of getFormat()
      */
@@ -189,7 +213,7 @@ public:
     void dump() const;
 
 private:
-    bool validateChannelMask() const;
+    aaudio_result_t validateChannelMask() const;
 
     int32_t                         mSamplesPerFrame      = AAUDIO_UNSPECIFIED;
     int32_t                         mSampleRate           = AAUDIO_UNSPECIFIED;
@@ -210,6 +234,10 @@ private:
     std::optional<std::string>      mOpPackageName        = {};
     std::optional<std::string>      mAttributionTag       = {};
     aaudio_channel_mask_t           mChannelMask          = AAUDIO_UNSPECIFIED;
+    int                             mHardwareSamplesPerFrame
+                                                          = AAUDIO_UNSPECIFIED;
+    int                             mHardwareSampleRate   = AAUDIO_UNSPECIFIED;
+    audio_format_t                  mHardwareAudioFormat  = AUDIO_FORMAT_DEFAULT;
 };
 
 } /* namespace aaudio */

@@ -1,0 +1,49 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_library {
+    name: "libaudiousecasevalidation",
+    host_supported: true,
+    srcs: [
+        "UsecaseLookup.cpp",
+        "UsecaseValidator.cpp",
+    ],
+    header_libs: [
+        "liberror_headers",
+    ],
+    shared_libs: [
+        "framework-permission-aidl-cpp",
+        "libaudioutils",
+        "libbase",
+        "liblog",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
+cc_test_host {
+    name: "libaudiousecasevalidation-test",
+    srcs: [
+        "tests/UsecaseValidator-test.cpp",
+    ],
+    header_libs: [
+        "liberror_headers",
+    ],
+    shared_libs: [
+        "framework-permission-aidl-cpp",
+        "libaudiousecasevalidation",
+        "libutils",
+    ],
+}

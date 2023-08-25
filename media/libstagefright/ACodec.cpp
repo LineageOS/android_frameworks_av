@@ -6317,6 +6317,11 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     flags |= OMX_BUFFERFLAG_EOS;
                 }
 
+                int32_t isDecodeOnly = 0;
+                if (buffer->meta()->findInt32("decode-only", &isDecodeOnly) && isDecodeOnly != 0) {
+                    flags |= OMX_BUFFERFLAG_DECODEONLY;
+                    mCodec->mDecodeOnlyTimesUs.emplace(timeUs);
+                }
                 size_t size = buffer->size();
                 size_t offset = buffer->offset();
                 if (buffer->base() != info->mCodecData->base()) {
@@ -6346,6 +6351,10 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                     ALOGV("[%s] calling emptyBuffer %u w/ EOS",
                          mCodec->mComponentName.c_str(), bufferID);
                 } else {
+                    if (flags & OMX_BUFFERFLAG_DECODEONLY) {
+                        ALOGV("[%s] calling emptyBuffer %u w/ decode only flag",
+                            mCodec->mComponentName.c_str(), bufferID);
+                    }
 #if TRACK_BUFFER_TIMING
                     ALOGI("[%s] calling emptyBuffer %u w/ time %lld us",
                          mCodec->mComponentName.c_str(), bufferID, (long long)timeUs);
@@ -6689,6 +6698,39 @@ bool ACodec::BaseState::onOMXFillBufferDone(
 
             info->mData.clear();
 
+            // Workaround: if OMX_BUFFERFLAG_DECODEONLY is not implemented in
+            // HAL, the flag is then removed in the corresponding output buffer.
+
+            // for all buffers that were marked as DECODE_ONLY, remove their timestamp
+            // if it is smaller than the timestamp of the buffer that was
+            // just received
+            while (!mCodec->mDecodeOnlyTimesUs.empty() &&
+                   *mCodec->mDecodeOnlyTimesUs.begin() < timeUs) {
+                    mCodec->mDecodeOnlyTimesUs.erase(mCodec->mDecodeOnlyTimesUs.begin());
+            }
+            // if OMX_BUFFERFLAG_DECODEONLY is not implemented in HAL, we need to restore the
+            // OMX_BUFFERFLAG_DECODEONLY flag to the frames we had saved in the set, the set
+            // contains the timestamps of buffers that were marked as DECODE_ONLY by the app
+            if (!mCodec->mDecodeOnlyTimesUs.empty() &&
+                *mCodec->mDecodeOnlyTimesUs.begin() == timeUs) {
+                mCodec->mDecodeOnlyTimesUs.erase(timeUs);
+                // If the app queued the last valid buffer as DECODE_ONLY and queued an additional
+                // empty buffer as EOS, it's possible that HAL sets the last valid frame as EOS
+                // instead and drops the empty buffer. In such a case, we should not add back
+                // the OMX_BUFFERFLAG_DECODEONLY flag to it, as doing so will make it so that the
+                // app does not receive the EOS buffer, which breaks the contract of EOS buffers
+                if (flags & OMX_BUFFERFLAG_EOS) {
+                    // Set buffer size to 0, as described by
+                    // https://developer.android.com/reference/android/media/MediaCodec.BufferInfo?hl=en#size
+                    // a buffer of size 0 should only be used to carry the EOS flag and should
+                    // be discarded by the app as it has no data
+                    buffer->setRange(0, 0);
+                } else {
+                    // re-add the OMX_BUFFERFLAG_DECODEONLY flag to the buffer in case it is
+                    // not the end of stream buffer
+                    flags |= OMX_BUFFERFLAG_DECODEONLY;
+                }
+            }
             mCodec->mBufferChannel->drainThisBuffer(info->mBufferID, flags);
 
             info->mStatus = BufferInfo::OWNED_BY_DOWNSTREAM;
@@ -6911,6 +6953,7 @@ void ACodec::UninitializedState::stateEntered() {
     mCodec->mConverter[0].clear();
     mCodec->mConverter[1].clear();
     mCodec->mComponentName.clear();
+    mCodec->mDecodeOnlyTimesUs.clear();
 }
 
 bool ACodec::UninitializedState::onMessageReceived(const sp<AMessage> &msg) {
@@ -8922,6 +8965,7 @@ void ACodec::FlushingState::stateEntered() {
     ALOGV("[%s] Now Flushing", mCodec->mComponentName.c_str());
 
     mFlushComplete[kPortIndexInput] = mFlushComplete[kPortIndexOutput] = false;
+    mCodec->mDecodeOnlyTimesUs.clear();
 
     // If we haven't transitioned after 3 seconds, we're probably stuck.
     sp<AMessage> msg = new AMessage(ACodec::kWhatCheckIfStuck, mCodec);

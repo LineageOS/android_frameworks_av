@@ -54,6 +54,8 @@
 #include "android/media/IAudioTrackCallback.h"
 #include "android/media/IEffect.h"
 #include "android/media/IEffectClient.h"
+#include "android/media/ISoundDose.h"
+#include "android/media/ISoundDoseCallback.h"
 #include "android/media/OpenInputRequest.h"
 #include "android/media/OpenInputResponse.h"
 #include "android/media/OpenOutputRequest.h"
@@ -115,6 +117,8 @@ public:
         size_t   afFrameCount;
         uint32_t afSampleRate;
         uint32_t afLatencyMs;
+        audio_channel_mask_t afChannelMask;
+        audio_format_t afFormat;
         audio_io_handle_t outputId;
         audio_port_handle_t portId;
         sp<media::IAudioTrack> audioTrack;
@@ -168,6 +172,7 @@ public:
         audio_port_handle_t portId;
         sp<media::IAudioRecord> audioRecord;
         audio_config_base_t serverConfig;
+        audio_config_base_t halConfig;
 
         ConversionResult<media::CreateRecordResponse> toAidl() const;
         static ConversionResult<CreateRecordOutput>
@@ -261,8 +266,6 @@ public:
                                media::OpenInputResponse* response) = 0;
 
     virtual status_t closeInput(audio_io_handle_t input) = 0;
-
-    virtual status_t invalidateStream(audio_stream_type_t stream) = 0;
 
     virtual status_t setVoiceVolume(float volume) = 0;
 
@@ -369,6 +372,11 @@ public:
     virtual status_t getSupportedLatencyModes(audio_io_handle_t output,
             std::vector<audio_latency_mode_t>* modes) = 0;
 
+    virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                           sp<media::ISoundDose>* soundDose) = 0;
+
+    virtual status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) = 0;
+
     virtual status_t setBluetoothVariableLatencyEnabled(bool enabled) = 0;
 
     virtual status_t isBluetoothVariableLatencyEnabled(bool* enabled) = 0;
@@ -430,7 +438,6 @@ public:
     status_t openInput(const media::OpenInputRequest& request,
                        media::OpenInputResponse* response) override;
     status_t closeInput(audio_io_handle_t input) override;
-    status_t invalidateStream(audio_stream_type_t stream) override;
     status_t setVoiceVolume(float volume) override;
     status_t getRenderPosition(uint32_t* halFrames, uint32_t* dspFrames,
                                audio_io_handle_t output) const override;
@@ -487,6 +494,9 @@ public:
     status_t setBluetoothVariableLatencyEnabled(bool enabled) override;
     status_t isBluetoothVariableLatencyEnabled(bool* enabled) override;
     status_t supportsBluetoothVariableLatency(bool* support) override;
+    status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                   sp<media::ISoundDose>* soundDose) override;
+    status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
     status_t getAudioPolicyConfig(media::AudioPolicyConfig* output) override;
 
 private:
@@ -541,7 +551,6 @@ public:
             RESTORE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_restoreOutput,
             OPEN_INPUT = media::BnAudioFlingerService::TRANSACTION_openInput,
             CLOSE_INPUT = media::BnAudioFlingerService::TRANSACTION_closeInput,
-            INVALIDATE_STREAM = media::BnAudioFlingerService::TRANSACTION_invalidateStream,
             SET_VOICE_VOLUME = media::BnAudioFlingerService::TRANSACTION_setVoiceVolume,
             GET_RENDER_POSITION = media::BnAudioFlingerService::TRANSACTION_getRenderPosition,
             GET_INPUT_FRAMES_LOST = media::BnAudioFlingerService::TRANSACTION_getInputFramesLost,
@@ -586,6 +595,8 @@ public:
                     media::BnAudioFlingerService::TRANSACTION_isBluetoothVariableLatencyEnabled,
             SUPPORTS_BLUETOOTH_VARIABLE_LATENCY =
                     media::BnAudioFlingerService::TRANSACTION_supportsBluetoothVariableLatency,
+            GET_SOUND_DOSE_INTERFACE = media::BnAudioFlingerService::TRANSACTION_getSoundDoseInterface,
+            INVALIDATE_TRACKS = media::BnAudioFlingerService::TRANSACTION_invalidateTracks,
             GET_AUDIO_POLICY_CONFIG =
                     media::BnAudioFlingerService::TRANSACTION_getAudioPolicyConfig,
         };
@@ -667,7 +678,6 @@ public:
     Status openInput(const media::OpenInputRequest& request,
                      media::OpenInputResponse* _aidl_return) override;
     Status closeInput(int32_t input) override;
-    Status invalidateStream(media::audio::common::AudioStreamType stream) override;
     Status setVoiceVolume(float volume) override;
     Status getRenderPosition(int32_t output, media::RenderPosition* _aidl_return) override;
     Status getInputFramesLost(int32_t ioHandle, int32_t* _aidl_return) override;
@@ -718,6 +728,9 @@ public:
     Status setBluetoothVariableLatencyEnabled(bool enabled) override;
     Status isBluetoothVariableLatencyEnabled(bool* enabled) override;
     Status supportsBluetoothVariableLatency(bool* support) override;
+    Status getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                 sp<media::ISoundDose>* _aidl_return) override;
+    Status invalidateTracks(const std::vector<int32_t>& portIds) override;
     Status getAudioPolicyConfig(media::AudioPolicyConfig* _aidl_return) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;

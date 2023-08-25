@@ -17,9 +17,11 @@
 #ifndef ANDROID_MEDIA_TUNERDVRHELPER_H
 #define ANDROID_MEDIA_TUNERDVRHELPER_H
 
+#include <aidl/android/media/tv/tunerresourcemanager/TunerDemuxInfo.h>
 #include <aidl/android/media/tv/tunerresourcemanager/TunerFrontendInfo.h>
 #include <utils/String16.h>
 
+using ::aidl::android::media::tv::tunerresourcemanager::TunerDemuxInfo;
 using ::aidl::android::media::tv::tunerresourcemanager::TunerFrontendInfo;
 using ::android::String16;
 
@@ -54,6 +56,10 @@ public:
 
     // TODO: update Demux, Descrambler.
     static void updateTunerResources(const vector<TunerFrontendInfo>& feInfos,
+                                     const vector<int32_t>& lnbHandles);
+
+    static void updateTunerResources(const vector<TunerFrontendInfo>& feInfos,
+                                     const vector<TunerDemuxInfo>& demuxInfos,
                                      const vector<int32_t>& lnbHandles);
     // TODO: create a map between resource id and handles.
     static int getResourceIdFromHandle(int resourceHandle, int type);

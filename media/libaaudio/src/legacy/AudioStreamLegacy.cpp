@@ -85,7 +85,7 @@ size_t AudioStreamLegacy::onMoreData(const android::AudioTrack::Buffer& buffer) 
     // AudioRecord::Buffer
     // TODO define our own AudioBuffer and pass it from the subclasses.
     size_t written = buffer.size();
-    if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
+    if (isDisconnected()) {
         ALOGW("%s() data, stream disconnected", __func__);
         // This will kill the stream and prevent it from being restarted.
         // That is OK because the stream is disconnected.
@@ -127,7 +127,7 @@ size_t AudioStreamLegacy::onMoreData(const android::AudioTrack::Buffer& buffer) 
             mCallbackEnabled.store(false);
         }
 
-        if (updateStateMachine() != AAUDIO_OK) {
+        if (processCommands() != AAUDIO_OK) {
             forceDisconnect();
             mCallbackEnabled.store(false);
         }
@@ -150,7 +150,7 @@ size_t AudioStreamLegacy::onMoreData(const android::AudioRecord::Buffer& buffer)
     // AudioRecord::Buffer
     // TODO define our own AudioBuffer and pass it from the subclasses.
     size_t written = buffer.size();
-    if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
+    if (isDisconnected()) {
         ALOGW("%s() data, stream disconnected", __func__);
         // This will kill the stream and prevent it from being restarted.
         // That is OK because the stream is disconnected.
@@ -192,7 +192,7 @@ size_t AudioStreamLegacy::onMoreData(const android::AudioRecord::Buffer& buffer)
             mCallbackEnabled.store(false);
         }
 
-        if (updateStateMachine() != AAUDIO_OK) {
+        if (processCommands() != AAUDIO_OK) {
             forceDisconnect();
             mCallbackEnabled.store(false);
         }
@@ -214,11 +214,11 @@ aaudio_result_t AudioStreamLegacy::checkForDisconnectRequest(bool errorCallbackE
 
 void AudioStreamLegacy::forceDisconnect(bool errorCallbackEnabled) {
     // There is no need to disconnect if already in these states.
-    if (getState() != AAUDIO_STREAM_STATE_DISCONNECTED
+    if (!isDisconnected()
             && getState() != AAUDIO_STREAM_STATE_CLOSING
             && getState() != AAUDIO_STREAM_STATE_CLOSED
             ) {
-        setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+        setDisconnected();
         if (errorCallbackEnabled) {
             maybeCallErrorCallback(AAUDIO_ERROR_DISCONNECTED);
         }
@@ -268,7 +268,7 @@ void AudioStreamLegacy::onAudioDeviceUpdate(audio_io_handle_t /* audioIo */,
     ALOGD("%s(deviceId = %d)", __func__, (int)deviceId);
     if (getDeviceId() != AAUDIO_UNSPECIFIED
             && getDeviceId() != deviceId
-            && getState() != AAUDIO_STREAM_STATE_DISCONNECTED
+            && !isDisconnected()
             ) {
         // Note that isDataCallbackActive() is affected by state so call it before DISCONNECTING.
         // If we have a data callback and the stream is active, then ask the data callback

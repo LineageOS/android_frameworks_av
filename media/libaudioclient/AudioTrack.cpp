@@ -29,6 +29,7 @@
 #include <audio_utils/clock.h>
 #include <audio_utils/primitives.h>
 #include <binder/IPCThreadState.h>
+#include <binder/IServiceManager.h>
 #include <media/AudioTrack.h>
 #include <utils/Log.h>
 #include <private/media/AudioTrackShared.h>
@@ -42,7 +43,9 @@
 
 #define WAIT_PERIOD_MS                  10
 #define WAIT_STREAM_END_TIMEOUT_SEC     120
+
 static const int kMaxLoopCountNotifications = 32;
+static constexpr char kAudioServiceName[] = "audio";
 
 using ::android::aidl_utils::statusTFromBinderStatus;
 using ::android::base::StringPrintf;
@@ -1230,6 +1233,21 @@ uint32_t AudioTrack::getOriginalSampleRate() const
     return mOriginalSampleRate;
 }
 
+uint32_t AudioTrack::getHalSampleRate() const
+{
+    return mAfSampleRate;
+}
+
+uint32_t AudioTrack::getHalChannelCount() const
+{
+    return mAfChannelCount;
+}
+
+audio_format_t AudioTrack::getHalFormat() const
+{
+    return mAfFormat;
+}
+
 status_t AudioTrack::setDualMonoMode(audio_dual_mono_mode_t mode)
 {
     AutoMutex lock(mLock);
@@ -1896,6 +1914,8 @@ status_t AudioTrack::createTrack_l()
 
     mAfFrameCount = output.afFrameCount;
     mAfSampleRate = output.afSampleRate;
+    mAfChannelCount = audio_channel_count_from_out_mask(output.afChannelMask);
+    mAfFormat = output.afFormat;
     mAfLatency = output.afLatencyMs;
 
     mLatency = mAfLatency + (1000LL * mFrameCount) / mSampleRate;
@@ -1960,6 +1980,9 @@ status_t AudioTrack::createTrack_l()
     }
 
     mPortId = output.portId;
+    // notify the upper layers about the new portId
+    triggerPortIdUpdate_l();
+
     // We retain a copy of the I/O handle, but don't own the reference
     mOutput = output.outputId;
     mRefreshRemaining = true;
@@ -2173,7 +2196,6 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, const struct timespec *re
         // obtainBuffer() is called with mutex unlocked, so keep extra references to these fields to
         // keep them from going away if another thread re-creates the track during obtainBuffer()
         sp<AudioTrackClientProxy> proxy;
-        sp<IMemory> iMem;
 
         {   // start of lock scope
             AutoMutex lock(mLock);
@@ -2199,8 +2221,9 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, const struct timespec *re
             }
 
             // Keep the extra references
+            mProxyObtainBufferRef = mProxy;
             proxy = mProxy;
-            iMem = mCblkMemory;
+            mCblkMemoryObtainBufferRef = mCblkMemory;
 
             if (mState == STATE_STOPPING) {
                 status = -EINTR;
@@ -2248,6 +2271,8 @@ void AudioTrack::releaseBuffer(const Buffer* audioBuffer)
     buffer.mFrameCount = stepCount;
     buffer.mRaw = audioBuffer->raw;
 
+    sp<IMemory> tempMemory;
+    sp<AudioTrackClientProxy> tempProxy;
     AutoMutex lock(mLock);
     if (audioBuffer->sequence != mSequence) {
         // This Buffer came from a different IAudioTrack instance, so ignore the releaseBuffer
@@ -2257,7 +2282,12 @@ void AudioTrack::releaseBuffer(const Buffer* audioBuffer)
     }
     mReleased += stepCount;
     mInUnderrun = false;
-    mProxy->releaseBuffer(&buffer);
+    mProxyObtainBufferRef->releaseBuffer(&buffer);
+    // The extra reference of shared memory and proxy from `obtainBuffer` is not used after
+    // calling `releaseBuffer`. Move the extra reference to a temp strong pointer so that it
+    // will be cleared outside `releaseBuffer`.
+    tempMemory = std::move(mCblkMemoryObtainBufferRef);
+    tempProxy = std::move(mProxyObtainBufferRef);
 
     // restart track if it was disabled by audioflinger due to previous underrun
     restartIfDisabled();
@@ -3534,10 +3564,32 @@ void AudioTrack::setPlayerIId(int playerIId)
     if (mPlayerIId == playerIId) return;
 
     mPlayerIId = playerIId;
+    triggerPortIdUpdate_l();
     mediametrics::LogItem(mMetricsId)
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYERIID)
         .set(AMEDIAMETRICS_PROP_PLAYERIID, playerIId)
         .record();
+}
+
+void AudioTrack::triggerPortIdUpdate_l() {
+    if (mAudioManager == nullptr) {
+        // use checkService() to avoid blocking if audio service is not up yet
+        sp<IBinder> binder =
+            defaultServiceManager()->checkService(String16(kAudioServiceName));
+        if (binder == nullptr) {
+            ALOGE("%s(%d): binding to audio service failed.",
+                  __func__,
+                  mPlayerIId);
+            return;
+        }
+
+        mAudioManager = interface_cast<IAudioManager>(binder);
+    }
+
+    // first time when the track is created we do not have a valid piid
+    if (mPlayerIId != PLAYER_PIID_INVALID) {
+        mAudioManager->playerEvent(mPlayerIId, PLAYER_UPDATE_PORT_ID, mPortId);
+    }
 }
 
 status_t AudioTrack::addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback)

@@ -17,9 +17,10 @@
 #define LOG_TAG "mediametrics_tests"
 #include <utils/Log.h>
 
-
 #include <stdio.h>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 #include <gtest/gtest.h>
 #include <media/MediaMetricsItem.h>
@@ -30,6 +31,7 @@
 #include <system/audio.h>
 
 using namespace android;
+using android::mediametrics::stringutils::parseVector;
 
 static size_t countNewlines(const char *s) {
     size_t count = 0;
@@ -55,6 +57,35 @@ TEST(mediametrics_tests, startsWith) {
   ASSERT_EQ(true, android::mediametrics::startsWith(s, std::string("tes")));
   ASSERT_EQ(false, android::mediametrics::startsWith(s, "ts"));
   ASSERT_EQ(false, android::mediametrics::startsWith(s, std::string("est")));
+}
+
+TEST(mediametrics_tests, parseVector) {
+    {
+        std::vector<int32_t> values;
+        EXPECT_EQ(true, parseVector("0{4,300,0,-112343,350}9", &values));
+        EXPECT_EQ(values, std::vector<int32_t>({0, 4, 300, 0, -112343, 350, 9}));
+    }
+    {
+        std::vector<int32_t> values;
+        EXPECT_EQ(true, parseVector("53", &values));
+        EXPECT_EQ(values, std::vector<int32_t>({53}));
+    }
+    {
+        std::vector<int32_t> values;
+        EXPECT_EQ(false, parseVector("5{3,6*3}3", &values));
+        EXPECT_EQ(values, std::vector<int32_t>({}));
+    }
+    {
+        std::vector<int32_t> values = {1}; // should still be this when parsing fails
+        std::vector<int32_t> expected = {1};
+        EXPECT_EQ(false, parseVector("51342abcd,1232", &values));
+        EXPECT_EQ(values, std::vector<int32_t>({1}));
+    }
+    {
+        std::vector<int32_t> values = {2}; // should still be this when parsing fails
+        EXPECT_EQ(false, parseVector("12345678901234,12345678901234", &values));
+        EXPECT_EQ(values, std::vector<int32_t>({2}));
+    }
 }
 
 TEST(mediametrics_tests, defer) {

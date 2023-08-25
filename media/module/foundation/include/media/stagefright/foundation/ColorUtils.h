@@ -57,7 +57,8 @@ struct ColorUtils {
         kColorStandardBT2020Constant =       7, // not in SDK
         kColorStandardBT470M =               8, // not in SDK
         kColorStandardFilm =                 9, // not in SDK
-        kColorStandardDCI_P3 =               10, // not in SDK, new in Android 8.0
+        kColorStandardDisplay_P3 =           10, // not in SDK, new in Android 8.0
+        kColorStandardDCI_P3 = kColorStandardDisplay_P3, // legacy (incorrect) name for Display P3
 
         /* This marks a section of color-standard values that are not supported by graphics HAL,
            but track defined color primaries-matrix coefficient combinations in media.
@@ -211,7 +212,7 @@ inline static const char *asString(android::ColorUtils::ColorStandard i, const c
         case ColorUtils::kColorStandardBT2020Constant:       return "BT2020Constant";
         case ColorUtils::kColorStandardBT470M:               return "BT470M";
         case ColorUtils::kColorStandardFilm:                 return "Film";
-        case ColorUtils::kColorStandardDCI_P3:               return "DCI_P3";
+        case ColorUtils::kColorStandardDisplay_P3:           return "Display_P3";
         default:                                             return def;
     }
 }

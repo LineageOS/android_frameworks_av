@@ -23,15 +23,16 @@ namespace aaudio {
 using android::aidl_utils::statusTFromBinderStatus;
 using android::binder::Status;
 
-AAudioBinderAdapter::AAudioBinderAdapter(IAAudioService* delegate)
-        : mDelegate(delegate) {}
+AAudioBinderAdapter::AAudioBinderAdapter(IAAudioService* delegate,
+                                         int32_t serviceLifetimeId)
+        : mDelegate(delegate), mServiceLifetimeId(serviceLifetimeId) {}
 
 void AAudioBinderAdapter::registerClient(const android::sp<IAAudioClient>& client) {
     mDelegate->registerClient(client);
 }
 
-aaudio_handle_t AAudioBinderAdapter::openStream(const AAudioStreamRequest& request,
-                                                AAudioStreamConfiguration& config) {
+AAudioHandleInfo AAudioBinderAdapter::openStream(const AAudioStreamRequest& request,
+                                                 AAudioStreamConfiguration& config) {
     aaudio_handle_t result;
     StreamParameters params;
     Status status = mDelegate->openStream(request.parcelable(),
@@ -41,23 +42,29 @@ aaudio_handle_t AAudioBinderAdapter::openStream(const AAudioStreamRequest& reque
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     config = params;
-    return result;
+    return {mServiceLifetimeId, result};
 }
 
-aaudio_result_t AAudioBinderAdapter::closeStream(aaudio_handle_t streamHandle) {
+aaudio_result_t AAudioBinderAdapter::closeStream(const AAudioHandleInfo& streamHandleInfo) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
-    Status status = mDelegate->closeStream(streamHandle, &result);
+    Status status = mDelegate->closeStream(streamHandleInfo.getHandle(), &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::getStreamDescription(aaudio_handle_t streamHandle,
+aaudio_result_t AAudioBinderAdapter::getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                                           AudioEndpointParcelable& endpointOut) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
     Endpoint endpoint;
-    Status status = mDelegate->getStreamDescription(streamHandle,
+    Status status = mDelegate->getStreamDescription(streamHandleInfo.getHandle(),
                                                     &endpoint,
                                                     &result);
     if (!status.isOk()) {
@@ -67,68 +74,91 @@ aaudio_result_t AAudioBinderAdapter::getStreamDescription(aaudio_handle_t stream
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::startStream(aaudio_handle_t streamHandle) {
+aaudio_result_t AAudioBinderAdapter::startStream(const AAudioHandleInfo& streamHandleInfo) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
-    Status status = mDelegate->startStream(streamHandle, &result);
+    Status status = mDelegate->startStream(streamHandleInfo.getHandle(), &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::pauseStream(aaudio_handle_t streamHandle) {
+aaudio_result_t AAudioBinderAdapter::pauseStream(const AAudioHandleInfo& streamHandleInfo) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
-    Status status = mDelegate->pauseStream(streamHandle, &result);
+    Status status = mDelegate->pauseStream(streamHandleInfo.getHandle(), &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::stopStream(aaudio_handle_t streamHandle) {
+aaudio_result_t AAudioBinderAdapter::stopStream(const AAudioHandleInfo& streamHandleInfo) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
-    Status status = mDelegate->stopStream(streamHandle, &result);
+    Status status = mDelegate->stopStream(streamHandleInfo.getHandle(), &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::flushStream(aaudio_handle_t streamHandle) {
+aaudio_result_t AAudioBinderAdapter::flushStream(const AAudioHandleInfo& streamHandleInfo) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
-    Status status = mDelegate->flushStream(streamHandle, &result);
+    Status status = mDelegate->flushStream(streamHandleInfo.getHandle(), &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::registerAudioThread(aaudio_handle_t streamHandle,
+aaudio_result_t AAudioBinderAdapter::registerAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                                          pid_t clientThreadId,
                                                          int64_t periodNanoseconds) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
-    Status status = mDelegate->registerAudioThread(streamHandle, clientThreadId, periodNanoseconds, &result);
+    Status status = mDelegate->registerAudioThread(
+            streamHandleInfo.getHandle(), clientThreadId, periodNanoseconds, &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::unregisterAudioThread(aaudio_handle_t streamHandle,
+aaudio_result_t AAudioBinderAdapter::unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                                            pid_t clientThreadId) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
-    Status status = mDelegate->unregisterAudioThread(streamHandle, clientThreadId, &result);
+    Status status = mDelegate->unregisterAudioThread(
+            streamHandleInfo.getHandle(), clientThreadId, &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
 
-aaudio_result_t AAudioBinderAdapter::exitStandby(aaudio_handle_t streamHandle,
+aaudio_result_t AAudioBinderAdapter::exitStandby(const AAudioHandleInfo& streamHandleInfo,
                                                  AudioEndpointParcelable &endpointOut) {
+    if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     aaudio_result_t result;
     Endpoint endpoint;
-    Status status = mDelegate->exitStandby(streamHandle, &endpoint, &result);
+    Status status = mDelegate->exitStandby(streamHandleInfo.getHandle(), &endpoint, &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }

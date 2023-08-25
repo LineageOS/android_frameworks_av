@@ -444,6 +444,10 @@ public:
 
     void setTracksInvalidatedStatusByStrategy(product_strategy_t strategy);
 
+    bool isConfigurationMatched(const audio_config_base_t& config, audio_output_flags_t flags);
+
+    PortHandleVector getClientsForStream(audio_stream_type_t streamType) const;
+
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
     audio_io_handle_t mIoHandle;           // output handle
     uint32_t mLatency;                  //
@@ -454,6 +458,7 @@ public:
     audio_session_t mDirectClientSession; // session id of the direct output client
     bool mPendingReopenToQueryProfiles = false;
     audio_channel_mask_t mMixerChannelMask = AUDIO_CHANNEL_NONE;
+    bool mUsePreferredMixerAttributes = false;
 };
 
 // Audio output driven by an input device directly.
