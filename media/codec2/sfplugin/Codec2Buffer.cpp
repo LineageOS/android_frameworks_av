@@ -26,9 +26,6 @@
 #include <android-base/properties.h>
 #include <android/hardware/cas/native/1.0/types.h>
 #include <android/hardware/drm/1.0/types.h>
-#include <android/hardware/graphics/common/1.2/types.h>
-#include <android/hardware/graphics/mapper/4.0/IMapper.h>
-#include <gralloctypes/Gralloc4.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/HardwareAPI.h>
 #include <media/stagefright/CodecBase.h>
@@ -38,6 +35,7 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include <mediadrm/ICrypto.h>
 #include <nativebase/nativebase.h>
+#include <ui/GraphicBufferMapper.h>
 #include <ui/Fence.h>
 
 #include <C2AllocatorGralloc.h>
@@ -1039,34 +1037,15 @@ native_handle_t *EncryptedLinearBlockBuffer::handle() const {
 }
 
 using ::aidl::android::hardware::graphics::common::Cta861_3;
-using ::aidl::android::hardware::graphics::common::Dataspace;
 using ::aidl::android::hardware::graphics::common::Smpte2086;
-
-using ::android::gralloc4::MetadataType_Cta861_3;
-using ::android::gralloc4::MetadataType_Dataspace;
-using ::android::gralloc4::MetadataType_Smpte2086;
-using ::android::gralloc4::MetadataType_Smpte2094_40;
-
-using ::android::hardware::Return;
-using ::android::hardware::hidl_vec;
-
-using Error4 = ::android::hardware::graphics::mapper::V4_0::Error;
-using IMapper4 = ::android::hardware::graphics::mapper::V4_0::IMapper;
 
 namespace {
 
-sp<IMapper4> GetMapper4() {
-    static ::android::base::NoDestructor<sp<IMapper4>> sMapper(IMapper4::getService());
-    return *sMapper;
-}
-
-class Gralloc4Buffer {
+class GrallocBuffer {
 public:
-    Gralloc4Buffer(const C2Handle *const handle) : mBuffer(nullptr) {
-        sp<IMapper4> mapper = GetMapper4();
-        if (!mapper) {
-            return;
-        }
+    GrallocBuffer(const C2Handle *const handle) : mBuffer(nullptr) {
+        GraphicBufferMapper& mapper = GraphicBufferMapper::get();
+
         // Unwrap raw buffer handle from the C2Handle
         native_handle_t *nh = UnwrapNativeCodec2GrallocHandle(handle);
         if (!nh) {
@@ -1074,13 +1053,14 @@ public:
         }
         // Import the raw handle so IMapper can use the buffer. The imported
         // handle must be freed when the client is done with the buffer.
-        mapper->importBuffer(
-                hardware::hidl_handle(nh),
-                [&](const Error4 &error, void *buffer) {
-                    if (error == Error4::NONE) {
-                        mBuffer = buffer;
-                    }
-                });
+        status_t status = mapper.importBufferNoValidate(
+                nh,
+                &mBuffer);
+
+        if (status != OK) {
+            ALOGE("Failed to import buffer. Status: %d.", status);
+            return;
+        }
 
         // TRICKY: UnwrapNativeCodec2GrallocHandle creates a new handle but
         //         does not clone the fds. Thus we need to delete the handle
@@ -1088,19 +1068,19 @@ public:
         native_handle_delete(nh);
     }
 
-    ~Gralloc4Buffer() {
-        sp<IMapper4> mapper = GetMapper4();
-        if (mapper && mBuffer) {
+    ~GrallocBuffer() {
+        GraphicBufferMapper& mapper = GraphicBufferMapper::get();
+        if (mBuffer) {
             // Free the imported buffer handle. This does not release the
             // underlying buffer itself.
-            mapper->freeBuffer(mBuffer);
+            mapper.freeBuffer(mBuffer);
         }
     }
 
-    void *get() const { return mBuffer; }
+    buffer_handle_t get() const { return mBuffer; }
     operator bool() const { return (mBuffer != nullptr); }
 private:
-    void *mBuffer;
+    buffer_handle_t mBuffer;
 };
 
 }  // namspace
@@ -1110,69 +1090,48 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
         std::shared_ptr<C2StreamHdrStaticMetadataInfo::input> *staticInfo,
         std::shared_ptr<C2StreamHdrDynamicMetadataInfo::input> *dynamicInfo) {
     c2_status_t err = C2_OK;
-    sp<IMapper4> mapper = GetMapper4();
-    Gralloc4Buffer buffer(handle);
-    if (!mapper || !buffer) {
+    GraphicBufferMapper& mapper = GraphicBufferMapper::get();
+    GrallocBuffer buffer(handle);
+    if (!buffer) {
         // Gralloc4 not supported; nothing to do
         return err;
     }
-    Error4 mapperErr = Error4::NONE;
     if (staticInfo) {
-        ALOGV("Grabbing static HDR info from gralloc4 metadata");
+        ALOGV("Grabbing static HDR info from gralloc metadata");
         staticInfo->reset(new C2StreamHdrStaticMetadataInfo::input(0u));
         memset(&(*staticInfo)->mastering, 0, sizeof((*staticInfo)->mastering));
         (*staticInfo)->maxCll = 0;
         (*staticInfo)->maxFall = 0;
-        IMapper4::get_cb cb = [&mapperErr, staticInfo](Error4 err, const hidl_vec<uint8_t> &vec) {
-            mapperErr = err;
-            if (err != Error4::NONE) {
-                return;
-            }
 
-            std::optional<Smpte2086> smpte2086;
-            gralloc4::decodeSmpte2086(vec, &smpte2086);
+        std::optional<Smpte2086> smpte2086;
+        status_t status = mapper.getSmpte2086(buffer.get(), &smpte2086);
+        if (status != OK) {
+            err = C2_CORRUPTED;
+        } else {
             if (smpte2086) {
-                (*staticInfo)->mastering.red.x    = smpte2086->primaryRed.x;
-                (*staticInfo)->mastering.red.y    = smpte2086->primaryRed.y;
-                (*staticInfo)->mastering.green.x  = smpte2086->primaryGreen.x;
-                (*staticInfo)->mastering.green.y  = smpte2086->primaryGreen.y;
-                (*staticInfo)->mastering.blue.x   = smpte2086->primaryBlue.x;
-                (*staticInfo)->mastering.blue.y   = smpte2086->primaryBlue.y;
-                (*staticInfo)->mastering.white.x  = smpte2086->whitePoint.x;
-                (*staticInfo)->mastering.white.y  = smpte2086->whitePoint.y;
+                  (*staticInfo)->mastering.red.x    = smpte2086->primaryRed.x;
+                  (*staticInfo)->mastering.red.y    = smpte2086->primaryRed.y;
+                  (*staticInfo)->mastering.green.x  = smpte2086->primaryGreen.x;
+                  (*staticInfo)->mastering.green.y  = smpte2086->primaryGreen.y;
+                  (*staticInfo)->mastering.blue.x   = smpte2086->primaryBlue.x;
+                  (*staticInfo)->mastering.blue.y   = smpte2086->primaryBlue.y;
+                  (*staticInfo)->mastering.white.x  = smpte2086->whitePoint.x;
+                  (*staticInfo)->mastering.white.y  = smpte2086->whitePoint.y;
 
-                (*staticInfo)->mastering.maxLuminance = smpte2086->maxLuminance;
-                (*staticInfo)->mastering.minLuminance = smpte2086->minLuminance;
-            } else {
-                mapperErr = Error4::BAD_VALUE;
+                  (*staticInfo)->mastering.maxLuminance = smpte2086->maxLuminance;
+                  (*staticInfo)->mastering.minLuminance = smpte2086->minLuminance;
             }
-        };
-        Return<void> ret = mapper->get(buffer.get(), MetadataType_Smpte2086, cb);
-        if (!ret.isOk()) {
-            err = C2_REFUSED;
-        } else if (mapperErr != Error4::NONE) {
-            err = C2_CORRUPTED;
         }
-        cb = [&mapperErr, staticInfo](Error4 err, const hidl_vec<uint8_t> &vec) {
-            mapperErr = err;
-            if (err != Error4::NONE) {
-                return;
-            }
 
-            std::optional<Cta861_3> cta861_3;
-            gralloc4::decodeCta861_3(vec, &cta861_3);
-            if (cta861_3) {
-                (*staticInfo)->maxCll   = cta861_3->maxContentLightLevel;
-                (*staticInfo)->maxFall  = cta861_3->maxFrameAverageLightLevel;
-            } else {
-                mapperErr = Error4::BAD_VALUE;
-            }
-        };
-        ret = mapper->get(buffer.get(), MetadataType_Cta861_3, cb);
-        if (!ret.isOk()) {
-            err = C2_REFUSED;
-        } else if (mapperErr != Error4::NONE) {
+        std::optional<Cta861_3> cta861_3;
+        status = mapper.getCta861_3(buffer.get(), &cta861_3);
+        if (status != OK) {
             err = C2_CORRUPTED;
+        } else {
+            if (cta861_3) {
+                  (*staticInfo)->maxCll   = cta861_3->maxContentLightLevel;
+                  (*staticInfo)->maxFall  = cta861_3->maxFrameAverageLightLevel;
+            }
         }
     }
 
@@ -1181,23 +1140,19 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
     }
 
     if (dynamicInfo) {
-        ALOGV("Grabbing dynamic HDR info from gralloc4 metadata");
+        ALOGV("Grabbing dynamic HDR info from gralloc metadata");
         dynamicInfo->reset();
-        IMapper4::get_cb cb = [&mapperErr, dynamicInfo](Error4 err, const hidl_vec<uint8_t> &vec) {
-            mapperErr = err;
-            if (err != Error4::NONE) {
-                return;
-            }
-            if (!dynamicInfo) {
-                return;
-            }
-            *dynamicInfo = C2StreamHdrDynamicMetadataInfo::input::AllocShared(
-                    vec.size(), 0u, C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40);
-            memcpy((*dynamicInfo)->m.data, vec.data(), vec.size());
-        };
-        Return<void> ret = mapper->get(buffer.get(), MetadataType_Smpte2094_40, cb);
-        if (!ret.isOk() || mapperErr != Error4::NONE) {
+        std::optional<std::vector<uint8_t>> vec;
+        status_t status = mapper.getSmpte2094_40(buffer.get(), &vec);
+        if (status != OK) {
             dynamicInfo->reset();
+            err = C2_CORRUPTED;
+        } else {
+            if (vec) {
+                *dynamicInfo = C2StreamHdrDynamicMetadataInfo::input::AllocShared(
+                      vec->size(), 0u, C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40);
+                memcpy((*dynamicInfo)->m.data, vec->data(), vec->size());
+            }
         }
     }
 
@@ -1210,25 +1165,18 @@ c2_status_t SetMetadataToGralloc4Handle(
         const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
         const C2Handle *const handle) {
     c2_status_t err = C2_OK;
-    sp<IMapper4> mapper = GetMapper4();
-    Gralloc4Buffer buffer(handle);
-    if (!mapper || !buffer) {
+    GraphicBufferMapper& mapper = GraphicBufferMapper::get();
+    GrallocBuffer buffer(handle);
+    if (!buffer) {
         // Gralloc4 not supported; nothing to do
         return err;
     }
-    {
-        hidl_vec<uint8_t> metadata;
-        if (gralloc4::encodeDataspace(static_cast<Dataspace>(dataSpace), &metadata) == OK) {
-            Return<Error4> ret = mapper->set(buffer.get(), MetadataType_Dataspace, metadata);
-            if (!ret.isOk()) {
-                err = C2_REFUSED;
-            } else if (ret != Error4::NONE) {
-                err = C2_CORRUPTED;
-            }
-        }
+    status_t status = mapper.setDataspace(buffer.get(), static_cast<ui::Dataspace>(dataSpace));
+    if (status != OK) {
+       err = C2_CORRUPTED;
     }
     if (staticInfo && *staticInfo) {
-        ALOGV("Setting static HDR info as gralloc4 metadata");
+        ALOGV("Setting static HDR info as gralloc metadata");
         std::optional<Smpte2086> smpte2086 = Smpte2086{
             {staticInfo->mastering.red.x, staticInfo->mastering.red.y},
             {staticInfo->mastering.green.x, staticInfo->mastering.green.y},
@@ -1237,7 +1185,6 @@ c2_status_t SetMetadataToGralloc4Handle(
             staticInfo->mastering.maxLuminance,
             staticInfo->mastering.minLuminance,
         };
-        hidl_vec<uint8_t> vec;
         if (0.0 <= smpte2086->primaryRed.x && smpte2086->primaryRed.x <= 1.0
                 && 0.0 <= smpte2086->primaryRed.y && smpte2086->primaryRed.y <= 1.0
                 && 0.0 <= smpte2086->primaryGreen.x && smpte2086->primaryGreen.x <= 1.0
@@ -1246,12 +1193,9 @@ c2_status_t SetMetadataToGralloc4Handle(
                 && 0.0 <= smpte2086->primaryBlue.y && smpte2086->primaryBlue.y <= 1.0
                 && 0.0 <= smpte2086->whitePoint.x && smpte2086->whitePoint.x <= 1.0
                 && 0.0 <= smpte2086->whitePoint.y && smpte2086->whitePoint.y <= 1.0
-                && 0.0 <= smpte2086->maxLuminance && 0.0 <= smpte2086->minLuminance
-                && gralloc4::encodeSmpte2086(smpte2086, &vec) == OK) {
-            Return<Error4> ret = mapper->set(buffer.get(), MetadataType_Smpte2086, vec);
-            if (!ret.isOk()) {
-                err = C2_REFUSED;
-            } else if (ret != Error4::NONE) {
+                && 0.0 <= smpte2086->maxLuminance && 0.0 <= smpte2086->minLuminance) {
+            status = mapper.setSmpte2086(buffer.get(), smpte2086);
+            if (status != OK) {
                 err = C2_CORRUPTED;
             }
         }
@@ -1259,41 +1203,23 @@ c2_status_t SetMetadataToGralloc4Handle(
             staticInfo->maxCll,
             staticInfo->maxFall,
         };
-        if (0.0 <= cta861_3->maxContentLightLevel && 0.0 <= cta861_3->maxFrameAverageLightLevel
-                && gralloc4::encodeCta861_3(cta861_3, &vec) == OK) {
-            Return<Error4> ret = mapper->set(buffer.get(), MetadataType_Cta861_3, vec);
-            if (!ret.isOk()) {
-                err = C2_REFUSED;
-            } else if (ret != Error4::NONE) {
+        if (0.0 <= cta861_3->maxContentLightLevel && 0.0 <= cta861_3->maxFrameAverageLightLevel) {
+            status = mapper.setCta861_3(buffer.get(), cta861_3);
+            if (status != OK) {
                 err = C2_CORRUPTED;
             }
         }
     }
     if (dynamicInfo && *dynamicInfo && dynamicInfo->flexCount() > 0) {
-        ALOGV("Setting dynamic HDR info as gralloc4 metadata");
-        std::optional<IMapper4::MetadataType> metadataType;
-        switch (dynamicInfo->m.type_) {
-        case C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_10:
-            // TODO
-            break;
-        case C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40:
-            metadataType = MetadataType_Smpte2094_40;
-            break;
-        }
+        ALOGV("Setting dynamic HDR info as gralloc metadata");
+        if (dynamicInfo->m.type_ == C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
+            std::optional<std::vector<uint8_t>> smpte2094_40 = std::vector<uint8_t>();
+            smpte2094_40->resize(dynamicInfo->flexCount());
+            memcpy(smpte2094_40->data(), dynamicInfo->m.data, dynamicInfo->flexCount());
 
-        if (metadataType) {
-            std::vector<uint8_t> smpte2094_40;
-            smpte2094_40.resize(dynamicInfo->flexCount());
-            memcpy(smpte2094_40.data(), dynamicInfo->m.data, dynamicInfo->flexCount());
-
-            hidl_vec<uint8_t> vec;
-            if (gralloc4::encodeSmpte2094_40({ smpte2094_40 }, &vec) == OK) {
-                Return<Error4> ret = mapper->set(buffer.get(), *metadataType, vec);
-                if (!ret.isOk()) {
-                    err = C2_REFUSED;
-                } else if (ret != Error4::NONE) {
-                    err = C2_CORRUPTED;
-                }
+            status = mapper.setSmpte2094_40(buffer.get(), smpte2094_40);
+            if (status != OK) {
+                err = C2_CORRUPTED;
             }
         } else {
             err = C2_BAD_VALUE;
