@@ -361,8 +361,8 @@ status_t ConvertRGBToPlanarYUV(
     const uint8_t *pBlue  = src.data()[C2PlanarLayout::PLANE_B];
 
 #define CLIP3(x,y,z) (((z) < (x)) ? (x) : (((z) > (y)) ? (y) : (z)))
-    for (size_t y = 0; y < src.height(); ++y) {
-        for (size_t x = 0; x < src.width(); ++x) {
+    for (size_t y = 0; y < src.crop().height; ++y) {
+        for (size_t x = 0; x < src.crop().width; ++x) {
             uint8_t red = *pRed;
             uint8_t green = *pGreen;
             uint8_t blue = *pBlue;
