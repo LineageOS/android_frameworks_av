@@ -33,7 +33,17 @@ public class Stats {
     private long mDeInitTimeNs;
     private long mStartTimeNs;
     private ArrayList<Integer> mFrameSizes;
+    /*
+     * Array for holding the wallclock time
+     * for each input buffer available.
+     */
     private ArrayList<Long> mInputTimer;
+    /*
+     * Array for holding the wallclock time
+     * for each output buffer available.
+     * This is used for determining the decoded
+     * frame intervals.
+     */
     private ArrayList<Long> mOutputTimer;
 
     public Stats() {
@@ -76,9 +86,15 @@ public class Stats {
 
     public long getDeInitTime() { return mDeInitTimeNs; }
 
+    public long getStartTime() { return mStartTimeNs; }
+
+    public ArrayList<Long> getOutputTimers() { return mOutputTimer; }
+
+    public ArrayList<Long> getInputTimers() { return mInputTimer; }
+
     public long getTimeDiff(long sTime, long eTime) { return (eTime - sTime); }
 
-    private long getTotalTime() {
+    public long getTotalTime() {
         if (mOutputTimer.size() == 0) {
             return -1;
         }
@@ -86,7 +102,7 @@ public class Stats {
         return lastTime - mStartTimeNs;
     }
 
-    private long getTotalSize() {
+    public long getTotalSize() {
         long totalSize = 0;
         for (long size : mFrameSizes) {
             totalSize += size;

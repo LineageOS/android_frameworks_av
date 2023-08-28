@@ -56,7 +56,8 @@ Camera3Stream::Camera3Stream(int id,
         const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
-        int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase) :
+        int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
+        int32_t colorSpace) :
     camera_stream(),
     mId(id),
     mSetId(setId),
@@ -96,6 +97,7 @@ Camera3Stream::Camera3Stream(int id,
     camera_stream::sensor_pixel_modes_used = sensorPixelModesUsed;
     camera_stream::dynamic_range_profile = dynamicRangeProfile;
     camera_stream::use_case = streamUseCase;
+    camera_stream::color_space = colorSpace;
 
     if ((format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_RAW_OPAQUE) &&
             maxSize == 0) {
@@ -134,6 +136,10 @@ int Camera3Stream::getFormat() const {
 
 android_dataspace Camera3Stream::getDataSpace() const {
     return camera_stream::data_space;
+}
+
+int32_t Camera3Stream::getColorSpace() const {
+    return camera_stream::color_space;
 }
 
 uint64_t Camera3Stream::getUsage() const {

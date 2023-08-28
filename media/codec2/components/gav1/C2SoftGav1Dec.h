@@ -19,6 +19,8 @@
 
 #include <inttypes.h>
 
+#include <memory>
+
 #include <media/stagefright/foundation/ColorUtils.h>
 
 #include <SimpleC2Component.h>
@@ -60,6 +62,9 @@ struct C2SoftGav1Dec : public SimpleC2Component {
   uint32_t mHeight;
   bool mSignalledOutputEos;
   bool mSignalledError;
+  // Used during 10-bit I444/I422 to 10-bit P010 & 8-bit I420 conversions.
+  std::unique_ptr<uint16_t[]> mTmpFrameBuffer;
+  size_t mTmpFrameBufferSize = 0;
 
   C2StreamHdrStaticMetadataInfo::output mHdrStaticMetadataInfo;
   std::unique_ptr<C2StreamHdr10PlusInfo::output> mHdr10PlusInfo = nullptr;
@@ -97,6 +102,9 @@ struct C2SoftGav1Dec : public SimpleC2Component {
   void destroyDecoder();
   void finishWork(uint64_t index, const std::unique_ptr<C2Work>& work,
                   const std::shared_ptr<C2GraphicBlock>& block);
+  // Sets |work->result| and mSignalledError. Returns false.
+  void setError(const std::unique_ptr<C2Work> &work, c2_status_t error);
+  bool allocTmpFrameBuffer(size_t size);
   bool outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
                     const std::unique_ptr<C2Work>& work);
   c2_status_t drainInternal(uint32_t drainMode,

@@ -30,7 +30,7 @@ namespace aaudio {
  */
 class SharedMemoryProxy {
 public:
-    SharedMemoryProxy() {}
+    SharedMemoryProxy() = default;
 
     ~SharedMemoryProxy();
 

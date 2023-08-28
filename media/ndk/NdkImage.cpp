@@ -24,6 +24,7 @@
 
 #include <android_media_Utils.h>
 #include <private/android/AHardwareBufferHelpers.h>
+#include <ui/PublicFormat.h>
 #include <utils/Log.h>
 
 using namespace android;
@@ -34,6 +35,8 @@ AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem*
         int64_t timestamp, int32_t width, int32_t height, int32_t numPlanes) :
         mReader(reader), mFormat(format), mUsage(usage), mBuffer(buffer), mLockedBuffer(nullptr),
         mTimestamp(timestamp), mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
+    PublicFormat publicFormat = static_cast<PublicFormat>(format);
+    mHalDataSpace = mapPublicFormatToHalDataspace(publicFormat);
     LOG_FATAL_IF(reader == nullptr, "AImageReader shouldn't be null while creating AImage");
 }
 
@@ -153,6 +156,20 @@ AImage::getTimestamp(int64_t* timestamp) const {
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
     *timestamp = mTimestamp;
+    return AMEDIA_OK;
+}
+
+media_status_t
+AImage::getDataSpace(android_dataspace* dataSpace) const {
+    if (dataSpace == nullptr) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    *dataSpace = static_cast<android_dataspace>(-1);
+    if (isClosed()) {
+        ALOGE("%s: image %p has been closed!", __FUNCTION__, this);
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
+    *dataSpace = mHalDataSpace;
     return AMEDIA_OK;
 }
 
@@ -816,4 +833,16 @@ media_status_t AImage_getHardwareBuffer(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
     return image->getHardwareBuffer(buffer);
+}
+
+EXPORT
+media_status_t AImage_getDataSpace(
+    const AImage* image, /*out*/int32_t* dataSpace) {
+    ALOGV("%s", __FUNCTION__);
+
+    if (image == nullptr || dataSpace == nullptr) {
+        ALOGE("%s: bad argument. image %p dataSpace %p", __FUNCTION__, image, dataSpace);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    return image->getDataSpace((android_dataspace*)(dataSpace));
 }

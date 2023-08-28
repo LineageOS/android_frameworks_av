@@ -119,7 +119,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mThreadIoHandle(thread ? thread->id() : AUDIO_IO_HANDLE_NONE),
         mPortId(portId),
         mIsInvalid(false),
-        mTrackMetrics(std::move(metricsId), isOut),
+        mTrackMetrics(std::move(metricsId), isOut, clientUid),
         mCreatorPid(creatorPid)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
@@ -163,11 +163,12 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
     }
 
     if (client != 0) {
-        mCblkMemory = client->heap()->allocate(size);
+        mCblkMemory = client->allocator().allocate(mediautils::NamedAllocRequest{{size},
+                std::string("Track ID: ").append(std::to_string(mId))});
         if (mCblkMemory == 0 ||
                 (mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->unsecurePointer())) == NULL) {
             ALOGE("%s(%d): not enough memory for AudioTrack size=%zu", __func__, mId, size);
-            client->heap()->dump("AudioTrack");
+            ALOGE("%s", client->allocator().dump().c_str());
             mCblkMemory.clear();
             return;
         }
@@ -652,7 +653,8 @@ AudioFlinger::PlaybackThread::Track::Track(
             audio_port_handle_t portId,
             size_t frameCountToBeReady,
             float speed,
-            bool isSpatialized)
+            bool isSpatialized,
+            bool isBitPerfect)
     :   TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount,
                   // TODO: Using unsecurePointer() has some associated security pitfalls
                   //       (see declaration for details).
@@ -687,7 +689,8 @@ AudioFlinger::PlaybackThread::Track::Track(
     mFlushHwPending(false),
     mFlags(flags),
     mSpeed(speed),
-    mIsSpatialized(isSpatialized)
+    mIsSpatialized(isSpatialized),
+    mIsBitPerfect(isBitPerfect)
 {
     // client == 0 implies sharedBuffer == 0
     ALOG_ASSERT(!(client == 0 && sharedBuffer != 0));
@@ -809,7 +812,7 @@ void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
                         "  Format Chn mask  SRate "
                         "ST Usg CT "
                         " G db  L dB  R dB  VS dB "
-                        "  Server FrmCnt  FrmRdy F Underruns  Flushed"
+                        "  Server FrmCnt  FrmRdy F Underruns  Flushed BitPerfect"
                         "%s\n",
                         isServerLatencySupported() ? "   Latency" : "");
 }
@@ -895,7 +898,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
                         "%08X %08X %6u "
                         "%2u %3x %2x "
                         "%5.2g %5.2g %5.2g %5.2g%c "
-                        "%08X %6zu%c %6zu %c %9u%c %7u",
+                        "%08X %6zu%c %6zu %c %9u%c %7u %10s",
             active ? "yes" : "no",
             (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
@@ -924,7 +927,8 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
             fillingStatus,
             mAudioTrackServerProxy->getUnderrunFrames(),
             nowInUnderrun,
-            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000
+            (unsigned)mAudioTrackServerProxy->framesFlushed() % 10000000,
+            isBitPerfect() ? "true" : "false"
             );
 
     if (isServerLatencySupported()) {
@@ -1135,10 +1139,10 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             mObservedUnderruns = playbackThread->getFastTrackUnderruns(mFastIndex);
         }
         status = playbackThread->addTrack_l(this);
-        if (status == INVALID_OPERATION || status == PERMISSION_DENIED) {
+        if (status == INVALID_OPERATION || status == PERMISSION_DENIED || status == DEAD_OBJECT) {
             triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
             //  restore previous state if start was rejected by policy manager
-            if (status == PERMISSION_DENIED) {
+            if (status == PERMISSION_DENIED || status == DEAD_OBJECT) {
                 mState = state;
             }
         }
@@ -1177,6 +1181,23 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
     }
     if (status == NO_ERROR) {
         forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+
+        // send format to AudioManager for playback activity monitoring
+        sp<IAudioManager> audioManager = thread->mAudioFlinger->getOrCreateAudioManager();
+        if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
+            std::unique_ptr<os::PersistableBundle> bundle =
+                    std::make_unique<os::PersistableBundle>();
+        bundle->putBoolean(String16(kExtraPlayerEventSpatializedKey),
+                           isSpatialized());
+        bundle->putInt(String16(kExtraPlayerEventSampleRateKey), mSampleRate);
+        bundle->putInt(String16(kExtraPlayerEventChannelMaskKey), mChannelMask);
+        status_t result = audioManager->portEvent(mPortId,
+                                                  PLAYER_UPDATE_FORMAT, bundle);
+        if (result != OK) {
+            ALOGE("%s: unable to send playback format for port ID %d, status error %d",
+                  __func__, mPortId, result);
+        }
+      }
     }
     return status;
 }
@@ -1401,8 +1422,11 @@ sp<VolumeShaper::State> AudioFlinger::PlaybackThread::Track::getVolumeShaperStat
     return mVolumeHandler->getVolumeShaperState(id);
 }
 
-void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volume)
+void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volumeLeft, float volumeRight)
 {
+    mFinalVolumeLeft = volumeLeft;
+    mFinalVolumeRight = volumeRight;
+    const float volume = (volumeLeft + volumeRight) * 0.5f;
     if (mFinalVolume != volume) { // Compare to an epsilon if too many meaningless updates
         mFinalVolume = volume;
         setMetadataHasChanged();
@@ -1486,12 +1510,54 @@ void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backI
     *backInserter++ = metadata;
 }
 
-void AudioFlinger::PlaybackThread::Track::setTeePatches(TeePatches teePatches) {
-    forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
-    mTeePatches = std::move(teePatches);
-    if (mState == TrackBase::ACTIVE || mState == TrackBase::RESUMING ||
-            mState == TrackBase::STOPPING_1) {
-        forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+void AudioFlinger::PlaybackThread::Track::updateTeePatches() {
+    if (mTeePatchesToUpdate.has_value()) {
+        forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
+        mTeePatches = mTeePatchesToUpdate.value();
+        if (mState == TrackBase::ACTIVE || mState == TrackBase::RESUMING ||
+                mState == TrackBase::STOPPING_1) {
+            forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+        }
+        mTeePatchesToUpdate.reset();
+    }
+}
+
+void AudioFlinger::PlaybackThread::Track::setTeePatchesToUpdate(TeePatches teePatchesToUpdate) {
+    ALOGW_IF(mTeePatchesToUpdate.has_value(),
+             "%s, existing tee patches to update will be ignored", __func__);
+    mTeePatchesToUpdate = std::move(teePatchesToUpdate);
+}
+
+// must be called with player thread lock held
+void AudioFlinger::PlaybackThread::Track::processMuteEvent_l(const sp<
+    IAudioManager>& audioManager, mute_state_t muteState)
+{
+    if (mMuteState == muteState) {
+        // mute state did not change, do nothing
+        return;
+    }
+
+    status_t result = UNKNOWN_ERROR;
+    if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
+        if (mMuteEventExtras == nullptr) {
+            mMuteEventExtras = std::make_unique<os::PersistableBundle>();
+        }
+        mMuteEventExtras->putInt(String16(kExtraPlayerEventMuteKey),
+                                 static_cast<int>(muteState));
+
+        result = audioManager->portEvent(mPortId,
+                                         PLAYER_UPDATE_MUTED,
+                                         mMuteEventExtras);
+    }
+
+    if (result == OK) {
+        mMuteState = muteState;
+    } else {
+        ALOGW("%s(%d): cannot process mute state for port ID %d, status error %d",
+              __func__,
+              id(),
+              mPortId,
+              result);
     }
 }
 
@@ -1931,6 +1997,8 @@ bool AudioFlinger::PlaybackThread::Track::AudioVibrationController::setMute(bool
         PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
         if ((mTrack->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
                 && playbackThread->mHapticChannelCount > 0) {
+            ALOGD("%s, haptic playback was %s for track %d",
+                    __func__, muted ? "muted" : "unmuted", mTrack->id());
             mTrack->setHapticPlaybackEnabled(!muted);
             return true;
         }
@@ -2020,17 +2088,50 @@ void AudioFlinger::PlaybackThread::OutputTrack::stop()
 
 ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t frames)
 {
+    if (!mActive && frames != 0) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr && thread->standby()) {
+            // preload one silent buffer to trigger mixer on start()
+            ClientProxy::Buffer buf { .mFrameCount = mClientProxy->getStartThresholdInFrames() };
+            status_t status = mClientProxy->obtainBuffer(&buf);
+            if (status != NO_ERROR && status != NOT_ENOUGH_DATA && status != WOULD_BLOCK) {
+                ALOGE("%s(%d): could not obtain buffer on start", __func__, mId);
+                return 0;
+            }
+            memset(buf.mRaw, 0, buf.mFrameCount * mFrameSize);
+            mClientProxy->releaseBuffer(&buf);
+
+            (void) start();
+
+            // wait for HAL stream to start before sending actual audio. Doing this on each
+            // OutputTrack makes that playback start on all output streams is synchronized.
+            // If another OutputTrack has already started it can underrun but this is OK
+            // as only silence has been played so far and the retry count is very high on
+            // OutputTrack.
+            auto pt = static_cast<PlaybackThread *>(thread.get());
+            if (!pt->waitForHalStart()) {
+                ALOGW("%s(%d): timeout waiting for thread to exit standby", __func__, mId);
+                stop();
+                return 0;
+            }
+
+            // enqueue the first buffer and exit so that other OutputTracks will also start before
+            // write() is called again and this buffer actually consumed.
+            Buffer firstBuffer;
+            firstBuffer.frameCount = frames;
+            firstBuffer.raw = data;
+            queueBuffer(firstBuffer);
+            return frames;
+        } else {
+            (void) start();
+        }
+    }
+
     Buffer *pInBuffer;
     Buffer inBuffer;
     inBuffer.frameCount = frames;
     inBuffer.raw = data;
-
     uint32_t waitTimeLeftMs = mSourceThread->waitTimeMs();
-
-    if (!mActive && frames != 0) {
-        (void) start();
-    }
-
     while (waitTimeLeftMs) {
         // First write pending buffers, then new data
         if (mBufferQueue.size()) {
@@ -2098,25 +2199,7 @@ ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t fr
     if (inBuffer.frameCount) {
         sp<ThreadBase> thread = mThread.promote();
         if (thread != 0 && !thread->standby()) {
-            if (mBufferQueue.size() < kMaxOverFlowBuffers) {
-                pInBuffer = new Buffer;
-                const size_t bufferSize = inBuffer.frameCount * mFrameSize;
-                pInBuffer->mBuffer = malloc(bufferSize);
-                LOG_ALWAYS_FATAL_IF(pInBuffer->mBuffer == nullptr,
-                        "%s: Unable to malloc size %zu", __func__, bufferSize);
-                pInBuffer->frameCount = inBuffer.frameCount;
-                pInBuffer->raw = pInBuffer->mBuffer;
-                memcpy(pInBuffer->raw, inBuffer.raw, inBuffer.frameCount * mFrameSize);
-                mBufferQueue.add(pInBuffer);
-                ALOGV("%s(%d): thread %d adding overflow buffer %zu", __func__, mId,
-                        (int)mThreadIoHandle, mBufferQueue.size());
-                // audio data is consumed (stored locally); set frameCount to 0.
-                inBuffer.frameCount = 0;
-            } else {
-                ALOGW("%s(%d): thread %d no more overflow buffers",
-                        __func__, mId, (int)mThreadIoHandle);
-                // TODO: return error for this.
-            }
+            queueBuffer(inBuffer);
         }
     }
 
@@ -2127,6 +2210,29 @@ ssize_t AudioFlinger::PlaybackThread::OutputTrack::write(void* data, uint32_t fr
     }
 
     return frames - inBuffer.frameCount;  // number of frames consumed.
+}
+
+void AudioFlinger::PlaybackThread::OutputTrack::queueBuffer(Buffer& inBuffer) {
+
+    if (mBufferQueue.size() < kMaxOverFlowBuffers) {
+        Buffer *pInBuffer = new Buffer;
+        const size_t bufferSize = inBuffer.frameCount * mFrameSize;
+        pInBuffer->mBuffer = malloc(bufferSize);
+        LOG_ALWAYS_FATAL_IF(pInBuffer->mBuffer == nullptr,
+                "%s: Unable to malloc size %zu", __func__, bufferSize);
+        pInBuffer->frameCount = inBuffer.frameCount;
+        pInBuffer->raw = pInBuffer->mBuffer;
+        memcpy(pInBuffer->raw, inBuffer.raw, inBuffer.frameCount * mFrameSize);
+        mBufferQueue.add(pInBuffer);
+        ALOGV("%s(%d): thread %d adding overflow buffer %zu", __func__, mId,
+                (int)mThreadIoHandle, mBufferQueue.size());
+        // audio data is consumed (stored locally); set frameCount to 0.
+        inBuffer.frameCount = 0;
+    } else {
+        ALOGW("%s(%d): thread %d no more overflow buffers",
+                __func__, mId, (int)mThreadIoHandle);
+        // TODO: return error for this.
+    }
 }
 
 void AudioFlinger::PlaybackThread::OutputTrack::copyMetadataTo(MetadataInserter& backInserter) const
@@ -3116,6 +3222,38 @@ int64_t AudioFlinger::MmapThread::MmapTrack::framesReleased() const
 
 void AudioFlinger::MmapThread::MmapTrack::onTimestamp(const ExtendedTimestamp &timestamp __unused)
 {
+}
+
+void AudioFlinger::MmapThread::MmapTrack::processMuteEvent_l(const sp<
+    IAudioManager>& audioManager, mute_state_t muteState)
+{
+    if (mMuteState == muteState) {
+        // mute state did not change, do nothing
+        return;
+    }
+
+    status_t result = UNKNOWN_ERROR;
+    if (audioManager && mPortId != AUDIO_PORT_HANDLE_NONE) {
+        if (mMuteEventExtras == nullptr) {
+            mMuteEventExtras = std::make_unique<os::PersistableBundle>();
+        }
+        mMuteEventExtras->putInt(String16(kExtraPlayerEventMuteKey),
+                                 static_cast<int>(muteState));
+
+        result = audioManager->portEvent(mPortId,
+                                         PLAYER_UPDATE_MUTED,
+                                         mMuteEventExtras);
+    }
+
+    if (result == OK) {
+        mMuteState = muteState;
+    } else {
+        ALOGW("%s(%d): cannot process mute state for port ID %d, status error %d",
+              __func__,
+              id(),
+              mPortId,
+              result);
+    }
 }
 
 void AudioFlinger::MmapThread::MmapTrack::appendDumpHeader(String8& result)

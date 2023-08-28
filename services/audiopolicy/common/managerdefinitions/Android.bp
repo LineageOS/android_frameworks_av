@@ -29,6 +29,7 @@ cc_library {
         "src/HwModule.cpp",
         "src/IOProfile.cpp",
         "src/PolicyAudioPort.cpp",
+        "src/PreferredMixerAttributesInfo.cpp",
         "src/Serializer.cpp",
         "src/SoundTriggerSession.cpp",
         "src/TypeConverter.cpp",

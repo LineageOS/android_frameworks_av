@@ -18,6 +18,7 @@ cc_test {
         "libbinder_ndk",
         "liblog",
         "libmedia",
+        "libmediautils",
         "libutils",
         "libmediautils",
         "libstats_media_metrics",

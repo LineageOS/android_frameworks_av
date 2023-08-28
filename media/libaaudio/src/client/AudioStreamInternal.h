@@ -48,7 +48,7 @@ public:
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
 
-    virtual aaudio_result_t updateStateMachine() override;
+    virtual aaudio_result_t processCommands() override;
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
@@ -83,7 +83,11 @@ public:
     aaudio_result_t stopClient(audio_port_handle_t clientHandle);
 
     aaudio_handle_t getServiceHandle() const {
-        return mServiceStreamHandle;
+        return mServiceStreamHandleInfo.getHandle();
+    }
+
+    int32_t getServiceLifetimeId() const {
+        return mServiceStreamHandleInfo.getServiceLifetimeId();
     }
 
 protected:
@@ -109,8 +113,6 @@ protected:
                             int64_t *wakeTimePtr) = 0;
 
     aaudio_result_t drainTimestampsFromService();
-
-    aaudio_result_t processCommands();
 
     aaudio_result_t stopCallback_l();
 
@@ -150,7 +152,8 @@ protected:
 
     std::unique_ptr<AudioEndpoint> mAudioEndpoint;   // source for reads or sink for writes
 
-    aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
+    // opaque handle returned from service
+    AAudioHandleInfo         mServiceStreamHandleInfo;
 
     int32_t                  mXRunCount = 0;      // how many underrun events?
 

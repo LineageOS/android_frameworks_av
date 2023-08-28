@@ -30,7 +30,7 @@ android {
     compileSdkVersion 30
     defaultConfig {
         applicationId "com.android.media.benchmark"
-        minSdkVersion 28
+        minSdkVersion 29
         targetSdkVersion 30
         versionCode 1
         versionName "1.0"

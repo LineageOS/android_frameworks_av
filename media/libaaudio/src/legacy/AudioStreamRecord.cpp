@@ -208,6 +208,10 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     setBufferCapacity(getBufferCapacityFromDevice());
     setFramesPerBurst(getFramesPerBurstFromDevice());
 
+    setHardwareSamplesPerFrame(mAudioRecord->getHalChannelCount());
+    setHardwareSampleRate(mAudioRecord->getHalSampleRate());
+    setHardwareFormat(mAudioRecord->getHalFormat());
+
     // We may need to pass the data through a block size adapter to guarantee constant size.
     if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
         // The block adapter runs before the format conversion.
@@ -364,8 +368,7 @@ aaudio_result_t AudioStreamRecord::requestStop_l() {
     return checkForDisconnectRequest(false);
 }
 
-aaudio_result_t AudioStreamRecord::updateStateMachine()
-{
+aaudio_result_t AudioStreamRecord::processCommands() {
     aaudio_result_t result = AAUDIO_OK;
     aaudio_wrapping_frames_t position;
     status_t err;
@@ -404,7 +407,7 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
         return result;
     }
 
-    if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
+    if (isDisconnected()) {
         return AAUDIO_ERROR_DISCONNECTED;
     }
 
@@ -447,7 +450,7 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
         // In this context, a DEAD_OBJECT is more likely to be a disconnect notification due to
         // AudioRecord invalidation.
         if (bytesActuallyRead == DEAD_OBJECT) {
-            setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+            setDisconnected();
             return AAUDIO_ERROR_DISCONNECTED;
         }
         return AAudioConvert_androidToAAudioResult(bytesActuallyRead);

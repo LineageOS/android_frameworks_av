@@ -83,6 +83,22 @@ void TunerHelper::updateTunerResources(const vector<TunerFrontendInfo>& feInfos,
     tunerRM->setFrontendInfoList(feInfos);
     tunerRM->setLnbInfoList(lnbHandles);
 }
+void TunerHelper::updateTunerResources(const vector<TunerFrontendInfo>& feInfos,
+                                       const vector<TunerDemuxInfo>& demuxInfos,
+                                       const vector<int32_t>& lnbHandles) {
+    ::ndk::SpAIBinder binder(AServiceManager_waitForService("tv_tuner_resource_mgr"));
+    shared_ptr<ITunerResourceManager> tunerRM = ITunerResourceManager::fromBinder(binder);
+    if (tunerRM == nullptr) {
+        return;
+    }
+
+    updateTunerResources(feInfos, lnbHandles);
+
+    // for Tuner 2.0 and below, Demux resource is not really managed under TRM
+    if (demuxInfos.size() > 0) {
+        tunerRM->setDemuxInfoList(demuxInfos);
+    }
+}
 
 // TODO: create a map between resource id and handles.
 int TunerHelper::getResourceIdFromHandle(int resourceHandle, int /*type*/) {

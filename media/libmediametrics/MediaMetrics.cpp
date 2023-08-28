@@ -86,6 +86,11 @@ void mediametrics_setRate(mediametrics_handle_t handle, attr_t attr,
     if (item != NULL) item->setRate(attr, count, duration);
 }
 
+void mediametrics_setString(mediametrics_handle_t handle, attr_t attr,
+                                 const std::string &string) {
+    mediametrics_setCString(handle, attr, string.c_str());
+}
+
 void mediametrics_setCString(mediametrics_handle_t handle, attr_t attr,
                                  const char *value) {
     Item *item = (Item *) handle;
@@ -150,6 +155,14 @@ bool mediametrics_getRate(mediametrics_handle_t handle, attr_t attr,
     Item *item = (Item *) handle;
     if (item == NULL) return false;
     return item->getRate(attr, count, duration, rate);
+}
+
+bool mediametrics_getString(mediametrics_handle_t handle, attr_t attr,
+                                 std::string *string) {
+    Item *item = (Item *) handle;
+    if (item == NULL) return false;
+
+    return item->getString(attr, string);
 }
 
 // NB: caller owns the string that comes back, is responsible for freeing it

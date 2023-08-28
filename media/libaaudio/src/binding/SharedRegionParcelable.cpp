@@ -46,12 +46,17 @@ SharedRegion SharedRegionParcelable::parcelable() const {
     return result;
 }
 
-void SharedRegionParcelable::setup(int32_t sharedMemoryIndex,
-                                   int32_t offsetInBytes,
-                                   int32_t sizeInBytes) {
-    mSharedMemoryIndex = sharedMemoryIndex;
-    mOffsetInBytes = offsetInBytes;
-    mSizeInBytes = sizeInBytes;
+void SharedRegionParcelable::setup(MemoryInfoTuple memoryInfoTuple) {
+    mSharedMemoryIndex = std::get<MEMORY_INDEX>(memoryInfoTuple);
+    mOffsetInBytes = std::get<OFFSET>(memoryInfoTuple);
+    mSizeInBytes = std::get<SIZE>(memoryInfoTuple);
+}
+
+SharedRegionParcelable::MemoryInfoTuple SharedRegionParcelable::getMemoryInfo(
+        const std::map<int32_t, int32_t>* memoryIndexMap) const {
+    return {memoryIndexMap == nullptr ? mSharedMemoryIndex : memoryIndexMap->at(mSharedMemoryIndex),
+            mOffsetInBytes,
+            mSizeInBytes};
 }
 
 aaudio_result_t SharedRegionParcelable::resolve(SharedMemoryParcelable *memoryParcels,

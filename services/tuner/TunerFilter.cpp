@@ -36,28 +36,28 @@ using ::android::IPCThreadState;
 
 using namespace std;
 
-TunerFilter::TunerFilter(shared_ptr<IFilter> filter, shared_ptr<FilterCallback> cb,
-                         DemuxFilterType type)
+TunerFilter::TunerFilter(const shared_ptr<IFilter> filter, const shared_ptr<FilterCallback> cb,
+                         const DemuxFilterType type, const shared_ptr<TunerService> tuner)
       : mFilter(filter),
         mType(type),
         mStarted(false),
         mShared(false),
         mClientPid(-1),
-        mFilterCallback(cb) {}
+        mFilterCallback(cb),
+        mTunerService(tuner) {}
 
 TunerFilter::~TunerFilter() {
-    Mutex::Autolock _l(mLock);
-    mFilter = nullptr;
+    close();
+    freeSharedFilterToken("");
+    {
+        Mutex::Autolock _l(mLock);
+        mFilter = nullptr;
+        mTunerService = nullptr;
+    }
 }
 
 ::ndk::ScopedAStatus TunerFilter::getQueueDesc(AidlMQDesc* _aidl_return) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         IPCThreadState* ipc = IPCThreadState::self();
         int32_t callingPid = ipc->getCallingPid();
@@ -73,12 +73,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::getId(int32_t* _aidl_return) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -94,12 +88,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::getId64Bit(int64_t* _aidl_return) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -115,12 +103,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::configure(const DemuxFilterSettings& in_settings) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -132,12 +114,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::configureMonitorEvent(int32_t monitorEventType) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -149,12 +125,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::configureIpFilterContextId(int32_t cid) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -166,12 +136,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::configureAvStreamType(const AvStreamType& in_avStreamType) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -183,12 +147,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::setDataSource(const shared_ptr<ITunerFilter>& filter) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (filter == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -207,12 +165,6 @@ TunerFilter::~TunerFilter() {
 ::ndk::ScopedAStatus TunerFilter::getAvSharedHandle(NativeHandle* out_avMemory,
                                                     int64_t* _aidl_return) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -225,12 +177,6 @@ TunerFilter::~TunerFilter() {
 ::ndk::ScopedAStatus TunerFilter::releaseAvHandle(const NativeHandle& in_handle,
                                                   int64_t in_avDataId) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         ALOGD("%s is called on a shared filter", __FUNCTION__);
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -242,12 +188,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::start() {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         IPCThreadState* ipc = IPCThreadState::self();
         int32_t callingPid = ipc->getCallingPid();
@@ -267,12 +207,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::stop() {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         IPCThreadState* ipc = IPCThreadState::self();
         int32_t callingPid = ipc->getCallingPid();
@@ -291,12 +225,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::flush() {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         IPCThreadState* ipc = IPCThreadState::self();
         int32_t callingPid = ipc->getCallingPid();
@@ -312,12 +240,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::close() {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared) {
         IPCThreadState* ipc = IPCThreadState::self();
         int32_t callingPid = ipc->getCallingPid();
@@ -326,7 +248,7 @@ TunerFilter::~TunerFilter() {
                 mFilterCallback->sendSharedFilterStatus(STATUS_INACCESSIBLE);
                 mFilterCallback->detachSharedFilterCallback();
             }
-            TunerService::getTunerService()->removeSharedFilter(this->ref<TunerFilter>());
+            mTunerService->removeSharedFilter(this->ref<TunerFilter>());
         } else {
             // Calling from shared process, do not really close this filter.
             if (mFilterCallback != nullptr) {
@@ -341,7 +263,6 @@ TunerFilter::~TunerFilter() {
         mFilterCallback->detachCallbacks();
     }
     auto res = mFilter->close();
-    mFilter = nullptr;
     mStarted = false;
     mShared = false;
     mClientPid = -1;
@@ -351,12 +272,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::acquireSharedFilterToken(string* _aidl_return) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (mShared || mStarted) {
         ALOGD("create SharedFilter in wrong state");
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -365,7 +280,7 @@ TunerFilter::~TunerFilter() {
 
     IPCThreadState* ipc = IPCThreadState::self();
     mClientPid = ipc->getCallingPid();
-    string token = TunerService::getTunerService()->addFilterToShared(this->ref<TunerFilter>());
+    string token = mTunerService->addFilterToShared(this->ref<TunerFilter>());
     _aidl_return->assign(token);
     mShared = true;
 
@@ -374,12 +289,6 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::freeSharedFilterToken(const string& /* in_filterToken */) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (!mShared) {
         // The filter is not shared or the shared filter has been closed.
         return ::ndk::ScopedAStatus::ok();
@@ -390,7 +299,7 @@ TunerFilter::~TunerFilter() {
         mFilterCallback->detachSharedFilterCallback();
     }
 
-    TunerService::getTunerService()->removeSharedFilter(this->ref<TunerFilter>());
+    mTunerService->removeSharedFilter(this->ref<TunerFilter>());
     mShared = false;
 
     return ::ndk::ScopedAStatus::ok();
@@ -398,24 +307,12 @@ TunerFilter::~TunerFilter() {
 
 ::ndk::ScopedAStatus TunerFilter::getFilterType(DemuxFilterType* _aidl_return) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     *_aidl_return = mType;
     return ::ndk::ScopedAStatus::ok();
 }
 
 ::ndk::ScopedAStatus TunerFilter::setDelayHint(const FilterDelayHint& in_hint) {
     Mutex::Autolock _l(mLock);
-    if (mFilter == nullptr) {
-        ALOGE("IFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFilter->setDelayHint(in_hint);
 }
 

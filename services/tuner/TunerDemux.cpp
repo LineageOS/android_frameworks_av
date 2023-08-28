@@ -26,6 +26,7 @@
 #include <aidl/android/hardware/tv/tuner/Result.h>
 
 #include "TunerDvr.h"
+#include "TunerService.h"
 #include "TunerTimeFilter.h"
 
 using ::aidl::android::hardware::tv::tuner::IDvr;
@@ -41,23 +42,21 @@ namespace media {
 namespace tv {
 namespace tuner {
 
-TunerDemux::TunerDemux(shared_ptr<IDemux> demux, int id) {
+TunerDemux::TunerDemux(const shared_ptr<IDemux> demux, const int id,
+                       const shared_ptr<TunerService> tuner) {
     mDemux = demux;
     mDemuxId = id;
+    mTunerService = tuner;
 }
 
 TunerDemux::~TunerDemux() {
+    close();
     mDemux = nullptr;
+    mTunerService = nullptr;
 }
 
 ::ndk::ScopedAStatus TunerDemux::setFrontendDataSource(
         const shared_ptr<ITunerFrontend>& in_frontend) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     int frontendId;
     in_frontend->getFrontendId(&frontendId);
 
@@ -65,43 +64,26 @@ TunerDemux::~TunerDemux() {
 }
 
 ::ndk::ScopedAStatus TunerDemux::setFrontendDataSourceById(int frontendId) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mDemux->setFrontendDataSource(frontendId);
 }
 
 ::ndk::ScopedAStatus TunerDemux::openFilter(const DemuxFilterType& in_type, int32_t in_bufferSize,
                                             const shared_ptr<ITunerFilterCallback>& in_cb,
                                             shared_ptr<ITunerFilter>* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     shared_ptr<IFilter> filter;
     shared_ptr<TunerFilter::FilterCallback> filterCb =
             ::ndk::SharedRefBase::make<TunerFilter::FilterCallback>(in_cb);
     shared_ptr<IFilterCallback> cb = filterCb;
     auto status = mDemux->openFilter(in_type, in_bufferSize, cb, &filter);
     if (status.isOk()) {
-        *_aidl_return = ::ndk::SharedRefBase::make<TunerFilter>(filter, filterCb, in_type);
+        *_aidl_return =
+                ::ndk::SharedRefBase::make<TunerFilter>(filter, filterCb, in_type, mTunerService);
     }
 
     return status;
 }
 
 ::ndk::ScopedAStatus TunerDemux::openTimeFilter(shared_ptr<ITunerTimeFilter>* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     shared_ptr<ITimeFilter> filter;
     auto status = mDemux->openTimeFilter(&filter);
     if (status.isOk()) {
@@ -113,35 +95,17 @@ TunerDemux::~TunerDemux() {
 
 ::ndk::ScopedAStatus TunerDemux::getAvSyncHwId(const shared_ptr<ITunerFilter>& tunerFilter,
                                                int32_t* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     shared_ptr<IFilter> halFilter = (static_cast<TunerFilter*>(tunerFilter.get()))->getHalFilter();
     return mDemux->getAvSyncHwId(halFilter, _aidl_return);
 }
 
 ::ndk::ScopedAStatus TunerDemux::getAvSyncTime(int32_t avSyncHwId, int64_t* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mDemux->getAvSyncTime(avSyncHwId, _aidl_return);
 }
 
 ::ndk::ScopedAStatus TunerDemux::openDvr(DvrType in_dvbType, int32_t in_bufferSize,
                                          const shared_ptr<ITunerDvrCallback>& in_cb,
                                          shared_ptr<ITunerDvr>* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     shared_ptr<IDvrCallback> callback = ::ndk::SharedRefBase::make<TunerDvr::DvrCallback>(in_cb);
     shared_ptr<IDvr> halDvr;
     auto res = mDemux->openDvr(in_dvbType, in_bufferSize, callback, &halDvr);
@@ -153,36 +117,15 @@ TunerDemux::~TunerDemux() {
 }
 
 ::ndk::ScopedAStatus TunerDemux::connectCiCam(int32_t ciCamId) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mDemux->connectCiCam(ciCamId);
 }
 
 ::ndk::ScopedAStatus TunerDemux::disconnectCiCam() {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mDemux->disconnectCiCam();
 }
 
 ::ndk::ScopedAStatus TunerDemux::close() {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
-    auto res = mDemux->close();
-    mDemux = nullptr;
-
-    return res;
+    return mDemux->close();
 }
 
 }  // namespace tuner

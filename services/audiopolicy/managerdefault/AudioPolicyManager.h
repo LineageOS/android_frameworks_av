@@ -48,6 +48,7 @@
 #include <AudioOutputDescriptor.h>
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
+#include <PreferredMixerAttributesInfo.h>
 #include <SoundTriggerSession.h>
 #include "EngineLibrary.h"
 #include "TypeConverter.h"
@@ -120,13 +121,14 @@ public:
                                   audio_session_t session,
                                   audio_stream_type_t *stream,
                                   const AttributionSourceState& attributionSource,
-                                  const audio_config_t *config,
+                                  audio_config_t *config,
                                   audio_output_flags_t *flags,
                                   audio_port_handle_t *selectedDeviceId,
                                   audio_port_handle_t *portId,
                                   std::vector<audio_io_handle_t> *secondaryOutputs,
                                   output_type_t *outputType,
-                                  bool *isSpatialized) override;
+                                  bool *isSpatialized,
+                                  bool *isBitPerfect) override;
         virtual status_t startOutput(audio_port_handle_t portId);
         virtual status_t stopOutput(audio_port_handle_t portId);
         virtual bool releaseOutput(audio_port_handle_t portId);
@@ -135,7 +137,7 @@ public:
                                          audio_unique_id_t riid,
                                          audio_session_t session,
                                          const AttributionSourceState& attributionSource,
-                                         const audio_config_base_t *config,
+                                         audio_config_base_t *config,
                                          audio_input_flags_t flags,
                                          audio_port_handle_t *selectedDeviceId,
                                          input_type_t *inputType,
@@ -302,8 +304,11 @@ public:
                                                    const AudioDeviceTypeAddrVector &devices);
 
         virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy,
-                                                      device_role_t role);
+                                                      device_role_t role,
+                                                      const AudioDeviceTypeAddrVector &devices);
 
+        virtual status_t clearDevicesRoleForStrategy(product_strategy_t strategy,
+                                                     device_role_t role);
 
         virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
                                                       device_role_t role,
@@ -355,6 +360,8 @@ public:
 
         virtual bool isUltrasoundSupported();
 
+        bool isHotwordStreamSupported(bool lookbackAudio) override;
+
         virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
         {
             return mEngine->listAudioProductStrategies(strategies);
@@ -399,6 +406,21 @@ public:
 
         virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                                          AudioProfileVector& audioProfiles);
+
+        status_t getSupportedMixerAttributes(
+                audio_port_handle_t portId,
+                std::vector<audio_mixer_attributes_t>& mixerAttrs) override;
+        status_t setPreferredMixerAttributes(
+                const audio_attributes_t* attr,
+                audio_port_handle_t portId,
+                uid_t uid,
+                const audio_mixer_attributes_t* mixerAttributes) override;
+        status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
+                                             audio_port_handle_t portId,
+                                             audio_mixer_attributes_t* mixerAttributes) override;
+        status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
+                                               audio_port_handle_t portId,
+                                               uid_t uid) override;
 
         bool isCallScreenModeSupported() override;
 
@@ -971,6 +993,10 @@ protected:
         sp<SourceClientDescriptor> mCallRxSourceClient;
         sp<SourceClientDescriptor> mCallTxSourceClient;
 
+        std::map<audio_port_handle_t,
+                 std::map<product_strategy_t,
+                          sp<PreferredMixerAttributesInfo>>> mPreferredMixerAttrInfos;
+
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
         DeviceVector getMsdAudioOutDevices() const;
@@ -1045,13 +1071,14 @@ private:
                 const audio_attributes_t *attr,
                 audio_stream_type_t *stream,
                 uid_t uid,
-                const audio_config_t *config,
+                audio_config_t *config,
                 audio_output_flags_t *flags,
                 audio_port_handle_t *selectedDeviceId,
                 bool *isRequestedDeviceForExclusiveUse,
                 std::vector<sp<AudioPolicyMix>> *secondaryMixes,
                 output_type_t *outputType,
-                bool *isSpatialized);
+                bool *isSpatialized,
+                bool *isBitPerfect);
         // internal method to return the output handle for the given device and format
         audio_io_handle_t getOutputForDevices(
                 const DeviceVector &devices,
@@ -1060,6 +1087,7 @@ private:
                 const audio_config_t *config,
                 audio_output_flags_t *flags,
                 bool *isSpatialized,
+                sp<PreferredMixerAttributesInfo> prefMixerAttrInfo = nullptr,
                 bool forceMutingHaptic = false);
 
         // Internal method checking if a direct output can be opened matching the requested
@@ -1126,7 +1154,9 @@ private:
          * @param session requester session id
          * @param uid requester uid
          * @param attributes requester audio attributes (e.g. input source and tags matter)
-         * @param config requester audio configuration (e.g. sample rate, format, channel mask).
+         * @param config requested audio configuration (e.g. sample rate, format, channel mask),
+         *               will be updated if current configuration doesn't support but another
+         *               one does
          * @param flags requester input flags
          * @param policyMix may be null, policy rules to be followed by the requester
          * @return input io handle aka unique input identifier selected for this device.
@@ -1134,7 +1164,7 @@ private:
         audio_io_handle_t getInputForDevice(const sp<DeviceDescriptor> &device,
                 audio_session_t session,
                 const audio_attributes_t &attributes,
-                const audio_config_base_t *config,
+                audio_config_base_t *config,
                 audio_input_flags_t flags,
                 const sp<AudioPolicyMix> &policyMix);
 
@@ -1208,7 +1238,8 @@ private:
         bool areAllDevicesSupported(
                 const AudioDeviceTypeAddrVector& devices,
                 std::function<bool(audio_devices_t)> predicate,
-                const char* context);
+                const char* context,
+                bool matchAddress = true);
 
         bool isScoRequestedForComm() const;
 
@@ -1225,11 +1256,15 @@ private:
          * @param[in] profile IOProfile to use as template
          * @param[in] devices initial route to apply to this output stream
          * @param[in] mixerConfig if not null, use this to configure the mixer
+         * @param[in] halConfig if not null, use this to configure the HAL
+         * @param[in] flags the flags to be used to open the output
          * @return an output descriptor for the newly opened stream or null in case of error.
          */
         sp<SwAudioOutputDescriptor> openOutputWithProfileAndDevice(
                 const sp<IOProfile>& profile, const DeviceVector& devices,
-                const audio_config_base_t *mixerConfig = nullptr);
+                const audio_config_base_t *mixerConfig = nullptr,
+                const audio_config_t *halConfig = nullptr,
+                audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE);
 
         bool isOffloadPossible(const audio_offload_info_t& offloadInfo,
                                bool durationIgnored = false);
@@ -1253,6 +1288,30 @@ private:
 
         // Filters only the relevant flags for getProfileForOutput
         audio_output_flags_t getRelevantFlags (audio_output_flags_t flags, bool directOnly);
+
+        status_t getDevicesForAttributes(const audio_attributes_t &attr,
+                                         DeviceVector &devices,
+                                         bool forVolume);
+
+        status_t getProfilesForDevices(const DeviceVector& devices,
+                                       AudioProfileVector& audioProfiles,
+                                       uint32_t flags,
+                                       bool isInput);
+
+        sp<PreferredMixerAttributesInfo> getPreferredMixerAttributesInfo(
+                audio_port_handle_t devicePortId, product_strategy_t strategy);
+
+        sp<SwAudioOutputDescriptor> reopenOutput(
+                sp<SwAudioOutputDescriptor> outputDesc,
+                const audio_config_t *config,
+                audio_output_flags_t flags,
+                const char* caller);
+
+        void reopenOutputsWithDevices(
+                const std::map<audio_io_handle_t, DeviceVector>& outputsToReopen);
+
+        PortHandleVector getClientsForStream(audio_stream_type_t streamType) const;
+        void invalidateStreams(StreamTypeVector streams) const;
 };
 
 };

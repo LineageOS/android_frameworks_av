@@ -96,9 +96,12 @@ typedef struct ACameraMetadata_entry {
     /**
      * The tag identifying the entry.
      *
-     * <p> It is one of the values defined in {@link NdkCameraMetadataTags.h}, and defines how the
+     * <p> It is one of the values defined in
+     * <a href="https://cs.android.com/android/platform/superproject/+/master:frameworks/av/camera/ndk/include/camera/NdkCameraMetadataTags.h">NdkCameraMetadataTags.h</a>
+     * , and defines how the
      * entry should be interpreted and which parts of the API provide it.
-     * See {@link NdkCameraMetadataTags.h} for more details. </p>
+     * See <a href="https://cs.android.com/android/platform/superproject/+/master:frameworks/av/camera/ndk/include/camera/NdkCameraMetadataTags.h">NdkCameraMetadataTags.h</a>
+     * for more details. </p>
      */
     uint32_t tag;
 
@@ -141,9 +144,11 @@ typedef struct ACameraMetadata_const_entry {
     /**
      * The tag identifying the entry.
      *
-     * <p> It is one of the values defined in {@link NdkCameraMetadataTags.h}, and defines how the
+     * <p> It is one of the values defined in <a href="https://cs.android.com/android/platform/superproject/+/master:frameworks/av/camera/ndk/include/camera/NdkCameraMetadataTags.h">NdkCameraMetadataTags.h</a>
+     * , and defines how the
      * entry should be interpreted and which parts of the API provide it.
-     * See {@link NdkCameraMetadataTags.h} for more details. </p>
+     * See <a href="https://cs.android.com/android/platform/superproject/+/master:frameworks/av/camera/ndk/include/camera/NdkCameraMetadataTags.h">NdkCameraMetadataTags.h</a>
+     * for more details. </p>
      */
     uint32_t tag;
 
@@ -185,7 +190,7 @@ typedef struct ACameraMetadata_const_entry {
  * @param metadata the {@link ACameraMetadata} of interest.
  * @param tag the tag value of the camera metadata entry to be get.
  * @param entry the output {@link ACameraMetadata_const_entry} will be filled here if the method
- *        call succeeeds.
+ *        call succeeds.
  *
  * @return <ul>
  *         <li>{@link ACAMERA_OK} if the method call succeeds.</li>

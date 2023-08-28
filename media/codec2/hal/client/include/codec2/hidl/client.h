@@ -549,4 +549,3 @@ protected:
 }  // namespace android
 
 #endif  // CODEC2_HIDL_CLIENT_H
-

@@ -35,8 +35,10 @@
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
 
+#include <aidl/AidlCameraService.h>
 #include <android-base/macros.h>
 #include <android-base/parseint.h>
+#include <android/permission/PermissionChecker.h>
 #include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
@@ -68,6 +70,8 @@
 #include <private/android_filesystem_config.h>
 #include <system/camera_vendor_tags.h>
 #include <system/camera_metadata.h>
+#include <binder/IServiceManager.h>
+#include <binder/IActivityManager.h>
 #include <camera/StringUtils.h>
 
 #include <system/camera.h>
@@ -82,6 +86,9 @@
 
 namespace {
     const char* kPermissionServiceName = "permission";
+    const char* kActivityServiceName = "activity";
+    const char* kSensorPrivacyServiceName = "sensor_privacy";
+    const char* kAppopsServiceName = "appops";
 }; // namespace anonymous
 
 namespace android {
@@ -89,6 +96,7 @@ namespace android {
 using binder::Status;
 using namespace camera3;
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
+using frameworks::cameraservice::service::implementation::AidlCameraService;
 using hardware::ICamera;
 using hardware::ICameraClient;
 using hardware::ICameraServiceListener;
@@ -121,6 +129,8 @@ static const std::string sCameraOpenCloseListenerPermission(
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
 static const std::string
         sCameraInjectExternalCameraPermission("android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
+// Constant integer for FGS Logging, used to denote the API type for logger
+static const int LOG_FGS_CAMERA_API = 1;
 const char *sFileName = "lastOpenSessionDumpFile";
 static constexpr int32_t kSystemNativeClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
 static constexpr int32_t kSystemNativeClientState =
@@ -133,7 +143,10 @@ const std::string CameraService::kWatchAllClientsFlag("all");
 // Set to keep track of logged service error events.
 static std::set<std::string> sServiceErrorEventSet;
 
-CameraService::CameraService() :
+CameraService::CameraService(
+        std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper) :
+        mCameraServiceProxyWrapper(cameraServiceProxyWrapper == nullptr ?
+                std::make_shared<CameraServiceProxyWrapper>() : cameraServiceProxyWrapper),
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0),
         mNumberOfCamerasWithoutSystemCamera(0),
@@ -151,6 +164,20 @@ CameraService::CameraService() :
 // partition. They just need to have a android system uid.
 static bool doesClientHaveSystemUid() {
     return (CameraThreadState::getCallingUid() < AID_APP_START);
+}
+
+// Enable processes with isolated AID to request the binder
+void CameraService::instantiate() {
+    CameraService::publish(true);
+}
+
+void CameraService::onServiceRegistration(const String16& name, const sp<IBinder>&) {
+    if (name != toString16(kAppopsServiceName)) {
+        return;
+    }
+
+    ALOGV("appops service registered. setting camera audio restriction");
+    mAppOps.setCameraAudioRestriction(mAudioRestriction);
 }
 
 void CameraService::onFirstRef()
@@ -177,16 +204,33 @@ void CameraService::onFirstRef()
     mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
     mSensorPrivacyPolicy->registerSelf();
     mInjectionStatusListener = new InjectionStatusListener(this);
-    mAppOps.setCameraAudioRestriction(mAudioRestriction);
+
+    // appops function setCamerAudioRestriction uses getService which
+    // is blocking till the appops service is ready. To enable early
+    // boot availability for cameraservice, use checkService which is
+    // non blocking and register for notifications
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(toString16(kAppopsServiceName));
+    if (!binder) {
+        sm->registerForNotifications(toString16(kAppopsServiceName), this);
+    } else {
+        mAppOps.setCameraAudioRestriction(mAudioRestriction);
+    }
+
     sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
     if (hcs->registerAsService() != android::OK) {
-        ALOGE("%s: Failed to register default android.frameworks.cameraservice.service@1.0",
+        // Deprecated, so it will fail to register on newer devices
+        ALOGW("%s: Did not register default android.frameworks.cameraservice.service@2.2",
               __FUNCTION__);
+    }
+
+    if (!AidlCameraService::registerService(this)) {
+        ALOGE("%s: Failed to register default AIDL VNDK CameraService", __FUNCTION__);
     }
 
     // This needs to be last call in this function, so that it's as close to
     // ServiceManager::addService() as possible.
-    CameraServiceProxyWrapper::pingCameraServiceProxy();
+    mCameraServiceProxyWrapper->pingCameraServiceProxy();
     ALOGI("CameraService pinged cameraservice proxy");
 }
 
@@ -265,7 +309,10 @@ void CameraService::broadcastTorchModeStatus(const std::string& cameraId, TorchM
                     cameraId.c_str());
             continue;
         }
-        i->getListener()->onTorchStatusChanged(mapToInterface(status), cameraId);
+        auto ret = i->getListener()->onTorchStatusChanged(mapToInterface(status),
+                cameraId);
+        i->handleBinderStatus(ret, "%s: Failed to trigger onTorchStatusChanged for %d:%d: %d",
+                __FUNCTION__, i->getListenerUid(), i->getListenerPid(), ret.exceptionCode());
     }
 }
 
@@ -532,8 +579,12 @@ void CameraService::onDeviceStatusChanged(const std::string& id,
                         id.c_str());
                 continue;
             }
-            listener->getListener()->onPhysicalCameraStatusChanged(mapToInterface(newStatus),
-                    id, physicalId);
+            auto ret = listener->getListener()->onPhysicalCameraStatusChanged(
+                    mapToInterface(newStatus), id, physicalId);
+            listener->handleBinderStatus(ret,
+                    "%s: Failed to trigger onPhysicalCameraStatusChanged for %d:%d: %d",
+                    __FUNCTION__, listener->getListenerUid(), listener->getListenerPid(),
+                    ret.exceptionCode());
         }
     }
 }
@@ -574,7 +625,10 @@ void CameraService::broadcastTorchStrengthLevel(const std::string& cameraId,
         int32_t newStrengthLevel) {
     Mutex::Autolock lock(mStatusListenerLock);
     for (auto& i : mListenerList) {
-        i->getListener()->onTorchStrengthLevelChanged(cameraId, newStrengthLevel);
+        auto ret = i->getListener()->onTorchStrengthLevelChanged(cameraId, newStrengthLevel);
+        i->handleBinderStatus(ret,
+                "%s: Failed to trigger onTorchStrengthLevelChanged for %d:%d: %d", __FUNCTION__,
+                i->getListenerUid(), i->getListenerPid(), ret.exceptionCode());
     }
 }
 
@@ -631,11 +685,18 @@ void CameraService::onTorchStatusChangedLocked(const std::string& cameraId,
     broadcastTorchModeStatus(cameraId, newStatus, systemCameraKind);
 }
 
-static bool hasPermissionsForSystemCamera(int callingPid, int callingUid,
-        bool logPermissionFailure = false) {
-    return checkPermission(toString16(sSystemCameraPermission), callingPid, callingUid,
-            logPermissionFailure) &&
-            checkPermission(toString16(sCameraPermission), callingPid, callingUid);
+static bool hasPermissionsForSystemCamera(int callingPid, int callingUid) {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForSystemCamera = permissionChecker.checkPermissionForPreflight(
+            toString16(sSystemCameraPermission), attributionSource, String16(),
+            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+            toString16(sCameraPermission), attributionSource, String16(),
+            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    return checkPermissionForSystemCamera && checkPermissionForCamera;
 }
 
 Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
@@ -714,8 +775,14 @@ std::string CameraService::cameraIdIntToStrLocked(int cameraIdInt) {
     const std::vector<std::string> *deviceIds = &mNormalDeviceIdsWithoutSystemCamera;
     auto callingPid = CameraThreadState::getCallingPid();
     auto callingUid = CameraThreadState::getCallingUid();
-    if (checkPermission(toString16(sSystemCameraPermission), callingPid, callingUid,
-            /*logPermissionFailure*/false) || getpid() == callingPid) {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForSystemCamera = permissionChecker.checkPermissionForPreflight(
+                toString16(sSystemCameraPermission), attributionSource, String16(),
+                AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    if (checkPermissionForSystemCamera || getpid() == callingPid) {
         deviceIds = &mNormalDeviceIds;
     }
     if (cameraIdInt < 0 || cameraIdInt >= static_cast<int>(deviceIds->size())) {
@@ -784,9 +851,16 @@ Status CameraService::getCameraCharacteristics(const std::string& cameraId,
     // If it's not calling from cameraserver, check the permission only if
     // android.permission.CAMERA is required. If android.permission.SYSTEM_CAMERA was needed,
     // it would've already been checked in shouldRejectSystemCameraConnection.
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+                toString16(sCameraPermission), attributionSource, String16(),
+                AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
     if ((callingPid != getpid()) &&
             (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
-            !checkPermission(toString16(sCameraPermission), callingPid, callingUid)) {
+            !checkPermissionForCamera) {
         res = cameraInfo->removePermissionEntries(
                 mCameraProviderManager->getProviderTagIdLocked(cameraId),
                 &tagsRemoved);
@@ -965,17 +1039,20 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
     }
     if (effectiveApiLevel == API_1) { // Camera1 API route
         sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
-        *client = new Camera2Client(cameraService, tmp, packageName, featureId,
-                cameraId, api1CameraId, facing, sensorOrientation, clientPid, clientUid,
-                servicePid, overrideForPerfClass, overrideToPortrait, forceSlowJpegMode);
+        *client = new Camera2Client(cameraService, tmp, cameraService->mCameraServiceProxyWrapper,
+                packageName, featureId, cameraId,
+                api1CameraId, facing, sensorOrientation,
+                clientPid, clientUid, servicePid, overrideForPerfClass, overrideToPortrait,
+                forceSlowJpegMode);
         ALOGI("%s: Camera1 API (legacy), override to portrait %d, forceSlowJpegMode %d",
                 __FUNCTION__, overrideToPortrait, forceSlowJpegMode);
     } else { // Camera2 API route
         sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                 static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
-        *client = new CameraDeviceClient(cameraService, tmp, packageName,
-                systemNativeClient, featureId, cameraId, facing, sensorOrientation,
-                clientPid, clientUid, servicePid, overrideForPerfClass, overrideToPortrait);
+        *client = new CameraDeviceClient(cameraService, tmp,
+                cameraService->mCameraServiceProxyWrapper, packageName, systemNativeClient,
+                featureId, cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid,
+                overrideForPerfClass, overrideToPortrait);
         ALOGI("%s: Camera2 API, override to portrait %d", __FUNCTION__, overrideToPortrait);
     }
     return Status::ok();
@@ -1218,6 +1295,9 @@ Status CameraService::validateConnectLocked(const std::string& cameraId,
 Status CameraService::validateClientPermissionsLocked(const std::string& cameraId,
         const std::string& clientName, int& clientUid, int& clientPid,
         /*out*/int& originalClientPid) const {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+
     int callingPid = CameraThreadState::getCallingPid();
     int callingUid = CameraThreadState::getCallingUid();
 
@@ -1264,9 +1344,14 @@ Status CameraService::validateClientPermissionsLocked(const std::string& cameraI
     // If it's not calling from cameraserver, check the permission if the
     // device isn't a system only camera (shouldRejectSystemCameraConnection already checks for
     // android.permission.SYSTEM_CAMERA for system only camera devices).
+    attributionSource.pid = clientPid;
+    attributionSource.uid = clientUid;
+    attributionSource.packageName = clientName;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+            toString16(sCameraPermission), attributionSource, String16(),
+            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
     if (callingPid != getpid() &&
-                (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
-                !checkPermission(toString16(sCameraPermission), clientPid, clientUid)) {
+                (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) && !checkPermissionForCamera) {
         ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
         return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
                 "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" without camera permission",
@@ -1605,6 +1690,15 @@ Status CameraService::connect(
     }
 
     *device = client;
+
+    const sp<IServiceManager> sm(defaultServiceManager());
+    const auto& mActivityManager = getActivityManager();
+    if (mActivityManager) {
+        mActivityManager->logFgsApiBegin(LOG_FGS_CAMERA_API,
+            CameraThreadState::getCallingUid(),
+            CameraThreadState::getCallingPid());
+    }
+
     return ret;
 }
 
@@ -1656,7 +1750,7 @@ bool CameraService::shouldRejectSystemCameraConnection(const std::string& camera
     //     characteristics) even if clients don't have android.permission.CAMERA. We do not want the
     //     same behavior for system camera devices.
     if (!systemClient && systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
-            !hasPermissionsForSystemCamera(cPid, cUid, /*logPermissionFailure*/true)) {
+            !hasPermissionsForSystemCamera(cPid, cUid)) {
         ALOGW("Rejecting access to system only camera %s, inadequete permissions",
                 cameraId.c_str());
         return true;
@@ -1703,7 +1797,7 @@ Status CameraService::connectDevice(
         clientUserId = multiuser_get_user_id(callingUid);
     }
 
-    if (CameraServiceProxyWrapper::isCameraDisabled(clientUserId)) {
+    if (mCameraServiceProxyWrapper->isCameraDisabled(clientUserId)) {
         std::string msg = "Camera disabled by device policy";
         ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return STATUS_ERROR(ERROR_DISABLED, msg.c_str());
@@ -1711,7 +1805,8 @@ Status CameraService::connectDevice(
 
     // enforce system camera permissions
     if (oomScoreOffset > 0 &&
-            !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid())) {
+            !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid()) &&
+            !isTrustedCallingUid(CameraThreadState::getCallingUid())) {
         std::string msg = fmt::sprintf("Cannot change the priority of a client %s pid %d for "
                         "camera id %s without SYSTEM_CAMERA permissions",
                         clientPackageNameAdj.c_str(), callingPid, cameraId.c_str());
@@ -1746,6 +1841,13 @@ Status CameraService::connectDevice(
         if (mMemFd == -1) {
             ALOGE("%s: Error while creating the file: %s", __FUNCTION__, sFileName);
         }
+    }
+    const sp<IServiceManager> sm(defaultServiceManager());
+    const auto& mActivityManager = getActivityManager();
+    if (mActivityManager) {
+        mActivityManager->logFgsApiBegin(LOG_FGS_CAMERA_API,
+            CameraThreadState::getCallingUid(),
+            CameraThreadState::getCallingPid());
     }
     return ret;
 }
@@ -1980,8 +2082,17 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
             client->setRotateAndCropOverride(rotateAndCropMode);
         } else {
             client->setRotateAndCropOverride(
-              CameraServiceProxyWrapper::getRotateAndCropOverride(
-                  clientPackageName, facing, multiuser_get_user_id(clientUid)));
+                mCameraServiceProxyWrapper->getRotateAndCropOverride(
+                    clientPackageName, facing, multiuser_get_user_id(clientUid)));
+        }
+
+        // Set autoframing override behaviour
+        if (mOverrideAutoframingMode != ANDROID_CONTROL_AUTOFRAMING_AUTO) {
+            client->setAutoframingOverride(mOverrideAutoframingMode);
+        } else {
+            client->setAutoframingOverride(
+                mCameraServiceProxyWrapper->getAutoframingOverride(
+                    clientPackageName));
         }
 
         // Set camera muting behavior
@@ -2024,6 +2135,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
 
         client->setImageDumpMask(mImageDumpMask);
         client->setStreamUseCaseOverrides(mStreamUseCaseOverrides);
+        client->setZoomOverride(mZoomOverrideValue);
     } // lock is destroyed, allow further connect calls
 
     // Important: release the mutex here so the client can call back into the service from its
@@ -2031,7 +2143,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
     device = client;
 
     int32_t openLatencyMs = ns2ms(systemTime() - openTimeNs);
-    CameraServiceProxyWrapper::logOpen(cameraId, facing, clientPackageName,
+    mCameraServiceProxyWrapper->logOpen(cameraId, facing, clientPackageName,
             effectiveApiLevel, isNonSystemNdk, openLatencyMs);
 
     {
@@ -2098,6 +2210,10 @@ status_t CameraService::addOfflineClient(const std::string &cameraId,
                 onlineClientDesc->getOwnerId(), onlinePriority.getState(),
                 // native clients don't have offline processing support.
                 /*ommScoreOffset*/ 0, /*systemNativeClient*/false);
+        if (offlineClientDesc == nullptr) {
+            ALOGE("%s: Offline client descriptor was NULL", __FUNCTION__);
+            return BAD_VALUE;
+        }
 
         // Allow only one offline device per camera
         auto incompatibleClients = mActiveClientManager.getIncompatibleClients(offlineClientDesc);
@@ -2461,9 +2577,20 @@ void CameraService::notifyMonitoredUids() {
 
     for (const auto& it : mListenerList) {
         auto ret = it->getListener()->onCameraAccessPrioritiesChanged();
-        if (!ret.isOk()) {
-            ALOGE("%s: Failed to trigger permission callback: %d", __FUNCTION__,
-                    ret.exceptionCode());
+        it->handleBinderStatus(ret, "%s: Failed to trigger permission callback for %d:%d: %d",
+                __FUNCTION__, it->getListenerUid(), it->getListenerPid(), ret.exceptionCode());
+    }
+}
+
+void CameraService::notifyMonitoredUids(const std::unordered_set<uid_t> &notifyUidSet) {
+    Mutex::Autolock lock(mStatusListenerLock);
+
+    for (const auto& it : mListenerList) {
+        if (notifyUidSet.find(it->getListenerUid()) != notifyUidSet.end()) {
+            ALOGV("%s: notifying uid %d", __FUNCTION__, it->getListenerUid());
+            auto ret = it->getListener()->onCameraAccessPrioritiesChanged();
+            it->handleBinderStatus(ret, "%s: Failed to trigger permission callback for %d:%d: %d",
+                    __FUNCTION__, it->getListenerUid(), it->getListenerPid(), ret.exceptionCode());
         }
     }
 }
@@ -2528,7 +2655,7 @@ Status CameraService::notifyDisplayConfigurationChange() {
             const auto basicClient = current->getValue();
             if (basicClient.get() != nullptr && !basicClient->getOverrideToPortrait()) {
                 basicClient->setRotateAndCropOverride(
-                        CameraServiceProxyWrapper::getRotateAndCropOverride(
+                        mCameraServiceProxyWrapper->getRotateAndCropOverride(
                                 basicClient->getPackageName(),
                                 basicClient->getCameraFacing(),
                                 multiuser_get_user_id(basicClient->getClientUid())));
@@ -2599,8 +2726,14 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
     // Check for camera permissions
     int callingPid = CameraThreadState::getCallingPid();
     int callingUid = CameraThreadState::getCallingUid();
-    if ((callingPid != getpid()) && !checkPermission(toString16(sCameraPermission), callingPid,
-            callingUid)) {
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    bool checkPermissionForCamera = permissionChecker.checkPermissionForPreflight(
+                toString16(sCameraPermission), attributionSource, String16(),
+                AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+    if ((callingPid != getpid()) && !checkPermissionForCamera) {
         ALOGE("%s: pid %d doesn't have camera permissions", __FUNCTION__, callingPid);
         return STATUS_ERROR(ERROR_PERMISSION_DENIED,
                 "android.permission.CAMERA needed to call"
@@ -2647,8 +2780,13 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
 
     auto clientUid = CameraThreadState::getCallingUid();
     auto clientPid = CameraThreadState::getCallingPid();
-    bool openCloseCallbackAllowed = checkPermission(toString16(sCameraOpenCloseListenerPermission),
-            clientPid, clientUid, /*logPermissionFailure*/false);
+    permission::PermissionChecker permissionChecker;
+    AttributionSourceState attributionSource{};
+    attributionSource.uid = clientUid;
+    attributionSource.pid = clientPid;
+    bool openCloseCallbackAllowed = permissionChecker.checkPermissionForPreflight(
+            toString16(sCameraOpenCloseListenerPermission), attributionSource, String16(),
+            AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
 
     Mutex::Autolock lock(mServiceLock);
 
@@ -2677,7 +2815,7 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         // permissions the listener process has / whether it is a vendor listener. Since it might be
         // eligible to listen to other camera ids.
         mListenerList.emplace_back(serviceListener);
-        mUidPolicy->registerMonitorUid(clientUid);
+        mUidPolicy->registerMonitorUid(clientUid, /*openCamera*/false);
     }
 
     /* Collect current devices and status */
@@ -2745,7 +2883,7 @@ Status CameraService::removeListener(const sp<ICameraServiceListener>& listener)
         Mutex::Autolock lock(mStatusListenerLock);
         for (auto it = mListenerList.begin(); it != mListenerList.end(); it++) {
             if (IInterface::asBinder((*it)->getListener()) == IInterface::asBinder(listener)) {
-                mUidPolicy->unregisterMonitorUid((*it)->getListenerUid());
+                mUidPolicy->unregisterMonitorUid((*it)->getListenerUid(), /*closeCamera*/false);
                 IInterface::asBinder(listener)->unlinkToDeath(*it);
                 mListenerList.erase(it);
                 return Status::ok();
@@ -2908,6 +3046,13 @@ Status CameraService::injectCamera(
     }
 
     return binder::Status::ok();
+}
+
+Status CameraService::reportExtensionSessionStats(
+        const hardware::CameraExtensionSessionStats& stats, std::string* sessionKey /*out*/) {
+    ALOGV("%s: reported %s", __FUNCTION__, stats.toString().c_str());
+    *sessionKey = mCameraServiceProxyWrapper->updateExtensionStats(stats);
+    return Status::ok();
 }
 
 void CameraService::removeByClient(const BasicClient* client) {
@@ -3386,6 +3531,13 @@ binder::Status CameraService::BasicClient::disconnect() {
     // client shouldn't be able to call into us anymore
     mClientPid = 0;
 
+    const auto& mActivityManager = getActivityManager();
+    if (mActivityManager) {
+        mActivityManager->logFgsApiEnd(LOG_FGS_CAMERA_API,
+            CameraThreadState::getCallingUid(),
+            CameraThreadState::getCallingPid());
+    }
+
     return res;
 }
 
@@ -3478,6 +3630,11 @@ status_t CameraService::BasicClient::handleAppOpMode(int32_t mode) {
                 mClientPackageName);
         bool isCameraPrivacyEnabled =
                 sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled();
+        // We don't want to return EACCESS if the CameraPrivacy is enabled.
+        // We prefer to successfully open the camera and perform camera muting
+        // or blocking in connectHelper as handleAppOpMode can be called before the
+        // connection has been fully established and at that time camera muting
+        // capabilities are unknown.
         if (!isUidActive || !isCameraPrivacyEnabled) {
             ALOGI("Camera %s: Access for \"%s\" has been restricted",
                     mCameraIdStr.c_str(), mClientPackageName.c_str());
@@ -3516,7 +3673,7 @@ status_t CameraService::BasicClient::startCameraOps() {
     // Transition device availability listeners from PRESENT -> NOT_AVAILABLE
     sCameraService->updateStatus(StatusInternal::NOT_AVAILABLE, mCameraIdStr);
 
-    sCameraService->mUidPolicy->registerMonitorUid(mClientUid);
+    sCameraService->mUidPolicy->registerMonitorUid(mClientUid, /*openCamera*/true);
 
     // Notify listeners of camera open/close status
     sCameraService->updateOpenCloseStatus(mCameraIdStr, true/*open*/, mClientPackageName);
@@ -3625,7 +3782,7 @@ status_t CameraService::BasicClient::finishCameraOps() {
     }
     mOpsCallback.clear();
 
-    sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid);
+    sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid, /*closeCamera*/true);
 
     // Notify listeners of camera open/close status
     sCameraService->updateOpenCloseStatus(mCameraIdStr, false/*open*/, mClientPackageName);
@@ -3732,20 +3889,44 @@ void CameraService::Client::OpsCallback::opChanged(int32_t op,
 //                  UidPolicy
 // ----------------------------------------------------------------------------
 
-void CameraService::UidPolicy::registerSelf() {
+void CameraService::UidPolicy::registerWithActivityManager() {
     Mutex::Autolock _l(mUidLock);
+    int32_t emptyUidArray[] = { };
 
     if (mRegistered) return;
     status_t res = mAm.linkToDeath(this);
-    mAm.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
+    mAm.registerUidObserverForUids(this, ActivityManager::UID_OBSERVER_GONE
             | ActivityManager::UID_OBSERVER_IDLE
             | ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE
             | ActivityManager::UID_OBSERVER_PROC_OOM_ADJ,
             ActivityManager::PROCESS_STATE_UNKNOWN,
-            toString16(kServiceName));
+            toString16(kServiceName), emptyUidArray, 0, mObserverToken);
     if (res == OK) {
         mRegistered = true;
         ALOGV("UidPolicy: Registered with ActivityManager");
+    } else {
+        ALOGE("UidPolicy: Failed to register with ActivityManager: 0x%08x", res);
+    }
+}
+
+void CameraService::UidPolicy::onServiceRegistration(const String16& name, const sp<IBinder>&) {
+    if (name != toString16(kActivityServiceName)) {
+        return;
+    }
+
+    registerWithActivityManager();
+}
+
+void CameraService::UidPolicy::registerSelf() {
+    // Use check service to see if the activity service is available
+    // If not available then register for notifications, instead of blocking
+    // till the service is ready
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(toString16(kActivityServiceName));
+    if (!binder) {
+        sm->registerForNotifications(toString16(kActivityServiceName), this);
+    } else {
+        registerWithActivityManager();
     }
 }
 
@@ -3804,24 +3985,54 @@ void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
     }
 }
 
-void CameraService::UidPolicy::onUidProcAdjChanged(uid_t uid) {
-    bool procAdjChange = false;
+/**
+ * When the OOM adj of the uid owning the camera changes, a different uid waiting on camera
+ * privileges may take precedence if the owner's new OOM adj is greater than the waiting package.
+ * Here, we track which monitoredUid has the camera, and track its adj relative to other
+ * monitoredUids. If it is revised above some other monitoredUid, signal
+ * onCameraAccessPrioritiesChanged. This only needs to capture the case where there are two
+ * foreground apps in split screen - state changes will capture all other cases.
+ */
+void CameraService::UidPolicy::onUidProcAdjChanged(uid_t uid, int32_t adj) {
+    std::unordered_set<uid_t> notifyUidSet;
     {
         Mutex::Autolock _l(mUidLock);
-        if (mMonitoredUids.find(uid) != mMonitoredUids.end()) {
-            procAdjChange = true;
+        auto it = mMonitoredUids.find(uid);
+
+        if (it != mMonitoredUids.end()) {
+            if (it->second.hasCamera) {
+                for (auto &monitoredUid : mMonitoredUids) {
+                    if (monitoredUid.first != uid && adj > monitoredUid.second.procAdj) {
+                        ALOGV("%s: notify uid %d", __FUNCTION__, monitoredUid.first);
+                        notifyUidSet.emplace(monitoredUid.first);
+                    }
+                }
+                ALOGV("%s: notify uid %d", __FUNCTION__, uid);
+                notifyUidSet.emplace(uid);
+            } else {
+                for (auto &monitoredUid : mMonitoredUids) {
+                    if (monitoredUid.second.hasCamera && adj < monitoredUid.second.procAdj) {
+                        ALOGV("%s: notify uid %d", __FUNCTION__, uid);
+                        notifyUidSet.emplace(uid);
+                    }
+                }
+            }
+            it->second.procAdj = adj;
         }
     }
 
-    if (procAdjChange) {
+    if (notifyUidSet.size() > 0) {
         sp<CameraService> service = mService.promote();
         if (service != nullptr) {
-            service->notifyMonitoredUids();
+            service->notifyMonitoredUids(notifyUidSet);
         }
     }
 }
 
-void CameraService::UidPolicy::registerMonitorUid(uid_t uid) {
+/**
+ * Register a uid for monitoring, and note whether it owns a camera.
+ */
+void CameraService::UidPolicy::registerMonitorUid(uid_t uid, bool openCamera) {
     Mutex::Autolock _l(mUidLock);
     auto it = mMonitoredUids.find(uid);
     if (it != mMonitoredUids.end()) {
@@ -3829,18 +4040,36 @@ void CameraService::UidPolicy::registerMonitorUid(uid_t uid) {
     } else {
         MonitoredUid monitoredUid;
         monitoredUid.procState = ActivityManager::PROCESS_STATE_NONEXISTENT;
+        monitoredUid.procAdj = resource_policy::UNKNOWN_ADJ;
         monitoredUid.refCount = 1;
-        mMonitoredUids.emplace(std::pair<uid_t, MonitoredUid>(uid, monitoredUid));
+        it = mMonitoredUids.emplace(std::pair<uid_t, MonitoredUid>(uid, monitoredUid)).first;
+        status_t res = mAm.addUidToObserver(mObserverToken, toString16(kServiceName), uid);
+        if (res != OK) {
+            ALOGE("UidPolicy: Failed to add uid to observer: 0x%08x", res);
+        }
+    }
+
+    if (openCamera) {
+        it->second.hasCamera = true;
     }
 }
 
-void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid) {
+/**
+ * Unregister a uid for monitoring, and note whether it lost ownership of a camera.
+ */
+void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid, bool closeCamera) {
     Mutex::Autolock _l(mUidLock);
     auto it = mMonitoredUids.find(uid);
     if (it != mMonitoredUids.end()) {
         it->second.refCount--;
         if (it->second.refCount == 0) {
             mMonitoredUids.erase(it);
+            status_t res = mAm.removeUidFromObserver(mObserverToken, toString16(kServiceName), uid);
+            if (res != OK) {
+                ALOGE("UidPolicy: Failed to remove uid from observer: 0x%08x", res);
+            }
+        } else if (closeCamera) {
+            it->second.hasCamera = false;
         }
     } else {
         ALOGE("%s: Trying to unregister uid: %d which is not monitored!", __FUNCTION__, uid);
@@ -3962,7 +4191,9 @@ void CameraService::UidPolicy::updateOverrideUid(uid_t uid, const std::string &c
 // ----------------------------------------------------------------------------
 //                  SensorPrivacyPolicy
 // ----------------------------------------------------------------------------
-void CameraService::SensorPrivacyPolicy::registerSelf() {
+
+void CameraService::SensorPrivacyPolicy::registerWithSensorPrivacyManager()
+{
     Mutex::Autolock _l(mSensorPrivacyLock);
     if (mRegistered) {
         return;
@@ -3977,6 +4208,27 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
     }
 }
 
+void CameraService::SensorPrivacyPolicy::onServiceRegistration(const String16& name,
+                                                               const sp<IBinder>&) {
+    if (name != toString16(kSensorPrivacyServiceName)) {
+        return;
+    }
+
+    registerWithSensorPrivacyManager();
+}
+
+void CameraService::SensorPrivacyPolicy::registerSelf() {
+    // Use checkservice to see if the sensor_privacy service is available
+    // If service is not available then register for notification
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> binder = sm->checkService(toString16(kSensorPrivacyServiceName));
+    if (!binder) {
+        sm->registerForNotifications(toString16(kSensorPrivacyServiceName),this);
+    } else {
+        registerWithSensorPrivacyManager();
+    }
+}
+
 void CameraService::SensorPrivacyPolicy::unregisterSelf() {
     Mutex::Autolock _l(mSensorPrivacyLock);
     mSpm.removeSensorPrivacyListener(this);
@@ -3986,6 +4238,10 @@ void CameraService::SensorPrivacyPolicy::unregisterSelf() {
 }
 
 bool CameraService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
+    if (!mRegistered) {
+      registerWithSensorPrivacyManager();
+    }
+
     Mutex::Autolock _l(mSensorPrivacyLock);
     return mSensorPrivacyEnabled;
 }
@@ -4692,8 +4948,12 @@ void CameraService::updateStatus(StatusInternal status, const std::string& camer
                             cameraId.c_str());
                     continue;
                 }
-                listener->getListener()->onStatusChanged(mapToInterface(status),
+                auto ret = listener->getListener()->onStatusChanged(mapToInterface(status),
                         cameraId);
+                listener->handleBinderStatus(ret,
+                        "%s: Failed to trigger onStatusChanged callback for %d:%d: %d",
+                        __FUNCTION__, listener->getListenerUid(), listener->getListenerPid(),
+                        ret.exceptionCode());
             }
         });
 }
@@ -4725,10 +4985,10 @@ void CameraService::updateOpenCloseStatus(const std::string& cameraId, bool open
         } else {
             ret = it->getListener()->onCameraClosed(cameraId);
         }
-        if (!ret.isOk()) {
-            ALOGE("%s: Failed to trigger onCameraOpened/onCameraClosed callback: %d", __FUNCTION__,
-                    ret.exceptionCode());
-        }
+
+        it->handleBinderStatus(ret,
+                "%s: Failed to trigger onCameraOpened/onCameraClosed callback for %d:%d: %d",
+                __FUNCTION__, it->getListenerUid(), it->getListenerPid(), ret.exceptionCode());
     }
 }
 
@@ -4829,8 +5089,12 @@ void CameraService::notifyPhysicalCameraStatusLocked(int32_t status,
                         physicalCameraId.c_str());
                 continue;
             }
-            listener->getListener()->onPhysicalCameraStatusChanged(status,
+            auto ret = listener->getListener()->onPhysicalCameraStatusChanged(status,
                     logicalCameraId, physicalCameraId);
+            listener->handleBinderStatus(ret,
+                    "%s: Failed to trigger onPhysicalCameraStatusChanged for %d:%d: %d",
+                    __FUNCTION__, listener->getListenerUid(), listener->getListenerPid(),
+                    ret.exceptionCode());
         }
     }
 }
@@ -4878,6 +5142,10 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleSetRotateAndCrop(args);
     } else if (args.size() >= 1 && args[0] == toString16("get-rotate-and-crop")) {
         return handleGetRotateAndCrop(out);
+    } else if (args.size() >= 2 && args[0] == toString16("set-autoframing")) {
+        return handleSetAutoframing(args);
+    } else if (args.size() >= 1 && args[0] == toString16("get-autoframing")) {
+        return handleGetAutoframing(out);
     } else if (args.size() >= 2 && args[0] == toString16("set-image-dump-mask")) {
         return handleSetImageDumpMask(args);
     } else if (args.size() >= 1 && args[0] == toString16("get-image-dump-mask")) {
@@ -4887,7 +5155,10 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
     } else if (args.size() >= 2 && args[0] == toString16("set-stream-use-case-override")) {
         return handleSetStreamUseCaseOverrides(args);
     } else if (args.size() >= 1 && args[0] == toString16("clear-stream-use-case-override")) {
-        return handleClearStreamUseCaseOverrides();
+        handleClearStreamUseCaseOverrides();
+        return OK;
+    } else if (args.size() >= 1 && args[0] == toString16("set-zoom-override")) {
+        return handleSetZoomOverride(args);
     } else if (args.size() >= 2 && args[0] == toString16("watch")) {
         return handleWatchCommand(args, in, out);
     } else if (args.size() >= 2 && args[0] == toString16("set-watchdog")) {
@@ -4985,6 +5256,34 @@ status_t CameraService::handleSetRotateAndCrop(const Vector<String16>& args) {
     return OK;
 }
 
+status_t CameraService::handleSetAutoframing(const Vector<String16>& args) {
+    char* end;
+    int autoframingValue = (int) strtol(toStdString(args[1]).c_str(), &end, /*base=*/10);
+    if ((*end != '\0') ||
+            (autoframingValue != ANDROID_CONTROL_AUTOFRAMING_OFF &&
+             autoframingValue != ANDROID_CONTROL_AUTOFRAMING_ON &&
+             autoframingValue != ANDROID_CONTROL_AUTOFRAMING_AUTO)) {
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock lock(mServiceLock);
+    mOverrideAutoframingMode = autoframingValue;
+
+    if (autoframingValue == ANDROID_CONTROL_AUTOFRAMING_AUTO) return OK;
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                basicClient->setAutoframingOverride(autoframingValue);
+            }
+        }
+    }
+
+    return OK;
+}
+
 status_t CameraService::handleSetCameraServiceWatchdog(const Vector<String16>& args) {
     int enableWatchdog = atoi(toStdString(args[1]).c_str());
 
@@ -5011,6 +5310,12 @@ status_t CameraService::handleGetRotateAndCrop(int out) {
     Mutex::Autolock lock(mServiceLock);
 
     return dprintf(out, "rotateAndCrop override: %d\n", mOverrideRotateAndCropMode);
+}
+
+status_t CameraService::handleGetAutoframing(int out) {
+    Mutex::Autolock lock(mServiceLock);
+
+    return dprintf(out, "autoframing override: %d\n", mOverrideAutoframingMode);
 }
 
 status_t CameraService::handleSetImageDumpMask(const Vector<String16>& args) {
@@ -5077,6 +5382,8 @@ status_t CameraService::handleSetStreamUseCaseOverrides(const Vector<String16>& 
             useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW_VIDEO_STILL;
         } else if (arg == "VIDEO_CALL") {
             useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_CALL;
+        } else if (arg == "CROPPED_RAW") {
+            useCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_CROPPED_RAW;
         } else {
             ALOGE("%s: Invalid stream use case %s", __FUNCTION__, arg.c_str());
             return BAD_VALUE;
@@ -5090,9 +5397,35 @@ status_t CameraService::handleSetStreamUseCaseOverrides(const Vector<String16>& 
     return OK;
 }
 
-status_t CameraService::handleClearStreamUseCaseOverrides() {
+void CameraService::handleClearStreamUseCaseOverrides() {
     Mutex::Autolock lock(mServiceLock);
     mStreamUseCaseOverrides.clear();
+}
+
+status_t CameraService::handleSetZoomOverride(const Vector<String16>& args) {
+    char* end;
+    int zoomOverrideValue = strtol(toStdString(args[1]).c_str(), &end, /*base=*/10);
+    if ((*end != '\0') ||
+            (zoomOverrideValue != -1 &&
+             zoomOverrideValue != ANDROID_CONTROL_SETTINGS_OVERRIDE_OFF &&
+             zoomOverrideValue != ANDROID_CONTROL_SETTINGS_OVERRIDE_ZOOM)) {
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock lock(mServiceLock);
+    mZoomOverrideValue = zoomOverrideValue;
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                if (basicClient->supportsZoomOverride()) {
+                    basicClient->setZoomOverride(mZoomOverrideValue);
+                }
+            }
+        }
+    }
 
     return OK;
 }
@@ -5433,6 +5766,9 @@ status_t CameraService::printHelp(int out) {
         "  set-rotate-and-crop <ROTATION> overrides the rotate-and-crop value for AUTO backcompat\n"
         "      Valid values 0=0 deg, 1=90 deg, 2=180 deg, 3=270 deg, 4=No override\n"
         "  get-rotate-and-crop returns the current override rotate-and-crop value\n"
+        "  set-autoframing <VALUE> overrides the autoframing value for AUTO\n"
+        "      Valid values 0=false, 1=true, 2=auto\n"
+        "  get-autoframing returns the current override autoframing value\n"
         "  set-image-dump-mask <MASK> specifies the formats to be saved to disk\n"
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"
@@ -5444,8 +5780,10 @@ status_t CameraService::printHelp(int out) {
         "      last use case is assigned to all the remaining streams. In case of multiple\n"
         "      streams with the same resolution, the tie-breaker is (JPEG, RAW, YUV, and PRIV)\n"
         "      Valid values are (case sensitive): DEFAULT, PREVIEW, STILL_CAPTURE, VIDEO_RECORD,\n"
-        "      PREVIEW_VIDEO_STILL, VIDEO_CALL\n"
+        "      PREVIEW_VIDEO_STILL, VIDEO_CALL, CROPPED_RAW\n"
         "  clear-stream-use-case-override clear the stream use case override\n"
+        "  set-zoom-override <-1/0/1> enable or disable zoom override\n"
+        "      Valid values -1: do not override, 0: override to OFF, 1: override to ZOOM\n"
         "  watch <start|stop|dump|print|clear> manages tag monitoring in connected clients\n"
         "  help print this message\n");
 }

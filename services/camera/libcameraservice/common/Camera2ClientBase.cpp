@@ -38,7 +38,6 @@
 #include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
 #include "utils/CameraThreadState.h"
-#include "utils/CameraServiceProxyWrapper.h"
 
 namespace android {
 
@@ -50,6 +49,7 @@ template <typename TClientBase>
 Camera2ClientBase<TClientBase>::Camera2ClientBase(
         const sp<CameraService>& cameraService,
         const sp<TCamCallbacks>& remoteCallback,
+        std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
         const std::string& clientPackageName,
         bool systemNativeClient,
         const std::optional<std::string>& clientFeatureId,
@@ -67,6 +67,7 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
                 clientFeatureId, cameraId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
                 clientUid, servicePid, overrideToPortrait),
         mSharedCameraCallbacks(remoteCallback),
+        mCameraServiceProxyWrapper(cameraServiceProxyWrapper),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
 {
     ALOGI("Camera %s: Opened. Client: %s (PID %d, UID %d)", cameraId.c_str(),
@@ -104,11 +105,6 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
           TClientBase::mCameraIdStr.c_str());
     status_t res;
 
-    // Verify ops permissions
-    res = TClientBase::startCameraOps();
-    if (res != OK) {
-        return res;
-    }
     IPCTransport providerTransport = IPCTransport::INVALID;
     res = providerPtr->getCameraIdIPCTransport(TClientBase::mCameraIdStr,
             &providerTransport);
@@ -118,12 +114,14 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
     switch (providerTransport) {
         case IPCTransport::HIDL:
             mDevice =
-                    new HidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
+                    new HidlCamera3Device(mCameraServiceProxyWrapper,
+                            TClientBase::mCameraIdStr, mOverrideForPerfClass,
                             TClientBase::mOverrideToPortrait, mLegacyClient);
             break;
         case IPCTransport::AIDL:
             mDevice =
-                    new AidlCamera3Device(TClientBase::mCameraIdStr, mOverrideForPerfClass,
+                    new AidlCamera3Device(mCameraServiceProxyWrapper,
+                            TClientBase::mCameraIdStr, mOverrideForPerfClass,
                             TClientBase::mOverrideToPortrait, mLegacyClient);
              break;
         default:
@@ -144,12 +142,30 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         return res;
     }
 
+    // Verify ops permissions
+    res = TClientBase::startCameraOps();
+    if (res != OK) {
+        TClientBase::finishCameraOps();
+        return res;
+    }
+
     wp<NotificationListener> weakThis(this);
     res = mDevice->setNotifyCallback(weakThis);
+    if (res != OK) {
+        ALOGE("%s: Camera %s: Unable to set notify callback: %s (%d)",
+                __FUNCTION__, TClientBase::mCameraIdStr.c_str(), strerror(-res), res);
+        return res;
+    }
 
     /** Start watchdog thread */
-    mCameraServiceWatchdog = new CameraServiceWatchdog();
-    mCameraServiceWatchdog->run("Camera2ClientBaseWatchdog");
+    mCameraServiceWatchdog = new CameraServiceWatchdog(TClientBase::mCameraIdStr,
+            mCameraServiceProxyWrapper);
+    res = mCameraServiceWatchdog->run("Camera2ClientBaseWatchdog");
+    if (res != OK) {
+        ALOGE("%s: Unable to start camera service watchdog thread: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return res;
+    }
 
     return OK;
 }
@@ -167,8 +183,8 @@ Camera2ClientBase<TClientBase>::~Camera2ClientBase() {
         mCameraServiceWatchdog.clear();
     }
 
-    ALOGI("Closed Camera %s. Client was: %s (PID %d, UID %u)",
-            TClientBase::mCameraIdStr.c_str(),
+    ALOGI("%s: Client object's dtor for Camera Id %s completed. Client was: %s (PID %d, UID %u)",
+            __FUNCTION__, TClientBase::mCameraIdStr.c_str(),
             TClientBase::mClientPackageName.c_str(),
             mInitialClientPid, TClientBase::mClientUid);
 }
@@ -374,7 +390,7 @@ status_t Camera2ClientBase<TClientBase>::notifyActive(float maxPreviewFps) {
                     TClientBase::mCameraIdStr.c_str(), res);
             return res;
         }
-        CameraServiceProxyWrapper::logActive(TClientBase::mCameraIdStr, maxPreviewFps);
+        mCameraServiceProxyWrapper->logActive(TClientBase::mCameraIdStr, maxPreviewFps);
     }
     mDeviceActive = true;
 
@@ -393,7 +409,7 @@ void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
             ALOGE("%s: Camera %s: Error finishing streaming ops: %d", __FUNCTION__,
                     TClientBase::mCameraIdStr.c_str(), res);
         }
-        CameraServiceProxyWrapper::logIdle(TClientBase::mCameraIdStr,
+        mCameraServiceProxyWrapper->logIdle(TClientBase::mCameraIdStr,
                 requestCount, resultErrorCount, deviceError, userTag, videoStabilizationMode,
                 streamStats);
     }

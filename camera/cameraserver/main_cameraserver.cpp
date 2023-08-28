@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include "CameraService.h"
+#include <android/binder_process.h>
 #include <hidl/HidlTransportSupport.h>
 
 using namespace android;
@@ -26,9 +27,12 @@ int main(int argc __unused, char** argv __unused)
 {
     signal(SIGPIPE, SIG_IGN);
 
-    // Set 5 threads for HIDL calls. Now cameraserver will serve HIDL calls in
-    // addition to consuming them from the Camera HAL as well.
+    // Set 5 threads for HIDL calls. Now cameraserver will serve HIDL calls.
     hardware::configureRpcThreadpool(5, /*willjoin*/ false);
+
+    // Set 5 threads for VNDK AIDL calls. Now cameraserver will serve
+    // VNDK AIDL calls in addition to consuming them from the Camera HAL as well.
+    ABinderProcess_setThreadPoolMaxThreadCount(5);
 
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
@@ -36,5 +40,8 @@ int main(int argc __unused, char** argv __unused)
     CameraService::instantiate();
     ALOGI("ServiceManager: %p done instantiate", sm.get());
     ProcessState::self()->startThreadPool();
+    ABinderProcess_startThreadPool();
+
     IPCThreadState::self()->joinThreadPool();
+    ABinderProcess_joinThreadPool();
 }

@@ -992,6 +992,11 @@ sp<AMessage> NuPlayer::GenericSource::getTrackInfo(size_t trackIndex) const {
         format->setInt32("auto", !!isAutoselect);
         format->setInt32("default", !!isDefault);
         format->setInt32("forced", !!isForced);
+    } else if (trackType == MEDIA_TRACK_TYPE_AUDIO) {
+        int32_t hapticChannelCount;
+        if (meta->findInt32(kKeyHapticChannelCount, &hapticChannelCount)) {
+            format->setInt32("haptic-channel-count", hapticChannelCount);
+        }
     }
 
     return format;

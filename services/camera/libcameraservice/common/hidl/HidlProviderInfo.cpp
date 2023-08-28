@@ -624,7 +624,7 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
                 __FUNCTION__, strerror(-res), res);
     }
 
-    if (SessionConfigurationUtils::isUltraHighResolutionSensor(mCameraCharacteristics)) {
+    if (SessionConfigurationUtils::supportsUltraHighResolutionCapture(mCameraCharacteristics)) {
         status_t status = addDynamicDepthTags(/*maxResolution*/true);
         if (OK != status) {
             ALOGE("%s: Failed appending dynamic depth tags for maximum resolution mode: %s (%d)",
@@ -641,6 +641,11 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
     res = addRotateCropTags();
     if (OK != res) {
         ALOGE("%s: Unable to add default SCALER_ROTATE_AND_CROP tags: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
+    }
+    res = addAutoframingTags();
+    if (OK != res) {
+        ALOGE("%s: Unable to add default AUTOFRAMING tags: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
     }
     res = addPreCorrectionActiveArraySize();

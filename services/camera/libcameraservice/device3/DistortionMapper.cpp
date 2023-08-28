@@ -67,7 +67,7 @@ status_t DistortionMapper::setupStaticInfo(const CameraMetadata &deviceInfo) {
         return res;
     }
 
-    bool mMaxResolution = SessionConfigurationUtils::isUltraHighResolutionSensor(deviceInfo);
+    bool mMaxResolution = SessionConfigurationUtils::supportsUltraHighResolutionCapture(deviceInfo);
     if (mMaxResolution) {
         res = setupStaticInfoLocked(deviceInfo, /*maxResolution*/true);
     }

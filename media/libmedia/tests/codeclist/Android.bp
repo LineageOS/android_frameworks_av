@@ -25,7 +25,7 @@ package {
 
 cc_test {
     name: "CodecListTest",
-    test_suites: ["device-tests", "mts"],
+    test_suites: ["device-tests"],
     gtest: true,
 
     // Support multilib variants (using different suffix per sub-architecture), which is needed on

@@ -33,9 +33,7 @@
 #include <functional>
 #include <sys/time.h>
 
-#define USE_LIBYUV
 #define PERF_PROFILING 0
-
 
 #if defined(__aarch64__) || defined(__ARM_NEON__)
 #define USE_NEON_Y410 1
@@ -48,6 +46,48 @@
 #endif
 
 namespace android {
+typedef const struct libyuv::YuvConstants LibyuvConstants;
+
+struct LibyuvConstPair {
+    const LibyuvConstants *yuv;
+    const LibyuvConstants *yvu;
+};
+
+// Function to resolve YUV Matrices defined in libyuv
+static LibyuvConstPair getLibYUVMatrix(
+        const ColorConverter::ColorSpace &colorSpace, bool is10Bit) {
+    LibyuvConstPair matrix = {nullptr, nullptr};
+    const bool isFullRange = (colorSpace.mRange == ColorUtils::kColorRangeFull);
+    if (colorSpace.isI601()) {
+        matrix.yuv = &libyuv::kYuvI601Constants;
+        matrix.yvu = &libyuv::kYvuI601Constants;
+    } else if (colorSpace.isJ601()) {
+        matrix.yuv = &libyuv::kYuvJPEGConstants;
+        matrix.yvu = &libyuv::kYvuJPEGConstants;
+    } else if (colorSpace.isH709()) {
+        matrix.yuv = &libyuv::kYuvH709Constants;
+        matrix.yvu = &libyuv::kYvuH709Constants;
+    } else if (colorSpace.isF709()) {
+        matrix.yuv = &libyuv::kYuvF709Constants;
+        matrix.yvu = &libyuv::kYvuF709Constants;
+    } else if (colorSpace.isBt2020()) {
+        matrix.yuv = &libyuv::kYuv2020Constants;
+        matrix.yvu = &libyuv::kYvu2020Constants;
+    } else if (colorSpace.isBtV2020()) {
+        matrix.yuv = &libyuv::kYuvV2020Constants;
+        matrix.yvu = &libyuv::kYvuV2020Constants;
+    } else {
+        // unspecified
+        if (isFullRange) {
+            matrix.yuv = is10Bit ? &libyuv::kYuvV2020Constants : &libyuv::kYuvJPEGConstants;
+            matrix.yvu = is10Bit ? &libyuv::kYvuV2020Constants : &libyuv::kYvuJPEGConstants;
+        } else {
+            matrix.yuv = is10Bit ? &libyuv::kYuv2020Constants : &libyuv::kYuvI601Constants;
+            matrix.yvu = is10Bit ? &libyuv::kYvu2020Constants : &libyuv::kYvuI601Constants;
+        }
+    }
+    return matrix;
+}
 
 static bool isRGB(OMX_COLOR_FORMATTYPE colorFormat) {
     return colorFormat == OMX_COLOR_Format16bitRGB565
@@ -56,26 +96,232 @@ static bool isRGB(OMX_COLOR_FORMATTYPE colorFormat) {
             || colorFormat == COLOR_Format32bitABGR2101010;
 }
 
-bool ColorConverter::ColorSpace::isBt2020() const {
-    return (mStandard == ColorUtils::kColorStandardBT2020);
+// check for limited Range
+bool ColorConverter::ColorSpace::isLimitedRange() const {
+    return mRange == ColorUtils::kColorRangeLimited;
 }
 
-bool ColorConverter::ColorSpace::isH420() const {
+// BT.2020 limited range YUV to RGB
+bool ColorConverter::ColorSpace::isBt2020() const {
+    return (mStandard == ColorUtils::kColorStandardBT2020
+            && mRange == ColorUtils::kColorRangeLimited);
+}
+
+// BT.2020 full range YUV to RGB
+bool ColorConverter::ColorSpace::isBtV2020() const {
+    return (mStandard == ColorUtils::kColorStandardBT2020
+            && mRange == ColorUtils::kColorRangeFull);
+}
+
+// BT.709 full range YUV to RGB
+bool ColorConverter::ColorSpace::isF709() const {
+    return (mStandard == ColorUtils::kColorStandardBT709
+            && mRange == ColorUtils::kColorRangeFull);
+}
+
+// BT.709 limited range YUV to RGB
+bool ColorConverter::ColorSpace::isH709() const {
     return (mStandard == ColorUtils::kColorStandardBT709)
             && (mRange == ColorUtils::kColorRangeLimited);
 }
 
+// BT.601 limited range YUV to RGB
 // the matrix coefficients are the same for both 601.625 and 601.525 standards
-bool ColorConverter::ColorSpace::isI420() const {
+bool ColorConverter::ColorSpace::isI601() const {
     return ((mStandard == ColorUtils::kColorStandardBT601_625)
             || (mStandard == ColorUtils::kColorStandardBT601_525))
             && (mRange == ColorUtils::kColorRangeLimited);
 }
 
-bool ColorConverter::ColorSpace::isJ420() const {
+// BT.601 full range YUV to RGB
+bool ColorConverter::ColorSpace::isJ601() const {
     return ((mStandard == ColorUtils::kColorStandardBT601_625)
             || (mStandard == ColorUtils::kColorStandardBT601_525))
             && (mRange == ColorUtils::kColorRangeFull);
+}
+
+// Utility functions for MediaImage2
+static MediaImage2 CreateYUV420PlanarMediaImage2(
+        uint32_t width, uint32_t height, uint32_t stride,
+        uint32_t vstride, uint32_t bitDepth) {
+    const uint32_t componentBytes = (bitDepth + 7) / 8;
+    return MediaImage2 {
+        .mType = MediaImage2::MEDIA_IMAGE_TYPE_YUV,
+        .mNumPlanes = 3,
+        .mWidth = width,
+        .mHeight = height,
+        .mBitDepth = bitDepth,
+        .mBitDepthAllocated = componentBytes * 8,
+        .mPlane = {
+            {
+                .mOffset = 0,
+                .mColInc = static_cast<int32_t>(componentBytes),
+                .mRowInc = static_cast<int32_t>(stride),
+                .mHorizSubsampling = 1,
+                .mVertSubsampling = 1,
+            },
+            {
+                .mOffset = stride * vstride,
+                .mColInc = static_cast<int32_t>(componentBytes),
+                .mRowInc = static_cast<int32_t>(stride / 2),
+                .mHorizSubsampling = 2,
+                .mVertSubsampling = 2,
+            },
+            {
+                .mOffset = stride * vstride * 5 / 4,
+                .mColInc = static_cast<int32_t>(componentBytes),
+                .mRowInc = static_cast<int32_t>(stride / 2),
+                .mHorizSubsampling = 2,
+                .mVertSubsampling = 2,
+            }
+        },
+    };
+}
+
+static MediaImage2 CreateYUV420SemiPlanarMediaImage2(
+        uint32_t width, uint32_t height, uint32_t stride,
+        uint32_t vstride, uint32_t bitDepth, bool uv = true /*nv12 or not*/) {
+    const uint32_t componentBytes = (bitDepth + 7) / 8;
+    return MediaImage2 {
+        .mType = MediaImage2::MEDIA_IMAGE_TYPE_YUV,
+        .mNumPlanes = 3,
+        .mWidth = width,
+        .mHeight = height,
+        .mBitDepth = bitDepth,
+        .mBitDepthAllocated = componentBytes * 8,
+        .mPlane = {
+            {
+                .mOffset = 0,
+                .mColInc = static_cast<int32_t>(componentBytes),
+                .mRowInc = static_cast<int32_t>(stride),
+                .mHorizSubsampling = 1,
+                .mVertSubsampling = 1,
+            },
+            {
+                .mOffset = stride * vstride + (uv ? 0 : componentBytes),
+                .mColInc = static_cast<int32_t>(2 * componentBytes),
+                .mRowInc = static_cast<int32_t>(stride),
+                .mHorizSubsampling = 2,
+                .mVertSubsampling = 2,
+            },
+            {
+                .mOffset = stride * vstride + (uv ? componentBytes : 0),
+                .mColInc = static_cast<int32_t>(2 * componentBytes),
+                .mRowInc = static_cast<int32_t>(stride),
+                .mHorizSubsampling = 2,
+                .mVertSubsampling = 2,
+            }
+        },
+    };
+}
+
+ColorConverter::Image::Image(const MediaImage2& img)
+    :mImage(img),
+    mLayout(ImageLayoutUnknown),
+    mSampling(ImageSamplingUnknown) {
+    const MediaImage2::PlaneInfo &yPlane =
+            img.mPlane[MediaImage2::PlaneIndex::Y];
+    const MediaImage2::PlaneInfo &uPlane =
+            img.mPlane[MediaImage2::PlaneIndex::U];
+    const MediaImage2::PlaneInfo &vPlane =
+            img.mPlane[MediaImage2::PlaneIndex::V];
+
+    if (mImage.mNumPlanes != 3) {
+        ALOGE("Conversion error: MediaImage2 mNumPlanes != 3");
+        mLayout = ImageLayoutUnknown;
+        mSampling = ImageSamplingUnknown;
+        mBitDepth = ImageBitDepthInvalid;
+        return;
+    }
+
+    if (mImage.mBitDepth == 8
+            && yPlane.mColInc == 1
+            && uPlane.mColInc == 1
+            && vPlane.mColInc == 1
+            && yPlane.mVertSubsampling == 1
+            && uPlane.mVertSubsampling == 2
+            && vPlane.mVertSubsampling == 2) {
+        mLayout = ImageLayout420Planar;
+        mSampling = ImageSamplingYUV420;
+    } else if (mImage.mBitDepth == 8
+            && yPlane.mColInc == 1
+            && uPlane.mColInc == 2
+            && vPlane.mColInc == 2
+            && yPlane.mVertSubsampling == 1
+            && uPlane.mVertSubsampling == 2
+            && vPlane.mVertSubsampling == 2
+            && ((vPlane.mOffset == uPlane.mOffset + 1) ||
+            (uPlane.mOffset == vPlane.mOffset + 1))) {
+        mLayout = ImageLayout420SemiPlanar;
+        mSampling = ImageSamplingYUV420;
+    }
+
+    mBitDepth = ImageBitDepthInvalid;
+    switch (img.mBitDepth) {
+        case 8:
+            mBitDepth = ImageBitDepth8;
+            break;
+
+        case 10:
+        case 12:
+        case 16:
+        default:
+            // TODO: Implement 10b, 12b and 16b using MediaImage2
+            mBitDepth = ImageBitDepthInvalid;
+    }
+
+}
+
+status_t ColorConverter::Image::getYUVPlaneOffsetAndStride(
+        const BitmapParams &src,
+        uint32_t *y_offset,
+        uint32_t *u_offset,
+        uint32_t *v_offset,
+        size_t *y_stride,
+        size_t *u_stride,
+        size_t *v_stride) const {
+
+    if (y_offset == nullptr || u_offset == nullptr || v_offset == nullptr
+            || y_stride == nullptr || u_stride == nullptr || v_stride == nullptr) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    if (mImage.mNumPlanes != 3) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    const MediaImage2::PlaneInfo &yPlane = mImage.mPlane[MediaImage2::PlaneIndex::Y];
+    *y_offset = yPlane.mOffset
+            + src.mCropTop * yPlane.mRowInc
+            + src.mCropLeft * yPlane.mColInc;
+
+    const MediaImage2::PlaneInfo &uPlane = mImage.mPlane[MediaImage2::PlaneIndex::U];
+    *u_offset = uPlane.mOffset
+            + (src.mCropTop / uPlane.mVertSubsampling) * uPlane.mRowInc
+            + (src.mCropLeft / uPlane.mHorizSubsampling) * uPlane.mColInc;
+
+    const MediaImage2::PlaneInfo &vPlane = mImage.mPlane[MediaImage2::PlaneIndex::V];
+    *v_offset = vPlane.mOffset
+            + (src.mCropTop / vPlane.mVertSubsampling) * vPlane.mRowInc
+            + (src.mCropLeft / vPlane.mHorizSubsampling) * vPlane.mColInc;
+
+    *y_stride = yPlane.mRowInc;
+    *u_stride = uPlane.mRowInc;
+    *v_stride = vPlane.mRowInc;
+
+    return OK;
+}
+
+bool ColorConverter::Image::isNV21() const {
+    if (getLayout() == ImageLayout420SemiPlanar) {
+        const MediaImage2::PlaneInfo &uPlane = mImage.mPlane[MediaImage2::PlaneIndex::U];
+        const MediaImage2::PlaneInfo &vPlane = mImage.mPlane[MediaImage2::PlaneIndex::V];
+
+        int componentBytes = (mImage.mBitDepthAllocated) / 8;
+
+        return (((vPlane.mOffset + componentBytes) == uPlane.mOffset));
+    }
+    return false;
 }
 
 /**
@@ -227,8 +473,42 @@ ColorConverter::~ColorConverter() {
     mClip10Bit = NULL;
 }
 
+// Set MediaImage2 Flexible formats
+void ColorConverter::setSrcMediaImage2(MediaImage2 img) {
+    mSrcImage = Image(img);
+ }
+
+bool ColorConverter::isValidForMediaImage2() const {
+
+    if (!mSrcImage
+            || mSrcImage->getMediaImage2().mType != MediaImage2::MEDIA_IMAGE_TYPE_YUV) {
+        // TODO: support Yonly or RGB etc?
+        return false;
+    }
+    // try to identify the src format
+
+    BitDepth_t srcBitDepth = mSrcImage->getBitDepth();
+
+    //TODO: support 12b and 16b ?
+    if (srcBitDepth == ImageBitDepthInvalid) {
+        return false;
+    }
+
+    return ((srcBitDepth == ImageBitDepth8  &&
+            (mDstFormat == OMX_COLOR_Format16bitRGB565
+            || mDstFormat == OMX_COLOR_Format32BitRGBA8888
+            || mDstFormat == OMX_COLOR_Format32bitBGRA8888))
+
+            || (srcBitDepth == ImageBitDepth10
+            && (mDstFormat == COLOR_Format32bitABGR2101010)));
+}
+
 bool ColorConverter::isValid() const {
     switch ((int32_t)mSrcFormat) {
+        case COLOR_FormatYUV420Flexible:
+            return isValidForMediaImage2();
+            break;
+
         case OMX_COLOR_FormatYUV420Planar16:
             if (mDstFormat == OMX_COLOR_FormatYUV444Y410) {
                 return true;
@@ -240,22 +520,23 @@ bool ColorConverter::isValid() const {
                     || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
 
         case OMX_COLOR_FormatCbYCrY:
-        case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
-        case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
             return mDstFormat == OMX_COLOR_Format16bitRGB565;
 
         case OMX_COLOR_FormatYUV420SemiPlanar:
-#ifdef USE_LIBYUV
+        case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
+        case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+            if (mSrcImage) {
+                return isValidForMediaImage2();
+            }
             return mDstFormat == OMX_COLOR_Format16bitRGB565
                     || mDstFormat == OMX_COLOR_Format32BitRGBA8888
                     || mDstFormat == OMX_COLOR_Format32bitBGRA8888;
-#else
-            return mDstFormat == OMX_COLOR_Format16bitRGB565;
-#endif
+
         case COLOR_FormatYUVP010:
             return mDstFormat == COLOR_Format32bitABGR2101010;
 
         default:
+            //TODO: Should this be enabled for MediaImage2?
             return false;
     }
 }
@@ -320,6 +601,13 @@ ColorConverter::BitmapParams::BitmapParams(
         mStride = mWidth;
         break;
 
+    case COLOR_FormatYUV420Flexible:
+        // MediaImage2 should be used.
+        mBpp = 1;
+        mStride = mWidth;
+
+        break;
+
     default:
         ALOGE("Unsupported color format %d", mColorFormat);
         mBpp = 1;
@@ -360,7 +648,8 @@ status_t ColorConverter::convert(
     BitmapParams src(
             const_cast<void *>(srcBits),
             srcWidth, srcHeight, srcStride,
-            srcCropLeft, srcCropTop, srcCropRight, srcCropBottom, mSrcFormat);
+            srcCropLeft, srcCropTop, srcCropRight, srcCropBottom,
+            mSrcFormat);
 
     BitmapParams dst(
             dstBits,
@@ -374,70 +663,67 @@ status_t ColorConverter::convert(
             && src.cropHeight() == dst.cropHeight())) {
         return ERROR_UNSUPPORTED;
     }
-
-    status_t err;
-
-    switch ((int32_t)mSrcFormat) {
-        case OMX_COLOR_FormatYUV420Planar:
-#ifdef USE_LIBYUV
-            err = convertYUV420PlanarUseLibYUV(src, dst);
-#else
-            err = convertYUV420Planar(src, dst);
+#if PERF_PROFILING
+    int64_t startTimeUs = ALooper::GetNowUs();
 #endif
+    status_t err;
+    switch ((int32_t)mSrcFormat) {
+        case COLOR_FormatYUV420Flexible:
+            err = convertYUVMediaImage(src, dst);
+            break;
+
+        case OMX_COLOR_FormatYUV420Planar:
+            if (!mSrcImage) {
+                mSrcImage = Image(CreateYUV420PlanarMediaImage2(
+                        srcWidth, srcHeight, srcStride, srcHeight, 8 /*bitDepth*/));
+            }
+            err = convertYUVMediaImage(src, dst);
+
             break;
 
         case OMX_COLOR_FormatYUV420Planar16:
-        {
-#if PERF_PROFILING
-            int64_t startTimeUs = ALooper::GetNowUs();
-#endif
             err = convertYUV420Planar16(src, dst);
-#if PERF_PROFILING
-            int64_t endTimeUs = ALooper::GetNowUs();
-            ALOGD("convertYUV420Planar16 took %lld us", (long long) (endTimeUs - startTimeUs));
-#endif
             break;
-        }
 
         case COLOR_FormatYUVP010:
-        {
-#if PERF_PROFILING
-            int64_t startTimeUs = ALooper::GetNowUs();
-#endif
             err = convertYUVP010(src, dst);
-#if PERF_PROFILING
-            int64_t endTimeUs = ALooper::GetNowUs();
-            ALOGD("convertYUVP010 took %lld us", (long long) (endTimeUs - startTimeUs));
-#endif
+
             break;
-        }
 
         case OMX_COLOR_FormatCbYCrY:
             err = convertCbYCrY(src, dst);
             break;
 
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
-            err = convertQCOMYUV420SemiPlanar(src, dst);
+            if (!mSrcImage) {
+                mSrcImage = Image(CreateYUV420SemiPlanarMediaImage2(
+                    srcWidth, srcHeight, srcStride, srcHeight, 8 /*bitDepth*/, false));
+            }
+            err = convertYUVMediaImage(src, dst);
+
             break;
 
         case OMX_COLOR_FormatYUV420SemiPlanar:
-#ifdef USE_LIBYUV
-            err = convertYUV420SemiPlanarUseLibYUV(src, dst);
-#else
-            err = convertYUV420SemiPlanar(src, dst);
-#endif
-            break;
-
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
-            err = convertTIYUV420PackedSemiPlanar(src, dst);
+            if (!mSrcImage) {
+                mSrcImage = Image(CreateYUV420SemiPlanarMediaImage2(
+                    srcWidth, srcHeight, srcStride, srcHeight, 8 /*bitDepth*/));
+            }
+            err = convertYUVMediaImage(src, dst);
+
             break;
 
         default:
-        {
+
             CHECK(!"Should not be here. Unknown color conversion.");
             break;
-        }
     }
+
+#if PERF_PROFILING
+    int64_t endTimeUs = ALooper::GetNowUs();
+    ALOGD("%s image took %lld us", asString_ColorFormat(mSrcFormat,"Unknown"),
+            (long long) (endTimeUs - startTimeUs));
+#endif
 
     return err;
 }
@@ -447,29 +733,36 @@ const struct ColorConverter::Coeffs *ColorConverter::getMatrix() const {
     const bool is10Bit = (mSrcFormat == COLOR_FormatYUVP010
             || mSrcFormat == OMX_COLOR_FormatYUV420Planar16);
 
-    switch (mSrcColorSpace.mStandard) {
-    case ColorUtils::kColorStandardBT601_525:
-    case ColorUtils::kColorStandardBT601_625:
+    ColorAspects::Primaries primaries;
+    ColorAspects::MatrixCoeffs matrix;
+    if (ColorUtils::unwrapColorAspectsFromColorStandard(
+            mSrcColorSpace.mStandard, &primaries, &matrix) != OK) {
+        matrix = ColorAspects::MatrixUnspecified;
+    }
+
+    switch (matrix) {
+    case ColorAspects::MatrixBT601_6:
+    case ColorAspects::MatrixBT470_6M:   // use 601 matrix as that is the closest for now
+    case ColorAspects::MatrixSMPTE240M:  // use 601 matrix as that is the closest for now
         return (isFullRange ? &BT601_FULL :
                 is10Bit ? &BT601_LTD_10BIT : &BT601_LIMITED);
 
-    case ColorUtils::kColorStandardBT709:
+    case ColorAspects::MatrixBT709_5:
         return (isFullRange ? &BT709_FULL :
                 is10Bit ? &BT709_LTD_10BIT : &BT709_LIMITED);
 
-    case ColorUtils::kColorStandardBT2020:
+    case ColorAspects::MatrixBT2020:
+    case ColorAspects::MatrixBT2020Constant: // use 2020 matrix as that is the closest for now
         return (isFullRange ? &BT2020_FULL :
                 is10Bit ? &BT2020_LTD_10BIT : &BT2020_LIMITED);
 
     default:
-        // for now use the default matrices for unhandled color spaces
-        // TODO: fail?
-        // return nullptr;
-        [[fallthrough]];
-
-    case ColorUtils::kColorStandardUnspecified:
-        return is10Bit ? &BT2020_LTD_10BIT : &BT601_LIMITED;
-
+        // use BT.2020 for 10-bit and 601 for 8-bit by default
+        if (is10Bit) {
+            return isFullRange ? &BT2020_FULL : &BT2020_LTD_10BIT;
+        } else {
+            return isFullRange ? &BT601_FULL : &BT601_LIMITED;
+        }
     }
 }
 
@@ -544,67 +837,103 @@ status_t ColorConverter::convertCbYCrY(
     return OK;
 }
 
+status_t ColorConverter::getSrcYUVPlaneOffsetAndStride(
+        const BitmapParams &src,
+        uint32_t *y_offset, uint32_t *u_offset, uint32_t *v_offset,
+        size_t *y_stride, size_t *u_stride, size_t *v_stride) const {
+    if (y_offset == nullptr || u_offset == nullptr || v_offset == nullptr
+            || y_stride == nullptr || u_stride == nullptr || v_stride == nullptr) {
+        ALOGE("nullptrs given for yuv source offset / stride");
+        return ERROR_MALFORMED;
+    }
+
+    if (mSrcImage) {
+        // if we have MediaImage2; get the info from MediaImage2
+        return mSrcImage->getYUVPlaneOffsetAndStride(src, y_offset, u_offset, v_offset,
+                y_stride, u_stride, v_stride);
+    }
+    return ERROR_UNSUPPORTED;
+}
 /*
     libyuv supports the following color spaces:
 
-    I420: BT.601 limited range
-    J420: BT.601 full range (jpeg)
-    H420: BT.709 limited range
+    I601:  BT.601 limited range
+    J601:  BT.601 full range (jpeg)
+    H709:  BT.709 limited range
+    F709:  BT.709 Full range
+    2020:  BT.2020 limited range
+    V2020: BT.2020 Full range
 
 */
 
-#define DECLARE_YUV2RGBFUNC(func, rgb) int (*func)(     \
-        const uint8_t*, int, const uint8_t*, int,       \
-        const uint8_t*, int, uint8_t*, int, int, int)   \
-        = mSrcColorSpace.isH420() ? libyuv::H420To##rgb \
-        : mSrcColorSpace.isJ420() ? libyuv::J420To##rgb \
-        : libyuv::I420To##rgb
-
 status_t ColorConverter::convertYUV420PlanarUseLibYUV(
         const BitmapParams &src, const BitmapParams &dst) {
-    // Fall back to our conversion if libyuv does not support the color space.
-    // I420 (BT.601 limited) is default, so don't fall back if we end up using it anyway.
-    if (!mSrcColorSpace.isH420() && !mSrcColorSpace.isJ420()
-            // && !mSrcColorSpace.isI420() /* same as line below */
-            && getMatrix() != &BT601_LIMITED) {
-        return convertYUV420Planar(src, dst);
+    LibyuvConstPair yuvConstants =
+            getLibYUVMatrix(mSrcColorSpace, false);
+
+    uint32_t y_offset = 0, u_offset = 0, v_offset = 0;
+    size_t src_stride_y =0, src_stride_u = 0, src_stride_v = 0;
+    if (getSrcYUVPlaneOffsetAndStride(src, &y_offset, &u_offset, &v_offset,
+                          &src_stride_y, &src_stride_u, &src_stride_v) != OK) {
+        return ERROR_UNSUPPORTED;
     }
 
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
         + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
 
-    const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
+    const uint8_t *src_y = (const uint8_t *)src.mBits + y_offset;
 
-    const uint8_t *src_u =
-        (const uint8_t *)src.mBits + src.mStride * src.mHeight
-        + (src.mCropTop / 2) * (src.mStride / 2) + (src.mCropLeft / 2);
+    const uint8_t *src_u = (const uint8_t *)src.mBits + u_offset;
 
-    const uint8_t *src_v =
-        src_u + (src.mStride / 2) * (src.mHeight / 2);
+    const uint8_t *src_v = (const uint8_t *)src.mBits + v_offset;
 
     switch (mDstFormat) {
     case OMX_COLOR_Format16bitRGB565:
     {
-        DECLARE_YUV2RGBFUNC(func, RGB565);
-        (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8_t *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
-        break;
-    }
+        libyuv::I420ToRGB565Matrix(src_y,
+                src_stride_y,
+                src_u,
+                src_stride_u,
+                src_v,
+                src_stride_v,
+                dst_ptr,
+                dst.mStride,
+                yuvConstants.yuv,
+                src.cropWidth(),
+                src.cropHeight());
 
-    case OMX_COLOR_Format32BitRGBA8888:
-    {
-        DECLARE_YUV2RGBFUNC(func, ABGR);
-        (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8_t *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
         break;
     }
 
     case OMX_COLOR_Format32bitBGRA8888:
     {
-        DECLARE_YUV2RGBFUNC(func, ARGB);
-        (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8_t *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
+        libyuv::I420ToARGBMatrix(src_y,
+                src_stride_y,
+                src_u,
+                src_stride_u,
+                src_v,
+                src_stride_v,
+                (uint8_t*)dst_ptr,
+                dst.mStride,
+                yuvConstants.yuv,
+                src.cropWidth(),
+                src.cropHeight());
+        break;
+    }
+
+    case OMX_COLOR_Format32BitRGBA8888:
+    {
+        libyuv::I420ToARGBMatrix(src_y,
+                src_stride_y,
+                src_v,
+                src_stride_v,
+                src_u,
+                src_stride_u,
+                (uint8_t*)dst_ptr,
+                dst.mStride,
+                yuvConstants.yvu,
+                src.cropWidth(),
+                src.cropHeight());
         break;
     }
 
@@ -617,38 +946,90 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
 
 status_t ColorConverter::convertYUV420SemiPlanarUseLibYUV(
         const BitmapParams &src, const BitmapParams &dst) {
-    // Fall back to our conversion if libyuv does not support the color space.
-    // libyuv only supports BT.601 limited range NV12. Don't fall back if we end up using it anyway.
-    if (// !mSrcColorSpace.isI420() && /* same as below */
-        getMatrix() != &BT601_LIMITED) {
-        return convertYUV420SemiPlanar(src, dst);
-    }
+    LibyuvConstPair yuvConstants =
+            getLibYUVMatrix(mSrcColorSpace, false);
 
+    uint32_t y_offset = 0, u_offset = 0, v_offset = 0;
+    size_t src_stride_y =0, src_stride_u = 0, src_stride_v = 0;
+    if (getSrcYUVPlaneOffsetAndStride(src, &y_offset, &u_offset, &v_offset,
+                          &src_stride_y, &src_stride_u, &src_stride_v) != OK) {
+        return ERROR_UNSUPPORTED;
+    }
+    (void)v_offset;
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
         + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
 
-    const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
+    const uint8_t *src_y = (const uint8_t *)src.mBits + y_offset;
 
-    const uint8_t *src_u =
-        (const uint8_t *)src.mBits + src.mStride * src.mHeight
-        + (src.mCropTop / 2) * src.mStride + src.mCropLeft;
+    const uint8_t *src_u = (const uint8_t *)src.mBits + u_offset;
+
+    const uint8_t *src_v = (const uint8_t *)src.mBits + v_offset;
+
+    bool isNV21 = (u_offset == (v_offset + 1)) ? true : false;
+
+    // libyuv function signature for semiplanar formats;
+    std::function<int(const uint8_t*, int,
+            const uint8_t*, int, uint8_t *, int,
+            LibyuvConstants *, int, int)> libyuvFunc;
 
     switch (mDstFormat) {
     case OMX_COLOR_Format16bitRGB565:
-        libyuv::NV12ToRGB565(src_y, src.mStride, src_u, src.mStride, (uint8_t *)dst_ptr,
-                dst.mStride, src.cropWidth(), src.cropHeight());
+    {
+        // Note: We don't seem to have similar function for NV21
+        libyuv::NV12ToRGB565Matrix(src_y,
+                src_stride_y,
+                src_u,
+                src_stride_u,
+                (uint8_t*)dst_ptr,
+                dst.mStride,
+                yuvConstants.yuv,
+                src.cropWidth(),
+                src.cropHeight());
         break;
-
+    }
     case OMX_COLOR_Format32bitBGRA8888:
-        libyuv::NV12ToARGB(src_y, src.mStride, src_u, src.mStride, (uint8_t *)dst_ptr,
-                dst.mStride, src.cropWidth(), src.cropHeight());
+    {
+        if (src_stride_u != src_stride_v) {
+            return ERROR_UNSUPPORTED;
+        }
+
+        libyuvFunc = isNV21 ? libyuv:: NV21ToARGBMatrix : libyuv:: NV12ToARGBMatrix;
+
+        libyuvFunc(src_y,
+                src_stride_y,
+                isNV21 ? src_v: src_u,
+                // src_stride_v should be equal to src_stride_u
+                // but this is done like this for readability
+                isNV21 ? src_stride_v : src_stride_u,
+                (uint8_t*)dst_ptr,
+                dst.mStride,
+                yuvConstants.yuv,
+                src.cropWidth(),
+                src.cropHeight());
         break;
+    }
 
     case OMX_COLOR_Format32BitRGBA8888:
-        libyuv::NV12ToABGR(src_y, src.mStride, src_u, src.mStride, (uint8_t *)dst_ptr,
-                dst.mStride, src.cropWidth(), src.cropHeight());
+    {
+
+        if (src_stride_u != src_stride_v) {
+            return ERROR_UNSUPPORTED;
+        }
+
+        libyuvFunc = isNV21 ? libyuv::NV12ToARGBMatrix : libyuv::NV21ToARGBMatrix;
+
+        libyuvFunc(src_y,
+                src_stride_y,
+                isNV21 ? src_v : src_u,
+                // src_stride_v should be equal to src_stride_u
+                isNV21 ? src_stride_v : src_stride_u,
+                (uint8_t*)dst_ptr,
+                dst.mStride,
+                yuvConstants.yvu,
+                src.cropWidth(),
+                src.cropHeight());
         break;
+    }
 
     default:
         return ERROR_UNSUPPORTED;
@@ -658,20 +1039,40 @@ status_t ColorConverter::convertYUV420SemiPlanarUseLibYUV(
 }
 
 std::function<void (void *, void *, void *, size_t,
-                    signed *, signed *, signed *, signed *)>
-getReadFromSrc(OMX_COLOR_FORMATTYPE srcFormat) {
-    switch(srcFormat) {
-    case OMX_COLOR_FormatYUV420Planar:
-        return [](void *src_y, void *src_u, void *src_v, size_t x,
-                  signed *y1, signed *y2, signed *u, signed *v) {
-            *y1 = ((uint8_t*)src_y)[x];
-            *y2 = ((uint8_t*)src_y)[x + 1];
-            *u = ((uint8_t*)src_u)[x / 2] - 128;
-            *v = ((uint8_t*)src_v)[x / 2] - 128;
-        };
-    // this format stores 10 bits content with 16 bits
-    // converting it to 8 bits src
-    case OMX_COLOR_FormatYUV420Planar16:
+        signed *, signed *, signed *, signed *)>
+getReadFromChromaHorizSubsampled2Image8b(std::optional<MediaImage2> image,
+        OMX_COLOR_FORMATTYPE srcFormat) {
+    // this function is for reading src only
+    // when both chromas are horizontally subsampled by 2
+    // this returns 2 luma for one chroma.
+    if (image) {
+        uint32_t uColInc =
+                image->mPlane[MediaImage2::PlaneIndex::U].mColInc;
+        uint32_t vColInc =
+                image->mPlane[MediaImage2::PlaneIndex::V].mColInc;
+        uint32_t uHorizSubsampling =
+                image->mPlane[MediaImage2::PlaneIndex::U].mHorizSubsampling;
+         uint32_t vHorizSubsampling =
+                image->mPlane[MediaImage2::PlaneIndex::V].mHorizSubsampling;
+
+        if (!(uHorizSubsampling == 2 && vHorizSubsampling == 2)) {
+            return nullptr;
+        }
+
+        if (image->mBitDepthAllocated == 8) {
+
+            return [uColInc, vColInc, uHorizSubsampling, vHorizSubsampling]
+                    (void *src_y, void *src_u, void *src_v, size_t x,
+                    signed *y1, signed *y2, signed *u, signed *v) {
+                *y1 = ((uint8_t *)src_y)[x];
+                *y2 = ((uint8_t *)src_y)[x + 1];
+                *u  = ((uint8_t *)src_u)[(x / uHorizSubsampling) * uColInc] - 128;
+                *v  = ((uint8_t *)src_v)[(x / vHorizSubsampling) * vColInc] - 128;
+            };
+        }
+    }
+    if (srcFormat == OMX_COLOR_FormatYUV420Planar16) {
+        // OMX_COLOR_FormatYUV420Planar16
         return [](void *src_y, void *src_u, void *src_v, size_t x,
                 signed *y1, signed *y2, signed *u, signed *v) {
             *y1 = (uint8_t)(((uint16_t*)src_y)[x] >> 2);
@@ -679,8 +1080,34 @@ getReadFromSrc(OMX_COLOR_FORMATTYPE srcFormat) {
             *u = (uint8_t)(((uint16_t*)src_u)[x / 2] >> 2) - 128;
             *v = (uint8_t)(((uint16_t*)src_v)[x / 2] >> 2) - 128;
         };
-    default:
-        TRESPASS();
+    }
+    return nullptr;
+}
+
+std::function<void (void *, void *, void *, size_t,
+        signed *, signed *, signed *)>
+getReadFromImage(std::optional<MediaImage2> image, OMX_COLOR_FORMATTYPE &srcFormat) {
+    (void)srcFormat;
+    if (image) {
+        uint32_t uColInc =
+                image->mPlane[MediaImage2::PlaneIndex::U].mColInc;
+        uint32_t vColInc =
+                image->mPlane[MediaImage2::PlaneIndex::V].mColInc;
+        uint32_t uHorizSubsampling =
+                image->mPlane[MediaImage2::PlaneIndex::U].mHorizSubsampling;
+         uint32_t vHorizSubsampling =
+                image->mPlane[MediaImage2::PlaneIndex::V].mHorizSubsampling;
+
+        if (image->mBitDepthAllocated == 8) {
+
+            return [uColInc, vColInc, uHorizSubsampling, vHorizSubsampling]
+                    (void *src_y, void *src_u, void *src_v, size_t x,
+                    signed *y1, signed *u, signed *v) {
+                *y1 = ((uint8_t *)src_y)[x];
+                *u  = ((uint8_t *)src_u)[(x / uHorizSubsampling) * uColInc] - 128;
+                *v  = ((uint8_t *)src_v)[(x / vHorizSubsampling) * vColInc] - 128;
+            };
+        }
     }
     return nullptr;
 }
@@ -779,8 +1206,178 @@ getWriteToDst(OMX_COLOR_FORMATTYPE dstFormat, void *kAdjustedClip) {
     return nullptr;
 }
 
-status_t ColorConverter::convertYUV420Planar(
+status_t ColorConverter::convertYUVMediaImage(
         const BitmapParams &src, const BitmapParams &dst) {
+    // first see if we can do this as a 420Planar or 420SemiPlanar 8b
+
+    if(!mSrcImage ||
+            mSrcImage->getMediaImage2().mType != MediaImage2::MEDIA_IMAGE_TYPE_YUV
+            || mSrcImage->getMediaImage2().mNumPlanes != 3) {
+        ALOGE("Cannot convert without MediaImage2 or MediaImage is not Valid YUV");
+        return ERROR_UNSUPPORTED;
+    }
+    if (mSrcImage->getBitDepth() == ImageBitDepth8
+            && mSrcImage->getSampling() == ImageSamplingYUV420) {
+        Layout_t layout = mSrcImage->getLayout();
+        switch (layout) {
+            case Layout_t::ImageLayout420Planar:
+            {
+                return convertYUV420PlanarUseLibYUV(src, dst);
+                break;
+            }
+
+            case Layout_t::ImageLayout420SemiPlanar:
+            {
+                // Note: libyuv doesn't support NV21 -> RGB565
+                if (!(mSrcImage->isNV21() && mDstFormat == OMX_COLOR_Format16bitRGB565)) {
+                    status_t ret = convertYUV420SemiPlanarUseLibYUV(src, dst);
+                    // This function may fail if some specific conditions are not
+                    // met for semiPlanar formats like strideU != strideV.
+                    // if failed, this will fail before attempting conversion, so
+                    // no additional memcpy will be involved here.
+                    // Upon failure, this will fall into pixel based processing below.
+                    if (ret == OK) {
+                        return ret;
+                    }
+                }
+                break;
+            }
+            default:
+                // we will handle this case below.
+                break;
+        }
+    }
+    const struct Coeffs *matrix = getMatrix();
+    if (!matrix) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    signed _b_u = matrix->_b_u;
+    signed _neg_g_u = -matrix->_g_u;
+    signed _neg_g_v = -matrix->_g_v;
+    signed _r_v = matrix->_r_v;
+    signed _y = matrix->_y;
+
+    uint8_t *dst_ptr = (uint8_t *)dst.mBits
+            + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
+
+
+    uint32_t y_offset = 0, u_offset = 0, v_offset = 0;
+    size_t src_stride_y =0, src_stride_u = 0, src_stride_v = 0;
+    if (getSrcYUVPlaneOffsetAndStride(src, &y_offset, &u_offset, &v_offset,
+            &src_stride_y, &src_stride_u, &src_stride_v) != OK) {
+        return ERROR_UNSUPPORTED;
+    }
+    uint32_t uVertSubsampling =
+            mSrcImage->getMediaImage2().mPlane[MediaImage2::PlaneIndex::U].mVertSubsampling;
+    uint32_t vVertSubsampling =
+            mSrcImage->getMediaImage2().mPlane[MediaImage2::PlaneIndex::V].mVertSubsampling;
+
+    //TODO: optimize for chroma sampling, reading and writing multiple pixels
+    //      within the same loop
+    signed _c16 = 0;
+    void *kAdjustedClip = nullptr;
+    if (mSrcImage->getBitDepth() != ImageBitDepth8) {
+        ALOGE("BitDepth != 8 for MediaImage2");
+        return ERROR_UNSUPPORTED;
+    }
+    _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
+    kAdjustedClip = initClip();
+
+    auto writeToDst = getWriteToDst(mDstFormat, (void *)kAdjustedClip);
+    uint8_t *src_y = (uint8_t *)src.mBits + y_offset;
+    uint8_t *src_u = (uint8_t *)src.mBits + u_offset;
+    uint8_t *src_v = (uint8_t *)src.mBits + v_offset;
+
+    switch (mSrcImage->getSampling()) {
+
+        case ImageSamplingYUV420:
+        {
+            // get read function that can read
+            // chroma sampling 2 with image
+            auto readFromSrcImage = getReadFromChromaHorizSubsampled2Image8b(
+                    mSrcImage->getMediaImage2(), mSrcFormat);
+            if (readFromSrcImage == nullptr) {
+                ALOGE("Cannot get a read function for this MediaImage2");
+                return ERROR_UNSUPPORTED;
+            }
+            for (size_t y = 0; y < src.cropHeight(); ++y) {
+                for (size_t x = 0; x < src.cropWidth(); x += 2) {
+                    signed y1, y2, u, v;
+                    readFromSrcImage(src_y, src_u, src_v, x, &y1, &y2, &u, &v);
+
+                    signed u_b = u * _b_u;
+                    signed u_g = u * _neg_g_u;
+                    signed v_g = v * _neg_g_v;
+                    signed v_r = v * _r_v;
+
+                    y1 = y1 - _c16;
+                    signed tmp1 = y1 * _y + 128;
+                    signed b1 = (tmp1 + u_b) / 256;
+                    signed g1 = (tmp1 + v_g + u_g) / 256;
+                    signed r1 = (tmp1 + v_r) / 256;
+
+                    y2 = y2 - _c16;
+                    signed tmp2 = y2 * _y + 128;
+                    signed b2 = (tmp2 + u_b) / 256;
+                    signed g2 = (tmp2 + v_g + u_g) / 256;
+                    signed r2 = (tmp2 + v_r) / 256;
+
+                    bool uncropped = x + 1 < src.cropWidth();
+                    writeToDst(dst_ptr + x * dst.mBpp, uncropped, r1, g1, b1, r2, g2, b2);
+                }
+                src_y += src_stride_y;
+                src_u += (((y + 1) % uVertSubsampling) == 0) ? src_stride_u : 0;
+                src_v += (((y + 1) % vVertSubsampling) == 0) ? src_stride_v : 0;
+
+                dst_ptr += dst.mStride;
+            }
+            break;
+        }
+
+        default:
+        {
+            // Interleaved or any other formats.
+            auto readFromSrcImage = getReadFromImage(mSrcImage->getMediaImage2(), mSrcFormat);
+            if (readFromSrcImage == nullptr) {
+                ALOGE("Cannot get a read function for this MediaImage2");
+                return ERROR_UNSUPPORTED;
+            }
+            for (size_t y = 0; y < src.cropHeight(); ++y) {
+                for (size_t x = 0; x < src.cropWidth(); x += 1) {
+                    signed y1, y2, u, v;
+                    readFromSrcImage(src_y, src_u, src_v, x, &y1, &u, &v);
+
+                    signed u_b = u * _b_u;
+                    signed u_g = u * _neg_g_u;
+                    signed v_g = v * _neg_g_v;
+                    signed v_r = v * _r_v;
+
+                    y1 = y1 - _c16;
+                    signed tmp1 = y1 * _y + 128;
+                    signed b1 = (tmp1 + u_b) / 256;
+                    signed g1 = (tmp1 + v_g + u_g) / 256;
+                    signed r1 = (tmp1 + v_r) / 256;
+
+                    writeToDst(dst_ptr + x * dst.mBpp, false, r1, g1, b1, 0, 0, 0);
+                }
+                src_y += src_stride_y;
+                src_u += (((y + 1) % uVertSubsampling) == 0) ? src_stride_u : 0;
+                src_v += (((y + 1) % vVertSubsampling) == 0) ? src_stride_v : 0;
+
+                dst_ptr += dst.mStride;
+            }
+        }
+    }
+    return OK;
+}
+
+status_t ColorConverter::convertYUV420Planar16(
+        const BitmapParams &src, const BitmapParams &dst) {
+    if (mDstFormat == OMX_COLOR_FormatYUV444Y410) {
+        return convertYUV420Planar16ToY410(src, dst);
+    }
+
     const struct Coeffs *matrix = getMatrix();
     if (!matrix) {
         return ERROR_UNSUPPORTED;
@@ -795,7 +1392,7 @@ status_t ColorConverter::convertYUV420Planar(
 
     uint8_t *kAdjustedClip = initClip();
 
-    auto readFromSrc = getReadFromSrc(mSrcFormat);
+    auto readFromSrc = getReadFromChromaHorizSubsampled2Image8b(std::nullopt, mSrcFormat);
     auto writeToDst = getWriteToDst(mDstFormat, (void *)kAdjustedClip);
 
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
@@ -842,17 +1439,7 @@ status_t ColorConverter::convertYUV420Planar(
 
         dst_ptr += dst.mStride;
     }
-
     return OK;
-}
-
-status_t ColorConverter::convertYUV420Planar16(
-        const BitmapParams &src, const BitmapParams &dst) {
-    if (mDstFormat == OMX_COLOR_FormatYUV444Y410) {
-        return convertYUV420Planar16ToY410(src, dst);
-    }
-
-    return convertYUV420Planar(src, dst);
 }
 
 status_t ColorConverter::convertYUVP010(
@@ -1132,102 +1719,6 @@ status_t ColorConverter::convertYUV420Planar16ToY410(
 }
 
 #endif // USE_NEON_Y410
-
-status_t ColorConverter::convertQCOMYUV420SemiPlanar(
-        const BitmapParams &src, const BitmapParams &dst) {
-    /* QCOMYUV420SemiPlanar is NV21, while MediaCodec uses NV12 */
-    return convertYUV420SemiPlanarBase(
-            src, dst, src.mWidth /* row_inc */, true /* isNV21 */);
-}
-
-status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
-        const BitmapParams &src, const BitmapParams &dst) {
-    return convertYUV420SemiPlanarBase(
-            src, dst, src.mWidth /* row_inc */);
-}
-
-status_t ColorConverter::convertYUV420SemiPlanar(
-        const BitmapParams &src, const BitmapParams &dst) {
-    return convertYUV420SemiPlanarBase(
-            src, dst, src.mStride /* row_inc */);
-}
-
-status_t ColorConverter::convertYUV420SemiPlanarBase(const BitmapParams &src,
-        const BitmapParams &dst, size_t row_inc, bool isNV21) {
-    const struct Coeffs *matrix = getMatrix();
-    if (!matrix) {
-        return ERROR_UNSUPPORTED;
-    }
-
-    signed _b_u = matrix->_b_u;
-    signed _neg_g_u = -matrix->_g_u;
-    signed _neg_g_v = -matrix->_g_v;
-    signed _r_v = matrix->_r_v;
-    signed _y = matrix->_y;
-    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
-
-    uint8_t *kAdjustedClip = initClip();
-
-    uint16_t *dst_ptr = (uint16_t *)((uint8_t *)
-            dst.mBits + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp);
-
-    const uint8_t *src_y =
-        (const uint8_t *)src.mBits + src.mCropTop * row_inc + src.mCropLeft;
-
-    const uint8_t *src_u = (const uint8_t *)src.mBits + src.mHeight * row_inc +
-        (src.mCropTop / 2) * row_inc + src.mCropLeft;
-
-    for (size_t y = 0; y < src.cropHeight(); ++y) {
-        for (size_t x = 0; x < src.cropWidth(); x += 2) {
-            signed y1 = (signed)src_y[x] - _c16;
-            signed y2 = (signed)src_y[x + 1] - _c16;
-
-            signed u = (signed)src_u[(x & ~1) + isNV21] - 128;
-            signed v = (signed)src_u[(x & ~1) + !isNV21] - 128;
-
-            signed u_b = u * _b_u;
-            signed u_g = u * _neg_g_u;
-            signed v_g = v * _neg_g_v;
-            signed v_r = v * _r_v;
-
-            signed tmp1 = y1 * _y + 128;
-            signed b1 = (tmp1 + u_b) / 256;
-            signed g1 = (tmp1 + v_g + u_g) / 256;
-            signed r1 = (tmp1 + v_r) / 256;
-
-            signed tmp2 = y2 * _y + 128;
-            signed b2 = (tmp2 + u_b) / 256;
-            signed g2 = (tmp2 + v_g + u_g) / 256;
-            signed r2 = (tmp2 + v_r) / 256;
-
-            uint32_t rgb1 =
-                ((kAdjustedClip[r1] >> 3) << 11)
-                | ((kAdjustedClip[g1] >> 2) << 5)
-                | (kAdjustedClip[b1] >> 3);
-
-            uint32_t rgb2 =
-                ((kAdjustedClip[r2] >> 3) << 11)
-                | ((kAdjustedClip[g2] >> 2) << 5)
-                | (kAdjustedClip[b2] >> 3);
-
-            if (x + 1 < src.cropWidth()) {
-                *(uint32_t *)(&dst_ptr[x]) = (rgb2 << 16) | rgb1;
-            } else {
-                dst_ptr[x] = rgb1;
-            }
-        }
-
-        src_y += row_inc;
-
-        if (y & 1) {
-            src_u += row_inc;
-        }
-
-        dst_ptr = (uint16_t*)((uint8_t*)dst_ptr + dst.mStride);
-    }
-
-    return OK;
-}
 
 uint8_t *ColorConverter::initClip() {
     if (mClip == NULL) {

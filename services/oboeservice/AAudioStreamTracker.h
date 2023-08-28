@@ -64,7 +64,7 @@ public:
      * @param serviceStream
      * @return handle for identifying the stream
      */
-    aaudio_handle_t addStreamForHandle(android::sp<AAudioServiceStreamBase> serviceStream);
+    aaudio_handle_t addStreamForHandle(const android::sp<AAudioServiceStreamBase>& serviceStream);
 
     /**
      * @return string that can be added to dumpsys

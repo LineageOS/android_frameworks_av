@@ -143,6 +143,7 @@ status_t AudioMixerBase::create(
         // setParameter(name, TRACK, MAIN_BUFFER, mixBuffer) is required before enable(name)
         t->mainBuffer = NULL;
         t->auxBuffer = NULL;
+        t->teeBuffer = nullptr;
         t->mMixerFormat = AUDIO_FORMAT_PCM_16_BIT;
         t->mFormat = format;
         t->mMixerInFormat = kUseFloat && kUseNewMixer ?
@@ -150,6 +151,8 @@ status_t AudioMixerBase::create(
         t->mMixerChannelMask = audio_channel_mask_from_representation_and_bits(
                 AUDIO_CHANNEL_REPRESENTATION_POSITION, AUDIO_CHANNEL_OUT_STEREO);
         t->mMixerChannelCount = audio_channel_count_from_out_mask(t->mMixerChannelMask);
+        t->mTeeBufferFrameCount = 0;
+        t->mInputFrameSize = audio_bytes_per_frame(t->channelCount, t->mFormat);
         status_t status = postCreateTrack(t.get());
         if (status != OK) return status;
         mTracks[name] = t;
@@ -176,6 +179,7 @@ bool AudioMixerBase::setChannelMasks(int name,
     track->channelCount = trackChannelCount;
     track->mMixerChannelMask = mixerChannelMask;
     track->mMixerChannelCount = mixerChannelCount;
+    track->mInputFrameSize = audio_bytes_per_frame(track->channelCount, track->mFormat);
 
     // Resampler channels may have changed.
     track->recreateResampler(mSampleRate);
@@ -401,6 +405,20 @@ void AudioMixerBase::setParameter(int name, int target, int param, void *value)
                 invalidate();
             }
             } break;
+        case TEE_BUFFER:
+            if (track->teeBuffer != valueBuf) {
+                track->teeBuffer = valueBuf;
+                ALOGV("setParameter(TRACK, TEE_BUFFER, %p)", valueBuf);
+                invalidate();
+            }
+            break;
+        case TEE_BUFFER_FRAME_COUNT:
+            if (track->mTeeBufferFrameCount != valueInt) {
+                track->mTeeBufferFrameCount = valueInt;
+                ALOGV("setParameter(TRACK, TEE_BUFFER_FRAME_COUNT, %i)", valueInt);
+                invalidate();
+            }
+            break;
         default:
             LOG_ALWAYS_FATAL("setParameter track: bad param %d", param);
         }

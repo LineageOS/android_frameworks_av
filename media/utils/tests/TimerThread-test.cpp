@@ -52,14 +52,16 @@ static void testBasic() {
     std::atomic<bool> taskRan = false;
     TimerThread thread;
     TimerThread::Handle handle =
-            thread.scheduleTask("Basic", [&taskRan](TimerThread::Handle handle __unused) {
+            thread.scheduleTask("Basic", [&taskRan](TimerThread::Handle) {
                     taskRan = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
     ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms - kJitter);
     ASSERT_FALSE(taskRan);
     std::this_thread::sleep_for(2 * kJitter);
-    ASSERT_TRUE(taskRan);
-    ASSERT_EQ(1, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_TRUE(taskRan); // timed-out called.
+    ASSERT_EQ(1ul, countChars(thread.timeoutToString(), REQUEST_START));
+    // nothing cancelled
+    ASSERT_EQ(0ul, countChars(thread.retiredToString(), REQUEST_START));
 }
 
 static void testCancel() {
@@ -68,15 +70,17 @@ static void testCancel() {
     std::atomic<bool> taskRan = false;
     TimerThread thread;
     TimerThread::Handle handle =
-            thread.scheduleTask("Cancel", [&taskRan](TimerThread::Handle handle __unused) {
+            thread.scheduleTask("Cancel", [&taskRan](TimerThread::Handle) {
                     taskRan = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
     ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms - kJitter);
     ASSERT_FALSE(taskRan);
     ASSERT_TRUE(thread.cancelTask(handle));
     std::this_thread::sleep_for(2 * kJitter);
-    ASSERT_FALSE(taskRan);
-    ASSERT_EQ(1, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_FALSE(taskRan); // timed-out did not call.
+    ASSERT_EQ(0ul, countChars(thread.timeoutToString(), REQUEST_START));
+    // task cancelled.
+    ASSERT_EQ(1ul, countChars(thread.retiredToString(), REQUEST_START));
 }
 
 static void testCancelAfterRun() {
@@ -86,14 +90,16 @@ static void testCancelAfterRun() {
     TimerThread thread;
     TimerThread::Handle handle =
             thread.scheduleTask("CancelAfterRun",
-                    [&taskRan](TimerThread::Handle handle __unused) {
+                    [&taskRan](TimerThread::Handle) {
                             taskRan = true; },
                             DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
     ASSERT_TRUE(TimerThread::isTimeoutHandle(handle));
     std::this_thread::sleep_for(100ms + kJitter);
-    ASSERT_TRUE(taskRan);
+    ASSERT_TRUE(taskRan); //  timed-out called.
     ASSERT_FALSE(thread.cancelTask(handle));
-    ASSERT_EQ(1, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.timeoutToString(), REQUEST_START));
+    // nothing actually cancelled
+    ASSERT_EQ(0ul, countChars(thread.retiredToString(), REQUEST_START));
 }
 
 static void testMultipleTasks() {
@@ -104,23 +110,23 @@ static void testMultipleTasks() {
 
     auto startTime = std::chrono::steady_clock::now();
 
-    thread.scheduleTask("0", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("0", [&taskRan](TimerThread::Handle) {
             taskRan[0] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(300, frac));
-    thread.scheduleTask("1", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("1", [&taskRan](TimerThread::Handle) {
             taskRan[1] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(100, frac));
-    thread.scheduleTask("2", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("2", [&taskRan](TimerThread::Handle) {
             taskRan[2] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(200, frac));
-    thread.scheduleTask("3", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("3", [&taskRan](TimerThread::Handle) {
             taskRan[3] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(400, frac));
-    auto handle4 = thread.scheduleTask("4", [&taskRan](TimerThread::Handle handle __unused) {
+    auto handle4 = thread.scheduleTask("4", [&taskRan](TimerThread::Handle) {
             taskRan[4] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(200, frac));
-    thread.scheduleTask("5", [&taskRan](TimerThread::Handle handle __unused) {
+    thread.scheduleTask("5", [&taskRan](TimerThread::Handle) {
             taskRan[5] = true; }, DISTRIBUTE_TIMEOUT_SECONDCHANCE_MS_FRAC(200, frac));
 
     // 6 tasks pending
-    ASSERT_EQ(6, countChars(thread.pendingToString(), REQUEST_START));
+    ASSERT_EQ(6ul, countChars(thread.pendingToString(), REQUEST_START));
     // 0 tasks completed
-    ASSERT_EQ(0, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(0ul, countChars(thread.retiredToString(), REQUEST_START));
 
     // None of the tasks are expected to have finished at the start.
     std::array<std::atomic<bool>, 6> expected{};
@@ -162,17 +168,19 @@ static void testMultipleTasks() {
     ASSERT_EQ(expected, taskRan);
 
     // 1 task pending
-    ASSERT_EQ(1, countChars(thread.pendingToString(), REQUEST_START));
-    // 4 tasks ran and 1 cancelled
-    ASSERT_EQ(4 + 1, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.pendingToString(), REQUEST_START));
+    // 4 tasks called on timeout,  and 1 cancelled
+    ASSERT_EQ(4ul, countChars(thread.timeoutToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.retiredToString(), REQUEST_START));
 
     // Task 3 should trigger around 400ms.
     std::this_thread::sleep_until(startTime + 400ms - kJitter);
 
     ASSERT_EQ(expected, taskRan);
 
-    // 4 tasks ran and 1 cancelled
-    ASSERT_EQ(4 + 1, countChars(thread.retiredToString(), REQUEST_START));
+    // 4 tasks called on timeout and 1 cancelled
+    ASSERT_EQ(4ul, countChars(thread.timeoutToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.retiredToString(), REQUEST_START));
 
     std::this_thread::sleep_until(startTime + 400ms + kJitter);
 
@@ -180,9 +188,10 @@ static void testMultipleTasks() {
     ASSERT_EQ(expected, taskRan);
 
     // 0 tasks pending
-    ASSERT_EQ(0, countChars(thread.pendingToString(), REQUEST_START));
-    // 5 tasks ran and 1 cancelled
-    ASSERT_EQ(5 + 1, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(0ul, countChars(thread.pendingToString(), REQUEST_START));
+    // 5 tasks called on timeout and 1 cancelled
+    ASSERT_EQ(5ul, countChars(thread.timeoutToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.retiredToString(), REQUEST_START));
 }
 
 }; // class TimerThreadTest
@@ -221,48 +230,48 @@ TEST(TimerThread, TrackedTasks) {
     ASSERT_TRUE(TimerThread::isNoTimeoutHandle(handle2));
 
     // 3 tasks pending
-    ASSERT_EQ(3, countChars(thread.pendingToString(), REQUEST_START));
+    ASSERT_EQ(3ul, countChars(thread.pendingToString(), REQUEST_START));
     // 0 tasks retired
-    ASSERT_EQ(0, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(0ul, countChars(thread.retiredToString(), REQUEST_START));
 
     ASSERT_TRUE(thread.cancelTask(handle0));
     ASSERT_TRUE(thread.cancelTask(handle1));
 
     // 1 task pending
-    ASSERT_EQ(1, countChars(thread.pendingToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.pendingToString(), REQUEST_START));
     // 2 tasks retired
-    ASSERT_EQ(2, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(2ul, countChars(thread.retiredToString(), REQUEST_START));
 
     // handle1 is stale, cancel returns false.
     ASSERT_FALSE(thread.cancelTask(handle1));
 
     // 1 task pending
-    ASSERT_EQ(1, countChars(thread.pendingToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.pendingToString(), REQUEST_START));
     // 2 tasks retired
-    ASSERT_EQ(2, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(2ul, countChars(thread.retiredToString(), REQUEST_START));
 
     // Add another tracked task.
     auto handle3 = thread.trackTask("3");
     ASSERT_TRUE(TimerThread::isNoTimeoutHandle(handle3));
 
     // 2 tasks pending
-    ASSERT_EQ(2, countChars(thread.pendingToString(), REQUEST_START));
+    ASSERT_EQ(2ul, countChars(thread.pendingToString(), REQUEST_START));
     // 2 tasks retired
-    ASSERT_EQ(2, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(2ul, countChars(thread.retiredToString(), REQUEST_START));
 
     ASSERT_TRUE(thread.cancelTask(handle2));
 
     // 1 tasks pending
-    ASSERT_EQ(1, countChars(thread.pendingToString(), REQUEST_START));
+    ASSERT_EQ(1ul, countChars(thread.pendingToString(), REQUEST_START));
     // 3 tasks retired
-    ASSERT_EQ(3, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(3ul, countChars(thread.retiredToString(), REQUEST_START));
 
     ASSERT_TRUE(thread.cancelTask(handle3));
 
     // 0 tasks pending
-    ASSERT_EQ(0, countChars(thread.pendingToString(), REQUEST_START));
+    ASSERT_EQ(0ul, countChars(thread.pendingToString(), REQUEST_START));
     // 4 tasks retired
-    ASSERT_EQ(4, countChars(thread.retiredToString(), REQUEST_START));
+    ASSERT_EQ(4ul, countChars(thread.retiredToString(), REQUEST_START));
 }
 
 }  // namespace

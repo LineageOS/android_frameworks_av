@@ -22,7 +22,7 @@ namespace android {
 namespace camera3 {
 namespace SessionConfigurationUtils {
 
-bool isUltraHighResolutionSensor(const CameraMetadata &deviceInfo);
+bool supportsUltraHighResolutionCapture(const CameraMetadata &deviceInfo);
 
 int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution = false);
 

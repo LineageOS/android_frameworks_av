@@ -102,8 +102,12 @@ class Stats {
         return (*(mOutputTimer.end() - 1) - mStartTimeNs);
     }
 
-    void dumpStatistics(string operation, string inputReference, int64_t duarationUs,
-                        string codecName = "", string mode = "", string statsFile = "");
-};
+    void dumpStatistics(const string& operation, const string& inputReference,
+                        int64_t duarationUs, const string& componentName = "",
+                        const string& mode = "", const string& statsFile = "");
 
+    void uploadMetrics(const string& operation, const string& inputReference,
+                      const int64_t& durationUs, const string& componentName = "",
+                      const string& mode = "");
+};
 #endif  // __STATS_H__

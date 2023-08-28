@@ -151,6 +151,8 @@ class CameraDevice final : public RefBase {
 
     camera_status_t updateOutputConfigurationLocked(ACaptureSessionOutput *output);
 
+    camera_status_t prepareLocked(ACameraWindowType *window);
+
     camera_status_t allocateCaptureRequest(
             const ACaptureRequest* request, sp<CaptureRequest>& outReq);
 
@@ -222,7 +224,8 @@ class CameraDevice final : public RefBase {
         kWhatLogicalCaptureFail, // onLogicalCameraCaptureFailed
         kWhatCaptureSeqEnd,    // onCaptureSequenceCompleted
         kWhatCaptureSeqAbort,  // onCaptureSequenceAborted
-        kWhatCaptureBufferLost,// onCaptureBufferLost
+        kWhatCaptureBufferLost, // onCaptureBufferLost
+        kWhatPreparedCb, // onWindowPrepared
         // Internal cleanup
         kWhatCleanUpSessions   // Cleanup cached sp<ACameraCaptureSession>
     };

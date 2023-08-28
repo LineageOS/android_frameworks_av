@@ -318,7 +318,13 @@ int main(int argc, char **argv) {
     sp<SurfaceComposerClient> composerClient = new SurfaceComposerClient;
     CHECK_EQ(composerClient->initCheck(), (status_t)OK);
 
-    const sp<IBinder> display = SurfaceComposerClient::getInternalDisplayToken();
+    const std::vector<PhysicalDisplayId> ids = SurfaceComposerClient::getPhysicalDisplayIds();
+    if (ids.empty()) {
+        SLOGE("Failed to get ID for any displays\n");
+        return 1;
+    }
+
+    const sp<IBinder> display = SurfaceComposerClient::getPhysicalDisplayToken(ids.front());
     CHECK(display != nullptr);
 
     ui::DisplayMode mode;

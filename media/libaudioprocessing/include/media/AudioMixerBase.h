@@ -68,6 +68,10 @@ public:
         // 0x4004 reserved
         MIXER_FORMAT    = 0x4005, // AUDIO_FORMAT_PCM_(FLOAT|16_BIT)
         MIXER_CHANNEL_MASK = 0x4006, // Channel mask for mixer output
+        // 0x4007, 0x4008, 0x4009 is defined for haptic stuff in AudioMixer.h
+        TEE_BUFFER = 0x400A,
+        TEE_BUFFER_FORMAT = 0x400B,
+        TEE_BUFFER_FRAME_COUNT = 0x400C,
         // for target RESAMPLE
         SAMPLE_RATE     = 0x4100, // Configure sample rate conversion on this track name;
                                   // parameter 'value' is the new sample rate in Hz.
@@ -271,6 +275,7 @@ public:
         uint32_t    sampleRate;
         int32_t*    mainBuffer;
         int32_t*    auxBuffer;
+        int32_t*    teeBuffer;
 
         int32_t     sessionId;
 
@@ -289,6 +294,10 @@ public:
 
         audio_channel_mask_t mMixerChannelMask;
         uint32_t             mMixerChannelCount;
+
+        int32_t        mTeeBufferFrameCount;
+
+        uint32_t       mInputFrameSize; // The track input frame size, used for tee buffer
 
         // consider volume muted only if all channel volume (floating point) is 0.f
         inline bool isVolumeMuted() const {

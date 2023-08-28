@@ -53,7 +53,8 @@ public:
             camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
-            int streamSetId, bool isShared) override;
+            int streamSetId, bool isShared, int32_t colorSpace,
+            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) override;
     status_t deleteInternalStreams() override;
     status_t configureStream() override;
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
@@ -67,6 +68,9 @@ public:
     // Return stream information about the internal camera streams
     static status_t getCompositeStreamInfo(const OutputStreamInfo &streamInfo,
             const CameraMetadata& ch, std::vector<OutputStreamInfo>* compositeOutput /*out*/);
+
+    // Get composite stream stats
+    void getStreamStats(hardware::CameraStreamStats*) override {};
 
 protected:
 

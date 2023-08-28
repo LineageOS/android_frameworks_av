@@ -940,7 +940,7 @@ struct Codec2Client::Component::OutputBufferQueue :
 
 // Codec2Client
 Codec2Client::Codec2Client(sp<Base> const& base,
-                           sp<c2_hidl::IConfigurable> const& configurable,
+                           sp<IConfigurable> const& configurable,
                            size_t serviceIndex)
       : Configurable{configurable},
         mBase1_0{base},

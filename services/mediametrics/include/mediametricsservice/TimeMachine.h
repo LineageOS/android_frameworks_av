@@ -143,6 +143,7 @@ private:
             if (mPropertyMap.size() >= kKeyMaxProperties &&
                     !mPropertyMap.count(property)) {
                 ALOGV("%s: too many properties, rejecting %s", __func__, property.c_str());
+                mRejectedPropertiesCount++;
                 return;
             }
             auto& timeSequence = mPropertyMap[property];
@@ -171,6 +172,10 @@ private:
                     --ll;
                     ss << s;
                 }
+            }
+            if (ll > 0 && mRejectedPropertiesCount > 0) {
+                ss << "Rejected properties: " << mRejectedPropertiesCount << "\n";
+                ll--;
             }
             return { ss.str(), lines - ll };
         }
@@ -214,6 +219,7 @@ private:
         const uid_t mAllowUid;
         const int64_t mCreationTime;
 
+        unsigned int mRejectedPropertiesCount = 0;
         int64_t mLastModificationTime;
         std::map<std::string /* property */, PropertyHistory> mPropertyMap;
     };
@@ -221,7 +227,7 @@ private:
     using History = std::map<std::string /* key */, std::shared_ptr<KeyHistory>>;
 
     static inline constexpr size_t kTimeSequenceMaxElements = 50;
-    static inline constexpr size_t kKeyMaxProperties = 50;
+    static inline constexpr size_t kKeyMaxProperties = 128;
     static inline constexpr size_t kKeyLowWaterMark = 400;
     static inline constexpr size_t kKeyHighWaterMark = 500;
 

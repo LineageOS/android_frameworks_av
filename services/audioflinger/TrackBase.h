@@ -109,6 +109,8 @@ public:
 
     virtual bool        isSpatialized() const { return false; }
 
+    virtual bool        isBitPerfect() const { return false; }
+
 #ifdef TEE_SINK
            void         dumpTee(int fd, const std::string &reason) const {
                                 mTee.dump(fd, reason);

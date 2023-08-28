@@ -29,6 +29,10 @@
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 
+namespace ndk {
+class SpAIBinder;
+}
+
 namespace android {
 
 class StreamInHalInterface;
@@ -149,6 +153,10 @@ class DeviceHalInterface : public virtual RefBase
     virtual error::Result<audio_hw_sync_t> getHwAvSync() = 0;
 
     virtual status_t dump(int fd, const Vector<String16>& args) = 0;
+
+    // Returns the sound dose binder interface if it is supported by the HAL, nullptr otherwise
+    virtual status_t getSoundDoseInterface(const std::string& module,
+                                           ::ndk::SpAIBinder* soundDoseBinder) = 0;
 
     virtual status_t prepareToDisconnectExternalDevice(const struct audio_port_v7* port) = 0;
 

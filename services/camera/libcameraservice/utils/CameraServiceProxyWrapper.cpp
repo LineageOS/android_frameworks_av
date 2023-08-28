@@ -28,32 +28,41 @@
 
 namespace android {
 
-using hardware::ICameraServiceProxy;
+using hardware::CameraExtensionSessionStats;
 using hardware::CameraSessionStats;
+using hardware::ICameraServiceProxy;
 
-Mutex CameraServiceProxyWrapper::sProxyMutex;
-sp<hardware::ICameraServiceProxy> CameraServiceProxyWrapper::sCameraServiceProxy;
-
-Mutex CameraServiceProxyWrapper::mLock;
-std::map<std::string, std::shared_ptr<CameraServiceProxyWrapper::CameraSessionStatsWrapper>>
-        CameraServiceProxyWrapper::mSessionStatsMap;
+namespace {
+// Sentinel value to be returned when extension session with a stale or invalid key is reported.
+const std::string POISON_EXT_STATS_KEY("poisoned_stats");
+} // anonymous namespace
 
 /**
  * CameraSessionStatsWrapper functions
  */
 
-void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onOpen() {
-    Mutex::Autolock l(mLock);
-
-    updateProxyDeviceState(mSessionStats);
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::updateProxyDeviceState(
+        sp<hardware::ICameraServiceProxy>& proxyBinder) {
+    if (proxyBinder == nullptr) return;
+    proxyBinder->notifyCameraState(mSessionStats);
 }
 
-void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onClose(int32_t latencyMs) {
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onOpen(
+        sp<hardware::ICameraServiceProxy>& proxyBinder) {
+    Mutex::Autolock l(mLock);
+    updateProxyDeviceState(proxyBinder);
+}
+
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onClose(
+    sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs,
+    bool deviceError) {
     Mutex::Autolock l(mLock);
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_CLOSED;
     mSessionStats.mLatencyMs = latencyMs;
-    updateProxyDeviceState(mSessionStats);
+    mSessionStats.mDeviceError = deviceError;
+    mSessionStats.mSessionIndex = 0;
+    updateProxyDeviceState(proxyBinder);
 }
 
 void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onStreamConfigured(
@@ -68,12 +77,14 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onStreamConfigured(
     }
 }
 
-void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(float maxPreviewFps) {
+void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(
+    sp<hardware::ICameraServiceProxy>& proxyBinder, float maxPreviewFps) {
     Mutex::Autolock l(mLock);
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_ACTIVE;
     mSessionStats.mMaxPreviewFps = maxPreviewFps;
-    updateProxyDeviceState(mSessionStats);
+    mSessionStats.mSessionIndex++;
+    updateProxyDeviceState(proxyBinder);
 
     // Reset mCreationDuration to -1 to distinguish between 1st session
     // after configuration, and all other sessions after configuration.
@@ -81,6 +92,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(float maxPre
 }
 
 void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
+        sp<hardware::ICameraServiceProxy>& proxyBinder,
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::string& userTag, int32_t videoStabilizationMode,
         const std::vector<hardware::CameraStreamStats>& streamStats) {
@@ -93,10 +105,76 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
     mSessionStats.mUserTag = userTag;
     mSessionStats.mVideoStabilizationMode = videoStabilizationMode;
     mSessionStats.mStreamStats = streamStats;
-    updateProxyDeviceState(mSessionStats);
+
+    updateProxyDeviceState(proxyBinder);
 
     mSessionStats.mInternalReconfigure = 0;
     mSessionStats.mStreamStats.clear();
+    mSessionStats.mCameraExtensionSessionStats = {};
+}
+
+int64_t CameraServiceProxyWrapper::CameraSessionStatsWrapper::getLogId() {
+    Mutex::Autolock l(mLock);
+    return mSessionStats.mLogId;
+}
+
+std::string CameraServiceProxyWrapper::CameraSessionStatsWrapper::updateExtensionSessionStats(
+        const hardware::CameraExtensionSessionStats& extStats) {
+    Mutex::Autolock l(mLock);
+    CameraExtensionSessionStats& currStats = mSessionStats.mCameraExtensionSessionStats;
+    if (currStats.key != extStats.key) {
+        // Mismatched keys. Extensions stats likely reported for a closed session
+        ALOGW("%s: mismatched extensions stats key: current='%s' reported='%s'. Dropping stats.",
+              __FUNCTION__, toStdString(currStats.key).c_str(), toStdString(extStats.key).c_str());
+        return POISON_EXT_STATS_KEY; // return poisoned key to so future calls are
+                                     // definitely dropped.
+    }
+
+    // Matching keys...
+    if (currStats.key.size()) {
+        // non-empty matching keys. overwrite.
+        ALOGV("%s: Overwriting extension session stats: %s", __FUNCTION__,
+              extStats.toString().c_str());
+        currStats = extStats;
+        return toStdString(currStats.key);
+    }
+
+    // Matching empty keys...
+    if (mSessionStats.mClientName != toStdString(extStats.clientName)) {
+        ALOGW("%s: extension stats reported for unexpected package: current='%s' reported='%s'. "
+              "Dropping stats.", __FUNCTION__,
+              mSessionStats.mClientName.c_str(),
+              toStdString(extStats.clientName).c_str());
+        return POISON_EXT_STATS_KEY;
+    }
+
+    // Matching empty keys for the current client...
+    if (mSessionStats.mNewCameraState == CameraSessionStats::CAMERA_STATE_OPEN ||
+        mSessionStats.mNewCameraState == CameraSessionStats::CAMERA_STATE_IDLE) {
+        // Camera is open, but not active. It is possible that the active callback hasn't
+        // occurred yet. Keep the stats, but don't associate it with any session.
+        ALOGV("%s: extension stat reported for an open, but not active camera. "
+              "Saving stats, but not generating key.", __FUNCTION__);
+        currStats = extStats;
+        return {}; // Subsequent calls will handle setting the correct key.
+    }
+
+    if (mSessionStats.mNewCameraState == CameraSessionStats::CAMERA_STATE_ACTIVE) {
+        // camera is active. First call for the session!
+        currStats = extStats;
+
+        // Generate a new key from logId and sessionIndex.
+        std::ostringstream key;
+        key << mSessionStats.mSessionIndex << '/' << mSessionStats.mLogId;
+        currStats.key = String16(key.str().c_str());
+        ALOGV("%s: New extension session stats: %s", __FUNCTION__, currStats.toString().c_str());
+        return toStdString(currStats.key);
+    }
+
+    // Camera is closed. Probably a stale call.
+    ALOGW("%s: extension stats reported for closed camera id '%s'. Dropping stats.",
+          __FUNCTION__, mSessionStats.mCameraId.c_str());
+    return {};
 }
 
 /**
@@ -105,19 +183,26 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
 
 sp<ICameraServiceProxy> CameraServiceProxyWrapper::getCameraServiceProxy() {
 #ifndef __BRILLO__
-    Mutex::Autolock al(sProxyMutex);
-    if (sCameraServiceProxy == nullptr) {
-        sp<IServiceManager> sm = defaultServiceManager();
-        // Use checkService because cameraserver normally starts before the
-        // system server and the proxy service. So the long timeout that getService
-        // has before giving up is inappropriate.
-        sp<IBinder> binder = sm->checkService(String16("media.camera.proxy"));
-        if (binder != nullptr) {
-            sCameraServiceProxy = interface_cast<ICameraServiceProxy>(binder);
-        }
+    Mutex::Autolock al(mProxyMutex);
+    if (mCameraServiceProxy == nullptr) {
+        mCameraServiceProxy = getDefaultCameraServiceProxy();
     }
 #endif
-    return sCameraServiceProxy;
+    return mCameraServiceProxy;
+}
+
+sp<hardware::ICameraServiceProxy> CameraServiceProxyWrapper::getDefaultCameraServiceProxy() {
+#ifndef __BRILLO__
+    sp<IServiceManager> sm = defaultServiceManager();
+    // Use checkService because cameraserver normally starts before the
+    // system server and the proxy service. So the long timeout that getService
+    // has before giving up is inappropriate.
+    sp<IBinder> binder = sm->checkService(String16("media.camera.proxy"));
+    if (binder != nullptr) {
+        return interface_cast<ICameraServiceProxy>(binder);
+    }
+#endif
+    return nullptr;
 }
 
 void CameraServiceProxyWrapper::pingCameraServiceProxy() {
@@ -141,10 +226,19 @@ int CameraServiceProxyWrapper::getRotateAndCropOverride(const std::string &packa
     return ret;
 }
 
-void CameraServiceProxyWrapper::updateProxyDeviceState(const CameraSessionStats& sessionStats) {
+int CameraServiceProxyWrapper::getAutoframingOverride(const std::string& packageName) {
     sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
-    if (proxyBinder == nullptr) return;
-    proxyBinder->notifyCameraState(sessionStats);
+    if (proxyBinder == nullptr) {
+        return ANDROID_CONTROL_AUTOFRAMING_OFF;
+    }
+    int ret = 0;
+    auto status = proxyBinder->getAutoframingOverride(packageName, &ret);
+    if (!status.isOk()) {
+        ALOGE("%s: Failed during autoframing override query: %s", __FUNCTION__,
+                status.exceptionMessage().c_str());
+    }
+
+    return ret;
 }
 
 void CameraServiceProxyWrapper::logStreamConfigured(const std::string& id,
@@ -152,12 +246,12 @@ void CameraServiceProxyWrapper::logStreamConfigured(const std::string& id,
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
-        sessionStats = mSessionStatsMap[id];
-        if (sessionStats == nullptr) {
+        if (mSessionStatsMap.count(id) == 0) {
             ALOGE("%s: SessionStatsMap should contain camera %s",
                     __FUNCTION__, id.c_str());
             return;
         }
+        sessionStats = mSessionStatsMap[id];
     }
 
     ALOGV("%s: id %s, operatingMode %d, internalConfig %d, latencyMs %d",
@@ -169,16 +263,17 @@ void CameraServiceProxyWrapper::logActive(const std::string& id, float maxPrevie
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
-        sessionStats = mSessionStatsMap[id];
-        if (sessionStats == nullptr) {
+        if (mSessionStatsMap.count(id) == 0) {
             ALOGE("%s: SessionStatsMap should contain camera %s when logActive is called",
                     __FUNCTION__, id.c_str());
             return;
         }
+        sessionStats = mSessionStatsMap[id];
     }
 
     ALOGV("%s: id %s", __FUNCTION__, id.c_str());
-    sessionStats->onActive(maxPreviewFps);
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onActive(proxyBinder, maxPreviewFps);
 }
 
 void CameraServiceProxyWrapper::logIdle(const std::string& id,
@@ -188,13 +283,12 @@ void CameraServiceProxyWrapper::logIdle(const std::string& id,
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
-        sessionStats = mSessionStatsMap[id];
-    }
-
-    if (sessionStats == nullptr) {
-        ALOGE("%s: SessionStatsMap should contain camera %s when logIdle is called",
+        if (mSessionStatsMap.count(id) == 0) {
+            ALOGE("%s: SessionStatsMap should contain camera %s when logIdle is called",
                 __FUNCTION__, id.c_str());
-        return;
+            return;
+        }
+        sessionStats = mSessionStatsMap[id];
     }
 
     ALOGV("%s: id %s, requestCount %" PRId64 ", resultErrorCount %" PRId64 ", deviceError %d"
@@ -208,7 +302,8 @@ void CameraServiceProxyWrapper::logIdle(const std::string& id,
                 streamStats[i].mStartLatencyMs);
     }
 
-    sessionStats->onIdle(requestCount, resultErrorCount, deviceError, userTag,
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onIdle(proxyBinder, requestCount, resultErrorCount, deviceError, userTag,
             videoStabilizationMode, streamStats);
 }
 
@@ -229,19 +324,24 @@ void CameraServiceProxyWrapper::logOpen(const std::string& id, int facing,
             apiLevel = CameraSessionStats::CAMERA_API_LEVEL_2;
         }
 
-        sessionStats = std::make_shared<CameraSessionStatsWrapper>(id, facing,
-                CameraSessionStats::CAMERA_STATE_OPEN, clientPackageName,
-                apiLevel, isNdk, latencyMs);
+        // Generate a new log ID for open events
+        int64_t logId = generateLogId(mRandomDevice);
+
+        sessionStats = std::make_shared<CameraSessionStatsWrapper>(
+                id, facing, CameraSessionStats::CAMERA_STATE_OPEN, clientPackageName,
+                apiLevel, isNdk, latencyMs, logId);
         mSessionStatsMap.emplace(id, sessionStats);
         ALOGV("%s: Adding id %s", __FUNCTION__, id.c_str());
     }
 
     ALOGV("%s: id %s, facing %d, effectiveApiLevel %d, isNdk %d, latencyMs %d",
             __FUNCTION__, id.c_str(), facing, effectiveApiLevel, isNdk, latencyMs);
-    sessionStats->onOpen();
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onOpen(proxyBinder);
 }
 
-void CameraServiceProxyWrapper::logClose(const std::string& id, int32_t latencyMs) {
+void CameraServiceProxyWrapper::logClose(const std::string& id, int32_t latencyMs,
+        bool deviceError) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
@@ -257,12 +357,15 @@ void CameraServiceProxyWrapper::logClose(const std::string& id, int32_t latencyM
                     __FUNCTION__, id.c_str());
             return;
         }
+
         mSessionStatsMap.erase(id);
-        ALOGV("%s: Erasing id %s", __FUNCTION__, id.c_str());
+        ALOGV("%s: Erasing id %s, deviceError %d", __FUNCTION__, id.c_str(), deviceError);
     }
 
-    ALOGV("%s: id %s, latencyMs %d", __FUNCTION__, id.c_str(), latencyMs);
-    sessionStats->onClose(latencyMs);
+    ALOGV("%s: id %s, latencyMs %d, deviceError %d", __FUNCTION__,
+            id.c_str(), latencyMs, deviceError);
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    sessionStats->onClose(proxyBinder, latencyMs, deviceError);
 }
 
 bool CameraServiceProxyWrapper::isCameraDisabled(int userId) {
@@ -277,4 +380,48 @@ bool CameraServiceProxyWrapper::isCameraDisabled(int userId) {
     return ret;
 }
 
-}; // namespace android
+int64_t CameraServiceProxyWrapper::getCurrentLogIdForCamera(const std::string& cameraId) {
+    std::shared_ptr<CameraSessionStatsWrapper> stats;
+    {
+        Mutex::Autolock _l(mLock);
+        if (mSessionStatsMap.count(cameraId) == 0) {
+            ALOGE("%s: SessionStatsMap should contain camera %s before asking for its logging ID.",
+                  __FUNCTION__, cameraId.c_str());
+            return 0;
+        }
+
+        stats = mSessionStatsMap[cameraId];
+    }
+    return stats->getLogId();
+}
+
+int64_t CameraServiceProxyWrapper::generateLogId(std::random_device& randomDevice) {
+    int64_t ret = 0;
+    do {
+        // std::random_device generates 32 bits per call, so we call it twice
+        ret = randomDevice();
+        ret = ret << 32;
+        ret = ret | randomDevice();
+    } while (ret == 0); // 0 is not a valid identifier
+
+    return ret;
+}
+
+std::string CameraServiceProxyWrapper::updateExtensionStats(
+        const hardware::CameraExtensionSessionStats& extStats) {
+    std::shared_ptr<CameraSessionStatsWrapper> stats;
+    std::string cameraId = toStdString(extStats.cameraId);
+    {
+        Mutex::Autolock _l(mLock);
+        if (mSessionStatsMap.count(cameraId) == 0) {
+            ALOGE("%s CameraExtensionSessionStats reported for camera id that isn't open: %s",
+                  __FUNCTION__, cameraId.c_str());
+            return {};
+        }
+
+        stats = mSessionStatsMap[cameraId];
+        return stats->updateExtensionSessionStats(extStats);
+    }
+}
+
+}  // namespace android

@@ -72,6 +72,8 @@ private:
     bool mHasVideo;
     size_t mSequenceLength;
 
+    Mutex mRetrieverLock;
+
     // Slice decoding only
     Mutex mLock;
     Condition mScanlineReady;

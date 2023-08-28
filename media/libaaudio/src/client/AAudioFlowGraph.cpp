@@ -20,7 +20,7 @@
 
 #include "AAudioFlowGraph.h"
 
-#include <flowgraph/ClipToRange.h>
+#include <flowgraph/Limiter.h>
 #include <flowgraph/ManyToMultiConverter.h>
 #include <flowgraph/MonoBlend.h>
 #include <flowgraph/MonoToMultiConverter.h>
@@ -78,11 +78,11 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
     }
 
     // For a pure float graph, there is chance that the data range may be very large.
-    // So we should clip to a reasonable value that allows a little headroom.
+    // So we should limit to a reasonable value that allows a little headroom.
     if (sourceFormat == AUDIO_FORMAT_PCM_FLOAT && sinkFormat == AUDIO_FORMAT_PCM_FLOAT) {
-        mClipper = std::make_unique<ClipToRange>(sourceChannelCount);
-        lastOutput->connect(&mClipper->input);
-        lastOutput = &mClipper->output;
+        mLimiter = std::make_unique<Limiter>(sourceChannelCount);
+        lastOutput->connect(&mLimiter->input);
+        lastOutput = &mLimiter->output;
     }
 
     // Expand the number of channels if required.

@@ -37,13 +37,14 @@ cc_binary {
         "libui",
         "libgui",
         "libbinder",
+        "libbinder_ndk",
         "libhidlbase",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.provider@2.4",
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.provider-V1-ndk",
+        "android.hardware.camera.provider-V2-ndk",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.4",
@@ -59,6 +60,6 @@ cc_binary {
     init_rc: ["cameraserver.rc"],
 
     vintf_fragments: [
-        "manifest_android.frameworks.cameraservice.service@2.2.xml",
+        "manifest_android.frameworks.cameraservice.service.xml",
     ],
 }
