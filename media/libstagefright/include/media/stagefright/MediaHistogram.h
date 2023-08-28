@@ -29,11 +29,11 @@ class MediaHistogram {
 public:
     MediaHistogram();
     void clear();
-    bool setup(int bucketCount, T width, T floor = 0);
+    bool setup(size_t bucketCount, T width, T floor = 0);
     bool setup(const std::vector<T> &bucketLimits);
     void insert(T sample);
-    size_t size();
-    int64_t operator[](int);
+    size_t size() const;
+    int64_t operator[](int) const;
     T getMin() const { return mMin; }
     T getMax() const { return mMax; }
     T getCount() const { return mCount; }
@@ -45,7 +45,7 @@ public:
 private:
     MediaHistogram(const MediaHistogram &); // disallow
 
-    bool allocate(int bucketCount, bool withBucketLimits);
+    void allocate(size_t bucketCount, bool withBucketLimits);
 
     T mFloor, mCeiling, mWidth;
     T mMin, mMax, mSum;
@@ -73,13 +73,12 @@ void MediaHistogram<T>::clear() {
 }
 
 template<typename T>
-bool MediaHistogram<T>::setup(int bucketCount, T width, T floor) {
+bool MediaHistogram<T>::setup(size_t bucketCount, T width, T floor) {
     if (bucketCount <= 0 || width <= 0) {
         return false;
     }
-    if (!allocate(bucketCount, false)) {
-        return false;
-    }
+    allocate(bucketCount, false);
+
     mWidth = width;
     mFloor = floor;
     mCeiling = floor + bucketCount * width;
@@ -92,14 +91,14 @@ bool MediaHistogram<T>::setup(const std::vector<T> &bucketLimits) {
     if (bucketLimits.size() <= 1) {
         return false;
     }
-    int bucketCount = bucketLimits.size() - 1;
-    if (!allocate(bucketCount, true)) {
-        return false;
-    }
+    // The floor is the first bucket limit value, so offset by 1
+    size_t bucketCount = bucketLimits.size() - 1;
+    allocate(bucketCount, true);
 
     mWidth = -1;
     mFloor = bucketLimits[0];
-    for (int i = 0; i < bucketCount; ++i) {
+    for (size_t i = 0; i < bucketCount; ++i) {
+        // The floor is the first bucket, so offset by 1
         mBucketLimits[i] = bucketLimits[i + 1];
     }
     mCeiling = bucketLimits[bucketCount];
@@ -108,7 +107,7 @@ bool MediaHistogram<T>::setup(const std::vector<T> &bucketLimits) {
 }
 
 template<typename T>
-bool MediaHistogram<T>::allocate(int bucketCount, bool withBucketLimits) {
+void MediaHistogram<T>::allocate(size_t bucketCount, bool withBucketLimits) {
     assert(bucketCount > 0);
     if (bucketCount != mBuckets.size()) {
         mBuckets = std::vector<T>(bucketCount, 0);
@@ -116,7 +115,6 @@ bool MediaHistogram<T>::allocate(int bucketCount, bool withBucketLimits) {
     if (withBucketLimits && mBucketLimits.size() != bucketCount) {
         mBucketLimits = std::vector<T>(bucketCount, 0);
     }
-    return true;
 }
 
 template<typename T>
@@ -128,8 +126,8 @@ void MediaHistogram<T>::insert(T sample) {
 
     mCount++;
     mSum += sample;
-    if (mMin > sample) mMin = sample;
-    if (mMax < sample) mMax = sample;
+    mMin = std::min(mMin, sample);
+    mMax = std::max(mMax, sample);
 
     if (sample < mFloor) {
         mBelow++;
@@ -138,7 +136,7 @@ void MediaHistogram<T>::insert(T sample) {
     } else if (mWidth == -1) {
         // A binary search might be more efficient for large number of buckets, but it is expected
         // that there will never be a large amount of buckets, so keep the code simple.
-        for (int slot = 0; slot < mBucketLimits.size(); ++slot) {
+        for (size_t slot = 0; slot < mBucketLimits.size(); ++slot) {
             if (sample < mBucketLimits[slot]) {
                 mBuckets[slot]++;
                 break;
@@ -153,12 +151,12 @@ void MediaHistogram<T>::insert(T sample) {
 }
 
 template<typename T>
-size_t MediaHistogram<T>::size() {
+size_t MediaHistogram<T>::size() const {
     return mBuckets.size() + 1;
 }
 
 template<typename T>
-int64_t MediaHistogram<T>::operator[](int i) {
+int64_t MediaHistogram<T>::operator[](int i) const {
     assert(i >= 0);
     assert(i <= mBuckets.size());
     if (i == mBuckets.size()) {
@@ -179,7 +177,7 @@ std::string MediaHistogram<T>::emit() const {
     } else {
         ss << mFloor << "," << mWidth << "," << mBelow << "{";
     }
-    for (int i = 0; i < mBuckets.size(); i++) {
+    for (size_t i = 0; i < mBuckets.size(); i++) {
         if (i != 0) {
             ss << ",";
         }
@@ -194,12 +192,12 @@ std::string MediaHistogram<T>::emitBuckets() const {
     std::stringstream ss("");
     if (mWidth == -1) {
         ss << mFloor;
-        for (int i = 0; i < mBucketLimits.size(); ++i) {
+        for (size_t i = 0; i < mBucketLimits.size(); ++i) {
             ss << ',' << mBucketLimits[i];
         }
     } else {
         ss << mFloor;
-        for (int i = 1; i <= mBuckets.size(); ++i) {
+        for (size_t i = 1; i <= mBuckets.size(); ++i) {
             ss << ',' << (mFloor + i * mWidth);
         }
     }
