@@ -50,7 +50,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
         size_t channelCount, audio_format_t format) {
     std::lock_guard _l(mLock);
 
-    if (mHalSoundDose != nullptr && mEnabledCsd) {
+    if (mHalSoundDose.size() > 0 && mEnabledCsd) {
         ALOGD("%s: using HAL MEL computation, no MelProcessor needed.", __func__);
         return nullptr;
     }
@@ -83,19 +83,27 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
     return melProcessor;
 }
 
-bool SoundDoseManager::setHalSoundDoseInterface(const std::shared_ptr<ISoundDose>& halSoundDose) {
+bool SoundDoseManager::setHalSoundDoseInterface(const std::string &module,
+                                                const std::shared_ptr<ISoundDose> &halSoundDose) {
     ALOGV("%s", __func__);
 
+    if (halSoundDose == nullptr) {
+        ALOGI("%s: passed ISoundDose object is null", __func__);
+        return false;
+    }
+
+    std::shared_ptr<HalSoundDoseCallback> halSoundDoseCallback;
     {
         std::lock_guard _l(mLock);
 
-        mHalSoundDose = halSoundDose;
-        if (halSoundDose == nullptr) {
-            ALOGI("%s: passed ISoundDose object is null, switching to internal CSD", __func__);
+        if (mHalSoundDose.find(module) != mHalSoundDose.end()) {
+            ALOGW("%s: Module %s already has a sound dose HAL assigned, skipping", __func__,
+                  module.c_str());
             return false;
         }
+        mHalSoundDose[module] = halSoundDose;
 
-        if (!mHalSoundDose->setOutputRs2UpperBound(mRs2UpperBound).isOk()) {
+        if (!halSoundDose->setOutputRs2UpperBound(mRs2UpperBound).isOk()) {
             ALOGW("%s: Cannot set RS2 value for momentary exposure %f",
                   __func__,
                   mRs2UpperBound);
@@ -119,16 +127,26 @@ bool SoundDoseManager::setHalSoundDoseInterface(const std::shared_ptr<ISoundDose
     return true;
 }
 
+void SoundDoseManager::resetHalSoundDoseInterfaces() {
+    ALOGV("%s", __func__);
+
+    const std::lock_guard _l(mLock);
+    mHalSoundDose.clear();
+}
+
 void SoundDoseManager::setOutputRs2UpperBound(float rs2Value) {
     ALOGV("%s", __func__);
     std::lock_guard _l(mLock);
 
-    if (mHalSoundDose != nullptr) {
-        // using the HAL sound dose interface
-        if (!mHalSoundDose->setOutputRs2UpperBound(rs2Value).isOk()) {
-            ALOGE("%s: Cannot set RS2 value for momentary exposure %f", __func__, rs2Value);
-            return;
+    if (mHalSoundDose.size() > 0) {
+        for (auto& halSoundDose : mHalSoundDose) {
+            // using the HAL sound dose interface
+            if (!halSoundDose.second->setOutputRs2UpperBound(rs2Value).isOk()) {
+                ALOGE("%s: Cannot set RS2 value for momentary exposure %f", __func__, rs2Value);
+                continue;
+            }
         }
+
         mRs2UpperBound = rs2Value;
         return;
     }
@@ -200,14 +218,16 @@ void SoundDoseManager::clearMapDeviceIdEntries(audio_port_handle_t deviceId) {
 
 ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWarning(
         float in_currentDbA, const AudioDevice& in_audioDevice) {
-    auto soundDoseManager = mSoundDoseManager.promote();
-    if (soundDoseManager == nullptr) {
-        return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
+    sp<SoundDoseManager> soundDoseManager;
+    {
+        const std::lock_guard _l(mCbLock);
+        soundDoseManager = mSoundDoseManager.promote();
+        if (soundDoseManager == nullptr) {
+            return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
+        }
     }
 
-    std::shared_ptr<ISoundDose> halSoundDose;
-    soundDoseManager->getHalSoundDose(&halSoundDose);
-    if(halSoundDose == nullptr) {
+    if (!soundDoseManager->useHalSoundDose()) {
         ALOGW("%s: HAL sound dose interface deactivated. Ignoring", __func__);
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
     }
@@ -227,14 +247,16 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWa
 ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onNewMelValues(
         const ISoundDose::IHalSoundDoseCallback::MelRecord& in_melRecord,
         const AudioDevice& in_audioDevice) {
-    auto soundDoseManager = mSoundDoseManager.promote();
-    if (soundDoseManager == nullptr) {
-        return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
+    sp<SoundDoseManager> soundDoseManager;
+    {
+        const std::lock_guard _l(mCbLock);
+        soundDoseManager = mSoundDoseManager.promote();
+        if (soundDoseManager == nullptr) {
+            return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
+        }
     }
 
-    std::shared_ptr<ISoundDose> halSoundDose;
-    soundDoseManager->getHalSoundDose(&halSoundDose);
-    if(halSoundDose == nullptr) {
+    if (!soundDoseManager->useHalSoundDose()) {
         ALOGW("%s: HAL sound dose interface deactivated. Ignoring", __func__);
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_STATE);
     }
@@ -508,7 +530,7 @@ bool SoundDoseManager::shouldComputeCsdForDeviceWithAddress(const audio_devices_
 
 void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
     // invalidate any HAL sound dose interface used
-    setHalSoundDoseInterface(nullptr);
+    resetHalSoundDoseInterfaces();
 
     std::lock_guard _l(mLock);
     mUseFrameworkMel = useFrameworkMel;
@@ -534,17 +556,12 @@ bool SoundDoseManager::isSoundDoseHalSupported() const {
         return false;
     }
 
-    std::shared_ptr<ISoundDose> halSoundDose;
-    getHalSoundDose(&halSoundDose);
-    if (mHalSoundDose == nullptr) {
-        return false;
-    }
-    return true;
+    return useHalSoundDose();
 }
 
-void SoundDoseManager::getHalSoundDose(std::shared_ptr<ISoundDose>* halSoundDose) const {
-    std::lock_guard _l(mLock);
-    *halSoundDose = mHalSoundDose;
+bool SoundDoseManager::useHalSoundDose() const {
+    const std::lock_guard _l(mLock);
+    return mHalSoundDose.size() > 0;
 }
 
 void SoundDoseManager::resetSoundDose() {
