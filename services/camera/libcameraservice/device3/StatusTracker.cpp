@@ -172,6 +172,7 @@ bool StatusTracker::threadLoop() {
         }
     }
 
+    bool waitForIdleFence = false;
     // After new pending states appear, or timeout, check if we're idle.  Even
     // with timeout, need to check to account for fences that may still be
     // clearing out
@@ -196,6 +197,7 @@ bool StatusTracker::threadLoop() {
             ssize_t idx = mStates.indexOfKey(newState.id);
             // Ignore notices for unknown components
             if (idx >= 0) {
+                bool validFence = newState.fence != Fence::NO_FENCE;
                 // Update single component state
                 mStates.replaceValueAt(idx, newState.state);
                 mIdleFence = Fence::merge(String8("idleFence"),
@@ -204,6 +206,8 @@ bool StatusTracker::threadLoop() {
                 ComponentState newState = getDeviceStateLocked();
                 if (newState != prevState) {
                     mStateTransitions.add(newState);
+                } else if (validFence && !waitForIdleFence) {
+                    waitForIdleFence = true;
                 }
                 prevState = newState;
             }
@@ -226,6 +230,13 @@ bool StatusTracker::threadLoop() {
         }
     }
     mStateTransitions.clear();
+
+    if (waitForIdleFence) {
+        auto ret = mIdleFence->wait(kWaitDuration);
+        if (ret == NO_ERROR) {
+            mComponentsChanged = true;
+        }
+    }
 
     return true;
 }
