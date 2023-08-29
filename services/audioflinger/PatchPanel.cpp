@@ -344,9 +344,9 @@ status_t PatchPanel::createAudioPatch(const struct audio_patch* patch,
                             goto exit;
                         }
                     }
-                    mAfPatchPanelCallback->unlock();
+                    mAfPatchPanelCallback->mutex().unlock();
                     status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
-                    mAfPatchPanelCallback->lock();
+                    mAfPatchPanelCallback->mutex().lock();
                     if (status == NO_ERROR) {
                         newPatch.setThread(thread);
                     }
@@ -412,9 +412,9 @@ status_t PatchPanel::createAudioPatch(const struct audio_patch* patch,
                 mAfPatchPanelCallback->updateOutDevicesForRecordThreads_l(devices);
             }
 
-            mAfPatchPanelCallback->unlock();
+            mAfPatchPanelCallback->mutex().unlock();
             status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
-            mAfPatchPanelCallback->lock();
+            mAfPatchPanelCallback->mutex().lock();
             if (status == NO_ERROR) {
                 newPatch.setThread(thread);
             }
@@ -768,9 +768,9 @@ status_t PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
                         break;
                     }
                 }
-                mAfPatchPanelCallback->unlock();
+                mAfPatchPanelCallback->mutex().unlock();
                 status = thread->sendReleaseAudioPatchConfigEvent(removedPatch.mHalHandle);
-                mAfPatchPanelCallback->lock();
+                mAfPatchPanelCallback->mutex().lock();
             } else {
                 status = hwDevice->releaseAudioPatch(removedPatch.mHalHandle);
             }
@@ -791,9 +791,9 @@ status_t PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
                     break;
                 }
             }
-            mAfPatchPanelCallback->unlock();
+            mAfPatchPanelCallback->mutex().unlock();
             status = thread->sendReleaseAudioPatchConfigEvent(removedPatch.mHalHandle);
-            mAfPatchPanelCallback->lock();
+            mAfPatchPanelCallback->mutex().lock();
         } break;
         default:
             status = BAD_VALUE;
