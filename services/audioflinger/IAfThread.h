@@ -19,6 +19,7 @@
 #include <android/media/IAudioTrackCallback.h>
 #include <android/media/IEffectClient.h>
 #include <audiomanager/IAudioManager.h>
+#include <audio_utils/mutex.h>
 #include <audio_utils/MelProcessor.h>
 #include <binder/MemoryDealer.h>
 #include <datapath/AudioStreamIn.h>
@@ -67,7 +68,7 @@ struct stream_type_t {
 // and hence may be used by the Effect / Track framework.
 class IAfThreadCallback : public virtual RefBase {
 public:
-    virtual Mutex& mutex() const = 0;
+    virtual audio_utils::mutex& mutex() const = 0;
     virtual bool isNonOffloadableGlobalEffectEnabled_l() const = 0;  // Tracks
     virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
     virtual bool btNrecIsOff() const = 0;
