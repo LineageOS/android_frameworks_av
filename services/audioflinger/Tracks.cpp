@@ -2349,13 +2349,13 @@ void OutputTrack::queueBuffer(Buffer& inBuffer) {
 
 void OutputTrack::copyMetadataTo(MetadataInserter& backInserter) const
 {
-    std::lock_guard<std::mutex> lock(mTrackMetadatasMutex);
+    audio_utils::lock_guard lock(mTrackMetadatasMutex);
     backInserter = std::copy(mTrackMetadatas.begin(), mTrackMetadatas.end(), backInserter);
 }
 
 void OutputTrack::setMetadatas(const SourceMetadatas& metadatas) {
     {
-        std::lock_guard<std::mutex> lock(mTrackMetadatasMutex);
+        audio_utils::lock_guard lock(mTrackMetadatasMutex);
         mTrackMetadatas = metadatas;
     }
     // No need to adjust metadata track volumes as OutputTrack volumes are always 0dBFS.
@@ -3303,7 +3303,7 @@ status_t PassthruPatchRecord::obtainBuffer(
     }
 
     {
-        std::lock_guard<std::mutex> lock(mReadLock);
+        audio_utils::lock_guard lock(readMutex());
         mReadBytes += bytesRead;
         mReadError = NO_ERROR;
     }
@@ -3330,7 +3330,7 @@ status_t PassthruPatchRecord::obtainBuffer(
 stream_error:
     stream->standby();
     {
-        std::lock_guard<std::mutex> lock(mReadLock);
+        audio_utils::lock_guard lock(readMutex());
         mReadError = result;
     }
     mReadCV.notify_one();
@@ -3359,7 +3359,7 @@ status_t PassthruPatchRecord::read(
 {
     bytes = std::min(bytes, mFrameCount * mFrameSize);
     {
-        std::unique_lock<std::mutex> lock(mReadLock);
+        audio_utils::unique_lock lock(readMutex());
         mReadCV.wait(lock, [&]{ return mReadError != NO_ERROR || mReadBytes != 0; });
         if (mReadError != NO_ERROR) {
             mLastReadFrames = 0;

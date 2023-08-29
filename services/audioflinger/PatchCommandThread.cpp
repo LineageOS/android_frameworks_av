@@ -29,7 +29,7 @@ constexpr char kPatchCommandThreadName[] = "AudioFlinger_PatchCommandThread";
 PatchCommandThread::~PatchCommandThread() {
     exit();
 
-    std::lock_guard _l(mLock);
+    audio_utils::lock_guard _l(mutex());
     mCommands.clear();
 }
 
@@ -39,7 +39,7 @@ void PatchCommandThread::onFirstRef() {
 
 void PatchCommandThread::addListener(const sp<PatchCommandListener>& listener) {
     ALOGV("%s add listener %p", __func__, static_cast<void*>(listener.get()));
-    std::lock_guard _l(mListenerLock);
+    audio_utils::lock_guard _l(listenerMutex());
     mListeners.emplace_back(listener);
 }
 
@@ -69,9 +69,8 @@ void PatchCommandThread::updateAudioPatch(audio_patch_handle_t oldHandle,
 }
 
 bool PatchCommandThread::threadLoop()
-NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
 {
-    std::unique_lock _l(mLock);
+    audio_utils::unique_lock _l(mutex());
 
     while (!exitPending()) {
         while (!mCommands.empty() && !exitPending()) {
@@ -81,7 +80,7 @@ NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
 
             std::vector<wp<PatchCommandListener>> listenersCopy;
             {
-                std::lock_guard _ll(mListenerLock);
+                audio_utils::lock_guard _ll(listenerMutex());
                 listenersCopy = mListeners;
             }
 
@@ -147,7 +146,7 @@ NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
 }
 
 void PatchCommandThread::sendCommand(const sp<Command>& command) {
-    std::lock_guard _l(mLock);
+    audio_utils::lock_guard _l(mutex());
     mCommands.emplace_back(command);
     mWaitWorkCV.notify_one();
 }
@@ -183,7 +182,7 @@ void PatchCommandThread::updateAudioPatchCommand(
 void PatchCommandThread::exit() {
     ALOGV("%s", __func__);
     {
-        std::lock_guard _l(mLock);
+        audio_utils::lock_guard _l(mutex());
         requestExit();
         mWaitWorkCV.notify_one();
     }
