@@ -38,24 +38,21 @@ bool AudioFlinger::MelReporter::activateHalSoundDoseComputation(const std::strin
 
     ndk::SpAIBinder soundDoseBinder;
     if (device->getSoundDoseInterface(module, &soundDoseBinder) != OK) {
-        ALOGW("%s: HAL cannot provide sound dose interface for module %s, use internal MEL",
+        ALOGW("%s: HAL cannot provide sound dose interface for module %s",
               __func__, module.c_str());
-        activateInternalSoundDoseComputation();
         return false;
     }
 
     if (soundDoseBinder == nullptr) {
-         ALOGW("%s: HAL doesn't implement a sound dose interface for module %s, use internal MEL",
+         ALOGW("%s: HAL doesn't implement a sound dose interface for module %s",
               __func__, module.c_str());
-        activateInternalSoundDoseComputation();
         return false;
     }
 
     std::shared_ptr<ISoundDose> soundDoseInterface = ISoundDose::fromBinder(soundDoseBinder);
 
-    if (!mSoundDoseManager->setHalSoundDoseInterface(soundDoseInterface)) {
+    if (!mSoundDoseManager->setHalSoundDoseInterface(module, soundDoseInterface)) {
         ALOGW("%s: cannot activate HAL MEL reporting for module %s", __func__, module.c_str());
-        activateInternalSoundDoseComputation();
         return false;
     }
 
@@ -73,7 +70,8 @@ void AudioFlinger::MelReporter::activateInternalSoundDoseComputation() {
         mUseHalSoundDoseInterface = false;
     }
 
-    mSoundDoseManager->setHalSoundDoseInterface(nullptr);
+    // reset the HAL interfaces and use internal MELs
+    mSoundDoseManager->resetHalSoundDoseInterfaces();
 }
 
 void AudioFlinger::MelReporter::onFirstRef() {
@@ -251,6 +249,9 @@ sp<media::ISoundDose> AudioFlinger::MelReporter::getSoundDoseInterface(
 void AudioFlinger::MelReporter::stopInternalMelComputation() {
     ALOGV("%s", __func__);
     std::lock_guard _l(mLock);
+    if (mUseHalSoundDoseInterface) {
+        return;
+    }
     mActiveMelPatches.clear();
     mUseHalSoundDoseInterface = true;
 }
