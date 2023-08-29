@@ -82,8 +82,7 @@ public:
             audio_devices_t deviceType,
             const String8& address,
             audio_output_flags_t flags) = 0;
-    virtual void lock() const = 0;
-    virtual void unlock() const = 0;
+    virtual audio_utils::mutex& mutex() const = 0;
     virtual const DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*>&
             getAudioHwDevs_l() const = 0;
     virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
