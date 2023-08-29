@@ -20,6 +20,7 @@
 #include "TrackBase.h"
 
 #include <android/os/BnExternalVibrationController.h>
+#include <audio_utils/mutex.h>
 #include <audio_utils/LinearMap.h>
 #include <binder/AppOpsManager.h>
 
@@ -467,7 +468,7 @@ private:
      */
     SourceMetadatas mTrackMetadatas;
     /** Protects mTrackMetadatas against concurrent access. */
-    mutable std::mutex mTrackMetadatasMutex;
+    mutable audio_utils::mutex mTrackMetadatasMutex;
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel
