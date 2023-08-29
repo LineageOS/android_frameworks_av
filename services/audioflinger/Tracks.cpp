@@ -277,7 +277,7 @@ TrackBase::~TrackBase()
     mCblkMemory.clear();    // free the shared memory before releasing the heap it belongs to
     if (mClient != 0) {
         // Client destructor must run with AudioFlinger client mutex locked
-        Mutex::Autolock _l(mClient->afClientCallback()->clientMutex());
+        audio_utils::lock_guard _l(mClient->afClientCallback()->clientMutex());
         // If the client's reference count drops to zero, the associated destructor
         // must run with AudioFlinger lock held. Thus the explicit clear() rather than
         // relying on the automatic clear() at end of scope.
@@ -1169,7 +1169,7 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
         if (isOffloaded()) {
-            Mutex::Autolock _laf(thread->afThreadCallback()->mutex());
+            audio_utils::lock_guard _laf(thread->afThreadCallback()->mutex());
             Mutex::Autolock _lth(thread->mutex());
             sp<IAfEffectChain> ec = thread->getEffectChain_l(mSessionId);
             if (thread->afThreadCallback()->isNonOffloadableGlobalEffectEnabled_l() ||
