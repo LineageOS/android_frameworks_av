@@ -17,6 +17,7 @@
 #define LOG_TAG "audioserver"
 //#define LOG_NDEBUG 0
 
+#include <dlfcn.h>
 #include <algorithm>
 
 #include <fcntl.h>
@@ -47,6 +48,24 @@ using namespace android;
 using android::media::audio::common::AudioMMapPolicy;
 using android::media::audio::common::AudioMMapPolicyInfo;
 using android::media::audio::common::AudioMMapPolicyType;
+
+void registerIHalAdapterVendorExtension() {
+    constexpr char kLibPath[] = "libaudiohalvendorextn.so";
+    void *libHandle = dlopen(kLibPath, RTLD_NOW | RTLD_NODELETE);
+    if (libHandle == nullptr) {
+        ALOGE("Failed to load library: %s (%s)", kLibPath, dlerror());
+        return;
+    }
+
+    auto registerInterface =
+        reinterpret_cast<void (*)()>(dlsym(libHandle, "registerInterface"));
+    if (registerInterface == nullptr) {
+        ALOGE("Failed to find symbol(registerInterface): error (%s)",
+              dlerror());
+        return;
+    }
+    registerInterface();
+}
 
 int main(int argc __unused, char **argv)
 {
@@ -150,6 +169,9 @@ int main(int argc __unused, char **argv)
         // Ensure threads for possible callbacks.  Note that get_audio_flinger() does
         // this automatically when called from AudioPolicy, but we do this anyways here.
         ProcessState::self()->startThreadPool();
+
+        // Making sure this service is registered before the flinger.
+        registerIHalAdapterVendorExtension();
 
         // Instantiating AudioFlinger (making it public, e.g. through ::initialize())
         // and then instantiating AudioPolicy (and making it public)
