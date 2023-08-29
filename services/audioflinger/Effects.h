@@ -111,8 +111,7 @@ public:
     bool             isPinned() const final { return mPinned; }
     void             unPin() final { mPinned = false; }
 
-    void             lock() ACQUIRE(mLock) final { mLock.lock(); }
-    void             unlock() RELEASE(mLock) final { mLock.unlock(); }
+    audio_utils::mutex& mutex() const final { return mMutex; }
 
     status_t         updatePolicyState() final;
 
@@ -135,7 +134,8 @@ protected:
 
     DISALLOW_COPY_AND_ASSIGN(EffectBase);
 
-    mutable Mutex mLock;      // mutex for process, commands and handles list protection
+    // mutex for process, commands and handles list protection
+    mutable audio_utils::mutex mMutex;
     mediautils::atomic_sp<EffectCallbackInterface> mCallback; // parent effect chain
     const int                 mId;        // this instance unique ID
     const audio_session_t     mSessionId; // audio session ID
@@ -148,9 +148,10 @@ protected:
                 // First handle in mHandles has highest priority and controls the effect module
 
     // Audio policy effect state management
-    // Mutex protecting transactions with audio policy manager as mLock cannot
+    // Mutex protecting transactions with audio policy manager as mutex() cannot
     // be held to avoid cross deadlocks with audio policy mutex
-    Mutex                     mPolicyLock;
+    audio_utils::mutex& policyMutex() const { return mPolicyMutex; }
+    mutable audio_utils::mutex mPolicyMutex;
     // Effect is registered in APM or not
     bool                      mPolicyRegistered = false;
     // Effect enabled state communicated to APM. Enabled state corresponds to
@@ -272,9 +273,10 @@ private:
     uint32_t mInChannelCountRequested;
     uint32_t mOutChannelCountRequested;
 
+    template <typename MUTEX>
     class AutoLockReentrant {
     public:
-        AutoLockReentrant(Mutex& mutex, pid_t allowedTid)
+        AutoLockReentrant(MUTEX& mutex, pid_t allowedTid)
             : mMutex(gettid() == allowedTid ? nullptr : &mutex)
         {
             if (mMutex != nullptr) mMutex->lock();
@@ -283,7 +285,7 @@ private:
             if (mMutex != nullptr) mMutex->unlock();
         }
     private:
-        Mutex * const mMutex;
+        MUTEX * const mMutex;
     };
 
     static constexpr pid_t INVALID_PID = (pid_t)-1;
@@ -364,7 +366,8 @@ private:
 private:
     DISALLOW_COPY_AND_ASSIGN(EffectHandle);
 
-    Mutex mLock;                             // protects IEffect method calls
+    audio_utils::mutex& mutex() const { return mMutex; }
+    mutable audio_utils::mutex mMutex; // protects IEffect method calls
     const wp<IAfEffectBase> mEffect;               // pointer to controlled EffectModule
     const sp<media::IEffectClient> mEffectClient;  // callback interface for client notifications
     /*const*/ sp<Client> mClient;            // client for shared memory allocation, see
@@ -397,12 +400,8 @@ public:
 
     void process_l() final;
 
-    void lock() ACQUIRE(mLock) final {
-        mLock.lock();
-    }
-    void unlock() RELEASE(mLock) final {
-        mLock.unlock();
-    }
+    audio_utils::mutex& mutex() const final { return mMutex; }
+
     status_t createEffect_l(sp<IAfEffectModule>& effect,
                             effect_descriptor_t *desc,
                             int id,
@@ -488,7 +487,7 @@ public:
     // Is this EffectChain compatible with the bit-perfect audio flag.
     bool isBitPerfectCompatible() const final;
 
-    // isCompatibleWithThread_l() must be called with thread->mLock held
+    // isCompatibleWithThread_l() must be called with thread->mutex() held
     bool isCompatibleWithThread_l(const sp<IAfThreadBase>& thread) const final;
 
     bool containsHapticGeneratingEffect_l() final;
@@ -624,7 +623,7 @@ private:
 
     std::optional<size_t> findVolumeControl_l(size_t from, size_t to) const;
 
-    mutable  Mutex mLock;        // mutex protecting effect list
+    mutable audio_utils::mutex mMutex; // mutex protecting effect list
              Vector<sp<IAfEffectModule>> mEffects; // list of effect modules
              audio_session_t mSessionId; // audio session ID
              sp<EffectBufferHalInterface> mInBuffer;  // chain input buffer
@@ -754,9 +753,10 @@ private:
     const sp<DeviceEffectManagerCallback> mManagerCallback;
     const sp<ProxyCallback> mMyCallback;
 
-    mutable Mutex mProxyLock;
-    std::map<audio_patch_handle_t, sp<IAfEffectHandle>> mEffectHandles; // protected by mProxyLock
-    sp<IAfEffectModule> mHalEffect; // protected by mProxyLock
+    audio_utils::mutex& proxyMutex() const { return mProxyMutex; }
+    mutable audio_utils::mutex mProxyMutex;
+    std::map<audio_patch_handle_t, sp<IAfEffectHandle>> mEffectHandles; // protected by mProxyMutex
+    sp<IAfEffectModule> mHalEffect; // protected by mProxyMutex
     struct audio_port_config mDevicePort = { .id = AUDIO_PORT_HANDLE_NONE };
     const bool mNotifyFramesProcessed;
 };

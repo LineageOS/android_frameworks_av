@@ -1865,7 +1865,7 @@ NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::lock()
 {
     effectChains = mEffectChains;
     for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->lock();
+        mEffectChains[i]->mutex().lock();
     }
 }
 
@@ -1874,7 +1874,7 @@ void ThreadBase::unlockEffectChains(
 NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
 {
     for (size_t i = 0; i < effectChains.size(); i++) {
-        effectChains[i]->unlock();
+        effectChains[i]->mutex().unlock();
     }
 }
 
