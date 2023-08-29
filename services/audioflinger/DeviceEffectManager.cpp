@@ -59,7 +59,7 @@ void DeviceEffectManager::onCreateAudioPatch(audio_patch_handle_t handle,
     ALOGV("%s handle %d mHalHandle %d device sink %08x",
             __func__, handle, patch.mHalHandle,
             patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mutex());
     for (auto& effectProxies : mDeviceEffects) {
         for (auto& effect : effectProxies.second) {
             const status_t status = effect->onCreatePatch(handle, patch);
@@ -71,7 +71,7 @@ void DeviceEffectManager::onCreateAudioPatch(audio_patch_handle_t handle,
 
 void DeviceEffectManager::onReleaseAudioPatch(audio_patch_handle_t handle) {
     ALOGV("%s", __func__);
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mutex());
     for (auto& effectProxies : mDeviceEffects) {
         for (auto& effect : effectProxies.second) {
             effect->onReleasePatch(handle);
@@ -84,7 +84,7 @@ void DeviceEffectManager::onUpdateAudioPatch(audio_patch_handle_t oldHandle,
     ALOGV("%s oldhandle %d newHandle %d mHalHandle %d device sink %08x",
             __func__, oldHandle, newHandle, patch.mHalHandle,
             patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mutex());
     for (auto& effectProxies : mDeviceEffects) {
         for (auto& effect : effectProxies.second) {
             const status_t status = effect->onUpdatePatch(oldHandle, newHandle, patch);
@@ -94,7 +94,7 @@ void DeviceEffectManager::onUpdateAudioPatch(audio_patch_handle_t oldHandle,
     }
 }
 
-// DeviceEffectManager::createEffect_l() must be called with AudioFlinger::mLock held
+// DeviceEffectManager::createEffect_l() must be called with AudioFlinger::mutex() held
 sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
         effect_descriptor_t *descriptor,
         const AudioDeviceTypeAddr& device,
@@ -117,7 +117,7 @@ sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
     }
 
     {
-        Mutex::Autolock _l(mLock);
+        audio_utils::lock_guard _l(mutex());
         auto iter = mDeviceEffects.find(device);
         if (iter != mDeviceEffects.end()) {
             effectsForDevice = iter->second;
@@ -203,7 +203,7 @@ status_t DeviceEffectManager::createEffectHal(
 void DeviceEffectManager::dump(int fd)
 NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 {
-    const bool locked = afutils::dumpTryLock(mLock);
+    const bool locked = afutils::dumpTryLock(mutex());
     if (!locked) {
         String8 result("DeviceEffectManager may be deadlocked\n");
         write(fd, result.c_str(), result.size());
@@ -222,13 +222,13 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     }
 
     if (locked) {
-        mLock.unlock();
+        mutex().unlock();
     }
 }
 
 size_t DeviceEffectManager::removeEffect(const sp<IAfDeviceEffectProxy>& effect)
 {
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mutex());
     const auto& iter = mDeviceEffects.find(effect->device());
     if (iter != mDeviceEffects.end()) {
         const auto& iterEffect = std::find_if(
