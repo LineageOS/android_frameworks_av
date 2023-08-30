@@ -103,7 +103,7 @@ ScopedAStatus AidlCameraService::getCameraCharacteristics(const std::string& in_
                 return fromSStatus(SStatus::ILLEGAL_ARGUMENT);
             default:
                 ALOGE("Get camera characteristics from camera service failed: %s",
-                      ret.toString8().string());
+                      ret.toString8().c_str());
                 return fromUStatus(ret);
         }
     }
@@ -313,7 +313,7 @@ ndk::ScopedAStatus AidlCameraService::getCameraVendorTagSections(
         }
         vendorTagSections.resize(numSections);
         for (size_t s = 0; s < numSections; s++) {
-            vendorTagSections[s].sectionName = (*sectionNames)[s].string();
+            vendorTagSections[s].sectionName = (*sectionNames)[s].c_str();
             vendorTagSections[s].tags = tagsBySection[s];
         }
         SProviderIdAndVendorTagSections & prvdrIdAndVendorTagSection =

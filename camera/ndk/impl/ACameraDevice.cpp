@@ -368,24 +368,24 @@ camera_status_t CameraDevice::prepareLocked(ACameraWindowType *window) {
         // ndk as well.
         if (remoteRet.exceptionCode() != EX_SERVICE_SPECIFIC) {
             ALOGE("Camera device %s failed to prepare output window %p: %s", getId(), window,
-                    remoteRet.toString8().string());
+                    remoteRet.toString8().c_str());
             return ACAMERA_ERROR_UNKNOWN;
 
         }
         switch (remoteRet.serviceSpecificErrorCode()) {
             case hardware::ICameraService::ERROR_INVALID_OPERATION:
                 ALOGE("Camera device %s invalid operation: %s", getId(),
-                        remoteRet.toString8().string());
+                        remoteRet.toString8().c_str());
                 return ACAMERA_ERROR_INVALID_OPERATION;
                 break;
             case hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT:
                 ALOGE("Camera device %s invalid input argument: %s", getId(),
-                        remoteRet.toString8().string());
+                        remoteRet.toString8().c_str());
                 return ACAMERA_ERROR_INVALID_PARAMETER;
                 break;
             default:
                 ALOGE("Camera device %s failed to prepare output window %p: %s", getId(), window,
-                        remoteRet.toString8().string());
+                        remoteRet.toString8().c_str());
                 return ACAMERA_ERROR_UNKNOWN;
         }
     }
