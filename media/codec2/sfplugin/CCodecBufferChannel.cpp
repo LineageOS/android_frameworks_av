@@ -2373,6 +2373,46 @@ void CCodecBufferChannel::setDescrambler(const sp<IDescrambler> &descrambler) {
     mDescrambler = descrambler;
 }
 
+uint32_t CCodecBufferChannel::getBuffersPixelFormat(bool isEncoder) {
+    if (isEncoder) {
+        return getInputBuffersPixelFormat();
+    } else {
+        return getOutputBuffersPixelFormat();
+    }
+}
+
+uint32_t CCodecBufferChannel::getInputBuffersPixelFormat() {
+    Mutexed<Input>::Locked input(mInput);
+    if (input->buffers == nullptr) {
+        return PIXEL_FORMAT_UNKNOWN;
+    }
+    return input->buffers->getPixelFormatIfApplicable();
+}
+
+uint32_t CCodecBufferChannel::getOutputBuffersPixelFormat() {
+    Mutexed<Output>::Locked output(mOutput);
+    if (output->buffers == nullptr) {
+        return PIXEL_FORMAT_UNKNOWN;
+    }
+    return output->buffers->getPixelFormatIfApplicable();
+}
+
+void CCodecBufferChannel::resetBuffersPixelFormat(bool isEncoder) {
+    if (isEncoder) {
+        Mutexed<Input>::Locked input(mInput);
+        if (input->buffers == nullptr) {
+            return;
+        }
+        input->buffers->resetPixelFormatIfApplicable();
+    } else {
+        Mutexed<Output>::Locked output(mOutput);
+        if (output->buffers == nullptr) {
+            return;
+        }
+        output->buffers->resetPixelFormatIfApplicable();
+    }
+}
+
 status_t toStatusT(c2_status_t c2s, c2_operation_t c2op) {
     // C2_OK is always translated to OK.
     if (c2s == C2_OK) {
