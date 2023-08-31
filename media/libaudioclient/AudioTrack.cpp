@@ -1699,29 +1699,42 @@ audio_io_handle_t AudioTrack::getOutput() const
 }
 
 status_t AudioTrack::setOutputDevice(audio_port_handle_t deviceId) {
+    status_t result = NO_ERROR;
     AutoMutex lock(mLock);
-    ALOGV("%s(%d): deviceId=%d mSelectedDeviceId=%d mRoutedDeviceId %d",
-            __func__, mPortId, deviceId, mSelectedDeviceId, mRoutedDeviceId);
+    ALOGV("%s(%d): deviceId=%d mSelectedDeviceId=%d",
+            __func__, mPortId, deviceId, mSelectedDeviceId);
     if (mSelectedDeviceId != deviceId) {
         mSelectedDeviceId = deviceId;
         if (mStatus == NO_ERROR) {
-            // allow track invalidation when track is not playing to propagate
-            // the updated mSelectedDeviceId
-            if (isPlaying_l()) {
-                if (mSelectedDeviceId != mRoutedDeviceId) {
-                    android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
-                    mProxy->interrupt();
+            if (isOffloadedOrDirect_l()) {
+                if (mState == STATE_STOPPED || mState == STATE_FLUSHED) {
+                    ALOGD("%s(%d): creating a new AudioTrack", __func__, mPortId);
+                    result = restoreTrack_l("setOutputDevice", true /* forceRestore */);
+                } else {
+                    ALOGW("%s(%d). Offloaded or Direct track is not STOPPED or FLUSHED. "
+                          "State: %s.",
+                            __func__, mPortId, stateToString(mState));
+                    result = INVALID_OPERATION;
                 }
             } else {
-                // if the track is idle, try to restore now and
-                // defer to next start if not possible
-                if (restoreTrack_l("setOutputDevice") != OK) {
-                    android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+                // allow track invalidation when track is not playing to propagate
+                // the updated mSelectedDeviceId
+                if (isPlaying_l()) {
+                    if (mSelectedDeviceId != mRoutedDeviceId) {
+                        android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+                        mProxy->interrupt();
+                    }
+                } else {
+                    // if the track is idle, try to restore now and
+                    // defer to next start if not possible
+                    if (restoreTrack_l("setOutputDevice") != OK) {
+                        android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+                    }
                 }
             }
         }
     }
-    return NO_ERROR;
+    return result;
 }
 
 audio_port_handle_t AudioTrack::getOutputDevice() {
@@ -2835,7 +2848,7 @@ nsecs_t AudioTrack::processAudioBuffer()
     return 0;
 }
 
-status_t AudioTrack::restoreTrack_l(const char *from)
+status_t AudioTrack::restoreTrack_l(const char *from, bool forceRestore)
 {
     status_t result = NO_ERROR;  // logged: make sure to set this before returning.
     const int64_t beginNs = systemTime();
@@ -2856,7 +2869,8 @@ status_t AudioTrack::restoreTrack_l(const char *from)
     // output parameters and new IAudioFlinger in createTrack_l()
     AudioSystem::clearAudioConfigCache();
 
-    if (isOffloadedOrDirect_l() || mDoNotReconnect) {
+    if (!forceRestore &&
+        (isOffloadedOrDirect_l() || mDoNotReconnect)) {
         // FIXME re-creation of offloaded and direct tracks is not yet implemented;
         // reconsider enabling for linear PCM encodings when position can be preserved.
         result = DEAD_OBJECT;
