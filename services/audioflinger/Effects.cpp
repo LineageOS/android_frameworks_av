@@ -990,13 +990,6 @@ status_t AudioFlinger::EffectModule::configure()
                     &size,
                     &cmdStatus);
         }
-
-        if (isVolumeControl()) {
-            // Force initializing the volume as 0 for volume control effect for safer ramping
-            uint32_t left = 0;
-            uint32_t right = 0;
-            setVolumeInternal(&left, &right, true /*controller*/);
-        }
     }
 
     // mConfig.outputCfg.buffer.frameCount cannot be zero.
@@ -2096,7 +2089,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 AudioFlinger::EffectChain::EffectChain(const wp<ThreadBase>& thread,
                                        audio_session_t sessionId)
     : mSessionId(sessionId), mActiveTrackCnt(0), mTrackCnt(0), mTailBufferCount(0),
-      mVolumeCtrlIdx(-1), mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
+      mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
       mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX),
       mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread))
 {
@@ -2342,6 +2335,15 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
     return NO_ERROR;
 }
 
+std::optional<size_t> AudioFlinger::EffectChain::findVolumeControl_l(size_t from, size_t to) const {
+    for (size_t i = std::min(to, mEffects.size()); i > from; i--) {
+        if (mEffects[i - 1]->isVolumeControlEnabled()) {
+            return i - 1;
+        }
+    }
+    return std::nullopt;
+}
+
 ssize_t AudioFlinger::EffectChain::getInsertIndex(const effect_descriptor_t& desc) {
     // Insert effects are inserted at the end of mEffects vector as they are processed
     //  after track and auxiliary effects.
@@ -2511,29 +2513,38 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
 {
     uint32_t newLeft = *left;
     uint32_t newRight = *right;
-    bool hasControl = false;
-    int ctrlIdx = -1;
-    size_t size = mEffects.size();
+    const size_t size = mEffects.size();
 
     // first update volume controller
-    for (size_t i = size; i > 0; i--) {
-        if (mEffects[i - 1]->isVolumeControlEnabled()) {
-            ctrlIdx = i - 1;
-            hasControl = true;
-            break;
-        }
-    }
+    const auto volumeControlIndex = findVolumeControl_l(0, size);
+    const int ctrlIdx = volumeControlIndex.value_or(-1);
+    const sp<EffectModule> volumeControlEffect =
+            volumeControlIndex.has_value() ? mEffects[ctrlIdx] : nullptr;
+    const sp<EffectModule> cachedVolumeControlEffect = mVolumeControlEffect.promote();
 
-    if (!force && ctrlIdx == mVolumeCtrlIdx &&
+    if (!force && volumeControlEffect == cachedVolumeControlEffect &&
             *left == mLeftVolume && *right == mRightVolume) {
-        if (hasControl) {
+        if (volumeControlIndex.has_value()) {
             *left = mNewLeftVolume;
             *right = mNewRightVolume;
         }
-        return hasControl;
+        return volumeControlIndex.has_value();
     }
 
-    mVolumeCtrlIdx = ctrlIdx;
+    if (volumeControlEffect != cachedVolumeControlEffect) {
+        // The volume control effect is a new one. Set the old one as full volume. Set the new onw
+        // as zero for safe ramping.
+        if (cachedVolumeControlEffect != nullptr) {
+            uint32_t leftMax = 1 << 24;
+            uint32_t rightMax = 1 << 24;
+            cachedVolumeControlEffect->setVolume(&leftMax, &rightMax, true /*controller*/);
+        }
+        if (volumeControlEffect != nullptr) {
+            uint32_t leftZero = 0;
+            uint32_t rightZero = 0;
+            volumeControlEffect->setVolume(&leftZero, &rightZero, true /*controller*/);
+        }
+    }
     mLeftVolume = newLeft;
     mRightVolume = newRight;
 
@@ -2570,7 +2581,7 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
 
     setVolumeForOutput_l(*left, *right);
 
-    return hasControl;
+    return volumeControlIndex.has_value();
 }
 
 // resetVolume_l() must be called with ThreadBase::mLock or EffectChain::mLock held
