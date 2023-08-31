@@ -3338,7 +3338,10 @@ status_t DeviceEffectProxy::onCreatePatch(
 }
 
 status_t DeviceEffectProxy::checkPort(const IAfPatchPanel::Patch& patch,
-        const struct audio_port_config *port, sp<IAfEffectHandle> *handle) {
+        const struct audio_port_config *port, sp<IAfEffectHandle> *handle)
+NO_THREAD_SAFETY_ANALYSIS
+// calling function 'createEffect_l' requires holding mutex 'AudioFlinger_Mutex' exclusively
+{
 
     ALOGV("%s type %d device type %d address %s device ID %d patch.isSoftware() %d",
             __func__, port->type, port->ext.device.type,
