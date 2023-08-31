@@ -37,6 +37,8 @@
 #include "FwdLockGlue.h"
 #include "MimeTypeUtil.h"
 
+#include <filesystem>
+
 #undef LOG_TAG
 #define LOG_TAG "FwdLockEngine"
 
@@ -227,7 +229,7 @@ DrmSupportInfo* FwdLockEngine::onGetSupportInfo(int /* uniqueId */) {
 bool FwdLockEngine::onCanHandle(int /* uniqueId */, const String8& path) {
     bool result = false;
 
-    String8 extString = path.getPathExtension();
+    String8 extString(std::filesystem::path(path.c_str()).extension().c_str());
     return IsFileSuffixSupported(extString);
 }
 
