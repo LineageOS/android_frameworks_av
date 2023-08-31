@@ -209,7 +209,7 @@ ssize_t HTTPDownloader::fetchBlock(
     *out = buffer;
     if (actualUrl != NULL) {
         *actualUrl = mDataSource->getUri();
-        if (actualUrl->isEmpty()) {
+        if (actualUrl->empty()) {
             *actualUrl = url;
         }
     }
