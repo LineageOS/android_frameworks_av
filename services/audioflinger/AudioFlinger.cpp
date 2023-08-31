@@ -4563,7 +4563,7 @@ status_t AudioFlinger::listAudioPorts(unsigned int* num_ports,
         struct audio_port* ports) const
 {
     audio_utils::lock_guard _l(mutex());
-    return mPatchPanel->listAudioPorts(num_ports, ports);
+    return mPatchPanel->listAudioPorts_l(num_ports, ports);
 }
 
 /* Get supported attributes for a given audio port */
@@ -4574,7 +4574,7 @@ status_t AudioFlinger::getAudioPort(struct audio_port_v7* port) const {
     }
 
     audio_utils::lock_guard _l(mutex());
-    return mPatchPanel->getAudioPort(port);
+    return mPatchPanel->getAudioPort_l(port);
 }
 
 /* Connect a patch between several source and sink ports */
@@ -4587,14 +4587,14 @@ status_t AudioFlinger::createAudioPatch(
     }
 
     audio_utils::lock_guard _l(mutex());
-    return mPatchPanel->createAudioPatch(patch, handle);
+    return mPatchPanel->createAudioPatch_l(patch, handle);
 }
 
 /* Disconnect a patch */
 status_t AudioFlinger::releaseAudioPatch(audio_patch_handle_t handle)
 {
     audio_utils::lock_guard _l(mutex());
-    return mPatchPanel->releaseAudioPatch(handle);
+    return mPatchPanel->releaseAudioPatch_l(handle);
 }
 
 /* List connected audio ports and they attributes */
@@ -4602,7 +4602,7 @@ status_t AudioFlinger::listAudioPatches(
         unsigned int* num_patches, struct audio_patch* patches) const
 {
     audio_utils::lock_guard _l(mutex());
-    return mPatchPanel->listAudioPatches(num_patches, patches);
+    return mPatchPanel->listAudioPatches_l(num_patches, patches);
 }
 
 // ----------------------------------------------------------------------------

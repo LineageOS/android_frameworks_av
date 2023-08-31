@@ -30,25 +30,29 @@ public:
         : mAfPatchPanelCallback(afPatchPanelCallback) {}
 
     /* List connected audio ports and their attributes */
-    status_t listAudioPorts(unsigned int *num_ports,
-        struct audio_port* ports) final;
+    status_t listAudioPorts_l(unsigned int *num_ports,
+            struct audio_port* ports) final REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* Get supported attributes for a given audio port */
-    status_t getAudioPort(struct audio_port_v7* port) final;
+    status_t getAudioPort_l(struct audio_port_v7* port) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* Create a patch between several source and sink ports */
-    status_t createAudioPatch(const struct audio_patch *patch,
+    status_t createAudioPatch_l(const struct audio_patch *patch,
                               audio_patch_handle_t *handle,
-                              bool endpointPatch = false) final;
+                              bool endpointPatch = false) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* Release a patch */
-    status_t releaseAudioPatch(audio_patch_handle_t handle) final;
+    status_t releaseAudioPatch_l(audio_patch_handle_t handle) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* List connected audio devices and they attributes */
-    status_t listAudioPatches(unsigned int *num_patches,
-            struct audio_patch* patches) final;
+    status_t listAudioPatches_l(unsigned int *num_patches,
+            struct audio_patch* patches) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
-    // Retrieves all currently estrablished software patches for a stream
+    // Retrieves all currently established software patches for a stream
     // opened on an intermediate module.
     status_t getDownstreamSoftwarePatches(audio_io_handle_t stream,
             std::vector<SoftwarePatch>* patches) const final;
@@ -60,20 +64,24 @@ public:
 
     void dump(int fd) const final;
 
-    // Call with AudioFlinger mLock held
-    const std::map<audio_patch_handle_t, Patch>& patches_l() const final { return mPatches; }
+    const std::map<audio_patch_handle_t, Patch>& patches_l() const final
+            REQUIRES(audio_utils::AudioFlinger_Mutex) { return mPatches; }
 
-    // Must be called under AudioFlinger::mLock
-    status_t getLatencyMs_l(audio_patch_handle_t patchHandle, double* latencyMs) const final;
+    status_t getLatencyMs_l(audio_patch_handle_t patchHandle, double* latencyMs) const final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
-    void closeThreadInternal_l(const sp<IAfThreadBase>& thread) const final;
+    void closeThreadInternal_l(const sp<IAfThreadBase>& thread) const final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
 private:
-    AudioHwDevice* findAudioHwDeviceByModule(audio_module_handle_t module);
-    sp<DeviceHalInterface> findHwDeviceByModule(audio_module_handle_t module);
-    void addSoftwarePatchToInsertedModules(
+    AudioHwDevice* findAudioHwDeviceByModule_l(audio_module_handle_t module)
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    sp<DeviceHalInterface> findHwDeviceByModule_l(audio_module_handle_t module)
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    void addSoftwarePatchToInsertedModules_l(
             audio_module_handle_t module, audio_patch_handle_t handle,
-            const struct audio_patch *patch);
+            const struct audio_patch *patch)
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
     void removeSoftwarePatchFromInsertedModules(audio_patch_handle_t handle);
     void erasePatch(audio_patch_handle_t handle);
 
