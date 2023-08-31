@@ -367,8 +367,9 @@ private:
     bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect) final
             EXCLUDES_AudioFlinger_Mutex;
 
-    status_t moveEffectChain_l(audio_session_t sessionId,
-            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread) final REQUIRES(mutex());
+    status_t moveEffectChain_ll(audio_session_t sessionId,
+            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread) final
+            REQUIRES(mutex(), audio_utils::ThreadBase_Mutex);
 
     // This is a helper that is called during incoming binder calls.
     // Requests media.log to start merging log buffers
@@ -546,8 +547,9 @@ private:
     // used by IAfDeviceEffectManagerCallback, IAfPatchPanelCallback, IAfThreadCallback
     audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) final;
 
-              status_t moveEffectChain_l(audio_session_t sessionId,
-    IAfRecordThread* srcThread, IAfRecordThread* dstThread) REQUIRES(mutex());
+    status_t moveEffectChain_ll(audio_session_t sessionId,
+            IAfRecordThread* srcThread, IAfRecordThread* dstThread)
+            REQUIRES(mutex(), audio_utils::ThreadBase_Mutex);
 
               // return thread associated with primary hardware device, or NULL
     DeviceTypeSet primaryOutputDevice_l() const REQUIRES(mutex());
