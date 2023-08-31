@@ -28,9 +28,11 @@ public:
     virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
     virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
     virtual status_t addEffectToHal(
-            const struct audio_port_config* device, const sp<EffectHalInterface>& effect) = 0;
+            const struct audio_port_config* device, const sp<EffectHalInterface>& effect)
+            EXCLUDES_AudioFlinger_HardwareMutex = 0;
     virtual status_t removeEffectFromHal(
-            const struct audio_port_config* device, const sp<EffectHalInterface>& effect) = 0;
+            const struct audio_port_config* device, const sp<EffectHalInterface>& effect)
+            EXCLUDES_AudioFlinger_HardwareMutex= 0;
 };
 
 class DeviceEffectManagerCallback;
