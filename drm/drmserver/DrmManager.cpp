@@ -127,7 +127,7 @@ void DrmManager::recordEngineMetrics(
         }
     }
 
-    if (!mimeType.isEmpty()) {
+    if (!mimeType.empty()) {
         metrics.mMimeTypes.insert(mimeType.c_str());
     } else if (NULL != info) {
         DrmSupportInfo::MimeTypeIterator mimeIter = info->getMimeTypeIterator();
@@ -395,7 +395,7 @@ String8 DrmManager::getOriginalMimeType(int uniqueId, const String8& path, int f
         IDrmEngine& rDrmEngine = mPlugInManager.getPlugIn(plugInId);
         mimeType = rDrmEngine.getOriginalMimeType(uniqueId, path, fd);
     }
-    if (!mimeType.isEmpty()) {
+    if (!mimeType.empty()) {
         recordEngineMetrics(__func__, plugInId, mimeType);
     }
     return mimeType;
