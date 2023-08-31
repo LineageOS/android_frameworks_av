@@ -77,7 +77,7 @@ bool JsonWebKey::extractKeysFromJsonWebKeySet(const String8& jsonWebKeySet,
             return false;
 
         if (findKey(mJsonObjects[i], &encodedKeyId, &encodedKey)) {
-            if (encodedKeyId.isEmpty() || encodedKey.isEmpty()) {
+            if (encodedKeyId.empty() || encodedKey.empty()) {
                 ALOGE("Must have both key id and key in the JsonWebKey set.");
                 continue;
             }
@@ -225,7 +225,7 @@ bool JsonWebKey::parseJsonObject(const String8& jsonObject,
  */
 bool JsonWebKey::parseJsonWebKeySet(const String8& jsonWebKeySet,
         Vector<String8>* jsonObjects) {
-    if (jsonWebKeySet.isEmpty()) {
+    if (jsonWebKeySet.empty()) {
         ALOGE("Empty JSON Web Key");
         return false;
     }

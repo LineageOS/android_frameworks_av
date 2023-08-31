@@ -393,7 +393,7 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
             PerformanceAnalysis& curr = hash.second;
             // write performance data to console
             curr.reportPerformance(&body, thread.first, hash.first);
-            if (!body.isEmpty()) {
+            if (!body.empty()) {
                 dumpLine(fd, indent, body);
                 body.clear();
             }
