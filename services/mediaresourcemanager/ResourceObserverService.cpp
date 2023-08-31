@@ -138,7 +138,7 @@ binder_status_t ResourceObserverService::dump(
                 String8 enabledEventsStr;
                 for (auto &event : sEvents) {
                     if (((uint64_t)observable.eventFilter & (uint64_t)event) != 0) {
-                        if (!enabledEventsStr.isEmpty()) {
+                        if (!enabledEventsStr.empty()) {
                             enabledEventsStr.append("|");
                         }
                         enabledEventsStr.append(toString(event).c_str());

@@ -691,7 +691,7 @@ void StagefrightMetadataRetriever::parseMetaData() {
     // To save the language codes for all timed text tracks
     // If multiple text tracks present, the format will look
     // like "eng:chi"
-    if (!timedTextLang.isEmpty()) {
+    if (!timedTextLang.empty()) {
         mMetaData.add(METADATA_KEY_TIMED_TEXT_LANGUAGES, timedTextLang);
     }
 

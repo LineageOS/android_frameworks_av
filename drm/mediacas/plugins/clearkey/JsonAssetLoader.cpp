@@ -187,7 +187,7 @@ bool JsonAssetLoader::parseJsonObject(const String8& jsonObject,
  */
 bool JsonAssetLoader::parseJsonAssetString(const String8& jsonAsset,
         Vector<String8>* jsonObjects) {
-    if (jsonAsset.isEmpty()) {
+    if (jsonAsset.empty()) {
         ALOGE("Empty JSON Web Key");
         return false;
     }

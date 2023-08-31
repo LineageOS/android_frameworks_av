@@ -212,8 +212,8 @@ static void playSource(sp<MediaSource> &source) {
         }
         rawSource = SimpleDecodingSource::Create(
                 source, flags, gSurface,
-                gComponentNameOverride.isEmpty() ? nullptr : gComponentNameOverride.c_str(),
-                !gComponentNameOverride.isEmpty());
+                gComponentNameOverride.empty() ? nullptr : gComponentNameOverride.c_str(),
+                !gComponentNameOverride.empty());
         if (rawSource == NULL) {
             return;
         }

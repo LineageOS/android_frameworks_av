@@ -152,7 +152,7 @@ status_t VendorTagDescriptor::readFromParcel(const android::Parcel* parcel) {
             break;
         }
         String8 tagName = parcel->readString8();
-        if (tagName.isEmpty()) {
+        if (tagName.empty()) {
             ALOGE("%s: parcel tag name was NULL for tag %d.", __FUNCTION__, tag);
             res = NOT_ENOUGH_DATA;
             break;
@@ -190,7 +190,7 @@ status_t VendorTagDescriptor::readFromParcel(const android::Parcel* parcel) {
                 "Vector capacity must be positive");
         for (size_t i = 0; i < sectionCount; ++i) {
             String8 sectionName = parcel->readString8();
-            if (sectionName.isEmpty()) {
+            if (sectionName.empty()) {
                 ALOGE("%s: parcel section name was NULL for section %zu.",
                       __FUNCTION__, i);
                 return NOT_ENOUGH_DATA;

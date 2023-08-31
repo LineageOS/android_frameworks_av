@@ -273,7 +273,7 @@ struct DrmHalHidl::DrmSessionClient : public aidl::android::media::BnResourceMan
     sp<DrmHalHidl> drm = mDrm.promote();
     if (drm == NULL) {
         name.append("<deleted>");
-    } else if (drm->getPropertyStringInternal(String8("vendor"), name) != OK || name.isEmpty()) {
+    } else if (drm->getPropertyStringInternal(String8("vendor"), name) != OK || name.empty()) {
         name.append("<Get vendor failed or is empty>");
     }
     name.append("[");
@@ -1261,12 +1261,12 @@ DrmStatus DrmHalHidl::getMetrics(const sp<IDrmMetricsConsumer>& consumer) {
     if (mPluginV1_1 != NULL) {
         String8 vendor;
         String8 description;
-        if (getPropertyStringInternal(String8("vendor"), vendor) != OK || vendor.isEmpty()) {
+        if (getPropertyStringInternal(String8("vendor"), vendor) != OK || vendor.empty()) {
             ALOGE("Get vendor failed or is empty");
             vendor = "NONE";
         }
         if (getPropertyStringInternal(String8("description"), description) != OK ||
-            description.isEmpty()) {
+            description.empty()) {
             ALOGE("Get description failed or is empty.");
             description = "NONE";
         }
