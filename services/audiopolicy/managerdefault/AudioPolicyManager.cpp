@@ -7656,8 +7656,10 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
     const auto musicVolumeSrc = toVolumeSource(AUDIO_STREAM_MUSIC, false);
     const auto alarmVolumeSrc = toVolumeSource(AUDIO_STREAM_ALARM, false);
     const auto a11yVolumeSrc = toVolumeSource(AUDIO_STREAM_ACCESSIBILITY, false);
-
-    if (volumeSource == a11yVolumeSrc
+    // Verify that the current volume source is not the ringer volume to prevent recursively
+    // calling to compute volume. This could happen in cases where a11y and ringer sounds belong
+    // to the same volume group.
+    if (volumeSource != ringVolumeSrc && volumeSource == a11yVolumeSrc
             && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState()) &&
             mOutputs.isActive(ringVolumeSrc, 0)) {
         auto &ringCurves = getVolumeCurves(AUDIO_STREAM_RING);
@@ -7720,8 +7722,12 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
         // when the phone is ringing we must consider that music could have been paused just before
         // by the music application and behave as if music was active if the last music track was
         // just stopped
-        if (isStreamActive(AUDIO_STREAM_MUSIC, SONIFICATION_HEADSET_MUSIC_DELAY) ||
-                mLimitRingtoneVolume) {
+        // Verify that the current volume source is not the music volume to prevent recursively
+        // calling to compute volume. This could happen in cases where music and
+        // (alarm, ring, notification, system, etc.) sounds belong to the same volume group.
+        if (volumeSource != musicVolumeSrc &&
+            (isStreamActive(AUDIO_STREAM_MUSIC, SONIFICATION_HEADSET_MUSIC_DELAY)
+                || mLimitRingtoneVolume)) {
             volumeDb += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
             DeviceTypeSet musicDevice =
                     mEngine->getOutputDevicesForAttributes(attributes_initializer(AUDIO_USAGE_MEDIA),
