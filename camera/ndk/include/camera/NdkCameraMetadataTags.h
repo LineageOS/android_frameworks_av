@@ -584,6 +584,13 @@ typedef enum acamera_metadata_tag {
      * <p>Only constrains auto-exposure (AE) algorithm, not
      * manual control of ACAMERA_SENSOR_EXPOSURE_TIME and
      * ACAMERA_SENSOR_FRAME_DURATION.</p>
+     * <p>To start a CaptureSession with a target FPS range different from the
+     * capture request template's default value, the application
+     * is strongly recommended to call
+     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }
+     * with the target fps range before creating the capture session. The aeTargetFpsRange is
+     * typically a session parameter. Specifying it at session creation time helps avoid
+     * session reconfiguration delays in cases like 60fps or high speed recording.</p>
      *
      * @see ACAMERA_SENSOR_EXPOSURE_TIME
      * @see ACAMERA_SENSOR_FRAME_DURATION
@@ -1128,6 +1135,12 @@ typedef enum acamera_metadata_tag {
      * ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE field will return
      * OFF if the recording output is not stabilized, or if there are no output
      * Surface types that can be stabilized.</p>
+     * <p>The application is strongly recommended to call
+     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }
+     * with the desired video stabilization mode before creating the capture session.
+     * Video stabilization mode is a session parameter on many devices. Specifying
+     * it at session creation time helps avoid reconfiguration delay caused by difference
+     * between the default value and the first CaptureRequest.</p>
      * <p>If a camera device supports both this mode and OIS
      * (ACAMERA_LENS_OPTICAL_STABILIZATION_MODE), turning both modes on may
      * produce undesirable interaction, so it is recommended not to enable
