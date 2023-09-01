@@ -131,7 +131,7 @@ static String8 sessionIdToString(const std::vector<uint8_t> &array) {
     for (size_t i = 0; i < array.size(); i++) {
         result.appendFormat("%02x ", array[i]);
     }
-    if (result.isEmpty()) {
+    if (result.empty()) {
         result.append("(null)");
     }
     return result;
