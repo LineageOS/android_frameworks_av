@@ -59,6 +59,8 @@ public:
 
     status_t unregisterMix(const AudioMix& mix);
 
+    status_t updateMix(const AudioMix& mix, const std::vector<AudioMixMatchCriterion>& newCriteria);
+
     void closeOutput(sp<SwAudioOutputDescriptor> &desc);
 
     /**

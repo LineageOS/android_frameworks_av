@@ -20,6 +20,7 @@ import android.content.AttributionSourceState;
 
 import android.media.AudioDirectMode;
 import android.media.AudioMix;
+import android.media.AudioMixUpdate;
 import android.media.AudioMixerAttributesInternal;
 import android.media.AudioOffloadMode;
 import android.media.AudioPatchFw;
@@ -261,6 +262,8 @@ interface IAudioPolicyService {
     AudioMode getPhoneState();
 
     void registerPolicyMixes(in AudioMix[] mixes, boolean registration);
+
+    void updatePolicyMixes(in AudioMixUpdate[] updates);
 
     void setUidDeviceAffinities(int /* uid_t */ uid, in AudioDevice[] devices);
 
