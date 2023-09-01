@@ -47,6 +47,7 @@ cc_defaults {
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libbase",
+        "libbinder_ndk",
         "libactivitymanager_aidl",
         "libandroid_net",
         "libaudioclient",
