@@ -157,13 +157,12 @@ namespace media {
 namespace c2 {
 namespace utils {
 
+// TODO: read it from aconfig flags
+bool IsEnabled() { return false; }
+
 const char* asString(Status status, const char* def) {
     return asString(static_cast<c2_status_t>(status.status), def);
 }
-
-namespace /* unnamed */ {
-
-} // unnamed namespace
 
 // C2FieldSupportedValuesQuery -> FieldSupportedValuesQuery
 bool ToAidl(
