@@ -18,6 +18,7 @@
 #define LOG_TAG "DrmPassthruPlugIn"
 #include <utils/Log.h>
 
+#include <android-base/strings.h>
 #include <drm/DrmRights.h>
 #include <drm/DrmConstraints.h>
 #include <drm/DrmMetadata.h>
@@ -28,6 +29,8 @@
 #include <drm/DrmInfoRequest.h>
 #include <drm/DrmSupportInfo.h>
 #include <DrmPassthruPlugIn.h>
+
+#include <filesystem>
 
 using namespace android;
 
@@ -159,9 +162,8 @@ DrmInfo* DrmPassthruPlugIn::onAcquireDrmInfo(int uniqueId, const DrmInfoRequest*
 
 bool DrmPassthruPlugIn::onCanHandle(int /*uniqueId*/, const String8& path) {
     ALOGV("DrmPassthruPlugIn::canHandle: %s ", path.c_str());
-    String8 extension = path.getPathExtension();
-    extension.toLower();
-    return (String8(".passthru") == extension);
+    const auto extension = std::filesystem::path(path.c_str()).extension();
+    return base::EqualsIgnoreCase(extension.string(), ".passthru");
 }
 
 String8 DrmPassthruPlugIn::onGetOriginalMimeType(int uniqueId,
