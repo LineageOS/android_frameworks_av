@@ -524,8 +524,8 @@ bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool is
                                      "audiotrack",
                                      // other media
                                      "codec",
-                                     "freeze",
-                                     "judder",
+                                     "videofreeze",
+                                     "videojudder",
                                      "extractor",
                                      "mediadrm",
                                      "mediaparser",
