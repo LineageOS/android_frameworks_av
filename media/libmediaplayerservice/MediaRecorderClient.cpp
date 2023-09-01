@@ -22,6 +22,7 @@
 #include "MediaPlayerService.h"
 #include "StagefrightRecorder.h"
 
+#include <android/binder_auto_utils.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <binder/IPCThreadState.h>
@@ -490,9 +491,9 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
         {
             for (std::shared_ptr<Codec2Client> const& client :
                     Codec2Client::CreateFromAllServices()) {
-                sp<IBase> base = client->getBase();
-                mDeathNotifiers.emplace_back(
-                        base, [l = wp<IMediaRecorderClient>(listener),
+                sp<IBase> hidlBase = client->getHidlBase();
+                ::ndk::SpAIBinder aidlBase = client->getAidlBase();
+                auto onBinderDied = [l = wp<IMediaRecorderClient>(listener),
                                name = std::string(client->getServiceName())]() {
                     sp<IMediaRecorderClient> listener = l.promote();
                     if (listener) {
@@ -507,7 +508,12 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
                               "without a death handler",
                               name.c_str());
                     }
-                });
+                };
+                if (hidlBase) {
+                    mDeathNotifiers.emplace_back(hidlBase, onBinderDied);
+                } else if (aidlBase.get() != nullptr) {
+                    mDeathNotifiers.emplace_back(aidlBase, onBinderDied);
+                }
             }
         }
     }
