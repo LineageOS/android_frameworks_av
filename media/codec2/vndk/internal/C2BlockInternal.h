@@ -17,9 +17,13 @@
 #ifndef ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 #define ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 
-#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
-
 #include <C2Buffer.h>
+
+#include <utils/RefBase.h>
+
+namespace android::hardware::graphics::bufferqueue::V2_0 {
+struct IGraphicBufferProducer;
+}
 
 // Note: HIDL-BufferPool and AIDL-BufferPool are not compatible
 namespace android::hardware::media::bufferpool {

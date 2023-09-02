@@ -25,7 +25,6 @@
 #include <C2Config.h> // for C2StreamUsageTuning
 #include <C2PlatformSupport.h>
 
-#include <android/binder_auto_utils.h>
 #include <android/hardware/media/bufferpool/2.0/IClientManager.h>
 #include <android/hardware/media/c2/1.0/IComponent.h>
 #include <android/hardware/media/c2/1.0/IComponentInterface.h>
@@ -34,6 +33,8 @@
 #include <android/hardware/media/c2/1.0/IConfigurable.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 
+#include <aidl/android/hardware/media/bufferpool2/IClientManager.h>
+#include <aidl/android/hardware/media/c2/BnComponentListener.h>
 #include <aidl/android/hardware/media/c2/FieldSupportedValues.h>
 #include <aidl/android/hardware/media/c2/FieldSupportedValuesQuery.h>
 #include <aidl/android/hardware/media/c2/FieldSupportedValuesQueryResult.h>
@@ -42,9 +43,17 @@
 #include <aidl/android/hardware/media/c2/IComponentStore.h>
 #include <aidl/android/hardware/media/c2/IConfigurable.h>
 #include <aidl/android/hardware/media/c2/ParamDescriptor.h>
+#include <aidl/android/hardware/media/c2/StructDescriptor.h>
 
+#include <aidlcommonsupport/NativeHandle.h>
+#include <android/binder_auto_utils.h>
+#include <android/binder_ibinder.h>
+#include <android/binder_manager.h>
 #include <android-base/properties.h>
+#include <android-base/stringprintf.h>
 #include <bufferpool/ClientManager.h>
+#include <bufferpool2/ClientManager.h>
+#include <codec2/aidl/BufferTypes.h>
 #include <codec2/aidl/ParamTypes.h>
 #include <codec2/hidl/1.0/types.h>
 #include <codec2/hidl/1.1/types.h>
@@ -86,6 +95,7 @@ using H2BGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
         V2_0::utils::H2BGraphicBufferProducer;
 using ::android::hardware::media::c2::V1_2::SurfaceSyncObj;
 
+namespace bufferpool2_aidl = ::aidl::android::hardware::media::bufferpool2;
 namespace bufferpool_hidl = ::android::hardware::media::bufferpool::V2_0;
 namespace c2_aidl = ::aidl::android::hardware::media::c2;
 namespace c2_hidl_base = ::android::hardware::media::c2;
@@ -178,6 +188,20 @@ public:
         return std::vector<std::shared_ptr<C2Component::Traits const>>();
     }
 };
+
+c2_status_t GetC2Status(const ::ndk::ScopedAStatus &transStatus, const char *method) {
+    if (!transStatus.isOk()) {
+        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
+            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
+            LOG(DEBUG) << method << " -- call failed: " << status << ".";
+            return status;
+        } else {
+            LOG(ERROR) << method << " -- transaction failed.";
+            return C2_TRANSACTION_FAILED;
+        }
+    }
+    return C2_OK;
+}
 
 }  // unnamed namespace
 
@@ -606,18 +630,11 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
     }
     c2_aidl::Params result;
     ndk::ScopedAStatus transStatus = mBase->query(indices, (mayBlock == C2_MAY_BLOCK), &result);
-    if (!transStatus.isOk()) {
-        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
-            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
-            LOG(DEBUG) << "query -- call failed: " << status << ".";
-            return status;
-        } else {
-            LOG(ERROR) << "query -- transaction failed.";
-            return C2_TRANSACTION_FAILED;
-        }
+    c2_status_t status = GetC2Status(transStatus, "query");
+    if (status != C2_OK) {
+        return status;
     }
 
-    c2_status_t status = C2_OK;
     std::vector<C2Param*> paramPointers;
     if (!c2_aidl::utils::ParseParamsBlob(&paramPointers, result)) {
         LOG(ERROR) << "query -- error while parsing params.";
@@ -686,17 +703,10 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::config(
     }
     c2_aidl::IConfigurable::ConfigResult result;
     ndk::ScopedAStatus transStatus = mBase->config(aidlParams, (mayBlock == C2_MAY_BLOCK), &result);
-    if (!transStatus.isOk()) {
-        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
-            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
-            LOG(DEBUG) << "config -- call failed: " << status << ".";
-            return status;
-        } else {
-            LOG(ERROR) << "config -- transaction failed.";
-            return C2_TRANSACTION_FAILED;
-        }
+    c2_status_t status = GetC2Status(transStatus, "config");
+    if (status != C2_OK) {
+        return status;
     }
-    c2_status_t status = C2_OK;
     size_t i = failures->size();
     failures->resize(i + result.failures.size());
     for (const c2_aidl::SettingResult& sf : result.failures) {
@@ -721,17 +731,10 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::querySupportedParams(
             std::numeric_limits<uint32_t>::min(),
             std::numeric_limits<uint32_t>::max(),
             &result);
-    if (!transStatus.isOk()) {
-        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
-            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
-            LOG(DEBUG) << "querySupportedParams -- call failed: " << status << ".";
-            return status;
-        } else {
-            LOG(ERROR) << "querySupportedParams -- transaction failed.";
-            return C2_TRANSACTION_FAILED;
-        }
+    c2_status_t status = GetC2Status(transStatus, "querySupportedParams");
+    if (status != C2_OK) {
+        return status;
     }
-    c2_status_t status = C2_OK;
     size_t i = params->size();
     params->resize(i + result.size());
     for (const c2_aidl::ParamDescriptor& sp : result) {
@@ -757,17 +760,10 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::querySupportedValues(
     std::vector<c2_aidl::FieldSupportedValuesQueryResult> result;
     ndk::ScopedAStatus transStatus = mBase->querySupportedValues(
             inFields, (mayBlock == C2_MAY_BLOCK), &result);
-    if (!transStatus.isOk()) {
-        if (transStatus.getExceptionCode() == EX_SERVICE_SPECIFIC) {
-            c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
-            LOG(DEBUG) << "querySupportedValues -- call failed: " << status << ".";
-            return status;
-        } else {
-            LOG(ERROR) << "querySupportedValues -- transaction failed.";
-            return C2_TRANSACTION_FAILED;
-        }
+    c2_status_t status = GetC2Status(transStatus, "querySupportedValues");
+    if (status != C2_OK) {
+        return status;
     }
-    c2_status_t status = C2_OK;
     if (result.size() != fields.size()) {
         LOG(ERROR) << "querySupportedValues -- "
                       "input and output lists "
@@ -923,11 +919,116 @@ struct Codec2Client::Component::HidlListener : public c2_hidl::IComponentListene
 
 };
 
-// Codec2Client::Component::BufferPoolSender
-struct Codec2Client::Component::BufferPoolSender :
+// Codec2Client::Component::AidlListener
+struct Codec2Client::Component::AidlListener : public c2_aidl::BnComponentListener {
+    std::weak_ptr<Component> component;
+    std::weak_ptr<Listener> base;
+
+    virtual ::ndk::ScopedAStatus onWorkDone(const c2_aidl::WorkBundle& workBundle) override {
+        std::list<std::unique_ptr<C2Work>> workItems;
+        if (!c2_aidl::utils::FromAidl(&workItems, workBundle)) {
+            LOG(DEBUG) << "onWorkDone -- received corrupted WorkBundle.";
+            return ::ndk::ScopedAStatus::ok();
+        }
+        // release input buffers potentially held by the component from queue
+        std::shared_ptr<Codec2Client::Component> strongComponent =
+                component.lock();
+        if (strongComponent) {
+            strongComponent->handleOnWorkDone(workItems);
+        }
+        if (std::shared_ptr<Codec2Client::Listener> listener = base.lock()) {
+            listener->onWorkDone(component, workItems);
+        } else {
+            LOG(DEBUG) << "onWorkDone -- listener died.";
+        }
+        return ::ndk::ScopedAStatus::ok();
+    }
+
+    virtual ::ndk::ScopedAStatus onTripped(
+            const std::vector<c2_aidl::SettingResult>& settingResults) override {
+        std::vector<std::shared_ptr<C2SettingResult>> c2SettingResults(
+                settingResults.size());
+        for (size_t i = 0; i < settingResults.size(); ++i) {
+            std::unique_ptr<C2SettingResult> c2SettingResult;
+            if (!c2_aidl::utils::FromAidl(&c2SettingResult, settingResults[i])) {
+                LOG(DEBUG) << "onTripped -- received corrupted SettingResult.";
+                return ::ndk::ScopedAStatus::ok();
+            }
+            c2SettingResults[i] = std::move(c2SettingResult);
+        }
+        if (std::shared_ptr<Codec2Client::Listener> listener = base.lock()) {
+            listener->onTripped(component, c2SettingResults);
+        } else {
+            LOG(DEBUG) << "onTripped -- listener died.";
+        }
+        return ::ndk::ScopedAStatus::ok();
+    }
+
+    virtual ::ndk::ScopedAStatus onError(const c2_aidl::Status &s, int32_t errorCode) override {
+        LOG(DEBUG) << "onError --"
+                   << " status = " << s.status
+                   << ", errorCode = " << errorCode
+                   << ".";
+        if (std::shared_ptr<Listener> listener = base.lock()) {
+            listener->onError(component, s.status == c2_aidl::Status::OK ?
+                    errorCode : static_cast<c2_status_t>(s.status));
+        } else {
+            LOG(DEBUG) << "onError -- listener died.";
+        }
+        return ::ndk::ScopedAStatus::ok();
+    }
+
+    virtual ::ndk::ScopedAStatus onFramesRendered(
+            const std::vector<RenderedFrame>& renderedFrames) override {
+        std::shared_ptr<Listener> listener = base.lock();
+        if (!listener) {
+            LOG(DEBUG) << "onFramesRendered -- listener died.";
+            return ::ndk::ScopedAStatus::ok();
+        }
+        for (const RenderedFrame& renderedFrame : renderedFrames) {
+            listener->onFrameRendered(
+                    renderedFrame.bufferQueueId,
+                    renderedFrame.slotId,
+                    renderedFrame.timestampNs);
+        }
+        return ::ndk::ScopedAStatus::ok();
+    }
+
+    virtual ::ndk::ScopedAStatus onInputBuffersReleased(
+            const std::vector<InputBuffer>& inputBuffers) override {
+        std::shared_ptr<Listener> listener = base.lock();
+        if (!listener) {
+            LOG(DEBUG) << "onInputBuffersReleased -- listener died.";
+            return ::ndk::ScopedAStatus::ok();
+        }
+        for (const InputBuffer& inputBuffer : inputBuffers) {
+            LOG(VERBOSE) << "onInputBuffersReleased --"
+                            " received death notification of"
+                            " input buffer:"
+                            " frameIndex = " << inputBuffer.frameIndex
+                         << ", bufferIndex = " << inputBuffer.arrayIndex
+                         << ".";
+            listener->onInputBufferDone(
+                    inputBuffer.frameIndex, inputBuffer.arrayIndex);
+        }
+        return ::ndk::ScopedAStatus::ok();
+    }
+
+};
+
+// Codec2Client::Component::HidlBufferPoolSender
+struct Codec2Client::Component::HidlBufferPoolSender :
         hardware::media::c2::V1_1::utils::DefaultBufferPoolSender {
-    BufferPoolSender()
+    HidlBufferPoolSender()
           : hardware::media::c2::V1_1::utils::DefaultBufferPoolSender() {
+    }
+};
+
+// Codec2Client::Component::AidlBufferPoolSender
+struct Codec2Client::Component::AidlBufferPoolSender :
+        c2_aidl::utils::DefaultBufferPoolSender {
+    AidlBufferPoolSender()
+          : c2_aidl::utils::DefaultBufferPoolSender() {
     }
 };
 
@@ -940,36 +1041,53 @@ struct Codec2Client::Component::OutputBufferQueue :
 };
 
 // Codec2Client
-Codec2Client::Codec2Client(sp<Base> const& base,
+Codec2Client::Codec2Client(sp<HidlBase> const& base,
                            sp<c2_hidl::IConfigurable> const& configurable,
                            size_t serviceIndex)
       : Configurable{configurable},
-        mBase1_0{base},
-        mBase1_1{Base1_1::castFrom(base)},
-        mBase1_2{Base1_2::castFrom(base)},
+        mHidlBase1_0{base},
+        mHidlBase1_1{HidlBase1_1::castFrom(base)},
+        mHidlBase1_2{HidlBase1_2::castFrom(base)},
         mServiceIndex{serviceIndex} {
     Return<sp<bufferpool_hidl::IClientManager>> transResult = base->getPoolClientManager();
     if (!transResult.isOk()) {
         LOG(ERROR) << "getPoolClientManager -- transaction failed.";
     } else {
-        mHostPoolManager = static_cast<sp<bufferpool_hidl::IClientManager>>(transResult);
+        mHidlHostPoolManager = static_cast<sp<bufferpool_hidl::IClientManager>>(transResult);
     }
 }
 
-sp<Codec2Client::Base> const& Codec2Client::getBase() const {
-    return mBase1_0;
+Codec2Client::Codec2Client(std::shared_ptr<AidlBase> const& base,
+                           std::shared_ptr<c2_aidl::IConfigurable> const& configurable,
+                           size_t serviceIndex)
+      : Configurable{configurable},
+        mAidlBase{base},
+        mServiceIndex{serviceIndex} {
+    ::ndk::ScopedAStatus transStatus = base->getPoolClientManager(&mAidlHostPoolManager);
+    if (!transStatus.isOk()) {
+        LOG(ERROR) << "getPoolClientManager -- transaction failed.";
+        mAidlHostPoolManager.reset();
+    }
 }
 
-sp<Codec2Client::Base1_0> const& Codec2Client::getBase1_0() const {
-    return mBase1_0;
+sp<Codec2Client::HidlBase> const& Codec2Client::getHidlBase() const {
+    return mHidlBase1_0;
 }
 
-sp<Codec2Client::Base1_1> const& Codec2Client::getBase1_1() const {
-    return mBase1_1;
+sp<Codec2Client::HidlBase1_0> const& Codec2Client::getHidlBase1_0() const {
+    return mHidlBase1_0;
 }
 
-sp<Codec2Client::Base1_2> const& Codec2Client::getBase1_2() const {
-    return mBase1_2;
+sp<Codec2Client::HidlBase1_1> const& Codec2Client::getHidlBase1_1() const {
+    return mHidlBase1_1;
+}
+
+sp<Codec2Client::HidlBase1_2> const& Codec2Client::getHidlBase1_2() const {
+    return mHidlBase1_2;
+}
+
+::ndk::SpAIBinder Codec2Client::getAidlBase() const {
+    return mAidlBase ? mAidlBase->asBinder() : nullptr;
 }
 
 std::string const& Codec2Client::getServiceName() const {
@@ -980,13 +1098,41 @@ c2_status_t Codec2Client::createComponent(
         const C2String& name,
         const std::shared_ptr<Codec2Client::Listener>& listener,
         std::shared_ptr<Codec2Client::Component>* const component) {
+    if (mAidlBase) {
+        std::shared_ptr<Component::AidlListener> aidlListener =
+                Component::AidlListener::make<Component::AidlListener>();
+        aidlListener->base = listener;
+        std::shared_ptr<c2_aidl::IComponent> aidlComponent;
+        ::ndk::ScopedAStatus transStatus = mAidlBase->createComponent(
+                name,
+                aidlListener,
+                bufferpool2_aidl::implementation::ClientManager::getInstance(),
+                &aidlComponent);
+        c2_status_t status = GetC2Status(transStatus, "createComponent");
+        if (status != C2_OK) {
+            return status;
+        } else if (!aidlComponent) {
+            LOG(ERROR) << "createComponent(" << name.c_str()
+                       << ") -- null component.";
+            return C2_CORRUPTED;
+        }
+        *component = std::make_shared<Codec2Client::Component>(aidlComponent);
+        status = (*component)->setDeathListener((*component), listener);
+        if (status != C2_OK) {
+            LOG(ERROR) << "createComponent(" << name.c_str()
+                       << ") -- failed to set up death listener: "
+                       << status << ".";
+        }
+        (*component)->mAidlBufferPoolSender->setReceiver(mAidlHostPoolManager);
+        return status;
+    }
 
     c2_status_t status;
     sp<Component::HidlListener> hidlListener = new Component::HidlListener{};
     hidlListener->base = listener;
     Return<void> transStatus;
-    if (mBase1_2) {
-        transStatus = mBase1_2->createComponent_1_2(
+    if (mHidlBase1_2) {
+        transStatus = mHidlBase1_2->createComponent_1_2(
             name,
             hidlListener,
             bufferpool_hidl::implementation::ClientManager::getInstance(),
@@ -1001,8 +1147,8 @@ c2_status_t Codec2Client::createComponent(
                 hidlListener->component = *component;
             });
     }
-    else if (mBase1_1) {
-        transStatus = mBase1_1->createComponent_1_1(
+    else if (mHidlBase1_1) {
+        transStatus = mHidlBase1_1->createComponent_1_1(
             name,
             hidlListener,
             bufferpool_hidl::implementation::ClientManager::getInstance(),
@@ -1016,8 +1162,8 @@ c2_status_t Codec2Client::createComponent(
                 *component = std::make_shared<Codec2Client::Component>(c);
                 hidlListener->component = *component;
             });
-    } else if (mBase1_0) { // ver1_0
-        transStatus = mBase1_0->createComponent(
+    } else if (mHidlBase1_0) { // ver1_0
+        transStatus = mHidlBase1_0->createComponent(
             name,
             hidlListener,
             bufferpool_hidl::implementation::ClientManager::getInstance(),
@@ -1060,15 +1206,32 @@ c2_status_t Codec2Client::createComponent(
                    << status << ".";
     }
 
-    (*component)->mBufferPoolSender->setReceiver(mHostPoolManager);
+    (*component)->mHidlBufferPoolSender->setReceiver(mHidlHostPoolManager);
     return status;
 }
 
 c2_status_t Codec2Client::createInterface(
         const C2String& name,
         std::shared_ptr<Codec2Client::Interface>* const interface) {
+    if (mAidlBase) {
+        std::shared_ptr<c2_aidl::IComponentInterface> aidlInterface;
+        ::ndk::ScopedAStatus transStatus = mAidlBase->createInterface(
+                name,
+                &aidlInterface);
+        c2_status_t status = GetC2Status(transStatus, "createInterface");
+        if (status != C2_OK) {
+            return status;
+        } else if (!aidlInterface) {
+            LOG(ERROR) << "createInterface(" << name.c_str()
+                       << ") -- null interface.";
+            return C2_CORRUPTED;
+        }
+        interface->reset(new Codec2Client::Interface(aidlInterface));
+        return C2_OK;
+    }
+
     c2_status_t status;
-    Return<void> transStatus = mBase1_0->createInterface(
+    Return<void> transStatus = mHidlBase1_0->createInterface(
             name,
             [&status, interface](
                     c2_hidl::Status s,
@@ -1099,8 +1262,13 @@ c2_status_t Codec2Client::createInterface(
 
 c2_status_t Codec2Client::createInputSurface(
         std::shared_ptr<InputSurface>* const inputSurface) {
+    if (mAidlBase) {
+        // FIXME
+        return C2_OMITTED;
+    }
+
     c2_status_t status;
-    Return<void> transStatus = mBase1_0->createInputSurface(
+    Return<void> transStatus = mHidlBase1_0->createInputSurface(
             [&status, inputSurface](
                     c2_hidl::Status s,
                     const sp<c2_hidl::IInputSurface>& i) {
@@ -1128,7 +1296,29 @@ std::vector<C2Component::Traits> Codec2Client::_listComponents(
         bool* success) const {
     std::vector<C2Component::Traits> traits;
     std::string const& serviceName = getServiceName();
-    Return<void> transStatus = mBase1_0->listComponents(
+
+    if (mAidlBase) {
+        std::vector<c2_aidl::IComponentStore::ComponentTraits> aidlTraits;
+        ::ndk::ScopedAStatus transStatus = mAidlBase->listComponents(&aidlTraits);
+        if (!transStatus.isOk()) {
+            LOG(ERROR) << "_listComponents -- transaction failed.";
+            *success = false;
+        } else {
+            traits.resize(aidlTraits.size());
+            *success = true;
+            for (size_t i = 0; i < aidlTraits.size(); ++i) {
+                if (!c2_aidl::utils::FromAidl(&traits[i], aidlTraits[i])) {
+                    LOG(ERROR) << "_listComponents -- corrupted output.";
+                    *success = false;
+                    traits.clear();
+                    break;
+                }
+                traits[i].owner = serviceName;
+            }
+        }
+        return traits;
+    }
+    Return<void> transStatus = mHidlBase1_0->listComponents(
             [&traits, &serviceName](c2_hidl::Status s,
                    const hidl_vec<c2_hidl::IComponentStore::ComponentTraits>& t) {
                 if (s != c2_hidl::Status::OK) {
@@ -1164,12 +1354,12 @@ c2_status_t Codec2Client::copyBuffer(
     return C2_OMITTED;
 }
 
-std::shared_ptr<C2ParamReflector>
-        Codec2Client::getParamReflector() {
+std::shared_ptr<C2ParamReflector> Codec2Client::getParamReflector() {
     // TODO: this is not meant to be exposed as C2ParamReflector on the client side; instead, it
     // should reflect the HAL API.
-    struct SimpleParamReflector : public C2ParamReflector {
-        virtual std::unique_ptr<C2StructDescriptor> describe(C2Param::CoreIndex coreIndex) const {
+    struct HidlSimpleParamReflector : public C2ParamReflector {
+        std::unique_ptr<C2StructDescriptor> describe(
+                C2Param::CoreIndex coreIndex) const override {
             hidl_vec<c2_hidl::ParamIndex> indices(1);
             indices[0] = static_cast<c2_hidl::ParamIndex>(coreIndex.coreIndex());
             std::unique_ptr<C2StructDescriptor> descriptor;
@@ -1211,80 +1401,112 @@ std::shared_ptr<C2ParamReflector>
             return descriptor;
         }
 
-        SimpleParamReflector(sp<Base> base)
+        HidlSimpleParamReflector(sp<HidlBase> base)
             : mBase(base) { }
 
-        sp<Base> mBase;
+        sp<HidlBase> mBase;
+    };
+    struct AidlSimpleParamReflector : public C2ParamReflector {
+        std::unique_ptr<C2StructDescriptor> describe(
+                C2Param::CoreIndex coreIndex) const override {
+            std::vector<c2_aidl::StructDescriptor> aidlDesc;
+            std::unique_ptr<C2StructDescriptor> descriptor;
+            ::ndk::ScopedAStatus transStatus = mBase->getStructDescriptors(
+                    {int32_t(coreIndex.coreIndex())},
+                    &aidlDesc);
+            c2_status_t status = GetC2Status(transStatus, "describe");
+            if (status != C2_OK) {
+                descriptor.reset();
+            } else if (!c2_aidl::utils::FromAidl(&descriptor, aidlDesc[0])) {
+                LOG(ERROR) << "describe -- conversion failed.";
+                descriptor.reset();
+            }
+            return descriptor;
+        }
+
+        AidlSimpleParamReflector(const std::shared_ptr<AidlBase> &base)
+            : mBase(base) { }
+
+        std::shared_ptr<AidlBase> mBase;
     };
 
-    return std::make_shared<SimpleParamReflector>(mBase1_0);
+    if (mAidlBase) {
+        return std::make_shared<AidlSimpleParamReflector>(mAidlBase);
+    }
+    return std::make_shared<HidlSimpleParamReflector>(mHidlBase1_0);
 };
 
-std::vector<std::string> const& Codec2Client::GetServiceNames() {
-    static std::vector<std::string> sServiceNames{[]() {
-        using ::android::hardware::media::c2::V1_0::IComponentStore;
-        using ::android::hidl::manager::V1_2::IServiceManager;
+std::vector<std::string> Codec2Client::CacheServiceNames() {
+    std::vector<std::string> names;
 
-        while (true) {
-            sp<IServiceManager> serviceManager = IServiceManager::getService();
-            CHECK(serviceManager) << "Hardware service manager is not running.";
+    if (c2_aidl::utils::IsEnabled()) {
+        // Get AIDL service names
+        AServiceManager_forEachDeclaredInstance(
+                AidlBase::descriptor, &names, [](const char *name, void *context) {
+                    std::vector<std::string> *names = (std::vector<std::string> *)context;
+                    names->emplace_back(name);
+                });
+    }
 
-            // There are three categories of services based on names.
-            std::vector<std::string> defaultNames; // Prefixed with "default"
-            std::vector<std::string> vendorNames;  // Prefixed with "vendor"
-            std::vector<std::string> otherNames;   // Others
-            Return<void> transResult;
-            transResult = serviceManager->listManifestByInterface(
-                    IComponentStore::descriptor,
-                    [&defaultNames, &vendorNames, &otherNames](
-                            hidl_vec<hidl_string> const& instanceNames) {
-                        for (hidl_string const& instanceName : instanceNames) {
-                            char const* name = instanceName.c_str();
-                            if (strncmp(name, "default", 7) == 0) {
-                                defaultNames.emplace_back(name);
-                            } else if (strncmp(name, "vendor", 6) == 0) {
-                                vendorNames.emplace_back(name);
-                            } else {
-                                otherNames.emplace_back(name);
-                            }
-                        }
-                    });
-            if (transResult.isOk()) {
-                // Sort service names in each category.
-                std::sort(defaultNames.begin(), defaultNames.end());
-                std::sort(vendorNames.begin(), vendorNames.end());
-                std::sort(otherNames.begin(), otherNames.end());
+    // Get HIDL service names
+    using ::android::hardware::media::c2::V1_0::IComponentStore;
+    using ::android::hidl::manager::V1_2::IServiceManager;
+    while (true) {
+        sp<IServiceManager> serviceManager = IServiceManager::getService();
+        CHECK(serviceManager) << "Hardware service manager is not running.";
 
-                // Concatenate the three lists in this order: default, vendor,
-                // other.
-                std::vector<std::string>& names = defaultNames;
-                names.reserve(names.size() + vendorNames.size() + otherNames.size());
-                names.insert(names.end(),
-                             std::make_move_iterator(vendorNames.begin()),
-                             std::make_move_iterator(vendorNames.end()));
-                names.insert(names.end(),
-                             std::make_move_iterator(otherNames.begin()),
-                             std::make_move_iterator(otherNames.end()));
-
-                // Summarize to logcat.
-                if (names.empty()) {
-                    LOG(INFO) << "No Codec2 services declared in the manifest.";
-                } else {
-                    std::stringstream stringOutput;
-                    stringOutput << "Available Codec2 services:";
-                    for (std::string const& name : names) {
-                        stringOutput << " \"" << name << "\"";
-                    }
-                    LOG(INFO) << stringOutput.str();
-                }
-
-                return names;
-            }
-            LOG(ERROR) << "Could not retrieve the list of service instances of "
-                       << IComponentStore::descriptor
-                       << ". Retrying...";
+        Return<void> transResult;
+        transResult = serviceManager->listManifestByInterface(
+                IComponentStore::descriptor,
+                [&names](
+                        hidl_vec<hidl_string> const& instanceNames) {
+                    names.insert(names.end(), instanceNames.begin(), instanceNames.end());
+                });
+        if (transResult.isOk()) {
+            break;
         }
-    }()};
+        LOG(ERROR) << "Could not retrieve the list of service instances of "
+                   << IComponentStore::descriptor
+                   << ". Retrying...";
+    }
+    // Sort service names in each category.
+    std::stable_sort(
+        names.begin(), names.end(),
+        [](const std::string &a, const std::string &b) {
+            // First compare by prefix: default -> vendor -> {everything else}
+            constexpr int DEFAULT = 1;
+            constexpr int VENDOR = 2;
+            constexpr int OTHER = 3;
+            int aPrefix = ((a.compare(0, 7, "default") == 0) ? DEFAULT :
+                           (a.compare(0, 6, "vendor") == 0) ? VENDOR :
+                           OTHER);
+            int bPrefix = ((b.compare(0, 7, "default") == 0) ? DEFAULT :
+                           (b.compare(0, 6, "vendor") == 0) ? VENDOR :
+                           OTHER);
+            if (aPrefix != bPrefix) {
+                return aPrefix < bPrefix;
+            }
+            // If the prefix is the same, compare alphabetically
+            return a < b;
+        });
+
+    // Summarize to logcat.
+    if (names.empty()) {
+        LOG(INFO) << "No Codec2 services declared in the manifest.";
+    } else {
+        std::stringstream stringOutput;
+        stringOutput << "Available Codec2 services:";
+        for (std::string const& name : names) {
+            stringOutput << " \"" << name << "\"";
+        }
+        LOG(INFO) << stringOutput.str();
+    }
+
+    return names;
+}
+
+std::vector<std::string> const& Codec2Client::GetServiceNames() {
+    static std::vector<std::string> sServiceNames = CacheServiceNames();
     return sServiceNames;
 }
 
@@ -1323,14 +1545,34 @@ std::vector<std::shared_ptr<Codec2Client>> Codec2Client::
 std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
     std::string const& name = GetServiceNames()[index];
     LOG(VERBOSE) << "Creating a Codec2 client to service \"" << name << "\"";
-    sp<Base> baseStore = Base::getService(name);
+
+    if (c2_aidl::utils::IsEnabled()) {
+        std::string instanceName =
+            ::android::base::StringPrintf("%s/%s", AidlBase::descriptor, name.c_str());
+        if (AServiceManager_isDeclared(instanceName.c_str())) {
+            std::shared_ptr<AidlBase> baseStore = AidlBase::fromBinder(
+                    ::ndk::SpAIBinder(AServiceManager_waitForService(instanceName.c_str())));
+            CHECK(baseStore) << "Codec2 AIDL service \"" << name << "\""
+                                " inaccessible for unknown reasons.";
+            LOG(VERBOSE) << "Client to Codec2 AIDL service \"" << name << "\" created";
+            std::shared_ptr<c2_aidl::IConfigurable> configurable;
+            ::ndk::ScopedAStatus transStatus = baseStore->getConfigurable(&configurable);
+            CHECK(transStatus.isOk()) << "Codec2 AIDL service \"" << name << "\""
+                                        "does not have IConfigurable.";
+            return std::make_shared<Codec2Client>(baseStore, configurable, index);
+        }
+    }
+
+    std::string instanceName = "android.hardware.media.c2/" + name;
+    sp<HidlBase> baseStore = HidlBase::getService(name);
     CHECK(baseStore) << "Codec2 service \"" << name << "\""
                         " inaccessible for unknown reasons.";
     LOG(VERBOSE) << "Client to Codec2 service \"" << name << "\" created";
-    Return<sp<IConfigurable>> transResult = baseStore->getConfigurable();
+    Return<sp<c2_hidl::IConfigurable>> transResult = baseStore->getConfigurable();
     CHECK(transResult.isOk()) << "Codec2 service \"" << name << "\""
                                 "does not have IConfigurable.";
-    sp<IConfigurable> configurable = static_cast<sp<IConfigurable>>(transResult);
+    sp<c2_hidl::IConfigurable> configurable =
+        static_cast<sp<c2_hidl::IConfigurable>>(transResult);
     return std::make_shared<Codec2Client>(baseStore, configurable, index);
 }
 
@@ -1432,8 +1674,7 @@ c2_status_t Codec2Client::CreateComponentByName(
     return status;
 }
 
-std::shared_ptr<Codec2Client::Interface>
-        Codec2Client::CreateInterfaceByName(
+std::shared_ptr<Codec2Client::Interface> Codec2Client::CreateInterfaceByName(
         const char* interfaceName,
         std::shared_ptr<Codec2Client>* owner,
         size_t numberOfAttempts) {
@@ -1519,13 +1760,8 @@ std::shared_ptr<Codec2Client::InputSurface> Codec2Client::CreateInputSurface(
     return nullptr;
 }
 
-// Codec2Client::Listener
-
-Codec2Client::Listener::~Listener() {
-}
-
 // Codec2Client::Interface
-Codec2Client::Interface::Interface(const sp<Base>& base)
+Codec2Client::Interface::Interface(const sp<HidlBase>& base)
       : Configurable{
             [base]() -> sp<c2_hidl::IConfigurable> {
                 Return<sp<c2_hidl::IConfigurable>> transResult =
@@ -1535,11 +1771,91 @@ Codec2Client::Interface::Interface(const sp<Base>& base)
                         nullptr;
             }()
         },
-        mBase{base} {
+        mHidlBase{base} {
+}
+
+Codec2Client::Interface::Interface(const std::shared_ptr<AidlBase>& base)
+      : Configurable{
+            [base]() -> std::shared_ptr<c2_aidl::IConfigurable> {
+                std::shared_ptr<c2_aidl::IConfigurable> aidlConfigurable;
+                ::ndk::ScopedAStatus transStatus =
+                    base->getConfigurable(&aidlConfigurable);
+                return transStatus.isOk() ? aidlConfigurable : nullptr;
+            }()
+        },
+        mAidlBase{base} {
 }
 
 // Codec2Client::Component
-Codec2Client::Component::Component(const sp<Base>& base)
+
+class Codec2Client::Component::AidlDeathManager {
+public:
+    AidlDeathManager()
+        : mSeq(0),
+          mDeathRecipient(AIBinder_DeathRecipient_new(OnBinderDied)) {
+    }
+
+    ~AidlDeathManager() = default;
+
+    bool linkToDeath(
+            const std::shared_ptr<Component> &comp,
+            const std::shared_ptr<Listener> &listener,
+            size_t *seqPtr) {
+        std::unique_lock lock(mMutex);
+        size_t seq = mSeq++;
+        if (!mMap.try_emplace(seq, comp, listener).second) {
+            return false;
+        }
+        if (STATUS_OK != AIBinder_linkToDeath(
+                comp->mAidlBase->asBinder().get(), mDeathRecipient.get(), (void *)seq)) {
+            mMap.erase(seq);
+            return false;
+        }
+        *seqPtr = seq;
+        return true;
+    }
+
+    void unlinkToDeath(size_t seq, const std::shared_ptr<AidlBase> &base) {
+        std::unique_lock lock(mMutex);
+        AIBinder_unlinkToDeath(base->asBinder().get(), mDeathRecipient.get(), (void *)seq);
+        mMap.erase(seq);
+    }
+
+private:
+    std::mutex mMutex;
+    size_t mSeq;
+    typedef std::tuple<std::weak_ptr<Component>, std::weak_ptr<Listener>> Context;
+    std::map<size_t, Context> mMap;
+    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
+
+    bool extractContext(size_t seq, Context *context) {
+        std::unique_lock lock(mMutex);
+        auto node = mMap.extract(seq);
+        if (!node) {
+            return false;
+        }
+        *context = node.mapped();
+        return true;
+    }
+
+    static void OnBinderDied(void *cookie) {
+        size_t seq = size_t(cookie);
+        Context context;
+        if (!Component::GetAidlDeathManager()->extractContext(seq, &context)) {
+            return;
+        }
+        std::weak_ptr<Component> weakComponent;
+        std::weak_ptr<Listener> weakListener;
+        std::tie(weakComponent, weakListener) = context;
+        if (std::shared_ptr<Listener> listener = weakListener.lock()) {
+            listener->onDeath(weakComponent);
+        } else {
+            LOG(DEBUG) << "onDeath -- listener died.";
+        }
+    }
+};
+
+Codec2Client::Component::Component(const sp<HidlBase>& base)
       : Configurable{
             [base]() -> sp<c2_hidl::IConfigurable> {
                 Return<sp<c2_hidl::IComponentInterface>> transResult1 =
@@ -1555,14 +1871,14 @@ Codec2Client::Component::Component(const sp<Base>& base)
                         nullptr;
             }()
         },
-        mBase1_0{base},
-        mBase1_1{Base1_1::castFrom(base)},
-        mBase1_2{Base1_2::castFrom(base)},
-        mBufferPoolSender{std::make_unique<BufferPoolSender>()},
+        mHidlBase1_0{base},
+        mHidlBase1_1{HidlBase1_1::castFrom(base)},
+        mHidlBase1_2{HidlBase1_2::castFrom(base)},
+        mHidlBufferPoolSender{std::make_unique<HidlBufferPoolSender>()},
         mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
 }
 
-Codec2Client::Component::Component(const sp<Base1_1>& base)
+Codec2Client::Component::Component(const sp<HidlBase1_1>& base)
       : Configurable{
             [base]() -> sp<c2_hidl::IConfigurable> {
                 Return<sp<c2_hidl::IComponentInterface>> transResult1 =
@@ -1578,14 +1894,14 @@ Codec2Client::Component::Component(const sp<Base1_1>& base)
                         nullptr;
             }()
         },
-        mBase1_0{base},
-        mBase1_1{base},
-        mBase1_2{Base1_2::castFrom(base)},
-        mBufferPoolSender{std::make_unique<BufferPoolSender>()},
+        mHidlBase1_0{base},
+        mHidlBase1_1{base},
+        mHidlBase1_2{HidlBase1_2::castFrom(base)},
+        mHidlBufferPoolSender{std::make_unique<HidlBufferPoolSender>()},
         mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
 }
 
-Codec2Client::Component::Component(const sp<Base1_2>& base)
+Codec2Client::Component::Component(const sp<HidlBase1_2>& base)
       : Configurable{
             [base]() -> sp<c2_hidl::IConfigurable> {
                 Return<sp<c2_hidl::IComponentInterface>> transResult1 =
@@ -1601,22 +1917,54 @@ Codec2Client::Component::Component(const sp<Base1_2>& base)
                         nullptr;
             }()
         },
-        mBase1_0{base},
-        mBase1_1{base},
-        mBase1_2{base},
-        mBufferPoolSender{std::make_unique<BufferPoolSender>()},
+        mHidlBase1_0{base},
+        mHidlBase1_1{base},
+        mHidlBase1_2{base},
+        mHidlBufferPoolSender{std::make_unique<HidlBufferPoolSender>()},
+        mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
+}
+
+Codec2Client::Component::Component(const std::shared_ptr<AidlBase> &base)
+      : Configurable{
+            [base]() -> std::shared_ptr<c2_aidl::IConfigurable> {
+                std::shared_ptr<c2_aidl::IComponentInterface> aidlIntf;
+                ::ndk::ScopedAStatus transStatus = base->getInterface(&aidlIntf);
+                if (!transStatus.isOk()) {
+                    return nullptr;
+                }
+                std::shared_ptr<c2_aidl::IConfigurable> aidlConfigurable;
+                transStatus = aidlIntf->getConfigurable(&aidlConfigurable);
+                return transStatus.isOk() ? aidlConfigurable : nullptr;
+            }()
+        },
+        mAidlBase{base},
+        mAidlBufferPoolSender{std::make_unique<AidlBufferPoolSender>()},
         mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
 }
 
 Codec2Client::Component::~Component() {
+    if (mAidlDeathSeq) {
+        GetAidlDeathManager()->unlinkToDeath(*mAidlDeathSeq, mAidlBase);
+    }
 }
 
 c2_status_t Codec2Client::Component::createBlockPool(
         C2Allocator::id_t id,
         C2BlockPool::local_id_t* blockPoolId,
         std::shared_ptr<Codec2Client::Configurable>* configurable) {
+    if (mAidlBase) {
+        c2_aidl::IComponent::BlockPool aidlBlockPool;
+        ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(id, &aidlBlockPool);
+        c2_status_t status = GetC2Status(transStatus, "createBlockPool");
+        if (status != C2_OK) {
+            return status;
+        }
+        *blockPoolId = aidlBlockPool.blockPoolId;
+        *configurable = std::make_shared<Configurable>(aidlBlockPool.configurable);
+        return C2_OK;
+    }
     c2_status_t status;
-    Return<void> transStatus = mBase1_0->createBlockPool(
+    Return<void> transStatus = mHidlBase1_0->createBlockPool(
             static_cast<uint32_t>(id),
             [&status, blockPoolId, configurable](
                     c2_hidl::Status s,
@@ -1641,7 +1989,11 @@ c2_status_t Codec2Client::Component::createBlockPool(
 
 c2_status_t Codec2Client::Component::destroyBlockPool(
         C2BlockPool::local_id_t localId) {
-    Return<c2_hidl::Status> transResult = mBase1_0->destroyBlockPool(
+    if (mAidlBase) {
+        ::ndk::ScopedAStatus transStatus = mAidlBase->destroyBlockPool(localId);
+        return GetC2Status(transStatus, "destroyBlockPool");
+    }
+    Return<c2_hidl::Status> transResult = mHidlBase1_0->destroyBlockPool(
             static_cast<uint64_t>(localId));
     if (!transResult.isOk()) {
         LOG(ERROR) << "destroyBlockPool -- transaction failed.";
@@ -1658,12 +2010,21 @@ void Codec2Client::Component::handleOnWorkDone(
 
 c2_status_t Codec2Client::Component::queue(
         std::list<std::unique_ptr<C2Work>>* const items) {
+    if (mAidlBase) {
+        c2_aidl::WorkBundle workBundle;
+        if (!c2_aidl::utils::ToAidl(&workBundle, *items, mAidlBufferPoolSender.get())) {
+            LOG(ERROR) << "queue -- bad input.";
+            return C2_TRANSACTION_FAILED;
+        }
+        ::ndk::ScopedAStatus transStatus = mAidlBase->queue(workBundle);
+        return GetC2Status(transStatus, "queue");
+    }
     c2_hidl::WorkBundle workBundle;
-    if (!objcpy(&workBundle, *items, mBufferPoolSender.get())) {
+    if (!c2_hidl::utils::objcpy(&workBundle, *items, mHidlBufferPoolSender.get())) {
         LOG(ERROR) << "queue -- bad input.";
         return C2_TRANSACTION_FAILED;
     }
-    Return<c2_hidl::Status> transStatus = mBase1_0->queue(workBundle);
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->queue(workBundle);
     if (!transStatus.isOk()) {
         LOG(ERROR) << "queue -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1679,25 +2040,38 @@ c2_status_t Codec2Client::Component::queue(
 c2_status_t Codec2Client::Component::flush(
         C2Component::flush_mode_t mode,
         std::list<std::unique_ptr<C2Work>>* const flushedWork) {
-    (void)mode; // Flush mode isn't supported in HIDL yet.
-    c2_status_t status;
-    Return<void> transStatus = mBase1_0->flush(
-            [&status, flushedWork](
-                    c2_hidl::Status s, const c2_hidl::WorkBundle& wb) {
-                status = static_cast<c2_status_t>(s);
-                if (status != C2_OK) {
-                    LOG(DEBUG) << "flush -- call failed: " << status << ".";
-                    return;
-                }
-                if (!c2_hidl::utils::objcpy(flushedWork, wb)) {
-                    status = C2_CORRUPTED;
-                } else {
-                    status = C2_OK;
-                }
-            });
-    if (!transStatus.isOk()) {
-        LOG(ERROR) << "flush -- transaction failed.";
-        return C2_TRANSACTION_FAILED;
+    (void)mode; // Flush mode isn't supported in HIDL/AIDL yet.
+    c2_status_t status = C2_OK;
+    if (mAidlBase) {
+        c2_aidl::WorkBundle workBundle;
+        ::ndk::ScopedAStatus transStatus = mAidlBase->flush(&workBundle);
+        c2_status_t status = GetC2Status(transStatus, "flush");
+        if (status != C2_OK) {
+            return status;
+        }
+        if (!c2_aidl::utils::FromAidl(flushedWork, workBundle)) {
+            LOG(DEBUG) << "flush -- flushedWork corrupted.";
+            return C2_CORRUPTED;
+        }
+    } else {
+        Return<void> transStatus = mHidlBase1_0->flush(
+                [&status, flushedWork](
+                        c2_hidl::Status s, const c2_hidl::WorkBundle& wb) {
+                    status = static_cast<c2_status_t>(s);
+                    if (status != C2_OK) {
+                        LOG(DEBUG) << "flush -- call failed: " << status << ".";
+                        return;
+                    }
+                    if (!c2_hidl::utils::objcpy(flushedWork, wb)) {
+                        status = C2_CORRUPTED;
+                    } else {
+                        status = C2_OK;
+                    }
+                });
+        if (!transStatus.isOk()) {
+            LOG(ERROR) << "flush -- transaction failed.";
+            return C2_TRANSACTION_FAILED;
+        }
     }
 
     // Indices of flushed work items.
@@ -1722,7 +2096,12 @@ c2_status_t Codec2Client::Component::flush(
 }
 
 c2_status_t Codec2Client::Component::drain(C2Component::drain_mode_t mode) {
-    Return<c2_hidl::Status> transStatus = mBase1_0->drain(
+    if (mAidlBase) {
+        ::ndk::ScopedAStatus transStatus = mAidlBase->drain(
+                mode == C2Component::DRAIN_COMPONENT_WITH_EOS);
+        return GetC2Status(transStatus, "drain");
+    }
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->drain(
             mode == C2Component::DRAIN_COMPONENT_WITH_EOS);
     if (!transStatus.isOk()) {
         LOG(ERROR) << "drain -- transaction failed.";
@@ -1737,7 +2116,11 @@ c2_status_t Codec2Client::Component::drain(C2Component::drain_mode_t mode) {
 }
 
 c2_status_t Codec2Client::Component::start() {
-    Return<c2_hidl::Status> transStatus = mBase1_0->start();
+    if (mAidlBase) {
+        ::ndk::ScopedAStatus transStatus = mAidlBase->start();
+        return GetC2Status(transStatus, "start");
+    }
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->start();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "start -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1751,7 +2134,11 @@ c2_status_t Codec2Client::Component::start() {
 }
 
 c2_status_t Codec2Client::Component::stop() {
-    Return<c2_hidl::Status> transStatus = mBase1_0->stop();
+    if (mAidlBase) {
+        ::ndk::ScopedAStatus transStatus = mAidlBase->stop();
+        return GetC2Status(transStatus, "stop");
+    }
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->stop();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "stop -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1765,7 +2152,11 @@ c2_status_t Codec2Client::Component::stop() {
 }
 
 c2_status_t Codec2Client::Component::reset() {
-    Return<c2_hidl::Status> transStatus = mBase1_0->reset();
+    if (mAidlBase) {
+        ::ndk::ScopedAStatus transStatus = mAidlBase->reset();
+        return GetC2Status(transStatus, "reset");
+    }
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->reset();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "reset -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1779,7 +2170,11 @@ c2_status_t Codec2Client::Component::reset() {
 }
 
 c2_status_t Codec2Client::Component::release() {
-    Return<c2_hidl::Status> transStatus = mBase1_0->release();
+    if (mAidlBase) {
+        ::ndk::ScopedAStatus transStatus = mAidlBase->release();
+        return GetC2Status(transStatus, "release");
+    }
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->release();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "release -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1796,11 +2191,25 @@ c2_status_t Codec2Client::Component::configureVideoTunnel(
         uint32_t avSyncHwId,
         native_handle_t** sidebandHandle) {
     *sidebandHandle = nullptr;
-    if (!mBase1_1) {
+    if (mAidlBase) {
+        ::aidl::android::hardware::common::NativeHandle handle;
+        ::ndk::ScopedAStatus transStatus = mAidlBase->configureVideoTunnel(avSyncHwId, &handle);
+        c2_status_t status = GetC2Status(transStatus, "configureVideoTunnel");
+        if (status != C2_OK) {
+            return status;
+        }
+        if (isAidlNativeHandleEmpty(handle)) {
+            LOG(DEBUG) << "configureVideoTunnel -- empty handle returned";
+        } else {
+            *sidebandHandle = dupFromAidl(handle);
+        }
+        return C2_OK;
+    }
+    if (!mHidlBase1_1) {
         return C2_OMITTED;
     }
     c2_status_t status{};
-    Return<void> transStatus = mBase1_1->configureVideoTunnel(avSyncHwId,
+    Return<void> transStatus = mHidlBase1_1->configureVideoTunnel(avSyncHwId,
             [&status, sidebandHandle](
                     c2_hidl::Status s, hardware::hidl_handle const& h) {
                 status = static_cast<c2_status_t>(s);
@@ -1841,8 +2250,8 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         bqId = 0;
         mOutputBufferQueue->configure(nullIgbp, generation, 0, maxDequeueCount, nullptr);
     } else {
-        mOutputBufferQueue->configure(surface, generation, bqId, maxDequeueCount, mBase1_2 ?
-                                      &syncObj : nullptr);
+        mOutputBufferQueue->configure(surface, generation, bqId, maxDequeueCount,
+                                      mHidlBase1_2 ? &syncObj : nullptr);
     }
 
     // set consumer bits
@@ -1881,11 +2290,15 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     ALOGD("setOutputSurface -- generation=%u consumer usage=%#llx%s",
             generation, (long long)consumerUsage, syncObj ? " sync" : "");
 
+    if (mAidlBase) {
+        // FIXME
+        return C2_OMITTED;
+    }
     Return<c2_hidl::Status> transStatus = syncObj ?
-            mBase1_2->setOutputSurfaceWithSyncObj(
+            mHidlBase1_2->setOutputSurfaceWithSyncObj(
                     static_cast<uint64_t>(blockPoolId),
                     bqId == 0 ? nullHgbp : igbp, *syncObj) :
-            mBase1_0->setOutputSurface(
+            mHidlBase1_0->setOutputSurface(
                     static_cast<uint64_t>(blockPoolId),
                     bqId == 0 ? nullHgbp : igbp);
 
@@ -1925,7 +2338,11 @@ void Codec2Client::Component::stopUsingOutputSurface(
         C2BlockPool::local_id_t blockPoolId) {
     std::scoped_lock lock(mOutputMutex);
     mOutputBufferQueue->stop();
-    Return<c2_hidl::Status> transStatus = mBase1_0->setOutputSurface(
+    if (mAidlBase) {
+        // FIXME
+        return;
+    }
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->setOutputSurface(
             static_cast<uint64_t>(blockPoolId), nullptr);
     if (!transStatus.isOk()) {
         LOG(ERROR) << "setOutputSurface(stopUsingOutputSurface) -- transaction failed.";
@@ -1943,8 +2360,12 @@ void Codec2Client::Component::stopUsingOutputSurface(
 c2_status_t Codec2Client::Component::connectToInputSurface(
         const std::shared_ptr<InputSurface>& inputSurface,
         std::shared_ptr<InputSurfaceConnection>* connection) {
+    if (mAidlBase) {
+        // FIXME
+        return C2_OMITTED;
+    }
     c2_status_t status;
-    Return<void> transStatus = mBase1_0->connectToInputSurface(
+    Return<void> transStatus = mHidlBase1_0->connectToInputSurface(
             inputSurface->mBase,
             [&status, connection](
                     c2_hidl::Status s, const sp<c2_hidl::IInputSurfaceConnection>& c) {
@@ -1967,8 +2388,12 @@ c2_status_t Codec2Client::Component::connectToOmxInputSurface(
         const sp<HGraphicBufferProducer1>& producer,
         const sp<HGraphicBufferSource>& source,
         std::shared_ptr<InputSurfaceConnection>* connection) {
+    if (mAidlBase) {
+        LOG(WARNING) << "Connecting to OMX input surface is not supported for AIDL C2 HAL";
+        return C2_OMITTED;
+    }
     c2_status_t status;
-    Return<void> transStatus = mBase1_0->connectToOmxInputSurface(
+    Return<void> transStatus = mHidlBase1_0->connectToOmxInputSurface(
             producer, source,
             [&status, connection](
                     c2_hidl::Status s, const sp<c2_hidl::IInputSurfaceConnection>& c) {
@@ -1988,7 +2413,11 @@ c2_status_t Codec2Client::Component::connectToOmxInputSurface(
 }
 
 c2_status_t Codec2Client::Component::disconnectFromInputSurface() {
-    Return<c2_hidl::Status> transStatus = mBase1_0->disconnectFromInputSurface();
+    if (mAidlBase) {
+        // FIXME
+        return C2_OMITTED;
+    }
+    Return<c2_hidl::Status> transStatus = mHidlBase1_0->disconnectFromInputSurface();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "disconnectToInputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -2000,6 +2429,12 @@ c2_status_t Codec2Client::Component::disconnectFromInputSurface() {
                    << status << ".";
     }
     return status;
+}
+
+Codec2Client::Component::AidlDeathManager *Codec2Client::Component::GetAidlDeathManager() {
+    // This object never gets destructed
+    static AidlDeathManager *sManager = new AidlDeathManager();
+    return sManager;
 }
 
 c2_status_t Codec2Client::Component::setDeathListener(
@@ -2022,12 +2457,20 @@ c2_status_t Codec2Client::Component::setDeathListener(
         }
     };
 
+    if (component->mAidlBase) {
+        size_t seq;
+        if (GetAidlDeathManager()->linkToDeath(component, listener, &seq)) {
+            component->mAidlDeathSeq = seq;
+        }
+        return C2_OK;
+    }
+
     sp<HidlDeathRecipient> deathRecipient = new HidlDeathRecipient();
     deathRecipient->base = listener;
     deathRecipient->component = component;
 
     component->mDeathRecipient = deathRecipient;
-    Return<bool> transResult = component->mBase1_0->linkToDeath(
+    Return<bool> transResult = component->mHidlBase1_0->linkToDeath(
             component->mDeathRecipient, 0);
     if (!transResult.isOk()) {
         LOG(ERROR) << "setDeathListener -- linkToDeath() transaction failed.";
