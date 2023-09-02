@@ -618,13 +618,15 @@ std::variant<status_t, RouteTraits::Element> PolicySerializer::deserialize<Route
     }
     // Convert Sink name to port pointer
     sp<PolicyAudioPort> sink = ctx->findPortByTagName(sinkAttr);
-    if (sink == NULL && !mIgnoreVendorExtensions) {
-        ALOGE("%s: no sink found with name=%s", __func__, sinkAttr.c_str());
-        return BAD_VALUE;
-    } else if (sink == NULL) {
-        ALOGW("Skipping route to sink \"%s\" as it likely has vendor extension type",
-                sinkAttr.c_str());
-        return NO_INIT;
+    if (sink == NULL) {
+        if (!mIgnoreVendorExtensions) {
+            ALOGE("%s: no sink found with name \"%s\"", __func__, sinkAttr.c_str());
+            return BAD_VALUE;
+        } else {
+            ALOGW("%s: skipping route to sink \"%s\" as it likely has vendor extension type",
+                  __func__, sinkAttr.c_str());
+            return NO_INIT;
+        }
     }
     route->setSink(sink);
 
@@ -641,12 +643,14 @@ std::variant<status_t, RouteTraits::Element> PolicySerializer::deserialize<Route
     while (devTag != NULL) {
         if (strlen(devTag) != 0) {
             sp<PolicyAudioPort> source = ctx->findPortByTagName(devTag);
-            if (source == NULL && !mIgnoreVendorExtensions) {
-                ALOGE("%s: no source found with name=%s", __func__, devTag);
-                return BAD_VALUE;
-            } else if (source == NULL) {
-                ALOGW("Skipping route source \"%s\" as it likely has vendor extension type",
-                        devTag);
+            if (source == NULL) {
+                if (!mIgnoreVendorExtensions) {
+                    ALOGE("%s: no source found with name \"%s\"", __func__, devTag);
+                    return BAD_VALUE;
+                } else {
+                    ALOGW("%s: skipping route source \"%s\" as it likely has vendor extension type",
+                          __func__, devTag);
+                }
             } else {
                 sources.add(source);
             }
@@ -728,10 +732,16 @@ std::variant<status_t, ModuleTraits::Element> PolicySerializer::deserialize<Modu
                         sp<DeviceDescriptor> device = module->getDeclaredDevices().
                                 getDeviceFromTagName(std::string(reinterpret_cast<const char*>(
                                                         attachedDevice.get())));
-                        if (device == nullptr && mIgnoreVendorExtensions) {
-                            ALOGW("Skipped attached device \"%s\" because it likely uses a vendor"
-                                    "extension type",
-                                    reinterpret_cast<const char*>(attachedDevice.get()));
+                        if (device == NULL) {
+                            if (mIgnoreVendorExtensions) {
+                                ALOGW("%s: skipped attached device \"%s\" because it likely uses a "
+                                      "vendor extension type",
+                                      __func__,
+                                      reinterpret_cast<const char*>(attachedDevice.get()));
+                            } else {
+                                ALOGE("%s: got null device in %s, \"%s\"", __func__, child->name,
+                                      reinterpret_cast<const char*>(attachedDevice.get()));
+                            }
                             continue;
                         }
                         ctx->addDevice(device);
