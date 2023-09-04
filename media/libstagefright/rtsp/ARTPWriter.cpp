@@ -105,6 +105,7 @@ ARTPWriter::ARTPWriter(int fd)
 
     mRTCPAddr = mRTPAddr;
     mRTCPAddr.sin_port = htons(ntohs(mRTPAddr.sin_port) | 1);
+    mVPSBuf = NULL;
     mSPSBuf = NULL;
     mPPSBuf = NULL;
 
