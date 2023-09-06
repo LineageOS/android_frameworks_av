@@ -32,7 +32,8 @@ using namespace android;
 int main() {
     ALOGD("Tuner service starting");
 
-    if (!property_get_bool("tuner.server.enable", false)) {
+    if (!property_get_bool("tuner.server.enable", false)
+        && !property_get_bool("ro.tuner.lazyhal", false)) {
         ALOGD("tuner is not enabled, terminating");
         return 0;
     }
