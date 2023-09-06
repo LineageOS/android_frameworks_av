@@ -14,6 +14,7 @@ cc_aconfig_library {
     name: "aconfig_mediacodec_flags_c_lib",
     min_sdk_version: "30",
     vendor_available: true,
+    double_loadable: true,
     apex_available: [
         "//apex_available:platform",
         "com.android.media.swcodec",
