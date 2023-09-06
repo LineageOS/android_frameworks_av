@@ -114,7 +114,6 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
             .usage = AHARDWAREBUFFER_USAGE_CPU_READ_RARELY |
                      AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
                      AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
-                     AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY |
                      AHARDWAREBUFFER_USAGE_VIDEO_ENCODE,
             .stride = 0,
             .rfu0 = 0,
