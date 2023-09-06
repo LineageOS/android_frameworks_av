@@ -227,7 +227,7 @@ AidlConversionDp::readChannelConfigFromParam(EffectParamReader& param) {
     RETURN_IF_ERROR(param.readFromValue(&enable));
 
     return DynamicsProcessing::ChannelConfig(
-            {.enable = VALUE_OR_RETURN(convertIntegral<bool>(enable)), .channel = channel});
+            {.channel = channel, .enable = VALUE_OR_RETURN(convertIntegral<bool>(enable))});
 }
 
 ConversionResult<DynamicsProcessing::EqBandConfig>

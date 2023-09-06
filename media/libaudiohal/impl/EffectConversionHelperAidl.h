@@ -72,6 +72,11 @@ class EffectConversionHelperAidl {
 
     static constexpr int kDefaultframeCount = 0x100;
 
+    template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+    static inline std::string numericPointerToString(T* pt) {
+        return pt ? std::to_string(*pt) : "nullptr";
+    }
+
     using AudioChannelLayout = aidl::android::media::audio::common::AudioChannelLayout;
     const aidl::android::media::audio::common::AudioConfig kDefaultAudioConfig = {
             .base = {.sampleRate = 44100,

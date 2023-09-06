@@ -101,6 +101,8 @@ status_t EffectConversionHelperAidl::handleInit(uint32_t cmdSize __unused,
                                                 const void* pCmdData __unused, uint32_t* replySize,
                                                 void* pReplyData) {
     if (!replySize || *replySize < sizeof(int) || !pReplyData) {
+        ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
+              numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
@@ -110,8 +112,10 @@ status_t EffectConversionHelperAidl::handleInit(uint32_t cmdSize __unused,
 
 status_t EffectConversionHelperAidl::handleSetParameter(uint32_t cmdSize, const void* pCmdData,
                                                         uint32_t* replySize, void* pReplyData) {
-    if (cmdSize < sizeof(effect_param_t) || !pCmdData || !replySize ||
-        *replySize < sizeof(int) || !pReplyData) {
+    if (cmdSize < sizeof(effect_param_t) || !pCmdData || !replySize || *replySize < sizeof(int) ||
+        !pReplyData) {
+        ALOGE("%s parameter invalid, cmdSize %u pCmdData %p replySize %s pReplyData %p", __func__,
+              cmdSize, pCmdData, numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
@@ -130,8 +134,8 @@ status_t EffectConversionHelperAidl::handleSetParameter(uint32_t cmdSize, const 
 status_t EffectConversionHelperAidl::handleGetParameter(uint32_t cmdSize, const void* pCmdData,
                                                         uint32_t* replySize, void* pReplyData) {
     if (cmdSize < sizeof(effect_param_t) || !pCmdData || !replySize || !pReplyData) {
-        ALOGE("%s illegal cmdSize %u pCmdData %p replySize %p replyData %p", __func__, cmdSize,
-              pCmdData, replySize, pReplyData);
+        ALOGE("%s illegal cmdSize %u pCmdData %p replySize %s replyData %p", __func__, cmdSize,
+              pCmdData, numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
@@ -158,21 +162,21 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
                                                      uint32_t* replySize, void* pReplyData) {
     if (!replySize || *replySize != sizeof(int) || !pReplyData ||
         cmdSize != sizeof(effect_config_t)) {
-        ALOGE("%s parameter invalid %u %p %p %p", __func__, cmdSize, pCmdData, replySize,
-              pReplyData);
+        ALOGE("%s parameter invalid, cmdSize %u pCmdData %p replySize %s pReplyData %p", __func__,
+              cmdSize, pCmdData, numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
     effect_config_t* config = (effect_config_t*)pCmdData;
     Parameter::Common common = {
+            .session = mCommon.session,
+            .ioHandle = mCommon.ioHandle,
             .input =
                     VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfig(
                             config->inputCfg, mIsInputStream)),
             .output =
                     VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfig(
-                            config->outputCfg, mIsInputStream)),
-            .session = mCommon.session,
-            .ioHandle = mCommon.ioHandle};
+                            config->outputCfg, mIsInputStream))};
 
     State state;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
@@ -224,13 +228,19 @@ status_t EffectConversionHelperAidl::handleGetConfig(uint32_t cmdSize __unused,
                                                      const void* pCmdData __unused,
                                                      uint32_t* replySize, void* pReplyData) {
     if (!replySize || *replySize != sizeof(effect_config_t) || !pReplyData) {
-        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
+              numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
     Parameter param;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(
             Parameter::Id::make<Parameter::Id::commonTag>(Parameter::common), &param)));
+    if (param.getTag() != Parameter::common) {
+        *replySize = 0;
+        ALOGW("%s no valid common tag return from HAL: %s", __func__, param.toString().c_str());
+        return BAD_VALUE;
+    }
 
     const auto& common = param.get<Parameter::common>();
     effect_config_t* pConfig = (effect_config_t*)pReplyData;
@@ -245,7 +255,8 @@ status_t EffectConversionHelperAidl::handleReset(uint32_t cmdSize __unused,
                                                  const void* pCmdData __unused, uint32_t* replySize,
                                                  void* pReplyData) {
     if (!replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
+              numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
@@ -256,7 +267,8 @@ status_t EffectConversionHelperAidl::handleEnable(uint32_t cmdSize __unused,
                                                   const void* pCmdData __unused,
                                                   uint32_t* replySize, void* pReplyData) {
     if (!replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
+              numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
@@ -267,7 +279,8 @@ status_t EffectConversionHelperAidl::handleDisable(uint32_t cmdSize __unused,
                                                    const void* pCmdData __unused,
                                                    uint32_t* replySize, void* pReplyData) {
     if (!replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
+              numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
@@ -277,8 +290,8 @@ status_t EffectConversionHelperAidl::handleDisable(uint32_t cmdSize __unused,
 status_t EffectConversionHelperAidl::handleSetAudioSource(uint32_t cmdSize, const void* pCmdData,
                                                           uint32_t* replySize, void* pReplyData) {
     if (cmdSize != sizeof(uint32_t) || !pCmdData || !replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %u %p %p %p", __func__, cmdSize, pCmdData, replySize,
-              pReplyData);
+        ALOGE("%s parameter invalid, cmdSize %u pCmdData %p replySize %s pReplyData %p", __func__,
+              cmdSize, pCmdData, numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
     if (!getDescriptor().common.flags.audioSourceIndication) {
@@ -297,8 +310,8 @@ status_t EffectConversionHelperAidl::handleSetAudioSource(uint32_t cmdSize, cons
 status_t EffectConversionHelperAidl::handleSetAudioMode(uint32_t cmdSize, const void* pCmdData,
                                                         uint32_t* replySize, void* pReplyData) {
     if (cmdSize != sizeof(uint32_t) || !pCmdData || !replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %u %p %p %p", __func__, cmdSize, pCmdData, replySize,
-              pReplyData);
+        ALOGE("%s parameter invalid, cmdSize %u pCmdData %p replySize %s pReplyData %p", __func__,
+              cmdSize, pCmdData, numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
     if (!getDescriptor().common.flags.audioModeIndication) {
@@ -316,8 +329,8 @@ status_t EffectConversionHelperAidl::handleSetAudioMode(uint32_t cmdSize, const 
 status_t EffectConversionHelperAidl::handleSetDevice(uint32_t cmdSize, const void* pCmdData,
                                                      uint32_t* replySize, void* pReplyData) {
     if (cmdSize != sizeof(uint32_t) || !pCmdData || !replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %u %p %p %p", __func__, cmdSize, pCmdData, replySize,
-              pReplyData);
+        ALOGE("%s parameter invalid, cmdSize %u pCmdData %p replySize %s pReplyData %p", __func__,
+              cmdSize, pCmdData, numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
     if (!getDescriptor().common.flags.deviceIndication) {
@@ -353,21 +366,27 @@ status_t EffectConversionHelperAidl::handleSetVolume(uint32_t cmdSize, const voi
     }
 
     constexpr uint32_t unityGain = 1 << 24;
-    Parameter::VolumeStereo requestedVolume = {.left = (float)(*(uint32_t*)pCmdData) / unityGain,
-                                      .right = (float)(*(uint32_t*)pCmdData + 1) / unityGain};
-
+    uint32_t vl = *(uint32_t*)pCmdData;
+    uint32_t vr = *((uint32_t*)pCmdData + 1);
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mEffect->setParameter(Parameter::make<Parameter::volumeStereo>(requestedVolume))));
+            mEffect->setParameter(Parameter::make<Parameter::volumeStereo>(Parameter::VolumeStereo(
+                    {.left = (float)vl / unityGain, .right = (float)vr / unityGain})))));
 
-    // get volume from effect and set if changed.
+    // get volume from effect and set if changed, return the volume in command if HAL not return
+    // correct parameter.
     Parameter::Id id = Parameter::Id::make<Parameter::Id::commonTag>(Parameter::volumeStereo);
     Parameter volParam;
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getParameter(id, &volParam)));
-    Parameter::VolumeStereo appliedVolume = volParam.get<Parameter::volumeStereo>();
+    const status_t getParamStatus = statusTFromBinderStatus(mEffect->getParameter(id, &volParam));
+    if (getParamStatus != OK || volParam.getTag() != Parameter::volumeStereo) {
+        ALOGW("%s no valid volume return from HAL, status %d: %s, return volume in command",
+              __func__, getParamStatus, volParam.toString().c_str());
+    } else {
+        Parameter::VolumeStereo appliedVolume = volParam.get<Parameter::volumeStereo>();
+        vl = (uint32_t)(appliedVolume.left * unityGain);
+        vr = (uint32_t)(appliedVolume.right * unityGain);
+    }
 
     if (replySize && *replySize == 2 * sizeof(uint32_t) && pReplyData) {
-        uint32_t vl = (uint32_t)(appliedVolume.left * unityGain);
-        uint32_t vr = (uint32_t)(appliedVolume.right * unityGain);
         uint32_t vol_ret[2] = {vl, vr};
         memcpy(pReplyData, vol_ret, sizeof(vol_ret));
     }
@@ -377,8 +396,8 @@ status_t EffectConversionHelperAidl::handleSetVolume(uint32_t cmdSize, const voi
 status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const void* pCmdData,
                                                       uint32_t* replySize, void* pReplyData) {
     if (cmdSize < sizeof(effect_offload_param_t) || !pCmdData || !replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %u %p %p %p", __func__, cmdSize, pCmdData, replySize,
-              pReplyData);
+        ALOGE("%s parameter invalid, cmdSize %u pCmdData %p replySize %s pReplyData %p", __func__,
+              cmdSize, pCmdData, numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
     effect_offload_param_t* offload = (effect_offload_param_t*)pCmdData;
@@ -410,7 +429,8 @@ status_t EffectConversionHelperAidl::handleVisualizerCapture(uint32_t cmdSize __
                                                              uint32_t* replySize,
                                                              void* pReplyData) {
     if (!replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        ALOGE("%s parameter invalid replySize %s pReplyData %p", __func__,
+              numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
@@ -430,7 +450,8 @@ status_t EffectConversionHelperAidl::handleVisualizerMeasure(uint32_t cmdSize __
                                                              uint32_t* replySize,
                                                              void* pReplyData) {
     if (!replySize || !pReplyData) {
-        ALOGE("%s parameter invalid %p %p", __func__, replySize, pReplyData);
+        ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
+              numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
