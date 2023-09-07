@@ -15,13 +15,12 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "Codec2-InputBufferManager"
+#define LOG_TAG "Codec2-InputBufferManager-Aidl"
 #include <android-base/logging.h>
 
-#include <codec2/hidl/1.0/InputBufferManager.h>
-#include <codec2/hidl/1.0/types.h>
+#include <codec2/aidl/InputBufferManager.h>
 
-#include <android/hardware/media/c2/1.0/IComponentListener.h>
+#include <aidl/android/hardware/media/c2/IComponentListener.h>
 #include <android-base/logging.h>
 
 #include <C2Buffer.h>
@@ -29,29 +28,29 @@
 
 #include <chrono>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
 
 using namespace ::android;
 
 void InputBufferManager::registerFrameData(
-        const sp<IComponentListener>& listener,
+        const std::shared_ptr<IComponentListener>& listener,
         const C2FrameData& input) {
     getInstance()._registerFrameData(listener, input);
 }
 
 void InputBufferManager::unregisterFrameData(
-        const wp<IComponentListener>& listener,
+        const std::weak_ptr<IComponentListener>& listener,
         const C2FrameData& input) {
     getInstance()._unregisterFrameData(listener, input);
 }
 
 void InputBufferManager::unregisterFrameData(
-        const wp<IComponentListener>& listener) {
+        const std::weak_ptr<IComponentListener>& listener) {
     getInstance()._unregisterFrameData(listener);
 }
 
@@ -61,7 +60,7 @@ void InputBufferManager::setNotificationInterval(
 }
 
 void InputBufferManager::_registerFrameData(
-        const sp<IComponentListener>& listener,
+        const std::shared_ptr<IComponentListener>& listener,
         const C2FrameData& input) {
     uint64_t frameIndex = input.ordinal.frameIndex.peeku();
     LOG(VERBOSE) << "InputBufferManager::_registerFrameData -- called with "
@@ -109,13 +108,11 @@ void InputBufferManager::_registerFrameData(
 //
 // This is called from onWorkDone() and flush().
 void InputBufferManager::_unregisterFrameData(
-        const wp<IComponentListener>& listener,
+        const std::weak_ptr<IComponentListener>& listener,
         const C2FrameData& input) {
     uint64_t frameIndex = input.ordinal.frameIndex.peeku();
     LOG(VERBOSE) << "InputBufferManager::_unregisterFrameData -- called with "
-                 << "listener @ 0x" << std::hex << listener.unsafe_get()
-                 << ", frameIndex = " << std::dec << frameIndex
-                 << ".";
+                 << "frameIndex = " << frameIndex << ".";
     std::lock_guard<std::mutex> lock(mMutex);
 
     auto findListener = mTrackedBuffersMap.find(listener);
@@ -134,11 +131,7 @@ void InputBufferManager::_unregisterFrameData(
                     if (status != C2_OK) {
                         LOG(DEBUG) << "InputBufferManager::_unregisterFrameData "
                                    << "-- unregisterOnDestroyNotify() failed "
-                                   << "(listener @ 0x"
-                                        << std::hex
-                                        << bufferId->listener.unsafe_get()
-                                   << ", frameIndex = "
-                                        << std::dec << bufferId->frameIndex
+                                   << "(frameIndex = " << bufferId->frameIndex
                                    << ", bufferIndex = " << bufferId->bufferIndex
                                    << ") => status = " << status
                                    << ".";
@@ -173,10 +166,8 @@ void InputBufferManager::_unregisterFrameData(
 // This is called when the component cleans up all input buffers, i.e., when
 // reset(), release(), stop() or ~Component() is called.
 void InputBufferManager::_unregisterFrameData(
-        const wp<IComponentListener>& listener) {
-    LOG(VERBOSE) << "InputBufferManager::_unregisterFrameData -- called with "
-                 << "listener @ 0x" << std::hex << listener.unsafe_get()
-                 << std::dec << ".";
+        const std::weak_ptr<IComponentListener>& listener) {
+    LOG(VERBOSE) << "InputBufferManager::_unregisterFrameData.";
     std::lock_guard<std::mutex> lock(mMutex);
 
     auto findListener = mTrackedBuffersMap.find(listener);
@@ -196,11 +187,7 @@ void InputBufferManager::_unregisterFrameData(
                     if (status != C2_OK) {
                         LOG(DEBUG) << "InputBufferManager::_unregisterFrameData "
                                    << "-- unregisterOnDestroyNotify() failed "
-                                   << "(listener @ 0x"
-                                        << std::hex
-                                        << bufferId->listener.unsafe_get()
-                                   << ", frameIndex = "
-                                        << std::dec << bufferId->frameIndex
+                                   << "(frameIndex = " << bufferId->frameIndex
                                    << ", bufferIndex = " << bufferId->bufferIndex
                                    << ") => status = " << status
                                    << ".";
@@ -256,16 +243,14 @@ void InputBufferManager::_onBufferDestroyed(const C2Buffer* buf, void* arg) {
                  << "buf @ 0x" << std::hex << buf
                  << ", arg @ 0x" << std::hex << arg
                  << std::dec << " -- "
-                 << "listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
-                 << ", frameIndex = " << std::dec << bufferId->frameIndex
+                 << ", frameIndex = " << bufferId->frameIndex
                  << ", bufferIndex = " << bufferId->bufferIndex
                  << ".";
     auto findListener = mTrackedBuffersMap.find(bufferId->listener);
     if (findListener == mTrackedBuffersMap.end()) {
         LOG(VERBOSE) << "InputBufferManager::_onBufferDestroyed -- "
                      << "received invalid listener: "
-                     << "listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
-                     << " (frameIndex = " << std::dec << bufferId->frameIndex
+                     << " (frameIndex = " << bufferId->frameIndex
                      << ", bufferIndex = " << bufferId->bufferIndex
                      << ").";
         return;
@@ -278,8 +263,7 @@ void InputBufferManager::_onBufferDestroyed(const C2Buffer* buf, void* arg) {
         LOG(DEBUG) << "InputBufferManager::_onBufferDestroyed -- "
                    << "received invalid frame index: "
                    << "frameIndex = " << bufferId->frameIndex
-                   << " (listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
-                   << ", bufferIndex = " << std::dec << bufferId->bufferIndex
+                   << ", bufferIndex = " << bufferId->bufferIndex
                    << ").";
         return;
     }
@@ -291,8 +275,7 @@ void InputBufferManager::_onBufferDestroyed(const C2Buffer* buf, void* arg) {
                    << "received invalid buffer index: "
                    << "bufferIndex = " << bufferId->bufferIndex
                    << " (frameIndex = " << bufferId->frameIndex
-                   << ", listener @ 0x" << std::hex << bufferId->listener.unsafe_get()
-                   << std::dec << ").";
+                   << ").";
         return;
     }
 
@@ -320,9 +303,9 @@ void InputBufferManager::_onBufferDestroyed(const C2Buffer* buf, void* arg) {
 bool InputBufferManager::processNotifications(nsecs_t* timeToRetryNs) {
 
     struct Notification {
-        sp<IComponentListener> listener;
-        hidl_vec<IComponentListener::InputBuffer> inputBuffers;
-        Notification(const sp<IComponentListener>& l, size_t s)
+        std::shared_ptr<IComponentListener> listener;
+        std::vector<IComponentListener::InputBuffer> inputBuffers;
+        Notification(const std::shared_ptr<IComponentListener>& l, size_t s)
               : listener(l), inputBuffers(s) {}
     };
     std::list<Notification> notifications;
@@ -336,7 +319,7 @@ bool InputBufferManager::processNotifications(nsecs_t* timeToRetryNs) {
         nsecs_t timeNowNs = systemTime();
         for (auto it = mDeathNotifications.begin();
                 it != mDeathNotifications.end(); ) {
-            sp<IComponentListener> listener = it->first.promote();
+            std::shared_ptr<IComponentListener> listener = it->first.lock();
             if (!listener) {
                 ++it;
                 continue;
@@ -371,7 +354,7 @@ bool InputBufferManager::processNotifications(nsecs_t* timeToRetryNs) {
 
             // Create the argument for the callback.
             notifications.emplace_back(listener, deathNotifications.count);
-            hidl_vec<IComponentListener::InputBuffer> &inputBuffers =
+            std::vector<IComponentListener::InputBuffer> &inputBuffers =
                     notifications.back().inputBuffers;
             size_t i = 0;
             for (std::pair<const uint64_t, std::vector<size_t>>& p :
@@ -466,11 +449,9 @@ InputBufferManager& InputBufferManager::getInstance() {
 }
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
-
-
+}  // namespace aidl
 
