@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef CODEC2_HIDL_V1_0_UTILS_COMPONENT_INTERFACE_H
-#define CODEC2_HIDL_V1_0_UTILS_COMPONENT_INTERFACE_H
+#ifndef CODEC2_AIDL_UTILS_COMPONENT_INTERFACE_H
+#define CODEC2_AIDL_UTILS_COMPONENT_INTERFACE_H
 
-#include <codec2/hidl/1.0/Configurable.h>
-#include <codec2/hidl/1.0/types.h>
+#include <codec2/aidl/Configurable.h>
+#include <codec2/aidl/ParamTypes.h>
 
-#include <android/hardware/media/c2/1.0/IComponentInterface.h>
-#include <hidl/Status.h>
+#include <aidl/android/hardware/media/c2/BnComponentInterface.h>
 
 #include <C2Component.h>
 #include <C2Buffer.h>
@@ -29,38 +28,35 @@
 
 #include <memory>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
-
-using ::android::hardware::Return;
-using ::android::hardware::Void;
-using ::android::sp;
 
 struct ComponentStore;
 
-struct ComponentInterface : public IComponentInterface {
+struct ComponentInterface : public BnComponentInterface {
     ComponentInterface(
             const std::shared_ptr<C2ComponentInterface>& interface,
             const std::shared_ptr<ParameterCache>& cache);
     c2_status_t status() const;
-    virtual Return<sp<IConfigurable>> getConfigurable() override;
+    ::ndk::ScopedAStatus getConfigurable(
+            std::shared_ptr<IConfigurable> *intf) override;
 
 protected:
     std::shared_ptr<C2ComponentInterface> mInterface;
-    sp<CachedConfigurable> mConfigurable;
+    std::shared_ptr<CachedConfigurable> mConfigurable;
     c2_status_t mInit;
 };
 
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
+}  // namespace aidl
 
-#endif  // CODEC2_HIDL_V1_0_UTILS_COMPONENT_INTERFACE_H
+#endif  // CODEC2_AIDL_UTILS_COMPONENT_INTERFACE_H

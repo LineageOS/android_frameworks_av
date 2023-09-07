@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef CODEC2_HIDL_V1_0_UTILS_INPUT_BUFFER_MANAGER_H
-#define CODEC2_HIDL_V1_0_UTILS_INPUT_BUFFER_MANAGER_H
+#ifndef CODEC2_AIDL_UTILS_INPUT_BUFFER_MANAGER_H
+#define CODEC2_AIDL_UTILS_INPUT_BUFFER_MANAGER_H
 
-#include <android/hardware/media/c2/1.0/IComponentListener.h>
+#include <aidl/android/hardware/media/c2/IComponentListener.h>
 #include <utils/Timers.h>
 
 #include <C2Buffer.h>
@@ -27,14 +27,12 @@
 #include <map>
 #include <thread>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
-
-using namespace ::android;
 
 /**
  * InputBufferManager
@@ -118,7 +116,7 @@ struct InputBufferManager {
      * \param input Input frame data whose input buffers are to be tracked.
      */
     static void registerFrameData(
-            const sp<IComponentListener>& listener,
+            const std::shared_ptr<IComponentListener>& listener,
             const C2FrameData& input);
 
     /**
@@ -134,7 +132,7 @@ struct InputBufferManager {
      * \param input Previously registered frame data.
      */
     static void unregisterFrameData(
-            const wp<IComponentListener>& listener,
+            const std::weak_ptr<IComponentListener>& listener,
             const C2FrameData& input);
 
     /**
@@ -150,7 +148,7 @@ struct InputBufferManager {
      * \param listener Previously registered listener.
      */
     static void unregisterFrameData(
-            const wp<IComponentListener>& listener);
+            const std::weak_ptr<IComponentListener>& listener);
 
     /**
      * Set the notification interval.
@@ -161,13 +159,13 @@ struct InputBufferManager {
 
 private:
     void _registerFrameData(
-            const sp<IComponentListener>& listener,
+            const std::shared_ptr<IComponentListener>& listener,
             const C2FrameData& input);
     void _unregisterFrameData(
-            const wp<IComponentListener>& listener,
+            const std::weak_ptr<IComponentListener>& listener,
             const C2FrameData& input);
     void _unregisterFrameData(
-            const wp<IComponentListener>& listener);
+            const std::weak_ptr<IComponentListener>& listener);
     void _setNotificationInterval(nsecs_t notificationIntervalNs);
 
     // The callback function tied to C2Buffer objects.
@@ -184,11 +182,11 @@ private:
     // Note that the "key" is bufferIndex according to operator<(). This is
     // designed to work with TrackedBuffersMap defined below.
     struct TrackedBuffer {
-        wp<IComponentListener> listener;
+        std::weak_ptr<IComponentListener> listener;
         uint64_t frameIndex;
         size_t bufferIndex;
         std::weak_ptr<C2Buffer> buffer;
-        TrackedBuffer(const wp<IComponentListener>& listener,
+        TrackedBuffer(const std::weak_ptr<IComponentListener>& listener,
                       uint64_t frameIndex,
                       size_t bufferIndex,
                       const std::shared_ptr<C2Buffer>& buffer)
@@ -204,9 +202,10 @@ private:
     // However, the value of the innermost map is TrackedBuffer, which also
     // contains an extra copy of listener and frameIndex. This is needed
     // because onBufferDestroyed() needs to know listener and frameIndex too.
-    typedef std::map<wp<IComponentListener>,
+    typedef std::map<std::weak_ptr<IComponentListener>,
                      std::map<uint64_t,
-                              std::set<TrackedBuffer*>>> TrackedBuffersMap;
+                              std::set<TrackedBuffer*>>,
+                     std::owner_less<std::weak_ptr<IComponentListener>>> TrackedBuffersMap;
 
     // Storage for pending (unsent) death notifications for one listener.
     // Each pair in member named "indices" are (frameIndex, bufferIndex) from
@@ -261,7 +260,9 @@ private:
     // A DeathNotifications object is associated to each listener. An entry in
     // this map will be removed if its associated DeathNotifications has count =
     // 0 and lastSentNs < systemTime() - mNotificationIntervalNs.
-    std::map<wp<IComponentListener>, DeathNotifications> mDeathNotifications;
+    std::map<std::weak_ptr<IComponentListener>,
+             DeathNotifications,
+             std::owner_less<std::weak_ptr<IComponentListener>>> mDeathNotifications;
 
     // Condition variable signaled when an entry is added to mDeathNotifications.
     std::condition_variable mOnBufferDestroyed;
@@ -290,11 +291,11 @@ private:
 };
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
+}  // namespace aidl
 
-#endif  // CODEC2_HIDL_V1_0_UTILS_INPUT_BUFFER_MANAGER_H
+#endif  // CODEC2_AIDL_UTILS_INPUT_BUFFER_MANAGER_H
 
