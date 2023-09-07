@@ -18,28 +18,26 @@
 #define LOG_TAG "Codec2-ComponentInterface"
 #include <android-base/logging.h>
 
-#include <codec2/hidl/1.0/Component.h>
-#include <codec2/hidl/1.0/ComponentInterface.h>
-#include <codec2/hidl/1.0/ComponentStore.h>
+#include <android/binder_auto_utils.h>
+#include <codec2/aidl/ComponentInterface.h>
+#include <codec2/aidl/Configurable.h>
 
-#include <hidl/HidlBinderSupport.h>
 #include <utils/Timers.h>
 
-#include <C2BqBufferPriv.h>
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
 
 #include <chrono>
 #include <thread>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
 
-using namespace ::android;
+using ::ndk::ScopedAStatus;
 
 namespace /* unnamed */ {
 
@@ -89,7 +87,8 @@ ComponentInterface::ComponentInterface(
         const std::shared_ptr<C2ComponentInterface>& intf,
         const std::shared_ptr<ParameterCache>& cache)
       : mInterface{intf},
-        mConfigurable{new CachedConfigurable(std::make_unique<CompIntf>(intf))} {
+        mConfigurable{SharedRefBase::make<CachedConfigurable>(
+                std::make_unique<CompIntf>(intf))} {
     mInit = mConfigurable->init(cache);
 }
 
@@ -97,14 +96,16 @@ c2_status_t ComponentInterface::status() const {
     return mInit;
 }
 
-Return<sp<IConfigurable>> ComponentInterface::getConfigurable() {
-    return mConfigurable;
+ScopedAStatus ComponentInterface::getConfigurable(
+        std::shared_ptr<IConfigurable> *configurable) {
+    *configurable = mConfigurable;
+    return ScopedAStatus::ok();
 }
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
+}  // namespace aidl
 

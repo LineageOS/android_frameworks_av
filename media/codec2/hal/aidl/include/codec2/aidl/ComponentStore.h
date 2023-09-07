@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef CODEC2_HIDL_V1_0_UTILS_COMPONENTSTORE_H
-#define CODEC2_HIDL_V1_0_UTILS_COMPONENTSTORE_H
+#ifndef CODEC2_AIDL_UTILS_COMPONENTSTORE_H
+#define CODEC2_AIDL_UTILS_COMPONENTSTORE_H
 
-#include <codec2/hidl/1.0/Component.h>
-#include <codec2/hidl/1.0/ComponentInterface.h>
-#include <codec2/hidl/1.0/Configurable.h>
+#include <android/binder_auto_utils.h>
+#include <codec2/aidl/ComponentInterface.h>
+#include <codec2/aidl/Configurable.h>
 
-#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
-#include <android/hardware/media/c2/1.0/IComponentStore.h>
-#include <hidl/Status.h>
+#include <aidl/android/hardware/media/bufferpool2/IClientManager.h>
+#include <aidl/android/hardware/media/c2/BnComponentStore.h>
 
 #include <C2Component.h>
 #include <C2Param.h>
@@ -38,23 +37,21 @@
 
 namespace android {
 class FilterWrapper;
+}  // namespace android
 
+namespace aidl {
+namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
 
-using ::android::hardware::media::bufferpool::V2_0::IClientManager;
+struct Component;
 
-using ::android::hardware::hidl_handle;
-using ::android::hardware::hidl_string;
-using ::android::hardware::hidl_vec;
-using ::android::hardware::Return;
-using ::android::hardware::Void;
-using ::android::sp;
+using ::aidl::android::hardware::media::bufferpool2::IClientManager;
 
-struct ComponentStore : public IComponentStore {
+struct ComponentStore : public BnComponentStore,
+                        public std::enable_shared_from_this<ComponentStore> {
     ComponentStore(const std::shared_ptr<C2ComponentStore>& store);
     virtual ~ComponentStore();
 
@@ -76,38 +73,38 @@ struct ComponentStore : public IComponentStore {
      */
     std::shared_ptr<ParameterCache> getParameterCache() const;
 
-    static std::shared_ptr<FilterWrapper> GetFilterWrapper();
+    static std::shared_ptr<::android::FilterWrapper> GetFilterWrapper();
 
-    // Methods from ::android::hardware::media::c2::V1_0::IComponentStore.
-    virtual Return<void> createComponent(
-            const hidl_string& name,
-            const sp<IComponentListener>& listener,
-            const sp<IClientManager>& pool,
-            createComponent_cb _hidl_cb) override;
-    virtual Return<void> createInterface(
-            const hidl_string& name,
-            createInterface_cb _hidl_cb) override;
-    virtual Return<void> listComponents(listComponents_cb _hidl_cb) override;
-    virtual Return<void> createInputSurface(
-            createInputSurface_cb _hidl_cb) override;
-    virtual Return<void> getStructDescriptors(
-            const hidl_vec<uint32_t>& indices,
-            getStructDescriptors_cb _hidl_cb) override;
-    virtual Return<sp<IClientManager>> getPoolClientManager() override;
-    virtual Return<Status> copyBuffer(
+    // Methods from ::aidl::android::hardware::media::c2::IComponentStore.
+    virtual ::ndk::ScopedAStatus createComponent(
+            const std::string& name,
+            const std::shared_ptr<IComponentListener>& listener,
+            const std::shared_ptr<IClientManager>& pool,
+            std::shared_ptr<IComponent> *component) override;
+    virtual ::ndk::ScopedAStatus createInterface(
+            const std::string& name,
+            std::shared_ptr<IComponentInterface> *intf) override;
+    virtual ::ndk::ScopedAStatus listComponents(
+            std::vector<IComponentStore::ComponentTraits>* traits) override;
+    virtual ::ndk::ScopedAStatus getStructDescriptors(
+            const std::vector<int32_t>& indices,
+            std::vector<StructDescriptor> *descs) override;
+    virtual ::ndk::ScopedAStatus getPoolClientManager(
+            std::shared_ptr<IClientManager> *manager) override;
+    virtual ::ndk::ScopedAStatus copyBuffer(
             const Buffer& src,
             const Buffer& dst) override;
-    virtual Return<sp<IConfigurable>> getConfigurable() override;
+    virtual ::ndk::ScopedAStatus getConfigurable(
+            std::shared_ptr<IConfigurable> *configurable) override;
 
     /**
      * Dumps information when lshal is called.
      */
-    virtual Return<void> debug(
-            const hidl_handle& handle,
-            const hidl_vec<hidl_string>& args) override;
+    virtual binder_status_t dump(
+            int fd, const char** args, uint32_t numArgs) override;
 
 protected:
-    sp<CachedConfigurable> mConfigurable;
+    std::shared_ptr<CachedConfigurable> mConfigurable;
     struct StoreParameterCache;
     std::shared_ptr<StoreParameterCache> mParameterCache;
 
@@ -153,10 +150,10 @@ protected:
 };
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
+}  // namespace aidl
 
-#endif  // CODEC2_HIDL_V1_0_UTILS_COMPONENTSTORE_H
+#endif  // CODEC2_AIDL_UTILS_COMPONENTSTORE_H

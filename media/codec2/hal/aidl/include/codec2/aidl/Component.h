@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef CODEC2_HIDL_V1_0_UTILS_COMPONENT_H
-#define CODEC2_HIDL_V1_0_UTILS_COMPONENT_H
+#ifndef CODEC2_AIDL_UTILS_COMPONENT_H
+#define CODEC2_AIDL_UTILS_COMPONENT_H
 
-#include <codec2/hidl/1.0/ComponentInterface.h>
-#include <codec2/hidl/1.0/Configurable.h>
-#include <codec2/hidl/1.0/types.h>
+#include <codec2/aidl/ComponentInterface.h>
+#include <codec2/aidl/Configurable.h>
+#include <codec2/aidl/BufferTypes.h>
+#include <codec2/aidl/ParamTypes.h>
 
-#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
-#include <android/hardware/media/c2/1.0/IComponent.h>
-#include <android/hardware/media/c2/1.0/IComponentInterface.h>
-#include <android/hardware/media/c2/1.0/IComponentListener.h>
-#include <android/hardware/media/c2/1.0/IComponentStore.h>
-#include <android/hardware/media/c2/1.0/IInputSink.h>
-#include <hidl/Status.h>
-#include <hwbinder/IBinder.h>
+#include <aidl/android/hardware/media/bufferpool2/IClientManager.h>
+#include <aidl/android/hardware/media/c2/BnComponent.h>
+#include <aidl/android/hardware/media/c2/IComponentInterface.h>
+#include <aidl/android/hardware/media/c2/IComponentListener.h>
+#include <aidl/android/hardware/media/c2/IComponentStore.h>
 
 #include <C2Component.h>
 #include <C2Buffer.h>
@@ -38,86 +36,50 @@
 #include <memory>
 #include <mutex>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
 
-using ::android::hardware::hidl_array;
-using ::android::hardware::hidl_memory;
-using ::android::hardware::hidl_string;
-using ::android::hardware::hidl_vec;
-using ::android::hardware::Return;
-using ::android::hardware::Void;
-using ::android::hardware::IBinder;
-using ::android::sp;
-using ::android::wp;
 
 struct ComponentStore;
 
-struct Component : public IComponent,
+struct Component : public BnComponent,
                    public std::enable_shared_from_this<Component> {
     Component(
             const std::shared_ptr<C2Component>&,
-            const sp<IComponentListener>& listener,
-            const sp<ComponentStore>& store,
-            const sp<::android::hardware::media::bufferpool::V2_0::
-                IClientManager>& clientPoolManager);
+            const std::shared_ptr<IComponentListener>& listener,
+            const std::shared_ptr<ComponentStore>& store,
+            const std::shared_ptr<bufferpool2::IClientManager>& clientPoolManager);
     c2_status_t status() const;
 
-    typedef ::android::hardware::graphics::bufferqueue::V1_0::
-            IGraphicBufferProducer HGraphicBufferProducer1;
-    typedef ::android::hardware::graphics::bufferqueue::V2_0::
-            IGraphicBufferProducer HGraphicBufferProducer2;
-
     // Methods from IComponent follow.
-    virtual Return<Status> queue(const WorkBundle& workBundle) override;
-    virtual Return<void> flush(flush_cb _hidl_cb) override;
-    virtual Return<Status> drain(bool withEos) override;
-    virtual Return<Status> setOutputSurface(
-            uint64_t blockPoolId,
-            const sp<HGraphicBufferProducer2>& surface) override;
-    virtual Return<void> connectToInputSurface(
-            const sp<IInputSurface>& inputSurface,
-            connectToInputSurface_cb _hidl_cb) override;
-    virtual Return<void> connectToOmxInputSurface(
-            const sp<HGraphicBufferProducer1>& producer,
-            const sp<::android::hardware::media::omx::V1_0::
-            IGraphicBufferSource>& source,
-            connectToOmxInputSurface_cb _hidl_cb) override;
-    virtual Return<Status> disconnectFromInputSurface() override;
-    virtual Return<void> createBlockPool(
-            uint32_t allocatorId,
-            createBlockPool_cb _hidl_cb) override;
-    virtual Return<Status> destroyBlockPool(uint64_t blockPoolId) override;
-    virtual Return<Status> start() override;
-    virtual Return<Status> stop() override;
-    virtual Return<Status> reset() override;
-    virtual Return<Status> release() override;
-    virtual Return<sp<IComponentInterface>> getInterface() override;
-    virtual Return<sp<IInputSink>> asInputSink() override;
-
-    // Returns a C2Component associated to the given sink if the sink is indeed
-    // a local component. Returns nullptr otherwise.
-    //
-    // This function is used by InputSurface::connect().
-    static std::shared_ptr<C2Component> findLocalComponent(
-            const sp<IInputSink>& sink);
+    ::ndk::ScopedAStatus queue(const WorkBundle& workBundle) override;
+    ::ndk::ScopedAStatus flush(WorkBundle *workBundle) override;
+    ::ndk::ScopedAStatus drain(bool withEos) override;
+    ::ndk::ScopedAStatus createBlockPool(
+            const IComponent::BlockPoolAllocator &allocator,
+            IComponent::BlockPool *blockPool) override;
+    ::ndk::ScopedAStatus destroyBlockPool(int64_t blockPoolId) override;
+    ::ndk::ScopedAStatus start() override;
+    ::ndk::ScopedAStatus stop() override;
+    ::ndk::ScopedAStatus reset() override;
+    ::ndk::ScopedAStatus release() override;
+    ::ndk::ScopedAStatus getInterface(
+            std::shared_ptr<IComponentInterface> *intf) override;
+    ::ndk::ScopedAStatus configureVideoTunnel(
+            int32_t avSyncHwId,
+            common::NativeHandle* handle) override;
 
 protected:
     c2_status_t mInit;
     std::shared_ptr<C2Component> mComponent;
-    sp<ComponentInterface> mInterface;
-    sp<IComponentListener> mListener;
-    sp<ComponentStore> mStore;
-    ::android::hardware::media::c2::V1_0::utils::DefaultBufferPoolSender
-            mBufferPoolSender;
-
-    struct Sink;
-    std::mutex mSinkMutex;
-    sp<Sink> mSink;
+    std::shared_ptr<ComponentInterface> mInterface;
+    std::shared_ptr<IComponentListener> mListener;
+    std::shared_ptr<ComponentStore> mStore;
+    DefaultBufferPoolSender mBufferPoolSender;
 
     std::mutex mBlockPoolsMutex;
     // This map keeps C2BlockPool objects that are created by createBlockPool()
@@ -125,7 +87,7 @@ protected:
     // destroyBlockPool(), reset() or release(), or by destroying the component.
     std::map<uint64_t, std::shared_ptr<C2BlockPool>> mBlockPools;
 
-    void initListener(const sp<Component>& self);
+    void initListener(const std::shared_ptr<Component>& self);
 
     virtual ~Component() override;
 
@@ -133,15 +95,18 @@ protected:
 
     struct Listener;
 
-    using HwDeathRecipient = ::android::hardware::hidl_death_recipient;
-    sp<HwDeathRecipient> mDeathRecipient;
+    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
+    static void OnBinderDied(void *cookie);
+    static void OnBinderUnlinked(void *cookie);
+    struct DeathContext;
+    DeathContext *mDeathContext;
 };
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
+}  // namespace aidl
 
-#endif  // CODEC2_HIDL_V1_0_UTILS_COMPONENT_H
+#endif  // CODEC2_AIDL_UTILS_COMPONENT_H
