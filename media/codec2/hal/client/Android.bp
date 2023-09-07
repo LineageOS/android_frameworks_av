@@ -23,6 +23,7 @@ cc_library {
     name: "libcodec2_client",
 
     srcs: [
+        "GraphicBufferAllocator.cpp",
         "GraphicsTracker.cpp",
         "client.cpp",
         "output.cpp",
