@@ -65,6 +65,7 @@ cc_library {
         "C2Store.cpp",
         "platform/C2BqBuffer.cpp",
         "platform/C2SurfaceSyncObj.cpp",
+        "platform/C2IgbaBuffer.cpp",
         "types.cpp",
         "util/C2Debug.cpp",
         "util/C2InterfaceHelper.cpp",
@@ -99,6 +100,7 @@ cc_library {
         "android.hardware.common.fmq-V1-ndk",
         "android.hardware.media.bufferpool@2.0",
         "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcutils",
@@ -154,6 +156,7 @@ cc_defaults {
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
         "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.c2-V1-ndk",
     ],
 
     shared_libs: [

@@ -54,8 +54,10 @@ using ::aidl::android::hardware::media::c2::BaseBlock;
 using ::aidl::android::hardware::media::c2::utils::BufferPoolTypes;
 
 using AidlNativeHandle = ::aidl::android::hardware::common::NativeHandle;
+using AidlHardwareBuffer = ::aidl::android::hardware::HardwareBuffer;
 
 constexpr BaseBlock::Tag NATIVE_BLOCK = BaseBlock::nativeBlock;
+constexpr BaseBlock::Tag HWB_BLOCK = BaseBlock::hwbBlock;
 constexpr BaseBlock::Tag POOLED_BLOCK = BaseBlock::pooledBlock;
 
 // BaseBlock -> C2BaseBlock
@@ -95,6 +97,21 @@ bool objcpy(C2BaseBlock* d, const BaseBlock& s) {
                 native_handle_close(sHandle);
                 native_handle_delete(sHandle);
             }
+            return false;
+        }
+    case HWB_BLOCK: {
+            AHardwareBuffer *pBuf =
+                    const_cast<AidlHardwareBuffer&>(
+                            s.get<HWB_BLOCK>()).release();
+            d->graphic = _C2BlockFactory::CreateGraphicBlock(pBuf);
+            if (pBuf) {
+                AHardwareBuffer_release(pBuf);
+            }
+            if (d->graphic) {
+                d->type = ::android::C2BaseBlock::GRAPHIC;
+                return true;
+            }
+            LOG(ERROR) << "Improper ahwb in BaseBlock::hwbBlock.";
             return false;
         }
     case POOLED_BLOCK: {
@@ -185,6 +202,13 @@ bool objcpy(C2Fence* d, const AidlNativeHandle& s) {
 template<>
 void SetHandle(BaseBlock *block, const C2Handle *handle) {
     block->set<BaseBlock::nativeBlock>(makeToAidl(handle));
+}
+
+template<>
+void SetAHardwareBuffer(BaseBlock *block, AHardwareBuffer *ahwb) {
+    AHardwareBuffer_acquire(ahwb);
+    block->set<HWB_BLOCK>(AidlHardwareBuffer());
+    (block->get<HWB_BLOCK>()).reset(ahwb);
 }
 
 template<>
@@ -324,6 +348,28 @@ bool ToAidl(
 // WorkBundle -> std::list<std::unique_ptr<C2Work>>
 bool FromAidl(std::list<std::unique_ptr<C2Work>>* d, const WorkBundle& s) {
     return ::android::objcpy(d, s);
+}
+
+void ReturnOutputBlocksToClientIfNeeded(
+        const std::list<std::unique_ptr<C2Work>>& workList) {
+    for (const std::unique_ptr<C2Work>& work : workList) {
+        if (!work) {
+            continue;
+        }
+        for (const std::unique_ptr<C2Worklet>& worklet : work->worklets) {
+            if (worklet) {
+                for (const std::shared_ptr<C2Buffer>& buffer : worklet->output.buffers) {
+                    if (buffer) {
+                        for (const C2ConstGraphicBlock& block : buffer->data().graphicBlocks()) {
+                            std::shared_ptr<_C2BlockPoolData> poolData =
+                                  _C2BlockFactory::GetGraphicBlockPoolData(block);
+                            _C2BlockFactory::DisownIgbaBlock(poolData);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 }  // namespace utils
