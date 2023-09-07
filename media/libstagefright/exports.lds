@@ -171,7 +171,6 @@
         FixedDiv1_C;
         FixedDiv_C;
         fixed_invtbl8;
-        GetARGBBlend;
         H420ToABGR;
         H420ToARGB;
         H422ToABGR;
