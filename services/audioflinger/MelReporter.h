@@ -64,7 +64,7 @@ public:
      * implementation, false otherwise.
      */
     bool activateHalSoundDoseComputation(const std::string& module,
-                                         const sp<DeviceHalInterface>& device);
+            const sp<DeviceHalInterface>& device) EXCLUDES_MelReporter_Mutex;
 
     /**
      * Activates the MEL reporting from internal framework values. These are used
@@ -72,7 +72,7 @@ public:
      * Note: the internal CSD computation does not guarantee a certification with
      * IEC62368-1 3rd edition or EN50332-3
      */
-    void activateInternalSoundDoseComputation();
+    void activateInternalSoundDoseComputation() EXCLUDES_MelReporter_Mutex;
 
     sp<media::ISoundDose> getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback);
 
@@ -80,8 +80,9 @@ public:
 
     // PatchCommandListener methods
     void onCreateAudioPatch(audio_patch_handle_t handle,
-        const IAfPatchPanel::Patch& patch) final;
-    void onReleaseAudioPatch(audio_patch_handle_t handle) final;
+            const IAfPatchPanel::Patch& patch) final
+            EXCLUDES_AudioFlinger_Mutex;
+    void onReleaseAudioPatch(audio_patch_handle_t handle) final EXCLUDES_AudioFlinger_Mutex;
 
     /**
      * The new metadata can determine whether we should compute MEL for the given thread.
@@ -89,7 +90,9 @@ public:
      * Otherwise, this method will disable CSD.
      **/
     void updateMetadataForCsd(audio_io_handle_t streamHandle,
-                              const std::vector<playback_track_metadata_v7_t>& metadataVec);
+            const std::vector<playback_track_metadata_v7_t>& metadataVec)
+            EXCLUDES_AudioFlinger_Mutex;
+
 private:
     struct ActiveMelPatch {
         audio_io_handle_t streamHandle{AUDIO_IO_HANDLE_NONE};
@@ -101,7 +104,9 @@ private:
     bool shouldComputeMelForDeviceType(audio_devices_t device);
 
     void stopInternalMelComputation();
-    audio_utils::mutex& mutex() const { return mMutex; }
+    audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::MelReporter_Mutex) {
+        return mMutex;
+    }
 
     /** Should be called with the following order of locks: mAudioFlinger.mutex() -> mutex(). */
     void stopMelComputationForPatch_l(const ActiveMelPatch& patch) REQUIRES(mutex());
