@@ -15,15 +15,16 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "Codec2-ComponentStore@1.2"
+#define LOG_TAG "Codec2-ComponentStore-Aidl"
 #include <android-base/logging.h>
 
-#include <codec2/hidl/1.2/ComponentStore.h>
-#include <codec2/hidl/1.2/InputSurface.h>
-#include <codec2/hidl/1.2/types.h>
+#include <bufferpool2/ClientManager.h>
+#include <codec2/aidl/Component.h>
+#include <codec2/aidl/ComponentInterface.h>
+#include <codec2/aidl/ComponentStore.h>
+#include <codec2/aidl/ParamTypes.h>
 
 #include <android-base/file.h>
-#include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <utils/Errors.h>
 
 #include <C2PlatformSupport.h>
@@ -43,16 +44,16 @@
 #include <FilterWrapper.h>
 #endif
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_2 {
 namespace utils {
 
-using namespace ::android;
-using ::android::GraphicBufferSource;
-using namespace ::android::hardware::media::bufferpool::V2_0::implementation;
+using ::android::DefaultFilterPlugin;
+using ::android::FilterWrapper;
+using ::ndk::ScopedAStatus;
 
 namespace /* unnamed */ {
 
@@ -131,12 +132,13 @@ struct ComponentStore::StoreParameterCache : public ParameterCache {
 };
 
 ComponentStore::ComponentStore(const std::shared_ptr<C2ComponentStore>& store)
-      : mConfigurable{new CachedConfigurable(std::make_unique<StoreIntf>(store))},
+      : mConfigurable{SharedRefBase::make<CachedConfigurable>(std::make_unique<StoreIntf>(store))},
         mParameterCache{std::make_shared<StoreParameterCache>(this)},
         mStore{store} {
 
-    std::shared_ptr<C2ComponentStore> platformStore = android::GetCodec2PlatformComponentStore();
-    SetPreferredCodec2ComponentStore(store);
+    std::shared_ptr<C2ComponentStore> platformStore =
+        ::android::GetCodec2PlatformComponentStore();
+    ::android::SetPreferredCodec2ComponentStore(store);
 
     // Retrieve struct descriptors
     mParamReflector = mStore->getParamReflector();
@@ -194,93 +196,78 @@ std::shared_ptr<FilterWrapper> ComponentStore::GetFilterWrapper() {
 }
 #endif
 
-// Methods from ::android::hardware::media::c2::V1_0::IComponentStore
-Return<void> ComponentStore::createComponent(
-        const hidl_string& name,
-        const sp<IComponentListener>& listener,
-        const sp<IClientManager>& pool,
-        createComponent_cb _hidl_cb) {
+// Methods from ::aidl::android::hardware::media::c2::IComponentStore
+ScopedAStatus ComponentStore::createComponent(
+        const std::string& name,
+        const std::shared_ptr<IComponentListener>& listener,
+        const std::shared_ptr<IClientManager>& pool,
+        std::shared_ptr<IComponent> *component) {
 
-    sp<Component> component;
     std::shared_ptr<C2Component> c2component;
-    Status status = static_cast<Status>(
-            mStore->createComponent(name, &c2component));
+    c2_status_t status =
+            mStore->createComponent(name, &c2component);
 
-    if (status == Status::OK) {
+    if (status == C2_OK) {
 #ifndef __ANDROID_APEX__
         c2component = GetFilterWrapper()->maybeWrapComponent(c2component);
 #endif
         onInterfaceLoaded(c2component->intf());
-        component = new Component(c2component, listener, this, pool);
+        std::shared_ptr<Component> comp =
+            SharedRefBase::make<Component>(c2component, listener, shared_from_this(), pool);
+        *component = comp;
         if (!component) {
-            status = Status::CORRUPTED;
+            status = C2_CORRUPTED;
         } else {
-            reportComponentBirth(component.get());
-            if (component->status() != C2_OK) {
-                status = static_cast<Status>(component->status());
+            reportComponentBirth(comp.get());
+            if (comp->status() != C2_OK) {
+                status = comp->status();
             } else {
-                component->initListener(component);
-                if (component->status() != C2_OK) {
-                    status = static_cast<Status>(component->status());
+                comp->initListener(comp);
+                if (comp->status() != C2_OK) {
+                    status = comp->status();
                 }
             }
         }
     }
-    _hidl_cb(status, component);
-    return Void();
+    if (status == C2_OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(status);
 }
 
-Return<void> ComponentStore::createInterface(
-        const hidl_string& name,
-        createInterface_cb _hidl_cb) {
+ScopedAStatus ComponentStore::createInterface(
+        const std::string& name,
+        std::shared_ptr<IComponentInterface> *intf) {
     std::shared_ptr<C2ComponentInterface> c2interface;
     c2_status_t res = mStore->createInterface(name, &c2interface);
-    sp<IComponentInterface> interface;
     if (res == C2_OK) {
 #ifndef __ANDROID_APEX__
         c2interface = GetFilterWrapper()->maybeWrapInterface(c2interface);
 #endif
         onInterfaceLoaded(c2interface);
-        interface = new ComponentInterface(c2interface, mParameterCache);
+        *intf = SharedRefBase::make<ComponentInterface>(c2interface, mParameterCache);
+        return ScopedAStatus::ok();
     }
-    _hidl_cb(static_cast<Status>(res), interface);
-    return Void();
+    return ScopedAStatus::fromServiceSpecificError(res);
 }
 
-Return<void> ComponentStore::listComponents(listComponents_cb _hidl_cb) {
+ScopedAStatus ComponentStore::listComponents(
+        std::vector<IComponentStore::ComponentTraits> *traits) {
     std::vector<std::shared_ptr<const C2Component::Traits>> c2traits =
             mStore->listComponents();
-    hidl_vec<IComponentStore::ComponentTraits> traits(c2traits.size());
+    traits->resize(c2traits.size());
     size_t ix = 0;
     for (const std::shared_ptr<const C2Component::Traits> &c2trait : c2traits) {
         if (c2trait) {
-            if (objcpy(&traits[ix], *c2trait)) {
+            if (ToAidl(&traits->at(ix), *c2trait)) {
                 ++ix;
             } else {
                 break;
             }
         }
     }
-    traits.resize(ix);
-    _hidl_cb(Status::OK, traits);
-    return Void();
-}
-
-Return<void> ComponentStore::createInputSurface(createInputSurface_cb _hidl_cb) {
-    sp<GraphicBufferSource> source = new GraphicBufferSource();
-    if (source->initCheck() != OK) {
-        _hidl_cb(Status::CORRUPTED, nullptr);
-        return Void();
-    }
-    using namespace std::placeholders;
-    sp<InputSurface> inputSurface = new InputSurface(
-            mParameterCache,
-            std::make_shared<C2ReflectorHelper>(),
-            source->getHGraphicBufferProducer(),
-            source);
-    _hidl_cb(inputSurface ? Status::OK : Status::NO_MEMORY,
-             inputSurface);
-    return Void();
+    traits->resize(ix);
+    return ScopedAStatus::ok();
 }
 
 void ComponentStore::onInterfaceLoaded(const std::shared_ptr<C2ComponentInterface> &intf) {
@@ -293,15 +280,16 @@ void ComponentStore::onInterfaceLoaded(const std::shared_ptr<C2ComponentInterfac
     }
 }
 
-Return<void> ComponentStore::getStructDescriptors(
-        const hidl_vec<uint32_t>& indices,
-        getStructDescriptors_cb _hidl_cb) {
-    hidl_vec<StructDescriptor> descriptors(indices.size());
+ScopedAStatus ComponentStore::getStructDescriptors(
+        const std::vector<int32_t>& indices,
+        std::vector<StructDescriptor> *descriptors) {
+    descriptors->resize(indices.size());
     size_t dstIx = 0;
-    Status res = Status::OK;
+    int32_t res = Status::OK;
     for (size_t srcIx = 0; srcIx < indices.size(); ++srcIx) {
         std::lock_guard<std::mutex> lock(mStructDescriptorsMutex);
-        const C2Param::CoreIndex coreIndex = C2Param::CoreIndex(indices[srcIx]).coreIndex();
+        const C2Param::CoreIndex coreIndex =
+            C2Param::CoreIndex(uint32_t(indices[srcIx])).coreIndex();
         const auto item = mStructDescriptors.find(coreIndex);
         if (item == mStructDescriptors.end()) {
             // not in the cache, and not known to be unsupported, query local reflector
@@ -312,7 +300,7 @@ Return<void> ComponentStore::getStructDescriptors(
                     mUnsupportedStructDescriptors.emplace(coreIndex);
                 } else {
                     mStructDescriptors.insert({ coreIndex, structDesc });
-                    if (objcpy(&descriptors[dstIx], *structDesc)) {
+                    if (ToAidl(&descriptors->at(dstIx), *structDesc)) {
                         ++dstIx;
                         continue;
                     }
@@ -322,7 +310,7 @@ Return<void> ComponentStore::getStructDescriptors(
             }
             res = Status::NOT_FOUND;
         } else if (item->second) {
-            if (objcpy(&descriptors[dstIx], *item->second)) {
+            if (ToAidl(&descriptors->at(dstIx), *item->second)) {
                 ++dstIx;
                 continue;
             }
@@ -333,96 +321,31 @@ Return<void> ComponentStore::getStructDescriptors(
             break;
         }
     }
-    descriptors.resize(dstIx);
-    _hidl_cb(res, descriptors);
-    return Void();
+    descriptors->resize(dstIx);
+    if (res == Status::OK) {
+        return ScopedAStatus::ok();
+    }
+    return ScopedAStatus::fromServiceSpecificError(res);
 }
 
-Return<sp<IClientManager>> ComponentStore::getPoolClientManager() {
-    return ClientManager::getInstance();
+ScopedAStatus ComponentStore::getPoolClientManager(
+        std::shared_ptr<IClientManager> *manager) {
+    using ::aidl::android::hardware::media::bufferpool2::implementation::ClientManager;
+    *manager = ClientManager::getInstance();
+    return ScopedAStatus::ok();
 }
 
-Return<Status> ComponentStore::copyBuffer(const Buffer& src, const Buffer& dst) {
+ScopedAStatus ComponentStore::copyBuffer(const Buffer& src, const Buffer& dst) {
     // TODO implement
     (void)src;
     (void)dst;
-    return Status::OMITTED;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
 }
 
-Return<sp<IConfigurable>> ComponentStore::getConfigurable() {
-    return mConfigurable;
-}
-
-// Methods from ::android::hardware::media::c2::V1_1::IComponentStore
-Return<void> ComponentStore::createComponent_1_1(
-        const hidl_string& name,
-        const sp<IComponentListener>& listener,
-        const sp<IClientManager>& pool,
-        createComponent_1_1_cb _hidl_cb) {
-
-    sp<Component> component;
-    std::shared_ptr<C2Component> c2component;
-    Status status = static_cast<Status>(
-            mStore->createComponent(name, &c2component));
-
-    if (status == Status::OK) {
-#ifndef __ANDROID_APEX__
-        c2component = GetFilterWrapper()->maybeWrapComponent(c2component);
-#endif
-        onInterfaceLoaded(c2component->intf());
-        component = new Component(c2component, listener, this, pool);
-        if (!component) {
-            status = Status::CORRUPTED;
-        } else {
-            reportComponentBirth(component.get());
-            if (component->status() != C2_OK) {
-                status = static_cast<Status>(component->status());
-            } else {
-                component->initListener(component);
-                if (component->status() != C2_OK) {
-                    status = static_cast<Status>(component->status());
-                }
-            }
-        }
-    }
-    _hidl_cb(status, component);
-    return Void();
-}
-
-// Methods from ::android::hardware::media::c2::V1_2::IComponentStore
-Return<void> ComponentStore::createComponent_1_2(
-        const hidl_string& name,
-        const sp<IComponentListener>& listener,
-        const sp<IClientManager>& pool,
-        createComponent_1_2_cb _hidl_cb) {
-
-    sp<Component> component;
-    std::shared_ptr<C2Component> c2component;
-    Status status = static_cast<Status>(
-            mStore->createComponent(name, &c2component));
-
-    if (status == Status::OK) {
-#ifndef __ANDROID_APEX__
-        c2component = GetFilterWrapper()->maybeWrapComponent(c2component);
-#endif
-        onInterfaceLoaded(c2component->intf());
-        component = new Component(c2component, listener, this, pool);
-        if (!component) {
-            status = Status::CORRUPTED;
-        } else {
-            reportComponentBirth(component.get());
-            if (component->status() != C2_OK) {
-                status = static_cast<Status>(component->status());
-            } else {
-                component->initListener(component);
-                if (component->status() != C2_OK) {
-                    status = static_cast<Status>(component->status());
-                }
-            }
-        }
-    }
-    _hidl_cb(status, component);
-    return Void();
+ScopedAStatus ComponentStore::getConfigurable(
+        std::shared_ptr<IConfigurable> *configurable) {
+    *configurable = mConfigurable;
+    return ScopedAStatus::ok();
 }
 
 // Called from createComponent() after a successful creation of `component`.
@@ -495,16 +418,9 @@ std::ostream& ComponentStore::dump(
 }
 
 // Dumps information when lshal is called.
-Return<void> ComponentStore::debug(
-        const hidl_handle& handle,
-        const hidl_vec<hidl_string>& /* args */) {
+binder_status_t ComponentStore::dump(
+        int fd, [[maybe_unused]] const char** args, [[maybe_unused]] uint32_t numArgs) {
     LOG(INFO) << "debug -- dumping...";
-    const native_handle_t *h = handle.getNativeHandle();
-    if (!h || h->numFds != 1) {
-       LOG(ERROR) << "debug -- dumping failed -- "
-               "invalid file descriptor to dump to";
-       return Void();
-    }
     std::ostringstream out;
 
     { // Populate "out".
@@ -546,17 +462,17 @@ Return<void> ComponentStore::debug(
                 << mStore->getName() << std::endl;
     }
 
-    if (!android::base::WriteStringToFd(out.str(), h->data[0])) {
+    if (!::android::base::WriteStringToFd(out.str(), fd)) {
         PLOG(WARNING) << "debug -- dumping failed -- write()";
     } else {
         LOG(INFO) << "debug -- dumping succeeded";
     }
-    return Void();
+    return STATUS_OK;
 }
 
 } // namespace utils
-} // namespace V1_2
 } // namespace c2
 } // namespace media
 } // namespace hardware
 } // namespace android
+} // namespace aidl
