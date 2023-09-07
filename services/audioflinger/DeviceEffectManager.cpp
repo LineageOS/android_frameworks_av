@@ -38,7 +38,7 @@ using media::IEffectClient;
 DeviceEffectManager::DeviceEffectManager(
         const sp<IAfDeviceEffectManagerCallback>& afDeviceEffectManagerCallback)
     : mAfDeviceEffectManagerCallback(afDeviceEffectManagerCallback),
-      mMyCallback(new DeviceEffectManagerCallback(*this)) {}
+      mMyCallback(sp<DeviceEffectManagerCallback>::make(*this)) {}
 
 void DeviceEffectManager::onFirstRef() {
     mAfDeviceEffectManagerCallback->getPatchCommandThread()->addListener(this);
@@ -161,6 +161,7 @@ sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
     return handle;
 }
 
+/* static */
 status_t DeviceEffectManager::checkEffectCompatibility(
         const effect_descriptor_t *desc) {
     const sp<EffectsFactoryHalInterface> effectsFactory =
@@ -187,6 +188,7 @@ status_t DeviceEffectManager::checkEffectCompatibility(
     return NO_ERROR;
 }
 
+/* static */
 status_t DeviceEffectManager::createEffectHal(
         const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t deviceId,
         sp<EffectHalInterface> *effect) {
