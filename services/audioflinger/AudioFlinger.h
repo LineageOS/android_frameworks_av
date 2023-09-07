@@ -342,7 +342,8 @@ private:
 
     // ----- begin IAfThreadCallback interface
 
-    bool isNonOffloadableGlobalEffectEnabled_l() const final REQUIRES(mutex());
+    bool isNonOffloadableGlobalEffectEnabled_l() const final
+            REQUIRES(mutex()) EXCLUDES_ThreadBase_Mutex;
     bool btNrecIsOff() const final { return mBtNrecIsOff.load(); }
     float masterVolume_l() const final REQUIRES(mutex());
     bool masterMute_l() const final REQUIRES(mutex());
@@ -387,7 +388,8 @@ private:
             const audioflinger::SyncEventCallback& callBack,
             const wp<IAfTrackBase>& cookie) final EXCLUDES_AudioFlinger_Mutex;
 
-    void ioConfigChanged(audio_io_config_event_t event,
+    // Hold either AudioFlinger::mutex or ThreadBase::mutex
+    void ioConfigChanged_l(audio_io_config_event_t event,
             const sp<AudioIoDescriptor>& ioDesc,
             pid_t pid = 0) final EXCLUDES_AudioFlinger_ClientMutex;
     void onNonOffloadableGlobalEffectEnable() final EXCLUDES_AudioFlinger_Mutex;

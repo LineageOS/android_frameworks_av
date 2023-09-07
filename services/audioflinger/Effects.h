@@ -488,8 +488,10 @@ public:
     bool isBitPerfectCompatible() const final;
 
     // isCompatibleWithThread_l() must be called with thread->mutex() held
-    bool isCompatibleWithThread_l(const sp<IAfThreadBase>& thread) const final;
+    bool isCompatibleWithThread_l(const sp<IAfThreadBase>& thread) const final
+            REQUIRES(audio_utils::ThreadBase_Mutex);
 
+    // Requires either IAfThreadBase::mutex() or EffectChain::mutex() held
     bool containsHapticGeneratingEffect_l() final;
 
     void setHapticIntensity_l(int id, os::HapticScale intensity) final;
