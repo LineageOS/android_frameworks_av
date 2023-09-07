@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
-#define CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
+#ifndef CODEC2_AIDL_UTILS_CONFIGURABLE_H
+#define CODEC2_AIDL_UTILS_CONFIGURABLE_H
 
-#include <android/hardware/media/c2/1.0/IConfigurable.h>
-#include <hidl/Status.h>
+#include <aidl/android/hardware/media/c2/BnConfigurable.h>
 
 #include <C2Component.h>
 #include <C2Param.h>
@@ -26,17 +25,12 @@
 
 #include <memory>
 
+namespace aidl {
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
 namespace utils {
-
-using ::android::hardware::hidl_vec;
-using ::android::hardware::Return;
-using ::android::hardware::Void;
-using ::android::sp;
 
 struct ComponentStore;
 
@@ -102,7 +96,7 @@ struct ParameterCache {
  *
  * Note that caching happens
  */
-struct CachedConfigurable : public IConfigurable {
+struct CachedConfigurable : public BnConfigurable {
     CachedConfigurable(std::unique_ptr<ConfigurableC2Intf>&& intf);
 
     // Populates mSupportedParams.
@@ -110,29 +104,29 @@ struct CachedConfigurable : public IConfigurable {
 
     // Methods from ::android::hardware::media::c2::V1_0::IConfigurable
 
-    virtual Return<uint32_t> getId() override;
+    virtual ::ndk::ScopedAStatus getId(int32_t* id) override;
 
-    virtual Return<void> getName(getName_cb _hidl_cb) override;
+    virtual ::ndk::ScopedAStatus getName(std::string* name) override;
 
-    virtual Return<void> query(
-            const hidl_vec<uint32_t>& indices,
+    virtual ::ndk::ScopedAStatus query(
+            const std::vector<int32_t>& indices,
             bool mayBlock,
-            query_cb _hidl_cb) override;
+            Params* params) override;
 
-    virtual Return<void> config(
-            const hidl_vec<uint8_t>& inParams,
+    virtual ::ndk::ScopedAStatus config(
+            const ::aidl::android::hardware::media::c2::Params& params,
             bool mayBlock,
-            config_cb _hidl_cb) override;
+            ConfigResult* result) override;
 
-    virtual Return<void> querySupportedParams(
-            uint32_t start,
-            uint32_t count,
-            querySupportedParams_cb _hidl_cb) override;
+    virtual ::ndk::ScopedAStatus querySupportedParams(
+            int32_t start,
+            int32_t count,
+            std::vector<ParamDescriptor>* paramDesc) override;
 
-    virtual Return<void> querySupportedValues(
-            const hidl_vec<FieldSupportedValuesQuery>& inFields,
+    virtual ::ndk::ScopedAStatus querySupportedValues(
+            const std::vector<FieldSupportedValuesQuery>& fields,
             bool mayBlock,
-            querySupportedValues_cb _hidl_cb) override;
+            std::vector<FieldSupportedValuesQueryResult>* result) override;
 
 protected:
     // Common Codec2.0 interface wrapper
@@ -143,11 +137,11 @@ protected:
 };
 
 }  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
+}  // namespace aidl
 
-#endif  // CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
+#endif  // CODEC2_AIDL_UTILS_CONFIGURABLE_H
 
