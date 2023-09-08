@@ -9511,6 +9511,7 @@ AudioFlinger::AudioStreamIn* AudioFlinger::RecordThread::clearInput()
     Mutex::Autolock _l(mLock);
     AudioStreamIn *input = mInput;
     mInput = NULL;
+    mInputSource.clear();
     return input;
 }
 
