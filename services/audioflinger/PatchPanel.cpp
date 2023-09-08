@@ -83,7 +83,7 @@ void PatchPanel::closeThreadInternal_l(const sp<IAfThreadBase>& thread) const
 }
 
 /* List connected audio ports and their attributes */
-status_t PatchPanel::listAudioPorts(unsigned int* /* num_ports */,
+status_t PatchPanel::listAudioPorts_l(unsigned int* /* num_ports */,
                                 struct audio_port *ports __unused)
 {
     ALOGV(__func__);
@@ -91,14 +91,14 @@ status_t PatchPanel::listAudioPorts(unsigned int* /* num_ports */,
 }
 
 /* Get supported attributes for a given audio port */
-status_t PatchPanel::getAudioPort(struct audio_port_v7* port)
+status_t PatchPanel::getAudioPort_l(struct audio_port_v7* port)
 {
     if (port->type != AUDIO_PORT_TYPE_DEVICE) {
         // Only query the HAL when the port is a device.
         // TODO: implement getAudioPort for mix.
         return INVALID_OPERATION;
     }
-    AudioHwDevice* hwDevice = findAudioHwDeviceByModule(port->ext.device.hw_module);
+    AudioHwDevice* hwDevice = findAudioHwDeviceByModule_l(port->ext.device.hw_module);
     if (hwDevice == nullptr) {
         ALOGW("%s cannot find hw module %d", __func__, port->ext.device.hw_module);
         return BAD_VALUE;
@@ -110,7 +110,7 @@ status_t PatchPanel::getAudioPort(struct audio_port_v7* port)
 }
 
 /* Connect a patch between several source and sink ports */
-status_t PatchPanel::createAudioPatch(const struct audio_patch* patch,
+status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
                                    audio_patch_handle_t *handle,
                                    bool endpointPatch)
  //unlocks AudioFlinger::mLock when calling IAfThreadBase::sendCreateAudioPatchConfigEvent
@@ -145,7 +145,7 @@ status_t PatchPanel::createAudioPatch(const struct audio_patch* patch,
             // 1) if a software patch is present, release the playback and capture threads and
             // tracks created. This will also release the corresponding audio HAL patches
             if (removedPatch.isSoftware()) {
-                removedPatch.clearConnections(this);
+                removedPatch.clearConnections_l(this);
             }
             // 2) if the new patch and old patch source or sink are devices from different
             // hw modules,  clear the audio HAL patches now because they will not be updated
@@ -171,7 +171,7 @@ status_t PatchPanel::createAudioPatch(const struct audio_patch* patch,
                     // removedPatch.mHalHandle would be AUDIO_PATCH_HANDLE_NONE in this case.
                     hwModule = oldPatch.sinks[0].ext.device.hw_module;
                 }
-                sp<DeviceHalInterface> hwDevice = findHwDeviceByModule(hwModule);
+                sp<DeviceHalInterface> hwDevice = findHwDeviceByModule_l(hwModule);
                 if (hwDevice != 0) {
                     hwDevice->releaseAudioPatch(removedPatch.mHalHandle);
                 }
@@ -191,7 +191,7 @@ status_t PatchPanel::createAudioPatch(const struct audio_patch* patch,
     switch (patch->sources[0].type) {
         case AUDIO_PORT_TYPE_DEVICE: {
             audio_module_handle_t srcModule = patch->sources[0].ext.device.hw_module;
-            AudioHwDevice *audioHwDevice = findAudioHwDeviceByModule(srcModule);
+            AudioHwDevice *audioHwDevice = findAudioHwDeviceByModule_l(srcModule);
             if (!audioHwDevice) {
                 status = BAD_VALUE;
                 goto exit;
@@ -323,7 +323,7 @@ status_t PatchPanel::createAudioPatch(const struct audio_patch* patch,
                     goto exit;
                 }
                 newPatch.mRecord.setThread(thread->asIAfRecordThread().get());
-                status = newPatch.createConnections(this);
+                status = newPatch.createConnections_l(this);
                 if (status != NO_ERROR) {
                     goto exit;
                 }
@@ -449,11 +449,11 @@ exit:
             mAfPatchPanelCallback->getPatchCommandThread()->createAudioPatch(*handle, newPatch);
         }
         if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
-            addSoftwarePatchToInsertedModules(insertedModule, *handle, &newPatch.mAudioPatch);
+            addSoftwarePatchToInsertedModules_l(insertedModule, *handle, &newPatch.mAudioPatch);
         }
         mPatches.insert(std::make_pair(*handle, std::move(newPatch)));
     } else {
-        newPatch.clearConnections(this);
+        newPatch.clearConnections_l(this);
     }
     return status;
 }
@@ -464,10 +464,10 @@ PatchPanel::Patch::~Patch()
             mRecord.handle(), mPlayback.handle());
 }
 
-status_t PatchPanel::Patch::createConnections(const sp<IAfPatchPanel>& panel)
+status_t PatchPanel::Patch::createConnections_l(const sp<IAfPatchPanel>& panel)
 {
     // create patch from source device to record thread input
-    status_t status = panel->createAudioPatch(
+    status_t status = panel->createAudioPatch_l(
             PatchBuilder().addSource(mAudioPatch.sources[0]).
                 addSink(mRecord.thread(), { .source = AUDIO_SOURCE_MIC }).patch(),
             mRecord.handlePtr(),
@@ -479,7 +479,7 @@ status_t PatchPanel::Patch::createConnections(const sp<IAfPatchPanel>& panel)
 
     // create patch from playback thread output to sink device
     if (mAudioPatch.num_sinks != 0) {
-        status = panel->createAudioPatch(
+        status = panel->createAudioPatch_l(
                 PatchBuilder().addSource(mPlayback.thread()).addSink(mAudioPatch.sinks[0]).patch(),
                 mPlayback.handlePtr(),
                 true /*endpointPatch*/);
@@ -628,15 +628,15 @@ status_t PatchPanel::Patch::createConnections(const sp<IAfPatchPanel>& panel)
     return status;
 }
 
-void PatchPanel::Patch::clearConnections(const sp<IAfPatchPanel>& panel)
+void PatchPanel::Patch::clearConnections_l(const sp<IAfPatchPanel>& panel)
 {
     ALOGV("%s() mRecord.handle %d mPlayback.handle %d",
             __func__, mRecord.handle(), mPlayback.handle());
     mRecord.stopTrack();
     mPlayback.stopTrack();
     mRecord.clearTrackPeer(); // mRecord stop is synchronous. Break PeerProxy sp<> cycle.
-    mRecord.closeConnections(panel);
-    mPlayback.closeConnections(panel);
+    mRecord.closeConnections_l(panel);
+    mPlayback.closeConnections_l(panel);
 }
 
 status_t PatchPanel::Patch::getLatencyMs(double* latencyMs) const
@@ -726,7 +726,7 @@ String8 PatchPanel::Patch::dump(audio_patch_handle_t myHandle) const
 }
 
 /* Disconnect a patch */
-status_t PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
+status_t PatchPanel::releaseAudioPatch_l(audio_patch_handle_t handle)
  //unlocks AudioFlinger::mLock when calling IAfThreadBase::sendReleaseAudioPatchConfigEvent
  //to avoid deadlocks if the thread loop needs to acquire AudioFlinger::mLock
  //before processing the release patch request.
@@ -745,7 +745,7 @@ status_t PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
     const struct audio_port_config &src = patch.sources[0];
     switch (src.type) {
         case AUDIO_PORT_TYPE_DEVICE: {
-            sp<DeviceHalInterface> hwDevice = findHwDeviceByModule(src.ext.device.hw_module);
+            sp<DeviceHalInterface> hwDevice = findHwDeviceByModule_l(src.ext.device.hw_module);
             if (hwDevice == 0) {
                 ALOGW("%s() bad src hw module %d", __func__, src.ext.device.hw_module);
                 status = BAD_VALUE;
@@ -753,7 +753,7 @@ status_t PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
             }
 
             if (removedPatch.isSoftware()) {
-                removedPatch.clearConnections(this);
+                removedPatch.clearConnections_l(this);
                 break;
             }
 
@@ -776,7 +776,7 @@ status_t PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
             }
         } break;
         case AUDIO_PORT_TYPE_MIX: {
-            if (findHwDeviceByModule(src.ext.mix.hw_module) == 0) {
+            if (findHwDeviceByModule_l(src.ext.mix.hw_module) == 0) {
                 ALOGW("%s() bad src hw module %d", __func__, src.ext.mix.hw_module);
                 status = BAD_VALUE;
                 break;
@@ -812,7 +812,7 @@ void PatchPanel::erasePatch(audio_patch_handle_t handle, bool reuseExistingHalPa
 }
 
 /* List connected audio ports and they attributes */
-status_t PatchPanel::listAudioPatches(unsigned int* /* num_patches */,
+status_t PatchPanel::listAudioPatches_l(unsigned int* /* num_patches */,
                                   struct audio_patch *patches __unused)
 {
     ALOGV(__func__);
@@ -869,7 +869,7 @@ void PatchPanel::notifyStreamClosed(audio_io_handle_t stream)
     }
 }
 
-AudioHwDevice* PatchPanel::findAudioHwDeviceByModule(audio_module_handle_t module)
+AudioHwDevice* PatchPanel::findAudioHwDeviceByModule_l(audio_module_handle_t module)
 {
     if (module == AUDIO_MODULE_HANDLE_NONE) return nullptr;
     ssize_t index = mAfPatchPanelCallback->getAudioHwDevs_l().indexOfKey(module);
@@ -880,13 +880,13 @@ AudioHwDevice* PatchPanel::findAudioHwDeviceByModule(audio_module_handle_t modul
     return mAfPatchPanelCallback->getAudioHwDevs_l().valueAt(index);
 }
 
-sp<DeviceHalInterface> PatchPanel::findHwDeviceByModule(audio_module_handle_t module)
+sp<DeviceHalInterface> PatchPanel::findHwDeviceByModule_l(audio_module_handle_t module)
 {
-    AudioHwDevice *audioHwDevice = findAudioHwDeviceByModule(module);
+    AudioHwDevice *audioHwDevice = findAudioHwDeviceByModule_l(module);
     return audioHwDevice ? audioHwDevice->hwDevice() : nullptr;
 }
 
-void PatchPanel::addSoftwarePatchToInsertedModules(
+void PatchPanel::addSoftwarePatchToInsertedModules_l(
         audio_module_handle_t module, audio_patch_handle_t handle,
         const struct audio_patch *patch)
 {
