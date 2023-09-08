@@ -241,13 +241,13 @@ status_t AudioPolicyMixCollection::updateMix(
             mix.mRouteFlags == registeredMix->mRouteFlags) {
             registeredMix->mCriteria = updatedCriteria;
             ALOGV("updateMix(): updated mix for dev=0x%x addr=%s", mix.mDeviceType,
-                  mix.mDeviceAddress.string());
+                  mix.mDeviceAddress.c_str());
             return NO_ERROR;
         }
     }
 
     ALOGE("updateMix(): mix not registered for dev=0x%x addr=%s", mix.mDeviceType,
-          mix.mDeviceAddress.string());
+          mix.mDeviceAddress.c_str());
     return BAD_VALUE;
 }
 

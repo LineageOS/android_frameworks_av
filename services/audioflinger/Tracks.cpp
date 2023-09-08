@@ -635,7 +635,7 @@ void OpPlayAudioMonitor::checkPlayAudioForUsage(bool doBroadcast) {
     bool shouldChange = !hasAppOps;  // check if we need to update.
     if (mHasOpPlayAudio.compare_exchange_strong(shouldChange, hasAppOps)) {
         ALOGI("OpPlayAudio: track:%d package:%s usage:%d %smuted", mId,
-              String8(mPackageName).string(), mUsage, hasAppOps ? "not " : "");
+              String8(mPackageName).c_str(), mUsage, hasAppOps ? "not " : "");
         if (doBroadcast) {
             auto thread = mThread.promote();
             if (thread != nullptr && thread->type() == IAfThreadBase::OFFLOAD) {
@@ -657,7 +657,7 @@ void OpPlayAudioMonitor::PlayAudioOpCallback::opChanged(int32_t op,
         return;
     }
 
-    ALOGI("%s OP_PLAY_AUDIO callback received for %s", __func__, String8(packageName).string());
+    ALOGI("%s OP_PLAY_AUDIO callback received for %s", __func__, String8(packageName).c_str());
     sp<OpPlayAudioMonitor> monitor = mMonitor.promote();
     if (monitor != NULL) {
         monitor->checkPlayAudioForUsage(/*doBroadcast=*/true);
