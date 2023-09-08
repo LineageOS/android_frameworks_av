@@ -996,15 +996,13 @@ private:
      *
      * This returns the Camera Id to use in case inputCameraId was remapped to a
      * different Id for the given packageName. Otherwise, it returns the inputCameraId.
-     */
-    std::string resolveCameraId(const std::string& inputCameraId, const std::string& packageName);
-    /**
-     * Resolve the (potentially remapped) camera Id to use.
      *
-     * This returns the Camera Id to use in case inputCameraId was remapped to a
-     * different Id for the packageName of the client. Otherwise, it returns the inputCameraId.
+     * If the packageName is not provided, it will be inferred from the clientUid.
      */
-    std::string resolveCameraId(const std::string& inputCameraId);
+    std::string resolveCameraId(
+            const std::string& inputCameraId,
+            int clientUid,
+            const std::string& packageName = "");
 
     /**
      * Updates the state of mCameraIdRemapping, while disconnecting active clients as necessary.
