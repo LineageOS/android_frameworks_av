@@ -245,7 +245,7 @@ String8 Camera::getParameters() const
     ALOGV("getParameters");
     String8 params;
     sp <::android::hardware::ICamera> c = mCamera;
-    if (c != 0) params = mCamera->getParameters();
+    if (c != 0) params = c->getParameters();
     return params;
 }
 
@@ -269,7 +269,7 @@ void Camera::setPreviewCallbackFlags(int flag)
     ALOGV("setPreviewCallbackFlags");
     sp <::android::hardware::ICamera> c = mCamera;
     if (c == 0) return;
-    mCamera->setPreviewCallbackFlag(flag);
+    c->setPreviewCallbackFlag(flag);
 }
 
 status_t Camera::setPreviewCallbackTarget(
