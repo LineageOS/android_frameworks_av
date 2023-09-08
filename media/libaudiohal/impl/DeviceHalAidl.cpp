@@ -42,6 +42,7 @@ using aidl::android::media::audio::common::AudioConfig;
 using aidl::android::media::audio::common::AudioDevice;
 using aidl::android::media::audio::common::AudioDeviceAddress;
 using aidl::android::media::audio::common::AudioDeviceType;
+using aidl::android::media::audio::common::AudioFormatDescription;
 using aidl::android::media::audio::common::AudioFormatType;
 using aidl::android::media::audio::common::AudioInputFlags;
 using aidl::android::media::audio::common::AudioIoFlags;
@@ -97,9 +98,15 @@ void setConfigFromPortConfig(AudioConfig* config, const AudioPortConfig& portCon
 }
 
 void setPortConfigFromConfig(AudioPortConfig* portConfig, const AudioConfig& config) {
-    portConfig->sampleRate = Int{ .value = config.base.sampleRate };
-    portConfig->channelMask = config.base.channelMask;
-    portConfig->format = config.base.format;
+    if (config.base.sampleRate != 0) {
+        portConfig->sampleRate = Int{ .value = config.base.sampleRate };
+    }
+    if (config.base.channelMask != AudioChannelLayout{}) {
+        portConfig->channelMask = config.base.channelMask;
+    }
+    if (config.base.format != AudioFormatDescription{}) {
+        portConfig->format = config.base.format;
+    }
 }
 
 // Note: these converters are for types defined in different AIDL files. Although these
@@ -1069,7 +1076,9 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
         matchDevice.address = AudioDeviceAddress::make<AudioDeviceAddress::id>();
         auto portsIt = findPort(matchDevice);
         if (portsIt == mPorts.end()) {
-            ALOGW("%s: device port for device %s is not found in the module %s",
+            // Since 'setConnectedState' is called for all modules, it is normal when the device
+            // port not found in every one of them.
+            ALOGD("%s: device port for device %s is not found in the module %s",
                     __func__, matchDevice.toString().c_str(), mInstance.c_str());
             return BAD_VALUE;
         }
