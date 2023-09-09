@@ -1535,7 +1535,7 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
         }
         RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
                 created));
-    } else if (!flags.has_value()) {
+    } else if (portConfigIt == mPortConfigs.end() && !flags.has_value()) {
         ALOGW("%s: mix port config for %s, handle %d not found in the module %s, "
                 "and was not created as flags are not specified",
                 __func__, config.toString().c_str(), ioHandle, mInstance.c_str());
