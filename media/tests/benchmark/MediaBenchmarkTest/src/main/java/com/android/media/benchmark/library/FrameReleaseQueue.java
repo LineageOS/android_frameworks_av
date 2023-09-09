@@ -23,20 +23,30 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class FrameReleaseQueue {
     private static final String TAG = "FrameReleaseQueue";
+    private final String MIME_AV1 = "video/av01";
+    private final int AV1_SUPERFRAME_DELAY = 6;
+    private final int THRESHOLD_TIME = 5;
 
     private MediaCodec mCodec;
     private LinkedBlockingQueue<FrameInfo> mFrameInfoQueue;
     private ReleaseThread mReleaseThread;
     private AtomicBoolean doFrameRelease = new AtomicBoolean(false);
+    private boolean mReleaseJobStarted = false;
     private boolean mRender = false;
     private int mWaitTime = 40; // milliseconds per frame
     private int mWaitTimeCorrection = 0;
     private int mCorrectionLoopCount;
     private int firstReleaseTime = -1;
-    private int THRESHOLD_TIME = 5;
+    private int mAllowedDelayTime = THRESHOLD_TIME;
+    private int mFrameDelay = 0;
+    private final ScheduledExecutorService mScheduler = Executors.newScheduledThreadPool(1);
+
 
     private static class FrameInfo {
         private int number;
@@ -50,30 +60,44 @@ public class FrameReleaseQueue {
     }
 
     private class ReleaseThread extends Thread {
+        private int mLoopCount = 0;
+        private int mNextReleaseTime = 0;
+
+        @SuppressWarnings("FutureReturnValueIgnored")
         public void run() {
-            long nextReleaseTime = 0;
-            int loopCount = 0;
-            while (doFrameRelease.get() || mFrameInfoQueue.size() > 0) {
+            /* Check if the release thread wakes up too late */
+            if (mLoopCount != 0) {
+                int delta = getCurSysTime() - mNextReleaseTime;
+                if (delta >= THRESHOLD_TIME) {
+                    Log.d(TAG, "Release thread wake up late by " + delta);
+                    /* For accidental late wake up, we should relax the timestamp
+                       check for display time */
+                    mAllowedDelayTime = 1 + delta;
+                } else {
+                    mAllowedDelayTime = THRESHOLD_TIME;
+                }
+            }
+            if (doFrameRelease.get() || mFrameInfoQueue.size() > 0) {
                 FrameInfo curFrameInfo = mFrameInfoQueue.peek();
                 if (curFrameInfo == null) {
-                    nextReleaseTime += mWaitTime;
+                    mNextReleaseTime += mWaitTime;
                 } else {
                     if (firstReleaseTime == -1 || curFrameInfo.displayTime <= 0) {
                         // first frame of loop
                         firstReleaseTime = getCurSysTime();
-                        nextReleaseTime = firstReleaseTime + mWaitTime;
+                        mNextReleaseTime = firstReleaseTime + mWaitTime;
                         popAndRelease(true);
                     } else if (!doFrameRelease.get() && mFrameInfoQueue.size() == 1) {
                         // EOS
                         Log.i(TAG, "EOS");
                         popAndRelease(false);
                     } else {
-                        nextReleaseTime += mWaitTime;
+                        mNextReleaseTime += mWaitTime;
                         int curSysTime = getCurSysTime();
                         int curMediaTime = curSysTime - firstReleaseTime;
                         while (curFrameInfo != null && curFrameInfo.displayTime > 0 &&
                                 curFrameInfo.displayTime <= curMediaTime) {
-                            if (!((curMediaTime - curFrameInfo.displayTime) <= THRESHOLD_TIME)) {
+                            if (!((curMediaTime - curFrameInfo.displayTime) <= mAllowedDelayTime)) {
                                 Log.d(TAG, "Dropping expired frame " + curFrameInfo.number +
                                     " display time " + curFrameInfo.displayTime +
                                     " current time " + curMediaTime);
@@ -91,20 +115,14 @@ public class FrameReleaseQueue {
                         }
                     }
                 }
-                long sleepTime = nextReleaseTime - getCurSysTime();
-                if (sleepTime > 0) {
-                    try {
-                        mReleaseThread.sleep(sleepTime);
-                    } catch (InterruptedException e) {
-                        Log.e(TAG, "Threw InterruptedException on sleep");
-                    }
-                } else {
-                    Log.d(TAG, "Thread sleep time less than 1");
+
+                long sleepTime = (long)(mNextReleaseTime - getCurSysTime());
+                mScheduler.schedule(mReleaseThread, sleepTime, TimeUnit.MILLISECONDS);
+
+                if (mLoopCount % mCorrectionLoopCount == 0) {
+                    mNextReleaseTime += mWaitTimeCorrection;
                 }
-                if (loopCount % mCorrectionLoopCount == 0) {
-                    nextReleaseTime += mWaitTimeCorrection;
-                }
-                loopCount += 1;
+                mLoopCount += 1;
             }
         }
     }
@@ -130,6 +148,12 @@ public class FrameReleaseQueue {
         this.mCodec = mediaCodec;
     }
 
+    public void setMime(String mime) {
+        if (mime.equals(MIME_AV1)) {
+            mFrameDelay = AV1_SUPERFRAME_DELAY;
+        }
+    }
+
     public boolean pushFrame(int frameNumber, int frameBufferId, long frameDisplayTime) {
         int frameDisplayTimeMs = (int)(frameDisplayTime/1000);
         FrameInfo curFrameInfo = new FrameInfo(frameNumber, frameBufferId, frameDisplayTimeMs);
@@ -138,8 +162,10 @@ public class FrameReleaseQueue {
             Log.e(TAG, "Failed to push frame with buffer id " + curFrameInfo.bufferId);
             return false;
         }
-        if (!mReleaseThread.isAlive()) {
-            mReleaseThread.start();
+
+        if (!mReleaseJobStarted && frameNumber >= mFrameDelay) {
+            mScheduler.execute(mReleaseThread);
+            mReleaseJobStarted = true;
             Log.i(TAG, "Started frame release thread");
         }
         return true;
@@ -149,12 +175,13 @@ public class FrameReleaseQueue {
         return (int)(System.nanoTime()/1000000);
     }
 
+    @SuppressWarnings("FutureReturnValueIgnored")
     private void popAndRelease(boolean renderThisFrame) {
         final boolean actualRender = (renderThisFrame && mRender);
         try {
             final FrameInfo curFrameInfo = mFrameInfoQueue.take();
 
-            CompletableFuture future = CompletableFuture.runAsync(() -> {
+            CompletableFuture.runAsync(() -> {
                 try {
                     mCodec.releaseOutputBuffer(curFrameInfo.bufferId, actualRender);
                 } catch (IllegalStateException e) {
@@ -169,11 +196,12 @@ public class FrameReleaseQueue {
 
     public void stopFrameRelease() {
         doFrameRelease.set(false);
-        try {
-            mReleaseThread.join();
-            Log.i(TAG, "Joined frame release thread");
-        } catch (InterruptedException e) {
-            Log.e(TAG, "Threw InterruptedException on thread join");
+        while (mFrameInfoQueue.size() > 0) {
+            try {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                Log.e(TAG, "Threw InterruptedException on sleep");
+            }
         }
     }
 }
