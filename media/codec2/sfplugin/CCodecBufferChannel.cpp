@@ -1044,6 +1044,15 @@ void CCodecBufferChannel::trackReleasedFrame(const IGraphicBufferProducer::Queue
     if (desiredRenderTimeNs < nowNs) {
         desiredRenderTimeNs = nowNs;
     }
+
+    // If the render time is more than a second from now, then pretend the frame is supposed to be
+    // rendered immediately, because that's what SurfaceFlinger heuristics will do. This is a tight
+    // coupling, but is really the only way to optimize away unnecessary present fence checks in
+    // processRenderedFrames.
+    if (desiredRenderTimeNs > nowNs + 1*1000*1000*1000LL) {
+        desiredRenderTimeNs = nowNs;
+    }
+
     // We've just queued a frame to the surface, so keep track of it and later check to see if it is
     // actually rendered.
     TrackedFrame frame;
