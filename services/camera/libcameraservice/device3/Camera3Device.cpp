@@ -2254,6 +2254,9 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     Mutex::Autolock il(mInterfaceLock);
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
 
+    // Make sure status tracker is flushed
+    mStatusTracker->flushPendingStates();
+
     Mutex::Autolock l(mLock);
     if (checkAbandonedStreamsLocked()) {
         ALOGW("%s: Abandoned stream detected, session parameters can't be applied correctly!",
