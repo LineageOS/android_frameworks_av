@@ -6167,12 +6167,11 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
     // Ensure volumeshaper state always advances even when muted.
     const sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
 
-    const size_t framesReleased = proxy->framesReleased();
     const int64_t frames = mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
     const int64_t time = mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL];
 
-    ALOGV("%s: Direct/Offload bufferConsumed:%zu  timestamp frames:%lld  time:%lld",
-            __func__, framesReleased, (long long)frames, (long long)time);
+    ALOGVV("%s: Direct/Offload bufferConsumed:%zu  timestamp frames:%lld  time:%lld",
+            __func__, proxy->framesReleased(), (long long)frames, (long long)time);
 
     const int64_t volumeShaperFrames =
             mMonotonicFrameCounter.updateAndGetMonotonicFrameCount(frames, time);
