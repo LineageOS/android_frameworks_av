@@ -150,3 +150,28 @@ cc_defaults {
         "libcodec2_aidl_client",
     ],
 }
+
+cc_fuzz {
+    name: "libcodec2-aidl-fuzzer",
+    vendor: true,
+    srcs: [
+        "fuzzer.cpp",
+    ],
+    defaults: [
+        "libcodec2-aidl-defaults",
+        "service_fuzzer_defaults",
+    ],
+    shared_libs: [
+        "libcodec2_vndk",
+
+        "libcodec2_soft_avcdec",
+        "libcodec2_soft_avcenc",
+        "libcodec2_soft_aacdec",
+        "libcodec2_soft_aacenc",
+    ],
+    fuzz_config: {
+        cc: [
+            "wonsik@google.com",
+        ],
+    },
+}
