@@ -713,7 +713,11 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
         aidlPatch.sourcePortConfigIds.clear();
         aidlPatch.sinkPortConfigIds.clear();
     }
-    ALOGD("%s: sources: %s, sinks: %s",
+    // The IDs will be found by 'fillPortConfigs', however the original 'aidlSources' and
+    // 'aidlSinks' will not be updated because 'setAudioPatch' only needs IDs. Here we log
+    // the source arguments, where only the audio configuration and device specifications
+    // are relevant.
+    ALOGD("%s: [disregard IDs] sources: %s, sinks: %s",
             __func__, ::android::internal::ToString(aidlSources).c_str(),
             ::android::internal::ToString(aidlSinks).c_str());
     auto fillPortConfigs = [&](
@@ -1059,9 +1063,10 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
         if (portsIt == mPorts.end()) {
             // Since 'setConnectedState' is called for all modules, it is normal when the device
             // port not found in every one of them.
-            ALOGD("%s: device port for device %s is not found in the module %s",
-                    __func__, matchDevice.toString().c_str(), mInstance.c_str());
             return BAD_VALUE;
+        } else {
+            ALOGD("%s: device port for device %s found in the module %s",
+                    __func__, matchDevice.toString().c_str(), mInstance.c_str());
         }
         // Use the ID of the "template" port, use all the information from the provided port.
         aidlPort.id = portsIt->first;
@@ -1077,9 +1082,12 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
         AudioDevice matchDevice = aidlPort.ext.get<AudioPortExt::device>().device;
         auto portsIt = findPort(matchDevice);
         if (portsIt == mPorts.end()) {
-            ALOGW("%s: device port for device %s is not found in the module %s",
-                    __func__, matchDevice.toString().c_str(), mInstance.c_str());
+            // Since 'setConnectedState' is called for all modules, it is normal when the device
+            // port not found in every one of them.
             return BAD_VALUE;
+        } else {
+            ALOGD("%s: device port for device %s found in the module %s",
+                    __func__, matchDevice.toString().c_str(), mInstance.c_str());
         }
         // Any streams opened on the external device must be closed by this time,
         // thus we can clean up patches and port configs that were created for them.
@@ -1508,7 +1516,7 @@ status_t DeviceHalAidl::findOrCreatePortConfig(
         }
         RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
                 created));
-    } else if (!flags.has_value()) {
+    } else if (portConfigIt == mPortConfigs.end() && !flags.has_value()) {
         ALOGW("%s: mix port config for %s, handle %d not found in the module %s, "
                 "and was not created as flags are not specified",
                 __func__, config.toString().c_str(), ioHandle, mInstance.c_str());
