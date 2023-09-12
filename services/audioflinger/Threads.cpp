@@ -1827,7 +1827,7 @@ void AudioFlinger::ThreadBase::toAudioPortConfig(struct audio_port_config *confi
     config->type = AUDIO_PORT_TYPE_MIX;
     config->ext.mix.handle = mId;
     config->sample_rate = mSampleRate;
-    config->format = mFormat;
+    config->format = mHALFormat;
     config->channel_mask = mChannelMask;
     config->config_mask = AUDIO_PORT_CONFIG_SAMPLE_RATE|AUDIO_PORT_CONFIG_CHANNEL_MASK|
                             AUDIO_PORT_CONFIG_FORMAT;
@@ -9483,6 +9483,7 @@ AudioFlinger::AudioStreamIn* AudioFlinger::RecordThread::clearInput()
     Mutex::Autolock _l(mLock);
     AudioStreamIn *input = mInput;
     mInput = NULL;
+    mInputSource.clear();
     return input;
 }
 
