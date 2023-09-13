@@ -261,6 +261,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
             const ::aidl::android::media::audio::common::AudioConfig& config,
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle);
+    bool isPortHeldByAStream(int32_t portId);
     status_t prepareToOpenStream(
         int32_t aidlHandle,
         const ::aidl::android::media::audio::common::AudioDevice& aidlDevice,
@@ -318,6 +319,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     std::mutex mLock;
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
     std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
+    std::set<int32_t> mConnectedPortIdsHeldByStreams;
 };
 
 } // namespace android
