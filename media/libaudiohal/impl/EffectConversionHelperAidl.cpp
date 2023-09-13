@@ -178,8 +178,9 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
     // in case of buffer/ioHandle re-configure for an opened effect, close it and re-open
     if (state != State::INIT && mCommon != common) {
-        ALOGI("%s at state %s, closing effect", __func__,
-              android::internal::ToString(state).c_str());
+        ALOGI("%s at state %s, common parameter change from %s to %s, closing effect", __func__,
+              android::internal::ToString(state).c_str(), mCommon.toString().c_str(),
+              common.toString().c_str());
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->close()));
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
         mStatusQ.reset();
@@ -455,8 +456,9 @@ status_t EffectConversionHelperAidl::updateEventFlags() {
                   efGroup);
             status = (status == OK) ? BAD_VALUE : status;
         }
-    } else if (isBypassing()) {
-        // for effect with bypass (no processing) flag, it's okay to not have statusQ
+    } else if (isBypassingOrOffload()) {
+        // for effect with bypass (no processing) or offloadIndication flag, it's okay to not have
+        // statusQ
         return OK;
     }
 
@@ -464,10 +466,20 @@ status_t EffectConversionHelperAidl::updateEventFlags() {
     return status;
 }
 
+bool EffectConversionHelperAidl::isBypassingOrOffload() const {
+    return isBypassing() || isOffload();
+}
+
 bool EffectConversionHelperAidl::isBypassing() const {
     return mEffect &&
            (mDesc.common.flags.bypass ||
             (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isBypassing()));
+}
+
+bool EffectConversionHelperAidl::isOffload() const {
+    return mEffect &&
+           (mDesc.common.flags.offloadIndication ||
+            (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isOffload()));
 }
 
 Descriptor EffectConversionHelperAidl::getDescriptor() const {
