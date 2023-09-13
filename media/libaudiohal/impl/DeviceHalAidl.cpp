@@ -1043,11 +1043,12 @@ status_t DeviceHalAidl::prepareToDisconnectExternalDevice(const struct audio_por
     // There is not AIDL API defined for `prepareToDisconnectExternalDevice`.
     // Call `setConnectedState` instead.
     // TODO(b/279824103): call prepareToDisconnectExternalDevice when it is added.
-    const status_t status = setConnectedState(port, false /*connected*/);
-    if (status == NO_ERROR) {
+    if (const status_t status = setConnectedState(port, false /*connected*/); status == NO_ERROR) {
         mDeviceDisconnectionNotified.insert(port->id);
     }
-    return status;
+    // Return that there was no error as otherwise the disconnection procedure will not be
+    // considered complete for upper layers, and 'setConnectedState' will not be called again.
+    return NO_ERROR;
 }
 
 status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
@@ -1087,6 +1088,7 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
             ALOGD("%s: device port for device %s found in the module %s",
                     __func__, matchDevice.toString().c_str(), mInstance.c_str());
         }
+        resetUnusedPatchesAndPortConfigs();
         // Use the ID of the "template" port, use all the information from the provided port.
         aidlPort.id = portsIt->first;
         AudioPort connectedPort;
@@ -1108,12 +1110,19 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
             ALOGD("%s: device port for device %s found in the module %s",
                     __func__, matchDevice.toString().c_str(), mInstance.c_str());
         }
-        // Any streams opened on the external device must be closed by this time,
-        // thus we can clean up patches and port configs that were created for them.
         resetUnusedPatchesAndPortConfigs();
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->disconnectExternalDevice(
-                                portsIt->second.id)));
-        mPorts.erase(portsIt);
+        // Streams are closed by AudioFlinger independently from device disconnections.
+        // It is possible that the stream has not been closed yet.
+        const int32_t portId = portsIt->second.id;
+        if (!isPortHeldByAStream(portId)) {
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                            mModule->disconnectExternalDevice(portId)));
+            mPorts.erase(portsIt);
+        } else {
+            ALOGD("%s: since device port ID %d is used by a stream, "
+                    "external device disconnection postponed", __func__, portId);
+            mConnectedPortIdsHeldByStreams.insert(portId);
+        }
     }
     return updateRoutes();
 }
@@ -1121,6 +1130,7 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
 status_t DeviceHalAidl::setSimulateDeviceConnections(bool enabled) {
     TIME_CHECK();
     if (!mModule) return NO_INIT;
+    resetUnusedPatchesAndPortConfigs();
     ModuleDebug debug{ .simulateDeviceConnections = enabled };
     status_t status = statusTFromBinderStatus(mModule->setModuleDebug(debug));
     // This is important to log as it affects HAL behavior.
@@ -1689,6 +1699,28 @@ DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(
                         p.ext.template get<Tag::mix>().handle == ioHandle; });
 }
 
+bool DeviceHalAidl::isPortHeldByAStream(int32_t portId) {
+    // It is assumed that mStreams has already been cleaned up.
+    for (const auto& streamPair : mStreams) {
+        int32_t patchId = streamPair.second;
+        auto patchIt = mPatches.find(patchId);
+        if (patchIt == mPatches.end()) continue;
+        for (int32_t id : patchIt->second.sourcePortConfigIds) {
+            auto portConfigIt = mPortConfigs.find(id);
+            if (portConfigIt != mPortConfigs.end() && portConfigIt->second.portId == portId) {
+                return true;
+            }
+        }
+        for (int32_t id : patchIt->second.sinkPortConfigIds) {
+            auto portConfigIt = mPortConfigs.find(id);
+            if (portConfigIt != mPortConfigs.end() && portConfigIt->second.portId == portId) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void DeviceHalAidl::resetPatch(int32_t patchId) {
     if (auto it = mPatches.find(patchId); it != mPatches.end()) {
         mPatches.erase(it);
@@ -1738,10 +1770,10 @@ void DeviceHalAidl::resetUnusedPortConfigs() {
     // The assumption is that port configs are used to create patches
     // (or to open streams, but that involves creation of patches, too). Thus,
     // orphaned port configs can and should be reset.
-    std::set<int32_t> portConfigIds;
+    std::map<int32_t, int32_t /*portID*/> portConfigIds;
     std::transform(mPortConfigs.begin(), mPortConfigs.end(),
             std::inserter(portConfigIds, portConfigIds.end()),
-            [](const auto& pcPair) { return pcPair.first; });
+            [](const auto& pcPair) { return std::make_pair(pcPair.first, pcPair.second.portId); });
     for (const auto& p : mPatches) {
         for (int32_t id : p.second.sourcePortConfigIds) portConfigIds.erase(id);
         for (int32_t id : p.second.sinkPortConfigIds) portConfigIds.erase(id);
@@ -1749,7 +1781,27 @@ void DeviceHalAidl::resetUnusedPortConfigs() {
     for (int32_t id : mInitialPortConfigIds) {
         portConfigIds.erase(id);
     }
-    for (int32_t id : portConfigIds) resetPortConfig(id);
+    std::set<int32_t> retryDeviceDisconnection;
+    for (const auto& portConfigAndIdPair : portConfigIds) {
+        resetPortConfig(portConfigAndIdPair.first);
+        if (mConnectedPortIdsHeldByStreams.count(portConfigAndIdPair.second) != 0) {
+            retryDeviceDisconnection.insert(portConfigAndIdPair.second);
+        }
+    }
+    for (int32_t portId : retryDeviceDisconnection) {
+        if (!isPortHeldByAStream(portId)) {
+            TIME_CHECK();
+            if (auto status = mModule->disconnectExternalDevice(portId); status.isOk()) {
+                mPorts.erase(portId);
+                mConnectedPortIdsHeldByStreams.erase(portId);
+                ALOGD("%s: executed postponed external device disconnection for port ID %d",
+                        __func__, portId);
+            }
+        }
+    }
+    if (!retryDeviceDisconnection.empty()) {
+        updateRoutes();
+    }
 }
 
 status_t DeviceHalAidl::updateRoutes() {
