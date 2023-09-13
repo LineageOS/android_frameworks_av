@@ -53,21 +53,18 @@ class DeathNotifier : public std::enable_shared_from_this<DeathNotifier> {
         std::weak_ptr<DeathNotifier> mDeathNotifier;
     };
 public:
+    static std::shared_ptr<DeathNotifier> Create(
+        const std::shared_ptr<IResourceManagerClient>& client,
+        const std::shared_ptr<ResourceManagerService>& service,
+        const ClientInfoParcel& clientInfo,
+        bool overrideProcessInfo = false);
+
     DeathNotifier(const std::shared_ptr<IResourceManagerClient>& client,
                   const std::shared_ptr<ResourceManagerService>& service,
-                  const ClientInfoParcel& clientInfo,
-                  AIBinder_DeathRecipient* recipient);
+                  const ClientInfoParcel& clientInfo);
 
     virtual ~DeathNotifier() {
         unlink();
-    }
-
-    void unlink() {
-        if (mClient != nullptr) {
-            // Register for the callbacks by linking to death notification.
-            AIBinder_unlinkToDeath(mClient->asBinder().get(), mRecipient, mCookie);
-            mClient = nullptr;
-        }
     }
 
     // Implement death recipient
@@ -81,24 +78,34 @@ private:
         // The context gets deleted at BinderUnlinkedCallback.
         mCookie = new BinderDiedContext{.mDeathNotifier = weak_from_this()};
         // Register for the callbacks by linking to death notification.
-        AIBinder_linkToDeath(mClient->asBinder().get(), mRecipient, mCookie);
+        AIBinder_linkToDeath(mClient->asBinder().get(), mDeathRecipient.get(), mCookie);
+    }
+
+    void unlink() {
+        if (mClient != nullptr) {
+            // Unlink from the death notification.
+            AIBinder_unlinkToDeath(mClient->asBinder().get(), mDeathRecipient.get(), mCookie);
+            mClient = nullptr;
+        }
     }
 
 protected:
     std::shared_ptr<IResourceManagerClient> mClient;
     std::weak_ptr<ResourceManagerService> mService;
     const ClientInfoParcel mClientInfo;
-    AIBinder_DeathRecipient* mRecipient;
     BinderDiedContext* mCookie;
+    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 };
 
 DeathNotifier::DeathNotifier(const std::shared_ptr<IResourceManagerClient>& client,
                              const std::shared_ptr<ResourceManagerService>& service,
-                             const ClientInfoParcel& clientInfo,
-                             AIBinder_DeathRecipient* recipient)
+                             const ClientInfoParcel& clientInfo)
     : mClient(client), mService(service), mClientInfo(clientInfo),
-      mRecipient(recipient), mCookie(nullptr) {
-    link();
+      mCookie(nullptr),
+      mDeathRecipient(::ndk::ScopedAIBinder_DeathRecipient(
+                      AIBinder_DeathRecipient_new(BinderDiedCallback))) {
+    // Setting callback notification when DeathRecipient gets deleted.
+    AIBinder_DeathRecipient_setOnUnlinked(mDeathRecipient.get(), BinderUnlinkedCallback);
 }
 
 //static
@@ -140,9 +147,8 @@ class OverrideProcessInfoDeathNotifier : public DeathNotifier {
 public:
     OverrideProcessInfoDeathNotifier(const std::shared_ptr<IResourceManagerClient>& client,
                                      const std::shared_ptr<ResourceManagerService>& service,
-                                     const ClientInfoParcel& clientInfo,
-                                     AIBinder_DeathRecipient* recipient)
-            : DeathNotifier(client, service, clientInfo, recipient) {}
+                                     const ClientInfoParcel& clientInfo)
+            : DeathNotifier(client, service, clientInfo) {}
 
     virtual ~OverrideProcessInfoDeathNotifier() {}
 
@@ -158,6 +164,26 @@ void OverrideProcessInfoDeathNotifier::binderDied() {
     }
 
     service->removeProcessInfoOverride(mClientInfo.pid);
+}
+
+std::shared_ptr<DeathNotifier> DeathNotifier::Create(
+    const std::shared_ptr<IResourceManagerClient>& client,
+    const std::shared_ptr<ResourceManagerService>& service,
+    const ClientInfoParcel& clientInfo,
+    bool overrideProcessInfo) {
+    std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
+    if (overrideProcessInfo) {
+        deathNotifier = std::make_shared<OverrideProcessInfoDeathNotifier>(
+            client, service, clientInfo);
+    } else {
+        deathNotifier = std::make_shared<DeathNotifier>(client, service, clientInfo);
+    }
+
+    if (deathNotifier) {
+        deathNotifier->link();
+    }
+
+    return deathNotifier;
 }
 
 template <typename T>
@@ -377,9 +403,7 @@ ResourceManagerService::ResourceManagerService(const sp<ProcessInfoInterface> &p
       mServiceLog(new ServiceLog()),
       mSupportsMultipleSecureCodecs(true),
       mSupportsSecureWithNonSecureCodec(true),
-      mCpuBoostCount(0),
-      mDeathRecipient(::ndk::ScopedAIBinder_DeathRecipient(
-                      AIBinder_DeathRecipient_new(DeathNotifier::BinderDiedCallback))) {
+      mCpuBoostCount(0) {
     mSystemCB->noteResetVideo();
     // Create ResourceManagerMetrics that handles all the metrics.
     mResourceManagerMetrics = std::make_unique<ResourceManagerMetrics>(mProcessInfo);
@@ -535,8 +559,8 @@ Status ResourceManagerService::addResource(const ClientInfoParcel& clientInfo,
         }
     }
     if (info.deathNotifier == nullptr && client != nullptr) {
-        info.deathNotifier = std::make_shared<DeathNotifier>(
-            client, ref<ResourceManagerService>(), clientInfo, mDeathRecipient.get());
+        info.deathNotifier = DeathNotifier::Create(
+            client, ref<ResourceManagerService>(), clientInfo);
     }
     if (mObserverService != nullptr && !resourceAdded.empty()) {
         mObserverService->onResourceAdded(uid, pid, resourceAdded);
@@ -905,8 +929,8 @@ Status ResourceManagerService::overrideProcessInfo(
                                 .uid = 0,
                                 .id = 0,
                                 .name = "<unknown client>"};
-    auto deathNotifier = std::make_shared<OverrideProcessInfoDeathNotifier>(
-            client, ref<ResourceManagerService>(), clientInfo, mDeathRecipient.get());
+    auto deathNotifier = DeathNotifier::Create(
+        client, ref<ResourceManagerService>(), clientInfo, true);
 
     mProcessInfoOverrideMap.emplace(pid, ProcessInfoOverride{deathNotifier, client});
 
