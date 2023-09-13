@@ -171,6 +171,24 @@ void IOProfile::toSupportedMixerAttributes(
     }
 }
 
+void IOProfile::refreshMixerBehaviors() {
+    if (getRole() == AUDIO_PORT_ROLE_SOURCE) {
+        mMixerBehaviors.clear();
+        mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_DEFAULT);
+        if (mFlags.output & AUDIO_OUTPUT_FLAG_BIT_PERFECT) {
+            mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_BIT_PERFECT);
+        }
+    }
+}
+
+status_t IOProfile::readFromParcelable(const media::AudioPortFw &parcelable) {
+    status_t status = AudioPort::readFromParcelable(parcelable);
+    if (status == OK) {
+        refreshMixerBehaviors();
+    }
+    return status;
+}
+
 void IOProfile::dump(String8 *dst, int spaces) const
 {
     String8 extraInfo;
@@ -195,6 +213,10 @@ void IOProfile::dump(String8 *dst, int spaces) const
             spaces - 2, "", maxActiveCount, curActiveCount);
     dst->appendFormat("%*s- recommendedMuteDurationMs: %u ms\n",
             spaces - 2, "", recommendedMuteDurationMs);
+    if (hasDynamicAudioProfile() && !mMixerBehaviors.empty()) {
+        dst->appendFormat("%*s- mixerBehaviors: %s\n",
+                spaces - 2, "", dumpMixerBehaviors(mMixerBehaviors).c_str());
+    }
 }
 
 void IOProfile::log()
