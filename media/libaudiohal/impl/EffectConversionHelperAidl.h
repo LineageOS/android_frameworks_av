@@ -41,7 +41,10 @@ class EffectConversionHelperAidl {
     std::shared_ptr<DataMQ> getInputMQ() { return mInputQ; }
     std::shared_ptr<DataMQ> getOutputMQ() { return mOutputQ; }
     std::shared_ptr<android::hardware::EventFlag> getEventFlagGroup() { return mEfGroup; }
+
     bool isBypassing() const;
+    bool isOffload() const;
+    bool isBypassingOrOffload() const;
 
     ::aidl::android::hardware::audio::effect::Descriptor getDescriptor() const;
 
