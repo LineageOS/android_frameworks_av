@@ -278,6 +278,10 @@ bool EffectProxy::isBypassing() const {
     return mSubEffects[mActiveSubIdx].descriptor.common.flags.bypass;
 }
 
+bool EffectProxy::isOffload() const {
+    return mSubEffects[mActiveSubIdx].descriptor.common.flags.offloadIndication;
+}
+
 binder_status_t EffectProxy::dump(int fd, const char** args, uint32_t numArgs) {
     const std::string dumpString = toString();
     write(fd, dumpString.c_str(), dumpString.size());
