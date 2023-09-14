@@ -165,14 +165,14 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
 
     effect_config_t* config = (effect_config_t*)pCmdData;
     Parameter::Common common = {
+            .session = mCommon.session,
+            .ioHandle = mCommon.ioHandle,
             .input =
                     VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfig(
                             config->inputCfg, mIsInputStream)),
             .output =
                     VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_buffer_config_t_AudioConfig(
-                            config->outputCfg, mIsInputStream)),
-            .session = mCommon.session,
-            .ioHandle = mCommon.ioHandle};
+                            config->outputCfg, mIsInputStream))};
 
     State state;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
@@ -456,7 +456,7 @@ status_t EffectConversionHelperAidl::updateEventFlags() {
                   efGroup);
             status = (status == OK) ? BAD_VALUE : status;
         }
-    } else if (isBypassingOrOffload()) {
+    } else if (isBypassingOrTunnel()) {
         // for effect with bypass (no processing) or offloadIndication flag, it's okay to not have
         // statusQ
         return OK;
@@ -466,8 +466,8 @@ status_t EffectConversionHelperAidl::updateEventFlags() {
     return status;
 }
 
-bool EffectConversionHelperAidl::isBypassingOrOffload() const {
-    return isBypassing() || isOffload();
+bool EffectConversionHelperAidl::isBypassingOrTunnel() const {
+    return isBypassing() || isTunnel();
 }
 
 bool EffectConversionHelperAidl::isBypassing() const {
@@ -476,10 +476,10 @@ bool EffectConversionHelperAidl::isBypassing() const {
             (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isBypassing()));
 }
 
-bool EffectConversionHelperAidl::isOffload() const {
+bool EffectConversionHelperAidl::isTunnel() const {
     return mEffect &&
-           (mDesc.common.flags.offloadIndication ||
-            (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isOffload()));
+           (mDesc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL ||
+            (mIsProxyEffect && std::static_pointer_cast<EffectProxy>(mEffect)->isTunnel()));
 }
 
 Descriptor EffectConversionHelperAidl::getDescriptor() const {
