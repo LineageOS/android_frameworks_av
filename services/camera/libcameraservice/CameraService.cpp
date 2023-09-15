@@ -124,6 +124,8 @@ static const std::string sDumpPermission("android.permission.DUMP");
 static const std::string sManageCameraPermission("android.permission.MANAGE_CAMERA");
 static const std::string sCameraPermission("android.permission.CAMERA");
 static const std::string sSystemCameraPermission("android.permission.SYSTEM_CAMERA");
+static const std::string sCameraHeadlessSystemUserPermission(
+        "android.permission.CAMERA_HEADLESS_SYSTEM_USER");
 static const std::string
         sCameraSendSystemEventsPermission("android.permission.CAMERA_SEND_SYSTEM_EVENTS");
 static const std::string sCameraOpenCloseListenerPermission(
@@ -703,6 +705,14 @@ static bool isAutomotiveDevice() {
     return strncmp(value, "automotive", PROPERTY_VALUE_MAX) == 0;
 }
 
+static bool isHeadlessSystemUserMode() {
+    // Checks if the device is running in headless system user mode
+    // by checking the property ro.fw.mu.headless_system_user.
+    char value[PROPERTY_VALUE_MAX] = {0};
+    property_get("ro.fw.mu.headless_system_user", value, "");
+    return strncmp(value, "true", PROPERTY_VALUE_MAX) == 0;
+}
+
 static bool isAutomotivePrivilegedClient(int32_t uid) {
     // Returns false if this is not an automotive device type.
     if (!isAutomotiveDevice())
@@ -790,6 +800,15 @@ bool CameraService::hasPermissionsForSystemCamera(const std::string& cameraId, i
     bool checkPermissionForCamera = checkPermission(cameraId,
             sCameraPermission, attributionSource, std::string(), AppOpsManager::OP_NONE);
     return checkPermissionForSystemCamera && checkPermissionForCamera;
+}
+
+bool CameraService::hasPermissionsForCameraHeadlessSystemUser(const std::string& cameraId,
+        int callingPid, int callingUid) const{
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    return checkPermission(cameraId, sCameraHeadlessSystemUserPermission, attributionSource,
+            std::string(), AppOpsManager::OP_NONE);
 }
 
 Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
@@ -1661,6 +1680,18 @@ Status CameraService::validateClientPermissionsLocked(const std::string& cameraI
         return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
                 "Callers from device user %d are not currently allowed to connect to camera \"%s\"",
                 clientUserId, cameraId.c_str());
+    }
+
+    // If the System User tries to access the camera when the device is running in
+    // headless system user mode, ensure that client has the required permission
+    // CAMERA_HEADLESS_SYSTEM_USER.
+    if (isHeadlessSystemUserMode() && (clientUserId == USER_SYSTEM) &&
+            !hasPermissionsForCameraHeadlessSystemUser(cameraId, callingPid, callingUid)) {
+        ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
+        return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
+                "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" as Headless System User\
+                without camera headless system user permission",
+                clientName.c_str(), clientUid, clientPid, cameraId.c_str());
     }
 
     return Status::ok();
