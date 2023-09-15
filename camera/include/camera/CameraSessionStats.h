@@ -161,6 +161,7 @@ public:
     std::vector<CameraStreamStats> mStreamStats;
     std::string mUserTag;
     int mVideoStabilizationMode;
+    bool mUsedUltraWide;
     int mSessionIndex;
 
     CameraExtensionSessionStats mCameraExtensionSessionStats;

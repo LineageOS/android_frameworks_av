@@ -369,6 +369,8 @@ private:
     std::string mUserTag;
     // The last set video stabilization mode
     int mVideoStabilizationMode = -1;
+    // Whether a zoom_ratio < 1.0 has been used during this session
+    bool mUsedUltraWide = false;
 
     // This only exists in case of camera ID Remapping.
     const std::string mOriginalCameraId;

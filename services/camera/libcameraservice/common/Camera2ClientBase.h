@@ -97,7 +97,8 @@ public:
     void                  notifyIdleWithUserTag(int64_t requestCount, int64_t resultErrorCount,
                                      bool deviceError,
                                      const std::vector<hardware::CameraStreamStats>& streamStats,
-                                     const std::string& userTag, int videoStabilizationMode);
+                                     const std::string& userTag, int videoStabilizationMode,
+                                     bool usedUltraWide);
 
     int                   getCameraId() const;
     const sp<CameraDeviceBase>&
