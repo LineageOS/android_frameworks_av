@@ -412,7 +412,23 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
                 mAfPatchPanelCallback->updateOutDevicesForRecordThreads_l(devices);
             }
 
+            // For endpoint patches, we do not need to re-evaluate the device effect state
+            // if the same HAL patch is reused (see calls to mAfPatchPanelCallback below)
+            if (endpointPatch) {
+                for (auto& p : mPatches) {
+                    // end point patches are skipped so we do not compare against this patch
+                    if (!p.second.mIsEndpointPatch && patchesHaveSameRoute(
+                            newPatch.mAudioPatch, p.second.mAudioPatch)) {
+                        ALOGV("%s() Sw Bridge endpoint reusing halHandle=%d", __func__,
+                              p.second.mHalHandle);
+                        halHandle = p.second.mHalHandle;
+                        reuseExistingHalPatch = true;
+                        break;
+                    }
+                }
+            }
             mAfPatchPanelCallback->mutex().unlock();
+
             status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
             mAfPatchPanelCallback->mutex().lock();
             if (status == NO_ERROR) {
@@ -442,11 +458,18 @@ exit:
         *handle = static_cast<audio_patch_handle_t>(
                 mAfPatchPanelCallback->nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH));
         newPatch.mHalHandle = halHandle;
-        if (reuseExistingHalPatch) {
-            mAfPatchPanelCallback->getPatchCommandThread()->updateAudioPatch(
-                    oldhandle, *handle, newPatch);
-        } else {
-            mAfPatchPanelCallback->getPatchCommandThread()->createAudioPatch(*handle, newPatch);
+        // Skip device effect:
+        //  -for sw bridge as effect are likely held by endpoint patches
+        //  -for endpoint reusing a HalPatch handle
+        if (!(newPatch.isSoftware()
+                || (endpointPatch && reuseExistingHalPatch))) {
+            if (reuseExistingHalPatch) {
+                mAfPatchPanelCallback->getPatchCommandThread()->updateAudioPatch(
+                        oldhandle, *handle, newPatch);
+            } else {
+                 mAfPatchPanelCallback->getPatchCommandThread()->createAudioPatch(
+                        *handle, newPatch);
+            }
         }
         if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
             addSoftwarePatchToInsertedModules_l(insertedModule, *handle, &newPatch.mAudioPatch);
@@ -734,12 +757,14 @@ status_t PatchPanel::releaseAudioPatch_l(audio_patch_handle_t handle)
  {
     ALOGV("%s handle %d", __func__, handle);
     status_t status = NO_ERROR;
+    bool doReleasePatch = true;
 
     auto iter = mPatches.find(handle);
     if (iter == mPatches.end()) {
         return BAD_VALUE;
     }
     Patch &removedPatch = iter->second;
+    const bool isSwBridge = removedPatch.isSoftware();
     const struct audio_patch &patch = removedPatch.mAudioPatch;
 
     const struct audio_port_config &src = patch.sources[0];
@@ -791,15 +816,31 @@ status_t PatchPanel::releaseAudioPatch_l(audio_patch_handle_t handle)
                     break;
                 }
             }
-            mAfPatchPanelCallback->mutex().unlock();
-            status = thread->sendReleaseAudioPatchConfigEvent(removedPatch.mHalHandle);
-            mAfPatchPanelCallback->mutex().lock();
+            // Check whether the removed patch Hal Handle is used in another non-Endpoint patch.
+            // Since this is a non-Endpoint patch, the removed patch is not considered (it is
+            // removed later from mPatches).
+            if (removedPatch.mIsEndpointPatch) {
+                for (auto& p: mPatches) {
+                    if (!p.second.mIsEndpointPatch
+                            && p.second.mHalHandle == removedPatch.mHalHandle) {
+                        ALOGV("%s() Sw Bridge endpoint used existing halHandle=%d, do not release",
+                              __func__,  p.second.mHalHandle);
+                        doReleasePatch = false;
+                        break;
+                    }
+                }
+            }
+            if (doReleasePatch) {
+                mAfPatchPanelCallback->mutex().unlock();
+                status = thread->sendReleaseAudioPatchConfigEvent(removedPatch.mHalHandle);
+                mAfPatchPanelCallback->mutex().lock();
+            }
         } break;
         default:
             status = BAD_VALUE;
     }
 
-    erasePatch(handle);
+    erasePatch(handle, /* reuseExistingHalPatch= */ !doReleasePatch || isSwBridge);
     return status;
 }
 
