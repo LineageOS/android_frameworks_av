@@ -685,7 +685,7 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     if (!(strcasestr(mMime.c_str(), "avc") || strcasestr(mMime.c_str(), "hevc") ||
           strcasestr(mMime.c_str(), "vp8") || strcasestr(mMime.c_str(), "vp9") ||
-          strcasestr(mMime.c_str(), "mpeg2"))) {
+          strcasestr(mMime.c_str(), "mpeg2") || strcasestr(mMime.c_str(), "av01"))) {
         return;
     }
 
