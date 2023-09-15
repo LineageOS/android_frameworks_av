@@ -500,7 +500,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     description("Encodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    bool signalEOS = std::get<3>(GetParam());
+    bool signalEOS = std::get<2>(GetParam());
     // Send an empty frame to receive CSD data from encoder.
     bool sendEmptyFirstFrame = std::get<3>(GetParam());
     mConfigBPictures = std::get<4>(GetParam());
