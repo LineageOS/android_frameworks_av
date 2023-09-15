@@ -23,6 +23,7 @@
 #include <aidl/android/hardware/graphics/common/PlaneLayoutComponentType.h>
 #include <android/hardware/graphics/common/1.2/types.h>
 #include <cutils/native_handle.h>
+#include <drm/drm_fourcc.h>
 #include <gralloctypes/Gralloc4.h>
 #include <hardware/gralloc.h>
 #include <ui/GraphicBufferAllocator.h>
@@ -478,7 +479,25 @@ c2_status_t C2AllocationGralloc::map(
     // 'NATIVE' on Android means LITTLE_ENDIAN
     constexpr C2PlaneInfo::endianness_t kEndianness = C2PlaneInfo::NATIVE;
 
-    switch (mFormat) {
+    // Try to resolve IMPLEMENTATION_DEFINED format to accurate format if
+    // possible.
+    uint32_t format = mFormat;
+    uint32_t fourCc;
+    if (format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
+        !GraphicBufferMapper::get().getPixelFormatFourCC(mBuffer, &fourCc)) {
+        switch (fourCc)  {
+            case DRM_FORMAT_XBGR8888:
+                 format = static_cast<uint32_t>(PixelFormat4::RGBX_8888);
+                 break;
+            case DRM_FORMAT_ABGR8888:
+                 format = static_cast<uint32_t>(PixelFormat4::RGBA_8888);
+                 break;
+            default:
+                 break;
+        }
+    }
+
+    switch (format) {
         case static_cast<uint32_t>(PixelFormat4::RGBA_1010102): {
             // TRICKY: this is used for media as YUV444 in the case when it is queued directly to a
             // Surface. In all other cases it is RGBA. We don't know which case it is here, so
