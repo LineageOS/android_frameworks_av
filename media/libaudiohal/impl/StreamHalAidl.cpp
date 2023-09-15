@@ -840,7 +840,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
                 parameters, String8(AudioParameter::keyOffloadCodecDelaySamples),
                 [&](int value) {
                     // The legacy keys are misnamed, the value is in frames.
-                    return value > 0 ? mOffloadMetadata.delayFrames = value, OK : BAD_VALUE;
+                    return value >= 0 ? mOffloadMetadata.delayFrames = value, OK : BAD_VALUE;
                 }))) {
         updateMetadata = true;
     }
@@ -848,7 +848,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
                 parameters, String8(AudioParameter::keyOffloadCodecPaddingSamples),
                 [&](int value) {
                     // The legacy keys are misnamed, the value is in frames.
-                    return value > 0 ? mOffloadMetadata.paddingFrames = value, OK : BAD_VALUE;
+                    return value >= 0 ? mOffloadMetadata.paddingFrames = value, OK : BAD_VALUE;
                 }))) {
         updateMetadata = true;
     }
