@@ -142,15 +142,15 @@ public:
     void onReleased(uint32_t generation);
 
     /**
-     * Get waitable fds for events.(allocate is ready, end of life cycle)
+     * Get waitable fd for events.(allocate is ready, end of life cycle)
      *
-     * @param[out]  allocFd     eventFd which signals being ready to allocate
-     * @param[out]  statusFd    eventFd which signals end of life cycle.
-     *                          When signaled no more allocate is possible.
+     * @param[out]  pipeFd      a file descriptor created from pipe2()
+     *                          in order for notifying being ready to allocate
+     *
      * @return  C2_OK
      *          C2_NO_MEMORY    Max # of fd reached.(not really a memory issue)
      */
-    c2_status_t getWaitableFds(int *allocFd, int *statusFd);
+    c2_status_t getWaitableFd(int *pipeFd);
 
     /**
      *  Ends to use the class. after the call, allocate will fail.
@@ -158,8 +158,6 @@ public:
     void stop();
 
 private:
-    static constexpr int kDefaultMaxDequeue = 2;
-
     struct BufferCache;
 
     struct BufferItem {
@@ -246,21 +244,30 @@ private:
     std::mutex mLock; // locks for data synchronization
     std::mutex mConfigLock; // locks for configuration change.
 
+    // NOTE: pipe2() creates two file descriptors for allocatable events
+    // and irrecoverable error events notification.
+    //
+    // A byte will be written to the writing end whenever a buffer is ready to
+    // dequeue/allocate. A byte will be read from the reading end whenever
+    // an allocate/dequeue event happens.
+    //
+    // The writing end will be closed when the end-of-lifecycle event was met.
+    //
+    // The reading end will be shared to the remote processes. Remote processes
+    // use ::poll() to check whether a buffer is ready to allocate/ready.
+    // Also ::poll() will let remote processes know the end-of-lifecycle event
+    // by returning POLLHUP event from the reading end.
+    ::android::base::unique_fd mReadPipeFd;   // The reading end file descriptor
+    ::android::base::unique_fd mWritePipeFd;  // The writing end file descriptor
+
     std::atomic<bool> mStopped;
-
-    ::android::base::unique_fd mAllocEventFd; // eventfd in semaphore mode which
-                                              // mirrors mDqueueable.
-    ::android::base::unique_fd mStopEventFd; // eventfd which indicates the life
-                                             // cycle of the class being stopped.
-
     std::thread mEventQueueThread; // Thread to handle interrupted
-                                   // writes to eventfd{s}.
+                                   // writes to the writing end.
     std::mutex mEventLock;
     std::condition_variable mEventCv;
 
     bool mStopEventThread;
     int mIncDequeueable; // pending # of write to increase dequeueable eventfd
-    bool mStopRequest; // pending write to statusfd
 
 private:
     explicit GraphicsTracker(int maxDequeueCount);
