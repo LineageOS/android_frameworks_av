@@ -699,6 +699,14 @@ status_t HidlCamera3Device::switchToOffline(
     // Java side to make sure the CameraCaptureSession is properly closed
 }
 
+void HidlCamera3Device::applyMaxBatchSizeLocked(
+        RequestList* requestList, const sp<camera3::Camera3OutputStreamInterface>& stream) {
+    int batchSize = requestList->size();
+
+    (*requestList->begin())->mBatchSize = batchSize;
+    stream->setBatchSize(batchSize);
+}
+
 sp<Camera3Device::RequestThread> HidlCamera3Device::createNewRequestThread(
                 wp<Camera3Device> parent, sp<camera3::StatusTracker> statusTracker,
                 sp<Camera3Device::HalInterface> interface,

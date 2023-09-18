@@ -703,6 +703,15 @@ class Camera3Device :
     status_t initializeCommonLocked();
 
     /**
+     * Update capture request list so that each batch size honors the batch_size_max report from
+     * the HAL. Set the batch size to output stream for buffer operations.
+     *
+     * Must be called with mLock held.
+     */
+    virtual void applyMaxBatchSizeLocked(
+            RequestList* requestList, const sp<camera3::Camera3OutputStreamInterface>& stream) = 0;
+
+    /**
      * Get the last request submitted to the hal by the request thread.
      *
      * Must be called with mLock held.
