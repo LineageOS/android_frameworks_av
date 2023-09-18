@@ -1609,23 +1609,21 @@ void MediaCodec::statsBufferSent(int64_t presentationUs, const sp<MediaCodecBuff
         mFramesInput++;
     }
 
-    const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
-    BufferFlightTiming_t startdata = { presentationUs, nowNs };
+    // mutex access to mBuffersInFlight and other stats
+    Mutex::Autolock al(mLatencyLock);
 
-    {
-        // mutex access to mBuffersInFlight and other stats
-        Mutex::Autolock al(mLatencyLock);
-
-
-        // XXX: we *could* make sure that the time is later than the end of queue
-        // as part of a consistency check...
+    // XXX: we *could* make sure that the time is later than the end of queue
+    // as part of a consistency check...
+    if (!mTunneled) {
+        const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
+        BufferFlightTiming_t startdata = { presentationUs, nowNs };
         mBuffersInFlight.push_back(startdata);
-
-        if (mIsLowLatencyModeOn && mIndexOfFirstFrameWhenLowLatencyOn < 0) {
-            mIndexOfFirstFrameWhenLowLatencyOn = mInputBufferCounter;
-        }
-        ++mInputBufferCounter;
     }
+
+    if (mIsLowLatencyModeOn && mIndexOfFirstFrameWhenLowLatencyOn < 0) {
+        mIndexOfFirstFrameWhenLowLatencyOn = mInputBufferCounter;
+    }
+    ++mInputBufferCounter;
 }
 
 // when we get a buffer back from the codec
