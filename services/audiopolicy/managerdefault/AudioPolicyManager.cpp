@@ -452,9 +452,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
 status_t AudioPolicyManager::deviceToAudioPort(audio_devices_t device, const char* device_address,
                                                const char* device_name,
                                                media::AudioPortFw* aidlPort) {
-    DeviceDescriptorBase devDescr(device, device_address);
-    devDescr.setName(device_name);
-    return devDescr.writeToParcelable(aidlPort);
+    const auto devDescr = sp<DeviceDescriptorBase>::make(device, device_address);
+    devDescr->setName(device_name);
+    return devDescr->writeToParcelable(aidlPort);
 }
 
 void AudioPolicyManager::setEngineDeviceConnectionState(const sp<DeviceDescriptor> device,
