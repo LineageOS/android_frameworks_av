@@ -43,8 +43,8 @@ class EffectConversionHelperAidl {
     std::shared_ptr<android::hardware::EventFlag> getEventFlagGroup() { return mEfGroup; }
 
     bool isBypassing() const;
-    bool isOffload() const;
-    bool isBypassingOrOffload() const;
+    bool isTunnel() const;
+    bool isBypassingOrTunnel() const;
 
     ::aidl::android::hardware::audio::effect::Descriptor getDescriptor() const;
 

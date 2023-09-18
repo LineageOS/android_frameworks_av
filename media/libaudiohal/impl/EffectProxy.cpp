@@ -278,8 +278,9 @@ bool EffectProxy::isBypassing() const {
     return mSubEffects[mActiveSubIdx].descriptor.common.flags.bypass;
 }
 
-bool EffectProxy::isOffload() const {
-    return mSubEffects[mActiveSubIdx].descriptor.common.flags.offloadIndication;
+bool EffectProxy::isTunnel() const {
+    return mSubEffects[mActiveSubIdx].descriptor.common.flags.hwAcceleratorMode ==
+           Flags::HardwareAccelerator::TUNNEL;
 }
 
 binder_status_t EffectProxy::dump(int fd, const char** args, uint32_t numArgs) {
