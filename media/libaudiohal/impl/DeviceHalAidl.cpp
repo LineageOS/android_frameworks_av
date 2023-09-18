@@ -1080,6 +1080,7 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
                 "%s: module %s, duplicate port ID received from HAL: %s, existing port: %s",
                 __func__, mInstance.c_str(), connectedPort.toString().c_str(),
                 it->second.toString().c_str());
+        mConnectedPorts[connectedPort.id] = false;
     } else {  // !connected
         AudioDevice matchDevice = aidlPort.ext.get<AudioPortExt::device>().device;
         auto portsIt = findPort(matchDevice);
@@ -1099,10 +1100,11 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
                             mModule->disconnectExternalDevice(portId)));
             mPorts.erase(portsIt);
+            mConnectedPorts.erase(portId);
         } else {
             ALOGD("%s: since device port ID %d is used by a stream, "
                     "external device disconnection postponed", __func__, portId);
-            mConnectedPortIdsHeldByStreams.insert(portId);
+            mConnectedPorts[portId] = true;
         }
     }
     return updateRoutes();
@@ -1601,8 +1603,25 @@ DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(const AudioDevice& device
     } else if (device.type.type == AudioDeviceType::OUT_DEFAULT) {
         return mPorts.find(mDefaultOutputPortId);
     }
-    return std::find_if(mPorts.begin(), mPorts.end(),
-            [&](const auto& pair) { return audioDeviceMatches(device, pair.second); });
+    if (device.address.getTag() != AudioDeviceAddress::id ||
+            !device.address.get<AudioDeviceAddress::id>().empty()) {
+        return std::find_if(mPorts.begin(), mPorts.end(),
+                [&](const auto& pair) { return audioDeviceMatches(device, pair.second); });
+    }
+    // For connection w/o an address, two ports can be found: the template port,
+    // and a connected port (if exists). Make sure we return the connected port.
+    DeviceHalAidl::Ports::iterator portIt = mPorts.end();
+    for (auto it = mPorts.begin(); it != mPorts.end(); ++it) {
+        if (audioDeviceMatches(device, it->second)) {
+            if (mConnectedPorts.find(it->first) != mConnectedPorts.end()) {
+                return it;
+            } else {
+                // Will return 'it' if there is no connected port.
+                portIt = it;
+            }
+        }
+    }
+    return portIt;
 }
 
 DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(
@@ -1765,7 +1784,8 @@ void DeviceHalAidl::resetUnusedPortConfigs() {
     std::set<int32_t> retryDeviceDisconnection;
     for (const auto& portConfigAndIdPair : portConfigIds) {
         resetPortConfig(portConfigAndIdPair.first);
-        if (mConnectedPortIdsHeldByStreams.count(portConfigAndIdPair.second) != 0) {
+        if (const auto it = mConnectedPorts.find(portConfigAndIdPair.second);
+                it != mConnectedPorts.end() && it->second) {
             retryDeviceDisconnection.insert(portConfigAndIdPair.second);
         }
     }
@@ -1774,7 +1794,7 @@ void DeviceHalAidl::resetUnusedPortConfigs() {
             TIME_CHECK();
             if (auto status = mModule->disconnectExternalDevice(portId); status.isOk()) {
                 mPorts.erase(portId);
-                mConnectedPortIdsHeldByStreams.erase(portId);
+                mConnectedPorts.erase(portId);
                 ALOGD("%s: executed postponed external device disconnection for port ID %d",
                         __func__, portId);
             }
