@@ -51,6 +51,7 @@
 
 #include <aidl/android/hardware/camera/device/ICameraInjectionSession.h>
 #include <aidlcommonsupport/NativeHandle.h>
+#include <android-base/properties.h>
 #include <android/binder_ibinder_platform.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 #include <camera/StringUtils.h>
@@ -312,6 +313,20 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
             mNeedFixupMonochromeTags = true;
         }
     }
+
+    // batch size limit is applied to the device with camera device version larger than 3.2 which is
+    // AIDL v2
+    hardware::hidl_version maxVersion{0, 0};
+    IPCTransport transport = IPCTransport::AIDL;
+    res = manager->getHighestSupportedVersion(mId, &maxVersion, &transport);
+    if (res != OK) {
+        ALOGE("%s: Error in getting camera device version id: %s (%d)", __FUNCTION__,
+              strerror(-res), res);
+        return res;
+    }
+    int deviceVersion = HARDWARE_DEVICE_API_VERSION(maxVersion.get_major(), maxVersion.get_minor());
+
+    mBatchSizeLimitEnabled = (deviceVersion >= CAMERA_DEVICE_API_VERSION_1_2);
 
     return initializeCommonLocked();
 }
@@ -1578,6 +1593,66 @@ status_t AidlCamera3Device::AidlCamera3DeviceInjectionMethods::replaceHalInterfa
     }
     parent->mInterface = newHalInterface;
     return OK;
+}
+
+void AidlCamera3Device::applyMaxBatchSizeLocked(
+        RequestList* requestList, const sp<camera3::Camera3OutputStreamInterface>& stream) {
+    int batchSize = requestList->size();
+
+    if (!mBatchSizeLimitEnabled) {
+        (*requestList->begin())->mBatchSize = batchSize;
+        stream->setBatchSize(batchSize);
+        return;
+    }
+
+    const auto& metadata = (*requestList->begin())->mSettingsList.begin()->metadata;
+
+    uint32_t tag = ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS;
+    auto sensorPixelModeEntry = metadata.find(ANDROID_SENSOR_PIXEL_MODE);
+    if (sensorPixelModeEntry.count != 0) {
+        if (ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION == sensorPixelModeEntry.data.u8[0]) {
+            tag = ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS_MAXIMUM_RESOLUTION;
+        }
+    }
+
+    const auto fpsRange = metadata.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE);
+    if (fpsRange.count > 1) {
+        auto configEntry = mDeviceInfo.find(tag);
+        for (size_t index = 4; index < configEntry.count; index += 5) {
+            if (stream->getWidth() == static_cast<uint32_t>(configEntry.data.i32[index - 4]) &&
+                stream->getHeight() == static_cast<uint32_t>(configEntry.data.i32[index - 3]) &&
+                fpsRange.data.i32[0] == configEntry.data.i32[index - 2] &&
+                fpsRange.data.i32[1] == configEntry.data.i32[index - 1]) {
+                const int maxBatchSize = configEntry.data.i32[index - 1] / 30;
+                const int reportedSize = configEntry.data.i32[index];
+
+                if (maxBatchSize % reportedSize == 0 && requestList->size() % reportedSize == 0) {
+                    batchSize = reportedSize;
+                    ALOGVV("Matching high speed configuration found. Limit batch size to %d",
+                           batchSize);
+                } else if (maxBatchSize % reportedSize == 0 &&
+                           reportedSize % requestList->size() == 0) {
+                    ALOGVV("Matching high speed configuration found, but requested batch size is "
+                           "divisor of batch_size_max. No need to limit batch size.");
+                } else {
+                    ALOGW("Matching high speed configuration found, but batch_size_max is not a "
+                          "divisor of corresponding fps_max/30 or requested batch size is not a "
+                          "divisor of batch_size_max, (fps_max %d, batch_size_max %d, requested "
+                          "batch size %zu)",
+                          configEntry.data.i32[index - 1], reportedSize, requestList->size());
+                }
+                break;
+            }
+        }
+    }
+
+    for (auto request = requestList->begin(); request != requestList->end(); request++) {
+        if (requestList->distance(requestList->begin(), request) % batchSize == 0) {
+            (*request)->mBatchSize = batchSize;
+        }
+    }
+
+    stream->setBatchSize(batchSize);
 }
 
 status_t AidlCamera3Device::injectionCameraInitialize(const std::string &injectedCamId,
