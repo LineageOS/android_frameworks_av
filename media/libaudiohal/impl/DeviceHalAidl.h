@@ -191,6 +191,8 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
         Status status = Status::UNKNOWN;
         MicrophoneInfoProvider::Info info;
     };
+    // IDs of ports for connected external devices, and whether they are held by streams.
+    using ConnectedPorts = std::map<int32_t /*port ID*/, bool>;
     using Patches = std::map<int32_t /*patch ID*/,
             ::aidl::android::hardware::audio::core::AudioPatch>;
     using PortConfigs = std::map<int32_t /*port config ID*/,
@@ -319,7 +321,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     std::mutex mLock;
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
     std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
-    std::set<int32_t> mConnectedPortIdsHeldByStreams;
+    ConnectedPorts mConnectedPorts;
 };
 
 } // namespace android
