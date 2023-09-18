@@ -540,9 +540,11 @@ media_status_t AImageReader_setBufferRemovedListener(
  *
  * @return AMEDIA_OK if the method call succeeds.
  *         AMEDIA_ERROR_INVALID_PARAMETER if reader or handle are NULL.
- *         AMEDIA_ERROR_UNKNOWN if some other error is encountered.
+ *         AMEDIA_ERROR_UNKNOWN if some other error is encountered or
+ *         the device no longer has android.hidl.token service to
+ *         satisfy the request because it is deprecated.
  */
-media_status_t AImageReader_getWindowNativeHandle(
+[[deprecated]] media_status_t AImageReader_getWindowNativeHandle(
     AImageReader *reader, /* out */native_handle_t **handle);
 #endif
 
