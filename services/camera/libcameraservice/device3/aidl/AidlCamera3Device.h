@@ -252,6 +252,10 @@ class AidlCamera3Device :
     };
 
   private:
+    virtual void applyMaxBatchSizeLocked(
+            RequestList* requestList,
+            const sp<camera3::Camera3OutputStreamInterface>& stream) override;
+
     virtual status_t injectionCameraInitialize(const std::string &injectCamId,
             sp<CameraProviderManager> manager) override;
 
@@ -271,6 +275,9 @@ class AidlCamera3Device :
 
     std::shared_ptr<AidlCameraDeviceCallbacks> mCallbacks = nullptr;
 
+    // Whether the batch_size_max field in the high speed configuration actually applied to
+    // capture requests.
+    bool mBatchSizeLimitEnabled = false;
 
 }; // class AidlCamera3Device
 

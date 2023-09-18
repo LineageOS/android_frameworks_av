@@ -213,6 +213,10 @@ class HidlCamera3Device :
     hardware::Return<void> notifyHelper(
             const hardware::hidl_vec<NotifyMsgType>& msgs);
 
+    virtual void applyMaxBatchSizeLocked(
+            RequestList* requestList,
+            const sp<camera3::Camera3OutputStreamInterface>& stream) override;
+
     virtual status_t injectionCameraInitialize(const std::string &injectCamId,
             sp<CameraProviderManager> manager) override;
 

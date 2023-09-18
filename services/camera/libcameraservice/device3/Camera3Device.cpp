@@ -51,6 +51,7 @@
 #include <cutils/properties.h>
 #include <camera/StringUtils.h>
 
+#include <android-base/properties.h>
 #include <android/hardware/camera/device/3.7/ICameraInjectionSession.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 
@@ -749,8 +750,7 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
         auto firstRequest = requestList->begin();
         for (auto& outputStream : (*firstRequest)->mOutputStreams) {
             if (outputStream->isVideoStream()) {
-                (*firstRequest)->mBatchSize = requestList->size();
-                outputStream->setBatchSize(requestList->size());
+                applyMaxBatchSizeLocked(requestList, outputStream);
                 break;
             }
         }
