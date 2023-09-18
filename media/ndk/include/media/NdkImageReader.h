@@ -534,15 +534,22 @@ media_status_t AImageReader_setBufferRemovedListener(
  * Get the native_handle_t corresponding to the ANativeWindow owned by the
  * AImageReader provided.
  *
+ * This is deprecated in API level 35 and will return AMEDIA_ERROR_UNKNOWN.
+ * The native_handle_t is no longer used with AIDL interfaces and
+ * ANativeWindow is used directly instead.
+ * Use AImageRead_getWindow to get the ANativeWindow and use that object.
+ *
  * @param reader The image reader of interest.
  * @param handle The output native_handle_t. This native handle is owned by
  *               this image reader.
  *
  * @return AMEDIA_OK if the method call succeeds.
  *         AMEDIA_ERROR_INVALID_PARAMETER if reader or handle are NULL.
- *         AMEDIA_ERROR_UNKNOWN if some other error is encountered.
+ *         AMEDIA_ERROR_UNKNOWN if some other error is encountered or
+ *         the device no longer has android.hidl.token service to
+ *         satisfy the request because it is deprecated.
  */
-media_status_t AImageReader_getWindowNativeHandle(
+[[deprecated]] media_status_t AImageReader_getWindowNativeHandle(
     AImageReader *reader, /* out */native_handle_t **handle);
 #endif
 
