@@ -532,6 +532,11 @@ OMX_ERRORTYPE SoftVPXEncoder::setConfig(
 
 OMX_ERRORTYPE SoftVPXEncoder::internalSetVp8Params(
         const OMX_VIDEO_PARAM_VP8TYPE* vp8Params) {
+    if (!isValidOMXParam(vp8Params)) {
+        android_errorWriteLog(0x534e4554, "273937171");
+        return OMX_ErrorBadParameter;
+    }
+
     if (vp8Params->nPortIndex != kOutputPortIndex) {
         return OMX_ErrorUnsupportedIndex;
     }
