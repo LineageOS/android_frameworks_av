@@ -1954,7 +1954,8 @@ c2_status_t Codec2Client::Component::createBlockPool(
         std::shared_ptr<Codec2Client::Configurable>* configurable) {
     if (mAidlBase) {
         c2_aidl::IComponent::BlockPool aidlBlockPool;
-        ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(id, &aidlBlockPool);
+        ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(static_cast<int32_t>(id),
+                                                                      &aidlBlockPool);
         c2_status_t status = GetC2Status(transStatus, "createBlockPool");
         if (status != C2_OK) {
             return status;
