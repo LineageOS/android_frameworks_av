@@ -485,6 +485,11 @@ OMX_ERRORTYPE SoftVPXEncoder::internalSetBitrateParams(
 
 OMX_ERRORTYPE SoftVPXEncoder::internalGetAndroidVpxParams(
         OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE *vpxAndroidParams) {
+    if (!isValidOMXParam(vpxAndroidParams)) {
+        android_errorWriteLog(0x534e4554, "273936601");
+        return OMX_ErrorBadParameter;
+    }
+
     if (vpxAndroidParams->nPortIndex != kOutputPortIndex) {
         return OMX_ErrorUnsupportedIndex;
     }
@@ -501,6 +506,10 @@ OMX_ERRORTYPE SoftVPXEncoder::internalGetAndroidVpxParams(
 
 OMX_ERRORTYPE SoftVPXEncoder::internalSetAndroidVpxParams(
         const OMX_VIDEO_PARAM_ANDROID_VP8ENCODERTYPE *vpxAndroidParams) {
+    if (!isValidOMXParam(vpxAndroidParams)) {
+        android_errorWriteLog(0x534e4554, "273937551");
+        return OMX_ErrorBadParameter;
+    }
     if (vpxAndroidParams->nPortIndex != kOutputPortIndex) {
         return OMX_ErrorUnsupportedIndex;
     }

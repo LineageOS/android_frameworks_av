@@ -119,6 +119,11 @@ OMX_ERRORTYPE SoftVP9Encoder::internalSetParameter(
 
 OMX_ERRORTYPE SoftVP9Encoder::internalGetVp9Params(
         OMX_VIDEO_PARAM_VP9TYPE *vp9Params) {
+    if (!isValidOMXParam(vp9Params)) {
+        android_errorWriteLog(0x534e4554, "273936553");
+        return OMX_ErrorBadParameter;
+    }
+
     if (vp9Params->nPortIndex != kOutputPortIndex) {
         return OMX_ErrorUnsupportedIndex;
     }
@@ -133,6 +138,11 @@ OMX_ERRORTYPE SoftVP9Encoder::internalGetVp9Params(
 
 OMX_ERRORTYPE SoftVP9Encoder::internalSetVp9Params(
         const OMX_VIDEO_PARAM_VP9TYPE *vp9Params) {
+    if (!isValidOMXParam(vp9Params)) {
+        android_errorWriteLog(0x534e4554, "273937136");
+        return OMX_ErrorBadParameter;
+    }
+
     if (vp9Params->nPortIndex != kOutputPortIndex) {
         return OMX_ErrorUnsupportedIndex;
     }
