@@ -173,7 +173,7 @@ status_t EffectHalAidl::process() {
               mConversion->isBypassing()
                       ? "bypassing"
                       : aidl::android::hardware::audio::effect::toString(state).c_str());
-        return OK;
+        return -ENODATA;
     }
 
     auto statusQ = mConversion->getStatusMQ();
