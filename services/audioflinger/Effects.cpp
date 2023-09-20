@@ -825,7 +825,10 @@ void AudioFlinger::EffectModule::reset_l()
     if (mStatus != NO_ERROR || mEffectInterface == 0) {
         return;
     }
-    mEffectInterface->command(EFFECT_CMD_RESET, 0, NULL, 0, NULL);
+
+    int reply = 0;
+    uint32_t replySize = sizeof(reply);
+    mEffectInterface->command(EFFECT_CMD_RESET, 0, NULL, &replySize, &reply);
 }
 
 status_t AudioFlinger::EffectModule::configure()
