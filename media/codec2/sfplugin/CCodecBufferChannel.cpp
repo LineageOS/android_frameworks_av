@@ -2128,8 +2128,15 @@ bool CCodecBufferChannel::handleWork(
 
     if (notifyClient && !buffer && !flags) {
         if (mTunneled && drop && outputFormat) {
-            ALOGV("[%s] onWorkDone: Keep tunneled, drop frame with format change (%lld)",
-                  mName, work->input.ordinal.frameIndex.peekull());
+            if (mOutputFormat != outputFormat) {
+                ALOGV("[%s] onWorkDone: Keep tunneled, drop frame with format change (%lld)",
+                      mName, work->input.ordinal.frameIndex.peekull());
+                mOutputFormat = outputFormat;
+            } else {
+                ALOGV("[%s] onWorkDone: Not reporting output buffer without format change (%lld)",
+                      mName, work->input.ordinal.frameIndex.peekull());
+                notifyClient = false;
+            }
         } else {
             ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
                   mName, work->input.ordinal.frameIndex.peekull());
