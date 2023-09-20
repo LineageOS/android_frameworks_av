@@ -45,6 +45,7 @@
 #include <aidl/android/hardware/media/c2/StructDescriptor.h>
 
 #include <aidlcommonsupport/NativeHandle.h>
+#include <android/api-level.h>
 #include <android/binder_auto_utils.h>
 #include <android/binder_ibinder.h>
 #include <android/binder_manager.h>
@@ -1439,12 +1440,16 @@ std::vector<std::string> Codec2Client::CacheServiceNames() {
     std::vector<std::string> names;
 
     if (c2_aidl::utils::IsSelected()) {
-        // Get AIDL service names
-        AServiceManager_forEachDeclaredInstance(
-                AidlBase::descriptor, &names, [](const char *name, void *context) {
-                    std::vector<std::string> *names = (std::vector<std::string> *)context;
-                    names->emplace_back(name);
-                });
+        if (__builtin_available(android __ANDROID_API_S__, *)) {
+            // Get AIDL service names
+            AServiceManager_forEachDeclaredInstance(
+                    AidlBase::descriptor, &names, [](const char *name, void *context) {
+                        std::vector<std::string> *names = (std::vector<std::string> *)context;
+                        names->emplace_back(name);
+                    });
+        } else {
+            LOG(FATAL) << "C2 AIDL cannot be selected on Android version older than 35";
+        }
     } else {
         // Get HIDL service names
         using ::android::hardware::media::c2::V1_0::IComponentStore;
@@ -1546,21 +1551,25 @@ std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
     LOG(VERBOSE) << "Creating a Codec2 client to service \"" << name << "\"";
 
     if (c2_aidl::utils::IsSelected()) {
-        std::string instanceName =
-            ::android::base::StringPrintf("%s/%s", AidlBase::descriptor, name.c_str());
-        if (AServiceManager_isDeclared(instanceName.c_str())) {
-            std::shared_ptr<AidlBase> baseStore = AidlBase::fromBinder(
-                    ::ndk::SpAIBinder(AServiceManager_waitForService(instanceName.c_str())));
-            CHECK(baseStore) << "Codec2 AIDL service \"" << name << "\""
-                                " inaccessible for unknown reasons.";
-            LOG(VERBOSE) << "Client to Codec2 AIDL service \"" << name << "\" created";
-            std::shared_ptr<c2_aidl::IConfigurable> configurable;
-            ::ndk::ScopedAStatus transStatus = baseStore->getConfigurable(&configurable);
-            CHECK(transStatus.isOk()) << "Codec2 AIDL service \"" << name << "\""
-                                        "does not have IConfigurable.";
-            return std::make_shared<Codec2Client>(baseStore, configurable, index);
+        if (__builtin_available(android __ANDROID_API_S__, *)) {
+            std::string instanceName =
+                ::android::base::StringPrintf("%s/%s", AidlBase::descriptor, name.c_str());
+            if (AServiceManager_isDeclared(instanceName.c_str())) {
+                std::shared_ptr<AidlBase> baseStore = AidlBase::fromBinder(
+                        ::ndk::SpAIBinder(AServiceManager_waitForService(instanceName.c_str())));
+                CHECK(baseStore) << "Codec2 AIDL service \"" << name << "\""
+                                    " inaccessible for unknown reasons.";
+                LOG(VERBOSE) << "Client to Codec2 AIDL service \"" << name << "\" created";
+                std::shared_ptr<c2_aidl::IConfigurable> configurable;
+                ::ndk::ScopedAStatus transStatus = baseStore->getConfigurable(&configurable);
+                CHECK(transStatus.isOk()) << "Codec2 AIDL service \"" << name << "\""
+                                            "does not have IConfigurable.";
+                return std::make_shared<Codec2Client>(baseStore, configurable, index);
+            } else {
+                LOG(ERROR) << "Codec2 AIDL service \"" << name << "\" is not declared";
+            }
         } else {
-            LOG(ERROR) << "Codec2 AIDL service \"" << name << "\" is not declared";
+            LOG(FATAL) << "C2 AIDL cannot be selected on Android version older than 35";
         }
     } else {
         std::string instanceName = "android.hardware.media.c2/" + name;
