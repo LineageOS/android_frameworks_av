@@ -46,9 +46,12 @@ using stats::media_metrics::\
 
 inline const char* getCodecType(MediaResourceSubType codecType) {
     switch (codecType) {
-        case MediaResourceSubType::kAudioCodec:         return "Audio";
-        case MediaResourceSubType::kVideoCodec:         return "Video";
-        case MediaResourceSubType::kImageCodec:         return "Image";
+        case MediaResourceSubType::kHwAudioCodec:       return "Hw Audio";
+        case MediaResourceSubType::kSwAudioCodec:       return "Sw Audio";
+        case MediaResourceSubType::kHwVideoCodec:       return "Hw Video";
+        case MediaResourceSubType::kSwVideoCodec:       return "Sw Video";
+        case MediaResourceSubType::kHwImageCodec:       return "Hw Image";
+        case MediaResourceSubType::kSwImageCodec:       return "Sw Image";
         case MediaResourceSubType::kUnspecifiedSubType:
         default:
                                                         return "Unspecified";
@@ -56,39 +59,29 @@ inline const char* getCodecType(MediaResourceSubType codecType) {
     return "Unspecified";
 }
 
-static CodecBucket getCodecBucket(bool isHardware,
-                                  bool isEncoder,
-                                  MediaResourceSubType codecType) {
-    if (isHardware) {
-        switch (codecType) {
-            case MediaResourceSubType::kAudioCodec:
-                if (isEncoder) return HwAudioEncoder;
-                return HwAudioDecoder;
-            case MediaResourceSubType::kVideoCodec:
-                if (isEncoder) return HwVideoEncoder;
-                return HwVideoDecoder;
-            case MediaResourceSubType::kImageCodec:
-                if (isEncoder) return HwImageEncoder;
-                return HwImageDecoder;
-            case MediaResourceSubType::kUnspecifiedSubType:
-            default:
-                return CodecBucketUnspecified;
-        }
-    } else {
-        switch (codecType) {
-            case MediaResourceSubType::kAudioCodec:
-                if (isEncoder) return SwAudioEncoder;
-                return SwAudioDecoder;
-            case MediaResourceSubType::kVideoCodec:
-                if (isEncoder) return SwVideoEncoder;
-                return SwVideoDecoder;
-            case MediaResourceSubType::kImageCodec:
-                if (isEncoder) return SwImageEncoder;
-                return SwImageDecoder;
-            case MediaResourceSubType::kUnspecifiedSubType:
-            default:
-                return CodecBucketUnspecified;
-        }
+inline bool isHardwareCodec(MediaResourceSubType codecType) {
+    return (codecType == MediaResourceSubType::kHwAudioCodec ||
+            codecType == MediaResourceSubType::kHwVideoCodec ||
+            codecType == MediaResourceSubType::kHwImageCodec);
+}
+
+static CodecBucket getCodecBucket(bool isEncoder, MediaResourceSubType codecType) {
+    switch (codecType) {
+    case MediaResourceSubType::kHwAudioCodec:
+        return isEncoder? HwAudioEncoder : HwAudioDecoder;
+    case MediaResourceSubType::kSwAudioCodec:
+        return isEncoder? SwAudioEncoder : SwAudioDecoder;
+    case MediaResourceSubType::kHwVideoCodec:
+        return isEncoder? HwVideoEncoder : HwVideoDecoder;
+    case MediaResourceSubType::kSwVideoCodec:
+        return isEncoder? SwVideoEncoder : SwVideoDecoder;
+    case MediaResourceSubType::kHwImageCodec:
+        return isEncoder? HwImageEncoder : HwImageDecoder;
+    case MediaResourceSubType::kSwImageCodec:
+        return isEncoder? SwImageEncoder : SwImageDecoder;
+    case MediaResourceSubType::kUnspecifiedSubType:
+    default:
+        return CodecBucketUnspecified;
     }
 
     return CodecBucketUnspecified;
@@ -179,8 +172,10 @@ void ResourceManagerMetrics::notifyClientConfigChanged(const ClientConfigParcel&
     std::scoped_lock lock(mLock);
     ClientConfigMap::iterator entry = mClientConfigMap.find(clientConfig.clientInfo.id);
     if (entry != mClientConfigMap.end() &&
-        (clientConfig.codecType == MediaResourceSubType::kVideoCodec ||
-        clientConfig.codecType == MediaResourceSubType::kImageCodec)) {
+        (clientConfig.codecType == MediaResourceSubType::kHwVideoCodec ||
+         clientConfig.codecType == MediaResourceSubType::kSwVideoCodec ||
+         clientConfig.codecType == MediaResourceSubType::kHwImageCodec ||
+         clientConfig.codecType == MediaResourceSubType::kSwImageCodec)) {
         int pid = clientConfig.clientInfo.pid;
         // Update the pixel count for this process
         updatePixelCount(pid, clientConfig.width * (long)clientConfig.height,
@@ -201,13 +196,13 @@ void ResourceManagerMetrics::notifyClientStarted(const ClientConfigParcel& clien
     mClientConfigMap[clientConfig.clientInfo.id] = clientConfig;
 
     // Update the concurrent codec count for this process.
-    CodecBucket codecBucket = getCodecBucket(clientConfig.isHardware,
-                                             clientConfig.isEncoder,
-                                             clientConfig.codecType);
+    CodecBucket codecBucket = getCodecBucket(clientConfig.isEncoder, clientConfig.codecType);
     increaseConcurrentCodecs(pid, codecBucket);
 
-    if (clientConfig.codecType == MediaResourceSubType::kVideoCodec ||
-        clientConfig.codecType == MediaResourceSubType::kImageCodec) {
+    if (clientConfig.codecType == MediaResourceSubType::kHwVideoCodec ||
+        clientConfig.codecType == MediaResourceSubType::kSwVideoCodec ||
+        clientConfig.codecType == MediaResourceSubType::kHwImageCodec ||
+        clientConfig.codecType == MediaResourceSubType::kSwImageCodec) {
         // Update the pixel count for this process
         increasePixelCount(pid, clientConfig.width * (long)clientConfig.height);
     }
@@ -236,7 +231,7 @@ void ResourceManagerMetrics::notifyClientStarted(const ClientConfigParcel& clien
          clientConfig.clientInfo.name.c_str(),
          static_cast<int32_t>(clientConfig.codecType),
          clientConfig.isEncoder,
-         clientConfig.isHardware,
+         isHardwareCodec(clientConfig.codecType),
          clientConfig.width, clientConfig.height,
          systemConcurrentCodecs,
          appConcurrentCodecs,
@@ -249,7 +244,7 @@ void ResourceManagerMetrics::notifyClientStarted(const ClientConfigParcel& clien
 
     ALOGV("%s: Pushed MEDIA_CODEC_STARTED atom: "
           "Process[pid(%d): uid(%d)] "
-          "Codec: [%s: %ju] is %s %s %s "
+          "Codec: [%s: %ju] is %s %s "
           "Timestamp: %jd "
           "Resolution: %d x %d "
           "ConcurrentCodec[%d]={System: %d App: %d} "
@@ -259,7 +254,6 @@ void ResourceManagerMetrics::notifyClientStarted(const ClientConfigParcel& clien
           pid, clientConfig.clientInfo.uid,
           clientConfig.clientInfo.name.c_str(),
           clientConfig.id,
-          clientConfig.isHardware? "hardware" : "software",
           getCodecType(clientConfig.codecType),
           clientConfig.isEncoder? "encoder" : "decoder",
           clientConfig.timeStamp,
@@ -273,13 +267,13 @@ void ResourceManagerMetrics::notifyClientStopped(const ClientConfigParcel& clien
     std::scoped_lock lock(mLock);
     int pid = clientConfig.clientInfo.pid;
     // Update the concurrent codec count for this process.
-    CodecBucket codecBucket = getCodecBucket(clientConfig.isHardware,
-                                             clientConfig.isEncoder,
-                                             clientConfig.codecType);
+    CodecBucket codecBucket = getCodecBucket(clientConfig.isEncoder, clientConfig.codecType);
     decreaseConcurrentCodecs(pid, codecBucket);
 
-    if (clientConfig.codecType == MediaResourceSubType::kVideoCodec ||
-        clientConfig.codecType == MediaResourceSubType::kImageCodec) {
+    if (clientConfig.codecType == MediaResourceSubType::kHwVideoCodec ||
+        clientConfig.codecType == MediaResourceSubType::kSwVideoCodec ||
+        clientConfig.codecType == MediaResourceSubType::kHwImageCodec ||
+        clientConfig.codecType == MediaResourceSubType::kSwImageCodec) {
         // Update the pixel count for this process
         decreasePixelCount(pid, clientConfig.width * (long)clientConfig.height);
     }
@@ -319,7 +313,7 @@ void ResourceManagerMetrics::notifyClientStopped(const ClientConfigParcel& clien
          clientConfig.clientInfo.name.c_str(),
          static_cast<int32_t>(clientConfig.codecType),
          clientConfig.isEncoder,
-         clientConfig.isHardware,
+         isHardwareCodec(clientConfig.codecType),
          clientConfig.width, clientConfig.height,
          systemConcurrentCodecs,
          appConcurrentCodecs,
@@ -327,7 +321,7 @@ void ResourceManagerMetrics::notifyClientStopped(const ClientConfigParcel& clien
          usageTime);
     ALOGV("%s: Pushed MEDIA_CODEC_STOPPED atom: "
           "Process[pid(%d): uid(%d)] "
-          "Codec: [%s: %ju] is %s %s %s "
+          "Codec: [%s: %ju] is %s %s "
           "Timestamp: %jd Usage time: %jd "
           "Resolution: %d x %d "
           "ConcurrentCodec[%d]={System: %d App: %d} "
@@ -336,7 +330,6 @@ void ResourceManagerMetrics::notifyClientStopped(const ClientConfigParcel& clien
           pid, clientConfig.clientInfo.uid,
           clientConfig.clientInfo.name.c_str(),
           clientConfig.id,
-          clientConfig.isHardware? "hardware" : "software",
           getCodecType(clientConfig.codecType),
           clientConfig.isEncoder? "encoder" : "decoder",
           clientConfig.timeStamp, usageTime,

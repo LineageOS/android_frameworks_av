@@ -28,32 +28,32 @@ class ResourceManagerServiceTest : public ResourceManagerServiceTestBase {
 private:
     static MediaResource createSecureVideoCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kSecureCodec,
-            MediaResource::SubType::kVideoCodec, amount);
+            MediaResource::SubType::kHwVideoCodec, amount);
     }
 
     static MediaResource createNonSecureVideoCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kNonSecureCodec,
-            MediaResource::SubType::kVideoCodec, amount);
+            MediaResource::SubType::kHwVideoCodec, amount);
     }
 
     static MediaResource createSecureAudioCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kSecureCodec,
-            MediaResource::SubType::kAudioCodec, amount);
+            MediaResource::SubType::kHwAudioCodec, amount);
     }
 
     static MediaResource createNonSecureAudioCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kNonSecureCodec,
-            MediaResource::SubType::kAudioCodec, amount);
+            MediaResource::SubType::kHwAudioCodec, amount);
     }
 
     static MediaResource createSecureImageCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kSecureCodec,
-            MediaResource::SubType::kImageCodec, amount);
+            MediaResource::SubType::kHwImageCodec, amount);
     }
 
     static MediaResource createNonSecureImageCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kNonSecureCodec,
-            MediaResource::SubType::kImageCodec, amount);
+            MediaResource::SubType::kHwImageCodec, amount);
     }
 
     static MediaResource createGraphicMemoryResource(int amount = 1) {
@@ -272,13 +272,15 @@ public:
 
         // test adding new types (including types that differs only in subType)
         resources11.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
-        resources11.push_back(MediaResource(MediaResource::Type::kSecureCodec, MediaResource::SubType::kVideoCodec, 1));
+        resources11.push_back(MediaResource(MediaResource::Type::kSecureCodec,
+                                            MediaResource::SubType::kHwVideoCodec, 1));
         mService->addResource(client1Info, mTestClient1, resources11);
 
         expected.clear();
         expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, 2));
         expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
-        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, MediaResource::SubType::kVideoCodec, 1));
+        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec,
+                                         MediaResource::SubType::kHwVideoCodec, 1));
         expected.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 500));
         expectEqResourceInfo(infos1.at(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
     }
@@ -811,7 +813,8 @@ public:
 
         // new client request should cause VIDEO_ON
         std::vector<MediaResourceParcel> resources1;
-        resources1.push_back(MediaResource(MediaResource::Type::kBattery, MediaResource::SubType::kVideoCodec, 1));
+        resources1.push_back(MediaResource(MediaResource::Type::kBattery,
+                                           MediaResource::SubType::kHwVideoCodec, 1));
         ClientInfoParcel client1Info{.pid = static_cast<int32_t>(kTestPid1),
                                      .uid = static_cast<int32_t>(kTestUid1),
                                      .id = getId(mTestClient1),
@@ -826,7 +829,8 @@ public:
 
         // new client request should cause VIDEO_ON
         std::vector<MediaResourceParcel> resources2;
-        resources2.push_back(MediaResource(MediaResource::Type::kBattery, MediaResource::SubType::kVideoCodec, 2));
+        resources2.push_back(MediaResource(MediaResource::Type::kBattery,
+                                           MediaResource::SubType::kHwVideoCodec, 2));
         ClientInfoParcel client2Info{.pid = static_cast<int32_t>(kTestPid2),
                                      .uid = static_cast<int32_t>(kTestUid2),
                                      .id = getId(mTestClient2),
@@ -1372,9 +1376,9 @@ public:
                                        int64_t id,
                                        const ClientInfoParcel& clientInfo,
                                        ClientConfigParcel& clientConfig) {
-        clientConfig.codecType = MediaResource::SubType::kVideoCodec;
+        clientConfig.codecType = hw? MediaResource::SubType::kHwVideoCodec :
+                                     MediaResource::SubType::kSwVideoCodec;
         clientConfig.isEncoder = encoder;
-        clientConfig.isHardware = hw;
         clientConfig.width = width;
         clientConfig.height = height;
         clientConfig.timeStamp = systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;

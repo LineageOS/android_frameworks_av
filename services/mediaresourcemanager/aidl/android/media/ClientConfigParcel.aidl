@@ -40,11 +40,6 @@ parcelable ClientConfigParcel {
      */
     boolean isEncoder;
 
-    /**
-     * true if this is hardware codec, false otherwise.
-     */
-    boolean isHardware;
-
     /*
      * Video Resolution of the codec when it was configured, as width and height (in pixels).
      */
@@ -55,6 +50,7 @@ parcelable ClientConfigParcel {
      * Timestamp (in microseconds) when this configuration is created.
      */
     long timeStamp;
+
     /*
      * ID associated with the Codec.
      * This will be used by the metrics:

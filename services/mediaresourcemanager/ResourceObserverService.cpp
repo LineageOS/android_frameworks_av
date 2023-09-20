@@ -41,7 +41,8 @@ static std::vector<MediaObservableEvent> sEvents = {
 };
 
 static MediaObservableType getObservableType(const MediaResourceParcel& res) {
-    if (res.subType == MediaResourceSubType::kVideoCodec) {
+    if (res.subType == MediaResourceSubType::kHwVideoCodec ||
+        res.subType == MediaResourceSubType::kSwVideoCodec) {
         if (res.type == MediaResourceType::kNonSecureCodec) {
             return MediaObservableType::kVideoNonSecureCodec;
         }

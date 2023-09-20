@@ -168,13 +168,16 @@ static void notifyResourceGranted(int pid, const std::vector<MediaResourceParcel
         sp<IMediaResourceMonitor> service = interface_cast<IMediaResourceMonitor>(binder);
         for (size_t i = 0; i < resources.size(); ++i) {
             switch (resources[i].subType) {
-                case MediaResource::SubType::kAudioCodec:
+                case MediaResource::SubType::kHwAudioCodec:
+                case MediaResource::SubType::kSwAudioCodec:
                     service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_AUDIO_CODEC);
                     break;
-                case MediaResource::SubType::kVideoCodec:
+                case MediaResource::SubType::kHwVideoCodec:
+                case MediaResource::SubType::kSwVideoCodec:
                     service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_VIDEO_CODEC);
                     break;
-                case MediaResource::SubType::kImageCodec:
+                case MediaResource::SubType::kHwImageCodec:
+                case MediaResource::SubType::kSwImageCodec:
                     service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_IMAGE_CODEC);
                     break;
                 case MediaResource::SubType::kUnspecifiedSubType:
@@ -366,7 +369,8 @@ void ResourceManagerService::onFirstAdded(const MediaResourceParcel& resource,
         }
         mCpuBoostCount++;
     } else if (resource.type == MediaResource::Type::kBattery
-            && resource.subType == MediaResource::SubType::kVideoCodec) {
+            && (resource.subType == MediaResource::SubType::kHwVideoCodec
+                || resource.subType == MediaResource::SubType::kSwVideoCodec)) {
         mSystemCB->noteStartVideo(clientInfo.uid);
     }
 }
@@ -380,7 +384,8 @@ void ResourceManagerService::onLastRemoved(const MediaResourceParcel& resource,
             mSystemCB->requestCpusetBoost(false);
         }
     } else if (resource.type == MediaResource::Type::kBattery
-            && resource.subType == MediaResource::SubType::kVideoCodec) {
+            && (resource.subType == MediaResource::SubType::kHwVideoCodec
+                || resource.subType == MediaResource::SubType::kSwVideoCodec)) {
         mSystemCB->noteStopVideo(clientInfo.uid);
     }
 }
@@ -904,9 +909,12 @@ Status ResourceManagerService::reclaimResourcesFromClientsPendingRemoval(int32_t
                 // Codec resources are segregated by audio, video and image domains.
                 case MediaResource::Type::kSecureCodec:
                 case MediaResource::Type::kNonSecureCodec:
-                    for (MediaResource::SubType subType : {MediaResource::SubType::kAudioCodec,
-                                                           MediaResource::SubType::kVideoCodec,
-                                                           MediaResource::SubType::kImageCodec}) {
+                    for (MediaResource::SubType subType : {MediaResource::SubType::kHwAudioCodec,
+                                                           MediaResource::SubType::kSwAudioCodec,
+                                                           MediaResource::SubType::kHwVideoCodec,
+                                                           MediaResource::SubType::kSwVideoCodec,
+                                                           MediaResource::SubType::kHwImageCodec,
+                                                           MediaResource::SubType::kSwImageCodec}) {
                         std::shared_ptr<IResourceManagerClient> client;
                         uid_t uid = 0;
                         if (getBiggestClientPendingRemoval_l(pid, type, subType, uid, &client)) {
