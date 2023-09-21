@@ -444,7 +444,8 @@ class CameraDeviceBase : public virtual FrameProducer {
      * and defaults to NONE.
      */
     virtual status_t setRotateAndCropAutoBehavior(
-            camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) = 0;
+            camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue,
+            bool fromHal = false) = 0;
 
     /**
      * Set the current behavior for the AUTOFRAMING control when in AUTO.

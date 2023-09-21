@@ -81,7 +81,7 @@ public:
     virtual status_t        setVideoTarget(const sp<IGraphicBufferProducer>& bufferProducer);
     virtual status_t        setAudioRestriction(int mode);
     virtual int32_t         getGlobalAudioRestriction();
-    virtual status_t        setRotateAndCropOverride(uint8_t rotateAndCrop);
+    virtual status_t        setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal = false);
     virtual status_t        setAutoframingOverride(uint8_t autoframingMode);
 
     virtual bool            supportsCameraMute();

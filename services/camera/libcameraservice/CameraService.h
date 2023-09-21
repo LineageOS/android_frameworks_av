@@ -362,7 +362,7 @@ public:
         static bool isValidAudioRestriction(int32_t mode);
 
         // Override rotate-and-crop AUTO behavior
-        virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop) = 0;
+        virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal = false) = 0;
 
         // Override autoframing AUTO behaviour
         virtual status_t setAutoframingOverride(uint8_t autoframingValue) = 0;
