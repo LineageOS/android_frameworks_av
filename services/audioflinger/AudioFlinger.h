@@ -29,6 +29,7 @@
 #include "PatchCommandThread.h"
 
 // External classes
+#include <audio_utils/mutex.h>
 #include <audio_utils/FdToString.h>
 #include <audio_utils/SimpleLog.h>
 #include <media/IAudioFlinger.h>
@@ -238,7 +239,7 @@ private:
 
     // ---- begin IAfClientCallback interface
 
-    Mutex& clientMutex() const final { return mClientLock; }
+    audio_utils::mutex& clientMutex() const final { return mClientMutex; }
     void removeClient_l(pid_t pid) final;
     void removeNotificationClient(pid_t pid) final;
     status_t moveAuxEffectToIo(
@@ -264,8 +265,9 @@ private:
     // ---- begin IAfMelReporterCallback interface
 
     // below also used by IAfThreadCallback
-    Mutex& mutex() const final { return mLock; }
-    sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const final REQUIRES(mLock);
+    audio_utils::mutex& mutex() const final { return mMutex; }
+    sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const final
+            REQUIRES(mutex());
 
     // ---- end of IAfMelReporterCallback interface
 
@@ -278,8 +280,6 @@ private:
     IAfPlaybackThread* checkPlaybackThread_l(audio_io_handle_t output) const final;
     IAfRecordThread* checkRecordThread_l(audio_io_handle_t input) const final;
     IAfMmapThread* checkMmapThread_l(audio_io_handle_t io) const final;
-    void lock() const final ACQUIRE(mLock) { mLock.lock(); }
-    void unlock() const final RELEASE(mLock) { mLock.unlock(); }
     sp<IAfThreadBase> openInput_l(audio_module_handle_t module,
             audio_io_handle_t* input,
             audio_config_t* config,
@@ -311,7 +311,7 @@ private:
     float masterVolume_l() const final;
     bool masterMute_l() const final;
     float getMasterBalance_l() const;
-    // no range check, AudioFlinger::mLock held
+    // no range check, AudioFlinger::mutex() held
     bool streamMute_l(audio_stream_type_t stream) const final { return mStreamTypes[stream].mute; }
     audio_mode_t getMode() const final { return mMode; }
     bool isLowRamDevice() const final { return mIsLowRamDevice; }
@@ -381,7 +381,8 @@ private:
     // When a log writer is unregistered, it is done lazily so that media.log can continue to see it
     // for as long as possible.  The memory is only freed when it is needed for another log writer.
     Vector< sp<NBLog::Writer> > mUnregisteredWriters;
-    Mutex               mUnregisteredWritersLock;
+    audio_utils::mutex& unregisteredWritersMutex() const { return mUnregisteredWritersMutex; }
+    mutable audio_utils::mutex mUnregisteredWritersMutex;
 
                             AudioFlinger() ANDROID_API;
     ~AudioFlinger() override;
@@ -397,7 +398,7 @@ private:
                                                 audio_devices_t deviceType);
 
     // incremented by 2 when screen state changes, bit 0 == 1 means "off"
-    // AudioFlinger::setParameters() updates with mLock.
+    // AudioFlinger::setParameters() updates with mutex().
     std::atomic_uint32_t mScreenState{};
 
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
@@ -453,8 +454,8 @@ private:
         bool mPendingRequests;
 
         // Mutex and condition variable around mPendingRequests' value
-        Mutex       mMutex;
-        Condition   mCond;
+        audio_utils::mutex mMutex;
+        audio_utils::condition_variable mCondition;
 
         // Duration of the sleep period after a processed request
         static const int kPostTriggerSleepPeriod = 1000000;
@@ -552,19 +553,21 @@ private:
         int         mCnt;
     };
 
-    mutable     Mutex                               mLock;
+    mutable audio_utils::mutex mMutex;
                 // protects mClients and mNotificationClients.
-                // must be locked after mLock and ThreadBase::mLock if both must be locked
-                // avoids acquiring AudioFlinger::mLock from inside thread loop.
+                // must be locked after mutex() and ThreadBase::mutex() if both must be locked
+                // avoids acquiring AudioFlinger::mutex() from inside thread loop.
 
-    mutable Mutex mClientLock;
+    mutable audio_utils::mutex mClientMutex;
 
-                // protected by mClientLock
+                // protected by mClientMutex
                 DefaultKeyedVector< pid_t, wp<Client> >     mClients;   // see ~Client()
 
-                mutable     Mutex                   mHardwareLock;
-                // NOTE: If both mLock and mHardwareLock mutexes must be held,
-                // always take mLock before mHardwareLock
+    audio_utils::mutex& hardwareMutex() const { return mHardwareMutex; }
+
+    mutable audio_utils::mutex mHardwareMutex;
+    // NOTE: If both mMutex and mHardwareMutex mutexes must be held,
+    // always take mMutex before mHardwareMutex
 
     std::atomic<AudioHwDevice*> mPrimaryHardwareDev = nullptr;
     DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*> mAudioHwDevs{nullptr /* defValue */};
@@ -606,15 +609,15 @@ private:
     DefaultKeyedVector<audio_io_handle_t, sp<IAfPlaybackThread>> mPlaybackThreads;
                 stream_type_t                       mStreamTypes[AUDIO_STREAM_CNT];
 
-                // member variables below are protected by mLock
+                // member variables below are protected by mutex()
     float mMasterVolume = 1.f;
     bool mMasterMute = false;
     float mMasterBalance = 0.f;
-                // end of variables protected by mLock
+                // end of variables protected by mutex()
 
     DefaultKeyedVector<audio_io_handle_t, sp<IAfRecordThread>> mRecordThreads;
 
-                // protected by mClientLock
+                // protected by clientMutex()
                 DefaultKeyedVector< pid_t, sp<NotificationClient> >    mNotificationClients;
 
                 // updated by atomic_fetch_add_explicit
@@ -623,7 +626,7 @@ private:
     std::atomic<audio_mode_t> mMode = AUDIO_MODE_INVALID;
     std::atomic<bool> mBtNrecIsOff = false;
 
-                // protected by mLock
+                // protected by mutex()
                 Vector<AudioSessionRef*> mAudioSessionRefs;
 
                 AudioHwDevice* loadHwModule_l(const char *name);

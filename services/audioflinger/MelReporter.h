@@ -20,6 +20,7 @@
 #include "IAfPatchPanel.h"
 #include "PatchCommandThread.h"
 
+#include <audio_utils/mutex.h>
 #include <sounddose/SoundDoseManager.h>
 
 #include <mutex>
@@ -31,7 +32,7 @@ constexpr static int kMaxTimestampDeltaInSec = 120;
 
 class IAfMelReporterCallback : public virtual RefBase {
 public:
-    virtual Mutex& mutex() const = 0;
+    virtual audio_utils::mutex& mutex() const = 0;
     virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
     virtual sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const = 0;
 };
