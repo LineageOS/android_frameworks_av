@@ -2,15 +2,15 @@ package: "com.android.internal.camera.flags"
 
 flag {
      namespace: "camera_platform"
-     name: "initial_test_flag"
-     description: "Flag infrastructure test flag"
-     bug: "292631208"
+     name: "camera_hsum_permission"
+     description: "Camera access by headless system user"
+     bug: "273539631"
 }
 
 flag {
      namespace: "camera_platform"
-     name: "camera_hsum_permission"
-     description: "Camera access by headless system user"
-     bug: "273539631"
+     name: "log_ultrawide_usage"
+     description: "Enable measuring how much usage there is for ultrawide-angle cameras"
+     bug: "300515796"
 }
 
