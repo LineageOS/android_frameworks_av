@@ -100,13 +100,16 @@ private:
 
     void sendCommand(const sp<Command>& command);
 
-    std::string mThreadName;
-    std::mutex mLock;
-    std::condition_variable mWaitWorkCV;
-    std::deque<sp<Command>> mCommands GUARDED_BY(mLock); // list of pending commands
+    audio_utils::mutex& mutex() const { return mMutex; }
+    audio_utils::mutex& listenerMutex() const { return mListenerMutex; }
 
-    std::mutex mListenerLock;
-    std::vector<wp<PatchCommandListener>> mListeners GUARDED_BY(mListenerLock);
+    std::string mThreadName;
+    mutable audio_utils::mutex mMutex;
+    audio_utils::condition_variable mWaitWorkCV;
+    std::deque<sp<Command>> mCommands GUARDED_BY(mutex()); // list of pending commands
+
+    mutable audio_utils::mutex mListenerMutex;
+    std::vector<wp<PatchCommandListener>> mListeners GUARDED_BY(listenerMutex());
 };
 
 }  // namespace android
