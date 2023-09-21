@@ -377,7 +377,7 @@ void TiffIfd::log() const {
     size_t s = mEntries.size();
     ALOGI("[ifd: %x, num_entries: %zu, entries:\n", getId(), s);
     for(size_t i = 0; i < s; ++i) {
-        ALOGI("\t%s", mEntries[i]->toString().string());
+        ALOGI("\t%s", mEntries[i]->toString().c_str());
     }
     ALOGI(", next_ifd: %x]", ((mNextIfd != NULL) ? mNextIfd->getId() : 0));
 }

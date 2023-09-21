@@ -249,7 +249,7 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     for (auto& surface : surfaceShims) {
         ALOGV("%s: OutputConfiguration: %p, name %s", __FUNCTION__,
                 surface.graphicBufferProducer.get(),
-                toString8(surface.name).string());
+                toString8(surface.name).c_str());
         mGbps.push_back(surface.graphicBufferProducer);
     }
 

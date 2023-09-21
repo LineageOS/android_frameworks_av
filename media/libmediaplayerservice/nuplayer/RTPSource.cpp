@@ -56,7 +56,7 @@ NuPlayer::RTPSource::RTPSource(
       mReceivedFirstRTPPacket(false),
       mPausing(false),
       mPauseGeneration(0) {
-    ALOGD("RTPSource initialized with rtpParams=%s", rtpParams.string());
+    ALOGD("RTPSource initialized with rtpParams=%s", rtpParams.c_str());
 }
 
 NuPlayer::RTPSource::~RTPSource() {
@@ -661,7 +661,7 @@ void NuPlayer::RTPSource::onDisconnected(const sp<AMessage> &msg) {
 }
 
 status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &value) {
-    ALOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
+    ALOGV("setParameter: key (%s) => value (%s)", key.c_str(), value.c_str());
 
     bool isAudioKey = key.contains("audio");
     TrackInfo *info = NULL;
@@ -684,12 +684,12 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
     if (key == "rtp-param-mime-type") {
         info->mMimeType = value;
 
-        const char *mime = value.string();
+        const char *mime = value.c_str();
         const char *delimiter = strchr(mime, '/');
         info->mCodecName = delimiter ? (delimiter + 1) : "<none>";
 
         ALOGV("rtp-param-mime-type: mMimeType (%s) => mCodecName (%s)",
-                info->mMimeType.string(), info->mCodecName.string());
+                info->mMimeType.c_str(), info->mCodecName.c_str());
     } else if (key == "video-param-decoder-profile") {
         info->mCodecProfile = atoi(value);
     } else if (key == "video-param-decoder-level") {
@@ -732,8 +732,8 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
 }
 
 status_t NuPlayer::RTPSource::setParameters(const String8 &params) {
-    ALOGV("setParameters: %s", params.string());
-    const char *cparams = params.string();
+    ALOGV("setParameters: %s", params.c_str());
+    const char *cparams = params.c_str();
     const char *key_start = cparams;
     for (;;) {
         const char *equal_pos = strchr(key_start, '=');
@@ -751,9 +751,9 @@ status_t NuPlayer::RTPSource::setParameters(const String8 &params) {
         const char *semicolon_pos = strchr(value_start, ';');
         String8 value;
         if (semicolon_pos == NULL) {
-            value.setTo(value_start);
+            value = value_start;
         } else {
-            value.setTo(value_start, semicolon_pos - value_start);
+            value = String8(value_start, semicolon_pos - value_start);
         }
         if (setParameter(key, value) != OK) {
             return BAD_VALUE;
@@ -784,7 +784,7 @@ void NuPlayer::RTPSource::setSocketNetwork(int64_t networkHandle) {
 //static
 void NuPlayer::RTPSource::TrimString(String8 *s) {
     size_t num_bytes = s->bytes();
-    const char *data = s->string();
+    const char *data = s->c_str();
 
     size_t leading_space = 0;
     while (leading_space < num_bytes && isspace(data[leading_space])) {
@@ -796,7 +796,7 @@ void NuPlayer::RTPSource::TrimString(String8 *s) {
         --i;
     }
 
-    s->setTo(String8(&data[leading_space], i - leading_space));
+    *s = String8(&data[leading_space], i - leading_space);
 }
 
 }  // namespace android

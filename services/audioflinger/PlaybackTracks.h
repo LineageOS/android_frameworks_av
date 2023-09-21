@@ -20,6 +20,7 @@
 #include "TrackBase.h"
 
 #include <android/os/BnExternalVibrationController.h>
+#include <audio_utils/mutex.h>
 #include <audio_utils/LinearMap.h>
 #include <binder/AppOpsManager.h>
 
@@ -62,8 +63,8 @@ private:
 
     wp<IAfThreadBase> mThread;
     std::atomic_bool mHasOpPlayAudio;
-    const AttributionSourceState mAttributionSource;
-    const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
+    const int32_t mUsage;  // on purpose not audio_usage_t because always checked in appOps as
+                           // int32_t
     const int mId; // for logging purposes only
     const uid_t mUid;
     const String16 mPackageName;
@@ -468,7 +469,8 @@ private:
      */
     SourceMetadatas mTrackMetadatas;
     /** Protects mTrackMetadatas against concurrent access. */
-    mutable std::mutex mTrackMetadatasMutex;
+    audio_utils::mutex& trackMetadataMutex() const { return mTrackMetadataMutex; }
+    mutable audio_utils::mutex mTrackMetadataMutex;
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel

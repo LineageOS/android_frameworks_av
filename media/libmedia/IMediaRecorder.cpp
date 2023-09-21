@@ -255,7 +255,7 @@ public:
 
     status_t setParameters(const String8& params)
     {
-        ALOGV("setParameter(%s)", params.string());
+        ALOGV("setParameter(%s)", params.c_str());
         Parcel data, reply;
         data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
         data.writeString8(params);
@@ -275,7 +275,7 @@ public:
 
     status_t setClientName(const String16& clientName)
     {
-        ALOGV("setClientName(%s)", String8(clientName).string());
+        ALOGV("setClientName(%s)", String8(clientName).c_str());
         Parcel data, reply;
         data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
         data.writeString16(clientName);

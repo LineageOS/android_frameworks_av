@@ -3036,7 +3036,7 @@ status_t AudioTrack::selectPresentation(int presentationId, int programId)
     param.addInt(String8(AudioParameter::keyPresentationId), presentationId);
     param.addInt(String8(AudioParameter::keyProgramId), programId);
     ALOGV("%s(%d): PresentationId/ProgramId[%s]",
-            __func__, mPortId, param.toString().string());
+            __func__, mPortId, param.toString().c_str());
 
     status_t status;
     mAudioTrack->setParameters(param.toString().c_str(), &status);
@@ -3479,7 +3479,7 @@ String8 AudioTrack::getParameters(const String8& keys)
     if (output != AUDIO_IO_HANDLE_NONE) {
         return AudioSystem::getParameters(output, keys);
     } else {
-        return String8::empty();
+        return String8();
     }
 }
 
@@ -3525,7 +3525,7 @@ status_t AudioTrack::dump(int fd, const Vector<String16>& args __unused) const
                         mLatency, mSelectedDeviceId, mRoutedDeviceId);
     result.appendFormat("  output(%d) AF latency (%u) AF frame count(%zu) AF SampleRate(%u)\n",
                         mOutput, mAfLatency, mAfFrameCount, mAfSampleRate);
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
     return NO_ERROR;
 }
 

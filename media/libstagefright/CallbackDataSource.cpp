@@ -38,7 +38,7 @@ CallbackDataSource::CallbackDataSource(
     mName = String8::format("CallbackDataSource(%d->%d, %s)",
             getpid(),
             IPCThreadState::self()->getCallingPid(),
-            mIDataSource->toString().string());
+            mIDataSource->toString().c_str());
 
 }
 
@@ -120,7 +120,7 @@ sp<IDataSource> CallbackDataSource::getIDataSource() const {
 
 TinyCacheSource::TinyCacheSource(const sp<DataSource>& source)
     : mSource(source), mCachedOffset(0), mCachedSize(0) {
-    mName = String8::format("TinyCacheSource(%s)", mSource->toString().string());
+    mName = String8::format("TinyCacheSource(%s)", mSource->toString().c_str());
 }
 
 status_t TinyCacheSource::initCheck() const {

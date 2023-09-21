@@ -96,7 +96,7 @@ static String8 arrayToString(const std::vector<uint8_t> &array) {
     for (size_t i = 0; i < array.size(); i++) {
         result.appendFormat("%02x ", array[i]);
     }
-    if (result.isEmpty()) {
+    if (result.empty()) {
         result.append("(null)");
     }
     return result;
@@ -135,7 +135,7 @@ status_t MockCasPlugin::openSession(uint32_t intent, uint32_t mode,
 }
 
 status_t MockCasPlugin::closeSession(const CasSessionId &sessionId) {
-    ALOGV("closeSession: sessionId=%s", arrayToString(sessionId).string());
+    ALOGV("closeSession: sessionId=%s", arrayToString(sessionId).c_str());
     Mutex::Autolock lock(mLock);
 
     sp<MockCasSession> session =
@@ -151,7 +151,7 @@ status_t MockCasPlugin::closeSession(const CasSessionId &sessionId) {
 status_t MockCasPlugin::setSessionPrivateData(
         const CasSessionId &sessionId, const CasData& /*data*/) {
     ALOGV("setSessionPrivateData: sessionId=%s",
-            arrayToString(sessionId).string());
+            arrayToString(sessionId).c_str());
     Mutex::Autolock lock(mLock);
 
     sp<MockCasSession> session =
@@ -164,7 +164,7 @@ status_t MockCasPlugin::setSessionPrivateData(
 
 status_t MockCasPlugin::processEcm(
         const CasSessionId &sessionId, const CasEcm& ecm) {
-    ALOGV("processEcm: sessionId=%s", arrayToString(sessionId).string());
+    ALOGV("processEcm: sessionId=%s", arrayToString(sessionId).c_str());
     Mutex::Autolock lock(mLock);
 
     sp<MockCasSession> session =
@@ -173,7 +173,7 @@ status_t MockCasPlugin::processEcm(
         return BAD_VALUE;
     }
     ALOGV("ECM: size=%zu", ecm.size());
-    ALOGV("ECM: data=%s", arrayToString(ecm).string());
+    ALOGV("ECM: data=%s", arrayToString(ecm).c_str());
 
     return OK;
 }
@@ -183,7 +183,7 @@ status_t MockCasPlugin::processEmm(const CasEmm& emm) {
     Mutex::Autolock lock(mLock);
 
     ALOGV("EMM: size=%zu", emm.size());
-    ALOGV("EMM: data=%s", arrayToString(emm).string());
+    ALOGV("EMM: data=%s", arrayToString(emm).c_str());
 
     return OK;
 }
@@ -200,14 +200,14 @@ status_t MockCasPlugin::sendSessionEvent(
         const CasSessionId &sessionId, int32_t event,
         int /*arg*/, const CasData& /*eventData*/) {
     ALOGV("sendSessionEvent: sessionId=%s, event=%d",
-          arrayToString(sessionId).string(), event);
+          arrayToString(sessionId).c_str(), event);
     Mutex::Autolock lock(mLock);
 
     return OK;
 }
 
 status_t MockCasPlugin::provision(const String8 &str) {
-    ALOGV("provision: provisionString=%s", str.string());
+    ALOGV("provision: provisionString=%s", str.c_str());
     Mutex::Autolock lock(mLock);
 
     return OK;
@@ -215,7 +215,7 @@ status_t MockCasPlugin::provision(const String8 &str) {
 
 status_t MockCasPlugin::refreshEntitlements(
         int32_t /*refreshType*/, const CasData &refreshData) {
-    ALOGV("refreshEntitlements: refreshData=%s", arrayToString(refreshData).string());
+    ALOGV("refreshEntitlements: refreshData=%s", arrayToString(refreshData).c_str());
     Mutex::Autolock lock(mLock);
 
     return OK;
@@ -256,7 +256,7 @@ ssize_t MockDescramblerPlugin::descramble(
     ALOGV("MockDescramblerPlugin::descramble(secure=%d, sctrl=%d,"
           "subSamples=%s, srcPtr=%p, dstPtr=%p, srcOffset=%d, dstOffset=%d)",
           (int)secure, (int)scramblingControl,
-          subSamplesToString(subSamples, numSubSamples).string(),
+          subSamplesToString(subSamples, numSubSamples).c_str(),
           srcPtr, dstPtr, srcOffset, dstOffset);
 
     return 0;

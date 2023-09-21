@@ -164,7 +164,7 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
 
 const char* NuMediaExtractor::getName() const {
     Mutex::Autolock autoLock(mLock);
-    return mImpl == nullptr ? nullptr : mName.string();
+    return mImpl == nullptr ? nullptr : mName.c_str();
 }
 
 static String8 arrayToString(const std::vector<uint8_t> &array) {
@@ -172,7 +172,7 @@ static String8 arrayToString(const std::vector<uint8_t> &array) {
     for (size_t i = 0; i < array.size(); i++) {
         result.appendFormat("%02x ", array[i]);
     }
-    if (result.isEmpty()) {
+    if (result.empty()) {
         result.append("(null)");
     }
     return result;

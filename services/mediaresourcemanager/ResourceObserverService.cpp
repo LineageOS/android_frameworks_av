@@ -122,7 +122,7 @@ binder_status_t ResourceObserverService::dump(
                 "can't dump ResourceManagerService from pid=%d, uid=%d\n",
                 AIBinder_getCallingPid(),
                 AIBinder_getCallingUid());
-        write(fd, result.string(), result.size());
+        write(fd, result.c_str(), result.size());
         return PERMISSION_DENIED;
     }
 
@@ -138,7 +138,7 @@ binder_status_t ResourceObserverService::dump(
                 String8 enabledEventsStr;
                 for (auto &event : sEvents) {
                     if (((uint64_t)observable.eventFilter & (uint64_t)event) != 0) {
-                        if (!enabledEventsStr.isEmpty()) {
+                        if (!enabledEventsStr.empty()) {
                             enabledEventsStr.append("|");
                         }
                         enabledEventsStr.append(toString(event).c_str());
@@ -150,7 +150,7 @@ binder_status_t ResourceObserverService::dump(
         }
     }
 
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
     return OK;
 }
 

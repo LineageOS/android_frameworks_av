@@ -64,6 +64,10 @@ cc_library_shared {
         "libfwdlock-decoder",
     ],
 
+    whole_static_libs: [
+        "libc++fs",
+    ],
+
     local_include_dirs: ["include"],
 
     relative_install_path: "drm",

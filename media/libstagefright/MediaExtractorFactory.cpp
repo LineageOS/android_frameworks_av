@@ -242,22 +242,22 @@ void MediaExtractorFactory::RegisterExtractors(
                 continue;
             }
             void *libHandle = android_dlopen_ext(
-                    libPath.string(),
+                    libPath.c_str(),
                     RTLD_NOW | RTLD_LOCAL, dlextinfo);
             if (libHandle == nullptr) {
-                ALOGI("dlopen(%s) reported error %s", libPath.string(), strerror(errno));
+                ALOGI("dlopen(%s) reported error %s", libPath.c_str(), strerror(errno));
                 continue;
             }
 
             GetExtractorDef getDef =
                 (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
             if (getDef == nullptr) {
-                ALOGI("no sniffer found in %s", libPath.string());
+                ALOGI("no sniffer found in %s", libPath.c_str());
                 dlclose(libHandle);
                 continue;
             }
 
-            ALOGV("registering sniffer for %s", libPath.string());
+            ALOGV("registering sniffer for %s", libPath.c_str());
             RegisterExtractor(
                     new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
         }
@@ -387,7 +387,7 @@ status_t MediaExtractorFactory::dump(int fd, const Vector<String16>&) {
             out.append("  (no plugins registered)\n");
         }
     }
-    write(fd, out.string(), out.size());
+    write(fd, out.c_str(), out.size());
     return OK;
 }
 

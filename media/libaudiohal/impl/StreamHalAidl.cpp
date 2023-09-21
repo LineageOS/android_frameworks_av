@@ -267,7 +267,11 @@ status_t StreamHalAidl::getLatency(uint32_t *latency) {
     if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
         return status;
     }
-    *latency = std::max<int32_t>(0, reply.latencyMs);
+
+    *latency = std::clamp(std::max<int32_t>(0, reply.latencyMs), 1, 3000);
+    ALOGW_IF(reply.latencyMs != static_cast<int32_t>(*latency),
+             "Suspicious latency value reported by HAL: %d, clamped to %u", reply.latencyMs,
+             *latency);
     return OK;
 }
 
@@ -836,7 +840,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
                 parameters, String8(AudioParameter::keyOffloadCodecDelaySamples),
                 [&](int value) {
                     // The legacy keys are misnamed, the value is in frames.
-                    return value > 0 ? mOffloadMetadata.delayFrames = value, OK : BAD_VALUE;
+                    return value >= 0 ? mOffloadMetadata.delayFrames = value, OK : BAD_VALUE;
                 }))) {
         updateMetadata = true;
     }
@@ -844,7 +848,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
                 parameters, String8(AudioParameter::keyOffloadCodecPaddingSamples),
                 [&](int value) {
                     // The legacy keys are misnamed, the value is in frames.
-                    return value > 0 ? mOffloadMetadata.paddingFrames = value, OK : BAD_VALUE;
+                    return value >= 0 ? mOffloadMetadata.paddingFrames = value, OK : BAD_VALUE;
                 }))) {
         updateMetadata = true;
     }

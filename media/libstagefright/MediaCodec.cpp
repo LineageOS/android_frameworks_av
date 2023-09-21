@@ -243,7 +243,7 @@ static const char *kCodecJudderScoreHistogramBuckets =
         "android.media.mediacodec.judder-score-histogram-buckets";
 // Freeze event
 static const char *kCodecFreezeEventCount = "android.media.mediacodec.freeze-event-count";
-static const char *kFreezeEventKeyName = "freeze";
+static const char *kFreezeEventKeyName = "videofreeze";
 static const char *kFreezeEventInitialTimeUs = "android.media.mediacodec.freeze.initial-time-us";
 static const char *kFreezeEventDurationMs = "android.media.mediacodec.freeze.duration-ms";
 static const char *kFreezeEventCount = "android.media.mediacodec.freeze.count";
@@ -255,7 +255,7 @@ static const char *kFreezeEventDetailsDistanceMs =
         "android.media.mediacodec.freeze.details-distance-ms";
 // Judder event
 static const char *kCodecJudderEventCount = "android.media.mediacodec.judder-event-count";
-static const char *kJudderEventKeyName = "judder";
+static const char *kJudderEventKeyName = "videojudder";
 static const char *kJudderEventInitialTimeUs = "android.media.mediacodec.judder.initial-time-us";
 static const char *kJudderEventDurationMs = "android.media.mediacodec.judder.duration-ms";
 static const char *kJudderEventCount = "android.media.mediacodec.judder.count";
@@ -1792,23 +1792,21 @@ void MediaCodec::statsBufferSent(int64_t presentationUs, const sp<MediaCodecBuff
         mFramesInput++;
     }
 
-    const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
-    BufferFlightTiming_t startdata = { presentationUs, nowNs };
+    // mutex access to mBuffersInFlight and other stats
+    Mutex::Autolock al(mLatencyLock);
 
-    {
-        // mutex access to mBuffersInFlight and other stats
-        Mutex::Autolock al(mLatencyLock);
-
-
-        // XXX: we *could* make sure that the time is later than the end of queue
-        // as part of a consistency check...
+    // XXX: we *could* make sure that the time is later than the end of queue
+    // as part of a consistency check...
+    if (!mTunneled) {
+        const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
+        BufferFlightTiming_t startdata = { presentationUs, nowNs };
         mBuffersInFlight.push_back(startdata);
-
-        if (mIsLowLatencyModeOn && mIndexOfFirstFrameWhenLowLatencyOn < 0) {
-            mIndexOfFirstFrameWhenLowLatencyOn = mInputBufferCounter;
-        }
-        ++mInputBufferCounter;
     }
+
+    if (mIsLowLatencyModeOn && mIndexOfFirstFrameWhenLowLatencyOn < 0) {
+        mIndexOfFirstFrameWhenLowLatencyOn = mInputBufferCounter;
+    }
+    ++mInputBufferCounter;
 }
 
 // when we get a buffer back from the codec

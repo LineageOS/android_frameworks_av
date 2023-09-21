@@ -1,0 +1,24 @@
+package {
+    default_applicable_licenses: ["frameworks_av_media_extractors_mp4_license"],
+}
+
+cc_test_host {
+    name: "HeifCleanApertureUnitTest",
+    gtest: true,
+
+    srcs: ["HeifCleanApertureUnitTest.cpp"],
+
+    header_libs: [
+        "libmp4extractor_headers",
+    ],
+
+    static_libs: [
+        "libmp4extractor",
+    ],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}

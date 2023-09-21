@@ -23,9 +23,14 @@ cc_library {
     name: "libcodec2_client",
 
     srcs: [
+        "GraphicBufferAllocator.cpp",
         "GraphicsTracker.cpp",
         "client.cpp",
         "output.cpp",
+    ],
+
+    defaults: [
+        "libcodec2-aidl-client-defaults",
     ],
 
     header_libs: [
@@ -38,6 +43,7 @@ cc_library {
         "android.hardware.media.c2@1.0",
         "android.hardware.media.c2@1.1",
         "android.hardware.media.c2@1.2",
+        "android.hardware.media.bufferpool2-V1-ndk",
         "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder",
@@ -52,9 +58,14 @@ cc_library {
         "libhidlbase",
         "liblog",
         "libnativewindow",
+        "libstagefright_aidl_bufferpool2",
         "libstagefright_bufferpool@2.0.1",
         "libui",
         "libutils",
+    ],
+
+    static_libs: [
+        "libaidlcommonsupport",
     ],
 
     export_include_dirs: [

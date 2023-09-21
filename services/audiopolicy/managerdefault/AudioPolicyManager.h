@@ -292,6 +292,9 @@ public:
 
         virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes);
         virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes);
+        virtual status_t updatePolicyMix(
+                const AudioMix& mix,
+                const std::vector<AudioMixMatchCriterion>& updatedCriteria) override;
         virtual status_t setUidDeviceAffinities(uid_t uid,
                 const AudioDeviceTypeAddrVector& devices);
         virtual status_t removeUidDeviceAffinities(uid_t uid);
@@ -817,10 +820,10 @@ protected:
 
         bool isPrimaryModule(const sp<HwModule> &module) const
         {
-            if (module == 0 || !hasPrimaryOutput()) {
+            if (module == nullptr || mPrimaryModuleHandle == AUDIO_MODULE_HANDLE_NONE) {
                 return false;
             }
-            return module->getHandle() == mPrimaryOutput->getModuleHandle();
+            return module->getHandle() == mPrimaryModuleHandle;
         }
         DeviceVector availablePrimaryOutputDevices() const
         {
@@ -932,6 +935,8 @@ protected:
         EngineInstance mEngine;                         // Audio Policy Engine instance
         AudioPolicyClientInterface *mpClientInterface;  // audio policy client interface
         sp<SwAudioOutputDescriptor> mPrimaryOutput;     // primary output descriptor
+        // mPrimaryModuleHandle is cached mPrimaryOutput->getModuleHandle();
+        audio_module_handle_t mPrimaryModuleHandle = AUDIO_MODULE_HANDLE_NONE;
         // list of descriptors for outputs currently opened
 
         sp<SwAudioOutputDescriptor> mSpatializerOutput;

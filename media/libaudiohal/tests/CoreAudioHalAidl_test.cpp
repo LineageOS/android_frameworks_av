@@ -452,7 +452,7 @@ TEST_F(DeviceHalAidlTest, VendorParameterIgnored) {
     String8 values;
     EXPECT_EQ(OK, mDevice->getParameters(String8("random_name"), &values));
     EXPECT_EQ(0UL, mModule->getRetrievedParameterIds().size());
-    EXPECT_TRUE(values.empty());
+    EXPECT_EQ(0UL, values.length());
 }
 
 class DeviceHalAidlVendorParametersTest : public testing::Test {

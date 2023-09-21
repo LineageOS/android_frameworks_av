@@ -51,6 +51,7 @@
 #include <cutils/properties.h>
 #include <camera/StringUtils.h>
 
+#include <android-base/properties.h>
 #include <android/hardware/camera/device/3.7/ICameraInjectionSession.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 
@@ -295,13 +296,6 @@ status_t Camera3Device::disconnectImpl() {
                     }
                 }
             }
-            // Signal to request thread that we're not expecting any
-            // more requests. This will be true since once we're in
-            // disconnect and we've cleared off the request queue, the
-            // request thread can't receive any new requests through
-            // binder calls - since disconnect holds
-            // mBinderSerialization lock.
-            mRequestThread->setRequestClearing();
         }
 
         if (mStatus == STATUS_ERROR) {
@@ -770,8 +764,7 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
         auto firstRequest = requestList->begin();
         for (auto& outputStream : (*firstRequest)->mOutputStreams) {
             if (outputStream->isVideoStream()) {
-                (*firstRequest)->mBatchSize = requestList->size();
-                outputStream->setBatchSize(requestList->size());
+                applyMaxBatchSizeLocked(requestList, outputStream);
                 break;
             }
         }
@@ -2339,6 +2332,9 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     // deadlocks (http://b/143513518)
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
 
+    // Make sure status tracker is flushed
+    mStatusTracker->flushPendingStates();
+
     Mutex::Autolock l(mLock);
     if (checkAbandonedStreamsLocked()) {
         ALOGW("%s: Abandoned stream detected, session parameters can't be applied correctly!",
@@ -3032,6 +3028,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mDoPause(false),
         mPaused(true),
         mNotifyPipelineDrain(false),
+        mPrevTriggers(0),
         mFrameNumber(0),
         mLatestRequestId(NAME_NOT_FOUND),
         mLatestFailedRequestId(NAME_NOT_FOUND),
@@ -3041,7 +3038,6 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mAutoframingOverride(ANDROID_CONTROL_AUTOFRAMING_OFF),
         mComposerOutput(false),
         mCameraMute(ANDROID_SENSOR_TEST_PATTERN_MODE_OFF),
-        mCameraMuteChanged(false),
         mSettingsOverride(ANDROID_CONTROL_SETTINGS_OVERRIDE_OFF),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
@@ -3299,8 +3295,12 @@ status_t Camera3Device::RequestThread::waitUntilRequestProcessed(
 }
 
 void Camera3Device::RequestThread::requestExit() {
-    // Call parent to set up shutdown
-    Thread::requestExit();
+    {
+        Mutex::Autolock l(mRequestLock);
+        mRequestClearing = true;
+        // Call parent to set up shutdown
+        Thread::requestExit();
+    }
     // The exit from any possible waits
     mDoPauseSignal.signal();
     mRequestSignal.signal();
@@ -4239,7 +4239,6 @@ status_t Camera3Device::RequestThread::setCameraMute(int32_t muteMode) {
     Mutex::Autolock l(mTriggerMutex);
     if (muteMode != mCameraMute) {
         mCameraMute = muteMode;
-        mCameraMuteChanged = true;
     }
     return OK;
 }
@@ -4431,11 +4430,6 @@ void Camera3Device::RequestThread::waitForNextRequestBatch() {
     }
 
     return;
-}
-
-void Camera3Device::RequestThread::setRequestClearing() {
-    Mutex::Autolock l(mRequestLock);
-    mRequestClearing = true;
 }
 
 sp<Camera3Device::CaptureRequest>

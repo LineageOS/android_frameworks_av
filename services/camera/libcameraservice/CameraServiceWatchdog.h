@@ -44,7 +44,7 @@
         watchThread([&]() { return toMonitor;}, gettid(), __FUNCTION__, cycles, cycleLength);
 
 // Default cycles and cycle length values used to calculate permitted elapsed time
-const static size_t   kMaxCycles     = 100;
+const static size_t   kMaxCycles     = 650;
 const static uint32_t kCycleLengthMs = 100;
 
 namespace android {

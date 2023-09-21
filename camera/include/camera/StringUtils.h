@@ -17,8 +17,6 @@
 #ifndef ANDROID_SERVERS_CAMERA_STRINGUTILS_H
 #define ANDROID_SERVERS_CAMERA_STRINGUTILS_H
 
-#include <codecvt>
-#include <locale>
 #include <memory>
 #include <optional>
 #include <string>
@@ -61,12 +59,12 @@ namespace android {
     }
 
     inline std::string toStdString(const String8 &str) {
-        return std::string(str.string());
+        return std::string(str.c_str());
     }
 
     inline std::string toStdString(const String16 &str) {
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-        return convert.to_bytes(str.string());
+        String8 str8(str);
+        return std::string(str8.c_str());
     }
 
     /**
@@ -74,8 +72,9 @@ namespace android {
      * len is the number of characters.
      */
     inline std::string toStdString(const char16_t *str, size_t len) {
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
-        return convert.to_bytes(str, str + len);
+        String16 str16(str, len);
+        String8 str8(str16);
+        return std::string(str8.c_str());
     }
 } // namespace android
 

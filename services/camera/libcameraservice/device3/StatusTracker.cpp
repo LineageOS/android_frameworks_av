@@ -34,7 +34,8 @@ StatusTracker::StatusTracker(wp<Camera3Device> parent) :
         mParent(parent),
         mNextComponentId(0),
         mIdleFence(new Fence()),
-        mDeviceState(IDLE) {
+        mDeviceState(IDLE),
+        mFlushed(true) {
 }
 
 StatusTracker::~StatusTracker() {
@@ -111,16 +112,33 @@ void StatusTracker::markComponent(int id, ComponentState state,
         const sp<Fence>& componentFence) {
     ALOGV("%s: Component %d is now %s", __FUNCTION__, id,
             state == IDLE ? "idle" : "active");
-    Mutex::Autolock l(mPendingLock);
 
-    StateChange newState = {
-        id,
-        state,
-        componentFence
-    };
+    // If any component state changes, the status tracker is considered
+    // not flushed.
+    {
+        Mutex::Autolock l(mFlushLock);
+        mFlushed = false;
+    }
 
-    mPendingChangeQueue.add(newState);
-    mPendingChangeSignal.signal();
+    {
+        Mutex::Autolock l(mPendingLock);
+
+        StateChange newState = {
+            id,
+            state,
+            componentFence
+        };
+
+        mPendingChangeQueue.add(newState);
+        mPendingChangeSignal.signal();
+    }
+}
+
+void StatusTracker::flushPendingStates()  {
+    Mutex::Autolock l(mFlushLock);
+    while (!mFlushed && isRunning()) {
+        mFlushCondition.waitRelative(mFlushLock, kWaitDuration);
+    }
 }
 
 void StatusTracker::requestExit() {
@@ -128,6 +146,7 @@ void StatusTracker::requestExit() {
     Thread::requestExit();
     // Then exit any waits
     mPendingChangeSignal.signal();
+    mFlushCondition.signal();
 }
 
 StatusTracker::ComponentState StatusTracker::getDeviceStateLocked() {
@@ -172,6 +191,7 @@ bool StatusTracker::threadLoop() {
         }
     }
 
+    bool waitForIdleFence = false;
     // After new pending states appear, or timeout, check if we're idle.  Even
     // with timeout, need to check to account for fences that may still be
     // clearing out
@@ -196,6 +216,7 @@ bool StatusTracker::threadLoop() {
             ssize_t idx = mStates.indexOfKey(newState.id);
             // Ignore notices for unknown components
             if (idx >= 0) {
+                bool validFence = newState.fence != Fence::NO_FENCE;
                 // Update single component state
                 mStates.replaceValueAt(idx, newState.state);
                 mIdleFence = Fence::merge(String8("idleFence"),
@@ -204,6 +225,8 @@ bool StatusTracker::threadLoop() {
                 ComponentState newState = getDeviceStateLocked();
                 if (newState != prevState) {
                     mStateTransitions.add(newState);
+                } else if (validFence && !waitForIdleFence) {
+                    waitForIdleFence = true;
                 }
                 prevState = newState;
             }
@@ -226,6 +249,24 @@ bool StatusTracker::threadLoop() {
         }
     }
     mStateTransitions.clear();
+
+    // After all pending changes are cleared and notified, mark the tracker
+    // as flushed.
+    {
+        Mutex::Autolock fl(mFlushLock);
+        Mutex::Autolock pl(mPendingLock);
+        if (mPendingChangeQueue.size() == 0) {
+            mFlushed = true;
+            mFlushCondition.signal();
+        }
+    }
+
+    if (waitForIdleFence) {
+        auto ret = mIdleFence->wait(kWaitDuration);
+        if (ret == NO_ERROR) {
+            mComponentsChanged = true;
+        }
+    }
 
     return true;
 }

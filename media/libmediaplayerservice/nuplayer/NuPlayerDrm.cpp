@@ -89,8 +89,8 @@ Vector<DrmUUID> NuPlayerDrm::parsePSSH(const void *pssh, size_t psshsize)
         drmSchemes.add(_uuid);
 
         ALOGV("ParsePSSH[%zu]: %s: %s", numentries,
-                _uuid.toHexString().string(),
-                DrmUUID::arrayToHex(data, datalen).string()
+                _uuid.toHexString().c_str(),
+                DrmUUID::arrayToHex(data, datalen).c_str()
              );
 
         numentries++;
@@ -167,7 +167,7 @@ void NuPlayerDrm::retrieveDrmInfo(const void *pssh, size_t psshsize, Parcel *par
     parcel->writeByteArray(psshsize, (const uint8_t*)pssh);
 
     ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  PSSH: size: %zu %s", psshsize,
-            DrmUUID::arrayToHex((uint8_t*)pssh, psshsize).string());
+            DrmUUID::arrayToHex((uint8_t*)pssh, psshsize).c_str());
 
     // 2) supportedDRMs
     Vector<DrmUUID> supportedDRMs = getSupportedDrmSchemes(pssh, psshsize);
@@ -177,7 +177,7 @@ void NuPlayerDrm::retrieveDrmInfo(const void *pssh, size_t psshsize, Parcel *par
         parcel->writeByteArray(DrmUUID::UUID_SIZE, uuid.ptr());
 
         ALOGV("retrieveDrmInfo: MEDIA_DRM_INFO  supportedScheme[%zu] %s", i,
-                uuid.toHexString().string());
+                uuid.toHexString().c_str());
     }
 }
 

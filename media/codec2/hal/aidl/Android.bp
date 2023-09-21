@@ -8,26 +8,34 @@ cc_library {
     name: "libcodec2_aidl_client",
 
     srcs: [
+        "BufferTypes.cpp",
         "ParamTypes.cpp",
     ],
 
     header_libs: [
-        "libcodec2_hal_common",
         "libcodec2_internal", // private
         "libgui_headers",
     ],
 
     shared_libs: [
+        "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.bufferpool2-V1-ndk",
         "android.hardware.media.c2-V1-ndk",
         "libbinder_ndk",
         "libbase",
         "libcodec2",
+        "libcodec2_hal_common",
         "libcodec2_vndk",
         "libcutils",
         "liblog",
         "libnativewindow",
+        "libstagefright_aidl_bufferpool2",
         "libutils",
+    ],
+
+    static_libs: [
+        "libaidlcommonsupport",
     ],
 
     export_include_dirs: [
@@ -37,104 +45,100 @@ cc_library {
     export_shared_lib_headers: [
         "android.hardware.media.c2-V1-ndk",
         "libcodec2",
+        "libcodec2_hal_common",
     ],
 }
 
 // DO NOT DEPEND ON THIS DIRECTLY
-// use libcodec2-hidl-defaults instead
-//cc_library {
-//    name: "libcodec2_hidl@1.0",
-//    vendor_available: true,
-//    min_sdk_version: "29",
-//    apex_available: [
-//        "//apex_available:platform",
-//        "com.android.media.swcodec",
-//    ],
-//
-//    defaults: ["hidl_defaults"],
-//
-//    srcs: [
-//        "Component.cpp",
-//        "ComponentInterface.cpp",
-//        "ComponentStore.cpp",
-//        "Configurable.cpp",
-//        "InputBufferManager.cpp",
-//        "InputSurface.cpp",
-//        "InputSurfaceConnection.cpp",
-//        "types.cpp",
-//    ],
-//
-//    header_libs: [
-//        "libbinder_headers",
-//        "libcodec2_hal_common",
-//        "libcodec2_internal", // private
-//        "libsystem_headers",
-//    ],
-//
-//    shared_libs: [
-//        "android.hardware.graphics.bufferqueue@1.0",
-//        "android.hardware.graphics.bufferqueue@2.0",
-//        "android.hardware.graphics.common@1.0",
-//        "android.hardware.media@1.0",
-//        "android.hardware.media.bufferpool@2.0",
-//        "android.hardware.media.c2@1.0",
-//        "android.hardware.media.omx@1.0",
-//        "libbase",
-//        "libcodec2",
-//        "libcodec2_vndk",
-//        "libcodec2_hidl_plugin_stub",
-//        "libcutils",
-//        "libhidlbase",
-//        "liblog",
-//        "libstagefright_bufferpool@2.0.1",
-//        "libstagefright_bufferqueue_helper_novndk",
-//        "libui",
-//        "libutils",
-//    ],
-//
-//    target: {
-//        vendor: {
-//            exclude_shared_libs: [
-//                "libstagefright_bufferqueue_helper_novndk",
-//                "libcodec2_hidl_plugin_stub",
-//            ],
-//            shared_libs: [
-//                "libstagefright_bufferqueue_helper",
-//                "libcodec2_hidl_plugin",
-//            ],
-//        },
-//        apex: {
-//            exclude_shared_libs: [
-//                "libcodec2_hidl_plugin",
-//                "libcodec2_hidl_plugin_stub",
-//            ],
-//        },
-//    },
-//
-//    export_include_dirs: [
-//        "include",
-//    ],
-//
-//    export_shared_lib_headers: [
-//        "android.hardware.media.c2@1.0",
-//        "libcodec2",
-//        "libcodec2_vndk",
-//        "libhidlbase",
-//        "libstagefright_bufferpool@2.0.1",
-//        "libui",
-//    ],
-//}
-//
-//// public dependency for Codec 2.0 HAL service implementations
-//cc_defaults {
-//    name: "libcodec2-hidl-defaults@1.0",
-//    defaults: ["libcodec2-impl-defaults"],
-//
-//    shared_libs: [
-//        "android.hardware.media.c2@1.0",
-//        "libcodec2_hidl@1.0",
-//    ],
-//}
+// use libcodec2-aidl-defaults instead
+cc_library {
+    name: "libcodec2_aidl",
+    vendor_available: true,
+    min_sdk_version: "34",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+        "test_com.android.media.swcodec",
+    ],
+
+    srcs: [
+        "BufferTypes.cpp",
+        "Component.cpp",
+        "ComponentInterface.cpp",
+        "ComponentStore.cpp",
+        "Configurable.cpp",
+        "InputBufferManager.cpp",
+        "ParamTypes.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
+    ],
+
+    shared_libs: [
+        "android.hardware.common-V2-ndk",
+        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.c2-V1-ndk",
+        "libbase",
+        "libbinder_ndk",
+        "libcodec2",
+        "libcodec2_hal_common",
+        "libcodec2_hidl_plugin_stub",
+        "libcodec2_vndk",
+        "libcutils",
+        "libhidlbase",
+        "liblog",
+        "libnativewindow",
+        "libstagefright_aidl_bufferpool2",
+        "libstagefright_bufferpool@2.0.1",
+        "libui",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libaidlcommonsupport",
+    ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libcodec2_hidl_plugin_stub",
+            ],
+            shared_libs: [
+                "libcodec2_hidl_plugin",
+            ],
+        },
+        apex: {
+            exclude_shared_libs: [
+                "libcodec2_hidl_plugin_stub",
+                "libcodec2_hidl_plugin",
+            ],
+        },
+    },
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
+        "libcodec2",
+        "libstagefright_bufferpool@2.0.1",
+        "libui",
+    ],
+}
+
+// public dependency for Codec 2.0 HAL service implementations
+cc_defaults {
+    name: "libcodec2-aidl-defaults",
+    min_sdk_version: "34",
+    defaults: ["libcodec2-impl-defaults"],
+
+    shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
+        "libcodec2_aidl",
+    ],
+}
 
 // public dependency for Codec 2.0 HAL client
 cc_defaults {
@@ -146,4 +150,29 @@ cc_defaults {
         "android.hardware.media.c2-V1-ndk",
         "libcodec2_aidl_client",
     ],
+}
+
+cc_fuzz {
+    name: "libcodec2-aidl-fuzzer",
+    vendor: true,
+    srcs: [
+        "fuzzer.cpp",
+    ],
+    defaults: [
+        "libcodec2-aidl-defaults",
+        "service_fuzzer_defaults",
+    ],
+    shared_libs: [
+        "libcodec2_vndk",
+
+        "libcodec2_soft_avcdec",
+        "libcodec2_soft_avcenc",
+        "libcodec2_soft_aacdec",
+        "libcodec2_soft_aacenc",
+    ],
+    fuzz_config: {
+        cc: [
+            "wonsik@google.com",
+        ],
+    },
 }

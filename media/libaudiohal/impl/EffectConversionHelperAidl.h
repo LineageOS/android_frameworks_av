@@ -41,7 +41,12 @@ class EffectConversionHelperAidl {
     std::shared_ptr<DataMQ> getInputMQ() { return mInputQ; }
     std::shared_ptr<DataMQ> getOutputMQ() { return mOutputQ; }
     std::shared_ptr<android::hardware::EventFlag> getEventFlagGroup() { return mEfGroup; }
+
     bool isBypassing() const;
+    bool isTunnel() const;
+    bool isBypassingOrTunnel() const;
+
+    ::aidl::android::hardware::audio::effect::Descriptor getDescriptor() const;
 
   protected:
     const int32_t mSessionId;
@@ -69,6 +74,11 @@ class EffectConversionHelperAidl {
     const bool mIsProxyEffect;
 
     static constexpr int kDefaultframeCount = 0x100;
+
+    template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+    static inline std::string numericPointerToString(T* pt) {
+        return pt ? std::to_string(*pt) : "nullptr";
+    }
 
     using AudioChannelLayout = aidl::android::media::audio::common::AudioChannelLayout;
     const aidl::android::media::audio::common::AudioConfig kDefaultAudioConfig = {
@@ -134,7 +144,6 @@ class EffectConversionHelperAidl {
     virtual status_t visualizerMeasure(uint32_t* replySize __unused, void* pReplyData __unused) {
         return BAD_VALUE;
     }
-
 };
 
 }  // namespace effect

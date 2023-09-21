@@ -66,7 +66,7 @@ class CameraDevice final : public RefBase {
                   ACameraDevice* wrapper);
     ~CameraDevice();
 
-    inline const char* getId() const { return mCameraId.string(); }
+    inline const char* getId() const { return mCameraId.c_str(); }
 
     camera_status_t createCaptureRequest(
             ACameraDevice_request_template templateId,

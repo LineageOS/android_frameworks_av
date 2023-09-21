@@ -703,6 +703,15 @@ class Camera3Device :
     status_t initializeCommonLocked();
 
     /**
+     * Update capture request list so that each batch size honors the batch_size_max report from
+     * the HAL. Set the batch size to output stream for buffer operations.
+     *
+     * Must be called with mLock held.
+     */
+    virtual void applyMaxBatchSizeLocked(
+            RequestList* requestList, const sp<camera3::Camera3OutputStreamInterface>& stream) = 0;
+
+    /**
      * Get the last request submitted to the hal by the request thread.
      *
      * Must be called with mLock held.
@@ -932,9 +941,6 @@ class Camera3Device :
          */
         void     setPaused(bool paused);
 
-        // set mRequestClearing - no new requests are expected to be queued to RequestThread
-        void setRequestClearing();
-
         /**
          * Wait until thread processes the capture request with settings'
          * android.request.id == requestId.
@@ -1157,7 +1163,6 @@ class Camera3Device :
         camera_metadata_enum_android_control_autoframing_t mAutoframingOverride;
         bool               mComposerOutput;
         int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
-        bool               mCameraMuteChanged;
         int32_t            mSettingsOverride; // -1 = use original, otherwise
                                               // the settings override to use.
 

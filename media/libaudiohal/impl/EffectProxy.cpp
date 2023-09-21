@@ -169,12 +169,6 @@ Descriptor::Common EffectProxy::buildDescriptorCommon(
             common.flags.hwAcceleratorMode = Flags::HardwareAccelerator::TUNNEL;
         }
 
-        // initial flag values before we know which sub-effect to active (with setOffloadParam)
-        // same as HIDL EffectProxy flags
-        common.flags.type = Flags::Type::INSERT;
-        common.flags.insert = Flags::Insert::LAST;
-        common.flags.volume = Flags::Volume::NONE;
-
         // set indication if any sub-effect indication was set
         common.flags.offloadIndication |= desc.common.flags.offloadIndication;
         common.flags.deviceIndication |= desc.common.flags.deviceIndication;
@@ -282,6 +276,11 @@ ndk::ScopedAStatus EffectProxy::runWithAllSubEffects(
 
 bool EffectProxy::isBypassing() const {
     return mSubEffects[mActiveSubIdx].descriptor.common.flags.bypass;
+}
+
+bool EffectProxy::isTunnel() const {
+    return mSubEffects[mActiveSubIdx].descriptor.common.flags.hwAcceleratorMode ==
+           Flags::HardwareAccelerator::TUNNEL;
 }
 
 binder_status_t EffectProxy::dump(int fd, const char** args, uint32_t numArgs) {

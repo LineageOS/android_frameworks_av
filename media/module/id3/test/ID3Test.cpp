@@ -94,7 +94,7 @@ TEST_P(ID3textTagTest, TextTagTest) {
                 String8 text;
                 countTextFrames++;
                 it.getString(&text);
-                ALOGV("Found text frame %s : %s \n", id.string(), text.string());
+                ALOGV("Found text frame %s : %s \n", id.c_str(), text.c_str());
             }
             it.next();
         }
@@ -106,10 +106,10 @@ TEST_P(ID3textTagTest, TextTagTest) {
             ASSERT_GT(id.length(), 0) << "Found an ID3 tag of 0 size";
             it.getString(&text);
             // if the tag has a value
-            if (strcmp(text.string(), "")) {
+            if (strcmp(text.c_str(), "")) {
                 countTextFrames++;
                 ALOGV("ID: %s\n", id.c_str());
-                ALOGV("Text string: %s\n", text.string());
+                ALOGV("Text string: %s\n", text.c_str());
             }
             it.next();
         }
@@ -134,7 +134,7 @@ TEST_P(ID3albumArtTest, AlbumArtTest) {
 
     if (albumArtPresent) {
         if (data) {
-            ALOGV("Found album art: size = %zu mime = %s \n", dataSize, mime.string());
+            ALOGV("Found album art: size = %zu mime = %s \n", dataSize, mime.c_str());
         }
         ASSERT_NE(data, nullptr) << "Expected album art, found none! " << path;
     } else {
@@ -168,7 +168,7 @@ TEST_P(ID3multiAlbumArtTest, MultiAlbumArtTest) {
             String8 mime;
             const void *data = tag.getAlbumArt(&dataSize, &mime);
             if (data) {
-                ALOGV("Found album art: size = %zu mime = %s \n", dataSize, mime.string());
+                ALOGV("Found album art: size = %zu mime = %s \n", dataSize, mime.c_str());
 #if (LOG_NDEBUG == 0)
                 hexdump(data, dataSize > 128 ? 128 : dataSize);
 #endif

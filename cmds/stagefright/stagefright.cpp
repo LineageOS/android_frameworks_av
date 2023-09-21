@@ -155,7 +155,7 @@ static void displayAVCProfileLevelIfPossible(const sp<MetaData>& meta) {
 }
 
 static void dumpSource(const sp<MediaSource> &source, const String8 &filename) {
-    FILE *out = fopen(filename.string(), "wb");
+    FILE *out = fopen(filename.c_str(), "wb");
 
     CHECK_EQ((status_t)OK, source->start());
 
@@ -212,8 +212,8 @@ static void playSource(sp<MediaSource> &source) {
         }
         rawSource = SimpleDecodingSource::Create(
                 source, flags, gSurface,
-                gComponentNameOverride.isEmpty() ? nullptr : gComponentNameOverride.c_str(),
-                !gComponentNameOverride.isEmpty());
+                gComponentNameOverride.empty() ? nullptr : gComponentNameOverride.c_str(),
+                !gComponentNameOverride.empty());
         if (rawSource == NULL) {
             return;
         }
@@ -538,9 +538,9 @@ static void writeSourcesToMP4(
         Vector<sp<MediaSource> > &sources, bool syncInfoPresent) {
 #if 0
     sp<MPEG4Writer> writer =
-        new MPEG4Writer(gWriteMP4Filename.string());
+        new MPEG4Writer(gWriteMP4Filename.c_str());
 #else
-    int fd = open(gWriteMP4Filename.string(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    int fd = open(gWriteMP4Filename.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
     if (fd < 0) {
         fprintf(stderr, "couldn't open file");
         return;
@@ -834,7 +834,7 @@ int main(int argc, char **argv) {
             case 'd':
             {
                 dumpStream = true;
-                dumpStreamFilename.setTo(optarg);
+                dumpStreamFilename = optarg;
                 break;
             }
 
@@ -842,13 +842,13 @@ int main(int argc, char **argv) {
             {
                 dumpPCMStream = true;
                 audioOnly = true;
-                dumpStreamFilename.setTo(optarg);
+                dumpStreamFilename = optarg;
                 break;
             }
 
             case 'N':
             {
-                gComponentNameOverride.setTo(optarg);
+                gComponentNameOverride = optarg;
                 break;
             }
 
@@ -886,7 +886,7 @@ int main(int argc, char **argv) {
             case 'w':
             {
                 gWriteMP4 = true;
-                gWriteMP4Filename.setTo(optarg);
+                gWriteMP4Filename = optarg;
                 break;
             }
 

@@ -41,8 +41,8 @@ HeifDecoder* createHeifDecoder() {
 namespace android {
 
 void initFrameInfo(HeifFrameInfo *info, const VideoFrame *videoFrame) {
-    info->mWidth = videoFrame->mWidth;
-    info->mHeight = videoFrame->mHeight;
+    info->mWidth = videoFrame->mDisplayWidth;
+    info->mHeight = videoFrame->mDisplayHeight;
     info->mRotationAngle = videoFrame->mRotationAngle;
     info->mBytesPerPixel = videoFrame->mBytesPerPixel;
     info->mDurationUs = videoFrame->mDurationUs;
@@ -742,8 +742,11 @@ bool HeifDecoderImpl::getScanlineInner(uint8_t* dst) {
     //       Either document why it is safe in this case or address the
     //       issue (e.g. by copying).
     VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
-    uint8_t* src = videoFrame->getFlattenedData() + videoFrame->mRowBytes * mCurScanline++;
-    memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mWidth);
+    uint8_t* src = videoFrame->getFlattenedData() +
+                   (videoFrame->mRowBytes * (mCurScanline + videoFrame->mDisplayTop)) +
+                   (videoFrame->mBytesPerPixel * videoFrame->mDisplayLeft);
+    mCurScanline++;
+    memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mDisplayWidth);
     return true;
 }
 

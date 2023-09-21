@@ -92,7 +92,7 @@ sp<DataSource> DataSourceFactory::CreateFromURI(
 
         source = NuCachedSource2::Create(
                 mediaHTTP,
-                cacheConfig.isEmpty() ? NULL : cacheConfig.string(),
+                cacheConfig.empty() ? NULL : cacheConfig.c_str(),
                 disconnectAtHighwatermark);
     } else if (!strncasecmp("data:", uri, 5)) {
         source = DataURISource::Create(uri);

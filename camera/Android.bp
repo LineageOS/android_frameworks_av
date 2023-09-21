@@ -43,6 +43,22 @@ license {
     ],
 }
 
+aconfig_declarations {
+    name: "camera_platform_flags",
+    package: "com.android.internal.camera.flags",
+    srcs: ["camera_platform.aconfig"],
+}
+
+cc_aconfig_library {
+    name: "camera_platform_flags_c_lib",
+    aconfig_declarations: "camera_platform_flags",
+}
+
+java_aconfig_library {
+    name: "camera_platform_flags_java_lib",
+    aconfig_declarations: "camera_platform_flags",
+}
+
 cc_library_headers {
     name: "camera_headers",
     export_include_dirs: ["include"],

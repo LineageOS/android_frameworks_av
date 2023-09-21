@@ -847,7 +847,7 @@ static bool convertTimeToDate(int64_t time_1904, String8 *s) {
     struct tm* tm = gmtime(&time_1970);
     if (tm != NULL &&
             strftime(tmp, sizeof(tmp), "%Y%m%dT%H%M%S.000Z", tm) > 0) {
-        s->setTo(tmp);
+        *s = tmp;
         return true;
     }
     return false;
@@ -1794,7 +1794,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 String8 mimeFormat(str + 8 + encoding_length + 1,
                         chunk_data_size - 8 - encoding_length - 1);
                 AMediaFormat_setString(mLastTrack->meta,
-                        AMEDIAFORMAT_KEY_MIME, mimeFormat.string());
+                        AMEDIAFORMAT_KEY_MIME, mimeFormat.c_str());
             }
             break;
         }
@@ -2813,7 +2813,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             String8 s;
             if (convertTimeToDate(creationTime, &s)) {
-                AMediaFormat_setString(mFileMetaData, AMEDIAFORMAT_KEY_DATE, s.string());
+                AMediaFormat_setString(mFileMetaData, AMEDIAFORMAT_KEY_DATE, s.c_str());
             }
 
             break;
@@ -4082,10 +4082,10 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
             buffer[size] = '\0';
             switch (mPath[5]) {
                 case FOURCC("mean"):
-                    mLastCommentMean.setTo((const char *)buffer + 4);
+                    mLastCommentMean = ((const char *)buffer + 4);
                     break;
                 case FOURCC("name"):
-                    mLastCommentName.setTo((const char *)buffer + 4);
+                    mLastCommentName = ((const char *)buffer + 4);
                     break;
                 case FOURCC("data"):
                     if (size < 8) {
@@ -4094,7 +4094,7 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
                         ALOGE("b/24346430");
                         return ERROR_MALFORMED;
                     }
-                    mLastCommentData.setTo((const char *)buffer + 8);
+                    mLastCommentData = ((const char *)buffer + 8);
                     break;
             }
 
@@ -4368,7 +4368,7 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
         } else {
             // Convert from UTF-16 string to UTF-8 string.
             String8 tmpUTF8str(framedata, len16);
-            AMediaFormat_setString(mFileMetaData, metadataKey, tmpUTF8str.string());
+            AMediaFormat_setString(mFileMetaData, metadataKey, tmpUTF8str.c_str());
         }
     }
 

@@ -22,6 +22,7 @@ import androidx.annotation.NonNull;
 import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
 
 public class FrameReleaseQueue {
     private static final String TAG = "FrameReleaseQueue";
@@ -61,31 +62,31 @@ public class FrameReleaseQueue {
                         // first frame of loop
                         firstReleaseTime = getCurSysTime();
                         nextReleaseTime = firstReleaseTime + mWaitTime;
-                        popAndRelease(curFrameInfo, true);
+                        popAndRelease(true);
                     } else if (!doFrameRelease.get() && mFrameInfoQueue.size() == 1) {
                         // EOS
                         Log.i(TAG, "EOS");
-                        popAndRelease(curFrameInfo, false);
+                        popAndRelease(false);
                     } else {
                         nextReleaseTime += mWaitTime;
                         int curSysTime = getCurSysTime();
                         int curMediaTime = curSysTime - firstReleaseTime;
                         while (curFrameInfo != null && curFrameInfo.displayTime > 0 &&
                                 curFrameInfo.displayTime <= curMediaTime) {
-                            if (!((curMediaTime - curFrameInfo.displayTime) < THRESHOLD_TIME)) {
+                            if (!((curMediaTime - curFrameInfo.displayTime) <= THRESHOLD_TIME)) {
                                 Log.d(TAG, "Dropping expired frame " + curFrameInfo.number +
                                     " display time " + curFrameInfo.displayTime +
                                     " current time " + curMediaTime);
-                                popAndRelease(curFrameInfo, false);
+                                popAndRelease(false);
                             } else {
-                                popAndRelease(curFrameInfo, true);
+                                popAndRelease(true);
                             }
                             curFrameInfo = mFrameInfoQueue.peek();
                         }
                         if (curFrameInfo != null && curFrameInfo.displayTime > curMediaTime) {
                             if ((curFrameInfo.displayTime - curMediaTime) < THRESHOLD_TIME) {
                                 // release the frame now as we are already there
-                                popAndRelease(curFrameInfo, true);
+                                popAndRelease(true);
                             }
                         }
                     }
@@ -148,19 +149,21 @@ public class FrameReleaseQueue {
         return (int)(System.nanoTime()/1000000);
     }
 
-    private void popAndRelease(FrameInfo curFrameInfo, boolean renderThisFrame) {
+    private void popAndRelease(boolean renderThisFrame) {
+        final boolean actualRender = (renderThisFrame && mRender);
         try {
-            curFrameInfo = mFrameInfoQueue.take();
+            final FrameInfo curFrameInfo = mFrameInfoQueue.take();
+
+            CompletableFuture future = CompletableFuture.runAsync(() -> {
+                try {
+                    mCodec.releaseOutputBuffer(curFrameInfo.bufferId, actualRender);
+                } catch (IllegalStateException e) {
+                    e.printStackTrace();
+                }
+            });
+
         } catch (InterruptedException e) {
             Log.e(TAG, "Threw InterruptedException on take");
-        }
-        boolean actualRender = (renderThisFrame && mRender);
-        try {
-            mCodec.releaseOutputBuffer(curFrameInfo.bufferId, actualRender);
-        } catch (IllegalStateException e) {
-            Log.e(TAG,
-                    "Threw IllegalStateException on releaseOutputBuffer for frame "
-                            + curFrameInfo.number);
         }
     }
 
