@@ -22,16 +22,16 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/FlacDecoderTest/FlacDecoderTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/flac/dec/test/FlacDecoder.zip).
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/module/codecs/flac/dec/test/FlacDecoder-1.0.zip).
 Download, unzip and push these files into device for testing.
 
 ```
-adb push FlacDecoder /data/local/tmp/
+adb push FlacDecoder-1.0 /data/local/tmp/
 ```
 
 usage: FlacDecoderTest -P \<path_to_folder\>
 ```
-adb shell /data/local/tmp/FlacDecoderTest -P /data/local/tmp/FlacDecoder/
+adb shell /data/local/tmp/FlacDecoderTest -P /data/local/tmp/FlacDecoder-1.0/
 ```
 Alternatively, the test can also be run using atest command.
 
