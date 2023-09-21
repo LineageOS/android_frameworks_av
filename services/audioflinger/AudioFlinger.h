@@ -20,6 +20,7 @@
 // Classes and interfaces directly used.
 #include "Client.h"
 #include "DeviceEffectManager.h"
+#include "EffectConfiguration.h"
 #include "IAfEffect.h"
 #include "IAfPatchPanel.h"
 #include "IAfThread.h"
@@ -459,7 +460,7 @@ private:
         static const int kPostTriggerSleepPeriod = 1000000;
     };
 
-    const sp<MediaLogNotifier> mMediaLogNotifier;
+    const sp<MediaLogNotifier> mMediaLogNotifier = sp<MediaLogNotifier>::make();
 
     // Find io handle by session id.
     // Preference is given to an io handle with a matching effect chain to session id.
@@ -565,13 +566,12 @@ private:
                 // NOTE: If both mLock and mHardwareLock mutexes must be held,
                 // always take mLock before mHardwareLock
 
-                // guarded by mHardwareLock
-                AudioHwDevice* mPrimaryHardwareDev;
-                DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*>  mAudioHwDevs;
+    std::atomic<AudioHwDevice*> mPrimaryHardwareDev = nullptr;
+    DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*> mAudioHwDevs{nullptr /* defValue */};
 
-                // These two fields are immutable after onFirstRef(), so no lock needed to access
-                sp<DevicesFactoryHalInterface> mDevicesFactoryHal;
-                sp<DevicesFactoryHalCallback> mDevicesFactoryHalCallback;
+     const sp<DevicesFactoryHalInterface> mDevicesFactoryHal =
+             DevicesFactoryHalInterface::create();
+     /* const */ sp<DevicesFactoryHalCallback> mDevicesFactoryHalCallback;  // set onFirstRef().
 
     // for dump, indicates which hardware operation is currently in progress (but not stream ops)
     enum hardware_call_state {
@@ -601,16 +601,15 @@ private:
         AUDIO_HW_SET_SIMULATE_CONNECTIONS, // setSimulateDeviceConnections
     };
 
-    mutable     hardware_call_state                 mHardwareStatus;    // for dump only
-
+    mutable hardware_call_state mHardwareStatus = AUDIO_HW_IDLE;  // for dump only
 
     DefaultKeyedVector<audio_io_handle_t, sp<IAfPlaybackThread>> mPlaybackThreads;
                 stream_type_t                       mStreamTypes[AUDIO_STREAM_CNT];
 
                 // member variables below are protected by mLock
-                float                               mMasterVolume;
-                bool                                mMasterMute;
-                float                               mMasterBalance = 0.f;
+    float mMasterVolume = 1.f;
+    bool mMasterMute = false;
+    float mMasterBalance = 0.f;
                 // end of variables protected by mLock
 
     DefaultKeyedVector<audio_io_handle_t, sp<IAfRecordThread>> mRecordThreads;
@@ -619,10 +618,10 @@ private:
                 DefaultKeyedVector< pid_t, sp<NotificationClient> >    mNotificationClients;
 
                 // updated by atomic_fetch_add_explicit
-                volatile atomic_uint_fast32_t       mNextUniqueIds[AUDIO_UNIQUE_ID_USE_MAX];
+    volatile atomic_uint_fast32_t mNextUniqueIds[AUDIO_UNIQUE_ID_USE_MAX];  // ctor init
 
-                audio_mode_t                        mMode;
-                std::atomic_bool                    mBtNrecIsOff;
+    std::atomic<audio_mode_t> mMode = AUDIO_MODE_INVALID;
+    std::atomic<bool> mBtNrecIsOff = false;
 
                 // protected by mLock
                 Vector<AudioSessionRef*> mAudioSessionRefs;
@@ -661,24 +660,25 @@ private:
     // though the variables are updated with mLock.
     size_t getClientSharedHeapSize() const;
 
-    std::atomic<bool> mIsLowRamDevice;
-    bool    mIsDeviceTypeKnown;
-    int64_t mTotalMemory;
-    std::atomic<size_t> mClientSharedHeapSize;
+    std::atomic<bool> mIsLowRamDevice = true;
+    bool mIsDeviceTypeKnown = false;
+    int64_t mTotalMemory = 0;
+    std::atomic<size_t> mClientSharedHeapSize = kMinimumClientSharedHeapSizeBytes;
     static constexpr size_t kMinimumClientSharedHeapSizeBytes = 1024 * 1024; // 1MB
 
-    nsecs_t mGlobalEffectEnableTime;  // when a global effect was last enabled
+    nsecs_t mGlobalEffectEnableTime = 0;  // when a global effect was last enabled
 
     /* const */ sp<IAfPatchPanel> mPatchPanel;
 
-    sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
+    const sp<EffectsFactoryHalInterface> mEffectsFactoryHal =
+            audioflinger::EffectConfiguration::getEffectsFactoryHal();
 
-    const sp<PatchCommandThread> mPatchCommandThread;
+    const sp<PatchCommandThread> mPatchCommandThread = sp<PatchCommandThread>::make();
     /* const */ sp<DeviceEffectManager> mDeviceEffectManager;  // set onFirstRef
     /* const */ sp<MelReporter> mMelReporter;  // set onFirstRef
 
-    bool       mSystemReady;
-    std::atomic_bool mAudioPolicyReady{};
+    bool mSystemReady = false;
+    std::atomic<bool> mAudioPolicyReady = false;
 
     mediautils::UidInfo mUidInfo;
 
@@ -699,7 +699,7 @@ private:
     mediautils::atomic_sp<IAudioManager>       mAudioManager;
 
     // Bluetooth Variable latency control logic is enabled or disabled
-    std::atomic_bool mBluetoothLatencyModesEnabled;
+    std::atomic<bool> mBluetoothLatencyModesEnabled = true;
 };
 
 // ----------------------------------------------------------------------------
