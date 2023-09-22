@@ -67,44 +67,56 @@ struct stream_type_t {
 // and hence may be used by the Effect / Track framework.
 class IAfThreadCallback : public virtual RefBase {
 public:
-    virtual audio_utils::mutex& mutex() const = 0;
-    virtual bool isNonOffloadableGlobalEffectEnabled_l() const = 0;  // Tracks
+    virtual audio_utils::mutex& mutex() const
+            RETURN_CAPABILITY(audio_utils::AudioFlinger_Mutex) = 0;
+    virtual bool isNonOffloadableGlobalEffectEnabled_l() const
+            REQUIRES(mutex()) = 0;  // Tracks
     virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
     virtual bool btNrecIsOff() const = 0;
-    virtual float masterVolume_l() const = 0;
-    virtual bool masterMute_l() const = 0;
-    virtual float getMasterBalance_l() const = 0;
-    virtual bool streamMute_l(audio_stream_type_t stream) const = 0;
+    virtual float masterVolume_l() const
+            REQUIRES(mutex()) = 0;
+    virtual bool masterMute_l() const
+            REQUIRES(mutex()) = 0;
+    virtual float getMasterBalance_l() const
+            REQUIRES(mutex()) = 0;
+    virtual bool streamMute_l(audio_stream_type_t stream) const
+            REQUIRES(mutex()) = 0;
     virtual audio_mode_t getMode() const = 0;
     virtual bool isLowRamDevice() const = 0;
     virtual bool isAudioPolicyReady() const = 0;  // Effects
     virtual uint32_t getScreenState() const = 0;
-    virtual std::optional<media::AudioVibratorInfo> getDefaultVibratorInfo_l() const = 0;
+    virtual std::optional<media::AudioVibratorInfo> getDefaultVibratorInfo_l() const
+            REQUIRES(mutex()) = 0;
     virtual const sp<IAfPatchPanel>& getPatchPanel() const = 0;
     virtual const sp<MelReporter>& getMelReporter() const = 0;
     virtual const sp<EffectsFactoryHalInterface>& getEffectsFactoryHal() const = 0;
     virtual sp<IAudioManager> getOrCreateAudioManager() = 0;  // Tracks
 
-    virtual bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect) = 0;
-    virtual status_t moveEffectChain_l(audio_session_t sessionId,
-            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread) = 0;
+    virtual bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect)
+            EXCLUDES_AudioFlinger_Mutex = 0;
+    virtual status_t moveEffectChain_ll(audio_session_t sessionId,
+            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread)
+            REQUIRES(mutex(), audio_utils::ThreadBase_Mutex) = 0;
 
     virtual void requestLogMerge() = 0;
-    virtual sp<NBLog::Writer> newWriter_l(size_t size, const char *name) = 0;
+    virtual sp<NBLog::Writer> newWriter_l(size_t size, const char *name)
+            REQUIRES(mutex()) = 0;
     virtual void unregisterWriter(const sp<NBLog::Writer>& writer) = 0;
 
     virtual sp<audioflinger::SyncEvent> createSyncEvent(AudioSystem::sync_event_t type,
             audio_session_t triggerSession,
             audio_session_t listenerSession,
             const audioflinger::SyncEventCallback& callBack,
-            const wp<IAfTrackBase>& cookie) = 0;
+            const wp<IAfTrackBase>& cookie)
+            EXCLUDES_AudioFlinger_Mutex = 0;
 
     virtual void ioConfigChanged(audio_io_config_event_t event,
             const sp<AudioIoDescriptor>& ioDesc,
-            pid_t pid = 0) = 0;
-    virtual void onNonOffloadableGlobalEffectEnable() = 0;
+            pid_t pid = 0) EXCLUDES_AudioFlinger_ClientMutex = 0;
+    virtual void onNonOffloadableGlobalEffectEnable() EXCLUDES_AudioFlinger_Mutex = 0;
     virtual void onSupportedLatencyModesChanged(
-            audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) = 0;
+            audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes)
+            EXCLUDES_AudioFlinger_ClientMutex = 0;
 };
 
 class IAfThreadBase : public virtual RefBase {
@@ -213,7 +225,8 @@ public:
             status_t* status /*non-NULL*/,
             bool pinned,
             bool probe,
-            bool notifyFramesProcessed) = 0;
+            bool notifyFramesProcessed)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     // return values for hasAudioSession (bit field)
     enum effect_state {
@@ -255,7 +268,8 @@ public:
     // add and effect module. Also creates the effect chain is none exists for
     // the effects audio session. Only called in a context of moving an effect
     // from one thread to another
-    virtual status_t addEffect_l(const sp<IAfEffectModule>& effect) = 0;
+    virtual status_t addEffect_ll(const sp<IAfEffectModule>& effect)
+            REQUIRES(audio_utils::AudioFlinger_Mutex, mutex()) = 0;
     // remove and effect module. Also removes the effect chain is this was the last
     // effect
     virtual void removeEffect_l(const sp<IAfEffectModule>& effect, bool release = false) = 0;
@@ -310,7 +324,8 @@ public:
     // deliver stats to mediametrics.
     virtual void sendStatistics(bool force) = 0;
 
-    virtual audio_utils::mutex& mutex() const = 0;
+    virtual audio_utils::mutex& mutex() const
+            RETURN_CAPABILITY(audio_utils::ThreadBase_Mutex) = 0;
 
     virtual void onEffectEnable(const sp<IAfEffectModule>& effect) = 0;
     virtual void onEffectDisable() = 0;
@@ -321,8 +336,10 @@ public:
     virtual void invalidateTracksForAudioSession(audio_session_t sessionId) const = 0;
 
     virtual bool isStreamInitialized() const = 0;
-    virtual void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) = 0;
-    virtual void stopMelComputation_l() = 0;
+    virtual void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
+    virtual void stopMelComputation_l()
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) const = 0;
 
@@ -398,7 +415,8 @@ public:
             audio_port_handle_t portId,
             const sp<media::IAudioTrackCallback>& callback,
             bool isSpatialized,
-            bool isBitPerfect) = 0;
+            bool isBitPerfect)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     virtual status_t addTrack_l(const sp<IAfTrack>& track) = 0;
     virtual bool destroyTrack_l(const sp<IAfTrack>& track) = 0;
@@ -502,7 +520,8 @@ public:
             pid_t tid,
             status_t* status /*non-NULL*/,
             audio_port_handle_t portId,
-            int32_t maxSharedAudioHistoryMs) = 0;
+            int32_t maxSharedAudioHistoryMs)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
     virtual void destroyTrack_l(const sp<IAfRecordTrack>& track) = 0;
     virtual void removeTrack_l(const sp<IAfRecordTrack>& track) = 0;
 
