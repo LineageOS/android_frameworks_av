@@ -51,8 +51,11 @@ namespace media {
 namespace c2 {
 namespace utils {
 
+#ifndef __ANDROID_APEX__
 using ::android::DefaultFilterPlugin;
 using ::android::FilterWrapper;
+#endif
+
 using ::ndk::ScopedAStatus;
 
 namespace /* unnamed */ {
