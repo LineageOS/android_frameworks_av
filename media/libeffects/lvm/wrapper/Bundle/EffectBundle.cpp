@@ -17,7 +17,7 @@
 #ifndef LVM_FLOAT
 typedef float LVM_FLOAT;
 #endif
-#define LOG_TAG "Bundle"
+#define LOG_TAG "EffectBundle"
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array)[0])
 //#define LOG_NDEBUG 0
 
@@ -1191,11 +1191,13 @@ void VirtualizerSetStrength(EffectContext* pContext, uint32_t strength) {
 //  0            if the configuration is supported
 //----------------------------------------------------------------------------
 int VirtualizerIsDeviceSupported(audio_devices_t deviceType) {
+    ALOGV("%s: deviceType:%#x", __func__, deviceType);
     switch (deviceType) {
         case AUDIO_DEVICE_OUT_WIRED_HEADSET:
         case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
         case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
         case AUDIO_DEVICE_OUT_USB_HEADSET:
+        case AUDIO_DEVICE_OUT_BLE_HEADSET:
             // case AUDIO_DEVICE_OUT_USB_DEVICE:  // For USB testing of the virtualizer only.
             return 0;
         default:
@@ -3372,10 +3374,10 @@ int Effect_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize, voi
             if (pContext->EffectType == LVM_BASS_BOOST) {
                 if ((device == AUDIO_DEVICE_OUT_SPEAKER) ||
                     (device == AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT) ||
-                    (device == AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER)) {
-                    ALOGV("\tEFFECT_CMD_SET_DEVICE device is invalid for LVM_BASS_BOOST %d",
-                          *(int32_t*)pCmdData);
-                    ALOGV("\tEFFECT_CMD_SET_DEVICE temporary disable LVM_BAS_BOOST");
+                     device == AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER ||
+                     device == AUDIO_DEVICE_OUT_BLE_SPEAKER) {
+                    ALOGV("%s: EFFECT_CMD_SET_DEVICE device %#x is invalid for LVM_BASS_BOOST",
+                            __func__, device);
 
                     // If a device doesn't support bassboost the effect must be temporarily disabled
                     // the effect must still report its original state as this can only be changed
