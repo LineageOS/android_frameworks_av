@@ -28,12 +28,9 @@
 
 #include <dav1d/dav1d.h>
 #include <deque>
+#include <C2SoftDav1dDump.h>
 
 //#define FILE_DUMP_ENABLE 1
-#define DUMP_FILE_PATH "/data/local/tmp/dump"
-#define INPUT_DATA_DUMP_EXT "av1"
-#define INPUT_SIZE_DUMP_EXT "size"
-#define OUTPUT_YUV_DUMP_EXT "yuv"
 
 namespace android {
 
@@ -122,17 +119,7 @@ struct C2SoftDav1dDec : public SimpleC2Component {
     void flushDav1d();
 
 #ifdef FILE_DUMP_ENABLE
-    char mInDataFileName[256];
-    char mInSizeFileName[256];
-    char mDav1dOutYuvFileName[256];
-
-    FILE* mInDataFile = nullptr;
-    FILE* mInSizeFile = nullptr;
-    FILE* mDav1dOutYuvFile = nullptr;
-
-    void writeDav1dOutYuvFile(const Dav1dPicture& p);
-
-    int num_frames_to_dump = 0;
+    C2SoftDav1dDump mC2SoftDav1dDump;
 #endif
 
     C2_DO_NOT_COPY(C2SoftDav1dDec);

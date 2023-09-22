@@ -26,29 +26,12 @@
 #include <Codec2CommonUtils.h>
 #include <Codec2Mapper.h>
 #include <SimpleC2Interface.h>
-#include <libyuv.h>
 #include <log/log.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 #include "C2SoftDav1dDec.h"
 
-// libyuv version required for I410ToAB30Matrix and I210ToAB30Matrix.
-#if LIBYUV_VERSION >= 1780
-#include <algorithm>
-#define HAVE_LIBYUV_I410_I210_TO_AB30 1
-#else
-#define HAVE_LIBYUV_I410_I210_TO_AB30 0
-#endif
-
 namespace android {
-
-// Flag to enable dumping the bitsteram and the decoded pictures to files.
-static const bool ENABLE_DUMPING_FILES_DEFAULT = false;
-static const char ENABLE_DUMPING_FILES_PROPERTY[] = "debug.dav1d.enabledumping";
-
-// The number of frames to dump to a file
-static const int NUM_FRAMES_TO_DUMP_DEFAULT = INT_MAX;
-static const char NUM_FRAMES_TO_DUMP_PROPERTY[] = "debug.dav1d.numframestodump";
 
 // The number of threads used for the dav1d decoder.
 static const int NUM_THREADS_DAV1D_DEFAULT = 0;
@@ -522,37 +505,8 @@ static int GetCPUCoreCount() {
 }
 
 bool C2SoftDav1dDec::initDecoder() {
-    nsecs_t now = systemTime();
 #ifdef FILE_DUMP_ENABLE
-    snprintf(mInDataFileName, 256, "%s_%" PRId64 "d.%s", DUMP_FILE_PATH, now, INPUT_DATA_DUMP_EXT);
-    snprintf(mInSizeFileName, 256, "%s_%" PRId64 "d.%s", DUMP_FILE_PATH, now, INPUT_SIZE_DUMP_EXT);
-    snprintf(mDav1dOutYuvFileName, 256, "%s_%" PRId64 "dx.%s", DUMP_FILE_PATH, now,
-             OUTPUT_YUV_DUMP_EXT);
-
-    bool enableDumping = android::base::GetBoolProperty(ENABLE_DUMPING_FILES_PROPERTY,
-                                                        ENABLE_DUMPING_FILES_DEFAULT);
-
-    num_frames_to_dump =
-            android::base::GetIntProperty(NUM_FRAMES_TO_DUMP_PROPERTY, NUM_FRAMES_TO_DUMP_DEFAULT);
-
-    if (enableDumping) {
-        ALOGD("enableDumping = %d, num_frames_to_dump = %d", enableDumping, num_frames_to_dump);
-
-        mInDataFile = fopen(mInDataFileName, "wb");
-        if (mInDataFile == nullptr) {
-            ALOGD("Could not open file %s", mInDataFileName);
-        }
-
-        mInSizeFile = fopen(mInSizeFileName, "wb");
-        if (mInSizeFile == nullptr) {
-            ALOGD("Could not open file %s", mInSizeFileName);
-        }
-
-        mDav1dOutYuvFile = fopen(mDav1dOutYuvFileName, "wb");
-        if (mDav1dOutYuvFile == nullptr) {
-            ALOGD("Could not open file %s", mDav1dOutYuvFileName);
-        }
-    }
+    mC2SoftDav1dDump.initDumping();
 #endif
     mSignalledError = false;
     mSignalledOutputEos = false;
@@ -601,20 +555,7 @@ void C2SoftDav1dDec::destroyDecoder() {
         mInputBufferIndex = 0;
     }
 #ifdef FILE_DUMP_ENABLE
-    if (mInDataFile != nullptr) {
-        fclose(mInDataFile);
-        mInDataFile = nullptr;
-    }
-
-    if (mInSizeFile != nullptr) {
-        fclose(mInSizeFile);
-        mInSizeFile = nullptr;
-    }
-
-    if (mDav1dOutYuvFile != nullptr) {
-        fclose(mDav1dOutYuvFile);
-        mDav1dOutYuvFile = nullptr;
-    }
+    mC2SoftDav1dDump.destroyDumping();
 #endif
 }
 
@@ -655,6 +596,10 @@ void C2SoftDav1dDec::finishWork(uint64_t index, const std::unique_ptr<C2Work>& w
     } else {
         finish(index, fillWork);
     }
+}
+
+static void freeCallback(const uint8_t */*data*/, void */*cookie*/) {
+    return;
 }
 
 void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
@@ -709,65 +654,24 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
                       seq.max_height, (long)in_frameIndex);
             }
 
-            // insert OBU TD if it is not present.
-            // TODO: b/286852962
-            uint8_t obu_type = (bitstream[0] >> 3) & 0xf;
             Dav1dData data;
 
-            uint8_t* ptr = (obu_type == DAV1D_OBU_TD) ? dav1d_data_create(&data, inSize)
-                                                      : dav1d_data_create(&data, inSize + 2);
-            if (ptr == nullptr) {
-                ALOGE("dav1d_data_create failed!");
+            res = dav1d_data_wrap(&data, bitstream, inSize, freeCallback, nullptr);
+            if (res != 0) {
+                ALOGE("Decoder wrap error %s!", strerror(DAV1D_ERR(res)));
                 i_ret = -1;
-
             } else {
                 data.m.timestamp = in_frameIndex;
+                // ALOGV("inSize=%ld, in_frameIndex=%ld, timestamp=%ld",
+                //       inSize, frameIndex, data.m.timestamp);
 
-                int new_Size;
-                if (obu_type != DAV1D_OBU_TD) {
-                    new_Size = (int)(inSize + 2);
-
-                    // OBU TD
-                    ptr[0] = 0x12;
-                    ptr[1] = 0;
-
-                    memcpy(ptr + 2, bitstream, inSize);
-                } else {
-                    new_Size = (int)(inSize);
-                    // TODO: b/277797541 - investigate how to wrap this pointer in Dav1dData to
-                    // avoid memcopy operations.
-                    memcpy(ptr, bitstream, new_Size);
-                }
-
-                // ALOGV("memcpy(ptr,bitstream,inSize=%ld,new_Size=%d,in_frameIndex=%ld,timestamp=%ld,"
-                //       "ptr[0,1,2,3,4]=%x,%x,%x,%x,%x)",
-                //       inSize, new_Size, frameIndex, data.m.timestamp, ptr[0], ptr[1], ptr[2],
-                //       ptr[3], ptr[4]);
 
                 // Dump the bitstream data (inputBuffer) if dumping is enabled.
 #ifdef FILE_DUMP_ENABLE
-                if (mInDataFile) {
-                    int ret = fwrite(ptr, 1, new_Size, mInDataFile);
-
-                    if (ret != new_Size) {
-                        ALOGE("Error in fwrite %s, requested %d, returned %d", mInDataFileName,
-                              new_Size, ret);
-                    }
-                }
-
-                // Dump the size per inputBuffer if dumping is enabled.
-                if (mInSizeFile) {
-                    int ret = fwrite(&new_Size, 1, 4, mInSizeFile);
-
-                    if (ret != 4) {
-                        ALOGE("Error in fwrite %s, requested %d, returned %d", mInSizeFileName, 4,
-                              ret);
-                    }
-                }
+                mC2SoftDav1dDump.dumpInput(ptr, new_Size);
 #endif
 
                 bool b_draining = false;
-                int res;
 
                 do {
                     res = dav1d_send_data(mDav1dCtx, &data);
@@ -1010,49 +914,6 @@ bool C2SoftDav1dDec::allocTmpFrameBuffer(size_t size) {
     return true;
 }
 
-#ifdef FILE_DUMP_ENABLE
-void C2SoftDav1dDec::writeDav1dOutYuvFile(const Dav1dPicture& p) {
-    if (mDav1dOutYuvFile != NULL) {
-        uint8_t* ptr;
-        const int hbd = p.p.bpc > 8;
-
-        ptr = (uint8_t*)p.data[0];
-        for (int y = 0; y < p.p.h; y++) {
-            int iSize = p.p.w << hbd;
-            int ret = fwrite(ptr, 1, iSize, mDav1dOutYuvFile);
-            if (ret != iSize) {
-                ALOGE("Error in fwrite %s, requested %d, returned %d", mDav1dOutYuvFileName, iSize,
-                      ret);
-                break;
-            }
-
-            ptr += p.stride[0];
-        }
-
-        if (p.p.layout != DAV1D_PIXEL_LAYOUT_I400) {
-            // u/v
-            const int ss_ver = p.p.layout == DAV1D_PIXEL_LAYOUT_I420;
-            const int ss_hor = p.p.layout != DAV1D_PIXEL_LAYOUT_I444;
-            const int cw = (p.p.w + ss_hor) >> ss_hor;
-            const int ch = (p.p.h + ss_ver) >> ss_ver;
-            for (int pl = 1; pl <= 2; pl++) {
-                ptr = (uint8_t*)p.data[pl];
-                for (int y = 0; y < ch; y++) {
-                    int iSize = cw << hbd;
-                    int ret = fwrite(ptr, 1, cw << hbd, mDav1dOutYuvFile);
-                    if (ret != iSize) {
-                        ALOGE("Error in fwrite %s, requested %d, returned %d", mDav1dOutYuvFileName,
-                              iSize, ret);
-                        break;
-                    }
-                    ptr += p.stride[1];
-                }
-            }
-        }
-    }
-}
-#endif
-
 bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
                                   const std::unique_ptr<C2Work>& work) {
     if (!(work && pool)) return false;
@@ -1114,16 +975,6 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     // out_frameIndex that the decoded picture returns from dav1d.
     int64_t out_frameIndex = img.m.timestamp;
 
-#if LIBYUV_VERSION < 1779
-    if (!(img.p.layout != DAV1D_PIXEL_LAYOUT_I400 || img.p.layout != DAV1D_PIXEL_LAYOUT_I420)) {
-        ALOGE("image_format %d not supported", img.p.layout);
-        mSignalledError = true;
-        work->workletsProcessed = 1u;
-        work->result = C2_CORRUPTED;
-        return false;
-    }
-#endif
-
     const bool isMonochrome = img.p.layout == DAV1D_PIXEL_LAYOUT_I400;
 
     int bitdepth = img.p.bpc;
@@ -1141,17 +992,6 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
             allowRGBA1010102 = true;
         }
         format = getHalPixelFormatForBitDepth10(allowRGBA1010102);
-#if !HAVE_LIBYUV_I410_I210_TO_AB30
-        if ((format == HAL_PIXEL_FORMAT_RGBA_1010102) &&
-            (is_img_ready ? img.p.layout == DAV1D_PIXEL_LAYOUT_I420
-                          : buffer->image_format != libgav1::kImageFormatYuv420)) {
-            ALOGE("Only YUV420 output is supported when targeting RGBA_1010102");
-            mSignalledError = true;
-            work->result = C2_OMITTED;
-            work->workletsProcessed = 1u;
-            return false;
-        }
-#endif
     }
 
     if (mHalPixelFormat != format) {
@@ -1206,6 +1046,19 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
     size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
+    CONV_FORMAT_T convFormat;
+    switch (img.p.layout) {
+        case DAV1D_PIXEL_LAYOUT_I444:
+            convFormat = CONV_FORMAT_I444;
+            break;
+        case DAV1D_PIXEL_LAYOUT_I422:
+            convFormat = CONV_FORMAT_I422;
+            break;
+        default:
+            convFormat = CONV_FORMAT_I420;
+            break;
+    }
+
     if (bitdepth == 10) {
         // TODO: b/277797541 - Investigate if we can ask DAV1D to output the required format during
         // decompression to avoid color conversion.
@@ -1217,146 +1070,67 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
         size_t srcVStride = img.stride[1] / 2;
 
         if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
-            bool processed = false;
-#if HAVE_LIBYUV_I410_I210_TO_AB30
-            if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-                libyuv::I410ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                                         dstYStride, &libyuv::kYuvV2020Constants, mWidth, mHeight);
-                processed = true;
-            } else if (img.p.layout == DAV1D_PIXEL_LAYOUT_I422) {
-                libyuv::I210ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                                         dstYStride, &libyuv::kYuvV2020Constants, mWidth, mHeight);
-                processed = true;
-            }
-#endif  // HAVE_LIBYUV_I410_I210_TO_AB30
-            if (!processed) {
-                if (isMonochrome) {
-                    const size_t tmpSize = mWidth;
-                    const bool needFill = tmpSize > mTmpFrameBufferSize;
-                    if (!allocTmpFrameBuffer(tmpSize)) {
-                        ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
-                        setError(work, C2_NO_MEMORY);
-                        return false;
-                    }
-                    srcU = srcV = mTmpFrameBuffer.get();
-                    srcUStride = srcVStride = 0;
-                    if (needFill) {
-                        std::fill_n(mTmpFrameBuffer.get(), tmpSize, 512);
-                    }
+            if (isMonochrome) {
+                const size_t tmpSize = mWidth;
+                const bool needFill = tmpSize > mTmpFrameBufferSize;
+                if (!allocTmpFrameBuffer(tmpSize)) {
+                    ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
+                    setError(work, C2_NO_MEMORY);
+                    return false;
                 }
-                convertYUV420Planar16ToY410OrRGBA1010102(
-                        (uint32_t*)dstY, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
-                        dstYStride / sizeof(uint32_t), mWidth, mHeight,
-                        std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+                srcU = srcV = mTmpFrameBuffer.get();
+                srcUStride = srcVStride = 0;
+                if (needFill) {
+                    std::fill_n(mTmpFrameBuffer.get(), tmpSize, 512);
+                }
             }
+            convertPlanar16ToY410OrRGBA1010102(
+                    dstY, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                    dstYStride, mWidth, mHeight,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects),
+                    convFormat);
         } else if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
             dstYStride /= 2;
             dstUStride /= 2;
             dstVStride /= 2;
-#if LIBYUV_VERSION >= 1779
+            size_t tmpSize = 0;
             if ((img.p.layout == DAV1D_PIXEL_LAYOUT_I444) ||
                 (img.p.layout == DAV1D_PIXEL_LAYOUT_I422)) {
-                // TODO(https://crbug.com/libyuv/952): replace this block with libyuv::I410ToP010
-                // and libyuv::I210ToP010 when they are available. Note it may be safe to alias dstY
-                // in I010ToP010, but the libyuv API doesn't make any guarantees.
-                const size_t tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
+                tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
                 if (!allocTmpFrameBuffer(tmpSize)) {
                     ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
                     setError(work, C2_NO_MEMORY);
                     return false;
                 }
-                uint16_t* const tmpY = mTmpFrameBuffer.get();
-                uint16_t* const tmpU = tmpY + dstYStride * mHeight;
-                uint16_t* const tmpV = tmpU + dstUStride * align(mHeight, 2) / 2;
-                if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-                    libyuv::I410ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
-                                       dstYStride, tmpU, dstUStride, tmpV, dstUStride, mWidth,
-                                       mHeight);
-                } else {
-                    libyuv::I210ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
-                                       dstYStride, tmpU, dstUStride, tmpV, dstUStride, mWidth,
-                                       mHeight);
-                }
-                libyuv::I010ToP010(tmpY, dstYStride, tmpU, dstUStride, tmpV, dstVStride,
-                                   (uint16_t*)dstY, dstYStride, (uint16_t*)dstU, dstUStride, mWidth,
-                                   mHeight);
-            } else {
-                convertYUV420Planar16ToP010((uint16_t*)dstY, (uint16_t*)dstU, srcY, srcU, srcV,
-                                            srcYStride, srcUStride, srcVStride, dstYStride,
-                                            dstUStride, mWidth, mHeight, isMonochrome);
             }
-#else   // LIBYUV_VERSION < 1779
-            convertYUV420Planar16ToP010((uint16_t*)dstY, (uint16_t*)dstU, srcY, srcU, srcV,
-                                        srcYStride, srcUStride, srcVStride, dstYStride, dstUStride,
-                                        mWidth, mHeight, isMonochrome);
-#endif  // LIBYUV_VERSION >= 1779
+            convertPlanar16ToP010((uint16_t*)dstY, (uint16_t*)dstU, srcY, srcU, srcV, srcYStride,
+                                  srcUStride, srcVStride, dstYStride, dstUStride, dstVStride,
+                                  mWidth, mHeight, isMonochrome, convFormat, mTmpFrameBuffer.get(),
+                                  tmpSize);
         } else {
-#if LIBYUV_VERSION >= 1779
+            size_t tmpSize = 0;
             if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-                // TODO(https://crbug.com/libyuv/950): replace this block with libyuv::I410ToI420
-                // when it's available.
-                const size_t tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
+                tmpSize = dstYStride * mHeight + dstUStride * align(mHeight, 2);
                 if (!allocTmpFrameBuffer(tmpSize)) {
                     ALOGE("Error allocating temp conversion buffer (%zu bytes)", tmpSize);
                     setError(work, C2_NO_MEMORY);
                     return false;
                 }
-                uint16_t* const tmpY = mTmpFrameBuffer.get();
-                uint16_t* const tmpU = tmpY + dstYStride * mHeight;
-                uint16_t* const tmpV = tmpU + dstUStride * align(mHeight, 2) / 2;
-                libyuv::I410ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
-                                   dstYStride, tmpU, dstUStride, tmpV, dstVStride, mWidth, mHeight);
-                libyuv::I010ToI420(tmpY, dstYStride, tmpU, dstUStride, tmpV, dstUStride, dstY,
-                                   dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-            } else if (img.p.layout == DAV1D_PIXEL_LAYOUT_I422) {
-                libyuv::I210ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                                   dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-            } else {
-                convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride,
-                                            srcUStride, srcVStride, dstYStride, dstUStride, mWidth,
-                                            mHeight, isMonochrome);
             }
-#else   // LIBYUV_VERSION < 1779
-            convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                        srcVStride, dstYStride, dstUStride, mWidth, mHeight,
-                                        isMonochrome);
-#endif  // LIBYUV_VERSION >= 1779
+            convertPlanar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                  srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight,
+                                  isMonochrome, convFormat, mTmpFrameBuffer.get(), tmpSize);
         }
-
-        // Dump the output buffer if dumping is enabled (debug only).
-#ifdef FILE_DUMP_ENABLE
-        FILE* fp_out = mDav1dOutYuvFile;
 
         // if(mOutputBufferIndex % 100 == 0)
         ALOGV("output a 10bit picture %dx%d from dav1d "
               "(mInputBufferIndex=%d,mOutputBufferIndex=%d,format=%d).",
               mWidth, mHeight, mInputBufferIndex, mOutputBufferIndex, format);
 
-        if (fp_out && mOutputBufferIndex <= num_frames_to_dump) {
-            for (int i = 0; i < mHeight; i++) {
-                int ret = fwrite((uint8_t*)srcY + i * srcYStride * 2, 1, mWidth * 2, fp_out);
-                if (ret != mWidth * 2) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth * 2, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcU + i * srcUStride * 2, 1, mWidth, fp_out);
-                if (ret != mWidth) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcV + i * srcVStride * 2, 1, mWidth, fp_out);
-                if (ret != mWidth) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth, ret);
-                    break;
-                }
-            }
-        }
+        // Dump the output buffer if dumping is enabled (debug only).
+#ifdef FILE_DUMP_ENABLE
+        mC2SoftDav1dDump.dumpOutput<uint16_t>(srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                                              mWidth, mHeight);
 #endif
     } else {
         const uint8_t* srcY = (const uint8_t*)img.data[0];
@@ -1367,51 +1141,19 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
         size_t srcUStride = img.stride[1];
         size_t srcVStride = img.stride[1];
 
-        // Dump the output buffer is dumping is enabled (debug only)
-#ifdef FILE_DUMP_ENABLE
-        FILE* fp_out = mDav1dOutYuvFile;
         // if(mOutputBufferIndex % 100 == 0)
         ALOGV("output a 8bit picture %dx%d from dav1d "
               "(mInputBufferIndex=%d,mOutputBufferIndex=%d,format=%d).",
               mWidth, mHeight, mInputBufferIndex, mOutputBufferIndex, format);
 
-        if (fp_out && mOutputBufferIndex <= num_frames_to_dump) {
-            for (int i = 0; i < mHeight; i++) {
-                int ret = fwrite((uint8_t*)srcY + i * srcYStride, 1, mWidth, fp_out);
-                if (ret != mWidth) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcU + i * srcUStride, 1, mWidth / 2, fp_out);
-                if (ret != mWidth / 2) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth / 2, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcV + i * srcVStride, 1, mWidth / 2, fp_out);
-                if (ret != mWidth / 2) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth / 2, ret);
-                    break;
-                }
-            }
-        }
+        // Dump the output buffer is dumping is enabled (debug only)
+#ifdef FILE_DUMP_ENABLE
+        mC2SoftDav1dDump.dumpOutput<uint8_t>(srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                                             mWidth, mHeight);
 #endif
-        if (img.p.layout == DAV1D_PIXEL_LAYOUT_I444) {
-            libyuv::I444ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                               dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-        } else if (img.p.layout == DAV1D_PIXEL_LAYOUT_I422) {
-            libyuv::I422ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY,
-                               dstYStride, dstU, dstUStride, dstV, dstVStride, mWidth, mHeight);
-        } else {
-            convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                       srcVStride, dstYStride, dstUStride, dstVStride, mWidth,
-                                       mHeight, isMonochrome);
-        }
+        convertPlanar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                             dstYStride, dstUStride, dstVStride, mWidth, mHeight, isMonochrome,
+                             convFormat);
     }
 
     dav1d_picture_unref(&img);
