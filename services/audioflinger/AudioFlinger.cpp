@@ -3023,8 +3023,8 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
                         checkPlaybackThread_l(mPlaybackThreads.keyAt(0));
                 if (dstThread != NULL) {
                     // audioflinger lock is held so order of thread lock acquisition doesn't matter
-                    audio_utils::lock_guard _dl(dstThread->mutex());
-                    audio_utils::lock_guard _sl(playbackThread->mutex());
+                    // Use scoped_lock to avoid deadlock order issues with duplicating threads.
+                    audio_utils::scoped_lock sl(dstThread->mutex(), playbackThread->mutex());
                     Vector<sp<IAfEffectChain>> effectChains = playbackThread->getEffectChains_l();
                     for (size_t i = 0; i < effectChains.size(); i ++) {
                         moveEffectChain_l(effectChains[i]->sessionId(), playbackThread.get(),
@@ -4285,8 +4285,7 @@ status_t AudioFlinger::moveEffects(audio_session_t sessionId, audio_io_handle_t 
         return BAD_VALUE;
     }
 
-    audio_utils::lock_guard _dl(dstThread->mutex());
-    audio_utils::lock_guard _sl(srcThread->mutex());
+    audio_utils::scoped_lock _ll(dstThread->mutex(), srcThread->mutex());
     return moveEffectChain_l(sessionId, srcThread, dstThread);
 }
 
@@ -4426,8 +4425,7 @@ status_t AudioFlinger::moveAuxEffectToIo(int EffectId,
     const sp<IAfPlaybackThread> thread = threadBase ? threadBase->asIAfPlaybackThread() : nullptr;
 
     if (EffectId != 0 && thread != 0 && dstThread != thread.get()) {
-        audio_utils::lock_guard _dl(dstThread->mutex());
-        audio_utils::lock_guard _sl(thread->mutex());
+        audio_utils::scoped_lock _ll(dstThread->mutex(), thread->mutex());
         sp<IAfEffectChain> srcChain = thread->getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
         sp<IAfEffectChain> dstChain;
         if (srcChain == 0) {
