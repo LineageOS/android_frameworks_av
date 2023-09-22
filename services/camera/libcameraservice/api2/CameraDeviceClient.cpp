@@ -1762,11 +1762,11 @@ status_t CameraDeviceClient::setCameraServiceWatchdog(bool enabled) {
     return mDevice->setCameraServiceWatchdog(enabled);
 }
 
-status_t CameraDeviceClient::setRotateAndCropOverride(uint8_t rotateAndCrop) {
+status_t CameraDeviceClient::setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal) {
     if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
 
     return mDevice->setRotateAndCropAutoBehavior(
-        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
+        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop), fromHal);
 }
 
 status_t CameraDeviceClient::setAutoframingOverride(uint8_t autoframingValue) {

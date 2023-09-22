@@ -80,7 +80,7 @@ public:
     status_t initialize(sp<CameraProviderManager> /*manager*/,
             const std::string& /*monitorTags*/) override;
 
-    status_t setRotateAndCropOverride(uint8_t rotateAndCrop) override;
+    status_t setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal = false) override;
 
     status_t setAutoframingOverride(uint8_t autoframingValue) override;
 

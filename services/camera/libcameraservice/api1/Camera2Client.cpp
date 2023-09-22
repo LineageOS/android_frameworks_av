@@ -2342,7 +2342,7 @@ status_t Camera2Client::setCameraServiceWatchdog(bool enabled) {
     return mDevice->setCameraServiceWatchdog(enabled);
 }
 
-status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
+status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal) {
     if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
 
     {
@@ -2356,7 +2356,7 @@ status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
     }
 
     return mDevice->setRotateAndCropAutoBehavior(
-        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
+        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop), fromHal);
 }
 
 status_t Camera2Client::setAutoframingOverride(uint8_t autoframingValue) {

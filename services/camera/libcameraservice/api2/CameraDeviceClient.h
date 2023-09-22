@@ -198,7 +198,8 @@ public:
     virtual status_t      initialize(sp<CameraProviderManager> manager,
             const std::string& monitorTags) override;
 
-    virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop) override;
+    virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop,
+            bool fromHal = false) override;
 
     virtual status_t      setAutoframingOverride(uint8_t autoframingValue) override;
 
