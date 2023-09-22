@@ -2001,7 +2001,9 @@ INSTANTIATE_TEST_SUITE_P(
                                         /*deviceAddress=*/"remote_submix_media"),
                         DPMmapTestParam(MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER,
                                         AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                                        /*deviceAddress=*/"remote_submix_media")));
+                                        /*deviceAddress=*/"remote_submix_media"),
+                        DPMmapTestParam(MIX_ROUTE_FLAG_RENDER, AUDIO_DEVICE_OUT_SPEAKER,
+                                        /*deviceAddress=*/"")));
 
 class AudioPolicyManagerTestDPMixRecordInjection : public AudioPolicyManagerTestDynamicPolicy,
         public testing::WithParamInterface<DPTestParam> {
