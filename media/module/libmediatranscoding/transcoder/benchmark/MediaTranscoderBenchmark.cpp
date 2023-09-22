@@ -615,7 +615,7 @@ void CustomCsvReporter::ReportRuns(const std::vector<Run>& reports) {
 }
 
 void CustomCsvReporter::PrintRunData(const Run& run) {
-    if (run.error_occurred) {
+    if (run.skipped) {
         return;
     }
     std::ostream& Out = GetOutputStream();
