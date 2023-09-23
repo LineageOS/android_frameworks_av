@@ -28,6 +28,7 @@ cc_defaults {
         "libcamera_client",
     ],
     shared_libs: [
+        "camera_platform_flags_c_lib",
         "libbase",
         "libcutils",
         "libutils",

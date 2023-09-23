@@ -396,7 +396,7 @@ template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::vector<hardware::CameraStreamStats>& streamStats,
-        const std::string& userTag, int videoStabilizationMode) {
+        const std::string& userTag, int videoStabilizationMode, bool usedUltraWide) {
     if (mDeviceActive) {
         status_t res = TClientBase::finishCameraStreamingOps();
         if (res != OK) {
@@ -405,7 +405,7 @@ void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         }
         mCameraServiceProxyWrapper->logIdle(TClientBase::mCameraIdStr,
                 requestCount, resultErrorCount, deviceError, userTag, videoStabilizationMode,
-                streamStats);
+                usedUltraWide, streamStats);
     }
     mDeviceActive = false;
 

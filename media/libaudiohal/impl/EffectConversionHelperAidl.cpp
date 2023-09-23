@@ -255,37 +255,37 @@ status_t EffectConversionHelperAidl::handleGetConfig(uint32_t cmdSize __unused,
 status_t EffectConversionHelperAidl::handleReset(uint32_t cmdSize __unused,
                                                  const void* pCmdData __unused, uint32_t* replySize,
                                                  void* pReplyData) {
-    if (!replySize || !pReplyData) {
+    if (!replySize || *replySize != sizeof(int) || !pReplyData) {
         ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
               numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
-    return statusTFromBinderStatus(mEffect->command(CommandId::RESET));
+    return *(int *)pReplyData = statusTFromBinderStatus(mEffect->command(CommandId::RESET));
 }
 
 status_t EffectConversionHelperAidl::handleEnable(uint32_t cmdSize __unused,
                                                   const void* pCmdData __unused,
                                                   uint32_t* replySize, void* pReplyData) {
-    if (!replySize || !pReplyData) {
+    if (!replySize || *replySize != sizeof(int) || !pReplyData) {
         ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
               numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
-    return statusTFromBinderStatus(mEffect->command(CommandId::START));
+    return *(int *)pReplyData = statusTFromBinderStatus(mEffect->command(CommandId::START));
 }
 
 status_t EffectConversionHelperAidl::handleDisable(uint32_t cmdSize __unused,
                                                    const void* pCmdData __unused,
                                                    uint32_t* replySize, void* pReplyData) {
-    if (!replySize || !pReplyData) {
+    if (!replySize || *replySize != sizeof(int) || !pReplyData) {
         ALOGE("%s parameter invalid, replySize %s pReplyData %p", __func__,
               numericPointerToString(replySize).c_str(), pReplyData);
         return BAD_VALUE;
     }
 
-    return statusTFromBinderStatus(mEffect->command(CommandId::STOP));
+    return *(int *)pReplyData = statusTFromBinderStatus(mEffect->command(CommandId::STOP));
 }
 
 status_t EffectConversionHelperAidl::handleSetAudioSource(uint32_t cmdSize, const void* pCmdData,

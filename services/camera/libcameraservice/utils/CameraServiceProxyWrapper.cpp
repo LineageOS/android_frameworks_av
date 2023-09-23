@@ -94,7 +94,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onActive(
 void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
         sp<hardware::ICameraServiceProxy>& proxyBinder,
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
-        const std::string& userTag, int32_t videoStabilizationMode,
+        const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
         const std::vector<hardware::CameraStreamStats>& streamStats) {
     Mutex::Autolock l(mLock);
 
@@ -104,6 +104,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
     mSessionStats.mDeviceError = deviceError;
     mSessionStats.mUserTag = userTag;
     mSessionStats.mVideoStabilizationMode = videoStabilizationMode;
+    mSessionStats.mUsedUltraWide = usedUltraWide;
     mSessionStats.mStreamStats = streamStats;
 
     updateProxyDeviceState(proxyBinder);
@@ -278,7 +279,7 @@ void CameraServiceProxyWrapper::logActive(const std::string& id, float maxPrevie
 
 void CameraServiceProxyWrapper::logIdle(const std::string& id,
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
-        const std::string& userTag, int32_t videoStabilizationMode,
+        const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
         const std::vector<hardware::CameraStreamStats>& streamStats) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
@@ -304,7 +305,7 @@ void CameraServiceProxyWrapper::logIdle(const std::string& id,
 
     sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     sessionStats->onIdle(proxyBinder, requestCount, resultErrorCount, deviceError, userTag,
-            videoStabilizationMode, streamStats);
+            videoStabilizationMode, usedUltraWide, streamStats);
 }
 
 void CameraServiceProxyWrapper::logOpen(const std::string& id, int facing,

@@ -2338,10 +2338,7 @@ void PlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
     dprintf(fd, "  Total writes: %d\n", mNumWrites);
     dprintf(fd, "  Delayed writes: %d\n", mNumDelayedWrites);
     dprintf(fd, "  Blocked in write: %s\n", mInWrite ? "yes" : "no");
-    dprintf(fd, "  Suspend count: %d\n", mSuspended);
-    dprintf(fd, "  Sink buffer : %p\n", mSinkBuffer);
-    dprintf(fd, "  Mixer buffer: %p\n", mMixerBuffer);
-    dprintf(fd, "  Effect buffer: %p\n", mEffectBuffer);
+    dprintf(fd, "  Suspend count: %d\n", (int32_t)mSuspended);
     dprintf(fd, "  Fast track availMask=%#x\n", mFastTrackAvailMask);
     dprintf(fd, "  Standby delay ns=%lld\n", (long long)mStandbyDelayNs);
     AudioStreamOut *output = mOutput;
@@ -2415,6 +2412,7 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
     }
 
     if (isBitPerfect) {
+        audio_utils::lock_guard _l(mutex());
         sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
         if (chain.get() != nullptr) {
             // Bit-perfect is required according to the configuration and preferred mixer
@@ -2842,7 +2840,6 @@ void PlaybackThread::setVolumeForOutput_l(float left, float right) const
 
 // addTrack_l() must be called with ThreadBase::mutex() held
 status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
-NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
 {
     status_t status = ALREADY_EXISTS;
 
@@ -4658,7 +4655,7 @@ void PlaybackThread::collectTimestamps_l()
             // and we use systemTime().
             mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] = mFramesWritten;
             mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = mLastIoBeginNs == -1
-                    ? systemTime() : mLastIoBeginNs;
+                    ? systemTime() : (int64_t)mLastIoBeginNs;
         }
 
         for (const sp<IAfTrack>& t : mActiveTracks) {
@@ -5299,7 +5296,8 @@ bool PlaybackThread::waitingAsyncCallback()
 // shared by MIXER and DIRECT, overridden by DUPLICATING
 void PlaybackThread::threadLoop_standby()
 {
-    ALOGV("Audio hardware entering standby, mixer %p, suspend count %d", this, mSuspended);
+    ALOGV("%s: audio hardware entering standby, mixer %p, suspend count %d",
+            __func__, this, (int32_t)mSuspended);
     mOutput->standby();
     if (mUseAsyncWrite != 0) {
         // discard any pending drain or write ack by incrementing sequence
@@ -6340,7 +6338,7 @@ bool MixerThread::checkForNewParameter_l(const String8& keyValuePair,
 void MixerThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     PlaybackThread::dumpInternals_l(fd, args);
-    dprintf(fd, "  Thread throttle time (msecs): %u\n", mThreadThrottleTimeMs);
+    dprintf(fd, "  Thread throttle time (msecs): %u\n", (uint32_t)mThreadThrottleTimeMs);
     dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
     dprintf(fd, "  Master balance: %f (%s)\n", mMasterBalance.load(),
@@ -7678,8 +7676,13 @@ void DuplicatingThread::removeOutputTrack(IAfPlaybackThread* thread)
             mOutputTracks[i]->destroy();
             mOutputTracks.removeAt(i);
             updateWaitTime_l();
-            if (thread->getOutput() == mOutput) {
-                mOutput = NULL;
+            // NO_THREAD_SAFETY_ANALYSIS
+            // Lambda workaround: as thread != this
+            // we can safely call the remote thread getOutput.
+            const bool equalOutput =
+                    [&](){ return thread->getOutput() == mOutput; }();
+            if (equalOutput) {
+                mOutput = nullptr;
             }
             return;
         }
@@ -10008,25 +10011,27 @@ void MmapThread::onFirstRef()
 void MmapThread::disconnect()
 {
     ActiveTracks<IAfMmapTrack> activeTracks;
+    audio_port_handle_t localPortId;
     {
         audio_utils::lock_guard _l(mutex());
         for (const sp<IAfMmapTrack>& t : mActiveTracks) {
             activeTracks.add(t);
         }
+        localPortId = mPortId;
     }
     for (const sp<IAfMmapTrack>& t : activeTracks) {
         stop(t->portId());
     }
     // This will decrement references and may cause the destruction of this thread.
     if (isOutput()) {
-        AudioSystem::releaseOutput(mPortId);
+        AudioSystem::releaseOutput(localPortId);
     } else {
-        AudioSystem::releaseInput(mPortId);
+        AudioSystem::releaseInput(localPortId);
     }
 }
 
 
-void MmapThread::configure(const audio_attributes_t* attr,
+void MmapThread::configure_l(const audio_attributes_t* attr,
                                                 audio_stream_type_t streamType __unused,
                                                 audio_session_t sessionId,
                                                 const sp<MmapStreamCallback>& callback,
@@ -10043,6 +10048,7 @@ void MmapThread::configure(const audio_attributes_t* attr,
 status_t MmapThread::createMmapBuffer(int32_t minSizeFrames,
                                   struct audio_mmap_buffer_info *info)
 {
+    audio_utils::lock_guard l(mutex());
     if (mHalStream == 0) {
         return NO_INIT;
     }
@@ -10052,6 +10058,7 @@ status_t MmapThread::createMmapBuffer(int32_t minSizeFrames,
 
 status_t MmapThread::getMmapPosition(struct audio_mmap_position* position) const
 {
+    audio_utils::lock_guard l(mutex());
     if (mHalStream == 0) {
         return NO_INIT;
     }
@@ -10079,6 +10086,7 @@ status_t MmapThread::start(const AudioClient& client,
                                          const audio_attributes_t *attr,
                                          audio_port_handle_t *handle)
 {
+    audio_utils::lock_guard l(mutex());
     ALOGV("%s clientUid %d mStandby %d mPortId %d *handle %d", __FUNCTION__,
           client.attributionSource.uid, mStandby, mPortId, *handle);
     if (mHalStream == 0) {
@@ -10089,7 +10097,7 @@ status_t MmapThread::start(const AudioClient& client,
 
     // For the first track, reuse portId and session allocated when the stream was opened.
     if (*handle == mPortId) {
-        acquireWakeLock();
+        acquireWakeLock_l();
         return NO_ERROR;
     }
 
@@ -10099,20 +10107,23 @@ status_t MmapThread::start(const AudioClient& client,
     const AttributionSourceState adjAttributionSource = afutils::checkAttributionSourcePackage(
             client.attributionSource);
 
+    const auto localSessionId = mSessionId;
+    auto localAttr = mAttr;
     if (isOutput()) {
         audio_config_t config = AUDIO_CONFIG_INITIALIZER;
         config.sample_rate = mSampleRate;
         config.channel_mask = mChannelMask;
         config.format = mFormat;
-        audio_stream_type_t stream = streamType();
+        audio_stream_type_t stream = streamType_l();
         audio_output_flags_t flags =
                 (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
         audio_port_handle_t deviceId = mDeviceId;
         std::vector<audio_io_handle_t> secondaryOutputs;
         bool isSpatialized;
         bool isBitPerfect;
-        ret = AudioSystem::getOutputForAttr(&mAttr, &io,
-                                            mSessionId,
+        mutex().unlock();
+        ret = AudioSystem::getOutputForAttr(&localAttr, &io,
+                                            localSessionId,
                                             &stream,
                                             adjAttributionSource,
                                             &config,
@@ -10122,6 +10133,8 @@ status_t MmapThread::start(const AudioClient& client,
                                             &secondaryOutputs,
                                             &isSpatialized,
                                             &isBitPerfect);
+        mutex().lock();
+        mAttr = localAttr;
         ALOGD_IF(!secondaryOutputs.empty(),
                  "MmapThread::start does not support secondary outputs, ignoring them");
     } else {
@@ -10130,14 +10143,17 @@ status_t MmapThread::start(const AudioClient& client,
         config.channel_mask = mChannelMask;
         config.format = mFormat;
         audio_port_handle_t deviceId = mDeviceId;
-        ret = AudioSystem::getInputForAttr(&mAttr, &io,
+        mutex().unlock();
+        ret = AudioSystem::getInputForAttr(&localAttr, &io,
                                               RECORD_RIID_INVALID,
-                                              mSessionId,
+                                              localSessionId,
                                               adjAttributionSource,
                                               &config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ,
                                               &deviceId,
                                               &portId);
+        mutex().lock();
+        // localAttr is const for getInputForAttr.
     }
     // APM should not chose a different input or output stream for the same set of attributes
     // and audo configuration
@@ -10148,18 +10164,20 @@ status_t MmapThread::start(const AudioClient& client,
     }
 
     if (isOutput()) {
+        mutex().unlock();
         ret = AudioSystem::startOutput(portId);
+        mutex().lock();
     } else {
         {
             // Add the track record before starting input so that the silent status for the
             // client can be cached.
-            audio_utils::lock_guard _l(mutex());
             setClientSilencedState_l(portId, false /*silenced*/);
         }
+        mutex().unlock();
         ret = AudioSystem::startInput(portId);
+        mutex().lock();
     }
 
-    audio_utils::lock_guard _l(mutex());
     // abort if start is rejected by audio policy manager
     if (ret != NO_ERROR) {
         ALOGE("%s: error start rejected by AudioPolicyManager = %d", __FUNCTION__, ret);
@@ -10203,7 +10221,7 @@ status_t MmapThread::start(const AudioClient& client,
     mActiveTracks.add(track);
     sp<IAfEffectChain> chain = getEffectChain_l(mSessionId);
     if (chain != 0) {
-        chain->setStrategy(getStrategyForStream(streamType()));
+        chain->setStrategy(getStrategyForStream(streamType_l()));
         chain->incTrackCnt();
         chain->incActiveTrackCnt();
     }
@@ -10225,17 +10243,16 @@ status_t MmapThread::start(const AudioClient& client,
 status_t MmapThread::stop(audio_port_handle_t handle)
 {
     ALOGV("%s handle %d", __FUNCTION__, handle);
+    audio_utils::lock_guard l(mutex());
 
     if (mHalStream == 0) {
         return NO_INIT;
     }
 
     if (handle == mPortId) {
-        releaseWakeLock();
+        releaseWakeLock_l();
         return NO_ERROR;
     }
-
-    audio_utils::lock_guard _l(mutex());
 
     sp<IAfMmapTrack> track;
     for (const sp<IAfMmapTrack>& t : mActiveTracks) {
@@ -10277,8 +10294,10 @@ status_t MmapThread::stop(audio_port_handle_t handle)
 }
 
 status_t MmapThread::standby()
+NO_THREAD_SAFETY_ANALYSIS  // clang bug
 {
     ALOGV("%s", __FUNCTION__);
+    audio_utils::lock_guard(mutex());
 
     if (mHalStream == 0) {
         return NO_INIT;
@@ -10292,7 +10311,7 @@ status_t MmapThread::standby()
         mThreadSnapshot.onEnd();
         mStandby = true;
     }
-    releaseWakeLock();
+    releaseWakeLock_l();
     return NO_ERROR;
 }
 
@@ -10578,6 +10597,7 @@ status_t MmapThread::releaseAudioPatch_l(const audio_patch_handle_t handle)
 }
 
 void MmapThread::toAudioPortConfig(struct audio_port_config* config)
+NO_THREAD_SAFETY_ANALYSIS // mAudioHwDev handle access
 {
     ThreadBase::toAudioPortConfig(config);
     if (isOutput()) {
@@ -10695,7 +10715,6 @@ status_t MmapThread::checkEffectCompatibility_l(
 }
 
 void MmapThread::checkInvalidTracks_l()
-NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
 {
     sp<MmapStreamCallback> callback;
     for (const sp<IAfMmapTrack>& track : mActiveTracks) {
@@ -10793,7 +10812,8 @@ void MmapPlaybackThread::configure(const audio_attributes_t* attr,
                                                 audio_port_handle_t deviceId,
                                                 audio_port_handle_t portId)
 {
-    MmapThread::configure(attr, streamType, sessionId, callback, deviceId, portId);
+    audio_utils::lock_guard l(mutex());
+    MmapThread::configure_l(attr, streamType, sessionId, callback, deviceId, portId);
     mStreamType = streamType;
 }
 
