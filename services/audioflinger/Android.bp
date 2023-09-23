@@ -156,6 +156,7 @@ cc_defaults {
         "libaudiohal",
         "libaudioprocessing",
         "libaudioutils",
+        "libaudioutils_nonvndk",
         "libcutils",
         "libutils",
         "liblog",
