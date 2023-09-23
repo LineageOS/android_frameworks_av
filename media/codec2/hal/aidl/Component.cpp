@@ -301,7 +301,7 @@ ScopedAStatus Component::createBlockPool(
     switch (allocator.getTag()) {
         case ALLOCATOR_ID:
 #ifdef __ANDROID_APEX__
-            status = CreateCodec2BlockPool(
+            status = ::android::CreateCodec2BlockPool(
                     static_cast<::android::C2PlatformAllocatorStore::id_t>(
                             allocator.get<ALLOCATOR_ID>()),
                     mComponent,
@@ -405,18 +405,22 @@ ScopedAStatus Component::configureVideoTunnel(
 }
 
 void Component::initListener(const std::shared_ptr<Component>& self) {
-    std::shared_ptr<C2Component::Listener> c2listener =
-            std::make_shared<Listener>(self);
-    c2_status_t res = mComponent->setListener_vb(c2listener, C2_DONT_BLOCK);
-    if (res != C2_OK) {
-        mInit = res;
-    }
+    if (__builtin_available(android __ANDROID_API_T__, *)) {
+        std::shared_ptr<C2Component::Listener> c2listener =
+                std::make_shared<Listener>(self);
+        c2_status_t res = mComponent->setListener_vb(c2listener, C2_DONT_BLOCK);
+        if (res != C2_OK) {
+            mInit = res;
+        }
 
-    mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
-            AIBinder_DeathRecipient_new(OnBinderDied));
-    mDeathContext = new DeathContext{weak_from_this()};
-    AIBinder_DeathRecipient_setOnUnlinked(mDeathRecipient.get(), OnBinderUnlinked);
-    AIBinder_linkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
+        mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
+                AIBinder_DeathRecipient_new(OnBinderDied));
+        mDeathContext = new DeathContext{weak_from_this()};
+        AIBinder_DeathRecipient_setOnUnlinked(mDeathRecipient.get(), OnBinderUnlinked);
+        AIBinder_linkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
+    } else {
+        mInit = C2_NO_INIT;
+    }
 }
 
 // static

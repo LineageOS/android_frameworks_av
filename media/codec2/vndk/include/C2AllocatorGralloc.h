@@ -46,6 +46,13 @@ C2Handle *WrapNativeCodec2GrallocHandle(
         uint32_t generation = 0, uint64_t igbp_id = 0, uint32_t igbp_slot = 0);
 
 /**
+ * Extract pixel format from the extra data of gralloc handle.
+ *
+ * @return 0 when no valid pixel format exists.
+ */
+uint32_t ExtractFormatFromCodec2GrallocHandle(const C2Handle *const handle);
+
+/**
  * When the gralloc handle is migrated to another bufferqueue, update
  * bufferqueue information.
  *

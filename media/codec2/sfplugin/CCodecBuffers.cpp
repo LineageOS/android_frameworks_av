@@ -18,6 +18,7 @@
 #define LOG_TAG "CCodecBuffers"
 #include <utils/Log.h>
 
+#include <C2AllocatorGralloc.h>
 #include <C2PlatformSupport.h>
 
 #include <media/stagefright/foundation/ADebug.h>
@@ -120,6 +121,10 @@ void CCodecBuffers::handleImageData(const sp<Codec2Buffer> &buffer) {
     }
     buffer->setFormat(mFormatWithImageData);
 }
+
+uint32_t CCodecBuffers::getPixelFormatIfApplicable() { return PIXEL_FORMAT_UNKNOWN; }
+
+bool CCodecBuffers::resetPixelFormatIfApplicable() { return false; }
 
 // InputBuffers
 
@@ -1043,7 +1048,8 @@ GraphicInputBuffers::GraphicInputBuffers(
         const char *componentName, const char *name)
     : InputBuffers(componentName, name),
       mImpl(mName),
-      mLocalBufferPool(LocalBufferPool::Create()) { }
+      mLocalBufferPool(LocalBufferPool::Create()),
+      mPixelFormat(PIXEL_FORMAT_UNKNOWN) { }
 
 bool GraphicInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {
     sp<Codec2Buffer> newBuffer = createNewBuffer();
@@ -1109,8 +1115,16 @@ size_t GraphicInputBuffers::numActiveSlots() const {
 
 sp<Codec2Buffer> GraphicInputBuffers::createNewBuffer() {
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+    mPixelFormat = extractPixelFormat(mFormat);
     return AllocateInputGraphicBuffer(
-            mPool, mFormat, extractPixelFormat(mFormat), usage, mLocalBufferPool);
+            mPool, mFormat, mPixelFormat, usage, mLocalBufferPool);
+}
+
+uint32_t GraphicInputBuffers::getPixelFormatIfApplicable() { return mPixelFormat; }
+
+bool GraphicInputBuffers::resetPixelFormatIfApplicable() {
+    mPixelFormat = PIXEL_FORMAT_UNKNOWN;
+    return true;
 }
 
 // OutputBuffersArray
@@ -1269,6 +1283,8 @@ status_t FlexOutputBuffers::registerBuffer(
     *index = mImpl.assignSlot(newBuffer);
     handleImageData(newBuffer);
     *clientBuffer = newBuffer;
+
+    extractPixelFormatFromC2Buffer(buffer);
     ALOGV("[%s] registered buffer %zu", mName, *index);
     return OK;
 }
@@ -1308,6 +1324,32 @@ std::unique_ptr<OutputBuffersArray> FlexOutputBuffers::toArrayMode(size_t size) 
 size_t FlexOutputBuffers::numActiveSlots() const {
     return mImpl.numActiveSlots();
 }
+
+bool FlexOutputBuffers::extractPixelFormatFromC2Buffer(const std::shared_ptr<C2Buffer> &buffer) {
+    if (buffer == nullptr) {
+        return false;
+    }
+    const C2BufferData &data = buffer->data();
+    // only extract the first pixel format in a metric session.
+    if (mPixelFormat != PIXEL_FORMAT_UNKNOWN || data.type() != C2BufferData::GRAPHIC
+            || data.graphicBlocks().empty()) {
+        return false;
+    }
+    const C2Handle *const handle = data.graphicBlocks().front().handle();
+    uint32_t pf = ExtractFormatFromCodec2GrallocHandle(handle);
+    if (pf == PIXEL_FORMAT_UNKNOWN) {
+        return false;
+    }
+    mPixelFormat = pf;
+    return true;
+}
+
+bool FlexOutputBuffers::resetPixelFormatIfApplicable() {
+    mPixelFormat = PIXEL_FORMAT_UNKNOWN;
+    return true;
+}
+
+uint32_t FlexOutputBuffers::getPixelFormatIfApplicable() { return mPixelFormat; }
 
 // LinearOutputBuffers
 
