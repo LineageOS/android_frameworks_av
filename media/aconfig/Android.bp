@@ -1,0 +1,16 @@
+aconfig_declarations {
+    name: "aconfig_mediacodec_flags",
+    package: "com.android.media.codec.flags",
+    srcs: ["mediacodec_flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "aconfig_mediacodec_flags_java_lib",
+    aconfig_declarations: "aconfig_mediacodec_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "aconfig_mediacodec_flags_c_lib",
+    aconfig_declarations: "aconfig_mediacodec_flags",
+}
