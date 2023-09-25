@@ -17,6 +17,7 @@
 #include <MtpDataPacket.h>
 #include <MtpDevHandle.h>
 #include <MtpPacketFuzzerUtils.h>
+#include <functional>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <utils/String16.h>
 
