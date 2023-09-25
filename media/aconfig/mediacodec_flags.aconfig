@@ -1,0 +1,8 @@
+package: "com.android.media.codec.flags"
+
+flag {
+  name: "large_audio_frame"
+  namespace: "codec_fwk"
+  description: "Feature flags for large audio frame support"
+  bug: "297219557"
+}
