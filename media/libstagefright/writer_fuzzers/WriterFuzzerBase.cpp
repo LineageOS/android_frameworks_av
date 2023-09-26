@@ -226,7 +226,13 @@ void WriterFuzzerBase::sendBuffersToWriter(sp<MediaAdapter> &currentTrack, int32
         mediaBuffer->add_ref();
 
         // This pushBuffer will wait until the mediaBuffer is consumed.
-        if (currentTrack->pushBuffer(mediaBuffer) != OK) {
+        android::status_t pushStatus = currentTrack->pushBuffer(mediaBuffer);
+
+        if (pushStatus != OK) {
+            if (pushStatus == INVALID_OPERATION) {
+                // In Case of INVALID_OPERATION, mObserver needs to be set before calling release()
+                mediaBuffer->setObserver(currentTrack.get());
+            }
             mediaBuffer->release();
         }
     }
