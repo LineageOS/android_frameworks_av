@@ -14,3 +14,9 @@ flag {
      bug: "300515796"
 }
 
+flag {
+     namespace: "camera_platform"
+     name: "camera_manual_flash_strength_control"
+     description: "Flash brightness level control in manual flash mode"
+     bug: "238348881"
+}
