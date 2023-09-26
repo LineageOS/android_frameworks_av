@@ -924,10 +924,8 @@ void CameraService::remapCameraIds(const TCameraIdRemapping& cameraIdRemapping) 
     }
 
     for (auto& clientSp : clientsToDisconnect) {
-        // We send up ERROR_CAMERA_DEVICE so that the app attempts to reconnect
-        // automatically. Note that this itself can cause clientSp->disconnect() based on the
-        // app's response.
-        clientSp->notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DEVICE,
+        // Notify the clients about the disconnection.
+        clientSp->notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
                 CaptureResultExtras{});
     }
 
