@@ -613,6 +613,14 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
                 __FUNCTION__, strerror(-res), res);
         return;
     }
+
+    res = fixupManualFlashStrengthControlTags();
+    if (OK != res) {
+        ALOGE("%s: Unable to fix up manual flash strength control tags: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        return;
+    }
+
     auto stat = addDynamicDepthTags();
     if (OK != stat) {
         ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-stat),
