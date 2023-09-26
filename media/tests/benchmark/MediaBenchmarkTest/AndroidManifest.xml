@@ -20,12 +20,13 @@
     package="com.android.media.benchmark">
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
-    <application
+    <application android:requestLegacyExternalStorage="true"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning,MissingApplicationIcon"
         tools:remove="android:appComponentFactory">
     </application>
-
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="31"/>
     <instrumentation android:name="androidx.test.runner.AndroidJUnitRunner"
             android:targetPackage="com.android.media.benchmark"
             android:label="Benchmark Media Test"/>
