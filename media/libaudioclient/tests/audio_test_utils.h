@@ -28,8 +28,6 @@
 #include <thread>
 
 #include <binder/MemoryDealer.h>
-#include <libxml/parser.h>
-#include <libxml/xinclude.h>
 #include <media/AidlConversion.h>
 #include <media/AudioRecord.h>
 #include <media/AudioTrack.h>
@@ -48,9 +46,6 @@ struct Route {
     std::string sink;
 };
 
-status_t parse_audio_policy_configuration_xml(std::vector<std::string>& attachedDevices,
-                                              std::vector<MixPort>& mixPorts,
-                                              std::vector<Route>& routes);
 status_t listAudioPorts(std::vector<audio_port_v7>& portsVec);
 status_t listAudioPatches(std::vector<struct audio_patch>& patchesVec);
 status_t getPortByAttributes(audio_port_role_t role, audio_port_type_t type,
