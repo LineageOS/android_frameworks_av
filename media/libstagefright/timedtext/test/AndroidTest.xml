@@ -34,6 +34,6 @@
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="TimedTextUnitTest" />
-        <option name="native-test-flag" value="-P /data/local/tmp/TimedTextUnitTest-1.0/" />
+        <option name="native-test-flag" value="-P /sdcard/test/TimedTextUnitTest-1.0/" />
     </test>
 </configuration>
