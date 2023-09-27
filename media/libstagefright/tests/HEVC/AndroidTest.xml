@@ -34,6 +34,6 @@
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="HEVCUtilsUnitTest" />
-        <option name="native-test-flag" value="-P /sdcard/tests/HEVCUtilsUnitTest-1.0/" />
+        <option name="native-test-flag" value="-P /sdcard/test/HEVCUtilsUnitTest-1.0/" />
     </test>
 </configuration>
