@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <sys/eventfd.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <private/android/AHardwareBufferHelpers.h>
@@ -24,6 +25,9 @@
 namespace aidl::android::hardware::media::c2::implementation {
 
 namespace {
+
+static constexpr int kMaxDequeueMin = 1;
+static constexpr int kMaxDequeueMax = ::android::BufferQueueDefs::NUM_BUFFER_SLOTS - 2;
 
 c2_status_t retrieveAHardwareBufferId(const C2ConstGraphicBlock &blk, uint64_t *bid) {
     // TODO
@@ -139,21 +143,26 @@ GraphicsTracker::GraphicsTracker(int maxDequeueCount)
     mDequeueable{maxDequeueCount},
     mTotalDequeued{0}, mTotalCancelled{0}, mTotalDropped{0}, mTotalReleased{0},
     mInConfig{false}, mStopped{false} {
-    if (maxDequeueCount <= 0) {
-        mMaxDequeue = kDefaultMaxDequeue;
-        mMaxDequeueRequested = kDefaultMaxDequeue;
-        mMaxDequeueCommitted = kDefaultMaxDequeue;
-        mDequeueable = kDefaultMaxDequeue;
+    if (maxDequeueCount < kMaxDequeueMin) {
+        mMaxDequeue = kMaxDequeueMin;
+        mMaxDequeueRequested = kMaxDequeueMin;
+        mMaxDequeueCommitted = kMaxDequeueMin;
+        mDequeueable = kMaxDequeueMin;
+    } else if(maxDequeueCount > kMaxDequeueMax) {
+        mMaxDequeue = kMaxDequeueMax;
+        mMaxDequeueRequested = kMaxDequeueMax;
+        mMaxDequeueCommitted = kMaxDequeueMax;
+        mDequeueable = kMaxDequeueMax;
     }
-    int allocEventFd = ::eventfd(mDequeueable, EFD_CLOEXEC | EFD_NONBLOCK | EFD_SEMAPHORE);
-    int statusEventFd = ::eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    int pipefd[2] = { -1, -1};
+    int ret = ::pipe2(pipefd, O_CLOEXEC | O_NONBLOCK);
 
-    mAllocEventFd.reset(allocEventFd);
-    mStopEventFd.reset(statusEventFd);
+    mReadPipeFd.reset(pipefd[0]);
+    mWritePipeFd.reset(pipefd[1]);
 
     mEventQueueThread = std::thread([this](){processEvent();});
 
-    CHECK(allocEventFd >= 0 && statusEventFd >= 0);
+    CHECK(ret >= 0);
     CHECK(mEventQueueThread.joinable());
 }
 
@@ -161,7 +170,6 @@ GraphicsTracker::~GraphicsTracker() {
     stop();
     if (mEventQueueThread.joinable()) {
         std::unique_lock<std::mutex> l(mEventLock);
-        mStopEventThread = true;
         l.unlock();
         mEventCv.notify_one();
         mEventQueueThread.join();
@@ -230,6 +238,11 @@ c2_status_t GraphicsTracker::configureGraphics(
 
 c2_status_t GraphicsTracker::configureMaxDequeueCount(int maxDequeueCount) {
     std::shared_ptr<BufferCache> cache;
+
+    if (maxDequeueCount < kMaxDequeueMin || maxDequeueCount > kMaxDequeueMax) {
+        ALOGE("max dequeue count %d is not valid", maxDequeueCount);
+        return C2_BAD_VALUE;
+    }
 
     // max dequeue count which can be committed to IGBP.
     // (Sometimes maxDequeueCount cannot be committed if the number of
@@ -347,89 +360,76 @@ void GraphicsTracker::updateDequeueConf() {
 
 void GraphicsTracker::stop() {
     bool expected = false;
+    std::unique_lock<std::mutex> l(mEventLock);
     bool updated = mStopped.compare_exchange_strong(expected, true);
     if (updated) {
-        uint64_t val = 1ULL;
-        int ret = ::write(mStopEventFd.get(), &val, 8);
-        if (ret < 0) {
-            // EINTR maybe
-            std::unique_lock<std::mutex> l(mEventLock);
-            mStopRequest = true;
-            l.unlock();
-            mEventCv.notify_one();
-            ALOGW("stop() status update pending");
-        }
+        int writeFd = mWritePipeFd.release();
+        ::close(writeFd);
     }
 }
 
 void GraphicsTracker::writeIncDequeueable(int inc) {
-    uint64_t val = inc;
-    int ret = ::write(mAllocEventFd.get(), &val, 8);
-    if (ret < 0) {
-        // EINTR due to signal handling maybe, this should be rare
+    CHECK(inc > 0 && inc < kMaxDequeueMax);
+    thread_local char buf[kMaxDequeueMax];
+    int diff = 0;
+    {
         std::unique_lock<std::mutex> l(mEventLock);
-        mIncDequeueable += inc;
-        l.unlock();
-        mEventCv.notify_one();
-        ALOGW("updating dequeueable to eventfd pending");
+        if (mStopped) {
+            return;
+        }
+        CHECK(mWritePipeFd.get() >= 0);
+        int ret = ::write(mWritePipeFd.get(), buf, inc);
+        if (ret == inc) {
+            return;
+        }
+        diff = ret < 0 ? inc : inc - ret;
+
+        // Partial write or EINTR. This will not happen in a real scenario.
+        mIncDequeueable += diff;
+        if (mIncDequeueable > 0) {
+            l.unlock();
+            mEventCv.notify_one();
+            ALOGW("updating dequeueable to pipefd pending");
+        }
     }
 }
 
 void GraphicsTracker::processEvent() {
-    // This is for write() failure of eventfds.
-    // write() failure other than EINTR should not happen.
-    int64_t acc = 0;
-    bool stopRequest = false;
-    bool stopCommitted = false;
-
+    // This is for partial/failed writes to the writing end.
+    // This may not happen in the real scenario.
+    thread_local char buf[kMaxDequeueMax];
     while (true) {
-        {
-            std::unique_lock<std::mutex> l(mEventLock);
-            acc += mIncDequeueable;
-            mIncDequeueable = 0;
-            stopRequest |= mStopRequest;
-            mStopRequest = false;
-            if (acc == 0 && stopRequest == stopCommitted) {
-                if (mStopEventThread) {
-                    break;
+        std::unique_lock<std::mutex> l(mEventLock);
+        if (mStopped) {
+            break;
+        }
+        if (mIncDequeueable > 0) {
+            int inc = mIncDequeueable > kMaxDequeueMax ? kMaxDequeueMax : mIncDequeueable;
+            int ret = ::write(mWritePipeFd.get(), buf, inc);
+            int written = ret <= 0 ? 0 : ret;
+            mIncDequeueable -= written;
+            if (mIncDequeueable > 0) {
+                l.unlock();
+                if (ret < 0) {
+                    ALOGE("write to writing end failed %d", errno);
+                } else {
+                    ALOGW("partial write %d(%d)", inc, written);
                 }
-                mEventCv.wait(l);
                 continue;
             }
         }
-
-        if (acc > 0) {
-            int ret = ::write(mAllocEventFd.get(), &acc, 8);
-            if (ret > 0) {
-                acc = 0;
-            }
-        }
-        if (stopRequest && !stopCommitted) {
-            uint64_t val = 1ULL;
-            int ret = ::write(mStopEventFd.get(), &val, 8);
-            if (ret > 0) {
-                stopCommitted = true;
-            }
-        }
-        if (mStopEventThread) {
-            break;
-        }
+        mEventCv.wait(l);
     }
 }
 
-c2_status_t GraphicsTracker::getWaitableFds(int *allocFd, int *statusFd) {
-    *allocFd = ::dup(mAllocEventFd.get());
-    *statusFd = ::dup(mStopEventFd.get());
-
-    if (*allocFd < 0 || *statusFd < 0) {
-        if (*allocFd >= 0) {
-            ::close(*allocFd);
-            *allocFd = -1;
+c2_status_t GraphicsTracker::getWaitableFd(int *pipeFd) {
+    *pipeFd = ::dup(mReadPipeFd.get());
+    if (*pipeFd < 0) {
+        if (mReadPipeFd.get() < 0) {
+            return C2_BAD_STATE;
         }
-        if (*statusFd >= 0) {
-            ::close(*statusFd);
-            *statusFd = -1;
-        }
+        // dup error
+        ALOGE("dup() for the reading end failed %d", errno);
         return C2_NO_MEMORY;
     }
     return C2_OK;
@@ -438,8 +438,8 @@ c2_status_t GraphicsTracker::getWaitableFds(int *allocFd, int *statusFd) {
 c2_status_t GraphicsTracker::requestAllocate(std::shared_ptr<BufferCache> *cache) {
     std::lock_guard<std::mutex> l(mLock);
     if (mDequeueable > 0) {
-        uint64_t val;
-        int ret = ::read(mAllocEventFd.get(), &val, 8);
+        char buf[1];
+        int ret = ::read(mReadPipeFd.get(), buf, 1);
         if (ret < 0) {
             if (errno == EINTR) {
                 // Do we really need to care for cancel due to signal handling?
@@ -451,6 +451,10 @@ c2_status_t GraphicsTracker::requestAllocate(std::shared_ptr<BufferCache> *cache
                 return C2_BLOCKING;
             }
             CHECK(errno != 0);
+        }
+        if (ret == 0) {
+            // writing end is closed
+            return C2_BAD_STATE;
         }
         mDequeueable--;
         *cache = mBufferCache;
