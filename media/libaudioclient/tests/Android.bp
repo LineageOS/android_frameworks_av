@@ -114,7 +114,6 @@ cc_defaults {
         "libnblog",
         "libprocessgroup",
         "libshmemcompat",
-        "libxml2",
         "mediametricsservice-aidl-cpp",
         "packagemanager_aidl-cpp",
         "shared-file-region-aidl-cpp",
