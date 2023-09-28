@@ -1079,7 +1079,8 @@ class FlexOutputBuffers : public OutputBuffers {
 public:
     FlexOutputBuffers(const char *componentName, const char *name = "Output[]")
         : OutputBuffers(componentName, name),
-          mImpl(mName) { }
+          mImpl(mName),
+          mPixelFormat(0) { }
 
     status_t registerBuffer(
             const std::shared_ptr<C2Buffer> &buffer,

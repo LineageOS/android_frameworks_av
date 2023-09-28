@@ -28,7 +28,8 @@ namespace android {
 class InputSurfaceWrapper {
 public:
     InputSurfaceWrapper()
-        : mDataSpace(HAL_DATASPACE_UNKNOWN) {
+        : mDataSpace(HAL_DATASPACE_UNKNOWN),
+          mPixelFormat(PIXEL_FORMAT_UNKNOWN) {
     }
 
     virtual ~InputSurfaceWrapper() = default;
