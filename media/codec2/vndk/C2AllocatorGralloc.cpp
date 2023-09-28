@@ -187,6 +187,14 @@ public:
         return res;
     }
 
+    static uint32_t getPixelFormat(const C2Handle *const handle) {
+        if (handle == nullptr) {
+            return 0;
+        }
+        const ExtraData *xd = GetExtraData(handle);
+        return xd->format;
+    }
+
     static bool MigrateNativeHandle(
             native_handle_t *handle,
             uint32_t generation, uint64_t igbp_id, uint32_t igbp_slot) {
@@ -331,6 +339,10 @@ C2Handle *WrapNativeCodec2GrallocHandle(
         uint32_t generation, uint64_t igbp_id, uint32_t igbp_slot) {
     return C2HandleGralloc::WrapNativeHandle(handle, width, height, format, usage, stride,
                                              generation, igbp_id, igbp_slot);
+}
+
+uint32_t ExtractFormatFromCodec2GrallocHandle(const C2Handle *const handle) {
+    return C2HandleGralloc::getPixelFormat(handle);
 }
 
 bool MigrateNativeCodec2GrallocHandle(
