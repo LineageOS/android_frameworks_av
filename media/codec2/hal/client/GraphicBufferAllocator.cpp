@@ -62,14 +62,12 @@ public:
     return ::ndk::ScopedAStatus::ok();
 }
 
-::ndk::ScopedAStatus GraphicBufferAllocator::getWaitableFds(
-        IGraphicBufferAllocator::WaitableFds* _aidl_return) {
-    int allocFd;
-    int statusFd;
-    c2_status_t ret = mGraphicsTracker->getWaitableFds(&allocFd, &statusFd);
+::ndk::ScopedAStatus GraphicBufferAllocator::getWaitableFd(
+        ::ndk::ScopedFileDescriptor* _aidl_return) {
+    int pipeFd;
+    c2_status_t ret = mGraphicsTracker->getWaitableFd(&pipeFd);
     if (ret == C2_OK) {
-        _aidl_return->allocEvent.set(allocFd);
-        _aidl_return->statusEvent.set(statusFd);
+        _aidl_return->set(pipeFd);
         return ::ndk::ScopedAStatus::ok();
     }
     return ::ndk::ScopedAStatus::fromServiceSpecificError(ret);
