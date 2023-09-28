@@ -39,6 +39,7 @@ struct _C2FenceFactory {
 
     class SurfaceFenceImpl;
     class SyncFenceImpl;
+    class PipeFenceImpl;
 
     /*
      * Create C2Fence for BufferQueueBased blockpool.
@@ -65,6 +66,15 @@ struct _C2FenceFactory {
      *                          It will be owned and closed by the returned fence object.
      */
     static C2Fence CreateMultipleFdSyncFence(const std::vector<int>& fenceFds);
+
+    /*
+     * Create C2Fence from an fd created by pipe()/pipe2() syscall.
+     *
+     * \param fd                An fd representing the write end from a pair of
+     *                          file descriptors which are created by
+     *                          pipe()/pipe2() syscall.
+     */
+    static C2Fence CreatePipeFence(int fd);
 
     /**
      * Create a native handle from fence for marshalling
