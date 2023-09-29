@@ -38,8 +38,8 @@ public:
 
     ::ndk::ScopedAStatus deallocate(int64_t in_id, bool* _aidl_return) override;
 
-    ::ndk::ScopedAStatus getWaitableFds(
-            IGraphicBufferAllocator::WaitableFds* _aidl_return) override;
+    ::ndk::ScopedAStatus getWaitableFd(
+            ::ndk::ScopedFileDescriptor* _aidl_return) override;
 
     /**
      * Configuring Surface/BufferQueue for the interface.
