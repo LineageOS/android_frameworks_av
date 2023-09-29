@@ -437,7 +437,7 @@ public:
         }
         bool hangUp = false;
         bool event = false;
-        if (waitEvent(0, &event, &event)) {
+        if (waitEvent(0, &hangUp, &event)) {
             if (hangUp) {
                 return false;
             }
