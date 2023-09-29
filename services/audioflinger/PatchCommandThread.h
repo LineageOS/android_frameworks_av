@@ -50,10 +50,12 @@ public:
     PatchCommandThread() : Thread(false /* canCallJava */) {}
     ~PatchCommandThread() override;
 
-    void addListener(const sp<PatchCommandListener>& listener);
+    void addListener(const sp<PatchCommandListener>& listener)
+            EXCLUDES_PatchCommandThread_ListenerMutex;
 
-    void createAudioPatch(audio_patch_handle_t handle, const IAfPatchPanel::Patch& patch);
-    void releaseAudioPatch(audio_patch_handle_t handle);
+    void createAudioPatch(audio_patch_handle_t handle, const IAfPatchPanel::Patch& patch)
+            EXCLUDES_PatchCommandThread_Mutex;
+    void releaseAudioPatch(audio_patch_handle_t handle) EXCLUDES_PatchCommandThread_Mutex;
 
     // Thread virtuals
     void onFirstRef() override;
@@ -62,9 +64,8 @@ public:
     void exit();
 
     void createAudioPatchCommand(audio_patch_handle_t handle,
-            const IAfPatchPanel::Patch& patch);
-    void releaseAudioPatchCommand(audio_patch_handle_t handle);
-
+            const IAfPatchPanel::Patch& patch) EXCLUDES_PatchCommandThread_Mutex;
+    void releaseAudioPatchCommand(audio_patch_handle_t handle) EXCLUDES_PatchCommandThread_Mutex;
 private:
     class CommandData;
 
@@ -98,12 +99,16 @@ private:
         audio_patch_handle_t mHandle;
     };
 
-    void sendCommand(const sp<Command>& command);
+    void sendCommand(const sp<Command>& command) EXCLUDES_PatchCommandThread_Mutex;
 
-    audio_utils::mutex& mutex() const { return mMutex; }
-    audio_utils::mutex& listenerMutex() const { return mListenerMutex; }
+    audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::PatchCommandThread_Mutex) {
+        return mMutex;
+    }
+    audio_utils::mutex& listenerMutex() const
+            RETURN_CAPABILITY(audio_utils::PatchCommandThread_ListenerMutex) {
+        return mListenerMutex;
+    }
 
-    std::string mThreadName;
     mutable audio_utils::mutex mMutex;
     audio_utils::condition_variable mWaitWorkCV;
     std::deque<sp<Command>> mCommands GUARDED_BY(mutex()); // list of pending commands
