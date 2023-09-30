@@ -1487,6 +1487,56 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupTorchStrengthTag
     return res;
 }
 
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupManualFlashStrengthControlTags() {
+    status_t res = OK;
+    auto& c = mCameraCharacteristics;
+    auto flashSingleStrengthMaxLevelEntry = c.find(ANDROID_FLASH_SINGLE_STRENGTH_MAX_LEVEL);
+    if (flashSingleStrengthMaxLevelEntry.count == 0) {
+        int32_t flashSingleStrengthMaxLevel = 1;
+        res = c.update(ANDROID_FLASH_SINGLE_STRENGTH_MAX_LEVEL,
+                &flashSingleStrengthMaxLevel, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_FLASH_SINGLE_STRENGTH_MAX_LEVEL: %s (%d)",
+                    __FUNCTION__,strerror(-res), res);
+            return res;
+        }
+    }
+    auto flashSingleStrengthDefaultLevelEntry = c.find(ANDROID_FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL);
+    if (flashSingleStrengthDefaultLevelEntry.count == 0) {
+        int32_t flashSingleStrengthDefaultLevel = 1;
+        res = c.update(ANDROID_FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL,
+                &flashSingleStrengthDefaultLevel, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL: %s (%d)",
+                    __FUNCTION__,strerror(-res), res);
+            return res;
+        }
+    }
+    auto flashTorchStrengthMaxLevelEntry = c.find(ANDROID_FLASH_TORCH_STRENGTH_MAX_LEVEL);
+    if (flashTorchStrengthMaxLevelEntry.count == 0) {
+        int32_t flashTorchStrengthMaxLevel = 1;
+        res = c.update(ANDROID_FLASH_TORCH_STRENGTH_MAX_LEVEL,
+                &flashTorchStrengthMaxLevel, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_FLASH_TORCH_STRENGTH_MAX_LEVEL: %s (%d)",
+                    __FUNCTION__,strerror(-res), res);
+            return res;
+        }
+    }
+    auto flashTorchStrengthDefaultLevelEntry = c.find(ANDROID_FLASH_TORCH_STRENGTH_DEFAULT_LEVEL);
+    if (flashTorchStrengthDefaultLevelEntry.count == 0) {
+        int32_t flashTorchStrengthDefaultLevel = 1;
+        res = c.update(ANDROID_FLASH_TORCH_STRENGTH_DEFAULT_LEVEL,
+                &flashTorchStrengthDefaultLevel, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_FLASH_TORCH_STRENGTH_DEFAULT_LEVEL: %s (%d)",
+                    __FUNCTION__,strerror(-res), res);
+            return res;
+        }
+    }
+    return res;
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags() {
     status_t res = OK;
     auto& c = mCameraCharacteristics;
