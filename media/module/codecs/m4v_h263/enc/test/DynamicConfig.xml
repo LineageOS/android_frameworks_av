@@ -15,7 +15,7 @@
 
 <dynamicConfig>
     <entry key="media_files_url">
-            <value>https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/enc/test/Mpeg4H263Encoder-1.1.zip
+            <value>https://dl.google.com/android-unittest/media/frameworks/av/media/module/codecs/m4v_h263/enc/test/Mpeg4H263Encoder-1.1.zip
             </value>
     </entry>
 </dynamicConfig>
