@@ -11,13 +11,13 @@ mmm frameworks/av/media/tests/benchmark/
 ```
 
 # Resources
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/tests/benchmark/MediaBenchmark.zip)
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/tests/benchmark/MediaBenchmarkTest/MediaBenchmark-1.1.zip)
 
 Download the MediaBenchmark.zip file, unzip and push it to /data/local/tmp/ on the device.
 
 ```
-unzip MediaBenchmark.zip
-adb push MediaBenchmark /data/local/tmp/MediaBenchmark/res/
+unzip MediaBenchmark-1.1.zip
+adb push MediaBenchmark-1.1 /data/local/tmp/MediaBenchmark/res/
 ```
 
 The resource files are assumed to be at /data/local/tmp/MediaBenchmark/res/. You can use a different location, but you have to modify the rest of the instructions to replace /data/local/tmp/MediaBenchmark/res/ with wherever you chose to put the files.
