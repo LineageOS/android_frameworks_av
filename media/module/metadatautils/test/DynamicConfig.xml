@@ -15,6 +15,6 @@
 
 <dynamicConfig>
     <entry key="media_files_url">
-            <value>https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/tests/metadatautils/MetaDataUtilsTestRes-1.1.zip</value>
+            <value>https://dl.google.com/android-unittest/media/frameworks/av/media/module/metadatautils/test/MetaDataUtilsTestRes-1.1.zip</value>
     </entry>
 </dynamicConfig>
