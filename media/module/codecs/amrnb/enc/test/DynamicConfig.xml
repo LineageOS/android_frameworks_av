@@ -15,6 +15,6 @@
 
 <dynamicConfig>
     <entry key="media_files_url">
-            <value>https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/amrnb/enc/test/AmrnbEncoderTest-1.0.zip</value>
+            <value>https://dl.google.com/android-unittest/media/frameworks/av/media/module/codecs/amrnb/enc/test/AmrnbEncoderTest-1.0.zip</value>
     </entry>
 </dynamicConfig>
