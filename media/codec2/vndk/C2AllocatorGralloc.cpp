@@ -246,6 +246,130 @@ public:
     }
 };
 
+class C2HandleAhwb : public C2Handle {
+private:
+    // TODO: remove extradata and use AHardwareBuffer directly.
+    struct ExtraData {
+        uint32_t width;
+        uint32_t height;
+        uint32_t format;
+        uint32_t usage_lo;
+        uint32_t usage_hi;
+        uint32_t stride;
+        uint32_t origId_lo;
+        uint32_t origId_hi;
+        uint32_t magic;
+    };
+
+    enum {
+        NUM_INTS = sizeof(ExtraData) / sizeof(int),
+    };
+    const static uint32_t MAGIC = '\xc2hw\x00';
+
+    static
+    const ExtraData* GetExtraData(const C2Handle *const handle) {
+        if (handle == nullptr
+                || native_handle_is_invalid(handle)
+                || handle->numInts < NUM_INTS) {
+            return nullptr;
+        }
+        return reinterpret_cast<const ExtraData*>(
+                &handle->data[handle->numFds + handle->numInts - NUM_INTS]);
+    }
+
+    static
+    ExtraData *GetExtraData(C2Handle *const handle) {
+        return const_cast<ExtraData *>(GetExtraData(const_cast<const C2Handle *const>(handle)));
+    }
+
+public:
+    void getOrigId(uint64_t *origId) const {
+        const ExtraData *ed = GetExtraData(this);
+        *origId = unsigned(ed->origId_lo) | uint64_t(unsigned(ed->origId_hi)) << 32;
+    }
+
+    static bool IsValid(const C2Handle *const o) {
+        if (o == nullptr) { // null handle is always valid
+            return true;
+        }
+        const ExtraData *xd = GetExtraData(o);
+        // we cannot validate width/height/format/usage without accessing gralloc driver
+        return xd != nullptr && xd->magic == MAGIC;
+    }
+
+    static C2HandleAhwb* WrapAndMoveNativeHandle(
+            const native_handle_t *const handle,
+            uint32_t width, uint32_t height, uint32_t format, uint64_t usage,
+            uint32_t stride, uint64_t origId) {
+        //CHECK(handle != nullptr);
+        if (native_handle_is_invalid(handle) || handle->numInts >
+                int((INT_MAX - handle->version) / sizeof(int)) - NUM_INTS - handle->numFds) {
+            return nullptr;
+        }
+        ExtraData xd = {
+            width, height, format, uint32_t(usage & 0xFFFFFFFF), uint32_t(usage >> 32),
+            stride,  uint32_t(origId & 0xFFFFFFFF), uint32_t(origId >> 32), MAGIC
+        };
+        native_handle_t *res = native_handle_create(handle->numFds, handle->numInts + NUM_INTS);
+        if (res != nullptr) {
+            memcpy(&res->data, &handle->data, sizeof(int) * (handle->numFds + handle->numInts));
+            *GetExtraData(res) = xd;
+        }
+        return reinterpret_cast<C2HandleAhwb *>(res);
+    }
+
+    static C2HandleAhwb* WrapNativeHandle(
+            const native_handle_t *const handle,
+            uint32_t width, uint32_t height, uint32_t format, uint64_t usage,
+            uint32_t stride, uint64_t origId) {
+        if (handle == nullptr) {
+            return nullptr;
+        }
+        native_handle_t *clone = native_handle_clone(handle);
+        if (clone == nullptr) {
+            return nullptr;
+        }
+        C2HandleAhwb *res = WrapAndMoveNativeHandle(
+                clone, width, height, format, usage, stride, origId);
+        if (res == nullptr) {
+            native_handle_close(clone);
+        }
+        native_handle_delete(clone);
+        return res;
+    }
+
+    static native_handle_t* UnwrapNativeHandle(
+            const C2Handle *const handle) {
+        const ExtraData *xd = GetExtraData(handle);
+        if (xd == nullptr || xd->magic != MAGIC) {
+            return nullptr;
+        }
+        native_handle_t *res = native_handle_create(handle->numFds, handle->numInts - NUM_INTS);
+        if (res != nullptr) {
+            memcpy(&res->data, &handle->data, sizeof(int) * (res->numFds + res->numInts));
+        }
+        return res;
+    }
+
+    static const C2HandleAhwb* Import(
+            const C2Handle *const handle,
+            uint32_t *width, uint32_t *height, uint32_t *format,
+            uint64_t *usage, uint32_t *stride,
+            uint64_t *origId) {
+        const ExtraData *xd = GetExtraData(handle);
+        if (xd == nullptr) {
+            return nullptr;
+        }
+        *width = xd->width;
+        *height = xd->height;
+        *format = xd->format;
+        *usage = xd->usage_lo | (uint64_t(xd->usage_hi) << 32);
+        *stride = xd->stride;
+        *origId = xd->origId_lo | (uint64_t(xd->origId_hi) << 32);
+        return reinterpret_cast<const C2HandleAhwb *>(handle);
+    }
+};
+
 static
 c2_status_t Gralloc4Mapper_lock(native_handle_t *handle, uint64_t usage, const Rect& bounds,
         C2PlanarLayout *layout, uint8_t **addr) {
@@ -797,6 +921,7 @@ bool MigrateNativeCodec2GrallocHandle(
 }
 
 
+
 class C2AllocationGralloc : public C2GraphicAllocation {
 public:
     virtual ~C2AllocationGralloc() override;
@@ -863,7 +988,7 @@ C2AllocationGralloc::C2AllocationGralloc(
 
 C2AllocationGralloc::~C2AllocationGralloc() {
     if (mBuffer && mLocked) {
-        // implementation ignores addresss and rect
+        // implementation ignores address and rect
         uint8_t* addr[C2PlanarLayout::MAX_NUM_PLANES] = {};
         unmap(addr, C2Rect(), nullptr);
     }
@@ -1124,4 +1249,321 @@ bool C2AllocatorGralloc::CheckHandle(const C2Handle* const o) {
     return C2HandleGralloc::IsValid(o);
 }
 
+
+native_handle_t *UnwrapNativeCodec2AhwbHandle(const C2Handle *const handle) {
+    return C2HandleAhwb::UnwrapNativeHandle(handle);
+}
+
+C2Handle *WrapNativeCodec2AhwbHandle(
+        const native_handle_t *const handle,
+        uint32_t width, uint32_t height, uint32_t format, uint64_t usage, uint32_t stride,
+        uint64_t origId) {
+    return C2HandleAhwb::WrapNativeHandle(handle, width, height, format, usage, stride,
+                                          origId);
+}
+
+class C2AllocationAhwb : public C2GraphicAllocation {
+public:
+    virtual ~C2AllocationAhwb() override;
+
+    virtual c2_status_t map(
+            C2Rect c2Rect, C2MemoryUsage usage, C2Fence *fence,
+            C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
+    virtual c2_status_t unmap(
+            uint8_t **addr /* nonnull */, C2Rect rect, C2Fence *fence /* nullable */) override;
+    virtual C2Allocator::id_t getAllocatorId() const override { return mAllocatorId; }
+    virtual const C2Handle *handle() const override { return mLockedHandle ? : mHandle; }
+    virtual bool equals(const std::shared_ptr<const C2GraphicAllocation> &other) const override;
+
+    // internal methods
+    // |handle| will be moved.
+
+    C2AllocationAhwb(
+              uint32_t width, uint32_t height,
+              uint32_t format, uint32_t layerCount,
+              uint64_t grallocUsage, uint32_t stride,
+              const C2HandleAhwb *const handle,
+              C2Allocator::id_t allocatorId);
+    int dup() const;
+    c2_status_t status() const;
+
+private:
+    const uint32_t mWidth;
+    const uint32_t mHeight;
+    const uint32_t mFormat;
+    const uint32_t mLayerCount;
+    const uint64_t mGrallocUsage;
+    const uint32_t mStride;
+    const native_handle_t *mRawHandle;
+    const C2HandleAhwb *mHandle;
+    buffer_handle_t mBuffer;
+    const C2HandleAhwb *mLockedHandle;
+    bool mLocked;
+    C2Allocator::id_t mAllocatorId;
+    std::mutex mMappedLock;
+};
+
+C2AllocationAhwb::C2AllocationAhwb(
+          uint32_t width, uint32_t height,
+          uint32_t format, uint32_t layerCount,
+          uint64_t grallocUsage, uint32_t stride,
+          const C2HandleAhwb *const handle,
+          C2Allocator::id_t allocatorId)
+    : C2GraphicAllocation(width, height),
+      mWidth(width),
+      mHeight(height),
+      mFormat(format),
+      mLayerCount(layerCount),
+      mGrallocUsage(grallocUsage),
+      mStride(stride),
+      mRawHandle(C2HandleAhwb::UnwrapNativeHandle(handle)),
+      mHandle(handle),
+      mBuffer(nullptr),
+      mLockedHandle(nullptr),
+      mLocked(false),
+      mAllocatorId(allocatorId) {
+}
+
+C2AllocationAhwb::~C2AllocationAhwb() {
+    if (mBuffer && mLocked) {
+        // implementation ignores address and rect
+        uint8_t* addr[C2PlanarLayout::MAX_NUM_PLANES] = {};
+        unmap(addr, C2Rect(), nullptr);
+    }
+    if (mBuffer) {
+        status_t err = GraphicBufferMapper::get().freeBuffer(mBuffer);
+        if (err) {
+            ALOGE("failed transaction: freeBuffer");
+        }
+    }
+    if (mRawHandle) {
+        native_handle_close(
+                const_cast<native_handle_t *>(
+                        reinterpret_cast<const native_handle_t *>(mRawHandle)));
+        native_handle_delete(
+                const_cast<native_handle_t *>(
+                        reinterpret_cast<const native_handle_t *>(mRawHandle)));
+    }
+    if (mHandle) {
+        native_handle_delete(
+                const_cast<native_handle_t *>(reinterpret_cast<const native_handle_t *>(mHandle)));
+    }
+    if (mLockedHandle) {
+        native_handle_delete(
+                const_cast<native_handle_t *>(
+                        reinterpret_cast<const native_handle_t *>(mLockedHandle)));
+    }
+}
+
+c2_status_t C2AllocationAhwb::map(
+        C2Rect c2Rect, C2MemoryUsage usage, C2Fence *fence,
+        C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) {
+    const Rect rect{(int32_t)c2Rect.left, (int32_t)c2Rect.top,
+                    (int32_t)(c2Rect.left + c2Rect.width) /* right */,
+                    (int32_t)(c2Rect.top + c2Rect.height) /* bottom */};
+
+    uint64_t grallocUsage = static_cast<C2AndroidMemoryUsage>(usage).asGrallocUsage();
+    ALOGV("mapping buffer with usage %#llx => %#llx",
+          (long long)usage.expected, (long long)grallocUsage);
+
+    // TODO
+    (void)fence;
+
+    std::lock_guard<std::mutex> lock(mMappedLock);
+    if (mBuffer && mLocked) {
+        ALOGD("already mapped");
+        return C2_DUPLICATE;
+    }
+    if (!layout || !addr) {
+        ALOGD("wrong param");
+        return C2_BAD_VALUE;
+    }
+
+    if (!mBuffer) {
+        // TODO: libui/libgui dependency removal (b/214400477)
+        status_t err = GraphicBufferMapper::get().importBuffer(
+                            mRawHandle, mWidth, mHeight, mLayerCount,
+                            mFormat, mGrallocUsage, mStride, &mBuffer);
+        if (err) {
+            ALOGE("failed transaction: importBuffer");
+            return C2_CORRUPTED;
+        }
+        if (mBuffer == nullptr) {
+            ALOGD("importBuffer returned null buffer");
+            return C2_CORRUPTED;
+        }
+        uint64_t origId = 0;
+        if (mHandle) {
+            mHandle->getOrigId(&origId);
+        }
+
+        mLockedHandle = C2HandleAhwb::WrapAndMoveNativeHandle(
+                mBuffer, mWidth, mHeight, mFormat, mGrallocUsage,
+                mStride, origId);
+    }
+
+    c2_status_t ret = PopulatePlaneLayout(
+            mBuffer, rect, mFormat, grallocUsage, mStride, layout, addr);
+    if (ret != C2_OK) {
+        return ret;
+    }
+    mLocked = true;
+
+    HandleInterleavedPlanes(layout, addr);
+
+    ALOGV("C2AllocationGralloc::map: layout: type=%d numPlanes=%d rootPlanes=%d",
+          layout->type, layout->numPlanes, layout->rootPlanes);
+    for (int i = 0; i < layout->numPlanes; ++i) {
+        const C2PlaneInfo &plane = layout->planes[i];
+        ALOGV("C2AllocationGralloc::map: plane[%d]: colInc=%d rowInc=%d rootIx=%u offset=%u",
+              i, plane.colInc, plane.rowInc, plane.rootIx, plane.offset);
+    }
+
+    return C2_OK;
+}
+
+c2_status_t C2AllocationAhwb::unmap(
+        uint8_t **addr, C2Rect rect, C2Fence *fence /* nullable */) {
+    // TODO: check addr and size, use fence
+    (void)addr;
+    (void)rect;
+    (void)fence;
+
+    std::lock_guard<std::mutex> lock(mMappedLock);
+    // TODO: fence
+    status_t err = GraphicBufferMapper::get().unlock(mBuffer);
+    if (err) {
+        ALOGE("failed transaction: unlock");
+        return C2_CORRUPTED;
+    }
+
+    mLocked = false;
+    return C2_OK;
+}
+
+bool C2AllocationAhwb::equals(const std::shared_ptr<const C2GraphicAllocation> &other) const {
+    return other && other->handle() == handle();
+}
+
+/* ===================================== AHARDWAREBUFFER ALLOCATOR ============================= */
+class C2AllocatorAhwb::Impl {
+public:
+    Impl(id_t id);
+
+    id_t getId() const {
+        return mTraits->id;
+    }
+
+    C2String getName() const {
+        return mTraits->name;
+    }
+
+    std::shared_ptr<const C2Allocator::Traits> getTraits() const {
+        return mTraits;
+    }
+
+    c2_status_t newGraphicAllocation(
+            uint32_t width, uint32_t height, uint32_t format, const C2MemoryUsage &usage,
+            std::shared_ptr<C2GraphicAllocation> *allocation);
+
+    c2_status_t priorGraphicAllocation(
+            const C2Handle *handle,
+            std::shared_ptr<C2GraphicAllocation> *allocation);
+
+    c2_status_t status() const { return mInit; }
+
+private:
+    std::shared_ptr<C2Allocator::Traits> mTraits;
+    c2_status_t mInit;
+};
+
+void _UnwrapNativeCodec2AhwbMetadata(
+        const C2Handle *const handle,
+        uint32_t *width, uint32_t *height, uint32_t *format,uint64_t *usage, uint32_t *stride,
+        uint64_t *origId) {
+    (void)C2HandleAhwb::Import(handle, width, height, format, usage, stride, origId);
+}
+
+C2AllocatorAhwb::Impl::Impl(id_t id)
+    : mInit(C2_OK) {
+    // TODO: get this from allocator
+    C2MemoryUsage minUsage = { 0, 0 }, maxUsage = { ~(uint64_t)0, ~(uint64_t)0 };
+    Traits traits = { "android.allocator.ahwb", id, C2Allocator::GRAPHIC, minUsage, maxUsage };
+    mTraits = std::make_shared<C2Allocator::Traits>(traits);
+}
+
+c2_status_t C2AllocatorAhwb::Impl::newGraphicAllocation(
+        uint32_t width, uint32_t height, uint32_t format, const C2MemoryUsage &usage,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+    // TODO: for client side usage
+    // HAL side Ahwb allocation should be done via IGBA currently.
+    (void) width;
+    (void) height;
+    (void) format;
+    (void) usage;
+    (void) allocation;
+    return C2_OMITTED;
+}
+
+c2_status_t C2AllocatorAhwb::Impl::priorGraphicAllocation(
+        const C2Handle *handle,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint32_t layerCount = 1;
+    uint64_t grallocUsage;
+    uint32_t stride;
+    uint64_t origId;
+
+    const C2HandleAhwb *ahwbHandle = C2HandleAhwb::Import(
+            handle, &width, &height, &format, &grallocUsage, &stride, &origId);
+    if (ahwbHandle == nullptr) {
+        return C2_BAD_VALUE;
+    }
+
+    allocation->reset(new C2AllocationAhwb(
+            width, height, format, layerCount,
+            grallocUsage, stride, ahwbHandle, mTraits->id));
+    return C2_OK;
+}
+
+C2AllocatorAhwb::C2AllocatorAhwb(id_t id)
+        : mImpl(new Impl(id)) {}
+
+C2AllocatorAhwb::~C2AllocatorAhwb() { delete mImpl; }
+
+C2Allocator::id_t C2AllocatorAhwb::getId() const {
+    return mImpl->getId();
+}
+
+C2String C2AllocatorAhwb::getName() const {
+    return mImpl->getName();
+}
+
+std::shared_ptr<const C2Allocator::Traits> C2AllocatorAhwb::getTraits() const {
+    return mImpl->getTraits();
+}
+
+c2_status_t C2AllocatorAhwb::newGraphicAllocation(
+        uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+    return mImpl->newGraphicAllocation(width, height, format, usage, allocation);
+}
+
+c2_status_t C2AllocatorAhwb::priorGraphicAllocation(
+        const C2Handle *handle,
+        std::shared_ptr<C2GraphicAllocation> *allocation) {
+    return mImpl->priorGraphicAllocation(handle, allocation);
+}
+
+c2_status_t C2AllocatorAhwb::status() const {
+    return mImpl->status();
+}
+
+// static
+bool C2AllocatorAhwb::CheckHandle(const C2Handle* const o) {
+    return C2HandleAhwb::IsValid(o);
+}
 } // namespace android
