@@ -1804,9 +1804,6 @@ public:
 
     bool hasFastMixer() const final { return false; }
 
-            // RefBase
-    void onFirstRef() final;
-
     status_t setRequestedLatencyMode(audio_latency_mode_t mode) final;
 
 protected:
