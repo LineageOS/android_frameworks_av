@@ -19,7 +19,7 @@
         <option name="cleanup" value="false" />
         <option name="push-file" key="{MODULE}" value="/data/local/tmp/{MODULE}" />
         <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libmediatranscoding/transcoder/benchmark/TranscodingBenchmark-1.2.zip?unzip=true"
+            key="https://dl.google.com/android-unittest/media/frameworks/av/media/module/libmediatranscoding/transcoder/benchmark/TranscodingBenchmark-1.2.zip?unzip=true"
             value="/data/local/tmp/TranscodingBenchmark/" />
     </target_preparer>
 
