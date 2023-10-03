@@ -138,11 +138,6 @@ status_t MediaMetadataRetriever::setDataSource(
 }
 
 sp<IMemory> MediaMetadataRetriever::getFrameAtTime(
-        int64_t timeUs, int option, bool metaOnly) {
-    return getFrameAtTime(timeUs, option, HAL_PIXEL_FORMAT_RGB_565, metaOnly);
-}
-
-sp<IMemory> MediaMetadataRetriever::getFrameAtTime(
         int64_t timeUs, int option, int colorFormat, bool metaOnly)
 {
     ALOGV("getFrameAtTime: time(%" PRId64 " us) option(%d) colorFormat(%d) metaOnly(%d)",
@@ -153,11 +148,6 @@ sp<IMemory> MediaMetadataRetriever::getFrameAtTime(
         return NULL;
     }
     return mRetriever->getFrameAtTime(timeUs, option, colorFormat, metaOnly);
-}
-
-sp<IMemory> MediaMetadataRetriever::getImageAtIndex(
-        int index, bool metaOnly, bool thumbnail) {
-    return getImageAtIndex(index, HAL_PIXEL_FORMAT_RGB_565, metaOnly, thumbnail);
 }
 
 sp<IMemory> MediaMetadataRetriever::getImageAtIndex(
@@ -183,11 +173,6 @@ sp<IMemory> MediaMetadataRetriever::getImageRectAtIndex(
     }
     return mRetriever->getImageRectAtIndex(
             index, colorFormat, left, top, right, bottom);
-}
-
-sp<IMemory>  MediaMetadataRetriever::getFrameAtIndex(
-        int index, bool metaOnly) {
-    return getFrameAtIndex(index, HAL_PIXEL_FORMAT_RGB_565, metaOnly);
 }
 
 sp<IMemory>  MediaMetadataRetriever::getFrameAtIndex(
