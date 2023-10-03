@@ -174,6 +174,24 @@ public:
         virtual hardware::hidl_vec<hardware::hidl_string> listServices() override;
     };
 
+    // Proxy to inject fake services in test.
+    class AidlServiceInteractionProxy {
+      public:
+        // Returns the Aidl service with the given serviceName
+        virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+        getAidlService(const std::string& serviceName) = 0;
+
+        virtual ~AidlServiceInteractionProxy() = default;
+    };
+
+    // Standard use case - call into the normal static methods which invoke
+    // the real service manager
+    class AidlServiceInteractionProxyImpl : public AidlServiceInteractionProxy {
+      public:
+        virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+        getAidlService(const std::string& serviceName) override;
+    };
+
     /**
      * Listener interface for device/torch status changes
      */
@@ -209,7 +227,8 @@ public:
      * used for testing. The lifetime of the proxy must exceed the lifetime of the manager.
      */
     status_t initialize(wp<StatusListener> listener,
-            HidlServiceInteractionProxy *hidlProxy = &sHidlServiceInteractionProxy);
+                        HidlServiceInteractionProxy* hidlProxy = &sHidlServiceInteractionProxy,
+                        AidlServiceInteractionProxy* aidlProxy = &sAidlServiceInteractionProxy);
 
     status_t getCameraIdIPCTransport(const std::string &id,
             IPCTransport *providerTransport) const;
@@ -424,6 +443,7 @@ private:
 
     wp<StatusListener> mListener;
     HidlServiceInteractionProxy* mHidlServiceProxy;
+    AidlServiceInteractionProxy* mAidlServiceProxy;
 
     // Current overall Android device physical status
     int64_t mDeviceState;
@@ -432,6 +452,7 @@ private:
     mutable std::mutex mProviderLifecycleLock;
 
     static HidlServiceInteractionProxyImpl sHidlServiceInteractionProxy;
+    static AidlServiceInteractionProxyImpl sAidlServiceInteractionProxy;
 
     struct HalCameraProvider {
       // Empty parent struct for storing either aidl / hidl camera provider reference
@@ -868,6 +889,8 @@ private:
     status_t usbDeviceDetached(const std::string &usbDeviceId);
     ndk::ScopedAStatus onAidlRegistration(const std::string& in_name,
             const ::ndk::SpAIBinder& in_binder);
+
+    static bool isVirtualCameraHalEnabled();
 };
 
 } // namespace android
