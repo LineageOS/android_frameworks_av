@@ -63,6 +63,36 @@ void _UnwrapNativeCodec2GrallocMetadata(
         uint32_t *width, uint32_t *height, uint32_t *format, uint64_t *usage, uint32_t *stride,
         uint32_t *generation, uint64_t *igbp_id, uint32_t *igbp_slot);
 
+/**
+ * Unwrap the native handle from a Codec2 handle allocated by C2AllocatorAhwb.
+ *
+ * @param handle a handle allocated by C2AllocatorAhwb. This includes handles returned for a
+ * graphic block allocation handle based on an AHardwareBuffer.
+ *
+ * @return a new NON-OWNING native handle that must be deleted using native_handle_delete.
+ */
+native_handle_t *UnwrapNativeCodec2AhwbHandle(const C2Handle *const handle);
+
+/**
+ * Wrap the gralloc handle and metadata based on AHardwareBuffer into Codec2 handle
+ * recognized by C2AllocatorAhwb.
+ *
+ * @return a new NON-OWNING C2Handle that must be closed and deleted using native_handle_close and
+ * native_handle_delete.
+ */
+C2Handle *WrapNativeCodec2AhwbHandle(
+        const native_handle_t *const handle,
+        uint32_t width, uint32_t height, uint32_t format, uint64_t usage, uint32_t stride,
+        uint64_t origId);
+
+/**
+ * \todo Get this from the buffer
+ */
+void _UnwrapNativeCodec2AhwbMetadata(
+        const C2Handle *const handle,
+        uint32_t *width, uint32_t *height, uint32_t *format, uint64_t *usage, uint32_t *stride,
+        uint64_t *origId);
+
 class C2AllocatorGralloc : public C2Allocator {
 public:
     virtual id_t getId() const override;
@@ -91,6 +121,53 @@ public:
 
     // deprecated
     static bool isValid(const C2Handle* const o) { return CheckHandle(o); }
+
+private:
+    class Impl;
+    Impl *mImpl;
+};
+
+/**
+ * C2Allocator for AHardwareBuffer based allocation.
+ *
+ * C2Allocator interface is based on C2Handle, which is actually wrapped
+ * native_handle_t. This is based on extracted handle from AHardwareBuffer.
+ * Trying to recover an AHardwareBuffer from C2GraphicAllocation created by the
+ * allocator will creates a new AHardwareBuffer with a different unique Id, but
+ * it is identical and will use same memory by the handle.
+ *
+ * C2GraphicAllocation does not have the original AHardwareBuffer. But
+ * C2GraphicBlock and C2ConstGraphicBlock has the original AHardwareBuffer,
+ * which can be sent to the other processes.
+ *
+ * TODO: Bundle AHardwareBuffer for C2GraphicAllocation.
+ * TODO: Add support for C2AllocatorBlob.
+ */
+class C2AllocatorAhwb : public C2Allocator {
+public:
+    virtual id_t getId() const override;
+
+    virtual C2String getName() const override;
+
+    virtual std::shared_ptr<const Traits> getTraits() const override;
+
+    virtual c2_status_t newGraphicAllocation(
+            uint32_t width, uint32_t height, uint32_t format, C2MemoryUsage usage,
+            std::shared_ptr<C2GraphicAllocation> *allocation) override;
+
+    virtual c2_status_t priorGraphicAllocation(
+            const C2Handle *handle,
+            std::shared_ptr<C2GraphicAllocation> *allocation) override;
+
+    C2AllocatorAhwb(id_t id);
+
+    c2_status_t status() const;
+
+    virtual ~C2AllocatorAhwb() override;
+
+    virtual bool checkHandle(const C2Handle* const o) const override { return CheckHandle(o); }
+
+    static bool CheckHandle(const C2Handle* const o);
 
 private:
     class Impl;
