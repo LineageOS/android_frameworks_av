@@ -37,6 +37,7 @@ namespace android {
 
 namespace flags = com::android::internal::camera::flags;
 namespace SessionConfigurationUtils = ::android::camera3::SessionConfigurationUtils;
+namespace flags = com::android::internal::camera::flags;
 
 using namespace aidl::android::hardware;
 using namespace hardware::camera;
@@ -506,12 +507,15 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
                 __FUNCTION__, strerror(-res), res);
         return;
     }
-    res = fixupManualFlashStrengthControlTags();
-    if (OK != res) {
-        ALOGE("%s: Unable to fix up manual flash strength control tags: %s (%d)",
-                __FUNCTION__, strerror(-res), res);
-        return;
+    if (flags::camera_manual_flash_strength_control()) {
+        res = fixupManualFlashStrengthControlTags();
+        if (OK != res) {
+            ALOGE("%s: Unable to fix up manual flash strength control tags: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return;
+        }
     }
+
     auto stat = addDynamicDepthTags();
     if (OK != stat) {
         ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-stat),
