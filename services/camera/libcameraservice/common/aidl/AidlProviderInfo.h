@@ -49,7 +49,7 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
 
     static void binderDied(void *cookie);
 
-    virtual IPCTransport getIPCTransport() override {return IPCTransport::AIDL;}
+    virtual IPCTransport getIPCTransport() const override {return IPCTransport::AIDL;}
 
     const std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
     startProviderInterface();

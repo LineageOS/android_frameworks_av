@@ -20,3 +20,10 @@ flag {
      description: "Flash brightness level control in manual flash mode"
      bug: "238348881"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "lazy_aidl_wait_for_service"
+     description: "Use waitForService instead of getService with lazy AIDL HALs"
+     bug: "285546208"
+}

@@ -17,6 +17,7 @@
 #include "common/HalConversionsTemplated.h"
 #include "common/CameraProviderInfoTemplated.h"
 
+#include <com_android_internal_camera_flags.h>
 #include <cutils/properties.h>
 
 #include <aidlcommonsupport/NativeHandle.h>
@@ -34,6 +35,7 @@ const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
 
 namespace android {
 
+namespace flags = com::android::internal::camera::flags;
 namespace SessionConfigurationUtils = ::android::camera3::SessionConfigurationUtils;
 
 using namespace aidl::android::hardware;
@@ -99,7 +101,14 @@ AidlProviderInfo::AidlProviderInfo(
 status_t AidlProviderInfo::initializeAidlProvider(
         std::shared_ptr<ICameraProvider>& interface, int64_t currentDeviceState) {
 
-    status_t res = parseProviderName(mProviderName, &mType, &mId);
+    using aidl::android::hardware::camera::provider::ICameraProvider;
+    std::string parsedProviderName = mProviderName;
+    if (flags::lazy_aidl_wait_for_service()) {
+        parsedProviderName =
+                mProviderName.substr(std::string(ICameraProvider::descriptor).size() + 1);
+    }
+
+    status_t res = parseProviderName(parsedProviderName, &mType, &mId);
     if (res != OK) {
         ALOGE("%s: Invalid provider name, ignoring", __FUNCTION__);
         return BAD_VALUE;
@@ -274,10 +283,13 @@ const std::shared_ptr<ICameraProvider> AidlProviderInfo::startProviderInterface(
         if (interface == nullptr) {
             ALOGV("Camera provider actually needs restart, calling getService(%s)",
                   mProviderName.c_str());
-            interface =
-                            ICameraProvider::fromBinder(
-                                    ndk::SpAIBinder(
-                                                AServiceManager_getService(mProviderName.c_str())));
+            AIBinder * binder = nullptr;
+            if (flags::lazy_aidl_wait_for_service()) {
+                binder = AServiceManager_waitForService(mProviderName.c_str());
+            } else {
+                binder = AServiceManager_getService(mProviderName.c_str());
+            }
+            interface = ICameraProvider::fromBinder(ndk::SpAIBinder(binder));
 
             // Set all devices as ENUMERATING, provider should update status
             // to PRESENT after initializing.

@@ -35,6 +35,7 @@
 #include <android/binder_manager.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
+#include <com_android_internal_camera_flags.h>
 #include <functional>
 #include <camera_metadata_hidden.h>
 #include <android-base/parseint.h>
@@ -56,6 +57,8 @@ using android::hardware::camera::common::V1_0::Status;
 using namespace camera3::SessionConfigurationUtils;
 using std::literals::chrono_literals::operator""s;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
+
+namespace flags = com::android::internal::camera::flags;
 
 namespace {
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
@@ -1968,9 +1971,15 @@ CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraI
 status_t CameraProviderManager::tryToInitializeAidlProviderLocked(
         const std::string& providerName, const sp<ProviderInfo>& providerInfo) {
     using aidl::android::hardware::camera::provider::ICameraProvider;
+
+    AIBinder *binder = nullptr;
+    if (flags::lazy_aidl_wait_for_service()) {
+        binder = AServiceManager_waitForService(providerName.c_str());
+    } else {
+        binder = AServiceManager_getService(providerName.c_str());
+    }
     std::shared_ptr<ICameraProvider> interface =
-            ICameraProvider::fromBinder(ndk::SpAIBinder(
-                    AServiceManager_getService(providerName.c_str())));
+            ICameraProvider::fromBinder(ndk::SpAIBinder(binder));
 
     if (interface == nullptr) {
         ALOGW("%s: AIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
@@ -2006,15 +2015,18 @@ status_t CameraProviderManager::addAidlProviderLocked(const std::string& newProv
     bool providerPresent = false;
     bool preexisting =
             (mAidlProviderWithBinders.find(newProvider) != mAidlProviderWithBinders.end());
-
-    // We need to use the extracted provider name here since 'newProvider' has
-    // the fully qualified name of the provider service in case of AIDL. We want
-    // just instance name.
     using aidl::android::hardware::camera::provider::ICameraProvider;
-    std::string extractedProviderName =
+    std::string providerNameUsed  =
             newProvider.substr(std::string(ICameraProvider::descriptor).size() + 1);
+    if (flags::lazy_aidl_wait_for_service()) {
+        // 'newProvider' has the fully qualified name of the provider service in case of AIDL.
+        // ProviderInfo::mProviderName also has the fully qualified name - so we just compare them
+        // here.
+        providerNameUsed = newProvider;
+    }
+
     for (const auto& providerInfo : mProviders) {
-        if (providerInfo->mProviderName == extractedProviderName) {
+        if (providerInfo->mProviderName == providerNameUsed) {
             ALOGW("%s: Camera provider HAL with name '%s' already registered",
                     __FUNCTION__, newProvider.c_str());
             // Do not add new instances for lazy HAL external provider or aidl
@@ -2031,7 +2043,7 @@ status_t CameraProviderManager::addAidlProviderLocked(const std::string& newProv
     }
 
     sp<AidlProviderInfo> providerInfo =
-            new AidlProviderInfo(extractedProviderName, providerInstance, this);
+            new AidlProviderInfo(providerNameUsed, providerInstance, this);
 
     if (!providerPresent) {
         status_t res = tryToInitializeAidlProviderLocked(newProvider, providerInfo);
@@ -2111,6 +2123,9 @@ status_t CameraProviderManager::removeProvider(const std::string& provider) {
             if (providerInfo->mProviderName == removedProviderName) {
                 IPCTransport providerTransport = providerInfo->getIPCTransport();
                 std::string removedAidlProviderName = getFullAidlProviderName(removedProviderName);
+                if (flags::lazy_aidl_wait_for_service()) {
+                    removedAidlProviderName = removedProviderName;
+                }
                 switch(providerTransport) {
                     case IPCTransport::HIDL:
                         return tryToInitializeHidlProviderLocked(removedProviderName, providerInfo);
@@ -2280,7 +2295,13 @@ void CameraProviderManager::ProviderInfo::removeAllDevices() {
 }
 
 bool CameraProviderManager::ProviderInfo::isExternalLazyHAL() const {
-    return kEnableLazyHal && (mProviderName == kExternalProviderName);
+    std::string providerName = mProviderName;
+    if (flags::lazy_aidl_wait_for_service() && getIPCTransport() == IPCTransport::AIDL) {
+        using aidl::android::hardware::camera::provider::ICameraProvider;
+        providerName =
+                mProviderName.substr(std::string(ICameraProvider::descriptor).size() + 1);
+    }
+    return kEnableLazyHal && (providerName == kExternalProviderName);
 }
 
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
