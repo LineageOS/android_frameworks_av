@@ -2212,7 +2212,9 @@ status_t MediaCodec::configure(
         mediametrics_setInt32(nextMetricsHandle, kCodecEncoder,
                               (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
 
-        mediametrics_setCString(nextMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
+        if (!mLogSessionId.empty()) {
+            mediametrics_setCString(nextMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
+        }
 
         // moved here from ::init()
         mediametrics_setCString(nextMetricsHandle, kCodecCodec, mInitName.c_str());

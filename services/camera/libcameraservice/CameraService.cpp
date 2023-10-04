@@ -47,6 +47,7 @@
 #include <binder/PermissionController.h>
 #include <binder/IResultReceiver.h>
 #include <binderthreadstate/CallerUtils.h>
+#include <com_android_internal_camera_flags.h>
 #include <cutils/atomic.h>
 #include <cutils/properties.h>
 #include <cutils/misc.h>
@@ -105,6 +106,7 @@ using hardware::camera2::ICameraInjectionCallback;
 using hardware::camera2::ICameraInjectionSession;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 using hardware::camera2::utils::ConcurrentCameraIdCombination;
+namespace flags = com::android::internal::camera::flags;
 
 // ----------------------------------------------------------------------------
 // Logging support -- this is for debugging only
@@ -1648,7 +1650,6 @@ Status CameraService::validateClientPermissionsLocked(const std::string& cameraI
                 callingUid, procState);
     }
 
-
     // Automotive privileged client AID_AUTOMOTIVE_EVS using exterior system camera for use cases
     // such as rear view and surround view cannot be disabled and are exempt from sensor privacy
     // policy. In all other cases,if sensor privacy is enabled then prevent access to the camera.
@@ -1680,16 +1681,18 @@ Status CameraService::validateClientPermissionsLocked(const std::string& cameraI
                 clientUserId, cameraId.c_str());
     }
 
-    // If the System User tries to access the camera when the device is running in
-    // headless system user mode, ensure that client has the required permission
-    // CAMERA_HEADLESS_SYSTEM_USER.
-    if (isHeadlessSystemUserMode() && (clientUserId == USER_SYSTEM) &&
-            !hasPermissionsForCameraHeadlessSystemUser(cameraId, callingPid, callingUid)) {
-        ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
-        return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
-                "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" as Headless System User\
-                without camera headless system user permission",
-                clientName.c_str(), clientUid, clientPid, cameraId.c_str());
+    if (flags::camera_hsum_permission()) {
+        // If the System User tries to access the camera when the device is running in
+        // headless system user mode, ensure that client has the required permission
+        // CAMERA_HEADLESS_SYSTEM_USER.
+        if (isHeadlessSystemUserMode() && (clientUserId == USER_SYSTEM) &&
+                !hasPermissionsForCameraHeadlessSystemUser(cameraId, callingPid, callingUid)) {
+            ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
+            return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
+                    "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" as Headless System \
+                    User without camera headless system user permission",
+                    clientName.c_str(), clientUid, clientPid, cameraId.c_str());
+        }
     }
 
     return Status::ok();
