@@ -72,6 +72,12 @@ std::string tokenizer(std::string::const_iterator& it,
 std::vector<std::string> split(const std::string& flags, const char *delim);
 
 /**
+ * Parses a vector of integers using ',' '{' and '}' as delimeters. Leaves
+ * vector unmodified if the parsing fails.
+ */
+bool parseVector(const std::string &str, std::vector<int32_t> *vector);
+
+/**
  * Parse the devices string and return a vector of device address pairs.
  *
  * A failure to parse returns early with the contents that were able to be parsed.

@@ -24,6 +24,7 @@
 #include <android/binder_manager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/PermissionCache.h>
+#include <cutils/properties.h>
 #include <utils/Log.h>
 
 #include "TunerHelper.h"
@@ -46,7 +47,6 @@ using ::aidl::android::hardware::tv::tuner::FrontendIsdbtCapabilities;
 using ::aidl::android::hardware::tv::tuner::FrontendIsdbtTimeInterleaveMode;
 using ::aidl::android::hardware::tv::tuner::FrontendType;
 using ::aidl::android::hardware::tv::tuner::Result;
-using ::aidl::android::media::tv::tunerresourcemanager::TunerFrontendInfo;
 using ::android::IPCThreadState;
 using ::android::PermissionCache;
 using ::android::hardware::hidl_vec;
@@ -63,47 +63,9 @@ namespace media {
 namespace tv {
 namespace tuner {
 
-shared_ptr<TunerHidlService> TunerHidlService::sTunerService = nullptr;
-
 TunerHidlService::TunerHidlService() {
-    if (!TunerHelper::checkTunerFeature()) {
-        ALOGD("Device doesn't have tuner hardware.");
-        return;
-    }
-
-    updateTunerResources();
-}
-
-TunerHidlService::~TunerHidlService() {
-    mOpenedFrontends.clear();
-    mLnaStatus = -1;
-}
-
-binder_status_t TunerHidlService::instantiate() {
-    if (HidlITuner::getService() == nullptr) {
-        ALOGD("Failed to get ITuner HIDL HAL");
-        return STATUS_NAME_NOT_FOUND;
-    }
-
-    sTunerService = ::ndk::SharedRefBase::make<TunerHidlService>();
-    return AServiceManager_addService(sTunerService->asBinder().get(), getServiceName());
-}
-
-shared_ptr<TunerHidlService> TunerHidlService::getTunerService() {
-    return sTunerService;
-}
-
-bool TunerHidlService::hasITuner() {
-    ALOGV("hasITuner");
-    if (mTuner != nullptr) {
-        return true;
-    }
-
     mTuner = HidlITuner::getService();
-    if (mTuner == nullptr) {
-        ALOGE("Failed to get ITuner service");
-        return false;
-    }
+    ALOGE_IF(mTuner == nullptr, "Failed to get ITuner service");
     mTunerVersion = TUNER_HAL_VERSION_1_0;
 
     mTuner_1_1 = ::android::hardware::tv::tuner::V1_1::ITuner::castFrom(mTuner);
@@ -113,23 +75,35 @@ bool TunerHidlService::hasITuner() {
         ALOGD("Failed to get ITuner_1_1 service");
     }
 
-    return true;
+    // Register tuner resources to TRM.
+    updateTunerResources();
 }
 
-bool TunerHidlService::hasITuner_1_1() {
-    ALOGV("hasITuner_1_1");
-    hasITuner();
-    return (mTunerVersion == TUNER_HAL_VERSION_1_1);
+TunerHidlService::~TunerHidlService() {
+    mOpenedFrontends.clear();
+    mLnaStatus = -1;
+    mTuner = nullptr;
+    mTuner_1_1 = nullptr;
+}
+
+binder_status_t TunerHidlService::instantiate() {
+    if (HidlITuner::getService() == nullptr) {
+        ALOGD("Failed to get ITuner HIDL HAL");
+        return STATUS_NAME_NOT_FOUND;
+    }
+
+    shared_ptr<TunerHidlService> tunerService = ::ndk::SharedRefBase::make<TunerHidlService>();
+    bool lazyHal = property_get_bool("ro.tuner.lazyhal", false);
+    if (lazyHal) {
+        return AServiceManager_registerLazyService(tunerService->asBinder().get(),
+                                                   getServiceName());
+    }
+    return AServiceManager_addService(tunerService->asBinder().get(), getServiceName());
 }
 
 ::ndk::ScopedAStatus TunerHidlService::openDemux(int32_t /* in_demuxHandle */,
                                                  shared_ptr<ITunerDemux>* _aidl_return) {
     ALOGV("openDemux");
-    if (!hasITuner()) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res;
     uint32_t id;
     sp<IDemux> demuxSp = nullptr;
@@ -140,7 +114,8 @@ bool TunerHidlService::hasITuner_1_1() {
         ALOGD("open demux, id = %d", demuxId);
     });
     if (res == HidlResult::SUCCESS) {
-        *_aidl_return = ::ndk::SharedRefBase::make<TunerHidlDemux>(demuxSp, id);
+        *_aidl_return = ::ndk::SharedRefBase::make<TunerHidlDemux>(demuxSp, id,
+                                                                   this->ref<TunerHidlService>());
         return ::ndk::ScopedAStatus::ok();
     }
 
@@ -148,13 +123,22 @@ bool TunerHidlService::hasITuner_1_1() {
     return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
 }
 
+::ndk::ScopedAStatus TunerHidlService::getDemuxInfo(int32_t /* in_demuxHandle */,
+                                                    DemuxInfo* /* _aidl_return */) {
+    ALOGE("getDemuxInfo is not supported");
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(HidlResult::UNAVAILABLE));
+}
+
+::ndk::ScopedAStatus TunerHidlService::getDemuxInfoList(
+        vector<DemuxInfo>* /* _aidle_return */) {
+    ALOGE("getDemuxInfoList is not supported");
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(HidlResult::UNAVAILABLE));
+}
+
 ::ndk::ScopedAStatus TunerHidlService::getDemuxCaps(DemuxCapabilities* _aidl_return) {
     ALOGV("getDemuxCaps");
-    if (!hasITuner()) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res;
     HidlDemuxCapabilities caps;
     mTuner->getDemuxCaps([&](HidlResult r, const HidlDemuxCapabilities& demuxCaps) {
@@ -171,11 +155,6 @@ bool TunerHidlService::hasITuner_1_1() {
 }
 
 ::ndk::ScopedAStatus TunerHidlService::getFrontendIds(vector<int32_t>* ids) {
-    if (!hasITuner()) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     hidl_vec<HidlFrontendId> feIds;
     HidlResult res = getHidlFrontendIds(feIds);
     if (res != HidlResult::SUCCESS) {
@@ -188,12 +167,6 @@ bool TunerHidlService::hasITuner_1_1() {
 }
 
 ::ndk::ScopedAStatus TunerHidlService::getFrontendInfo(int32_t id, FrontendInfo* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGE("ITuner service is not init.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlFrontendInfo info;
     HidlResult res = getHidlFrontendInfo(id, info);
     if (res != HidlResult::SUCCESS) {
@@ -202,7 +175,7 @@ bool TunerHidlService::hasITuner_1_1() {
 
     HidlFrontendDtmbCapabilities dtmbCaps;
     if (static_cast<HidlFrontendType>(info.type) == HidlFrontendType::DTMB) {
-        if (!hasITuner_1_1()) {
+        if (mTuner_1_1 == nullptr) {
             ALOGE("ITuner_1_1 service is not init.");
             return ::ndk::ScopedAStatus::fromServiceSpecificError(
                     static_cast<int32_t>(Result::UNAVAILABLE));
@@ -224,12 +197,6 @@ bool TunerHidlService::hasITuner_1_1() {
 
 ::ndk::ScopedAStatus TunerHidlService::openFrontend(int32_t frontendHandle,
                                                     shared_ptr<ITunerFrontend>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGE("ITuner service is not init.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status;
     sp<HidlIFrontend> frontend;
     int id = TunerHelper::getResourceIdFromHandle(frontendHandle, FRONTEND);
@@ -241,8 +208,8 @@ bool TunerHidlService::hasITuner_1_1() {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
     }
 
-    shared_ptr<TunerHidlFrontend> tunerFrontend =
-            ::ndk::SharedRefBase::make<TunerHidlFrontend>(frontend, id);
+    shared_ptr<TunerHidlFrontend> tunerFrontend = ::ndk::SharedRefBase::make<TunerHidlFrontend>(
+            frontend, id, this->ref<TunerHidlService>());
     if (mLnaStatus != -1) {
         tunerFrontend->setLna(mLnaStatus == 1);
     }
@@ -255,12 +222,6 @@ bool TunerHidlService::hasITuner_1_1() {
 }
 
 ::ndk::ScopedAStatus TunerHidlService::openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGD("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status;
     sp<HidlILnb> lnb;
     int id = TunerHelper::getResourceIdFromHandle(lnbHandle, LNB);
@@ -278,12 +239,6 @@ bool TunerHidlService::hasITuner_1_1() {
 
 ::ndk::ScopedAStatus TunerHidlService::openLnbByName(const string& lnbName,
                                                      shared_ptr<ITunerLnb>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGE("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     int lnbId;
     HidlResult status;
     sp<HidlILnb> lnb;
@@ -302,12 +257,6 @@ bool TunerHidlService::hasITuner_1_1() {
 
 ::ndk::ScopedAStatus TunerHidlService::openDescrambler(
         int32_t /*descramblerHandle*/, shared_ptr<ITunerDescrambler>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGD("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status;
     sp<HidlIDescrambler> descrambler;
     //int id = TunerHelper::getResourceIdFromHandle(descramblerHandle, DESCRAMBLER);
@@ -324,7 +273,6 @@ bool TunerHidlService::hasITuner_1_1() {
 }
 
 ::ndk::ScopedAStatus TunerHidlService::getTunerHalVersion(int* _aidl_return) {
-    hasITuner();
     *_aidl_return = mTunerVersion;
     return ::ndk::ScopedAStatus::ok();
 }
@@ -332,7 +280,7 @@ bool TunerHidlService::hasITuner_1_1() {
 ::ndk::ScopedAStatus TunerHidlService::openSharedFilter(
         const string& in_filterToken, const shared_ptr<ITunerFilterCallback>& in_cb,
         shared_ptr<ITunerFilter>* _aidl_return) {
-    if (!hasITuner()) {
+    if (mTuner == nullptr) {
         ALOGE("get ITuner failed");
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::UNAVAILABLE));
@@ -368,8 +316,13 @@ bool TunerHidlService::hasITuner_1_1() {
     return ::ndk::ScopedAStatus::ok();
 }
 
+::ndk::ScopedAStatus TunerHidlService::isLnaSupported(bool* /* _aidl_return */) {
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(
+            static_cast<int32_t>(Result::UNAVAILABLE));
+}
+
 ::ndk::ScopedAStatus TunerHidlService::setLna(bool bEnable) {
-    if (!hasITuner()) {
+    if (mTuner == nullptr) {
         ALOGE("get ITuner failed");
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::UNAVAILABLE));
@@ -428,11 +381,6 @@ void TunerHidlService::removeFrontend(const shared_ptr<TunerHidlFrontend>& front
 }
 
 void TunerHidlService::updateTunerResources() {
-    if (!hasITuner()) {
-        ALOGE("Failed to updateTunerResources");
-        return;
-    }
-
     TunerHelper::updateTunerResources(getTRMFrontendInfos(), getTRMLnbHandles());
 }
 

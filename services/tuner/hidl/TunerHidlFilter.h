@@ -114,6 +114,8 @@ using AidlMQDesc = MQDescriptor<int8_t, SynchronizedReadWrite>;
 const static int IP_V4_LENGTH = 4;
 const static int IP_V6_LENGTH = 16;
 
+class TunerHidlService;
+
 class TunerHidlFilter : public BnTunerFilter {
 public:
     class FilterCallback : public HidlIFilterCallback {
@@ -165,7 +167,8 @@ public:
         Mutex mCallbackLock;
     };
 
-    TunerHidlFilter(sp<HidlIFilter> filter, sp<FilterCallback> cb, DemuxFilterType type);
+    TunerHidlFilter(const sp<HidlIFilter> filter, const sp<FilterCallback> cb,
+                    const DemuxFilterType type, const shared_ptr<TunerHidlService> tuner);
     virtual ~TunerHidlFilter();
 
     ::ndk::ScopedAStatus getId(int32_t* _aidl_return) override;
@@ -230,6 +233,7 @@ private:
     int32_t mClientPid;
     sp<FilterCallback> mFilterCallback;
     Mutex mLock;
+    shared_ptr<TunerHidlService> mTunerService;
 };
 
 }  // namespace tuner

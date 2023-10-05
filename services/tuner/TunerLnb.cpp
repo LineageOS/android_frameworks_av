@@ -36,18 +36,13 @@ TunerLnb::TunerLnb(shared_ptr<ILnb> lnb, int id) {
 }
 
 TunerLnb::~TunerLnb() {
+    close();
     mLnb = nullptr;
     mId = -1;
 }
 
 ::ndk::ScopedAStatus TunerLnb::setCallback(
         const shared_ptr<ITunerLnbCallback>& in_tunerLnbCallback) {
-    if (mLnb == nullptr) {
-        ALOGE("ILnb is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (in_tunerLnbCallback == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -59,56 +54,23 @@ TunerLnb::~TunerLnb() {
 }
 
 ::ndk::ScopedAStatus TunerLnb::setVoltage(LnbVoltage in_voltage) {
-    if (mLnb == nullptr) {
-        ALOGE("ILnb is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mLnb->setVoltage(in_voltage);
 }
 
 ::ndk::ScopedAStatus TunerLnb::setTone(LnbTone in_tone) {
-    if (mLnb == nullptr) {
-        ALOGE("ILnb is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mLnb->setTone(in_tone);
 }
 
 ::ndk::ScopedAStatus TunerLnb::setSatellitePosition(LnbPosition in_position) {
-    if (mLnb == nullptr) {
-        ALOGE("ILnb is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mLnb->setSatellitePosition(in_position);
 }
 
 ::ndk::ScopedAStatus TunerLnb::sendDiseqcMessage(const vector<uint8_t>& in_diseqcMessage) {
-    if (mLnb == nullptr) {
-        ALOGE("ILnb is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mLnb->sendDiseqcMessage(in_diseqcMessage);
 }
 
 ::ndk::ScopedAStatus TunerLnb::close() {
-    if (mLnb == nullptr) {
-        ALOGE("ILnb is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
-    auto res = mLnb->close();
-    mLnb = nullptr;
-
-    return res;
+    return mLnb->close();
 }
 
 /////////////// ILnbCallback ///////////////////////

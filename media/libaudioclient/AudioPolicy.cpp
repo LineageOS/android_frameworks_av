@@ -57,6 +57,10 @@ status_t AudioMixMatchCriterion::readFromParcel(Parcel *parcel)
     case RULE_EXCLUDE_USERID:
         mValue.mUserId = (int) parcel->readInt32();
         break;
+    case RULE_MATCH_AUDIO_SESSION_ID:
+    case RULE_EXCLUDE_AUDIO_SESSION_ID:
+        mValue.mAudioSessionId = (audio_session_t) parcel->readInt32();
+        break;
     default:
         ALOGE("Trying to build AudioMixMatchCriterion from unknown rule %d", mRule);
         return BAD_VALUE;
@@ -199,9 +203,10 @@ bool AudioMix::hasUserIdRule(bool match, int userId) const {
     return false;
 }
 
-bool AudioMix::hasMatchUserIdRule() const {
+bool AudioMix::hasUserIdRule(bool match) const {
+    const uint32_t rule = match ? RULE_MATCH_USERID : RULE_EXCLUDE_USERID;
     for (size_t i = 0; i < mCriteria.size(); i++) {
-        if (mCriteria[i].mRule == RULE_MATCH_USERID) {
+        if (mCriteria[i].mRule == rule) {
             return true;
         }
     }
@@ -210,7 +215,7 @@ bool AudioMix::hasMatchUserIdRule() const {
 
 bool AudioMix::isDeviceAffinityCompatible() const {
     return ((mMixType == MIX_TYPE_PLAYERS)
-            && (mRouteFlags == MIX_ROUTE_FLAG_RENDER));
+            && ((mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER));
 }
 
 } // namespace android

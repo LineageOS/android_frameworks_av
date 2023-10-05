@@ -1814,7 +1814,8 @@ int Antagonizer::callbackThread(void* user)
 MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId,
         const AttributionSourceState& attributionSource, const audio_attributes_t* attr,
         const sp<AudioSystem::AudioDeviceCallback>& deviceCallback)
-    : mCallback(NULL),
+    : mCachedPlayerIId(PLAYER_PIID_INVALID),
+      mCallback(NULL),
       mCallbackCookie(NULL),
       mCallbackData(NULL),
       mStreamType(AUDIO_STREAM_MUSIC),
@@ -2322,6 +2323,10 @@ status_t MediaPlayerService::AudioOutput::open(
         return t->applyVolumeShaper(shaper.mConfiguration, operationToEnd);
     });
 
+    if (mCachedPlayerIId != PLAYER_PIID_INVALID) {
+        t->setPlayerIId(mCachedPlayerIId);
+    }
+
     mSampleRateHz = sampleRate;
     mFlags = flags;
     mMsecsPerFrame = 1E3f / (mPlaybackRate.mSpeed * sampleRate);
@@ -2372,6 +2377,17 @@ status_t MediaPlayerService::AudioOutput::start()
         return status;
     }
     return NO_INIT;
+}
+
+void MediaPlayerService::AudioOutput::setPlayerIId(int32_t playerIId)
+{
+    ALOGV("setPlayerIId(%d)", playerIId);
+    Mutex::Autolock lock(mLock);
+    mCachedPlayerIId = playerIId;
+
+    if (mTrack != nullptr) {
+        mTrack->setPlayerIId(mCachedPlayerIId);
+    }
 }
 
 void MediaPlayerService::AudioOutput::setNextOutput(const sp<AudioOutput>& nextOutput) {

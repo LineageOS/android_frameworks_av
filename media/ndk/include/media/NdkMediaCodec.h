@@ -63,11 +63,41 @@ struct AMediaCodecBufferInfo {
 typedef struct AMediaCodecBufferInfo AMediaCodecBufferInfo;
 typedef struct AMediaCodecCryptoInfo AMediaCodecCryptoInfo;
 
+
+/**
+ * Definitions of per-buffer flags for operation with NdkMediaCodec.
+ *
+ * The semantics of these enums match those of the same name
+ * in {@link android.media.MediaCodec}.
+ */
 enum {
+    /**
+     * This indicates that the (encoded) buffer marked as such contains
+     * the data for a key frame.
+     *
+     * Semantics are the same as {@link android.media.MediaCodec#BUFFER_FLAG_KEY_FRAME}
+     */
+    AMEDIACODEC_BUFFER_FLAG_KEY_FRAME = 1, // introduced in API 34
     AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG = 2,
     AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM = 4,
     AMEDIACODEC_BUFFER_FLAG_PARTIAL_FRAME = 8,
+    /**
+     * This indicates that the buffer contains non-media data for the
+     * muxer to process.
+     *
+     * Semantics are the same as {@link android.media.MediaCodec#BUFFER_FLAG_MUXER_DATA}
+     */
+    AMEDIACODEC_BUFFER_FLAG_MUXER_DATA = 16,  // introduced in API 34
+    /**
+     * This indicates that the buffer is decoded and updates the internal state of the decoder,
+     * but does not produce any output buffer.
+     *
+     * Semantics are the same as {@link android.media.MediaCodec#BUFFER_FLAG_DECODE_ONLY}
+     */
+    AMEDIACODEC_BUFFER_FLAG_DECODE_ONLY = 32,  // introduced in API 34
+};
 
+enum {
     AMEDIACODEC_CONFIGURE_FLAG_ENCODE = 1,
     AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED = -3,
     AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED = -2,

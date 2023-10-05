@@ -43,6 +43,7 @@ Parameters::Parameters(int cameraId,
         int cameraFacing) :
         cameraId(cameraId),
         cameraFacing(cameraFacing),
+        isSlowJpegModeForced(false),
         info(NULL),
         mDefaultSceneMode(ANDROID_CONTROL_SCENE_MODE_DISABLED) {
 }

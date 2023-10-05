@@ -16,54 +16,63 @@
 #ifndef _ACAMERA_DEVICE_H
 #define _ACAMERA_DEVICE_H
 
-#include <memory>
-#include <map>
-#include <set>
-#include <atomic>
-#include <utility>
-#include <vector>
-#include <utils/StrongPointer.h>
-#include <utils/Mutex.h>
-#include <utils/List.h>
-#include <utils/Vector.h>
-#include <android/frameworks/cameraservice/device/2.1/ICameraDeviceUser.h>
-#include <android/frameworks/cameraservice/device/2.0/ICameraDeviceCallback.h>
-#include <android/frameworks/cameraservice/device/2.0/types.h>
-#include <fmq/MessageQueue.h>
-#include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/foundation/AHandler.h>
-#include <media/stagefright/foundation/AMessage.h>
-
-#include <camera/NdkCameraManager.h>
-#include <camera/NdkCameraCaptureSession.h>
-
 #include "ACameraMetadata.h"
 #include "utils.h"
+
+#include <aidl/android/frameworks/cameraservice/common/Status.h>
+#include <aidl/android/frameworks/cameraservice/device/BnCameraDeviceCallback.h>
+#include <aidl/android/frameworks/cameraservice/device/CaptureResultExtras.h>
+#include <aidl/android/frameworks/cameraservice/device/ErrorCode.h>
+#include <aidl/android/frameworks/cameraservice/device/CaptureMetadataInfo.h>
+#include <aidl/android/frameworks/cameraservice/device/ICameraDeviceUser.h>
+#include <aidl/android/frameworks/cameraservice/device/PhysicalCameraSettings.h>
+#include <aidl/android/frameworks/cameraservice/device/PhysicalCaptureResultInfo.h>
+#include <aidl/android/frameworks/cameraservice/device/StreamConfigurationMode.h>
+#include <aidl/android/frameworks/cameraservice/device/SubmitInfo.h>
+#include <aidl/android/frameworks/cameraservice/service/CameraStatusAndId.h>
+#include <atomic>
+#include <camera/NdkCameraCaptureSession.h>
+#include <camera/NdkCameraManager.h>
+#include <fmq/AidlMessageQueue.h>
+#include <fmq/MessageQueue.h>
+#include <map>
+#include <media/stagefright/foundation/AHandler.h>
+#include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AMessage.h>
+#include <memory>
+#include <set>
+#include <utility>
+#include <utils/List.h>
+#include <utils/Mutex.h>
+#include <utils/StrongPointer.h>
+#include <utils/Vector.h>
+#include <vector>
 
 namespace android {
 namespace acam {
 
-using ICameraDeviceCallback = frameworks::cameraservice::device::V2_0::ICameraDeviceCallback;
-using ICameraDeviceUser_2_0 = frameworks::cameraservice::device::V2_0::ICameraDeviceUser;
-using ICameraDeviceUser = frameworks::cameraservice::device::V2_1::ICameraDeviceUser;
-using CaptureResultExtras = frameworks::cameraservice::device::V2_0::CaptureResultExtras;
-using PhysicalCaptureResultInfo = frameworks::cameraservice::device::V2_0::PhysicalCaptureResultInfo;
-using PhysicalCameraSettings = frameworks::cameraservice::device::V2_0::PhysicalCameraSettings;
-using SubmitInfo = frameworks::cameraservice::device::V2_0::SubmitInfo;
-using CaptureResultExtras = frameworks::cameraservice::device::V2_0::CaptureResultExtras;
-using ErrorCode = frameworks::cameraservice::device::V2_0::ErrorCode;
-using FmqSizeOrMetadata = frameworks::cameraservice::device::V2_0::FmqSizeOrMetadata;
-using StreamConfigurationMode = frameworks::cameraservice::device::V2_0::StreamConfigurationMode;
-using Status = frameworks::cameraservice::common::V2_0::Status;
-using ResultMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
-using RequestMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
-using CameraStatusAndId = frameworks::cameraservice::service::V2_0::CameraStatusAndId;
+using ::aidl::android::frameworks::cameraservice::common::Status;
+using ::aidl::android::frameworks::cameraservice::device::BnCameraDeviceCallback;
+using ::aidl::android::frameworks::cameraservice::device::CaptureResultExtras;
+using ::aidl::android::frameworks::cameraservice::device::ErrorCode;
+using ::aidl::android::frameworks::cameraservice::device::CaptureMetadataInfo;
+using ::aidl::android::frameworks::cameraservice::device::ICameraDeviceCallback;
+using ::aidl::android::frameworks::cameraservice::device::ICameraDeviceUser;
+using ::aidl::android::frameworks::cameraservice::device::OutputConfiguration;
+using ::aidl::android::frameworks::cameraservice::device::PhysicalCameraSettings;
+using ::aidl::android::frameworks::cameraservice::device::PhysicalCaptureResultInfo;
+using ::aidl::android::frameworks::cameraservice::device::StreamConfigurationMode;
+using ::aidl::android::frameworks::cameraservice::device::SubmitInfo;
+using ::aidl::android::frameworks::cameraservice::service::CameraStatusAndId;
+using ::aidl::android::hardware::common::fmq::SynchronizedReadWrite;
+using ::android::AidlMessageQueue;
+using ::android::acam::utils::native_handle_ptr_wrapper;
 
-using hardware::hidl_vec;
-using hardware::hidl_string;
-using utils::native_handle_ptr_wrapper;
+
+using ResultMetadataQueue = AidlMessageQueue<int8_t, SynchronizedReadWrite>;
+using RequestMetadataQueue = AidlMessageQueue<int8_t, SynchronizedReadWrite>;
+
 using utils::CaptureRequest;
-using utils::OutputConfigurationWrapper;
 
 // Wrap ACameraCaptureFailure so it can be ref-counted
 struct CameraCaptureFailure : public RefBase, public ACameraCaptureFailure { };
@@ -83,12 +92,15 @@ struct ACameraPhysicalCaptureResultInfo: public RefBase {
     int64_t mFrameNumber;
 };
 
-class CameraDevice final : public RefBase {
+class CameraDevice final : public std::enable_shared_from_this<CameraDevice> {
   public:
     CameraDevice(const char* id, ACameraDevice_StateCallbacks* cb,
                   sp<ACameraMetadata> chars,
                   ACameraDevice* wrapper);
     ~CameraDevice();
+
+    // Called to initialize fields that require shared_ptr to `this`
+    void init();
 
     inline const char* getId() const { return mCameraId.c_str(); }
 
@@ -107,30 +119,36 @@ class CameraDevice final : public RefBase {
             const ACaptureSessionOutputContainer* sessionOutputContainer) const;
 
     // Callbacks from camera service
-    class ServiceCallback : public ICameraDeviceCallback {
+    class ServiceCallback : public BnCameraDeviceCallback {
       public:
-        explicit ServiceCallback(CameraDevice* device) : mDevice(device) {}
-        android::hardware::Return<void> onDeviceError(ErrorCode errorCode,
-                           const CaptureResultExtras& resultExtras) override;
-        android::hardware::Return<void> onDeviceIdle() override;
-        android::hardware::Return<void> onCaptureStarted(const CaptureResultExtras& resultExtras,
-                              uint64_t timestamp) override;
-        android::hardware::Return<void> onResultReceived(const FmqSizeOrMetadata& result,
-                              const CaptureResultExtras& resultExtras,
-                              const hidl_vec<PhysicalCaptureResultInfo>& physicalResultInfos) override;
-        android::hardware::Return<void> onRepeatingRequestError(uint64_t lastFrameNumber,
-                int32_t stoppedSequenceId) override;
+        explicit ServiceCallback(std::weak_ptr<CameraDevice> device) :
+              mDevice(std::move(device)) {}
+
+        ndk::ScopedAStatus onDeviceError(ErrorCode in_errorCode,
+                                         const CaptureResultExtras& in_resultExtras) override;
+        ndk::ScopedAStatus onDeviceIdle() override;
+
+        ndk::ScopedAStatus onCaptureStarted(const CaptureResultExtras& in_resultExtras,
+                                            int64_t in_timestamp) override;
+        ndk::ScopedAStatus onPrepared(int32_t in_streamId) override;
+        ndk::ScopedAStatus onRepeatingRequestError(int64_t in_lastFrameNumber,
+                                                   int32_t in_repeatingRequestId) override;
+        ndk::ScopedAStatus onResultReceived(const CaptureMetadataInfo& in_result,
+                                            const CaptureResultExtras& in_resultExtras,
+                                            const std::vector<PhysicalCaptureResultInfo>&
+                                                    in_physicalCaptureResultInfos) override;
+
       private:
-        camera_status_t readOneResultMetadata(const FmqSizeOrMetadata& fmqSizeOrMetadata,
+        camera_status_t readOneResultMetadata(const CaptureMetadataInfo& captureMetadataInfo,
                 ResultMetadataQueue* metadataQueue, CameraMetadata* metadata);
-        const wp<CameraDevice> mDevice;
+        const std::weak_ptr<CameraDevice> mDevice;
     };
-    inline sp<ICameraDeviceCallback> getServiceCallback() {
+    inline std::shared_ptr<BnCameraDeviceCallback> getServiceCallback() {
         return mServiceCallback;
     };
 
     // Camera device is only functional after remote being set
-    void setRemoteDevice(sp<ICameraDeviceUser> remote);
+    void setRemoteDevice(std::shared_ptr<ICameraDeviceUser> remote);
 
     bool setDeviceMetadataQueues();
     inline ACameraDevice* getWrapper() const { return mWrapper; };
@@ -179,6 +197,8 @@ class CameraDevice final : public RefBase {
 
     camera_status_t updateOutputConfigurationLocked(ACaptureSessionOutput *output);
 
+    camera_status_t prepareLocked(ACameraWindowType *window);
+
     // Since this writes to ICameraDeviceUser's fmq, clients must take care that:
     //   a) This function is called serially.
     //   b) This function is called in accordance with ICameraDeviceUser.submitRequestList,
@@ -208,15 +228,15 @@ class CameraDevice final : public RefBase {
     void postSessionMsgAndCleanup(sp<AMessage>& msg);
 
     mutable Mutex mDeviceLock;
-    const hidl_string mCameraId;                          // Camera ID
+    const std::string mCameraId;                          // Camera ID
     const ACameraDevice_StateCallbacks mAppCallbacks; // Callback to app
     const sp<ACameraMetadata> mChars;    // Camera characteristics
-    const sp<ServiceCallback> mServiceCallback;
+    std::shared_ptr<ServiceCallback> mServiceCallback;
     ACameraDevice* mWrapper;
 
     // stream id -> pair of (ACameraWindowType* from application, OutputConfiguration used for
     // camera service)
-    std::map<int, std::pair<native_handle_ptr_wrapper, OutputConfigurationWrapper>> mConfiguredOutputs;
+    std::map<int, std::pair<native_handle_ptr_wrapper, OutputConfiguration>> mConfiguredOutputs;
 
     // TODO: maybe a bool will suffice for synchronous implementation?
     std::atomic_bool mClosing;
@@ -232,7 +252,7 @@ class CameraDevice final : public RefBase {
     // This will avoid a busy session being deleted before it's back to idle state
     sp<ACameraCaptureSession> mBusySession;
 
-    sp<ICameraDeviceUser> mRemote;
+    std::shared_ptr<ICameraDeviceUser> mRemote;
 
     // Looper thread to handle callback to app
     sp<ALooper> mCbLooper;
@@ -252,7 +272,8 @@ class CameraDevice final : public RefBase {
         kWhatLogicalCaptureFail, // onLogicalCameraCaptureFailed
         kWhatCaptureSeqEnd,    // onCaptureSequenceCompleted
         kWhatCaptureSeqAbort,  // onCaptureSequenceAborted
-        kWhatCaptureBufferLost,// onCaptureBufferLost
+        kWhatCaptureBufferLost, // onCaptureBufferLost
+        kWhatPreparedCb, // onPrepared
         // Internal cleanup
         kWhatCleanUpSessions   // Cleanup cached sp<ACameraCaptureSession>
     };
@@ -281,7 +302,7 @@ class CameraDevice final : public RefBase {
         // This handler will cache all capture session sp until kWhatCleanUpSessions
         // is processed. This is used to guarantee the last session reference is always
         // being removed in callback thread without holding camera device lock
-        Vector<sp<ACameraCaptureSession>> mCachedSessions;
+        std::vector<sp<ACameraCaptureSession>> mCachedSessions;
     };
     sp<CallbackHandler> mHandler;
 
@@ -303,19 +324,19 @@ class CameraDevice final : public RefBase {
 
     struct CallbackHolder {
         CallbackHolder(sp<ACameraCaptureSession>          session,
-                       const Vector<sp<CaptureRequest>>&  requests,
+                       std::vector<sp<CaptureRequest>>   requests,
                        bool                               isRepeating,
                        ACameraCaptureSession_captureCallbacks* cbs);
         CallbackHolder(sp<ACameraCaptureSession>          session,
-                       const Vector<sp<CaptureRequest>>&  requests,
+                       std::vector<sp<CaptureRequest>>   requests,
                        bool                               isRepeating,
                        ACameraCaptureSession_logicalCamera_captureCallbacks* lcbs);
         CallbackHolder(sp<ACameraCaptureSession>          session,
-                       const Vector<sp<CaptureRequest> >& requests,
+                       std::vector<sp<CaptureRequest> >  requests,
                        bool                               isRepeating,
                        ACameraCaptureSession_captureCallbacksV2* cbs);
         CallbackHolder(sp<ACameraCaptureSession>          session,
-                       const Vector<sp<CaptureRequest> >& requests,
+                       std::vector<sp<CaptureRequest> >  requests,
                        bool                               isRepeating,
                        ACameraCaptureSession_logicalCamera_captureCallbacksV2* lcbs);
         void clearCallbacks() {
@@ -359,7 +380,7 @@ class CameraDevice final : public RefBase {
         }
 
         sp<ACameraCaptureSession>   mSession;
-        Vector<sp<CaptureRequest>>  mRequests;
+        std::vector<sp<CaptureRequest>>  mRequests;
         const bool                  mIsRepeating;
         const bool                  mIs2Callback;
         const bool                  mIsLogicalCameraCallback;
@@ -401,7 +422,7 @@ class CameraDevice final : public RefBase {
     // Misc variables
     int32_t mShadingMapSize[2];   // const after constructor
     int32_t mPartialResultCount;  // const after constructor
-    std::shared_ptr<ResultMetadataQueue> mCaptureRequestMetadataQueue = nullptr;
+    std::shared_ptr<RequestMetadataQueue> mCaptureRequestMetadataQueue = nullptr;
     std::shared_ptr<ResultMetadataQueue> mCaptureResultMetadataQueue = nullptr;
 };
 
@@ -415,7 +436,10 @@ class CameraDevice final : public RefBase {
 struct ACameraDevice {
     ACameraDevice(const char* id, ACameraDevice_StateCallbacks* cb,
                   sp<ACameraMetadata> chars) :
-            mDevice(new android::acam::CameraDevice(id, cb, std::move(chars), this)) {}
+            mDevice(std::make_shared<android::acam::CameraDevice>(id, cb,
+                                                                std::move(chars), this)) {
+        mDevice->init();
+    }
 
     ~ACameraDevice();
     /*******************
@@ -446,19 +470,20 @@ struct ACameraDevice {
     /***********************
      * Device interal APIs *
      ***********************/
-    inline android::sp<android::acam::ICameraDeviceCallback> getServiceCallback() {
+    inline std::shared_ptr<android::acam::BnCameraDeviceCallback> getServiceCallback() {
         return mDevice->getServiceCallback();
     };
 
     // Camera device is only functional after remote being set
-    inline void setRemoteDevice(android::sp<android::acam::ICameraDeviceUser> remote) {
+    inline void setRemoteDevice(std::shared_ptr<
+            ::aidl::android::frameworks::cameraservice::device::ICameraDeviceUser> remote) {
         mDevice->setRemoteDevice(remote);
     }
     inline bool setDeviceMetadataQueues() {
         return mDevice->setDeviceMetadataQueues();
     }
   private:
-    android::sp<android::acam::CameraDevice> mDevice;
+    std::shared_ptr<android::acam::CameraDevice> mDevice;
 };
 
 #endif // _ACAMERA_DEVICE_H

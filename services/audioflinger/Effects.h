@@ -280,7 +280,7 @@ public:
     static bool      isHapticGenerator(const effect_uuid_t* type);
     bool             isHapticGenerator() const;
 
-    status_t         setHapticIntensity(int id, int intensity);
+    status_t         setHapticIntensity(int id, os::HapticScale intensity);
     status_t         setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo);
 
     status_t         getConfigs(audio_config_base_t* inputCfg,
@@ -319,7 +319,8 @@ private:
                                     // sending disable command.
     uint32_t mDisableWaitCnt;       // current process() calls count during disable period.
     bool     mOffloaded;            // effect is currently offloaded to the audio DSP
-    bool     mAddedToHal;           // effect has been added to the audio HAL
+    // effect has been added to this HAL input stream
+    audio_io_handle_t mCurrentHalStream = AUDIO_IO_HANDLE_NONE;
     bool     mIsOutput;             // direction of the AF thread
 
     bool    mSupportsFloat;         // effect supports float processing
@@ -543,12 +544,15 @@ public:
     // Is this EffectChain compatible with the FAST audio flag.
     bool isFastCompatible() const;
 
+    // Is this EffectChain compatible with the bit-perfect audio flag.
+    bool isBitPerfectCompatible() const;
+
     // isCompatibleWithThread_l() must be called with thread->mLock held
     bool isCompatibleWithThread_l(const sp<ThreadBase>& thread) const;
 
     bool containsHapticGeneratingEffect_l();
 
-    void setHapticIntensity_l(int id, int intensity);
+    void setHapticIntensity_l(int id, os::HapticScale intensity);
 
     sp<EffectCallbackInterface> effectCallback() const { return mEffectCallback; }
     wp<ThreadBase> thread() const { return mEffectCallback->thread(); }

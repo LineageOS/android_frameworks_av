@@ -86,7 +86,8 @@ public:
             size_t offset,
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
-            const sp<MediaCodecBuffer> &buffer) override;
+            const sp<MediaCodecBuffer> &buffer,
+            AString* errorDetailMsg) override;
     virtual status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
     virtual void pollForRenderedBuffers() override;
@@ -321,6 +322,9 @@ private:
         std::unique_ptr<OutputBuffers> buffers;
         size_t numSlots;
         uint32_t outputDelay;
+        // true iff the underlying block pool is bounded --- for example,
+        // a BufferQueue-based block pool would be bounded by the BufferQueue.
+        bool bounded;
     };
     Mutexed<Output> mOutput;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mFlushedConfigs;
@@ -331,6 +335,7 @@ private:
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
 
     std::deque<TrackedFrame> mTrackedFrames;
+    bool mAreRenderMetricsEnabled;
     bool mIsSurfaceToDisplay;
     bool mHasPresentFenceTimes;
 
@@ -341,6 +346,7 @@ private:
         std::map<uint64_t, int> rotation;
     };
     Mutexed<OutputSurface> mOutputSurface;
+    int mRenderingDepth;
 
     struct BlockPools {
         C2Allocator::id_t inputAllocatorId;

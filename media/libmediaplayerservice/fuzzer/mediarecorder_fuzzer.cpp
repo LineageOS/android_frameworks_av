@@ -18,6 +18,10 @@
 #include <media/stagefright/foundation/AString.h>
 #include "fuzzer/FuzzedDataProvider.h"
 
+#include <AudioFlinger.h>
+#include <MediaPlayerService.h>
+#include <ResourceManagerService.h>
+#include <fakeservicemanager/FakeServiceManager.h>
 #include <StagefrightRecorder.h>
 #include <camera/Camera.h>
 #include <camera/android/hardware/ICamera.h>
@@ -25,6 +29,7 @@
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
 #include <media/stagefright/PersistentSurface.h>
+#include <mediametricsservice/MediaMetricsService.h>
 #include <thread>
 
 using namespace std;
@@ -303,6 +308,21 @@ void MediaRecorderClientFuzzer::process() {
 
     mStfRecorder->close();
     mStfRecorder->reset();
+}
+
+extern "C" int LLVMFuzzerInitialize(int /* *argc */, char /* ***argv */) {
+    /**
+     * Initializing a FakeServiceManager and adding the instances
+     * of all the required services
+     */
+    sp<IServiceManager> fakeServiceManager = new FakeServiceManager();
+    setDefaultServiceManager(fakeServiceManager);
+    MediaPlayerService::instantiate();
+    AudioFlinger::instantiate();
+    ResourceManagerService::instantiate();
+    fakeServiceManager->addService(String16(MediaMetricsService::kServiceName),
+                                    new MediaMetricsService());
+    return 0;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {

@@ -46,6 +46,9 @@ const char* AImageReader::kGraphicBufferKey = "GraphicBuffer";
 
 static constexpr int kWindowHalTokenSizeMax = 256;
 
+static media_status_t validateParameters(int32_t width, int32_t height, int32_t format,
+                                         uint64_t usage, int32_t maxImages,
+                                         /*out*/ AImageReader**& reader);
 static native_handle_t *convertHalTokenToNativeHandle(const HalToken &halToken);
 
 bool
@@ -265,13 +268,17 @@ AImageReader::AImageReader(int32_t width,
                            int32_t height,
                            int32_t format,
                            uint64_t usage,
-                           int32_t maxImages)
+                           int32_t maxImages,
+                           uint32_t hardwareBufferFormat,
+                           android_dataspace dataSpace)
     : mWidth(width),
       mHeight(height),
       mFormat(format),
       mUsage(usage),
       mMaxImages(maxImages),
       mNumPlanes(getNumPlanesForFormat(format)),
+      mHalFormat(hardwareBufferFormat),
+      mHalDataSpace(dataSpace),
       mFrameListener(new FrameListener(this)),
       mBufferRemovedListener(new BufferRemovedListener(this)) {}
 
@@ -282,9 +289,6 @@ AImageReader::~AImageReader() {
 
 media_status_t
 AImageReader::init() {
-    PublicFormat publicFormat = static_cast<PublicFormat>(mFormat);
-    mHalFormat = mapPublicFormatToHalFormat(publicFormat);
-    mHalDataSpace = mapPublicFormatToHalDataspace(publicFormat);
     mHalUsage = AHardwareBuffer_convertToGrallocUsageBits(mUsage);
 
     sp<IGraphicBufferProducer> gbProducer;
@@ -648,6 +652,41 @@ AImageReader::acquireLatestImage(/*out*/AImage** image, /*out*/int* acquireFence
     }
 }
 
+static
+media_status_t validateParameters(int32_t width, int32_t height, int32_t format,
+                                  uint64_t usage, int32_t maxImages,
+                                  /*out*/ AImageReader**& reader) {
+    if (reader == nullptr) {
+        ALOGE("%s: reader argument is null", __FUNCTION__);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (width < 1 || height < 1) {
+        ALOGE("%s: image dimension must be positive: w:%d h:%d",
+                __FUNCTION__, width, height);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (maxImages < 1) {
+        ALOGE("%s: max outstanding image count must be at least 1 (%d)",
+                __FUNCTION__, maxImages);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (maxImages > BufferQueueDefs::NUM_BUFFER_SLOTS) {
+        ALOGE("%s: max outstanding image count (%d) cannot be larget than %d.",
+              __FUNCTION__, maxImages, BufferQueueDefs::NUM_BUFFER_SLOTS);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    if (!AImageReader::isSupportedFormatAndUsage(format, usage)) {
+        ALOGE("%s: format %d is not supported with usage 0x%" PRIx64 " by AImageReader",
+                __FUNCTION__, format, usage);
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    return AMEDIA_OK;
+}
+
 static native_handle_t *convertHalTokenToNativeHandle(
         const HalToken &halToken) {
     // We attempt to store halToken in the ints of the native_handle_t after its
@@ -698,42 +737,32 @@ media_status_t AImageReader_getWindowNativeHandle(
 } //extern "C"
 
 EXPORT
+media_status_t AImageReader_newWithDataSpace(
+        int32_t width, int32_t height, uint64_t usage, int32_t maxImages,
+        uint32_t hardwareBufferFormat, int32_t dataSpace,
+        /*out*/ AImageReader** reader) {
+    ALOGV("%s", __FUNCTION__);
+
+    android_dataspace halDataSpace = static_cast<android_dataspace>(dataSpace);
+    int32_t format = static_cast<int32_t>(
+          mapHalFormatDataspaceToPublicFormat(hardwareBufferFormat, halDataSpace));
+    return AImageReader_newWithUsage(width, height, format, usage, maxImages, reader);
+}
+
+EXPORT
 media_status_t AImageReader_newWithUsage(
         int32_t width, int32_t height, int32_t format, uint64_t usage,
         int32_t maxImages, /*out*/ AImageReader** reader) {
     ALOGV("%s", __FUNCTION__);
 
-    if (width < 1 || height < 1) {
-        ALOGE("%s: image dimension must be positive: w:%d h:%d",
-                __FUNCTION__, width, height);
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
+    validateParameters(width, height, format, usage, maxImages, reader);
 
-    if (maxImages < 1) {
-        ALOGE("%s: max outstanding image count must be at least 1 (%d)",
-                __FUNCTION__, maxImages);
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
-
-    if (maxImages > BufferQueueDefs::NUM_BUFFER_SLOTS) {
-        ALOGE("%s: max outstanding image count (%d) cannot be larget than %d.",
-              __FUNCTION__, maxImages, BufferQueueDefs::NUM_BUFFER_SLOTS);
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
-
-    if (!AImageReader::isSupportedFormatAndUsage(format, usage)) {
-        ALOGE("%s: format %d is not supported with usage 0x%" PRIx64 " by AImageReader",
-                __FUNCTION__, format, usage);
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
-
-    if (reader == nullptr) {
-        ALOGE("%s: reader argument is null", __FUNCTION__);
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
+    PublicFormat publicFormat = static_cast<PublicFormat>(format);
+    uint32_t halFormat = mapPublicFormatToHalFormat(publicFormat);
+    android_dataspace halDataSpace = mapPublicFormatToHalDataspace(publicFormat);
 
     AImageReader* tmpReader = new AImageReader(
-        width, height, format, usage, maxImages);
+        width, height, format, usage, maxImages, halFormat, halDataSpace);
     if (tmpReader == nullptr) {
         ALOGE("%s: AImageReader allocation failed", __FUNCTION__);
         return AMEDIA_ERROR_UNKNOWN;

@@ -13,11 +13,13 @@ LIBMEDIANDK {
     AImageReader_getWindow; # introduced=24
     AImageReader_new; # introduced=24
     AImageReader_newWithUsage; # introduced=26
+    AImageReader_newWithDataSpace; # introduced=UpsideDownCake
     AImageReader_setBufferRemovedListener; # introduced=26
     AImageReader_setImageListener; # introduced=24
     AImage_delete; # introduced=24
     AImage_deleteAsync; # introduced=26
     AImage_getCropRect; # introduced=24
+    AImage_getDataSpace; # introduced=UpsideDownCake
     AImage_getFormat; # introduced=24
     AImage_getHardwareBuffer; # introduced=26
     AImage_getHeight; # introduced=24
@@ -45,6 +47,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_ALBUM; # var introduced=29
     AMEDIAFORMAT_KEY_ALBUMART; # var introduced=29
     AMEDIAFORMAT_KEY_ALBUMARTIST; # var introduced=29
+    AMEDIAFORMAT_KEY_ALLOW_FRAME_DROP; # var introduced=34
     AMEDIAFORMAT_KEY_ARTIST; # var introduced=29
     AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO; # var introduced=29
     AMEDIAFORMAT_KEY_AUDIO_SESSION_ID; # var introduced=28
@@ -117,6 +120,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_LOW_LATENCY; # var introduced=30
     AMEDIAFORMAT_KEY_LYRICIST; # var introduced=29
     AMEDIAFORMAT_KEY_MANUFACTURER; # var introduced=29
+    AMEDIAFORMAT_KEY_MAX_B_FRAMES; # var introduced=34
     AMEDIAFORMAT_KEY_MAX_BIT_RATE; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_HEIGHT; # var introduced=21

@@ -37,12 +37,9 @@ class MmapStreamCallback : public virtual RefBase {
 
     /**
      * The volume to be applied to the use case specified when opening the stream has changed
-     * \param[in] channels a channel mask containing all channels the volume should be applied to.
-     * \param[in] values the volume values to be applied to each channel. The size of the vector
-     *                   should correspond to the channel count retrieved with
-     *                   audio_channel_count_from_in_mask() or audio_channel_count_from_out_mask()
+     * \param[in] volume the new target volume
      */
-    virtual void onVolumeChanged(audio_channel_mask_t channels, Vector<float> values) = 0;
+    virtual void onVolumeChanged(float volume) = 0;
 
     /**
      * The device the stream is routed to/from has changed

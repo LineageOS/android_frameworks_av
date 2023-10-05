@@ -238,3 +238,25 @@ aaudio_result_t AAudioServiceStreamMMAP::getAudioDataDescription_l(
             static_cast<AAudioServiceEndpointMMAP *>(endpoint.get());
     return serviceEndpointMMAP->getDownDataDescription(parcelable);
 }
+
+int64_t AAudioServiceStreamMMAP::nextDataReportTime_l() {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return std::numeric_limits<int64_t>::max();
+    }
+    sp<AAudioServiceEndpointMMAP> serviceEndpointMMAP =
+            static_cast<AAudioServiceEndpointMMAP *>(endpoint.get());
+    return serviceEndpointMMAP->nextDataReportTime();
+}
+
+void AAudioServiceStreamMMAP::reportData_l() {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return;
+    }
+    sp<AAudioServiceEndpointMMAP> serviceEndpointMMAP =
+            static_cast<AAudioServiceEndpointMMAP *>(endpoint.get());
+    return serviceEndpointMMAP->reportData();
+}

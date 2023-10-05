@@ -27,6 +27,7 @@
 #include <android/binder_manager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/PermissionCache.h>
+#include <cutils/properties.h>
 #include <utils/Log.h>
 
 #include <string>
@@ -51,107 +52,125 @@ namespace media {
 namespace tv {
 namespace tuner {
 
-shared_ptr<TunerService> TunerService::sTunerService = nullptr;
-
 TunerService::TunerService() {
-    if (!TunerHelper::checkTunerFeature()) {
-        ALOGD("Device doesn't have tuner hardware.");
-        return;
+    const string statsServiceName = string() + ITuner::descriptor + "/default";
+    ::ndk::SpAIBinder binder(AServiceManager_waitForService(statsServiceName.c_str()));
+    mTuner = ITuner::fromBinder(binder);
+    ALOGE_IF(mTuner == nullptr, "Failed to get Tuner HAL Service");
+
+    mTunerVersion = TUNER_HAL_VERSION_2_0;
+    if (mTuner->getInterfaceVersion(&mTunerVersion).isOk()) {
+        // Tuner AIDL HAL version 1 will be Tuner HAL 2.0
+        mTunerVersion = (mTunerVersion + 1) << 16;
     }
 
+    // Register the tuner resources to TRM.
     updateTunerResources();
 }
 
-TunerService::~TunerService() {}
+TunerService::~TunerService() {
+    mTuner = nullptr;
+}
 
 binder_status_t TunerService::instantiate() {
-    sTunerService = ::ndk::SharedRefBase::make<TunerService>();
-    return AServiceManager_addService(sTunerService->asBinder().get(), getServiceName());
-}
-
-shared_ptr<TunerService> TunerService::getTunerService() {
-    return sTunerService;
-}
-
-bool TunerService::hasITuner() {
-    ALOGV("hasITuner");
-    if (mTuner != nullptr) {
-        return true;
+    shared_ptr<TunerService> tunerService = ::ndk::SharedRefBase::make<TunerService>();
+    bool lazyHal = property_get_bool("ro.tuner.lazyhal", false);
+    if (lazyHal) {
+        return AServiceManager_registerLazyService(tunerService->asBinder().get(),
+                                                   getServiceName());
     }
-    const string statsServiceName = string() + ITuner::descriptor + "/default";
-    if (AServiceManager_isDeclared(statsServiceName.c_str())) {
-        ::ndk::SpAIBinder binder(AServiceManager_waitForService(statsServiceName.c_str()));
-        mTuner = ITuner::fromBinder(binder);
-    } else {
-        mTuner = nullptr;
-        ALOGE("Failed to get Tuner HAL Service");
-        return false;
-    }
-
-    mTunerVersion = TUNER_HAL_VERSION_2_0;
-    // TODO: Enable this after Tuner HAL is frozen.
-    // if (mTuner->getInterfaceVersion(&mTunerVersion).isOk()) {
-    //  // Tuner AIDL HAL version 1 will be Tuner HAL 2.0
-    //  mTunerVersion = (mTunerVersion + 1) << 16;
-    //}
-
-    return true;
+    return AServiceManager_addService(tunerService->asBinder().get(), getServiceName());
 }
 
-::ndk::ScopedAStatus TunerService::openDemux(int32_t /* in_demuxHandle */,
+::ndk::ScopedAStatus TunerService::openDemux(int32_t in_demuxHandle,
                                              shared_ptr<ITunerDemux>* _aidl_return) {
     ALOGV("openDemux");
-    if (!hasITuner()) {
+    shared_ptr<IDemux> demux;
+    bool fallBackToOpenDemux = false;
+    vector<int32_t> ids;
+
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
+        fallBackToOpenDemux = true;
+    } else {
+        mTuner->getDemuxIds(&ids);
+        if (ids.size() == 0) {
+            fallBackToOpenDemux = true;
+        }
+    }
+
+    if (fallBackToOpenDemux) {
+        auto status = mTuner->openDemux(&ids, &demux);
+        if (status.isOk()) {
+            *_aidl_return = ::ndk::SharedRefBase::make<TunerDemux>(demux, ids[0],
+                                                                   this->ref<TunerService>());
+        }
+        return status;
+    } else {
+        int id = TunerHelper::getResourceIdFromHandle(in_demuxHandle, DEMUX);
+        auto status = mTuner->openDemuxById(id, &demux);
+        if (status.isOk()) {
+            *_aidl_return =
+                    ::ndk::SharedRefBase::make<TunerDemux>(demux, id, this->ref<TunerService>());
+        }
+        return status;
+    }
+}
+
+::ndk::ScopedAStatus TunerService::getDemuxInfo(int32_t in_demuxHandle, DemuxInfo* _aidl_return) {
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
-    vector<int32_t> id;
-    shared_ptr<IDemux> demux;
-    auto status = mTuner->openDemux(&id, &demux);
-    if (status.isOk()) {
-        *_aidl_return = ::ndk::SharedRefBase::make<TunerDemux>(demux, id[0]);
+    int id = TunerHelper::getResourceIdFromHandle(in_demuxHandle, DEMUX);
+    return mTuner->getDemuxInfo(id, _aidl_return);
+}
+
+::ndk::ScopedAStatus TunerService::getDemuxInfoList(vector<DemuxInfo>* _aidl_return) {
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+    vector<DemuxInfo> demuxInfoList;
+    vector<int32_t> ids;
+    auto status = mTuner->getDemuxIds(&ids);
+    if (!status.isOk()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    return status;
+    for (int i = 0; i < ids.size(); i++) {
+        DemuxInfo demuxInfo;
+        auto res = mTuner->getDemuxInfo(ids[i], &demuxInfo);
+        if (!res.isOk()) {
+            continue;
+        }
+        demuxInfoList.push_back(demuxInfo);
+    }
+
+    if (demuxInfoList.size() > 0) {
+        *_aidl_return = demuxInfoList;
+        return ::ndk::ScopedAStatus::ok();
+    } else {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
 }
 
 ::ndk::ScopedAStatus TunerService::getDemuxCaps(DemuxCapabilities* _aidl_return) {
     ALOGV("getDemuxCaps");
-    if (!hasITuner()) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mTuner->getDemuxCaps(_aidl_return);
 }
 
 ::ndk::ScopedAStatus TunerService::getFrontendIds(vector<int32_t>* ids) {
-    if (!hasITuner()) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mTuner->getFrontendIds(ids);
 }
 
 ::ndk::ScopedAStatus TunerService::getFrontendInfo(int32_t id, FrontendInfo* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGE("ITuner service is not init.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mTuner->getFrontendInfo(id, _aidl_return);
 }
 
 ::ndk::ScopedAStatus TunerService::openFrontend(int32_t frontendHandle,
                                                 shared_ptr<ITunerFrontend>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGE("ITuner service is not init.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     int id = TunerHelper::getResourceIdFromHandle(frontendHandle, FRONTEND);
     shared_ptr<IFrontend> frontend;
     auto status = mTuner->openFrontendById(id, &frontend);
@@ -163,12 +182,6 @@ bool TunerService::hasITuner() {
 }
 
 ::ndk::ScopedAStatus TunerService::openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGD("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     shared_ptr<ILnb> lnb;
     int id = TunerHelper::getResourceIdFromHandle(lnbHandle, LNB);
     auto status = mTuner->openLnbById(id, &lnb);
@@ -181,12 +194,6 @@ bool TunerService::hasITuner() {
 
 ::ndk::ScopedAStatus TunerService::openLnbByName(const string& lnbName,
                                                  shared_ptr<ITunerLnb>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGE("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     vector<int32_t> id;
     shared_ptr<ILnb> lnb;
     auto status = mTuner->openLnbByName(lnbName, &id, &lnb);
@@ -199,12 +206,6 @@ bool TunerService::hasITuner() {
 
 ::ndk::ScopedAStatus TunerService::openDescrambler(int32_t /*descramblerHandle*/,
                                                    shared_ptr<ITunerDescrambler>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGD("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     shared_ptr<IDescrambler> descrambler;
     // int id = TunerHelper::getResourceIdFromHandle(descramblerHandle, DESCRAMBLER);
     auto status = mTuner->openDescrambler(&descrambler);
@@ -216,7 +217,6 @@ bool TunerService::hasITuner() {
 }
 
 ::ndk::ScopedAStatus TunerService::getTunerHalVersion(int* _aidl_return) {
-    hasITuner();
     *_aidl_return = mTunerVersion;
     return ::ndk::ScopedAStatus::ok();
 }
@@ -224,12 +224,6 @@ bool TunerService::hasITuner() {
 ::ndk::ScopedAStatus TunerService::openSharedFilter(const string& in_filterToken,
                                                     const shared_ptr<ITunerFilterCallback>& in_cb,
                                                     shared_ptr<ITunerFilter>* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGE("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (!PermissionCache::checkCallingPermission(sSharedFilterPermission)) {
         ALOGE("Request requires android.permission.ACCESS_TV_SHARED_FILTER");
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -260,35 +254,22 @@ bool TunerService::hasITuner() {
     return ::ndk::ScopedAStatus::ok();
 }
 
-::ndk::ScopedAStatus TunerService::setLna(bool bEnable) {
-    if (!hasITuner()) {
-        ALOGD("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
+::ndk::ScopedAStatus TunerService::isLnaSupported(bool* _aidl_return) {
+    ALOGV("isLnaSupported");
+    return mTuner->isLnaSupported(_aidl_return);
+}
 
+::ndk::ScopedAStatus TunerService::setLna(bool bEnable) {
     return mTuner->setLna(bEnable);
 }
 
 ::ndk::ScopedAStatus TunerService::setMaxNumberOfFrontends(FrontendType in_frontendType,
                                                            int32_t in_maxNumber) {
-    if (!hasITuner()) {
-        ALOGD("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mTuner->setMaxNumberOfFrontends(in_frontendType, in_maxNumber);
 }
 
 ::ndk::ScopedAStatus TunerService::getMaxNumberOfFrontends(FrontendType in_frontendType,
                                                            int32_t* _aidl_return) {
-    if (!hasITuner()) {
-        ALOGD("get ITuner failed");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mTuner->getMaxNumberOfFrontends(in_frontendType, _aidl_return);
 }
 
@@ -309,12 +290,9 @@ void TunerService::removeSharedFilter(const shared_ptr<TunerFilter>& sharedFilte
 }
 
 void TunerService::updateTunerResources() {
-    if (!hasITuner()) {
-        ALOGE("Failed to updateTunerResources");
-        return;
-    }
-
-    TunerHelper::updateTunerResources(getTRMFrontendInfos(), getTRMLnbHandles());
+    TunerHelper::updateTunerResources(getTRMFrontendInfos(),
+                                      getTRMDemuxInfos(),
+                                      getTRMLnbHandles());
 }
 
 vector<TunerFrontendInfo> TunerService::getTRMFrontendInfos() {
@@ -337,6 +315,32 @@ vector<TunerFrontendInfo> TunerService::getTRMFrontendInfos() {
                 .exclusiveGroupId = frontendInfo.exclusiveGroupId,
         };
         infos.push_back(tunerFrontendInfo);
+    }
+
+    return infos;
+}
+
+vector<TunerDemuxInfo> TunerService::getTRMDemuxInfos() {
+    vector<TunerDemuxInfo> infos;
+    vector<int32_t> ids;
+
+    if (mTunerVersion <= TUNER_HAL_VERSION_2_0) {
+        return infos;
+    }
+
+    auto status = mTuner->getDemuxIds(&ids);
+    if (!status.isOk()) {
+        return infos;
+    }
+
+    for (int i = 0; i < ids.size(); i++) {
+        DemuxInfo demuxInfo;
+        mTuner->getDemuxInfo(ids[i], &demuxInfo);
+        TunerDemuxInfo tunerDemuxInfo{
+                .handle = TunerHelper::getResourceHandleFromId((int)ids[i], DEMUX),
+                .filterTypes = static_cast<int>(demuxInfo.filterTypes)
+        };
+        infos.push_back(tunerDemuxInfo);
     }
 
     return infos;

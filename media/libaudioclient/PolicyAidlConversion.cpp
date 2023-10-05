@@ -158,6 +158,11 @@ aidl2legacy_AudioMixMatchCriterionValue(
                     convertIntegral<int>(UNION_GET(aidl, userId).value()));
             *rule |= RULE_MATCH_USERID;
             return legacy;
+        case media::AudioMixMatchCriterionValue::audioSessionId:
+            legacy.mAudioSessionId = VALUE_OR_RETURN(
+                    aidl2legacy_int32_t_audio_session_t(UNION_GET(aidl, audioSessionId).value()));
+            *rule |= RULE_MATCH_AUDIO_SESSION_ID;
+            return legacy;
     }
     return unexpected(BAD_VALUE);
 }
@@ -185,7 +190,10 @@ legacy2aidl_AudioMixMatchCriterionValue(
         case RULE_MATCH_USERID:
             UNION_SET(aidl, userId, VALUE_OR_RETURN(convertReinterpret<uint32_t>(legacy.mUserId)));
             break;
-
+        case RULE_MATCH_AUDIO_SESSION_ID:
+            UNION_SET(aidl, audioSessionId,
+                VALUE_OR_RETURN(legacy2aidl_audio_session_t_int32_t(legacy.mAudioSessionId)));
+            break;
         default:
             return unexpected(BAD_VALUE);
     }
@@ -463,5 +471,52 @@ legacy2aidl_audio_offload_mode_t_AudioOffloadMode(audio_offload_mode_t legacy) {
     }
     return unexpected(BAD_VALUE);
 }
+
+ConversionResult<audio_mixer_behavior_t>
+aidl2legacy_AudioMixerBehavior_audio_mixer_behavior_t(media::AudioMixerBehavior aidl) {
+    switch (aidl) {
+        case media::AudioMixerBehavior::DEFAULT:
+            return AUDIO_MIXER_BEHAVIOR_DEFAULT;
+        case media::AudioMixerBehavior::BIT_PERFECT:
+            return AUDIO_MIXER_BEHAVIOR_BIT_PERFECT;
+        case media::AudioMixerBehavior::INVALID:
+            return AUDIO_MIXER_BEHAVIOR_INVALID;
+    }
+    return unexpected(BAD_VALUE);
+}
+ConversionResult<media::AudioMixerBehavior>
+legacy2aidl_audio_mixer_behavior_t_AudioMixerBehavior(audio_mixer_behavior_t legacy) {
+    switch (legacy) {
+        case AUDIO_MIXER_BEHAVIOR_DEFAULT:
+            return media::AudioMixerBehavior::DEFAULT;
+        case AUDIO_MIXER_BEHAVIOR_BIT_PERFECT:
+            return media::AudioMixerBehavior::BIT_PERFECT;
+        case AUDIO_MIXER_BEHAVIOR_INVALID:
+            return media::AudioMixerBehavior::INVALID;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_mixer_attributes_t>
+aidl2legacy_AudioMixerAttributesInternal_audio_mixer_attributes_t(
+        const media::AudioMixerAttributesInternal& aidl) {
+    audio_mixer_attributes_t legacy = AUDIO_MIXER_ATTRIBUTES_INITIALIZER;
+    legacy.config = VALUE_OR_RETURN(
+            aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.config, false /*isInput*/));
+    legacy.mixer_behavior = VALUE_OR_RETURN(
+            aidl2legacy_AudioMixerBehavior_audio_mixer_behavior_t(aidl.mixerBehavior));
+    return legacy;
+}
+ConversionResult<media::AudioMixerAttributesInternal>
+legacy2aidl_audio_mixer_attributes_t_AudioMixerAttributesInternal(
+        const audio_mixer_attributes& legacy) {
+    media::AudioMixerAttributesInternal aidl;
+    aidl.config = VALUE_OR_RETURN(
+            legacy2aidl_audio_config_base_t_AudioConfigBase(legacy.config, false /*isInput*/));
+    aidl.mixerBehavior = VALUE_OR_RETURN(
+            legacy2aidl_audio_mixer_behavior_t_AudioMixerBehavior(legacy.mixer_behavior));
+    return aidl;
+}
+
 
 }  // namespace android

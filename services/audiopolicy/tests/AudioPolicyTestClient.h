@@ -57,7 +57,6 @@ public:
                              float /*volume*/,
                              audio_io_handle_t /*output*/,
                              int /*delayMs*/) override { return NO_INIT; }
-    status_t invalidateStream(audio_stream_type_t /*stream*/) override { return NO_INIT; }
     void setParameters(audio_io_handle_t /*ioHandle*/,
                        const String8& /*keyValuePairs*/,
                        int /*delayMs*/) override { }
@@ -102,6 +101,9 @@ public:
     }
     status_t setDeviceConnectedState(const struct audio_port_v7 *port __unused,
                                      media::DeviceConnectedState state __unused) override {
+        return NO_INIT;
+    }
+    status_t invalidateTracks(const std::vector<audio_port_handle_t>& /*portIds*/) override {
         return NO_INIT;
     }
 };

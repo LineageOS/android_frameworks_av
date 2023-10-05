@@ -212,6 +212,8 @@ cc_library_shared {
 cc_library_shared {
     name: "libaudiohal@7.1",
     defaults: [
+        "latest_android_hardware_audio_core_sounddose_ndk_shared",
+        "latest_android_hardware_audio_sounddose_ndk_shared",
         "libaudiohal_default",
         "libaudiohal_hidl_default"
     ],
@@ -231,6 +233,9 @@ cc_library_shared {
         "android.hardware.audio@7.1-util",
         "libaudiohal.effect@7.0",
     ],
+    shared_libs: [
+        "libbinder_ndk",
+    ],
     cflags: [
         "-DMAJOR_VERSION=7",
         "-DMINOR_VERSION=1",
@@ -245,6 +250,7 @@ cc_defaults {
     defaults: [
         "latest_android_hardware_audio_common_ndk_shared",
         "latest_android_hardware_audio_core_ndk_shared",
+        "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "latest_android_hardware_audio_effect_ndk_shared",
         "latest_android_media_audio_common_types_ndk_shared",
     ],

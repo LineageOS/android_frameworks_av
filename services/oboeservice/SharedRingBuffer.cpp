@@ -62,7 +62,7 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
 
     // Map the fd to memory addresses. Use a temporary pointer to keep the mmap result and update
     // it to `mSharedMemory` only when mmap operate successfully.
-    uint8_t* tmpPtr = (uint8_t *) mmap(0, mSharedMemorySizeInBytes,
+    auto tmpPtr = (uint8_t *) mmap(nullptr, mSharedMemorySizeInBytes,
                          PROT_READ|PROT_WRITE,
                          MAP_SHARED,
                          mFileDescriptor.get(), 0);
@@ -74,10 +74,8 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
     mSharedMemory = tmpPtr;
 
     // Get addresses for our counters and data from the shared memory.
-    fifo_counter_t *readCounterAddress =
-            (fifo_counter_t *) &mSharedMemory[SHARED_RINGBUFFER_READ_OFFSET];
-    fifo_counter_t *writeCounterAddress =
-            (fifo_counter_t *) &mSharedMemory[SHARED_RINGBUFFER_WRITE_OFFSET];
+    auto readCounterAddress = (fifo_counter_t *) &mSharedMemory[SHARED_RINGBUFFER_READ_OFFSET];
+    auto writeCounterAddress = (fifo_counter_t *) &mSharedMemory[SHARED_RINGBUFFER_WRITE_OFFSET];
     uint8_t *dataAddress = &mSharedMemory[SHARED_RINGBUFFER_DATA_OFFSET];
 
     mFifoBuffer = std::make_shared<FifoBufferIndirect>(bytesPerFrame, capacityInFrames,

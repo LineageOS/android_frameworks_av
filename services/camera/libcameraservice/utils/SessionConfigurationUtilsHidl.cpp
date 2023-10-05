@@ -111,8 +111,8 @@ convertToHALStreamCombination(
         bool overrideForPerfClass, bool *earlyExit) {
     aidl::android::hardware::camera::device::StreamConfiguration aidlStreamConfiguration;
     auto ret = convertToHALStreamCombination(sessionConfiguration, logicalCameraId, deviceInfo,
-            getMetadata, physicalCameraIds, aidlStreamConfiguration, overrideForPerfClass,
-            earlyExit);
+            false /*isCompositeJpegRDisabled*/, getMetadata, physicalCameraIds,
+            aidlStreamConfiguration, overrideForPerfClass, earlyExit);
     if (!ret.isOk()) {
         return ret;
     }

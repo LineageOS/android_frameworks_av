@@ -176,26 +176,23 @@ namespace media {
 namespace tv {
 namespace tuner {
 
-TunerHidlFrontend::TunerHidlFrontend(sp<HidlIFrontend> frontend, int id) {
+TunerHidlFrontend::TunerHidlFrontend(const sp<HidlIFrontend> frontend, const int id,
+                                     const shared_ptr<TunerHidlService> tuner) {
     mFrontend = frontend;
     mFrontend_1_1 = ::android::hardware::tv::tuner::V1_1::IFrontend::castFrom(mFrontend);
     mId = id;
+    mTunerService = tuner;
 }
 
 TunerHidlFrontend::~TunerHidlFrontend() {
     mFrontend = nullptr;
     mFrontend_1_1 = nullptr;
     mId = -1;
+    mTunerService = nullptr;
 }
 
 ::ndk::ScopedAStatus TunerHidlFrontend::setCallback(
         const shared_ptr<ITunerFrontendCallback>& tunerFrontendCallback) {
-    if (mFrontend == nullptr) {
-        ALOGE("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (tunerFrontendCallback == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -211,12 +208,6 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerHidlFrontend::tune(const FrontendSettings& settings) {
-    if (mFrontend == nullptr) {
-        ALOGE("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status;
     HidlFrontendSettings frontendSettings;
     HidlFrontendSettingsExt1_1 frontendSettingsExt;
@@ -234,12 +225,6 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerHidlFrontend::stopTune() {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status = mFrontend->stopTune();
     if (status == HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::ok();
@@ -250,12 +235,6 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 
 ::ndk::ScopedAStatus TunerHidlFrontend::scan(const FrontendSettings& settings,
                                              FrontendScanType frontendScanType) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status;
     HidlFrontendSettings frontendSettings;
     HidlFrontendSettingsExt1_1 frontendSettingsExt;
@@ -276,12 +255,6 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerHidlFrontend::stopScan() {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status = mFrontend->stopScan();
     if (status == HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::ok();
@@ -291,12 +264,6 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerHidlFrontend::setLnb(const shared_ptr<ITunerLnb>& lnb) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (lnb == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -349,18 +316,8 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerHidlFrontend::close() {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
-    TunerHidlService::getTunerService()->removeFrontend(this->ref<TunerHidlFrontend>());
-
+    mTunerService->removeFrontend(this->ref<TunerHidlFrontend>());
     HidlResult status = mFrontend->close();
-    mFrontend = nullptr;
-    mFrontend_1_1 = nullptr;
-
     if (status != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
     }
@@ -370,12 +327,6 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 
 ::ndk::ScopedAStatus TunerHidlFrontend::getStatus(const vector<FrontendStatusType>& in_statusTypes,
                                                   vector<FrontendStatus>* _aidl_return) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res;
     vector<HidlFrontendStatus> status;
     vector<HidlFrontendStatusExt1_1> statusExt;
@@ -442,11 +393,6 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 }
 
 void TunerHidlFrontend::setLna(bool bEnable) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return;
-    }
-
     mFrontend->setLna(bEnable);
 }
 

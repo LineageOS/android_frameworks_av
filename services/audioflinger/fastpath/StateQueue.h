@@ -123,11 +123,10 @@ struct StateQueueMutatorDump {
 #endif
 
 // manages a FIFO queue of states
-template<typename T> class StateQueue {
+// marking as final to avoid derived classes as there are no virtuals.
+template<typename T> class StateQueue final {
 
 public:
-    virtual ~StateQueue() = default;  // why is this virtual?
-
     // Observer APIs
 
     // Poll for a state change.  Returns a pointer to a read-only state,

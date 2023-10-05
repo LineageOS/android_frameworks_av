@@ -53,6 +53,28 @@ public:
     MOCK_METHOD(void, onMessageReceived, (const sp<AMessage>&), (override));
 };
 
+TEST(AMessage_tests, countsAndLimits) {
+  sp<AMessage> m1 = new AMessage();
+
+  // clear, countEntries, maxAllowedEntries
+
+  EXPECT_EQ(0, m1->countEntries());
+
+  m1->setInt32("smaller", INT32_MAX - 2);
+  m1->setInt64("big", INT64_MAX);
+  m1->setString("bigBallOfString", "whatever");
+  EXPECT_EQ(3, m1->countEntries());
+
+  m1->clear();
+  EXPECT_EQ(0, m1->countEntries());
+
+  EXPECT_TRUE(m1->maxAllowedEntries() > 0);
+  EXPECT_TRUE(AMessage::maxAllowedEntries() > 0);
+
+  // static function, make sure we get a consistent answer
+  EXPECT_EQ(m1->maxAllowedEntries(), AMessage::maxAllowedEntries());
+}
+
 TEST(AMessage_tests, settersAndGetters) {
   sp<AMessage> m1 = new AMessage();
 

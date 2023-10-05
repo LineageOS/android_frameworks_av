@@ -181,6 +181,9 @@ struct InFlightRequest {
     // Indicates that ROTATE_AND_CROP was set to AUTO
     bool rotateAndCropAuto;
 
+    // Indicates that AUTOFRAMING was set to AUTO
+    bool autoframingAuto;
+
     // Requested camera ids (both logical and physical) with zoomRatio != 1.0f
     std::set<std::string> cameraIdsWithZoom;
 
@@ -213,6 +216,7 @@ struct InFlightRequest {
             stillCapture(false),
             zslCapture(false),
             rotateAndCropAuto(false),
+            autoframingAuto(false),
             requestTimeNs(0),
             transform(-1) {
     }
@@ -220,8 +224,9 @@ struct InFlightRequest {
     InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
             bool hasAppCallback, nsecs_t minDuration, nsecs_t maxDuration, bool fixedFps,
             const std::set<std::set<std::string>>& physicalCameraIdSet, bool isStillCapture,
-            bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& idsWithZoom,
-            nsecs_t requestNs, const SurfaceMap& outSurfaces = SurfaceMap{}) :
+            bool isZslCapture, bool rotateAndCropAuto, bool autoframingAuto,
+            const std::set<std::string>& idsWithZoom, nsecs_t requestNs,
+            const SurfaceMap& outSurfaces = SurfaceMap{}) :
             shutterTimestamp(0),
             sensorTimestamp(0),
             requestStatus(OK),
@@ -239,6 +244,7 @@ struct InFlightRequest {
             stillCapture(isStillCapture),
             zslCapture(isZslCapture),
             rotateAndCropAuto(rotateAndCropAuto),
+            autoframingAuto(autoframingAuto),
             cameraIdsWithZoom(idsWithZoom),
             requestTimeNs(requestNs),
             outputSurfaces(outSurfaces),

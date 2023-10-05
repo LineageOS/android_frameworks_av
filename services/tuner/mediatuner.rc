@@ -1,9 +1,15 @@
+# media.tuner service is not started by default unless tuner.server.enable is set
+# as "true" by TRM (Tuner Resource Manager). TRM checks ro.tuner.lazyhal, if it
+# isn't true , TRM sets tuner.server.enable as "true".
 service media.tuner /system/bin/mediatuner
     class main
     group media
     user root
     ioprio rt 4
-    onrestart restart vendor.tuner-hal-1-0
-    onrestart restart vendor.tuner-hal-1-1
-    onrestart restart vendor.tuner-default
     task_profiles ProcessCapacityHigh HighPerformance
+    interface aidl media.tuner
+    oneshot
+    disabled
+
+on property:tuner.server.enable=true
+    enable media.tuner

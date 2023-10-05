@@ -14,45 +14,38 @@
  * limitations under the License.
  */
 
-#include <android/frameworks/cameraservice/service/2.0/ICameraService.h>
-#include <android/frameworks/cameraservice/device/2.0/ICameraDeviceUser.h>
-#include <android/frameworks/cameraservice/device/2.0/types.h>
-#include <camera/NdkCameraDevice.h>
+#ifndef CAMERA_NDK_VENDOR_UTILS_H
+#define CAMERA_NDK_VENDOR_UTILS_H
+
 #include <CameraMetadata.h>
+#include <aidl/android/frameworks/cameraservice/common/Status.h>
+#include <aidl/android/frameworks/cameraservice/device/CameraMetadata.h>
+#include <aidl/android/frameworks/cameraservice/device/CaptureRequest.h>
+#include <aidl/android/frameworks/cameraservice/device/ICameraDeviceUser.h>
+#include <aidl/android/frameworks/cameraservice/device/OutputConfiguration.h>
+#include <aidl/android/frameworks/cameraservice/device/PhysicalCameraSettings.h>
+#include <aidl/android/frameworks/cameraservice/device/TemplateId.h>
+#include <aidl/android/frameworks/cameraservice/service/ICameraService.h>
+#include <camera/NdkCameraDevice.h>
 #include <hardware/camera3.h>
-
-#ifndef CAMERA_NDK_VENDOR_H
-#define CAMERA_NDK_VENDOR_H
-
-using android::hardware::hidl_vec;
-using android::hardware::hidl_handle;
+#include <utils/RefBase.h>
 
 namespace android {
 namespace acam {
 namespace utils {
 
-using CameraMetadata = hardware::camera::common::V1_0::helper::CameraMetadata;
-using HCameraMetadata  = frameworks::cameraservice::service::V2_0::CameraMetadata;
-using Status = frameworks::cameraservice::common::V2_0::Status;
-using TemplateId = frameworks::cameraservice::device::V2_0::TemplateId;
-using PhysicalCameraSettings = frameworks::cameraservice::device::V2_0::PhysicalCameraSettings;
-using HRotation = frameworks::cameraservice::device::V2_0::OutputConfiguration::Rotation;
-using OutputConfiguration = frameworks::cameraservice::device::V2_0::OutputConfiguration;
-
-// Utility class so that CaptureRequest can be stored by sp<>
-struct CaptureRequest : public RefBase {
-  frameworks::cameraservice::device::V2_0::CaptureRequest mCaptureRequest;
-  std::vector<const native_handle_t *> mSurfaceList;
-  //Physical camera settings metadata is stored here, since the capture request
-  //might not contain it. That's since, fmq might have consumed it.
-  hidl_vec<PhysicalCameraSettings> mPhysicalCameraSettings;
-};
-
-bool areWindowNativeHandlesEqual(hidl_vec<hidl_handle> handles1, hidl_vec<hidl_handle>handles2);
-
-bool areWindowNativeHandlesLessThan(hidl_vec<hidl_handle> handles1, hidl_vec<hidl_handle>handles2);
+using ::aidl::android::frameworks::cameraservice::common::Status;
+using ::aidl::android::frameworks::cameraservice::device::OutputConfiguration;
+using ::aidl::android::frameworks::cameraservice::device::PhysicalCameraSettings;
+using ::aidl::android::frameworks::cameraservice::device::TemplateId;
+using ::aidl::android::hardware::common::NativeHandle;
+using ::android::hardware::camera::common::V1_0::helper::CameraMetadata;
+using AidlCameraMetadata = ::aidl::android::frameworks::cameraservice::device::CameraMetadata;
+using AidlCaptureRequest = ::aidl::android::frameworks::cameraservice::device::CaptureRequest;
 
 bool isWindowNativeHandleEqual(const native_handle_t *nh1, const native_handle_t *nh2);
+
+bool isWindowNativeHandleEqual(const native_handle_t* nh1, const NativeHandle& nh2);
 
 bool isWindowNativeHandleLessThan(const native_handle_t *nh1, const native_handle_t *nh2);
 
@@ -88,117 +81,30 @@ struct native_handle_ptr_wrapper {
 
 };
 
-// Wrapper around OutputConfiguration. This is needed since HIDL
-// OutputConfiguration is auto-generated and marked final. Therefore, operator
-// overloads outside the class, will not get picked by clang while trying to
-// store OutputConfiguration in maps/sets.
-struct OutputConfigurationWrapper {
-    OutputConfiguration mOutputConfiguration;
-
-    operator const OutputConfiguration &() const {
-        return mOutputConfiguration;
-    }
-
-    OutputConfigurationWrapper() {
-        mOutputConfiguration.rotation = OutputConfiguration::Rotation::R0;
-        // The ndk currently doesn't support deferred surfaces
-        mOutputConfiguration.isDeferred = false;
-        mOutputConfiguration.width = 0;
-        mOutputConfiguration.height = 0;
-        // ndk doesn't support inter OutputConfiguration buffer sharing.
-        mOutputConfiguration.windowGroupId = -1;
-    };
-
-    OutputConfigurationWrapper(const OutputConfigurationWrapper &other) {
-        *this = other;
-    }
-
-    // Needed to make sure that OutputConfiguration in
-    // OutputConfigurationWrapper, when copied doesn't call hidl_handle's
-    // assignment operator / copy constructor, which will lead to native handle
-    // cloning, which is not what we want for app callbacks which have the native
-    // handle as parameter.
-    OutputConfigurationWrapper &operator=(const OutputConfigurationWrapper &other) {
-        const OutputConfiguration &outputConfiguration = other.mOutputConfiguration;
-        mOutputConfiguration.rotation = outputConfiguration.rotation;
-        mOutputConfiguration.isDeferred = outputConfiguration.isDeferred;
-        mOutputConfiguration.width = outputConfiguration.width;
-        mOutputConfiguration.height = outputConfiguration.height;
-        mOutputConfiguration.windowGroupId = outputConfiguration.windowGroupId;
-        mOutputConfiguration.windowHandles.resize(outputConfiguration.windowHandles.size());
-        mOutputConfiguration.physicalCameraId = outputConfiguration.physicalCameraId;
-        size_t i = 0;
-        for (const auto &handle : outputConfiguration.windowHandles) {
-            mOutputConfiguration.windowHandles[i++] = handle.getNativeHandle();
-        }
-        return *this;
-    }
-
-    bool operator ==(const OutputConfiguration &other) const {
-        const OutputConfiguration &self = mOutputConfiguration;
-        return self.rotation == other.rotation && self.windowGroupId == other.windowGroupId &&
-                self.physicalCameraId == other.physicalCameraId && self.width == other.width &&
-                self.height == other.height && self.isDeferred == other.isDeferred &&
-                areWindowNativeHandlesEqual(self.windowHandles, other.windowHandles);
-    }
-
-    bool operator < (const OutputConfiguration &other) const {
-        if (*this == other) {
-            return false;
-        }
-        const OutputConfiguration &self = mOutputConfiguration;
-        if (self.windowGroupId != other.windowGroupId) {
-            return self.windowGroupId < other.windowGroupId;
-        }
-
-        if (self.width != other.width) {
-            return self.width < other.width;
-        }
-
-        if (self.height != other.height) {
-            return self.height < other.height;
-        }
-
-        if (self.rotation != other.rotation) {
-            return static_cast<uint32_t>(self.rotation) < static_cast<uint32_t>(other.rotation);
-        }
-
-        if (self.isDeferred != other.isDeferred) {
-            return self.isDeferred < other.isDeferred;
-        }
-
-        if (self.physicalCameraId != other.physicalCameraId) {
-            return self.physicalCameraId < other.physicalCameraId;
-        }
-        return areWindowNativeHandlesLessThan(self.windowHandles, other.windowHandles);
-    }
-
-    bool operator != (const OutputConfiguration &other) const {
-        return !(*this == other);
-    }
-
-    bool operator > (const OutputConfiguration &other) const {
-        return (*this != other) && !(*this < other);
-    }
+// Utility class so that CaptureRequest can be stored by sp<>
+struct CaptureRequest: public RefBase {
+  AidlCaptureRequest mCaptureRequest;
+  std::vector<native_handle_ptr_wrapper> mSurfaceList;
+  // Physical camera settings metadata is stored here, as the capture request
+  // might not contain it. That's since, fmq might have consumed it.
+  std::vector<PhysicalCameraSettings> mPhysicalCameraSettings;
 };
 
-// Convert CaptureRequest wrappable by sp<> to hidl CaptureRequest.
-frameworks::cameraservice::device::V2_0::CaptureRequest convertToHidl(
-    const CaptureRequest *captureRequest);
+AidlCaptureRequest convertToAidl(const CaptureRequest *captureRequest);
 
-HRotation convertToHidl(int rotation);
+OutputConfiguration::Rotation convertToAidl(int rotation);
 
-bool convertFromHidlCloned(const HCameraMetadata &metadata, CameraMetadata *rawMetadata);
+bool cloneFromAidl(const AidlCameraMetadata & srcMetadata, camera_metadata_t** dst);
 
 // Note: existing data in dst will be gone.
-void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst, bool shouldOwn = false);
+void convertToAidl(const camera_metadata_t *src, AidlCameraMetadata * dst);
 
-TemplateId convertToHidl(ACameraDevice_request_template templateId);
+TemplateId convertToAidl(ACameraDevice_request_template templateId);
 
-camera_status_t convertFromHidl(Status status);
+camera_status_t convertFromAidl(Status status);
 
 } // namespace utils
 } // namespace acam
 } // namespace android
 
-#endif // CAMERA_NDK_VENDOR_H
+#endif // CAMERA_NDK_VENDOR_UTILS_H

@@ -170,6 +170,21 @@ audio_policy_forced_cfg_t Engine::getForceUse(audio_policy_force_use_t usage) co
     return mPolicyParameterMgr->getForceUse(usage);
 }
 
+status_t Engine::setOutputDevicesConnectionState(const DeviceVector &devices,
+                                                 audio_policy_dev_state_t state)
+{
+    for (const auto &device : devices) {
+        mPolicyParameterMgr->setDeviceConnectionState(device->type(), device->address(), state);
+    }
+    DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    if (state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) {
+        availableOutputDevices.remove(devices);
+    } else {
+        availableOutputDevices.add(devices);
+    }
+    return mPolicyParameterMgr->setAvailableOutputDevices(availableOutputDevices.types());
+}
+
 status_t Engine::setDeviceConnectionState(const sp<DeviceDescriptor> device,
                                           audio_policy_dev_state_t state)
 {
@@ -210,16 +225,125 @@ status_t Engine::loadAudioPolicyEngineConfig(const std::string& xmlFilePath)
     return result.nbSkippedElement == 0? NO_ERROR : BAD_VALUE;
 }
 
+status_t Engine::setDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+                                           const AudioDeviceTypeAddrVector &devices)
+{
+    DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    DeviceVector prevDisabledDevices =
+            getDisabledDevicesForProductStrategy(availableOutputDevices, strategy);
+    status_t status = EngineBase::setDevicesRoleForStrategy(strategy, role, devices);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    DeviceVector newDisabledDevices =
+            getDisabledDevicesForProductStrategy(availableOutputDevices, strategy);
+    if (role == DEVICE_ROLE_PREFERRED) {
+        DeviceVector reenabledDevices = prevDisabledDevices;
+        reenabledDevices.remove(newDisabledDevices);
+        if (reenabledDevices.empty()) {
+            ALOGD("%s DEVICE_ROLE_PREFERRED empty renabled devices", __func__);
+            return status;
+        }
+        // some devices were moved from disabled to preferred, need to force a resync for these
+        enableDevicesForStrategy(strategy, prevDisabledDevices);
+    }
+    if (newDisabledDevices.empty()) {
+        return status;
+    }
+    return disableDevicesForStrategy(strategy, newDisabledDevices);
+}
+
+status_t Engine::removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+        const AudioDeviceTypeAddrVector &devices)
+{
+    const auto productStrategies = getProductStrategies();
+    if (productStrategies.find(strategy) == end(productStrategies)) {
+        ALOGE("%s invalid %d", __func__, strategy);
+        return BAD_VALUE;
+    }
+    DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    DeviceVector prevDisabledDevices =
+            getDisabledDevicesForProductStrategy(availableOutputDevices, strategy);
+    status_t status = EngineBase::removeDevicesRoleForStrategy(strategy, role, devices);
+    if (status != NO_ERROR || role == DEVICE_ROLE_PREFERRED) {
+        return status;
+    }
+    // Removing ROLE_DISABLED for given devices, need to force a resync for these
+    enableDevicesForStrategy(strategy, prevDisabledDevices);
+
+    DeviceVector remainingDisabledDevices = getDisabledDevicesForProductStrategy(
+            availableOutputDevices, strategy);
+    if (remainingDisabledDevices.empty()) {
+        return status;
+    }
+    return disableDevicesForStrategy(strategy, remainingDisabledDevices);
+}
+
+status_t Engine::clearDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role)
+{
+    const auto productStrategies = getProductStrategies();
+    if (productStrategies.find(strategy) == end(productStrategies)) {
+        ALOGE("%s invalid %d", __func__, strategy);
+        return BAD_VALUE;
+    }
+    DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    DeviceVector prevDisabledDevices =
+            getDisabledDevicesForProductStrategy(availableOutputDevices, strategy);
+    status_t status = EngineBase::clearDevicesRoleForStrategy(strategy, role);
+    if (status != NO_ERROR || role == DEVICE_ROLE_PREFERRED || prevDisabledDevices.empty()) {
+        return status;
+    }
+    // Disabled devices were removed, need to force a resync for these
+    enableDevicesForStrategy(strategy, prevDisabledDevices);
+    return NO_ERROR;
+}
+
+void Engine::enableDevicesForStrategy(product_strategy_t strategy __unused,
+        const DeviceVector &devicesToEnable) {
+    // devices were (re)enabled, need to force a resync for these
+    setOutputDevicesConnectionState(devicesToEnable, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE);
+    setOutputDevicesConnectionState(devicesToEnable, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+}
+
+status_t Engine::disableDevicesForStrategy(product_strategy_t strategy,
+        const DeviceVector &devicesToDisable) {
+    // Filter out disabled devices for this strategy.
+    // However, to update the output device decision, availability criterion shall be updated,
+    // which may impact other strategies. So, as a WA, reconsider now and later to prevent from
+    // altering decision for other strategies;
+    setOutputDevicesConnectionState(devicesToDisable, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE);
+
+    DeviceTypeSet deviceTypes = getProductStrategies().getDeviceTypesForProductStrategy(strategy);
+    const std::string address(getProductStrategies().getDeviceAddressForProductStrategy(strategy));
+
+    setOutputDevicesConnectionState(devicesToDisable, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+
+    // Force reapply devices for given strategy
+    getProductStrategies().at(strategy)->setDeviceTypes(deviceTypes);
+    setDeviceAddressForProductStrategy(strategy, address);
+    return NO_ERROR;
+}
+
 DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
 {
+    DeviceVector selectedDevices = {};
+    DeviceVector disabledDevices = {};
     const auto productStrategies = getProductStrategies();
     if (productStrategies.find(ps) == productStrategies.end()) {
         ALOGE("%s: Trying to get device on invalid strategy %d", __FUNCTION__, ps);
-        return {};
+        return selectedDevices;
     }
-    const DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     DeviceTypeSet availableOutputDevicesTypes = availableOutputDevices.types();
+
+    // check if this strategy has a preferred device that is available,
+    // if yes, give priority to it.
+    DeviceVector preferredAvailableDevVec =
+            getPreferredAvailableDevicesForProductStrategy(availableOutputDevices, ps);
+    if (!preferredAvailableDevVec.isEmpty()) {
+        return preferredAvailableDevVec;
+    }
 
     /** This is the only case handled programmatically because the PFW is unable to know the
      * activity of streams.
@@ -232,33 +356,34 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
      * -When media is not playing anymore, fall back on the sonification behavior
      */
     DeviceTypeSet deviceTypes;
+    product_strategy_t psOrFallback = ps;
     if (ps == getProductStrategyForStream(AUDIO_STREAM_NOTIFICATION) &&
             !is_state_in_call(getPhoneState()) &&
             !outputs.isActiveRemotely(toVolumeSource(AUDIO_STREAM_MUSIC),
                                       SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY) &&
             outputs.isActive(toVolumeSource(AUDIO_STREAM_MUSIC),
                              SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
-        product_strategy_t strategyForMedia =
-                getProductStrategyForStream(AUDIO_STREAM_MUSIC);
-        deviceTypes = productStrategies.getDeviceTypesForProductStrategy(strategyForMedia);
+        psOrFallback = getProductStrategyForStream(AUDIO_STREAM_MUSIC);
     } else if (ps == getProductStrategyForStream(AUDIO_STREAM_ACCESSIBILITY) &&
         (outputs.isActive(toVolumeSource(AUDIO_STREAM_RING)) ||
          outputs.isActive(toVolumeSource(AUDIO_STREAM_ALARM)))) {
             // do not route accessibility prompts to a digital output currently configured with a
             // compressed format as they would likely not be mixed and dropped.
             // Device For Sonification conf file has HDMI, SPDIF and HDMI ARC unreacheable.
-        product_strategy_t strategyNotification = getProductStrategyForStream(AUDIO_STREAM_RING);
-        deviceTypes = productStrategies.getDeviceTypesForProductStrategy(strategyNotification);
-    } else {
-        deviceTypes = productStrategies.getDeviceTypesForProductStrategy(ps);
+        psOrFallback = getProductStrategyForStream(AUDIO_STREAM_RING);
     }
+    disabledDevices = getDisabledDevicesForProductStrategy(availableOutputDevices, psOrFallback);
+    deviceTypes = productStrategies.getDeviceTypesForProductStrategy(psOrFallback);
+    // In case a fallback is decided on other strategy, prevent from selecting this device if
+    // disabled for current strategy.
+    availableOutputDevices.remove(disabledDevices);
+
     if (deviceTypes.empty() ||
             Intersection(deviceTypes, availableOutputDevicesTypes).empty()) {
         auto defaultDevice = getApmObserver()->getDefaultOutputDevice();
         ALOG_ASSERT(defaultDevice != nullptr, "no valid default device defined");
-        return DeviceVector(defaultDevice);
-    }
-    if (/*device_distinguishes_on_address(*deviceTypes.begin())*/ isSingleDeviceType(
+        selectedDevices = DeviceVector(defaultDevice);
+    } else if (/*device_distinguishes_on_address(*deviceTypes.begin())*/ isSingleDeviceType(
             deviceTypes, AUDIO_DEVICE_OUT_BUS)) {
         // We do expect only one device for these types of devices
         // Criterion device address garantee this one is available
@@ -273,12 +398,15 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
                   dumpDeviceTypes(deviceTypes).c_str(), address.c_str());
             auto defaultDevice = getApmObserver()->getDefaultOutputDevice();
             ALOG_ASSERT(defaultDevice != nullptr, "Default Output Device NOT available");
-            return DeviceVector(defaultDevice);
+            selectedDevices = DeviceVector(defaultDevice);
+        } else {
+            selectedDevices = DeviceVector(busDevice);
         }
-        return DeviceVector(busDevice);
+    } else {
+        ALOGV("%s:device %s %d", __FUNCTION__, dumpDeviceTypes(deviceTypes).c_str(), ps);
+        selectedDevices = availableOutputDevices.getDevicesFromTypes(deviceTypes);
     }
-    ALOGV("%s:device %s %d", __FUNCTION__, dumpDeviceTypes(deviceTypes).c_str(), ps);
-    return availableOutputDevices.getDevicesFromTypes(deviceTypes);
+    return selectedDevices;
 }
 
 DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &attributes,
@@ -320,6 +448,7 @@ DeviceVector Engine::getOutputDevicesForStream(audio_stream_type_t stream, bool 
 
 sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_t &attr,
                                                          uid_t uid,
+                                                         audio_session_t session,
                                                          sp<AudioPolicyMix> *mix) const
 {
     const auto &policyMixes = getApmObserver()->getAudioPolicyMixCollection();
@@ -341,6 +470,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
     device = policyMixes.getDeviceAndMixForInputSource(attr,
                                                        availableInputDevices,
                                                        uid,
+                                                       session,
                                                        mix);
     if (device != nullptr) {
         return device;

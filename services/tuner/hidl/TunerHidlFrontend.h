@@ -64,9 +64,12 @@ namespace media {
 namespace tv {
 namespace tuner {
 
+class TunerHidlService;
+
 class TunerHidlFrontend : public BnTunerFrontend {
 public:
-    TunerHidlFrontend(sp<HidlIFrontend> frontend, int id);
+    TunerHidlFrontend(const sp<HidlIFrontend> frontend, const int id,
+                      const shared_ptr<TunerHidlService> tuner);
     virtual ~TunerHidlFrontend();
 
     ::ndk::ScopedAStatus setCallback(
@@ -118,6 +121,7 @@ private:
     int mId;
     sp<HidlIFrontend> mFrontend;
     sp<::android::hardware::tv::tuner::V1_1::IFrontend> mFrontend_1_1;
+    shared_ptr<TunerHidlService> mTunerService;
 };
 
 }  // namespace tuner

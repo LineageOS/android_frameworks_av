@@ -82,6 +82,8 @@ public:
 
     status_t setRotateAndCropOverride(uint8_t rotateAndCrop) override;
 
+    status_t setAutoframingOverride(uint8_t autoframingValue) override;
+
     bool supportsCameraMute() override;
     status_t setCameraMute(bool enabled) override;
 
@@ -91,6 +93,10 @@ public:
             const std::vector<int64_t>& useCaseOverrides) override;
 
     void clearStreamUseCaseOverrides() override;
+
+    bool supportsZoomOverride() override;
+
+    status_t setZoomOverride(int32_t zoomOverride) override;
 
     // permissions management
     status_t startCameraOps() override;

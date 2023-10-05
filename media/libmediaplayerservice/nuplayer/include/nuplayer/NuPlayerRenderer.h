@@ -83,6 +83,8 @@ struct NuPlayer::Renderer : public AHandler {
             bool isStreaming);
     void closeAudioSink();
 
+    void dump(AString& logString);
+
     // re-open audio sink after all pending audio buffers played.
     void changeAudioFormat(
             const sp<AMessage> &format,
@@ -237,6 +239,32 @@ private:
     bool getCurrentPositionIfPaused_l(int64_t *mediaUs);
     status_t getCurrentPositionFromAnchor(
             int64_t *mediaUs, int64_t nowUs, bool allowPastQueuedVideo = false);
+
+    struct WakeLockEvent{
+        int64_t mTimeMs;
+        int32_t mEventTimeoutGeneration;
+        int32_t mRendererTimeoutGeneration;
+
+        WakeLockEvent():
+            mTimeMs(0),
+            mEventTimeoutGeneration(0),
+            mRendererTimeoutGeneration(0) {}
+
+        void updateValues(int64_t timeMs,
+                          int32_t eventGeneration,
+                          int32_t rendererGeneration) {
+            mTimeMs = timeMs;
+            mEventTimeoutGeneration = eventGeneration;
+            mRendererTimeoutGeneration = rendererGeneration;
+        }
+
+        void dump(AString& logString);
+    };
+
+    WakeLockEvent mWakelockAcquireEvent;
+    WakeLockEvent mWakelockTimeoutEvent;
+    WakeLockEvent mWakelockReleaseEvent;
+    WakeLockEvent mWakelockCancelEvent;
 
     void notifyEOSCallback();
     size_t fillAudioBuffer(void *buffer, size_t size);

@@ -49,7 +49,7 @@ cc_defaults {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.provider-V1-ndk",
+        "android.hardware.camera.provider-V2-ndk",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.3",
@@ -61,6 +61,7 @@ cc_defaults {
     fuzz_config: {
         cc: [
             "android-media-fuzzing-reports@google.com",
+            "android-camera-fwk-eng@google.com",
         ],
         componentid: 155276,
         libfuzzer_options: [

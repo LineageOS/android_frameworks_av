@@ -33,6 +33,7 @@
 using ::aidl::android::hardware::tv::tuner::DemuxCapabilities;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
+using ::aidl::android::hardware::tv::tuner::DemuxInfo;
 using ::aidl::android::hardware::tv::tuner::FrontendInfo;
 using ::aidl::android::hardware::tv::tuner::FrontendType;
 using ::aidl::android::media::tv::tuner::ITunerDemux;
@@ -83,12 +84,15 @@ public:
     ::ndk::ScopedAStatus openDemux(int32_t in_demuxHandle,
                                    shared_ptr<ITunerDemux>* _aidl_return) override;
     ::ndk::ScopedAStatus getDemuxCaps(DemuxCapabilities* _aidl_return) override;
+    ::ndk::ScopedAStatus getDemuxInfo(int32_t in_demuxHandle, DemuxInfo* _aidl_return) override;
+    ::ndk::ScopedAStatus getDemuxInfoList(vector<DemuxInfo>* _aidl_return) override;
     ::ndk::ScopedAStatus openDescrambler(int32_t in_descramblerHandle,
                                          shared_ptr<ITunerDescrambler>* _aidl_return) override;
     ::ndk::ScopedAStatus getTunerHalVersion(int32_t* _aidl_return) override;
     ::ndk::ScopedAStatus openSharedFilter(const string& in_filterToken,
                                           const shared_ptr<ITunerFilterCallback>& in_cb,
                                           shared_ptr<ITunerFilter>* _aidl_return) override;
+    ::ndk::ScopedAStatus isLnaSupported(bool* _aidl_return) override;
     ::ndk::ScopedAStatus setLna(bool in_bEnable) override;
     ::ndk::ScopedAStatus setMaxNumberOfFrontends(FrontendType in_frontendType,
                                                  int32_t in_maxNumber) override;
@@ -99,11 +103,7 @@ public:
     void removeSharedFilter(const shared_ptr<TunerHidlFilter>& sharedFilter);
     void removeFrontend(const shared_ptr<TunerHidlFrontend>& frontend);
 
-    static shared_ptr<TunerHidlService> getTunerService();
-
 private:
-    bool hasITuner();
-    bool hasITuner_1_1();
     void updateTunerResources();
     vector<TunerFrontendInfo> getTRMFrontendInfos();
     vector<int32_t> getTRMLnbHandles();
@@ -121,8 +121,6 @@ private:
     Mutex mOpenedFrontendsLock;
     unordered_set<shared_ptr<TunerHidlFrontend>> mOpenedFrontends;
     int mLnaStatus = -1;
-
-    static shared_ptr<TunerHidlService> sTunerService;
 };
 
 }  // namespace tuner

@@ -22,6 +22,8 @@
 #include <system/audio.h>
 
 #include <android/media/AudioMix.h>
+#include <android/media/AudioMixerAttributesInternal.h>
+#include <android/media/AudioMixerBehavior.h>
 #include <android/media/AudioMixCallbackFlag.h>
 #include <android/media/AudioMixRouteFlag.h>
 #include <android/media/AudioMixType.h>
@@ -101,5 +103,17 @@ ConversionResult<audio_offload_mode_t>
 aidl2legacy_AudioOffloadMode_audio_offload_mode_t(media::AudioOffloadMode aidl);
 ConversionResult<media::AudioOffloadMode>
 legacy2aidl_audio_offload_mode_t_AudioOffloadMode(audio_offload_mode_t legacy);
+
+ConversionResult<audio_mixer_behavior_t>
+aidl2legacy_AudioMixerBehavior_audio_mixer_behavior_t(media::AudioMixerBehavior aidl);
+ConversionResult<media::AudioMixerBehavior>
+legacy2aidl_audio_mixer_behavior_t_AudioMixerBehavior(audio_mixer_behavior_t legacy);
+
+ConversionResult<audio_mixer_attributes_t>
+aidl2legacy_AudioMixerAttributesInternal_audio_mixer_attributes_t(
+        const media::AudioMixerAttributesInternal& aidl);
+ConversionResult<media::AudioMixerAttributesInternal>
+legacy2aidl_audio_mixer_attributes_t_AudioMixerAttributesInternal(
+        const audio_mixer_attributes_t& legacy);
 
 }  // namespace android

@@ -48,10 +48,22 @@ __BEGIN_DECLS
 struct AMediaMuxer;
 typedef struct AMediaMuxer AMediaMuxer;
 
+/**
+ * Defines the output format. These constants are used with constructor.
+ *
+ * These enums match the ones used in {@link android.media.MediaMuxer.OutputFormat}
+ */
 typedef enum {
+    /** MPEG4 media file format*/
     AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4 = 0,
-    AMEDIAMUXER_OUTPUT_FORMAT_WEBM   = 1,
-    AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP   = 2,
+    /** WEBM media file format*/
+    AMEDIAMUXER_OUTPUT_FORMAT_WEBM = 1,
+    /** 3GPP media file format*/
+    AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP = 2,
+    /** HEIF media file format*/
+    AMEDIAMUXER_OUTPUT_FORMAT_HEIF = 3,  // introduced in API 34
+    /** Ogg media file format*/
+    AMEDIAMUXER_OUTPUT_FORMAT_OGG = 4,  // introduced in API 34
 } OutputFormat;
 
 typedef enum {

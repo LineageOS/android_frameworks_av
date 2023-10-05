@@ -1019,6 +1019,25 @@ int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports) {
     return statusTFromBinderStatus(mModule->supportsVariableLatency(supports));
 }
 
+status_t DeviceHalAidl::getSoundDoseInterface(const std::string& module,
+                                              ::ndk::SpAIBinder* soundDoseBinder)  {
+    TIME_CHECK();
+    if (!mModule) return NO_INIT;
+    if (mSoundDose == nullptr) {
+        ndk::ScopedAStatus status = mModule->getSoundDose(&mSoundDose);
+        if (!status.isOk()) {
+            ALOGE("%s failed to return the sound dose interface for module %s: %s",
+                  __func__,
+                  module.c_str(),
+                  status.getDescription().c_str());
+            return BAD_VALUE;
+        }
+    }
+    *soundDoseBinder = mSoundDose->asBinder();
+    ALOGI("%s using audio AIDL HAL sound dose interface", __func__);
+
+    return OK;
+}
 
 status_t DeviceHalAidl::prepareToDisconnectExternalDevice(const struct audio_port_v7* port) {
     // There is not AIDL API defined for `prepareToDisconnectExternalDevice`.

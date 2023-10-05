@@ -37,18 +37,13 @@ TunerFrontend::TunerFrontend(shared_ptr<IFrontend> frontend, int id) {
 }
 
 TunerFrontend::~TunerFrontend() {
+    close();
     mFrontend = nullptr;
     mId = -1;
 }
 
 ::ndk::ScopedAStatus TunerFrontend::setCallback(
         const shared_ptr<ITunerFrontendCallback>& tunerFrontendCallback) {
-    if (mFrontend == nullptr) {
-        ALOGE("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (tunerFrontendCallback == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -60,53 +55,23 @@ TunerFrontend::~TunerFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerFrontend::tune(const FrontendSettings& settings) {
-    if (mFrontend == nullptr) {
-        ALOGE("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->tune(settings);
 }
 
 ::ndk::ScopedAStatus TunerFrontend::stopTune() {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->stopTune();
 }
 
 ::ndk::ScopedAStatus TunerFrontend::scan(const FrontendSettings& settings,
                                          FrontendScanType frontendScanType) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->scan(settings, frontendScanType);
 }
 
 ::ndk::ScopedAStatus TunerFrontend::stopScan() {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->stopScan();
 }
 
 ::ndk::ScopedAStatus TunerFrontend::setLnb(const shared_ptr<ITunerLnb>& lnb) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (lnb == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -116,46 +81,19 @@ TunerFrontend::~TunerFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerFrontend::linkCiCamToFrontend(int32_t ciCamId, int32_t* _aidl_return) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->linkCiCam(ciCamId, _aidl_return);
 }
 
 ::ndk::ScopedAStatus TunerFrontend::unlinkCiCamToFrontend(int32_t ciCamId) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->unlinkCiCam(ciCamId);
 }
 
 ::ndk::ScopedAStatus TunerFrontend::close() {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
-    auto res = mFrontend->close();
-    mFrontend = nullptr;
-
-    return res;
+    return mFrontend->close();
 }
 
 ::ndk::ScopedAStatus TunerFrontend::getStatus(const vector<FrontendStatusType>& in_statusTypes,
                                               vector<FrontendStatus>* _aidl_return) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->getStatus(in_statusTypes, _aidl_return);
 }
 
@@ -165,34 +103,16 @@ TunerFrontend::~TunerFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerFrontend::getHardwareInfo(std::string* _aidl_return) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->getHardwareInfo(_aidl_return);
 }
 
 ::ndk::ScopedAStatus TunerFrontend::removeOutputPid(int32_t in_pid) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->removeOutputPid(in_pid);
 }
 
 ::ndk::ScopedAStatus TunerFrontend::getFrontendStatusReadiness(
         const std::vector<FrontendStatusType>& in_statusTypes,
         std::vector<FrontendStatusReadiness>* _aidl_return) {
-    if (mFrontend == nullptr) {
-        ALOGD("IFrontend is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     return mFrontend->getFrontendStatusReadiness(in_statusTypes, _aidl_return);
 }
 

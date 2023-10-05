@@ -44,6 +44,7 @@
 #include <mediautils/TimeCheck.h>
 
 #include "AudioFlinger.h"
+#include "EffectConfiguration.h"
 
 // ----------------------------------------------------------------------------
 
@@ -65,6 +66,7 @@
 namespace android {
 
 using aidl_utils::statusTFromBinderStatus;
+using audioflinger::EffectConfiguration;
 using binder::Status;
 
 namespace {
@@ -278,8 +280,8 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
         if (!doRegister && !(registered && doEnable)) {
             return NO_ERROR;
         }
-        mPolicyLock.lock();
     }
+    mPolicyLock.lock();
     ALOGV("%s name %s id %d session %d doRegister %d registered %d doEnable %d enabled %d",
         __func__, mDescriptor.name, mId, mSessionId, doRegister, registered, doEnable, enabled);
     if (doRegister) {
@@ -570,7 +572,6 @@ AudioFlinger::EffectModule::EffectModule(const sp<AudioFlinger::EffectCallbackIn
       mMaxDisableWaitCnt(1), // set by configure(), should be >= 1
       mDisableWaitCnt(0),    // set by process() and updateState()
       mOffloaded(false),
-      mAddedToHal(false),
       mIsOutput(false)
       , mSupportsFloat(false)
 {
@@ -920,6 +921,7 @@ status_t AudioFlinger::EffectModule::configure()
     }
 
     if (status != NO_ERROR &&
+            EffectConfiguration::isHidl() && // only HIDL effects support channel conversion
             mIsOutput &&
             (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO
                     || mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO)) {
@@ -948,7 +950,8 @@ status_t AudioFlinger::EffectModule::configure()
         mSupportsFloat = true;
     }
 
-    if (status != NO_ERROR) {
+    // only HIDL effects support integer conversion.
+    if (status != NO_ERROR && EffectConfiguration::isHidl()) {
         ALOGV("EFFECT_CMD_SET_CONFIG failed with float format, retry with int16_t.");
         mConfig.inputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
         mConfig.outputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
@@ -1031,12 +1034,12 @@ void AudioFlinger::EffectModule::addEffectToHal_l()
 {
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC ||
          (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
-        if (mAddedToHal) {
+        if (mCurrentHalStream == getCallback()->io()) {
             return;
         }
 
         (void)getCallback()->addEffectToHal(mEffectInterface);
-        mAddedToHal = true;
+        mCurrentHalStream = getCallback()->io();
     }
 }
 
@@ -1132,12 +1135,11 @@ status_t AudioFlinger::EffectModule::removeEffectFromHal_l()
 {
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC ||
              (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
-        if (!mAddedToHal) {
-            return NO_ERROR;
+        if (mCurrentHalStream != getCallback()->io()) {
+            return (mCurrentHalStream == AUDIO_IO_HANDLE_NONE) ? NO_ERROR : INVALID_OPERATION;
         }
-
         getCallback()->removeEffectFromHal(mEffectInterface);
-        mAddedToHal = false;
+        mCurrentHalStream = AUDIO_IO_HANDLE_NONE;
     }
     return NO_ERROR;
 }
@@ -1521,7 +1523,7 @@ bool AudioFlinger::EffectModule::isHapticGenerator() const {
     return isHapticGenerator(&mDescriptor.type);
 }
 
-status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
+status_t AudioFlinger::EffectModule::setHapticIntensity(int id, os::HapticScale intensity)
 {
     if (mStatus != NO_ERROR) {
         return mStatus;
@@ -1537,7 +1539,7 @@ status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
     param->vsize = sizeof(int32_t) * 2;
     *(int32_t*)param->data = HG_PARAM_HAPTIC_INTENSITY;
     *((int32_t*)param->data + 1) = id;
-    *((int32_t*)param->data + 2) = intensity;
+    *((int32_t*)param->data + 2) = static_cast<int32_t>(intensity);
     std::vector<uint8_t> response;
     status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
     if (status == NO_ERROR) {
@@ -1684,7 +1686,14 @@ AudioFlinger::EffectHandle::EffectHandle(const sp<EffectBase>& effect,
         return;
     }
     int bufOffset = ((sizeof(effect_param_cblk_t) - 1) / sizeof(int) + 1) * sizeof(int);
-    mCblkMemory = client->heap()->allocate(EFFECT_PARAM_BUFFER_SIZE + bufOffset);
+    mCblkMemory = client->allocator().allocate(mediautils::NamedAllocRequest{
+            {static_cast<size_t>(EFFECT_PARAM_BUFFER_SIZE + bufOffset)},
+            std::string("Effect ID: ")
+                    .append(std::to_string(effect->id()))
+                    .append(" Session ID: ")
+                    .append(std::to_string(static_cast<int>(effect->sessionId())))
+                    .append(" \n")
+            });
     if (mCblkMemory == 0 ||
             (mCblk = static_cast<effect_param_cblk_t *>(mCblkMemory->unsecurePointer())) == NULL) {
         ALOGE("not enough memory for Effect size=%zu", EFFECT_PARAM_BUFFER_SIZE +
@@ -2608,7 +2617,7 @@ bool AudioFlinger::EffectChain::containsHapticGeneratingEffect_l()
     return false;
 }
 
-void AudioFlinger::EffectChain::setHapticIntensity_l(int id, int intensity)
+void AudioFlinger::EffectChain::setHapticIntensity_l(int id, os::HapticScale intensity)
 {
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mEffects.size(); ++i) {
@@ -2893,6 +2902,9 @@ void AudioFlinger::EffectChain::checkOutputFlagCompatibility(audio_output_flags_
     if ((*flags & AUDIO_OUTPUT_FLAG_FAST) != 0 && !isFastCompatible()) {
         *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_FAST);
     }
+    if ((*flags & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != 0 && !isBitPerfectCompatible()) {
+        *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_BIT_PERFECT);
+    }
 }
 
 void AudioFlinger::EffectChain::checkInputFlagCompatibility(audio_input_flags_t *flags) const
@@ -2930,6 +2942,18 @@ bool AudioFlinger::EffectChain::isFastCompatible() const
     return true;
 }
 
+bool AudioFlinger::EffectChain::isBitPerfectCompatible() const {
+    Mutex::Autolock _l(mLock);
+    for (const auto &effect : mEffects) {
+        if (effect->isProcessImplemented()
+                && effect->isImplementationSoftware()) {
+            return false;
+        }
+    }
+    // Allow effects without processing or hw accelerated effects.
+    return true;
+}
+
 // isCompatibleWithThread_l() must be called with thread->mLock held
 bool AudioFlinger::EffectChain::isCompatibleWithThread_l(const sp<ThreadBase>& thread) const
 {
@@ -2947,7 +2971,8 @@ status_t AudioFlinger::EffectChain::EffectCallback::createEffectHal(
         const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t deviceId,
         sp<EffectHalInterface> *effect) {
     status_t status = NO_INIT;
-    sp<EffectsFactoryHalInterface> effectsFactory = mAudioFlinger.getEffectsFactory();
+    const sp<EffectsFactoryHalInterface> effectsFactory =
+            EffectConfiguration::getEffectsFactoryHal();
     if (effectsFactory != 0) {
         status = effectsFactory->createEffect(pEffectUuid, sessionId, io(), deviceId, effect);
     }

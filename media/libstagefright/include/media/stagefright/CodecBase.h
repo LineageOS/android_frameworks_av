@@ -385,7 +385,8 @@ public:
             size_t offset,
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
-            const sp<MediaCodecBuffer> &buffer) {
+            const sp<MediaCodecBuffer> &buffer,
+            AString* errorDetailMsg) {
         (void)memory;
         (void)secure;
         (void)key;
@@ -396,6 +397,7 @@ public:
         (void)subSamples;
         (void)numSubSamples;
         (void)buffer;
+        (void)errorDetailMsg;
         return -ENOSYS;
     }
     /**

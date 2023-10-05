@@ -30,6 +30,7 @@ import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.ICameraServiceListener;
 import android.hardware.CameraInfo;
 import android.hardware.CameraStatus;
+import android.hardware.CameraExtensionSessionStats;
 
 /**
  * Binder interface for the native camera service running in mediaserver.
@@ -213,6 +214,26 @@ interface ICameraService
      * Callers require the android.permission.CAMERA_SEND_SYSTEM_EVENTS permission.
      */
     oneway void notifyDeviceStateChange(long newState);
+
+    /**
+     * Report Extension specific metrics to camera service for logging. This should only be called
+     * by CameraExtensionSession to log extension metrics. All calls after the first must set
+     * CameraExtensionSessionStats.key to the value returned by this function.
+     *
+     * Each subsequent call fully overwrites the existing CameraExtensionSessionStats for the
+     * current session, so the caller is responsible for keeping the stats complete.
+     *
+     * Due to cameraservice and cameraservice_proxy architecture, there is no guarantee that
+     * {@code stats} will be logged immediately (or at all). CameraService will log whatever
+     * extension stats it has at the time of camera session closing which may be before the app
+     * process receives a session/device closed callback; so CameraExtensionSession
+     * should send metrics to the cameraservice preriodically, and cameraservice must handle calls
+     * to this function from sessions that have not been logged yet and from sessions that have
+     * already been closed.
+     *
+     * @return the key that must be used to report updates to previously reported stats.
+     */
+    @utf8InCpp String reportExtensionSessionStats(in CameraExtensionSessionStats stats);
 
     // Bitfield constants for notifyDeviceStateChange
     // All bits >= 32 are for custom vendor states

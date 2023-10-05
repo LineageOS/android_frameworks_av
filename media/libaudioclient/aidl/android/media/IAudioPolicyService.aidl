@@ -20,6 +20,7 @@ import android.content.AttributionSourceState;
 
 import android.media.AudioDirectMode;
 import android.media.AudioMix;
+import android.media.AudioMixerAttributesInternal;
 import android.media.AudioOffloadMode;
 import android.media.AudioPatchFw;
 import android.media.AudioPolicyDeviceState;
@@ -320,6 +321,15 @@ interface IAudioPolicyService {
 
     boolean isUltrasoundSupported();
 
+    /**
+     * Queries if there is hardware support for requesting audio capture content from
+     * the DSP hotword pipeline.
+     *
+     * @param lookbackAudio true if additionally querying for the ability to capture audio
+     *                      from the pipeline prior to capture stream open.
+     */
+    boolean isHotwordStreamSupported(boolean lookbackAudio);
+
     AudioProductStrategy[] listAudioProductStrategies();
     int /* product_strategy_t */ getProductStrategyFromAudioAttributes(
             in AudioAttributes aa, boolean fallbackOnDefault);
@@ -337,7 +347,10 @@ interface IAudioPolicyService {
                                    in AudioDevice[] devices);
 
     void removeDevicesRoleForStrategy(int /* product_strategy_t */ strategy,
-                                       DeviceRole role);
+                                      DeviceRole role,
+                                      in AudioDevice[] devices);
+
+    void clearDevicesRoleForStrategy(int /* product_strategy_t */ strategy, DeviceRole role);
 
     AudioDevice[] getDevicesForRoleAndStrategy(int /* product_strategy_t */ strategy,
                                                DeviceRole role);
@@ -398,6 +411,60 @@ interface IAudioPolicyService {
      * for the specified audio attributes.
      */
     AudioProfile[] getDirectProfilesForAttributes(in AudioAttributes attr);
+
+    /**
+     * Return a list of AudioMixerAttributes that can be used to set preferred mixer attributes
+     * for the given device.
+     */
+    AudioMixerAttributesInternal[] getSupportedMixerAttributes(
+            int /* audio_port_handle_t */ portId);
+
+    /**
+     * Set preferred mixer attributes for a given device on a given audio attributes.
+     * When conflicting requests are received, the last request will be honored.
+     * The preferred mixer attributes can only be set when 1) the usage is media, 2) the
+     * given device is currently available, 3) the given device is usb device, 4) the given mixer
+     * attributes is supported by the given device.
+     *
+     * @param attr the audio attributes whose mixer attributes should be set.
+     * @param portId the port id of the device to be routed.
+     * @param uid the uid of the request client. The uid will be used to recognize the ownership for
+     *            the preferred mixer attributes. All the playback with same audio attributes from
+     *            the same uid will be attached to the mixer with the preferred attributes if the
+     *            playback is routed to the given device.
+     * @param mixerAttr the preferred mixer attributes.
+     */
+    void setPreferredMixerAttributes(in AudioAttributes attr,
+                                     int /* audio_port_handle_t */ portId,
+                                     int /* uid_t */ uid,
+                                     in AudioMixerAttributesInternal mixerAttr);
+
+    /**
+     * Get preferred mixer attributes for a given device on a given audio attributes.
+     * Null will be returned if there is no preferred mixer attributes set or it has
+     * been cleared.
+     *
+     * @param attr the audio attributes whose mixer attributes should be set.
+     * @param portId the port id of the device to be routed.
+     */
+    @nullable AudioMixerAttributesInternal getPreferredMixerAttributes(
+            in AudioAttributes attr,
+            int /* audio_port_handle_t */ portId);
+
+    /**
+     * Clear preferred mixer attributes for a given device on a given audio attributes that
+     * is previously set via setPreferredMixerAttributes.
+     *
+     * @param attr the audio attributes whose mixer attributes should be set.
+     * @param portId the port id of the device to be routed.
+     * @param uid the uid of the request client. The uid is used to identify the ownership for the
+     *            preferred mixer attributes. The preferred mixer attributes will only be cleared
+     *            if the uid is the same as the owner of current preferred mixer attributes.
+     */
+    void clearPreferredMixerAttributes(in AudioAttributes attr,
+                                       int /* audio_port_handle_t */ portId,
+                                       int /* uid_t */ uid);
+
 
     // When adding a new method, please review and update
     // AudioPolicyService.cpp AudioPolicyService::onTransact()

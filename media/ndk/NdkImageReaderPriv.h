@@ -56,10 +56,12 @@ struct AImageReader : public RefBase {
                  int32_t height,
                  int32_t format,
                  uint64_t usage,
-                 int32_t maxImages);
+                 int32_t maxImages,
+                 uint32_t hardwareBufferFormat,
+                 android_dataspace dataSpace);
     ~AImageReader();
 
-    // Inintialize AImageReader, uninitialized or failed to initialize AImageReader
+    // Initialize AImageReader, uninitialized or failed to initialize AImageReader
     // should never be passed to application
     media_status_t init();
 
@@ -79,7 +81,6 @@ struct AImageReader : public RefBase {
     void           close();
 
   private:
-
     friend struct AImage; // for grabing reader lock
 
     BufferItem* getBufferItemLocked();
@@ -118,12 +119,15 @@ struct AImageReader : public RefBase {
 
     const int32_t mWidth;
     const int32_t mHeight;
-    const int32_t mFormat;
+    int32_t mFormat;
     const uint64_t mUsage;  // AHARDWAREBUFFER_USAGE_* flags.
     const int32_t mMaxImages;
 
     // TODO(jwcai) Seems completely unused in AImageReader class.
     const int32_t mNumPlanes;
+
+    uint32_t mHalFormat = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+    android_dataspace mHalDataSpace = HAL_DATASPACE_UNKNOWN;
 
     struct FrameListener : public ConsumerBase::FrameAvailableListener {
       public:
@@ -155,8 +159,6 @@ struct AImageReader : public RefBase {
     };
     sp<BufferRemovedListener> mBufferRemovedListener;
 
-    int mHalFormat;
-    android_dataspace mHalDataSpace;
     uint64_t mHalUsage;
 
     sp<IGraphicBufferProducer> mProducer;

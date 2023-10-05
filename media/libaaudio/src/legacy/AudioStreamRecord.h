@@ -58,7 +58,7 @@ public:
 
     int64_t getFramesWritten() override;
 
-    aaudio_result_t updateStateMachine() override;
+    aaudio_result_t processCommands() override;
 
     aaudio_direction_t getDirection() const override {
         return AAUDIO_DIRECTION_INPUT;

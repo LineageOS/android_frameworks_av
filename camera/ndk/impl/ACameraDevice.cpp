@@ -341,6 +341,58 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
     return ACAMERA_OK;
 }
 
+camera_status_t CameraDevice::prepareLocked(ACameraWindowType *window) {
+    camera_status_t ret = checkCameraClosedOrErrorLocked();
+    if (ret != ACAMERA_OK) {
+        return ret;
+    }
+
+    if (window == nullptr) {
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    int32_t streamId = -1;
+    for (auto& kvPair : mConfiguredOutputs) {
+        if (window == kvPair.second.first) {
+            streamId = kvPair.first;
+            break;
+        }
+    }
+    if (streamId < 0) {
+        ALOGE("Error: Invalid output configuration");
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    auto remoteRet = mRemote->prepare(streamId);
+    if (!remoteRet.isOk()) {
+        // TODO:(b/259735869) Do this check for all other binder calls in the
+        // ndk as well.
+        if (remoteRet.exceptionCode() != EX_SERVICE_SPECIFIC) {
+            ALOGE("Camera device %s failed to prepare output window %p: %s", getId(), window,
+                    remoteRet.toString8().c_str());
+            return ACAMERA_ERROR_UNKNOWN;
+
+        }
+        switch (remoteRet.serviceSpecificErrorCode()) {
+            case hardware::ICameraService::ERROR_INVALID_OPERATION:
+                ALOGE("Camera device %s invalid operation: %s", getId(),
+                        remoteRet.toString8().c_str());
+                return ACAMERA_ERROR_INVALID_OPERATION;
+                break;
+            case hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT:
+                ALOGE("Camera device %s invalid input argument: %s", getId(),
+                        remoteRet.toString8().c_str());
+                return ACAMERA_ERROR_INVALID_PARAMETER;
+                break;
+            default:
+                ALOGE("Camera device %s failed to prepare output window %p: %s", getId(), window,
+                        remoteRet.toString8().c_str());
+                return ACAMERA_ERROR_UNKNOWN;
+        }
+    }
+
+    return ACAMERA_OK;
+}
+
 camera_status_t
 CameraDevice::allocateCaptureRequest(
         const ACaptureRequest* request, /*out*/sp<CaptureRequest>& outReq) {
@@ -917,6 +969,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
+        case kWhatPreparedCb:
             ALOGV("%s: Received msg %d", __FUNCTION__, msg->what());
             break;
         case kWhatCleanUpSessions:
@@ -990,6 +1043,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
+        case kWhatPreparedCb:
         {
             sp<RefBase> obj;
             found = msg->findObject(kSessionSpKey, &obj);
@@ -1030,6 +1084,26 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
                     (*onState)(context, session.get());
+                    break;
+                }
+                case kWhatPreparedCb:
+                {
+                    ACameraCaptureSession_prepareCallback onWindowPrepared;
+                    found = msg->findPointer(kCallbackFpKey, (void**) &onWindowPrepared);
+                    if (!found) {
+                        ALOGE("%s: Cannot find window prepared callback!", __FUNCTION__);
+                        return;
+                    }
+                    if (onWindowPrepared == nullptr) {
+                        return;
+                    }
+                    ACameraWindowType* anw;
+                    found = msg->findPointer(kAnwKey, (void**) &anw);
+                    if (!found) {
+                        ALOGE("%s: Cannot find ANativeWindow: %d!", __FUNCTION__, __LINE__);
+                        return;
+                    }
+                    (*onWindowPrepared)(context, anw, session.get());
                     break;
                 }
                 case kWhatCaptureStart:
@@ -1410,7 +1484,6 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
     while (it != mSequenceLastFrameNumberMap.end()) {
         int sequenceId = it->first;
         int64_t lastFrameNumber = it->second.lastFrameNumber;
-        bool hasCallback = true;
 
         if (mRemote == nullptr) {
             ALOGW("Camera %s closed while checking sequence complete", getId());
@@ -1423,7 +1496,6 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
             // This should not happen because we always register callback (with nullptr inside)
             if (mSequenceCallbackMap.count(sequenceId) == 0) {
                 ALOGW("No callback found for sequenceId %d", sequenceId);
-                hasCallback = false;
             }
 
             if (lastFrameNumber <= completedFrameNumber) {
@@ -1729,8 +1801,36 @@ CameraDevice::ServiceCallback::onResultReceived(
 }
 
 binder::Status
-CameraDevice::ServiceCallback::onPrepared(int) {
-    // Prepare not yet implemented in NDK
+CameraDevice::ServiceCallback::onPrepared(int streamId) {
+    ALOGV("%s: callback for stream id %d", __FUNCTION__, streamId);
+    binder::Status ret = binder::Status::ok();
+    sp<CameraDevice> dev = mDevice.promote();
+    if (dev == nullptr) {
+        return ret; // device has been closed
+    }
+    Mutex::Autolock _l(dev->mDeviceLock);
+    if (dev->isClosed() || dev->mRemote == nullptr) {
+        return ret;
+    }
+    auto it = dev->mConfiguredOutputs.find(streamId);
+    if (it == dev->mConfiguredOutputs.end()) {
+        ALOGE("%s: stream id %d does not exist", __FUNCTION__ , streamId);
+        return ret;
+    }
+    sp<ACameraCaptureSession> session = dev->mCurrentSession.promote();
+    if (session == nullptr) {
+        ALOGE("%s: Session is dead already", __FUNCTION__ );
+        return ret;
+    }
+    // We've found the window corresponding to the surface id.
+    ACameraWindowType *window = it->second.first;
+    sp<AMessage> msg = new AMessage(kWhatPreparedCb, dev->mHandler);
+    msg->setPointer(kContextKey, session->mPreparedCb.context);
+    msg->setPointer(kAnwKey, window);
+    msg->setObject(kSessionSpKey, session);
+    msg->setPointer(kCallbackFpKey, (void *)session->mPreparedCb.onWindowPrepared);
+    dev->postSessionMsgAndCleanup(msg);
+
     return binder::Status::ok();
 }
 

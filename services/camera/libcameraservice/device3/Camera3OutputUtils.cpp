@@ -129,12 +129,71 @@ status_t fixupMonochromeTags(
     return res;
 }
 
+status_t fixupAutoframingTags(CameraMetadata& resultMetadata) {
+    status_t res = OK;
+    camera_metadata_entry autoframingEntry =
+            resultMetadata.find(ANDROID_CONTROL_AUTOFRAMING);
+    if (autoframingEntry.count == 0) {
+        const uint8_t defaultAutoframingEntry = ANDROID_CONTROL_AUTOFRAMING_OFF;
+        res = resultMetadata.update(ANDROID_CONTROL_AUTOFRAMING, &defaultAutoframingEntry, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_CONTROL_AUTOFRAMING: %s (%d)",
+                  __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+
+    camera_metadata_entry autoframingStateEntry =
+            resultMetadata.find(ANDROID_CONTROL_AUTOFRAMING_STATE);
+    if (autoframingStateEntry.count == 0) {
+        const uint8_t defaultAutoframingStateEntry = ANDROID_CONTROL_AUTOFRAMING_STATE_INACTIVE;
+        res = resultMetadata.update(ANDROID_CONTROL_AUTOFRAMING_STATE,
+                                    &defaultAutoframingStateEntry, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_CONTROL_AUTOFRAMING_STATE: %s (%d)",
+                  __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+
+    return res;
+}
+
+void correctMeteringRegions(camera_metadata_t *meta) {
+    if (meta == nullptr) return;
+
+    uint32_t meteringRegionKeys[] = {
+            ANDROID_CONTROL_AE_REGIONS,
+            ANDROID_CONTROL_AWB_REGIONS,
+            ANDROID_CONTROL_AF_REGIONS };
+
+    for (uint32_t key : meteringRegionKeys) {
+        camera_metadata_entry_t entry;
+        int res = find_camera_metadata_entry(meta, key, &entry);
+        if (res != OK) continue;
+
+        for (size_t i = 0; i < entry.count; i += 5) {
+            if (entry.data.i32[0] > entry.data.i32[2]) {
+                ALOGW("%s: Invalid metering region (%d): left: %d, right: %d",
+                        __FUNCTION__, key, entry.data.i32[0], entry.data.i32[2]);
+                entry.data.i32[2] = entry.data.i32[0];
+            }
+            if (entry.data.i32[1] > entry.data.i32[3]) {
+                ALOGW("%s: Invalid metering region (%d): top: %d, bottom: %d",
+                        __FUNCTION__, key, entry.data.i32[1], entry.data.i32[3]);
+                entry.data.i32[3] = entry.data.i32[1];
+            }
+        }
+    }
+}
+
 void insertResultLocked(CaptureOutputStates& states, CaptureResult *result, uint32_t frameNumber) {
     if (result == nullptr) return;
 
     camera_metadata_t *meta = const_cast<camera_metadata_t *>(
             result->mMetadata.getAndLock());
     set_camera_metadata_vendor_id(meta, states.vendorTagId);
+    correctMeteringRegions(meta);
     result->mMetadata.unlock(meta);
 
     if (result->mMetadata.update(ANDROID_REQUEST_FRAME_COUNT,
@@ -153,6 +212,7 @@ void insertResultLocked(CaptureOutputStates& states, CaptureResult *result, uint
         camera_metadata_t *pmeta = const_cast<camera_metadata_t *>(
                 physicalMetadata.mPhysicalCameraMetadata.getAndLock());
         set_camera_metadata_vendor_id(pmeta, states.vendorTagId);
+        correctMeteringRegions(pmeta);
         physicalMetadata.mPhysicalCameraMetadata.unlock(pmeta);
     }
 
@@ -325,6 +385,22 @@ void sendCaptureResult(
         }
     }
 
+    // Fix up autoframing metadata
+    res = fixupAutoframingTags(captureResult.mMetadata);
+    if (res != OK) {
+        SET_ERR("Failed to set autoframing defaults in result metadata: %s (%d)",
+                strerror(-res), res);
+        return;
+    }
+    for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
+        res = fixupAutoframingTags(physicalMetadata.mPhysicalCameraMetadata);
+        if (res != OK) {
+            SET_ERR("Failed to set autoframing defaults in physical result metadata: %s (%d)",
+                    strerror(-res), res);
+            return;
+        }
+    }
+
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
         const std::string cameraId = physicalMetadata.mPhysicalCameraId;
         auto mapper = states.distortionMappers.find(cameraId);
@@ -463,6 +539,32 @@ bool erasePhysicalCameraIdSet(
         }
     }
     return found;
+}
+
+const std::set<std::string>& getCameraIdsWithZoomLocked(
+        const InFlightRequestMap& inflightMap, const CameraMetadata& metadata,
+        const std::set<std::string>& cameraIdsWithZoom) {
+    camera_metadata_ro_entry overrideEntry =
+            metadata.find(ANDROID_CONTROL_SETTINGS_OVERRIDE);
+    camera_metadata_ro_entry frameNumberEntry =
+            metadata.find(ANDROID_CONTROL_SETTINGS_OVERRIDING_FRAME_NUMBER);
+    if (overrideEntry.count != 1
+            || overrideEntry.data.i32[0] != ANDROID_CONTROL_SETTINGS_OVERRIDE_ZOOM
+            || frameNumberEntry.count != 1) {
+        // No valid overriding frame number, skip
+        return cameraIdsWithZoom;
+    }
+
+    uint32_t overridingFrameNumber = frameNumberEntry.data.i32[0];
+    ssize_t idx = inflightMap.indexOfKey(overridingFrameNumber);
+    if (idx < 0) {
+        ALOGE("%s: Failed to find pending request #%d in inflight map",
+                __FUNCTION__, overridingFrameNumber);
+        return cameraIdsWithZoom;
+    }
+
+    const InFlightRequest &r = inflightMap.valueFor(overridingFrameNumber);
+    return r.cameraIdsWithZoom;
 }
 
 void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result) {
@@ -676,10 +778,12 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
             } else if (request.hasCallback) {
                 CameraMetadata metadata;
                 metadata = result->result;
+                auto cameraIdsWithZoom = getCameraIdsWithZoomLocked(
+                        states.inflightMap, metadata, request.cameraIdsWithZoom);
                 sendCaptureResult(states, metadata, request.resultExtras,
                     collectedPartialResult, frameNumber,
                     hasInputBufferInRequest, request.zslCapture && request.stillCapture,
-                    request.rotateAndCropAuto, request.cameraIdsWithZoom,
+                    request.rotateAndCropAuto, cameraIdsWithZoom,
                     request.physicalMetadatas);
             }
         }
@@ -906,11 +1010,13 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                     states.listener->notifyShutter(r.resultExtras, msg.timestamp);
                 }
                 // send pending result and buffers
+                const auto& cameraIdsWithZoom = getCameraIdsWithZoomLocked(
+                        inflightMap, r.pendingMetadata, r.cameraIdsWithZoom);
                 sendCaptureResult(states,
                     r.pendingMetadata, r.resultExtras,
                     r.collectedPartialResult, msg.frame_number,
                     r.hasInputBuffer, r.zslCapture && r.stillCapture,
-                    r.rotateAndCropAuto, r.cameraIdsWithZoom, r.physicalMetadatas);
+                    r.rotateAndCropAuto, cameraIdsWithZoom, r.physicalMetadatas);
             }
             returnAndRemovePendingOutputBuffers(
                     states.useHalBufManager, states.listener, r, states.sessionStatsBuilder);

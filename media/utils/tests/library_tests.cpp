@@ -26,8 +26,9 @@ using namespace android::mediautils;
 
 namespace {
 
-static int32_t here = 0;  // accessed on same thread.
+[[maybe_unused]] static int32_t here = 0;  // accessed on same thread.
 
+#if __android__
 TEST(library_tests, basic) {
     std::string path = android::base::GetExecutableDirectory() + "/libsharedtest.so";
     // The flags to loadLibrary should not include  RTLD_GLOBAL or RTLD_NODELETE
@@ -64,6 +65,7 @@ TEST(library_tests, basic) {
     // will prevent unloading libraries.
     ASSERT_EQ(1, here);
 }
+#endif
 
 TEST(library_tests, sad_library) {
     std::string path = android::base::GetExecutableDirectory()

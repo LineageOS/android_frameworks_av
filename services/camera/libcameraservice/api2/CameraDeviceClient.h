@@ -29,6 +29,7 @@
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
 #include "CompositeStream.h"
+#include "utils/CameraServiceProxyWrapper.h"
 #include "utils/SessionConfigurationUtils.h"
 
 using android::camera3::OutputStreamInfo;
@@ -179,6 +180,7 @@ public:
 
     CameraDeviceClient(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
+            std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
             const std::string& clientPackageName,
             bool clientPackageOverride,
             const std::optional<std::string>& clientFeatureId,
@@ -197,8 +199,13 @@ public:
 
     virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop) override;
 
+    virtual status_t      setAutoframingOverride(uint8_t autoframingValue) override;
+
     virtual bool          supportsCameraMute();
     virtual status_t      setCameraMute(bool enabled);
+
+    virtual bool          supportsZoomOverride() override;
+    virtual status_t      setZoomOverride(int32_t zoomOverride) override;
 
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
@@ -238,7 +245,7 @@ protected:
     // Calculate the ANativeWindow transform from android.sensor.orientation
     status_t              getRotationTransformLocked(int mirrorMode, /*out*/int32_t* transform);
 
-    bool isUltraHighResolutionSensor(const std::string &cameraId);
+    bool supportsUltraHighResolutionCapture(const std::string &cameraId);
 
     bool isSensorPixelModeConsistent(const std::list<int> &streamIdList,
             const CameraMetadata &settings);

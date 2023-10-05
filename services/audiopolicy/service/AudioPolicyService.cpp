@@ -138,6 +138,7 @@ BINDER_METHOD_ENTRY(setA11yServicesUids) \
 BINDER_METHOD_ENTRY(setCurrentImeUid) \
 BINDER_METHOD_ENTRY(isHapticPlaybackSupported) \
 BINDER_METHOD_ENTRY(isUltrasoundSupported) \
+BINDER_METHOD_ENTRY(isHotwordStreamSupported) \
 BINDER_METHOD_ENTRY(listAudioProductStrategies) \
 BINDER_METHOD_ENTRY(getProductStrategyFromAudioAttributes) \
 BINDER_METHOD_ENTRY(listAudioVolumeGroups) \
@@ -146,6 +147,7 @@ BINDER_METHOD_ENTRY(setRttEnabled) \
 BINDER_METHOD_ENTRY(isCallScreenModeSupported) \
 BINDER_METHOD_ENTRY(setDevicesRoleForStrategy) \
 BINDER_METHOD_ENTRY(removeDevicesRoleForStrategy) \
+BINDER_METHOD_ENTRY(clearDevicesRoleForStrategy) \
 BINDER_METHOD_ENTRY(getDevicesForRoleAndStrategy) \
 BINDER_METHOD_ENTRY(setDevicesRoleForCapturePreset) \
 BINDER_METHOD_ENTRY(addDevicesRoleForCapturePreset) \
@@ -156,7 +158,11 @@ BINDER_METHOD_ENTRY(registerSoundTriggerCaptureStateListener) \
 BINDER_METHOD_ENTRY(getSpatializer) \
 BINDER_METHOD_ENTRY(canBeSpatialized) \
 BINDER_METHOD_ENTRY(getDirectPlaybackSupport) \
-BINDER_METHOD_ENTRY(getDirectProfilesForAttributes) \
+BINDER_METHOD_ENTRY(getDirectProfilesForAttributes)  \
+BINDER_METHOD_ENTRY(getSupportedMixerAttributes) \
+BINDER_METHOD_ENTRY(setPreferredMixerAttributes) \
+BINDER_METHOD_ENTRY(getPreferredMixerAttributes) \
+BINDER_METHOD_ENTRY(clearPreferredMixerAttributes) \
 
 // singleton for Binder Method Statistics for IAudioPolicyService
 static auto& getIAudioPolicyServiceStatistics() {
@@ -218,7 +224,8 @@ AudioPolicyService::AudioPolicyService()
       mPhoneState(AUDIO_MODE_INVALID),
       mCaptureStateNotifier(false),
       mCreateAudioPolicyManager(createAudioPolicyManager),
-      mDestroyAudioPolicyManager(destroyAudioPolicyManager) {
+      mDestroyAudioPolicyManager(destroyAudioPolicyManager),
+      mUsecaseValidator(media::createUsecaseValidator()) {
       setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
@@ -1025,10 +1032,11 @@ void AudioPolicyService::updateUidStates_l()
         //     AND is on TOP or latest started
         //     AND there is no active privacy sensitive capture or call
         //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+        bool allowSensitiveCapture =
+            !isSensitiveActive || isTopOrLatestSensitive || current->canCaptureOutput;
         bool allowCapture = !isAssistantOnTop
                 && (isTopOrLatestActive || isTopOrLatestSensitive)
-                && !(isSensitiveActive
-                    && !(isTopOrLatestSensitive || current->canCaptureOutput))
+                && allowSensitiveCapture
                 && canCaptureIfInCallOrCommunication(current);
 
         if (!current->hasOp()) {
@@ -1051,7 +1059,7 @@ void AudioPolicyService::updateUidStates_l()
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                     allowCapture = true;
                 }
-            } else if (!(isSensitiveActive && !current->canCaptureOutput)
+            } else if (allowSensitiveCapture
                     && canCaptureIfInCallOrCommunication(current)) {
                 if (isTopOrLatestAssistant
                     && (source == AUDIO_SOURCE_VOICE_RECOGNITION
@@ -1072,7 +1080,7 @@ void AudioPolicyService::updateUidStates_l()
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                     allowCapture = true;
                 }
-            } else if (!(isSensitiveActive && !current->canCaptureOutput)
+            } else if (allowSensitiveCapture
                         && canCaptureIfInCallOrCommunication(current)) {
                 if ((source == AUDIO_SOURCE_VOICE_RECOGNITION) || (source == AUDIO_SOURCE_HOTWORD))
                 {
@@ -1087,7 +1095,7 @@ void AudioPolicyService::updateUidStates_l()
             //     OR
             //         Is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
             if (!isAssistantOnTop
-                    && !(isSensitiveActive && !current->canCaptureOutput)
+                    && allowSensitiveCapture
                     && canCaptureIfInCallOrCommunication(current)) {
                 allowCapture = true;
             }
@@ -1325,11 +1333,13 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_getVolumeGroupFromAudioAttributes:
         case TRANSACTION_acquireSoundTriggerSession:
         case TRANSACTION_releaseSoundTriggerSession:
+        case TRANSACTION_isHotwordStreamSupported:
         case TRANSACTION_setRttEnabled:
         case TRANSACTION_isCallScreenModeSupported:
         case TRANSACTION_setDevicesRoleForStrategy:
         case TRANSACTION_setSupportedSystemUsages:
         case TRANSACTION_removeDevicesRoleForStrategy:
+        case TRANSACTION_clearDevicesRoleForStrategy:
         case TRANSACTION_getDevicesForRoleAndStrategy:
         case TRANSACTION_getDevicesForAttributes:
         case TRANSACTION_setAllowedCapturePolicy:
@@ -1341,7 +1351,9 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_removeDevicesRoleForCapturePreset:
         case TRANSACTION_clearDevicesRoleForCapturePreset:
         case TRANSACTION_getDevicesForRoleAndCapturePreset:
-        case TRANSACTION_getSpatializer: {
+        case TRANSACTION_getSpatializer:
+        case TRANSACTION_setPreferredMixerAttributes:
+        case TRANSACTION_clearPreferredMixerAttributes: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1548,6 +1560,16 @@ status_t AudioPolicyService::printHelp(int out) {
         "  help print this message\n");
 }
 
+status_t AudioPolicyService::registerOutput(audio_io_handle_t output,
+                        const audio_config_base_t& config,
+                        const audio_output_flags_t flags) {
+    return mUsecaseValidator->registerStream(output, config, flags);
+}
+
+status_t AudioPolicyService::unregisterOutput(audio_io_handle_t output) {
+    return mUsecaseValidator->unregisterStream(output);
+}
+
 // -----------  AudioPolicyService::UidPolicy implementation ----------
 
 void AudioPolicyService::UidPolicy::registerSelf() {
@@ -1690,7 +1712,7 @@ void AudioPolicyService::UidPolicy::onUidStateChanged(uid_t uid,
     }
 }
 
-void AudioPolicyService::UidPolicy::onUidProcAdjChanged(uid_t uid __unused) {
+void AudioPolicyService::UidPolicy::onUidProcAdjChanged(uid_t uid __unused, int32_t adj __unused) {
 }
 
 void AudioPolicyService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {

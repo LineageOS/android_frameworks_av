@@ -17,7 +17,7 @@
 #include <stdio.h>
 
 #define LOG_TAG "DeviceHalHidl"
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 
 #include <cutils/native_handle.h>
 #include <cutils/properties.h>
@@ -36,6 +36,17 @@
 #include "ParameterUtils.h"
 #include "StreamHalHidl.h"
 
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+#include <aidl/android/hardware/audio/core/sounddose/BpSoundDose.h>
+#include <aidl/android/hardware/audio/sounddose/BpSoundDoseFactory.h>
+#include <android/binder_manager.h>
+
+constexpr std::string_view kSoundDoseInterfaceModule = "/default";
+
+using aidl::android::hardware::audio::core::sounddose::ISoundDose;
+using aidl::android::hardware::audio::sounddose::ISoundDoseFactory;
+#endif
+
 using ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION::implementation::HidlUtils;
 using ::android::hardware::audio::common::utils::EnumBitfield;
 using ::android::hardware::audio::CORE_TYPES_CPP_VERSION::implementation::CoreUtils;
@@ -47,8 +58,21 @@ namespace android {
 using namespace ::android::hardware::audio::common::COMMON_TYPES_CPP_VERSION;
 using namespace ::android::hardware::audio::CORE_TYPES_CPP_VERSION;
 
+class DeviceHalHidl::SoundDoseWrapper {
+public:
+    SoundDoseWrapper() = default;
+    ~SoundDoseWrapper() = default;
+
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+    std::shared_ptr<ISoundDoseFactory> mSoundDoseFactory;
+    std::shared_ptr<ISoundDose> mSoundDose;
+#endif
+};
+
 DeviceHalHidl::DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device)
-        : CoreConversionHelperHidl("DeviceHalHidl"), mDevice(device) {
+        : CoreConversionHelperHidl("DeviceHalHidl"),
+          mDevice(device),
+          mSoundDoseWrapper(std::make_unique<DeviceHalHidl::SoundDoseWrapper>()) {
 }
 
 DeviceHalHidl::DeviceHalHidl(
@@ -57,7 +81,8 @@ DeviceHalHidl::DeviceHalHidl(
 #if MAJOR_VERSION <= 6 || (MAJOR_VERSION == 7 && MINOR_VERSION == 0)
           mDevice(device),
 #endif
-          mPrimaryDevice(device) {
+          mPrimaryDevice(device),
+          mSoundDoseWrapper(std::make_unique<DeviceHalHidl::SoundDoseWrapper>()) {
 #if MAJOR_VERSION == 7 && MINOR_VERSION == 1
     auto getDeviceRet = mPrimaryDevice->getDevice();
     if (getDeviceRet.isOk()) {
@@ -612,5 +637,51 @@ status_t DeviceHalHidl::dump(int fd, const Vector<String16>& args) {
 
     return processReturn("dump", ret);
 }
+
+#if MAJOR_VERSION == 7 && MINOR_VERSION == 1
+status_t DeviceHalHidl::getSoundDoseInterface(const std::string& module,
+                                              ::ndk::SpAIBinder* soundDoseBinder) {
+    if (mSoundDoseWrapper->mSoundDose != nullptr) {
+        *soundDoseBinder = mSoundDoseWrapper->mSoundDose->asBinder();
+        return OK;
+    }
+
+    if (mSoundDoseWrapper->mSoundDoseFactory == nullptr) {
+        std::string interface =
+            std::string(ISoundDoseFactory::descriptor) + kSoundDoseInterfaceModule.data();
+        AIBinder* binder = AServiceManager_checkService(interface.c_str());
+        if (binder == nullptr) {
+            ALOGW("%s service %s doesn't exist", __func__, interface.c_str());
+            return NO_INIT;
+        }
+        mSoundDoseWrapper->mSoundDoseFactory =
+                ISoundDoseFactory::fromBinder(ndk::SpAIBinder(binder));
+    }
+
+    auto result = mSoundDoseWrapper->mSoundDoseFactory->getSoundDose(
+                        module, &mSoundDoseWrapper->mSoundDose);
+    if (!result.isOk()) {
+        ALOGW("%s could not get sound dose interface: %s", __func__, result.getMessage());
+        return BAD_VALUE;
+    }
+
+    if (mSoundDoseWrapper->mSoundDose == nullptr) {
+        ALOGW("%s standalone sound dose interface is not implemented", __func__);
+        *soundDoseBinder = nullptr;
+        return OK;
+    }
+
+    *soundDoseBinder = mSoundDoseWrapper->mSoundDose->asBinder();
+    ALOGI("%s using standalone sound dose interface", __func__);
+    return OK;
+}
+#else
+status_t DeviceHalHidl::getSoundDoseInterface(const std::string& module,
+                                              ::ndk::SpAIBinder* soundDoseBinder) {
+    (void)module;  // avoid unused param
+    (void)soundDoseBinder;  // avoid unused param
+    return INVALID_OPERATION;
+}
+#endif
 
 } // namespace android

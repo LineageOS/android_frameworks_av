@@ -22,6 +22,7 @@
 
 #include <aidl/android/media/audio/IHalAdapterVendorExtension.h>
 #include <aidl/android/hardware/audio/core/BpModule.h>
+#include <aidl/android/hardware/audio/core/sounddose/BpSoundDose.h>
 #include <android-base/thread_annotations.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -166,6 +167,9 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
 
     int32_t supportsBluetoothVariableLatency(bool* supports __unused) override;
 
+    status_t getSoundDoseInterface(const std::string& module,
+                                   ::ndk::SpAIBinder* soundDoseBinder) override;
+
     status_t prepareToDisconnectExternalDevice(const struct audio_port_v7 *port) override;
 
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
@@ -302,6 +306,8 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetooth> mBluetooth;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetoothA2dp> mBluetoothA2dp;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetoothLe> mBluetoothLe;
+    std::shared_ptr<::aidl::android::hardware::audio::core::sounddose::ISoundDose>
+        mSoundDose = nullptr;
     Ports mPorts;
     int32_t mDefaultInputPortId = -1;
     int32_t mDefaultOutputPortId = -1;

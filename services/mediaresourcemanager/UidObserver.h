@@ -74,7 +74,7 @@ private:
     void onUidIdle(uid_t uid, bool disabled) override;
     void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
             int32_t capability) override;
-    void onUidProcAdjChanged(uid_t uid) override;
+    void onUidProcAdjChanged(uid_t uid, int32_t adj) override;
 
     // IServiceManager::LocalRegistrationCallback implementation.
     void onServiceRegistration(const String16& name,

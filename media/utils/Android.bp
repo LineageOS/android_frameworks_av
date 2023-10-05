@@ -21,17 +21,34 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
-cc_library {
-    name: "libmediautils",
+cc_defaults {
+    name: "libmediautils_defaults",
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+    sanitize: {
+        cfi: true,
+        integer_overflow: true,
+    },
+    target: {
+        host: {
+            sanitize: {
+                cfi: false,
+            },
+        },
+    },
+}
 
+filegroup {
+    name: "libmediautils_core_srcs",
     srcs: [
         "AImageReaderUtils.cpp",
         "BatteryNotifier.cpp",
         "ISchedulingPolicyService.cpp",
         "Library.cpp",
-        "LimitProcessMemory.cpp",
         "MediaUtilsDelayed.cpp",
-        "MemoryLeakTrackUtil.cpp",
         "MethodStatistics.cpp",
         "Process.cpp",
         "ProcessInfo.cpp",
@@ -41,20 +58,41 @@ cc_library {
         "TimeCheck.cpp",
         "TimerThread.cpp",
     ],
+}
+
+cc_library_headers {
+    name: "libmediautils_headers",
+    host_supported: true,
+    vendor_available: true, // required for platform/hardware/interfaces
+    shared_libs: [
+        "liblog",
+    ],
+    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+}
+
+
+cc_library {
+    name: "libmediautils",
+    host_supported: true,
+    defaults: ["libmediautils_defaults"],
+    srcs: [
+        ":libmediautils_core_srcs",
+    ],
     static_libs: [
-        "libc_malloc_debug_backtrace",
         "libbatterystats_aidl",
         "libprocessinfoservice_aidl",
     ],
     shared_libs: [
         "libaudioclient_aidl_conversion",
         "libaudioutils", // for clock.h, Statistics.h
+        "libbase",
         "libbinder",
         "libcutils",
-        "liblog",
-        "libutils",
         "libhidlbase",
+        "liblog",
         "libpermission",
+        "libutils",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
         "packagemanager_aidl-cpp",
@@ -72,36 +110,43 @@ cc_library {
         "-Wthread-safety",
     ],
 
-    header_libs: [
-        "bionic_libc_platform_headers",
-        "libmedia_headers",
-    ],
-
     export_shared_lib_headers: [
         "libpermission",
     ],
 
     required: [
-        "libmediautils_delayed",  // lazy loaded
+        "libmediautils_delayed", // lazy loaded
     ],
 
-    include_dirs: [
-        // For DEBUGGER_SIGNAL
-        "system/core/debuggerd/include",
-    ],
+    target: {
+        android: {
+            srcs: [
+                "LimitProcessMemory.cpp",
+                "MemoryLeakTrackUtil.cpp",
+            ],
+            static_libs: [
+                "libc_malloc_debug_backtrace",
+            ],
+            include_dirs: [
+                // For DEBUGGER_SIGNAL
+                "system/core/debuggerd/include",
+            ],
+            header_libs: [
+                "bionic_libc_platform_headers",
+            ],
+        },
+    },
+
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
 
 cc_library {
     name: "libmediautils_delayed", // match with MEDIAUTILS_DELAYED_LIBRARY_NAME
+    host_supported: true,
+    defaults: ["libmediautils_defaults"],
     srcs: [
         "MediaUtilsDelayedLibrary.cpp",
-    ],
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wextra",
     ],
     shared_libs: [
         "liblog",
@@ -112,16 +157,12 @@ cc_library {
 
 cc_library {
     name: "libmediautils_vendor",
-    vendor_available: true,  // required for platform/hardware/interfaces
+    defaults: ["libmediautils_defaults"],
+    vendor_available: true, // required for platform/hardware/interfaces
     srcs: [
         "MemoryLeakTrackUtil.cpp",
     ],
 
-    cflags: [
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-    ],
     shared_libs: [
         "liblog",
         "libutils",
@@ -137,24 +178,4 @@ cc_library {
 
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
-}
-
-
-cc_library_headers {
-    name: "libmediautils_headers",
-    vendor_available: true,  // required for platform/hardware/interfaces
-
-    export_include_dirs: ["include"],
-}
-
-cc_test {
-    name: "libmediautils_test",
-    srcs: [
-        "memory-test.cpp",
-        "TimerThread-test.cpp",
-    ],
-    shared_libs: [
-      "libmediautils",
-      "libutils",
-    ]
 }

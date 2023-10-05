@@ -16,23 +16,27 @@
 
 #define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <cutils/properties.h>
+#include <assert.h>
+#include <math.h>
 #include <stdint.h>
+
+#include <aaudio/AAudioTesting.h>
+#include <android/media/audio/common/AudioMMapPolicy.h>
+#include <cutils/properties.h>
 #include <sys/types.h>
+#include <system/audio.h>
 #include <utils/Errors.h>
+#include <utils/Log.h>
 
 #include "aaudio/AAudio.h"
 #include "core/AudioGlobal.h"
-#include <aaudio/AAudioTesting.h>
-#include <math.h>
-#include <system/audio.h>
-#include <assert.h>
-
 #include "utility/AAudioUtilities.h"
 
 using namespace android;
+
+using android::media::audio::common::AudioMMapPolicy;
+using android::media::audio::common::AudioMMapPolicyInfo;
 
 status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
     // This covers the case for AAUDIO_OK and for positive results.
@@ -140,6 +144,9 @@ audio_format_t AAudioConvert_aaudioToAndroidDataFormat(aaudio_format_t aaudioFor
     case AAUDIO_FORMAT_PCM_I32:
         androidFormat = AUDIO_FORMAT_PCM_32_BIT;
         break;
+    case AAUDIO_FORMAT_IEC61937:
+        androidFormat = AUDIO_FORMAT_IEC61937;
+        break;
     default:
         androidFormat = AUDIO_FORMAT_INVALID;
         ALOGE("%s() 0x%08X unrecognized", __func__, aaudioFormat);
@@ -166,12 +173,26 @@ aaudio_format_t AAudioConvert_androidToAAudioDataFormat(audio_format_t androidFo
     case AUDIO_FORMAT_PCM_32_BIT:
         aaudioFormat = AAUDIO_FORMAT_PCM_I32;
         break;
+    case AUDIO_FORMAT_IEC61937:
+        aaudioFormat = AAUDIO_FORMAT_IEC61937;
+        break;
     default:
         aaudioFormat = AAUDIO_FORMAT_INVALID;
         ALOGE("%s() 0x%08X unrecognized", __func__, androidFormat);
         break;
     }
     return aaudioFormat;
+}
+
+aaudio_format_t AAudioConvert_androidToNearestAAudioDataFormat(audio_format_t androidFormat) {
+    // Special case AUDIO_FORMAT_PCM_8_24_BIT because this function should be used to find the
+    // resolution of the data format. Setting AUDIO_FORMAT_PCM_8_24_BIT directly is not available
+    // from AAudio but hardware may use AUDIO_FORMAT_PCM_8_24_BIT under the hood.
+    if (androidFormat == AUDIO_FORMAT_PCM_8_24_BIT) {
+        ALOGD("%s() converting 8.24 to 24 bit packed", __func__);
+        return AAUDIO_FORMAT_PCM_I24_PACKED;
+    }
+    return AAudioConvert_androidToAAudioDataFormat(androidFormat);
 }
 
 // Make a message string from the condition.
@@ -234,10 +255,11 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
     return (audio_source_t) preset; // same value
 }
 
-audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
+audio_flags_mask_t AAudio_computeAudioFlagsMask(
         aaudio_allowed_capture_policy_t policy,
         aaudio_spatialization_behavior_t spatializationBehavior,
-        bool isContentSpatialized) {
+        bool isContentSpatialized,
+        audio_output_flags_t outputFlags) {
     audio_flags_mask_t flagsMask = AUDIO_FLAG_NONE;
     switch (policy) {
         case AAUDIO_UNSPECIFIED:
@@ -272,6 +294,15 @@ audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
 
     if (isContentSpatialized) {
         flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_CONTENT_SPATIALIZED);
+    }
+
+    if ((outputFlags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_HW_AV_SYNC);
+    }
+    if ((outputFlags & AUDIO_OUTPUT_FLAG_FAST) != 0) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_LOW_LATENCY);
+    } else if ((outputFlags & AUDIO_OUTPUT_FLAG_DEEP_BUFFER) != 0) {
+        flagsMask = static_cast<audio_flags_mask_t>(flagsMask | AUDIO_FLAG_DEEP_BUFFER);
     }
 
     return flagsMask;
@@ -631,4 +662,32 @@ aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {
             break;
     }
     return result;
+}
+
+namespace {
+
+aaudio_policy_t aidl2legacy_aaudio_policy(AudioMMapPolicy aidl) {
+    switch (aidl) {
+        case AudioMMapPolicy::NEVER:
+            return AAUDIO_POLICY_NEVER;
+        case AudioMMapPolicy::AUTO:
+            return AAUDIO_POLICY_AUTO;
+        case AudioMMapPolicy::ALWAYS:
+            return AAUDIO_POLICY_ALWAYS;
+        case AudioMMapPolicy::UNSPECIFIED:
+        default:
+            return AAUDIO_UNSPECIFIED;
+    }
+}
+
+} // namespace
+
+aaudio_policy_t AAudio_getAAudioPolicy(const std::vector<AudioMMapPolicyInfo>& policyInfos) {
+    if (policyInfos.empty()) return AAUDIO_POLICY_AUTO;
+    for (size_t i = 1; i < policyInfos.size(); ++i) {
+        if (policyInfos.at(i).mmapPolicy != policyInfos.at(0).mmapPolicy) {
+            return AAUDIO_POLICY_AUTO;
+        }
+    }
+    return aidl2legacy_aaudio_policy(policyInfos.at(0).mmapPolicy);
 }

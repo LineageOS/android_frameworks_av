@@ -33,6 +33,7 @@ public:
         MMAP_PLAYBACK,      // Thread class for MMAP playback stream
         MMAP_CAPTURE,       // Thread class for MMAP capture stream
         SPATIALIZER,  //
+        BIT_PERFECT,        // Thread class for BitPerfectThread
         // If you add any values here, also update ThreadBase::threadTypeToString()
     };
 
@@ -375,8 +376,6 @@ public:
     virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
 
     virtual     void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs);
-    virtual     void        onHalLatencyModesChanged_l() {}
-
 
                 // see note at declaration of mStandby, mOutDevice and mInDevice
                 bool        standby() const { return mStandby; }
@@ -430,8 +429,10 @@ public:
                                             // track
                     FAST_SESSION = 0x4,     // the audio session corresponds to at least one
                                             // fast track
-                    SPATIALIZED_SESSION = 0x8 // the audio session corresponds to at least one
-                                              // spatialized track
+                    SPATIALIZED_SESSION = 0x8, // the audio session corresponds to at least one
+                                               // spatialized track
+                    BIT_PERFECT_SESSION = 0x10 // the audio session corresponds to at least one
+                                               // bit-perfect track
                 };
 
                 // get effect chain corresponding to session Id.
@@ -496,6 +497,9 @@ public:
                             }
                             if (track->isSpatialized()) {
                                 result |= SPATIALIZED_SESSION;  // caution, only first track.
+                            }
+                            if (track->isBitPerfect()) {
+                                result |= BIT_PERFECT_SESSION;
                             }
                             break;
                         }
@@ -572,6 +576,9 @@ public:
 
     virtual     bool isStreamInitialized() = 0;
 
+    virtual     void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor);
+    virtual     void stopMelComputation_l();
+
 protected:
 
                 // entry describing an effect being suspended in mSuspendedSessions keyed vector
@@ -603,7 +610,11 @@ protected:
                 void checkSuspendOnAddEffectChain_l(const sp<EffectChain>& chain);
 
                 // sends the metadata of the active tracks to the HAL
-    virtual     void        updateMetadata_l() = 0;
+                struct MetadataUpdate {
+                    std::vector<playback_track_metadata_v7_t> playbackMetadataUpdate;
+                    std::vector<record_track_metadata_v7_t>   recordMetadataUpdate;
+                };
+    virtual     MetadataUpdate           updateMetadata_l() = 0;
 
                 String16 getWakeLockTag();
 
@@ -619,12 +630,14 @@ protected:
 
                 product_strategy_t getStrategyForStream(audio_stream_type_t stream) const;
 
+    virtual     void        onHalLatencyModesChanged_l() {}
+
     virtual     void        dumpInternals_l(int fd __unused, const Vector<String16>& args __unused)
                             { }
     virtual     void        dumpTracks_l(int fd __unused, const Vector<String16>& args __unused) { }
 
 
-    friend class AudioFlinger;      // for mEffectChains
+    friend class AudioFlinger;      // for mEffectChains and mAudioManager
 
                 const type_t            mType;
 
@@ -796,6 +809,11 @@ protected:
                      *          true if volume of one of active tracks was changed.
                      */
                     bool            readAndClearHasChanged();
+
+                    /** Force updating track metadata to audio HAL stream next time
+                     * readAndClearHasChanged() is called.
+                     */
+                    void            setHasChanged() { mHasChanged = true; }
 
                 private:
                     void            logTrack(const char *funcName, const sp<T> &track) const;
@@ -977,7 +995,8 @@ public:
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId,
                                 const sp<media::IAudioTrackCallback>& callback,
-                                bool isSpatialized);
+                                bool isSpatialized,
+                                bool isBitPerfect);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -1024,7 +1043,11 @@ public:
 
                 // called with AudioFlinger lock held
                         bool     invalidateTracks_l(audio_stream_type_t streamType);
+                        bool     invalidateTracks_l(std::set<audio_port_handle_t>& portIds);
                 virtual void     invalidateTracks(audio_stream_type_t streamType);
+                // Invalidate tracks by a set of port ids. The port id will be removed from
+                // the given set if the corresponding track is found and invalidated.
+                virtual void     invalidateTracks(std::set<audio_port_handle_t>& portIds);
 
     virtual     size_t      frameCount() const { return mNormalFrameCount; }
 
@@ -1086,8 +1109,39 @@ public:
                     return INVALID_OPERATION;
                 }
 
-    virtual     status_t setBluetoothVariableLatencyEnabled(bool enabled);
+    virtual     status_t setBluetoothVariableLatencyEnabled(bool enabled __unused) {
+                    return INVALID_OPERATION;
+                }
 
+                void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override;
+                void stopMelComputation_l() override;
+
+                void setStandby() {
+                    Mutex::Autolock _l(mLock);
+                    setStandby_l();
+                }
+
+                void setStandby_l() {
+                    mStandby = true;
+                    mHalStarted = false;
+                    mKernelPositionOnStandby =
+                        mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+                }
+
+                bool waitForHalStart() {
+                    Mutex::Autolock _l(mLock);
+                    static const nsecs_t kWaitHalTimeoutNs = seconds(2);
+                    nsecs_t endWaitTimetNs = systemTime() + kWaitHalTimeoutNs;
+                    while (!mHalStarted) {
+                        nsecs_t timeNs = systemTime();
+                        if (timeNs >= endWaitTimetNs) {
+                            break;
+                        }
+                        nsecs_t waitTimeLeftNs = endWaitTimetNs - timeNs;
+                        mWaitHalStartCV.waitRelative(mLock, waitTimeLeftNs);
+                    }
+                    return mHalStarted;
+                }
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1156,6 +1210,9 @@ protected:
     // When this is set, all mixer data is routed into the effects buffer
     // for any processing (including output processing).
     bool                            mEffectBufferValid;
+
+    // Set to "true" to enable when data has already copied to sink
+    bool                            mHasDataCopiedToSinkBuffer = false;
 
     // Frame size aligned buffer used as input and output to all post processing effects
     // except the Spatializer in a SPATIALIZER thread. Non spatialized tracks are mixed into
@@ -1251,7 +1308,7 @@ private:
     void        removeTrack_l(const sp<Track>& track);
 
     void        readOutputParameters_l();
-    void        updateMetadata_l() final;
+    MetadataUpdate          updateMetadata_l() final;
     virtual void sendMetadataToBackend_l(const StreamOutHalInterface::SourceMetadata& metadata);
 
     void        collectTimestamps_l();
@@ -1384,6 +1441,14 @@ private:
     // Downstream patch latency, available if mDownstreamLatencyStatMs.getN() > 0.
     audio_utils::Statistics<double> mDownstreamLatencyStatMs{0.999};
 
+    // output stream start detection based on render position returned by the kernel
+    // condition signalled when the output stream has started
+    Condition                mWaitHalStartCV;
+    // true when the output stream render position has moved, reset to false in standby
+    bool                     mHalStarted = false;
+    // last kernel render position saved when entering standby
+    int64_t                  mKernelPositionOnStandby = 0;
+
 public:
     virtual     bool        hasFastMixer() const = 0;
     virtual     FastTrackUnderruns getFastTrackUnderruns(size_t fastIndex __unused) const
@@ -1438,12 +1503,10 @@ protected:
     virtual     void flushHw_l() {
                     mIsTimestampAdvancing.clear();
                 }
-
-        // Bluetooth Variable latency control logic is enabled or disabled for this thread
-        std::atomic_bool mBluetoothLatencyModesEnabled;
 };
 
-class MixerThread : public PlaybackThread {
+class MixerThread : public PlaybackThread,
+                    public StreamOutHalInterfaceLatencyModeCallback  {
 public:
     MixerThread(const sp<AudioFlinger>& audioFlinger,
                 AudioStreamOut* output,
@@ -1452,6 +1515,13 @@ public:
                 type_t type = MIXER,
                 audio_config_base_t *mixerConfig = nullptr);
     virtual             ~MixerThread();
+
+    // RefBase
+    virtual     void        onFirstRef();
+
+                // StreamOutHalInterfaceLatencyModeCallback
+                void        onRecommendedLatencyModeChanged(
+                                    std::vector<audio_latency_mode_t> modes) override;
 
     // Thread virtuals
 
@@ -1489,6 +1559,17 @@ protected:
     virtual     status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
 
                 AudioMixer* mAudioMixer;    // normal mixer
+
+            // Support low latency mode by default as unless explicitly indicated by the audio HAL
+            // we assume the audio path is compatible with the head tracking latency requirements
+            std::vector<audio_latency_mode_t> mSupportedLatencyModes = {AUDIO_LATENCY_MODE_LOW};
+            // default to invalid value to force first update to the audio HAL
+            audio_latency_mode_t mSetLatencyMode =
+                    (audio_latency_mode_t)AUDIO_LATENCY_MODE_INVALID;
+
+            // Bluetooth Variable latency control logic is enabled or disabled for this thread
+            std::atomic_bool mBluetoothLatencyModesEnabled;
+
 private:
                 // one-time initialization, no locks required
                 sp<FastMixer>     mFastMixer;     // non-0 if there is also a fast mixer
@@ -1522,6 +1603,11 @@ public:
                                 return INVALID_OPERATION;
                             }
 
+                status_t    getSupportedLatencyModes(
+                                    std::vector<audio_latency_mode_t>* modes) override;
+
+                status_t    setBluetoothVariableLatencyEnabled(bool enabled) override;
+
 protected:
     virtual     void       setMasterMono_l(bool mono) {
                                mMasterMono.store(mono);
@@ -1540,6 +1626,10 @@ protected:
                                    mFastMixer->setMasterBalance(balance);
                                }
                            }
+
+                void       updateHalSupportedLatencyModes_l();
+                void       onHalLatencyModesChanged_l() override;
+                void       setHalLatencyMode_l() override;
 };
 
 class DirectOutputThread : public PlaybackThread {
@@ -1640,6 +1730,7 @@ protected:
     virtual     bool        waitingAsyncCallback();
     virtual     bool        waitingAsyncCallback_l();
     virtual     void        invalidateTracks(audio_stream_type_t streamType);
+                void        invalidateTracks(std::set<audio_port_handle_t>& portIds) override;
 
     virtual     bool        keepWakeLock() const { return (mKeepWakeLock || (mDrainSequence & 1)); }
 
@@ -1742,8 +1833,7 @@ public:
     }
 };
 
-class SpatializerThread : public MixerThread,
-        public StreamOutHalInterfaceLatencyModeCallback {
+class SpatializerThread : public MixerThread {
 public:
     SpatializerThread(const sp<AudioFlinger>& audioFlinger,
                            AudioStreamOut* output,
@@ -1754,32 +1844,16 @@ public:
 
             bool hasFastMixer() const override { return false; }
 
-            status_t    createAudioPatch_l(const struct audio_patch *patch,
-                                   audio_patch_handle_t *handle) override;
-
             // RefBase
             virtual void        onFirstRef();
 
-            // StreamOutHalInterfaceLatencyModeCallback
-            void onRecommendedLatencyModeChanged(std::vector<audio_latency_mode_t> modes) override;
-
             status_t setRequestedLatencyMode(audio_latency_mode_t mode) override;
-            status_t getSupportedLatencyModes(std::vector<audio_latency_mode_t>* modes) override;
 
 protected:
             void checkOutputStageEffects() override;
-            void onHalLatencyModesChanged_l() override;
             void setHalLatencyMode_l() override;
 
 private:
-            void updateHalSupportedLatencyModes_l();
-
-            // Support low latency mode by default as unless explicitly indicated by the audio HAL
-            // we assume the audio path is compatible with the head tracking latency requirements
-            std::vector<audio_latency_mode_t> mSupportedLatencyModes = {AUDIO_LATENCY_MODE_LOW};
-            // default to invalid value to force first update to the audio HAL
-            audio_latency_mode_t mSetLatencyMode =
-                    (audio_latency_mode_t)AUDIO_LATENCY_MODE_INVALID;
             // Do not request a specific mode by default
             audio_latency_mode_t mRequestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
 
@@ -1949,7 +2023,7 @@ public:
             status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
             status_t    setPreferredMicrophoneFieldDimension(float zoom);
 
-            void        updateMetadata_l() override;
+            MetadataUpdate        updateMetadata_l() override;
 
             bool        fastTrackAvailable() const { return mFastTrackAvail; }
 
@@ -2091,6 +2165,7 @@ class MmapThread : public ThreadBase
     status_t stop(audio_port_handle_t handle);
     status_t standby();
     virtual status_t getExternalPosition(uint64_t *position, int64_t *timeNaos) = 0;
+    virtual status_t reportData(const void* buffer, size_t frameCount);
 
     // RefBase
     virtual     void        onFirstRef();
@@ -2101,7 +2176,7 @@ class MmapThread : public ThreadBase
     virtual     void        threadLoop_exit();
     virtual     void        threadLoop_standby();
     virtual     bool        shouldStandby_l() { return false; }
-    virtual     status_t    exitStandby();
+    virtual     status_t    exitStandby_l() REQUIRES(mLock);
 
     virtual     status_t    initCheck() const { return (mHalStream == 0) ? NO_INIT : NO_ERROR; }
     virtual     size_t      frameCount() const { return mFrameCount; }
@@ -2137,6 +2212,7 @@ class MmapThread : public ThreadBase
     virtual     audio_stream_type_t streamType() { return AUDIO_STREAM_DEFAULT; }
 
     virtual     void        invalidateTracks(audio_stream_type_t streamType __unused) {}
+    virtual     void        invalidateTracks(std::set<audio_port_handle_t>& portIds __unused) {}
 
                 // Sets the UID records silence
     virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
@@ -2216,12 +2292,13 @@ public:
                 void        setMasterMute_l(bool muted) { mMasterMute = muted; }
 
     virtual     void        invalidateTracks(audio_stream_type_t streamType);
+                void        invalidateTracks(std::set<audio_port_handle_t>& portIds) override;
 
     virtual     audio_stream_type_t streamType() { return mStreamType; }
     virtual     void        checkSilentMode_l();
                 void        processVolume_l() override;
 
-                void        updateMetadata_l() override;
+                MetadataUpdate        updateMetadata_l() override;
 
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
@@ -2231,20 +2308,22 @@ public:
                                 return !(mOutput == nullptr || mOutput->stream == nullptr);
                             }
 
+                status_t    reportData(const void* buffer, size_t frameCount) override;
+
+                void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override;
+                void stopMelComputation_l() override;
+
 protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
-                float       streamVolume_l() const {
-                    return mStreamTypes[mStreamType].volume;
-                }
-                bool     streamMuted_l() const {
-                    return mStreamTypes[mStreamType].mute;
-                }
 
-                stream_type_t               mStreamTypes[AUDIO_STREAM_CNT];
                 audio_stream_type_t         mStreamType;
                 float                       mMasterVolume;
+                float                       mStreamVolume;
                 bool                        mMasterMute;
+                bool                        mStreamMute;
                 AudioStreamOut*             mOutput;
+
+                mediautils::atomic_sp<audio_utils::MelProcessor> mMelProcessor;
 };
 
 class MmapCaptureThread : public MmapThread
@@ -2257,9 +2336,9 @@ public:
 
                 AudioStreamIn* clearInput();
 
-                status_t       exitStandby() override;
+                status_t       exitStandby_l() REQUIRES(mLock) override;
 
-                void           updateMetadata_l() override;
+                MetadataUpdate           updateMetadata_l() override;
                 void           processVolume_l() override;
                 void           setRecordSilenced(audio_port_handle_t portId,
                                                  bool silenced) override;
@@ -2275,4 +2354,19 @@ public:
 protected:
 
                 AudioStreamIn*  mInput;
+};
+
+class BitPerfectThread : public MixerThread {
+public:
+    BitPerfectThread(const sp<AudioFlinger>& audioflinger, AudioStreamOut *output,
+                     audio_io_handle_t id, bool systemReady);
+
+protected:
+    mixer_state prepareTracks_l(Vector<sp<Track>> *tracksToRemove) override;
+    void threadLoop_mix() override;
+
+private:
+    bool mIsBitPerfect;
+    float mVolumeLeft = 0.f;
+    float mVolumeRight = 0.f;
 };

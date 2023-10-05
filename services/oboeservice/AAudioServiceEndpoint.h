@@ -43,7 +43,7 @@ class AAudioServiceEndpoint
         , public AAudioStreamParameters {
 public:
 
-    virtual ~AAudioServiceEndpoint();
+    ~AAudioServiceEndpoint() override;
 
     virtual std::string dump() const;
 
@@ -55,9 +55,9 @@ public:
      */
     virtual void close() = 0;
 
-    aaudio_result_t registerStream(android::sp<AAudioServiceStreamBase> stream);
+    aaudio_result_t registerStream(const android::sp<AAudioServiceStreamBase>& stream);
 
-    aaudio_result_t unregisterStream(android::sp<AAudioServiceStreamBase> stream);
+    aaudio_result_t unregisterStream(const android::sp<AAudioServiceStreamBase>& stream);
 
     virtual aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
                                         audio_port_handle_t *clientHandle) = 0;
@@ -65,14 +65,14 @@ public:
     virtual aaudio_result_t stopStream(android::sp<AAudioServiceStreamBase> stream,
                                        audio_port_handle_t clientHandle) = 0;
 
-    virtual aaudio_result_t startClient(const android::AudioClient& client,
-                                        const audio_attributes_t *attr,
-                                        audio_port_handle_t *clientHandle) {
+    virtual aaudio_result_t startClient(const android::AudioClient& /*client*/,
+                                        const audio_attributes_t* /*attr*/,
+                                        audio_port_handle_t* /*clientHandle*/) {
         ALOGD("AAudioServiceEndpoint::startClient(...) AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle) {
+    virtual aaudio_result_t stopClient(audio_port_handle_t /*clientHandle*/) {
         ALOGD("AAudioServiceEndpoint::stopClient(...) AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
     }
@@ -82,7 +82,7 @@ public:
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    virtual aaudio_result_t exitStandby(AudioEndpointParcelable* parcelable) {
+    virtual aaudio_result_t exitStandby(AudioEndpointParcelable* /*parcelable*/) {
         ALOGD("AAudioServiceEndpoint::exitStandby() AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
     }

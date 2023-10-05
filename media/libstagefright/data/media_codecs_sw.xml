@@ -165,7 +165,7 @@
         <MediaCodec name="c2.android.vp8.decoder" type="video/x-vnd.on2.vp8" variant="slow-cpu,!slow-cpu">
             <Alias name="OMX.google.vp8.decoder" />
             <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
+            <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
                 <Limit name="block-count" range="1-16384" />
@@ -182,7 +182,7 @@
         </MediaCodec>
         <MediaCodec name="c2.android.vp9.decoder" type="video/x-vnd.on2.vp9" variant="slow-cpu,!slow-cpu">
             <Alias name="OMX.google.vp9.decoder" />
-            <Limit name="alignment" value="2x2" />
+            <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
                 <Limit name="size" min="2x2" max="2048x2048" />
@@ -199,13 +199,22 @@
             <Feature name="adaptive-playback" />
             <Attribute name="software-codec" />
         </MediaCodec>
-        <MediaCodec name="c2.android.av1.decoder" type="video/av01" variant="!slow-cpu">
-            <Limit name="size" min="2x2" max="2048x2048" />
+        <MediaCodec name="c2.android.av1.decoder" type="video/av01" variant="slow-cpu,!slow-cpu">
+            <!-- TODO: implement a mechanism to prevent AV1 Decoder usage on pre-U devices -->
             <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
-            <Limit name="block-count" range="1-16384" />
-            <Limit name="blocks-per-second" range="1-2073600" />
-            <Limit name="bitrate" range="1-120000000" />
+            <Variant name="!slow-cpu">
+                <Limit name="size" min="2x2" max="2048x2048" />
+                <Limit name="block-count" range="1-8192" /> <!-- max 2048x1024 -->
+                <Limit name="blocks-per-second" range="1-245760" />
+                <Limit name="bitrate" range="1-40000000" />
+            </Variant>
+            <Variant name="slow-cpu">
+                <Limit name="size" min="2x2" max="1280x1280" />
+                <Limit name="block-count" range="1-3600" /> <!-- max 1280x720 -->
+                <Limit name="blocks-per-second" range="1-108000" />
+                <Limit name="bitrate" range="1-5000000" />
+            </Variant>
             <Feature name="adaptive-playback" />
             <Attribute name="software-codec" />
         </MediaCodec>
@@ -349,6 +358,24 @@
             <Limit name="block-count" range="1-3600" /> <!-- max 1280x720 -->
             <Limit name="bitrate" range="1-40000000" />
             <Feature name="bitrate-modes" value="VBR,CBR" />
+            <Attribute name="software-codec" />
+        </MediaCodec>
+        <MediaCodec name="c2.android.av1.encoder" type="video/av01" enabled="false" minsdk="34" variant="slow-cpu,!slow-cpu">
+            <Limit name="alignment" value="2x2" />
+            <Limit name="block-size" value="16x16" />
+            <Variant name="!slow-cpu">
+                <Limit name="size" min="2x2" max="1920x1920" />
+                <Limit name="block-count" range="1-8100" /> <!-- max 1920x1080 -->
+                <Limit name="bitrate" range="1-20000000" />
+            </Variant>
+            <Variant name="slow-cpu">
+                <Limit name="size" min="2x2" max="720x720" />
+                <Limit name="block-count" range="1-1350" /> <!-- max 720x480 -->
+                <Limit name="bitrate" range="1-5000000" />
+            </Variant>
+            <Limit name="quality" range="0-100"  default="80" />
+            <Limit name="complexity" range="0-5"  default="0" />
+            <Feature name="bitrate-modes" value="VBR,CBR,CQ" />
             <Attribute name="software-codec" />
         </MediaCodec>
     </Encoders>

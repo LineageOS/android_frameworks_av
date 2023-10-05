@@ -185,7 +185,8 @@ struct DrmPlugin : public BnDrmPlugin {
     std::map<std::string, std::vector<uint8_t>> mByteArrayProperties;
     std::map<std::string, std::vector<uint8_t>> mReleaseKeysMap;
     std::map<std::vector<uint8_t>, std::string> mPlaybackId;
-    std::map<std::vector<uint8_t>, SecurityLevel> mSecurityLevel;
+    std::map<std::vector<uint8_t>, SecurityLevel> mSecurityLevel
+        GUARDED_BY(mSecurityLevelLock);
     ::std::shared_ptr<IDrmPluginListener> mListener;
     SessionLibrary* mSessionLibrary;
     int64_t mOpenSessionOkCount;
@@ -204,6 +205,7 @@ struct DrmPlugin : public BnDrmPlugin {
 
     DeviceFiles mFileHandle;
     ::android::Mutex mSecureStopLock;
+    ::android::Mutex mSecurityLevelLock;
 
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);
 };

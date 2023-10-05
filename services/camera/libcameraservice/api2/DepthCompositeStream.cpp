@@ -99,7 +99,7 @@ DepthCompositeStream::DepthCompositeStream(sp<CameraDeviceBase> device,
         }
 
         getSupportedDepthSizes(staticInfo, /*maxResolution*/false, &mSupportedDepthSizes);
-        if (SessionConfigurationUtils::isUltraHighResolutionSensor(staticInfo)) {
+        if (SessionConfigurationUtils::supportsUltraHighResolutionCapture(staticInfo)) {
             getSupportedDepthSizes(staticInfo, true, &mSupportedDepthSizesMaximumResolution);
         }
     }
@@ -582,7 +582,8 @@ status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surfac
         camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds,
-        int /*streamSetId*/, bool /*isShared*/) {
+        int /*streamSetId*/, bool /*isShared*/, int32_t /*colorSpace*/,
+        int64_t /*dynamicProfile*/, int64_t /*streamUseCase*/, bool useReadoutTimestamp) {
     if (mSupportedDepthSizes.empty()) {
         ALOGE("%s: This camera device doesn't support any depth map streams!", __FUNCTION__);
         return INVALID_OPERATION;
@@ -613,7 +614,14 @@ status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surfac
     mBlobSurface = new Surface(producer);
 
     ret = device->createStream(mBlobSurface, width, height, format, kJpegDataSpace, rotation,
-            id, physicalCameraId, sensorPixelModesUsed, surfaceIds);
+            id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
+            camera3::CAMERA3_STREAM_SET_ID_INVALID, /*isShared*/false, /*isMultiResolution*/false,
+            /*consumerUsage*/0, ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+            OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            OutputConfiguration::MIRROR_MODE_AUTO,
+            ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED,
+            useReadoutTimestamp);
     if (ret == OK) {
         mBlobStreamId = *id;
         mBlobSurfaceId = (*surfaceIds)[0];
@@ -630,7 +638,14 @@ status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surfac
     std::vector<int> depthSurfaceId;
     ret = device->createStream(mDepthSurface, depthWidth, depthHeight, kDepthMapPixelFormat,
             kDepthMapDataSpace, rotation, &mDepthStreamId, physicalCameraId, sensorPixelModesUsed,
-            &depthSurfaceId);
+            &depthSurfaceId, camera3::CAMERA3_STREAM_SET_ID_INVALID, /*isShared*/false,
+            /*isMultiResolution*/false, /*consumerUsage*/0,
+            ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
+            ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+            OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            OutputConfiguration::MIRROR_MODE_AUTO,
+            ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED,
+            useReadoutTimestamp);
     if (ret == OK) {
         mDepthSurfaceId = depthSurfaceId[0];
     } else {
@@ -887,7 +902,7 @@ status_t DepthCompositeStream::getCompositeStreamInfo(const OutputStreamInfo &st
         return BAD_VALUE;
     }
 
-    if (SessionConfigurationUtils::isUltraHighResolutionSensor(ch)) {
+    if (SessionConfigurationUtils::supportsUltraHighResolutionCapture(ch)) {
         getSupportedDepthSizes(ch, /*maxResolution*/true, &depthSizesMaximumResolution);
         if (depthSizesMaximumResolution.empty()) {
             ALOGE("%s: No depth stream configurations for maximum resolution present",

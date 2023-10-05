@@ -744,5 +744,21 @@ void AdjustChannelsBufferProvider::reset()
     mContractedWrittenFrames = 0;
     CopyBufferProvider::reset();
 }
+
+void TeeBufferProvider::copyFrames(void *dst, const void *src, size_t frames) {
+    memcpy(dst, src, frames * mInputFrameSize);
+    if (int teeBufferFrameLeft = mTeeBufferFrameCount - mFrameCopied; teeBufferFrameLeft < frames) {
+        ALOGW("Unable to copy all frames to tee buffer, %d frames dropped",
+              (int)frames - teeBufferFrameLeft);
+        frames = teeBufferFrameLeft;
+    }
+    memcpy(mTeeBuffer + mFrameCopied * mInputFrameSize, src, frames * mInputFrameSize);
+    mFrameCopied += frames;
+}
+
+void TeeBufferProvider::clearFramesCopied() {
+    mFrameCopied = 0;
+}
+
 // ----------------------------------------------------------------------------
 } // namespace android

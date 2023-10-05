@@ -32,6 +32,7 @@
 using ::aidl::android::hardware::tv::tuner::DemuxCapabilities;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
+using ::aidl::android::hardware::tv::tuner::DemuxInfo;
 using ::aidl::android::hardware::tv::tuner::FrontendInfo;
 using ::aidl::android::hardware::tv::tuner::FrontendType;
 using ::aidl::android::hardware::tv::tuner::ITuner;
@@ -71,12 +72,15 @@ public:
     ::ndk::ScopedAStatus openDemux(int32_t in_demuxHandle,
                                    shared_ptr<ITunerDemux>* _aidl_return) override;
     ::ndk::ScopedAStatus getDemuxCaps(DemuxCapabilities* _aidl_return) override;
+    ::ndk::ScopedAStatus getDemuxInfo(int32_t in_demuxHandle, DemuxInfo* _aidl_return) override;
+    ::ndk::ScopedAStatus getDemuxInfoList(vector<DemuxInfo>* _aidl_return) override;
     ::ndk::ScopedAStatus openDescrambler(int32_t in_descramblerHandle,
                                          shared_ptr<ITunerDescrambler>* _aidl_return) override;
     ::ndk::ScopedAStatus getTunerHalVersion(int32_t* _aidl_return) override;
     ::ndk::ScopedAStatus openSharedFilter(const string& in_filterToken,
                                           const shared_ptr<ITunerFilterCallback>& in_cb,
                                           shared_ptr<ITunerFilter>* _aidl_return) override;
+    ::ndk::ScopedAStatus isLnaSupported(bool* _aidl_return) override;
     ::ndk::ScopedAStatus setLna(bool in_bEnable) override;
     ::ndk::ScopedAStatus setMaxNumberOfFrontends(FrontendType in_frontendType,
                                                  int32_t in_maxNumber) override;
@@ -86,20 +90,16 @@ public:
     string addFilterToShared(const shared_ptr<TunerFilter>& sharedFilter);
     void removeSharedFilter(const shared_ptr<TunerFilter>& sharedFilter);
 
-    static shared_ptr<TunerService> getTunerService();
-
 private:
-    bool hasITuner();
     void updateTunerResources();
     vector<TunerFrontendInfo> getTRMFrontendInfos();
+    vector<TunerDemuxInfo> getTRMDemuxInfos();
     vector<int32_t> getTRMLnbHandles();
 
     shared_ptr<ITuner> mTuner;
     int mTunerVersion = TUNER_HAL_VERSION_UNKNOWN;
     Mutex mSharedFiltersLock;
     map<string, shared_ptr<TunerFilter>> mSharedFilters;
-
-    static shared_ptr<TunerService> sTunerService;
 };
 
 }  // namespace tuner

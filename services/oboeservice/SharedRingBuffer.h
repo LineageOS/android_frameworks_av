@@ -39,7 +39,7 @@ namespace aaudio {
  */
 class SharedRingBuffer {
 public:
-    SharedRingBuffer() {}
+    SharedRingBuffer() = default;
 
     virtual ~SharedRingBuffer();
 
