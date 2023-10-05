@@ -546,7 +546,7 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_
         if (out_size != NULL) {
             *out_size = abuf->capacity();
         }
-        return abuf->data();
+        return abuf->base();
     }
 
     android::Vector<android::sp<android::MediaCodecBuffer> > abufs;
@@ -563,7 +563,7 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_
         if (out_size != NULL) {
             *out_size = abufs[idx]->capacity();
         }
-        return abufs[idx]->data();
+        return abufs[idx]->base();
     }
     ALOGE("couldn't get input buffers");
     return NULL;
@@ -581,7 +581,7 @@ uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec *mData, size_t idx, size_t *out
         if (out_size != NULL) {
             *out_size = abuf->capacity();
         }
-        return abuf->data();
+        return abuf->base();
     }
 
     android::Vector<android::sp<android::MediaCodecBuffer> > abufs;
@@ -594,7 +594,7 @@ uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec *mData, size_t idx, size_t *out
         if (out_size != NULL) {
             *out_size = abufs[idx]->capacity();
         }
-        return abufs[idx]->data();
+        return abufs[idx]->base();
     }
     ALOGE("couldn't get output buffers");
     return NULL;
