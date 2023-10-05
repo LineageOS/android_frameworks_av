@@ -18,6 +18,7 @@
 #include <fuzzer/FuzzedDataProvider.h>
 #include <gui/BufferQueue.h>
 #include <media/NdkImageReader.h>
+#include <functional>
 
 constexpr int32_t kMaxSize = INT_MAX;
 constexpr int32_t kMinSize = 1;
