@@ -3899,6 +3899,18 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 {
     aflog::setThreadWriter(mNBLogWriter.get());
 
+    if (mType == SPATIALIZER) {
+        const pid_t tid = getTid();
+        if (tid == -1) {  // odd: we are here, we must be a running thread.
+            ALOGW("%s: Cannot update Spatializer mixer thread priority, no tid", __func__);
+        } else {
+            const int priorityBoost = requestSpatializerPriority(getpid(), tid);
+            if (priorityBoost > 0) {
+                stream()->setHalThreadPriority(priorityBoost);
+            }
+        }
+    }
+
     Vector<sp<IAfTrack>> tracksToRemove;
 
     mStandbyTimeNs = systemTime();
@@ -7765,21 +7777,6 @@ SpatializerThread::SpatializerThread(const sp<IAfThreadCallback>& afThreadCallba
                                                              audio_config_base_t *mixerConfig)
     : MixerThread(afThreadCallback, output, id, systemReady, SPATIALIZER, mixerConfig)
 {
-}
-
-void SpatializerThread::onFirstRef() {
-    MixerThread::onFirstRef();
-
-    const pid_t tid = getTid();
-    if (tid == -1) {
-        // Unusual: PlaybackThread::onFirstRef() should set the threadLoop running.
-        ALOGW("%s: Cannot update Spatializer mixer thread priority, not running", __func__);
-    } else {
-        const int priorityBoost = requestSpatializerPriority(getpid(), tid);
-        if (priorityBoost > 0) {
-            stream()->setHalThreadPriority(priorityBoost);
-        }
-    }
 }
 
 void SpatializerThread::setHalLatencyMode_l() {

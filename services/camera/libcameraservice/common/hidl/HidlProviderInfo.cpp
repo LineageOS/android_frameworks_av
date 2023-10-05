@@ -17,6 +17,7 @@
 #include "common/HalConversionsTemplated.h"
 #include "common/CameraProviderInfoTemplated.h"
 
+#include <com_android_internal_camera_flags.h>
 #include <cutils/properties.h>
 
 #include <android/hardware/ICameraService.h>
@@ -44,6 +45,7 @@ using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 
 using StatusListener = CameraProviderManager::StatusListener;
 using HalDeviceStatusType = android::hardware::camera::common::V1_0::CameraDeviceStatus;
+namespace flags = com::android::internal::camera::flags;
 
 using hardware::camera::provider::V2_5::DeviceState;
 using hardware::ICameraService;
@@ -613,12 +615,13 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
                 __FUNCTION__, strerror(-res), res);
         return;
     }
-
-    res = fixupManualFlashStrengthControlTags();
-    if (OK != res) {
-        ALOGE("%s: Unable to fix up manual flash strength control tags: %s (%d)",
-                __FUNCTION__, strerror(-res), res);
-        return;
+    if (flags::camera_manual_flash_strength_control()) {
+        res = fixupManualFlashStrengthControlTags();
+        if (OK != res) {
+            ALOGE("%s: Unable to fix up manual flash strength control tags: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return;
+        }
     }
 
     auto stat = addDynamicDepthTags();
