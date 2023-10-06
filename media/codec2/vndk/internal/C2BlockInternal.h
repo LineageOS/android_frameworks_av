@@ -39,6 +39,8 @@ struct BufferPoolData;
 
 }
 
+typedef struct AHardwareBuffer AHardwareBuffer;
+
 using bufferpool_BufferPoolData = android::hardware::media::bufferpool::BufferPoolData;
 using bufferpool2_BufferPoolData = aidl::android::hardware::media::bufferpool2::BufferPoolData;
 
@@ -50,6 +52,7 @@ struct C2_HIDE _C2BlockPoolData {
         TYPE_BUFFERPOOL = 0,
         TYPE_BUFFERQUEUE,
         TYPE_BUFFERPOOL2, // AIDL-BufferPool
+        TYPE_AHWBUFFER, // AHardwareBuffer based block
     };
 
     virtual type_t getType() const = 0;
@@ -172,6 +175,17 @@ struct _C2BlockFactory {
     std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(
             const C2Handle *handle,
             const std::shared_ptr<bufferpool_BufferPoolData> &data);
+
+    /**
+     * Create a graphic block from the received AHardwareBuffer.
+     *
+     * \param buffer  AHardwareBuffer
+     *
+     * \return shared pointer to the graphic block. nullptr if there was not enough memory to
+     *         create this block.
+     */
+    static
+    std::shared_ptr<C2GraphicBlock> CreateGraphicBlock(AHardwareBuffer *buffer);
 
     /**
      * Get bufferpool data from the blockpool data.
@@ -432,6 +446,31 @@ struct _C2BlockFactory {
      */
     static
     bool DisplayBlockToBufferQueue(
+            const std::shared_ptr<_C2BlockPoolData>& poolData);
+
+    /**
+     * Retrieves a AHardwareBuffer from data of a graphic block which was
+     * allocated via IGBA based blockpool. Retrieved AHardwareBuffer handle
+     * does not have the ownership. poolData still has the ownership. Use
+     * AHardwareBuffer_acquire()/AHardwareBuffer_release if independent
+     * life-cycle/ownership is required.
+     *
+     * \param[in]   poolData  blockpool data.
+     * \param[out]  pBuf      ptr to AHardwareBuffer
+     *
+     * \return true if AHardwareBuffer was returned to output parameter, false
+     * otherwise.
+     */
+    static
+    bool GetAHardwareBuffer(
+            const std::shared_ptr<const _C2BlockPoolData>& poolData,
+            AHardwareBuffer **pBuf);
+
+    /**
+     * Mark a graphic block is not owned by the current process anymore.
+     * (Use this method after transfer is being completed.)
+     */
+    static void DisownIgbaBlock(
             const std::shared_ptr<_C2BlockPoolData>& poolData);
 };
 
