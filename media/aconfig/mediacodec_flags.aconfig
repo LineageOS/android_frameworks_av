@@ -6,3 +6,10 @@ flag {
   description: "Feature flags for large audio frame support"
   bug: "297219557"
 }
+
+flag {
+  name: "codec_importance"
+  namespace: "codec_fwk"
+  description: "Feature flags for media codec importance"
+  bug: "297929011"
+}
