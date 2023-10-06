@@ -86,6 +86,15 @@ public:
         BLOB,
 
         /**
+         * ID of C2AIDL IGraphicBufferAllocator backed platform allocator.
+         *
+         * C2Handle layout is not public. Use C2AllocatorAhwb::UnwrapNativeCodec2AhwbHandle
+         * to get the underlying gralloc handle from a C2Handle, and WrapNativeCodec2AhwbHandle
+         * to create a C2Handle from a gralloc handle - for C2Allocator::priorAllocation.
+         */
+        IGBA,
+
+        /**
          * ID of indicating the end of platform allocator definition.
          *
          * \note always put this macro in the last place.
