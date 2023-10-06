@@ -110,8 +110,12 @@ void MediaClock::updateAnchor(
     if (mAnchorTimeRealUs != -1) {
         int64_t oldNowMediaUs =
             mAnchorTimeMediaUs + (nowUs - mAnchorTimeRealUs) * (double)mPlaybackRate;
-        if (nowMediaUs < oldNowMediaUs + kAnchorFluctuationAllowedUs
-                && nowMediaUs > oldNowMediaUs - kAnchorFluctuationAllowedUs) {
+        // earlier, we ensured that the anchor times are non-negative and the
+        // math to calculate the now/oldNow times stays non-negative.
+        // by casting into uint64_t, we gain headroom to avoid any overflows at the upper end
+        // when adding the fluctuation allowance.
+        if ((uint64_t)nowMediaUs < (uint64_t)oldNowMediaUs + kAnchorFluctuationAllowedUs
+                && (uint64_t)nowMediaUs + kAnchorFluctuationAllowedUs > (uint64_t)oldNowMediaUs) {
             return;
         }
     }

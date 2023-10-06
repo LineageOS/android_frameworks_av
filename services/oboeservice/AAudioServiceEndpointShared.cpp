@@ -82,6 +82,9 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     setDeviceId(mStreamInternal->getDeviceId());
     setSessionId(mStreamInternal->getSessionId());
     setFormat(AUDIO_FORMAT_PCM_FLOAT); // force for mixer
+    setHardwareSampleRate(mStreamInternal->getHardwareSampleRate());
+    setHardwareFormat(mStreamInternal->getHardwareFormat());
+    setHardwareSamplesPerFrame(mStreamInternal->getHardwareSamplesPerFrame());
     mFramesPerBurst = mStreamInternal->getFramesPerBurst();
 
     return result;
@@ -100,8 +103,7 @@ static void *aaudio_endpoint_thread_proc(void *arg) {
     // Prevent the stream from being deleted while being used.
     // This is just for extra safety. It is probably not needed because
     // this callback should be joined before the stream is closed.
-    AAudioServiceEndpointShared *endpointPtr =
-        static_cast<AAudioServiceEndpointShared *>(arg);
+    auto endpointPtr = static_cast<AAudioServiceEndpointShared *>(arg);
     android::sp<AAudioServiceEndpointShared> endpoint(endpointPtr);
     // Balance the incStrong() in startSharingThread_l().
     endpoint->decStrong(nullptr);
@@ -137,7 +139,7 @@ aaudio_result_t aaudio::AAudioServiceEndpointShared::startSharingThread_l() {
 
 aaudio_result_t aaudio::AAudioServiceEndpointShared::stopSharingThread() {
     mCallbackEnabled.store(false);
-    return getStreamInternal()->joinThread(NULL);
+    return getStreamInternal()->joinThread(nullptr);
 }
 
 aaudio_result_t AAudioServiceEndpointShared::startStream(
@@ -177,8 +179,8 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointShared::stopStream(sp<AAudioServiceStreamBase> sharedStream,
-                                                        audio_port_handle_t clientHandle) {
+aaudio_result_t AAudioServiceEndpointShared::stopStream(
+        sp<AAudioServiceStreamBase> /*sharedStream*/, audio_port_handle_t clientHandle) {
     // Ignore result.
     (void) getStreamInternal()->stopClient(clientHandle);
 

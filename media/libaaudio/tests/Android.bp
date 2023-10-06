@@ -214,3 +214,26 @@ cc_binary {
     srcs: ["test_disconnect_race.cpp"],
     shared_libs: ["libaaudio"],
 }
+
+cc_test {
+    name: "aaudio_test_mmap_path",
+    defaults: [
+        "libaaudio_tests_defaults",
+    ],
+    srcs: ["test_mmap_path.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libaaudio_internal",
+        "libaudioclient",
+        "liblog",
+    ],
+}
+
+cc_test {
+    name: "test_resampler",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_resampler.cpp"],
+    shared_libs: [
+        "libaaudio_internal",
+    ],
+}

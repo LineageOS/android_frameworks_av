@@ -79,7 +79,7 @@ typedef struct AImageReader AImageReader;
  *            by the user, one of them has to be released before a new {@link AImage} will become
  *            available for access through {@link AImageReader_acquireLatestImage} or
  *            {@link AImageReader_acquireNextImage}. Must be greater than 0.
- * @param reader The created image reader will be filled here if the method call succeeeds.
+ * @param reader The created image reader will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -133,7 +133,7 @@ media_status_t AImageReader_getWindow(AImageReader* reader, /*out*/ANativeWindow
  * Available since API level 24.
  *
  * @param reader The image reader of interest.
- * @param width the default width of the reader will be filled here if the method call succeeeds.
+ * @param width the default width of the reader will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -151,7 +151,7 @@ media_status_t AImageReader_getWidth(const AImageReader* reader, /*out*/int32_t*
  * Available since API level 24.
  *
  * @param reader The image reader of interest.
- * @param height the default height of the reader will be filled here if the method call succeeeds.
+ * @param height the default height of the reader will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -165,7 +165,7 @@ media_status_t AImageReader_getHeight(const AImageReader* reader, /*out*/int32_t
  * Available since API level 24.
  *
  * @param reader The image reader of interest.
- * @param format the fromat of the reader will be filled here if the method call succeeeds. The
+ * @param format the format of the reader will be filled here if the method call succeeds. The
  *                value will be one of the AIMAGE_FORMAT_* enum value defiend in {@link NdkImage.h}.
  *
  * @return <ul>
@@ -181,7 +181,7 @@ media_status_t AImageReader_getFormat(const AImageReader* reader, /*out*/int32_t
  *
  * @param reader The image reader of interest.
  * @param maxImages the maximum number of concurrently acquired images of the reader will be filled
- *                here if the method call succeeeds.
+ *                here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -212,7 +212,7 @@ media_status_t AImageReader_getMaxImages(const AImageReader* reader, /*out*/int3
  * Available since API level 24.
  *
  * @param reader The image reader of interest.
- * @param image the acquired {@link AImage} will be filled here if the method call succeeeds.
+ * @param image the acquired {@link AImage} will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -257,7 +257,7 @@ media_status_t AImageReader_acquireNextImage(AImageReader* reader, /*out*/AImage
  * Available since API level 24.
  *
  * @param reader The image reader of interest.
- * @param image the acquired {@link AImage} will be filled here if the method call succeeeds.
+ * @param image the acquired {@link AImage} will be filled here if the method call succeeds.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -385,6 +385,44 @@ media_status_t AImageReader_setImageListener(
 media_status_t AImageReader_newWithUsage(
         int32_t width, int32_t height, int32_t format, uint64_t usage, int32_t maxImages,
         /*out*/ AImageReader** reader) __INTRODUCED_IN(26);
+
+/**
+ * AImageReader constructor similar to {@link AImageReader_newWithUsage} that takes
+ * two additional parameters to build the format of the Image. All other parameters
+ * and the return values are identical to those passed to {@link AImageReader_newWithUsage}.
+ *
+ * <p>Instead of passing {@code format} parameter, this constructor accepts
+ * the combination of {@code hardwareBufferFormat} and {@code dataSpace} for the
+ * format of the Image that the reader will produce.</p>
+ *
+ * Available since API level 34.
+ *
+ * @param width The default width in pixels of the Images that this reader will produce.
+ * @param height The default height in pixels of the Images that this reader will produce.
+ * @param usage specifies how the consumer will access the AImage.
+ *              See {@link AImageReader_newWithUsage} parameter description for more details.
+ * @param maxImages The maximum number of images the user will want to access simultaneously.
+ *                  See {@link AImageReader_newWithUsage} parameter description for more details.
+ * @param hardwareBufferFormat The hardware buffer format passed by the producer.
+ *                             This must be one of the AHARDWAREBUFFER_FORMAT_* enum values defined
+ *                             in {@link hardware_buffer.h}.
+ * @param dataSpace The dataspace of the Image passed by the producer.
+ *                  This must be one of the ADATASPACE_* enum values defined in
+ *                  {@link ADataSpace}.
+ * @param reader The created image reader will be filled here if the method call succeeds.
+ *
+ * @return <ul>
+ *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
+ *         <li>{@link AMEDIA_ERROR_INVALID_PARAMETER} if reader is NULL, or one or more of width,
+ *                 height, maxImages, hardwareBufferFormat or dataSpace arguments
+ *                 is not supported.</li>
+ *         <li>{@link AMEDIA_ERROR_UNKNOWN} if the method fails for some other reasons.</li></ul>
+ *
+ * @see AImageReader_newWithUsage
+ */
+media_status_t AImageReader_newWithDataSpace(int32_t width, int32_t height, uint64_t usage,
+        int32_t maxImages, uint32_t hardwareBufferFormat, int32_t dataSpace,
+        /*out*/ AImageReader** reader) __INTRODUCED_IN(34);
 
 /**
  * Acquire the next {@link AImage} from the image reader's queue asynchronously.

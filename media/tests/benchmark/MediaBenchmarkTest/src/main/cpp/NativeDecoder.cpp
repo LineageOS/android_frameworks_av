@@ -80,7 +80,6 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
         vector<AMediaCodecBufferInfo> frameInfo;
         AMediaCodecBufferInfo info;
         uint32_t inputBufferOffset = 0;
-
         // Get frame data
         while (1) {
             status = extractor->getFrameSample(info);
@@ -111,7 +110,7 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
         const char *statsFile = env->GetStringUTFChars(jStatsFile, nullptr);
         string sInputReference = string(inputReference);
         decoder->dumpStatistics(sInputReference, sCodecName, (asyncMode ? "async" : "sync"),
-                                statsFile);
+                                (statsFile == nullptr ? "" : statsFile));
         env->ReleaseStringUTFChars(jCodecName, codecName);
         env->ReleaseStringUTFChars(jStatsFile, statsFile);
         env->ReleaseStringUTFChars(jFileName, inputReference);

@@ -127,6 +127,7 @@ struct HidlCameraDeviceUser final : public HCameraDeviceUser {
     std::shared_ptr<CaptureResultMetadataQueue> mCaptureResultMetadataQueue = nullptr;
     bool mInitSuccess = false;
     int32_t mRequestId = REQUEST_ID_NONE;
+    int mVndkVersion = -1;
 };
 
 } // implementation

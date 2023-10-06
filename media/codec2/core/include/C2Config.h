@@ -2016,7 +2016,8 @@ constexpr char C2_PARAMKEY_MAX_CHANNEL_COUNT[] = "raw.max-channel-count";
 constexpr char C2_PARAMKEY_MAX_CODED_CHANNEL_COUNT[] = "coded.max-channel-count";
 
 /**
- * Audio channel mask. Used by decoder to express audio channel mask of decoded content.
+ * Audio channel mask. Used by decoder to express audio channel mask of decoded content,
+ * or by encoder for the channel mask of the encoded content once decoded.
  * Channel representation is specified according to the Java android.media.AudioFormat
  * CHANNEL_OUT_* constants.
  */

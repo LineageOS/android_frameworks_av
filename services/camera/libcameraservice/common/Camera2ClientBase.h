@@ -19,6 +19,7 @@
 
 #include "common/CameraDeviceBase.h"
 #include "camera/CaptureResult.h"
+#include "utils/CameraServiceProxyWrapper.h"
 #include "CameraServiceWatchdog.h"
 
 namespace android {
@@ -48,6 +49,7 @@ public:
     // TODO: too many params, move into a ClientArgs<T>
     Camera2ClientBase(const sp<CameraService>& cameraService,
                       const sp<TCamCallbacks>& remoteCallback,
+                      std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
                       const std::string& clientPackageName,
                       bool systemNativeClient,
                       const std::optional<std::string>& clientFeatureId,
@@ -142,6 +144,7 @@ protected:
     pid_t mInitialClientPid;
     bool mOverrideForPerfClass = false;
     bool mLegacyClient = false;
+    std::shared_ptr<CameraServiceProxyWrapper> mCameraServiceProxyWrapper;
 
     virtual sp<IBinder> asBinderWrapper() {
         return IInterface::asBinder(this);

@@ -40,6 +40,10 @@ AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& par
     auto convFormat = android::aidl2legacy_AudioFormatDescription_audio_format_t(
             parcelable.audioFormat);
     setFormat(convFormat.ok() ? convFormat.value() : AUDIO_FORMAT_INVALID);
+    if (!convFormat.ok()) {
+        ALOGE("audioFormat (%s) aidl2legacy conversion failed",
+              parcelable.hardwareAudioFormat.toString().c_str());
+    }
     static_assert(sizeof(aaudio_direction_t) == sizeof(parcelable.direction));
     setDirection(parcelable.direction);
     static_assert(sizeof(audio_usage_t) == sizeof(parcelable.usage));
@@ -52,7 +56,6 @@ AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& par
     setSpatializationBehavior(parcelable.spatializationBehavior);
     setIsContentSpatialized(parcelable.isContentSpatialized);
 
-
     static_assert(sizeof(aaudio_input_preset_t) == sizeof(parcelable.inputPreset));
     setInputPreset(parcelable.inputPreset);
     setBufferCapacity(parcelable.bufferCapacity);
@@ -62,6 +65,15 @@ AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& par
     static_assert(sizeof(aaudio_session_id_t) == sizeof(parcelable.sessionId));
     setSessionId(parcelable.sessionId);
     setPrivacySensitive(parcelable.isPrivacySensitive);
+    setHardwareSamplesPerFrame(parcelable.hardwareSamplesPerFrame);
+    setHardwareSampleRate(parcelable.hardwareSampleRate);
+    auto convHardwareFormat = android::aidl2legacy_AudioFormatDescription_audio_format_t(
+            parcelable.hardwareAudioFormat);
+    setHardwareFormat(convHardwareFormat.ok() ? convHardwareFormat.value() : AUDIO_FORMAT_INVALID);
+    if (!convHardwareFormat.ok()) {
+        ALOGE("hardwareAudioFormat (%s) aidl2legacy conversion failed",
+              parcelable.hardwareAudioFormat.toString().c_str());
+    }
 }
 
 AAudioStreamConfiguration&
@@ -82,6 +94,8 @@ StreamParameters AAudioStreamConfiguration::parcelable() const {
     if (convAudioFormat.ok()) {
         result.audioFormat = convAudioFormat.value();
     } else {
+        ALOGE("audioFormat (%s) legacy2aidl conversion failed",
+              audio_format_to_string(getFormat()));
         result.audioFormat = AudioFormatDescription{};
         result.audioFormat.type =
                 android::media::audio::common::AudioFormatType::SYS_RESERVED_INVALID;
@@ -92,6 +106,10 @@ StreamParameters AAudioStreamConfiguration::parcelable() const {
     result.usage = getUsage();
     static_assert(sizeof(aaudio_content_type_t) == sizeof(result.contentType));
     result.contentType = getContentType();
+    static_assert(
+            sizeof(aaudio_spatialization_behavior_t) == sizeof(result.spatializationBehavior));
+    result.spatializationBehavior = getSpatializationBehavior();
+    result.isContentSpatialized = isContentSpatialized();
     static_assert(sizeof(aaudio_input_preset_t) == sizeof(result.inputPreset));
     result.inputPreset = getInputPreset();
     result.bufferCapacity = getBufferCapacity();
@@ -100,5 +118,18 @@ StreamParameters AAudioStreamConfiguration::parcelable() const {
     static_assert(sizeof(aaudio_session_id_t) == sizeof(result.sessionId));
     result.sessionId = getSessionId();
     result.isPrivacySensitive = isPrivacySensitive();
+    result.hardwareSamplesPerFrame = getHardwareSamplesPerFrame();
+    result.hardwareSampleRate = getHardwareSampleRate();
+    auto convHardwareAudioFormat = android::legacy2aidl_audio_format_t_AudioFormatDescription(
+            getHardwareFormat());
+    if (convHardwareAudioFormat.ok()) {
+        result.hardwareAudioFormat = convHardwareAudioFormat.value();
+    } else {
+        ALOGE("hardwareAudioFormat (%s) legacy2aidl conversion failed",
+              audio_format_to_string(getHardwareFormat()));
+        result.hardwareAudioFormat = AudioFormatDescription{};
+        result.hardwareAudioFormat.type =
+                android::media::audio::common::AudioFormatType::SYS_RESERVED_INVALID;
+    }
     return result;
 }

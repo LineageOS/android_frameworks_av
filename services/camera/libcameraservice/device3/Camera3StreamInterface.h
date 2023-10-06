@@ -67,6 +67,7 @@ typedef struct camera_stream {
     std::unordered_set<int32_t> sensor_pixel_modes_used;
     int64_t dynamic_range_profile;
     int64_t use_case;
+    int32_t color_space;
 } camera_stream_t;
 
 typedef struct camera_stream_buffer {
@@ -114,20 +115,24 @@ class OutputStreamInfo {
         int64_t streamUseCase;
         int timestampBase;
         int mirrorMode;
+        int32_t colorSpace;
         OutputStreamInfo() :
             width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
             consumerUsage(0),
             dynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
             streamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
             timestampBase(OutputConfiguration::TIMESTAMP_BASE_DEFAULT),
-            mirrorMode(OutputConfiguration::MIRROR_MODE_AUTO) {}
+            mirrorMode(OutputConfiguration::MIRROR_MODE_AUTO),
+            colorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED) {}
         OutputStreamInfo(int _width, int _height, int _format, android_dataspace _dataSpace,
                 uint64_t _consumerUsage, const std::unordered_set<int32_t>& _sensorPixelModesUsed,
-                int64_t _dynamicRangeProfile, int _streamUseCase, int _timestampBase, int _mirrorMode) :
+                int64_t _dynamicRangeProfile, int _streamUseCase, int _timestampBase, int _mirrorMode,
+                int32_t _colorSpace) :
             width(_width), height(_height), format(_format),
             dataSpace(_dataSpace), consumerUsage(_consumerUsage),
             sensorPixelModesUsed(_sensorPixelModesUsed), dynamicRangeProfile(_dynamicRangeProfile),
-            streamUseCase(_streamUseCase), timestampBase(_timestampBase), mirrorMode(_mirrorMode) {}
+            streamUseCase(_streamUseCase), timestampBase(_timestampBase), mirrorMode(_mirrorMode),
+            colorSpace(_colorSpace) {}
 };
 
 // Utility class to lock and unlock a GraphicBuffer
@@ -206,6 +211,7 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual int      getFormat() const = 0;
     virtual int64_t  getDynamicRangeProfile() const = 0;
     virtual android_dataspace getDataSpace() const = 0;
+    virtual int32_t getColorSpace() const = 0;
     virtual void setFormatOverride(bool formatOverriden) = 0;
     virtual bool isFormatOverridden() const = 0;
     virtual int getOriginalFormat() const = 0;

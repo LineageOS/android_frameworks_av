@@ -710,10 +710,6 @@ private:
                 layerSettings.source.buffer.fence = Fence::NO_FENCE;
                 layerSettings.source.buffer.textureName = textureName;
                 layerSettings.source.buffer.usePremultipliedAlpha = false;
-                layerSettings.source.buffer.isY410BT2020 =
-                    (layerSettings.sourceDataspace == ui::Dataspace::BT2020_ITU_PQ ||
-                     layerSettings.sourceDataspace == ui::Dataspace::BT2020_ITU_HLG) &&
-                    format == HAL_PIXEL_FORMAT_RGBA_1010102;
                 layerSettings.source.buffer.maxMasteringLuminance =
                     (hdrStaticInfo && *hdrStaticInfo &&
                      hdrStaticInfo->mastering.maxLuminance > 0 &&
@@ -810,8 +806,6 @@ const FilterPlugin_V1::Descriptor SampleToneMappingFilter::Interface::DESCRIPTOR
     // affectedParams
     {
         C2StreamHdrStaticInfo::output::PARAM_TYPE,
-        C2StreamHdr10PlusInfo::output::PARAM_TYPE,  // will be deprecated
-        C2StreamHdrDynamicMetadataInfo::output::PARAM_TYPE,
         C2StreamColorAspectsInfo::output::PARAM_TYPE,
     },
 };

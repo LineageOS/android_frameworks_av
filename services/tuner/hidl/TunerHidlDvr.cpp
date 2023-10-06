@@ -54,12 +54,6 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::getQueueDesc(AidlMQDesc* _aidl_return) {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     MQDesc dvrMQDesc;
     HidlResult res;
     mDvr->getQueueDesc([&](HidlResult r, const MQDesc& desc) {
@@ -77,12 +71,6 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::configure(const DvrSettings& in_settings) {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDvr->configure(getHidlDvrSettings(in_settings));
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -91,12 +79,6 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::attachFilter(const shared_ptr<ITunerFilter>& in_filter) {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (in_filter == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -116,12 +98,6 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::detachFilter(const shared_ptr<ITunerFilter>& in_filter) {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     if (in_filter == nullptr) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
@@ -141,12 +117,6 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::start() {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDvr->start();
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -155,12 +125,6 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::stop() {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDvr->stop();
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -169,12 +133,6 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::flush() {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDvr->flush();
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -183,19 +141,16 @@ TunerHidlDvr::~TunerHidlDvr() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDvr::close() {
-    if (mDvr == nullptr) {
-        ALOGE("IDvr is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mDvr->close();
-    mDvr = nullptr;
-
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }
     return ::ndk::ScopedAStatus::ok();
+}
+
+::ndk::ScopedAStatus TunerHidlDvr::setStatusCheckIntervalHint(int64_t /* in_milliseconds */) {
+    HidlResult res = HidlResult::UNAVAILABLE;
+    return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
 }
 
 HidlDvrSettings TunerHidlDvr::getHidlDvrSettings(const DvrSettings& settings) {

@@ -25,7 +25,6 @@ public:
     // Park the specific FastThread, which can be nullptr, in hot idle if not currently idling
     explicit AutoPark(const sp<T>& fastThread) : mFastThread(fastThread)
     {
-        mPreviousCommand = FastThreadState::HOT_IDLE;
         if (fastThread != nullptr) {
             auto sq = mFastThread->sq();
             FastThreadState *state = sq->begin();
@@ -57,7 +56,7 @@ public:
 private:
     const sp<T>                 mFastThread;
     // if !&IDLE, holds the FastThread state to restore after new parameters processed
-    FastThreadState::Command    mPreviousCommand;
+    FastThreadState::Command    mPreviousCommand = FastThreadState::HOT_IDLE;
 };  // class AutoPark
 
 }   // namespace android

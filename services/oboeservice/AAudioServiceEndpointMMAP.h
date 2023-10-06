@@ -30,6 +30,7 @@
 #include "AAudioServiceStreamMMAP.h"
 #include "AAudioMixer.h"
 #include "AAudioService.h"
+#include "SharedMemoryWrapper.h"
 
 namespace aaudio {
 
@@ -44,7 +45,7 @@ class AAudioServiceEndpointMMAP
 public:
     explicit AAudioServiceEndpointMMAP(android::AAudioService &audioService);
 
-    virtual ~AAudioServiceEndpointMMAP() = default;
+    ~AAudioServiceEndpointMMAP() override = default;
 
     std::string dump() const override;
 
@@ -77,8 +78,7 @@ public:
     // -------------- Callback functions for MmapStreamCallback ---------------------
     void onTearDown(audio_port_handle_t portHandle) override;
 
-    void onVolumeChanged(audio_channel_mask_t channels,
-                         android::Vector<float> values) override;
+    void onVolumeChanged(float volume) override;
 
     void onRoutingChanged(audio_port_handle_t portHandle) override;
     // ------------------------------------------------------------------------------
@@ -91,11 +91,15 @@ public:
 
     aaudio_result_t getExternalPosition(uint64_t *positionFrames, int64_t *timeNanos);
 
+    int64_t nextDataReportTime();
+
+    void reportData();
+
 private:
 
-    aaudio_result_t openWithFormat(audio_format_t audioFormat);
+    aaudio_result_t openWithFormat(audio_format_t audioFormat, audio_format_t* nextFormatToTry);
 
-    aaudio_result_t createMmapBuffer(android::base::unique_fd* fileDescriptor);
+    aaudio_result_t createMmapBuffer();
 
     MonotonicCounter                          mFramesTransferred;
 
@@ -108,7 +112,7 @@ private:
 
     android::AAudioService                    &mAAudioService;
 
-    android::base::unique_fd                  mAudioDataFileDescriptor;
+    std::unique_ptr<SharedMemoryWrapper>      mAudioDataWrapper;
 
     int64_t                                   mHardwareTimeOffsetNanos = 0; // TODO get from HAL
 
@@ -118,6 +122,7 @@ private:
     int32_t                                   mTimestampGracePeriodMs;
     int32_t                                   mFrozenPositionCount = 0;
     int32_t                                   mFrozenTimestampCount = 0;
+    int64_t                                   mDataReportOffsetNanos = 0;
 
 };
 

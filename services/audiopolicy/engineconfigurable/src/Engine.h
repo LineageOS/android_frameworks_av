@@ -71,8 +71,16 @@ public:
 
     sp<DeviceDescriptor> getInputDeviceForAttributes(const audio_attributes_t &attr,
                                                      uid_t uid = 0,
+                                                     audio_session_t session = AUDIO_SESSION_NONE,
                                                      sp<AudioPolicyMix> *mix = nullptr)
                                                      const override;
+
+    status_t setDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+                                       const AudioDeviceTypeAddrVector &devices) override;
+
+    status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+                const AudioDeviceTypeAddrVector &devices) override;
+    status_t clearDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role) override;
 
     ///
     /// from AudioPolicyPluginInterface
@@ -101,6 +109,12 @@ public:
     }
 
 private:
+    android::status_t disableDevicesForStrategy(product_strategy_t strategy,
+            const DeviceVector &devicesToDisable);
+    void enableDevicesForStrategy(product_strategy_t strategy, const DeviceVector &devicesToEnable);
+    android::status_t setOutputDevicesConnectionState(const DeviceVector &devices,
+                                                      audio_policy_dev_state_t state);
+
     /* Copy facilities are put private to disable copy. */
     Engine(const Engine &object);
     Engine &operator=(const Engine &object);

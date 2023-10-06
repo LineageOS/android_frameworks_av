@@ -17,7 +17,9 @@
 #ifndef ANDROID_AUDIO_STREAM_OUT_SINK_H
 #define ANDROID_AUDIO_STREAM_OUT_SINK_H
 
+#include <audio_utils/MelProcessor.h>
 #include <media/nbaio/NBAIO.h>
+#include <mediautils/Synchronization.h>
 
 namespace android {
 
@@ -48,6 +50,10 @@ public:
 
     // NBAIO_Sink end
 
+    void startMelComputation(const sp<audio_utils::MelProcessor>& processor);
+
+    void stopMelComputation();
+
 #if 0   // until necessary
     sp<StreamOutHalInterface> stream() const { return mStream; }
 #endif
@@ -55,6 +61,7 @@ public:
 private:
     sp<StreamOutHalInterface> mStream;
     size_t              mStreamBufferSizeBytes; // as reported by get_buffer_size()
+    mediautils::atomic_sp<audio_utils::MelProcessor> mMelProcessor;
 };
 
 }   // namespace android

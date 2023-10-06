@@ -125,6 +125,7 @@ EXPORT
 AMediaFormat* AMediaExtractor_getFileFormat(AMediaExtractor *mData) {
     sp<AMessage> format;
     mData->mImpl->getFileFormat(&format);
+    // ignore any error, we want to return the empty format
     return AMediaFormat_fromMsg(&format);
 }
 
@@ -247,7 +248,10 @@ PsshInfo* AMediaExtractor_getPsshInfo(AMediaExtractor *ex) {
     }
 
     sp<AMessage> format;
-    ex->mImpl->getFileFormat(&format);
+    if (ex->mImpl->getFileFormat(&format) != OK) {
+        android_errorWriteWithInfoLog(0x534e4554, "243222985", -1, nullptr, 0);
+        return NULL;
+    }
     sp<ABuffer> buffer;
     if(!format->findBuffer("pssh", &buffer)) {
         return NULL;

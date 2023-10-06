@@ -252,6 +252,19 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expectedZoomOutCoords[i]), kMaxAllowedPixelError);
     }
+
+    // Verify region zoom scaling doesn't generate invalid metering region
+    // (width < 0, or height < 0)
+    std::array<float, 3> scaleRatios = {10.0f, 1.0f, 0.1f};
+    for (float scaleRatio : scaleRatios) {
+        for (size_t i = 0; i < originalCoords.size(); i+= 2) {
+            int32_t coordinates[] = {originalCoords[i], originalCoords[i+1],
+                    originalCoords[i], originalCoords[i+1]};
+            mapper.scaleRegion(coordinates, scaleRatio, width, height);
+            EXPECT_LE(coordinates[0], coordinates[2]);
+            EXPECT_LE(coordinates[1], coordinates[3]);
+        }
+    }
 }
 
 TEST(ZoomRatioTest, scaleCoordinatesTest) {

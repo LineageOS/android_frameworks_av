@@ -43,12 +43,6 @@ TunerHidlTimeFilter::~TunerHidlTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerHidlTimeFilter::setTimeStamp(int64_t timeStamp) {
-    if (mTimeFilter == nullptr) {
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status = mTimeFilter->setTimeStamp(static_cast<uint64_t>(timeStamp));
     if (status != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
@@ -57,12 +51,6 @@ TunerHidlTimeFilter::~TunerHidlTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerHidlTimeFilter::clearTimeStamp() {
-    if (mTimeFilter == nullptr) {
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status = mTimeFilter->clearTimeStamp();
     if (status != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
@@ -71,13 +59,6 @@ TunerHidlTimeFilter::~TunerHidlTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerHidlTimeFilter::getSourceTime(int64_t* _aidl_return) {
-    if (mTimeFilter == nullptr) {
-        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status;
     mTimeFilter->getSourceTime([&](HidlResult r, uint64_t t) {
         status = r;
@@ -91,13 +72,6 @@ TunerHidlTimeFilter::~TunerHidlTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerHidlTimeFilter::getTimeStamp(int64_t* _aidl_return) {
-    if (mTimeFilter == nullptr) {
-        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult status;
     mTimeFilter->getTimeStamp([&](HidlResult r, uint64_t t) {
         status = r;
@@ -111,15 +85,7 @@ TunerHidlTimeFilter::~TunerHidlTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerHidlTimeFilter::close() {
-    if (mTimeFilter == nullptr) {
-        ALOGE("ITimeFilter is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
-    }
-
     HidlResult res = mTimeFilter->close();
-    mTimeFilter = nullptr;
-
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }

@@ -26,7 +26,7 @@
 
 namespace aaudio {
 
-typedef int32_t aaudio_command_opcode;
+using aaudio_command_opcode = int32_t;
 
 class AAudioCommandParam {
 public:
@@ -39,7 +39,7 @@ public:
     explicit AAudioCommand(
             aaudio_command_opcode opCode, std::shared_ptr<AAudioCommandParam> param = nullptr,
             bool waitForReply = false, int64_t timeoutNanos = 0)
-            : operationCode(opCode), parameter(param), isWaitingForReply(waitForReply),
+            : operationCode(opCode), parameter(std::move(param)), isWaitingForReply(waitForReply),
               timeoutNanoseconds(timeoutNanos) { }
     virtual ~AAudioCommand() = default;
 
@@ -66,7 +66,7 @@ public:
      * @return the result of sending the command or the result of executing the command if command
      *         need to wait for a reply. If timeout happens, AAUDIO_ERROR_TIMEOUT will be returned.
      */
-    aaudio_result_t sendCommand(std::shared_ptr<AAudioCommand> command);
+    aaudio_result_t sendCommand(const std::shared_ptr<AAudioCommand>& command);
 
     /**
      * Wait for next available command OR until the timeout is expired.

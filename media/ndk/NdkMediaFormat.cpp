@@ -332,6 +332,9 @@ void AMediaFormat_setString(AMediaFormat* format, const char* name, const char* 
     if (name == nullptr) {
         return;
     }
+    if (value == nullptr) {
+        return;
+    }
     // AMessage::setString() makes a copy of the string
     format->mFormat->setString(name, value, strlen(value));
 }
@@ -365,6 +368,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_AAC_SBR_MODE = "aac-sbr-mode";
 EXPORT const char* AMEDIAFORMAT_KEY_ALBUM = "album";
 EXPORT const char* AMEDIAFORMAT_KEY_ALBUMART = "albumart";
 EXPORT const char* AMEDIAFORMAT_KEY_ALBUMARTIST = "albumartist";
+EXPORT const char* AMEDIAFORMAT_KEY_ALLOW_FRAME_DROP = "allow-frame-drop";
 EXPORT const char* AMEDIAFORMAT_KEY_ARTIST = "artist";
 EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO = "audio-presentation-info";
 EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_PRESENTATION_ID =
@@ -441,6 +445,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_LOW_LATENCY = "low-latency";
 EXPORT const char* AMEDIAFORMAT_KEY_LYRICIST = "lyricist";
 EXPORT const char* AMEDIAFORMAT_KEY_MANUFACTURER = "manufacturer";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_BIT_RATE = "max-bitrate";
+EXPORT const char* AMEDIAFORMAT_KEY_MAX_B_FRAMES = "max-bframes";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER = "max-fps-to-encoder";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_HEIGHT = "max-height";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_INPUT_SIZE = "max-input-size";

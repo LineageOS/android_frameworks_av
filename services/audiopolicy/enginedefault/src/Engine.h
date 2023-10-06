@@ -73,6 +73,7 @@ private:
 
     sp<DeviceDescriptor> getInputDeviceForAttributes(const audio_attributes_t &attr,
                                                      uid_t uid = 0,
+                                                     audio_session_t session = AUDIO_SESSION_NONE,
                                                      sp<AudioPolicyMix> *mix = nullptr)
                                                      const override;
 
@@ -103,8 +104,10 @@ private:
     product_strategy_t getProductStrategyFromLegacy(legacy_strategy legacyStrategy) const;
     audio_devices_t getPreferredDeviceTypeForLegacyStrategy(
         const DeviceVector& availableOutputDevices, legacy_strategy legacyStrategy) const;
-    DeviceVector getPreferredAvailableDevicesForProductStrategy(
-        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
+    DeviceVector getPreferredAvailableDevicesForInputSource(
+            const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
+    DeviceVector getDisabledDevicesForInputSource(
+            const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
 
     std::map<product_strategy_t, legacy_strategy> mLegacyStrategyMap;
 };

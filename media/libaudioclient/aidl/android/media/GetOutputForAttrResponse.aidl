@@ -16,8 +16,9 @@
 
 package android.media;
 
+import android.media.audio.common.AudioAttributes;
+import android.media.audio.common.AudioConfigBase;
 import android.media.audio.common.AudioStreamType;
-
 /**
  * {@hide}
  */
@@ -33,4 +34,9 @@ parcelable GetOutputForAttrResponse {
     int[] secondaryOutputs;
     /** True if the track is connected to a spatializer mixer and actually spatialized */
     boolean isSpatialized;
+    /** The suggested audio config if fails to get an output. **/
+    AudioConfigBase configBase;
+    boolean isBitPerfect;
+    /** The corrected audio attributes. **/
+    AudioAttributes attr;
 }

@@ -69,8 +69,8 @@ public:
                 DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
                 .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
                 .withFields({
-                    C2F(mSize, width).inRange(2, 2048, 2),
-                    C2F(mSize, height).inRange(2, 2048, 2),
+                    C2F(mSize, width).inRange(2, 2048),
+                    C2F(mSize, height).inRange(2, 2048),
                 })
                 .withSetter(SizeSetter)
                 .build());
@@ -734,7 +734,12 @@ status_t C2SoftVpxDec::outputBuffer(
     }
 
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-    c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format, usage, &block);
+    // We always create a graphic block that is width aligned to 16 and height
+    // aligned to 2. We set the correct "crop" value of the image in the call to
+    // createGraphicBuffer() by setting the correct image dimensions.
+    c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16),
+                                              align(mHeight, 2), format, usage,
+                                              &block);
     if (err != C2_OK) {
         ALOGE("fetchGraphicBlock for Output failed with status %d", err);
         work->result = err;
@@ -761,7 +766,8 @@ status_t C2SoftVpxDec::outputBuffer(
     size_t srcVStride = img->stride[VPX_PLANE_V];
     C2PlanarLayout layout = wView.layout();
     size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-    size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+    size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+    size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
     if (img->fmt == VPX_IMG_FMT_I42016) {
         const uint16_t *srcY = (const uint16_t *)img->planes[VPX_PLANE_Y];
@@ -799,10 +805,10 @@ status_t C2SoftVpxDec::outputBuffer(
         } else if (format == HAL_PIXEL_FORMAT_YCBCR_P010) {
             convertYUV420Planar16ToP010((uint16_t *)dstY, (uint16_t *)dstU, srcY, srcU, srcV,
                                         srcYStride / 2, srcUStride / 2, srcVStride / 2,
-                                        dstYStride / 2, dstUVStride / 2, mWidth, mHeight);
+                                        dstYStride / 2, dstUStride / 2, mWidth, mHeight);
         } else {
             convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2,
-                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUVStride,
+                                        srcUStride / 2, srcVStride / 2, dstYStride, dstUStride,
                                         mWidth, mHeight);
         }
     } else {
@@ -811,7 +817,7 @@ status_t C2SoftVpxDec::outputBuffer(
         const uint8_t *srcV = (const uint8_t *)img->planes[VPX_PLANE_V];
 
         convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                   srcVStride, dstYStride, dstUVStride, mWidth, mHeight);
+                                   srcVStride, dstYStride, dstVStride, dstVStride, mWidth, mHeight);
     }
     finishWork(((c2_cntr64_t *)img->user_priv)->peekull(), work, std::move(block));
     return OK;

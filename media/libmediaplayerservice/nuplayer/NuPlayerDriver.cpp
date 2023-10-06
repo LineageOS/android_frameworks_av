@@ -26,6 +26,7 @@
 #include "NuPlayer.h"
 #include "NuPlayerSource.h"
 
+#include <audiomanager/AudioManager.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -85,6 +86,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mMediaClock(new MediaClock),
       mPlayer(new NuPlayer(pid, mMediaClock)),
       mPlayerFlags(0),
+      mCachedPlayerIId(PLAYER_PIID_INVALID),
       mMetricsItem(NULL),
       mClientUid(-1),
       mAtEOS(false),
@@ -804,6 +806,16 @@ status_t NuPlayerDriver::invoke(const Parcel &request, Parcel *reply) {
             return mPlayer->getSelectedTrack(type, reply);
         }
 
+        case INVOKE_ID_SET_PLAYER_IID:
+        {
+            Mutex::Autolock autoLock(mAudioSinkLock);
+            mCachedPlayerIId = request.readInt32();
+            if (mAudioSink != nullptr) {
+                mAudioSink->setPlayerIId(mCachedPlayerIId);
+            }
+            return OK;
+        }
+
         default:
         {
             return INVALID_OPERATION;
@@ -812,8 +824,12 @@ status_t NuPlayerDriver::invoke(const Parcel &request, Parcel *reply) {
 }
 
 void NuPlayerDriver::setAudioSink(const sp<AudioSink> &audioSink) {
+    Mutex::Autolock autoLock(mAudioSinkLock);
     mPlayer->setAudioSink(audioSink);
     mAudioSink = audioSink;
+    if (mCachedPlayerIId != PLAYER_PIID_INVALID) {
+        mAudioSink->setPlayerIId(mCachedPlayerIId);
+    }
 }
 
 status_t NuPlayerDriver::setParameter(
@@ -953,13 +969,16 @@ status_t NuPlayerDriver::dump(
     }
 
     if (locked) {
-        snprintf(buf, sizeof(buf), "  state(%d), atEOS(%d), looping(%d), autoLoop(%d)\n",
+        snprintf(buf, sizeof(buf), "  state(%d), atEOS(%d), looping(%d), autoLoop(%d), ",
                 mState, mAtEOS, mLooping, mAutoLoop);
+        logString.append(buf);
+        mPlayer->dump(logString);
+        logString.append("\n");
         mLock.unlock();
     } else {
         snprintf(buf, sizeof(buf), "  NPD(%p) lock is taken\n", this);
+        logString.append(buf);
     }
-    logString.append(buf);
 
     for (size_t i = 0; i < trackStats.size(); ++i) {
         const sp<AMessage> &stats = trackStats.itemAt(i);
@@ -1027,6 +1046,7 @@ void NuPlayerDriver::notifyListener_l(
             if (mState != STATE_RESET_IN_PROGRESS) {
                 if (mAutoLoop) {
                     audio_stream_type_t streamType = AUDIO_STREAM_MUSIC;
+                    Mutex::Autolock autoLock(mAudioSinkLock);
                     if (mAudioSink != NULL) {
                         streamType = mAudioSink->getAudioStreamType();
                     }
@@ -1037,6 +1057,7 @@ void NuPlayerDriver::notifyListener_l(
                 }
                 if (mLooping || mAutoLoop) {
                     mPlayer->seekToAsync(0);
+                    Mutex::Autolock autoLock(mAudioSinkLock);
                     if (mAudioSink != NULL) {
                         // The renderer has stopped the sink at the end in order to play out
                         // the last little bit of audio. If we're looping, we need to restart it.

@@ -18,6 +18,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
+#include <hidl/HidlTransportSupport.h>
 
 #include "TunerService.h"
 #include "hidl/TunerHidlService.h"
@@ -32,6 +33,8 @@ int main() {
 
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
+    hardware::configureRpcThreadpool(16, true);
+    ProcessState::self()->setThreadPoolMaxThreadCount(16);
 
     // Check legacy HIDL HAL first. If it's not existed, use AIDL HAL.
     binder_status_t status = TunerHidlService::instantiate();

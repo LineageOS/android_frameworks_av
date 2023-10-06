@@ -104,6 +104,8 @@ struct NuPlayer : public AHandler {
 
     void setTargetBitrate(int bitrate /* bps */);
 
+    void dump(AString& logString);
+
 protected:
     virtual ~NuPlayer();
 

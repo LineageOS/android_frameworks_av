@@ -85,6 +85,23 @@ typedef struct EndpointDescriptor_s {
     RingBufferDescriptor dataQueueDescriptor;    // playback or capture
 } EndpointDescriptor;
 
+static constexpr int32_t AAUDIO_SERVICE_LIFETIME_ID_INVALID = -1;
+
+class AAudioHandleInfo {
+public:
+    AAudioHandleInfo()
+            : AAudioHandleInfo(AAUDIO_SERVICE_LIFETIME_ID_INVALID, AAUDIO_HANDLE_INVALID) {}
+    AAudioHandleInfo(int32_t serviceLifetimeId, aaudio_handle_t handle)
+            : mServiceLifetimeId(serviceLifetimeId), mHandle(handle) {}
+
+    int32_t getServiceLifetimeId() const { return mServiceLifetimeId; }
+    aaudio_handle_t getHandle() const { return mHandle; }
+
+private:
+    int32_t mServiceLifetimeId;
+    aaudio_handle_t mHandle;
+};
+
 } // namespace aaudio
 
 #endif //BINDING_AAUDIOSERVICEDEFINITIONS_H

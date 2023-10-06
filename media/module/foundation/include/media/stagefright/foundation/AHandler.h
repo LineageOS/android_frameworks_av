@@ -30,7 +30,10 @@ struct AHandler : public RefBase {
     AHandler()
         : mID(0),
           mVerboseStats(false),
-          mMessageCounter(0) {
+          mMessageCounter(0),
+          mDeliveringMessage(false),
+          mCurrentMessageWhat(0),
+          mCurrentMessageStartTimeUs(0){
     }
 
     ALooper::handler_id id() const {
@@ -69,7 +72,16 @@ private:
     uint64_t mMessageCounter;
     KeyedVector<uint32_t, uint32_t> mMessages;
 
+    Mutex mLock;
+    bool mDeliveringMessage;
+    uint32_t  mCurrentMessageWhat;
+    int64_t mCurrentMessageStartTimeUs;
+
     void deliverMessage(const sp<AMessage> &msg);
+
+    void setDeliveryStatus(bool, uint32_t, int64_t);
+    void getDeliveryStatus(bool&, uint32_t&, int64_t&);
+
 
     DISALLOW_EVIL_CONSTRUCTORS(AHandler);
 };

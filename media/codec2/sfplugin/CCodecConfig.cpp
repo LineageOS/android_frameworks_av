@@ -285,6 +285,12 @@ struct StandardParams {
         }
     }
 
+    // Updates or adds a mapper for a "sdkkey"
+    void updateConfigMappersForKey(const SdkKey& key,
+            const std::vector<ConfigMapper>& vec_cm) {
+        mConfigMappers.insert_or_assign(key, vec_cm);
+    }
+
     /**
      * Returns all paths for a specific domain.
      *
@@ -934,6 +940,9 @@ void CCodecConfig::initializeStandardParams() {
     add(ConfigMapper(KEY_CHANNEL_MASK, C2_PARAMKEY_CHANNEL_MASK, "value")
         .limitTo(D::AUDIO & D::DECODER & D::READ));
 
+    add(ConfigMapper(KEY_CHANNEL_MASK, C2_PARAMKEY_CHANNEL_MASK, "value")
+        .limitTo(D::AUDIO & D::ENCODER & D::CONFIG));
+
     add(ConfigMapper(KEY_AAC_SBR_MODE, C2_PARAMKEY_AAC_SBR_MODE, "value")
         .limitTo(D::AUDIO & D::ENCODER & (D::CONFIG | D::PARAM | D::READ))
         .withMapper([](C2Value v) -> C2Value {
@@ -955,7 +964,7 @@ void CCodecConfig::initializeStandardParams() {
         .limitTo(D::ENCODER & (D::CONFIG | D::PARAM)));
     add(ConfigMapper(KEY_FLAC_COMPRESSION_LEVEL, C2_PARAMKEY_COMPLEXITY, "value")
         .limitTo(D::AUDIO & D::ENCODER));
-    add(ConfigMapper("complexity", C2_PARAMKEY_COMPLEXITY, "value")
+    add(ConfigMapper(KEY_COMPLEXITY, C2_PARAMKEY_COMPLEXITY, "value")
         .limitTo(D::ENCODER & (D::CONFIG | D::PARAM)));
 
     add(ConfigMapper(KEY_GRID_COLUMNS, C2_PARAMKEY_TILE_LAYOUT, "columns")
@@ -1914,6 +1923,67 @@ status_t CCodecConfig::getConfigUpdateFromSdkParams(
         const sp<AMessage> &sdkParams, Domain configDomain,
         c2_blocking_t blocking,
         std::vector<std::unique_ptr<C2Param>> *configUpdate) const {
+    // update the mappers if we know something more of this format.
+    // AV1 10b or 8b encoding request.
+    AString mime;
+    int32_t requestedSdkProfile = -1;
+    if ((mDomain == (IS_VIDEO | IS_ENCODER)) &&
+            sdkParams->findString(KEY_MIME, &mime) &&
+            mime == MIMETYPE_VIDEO_AV1) {
+
+        sdkParams->findInt32(KEY_PROFILE, &requestedSdkProfile);
+        bool is10bAv1EncodeRequested = (requestedSdkProfile == AV1ProfileMain10);
+
+        int32_t bitDepth = (is10bAv1EncodeRequested) ? 10 : 8;
+        // we always initilze with an 8b mapper. Update this only if needed.
+        if (bitDepth != 8) {
+            std::shared_ptr<C2Mapper::ProfileLevelMapper> mapper =
+                C2Mapper::GetBitDepthProfileLevelMapper(mCodingMediaType, bitDepth);
+            mStandardParams->updateConfigMappersForKey(StandardParams::SdkKey(KEY_PROFILE),
+                {
+                    ConfigMapper(KEY_PROFILE, C2_PARAMKEY_PROFILE_LEVEL, "profile")
+                    .limitTo(Domain::CODED)
+                    .withMappers([mapper](C2Value v) -> C2Value {
+                        C2Config::profile_t c2 = PROFILE_UNUSED;
+                        int32_t sdk;
+                        if (mapper && v.get(&sdk) && mapper->mapProfile(sdk, &c2)) {
+                            return c2;
+                        }
+                        return PROFILE_UNUSED;
+                        }, [mapper](C2Value v) -> C2Value {
+                        C2Config::profile_t c2;
+                        int32_t sdk;
+                        using C2ValueType =
+                            typename _c2_reduce_enum_to_underlying_type<decltype(c2)>::type;
+                        if (mapper && v.get((C2ValueType*)&c2) && mapper->mapProfile(c2, &sdk)) {
+                            return sdk;
+                        }
+                        return C2Value();
+                })});
+            mStandardParams->updateConfigMappersForKey(StandardParams::SdkKey(KEY_LEVEL),
+                {
+                    ConfigMapper(KEY_LEVEL, C2_PARAMKEY_PROFILE_LEVEL, "level")
+                    .limitTo(Domain::CODED)
+                    .withMappers([mapper](C2Value v) -> C2Value {
+                        C2Config::level_t c2 = LEVEL_UNUSED;
+                        int32_t sdk;
+                        if (mapper && v.get(&sdk) && mapper->mapLevel(sdk, &c2)) {
+                            return c2;
+                        }
+                        return LEVEL_UNUSED;
+                        }, [mapper](C2Value v) -> C2Value {
+                        C2Config::level_t c2;
+                        int32_t sdk;
+                        using C2ValueType =
+                            typename _c2_reduce_enum_to_underlying_type<decltype(c2)>::type;
+                        if (mapper && v.get((C2ValueType*)&c2) && mapper->mapLevel(c2, &sdk)) {
+                            return sdk;
+                        }
+                        return C2Value();
+                })});
+        }
+    }
+
     ReflectedParamUpdater::Dict params = getReflectedFormat(sdkParams, configDomain);
 
     std::vector<C2Param::Index> indices;

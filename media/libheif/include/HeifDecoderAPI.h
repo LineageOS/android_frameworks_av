@@ -47,7 +47,7 @@ struct HeifFrameInfo {
     int32_t  mRotationAngle;           // Rotation angle, clockwise, should be multiple of 90
     uint32_t mBytesPerPixel;           // Number of bytes for one pixel
     int64_t  mDurationUs;              // Duration of the frame in us
-    uint32_t mBitDepth;                // Number of bits for each of the R/G/B channels
+    uint32_t mBitDepth;                // Number of bits of R/G/B channel
     std::vector<uint8_t> mIccData;     // ICC data array
 };
 
@@ -164,7 +164,7 @@ struct HeifDecoder {
     virtual size_t skipScanlines(size_t count) = 0;
 
     /*
-     * Returns color depth in bits for each of the R/G/B channels.
+     * Returns color depth of R/G/B channel.
      */
     virtual uint32_t getColorDepth() = 0;
 

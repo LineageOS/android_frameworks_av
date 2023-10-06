@@ -47,6 +47,21 @@ struct ACaptureSessionOutput {
         return mWindow > other.mWindow;
     }
 
+    inline bool isWindowEqual(ACameraWindowType* window) const {
+        return mWindow == window;
+    }
+
+    // returns true if the window was successfully added, false otherwise.
+    inline bool addSharedWindow(ACameraWindowType* window) {
+        auto ret = mSharedWindows.insert(window);
+        return ret.second;
+    }
+
+    // returns the number of elements removed.
+    inline size_t removeSharedWindow(ACameraWindowType* window) {
+        return mSharedWindows.erase(window);
+    }
+
     ACameraWindowType* mWindow;
     std::set<ACameraWindowType *> mSharedWindows;
     bool           mIsShared;
@@ -60,11 +75,31 @@ struct ACaptureSessionOutputContainer {
 };
 
 /**
+ * Capture session state callbacks used in {@link ACameraDevice_setPrepareCallbacks}
+ */
+typedef struct ACameraCaptureSession_prepareCallbacks {
+    /// optional application context. This will be passed in the context
+    /// parameter of the {@link onWindowPrepared} callback.
+    void*                               context;
+
+    ACameraCaptureSession_prepareCallback onWindowPrepared;
+} ACameraCaptureSession_prepareCallbacks;
+
+/**
  * ACameraCaptureSession opaque struct definition
  * Leave outside of android namespace because it's NDK struct
  */
 struct ACameraCaptureSession : public RefBase {
   public:
+#ifdef __ANDROID_VNDK__
+    ACameraCaptureSession(
+            int id,
+            const ACaptureSessionOutputContainer* outputs,
+            const ACameraCaptureSession_stateCallbacks* cb,
+            std::weak_ptr<android::acam::CameraDevice> device) :
+            mId(id), mOutput(*outputs), mUserSessionCallback(*cb),
+            mDevice(std::move(device)) {}
+#else
     ACameraCaptureSession(
             int id,
             const ACaptureSessionOutputContainer* outputs,
@@ -72,6 +107,7 @@ struct ACameraCaptureSession : public RefBase {
             android::acam::CameraDevice* device) :
             mId(id), mOutput(*outputs), mUserSessionCallback(*cb),
             mDevice(device) {}
+#endif
 
     // This can be called in app calling close() or after some app callback is finished
     // Make sure the caller does not hold device or session lock!
@@ -105,6 +141,14 @@ struct ACameraCaptureSession : public RefBase {
 
     camera_status_t updateOutputConfiguration(ACaptureSessionOutput *output);
 
+    void setWindowPreparedCallback(void *context,
+            ACameraCaptureSession_prepareCallback cb) {
+        Mutex::Autolock _l(mSessionLock);
+        mPreparedCb.context = context;
+        mPreparedCb.onWindowPrepared = cb;
+    }
+    camera_status_t prepare(ACameraWindowType *window);
+
     ACameraDevice* getDevice();
 
   private:
@@ -114,14 +158,24 @@ struct ACameraCaptureSession : public RefBase {
     // or a new session is replacing this session.
     void closeByDevice();
 
+#ifdef __ANDROID_VNDK__
+    std::shared_ptr<android::acam::CameraDevice> getDevicePtr();
+#else
     sp<android::acam::CameraDevice> getDeviceSp();
+#endif
 
     const int mId;
     const ACaptureSessionOutputContainer mOutput;
     const ACameraCaptureSession_stateCallbacks mUserSessionCallback;
+#ifdef __ANDROID_VNDK__
+    const std::weak_ptr<android::acam::CameraDevice> mDevice;
+#else
     const wp<android::acam::CameraDevice> mDevice;
+#endif
+
     bool  mIsClosed = false;
     bool  mClosedByApp = false;
+    ACameraCaptureSession_prepareCallbacks mPreparedCb;
     Mutex mSessionLock;
 };
 

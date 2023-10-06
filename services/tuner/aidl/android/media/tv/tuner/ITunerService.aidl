@@ -17,6 +17,7 @@
 package android.media.tv.tuner;
 
 import android.hardware.tv.tuner.DemuxCapabilities;
+import android.hardware.tv.tuner.DemuxInfo;
 import android.hardware.tv.tuner.FrontendInfo;
 import android.hardware.tv.tuner.FrontendType;
 import android.media.tv.tuner.ITunerDemux;
@@ -77,6 +78,21 @@ interface ITunerService {
     ITunerDemux openDemux(in int demuxHandle);
 
     /**
+     * Retrieve the supported filter main types
+     *
+     * @param demuxHandle the handle of the demux to query demux info for
+     * @return the demux info
+     */
+    DemuxInfo getDemuxInfo(in int demuxHandle);
+
+    /**
+     * Retrieve the list of demux info for all the demuxes on the system
+     *
+     * @return the list of DemuxInfo
+     */
+    DemuxInfo[] getDemuxInfoList();
+
+    /**
      * Retrieve the Tuner Demux capabilities.
      *
      * @return the demux’s capabilities.
@@ -105,6 +121,13 @@ interface ITunerService {
      * @return a newly created ITunerFilter interface.
      */
     ITunerFilter openSharedFilter(in String filterToken, in ITunerFilterCallback cb);
+
+    /**
+     * Is Low Noise Amplifier (LNA) supported by the Tuner.
+     *
+     * @return {@code true} if supported, otherwise {@code false}.
+     */
+    boolean isLnaSupported();
 
     /**
      * Enable or Disable Low Noise Amplifier (LNA).

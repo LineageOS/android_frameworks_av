@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "system/graphics-base-v1.0.h"
+#include "system/graphics-base-v1.1.h"
 #define LOG_TAG "CameraProviderManager"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
@@ -40,6 +42,7 @@
 #include <cutils/properties.h>
 #include <hwbinder/IPCThreadState.h>
 #include <utils/Trace.h>
+#include <ui/PublicFormat.h>
 #include <camera/StringUtils.h>
 
 #include "api2/HeicCompositeStream.h"
@@ -60,6 +63,8 @@ const std::string kExternalProviderName = "external/0";
 } // anonymous namespace
 
 const float CameraProviderManager::kDepthARTolerance = .1f;
+const bool CameraProviderManager::kFrameworkJpegRDisabled =
+        property_get_bool("ro.camera.disableJpegR", false);
 
 CameraProviderManager::HidlServiceInteractionProxyImpl
 CameraProviderManager::sHidlServiceInteractionProxy{};
@@ -310,6 +315,18 @@ bool CameraProviderManager::supportNativeZoomRatio(const std::string &id) const 
     if (deviceInfo == nullptr) return false;
 
     return deviceInfo->supportNativeZoomRatio();
+}
+
+bool CameraProviderManager::isCompositeJpegRDisabled(const std::string &id) const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    return isCompositeJpegRDisabledLocked(id);
+}
+
+bool CameraProviderManager::isCompositeJpegRDisabledLocked(const std::string &id) const {
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) return false;
+
+    return deviceInfo->isCompositeJpegRDisabled();
 }
 
 status_t CameraProviderManager::getResourceCost(const std::string &id,
@@ -1000,19 +1017,21 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDurations(
     auto availableDurations = ch.find(tag);
     if (availableDurations.count > 0) {
         // Duration entry contains 4 elements (format, width, height, duration)
-        for (size_t i = 0; i < availableDurations.count; i += 4) {
-            for (const auto& size : sizes) {
-                int64_t width = std::get<0>(size);
-                int64_t height = std::get<1>(size);
+        for (const auto& size : sizes) {
+            int64_t width = std::get<0>(size);
+            int64_t height = std::get<1>(size);
+            for (size_t i = 0; i < availableDurations.count; i += 4) {
                 if ((availableDurations.data.i64[i] == format) &&
                         (availableDurations.data.i64[i+1] == width) &&
                         (availableDurations.data.i64[i+2] == height)) {
                     durations->push_back(availableDurations.data.i64[i+3]);
+                    break;
                 }
             }
         }
     }
 }
+
 void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDynamicDepthDurations(
         const std::vector<int64_t>& depthDurations, const std::vector<int64_t>& blobDurations,
         std::vector<int64_t> *dynamicDepthDurations /*out*/) {
@@ -1070,6 +1089,212 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDynamicDepthS
             dynamicDepthSizes->push_back(blobSize);
         }
     }
+}
+
+bool CameraProviderManager::isConcurrentDynamicRangeCaptureSupported(
+        const CameraMetadata& deviceInfo, int64_t profile, int64_t concurrentProfile) {
+    auto entry = deviceInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if (entry.count == 0) {
+        return false;
+    }
+
+    const auto it = std::find(entry.data.u8, entry.data.u8 + entry.count,
+            ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT);
+    if (it == entry.data.u8 + entry.count) {
+        return false;
+    }
+
+    entry = deviceInfo.find(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP);
+    if (entry.count == 0 || ((entry.count % 3) != 0)) {
+        return false;
+    }
+
+    for (size_t i = 0; i < entry.count; i += 3) {
+        if (entry.data.i64[i] == profile) {
+            if ((entry.data.i64[i+1] == 0) || (entry.data.i64[i+1] & concurrentProfile)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveJpegRTags(bool maxResolution) {
+    if (kFrameworkJpegRDisabled || mCompositeJpegRDisabled) {
+        return OK;
+    }
+
+    const int32_t scalerSizesTag =
+              SessionConfigurationUtils::getAppropriateModeTag(
+                      ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, maxResolution);
+    const int32_t scalerMinFrameDurationsTag = SessionConfigurationUtils::getAppropriateModeTag(
+            ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, maxResolution);
+    const int32_t scalerStallDurationsTag =
+                 SessionConfigurationUtils::getAppropriateModeTag(
+                        ANDROID_SCALER_AVAILABLE_STALL_DURATIONS, maxResolution);
+
+    const int32_t jpegRSizesTag =
+            SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS, maxResolution);
+    const int32_t jpegRStallDurationsTag =
+            SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_JPEGR_AVAILABLE_JPEG_R_STALL_DURATIONS, maxResolution);
+    const int32_t jpegRMinFrameDurationsTag =
+            SessionConfigurationUtils::getAppropriateModeTag(
+                 ANDROID_JPEGR_AVAILABLE_JPEG_R_MIN_FRAME_DURATIONS, maxResolution);
+
+    auto& c = mCameraCharacteristics;
+    std::vector<int32_t> supportedChTags;
+    auto chTags = c.find(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS);
+    if (chTags.count == 0) {
+        ALOGE("%s: No supported camera characteristics keys!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    std::vector<std::tuple<size_t, size_t>> supportedP010Sizes, supportedBlobSizes;
+    auto capabilities = c.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if (capabilities.count == 0) {
+        ALOGE("%s: Supported camera capabilities is empty!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    auto end = capabilities.data.u8 + capabilities.count;
+    bool isTenBitOutputSupported = std::find(capabilities.data.u8, end,
+            ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT) != end;
+    if (!isTenBitOutputSupported) {
+        // No 10-bit support, nothing more to do.
+        return OK;
+    }
+
+    if (!isConcurrentDynamicRangeCaptureSupported(c,
+                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10,
+                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) &&
+            !property_get_bool("ro.camera.enableCompositeAPI0JpegR", false)) {
+        // API0, P010 only Jpeg/R support is meant to be used only as a reference due to possible
+        // impact on quality and performance.
+        // This data path will be turned off by default and individual device builds must enable
+        // 'ro.camera.enableCompositeAPI0JpegR' in order to experiment using it.
+        mCompositeJpegRDisabled = true;
+        return OK;
+    }
+
+    getSupportedSizes(c, scalerSizesTag,
+            static_cast<android_pixel_format_t>(HAL_PIXEL_FORMAT_BLOB), &supportedBlobSizes);
+    getSupportedSizes(c, scalerSizesTag,
+            static_cast<android_pixel_format_t>(HAL_PIXEL_FORMAT_YCBCR_P010), &supportedP010Sizes);
+    auto it = supportedP010Sizes.begin();
+    while (it != supportedP010Sizes.end()) {
+        if (std::find(supportedBlobSizes.begin(), supportedBlobSizes.end(), *it) ==
+                supportedBlobSizes.end()) {
+            it = supportedP010Sizes.erase(it);
+        } else {
+            it++;
+        }
+    }
+    if (supportedP010Sizes.empty()) {
+        // Nothing to do in this case.
+        return OK;
+    }
+
+    std::vector<int32_t> jpegREntries;
+    for (const auto& it : supportedP010Sizes) {
+        int32_t entry[4] = {HAL_PIXEL_FORMAT_BLOB, static_cast<int32_t> (std::get<0>(it)),
+                static_cast<int32_t> (std::get<1>(it)),
+                ANDROID_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_OUTPUT };
+        jpegREntries.insert(jpegREntries.end(), entry, entry + 4);
+    }
+
+    std::vector<int64_t> blobMinDurations, blobStallDurations;
+    std::vector<int64_t> jpegRMinDurations, jpegRStallDurations;
+
+    // We use the jpeg stall and min frame durations to approximate the respective jpeg/r
+    // durations.
+    getSupportedDurations(c, scalerMinFrameDurationsTag, HAL_PIXEL_FORMAT_BLOB,
+            supportedP010Sizes, &blobMinDurations);
+    getSupportedDurations(c, scalerStallDurationsTag, HAL_PIXEL_FORMAT_BLOB,
+            supportedP010Sizes, &blobStallDurations);
+    if (blobStallDurations.empty() || blobMinDurations.empty() ||
+            supportedP010Sizes.size() != blobMinDurations.size() ||
+            blobMinDurations.size() != blobStallDurations.size()) {
+        ALOGE("%s: Unexpected number of available blob durations! %zu vs. %zu with "
+                "supportedP010Sizes size: %zu", __FUNCTION__, blobMinDurations.size(),
+                blobStallDurations.size(), supportedP010Sizes.size());
+        return BAD_VALUE;
+    }
+
+    auto itDuration = blobMinDurations.begin();
+    auto itSize = supportedP010Sizes.begin();
+    while (itDuration != blobMinDurations.end()) {
+        int64_t entry[4] = {HAL_PIXEL_FORMAT_BLOB, static_cast<int32_t> (std::get<0>(*itSize)),
+                static_cast<int32_t> (std::get<1>(*itSize)), *itDuration};
+        jpegRMinDurations.insert(jpegRMinDurations.end(), entry, entry + 4);
+        itDuration++; itSize++;
+    }
+
+    itDuration = blobStallDurations.begin();
+    itSize = supportedP010Sizes.begin();
+    while (itDuration != blobStallDurations.end()) {
+        int64_t entry[4] = {HAL_PIXEL_FORMAT_BLOB, static_cast<int32_t> (std::get<0>(*itSize)),
+                static_cast<int32_t> (std::get<1>(*itSize)), *itDuration};
+        jpegRStallDurations.insert(jpegRStallDurations.end(), entry, entry + 4);
+        itDuration++; itSize++;
+    }
+
+    supportedChTags.reserve(chTags.count + 3);
+    supportedChTags.insert(supportedChTags.end(), chTags.data.i32,
+            chTags.data.i32 + chTags.count);
+    supportedChTags.push_back(jpegRSizesTag);
+    supportedChTags.push_back(jpegRMinFrameDurationsTag);
+    supportedChTags.push_back(jpegRStallDurationsTag);
+    c.update(jpegRSizesTag, jpegREntries.data(), jpegREntries.size());
+    c.update(jpegRMinFrameDurationsTag, jpegRMinDurations.data(), jpegRMinDurations.size());
+    c.update(jpegRStallDurationsTag, jpegRStallDurations.data(), jpegRStallDurations.size());
+    c.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, supportedChTags.data(),
+            supportedChTags.size());
+
+    auto colorSpaces = c.find(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP);
+    if (colorSpaces.count > 0 && !maxResolution) {
+        bool displayP3Support = false;
+        int64_t dynamicRange = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+        for (size_t i = 0; i < colorSpaces.count; i += 3) {
+            auto colorSpace = colorSpaces.data.i64[i];
+            auto format = colorSpaces.data.i64[i+1];
+            bool formatMatch = (format == static_cast<int64_t>(PublicFormat::JPEG)) ||
+                    (format == static_cast<int64_t>(PublicFormat::UNKNOWN));
+            bool colorSpaceMatch =
+                colorSpace == ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DISPLAY_P3;
+            if (formatMatch && colorSpaceMatch) {
+                displayP3Support = true;
+            }
+
+            // Jpeg/R will support the same dynamic range profiles as P010
+            if (format == static_cast<int64_t>(PublicFormat::YCBCR_P010)) {
+                dynamicRange |= colorSpaces.data.i64[i+2];
+            }
+        }
+        if (displayP3Support) {
+            std::vector<int64_t> supportedColorSpaces;
+            // Jpeg/R must support the default system as well ase display P3 color space
+            supportedColorSpaces.reserve(colorSpaces.count + 3*2);
+            supportedColorSpaces.insert(supportedColorSpaces.end(), colorSpaces.data.i64,
+                    colorSpaces.data.i64 + colorSpaces.count);
+
+            supportedColorSpaces.push_back(static_cast<int64_t>(
+                    ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_SRGB));
+            supportedColorSpaces.push_back(static_cast<int64_t>(PublicFormat::JPEG_R));
+            supportedColorSpaces.push_back(dynamicRange);
+
+            supportedColorSpaces.push_back(static_cast<int64_t>(
+                    ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_DISPLAY_P3));
+            supportedColorSpaces.push_back(static_cast<int64_t>(PublicFormat::JPEG_R));
+            supportedColorSpaces.push_back(dynamicRange);
+            c.update(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP,
+                    supportedColorSpaces.data(), supportedColorSpaces.size());
+        }
+    }
+
+    return OK;
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags(
@@ -1352,6 +1577,19 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addRotateCropTags() {
         uint8_t defaultAvailableRotateCropEntry = ANDROID_SCALER_ROTATE_AND_CROP_NONE;
         res = c.update(ANDROID_SCALER_AVAILABLE_ROTATE_AND_CROP_MODES,
                 &defaultAvailableRotateCropEntry, 1);
+    }
+    return res;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addAutoframingTags() {
+    status_t res = OK;
+    auto& c = mCameraCharacteristics;
+
+    auto availableAutoframingEntry = c.find(ANDROID_CONTROL_AUTOFRAMING_AVAILABLE);
+    if (availableAutoframingEntry.count == 0) {
+        uint8_t  defaultAutoframingEntry = ANDROID_CONTROL_AUTOFRAMING_AVAILABLE_FALSE;
+        res = c.update(ANDROID_CONTROL_AUTOFRAMING_AVAILABLE,
+                &defaultAutoframingEntry, 1);
     }
     return res;
 }
@@ -2302,6 +2540,10 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::notifyDeviceStateChange(i
             (mDeviceStateOrientationMap.find(newState) != mDeviceStateOrientationMap.end())) {
         mCameraCharacteristics.update(ANDROID_SENSOR_ORIENTATION,
                 &mDeviceStateOrientationMap[newState], 1);
+        if (mCameraCharNoPCOverride.get() != nullptr) {
+            mCameraCharNoPCOverride->update(ANDROID_SENSOR_ORIENTATION,
+                &mDeviceStateOrientationMap[newState], 1);
+        }
     }
 }
 

@@ -363,6 +363,20 @@ private:
         SimpleLog mSimpleLog GUARDED_BY(mLock) {64};
     } mSpatializer{*this};
 
+    // MidiLogging collects info whenever a MIDI device is closed.
+    class MidiLogging {
+    public:
+        explicit MidiLogging(AudioAnalytics &audioAnalytics)
+            : mAudioAnalytics(audioAnalytics) {}
+
+        void onEvent(
+                const std::shared_ptr<const android::mediametrics::Item> &item) const;
+
+    private:
+
+        AudioAnalytics &mAudioAnalytics;
+    } mMidiLogging{*this};
+
     AudioPowerUsage mAudioPowerUsage;
 };
 

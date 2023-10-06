@@ -111,12 +111,15 @@ class CameraFuzzer : public ::android::hardware::BnCameraClient {
     size_t mPreviewBufferCount = 0;
     bool mAutoFocusMessage = false;
     bool mSnapshotNotification = false;
+    bool mRecordingNotification = false;
     mutable Mutex mPreviewLock;
     mutable Condition mPreviewCondition;
     mutable Mutex mAutoFocusLock;
     mutable Condition mAutoFocusCondition;
     mutable Mutex mSnapshotLock;
     mutable Condition mSnapshotCondition;
+    mutable Mutex mRecordingLock;
+    mutable Condition mRecordingCondition;
 
     void getNumCameras();
     void getCameraInformation(int32_t cameraId);
@@ -125,6 +128,7 @@ class CameraFuzzer : public ::android::hardware::BnCameraClient {
     void invokeDump();
     void invokeShellCommand();
     void invokeNotifyCalls();
+    void invokeTorchAPIs(int32_t cameraId);
 
     // CameraClient interface
     void notifyCallback(int32_t msgType, int32_t, int32_t) override;
@@ -152,6 +156,8 @@ void CameraFuzzer::dataCallback(int32_t msgType, const sp<IMemory> & /*data*/,
             Mutex::Autolock l(mPreviewLock);
             ++mPreviewBufferCount;
             mPreviewCondition.broadcast();
+            mRecordingNotification = true;
+            mRecordingCondition.broadcast();
             break;
         }
         case CAMERA_MSG_COMPRESSED_IMAGE: {
@@ -311,116 +317,155 @@ void CameraFuzzer::invokeNotifyCalls() {
     mCameraService->notifySystemEvent(eventId, args);
 }
 
+void CameraFuzzer::invokeTorchAPIs(int32_t cameraId) {
+    std::string cameraIdStr = std::to_string(cameraId);
+    sp<IBinder> binder = new BBinder;
+
+    mCameraService->setTorchMode(cameraIdStr, true, binder);
+    ALOGV("Turned torch on.");
+    int32_t torchStrength = rand() % 5 + 1;
+    ALOGV("Changing torch strength level to %d", torchStrength);
+    mCameraService->turnOnTorchWithStrengthLevel(cameraIdStr, torchStrength, binder);
+    mCameraService->setTorchMode(cameraIdStr, false, binder);
+    ALOGV("Turned torch off.");
+}
+
 void CameraFuzzer::invokeCameraAPIs() {
-    for (int32_t cameraId = 0; cameraId < mNumCameras; ++cameraId) {
-        getCameraInformation(cameraId);
+    /** In order to avoid the timeout issue caused due to multiple iteration of loops, the 'for'
+     * loops are removed and the 'cameraId', 'pictureSize' and 'videoSize' are derived using the
+     * FuzzedDataProvider from the available cameras and vectors of 'pictureSizes' and 'videoSizes'
+     */
+    int32_t cameraId = mFuzzedDataProvider->ConsumeIntegralInRange<int32_t>(0, mNumCameras - 1);
+    getCameraInformation(cameraId);
+    invokeTorchAPIs(cameraId);
 
-        ::android::binder::Status rc;
-        sp<ICamera> cameraDevice;
+    ::android::binder::Status rc;
+    sp<ICamera> cameraDevice;
 
-        rc = mCameraService->connect(this, cameraId, std::string(),
-                android::CameraService::USE_CALLING_UID, android::CameraService::USE_CALLING_PID,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/true,
-                /*forceSlowJpegMode*/false,
-                &cameraDevice);
-        if (!rc.isOk()) {
-            // camera not connected
-            return;
+    rc = mCameraService->connect(this, cameraId, std::string(),
+                                 android::CameraService::USE_CALLING_UID,
+                                 android::CameraService::USE_CALLING_PID,
+                                 /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
+                                 /*overrideToPortrait*/true, /*forceSlowJpegMode*/false,
+                                 &cameraDevice);
+    if (!rc.isOk()) {
+        // camera not connected
+        return;
+    }
+    if (cameraDevice) {
+        sp<Surface> previewSurface;
+        sp<SurfaceControl> surfaceControl;
+        CameraParameters params(cameraDevice->getParameters());
+        String8 focusModes(params.get(CameraParameters::KEY_SUPPORTED_FOCUS_MODES));
+        bool isAFSupported = false;
+        const char* focusMode = nullptr;
+
+        if (focusModes.contains(CameraParameters::FOCUS_MODE_AUTO)) {
+            isAFSupported = true;
+        } else if (focusModes.contains(CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE)) {
+            isAFSupported = true;
+            focusMode = CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE;
+        } else if (focusModes.contains(CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO)) {
+            isAFSupported = true;
+            focusMode = CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO;
+        } else if (focusModes.contains(CameraParameters::FOCUS_MODE_MACRO)) {
+            isAFSupported = true;
+            focusMode = CameraParameters::FOCUS_MODE_MACRO;
         }
-        if (cameraDevice) {
-            sp<Surface> previewSurface;
-            sp<SurfaceControl> surfaceControl;
-            CameraParameters params(cameraDevice->getParameters());
-            String8 focusModes(params.get(CameraParameters::KEY_SUPPORTED_FOCUS_MODES));
-            bool isAFSupported = false;
-            const char *focusMode = nullptr;
+        if (nullptr != focusMode) {
+            params.set(CameraParameters::KEY_FOCUS_MODE, focusMode);
+            cameraDevice->setParameters(params.flatten());
+        }
+        int previewWidth, previewHeight;
+        params.getPreviewSize(&previewWidth, &previewHeight);
 
-            if (focusModes.contains(CameraParameters::FOCUS_MODE_AUTO)) {
-                isAFSupported = true;
-            } else if (focusModes.contains(CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE)) {
-                isAFSupported = true;
-                focusMode = CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE;
-            } else if (focusModes.contains(CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO)) {
-                isAFSupported = true;
-                focusMode = CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO;
-            } else if (focusModes.contains(CameraParameters::FOCUS_MODE_MACRO)) {
-                isAFSupported = true;
-                focusMode = CameraParameters::FOCUS_MODE_MACRO;
-            }
-            if (nullptr != focusMode) {
-                params.set(CameraParameters::KEY_FOCUS_MODE, focusMode);
-                cameraDevice->setParameters(params.flatten());
-            }
-            int previewWidth, previewHeight;
-            params.getPreviewSize(&previewWidth, &previewHeight);
+        mComposerClient = new SurfaceComposerClient;
+        mComposerClient->initCheck();
 
-            mComposerClient = new SurfaceComposerClient;
-            mComposerClient->initCheck();
-
-            bool shouldPassInvalidLayerMetaData = mFuzzedDataProvider->ConsumeBool();
-            int layerMetaData;
-            if (shouldPassInvalidLayerMetaData) {
-                layerMetaData = mFuzzedDataProvider->ConsumeIntegral<int>();
-            } else {
-                layerMetaData = kLayerMetadata[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(
+        bool shouldPassInvalidLayerMetaData = mFuzzedDataProvider->ConsumeBool();
+        int layerMetaData;
+        if (shouldPassInvalidLayerMetaData) {
+            layerMetaData = mFuzzedDataProvider->ConsumeIntegral<int>();
+        } else {
+            layerMetaData = kLayerMetadata[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(
                     0, kNumLayerMetaData - 1)];
-            }
-            surfaceControl = mComposerClient->createSurface(
+        }
+        surfaceControl = mComposerClient->createSurface(
                 String8("Test Surface"), previewWidth, previewHeight,
                 CameraParameters::previewFormatToEnum(params.getPreviewFormat()), layerMetaData);
 
-            if (surfaceControl.get() != nullptr) {
-                SurfaceComposerClient::Transaction{}
+        if (surfaceControl.get()) {
+            SurfaceComposerClient::Transaction{}
                     .setLayer(surfaceControl, 0x7fffffff)
                     .show(surfaceControl)
                     .apply();
 
-                previewSurface = surfaceControl->getSurface();
+            previewSurface = surfaceControl->getSurface();
+            if (previewSurface.get()) {
                 cameraDevice->setPreviewTarget(previewSurface->getIGraphicBufferProducer());
             }
-            cameraDevice->setPreviewCallbackFlag(CAMERA_FRAME_CALLBACK_FLAG_CAMCORDER);
+        }
+        cameraDevice->setPreviewCallbackFlag(CAMERA_FRAME_CALLBACK_FLAG_CAMCORDER);
 
-            Vector<Size> pictureSizes;
-            params.getSupportedPictureSizes(pictureSizes);
+        Vector<Size> pictureSizes;
+        params.getSupportedPictureSizes(pictureSizes);
 
-            for (size_t i = 0; i < pictureSizes.size(); ++i) {
-                params.setPictureSize(pictureSizes[i].width, pictureSizes[i].height);
-                cameraDevice->setParameters(params.flatten());
-                cameraDevice->startPreview();
-                waitForPreviewStart();
-                cameraDevice->autoFocus();
-                waitForEvent(mAutoFocusLock, mAutoFocusCondition, mAutoFocusMessage);
-                bool shouldPassInvalidCameraMsg = mFuzzedDataProvider->ConsumeBool();
-                int msgType;
-                if (shouldPassInvalidCameraMsg) {
-                    msgType = mFuzzedDataProvider->ConsumeIntegral<int>();
-                } else {
-                    msgType = kCameraMsg[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(
+        if (pictureSizes.size()) {
+            Size pictureSize = pictureSizes[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(
+                    0, pictureSizes.size() - 1)];
+            params.setPictureSize(pictureSize.width, pictureSize.height);
+            cameraDevice->setParameters(params.flatten());
+            cameraDevice->startPreview();
+            waitForPreviewStart();
+            cameraDevice->autoFocus();
+            waitForEvent(mAutoFocusLock, mAutoFocusCondition, mAutoFocusMessage);
+            bool shouldPassInvalidCameraMsg = mFuzzedDataProvider->ConsumeBool();
+            int msgType;
+            if (shouldPassInvalidCameraMsg) {
+                msgType = mFuzzedDataProvider->ConsumeIntegral<int>();
+            } else {
+                msgType = kCameraMsg[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(
                         0, kNumCameraMsg - 1)];
-                }
-                cameraDevice->takePicture(msgType);
-
-                waitForEvent(mSnapshotLock, mSnapshotCondition, mSnapshotNotification);
             }
+            cameraDevice->takePicture(msgType);
 
-            Vector<Size> videoSizes;
-            params.getSupportedVideoSizes(videoSizes);
+            waitForEvent(mSnapshotLock, mSnapshotCondition, mSnapshotNotification);
+            cameraDevice->stopPreview();
+        }
 
-            for (size_t i = 0; i < videoSizes.size(); ++i) {
-                params.setVideoSize(videoSizes[i].width, videoSizes[i].height);
+        Vector<Size> videoSizes;
+        params.getSupportedVideoSizes(videoSizes);
 
-                cameraDevice->setParameters(params.flatten());
-                cameraDevice->startPreview();
-                waitForPreviewStart();
-                cameraDevice->setVideoBufferMode(
+        if (videoSizes.size()) {
+            Size videoSize = videoSizes[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(
+                    0, videoSizes.size() - 1)];
+            params.setVideoSize(videoSize.width, videoSize.height);
+
+            cameraDevice->setParameters(params.flatten());
+            cameraDevice->startPreview();
+            waitForPreviewStart();
+            cameraDevice->setVideoBufferMode(
                     android::hardware::BnCamera::VIDEO_BUFFER_MODE_BUFFER_QUEUE);
-                cameraDevice->setVideoTarget(previewSurface->getIGraphicBufferProducer());
-                cameraDevice->startRecording();
-                cameraDevice->stopRecording();
+            sp<SurfaceControl> surfaceControlVideo = mComposerClient->createSurface(
+                    String8("Test Surface Video"), previewWidth, previewHeight,
+                    CameraParameters::previewFormatToEnum(params.getPreviewFormat()),
+                    layerMetaData);
+            if (surfaceControlVideo.get()) {
+                SurfaceComposerClient::Transaction{}
+                        .setLayer(surfaceControlVideo, 0x7fffffff)
+                        .show(surfaceControlVideo)
+                        .apply();
+                sp<Surface> previewSurfaceVideo = surfaceControlVideo->getSurface();
+                if (previewSurfaceVideo.get()) {
+                    cameraDevice->setVideoTarget(previewSurfaceVideo->getIGraphicBufferProducer());
+                }
             }
             cameraDevice->stopPreview();
-            cameraDevice->disconnect();
+            cameraDevice->startRecording();
+            waitForEvent(mRecordingLock, mRecordingCondition, mRecordingNotification);
+            cameraDevice->stopRecording();
         }
+        cameraDevice->disconnect();
     }
 }
 

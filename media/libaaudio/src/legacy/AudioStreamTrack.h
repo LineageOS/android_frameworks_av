@@ -79,13 +79,15 @@ public:
         return AAUDIO_DIRECTION_OUTPUT;
     }
 
-    aaudio_result_t updateStateMachine() override;
+    aaudio_result_t processCommands() override;
 
     int64_t incrementClientFrameCounter(int32_t frames) override {
         return incrementFramesWritten(frames);
     }
 
     android::status_t doSetVolume() override;
+
+    void registerPlayerBase() override;
 
 #if AAUDIO_USE_VOLUME_SHAPER
     virtual android::binder::Status applyVolumeShaper(

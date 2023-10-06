@@ -80,12 +80,13 @@ private:
                                         // if sink format is different than mixer output.
     size_t          mSinkBufferSize = 0;
     uint32_t        mSinkChannelCount = FCC_2;
-    audio_channel_mask_t mSinkChannelMask;
+    audio_channel_mask_t mSinkChannelMask;        // set in ctor
     void*           mMixerBuffer = nullptr;       // mixer output buffer.
     size_t          mMixerBufferSize = 0;
     static constexpr audio_format_t mMixerBufferFormat = AUDIO_FORMAT_PCM_FLOAT;
 
-    uint32_t        mAudioChannelCount; // audio channel count, excludes haptic channels.
+    // audio channel count, excludes haptic channels.  Set in onStateChange().
+    uint32_t        mAudioChannelCount = 0;
 
     enum {UNDEFINED, MIXED, ZEROED} mMixerBufferState = UNDEFINED;
     NBAIO_Format    mFormat{Format_Invalid};
@@ -103,7 +104,7 @@ private:
     // accessed without lock between multiple threads.
     std::atomic_bool mMasterMono{};
     std::atomic<float> mMasterBalance{};
-    std::atomic_int_fast64_t mBoottimeOffset;
+    std::atomic_int_fast64_t mBoottimeOffset{};
 
     // parent thread id for debugging purposes
     [[maybe_unused]] const audio_io_handle_t mThreadIoHandle;

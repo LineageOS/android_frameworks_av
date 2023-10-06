@@ -39,17 +39,16 @@ const char* CameraManagerGlobal::kCallbackFpKey = "CallbackFp";
 const char* CameraManagerGlobal::kContextKey    = "CallbackContext";
 const nsecs_t CameraManagerGlobal::kCallbackDrainTimeout = 5000000; // 5 ms
 Mutex                CameraManagerGlobal::sLock;
-CameraManagerGlobal* CameraManagerGlobal::sInstance = nullptr;
+wp<CameraManagerGlobal> CameraManagerGlobal::sInstance = nullptr;
 
-CameraManagerGlobal&
-CameraManagerGlobal::getInstance() {
+sp<CameraManagerGlobal> CameraManagerGlobal::getInstance() {
     Mutex::Autolock _l(sLock);
-    CameraManagerGlobal* instance = sInstance;
+    sp<CameraManagerGlobal> instance = sInstance.promote();
     if (instance == nullptr) {
         instance = new CameraManagerGlobal();
         sInstance = instance;
     }
-    return *instance;
+    return instance;
 }
 
 CameraManagerGlobal::~CameraManagerGlobal() {
@@ -638,7 +637,7 @@ ACameraManager::getCameraIdList(ACameraIdList** cameraIdList) {
     Mutex::Autolock _l(mLock);
 
     std::vector<std::string> idList;
-    CameraManagerGlobal::getInstance().getCameraIdList(&idList);
+    CameraManagerGlobal::getInstance()->getCameraIdList(&idList);
 
     int numCameras = idList.size();
     ACameraIdList *out = new ACameraIdList;
@@ -688,7 +687,7 @@ camera_status_t ACameraManager::getCameraCharacteristics(
         const char* cameraIdStr, sp<ACameraMetadata>* characteristics) {
     Mutex::Autolock _l(mLock);
 
-    sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();
+    sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance()->getCameraService();
     if (cs == nullptr) {
         ALOGE("%s: Cannot reach camera service!", __FUNCTION__);
         return ACAMERA_ERROR_CAMERA_DISCONNECTED;
@@ -734,7 +733,7 @@ ACameraManager::openCamera(
 
     ACameraDevice* device = new ACameraDevice(cameraId, callback, chars);
 
-    sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();
+    sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance()->getCameraService();
     if (cs == nullptr) {
         ALOGE("%s: Cannot reach camera service!", __FUNCTION__);
         delete device;

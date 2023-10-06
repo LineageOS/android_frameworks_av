@@ -73,13 +73,13 @@ aaudio_result_t AAudioClientTracker::registerClient(pid_t pid,
         return AAUDIO_ERROR_NULL;
     }
 
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     if (mNotificationClients.count(pid) == 0) {
-        sp<IBinder> binder = IInterface::asBinder(client);
-        sp<NotificationClient> notificationClient = new NotificationClient(pid, binder);
+        const sp<IBinder> binder = IInterface::asBinder(client);
+        const sp<NotificationClient> notificationClient = new NotificationClient(pid, binder);
         mNotificationClients[pid] = notificationClient;
 
-        status_t status = binder->linkToDeath(notificationClient);
+        const status_t status = binder->linkToDeath(notificationClient);
         ALOGW_IF(status != NO_ERROR, "registerClient() linkToDeath = %d\n", status);
         return AAudioConvert_androidToAAudioResult(status);
     } else {
@@ -90,12 +90,12 @@ aaudio_result_t AAudioClientTracker::registerClient(pid_t pid,
 
 void AAudioClientTracker::unregisterClient(pid_t pid) {
     ALOGV("unregisterClient(), calling pid = %d, getpid() = %d\n", pid, getpid());
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     mNotificationClients.erase(pid);
 }
 
 int32_t AAudioClientTracker::getStreamCount(pid_t pid) {
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     auto it = mNotificationClients.find(pid);
     if (it != mNotificationClients.end()) {
         return it->second->getStreamCount();
@@ -105,18 +105,19 @@ int32_t AAudioClientTracker::getStreamCount(pid_t pid) {
 }
 
 aaudio_result_t
-AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase> serviceStream) {
+AAudioClientTracker::registerClientStream(
+        pid_t pid, const sp<AAudioServiceStreamBase>& serviceStream) {
     ALOGV("registerClientStream(%d,)\n", pid);
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     return getNotificationClient_l(pid)->registerClientStream(serviceStream);
 }
 
 // Find the tracker for this process and remove it.
 aaudio_result_t
 AAudioClientTracker::unregisterClientStream(pid_t pid,
-                                            sp<AAudioServiceStreamBase> serviceStream) {
+                                            const sp<AAudioServiceStreamBase>& serviceStream) {
     ALOGV("unregisterClientStream(%d,)\n", pid);
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     auto it = mNotificationClients.find(pid);
     if (it != mNotificationClients.end()) {
         ALOGV("unregisterClientStream(%d,) found NotificationClient\n", pid);
@@ -129,12 +130,12 @@ AAudioClientTracker::unregisterClientStream(pid_t pid,
 
 void AAudioClientTracker::setExclusiveEnabled(pid_t pid, bool enabled) {
     ALOGD("%s(%d, %d)\n", __func__, pid, enabled);
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     getNotificationClient_l(pid)->setExclusiveEnabled(enabled);
 }
 
 bool AAudioClientTracker::isExclusiveEnabled(pid_t pid) {
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     return getNotificationClient_l(pid)->isExclusiveEnabled();
 }
 
@@ -158,24 +159,21 @@ AAudioClientTracker::NotificationClient::NotificationClient(pid_t pid, const sp<
         : mProcessId(pid), mBinder(binder) {
 }
 
-AAudioClientTracker::NotificationClient::~NotificationClient() {
-}
-
 int32_t AAudioClientTracker::NotificationClient::getStreamCount() {
-    std::lock_guard<std::mutex> lock(mLock);
+    const std::lock_guard<std::mutex> lock(mLock);
     return mStreams.size();
 }
 
 aaudio_result_t AAudioClientTracker::NotificationClient::registerClientStream(
-        sp<AAudioServiceStreamBase> serviceStream) {
-    std::lock_guard<std::mutex> lock(mLock);
+        const sp<AAudioServiceStreamBase>& serviceStream) {
+    const std::lock_guard<std::mutex> lock(mLock);
     mStreams.insert(serviceStream);
     return AAUDIO_OK;
 }
 
 aaudio_result_t AAudioClientTracker::NotificationClient::unregisterClientStream(
-        sp<AAudioServiceStreamBase> serviceStream) {
-    std::lock_guard<std::mutex> lock(mLock);
+        const sp<AAudioServiceStreamBase>& serviceStream) {
+    const std::lock_guard<std::mutex> lock(mLock);
     mStreams.erase(serviceStream);
     return AAUDIO_OK;
 }
@@ -189,20 +187,21 @@ void AAudioClientTracker::NotificationClient::binderDied(const wp<IBinder>& who 
         std::set<sp<AAudioServiceStreamBase>>  streamsToClose;
 
         {
-            std::lock_guard<std::mutex> lock(mLock);
+            const std::lock_guard<std::mutex> lock(mLock);
             for (const auto& serviceStream : mStreams) {
                 streamsToClose.insert(serviceStream);
             }
         }
 
         for (const auto& serviceStream : streamsToClose) {
-            aaudio_handle_t handle = serviceStream->getHandle();
+            const aaudio_handle_t handle = serviceStream->getHandle();
             ALOGW("binderDied() close abandoned stream 0x%08X\n", handle);
-            aaudioService->asAAudioServiceInterface().closeStream(handle);
+            AAudioHandleInfo handleInfo(DEFAULT_AAUDIO_SERVICE_ID, handle);
+            aaudioService->asAAudioServiceInterface().closeStream(handleInfo);
         }
         // mStreams should be empty now
     }
-    sp<NotificationClient> keep(this);
+    const sp<NotificationClient> keep(this);
     AAudioClientTracker::getInstance().unregisterClient(mProcessId);
 }
 

@@ -418,10 +418,22 @@ AAUDIO_API int32_t AAudioStream_getSampleRate(AAudioStream* stream)
     return audioStream->getSampleRate();
 }
 
+AAUDIO_API int32_t AAudioStream_getHardwareSampleRate(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getHardwareSampleRate();
+}
+
 AAUDIO_API int32_t AAudioStream_getChannelCount(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getSamplesPerFrame();
+}
+
+AAUDIO_API int32_t AAudioStream_getHardwareChannelCount(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getHardwareSamplesPerFrame();
 }
 
 AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream)
@@ -432,7 +444,7 @@ AAUDIO_API int32_t AAudioStream_getSamplesPerFrame(AAudioStream* stream)
 AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->getState();
+    return audioStream->getStateExternal();
 }
 
 AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream)
@@ -441,6 +453,14 @@ AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream)
     // Use audio_format_t internally.
     audio_format_t internalFormat = audioStream->getFormat();
     return AAudioConvert_androidToAAudioDataFormat(internalFormat);
+}
+
+AAUDIO_API aaudio_format_t AAudioStream_getHardwareFormat(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    // Use audio_format_t internally.
+    audio_format_t internalFormat = audioStream->getHardwareFormat();
+    return AAudioConvert_androidToNearestAAudioDataFormat(internalFormat);
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream* stream,

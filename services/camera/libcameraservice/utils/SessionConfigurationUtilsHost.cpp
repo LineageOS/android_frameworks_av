@@ -49,12 +49,22 @@ int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution) {
             return ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION;
         case ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS:
             return ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS_MAXIMUM_RESOLUTION;
+        case ANDROID_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS:
+            return ANDROID_JPEGR_AVAILABLE_JPEG_R_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION;
+        case ANDROID_JPEGR_AVAILABLE_JPEG_R_MIN_FRAME_DURATIONS:
+            return ANDROID_JPEGR_AVAILABLE_JPEG_R_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION;
+        case ANDROID_JPEGR_AVAILABLE_JPEG_R_STALL_DURATIONS:
+            return ANDROID_JPEGR_AVAILABLE_JPEG_R_STALL_DURATIONS_MAXIMUM_RESOLUTION;
         case ANDROID_SENSOR_OPAQUE_RAW_SIZE:
             return ANDROID_SENSOR_OPAQUE_RAW_SIZE_MAXIMUM_RESOLUTION;
         case ANDROID_LENS_INTRINSIC_CALIBRATION:
             return ANDROID_LENS_INTRINSIC_CALIBRATION_MAXIMUM_RESOLUTION;
         case ANDROID_LENS_DISTORTION:
             return ANDROID_LENS_DISTORTION_MAXIMUM_RESOLUTION;
+        case ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE:
+            return ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION;
+        case ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE:
+            return ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION;
         default:
             ALOGE("%s: Tag %d doesn't have a maximum resolution counterpart", __FUNCTION__,
                     defaultTag);
@@ -63,7 +73,62 @@ int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution) {
     return -1;
 }
 
-bool isUltraHighResolutionSensor(const CameraMetadata &deviceInfo) {
+static bool isKeyPresentWithCount(const CameraMetadata &deviceInfo, uint32_t tag, uint32_t count) {
+    auto countFound = deviceInfo.find(tag).count;
+    return (countFound != 0) && (countFound % count == 0);
+}
+
+static bool supportsKeysForBasicUltraHighResolutionCapture(const CameraMetadata &deviceInfo) {
+    // Check whether the following conditions are satisfied for reduced ultra high
+    // resolution support :
+    // 1) SENSOR_PIXEL_MODE is advertised in ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS
+    // 2) The following keys are present in CameraCharacteristics for basic functionality
+    //        a) ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION
+    //        b) ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION
+    //        c) ANDROID_SCALER_AVAILABLE_STALL_DURATIONS_MAXIMUM_RESOLUTION
+    //        d) ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION
+    //        e) ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION
+    //        f) ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE_MAXIMUM_RESOLUTION
+    camera_metadata_ro_entry_t entryChar;
+    entryChar = deviceInfo.find(ANDROID_REQUEST_AVAILABLE_REQUEST_KEYS);
+    bool supportsSensorPixelMode = false;
+    for (size_t i = 0; i < entryChar.count; i++) {
+        int32_t key = entryChar.data.i32[i];
+        if (key == ANDROID_SENSOR_PIXEL_MODE) {
+            supportsSensorPixelMode = true;
+            break;
+        }
+    }
+    if (!supportsSensorPixelMode) {
+        return false;
+    }
+
+    // Basic sensor array size information tags are present
+    if (!isKeyPresentWithCount(deviceInfo, ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE_MAXIMUM_RESOLUTION,
+            /*count*/2) ||
+            !isKeyPresentWithCount(deviceInfo,
+                    ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION,
+                    /*count*/4) ||
+            !isKeyPresentWithCount(deviceInfo,
+                    ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION, /*count*/4) ||
+            !isKeyPresentWithCount(deviceInfo, ANDROID_SENSOR_INFO_BINNING_FACTOR, /*count*/2)) {
+        return false;
+    }
+
+    // Basic stream configuration tags are present
+    if (!isKeyPresentWithCount(deviceInfo,
+            ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION, /*count*/4) ||
+            !isKeyPresentWithCount(deviceInfo,
+                    ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS_MAXIMUM_RESOLUTION, /*count*/4) ||
+            !isKeyPresentWithCount(deviceInfo,
+                    ANDROID_SCALER_AVAILABLE_STALL_DURATIONS_MAXIMUM_RESOLUTION, /*count*/ 4)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool supportsUltraHighResolutionCapture(const CameraMetadata &deviceInfo) {
     camera_metadata_ro_entry_t entryCap;
     entryCap = deviceInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
     // Go through the capabilities and check if it has
@@ -74,7 +139,10 @@ bool isUltraHighResolutionSensor(const CameraMetadata &deviceInfo) {
             return true;
         }
     }
-    return false;
+
+    // If not, then check that the keys which guarantee basic supports for
+    // ultra high resolution capture are supported.
+    return supportsKeysForBasicUltraHighResolutionCapture(deviceInfo);
 }
 
 bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo,

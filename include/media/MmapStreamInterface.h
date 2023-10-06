@@ -155,6 +155,18 @@ class MmapStreamInterface : public virtual RefBase
      */
     virtual status_t standby() = 0;
 
+    /**
+     * Report when data being written to a playback buffer. Currently, this is used by mmap
+     * playback thread for sound dose computation.
+     *
+     * \param[in] buffer a pointer to the audio data
+     * \param[in] frameCount the number of frames written by the CPU
+     * \return OK in case of success.
+     *         NO_INIT in case of initialization error
+     *         INVALID_OPERATION in case of wrong thread type
+     */
+    virtual status_t reportData(const void* buffer, size_t frameCount) = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     MmapStreamInterface() {}

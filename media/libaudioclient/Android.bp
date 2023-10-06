@@ -336,6 +336,8 @@ aidl_interface {
     srcs: [
         "aidl/android/media/AudioAttributesEx.aidl",
         "aidl/android/media/AudioMix.aidl",
+        "aidl/android/media/AudioMixerAttributesInternal.aidl",
+        "aidl/android/media/AudioMixerBehavior.aidl",
         "aidl/android/media/AudioMixCallbackFlag.aidl",
         "aidl/android/media/AudioMixMatchCriterion.aidl",
         "aidl/android/media/AudioMixMatchCriterionValue.aidl",
@@ -395,6 +397,10 @@ aidl_interface {
         "aidl/android/media/IAudioRecord.aidl",
         "aidl/android/media/IAudioTrack.aidl",
         "aidl/android/media/IAudioTrackCallback.aidl",
+
+        "aidl/android/media/ISoundDose.aidl",
+        "aidl/android/media/ISoundDoseCallback.aidl",
+        "aidl/android/media/SoundDoseRecord.aidl",
     ],
     imports: [
         "android.media.audio.common.types-V2",
@@ -481,6 +487,24 @@ aidl_interface {
                 "com.android.media",
             ],
         },
+        java: {
+            sdk_version: "module_current",
+        },
+    },
+}
+
+aidl_interface {
+    name: "sounddose-aidl",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/ISoundDose.aidl",
+        "aidl/android/media/ISoundDoseCallback.aidl",
+        "aidl/android/media/SoundDoseRecord.aidl",
+    ],
+
+    double_loadable: true,
+    backend: {
         java: {
             sdk_version: "module_current",
         },

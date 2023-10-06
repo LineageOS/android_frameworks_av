@@ -54,10 +54,10 @@ public:
     int32_t getStreamCount(pid_t pid);
 
     aaudio_result_t registerClientStream(pid_t pid,
-                                         android::sp<AAudioServiceStreamBase> serviceStream);
+                                         const android::sp<AAudioServiceStreamBase>& serviceStream);
 
-    aaudio_result_t unregisterClientStream(pid_t pid,
-                                           android::sp<AAudioServiceStreamBase> serviceStream);
+    aaudio_result_t unregisterClientStream(
+            pid_t pid, const android::sp<AAudioServiceStreamBase>& serviceStream);
 
     /**
      * Specify whether a process is allowed to create an EXCLUSIVE MMAP stream.
@@ -84,15 +84,17 @@ private:
     class NotificationClient : public IBinder::DeathRecipient {
     public:
         NotificationClient(pid_t pid, const android::sp<IBinder>& binder);
-        virtual ~NotificationClient();
+        ~NotificationClient() override = default;
 
         int32_t getStreamCount();
 
         std::string dump() const;
 
-        aaudio_result_t registerClientStream(android::sp<AAudioServiceStreamBase> serviceStream);
+        aaudio_result_t registerClientStream(
+                const android::sp<AAudioServiceStreamBase>& serviceStream);
 
-        aaudio_result_t unregisterClientStream(android::sp<AAudioServiceStreamBase> serviceStream);
+        aaudio_result_t unregisterClientStream(
+                const android::sp<AAudioServiceStreamBase>& serviceStream);
 
         void setExclusiveEnabled(bool enabled) {
             mExclusiveEnabled = enabled;
@@ -103,7 +105,7 @@ private:
         }
 
         // IBinder::DeathRecipient
-        virtual     void    binderDied(const android::wp<IBinder>& who);
+        void binderDied(const android::wp<IBinder>& who) override;
 
     private:
         mutable std::mutex                              mLock;

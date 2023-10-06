@@ -75,18 +75,23 @@
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/VolumeShaper.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/SharedMemoryAllocator.h>
 #include <mediautils/Synchronization.h>
 #include <mediautils/ThreadSnapshot.h>
 
+#include <afutils/AllocatorFactory.h>
 #include <afutils/AudioWatchdog.h>
 #include <afutils/NBAIO_Tee.h>
 
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
 #include <audio_utils/LinearMap.h>
+#include <audio_utils/MelAggregator.h>
+#include <audio_utils/MelProcessor.h>
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimestampVerifier.h>
 
+#include <sounddose/SoundDoseManager.h>
 #include <timing/MonotonicFrameCounter.h>
 #include <timing/SyncEvent.h>
 #include <timing/SynchronizedRecordState.h>
@@ -99,7 +104,6 @@
 #include <fastpath/FastCapture.h>
 #include <fastpath/FastMixer.h>
 #include <media/nbaio/NBAIO.h>
-
 
 #include <android/os/IPowerManager.h>
 
@@ -123,6 +127,7 @@ class DevicesFactoryHalCallback;
 class DevicesFactoryHalInterface;
 class EffectsFactoryHalInterface;
 class FastMixer;
+class IAudioManager;
 class PassthruBufferProvider;
 class RecordBufferConverter;
 class ServerProxy;
@@ -208,8 +213,6 @@ public:
                                media::OpenInputResponse* response);
 
     virtual status_t closeInput(audio_io_handle_t input);
-
-    virtual status_t invalidateStream(audio_stream_type_t stream);
 
     virtual status_t setVoiceVolume(float volume);
 
@@ -315,6 +318,11 @@ public:
 
     virtual status_t supportsBluetoothVariableLatency(bool* support);
 
+    virtual status_t getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback,
+                                           sp<media::ISoundDose>* soundDose);
+
+    status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
+
     virtual status_t getAudioPolicyConfig(media::AudioPolicyConfig* config);
 
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
@@ -336,7 +344,8 @@ public:
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);
 
-    static int onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration);
+    static os::HapticScale onExternalVibrationStart(
+        const sp<os::ExternalVibration>& externalVibration);
     static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
 
     status_t addEffectToHal(
@@ -386,6 +395,8 @@ public:
 
     bool        btNrecIsOff() const { return mBtNrecIsOff.load(); }
 
+    void             lock() ACQUIRE(mLock) { mLock.lock(); }
+    void             unlock() RELEASE(mLock) { mLock.unlock(); }
 
 private:
 
@@ -479,19 +490,19 @@ private:
 
     // --- Client ---
     class Client : public RefBase {
-    public:
-                            Client(const sp<AudioFlinger>& audioFlinger, pid_t pid);
+      public:
+        Client(const sp<AudioFlinger>& audioFlinger, pid_t pid);
         virtual             ~Client();
-        sp<MemoryDealer>    heap() const;
+        AllocatorFactory::ClientAllocator& allocator();
         pid_t               pid() const { return mPid; }
         sp<AudioFlinger>    audioFlinger() const { return mAudioFlinger; }
 
     private:
         DISALLOW_COPY_AND_ASSIGN(Client);
 
-        const sp<AudioFlinger> mAudioFlinger;
-              sp<MemoryDealer> mMemoryDealer;
+        const sp<AudioFlinger>    mAudioFlinger;
         const pid_t         mPid;
+        AllocatorFactory::ClientAllocator mClientAllocator;
     };
 
     // --- Notification Client ---
@@ -561,6 +572,7 @@ private:
     class OffloadThread;
     class DuplicatingThread;
     class AsyncCallbackThread;
+    class BitPerfectThread;
     class Track;
     class RecordTrack;
     class EffectBase;
@@ -603,9 +615,13 @@ private:
 
 #include "PatchPanel.h"
 
+#include "PatchCommandThread.h"
+
 #include "Effects.h"
 
 #include "DeviceEffectManager.h"
+
+#include "MelReporter.h"
 
     // Find io handle by session id.
     // Preference is given to an io handle with a matching effect chain to session id.
@@ -707,12 +723,15 @@ private:
                                audio_port_handle_t *handle);
         virtual status_t stop(audio_port_handle_t handle);
         virtual status_t standby();
+                status_t reportData(const void* buffer, size_t frameCount) override;
 
     private:
         const sp<MmapThread> mThread;
     };
 
               ThreadBase *checkThread_l(audio_io_handle_t ioHandle) const;
+              sp<AudioFlinger::ThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const
+                      REQUIRES(mLock);
               PlaybackThread *checkPlaybackThread_l(audio_io_handle_t output) const;
               MixerThread *checkMixerThread_l(audio_io_handle_t output) const;
               RecordThread *checkRecordThread_l(audio_io_handle_t input) const;
@@ -966,6 +985,8 @@ private:
                                       size_t rejectedKVPSize, const String8& rejectedKVPs,
                                       uid_t callingUid);
 
+    sp<IAudioManager> getOrCreateAudioManager();
+
 public:
     // These methods read variables atomically without mLock,
     // though the variables are updated with mLock.
@@ -985,7 +1006,9 @@ private:
     PatchPanel mPatchPanel;
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 
-    DeviceEffectManager mDeviceEffectManager;
+    const sp<PatchCommandThread> mPatchCommandThread;
+    sp<DeviceEffectManager> mDeviceEffectManager;
+    sp<MelReporter> mMelReporter;
 
     bool       mSystemReady;
     std::atomic_bool mAudioPolicyReady{};
@@ -1007,6 +1030,9 @@ private:
              std::vector<media::audio::common::AudioMMapPolicyInfo>> mPolicyInfos;
     int32_t mAAudioBurstsPerBuffer = 0;
     int32_t mAAudioHwBurstMinMicros = 0;
+
+    /** Interface for interacting with the AudioService. */
+    mediautils::atomic_sp<IAudioManager>       mAudioManager;
 
     // Bluetooth Variable latency control logic is enabled or disabled
     std::atomic_bool mBluetoothLatencyModesEnabled;

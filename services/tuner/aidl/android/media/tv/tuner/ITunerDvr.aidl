@@ -66,4 +66,9 @@ interface ITunerDvr {
      * close the DVR instance to release resource for DVR.
      */
     void close();
+
+    /**
+     * Set status check time interval.
+     */
+    void setStatusCheckIntervalHint(in long milliseconds);
 }

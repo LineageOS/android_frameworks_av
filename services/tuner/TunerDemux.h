@@ -32,10 +32,13 @@ namespace media {
 namespace tv {
 namespace tuner {
 
+class TunerService;
+
 class TunerDemux : public BnTunerDemux {
 
 public:
-    TunerDemux(shared_ptr<IDemux> demux, int demuxId);
+    TunerDemux(const shared_ptr<IDemux> demux, const int demuxId,
+               const shared_ptr<TunerService> tuner);
     virtual ~TunerDemux();
 
     ::ndk::ScopedAStatus setFrontendDataSource(
@@ -60,6 +63,7 @@ public:
 private:
     shared_ptr<IDemux> mDemux;
     int mDemuxId;
+    shared_ptr<TunerService> mTunerService;
 };
 
 }  // namespace tuner

@@ -427,8 +427,8 @@ TEST_F(AudioSystemTest, DevicesForRoleAndStrategy) {
         EXPECT_EQ(OK, AudioSystem::getDevicesForRoleAndStrategy(mediaStrategy.getId(),
                                                                 DEVICE_ROLE_PREFERRED, devices));
         EXPECT_EQ(devices, outputDevices);
-        EXPECT_EQ(OK, AudioSystem::removeDevicesRoleForStrategy(mediaStrategy.getId(),
-                                                                DEVICE_ROLE_PREFERRED));
+        EXPECT_EQ(OK, AudioSystem::clearDevicesRoleForStrategy(mediaStrategy.getId(),
+                                                               DEVICE_ROLE_PREFERRED));
         EXPECT_EQ(NAME_NOT_FOUND, AudioSystem::getDevicesForRoleAndStrategy(
                                           mediaStrategy.getId(), DEVICE_ROLE_PREFERRED, devices));
     }

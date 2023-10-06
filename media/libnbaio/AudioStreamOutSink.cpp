@@ -50,6 +50,14 @@ ssize_t AudioStreamOutSink::negotiate(const NBAIO_Format offers[], size_t numOff
         mFormat = Format_from_SR_C(config.sample_rate,
                 audio_channel_count_from_out_mask(config.channel_mask), config.format);
         mFrameSize = Format_frameSize(mFormat);
+
+        // update format for MEL computation
+        auto processor = mMelProcessor.load();
+        if (processor) {
+            processor->updateAudioFormat(config.sample_rate,
+                                         audio_channel_count_from_out_mask(config.channel_mask),
+                                         config.format);
+        }
     }
     return NBAIO_Sink::negotiate(offers, numOffers, counterOffers, numCounterOffers);
 }
@@ -63,8 +71,15 @@ ssize_t AudioStreamOutSink::write(const void *buffer, size_t count)
     size_t written;
     status_t ret = mStream->write(buffer, count * mFrameSize, &written);
     if (ret == OK && written > 0) {
+        // Send to MelProcessor for sound dose measurement.
+        auto processor = mMelProcessor.load();
+        if (processor) {
+            processor->process(buffer, written);
+        }
+
         written /= mFrameSize;
         mFramesWritten += written;
+
         return written;
     } else {
         // FIXME verify HAL implementations are returning the correct error codes e.g. WOULD_BLOCK
@@ -83,6 +98,30 @@ status_t AudioStreamOutSink::getTimestamp(ExtendedTimestamp &timestamp)
     timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL] = position64;
     timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] = audio_utils_ns_from_timespec(&time);
     return OK;
+}
+
+void AudioStreamOutSink::startMelComputation(const sp<audio_utils::MelProcessor>& processor)
+{
+    ALOGV("%s start mel computation for device %d", __func__, processor->getDeviceId());
+
+    mMelProcessor.store(processor);
+    if (processor) {
+        // update format for MEL computation
+        processor->updateAudioFormat(mFormat.mSampleRate,
+                                     mFormat.mChannelCount,
+                                     mFormat.mFormat);
+        processor->resume();
+    }
+
+}
+
+void AudioStreamOutSink::stopMelComputation()
+{
+    auto melProcessor = mMelProcessor.load();
+    if (melProcessor != nullptr) {
+        ALOGV("%s pause mel computation for device %d", __func__, melProcessor->getDeviceId());
+        melProcessor->pause();
+    }
 }
 
 }   // namespace android

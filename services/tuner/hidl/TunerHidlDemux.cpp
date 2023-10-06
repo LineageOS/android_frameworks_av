@@ -20,6 +20,7 @@
 
 #include "TunerHidlDvr.h"
 #include "TunerHidlFilter.h"
+#include "TunerHidlService.h"
 #include "TunerHidlTimeFilter.h"
 
 using ::aidl::android::hardware::tv::tuner::DemuxFilterSubType;
@@ -42,23 +43,20 @@ namespace media {
 namespace tv {
 namespace tuner {
 
-TunerHidlDemux::TunerHidlDemux(sp<IDemux> demux, int id) {
+TunerHidlDemux::TunerHidlDemux(const sp<IDemux> demux, const int id,
+                               const shared_ptr<TunerHidlService> tuner) {
     mDemux = demux;
     mDemuxId = id;
+    mTunerService = tuner;
 }
 
 TunerHidlDemux::~TunerHidlDemux() {
     mDemux = nullptr;
+    mTunerService = nullptr;
 }
 
 ::ndk::ScopedAStatus TunerHidlDemux::setFrontendDataSource(
         const shared_ptr<ITunerFrontend>& in_frontend) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     int frontendId;
     in_frontend->getFrontendId(&frontendId);
     HidlResult res = mDemux->setFrontendDataSource(frontendId);
@@ -69,12 +67,6 @@ TunerHidlDemux::~TunerHidlDemux() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDemux::setFrontendDataSourceById(int frontendId) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     HidlResult res = mDemux->setFrontendDataSource(frontendId);
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -86,12 +78,6 @@ TunerHidlDemux::~TunerHidlDemux() {
                                                 int32_t in_bufferSize,
                                                 const shared_ptr<ITunerFilterCallback>& in_cb,
                                                 shared_ptr<ITunerFilter>* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     HidlDemuxFilterMainType mainType = static_cast<HidlDemuxFilterMainType>(in_type.mainType);
     HidlDemuxFilterType filterType{
             .mainType = mainType,
@@ -132,17 +118,12 @@ TunerHidlDemux::~TunerHidlDemux() {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(status));
     }
 
-    *_aidl_return = ::ndk::SharedRefBase::make<TunerHidlFilter>(filterSp, filterCb, in_type);
+    *_aidl_return =
+            ::ndk::SharedRefBase::make<TunerHidlFilter>(filterSp, filterCb, in_type, mTunerService);
     return ::ndk::ScopedAStatus::ok();
 }
 
 ::ndk::ScopedAStatus TunerHidlDemux::openTimeFilter(shared_ptr<ITunerTimeFilter>* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     HidlResult status;
     sp<HidlITimeFilter> filterSp;
     mDemux->openTimeFilter([&](HidlResult r, const sp<HidlITimeFilter>& filter) {
@@ -159,12 +140,6 @@ TunerHidlDemux::~TunerHidlDemux() {
 
 ::ndk::ScopedAStatus TunerHidlDemux::getAvSyncHwId(const shared_ptr<ITunerFilter>& tunerFilter,
                                                    int32_t* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     uint32_t avSyncHwId;
     HidlResult res;
     sp<HidlIFilter> halFilter = static_cast<TunerHidlFilter*>(tunerFilter.get())->getHalFilter();
@@ -181,12 +156,6 @@ TunerHidlDemux::~TunerHidlDemux() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDemux::getAvSyncTime(int32_t avSyncHwId, int64_t* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     uint64_t time;
     HidlResult res;
     mDemux->getAvSyncTime(static_cast<uint32_t>(avSyncHwId), [&](HidlResult r, uint64_t ts) {
@@ -204,12 +173,6 @@ TunerHidlDemux::~TunerHidlDemux() {
 ::ndk::ScopedAStatus TunerHidlDemux::openDvr(DvrType in_dvbType, int32_t in_bufferSize,
                                              const shared_ptr<ITunerDvrCallback>& in_cb,
                                              shared_ptr<ITunerDvr>* _aidl_return) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     HidlResult res;
     sp<HidlIDvrCallback> callback = new TunerHidlDvr::DvrCallback(in_cb);
     sp<HidlIDvr> hidlDvr;
@@ -228,12 +191,6 @@ TunerHidlDemux::~TunerHidlDemux() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDemux::connectCiCam(int32_t ciCamId) {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     HidlResult res = mDemux->connectCiCam(static_cast<uint32_t>(ciCamId));
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -242,12 +199,6 @@ TunerHidlDemux::~TunerHidlDemux() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDemux::disconnectCiCam() {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     HidlResult res = mDemux->disconnectCiCam();
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
@@ -256,15 +207,7 @@ TunerHidlDemux::~TunerHidlDemux() {
 }
 
 ::ndk::ScopedAStatus TunerHidlDemux::close() {
-    if (mDemux == nullptr) {
-        ALOGE("IDemux is not initialized.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(HidlResult::UNAVAILABLE));
-    }
-
     HidlResult res = mDemux->close();
-    mDemux = nullptr;
-
     if (res != HidlResult::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }

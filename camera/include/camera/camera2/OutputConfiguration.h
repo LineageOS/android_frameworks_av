@@ -46,8 +46,7 @@ public:
         TIMESTAMP_BASE_MONOTONIC = 2,
         TIMESTAMP_BASE_REALTIME = 3,
         TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED = 4,
-        TIMESTAMP_BASE_READOUT_SENSOR = 5,
-        TIMESTAMP_BASE_MAX = TIMESTAMP_BASE_READOUT_SENSOR,
+        TIMESTAMP_BASE_MAX = TIMESTAMP_BASE_CHOREOGRAPHER_SYNCED,
     };
     enum MirrorModeType {
         MIRROR_MODE_AUTO = 0,
@@ -63,6 +62,7 @@ public:
     int                        getWidth() const;
     int                        getHeight() const;
     int64_t                    getDynamicRangeProfile() const;
+    int32_t                    getColorSpace() const;
     bool                       isDeferred() const;
     bool                       isShared() const;
     std::string                getPhysicalCameraId() const;
@@ -70,6 +70,7 @@ public:
     int64_t                    getStreamUseCase() const;
     int                        getTimestampBase() const;
     int                        getMirrorMode() const;
+    bool                       useReadoutTimestamp() const;
 
     // set of sensor pixel mode resolutions allowed {MAX_RESOLUTION, DEFAULT_MODE};
     const std::vector<int32_t>&            getSensorPixelModesUsed() const;
@@ -113,9 +114,11 @@ public:
                 mIsMultiResolution == other.mIsMultiResolution &&
                 sensorPixelModesUsedEqual(other) &&
                 mDynamicRangeProfile == other.mDynamicRangeProfile &&
+                mColorSpace == other.mColorSpace &&
                 mStreamUseCase == other.mStreamUseCase &&
                 mTimestampBase == other.mTimestampBase &&
-                mMirrorMode == other.mMirrorMode);
+                mMirrorMode == other.mMirrorMode &&
+                mUseReadoutTimestamp == other.mUseReadoutTimestamp);
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -155,6 +158,9 @@ public:
         if (mDynamicRangeProfile != other.mDynamicRangeProfile) {
             return mDynamicRangeProfile < other.mDynamicRangeProfile;
         }
+        if (mColorSpace != other.mColorSpace) {
+            return mColorSpace < other.mColorSpace;
+        }
         if (mStreamUseCase != other.mStreamUseCase) {
             return mStreamUseCase < other.mStreamUseCase;
         }
@@ -163,6 +169,9 @@ public:
         }
         if (mMirrorMode != other.mMirrorMode) {
             return mMirrorMode < other.mMirrorMode;
+        }
+        if (mUseReadoutTimestamp != other.mUseReadoutTimestamp) {
+            return mUseReadoutTimestamp < other.mUseReadoutTimestamp;
         }
         return gbpsLessThan(other);
     }
@@ -189,9 +198,11 @@ private:
     bool                       mIsMultiResolution;
     std::vector<int32_t>       mSensorPixelModesUsed;
     int64_t                    mDynamicRangeProfile;
+    int32_t                    mColorSpace;
     int64_t                    mStreamUseCase;
     int                        mTimestampBase;
     int                        mMirrorMode;
+    bool                       mUseReadoutTimestamp;
 };
 } // namespace params
 } // namespace camera2

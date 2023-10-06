@@ -34,6 +34,9 @@ aaudio_format_t kAAudioFormats[] = {
     AAUDIO_FORMAT_UNSPECIFIED,
     AAUDIO_FORMAT_PCM_I16,
     AAUDIO_FORMAT_PCM_FLOAT,
+    AAUDIO_FORMAT_PCM_I24_PACKED,
+    AAUDIO_FORMAT_PCM_I32,
+    AAUDIO_FORMAT_IEC61937
 };
 
 aaudio_usage_t kAAudioUsages[] = {
@@ -146,41 +149,42 @@ class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
 
     void registerClient(const sp<IAAudioClient> &client UNUSED_PARAM) override {}
 
-    aaudio_handle_t openStream(const AAudioStreamRequest &request,
-                               AAudioStreamConfiguration &configurationOutput) override;
+    AAudioHandleInfo openStream(const AAudioStreamRequest &request,
+                                AAudioStreamConfiguration &configurationOutput) override;
 
-    aaudio_result_t closeStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t getStreamDescription(aaudio_handle_t streamHandle,
+    aaudio_result_t getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                          AudioEndpointParcelable &parcelable) override;
 
-    aaudio_result_t startStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t startStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t pauseStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t pauseStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t stopStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t stopStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t flushStream(aaudio_handle_t streamHandle) override;
+    aaudio_result_t flushStream(const AAudioHandleInfo& streamHandleInfo) override;
 
-    aaudio_result_t registerAudioThread(aaudio_handle_t streamHandle, pid_t clientThreadId,
+    aaudio_result_t registerAudioThread(const AAudioHandleInfo& streamHandleInfo,
+                                        pid_t clientThreadId,
                                         int64_t periodNanoseconds) override;
 
-    aaudio_result_t unregisterAudioThread(aaudio_handle_t streamHandle,
+    aaudio_result_t unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                           pid_t clientThreadId) override;
 
-    aaudio_result_t startClient(aaudio_handle_t streamHandle UNUSED_PARAM,
+    aaudio_result_t startClient(const AAudioHandleInfo& streamHandleInfo UNUSED_PARAM,
                                 const AudioClient &client UNUSED_PARAM,
                                 const audio_attributes_t *attr UNUSED_PARAM,
                                 audio_port_handle_t *clientHandle UNUSED_PARAM) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    aaudio_result_t stopClient(aaudio_handle_t streamHandle UNUSED_PARAM,
+    aaudio_result_t stopClient(const AAudioHandleInfo& streamHandleInfo UNUSED_PARAM,
                                audio_port_handle_t clientHandle UNUSED_PARAM) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    aaudio_result_t exitStandby(aaudio_handle_t streamHandle UNUSED_PARAM,
+    aaudio_result_t exitStandby(const AAudioHandleInfo& streamHandleInfo UNUSED_PARAM,
                                 AudioEndpointParcelable &parcelable UNUSED_PARAM) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
@@ -247,92 +251,91 @@ void FuzzAAudioClient::dropAAudioService() {
     mAAudioService.clear();
 }
 
-aaudio_handle_t FuzzAAudioClient::openStream(const AAudioStreamRequest &request,
-                                             AAudioStreamConfiguration &configurationOutput) {
-    aaudio_handle_t stream;
+AAudioHandleInfo FuzzAAudioClient::openStream(const AAudioStreamRequest &request,
+                                              AAudioStreamConfiguration &configurationOutput) {
     for (int i = 0; i < 2; ++i) {
         AAudioServiceInterface *service = getAAudioService();
         if (!service) {
-            return AAUDIO_ERROR_NO_SERVICE;
+            return {-1, AAUDIO_ERROR_NO_SERVICE};
         }
 
-        stream = service->openStream(request, configurationOutput);
+        auto streamHandleInfo = service->openStream(request, configurationOutput);
 
-        if (stream == AAUDIO_ERROR_NO_SERVICE) {
+        if (streamHandleInfo.getHandle() == AAUDIO_ERROR_NO_SERVICE) {
             dropAAudioService();
         } else {
-            break;
+            return streamHandleInfo;
         }
     }
-    return stream;
+    return {-1, AAUDIO_ERROR_NO_SERVICE};
 }
 
-aaudio_result_t FuzzAAudioClient::closeStream(aaudio_handle_t streamHandle) {
+aaudio_result_t FuzzAAudioClient::closeStream(const AAudioHandleInfo& streamHandleInfo) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->closeStream(streamHandle);
+    return service->closeStream(streamHandleInfo);
 }
 
-aaudio_result_t FuzzAAudioClient::getStreamDescription(aaudio_handle_t streamHandle,
+aaudio_result_t FuzzAAudioClient::getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                                        AudioEndpointParcelable &parcelable) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->getStreamDescription(streamHandle, parcelable);
+    return service->getStreamDescription(streamHandleInfo, parcelable);
 }
 
-aaudio_result_t FuzzAAudioClient::startStream(aaudio_handle_t streamHandle) {
+aaudio_result_t FuzzAAudioClient::startStream(const AAudioHandleInfo& streamHandleInfo) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->startStream(streamHandle);
+    return service->startStream(streamHandleInfo);
 }
 
-aaudio_result_t FuzzAAudioClient::pauseStream(aaudio_handle_t streamHandle) {
+aaudio_result_t FuzzAAudioClient::pauseStream(const AAudioHandleInfo& streamHandleInfo) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->pauseStream(streamHandle);
+    return service->pauseStream(streamHandleInfo);
 }
 
-aaudio_result_t FuzzAAudioClient::stopStream(aaudio_handle_t streamHandle) {
+aaudio_result_t FuzzAAudioClient::stopStream(const AAudioHandleInfo& streamHandleInfo) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->stopStream(streamHandle);
+    return service->stopStream(streamHandleInfo);
 }
 
-aaudio_result_t FuzzAAudioClient::flushStream(aaudio_handle_t streamHandle) {
+aaudio_result_t FuzzAAudioClient::flushStream(const AAudioHandleInfo& streamHandleInfo) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->flushStream(streamHandle);
+    return service->flushStream(streamHandleInfo);
 }
 
-aaudio_result_t FuzzAAudioClient::registerAudioThread(aaudio_handle_t streamHandle,
+aaudio_result_t FuzzAAudioClient::registerAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                                       pid_t clientThreadId,
                                                       int64_t periodNanoseconds) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->registerAudioThread(streamHandle, clientThreadId, periodNanoseconds);
+    return service->registerAudioThread(streamHandleInfo, clientThreadId, periodNanoseconds);
 }
 
-aaudio_result_t FuzzAAudioClient::unregisterAudioThread(aaudio_handle_t streamHandle,
+aaudio_result_t FuzzAAudioClient::unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                                         pid_t clientThreadId) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->unregisterAudioThread(streamHandle, clientThreadId);
+    return service->unregisterAudioThread(streamHandleInfo, clientThreadId);
 }
 
 class OboeserviceFuzzer {
@@ -400,8 +403,15 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
 
     request.getConfiguration().setBufferCapacity(fdp.ConsumeIntegral<int32_t>());
 
-    aaudio_handle_t stream = mClient->openStream(request, configurationOutput);
-    if (stream < 0) {
+    request.getConfiguration().setHardwareSampleRate(fdp.ConsumeIntegral<int32_t>());
+    request.getConfiguration().setHardwareSamplesPerFrame(fdp.ConsumeIntegral<int32_t>());
+    request.getConfiguration().setHardwareFormat((audio_format_t)(
+        fdp.ConsumeBool()
+            ? fdp.ConsumeIntegral<int32_t>()
+            : kAAudioFormats[fdp.ConsumeIntegralInRange<int32_t>(0, kNumAAudioFormats - 1)]));
+
+    auto streamHandleInfo = mClient->openStream(request, configurationOutput);
+    if (streamHandleInfo.getHandle() < 0) {
         // invalid request, stream not opened.
         return;
     }
@@ -410,23 +420,23 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
         int action = fdp.ConsumeIntegralInRange<int32_t>(0, 4);
         switch (action) {
             case 0:
-                mClient->getStreamDescription(stream, audioEndpointParcelable);
+                mClient->getStreamDescription(streamHandleInfo, audioEndpointParcelable);
                 break;
             case 1:
-                mClient->startStream(stream);
+                mClient->startStream(streamHandleInfo);
                 break;
             case 2:
-                mClient->pauseStream(stream);
+                mClient->pauseStream(streamHandleInfo);
                 break;
             case 3:
-                mClient->stopStream(stream);
+                mClient->stopStream(streamHandleInfo);
                 break;
             case 4:
-                mClient->flushStream(stream);
+                mClient->flushStream(streamHandleInfo);
                 break;
         }
     }
-    mClient->closeStream(stream);
+    mClient->closeStream(streamHandleInfo);
     assert(mClient->getDeathCount() == 0);
 }
 

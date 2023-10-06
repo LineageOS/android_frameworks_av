@@ -55,3 +55,20 @@ cc_test {
         "-Wall",
     ],
 }
+
+cc_test {
+    name: "VideoRenderQualityTracker_test",
+    srcs: ["VideoRenderQualityTracker_test.cpp"],
+
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libstagefright",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+}

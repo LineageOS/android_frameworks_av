@@ -522,4 +522,3 @@ void OutputBufferQueue::updateMaxDequeueBufferCount(int maxDequeueBufferCount) {
 }  // namespace media
 }  // namespace hardware
 }  // namespace android
-

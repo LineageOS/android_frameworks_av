@@ -29,6 +29,9 @@ package {
 
 cc_fuzz {
     name: "oboeservice_fuzzer",
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
     srcs: [
         "oboeservice_fuzzer.cpp",
     ],

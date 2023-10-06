@@ -91,8 +91,6 @@ public:
     uint32_t mSize;            // Number of bytes of frame data
     uint32_t mIccSize;         // Number of bytes of ICC data
     uint32_t mBitDepth;        // number of bits per R / G / B channel
-
-    // Adding new items must be 64-bit aligned.
 };
 
 }; // namespace android

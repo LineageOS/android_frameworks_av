@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-#include <vector>
-#include <inttypes.h>
-#include <android/frameworks/cameraservice/service/2.0/ICameraService.h>
-#include <android/frameworks/cameraservice/device/2.0/types.h>
-#include <CameraMetadata.h>
-
-#include "ndk_vendor/impl/ACameraDevice.h"
 #include "ACameraCaptureSession.h"
 #include "ACameraMetadata.h"
 #include "ACaptureRequest.h"
 #include "utils.h"
+#include <CameraMetadata.h>
+#include <inttypes.h>
+#include <ndk_vendor/impl/ACameraDevice.h>
+#include <vector>
 
 using namespace android;
 
@@ -32,22 +29,22 @@ namespace android {
 namespace acam {
 
 template<class T>
-camera_status_t
-CameraDevice::captureLocked(
+camera_status_t CameraDevice::captureLocked(
         sp<ACameraCaptureSession> session,
         /*optional*/T* cbs,
-        int numRequests, ACaptureRequest** requests,
+        int numRequests,
+        ACaptureRequest** requests,
         /*optional*/int* captureSequenceId) {
     return submitRequestsLocked(
             session, cbs, numRequests, requests, captureSequenceId, /*isRepeating*/false);
 }
 
 template<class T>
-camera_status_t
-CameraDevice::setRepeatingRequestsLocked(
+camera_status_t CameraDevice::setRepeatingRequestsLocked(
         sp<ACameraCaptureSession> session,
         /*optional*/T* cbs,
-        int numRequests, ACaptureRequest** requests,
+        int numRequests,
+        ACaptureRequest** requests,
         /*optional*/int* captureSequenceId) {
     return submitRequestsLocked(
             session, cbs, numRequests, requests, captureSequenceId, /*isRepeating*/true);
@@ -56,11 +53,10 @@ CameraDevice::setRepeatingRequestsLocked(
 template<class T>
 camera_status_t CameraDevice::submitRequestsLocked(
         sp<ACameraCaptureSession> session,
-        /*optional*/T* cbs,
-        int numRequests, ACaptureRequest** requests,
+        /*optional*/T* cbs, int numRequests,
+        ACaptureRequest** requests,
         /*out*/int* captureSequenceId,
-        bool isRepeating)
-{
+        bool isRepeating) {
     camera_status_t ret = checkCameraClosedOrErrorLocked();
     if (ret != ACAMERA_OK) {
         ALOGE("Camera %s submit capture request failed! ret %d", getId(), ret);
@@ -68,9 +64,10 @@ camera_status_t CameraDevice::submitRequestsLocked(
     }
 
     // Form two vectors of capture request, one for internal tracking
-    std::vector<frameworks::cameraservice::device::V2_0::CaptureRequest> requestList;
-    Vector<sp<CaptureRequest>> requestsV;
-    requestsV.setCapacity(numRequests);
+
+    std::vector<::aidl::android::frameworks::cameraservice::device::CaptureRequest> requestList;
+    std::vector<sp<CaptureRequest>> requestsV;
+    requestsV.reserve(numRequests);
     for (int i = 0; i < numRequests; i++) {
         sp<CaptureRequest> req;
         ret = allocateCaptureRequestLocked(requests[i], req);
@@ -87,7 +84,7 @@ camera_status_t CameraDevice::submitRequestsLocked(
             ALOGE("Capture request without output target cannot be submitted!");
             return ACAMERA_ERROR_INVALID_PARAMETER;
         }
-        requestList.push_back(utils::convertToHidl(req.get()));
+        requestList.push_back(utils::convertToAidl(req.get()));
         requestsV.push_back(req);
     }
     if (isRepeating) {
@@ -100,18 +97,20 @@ camera_status_t CameraDevice::submitRequestsLocked(
 
     SubmitInfo info;
     Status status;
-    auto remoteRet = mRemote->submitRequestList(requestList, isRepeating,
-                                                [&status, &info](auto s, auto &submitInfo) {
-                                                    status = s;
-                                                    info = submitInfo;
-                                                });
-    if (!remoteRet.isOk()) {
-        ALOGE("%s: Transaction error for submitRequestList call: %s", __FUNCTION__,
-              remoteRet.description().c_str());
+    ndk::ScopedAStatus remoteRet = mRemote->submitRequestList(requestList, isRepeating, &info);
+        if (!remoteRet.isOk()) {
+            if (remoteRet.getExceptionCode() == EX_SERVICE_SPECIFIC) {
+            Status errStatus = static_cast<Status>(remoteRet.getServiceSpecificError());
+            ALOGE("%s: submitRequestList call failed: %s",
+                  __FUNCTION__, toString(errStatus).c_str());
+            return utils::convertFromAidl(errStatus);
+        } else {
+            ALOGE("%s: Transaction error for submitRequestList call: %d", __FUNCTION__,
+                  remoteRet.getExceptionCode());
+            return ACAMERA_ERROR_UNKNOWN;
+        }
     }
-    if (status != Status::NO_ERROR) {
-        return utils::convertFromHidl(status);
-    }
+
     int32_t sequenceId = info.requestId;
     int64_t lastFrameNumber = info.lastFrameNumber;
     if (sequenceId < 0) {

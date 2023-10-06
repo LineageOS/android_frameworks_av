@@ -36,10 +36,12 @@
 #include <utils/Log.h>
 #include <unordered_map>
 
+#include "utils/CameraServiceProxyWrapper.h"
+
 // Used to wrap the call of interest in start and stop calls
-#define WATCH(toMonitor) watchThread([&]() { return toMonitor;}, gettid())
+#define WATCH(toMonitor) watchThread([&]() { return toMonitor;}, gettid(), __FUNCTION__)
 #define WATCH_CUSTOM_TIMER(toMonitor, cycles, cycleLength) \
-        watchThread([&]() { return toMonitor;}, gettid(), cycles, cycleLength);
+        watchThread([&]() { return toMonitor;}, gettid(), __FUNCTION__, cycles, cycleLength);
 
 // Default cycles and cycle length values used to calculate permitted elapsed time
 const static size_t   kMaxCycles     = 100;
@@ -49,13 +51,24 @@ namespace android {
 
 class CameraServiceWatchdog : public Thread {
 
-public:
-    explicit CameraServiceWatchdog() : mPause(true), mMaxCycles(kMaxCycles),
-            mCycleLengthMs(kCycleLengthMs), mEnabled(true) {};
+struct MonitoredFunction {
+    uint32_t cycles;
+    std::string functionName;
+};
 
-    explicit CameraServiceWatchdog (size_t maxCycles, uint32_t cycleLengthMs, bool enabled) :
-            mPause(true), mMaxCycles(maxCycles), mCycleLengthMs(cycleLengthMs), mEnabled(enabled)
-                    {};
+public:
+    explicit CameraServiceWatchdog(const std::string &cameraId,
+            std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper) :
+                    mCameraId(cameraId), mPause(true), mMaxCycles(kMaxCycles),
+                    mCycleLengthMs(kCycleLengthMs), mEnabled(true),
+                    mCameraServiceProxyWrapper(cameraServiceProxyWrapper) {};
+
+    explicit CameraServiceWatchdog (const std::string &cameraId, size_t maxCycles,
+            uint32_t cycleLengthMs, bool enabled,
+            std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper) :
+                    mCameraId(cameraId), mPause(true), mMaxCycles(maxCycles),
+                    mCycleLengthMs(cycleLengthMs), mEnabled(enabled),
+                    mCameraServiceProxyWrapper(cameraServiceProxyWrapper) {};
 
     virtual ~CameraServiceWatchdog() {};
 
@@ -66,7 +79,8 @@ public:
 
     /** Used to wrap monitored calls in start and stop functions using custom timer values */
     template<typename T>
-    auto watchThread(T func, uint32_t tid, uint32_t cycles, uint32_t cycleLength) {
+    auto watchThread(T func, uint32_t tid, const char* functionName, uint32_t cycles,
+            uint32_t cycleLength) {
         decltype(func()) res;
 
         if (cycles != mMaxCycles || cycleLength != mCycleLengthMs) {
@@ -75,24 +89,24 @@ public:
 
             // Lock for mEnabled
             mEnabledLock.lock();
-            sp<CameraServiceWatchdog> tempWatchdog =
-                    new CameraServiceWatchdog(cycles, cycleLength, mEnabled);
+            sp<CameraServiceWatchdog> tempWatchdog = new CameraServiceWatchdog(
+                    mCameraId, cycles, cycleLength, mEnabled, mCameraServiceProxyWrapper);
             mEnabledLock.unlock();
 
             status_t status = tempWatchdog->run("CameraServiceWatchdog");
             if (status != OK) {
                 ALOGE("Unable to watch thread: %s (%d)", strerror(-status), status);
-                res = watchThread(func, tid);
+                res = watchThread(func, tid, functionName);
                 return res;
             }
 
-            res = tempWatchdog->watchThread(func, tid);
+            res = tempWatchdog->watchThread(func, tid, functionName);
             tempWatchdog->requestExit();
             tempWatchdog.clear();
         } else {
             // If custom timer values are equivalent to set class timer values, use
             // current thread
-            res = watchThread(func, tid);
+            res = watchThread(func, tid, functionName);
         }
 
         return res;
@@ -100,12 +114,12 @@ public:
 
     /** Used to wrap monitored calls in start and stop functions using class timer values */
     template<typename T>
-    auto watchThread(T func, uint32_t tid) {
+    auto watchThread(T func, uint32_t tid, const char* functionName) {
         decltype(func()) res;
         AutoMutex _l(mEnabledLock);
 
         if (mEnabled) {
-            start(tid);
+            start(tid, functionName);
             res = func();
             stop(tid);
         } else {
@@ -121,7 +135,7 @@ private:
      * Start adds a cycle counter for the calling thread. When threadloop is blocked/paused,
      * start() unblocks and starts the watchdog
      */
-    void start(uint32_t tid);
+    void start(uint32_t tid, const char* functionName);
 
     /**
      * If there are no calls left to be monitored, stop blocks/pauses threadloop
@@ -129,17 +143,24 @@ private:
      */
     void stop(uint32_t tid);
 
+    std::string getAbortMessage(const std::string& functionName);
+
     virtual bool    threadLoop();
 
     Mutex           mWatchdogLock;      // Lock for condition variable
     Mutex           mEnabledLock;       // Lock for enabled status
     Condition       mWatchdogCondition; // Condition variable for stop/start
+    std::string     mCameraId;          // Camera Id the watchdog belongs to
     bool            mPause;             // True if tid map is empty
     uint32_t        mMaxCycles;         // Max cycles
     uint32_t        mCycleLengthMs;     // Length of time elapsed per cycle
     bool            mEnabled;           // True if watchdog is enabled
 
-    std::unordered_map<uint32_t, uint32_t> tidToCycleCounterMap; // Thread Id to cycle counter map
+    std::shared_ptr<CameraServiceProxyWrapper> mCameraServiceProxyWrapper;
+
+    std::unordered_map<uint32_t, MonitoredFunction> mTidMap; // Thread Id to MonitoredFunction type
+                                                             // which retrieves the num of cycles
+                                                             // and name of the function
 };
 
 }   // namespace android
