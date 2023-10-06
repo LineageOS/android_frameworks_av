@@ -63,6 +63,9 @@ typedef C2GlobalParam<C2Info, C2Hal_Rect, 1> C2Hal_RectInfo;
 template <typename BaseBlock>
 void SetHandle(BaseBlock *baseBlock, const C2Handle *handle);
 
+template <typename BaseBlock>
+void SetAHardwareBuffer(BaseBlock *baseBlock, AHardwareBuffer *pBuf);
+
 template <typename BufferPoolTypes, typename BaseBlock>
 void SetPooledBlock(
         BaseBlock *baseBlock,
@@ -96,6 +99,31 @@ bool _addBaseBlock(
 
         BaseBlock &dBaseBlock = baseBlocks->back();
         SetHandle(&dBaseBlock, handle);
+    }
+    return true;
+}
+
+// Find or add a HAL BaseBlock object from a given AHardwareBuffer* to a list and an
+// associated map.
+template <typename BaseBlock>
+bool _addBaseBlock(
+        uint32_t* index,
+        AHardwareBuffer* pBuf,
+        std::list<BaseBlock>* baseBlocks,
+        std::map<const void*, uint32_t>* baseBlockIndices) {
+    if (!pBuf) {
+        LOG(ERROR) << "addBaseBlock called on a null AHardwareBuffer.";
+    }
+    auto it = baseBlockIndices->find(pBuf);
+    if (it != baseBlockIndices->end()) {
+        *index = it->second;
+    } else {
+        *index = baseBlocks->size();
+        baseBlockIndices->emplace(pBuf, *index);
+        baseBlocks->emplace_back();
+
+        BaseBlock &dBaseBlock = baseBlocks->back();
+        SetAHardwareBuffer(&dBaseBlock, pBuf);
     }
     return true;
 }
@@ -178,6 +206,15 @@ bool addBaseBlock(
         }
         return _addBaseBlock(
                 index, handle,
+                baseBlocks, baseBlockIndices);
+    case _C2BlockPoolData::TYPE_AHWBUFFER:
+        AHardwareBuffer *pBuf;
+        if (!_C2BlockFactory::GetAHardwareBuffer(blockPoolData, &pBuf)) {
+            LOG(ERROR) << "AHardwareBuffer unavailable in a block.";
+            return false;
+        }
+        return _addBaseBlock(
+                index, pBuf,
                 baseBlocks, baseBlockIndices);
     default:
         LOG(ERROR) << "Unknown C2BlockPoolData type.";
