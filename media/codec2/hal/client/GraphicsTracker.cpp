@@ -20,6 +20,7 @@
 #include <private/android/AHardwareBufferHelpers.h>
 #include <vndk/hardware_buffer.h>
 
+#include <C2BlockInternal.h>
 #include <codec2/aidl/GraphicsTracker.h>
 
 namespace aidl::android::hardware::media::c2::implementation {
@@ -30,10 +31,23 @@ static constexpr int kMaxDequeueMin = 1;
 static constexpr int kMaxDequeueMax = ::android::BufferQueueDefs::NUM_BUFFER_SLOTS - 2;
 
 c2_status_t retrieveAHardwareBufferId(const C2ConstGraphicBlock &blk, uint64_t *bid) {
-    // TODO
-    (void)blk;
-    (void)bid;
-    return C2_OK;
+    std::shared_ptr<const _C2BlockPoolData> bpData = _C2BlockFactory::GetGraphicBlockPoolData(blk);
+    if (bpData->getType() != _C2BlockPoolData::TYPE_AHWBUFFER) {
+        return C2_BAD_VALUE;
+    }
+    if (__builtin_available(android __ANDROID_API_T__, *)) {
+        AHardwareBuffer *pBuf;
+        if (!_C2BlockFactory::GetAHardwareBuffer(bpData, &pBuf)) {
+            return C2_CORRUPTED;
+        }
+        int ret = AHardwareBuffer_getId(pBuf, bid);
+        if (ret != ::android::OK) {
+            return C2_CORRUPTED;
+        }
+        return C2_OK;
+    } else {
+        return C2_OMITTED;
+    }
 }
 
 } // anonymous namespace
@@ -44,16 +58,18 @@ GraphicsTracker::BufferItem::BufferItem(
     if (!buf) {
         return;
     }
-    AHardwareBuffer *pBuf = AHardwareBuffer_from_GraphicBuffer(buf.get());
-    int ret = AHardwareBuffer_getId(pBuf, &mId);
-    if (ret != ::android::OK) {
-        return;
+    if (__builtin_available(android __ANDROID_API_T__, *)) {
+        AHardwareBuffer *pBuf = AHardwareBuffer_from_GraphicBuffer(buf.get());
+        int ret = AHardwareBuffer_getId(pBuf, &mId);
+        if (ret != ::android::OK) {
+            return;
+        }
+        mUsage = buf->getUsage();
+        AHardwareBuffer_acquire(pBuf);
+        mBuf = pBuf;
+        mFence = fence;
+        mInit = true;
     }
-    mUsage = buf->getUsage();
-    AHardwareBuffer_acquire(pBuf);
-    mBuf = pBuf;
-    mFence = fence;
-    mInit = true;
 }
 
 GraphicsTracker::BufferItem::BufferItem(
