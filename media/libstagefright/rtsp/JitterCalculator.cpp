@@ -47,7 +47,14 @@ void JitterCalc::putBaseData(uint32_t rtpTime, int64_t arrivalTimeUs) {
     int64_t scheduledTimeUs = ((int32_t)diff) * 1000000ll / mClockRate;
     int64_t elapsedTimeUs = arrivalTimeUs - mFirstArrivalTimeUs;
     int64_t correctionTimeUs = elapsedTimeUs - scheduledTimeUs; // additional propagation delay;
-    mBaseJitterUs = (mBaseJitterUs * 15 + correctionTimeUs) / 16;
+
+    // We want to approximate correctionTimeUs by slowly (1:15) averaging into jitter base, but
+    // both correction time and base jitter can roll over. Adjust correctionTime to be close to
+    // base jitter. Accomplish this by calculating the closest 32-bit delta (positive or
+    // negative) and applying 1/16th of it to the base jitter.
+    int32_t correctionDiff;
+    (void)__builtin_sub_overflow(correctionTimeUs, mBaseJitterUs, &correctionDiff);
+    mBaseJitterUs = int32_t(int64_t(mBaseJitterUs) + correctionDiff / 16);
     ALOGV("BaseJitterUs : %lld \t\t correctionTimeUs : %lld",
             (long long)mBaseJitterUs, (long long)correctionTimeUs);
 }
