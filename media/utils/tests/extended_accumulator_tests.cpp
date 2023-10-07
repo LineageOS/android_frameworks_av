@@ -68,10 +68,10 @@ void testPair(TestUInt prevVal, std::make_signed_t<TestUInt> delta) {
     EXPECT_EQ(result, delta);
 
     // Test overflow/underflow event reporting.
-    if (next < base) EXPECT_EQ(TestDetect::Wrap::UNDERFLOW, status);
+    if (next < base) EXPECT_EQ(TestDetect::Wrap::Underflow, status);
     else if (next > base + std::numeric_limits<TestUInt>::max())
-        EXPECT_EQ(TestDetect::Wrap::OVERFLOW, status);
-    else EXPECT_EQ(TestDetect::Wrap::NORMAL, status);
+        EXPECT_EQ(TestDetect::Wrap::Overflow, status);
+    else EXPECT_EQ(TestDetect::Wrap::Normal, status);
 }
 
 // Test this utility on every combination of prior and update value for the

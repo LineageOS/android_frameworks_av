@@ -115,6 +115,12 @@ bool FromAidl(
         std::list<std::unique_ptr<C2Work>>* d,
         const WorkBundle& s);
 
+// Return the ownership of output blocks to the client if it is originally
+// created from the client, after C2Work is returned to the client.
+// (e.g. C2BqPool / C2IgbaBlockPool)
+void ReturnOutputBlocksToClientIfNeeded(
+        const std::list<std::unique_ptr<C2Work>>& workList);
+
 /**
  * Converts a BufferPool status value to c2_status_t.
  * \param BufferPool status
