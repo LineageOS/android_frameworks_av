@@ -255,6 +255,26 @@ public:
 
 class IAfPlaybackThread : public virtual IAfThreadBase, public virtual VolumeInterface {
 public:
+    static sp<IAfPlaybackThread> createBitPerfectThread(
+            const sp<AudioFlinger>& audioflinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady);
+
+    static sp<IAfPlaybackThread> createDirectOutputThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, const audio_offload_info_t& offloadInfo);
+
+    static sp<IAfPlaybackThread> createMixerThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, type_t type = MIXER, audio_config_base_t* mixerConfig = nullptr);
+
+    static sp<IAfPlaybackThread> createOffloadThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, const audio_offload_info_t& offloadInfo);
+
+    static sp<IAfPlaybackThread> createSpatializerThread(
+            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
+            bool systemReady, audio_config_base_t* mixerConfig);
+
     static constexpr int8_t kMaxTrackStopRetriesOffload = 2;
 
     enum mixer_state {
@@ -367,6 +387,10 @@ public:
 
 class IAfDuplicatingThread : public virtual IAfPlaybackThread {
 public:
+    static sp<IAfDuplicatingThread> create(
+            const sp<AudioFlinger>& audioFlinger, IAfPlaybackThread* mainThread,
+            audio_io_handle_t id, bool systemReady);
+
     virtual void addOutputTrack(IAfPlaybackThread* thread) = 0;
     virtual uint32_t waitTimeMs() const = 0;
     virtual void removeOutputTrack(IAfPlaybackThread* thread) = 0;
@@ -474,11 +498,19 @@ public:
 
 class IAfMmapPlaybackThread : public virtual IAfMmapThread, public virtual VolumeInterface {
 public:
+    static sp<IAfMmapPlaybackThread> create(
+            const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id, AudioHwDevice* hwDev,
+            AudioStreamOut* output, bool systemReady);
+
     virtual AudioStreamOut* clearOutput() = 0;
 };
 
 class IAfMmapCaptureThread : public virtual IAfMmapThread {
 public:
+    static sp<IAfMmapCaptureThread> create(
+            const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id, AudioHwDevice* hwDev,
+            AudioStreamIn* input, bool systemReady);
+
     virtual AudioStreamIn* clearInput() = 0;
 };
 

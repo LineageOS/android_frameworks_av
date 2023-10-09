@@ -640,7 +640,7 @@ void OpPlayAudioMonitor::checkPlayAudioForUsage(bool doBroadcast)
         ALOGD("OpPlayAudio: track:%d usage:%d %smuted", mId, mUsage, hasAppOps ? "not " : "");
         if (doBroadcast) {
             auto thread = mThread.promote();
-            if (thread != nullptr && thread->type() == AudioFlinger::ThreadBase::OFFLOAD) {
+            if (thread != nullptr && thread->type() == IAfThreadBase::OFFLOAD) {
                 // Wake up Thread if offloaded, otherwise it may be several seconds for update.
                 Mutex::Autolock _l(thread->mutex());
                 thread->broadcast_l();

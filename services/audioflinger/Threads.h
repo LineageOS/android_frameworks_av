@@ -15,11 +15,9 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
 
-public: // TODO(b/288339104) extract out of AudioFlinger class
+namespace android {
 
 class AsyncCallbackThread;
 
@@ -859,15 +857,18 @@ protected:
     virtual     void        onDrainReady();
     virtual     void        onError();
 
+public: // AsyncCallbackThread
                 void        resetWriteBlocked(uint32_t sequence);
                 void        resetDraining(uint32_t sequence);
+protected:
 
     virtual     bool        waitingAsyncCallback();
     virtual     bool        waitingAsyncCallback_l();
     virtual     bool        shouldStandby_l();
     virtual     void        onAddNewTrack_l();
+public:  // AsyncCallbackThread
                 void        onAsyncError(); // error reported by AsyncCallbackThread
-
+protected:
     // StreamHalInterfaceCodecFormatCallback implementation
                 void        onCodecFormatChanged(
             const std::basic_string<uint8_t>& metadataBs) final;
@@ -1183,7 +1184,6 @@ protected:
 
     audio_channel_mask_t            mMixerChannelMask = AUDIO_CHANNEL_NONE;
 
-private:
     // mMasterMute is in both PlaybackThread and in AudioFlinger.  When a
     // PlaybackThread needs to find out if master-muted, it checks it's local
     // copy rather than the one in AudioFlinger.  This optimization saves a lock.
@@ -1197,7 +1197,6 @@ private:
                             : mTimestampVerifier.DISCONTINUITY_MODE_CONTINUOUS;
                 }
 
-protected:
     ActiveTracks<IAfTrack> mActiveTracks;
 
     // Time to sleep between cycles when:
@@ -1236,8 +1235,6 @@ protected:
     audio_session_t sessionId) const override {
                                 ThreadBase::invalidateTracksForAudioSession_l(sessionId, mTracks);
                             }
-
-private:
 
     friend class AudioFlinger;      // for numerous
 
@@ -1307,6 +1304,7 @@ private:
     Tracks<IAfTrack>                   mTracks;
 
     stream_type_t                   mStreamTypes[AUDIO_STREAM_CNT];
+
     AudioStreamOut                  *mOutput;
 
     float                           mMasterVolume;
@@ -1361,19 +1359,20 @@ private:
     // Bit 0 is reset by the async callback thread calling resetDraining(). Out of sequence
     // callbacks are ignored.
     uint32_t                        mDrainSequence;
+
     sp<AsyncCallbackThread>         mCallbackThread;
 
     Mutex                                    mAudioTrackCbLock;
     // Record of IAudioTrackCallback
     std::map<sp<IAfTrack>, sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
-private:
     // The HAL output sink is treated as non-blocking, but current implementation is blocking
     sp<NBAIO_Sink>          mOutputSink;
     // If a fast mixer is present, the blocking pipe sink, otherwise clear
     sp<NBAIO_Sink>          mPipeSink;
     // The current sink for the normal mixer to write it's (sub)mix, mOutputSink or mPipeSink
     sp<NBAIO_Sink>          mNormalSink;
+
     uint32_t                mScreenState;   // cached copy of gScreenState
     // TODO: add comment and adjust size as needed
     static const size_t     kFastMixerLogSize = 8 * 1024;
@@ -1686,10 +1685,7 @@ private:
 
 class AsyncCallbackThread : public Thread {
 public:
-
     explicit AsyncCallbackThread(const wp<PlaybackThread>& playbackThread);
-
-    virtual             ~AsyncCallbackThread();
 
     // Thread virtuals
     virtual bool        threadLoop();
@@ -2049,7 +2045,6 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
     MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
                AudioHwDevice *hwDev, const sp<StreamHalInterface>& stream, bool systemReady,
                bool isOut);
-    ~MmapThread() override;
 
     void configure(const audio_attributes_t* attr,
                                       audio_stream_type_t streamType,
@@ -2279,4 +2274,4 @@ private:
     float mVolumeRight = 0.f;
 };
 
-private:
+} // namespace android
