@@ -126,8 +126,6 @@ static constexpr char kNoEffectsFactory[] = "Effects Factory is absent\n";
 
 static constexpr char kAudioServiceName[] = "audio";
 
-nsecs_t AudioFlinger::mStandbyTimeInNsecs = kDefaultStandbyTimeInNsecs;
-
 // In order to avoid invalidating offloaded tracks each time a Visualizer is turned on and off
 // we define a minimum time during which a global effect is considered enabled.
 static const nsecs_t kMinGlobalEffectEnabletimeNs = seconds(7200);
@@ -342,20 +340,6 @@ AudioFlinger::AudioFlinger()
 void AudioFlinger::onFirstRef()
 {
     Mutex::Autolock _l(mLock);
-
-    /* TODO: move all this work into an Init() function */
-    char val_str[PROPERTY_VALUE_MAX] = { 0 };
-    if (property_get("ro.audio.flinger_standbytime_ms", val_str, NULL) >= 0) {
-        uint32_t int_val;
-        if (1 == sscanf(val_str, "%u", &int_val)) {
-            mStandbyTimeInNsecs = milliseconds(int_val);
-            ALOGI("Using %u mSec as standby time.", int_val);
-        } else {
-            mStandbyTimeInNsecs = kDefaultStandbyTimeInNsecs;
-            ALOGI("Using default %u mSec as standby time.",
-                    (uint32_t)(mStandbyTimeInNsecs / 1000000));
-        }
-    }
 
     mMode = AUDIO_MODE_NORMAL;
 
@@ -760,10 +744,7 @@ void AudioFlinger::dumpInternals(int fd, const Vector<String16>& args __unused)
     String8 result;
     hardware_call_state hardwareStatus = mHardwareStatus;
 
-    snprintf(buffer, SIZE, "Hardware status: %d\n"
-                           "Standby Time mSec: %u\n",
-                            hardwareStatus,
-                            (uint32_t)(mStandbyTimeInNsecs / 1000000));
+    snprintf(buffer, SIZE, "Hardware status: %d\n", hardwareStatus);
     result.append(buffer);
     write(fd, result.c_str(), result.size());
 
