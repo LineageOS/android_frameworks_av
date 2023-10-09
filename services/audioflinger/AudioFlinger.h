@@ -102,6 +102,7 @@
 #include <datapath/SpdifStreamOut.h>
 #include <datapath/ThreadMetrics.h>
 #include <datapath/TrackMetrics.h>
+#include <datapath/VolumeInterface.h>
 #include <fastpath/FastCapture.h>
 #include <fastpath/FastMixer.h>
 #include <media/nbaio/NBAIO.h>
@@ -654,8 +655,8 @@ private:
               MixerThread *checkMixerThread_l(audio_io_handle_t output) const;
               RecordThread *checkRecordThread_l(audio_io_handle_t input) const;
               MmapThread *checkMmapThread_l(audio_io_handle_t io) const;
-              VolumeInterface *getVolumeInterface_l(audio_io_handle_t output) const;
-              Vector <VolumeInterface *> getAllVolumeInterfaces_l() const;
+              sp<VolumeInterface> getVolumeInterface_l(audio_io_handle_t output) const;
+              std::vector<sp<VolumeInterface>> getAllVolumeInterfaces_l() const;
 
               sp<ThreadBase> openInput_l(audio_module_handle_t module,
                                            audio_io_handle_t *input,

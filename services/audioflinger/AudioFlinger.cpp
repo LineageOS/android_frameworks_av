@@ -1585,7 +1585,7 @@ status_t AudioFlinger::setMasterMute(bool muted)
     // assigned to HALs which do not have master mute support will apply master mute
     // during the mix operation.  Threads with HALs which do support master mute
     // will simply ignore the setting.
-    Vector<VolumeInterface *> volumeInterfaces = getAllVolumeInterfaces_l();
+    std::vector<sp<VolumeInterface>> volumeInterfaces = getAllVolumeInterfaces_l();
     for (size_t i = 0; i < volumeInterfaces.size(); i++) {
         volumeInterfaces[i]->setMasterMute(muted);
     }
@@ -1661,7 +1661,7 @@ status_t AudioFlinger::setStreamVolume(audio_stream_type_t stream, float value,
                         "AUDIO_STREAM_PATCH must have full scale volume");
 
     AutoMutex lock(mLock);
-    VolumeInterface *volumeInterface = getVolumeInterface_l(output);
+    sp<VolumeInterface> volumeInterface = getVolumeInterface_l(output);
     if (volumeInterface == NULL) {
         return BAD_VALUE;
     }
@@ -1764,7 +1764,7 @@ status_t AudioFlinger::setStreamMute(audio_stream_type_t stream, bool muted)
 
     AutoMutex lock(mLock);
     mStreamTypes[stream].mute = muted;
-    Vector<VolumeInterface *> volumeInterfaces = getAllVolumeInterfaces_l();
+    std::vector<sp<VolumeInterface>> volumeInterfaces = getAllVolumeInterfaces_l();
     for (size_t i = 0; i < volumeInterfaces.size(); i++) {
         volumeInterfaces[i]->setStreamMute(stream, muted);
     }
@@ -1783,7 +1783,7 @@ float AudioFlinger::streamVolume(audio_stream_type_t stream, audio_io_handle_t o
     }
 
     AutoMutex lock(mLock);
-    VolumeInterface *volumeInterface = getVolumeInterface_l(output);
+    sp<VolumeInterface> volumeInterface = getVolumeInterface_l(output);
     if (volumeInterface == NULL) {
         return 0.0f;
     }
@@ -3786,9 +3786,9 @@ AudioFlinger::MmapThread *AudioFlinger::checkMmapThread_l(audio_io_handle_t io) 
 
 
 // checkPlaybackThread_l() must be called with AudioFlinger::mLock held
-AudioFlinger::VolumeInterface *AudioFlinger::getVolumeInterface_l(audio_io_handle_t output) const
+sp<VolumeInterface> AudioFlinger::getVolumeInterface_l(audio_io_handle_t output) const
 {
-    VolumeInterface *volumeInterface = mPlaybackThreads.valueFor(output).get();
+    sp<VolumeInterface> volumeInterface = mPlaybackThreads.valueFor(output).get();
     if (volumeInterface == nullptr) {
         MmapThread *mmapThread = mMmapThreads.valueFor(output).get();
         if (mmapThread != nullptr) {
@@ -3802,17 +3802,17 @@ AudioFlinger::VolumeInterface *AudioFlinger::getVolumeInterface_l(audio_io_handl
     return volumeInterface;
 }
 
-Vector <AudioFlinger::VolumeInterface *> AudioFlinger::getAllVolumeInterfaces_l() const
+std::vector<sp<VolumeInterface>> AudioFlinger::getAllVolumeInterfaces_l() const
 {
-    Vector <VolumeInterface *> volumeInterfaces;
+    std::vector<sp<VolumeInterface>> volumeInterfaces;
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        volumeInterfaces.add(mPlaybackThreads.valueAt(i).get());
+        volumeInterfaces.push_back(mPlaybackThreads.valueAt(i).get());
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
         if (mMmapThreads.valueAt(i)->isOutput()) {
             MmapPlaybackThread *mmapPlaybackThread =
                     static_cast<MmapPlaybackThread *>(mMmapThreads.valueAt(i).get());
-            volumeInterfaces.add(mmapPlaybackThread);
+            volumeInterfaces.push_back(mmapPlaybackThread);
         }
     }
     return volumeInterfaces;

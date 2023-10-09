@@ -848,19 +848,6 @@ private:
                 void dumpEffectChains_l(int fd, const Vector<String16>& args);
 };
 
-class VolumeInterface {
- public:
-
-    virtual ~VolumeInterface() {}
-
-    virtual void        setMasterVolume(float value) = 0;
-    virtual void        setMasterMute(bool muted) = 0;
-    virtual void        setStreamVolume(audio_stream_type_t stream, float value) = 0;
-    virtual void        setStreamMute(audio_stream_type_t stream, bool muted) = 0;
-    virtual float       streamVolume(audio_stream_type_t stream) const = 0;
-
-};
-
 // --- PlaybackThread ---
 class PlaybackThread : public ThreadBase, public StreamOutHalInterfaceCallback,
                        public VolumeInterface, public StreamOutHalInterfaceEventCallback {
