@@ -16,15 +16,20 @@
 
 #pragma once
 
+// The following includes are required because we have class definitions below
+// for EndPoint and Patch, which precludes using a forward declaration only.
+#include "IAfThread.h"  // IAfThreadBase IAfMmapThread IAfPlaybackThread IAfRecordThread
+#include "IAfTrack.h"   // IAfPatchRecord IAfPatchTrack
+
+#include <datapath/AudioHwDevice.h>
+#include <media/DeviceDescriptorBase.h>
+#include <utils/Log.h>      // ALOG used in this file
+#include <utils/RefBase.h>  // avoid transitive dependency
+#include <utils/Thread.h>
+
 namespace android {
 
-class IAfMmapThread;
 class IAfPatchPanel;
-class IAfPatchRecord;
-class IAfPatchTrack;
-class IAfPlaybackThread;
-class IAfRecordThread;
-class IAfThreadBase;
 class PatchCommandThread;
 
 class SoftwarePatch {

@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "AudioHwDevice.h"
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
 
