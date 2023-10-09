@@ -18,11 +18,17 @@
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="false" />
         <option name="push-file" key="{MODULE}" value="/data/local/tmp/{MODULE}" />
-        <option name="push-file"
-            key="https://dl.google.com/android-unittest/media/frameworks/av/media/module/libmediatranscoding/transcoder/benchmark/TranscodingBenchmark-1.2.zip?unzip=true"
-            value="/data/local/tmp/TranscodingBenchmark/" />
     </target_preparer>
-
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="target" value="host" />
+        <option name="config-filename" value="{MODULE}" />
+        <option name="version" value="1.0"/>
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.MediaPreparer">
+        <option name="push-all" value="true" />
+        <option name="media-folder-name" value="TranscodingBenchmark-1.2" />
+        <option name="dynamic-config-module" value="{MODULE}" />
+    </target_preparer>
     <test class="com.android.tradefed.testtype.GoogleBenchmarkTest" >
         <option name="native-benchmark-device-path" value="/data/local/tmp" />
         <option name="benchmark-module-name" value="{MODULE}" />
