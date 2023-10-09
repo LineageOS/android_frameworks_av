@@ -582,13 +582,6 @@ private:
     // Requests media.log to start merging log buffers
     void requestLogMerge();
 
-    // TODO(b/288339104) replace these forward declaration classes with interfaces.
-private:
-    struct TeePatch;
-public:
-    using TeePatches = std::vector<TeePatch>;
-private:
-
     // Find io handle by session id.
     // Preference is given to an io handle with a matching effect chain to session id.
     // If none found, AUDIO_IO_HANDLE_NONE is returned.
@@ -721,11 +714,6 @@ private:
                 void forwardParametersToDownstreamPatches_l(
                         audio_io_handle_t upStream, const String8& keyValuePairs,
             const std::function<bool(const sp<IAfPlaybackThread>&)>& useThread = nullptr);
-
-    struct TeePatch {
-        sp<IAfPatchRecord> patchRecord;
-        sp<IAfPatchTrack> patchTrack;
-    };
 
     // for mAudioSessionRefs only
     struct AudioSessionRef {
