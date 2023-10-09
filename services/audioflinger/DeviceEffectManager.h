@@ -17,6 +17,11 @@
 
 #pragma once
 
+#include "IAfEffect.h"
+#include "PatchCommandThread.h"
+
+#include <utils/Mutex.h>  // avoid transitive dependency
+
 namespace android {
 
 class IAfDeviceEffectManagerCallback : public virtual RefBase {

@@ -15,16 +15,17 @@
 ** limitations under the License.
 */
 
-
 #define LOG_TAG "DeviceEffectManager"
 //#define LOG_NDEBUG 0
 
-#include <utils/Log.h>
-#include <audio_utils/primitives.h>
+#include "DeviceEffectManager.h"
 
-#include "AudioFlinger.h"
 #include "EffectConfiguration.h"
+
+#include <afutils/DumpTryLock.h>
+#include <audio_utils/primitives.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <utils/Log.h>
 
 // ----------------------------------------------------------------------------
 
@@ -172,7 +173,7 @@ status_t DeviceEffectManager::createEffectHal(
 void DeviceEffectManager::dump(int fd)
 NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 {
-    const bool locked = AudioFlinger::dumpTryLock(mLock);
+    const bool locked = afutils::dumpTryLock(mLock);
     if (!locked) {
         String8 result("DeviceEffectManager may be deadlocked\n");
         write(fd, result.c_str(), result.size());
