@@ -42,6 +42,7 @@ cc_library {
         "Permission.cpp",
         "PropertyUtils.cpp",
         "TypedLogger.cpp",
+        "Vibrator.cpp",
     ],
 
     shared_libs: [
@@ -55,6 +56,7 @@ cc_library {
         "libnbaio",
         "libnblog",
         "libutils",
+        "libvibrator",
     ],
 
     static_libs: [

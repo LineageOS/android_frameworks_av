@@ -480,11 +480,6 @@ public:
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);
-
-    static os::HapticScale onExternalVibrationStart(
-        const sp<os::ExternalVibration>& externalVibration);
-    static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
-
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
     static const size_t kLogMemorySize = 400 * 1024;
