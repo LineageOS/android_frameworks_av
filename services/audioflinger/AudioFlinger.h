@@ -122,6 +122,9 @@
 #include "Client.h"
 #include "ResamplerBufferProvider.h"
 
+// TODO(b/291319167) remove me when AudioFlinger class not directly used by subcomponents
+namespace android { class AudioFlinger; }
+
 // include AudioFlinger component interfaces
 #include "IAfPatchPanel.h"  // this should be listed before other IAf* interfaces.
 #include "IAfEffect.h"
@@ -160,10 +163,10 @@ struct stream_type_t {
 
 class AudioFlinger
     : public AudioFlingerServerAdapter::Delegate  // IAudioFlinger client interface
+    , public IAfClientCallback
 {
     friend class sp<AudioFlinger>;
     // TODO(b/291319167) Create interface and remove friends.
-    friend class Client; // removeClient_l();
     friend class DeviceEffectManager;
     friend class DeviceEffectManagerCallback;
     friend class MelReporter;
@@ -356,6 +359,18 @@ public:
             const std::function<status_t()>& delegate) final;
 
     // ---- end of IAudioFlinger interface
+
+    // ---- begin IAfClientCallback interface
+
+    Mutex& clientMutex() const final { return mClientLock; }
+    void removeClient_l(pid_t pid) final;
+    void removeNotificationClient(pid_t pid) final;
+    status_t moveAuxEffectToIo(
+            int effectId,
+            const sp<IAfPlaybackThread>& dstThread,
+            sp<IAfPlaybackThread>* srcThread) final;
+
+    // ---- end of IAfClientCallback interface
 
     bool isAudioPolicyReady() const { return mAudioPolicyReady.load(); }
 
@@ -654,12 +669,6 @@ private:
               status_t moveEffectChain_l(audio_session_t sessionId,
             IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread);
 
-public:
-    // TODO(b/291319167) cluster together
-              status_t moveAuxEffectToIo(int EffectId,
-            const sp<IAfPlaybackThread>& dstThread, sp<IAfPlaybackThread>* srcThread);
-private:
-
               // return thread associated with primary hardware device, or NULL
               IAfPlaybackThread* primaryPlaybackThread_l() const;
               DeviceTypeSet primaryOutputDevice_l() const;
@@ -676,9 +685,6 @@ private:
                       IAfPlaybackThread* thread,
                       const std::vector<audio_io_handle_t>& secondaryOutputs) const;
 
-
-                void        removeClient_l(pid_t pid);
-                void        removeNotificationClient(pid_t pid);
 public:
     // TODO(b/291319167) cluster together
                 bool isNonOffloadableGlobalEffectEnabled_l();
@@ -730,9 +736,9 @@ public:
                 // must be locked after mLock and ThreadBase::mLock if both must be locked
                 // avoids acquiring AudioFlinger::mLock from inside thread loop.
 
-    // TODO(b/291319167) access by getter,
-    mutable     Mutex                               mClientLock;
 private:
+    mutable Mutex mClientLock;
+
                 // protected by mClientLock
                 DefaultKeyedVector< pid_t, wp<Client> >     mClients;   // see ~Client()
 
