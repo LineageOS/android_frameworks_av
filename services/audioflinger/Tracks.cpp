@@ -337,14 +337,60 @@ void AudioFlinger::ThreadBase::PatchTrackBase::setPeerTimeout(std::chrono::nanos
 #undef LOG_TAG
 #define LOG_TAG "AF::TrackHandle"
 
-AudioFlinger::TrackHandle::TrackHandle(const sp<AudioFlinger::PlaybackThread::Track>& track)
+class TrackHandle : public android::media::BnAudioTrack {
+public:
+    explicit TrackHandle(const sp<AudioFlinger::PlaybackThread::Track>& track);
+    ~TrackHandle() override;
+
+    binder::Status getCblk(std::optional<media::SharedFileRegion>* _aidl_return) final;
+    binder::Status start(int32_t* _aidl_return) final;
+    binder::Status stop() final;
+    binder::Status flush() final;
+    binder::Status pause() final;
+    binder::Status attachAuxEffect(int32_t effectId, int32_t* _aidl_return) final;
+    binder::Status setParameters(const std::string& keyValuePairs,
+                                 int32_t* _aidl_return) final;
+    binder::Status selectPresentation(int32_t presentationId, int32_t programId,
+                                      int32_t* _aidl_return) final;
+    binder::Status getTimestamp(media::AudioTimestampInternal* timestamp,
+                                int32_t* _aidl_return) final;
+    binder::Status signal() final;
+    binder::Status applyVolumeShaper(const media::VolumeShaperConfiguration& configuration,
+                                     const media::VolumeShaperOperation& operation,
+                                     int32_t* _aidl_return) final;
+    binder::Status getVolumeShaperState(
+            int32_t id,
+            std::optional<media::VolumeShaperState>* _aidl_return) final;
+    binder::Status getDualMonoMode(
+            media::audio::common::AudioDualMonoMode* _aidl_return) final;
+    binder::Status setDualMonoMode(
+            media::audio::common::AudioDualMonoMode mode) final;
+    binder::Status getAudioDescriptionMixLevel(float* _aidl_return) final;
+    binder::Status setAudioDescriptionMixLevel(float leveldB) final;
+    binder::Status getPlaybackRateParameters(
+            media::audio::common::AudioPlaybackRate* _aidl_return) final;
+    binder::Status setPlaybackRateParameters(
+            const media::audio::common::AudioPlaybackRate& playbackRate) final;
+
+private:
+    const sp<AudioFlinger::PlaybackThread::Track> mTrack;
+};
+
+/* static */
+sp<media::IAudioTrack> AudioFlinger::PlaybackThread::Track::createIAudioTrackAdapter(
+        const sp<Track>& track) {
+    return sp<TrackHandle>::make(track);
+}
+
+TrackHandle::TrackHandle(const sp<AudioFlinger::PlaybackThread::Track>& track)
     : BnAudioTrack(),
       mTrack(track)
 {
+    // TODO(b/288339104) binder thread priority change not needed.
     setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
-AudioFlinger::TrackHandle::~TrackHandle() {
+TrackHandle::~TrackHandle() {
     // just stop the track on deletion, associated resources
     // will be freed from the main thread once all pending buffers have
     // been played. Unless it's not in the active track list, in which
@@ -352,51 +398,51 @@ AudioFlinger::TrackHandle::~TrackHandle() {
     mTrack->destroy();
 }
 
-Status AudioFlinger::TrackHandle::getCblk(
+Status TrackHandle::getCblk(
         std::optional<media::SharedFileRegion>* _aidl_return) {
     *_aidl_return = legacy2aidl_NullableIMemory_SharedFileRegion(mTrack->getCblk()).value();
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::start(int32_t* _aidl_return) {
+Status TrackHandle::start(int32_t* _aidl_return) {
     *_aidl_return = mTrack->start();
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::stop() {
+Status TrackHandle::stop() {
     mTrack->stop();
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::flush() {
+Status TrackHandle::flush() {
     mTrack->flush();
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::pause() {
+Status TrackHandle::pause() {
     mTrack->pause();
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::attachAuxEffect(int32_t effectId,
+Status TrackHandle::attachAuxEffect(int32_t effectId,
                                                   int32_t* _aidl_return) {
     *_aidl_return = mTrack->attachAuxEffect(effectId);
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::setParameters(const std::string& keyValuePairs,
+Status TrackHandle::setParameters(const std::string& keyValuePairs,
                                                 int32_t* _aidl_return) {
     *_aidl_return = mTrack->setParameters(String8(keyValuePairs.c_str()));
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::selectPresentation(int32_t presentationId, int32_t programId,
+Status TrackHandle::selectPresentation(int32_t presentationId, int32_t programId,
                                                      int32_t* _aidl_return) {
     *_aidl_return = mTrack->selectPresentation(presentationId, programId);
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::getTimestamp(media::AudioTimestampInternal* timestamp,
+Status TrackHandle::getTimestamp(media::AudioTimestampInternal* timestamp,
                                                int32_t* _aidl_return) {
     AudioTimestamp legacy;
     *_aidl_return = mTrack->getTimestamp(legacy);
@@ -407,12 +453,12 @@ Status AudioFlinger::TrackHandle::getTimestamp(media::AudioTimestampInternal* ti
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::signal() {
+Status TrackHandle::signal() {
     mTrack->signal();
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::applyVolumeShaper(
+Status TrackHandle::applyVolumeShaper(
         const media::VolumeShaperConfiguration& configuration,
         const media::VolumeShaperOperation& operation,
         int32_t* _aidl_return) {
@@ -432,7 +478,7 @@ Status AudioFlinger::TrackHandle::applyVolumeShaper(
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::getVolumeShaperState(
+Status TrackHandle::getVolumeShaperState(
         int32_t id,
         std::optional<media::VolumeShaperState>* _aidl_return) {
     sp<VolumeShaper::State> legacy = mTrack->getVolumeShaperState(id);
@@ -446,7 +492,7 @@ Status AudioFlinger::TrackHandle::getVolumeShaperState(
     return Status::ok();
 }
 
-Status AudioFlinger::TrackHandle::getDualMonoMode(
+Status TrackHandle::getDualMonoMode(
         media::audio::common::AudioDualMonoMode* _aidl_return)
 {
     audio_dual_mono_mode_t mode = AUDIO_DUAL_MONO_MODE_OFF;
@@ -459,7 +505,7 @@ Status AudioFlinger::TrackHandle::getDualMonoMode(
     return binderStatusFromStatusT(status);
 }
 
-Status AudioFlinger::TrackHandle::setDualMonoMode(
+Status TrackHandle::setDualMonoMode(
         media::audio::common::AudioDualMonoMode mode)
 {
     const auto localMonoMode = VALUE_OR_RETURN_BINDER_STATUS(
@@ -468,7 +514,7 @@ Status AudioFlinger::TrackHandle::setDualMonoMode(
             ?: mTrack->setDualMonoMode(localMonoMode));
 }
 
-Status AudioFlinger::TrackHandle::getAudioDescriptionMixLevel(float* _aidl_return)
+Status TrackHandle::getAudioDescriptionMixLevel(float* _aidl_return)
 {
     float leveldB = -std::numeric_limits<float>::infinity();
     const status_t status = mTrack->getAudioDescriptionMixLevel(&leveldB)
@@ -477,13 +523,13 @@ Status AudioFlinger::TrackHandle::getAudioDescriptionMixLevel(float* _aidl_retur
     return binderStatusFromStatusT(status);
 }
 
-Status AudioFlinger::TrackHandle::setAudioDescriptionMixLevel(float leveldB)
+Status TrackHandle::setAudioDescriptionMixLevel(float leveldB)
 {
     return binderStatusFromStatusT(AudioValidator::validateAudioDescriptionMixLevel(leveldB)
              ?: mTrack->setAudioDescriptionMixLevel(leveldB));
 }
 
-Status AudioFlinger::TrackHandle::getPlaybackRateParameters(
+Status TrackHandle::getPlaybackRateParameters(
         media::audio::common::AudioPlaybackRate* _aidl_return)
 {
     audio_playback_rate_t localPlaybackRate{};
@@ -496,7 +542,7 @@ Status AudioFlinger::TrackHandle::getPlaybackRateParameters(
     return binderStatusFromStatusT(status);
 }
 
-Status AudioFlinger::TrackHandle::setPlaybackRateParameters(
+Status TrackHandle::setPlaybackRateParameters(
         const media::audio::common::AudioPlaybackRate& playbackRate)
 {
     const audio_playback_rate_t localPlaybackRate = VALUE_OR_RETURN_BINDER_STATUS(
@@ -2435,55 +2481,84 @@ void AudioFlinger::PlaybackThread::PatchTrack::restartIfDisabled()
 #undef LOG_TAG
 #define LOG_TAG "AF::RecordHandle"
 
-AudioFlinger::RecordHandle::RecordHandle(
+class RecordHandle : public android::media::BnAudioRecord {
+public:
+    explicit RecordHandle(const sp<AudioFlinger::RecordThread::RecordTrack>& recordTrack);
+    ~RecordHandle() override;
+    binder::Status start(int /*AudioSystem::sync_event_t*/ event,
+            int /*audio_session_t*/ triggerSession) final;
+    binder::Status stop() final;
+    binder::Status getActiveMicrophones(
+            std::vector<media::MicrophoneInfoFw>* activeMicrophones) final;
+    binder::Status setPreferredMicrophoneDirection(
+            int /*audio_microphone_direction_t*/ direction) final;
+    binder::Status setPreferredMicrophoneFieldDimension(float zoom) final;
+    binder::Status shareAudioHistory(
+            const std::string& sharedAudioPackageName, int64_t sharedAudioStartMs) final;
+
+private:
+    const sp<AudioFlinger::RecordThread::RecordTrack> mRecordTrack;
+
+    // for use from destructor
+    void stop_nonvirtual();
+};
+
+/* static */
+sp<media::IAudioRecord> AudioFlinger::RecordThread::RecordTrack::createIAudioRecordAdapter(
+        const sp<RecordTrack>& recordTrack) {
+    return sp<RecordHandle>::make(recordTrack);
+}
+
+RecordHandle::RecordHandle(
         const sp<AudioFlinger::RecordThread::RecordTrack>& recordTrack)
     : BnAudioRecord(),
     mRecordTrack(recordTrack)
 {
+    // TODO(b/288339104) binder thread priority change not needed.
     setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
-AudioFlinger::RecordHandle::~RecordHandle() {
+RecordHandle::~RecordHandle() {
     stop_nonvirtual();
     mRecordTrack->destroy();
 }
 
-binder::Status AudioFlinger::RecordHandle::start(int /*AudioSystem::sync_event_t*/ event,
+binder::Status RecordHandle::start(int /*AudioSystem::sync_event_t*/ event,
         int /*audio_session_t*/ triggerSession) {
     ALOGV("%s()", __func__);
     return binderStatusFromStatusT(
         mRecordTrack->start((AudioSystem::sync_event_t)event, (audio_session_t) triggerSession));
 }
 
-binder::Status AudioFlinger::RecordHandle::stop() {
+binder::Status RecordHandle::stop() {
     stop_nonvirtual();
     return binder::Status::ok();
 }
 
-void AudioFlinger::RecordHandle::stop_nonvirtual() {
+void RecordHandle::stop_nonvirtual() {
     ALOGV("%s()", __func__);
     mRecordTrack->stop();
 }
 
-binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
+binder::Status RecordHandle::getActiveMicrophones(
         std::vector<media::MicrophoneInfoFw>* activeMicrophones) {
     ALOGV("%s()", __func__);
     return binderStatusFromStatusT(mRecordTrack->getActiveMicrophones(activeMicrophones));
 }
 
-binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneDirection(
+binder::Status RecordHandle::setPreferredMicrophoneDirection(
         int /*audio_microphone_direction_t*/ direction) {
     ALOGV("%s()", __func__);
     return binderStatusFromStatusT(mRecordTrack->setPreferredMicrophoneDirection(
             static_cast<audio_microphone_direction_t>(direction)));
 }
 
-binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneFieldDimension(float zoom) {
+binder::Status RecordHandle::setPreferredMicrophoneFieldDimension(float zoom) {
     ALOGV("%s()", __func__);
     return binderStatusFromStatusT(mRecordTrack->setPreferredMicrophoneFieldDimension(zoom));
 }
 
-binder::Status AudioFlinger::RecordHandle::shareAudioHistory(
+binder::Status RecordHandle::shareAudioHistory(
         const std::string& sharedAudioPackageName, int64_t sharedAudioStartMs) {
     return binderStatusFromStatusT(
             mRecordTrack->shareAudioHistory(sharedAudioPackageName, sharedAudioStartMs));
