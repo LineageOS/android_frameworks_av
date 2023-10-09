@@ -67,8 +67,8 @@ public:
 
     // PatchCommandListener methods
     void onCreateAudioPatch(audio_patch_handle_t handle,
-                            const PatchPanel::Patch& patch) override;
-    void onReleaseAudioPatch(audio_patch_handle_t handle) override;
+        const IAfPatchPanel::Patch& patch) final;
+    void onReleaseAudioPatch(audio_patch_handle_t handle) final;
 
     /**
      * The new metadata can determine whether we should compute MEL for the given thread.
