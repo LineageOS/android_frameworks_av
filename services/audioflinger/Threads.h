@@ -847,8 +847,6 @@ private:
                 void dumpEffectChains_l(int fd, const Vector<String16>& args);
 };
 
-private:
-
 class VolumeInterface {
  public:
 
@@ -2375,3 +2373,5 @@ private:
     float mVolumeLeft = 0.f;
     float mVolumeRight = 0.f;
 };
+
+private:

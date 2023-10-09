@@ -558,8 +558,8 @@ private:
     // Requests media.log to start merging log buffers
     void requestLogMerge();
 
-    class TrackHandle;
-    class RecordHandle;
+    // TODO(b/288339104) replace these forward declaration classes with interfaces.
+public:
     class RecordThread;
     class PlaybackThread;
     class MixerThread;
@@ -568,6 +568,7 @@ private:
     class DuplicatingThread;
     class AsyncCallbackThread;
     class BitPerfectThread;
+private:
     class Track;
     class RecordTrack;
     class DeviceEffectManager;
@@ -632,69 +633,6 @@ private:
         }
         return io;
     }
-
-    // server side of the client's IAudioTrack
-    class TrackHandle : public android::media::BnAudioTrack {
-    public:
-        explicit            TrackHandle(const sp<PlaybackThread::Track>& track);
-        virtual             ~TrackHandle();
-
-        binder::Status getCblk(std::optional<media::SharedFileRegion>* _aidl_return) override;
-        binder::Status start(int32_t* _aidl_return) override;
-        binder::Status stop() override;
-        binder::Status flush() override;
-        binder::Status pause() override;
-        binder::Status attachAuxEffect(int32_t effectId, int32_t* _aidl_return) override;
-        binder::Status setParameters(const std::string& keyValuePairs,
-                                     int32_t* _aidl_return) override;
-        binder::Status selectPresentation(int32_t presentationId, int32_t programId,
-                                          int32_t* _aidl_return) override;
-        binder::Status getTimestamp(media::AudioTimestampInternal* timestamp,
-                                    int32_t* _aidl_return) override;
-        binder::Status signal() override;
-        binder::Status applyVolumeShaper(const media::VolumeShaperConfiguration& configuration,
-                                         const media::VolumeShaperOperation& operation,
-                                         int32_t* _aidl_return) override;
-        binder::Status getVolumeShaperState(
-                int32_t id,
-                std::optional<media::VolumeShaperState>* _aidl_return) override;
-        binder::Status getDualMonoMode(
-                media::audio::common::AudioDualMonoMode* _aidl_return) override;
-        binder::Status setDualMonoMode(
-                media::audio::common::AudioDualMonoMode mode) override;
-        binder::Status getAudioDescriptionMixLevel(float* _aidl_return) override;
-        binder::Status setAudioDescriptionMixLevel(float leveldB) override;
-        binder::Status getPlaybackRateParameters(
-                media::audio::common::AudioPlaybackRate* _aidl_return) override;
-        binder::Status setPlaybackRateParameters(
-                const media::audio::common::AudioPlaybackRate& playbackRate) override;
-
-    private:
-        const sp<PlaybackThread::Track> mTrack;
-    };
-
-    // server side of the client's IAudioRecord
-    class RecordHandle : public android::media::BnAudioRecord {
-    public:
-        explicit RecordHandle(const sp<RecordThread::RecordTrack>& recordTrack);
-        virtual             ~RecordHandle();
-        virtual binder::Status    start(int /*AudioSystem::sync_event_t*/ event,
-                int /*audio_session_t*/ triggerSession);
-        virtual binder::Status   stop();
-        virtual binder::Status   getActiveMicrophones(
-                std::vector<media::MicrophoneInfoFw>* activeMicrophones);
-        virtual binder::Status   setPreferredMicrophoneDirection(
-                int /*audio_microphone_direction_t*/ direction);
-        virtual binder::Status   setPreferredMicrophoneFieldDimension(float zoom);
-        virtual binder::Status   shareAudioHistory(const std::string& sharedAudioPackageName,
-                                                   int64_t sharedAudioStartMs);
-
-    private:
-        const sp<RecordThread::RecordTrack> mRecordTrack;
-
-        // for use from destructor
-        void                stop_nonvirtual();
-    };
 
     // Mmap stream control interface implementation. Each MmapThreadHandle controls one
     // MmapPlaybackThread or MmapCaptureThread instance.

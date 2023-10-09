@@ -24,6 +24,13 @@
 // record track
 class RecordTrack : public TrackBase {
 public:
+    // createIAudioRecordAdapter() is a static constructor which creates an
+    // IAudioRecord AIDL interface wrapper from the RecordTrack object that
+    // may be passed back to the client (if needed).
+    //
+    // Only one AIDL IAudioRecord interface wrapper should be created per RecordTrack.
+    static sp<media::IAudioRecord> createIAudioRecordAdapter(const sp<RecordTrack>& recordTrack);
+
                         RecordTrack(RecordThread *thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& attr,
