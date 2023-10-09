@@ -1674,17 +1674,16 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 /* static */
 sp<IAfEffectHandle> IAfEffectHandle::create(
         const sp<IAfEffectBase>& effect,
-        const sp<RefBase /*AudioFlinger::Client */>& client, // TODO(b/288339104) update type
+        const sp<Client>& client,
         const sp<media::IEffectClient>& effectClient,
         int32_t priority, bool notifyFramesProcessed)
 {
     return sp<EffectHandle>::make(
-            effect, sp<AudioFlinger::Client>::cast(client),
-            effectClient, priority, notifyFramesProcessed);
+            effect, client, effectClient, priority, notifyFramesProcessed);
 }
 
 EffectHandle::EffectHandle(const sp<IAfEffectBase>& effect,
-                                         const sp<AudioFlinger::Client>& client,
+                                         const sp<Client>& client,
                                          const sp<media::IEffectClient>& effectClient,
                                          int32_t priority, bool notifyFramesProcessed)
     : BnEffect(),
