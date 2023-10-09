@@ -3692,7 +3692,7 @@ std::vector<sp<IAfEffectModule>> AudioFlinger::purgeStaleEffects_l() {
          // clang-tidy suggests const ref
         sp<IAfEffectChain> ec = chains[i];  // NOLINT(performance-unnecessary-copy-initialization)
         int sessionid = ec->sessionId();
-        const auto t = sp<IAfThreadBase>::cast(ec->thread().promote()); // TODO(b/288339104)
+        const auto t = ec->thread().promote();
         if (t == 0) {
             continue;
         }

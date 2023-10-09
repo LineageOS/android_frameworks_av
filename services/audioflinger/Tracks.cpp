@@ -388,7 +388,6 @@ TrackHandle::TrackHandle(const sp<IAfTrack>& track)
     : BnAudioTrack(),
       mTrack(track)
 {
-    // TODO(b/288339104) binder thread priority change not needed.
     setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
@@ -2614,7 +2613,6 @@ RecordHandle::RecordHandle(
     : BnAudioRecord(),
     mRecordTrack(recordTrack)
 {
-    // TODO(b/288339104) binder thread priority change not needed.
     setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
 }
 
@@ -2669,7 +2667,7 @@ binder::Status RecordHandle::shareAudioHistory(
 #define LOG_TAG "AF::RecordTrack"
 
 
-/* static */ // TODO(b/288339104)
+/* static */
 sp<IAfRecordTrack> IAfRecordTrack::create(IAfRecordThread* thread,
         const sp<Client>& client,
         const audio_attributes_t& attr,
