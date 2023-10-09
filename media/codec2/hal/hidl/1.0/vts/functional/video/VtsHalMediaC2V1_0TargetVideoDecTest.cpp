@@ -120,8 +120,8 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
 
         std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
         CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mLinearAllocator), C2_OK);
-        mLinearPool = std::make_shared<C2PooledBlockPool>(
-                mLinearAllocator, mBlockPoolId++, getBufferPoolVer());
+        mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++,
+                                                          getBufferPoolVer());
         ASSERT_NE(mLinearPool, nullptr);
 
         std::vector<std::unique_ptr<C2Param>> queried;
@@ -463,7 +463,9 @@ void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         }
         int64_t timestamp = (*Info)[frameID].timestamp;
 
-        flags = ((*Info)[frameID].flags == FLAG_CONFIG_DATA) ? C2FrameData::FLAG_CODEC_CONFIG : 0;
+        flags = ((*Info)[frameID].vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME))
+                        ? C2FrameData::FLAG_CODEC_CONFIG
+                        : 0;
         if (signalEOS && ((frameID == (int)Info->size() - 1) || (frameID == (offset + range - 1))))
             flags |= C2FrameData::FLAG_END_OF_STREAM;
 
@@ -711,17 +713,19 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
         ASSERT_EQ(eleInfo.is_open(), true) << mInputFile << " - file not found";
         int bytesCount = 0;
         uint32_t flags = 0;
+        uint32_t vtsFlags = 0;
         uint32_t timestamp = 0;
         uint32_t timestampMax = 0;
         while (1) {
             if (!(eleInfo >> bytesCount)) break;
             eleInfo >> flags;
+            vtsFlags = mapInfoFlagstoVtsFlags(flags);
+            ASSERT_NE(vtsFlags, 0xFF) << "unrecognized flag entry in info file: " << mInfoFile;
             eleInfo >> timestamp;
             timestamp += timestampOffset;
-            Info.push_back({bytesCount, flags, timestamp});
-            bool codecConfig =
-                    flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
-            bool nonDisplayFrame = ((flags & FLAG_NON_DISPLAY_FRAME) != 0);
+            Info.push_back({bytesCount, vtsFlags, timestamp});
+            bool codecConfig = (vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME)) != 0;
+            bool nonDisplayFrame = (vtsFlags & (1 << VTS_BIT_FLAG_NO_SHOW_FRAME)) != 0;
 
             {
                 ULock l(mQueueLock);
@@ -795,20 +799,15 @@ TEST_P(Codec2VideoDecHidlTest, ThumbnailTest) {
     int32_t numCsds = populateInfoVector(mInfoFile, &Info, mTimestampDevTest, &mTimestampUslist);
     ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << mInfoFile;
 
-    uint32_t flags = 0;
     for (size_t i = 0; i < MAX_ITERATIONS; i++) {
         ASSERT_EQ(mComponent->start(), C2_OK);
 
         // request EOS for thumbnail
         // signal EOS flag with last frame
         size_t j = -1;
-        do {
-            j++;
-            flags = 0;
-            if (Info[j].flags) flags = 1u << (Info[j].flags - 1);
-
-        } while (!(flags & SYNC_FRAME));
-
+        for (j = 0; j < Info.size(); j++) {
+            if (Info[j].vtsFlags & (1 << VTS_BIT_FLAG_SYNC_FRAME)) break;
+        }
         std::ifstream eleStream;
         eleStream.open(mInputFile, std::ifstream::binary);
         ASSERT_EQ(eleStream.is_open(), true);
@@ -908,14 +907,11 @@ TEST_P(Codec2VideoDecHidlTest, FlushTest) {
     // Seek to next key frame and start decoding till the end
     int index = numFramesFlushed;
     bool keyFrame = false;
-    uint32_t flags = 0;
     while (index < (int)Info.size()) {
-        if (Info[index].flags) flags = 1u << (Info[index].flags - 1);
-        if ((flags & SYNC_FRAME) == SYNC_FRAME) {
+        if (Info[index].vtsFlags & (1 << VTS_BIT_FLAG_SYNC_FRAME)) {
             keyFrame = true;
             break;
         }
-        flags = 0;
         eleStream.ignore(Info[index].bytesCount);
         index++;
     }
@@ -949,24 +945,24 @@ TEST_P(Codec2VideoDecHidlTest, DecodeTestEmptyBuffersInserted) {
     int bytesCount = 0;
     uint32_t frameId = 0;
     uint32_t flags = 0;
+    uint32_t vtsFlags = 0;
     uint32_t timestamp = 0;
     bool codecConfig = false;
     // This test introduces empty CSD after every 20th frame
     // and empty input frames at an interval of 5 frames.
     while (1) {
         if (!(frameId % 5)) {
-            if (!(frameId % 20))
-                flags = 32;
-            else
-                flags = 0;
+            vtsFlags = !(frameId % 20) ? (1 << VTS_BIT_FLAG_CSD_FRAME) : 0;
             bytesCount = 0;
         } else {
             if (!(eleInfo >> bytesCount)) break;
             eleInfo >> flags;
+            vtsFlags = mapInfoFlagstoVtsFlags(flags);
+            ASSERT_NE(vtsFlags, 0xFF) << "unrecognized flag entry in info file: " << mInfoFile;
             eleInfo >> timestamp;
-            codecConfig = flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
+            codecConfig = (vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME)) != 0;
         }
-        Info.push_back({bytesCount, flags, timestamp});
+        Info.push_back({bytesCount, vtsFlags, timestamp});
         frameId++;
     }
     eleInfo.close();
@@ -1046,12 +1042,9 @@ TEST_P(Codec2VideoDecCsdInputTests, CSDFlushTest) {
     }
 
     int offset = framesToDecode;
-    uint32_t flags = 0;
     while (1) {
         while (offset < (int)Info.size()) {
-            flags = 0;
-            if (Info[offset].flags) flags = 1u << (Info[offset].flags - 1);
-            if (flags & SYNC_FRAME) {
+            if (Info[offset].vtsFlags & (1 << VTS_BIT_FLAG_SYNC_FRAME)) {
                 keyFrame = true;
                 break;
             }
