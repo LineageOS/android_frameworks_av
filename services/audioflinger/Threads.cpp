@@ -245,6 +245,18 @@ static int sFastTrackMultiplier = kFastTrackMultiplier;
 // and that all "fast" AudioRecord clients read from.  In either case, the size can be small.
 static const size_t kRecordThreadReadOnlyHeapSize = 0xD000;
 
+static constexpr nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
+
+static nsecs_t getStandbyTimeInNanos() {
+    static nsecs_t standbyTimeInNanos = []() {
+        const int ms = property_get_int32("ro.audio.flinger_standbytime_ms",
+                    kDefaultStandbyTimeInNsecs / NANOS_PER_MILLISECOND);
+        ALOGI("%s: Using %d ms as standby time", __func__, ms);
+        return milliseconds(ms);
+    }();
+    return standbyTimeInNanos;
+}
+
 // ----------------------------------------------------------------------------
 
 // TODO: move all toString helpers to audio.h
@@ -2085,7 +2097,7 @@ PlaybackThread::PlaybackThread(const sp<IAfThreadCallback>& afThreadCallback,
         mNumWrites(0), mNumDelayedWrites(0), mInWrite(false),
         mMixerStatus(MIXER_IDLE),
         mMixerStatusIgnoringFastTracks(MIXER_IDLE),
-        mStandbyDelayNs(AudioFlinger::mStandbyTimeInNsecs),
+        mStandbyDelayNs(getStandbyTimeInNanos()),
         mBytesRemaining(0),
         mCurrentWriteLength(0),
         mUseAsyncWrite(false),
@@ -3558,7 +3570,7 @@ void PlaybackThread::cacheParameters_l()
     mActiveSleepTimeUs = activeSleepTimeUs();
     mIdleSleepTimeUs = idleSleepTimeUs();
 
-    mStandbyDelayNs = AudioFlinger::mStandbyTimeInNsecs;
+    mStandbyDelayNs = getStandbyTimeInNanos();
 
     // make sure standby delay is not too short when connected to an A2DP sink to avoid
     // truncating audio when going to standby.

@@ -149,8 +149,6 @@ class ServerProxy;
 
 // ----------------------------------------------------------------------------
 
-static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
-
 using android::content::AttributionSourceState;
 
 struct stream_type_t {
@@ -558,10 +556,6 @@ public:
             return false;
         }
     }
-
-    // standby delay for MIXER and DUPLICATING playback threads is read from property
-    // ro.audio.flinger_standbytime_ms or defaults to kDefaultStandbyTimeInNsecs
-    static nsecs_t          mStandbyTimeInNsecs;
 
 private:
 
