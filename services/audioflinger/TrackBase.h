@@ -370,36 +370,27 @@ protected:
     std::atomic_flag    mChangeNotified = ATOMIC_FLAG_INIT;
 };
 
-// PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.
-// it provides buffer access methods that map those of a ClientProxy (see AudioTrackShared.h)
-class PatchProxyBufferProvider
-{
-public:
-
-    virtual ~PatchProxyBufferProvider() = default;
-
-    virtual bool        producesBufferOnDemand() const = 0;
-    virtual status_t    obtainBuffer(Proxy::Buffer* buffer,
-                                     const struct timespec *requested = NULL) = 0;
-    virtual void        releaseBuffer(Proxy::Buffer* buffer) = 0;
-};
-
-class PatchTrackBase : public PatchProxyBufferProvider
+class PatchTrackBase : public PatchProxyBufferProvider, public virtual IAfPatchTrackBase
 {
 public:
     using Timeout = std::optional<std::chrono::nanoseconds>;
                         PatchTrackBase(const sp<ClientProxy>& proxy, const ThreadBase& thread,
                                        const Timeout& timeout);
-            void        setPeerTimeout(std::chrono::nanoseconds timeout);
-            template <typename T>
-            void        setPeerProxy(const sp<T> &proxy, bool holdReference) {
-                            mPeerReferenceHold = holdReference ? proxy : nullptr;
-                            mPeerProxy = proxy.get();
-                        }
-            void        clearPeerProxy() {
+            void setPeerTimeout(std::chrono::nanoseconds timeout) final;
+            void setPeerProxy(const sp<IAfPatchTrackBase>& proxy, bool holdReference) final {
+                if (proxy) {
+                    mPeerReferenceHold = holdReference ? proxy : nullptr;
+                    mPeerProxy = proxy->asPatchProxyBufferProvider();
+                } else {
+                    clearPeerProxy();
+                }
+            }
+            void clearPeerProxy() final {
                             mPeerReferenceHold.clear();
                             mPeerProxy = nullptr;
                         }
+
+            PatchProxyBufferProvider* asPatchProxyBufferProvider() final { return this; }
 
             bool        producesBufferOnDemand() const override { return false; }
 
