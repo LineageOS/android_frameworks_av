@@ -118,6 +118,7 @@
 #include "android/media/BnEffect.h"
 
 #include "Client.h"
+#include "ResamplerBufferProvider.h"
 
 // include AudioFlinger component interfaces
 #include "IAfEffect.h"
@@ -135,7 +136,6 @@ class EffectsFactoryHalInterface;
 class FastMixer;
 class IAudioManager;
 class PassthruBufferProvider;
-class RecordBufferConverter;
 class ServerProxy;
 
 // ----------------------------------------------------------------------------
@@ -570,8 +570,6 @@ public:
     class AsyncCallbackThread;
     class BitPerfectThread;
 private:
-    class Track;
-    class RecordTrack;
     class DeviceEffectManager;
     // TODO(b/288339104) these should be separate files
 public:
@@ -580,8 +578,9 @@ public:
 private:
     struct AudioStreamIn;
     struct TeePatch;
+public:
     using TeePatches = std::vector<TeePatch>;
-
+private:
 
     struct  stream_type_t {
         stream_type_t()
@@ -704,9 +703,12 @@ private:
                                      PlaybackThread *srcThread,
                                      PlaybackThread *dstThread);
 
+public:
+    // TODO(b/288339104) cluster together
               status_t moveAuxEffectToIo(int EffectId,
                                          const sp<PlaybackThread>& dstThread,
                                          sp<PlaybackThread> *srcThread);
+private:
 
               // return thread associated with primary hardware device, or NULL
               PlaybackThread *primaryPlaybackThread_l() const;
@@ -727,7 +729,10 @@ private:
 
                 void        removeClient_l(pid_t pid);
                 void        removeNotificationClient(pid_t pid);
+public:
+    // TODO(b/288339104) cluster together
                 bool isNonOffloadableGlobalEffectEnabled_l();
+private:
                 void onNonOffloadableGlobalEffectEnable();
                 bool isSessionAcquired_l(audio_session_t audioSession);
 
@@ -782,8 +787,8 @@ private:
     };
 
     struct TeePatch {
-        sp<RecordThread::PatchRecord> patchRecord;
-        sp<PlaybackThread::PatchTrack> patchTrack;
+        sp<IAfPatchRecord> patchRecord;
+        sp<IAfPatchTrack> patchTrack;
     };
 
     // for mAudioSessionRefs only
@@ -796,11 +801,13 @@ private:
         int         mCnt;
     };
 
+public:
+    // TODO(b/288339104) access by getter,
     mutable     Mutex                               mLock;
                 // protects mClients and mNotificationClients.
                 // must be locked after mLock and ThreadBase::mLock if both must be locked
                 // avoids acquiring AudioFlinger::mLock from inside thread loop.
-public:
+
     // TODO(b/288339104) access by getter,
     mutable     Mutex                               mClientLock;
 private:
@@ -909,9 +916,9 @@ private:
                                       size_t rejectedKVPSize, const String8& rejectedKVPs,
                                       uid_t callingUid);
 
+public:
     sp<IAudioManager> getOrCreateAudioManager();
 
-public:
     // These methods read variables atomically without mLock,
     // though the variables are updated with mLock.
     bool    isLowRamDevice() const { return mIsLowRamDevice; }
