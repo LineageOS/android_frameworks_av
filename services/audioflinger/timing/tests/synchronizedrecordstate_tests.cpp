@@ -59,6 +59,7 @@ TEST(SynchronizedRecordStateTests, Basic) {
     ASSERT_EQ(0, recordState.updateRecordFrames(1'000'000'000));
     ASSERT_FALSE(triggered);
     ASSERT_TRUE(syncEvent->isCancelled());
+    ASSERT_EQ(cookie, std::any_cast<decltype(cookie)>(syncEvent->cookie()));
 
     // Check count down after track is complete.
     syncEvent = sp<SyncEvent>::make(
