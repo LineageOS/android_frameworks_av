@@ -39,18 +39,16 @@
 
 #include <thread>
 
+#include "BenchmarkCommon.h"
 using namespace android;
 
 static void ReadMediaSamples(benchmark::State& state, const std::string& srcFileName,
                              bool readAudio, bool sequentialAccess = false) {
-    // Asset directory.
-    static const std::string kAssetDirectory = "/data/local/tmp/TranscodingBenchmark/";
-
     int srcFd = 0;
     std::string srcPath = kAssetDirectory + srcFileName;
 
     if ((srcFd = open(srcPath.c_str(), O_RDONLY)) < 0) {
-        state.SkipWithError("Unable to open source file");
+        state.SkipWithError("Unable to open source file: " + srcPath);
         return;
     }
 
