@@ -24,24 +24,24 @@ namespace android {
 
 constexpr char kPatchCommandThreadName[] = "AudioFlinger_PatchCommandThread";
 
-AudioFlinger::PatchCommandThread::~PatchCommandThread() {
+PatchCommandThread::~PatchCommandThread() {
     exit();
 
     std::lock_guard _l(mLock);
     mCommands.clear();
 }
 
-void AudioFlinger::PatchCommandThread::onFirstRef() {
+void PatchCommandThread::onFirstRef() {
     run(kPatchCommandThreadName, ANDROID_PRIORITY_AUDIO);
 }
 
-void AudioFlinger::PatchCommandThread::addListener(const sp<PatchCommandListener>& listener) {
+void PatchCommandThread::addListener(const sp<PatchCommandListener>& listener) {
     ALOGV("%s add listener %p", __func__, static_cast<void*>(listener.get()));
     std::lock_guard _l(mListenerLock);
     mListeners.emplace_back(listener);
 }
 
-void AudioFlinger::PatchCommandThread::createAudioPatch(audio_patch_handle_t handle,
+void PatchCommandThread::createAudioPatch(audio_patch_handle_t handle,
         const IAfPatchPanel::Patch& patch) {
     ALOGV("%s handle %d mHalHandle %d num sinks %d device sink %08x",
             __func__, handle, patch.mHalHandle,
@@ -51,12 +51,12 @@ void AudioFlinger::PatchCommandThread::createAudioPatch(audio_patch_handle_t han
     createAudioPatchCommand(handle, patch);
 }
 
-void AudioFlinger::PatchCommandThread::releaseAudioPatch(audio_patch_handle_t handle) {
+void PatchCommandThread::releaseAudioPatch(audio_patch_handle_t handle) {
     ALOGV("%s", __func__);
     releaseAudioPatchCommand(handle);
 }
 
-bool AudioFlinger::PatchCommandThread::threadLoop()
+bool PatchCommandThread::threadLoop()
 NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
 {
     std::unique_lock _l(mLock);
@@ -119,13 +119,13 @@ NO_THREAD_SAFETY_ANALYSIS  // bug in clang compiler.
     return false;
 }
 
-void AudioFlinger::PatchCommandThread::sendCommand(const sp<Command>& command) {
+void PatchCommandThread::sendCommand(const sp<Command>& command) {
     std::lock_guard _l(mLock);
     mCommands.emplace_back(command);
     mWaitWorkCV.notify_one();
 }
 
-void AudioFlinger::PatchCommandThread::createAudioPatchCommand(
+void PatchCommandThread::createAudioPatchCommand(
         audio_patch_handle_t handle, const IAfPatchPanel::Patch& patch) {
     auto command = sp<Command>::make(CREATE_AUDIO_PATCH,
                                      new CreateAudioPatchData(handle, patch));
@@ -136,14 +136,14 @@ void AudioFlinger::PatchCommandThread::createAudioPatchCommand(
     sendCommand(command);
 }
 
-void AudioFlinger::PatchCommandThread::releaseAudioPatchCommand(audio_patch_handle_t handle) {
+void PatchCommandThread::releaseAudioPatchCommand(audio_patch_handle_t handle) {
     sp<Command> command =
         sp<Command>::make(RELEASE_AUDIO_PATCH, new ReleaseAudioPatchData(handle));
     ALOGV("%s adding release patch", __func__);
     sendCommand(command);
 }
 
-void AudioFlinger::PatchCommandThread::exit() {
+void PatchCommandThread::exit() {
     ALOGV("%s", __func__);
     {
         std::lock_guard _l(mLock);

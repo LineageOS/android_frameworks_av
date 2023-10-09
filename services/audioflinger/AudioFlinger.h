@@ -128,6 +128,9 @@
 #include "IAfThread.h"
 #include "IAfTrack.h"
 
+// Classes that depend on IAf* interfaces but are not cross-dependent.
+#include "PatchCommandThread.h"
+
 namespace android {
 
 class AudioMixer;
@@ -584,8 +587,6 @@ private:
 public:
     using TeePatches = std::vector<TeePatch>;
 private:
-
-#include "PatchCommandThread.h"
 
 #include "DeviceEffectManager.h"
 
