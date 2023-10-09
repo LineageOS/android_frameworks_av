@@ -15,32 +15,33 @@
 ** limitations under the License.
 */
 
-
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
-#include "Configuration.h"
-#include <linux/futex.h>
-#include <math.h>
-#include <sys/syscall.h>
+#include "MmapTracks.h"
+#include "PlaybackTracks.h"
+#include "RecordTracks.h"
+
+#include "Client.h"
+#include "IAfEffect.h"
+#include "IAfThread.h"
+#include "ResamplerBufferProvider.h"
+
+#include <audio_utils/minifloat.h>
+#include <media/AudioValidator.h>
+#include <media/RecordBufferConverter.h>
+#include <media/nbaio/Pipe.h>
+#include <media/nbaio/PipeReader.h>
+#include <mediautils/ServiceUtilities.h>
+#include <mediautils/SharedMemoryAllocator.h>
+#include <private/media/AudioTrackShared.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
-#include <private/media/AudioTrackShared.h>
-
-#include "AudioFlinger.h"
-#include "TrackBase.h"
-#include "PlaybackTracks.h"
-#include "RecordTracks.h"
-#include "MmapTracks.h"
-
-#include <media/nbaio/Pipe.h>
-#include <media/nbaio/PipeReader.h>
-#include <media/AudioValidator.h>
-#include <media/RecordBufferConverter.h>
-#include <mediautils/ServiceUtilities.h>
-#include <audio_utils/minifloat.h>
+#include <linux/futex.h>
+#include <math.h>
+#include <sys/syscall.h>
 
 // ----------------------------------------------------------------------------
 

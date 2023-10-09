@@ -17,6 +17,18 @@
 
 #pragma once
 
+#include "Configuration.h"  // TEE_SINK
+#include "IAfTrack.h"
+
+#include <afutils/NBAIO_Tee.h>
+#include <android-base/macros.h>  // DISALLOW_COPY_AND_ASSIGN
+#include <datapath/TrackMetrics.h>
+#include <mediautils/BatteryNotifier.h>
+
+#include <atomic>    // avoid transitive dependency
+#include <list>      // avoid transitive dependency
+#include <optional>  // avoid transitive dependency
+
 namespace android {
 
 // base for record and playback
