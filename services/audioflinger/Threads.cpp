@@ -2089,7 +2089,7 @@ PlaybackThread::PlaybackThread(const sp<IAfThreadCallback>& afThreadCallback,
         mUseAsyncWrite(false),
         mWriteAckSequence(0),
         mDrainSequence(0),
-        mScreenState(AudioFlinger::mScreenState),
+        mScreenState(mAfThreadCallback->getScreenState()),
         // index 0 is reserved for normal mixer's submix
         mFastTrackAvailMask(((1 << FastMixerState::sMaxFastTracks) - 1) & ~1),
         mHwSupportsPause(false), mHwPaused(false), mFlushPending(false),
@@ -3422,7 +3422,7 @@ ssize_t PlaybackThread::threadLoop_write()
 
         ATRACE_BEGIN("write");
         // update the setpoint when AudioFlinger::mScreenState changes
-        uint32_t screenState = AudioFlinger::mScreenState;
+        const uint32_t screenState = mAfThreadCallback->getScreenState();
         if (screenState != mScreenState) {
             mScreenState = screenState;
             MonoPipe *pipe = (MonoPipe *)mPipeSink.get();
