@@ -52,7 +52,7 @@ status_t AudioFlinger::listAudioPorts(unsigned int *num_ports,
                                 struct audio_port *ports)
 {
     Mutex::Autolock _l(mLock);
-    return mPatchPanel.listAudioPorts(num_ports, ports);
+    return mPatchPanel->listAudioPorts(num_ports, ports);
 }
 
 /* Get supported attributes for a given audio port */
@@ -63,7 +63,7 @@ status_t AudioFlinger::getAudioPort(struct audio_port_v7 *port) {
     }
 
     Mutex::Autolock _l(mLock);
-    return mPatchPanel.getAudioPort(port);
+    return mPatchPanel->getAudioPort(port);
 }
 
 /* Connect a patch between several source and sink ports */
@@ -76,14 +76,14 @@ status_t AudioFlinger::createAudioPatch(const struct audio_patch *patch,
     }
 
     Mutex::Autolock _l(mLock);
-    return mPatchPanel.createAudioPatch(patch, handle);
+    return mPatchPanel->createAudioPatch(patch, handle);
 }
 
 /* Disconnect a patch */
 status_t AudioFlinger::releaseAudioPatch(audio_patch_handle_t handle)
 {
     Mutex::Autolock _l(mLock);
-    return mPatchPanel.releaseAudioPatch(handle);
+    return mPatchPanel->releaseAudioPatch(handle);
 }
 
 /* List connected audio ports and they attributes */
@@ -91,16 +91,41 @@ status_t AudioFlinger::listAudioPatches(unsigned int *num_patches,
                                   struct audio_patch *patches)
 {
     Mutex::Autolock _l(mLock);
-    return mPatchPanel.listAudioPatches(num_patches, patches);
+    return mPatchPanel->listAudioPatches(num_patches, patches);
 }
 
-status_t AudioFlinger::PatchPanel::SoftwarePatch::getLatencyMs_l(double *latencyMs) const
+/* static */
+sp<IAfPatchPanel> IAfPatchPanel::create(AudioFlinger* audioFlinger) {
+    return sp<AudioFlinger::PatchPanel>::make(audioFlinger);
+}
+
+status_t SoftwarePatch::getLatencyMs_l(double* latencyMs) const {
+    return mPatchPanel->getLatencyMs_l(mPatchHandle, latencyMs);
+}
+
+status_t AudioFlinger::PatchPanel::getLatencyMs_l(
+        audio_patch_handle_t patchHandle, double* latencyMs) const
 {
-    const auto& iter = mPatchPanel.mPatches.find(mPatchHandle);
-    if (iter != mPatchPanel.mPatches.end()) {
+    const auto& iter = mPatches.find(patchHandle);
+    if (iter != mPatches.end()) {
         return iter->second.getLatencyMs(latencyMs);
     } else {
         return BAD_VALUE;
+    }
+}
+
+void AudioFlinger::PatchPanel::closeThreadInternal_l(const sp<IAfThreadBase>& thread) const
+{
+    if (const auto recordThread = thread->asIAfRecordThread();
+            recordThread) {
+        mAudioFlinger.closeThreadInternal_l(recordThread);
+    } else if (const auto playbackThread = thread->asIAfPlaybackThread();
+            playbackThread) {
+        mAudioFlinger.closeThreadInternal_l(playbackThread);
+    } else {
+        LOG_ALWAYS_FATAL("%s: Endpoints only accept IAfPlayback and IAfRecord threads, "
+                "invalid thread, id: %d  type: %d",
+                __func__, thread->id(), thread->type());
     }
 }
 
@@ -472,7 +497,7 @@ AudioFlinger::PatchPanel::Patch::~Patch()
             mRecord.handle(), mPlayback.handle());
 }
 
-status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
+status_t AudioFlinger::PatchPanel::Patch::createConnections(const sp<IAfPatchPanel>& panel)
 {
     // create patch from source device to record thread input
     status_t status = panel->createAudioPatch(
@@ -636,7 +661,7 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     return status;
 }
 
-void AudioFlinger::PatchPanel::Patch::clearConnections(PatchPanel *panel)
+void AudioFlinger::PatchPanel::Patch::clearConnections(const sp<IAfPatchPanel>& panel)
 {
     ALOGV("%s() mRecord.handle %d mPlayback.handle %d",
             __func__, mRecord.handle(), mPlayback.handle());
@@ -827,7 +852,7 @@ status_t AudioFlinger::PatchPanel::listAudioPatches(unsigned int *num_patches __
 
 status_t AudioFlinger::PatchPanel::getDownstreamSoftwarePatches(
         audio_io_handle_t stream,
-        std::vector<AudioFlinger::PatchPanel::SoftwarePatch> *patches) const
+        std::vector<SoftwarePatch>* patches) const
 {
     for (const auto& module : mInsertedModules) {
         if (module.second.streams.count(stream)) {
@@ -835,7 +860,8 @@ status_t AudioFlinger::PatchPanel::getDownstreamSoftwarePatches(
                 const auto& patch_iter = mPatches.find(patchHandle);
                 if (patch_iter != mPatches.end()) {
                     const Patch &patch = patch_iter->second;
-                    patches->emplace_back(*this, patchHandle,
+                    patches->emplace_back(sp<const IAfPatchPanel>::fromExisting(this),
+                            patchHandle,
                             patch.mPlayback.const_thread()->id(),
                             patch.mRecord.const_thread()->id());
                 } else {
