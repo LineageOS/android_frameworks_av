@@ -17,8 +17,12 @@
 
 #pragma once
 
-#include <mutex>
+#include "IAfPatchPanel.h"
+#include "PatchCommandThread.h"
+
 #include <sounddose/SoundDoseManager.h>
+
+#include <mutex>
 #include <unordered_map>
 
 namespace android {
