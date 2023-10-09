@@ -26,6 +26,50 @@ class IAfMmapCaptureThread;
 class IAfMmapPlaybackThread;
 class IAfPlaybackThread;
 class IAfRecordThread;
+class MelReporter;
+
+// Note this is exposed through IAfThreadBase::afThreadCallback()
+// and hence may be used by the Effect / Track framework.
+class IAfThreadCallback : public virtual RefBase {
+public:
+    virtual Mutex& mutex() const = 0;
+    virtual bool isNonOffloadableGlobalEffectEnabled_l() const = 0;  // Tracks
+    virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
+    virtual bool btNrecIsOff() const = 0;
+    virtual float masterVolume_l() const = 0;
+    virtual bool masterMute_l() const = 0;
+    virtual float getMasterBalance_l() const = 0;
+    virtual bool streamMute_l(audio_stream_type_t stream) const = 0;
+    virtual audio_mode_t getMode() const = 0;
+    virtual bool isLowRamDevice() const = 0;
+    virtual bool isAudioPolicyReady() const = 0;  // Effects
+    virtual std::optional<media::AudioVibratorInfo> getDefaultVibratorInfo_l() const = 0;
+    virtual const sp<IAfPatchPanel>& getPatchPanel() const = 0;
+    virtual const sp<MelReporter>& getMelReporter() const = 0;
+    virtual const sp<EffectsFactoryHalInterface>& getEffectsFactoryHal() const = 0;
+    virtual sp<IAudioManager> getOrCreateAudioManager() = 0;  // Tracks
+
+    virtual bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect) = 0;
+    virtual status_t moveEffectChain_l(audio_session_t sessionId,
+            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread) = 0;
+
+    virtual void requestLogMerge() = 0;
+    virtual sp<NBLog::Writer> newWriter_l(size_t size, const char *name) = 0;
+    virtual void unregisterWriter(const sp<NBLog::Writer>& writer) = 0;
+
+    virtual sp<audioflinger::SyncEvent> createSyncEvent(AudioSystem::sync_event_t type,
+            audio_session_t triggerSession,
+            audio_session_t listenerSession,
+            const audioflinger::SyncEventCallback& callBack,
+            const wp<IAfTrackBase>& cookie) = 0;
+
+    virtual void ioConfigChanged(audio_io_config_event_t event,
+            const sp<AudioIoDescriptor>& ioDesc,
+            pid_t pid = 0) = 0;
+    virtual void onNonOffloadableGlobalEffectEnable() = 0;
+    virtual void onSupportedLatencyModesChanged(
+            audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) = 0;
+};
 
 class IAfThreadBase : public virtual RefBase {
 public:
@@ -250,30 +294,31 @@ public:
     virtual sp<IAfDuplicatingThread> asIAfDuplicatingThread() { return nullptr; }
     virtual sp<IAfPlaybackThread> asIAfPlaybackThread() { return nullptr; }
     virtual sp<IAfRecordThread> asIAfRecordThread() { return nullptr; }
-    virtual AudioFlinger* audioFlinger() const = 0;
+    virtual IAfThreadCallback* afThreadCallback() const = 0;
 };
 
 class IAfPlaybackThread : public virtual IAfThreadBase, public virtual VolumeInterface {
 public:
     static sp<IAfPlaybackThread> createBitPerfectThread(
-            const sp<AudioFlinger>& audioflinger, AudioStreamOut* output, audio_io_handle_t id,
-            bool systemReady);
+            const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
+            audio_io_handle_t id, bool systemReady);
 
     static sp<IAfPlaybackThread> createDirectOutputThread(
-            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
-            bool systemReady, const audio_offload_info_t& offloadInfo);
+            const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
+            audio_io_handle_t id, bool systemReady, const audio_offload_info_t& offloadInfo);
 
     static sp<IAfPlaybackThread> createMixerThread(
-            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
-            bool systemReady, type_t type = MIXER, audio_config_base_t* mixerConfig = nullptr);
+            const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
+            audio_io_handle_t id, bool systemReady, type_t type = MIXER,
+            audio_config_base_t* mixerConfig = nullptr);
 
     static sp<IAfPlaybackThread> createOffloadThread(
-            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
-            bool systemReady, const audio_offload_info_t& offloadInfo);
+            const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
+            audio_io_handle_t id, bool systemReady, const audio_offload_info_t& offloadInfo);
 
     static sp<IAfPlaybackThread> createSpatializerThread(
-            const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output, audio_io_handle_t id,
-            bool systemReady, audio_config_base_t* mixerConfig);
+            const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut* output,
+            audio_io_handle_t id, bool systemReady, audio_config_base_t* mixerConfig);
 
     static constexpr int8_t kMaxTrackStopRetriesOffload = 2;
 
@@ -388,7 +433,7 @@ public:
 class IAfDuplicatingThread : public virtual IAfPlaybackThread {
 public:
     static sp<IAfDuplicatingThread> create(
-            const sp<AudioFlinger>& audioFlinger, IAfPlaybackThread* mainThread,
+            const sp<IAfThreadCallback>& afThreadCallback, IAfPlaybackThread* mainThread,
             audio_io_handle_t id, bool systemReady);
 
     virtual void addOutputTrack(IAfPlaybackThread* thread) = 0;
@@ -399,8 +444,8 @@ public:
 class IAfRecordThread : public virtual IAfThreadBase {
 public:
     static sp<IAfRecordThread> create(
-            const sp<AudioFlinger>& audioFlinger, AudioStreamIn* input, audio_io_handle_t id,
-            bool systemReady);
+            const sp<IAfThreadCallback>& afThreadCallback, AudioStreamIn* input,
+            audio_io_handle_t id, bool systemReady);
 
     virtual sp<IAfRecordTrack> createRecordTrack_l(
             const sp<Client>& client,
@@ -499,8 +544,8 @@ public:
 class IAfMmapPlaybackThread : public virtual IAfMmapThread, public virtual VolumeInterface {
 public:
     static sp<IAfMmapPlaybackThread> create(
-            const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id, AudioHwDevice* hwDev,
-            AudioStreamOut* output, bool systemReady);
+            const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
+            AudioHwDevice* hwDev, AudioStreamOut* output, bool systemReady);
 
     virtual AudioStreamOut* clearOutput() = 0;
 };
@@ -508,8 +553,8 @@ public:
 class IAfMmapCaptureThread : public virtual IAfMmapThread {
 public:
     static sp<IAfMmapCaptureThread> create(
-            const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id, AudioHwDevice* hwDev,
-            AudioStreamIn* input, bool systemReady);
+            const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
+            AudioHwDevice* hwDev, AudioStreamIn* input, bool systemReady);
 
     virtual AudioStreamIn* clearInput() = 0;
 };

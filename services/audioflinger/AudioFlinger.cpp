@@ -528,7 +528,7 @@ status_t AudioFlinger::setSimulateDeviceConnections(bool enabled) {
 }
 
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
-std::optional<media::AudioVibratorInfo> AudioFlinger::getDefaultVibratorInfo_l() {
+std::optional<media::AudioVibratorInfo> AudioFlinger::getDefaultVibratorInfo_l() const {
     if (mAudioVibratorInfos.empty()) {
         return {};
     }
@@ -4662,7 +4662,7 @@ Exit:
     return status;
 }
 
-bool AudioFlinger::isNonOffloadableGlobalEffectEnabled_l()
+bool AudioFlinger::isNonOffloadableGlobalEffectEnabled_l() const
 NO_THREAD_SAFETY_ANALYSIS  // thread lock for getEffectChain_l.
 {
     if (mGlobalEffectEnableTime != 0 &&

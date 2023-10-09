@@ -2112,30 +2112,22 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 
 /* static */
 sp<IAfEffectChain> IAfEffectChain::create(
-        const wp<IAfThreadBase>& wThread,
+        const sp<IAfThreadBase>& thread,
         audio_session_t sessionId)
 {
-    return sp<EffectChain>::make(wThread, sessionId);
+    return sp<EffectChain>::make(thread, sessionId);
 }
 
-EffectChain::EffectChain(const wp<IAfThreadBase>& thread,
+EffectChain::EffectChain(const sp<IAfThreadBase>& thread,
                                        audio_session_t sessionId)
     : mSessionId(sessionId), mActiveTrackCnt(0), mTrackCnt(0), mTailBufferCount(0),
       mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
       mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX),
       mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread))
 {
-    const sp<IAfThreadBase> p = thread.promote();
-    if (p == nullptr) {
-        return;
-    }
-    mStrategy = p->getStrategyForStream(AUDIO_STREAM_MUSIC);
-    mMaxTailBuffers = ((kProcessTailDurationMs * p->sampleRate()) / 1000) /
-                                    p->frameCount();
-}
-
-EffectChain::~EffectChain()
-{
+    mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
+    mMaxTailBuffers = ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
+                                    thread->frameCount();
 }
 
 // getEffectFromDesc_l() must be called with IAfThreadBase::mutex() held
@@ -3002,12 +2994,12 @@ status_t EffectChain::EffectCallback::createEffectHal(
 bool EffectChain::EffectCallback::updateOrphanEffectChains(
         const sp<IAfEffectBase>& effect) {
     // in EffectChain context, an EffectBase is always from an EffectModule so static cast is safe
-    return mAudioFlinger.updateOrphanEffectChains(effect->asEffectModule());
+    return mAfThreadCallback->updateOrphanEffectChains(effect->asEffectModule());
 }
 
 status_t EffectChain::EffectCallback::allocateHalBuffer(
         size_t size, sp<EffectBufferHalInterface>* buffer) {
-    return mAudioFlinger.mEffectsFactoryHal->allocateBuffer(size, buffer);
+    return mAfThreadCallback->getEffectsFactoryHal()->allocateBuffer(size, buffer);
 }
 
 status_t EffectChain::EffectCallback::addEffectToHal(
