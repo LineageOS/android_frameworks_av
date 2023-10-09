@@ -124,6 +124,7 @@
 
 // include AudioFlinger component interfaces
 #include "IAfEffect.h"
+#include "IAfThread.h"
 #include "IAfTrack.h"
 
 namespace android {
@@ -148,10 +149,24 @@ static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
 using android::content::AttributionSourceState;
 
+struct stream_type_t {
+    float volume = 1.f;
+    bool mute = false;
+};
+
 class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
     friend class sp<AudioFlinger>;
     friend class Client; // removeClient_l();
+    // TODO(b/291012167) replace the Thread friends with an interface.
+    friend class DirectOutputThread;
+    friend class MixerThread;
+    friend class MmapPlaybackThread;
+    friend class MmapThread;
+    friend class PlaybackThread;
+    friend class RecordThread;
+    friend class ThreadBase;
+
 public:
     static void instantiate() ANDROID_API;
 
@@ -497,11 +512,7 @@ private:
 
     SimpleLog mThreadLog{16}; // 16 Thread history limit
 
-public:
-    // TODO(b/288339104)
-    class ThreadBase;
-private:
-    void dumpToThreadLog_l(const sp<ThreadBase> &thread);
+    void dumpToThreadLog_l(const sp<IAfThreadBase>& thread);
 
     // --- Notification Client ---
     class NotificationClient : public IBinder::DeathRecipient {
@@ -562,16 +573,6 @@ private:
     void requestLogMerge();
 
     // TODO(b/288339104) replace these forward declaration classes with interfaces.
-public:
-    class RecordThread;
-    class PlaybackThread;
-    class MixerThread;
-    class DirectOutputThread;
-    class OffloadThread;
-    class DuplicatingThread;
-    class AsyncCallbackThread;
-    class BitPerfectThread;
-private:
     class DeviceEffectManager;
     // TODO(b/288339104) these should be separate files
 public:
@@ -582,20 +583,6 @@ private:
 public:
     using TeePatches = std::vector<TeePatch>;
 private:
-
-    struct  stream_type_t {
-        stream_type_t()
-            :   volume(1.0f),
-                mute(false)
-        {
-        }
-        float       volume;
-        bool        mute;
-    };
-
-    // --- PlaybackThread ---
-
-#include "Threads.h"
 
 #include "PatchPanel.h"
 
@@ -617,7 +604,7 @@ private:
             const uint32_t sessionType = threads.valueAt(i)->hasAudioSession(sessionId);
             if (sessionType != 0) {
                 io = threads.keyAt(i);
-                if ((sessionType & AudioFlinger::ThreadBase::EFFECT_SESSION) != 0) {
+                if ((sessionType & IAfThreadBase::EFFECT_SESSION) != 0) {
                     break; // effect chain here.
                 }
             }
@@ -625,40 +612,16 @@ private:
         return io;
     }
 
-    // Mmap stream control interface implementation. Each MmapThreadHandle controls one
-    // MmapPlaybackThread or MmapCaptureThread instance.
-    class MmapThreadHandle : public MmapStreamInterface {
-    public:
-        explicit            MmapThreadHandle(const sp<MmapThread>& thread);
-        virtual             ~MmapThreadHandle();
-
-        // MmapStreamInterface virtuals
-        virtual status_t createMmapBuffer(int32_t minSizeFrames,
-                                          struct audio_mmap_buffer_info *info);
-        virtual status_t getMmapPosition(struct audio_mmap_position *position);
-        virtual status_t getExternalPosition(uint64_t *position, int64_t *timeNanos);
-        virtual status_t start(const AudioClient& client,
-                               const audio_attributes_t *attr,
-                               audio_port_handle_t *handle);
-        virtual status_t stop(audio_port_handle_t handle);
-        virtual status_t standby();
-                status_t reportData(const void* buffer, size_t frameCount) override;
-
-    private:
-        const sp<MmapThread> mThread;
-    };
-
-              ThreadBase *checkThread_l(audio_io_handle_t ioHandle) const;
-              sp<AudioFlinger::ThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const
-                      REQUIRES(mLock);
-              PlaybackThread *checkPlaybackThread_l(audio_io_handle_t output) const;
-              MixerThread *checkMixerThread_l(audio_io_handle_t output) const;
-              RecordThread *checkRecordThread_l(audio_io_handle_t input) const;
-              MmapThread *checkMmapThread_l(audio_io_handle_t io) const;
+    IAfThreadBase* checkThread_l(audio_io_handle_t ioHandle) const;
+    sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const REQUIRES(mLock);
+    IAfPlaybackThread* checkPlaybackThread_l(audio_io_handle_t output) const;
+    IAfPlaybackThread* checkMixerThread_l(audio_io_handle_t output) const;
+    IAfRecordThread* checkRecordThread_l(audio_io_handle_t input) const;
+    IAfMmapThread* checkMmapThread_l(audio_io_handle_t io) const;
               sp<VolumeInterface> getVolumeInterface_l(audio_io_handle_t output) const;
               std::vector<sp<VolumeInterface>> getAllVolumeInterfaces_l() const;
 
-              sp<ThreadBase> openInput_l(audio_module_handle_t module,
+    sp<IAfThreadBase> openInput_l(audio_module_handle_t module,
                                            audio_io_handle_t *input,
                                            audio_config_t *config,
                                            audio_devices_t device,
@@ -667,7 +630,7 @@ private:
                                            audio_input_flags_t flags,
                                            audio_devices_t outputDevice,
                                            const String8& outputDeviceAddress);
-              sp<ThreadBase> openOutput_l(audio_module_handle_t module,
+    sp<IAfThreadBase> openOutput_l(audio_module_handle_t module,
                                           audio_io_handle_t *output,
                                           audio_config_t *halConfig,
                                           audio_config_base_t *mixerConfig,
@@ -675,8 +638,8 @@ private:
                                           const String8& address,
                                           audio_output_flags_t flags);
 
-              void closeOutputFinish(const sp<PlaybackThread>& thread);
-              void closeInputFinish(const sp<RecordThread>& thread);
+    void closeOutputFinish(const sp<IAfPlaybackThread>& thread);
+    void closeInputFinish(const sp<IAfRecordThread>& thread);
 
               // no range check, AudioFlinger::mLock held
               bool streamMute_l(audio_stream_type_t stream) const
@@ -701,30 +664,28 @@ private:
               audio_unique_id_t nextUniqueId(audio_unique_id_use_t use);
 
               status_t moveEffectChain_l(audio_session_t sessionId,
-                                     PlaybackThread *srcThread,
-                                     PlaybackThread *dstThread);
+            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread);
 
 public:
     // TODO(b/288339104) cluster together
               status_t moveAuxEffectToIo(int EffectId,
-                                         const sp<PlaybackThread>& dstThread,
-                                         sp<PlaybackThread> *srcThread);
+            const sp<IAfPlaybackThread>& dstThread, sp<IAfPlaybackThread>* srcThread);
 private:
 
               // return thread associated with primary hardware device, or NULL
-              PlaybackThread *primaryPlaybackThread_l() const;
+              IAfPlaybackThread* primaryPlaybackThread_l() const;
               DeviceTypeSet primaryOutputDevice_l() const;
 
               // return the playback thread with smallest HAL buffer size, and prefer fast
-              PlaybackThread *fastPlaybackThread_l() const;
+              IAfPlaybackThread* fastPlaybackThread_l() const;
 
-              sp<ThreadBase> getEffectThread_l(audio_session_t sessionId, int effectId);
+              sp<IAfThreadBase> getEffectThread_l(audio_session_t sessionId, int effectId);
 
-              ThreadBase *hapticPlaybackThread_l() const;
+              IAfThreadBase* hapticPlaybackThread_l() const;
 
               void updateSecondaryOutputsForTrack_l(
                       IAfTrack* track,
-                      PlaybackThread* thread,
+                      IAfPlaybackThread* thread,
                       const std::vector<audio_io_handle_t>& secondaryOutputs) const;
 
 
@@ -762,7 +723,7 @@ private:
                 void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices);
                 void forwardParametersToDownstreamPatches_l(
                         audio_io_handle_t upStream, const String8& keyValuePairs,
-                        const std::function<bool(const sp<PlaybackThread>&)>& useThread = nullptr);
+            const std::function<bool(const sp<IAfPlaybackThread>&)>& useThread = nullptr);
 
     struct TeePatch {
         sp<IAfPatchRecord> patchRecord;
@@ -835,7 +796,7 @@ private:
     mutable     hardware_call_state                 mHardwareStatus;    // for dump only
 
 
-                DefaultKeyedVector< audio_io_handle_t, sp<PlaybackThread> >  mPlaybackThreads;
+    DefaultKeyedVector<audio_io_handle_t, sp<IAfPlaybackThread>> mPlaybackThreads;
                 stream_type_t                       mStreamTypes[AUDIO_STREAM_CNT];
 
                 // member variables below are protected by mLock
@@ -844,7 +805,7 @@ private:
                 float                               mMasterBalance = 0.f;
                 // end of variables protected by mLock
 
-                DefaultKeyedVector< audio_io_handle_t, sp<RecordThread> >    mRecordThreads;
+    DefaultKeyedVector<audio_io_handle_t, sp<IAfRecordThread>> mRecordThreads;
 
                 // protected by mClientLock
                 DefaultKeyedVector< pid_t, sp<NotificationClient> >    mNotificationClients;
@@ -875,17 +836,17 @@ private:
                 // list of MMAP stream control threads. Those threads allow for wake lock, routing
                 // and volume control for activity on the associated MMAP stream at the HAL.
                 // Audio data transfer is directly handled by the client creating the MMAP stream
-                DefaultKeyedVector< audio_io_handle_t, sp<MmapThread> >  mMmapThreads;
+    DefaultKeyedVector<audio_io_handle_t, sp<IAfMmapThread>> mMmapThreads;
 
 private:
     sp<Client>  registerPid(pid_t pid);    // always returns non-0
 
     // for use from destructor
     status_t    closeOutput_nonvirtual(audio_io_handle_t output);
-    void        closeThreadInternal_l(const sp<PlaybackThread>& thread);
+    void closeThreadInternal_l(const sp<IAfPlaybackThread>& thread);
     status_t    closeInput_nonvirtual(audio_io_handle_t input);
-    void        closeThreadInternal_l(const sp<RecordThread>& thread);
-    void        setAudioHwSyncForSession_l(PlaybackThread *thread, audio_session_t sessionId);
+    void closeThreadInternal_l(const sp<IAfRecordThread>& thread);
+    void setAudioHwSyncForSession_l(IAfPlaybackThread* thread, audio_session_t sessionId);
 
     status_t    checkStreamType(audio_stream_type_t stream) const;
 

@@ -18,6 +18,11 @@
 
 namespace android {
 
+class IAfDuplicatingThread;
+class IAfPlaybackThread;
+class IAfRecordThread;
+class IAfThreadBase;
+
 // Common interface to all Playback and Record tracks.
 class IAfTrackBase : public virtual RefBase {
 public:
@@ -97,8 +102,7 @@ public:
     virtual void releaseBuffer(AudioBufferProvider::Buffer* buffer) = 0;
 
     // Added for RecordTrack and OutputTrack
-    // TODO(b/288339104) type
-    virtual wp<Thread> thread() const = 0;
+    virtual wp<IAfThreadBase> thread() const = 0;
     virtual const sp<ServerProxy>& serverProxy() const = 0;
 
     // TEE_SINK
@@ -221,8 +225,8 @@ public:
     // Only one AIDL IAudioTrack interface adapter should be created per Track.
     static sp<media::IAudioTrack> createIAudioTrackAdapter(const sp<IAfTrack>& track);
 
-    static sp<IAfTrack> create( // TODO(b/288339104) void*
-            void* /* AudioFlinger::PlaybackThread */ thread,
+    static sp<IAfTrack> create(
+            IAfPlaybackThread* thread,
             const sp<Client>& client,
             audio_stream_type_t streamType,
             const audio_attributes_t& attr,
@@ -387,8 +391,8 @@ class IAfOutputTrack : public virtual IAfTrack {
 public:
     // TODO(b/288339104) void*
     static sp<IAfOutputTrack> create(
-            void* /* AudioFlinger::PlaybackThread */ playbackThread,
-            void* /* AudioFlinger::DuplicatingThread */ sourceThread, uint32_t sampleRate,
+            IAfPlaybackThread* playbackThread,
+            IAfDuplicatingThread* sourceThread, uint32_t sampleRate,
             audio_format_t format, audio_channel_mask_t channelMask, size_t frameCount,
             const AttributionSourceState& attributionSource);
 
@@ -405,7 +409,7 @@ public:
 class IAfMmapTrack : public virtual IAfTrackBase {
 public:
     // TODO(b/288339104) void*
-    static sp<IAfMmapTrack> create(void* /*AudioFlinger::ThreadBase */ thread,
+    static sp<IAfMmapTrack> create(IAfThreadBase* thread,
             const audio_attributes_t& attr,
             uint32_t sampleRate,
             audio_format_t format,
@@ -443,7 +447,7 @@ public:
     static sp<media::IAudioRecord> createIAudioRecordAdapter(const sp<IAfRecordTrack>& recordTrack);
 
     // TODO(b/288339104) void*
-    static sp<IAfRecordTrack> create(void* /* AudioFlinger::RecordThread */ thread,
+    static sp<IAfRecordTrack> create(IAfRecordThread* thread,
             const sp<Client>& client,
             const audio_attributes_t& attr,
             uint32_t sampleRate,
@@ -521,7 +525,7 @@ public:
 class IAfPatchTrack : public virtual IAfTrack, public virtual IAfPatchTrackBase {
 public:
     static sp<IAfPatchTrack> create(
-            void * /* PlaybackThread */ playbackThread, // TODO(b/288339104)
+            IAfPlaybackThread* playbackThread,
             audio_stream_type_t streamType,
             uint32_t sampleRate,
             audio_channel_mask_t channelMask,
@@ -540,7 +544,7 @@ public:
 class IAfPatchRecord : public virtual IAfRecordTrack, public virtual IAfPatchTrackBase {
 public:
     static sp<IAfPatchRecord> create(
-            void* /* RecordThread */ recordThread, // TODO(b/288339104)
+            IAfRecordThread* recordThread,
             uint32_t sampleRate,
             audio_channel_mask_t channelMask,
             audio_format_t format,
@@ -552,7 +556,7 @@ public:
             audio_source_t source = AUDIO_SOURCE_DEFAULT);
 
     static sp<IAfPatchRecord> createPassThru(
-            void* /* RecordThread */ recordThread, // TODO(b/288339104)
+            IAfRecordThread* recordThread,
             uint32_t sampleRate,
             audio_channel_mask_t channelMask,
             audio_format_t format,
