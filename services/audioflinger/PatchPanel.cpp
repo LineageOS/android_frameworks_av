@@ -50,14 +50,14 @@ namespace android {
 
 /* List connected audio ports and their attributes */
 status_t AudioFlinger::listAudioPorts(unsigned int *num_ports,
-                                struct audio_port *ports)
+        struct audio_port* ports) const
 {
     Mutex::Autolock _l(mLock);
     return mPatchPanel->listAudioPorts(num_ports, ports);
 }
 
 /* Get supported attributes for a given audio port */
-status_t AudioFlinger::getAudioPort(struct audio_port_v7 *port) {
+status_t AudioFlinger::getAudioPort(struct audio_port_v7* port) const {
     status_t status = AudioValidator::validateAudioPort(*port);
     if (status != NO_ERROR) {
         return status;
@@ -88,8 +88,8 @@ status_t AudioFlinger::releaseAudioPatch(audio_patch_handle_t handle)
 }
 
 /* List connected audio ports and they attributes */
-status_t AudioFlinger::listAudioPatches(unsigned int *num_patches,
-                                  struct audio_patch *patches)
+status_t AudioFlinger::listAudioPatches(
+        unsigned int* num_patches, struct audio_patch* patches) const
 {
     Mutex::Autolock _l(mLock);
     return mPatchPanel->listAudioPatches(num_patches, patches);
