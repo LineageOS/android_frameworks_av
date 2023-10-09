@@ -2971,6 +2971,11 @@ static const effect_uuid_t SL_IID_VOLUME_ = { 0x09e8ede0, 0xddde, 0x11db, 0xb4f6
 const effect_uuid_t * const SL_IID_VOLUME = &SL_IID_VOLUME_;
 #endif //OPENSL_ES_H_
 
+// Dolby Atmos
+static const effect_uuid_t SL_IID_DAP_ = { 0x46d279d9, 0x9be7, 0x453d, 0x9d7c,
+                                         { 0xef, 0x93, 0x7f, 0x67, 0x55, 0x87 } };
+const effect_uuid_t * const SL_IID_DAP = &SL_IID_DAP_;
+
 /* static */
 bool EffectChain::isEffectEligibleForBtNrecSuspend_l(const effect_uuid_t* type) {
     // Only NS and AEC are suspended when BtNRec is off
@@ -2990,6 +2995,7 @@ bool EffectChain::isEffectEligibleForSuspend(const effect_descriptor_t& desc)
           (desc.flags & EFFECT_FLAG_NOT_ELIGIBLE_SUSPEND) ||
           (memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) ||
           (memcmp(&desc.type, SL_IID_VOLUME, sizeof(effect_uuid_t)) == 0) ||
+          (memcmp(&desc.type, SL_IID_DAP, sizeof(effect_uuid_t)) == 0) ||
           (memcmp(&desc.type, SL_IID_DYNAMICSPROCESSING, sizeof(effect_uuid_t)) == 0)))) {
         return false;
     }
