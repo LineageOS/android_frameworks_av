@@ -15,7 +15,6 @@
 ** limitations under the License.
 */
 
-
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
 
@@ -23,73 +22,44 @@
 #define AUDIO_ARRAYS_STATIC_CHECK 1
 
 #include "Configuration.h"
-#include <dirent.h>
-#include <math.h>
-#include <signal.h>
-#include <string>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <thread>
-
-#include <android-base/stringprintf.h>
-#include <android/media/IAudioPolicyService.h>
-#include <android/os/IExternalVibratorService.h>
-#include <binder/IPCThreadState.h>
-#include <binder/IServiceManager.h>
-#include <utils/Log.h>
-#include <utils/Trace.h>
-#include <binder/Parcel.h>
-#include <media/audiohal/AudioHalVersionInfo.h>
-#include <media/audiohal/DeviceHalInterface.h>
-#include <media/audiohal/DevicesFactoryHalInterface.h>
-#include <media/audiohal/EffectsFactoryHalInterface.h>
-#include <media/AudioParameter.h>
-#include <media/MediaMetricsItem.h>
-#include <media/TypeConverter.h>
-#include <mediautils/TimeCheck.h>
-#include <memunreachable/memunreachable.h>
-#include <utils/String16.h>
-#include <utils/threads.h>
-
-#include <cutils/atomic.h>
-#include <cutils/properties.h>
-
-#include <system/audio.h>
-#include <audiomanager/IAudioManager.h>
-
 #include "AudioFlinger.h"
 #include "EffectConfiguration.h"
+
+//#define BUFLOG_NDEBUG 0
+#include <afutils/BufLog.h>
+#include <afutils/DumpTryLock.h>
+#include <afutils/Permission.h>
 #include <afutils/PropertyUtils.h>
-
-#include <media/AudioResamplerPublic.h>
-
-#include <system/audio_effects/effect_visualizer.h>
-#include <system/audio_effects/effect_ns.h>
-#include <system/audio_effects/effect_aec.h>
-#include <system/audio_effects/effect_hapticgenerator.h>
-#include <system/audio_effects/effect_spatializer.h>
-
-#include <audio_utils/primitives.h>
-
-#include <powermanager/PowerManager.h>
-
-#include <media/IMediaLogService.h>
+#include <afutils/TypedLogger.h>
+#include <android-base/stringprintf.h>
+#include <android/media/IAudioPolicyService.h>
+#include <audiomanager/IAudioManager.h>
+#include <binder/IPCThreadState.h>
+#include <binder/IServiceManager.h>
+#include <binder/Parcel.h>
+#include <cutils/properties.h>
 #include <media/AidlConversion.h>
+#include <media/AudioParameter.h>
 #include <media/AudioValidator.h>
-#include <media/nbaio/Pipe.h>
-#include <media/nbaio/PipeReader.h>
+#include <media/IMediaLogService.h>
+#include <media/MediaMetricsItem.h>
+#include <media/TypeConverter.h>
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/MemoryLeakTrackUtil.h>
 #include <mediautils/MethodStatistics.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
-#include <private/android_filesystem_config.h>
+#include <memunreachable/memunreachable.h>
+// required for effect matching
+#include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_ns.h>
+#include <system/audio_effects/effect_spatializer.h>
+#include <system/audio_effects/effect_visualizer.h>
+#include <utils/Log.h>
 
-//#define BUFLOG_NDEBUG 0
-#include <afutils/DumpTryLock.h>
-#include <afutils/BufLog.h>
-#include <afutils/Permission.h>
-#include <afutils/TypedLogger.h>
+// not needed with the includes above, added to prevent transitive include dependency.
+#include <chrono>
+#include <thread>
 
 // ----------------------------------------------------------------------------
 
@@ -515,7 +485,7 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
                                              sp<MmapStreamInterface>& interface,
                                              audio_port_handle_t *handle)
 {
-    // TODO: Use ServiceManager to get IAudioFlinger instead of by atomic pointer.
+    // TODO(b/292281786): Use ServiceManager to get IAudioFlinger instead of by atomic pointer.
     // This allows moving oboeservice (AAudio) to a separate process in the future.
     sp<AudioFlinger> af = AudioFlinger::gAudioFlinger.load();  // either nullptr or singleton AF.
     status_t ret = NO_INIT;
