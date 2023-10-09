@@ -17,6 +17,11 @@
 
 #pragma once
 
+#include "IAfPatchPanel.h"
+
+#include <map>  // avoid transitive dependency
+#include <set>  // avoid transitive dependency
+
 namespace android {
 
 class PatchPanel : public IAfPatchPanel {
