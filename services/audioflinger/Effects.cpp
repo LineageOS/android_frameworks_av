@@ -3271,11 +3271,11 @@ int32_t EffectChain::EffectCallback::activeTrackCnt() const {
 /* static */
 sp<IAfDeviceEffectProxy> IAfDeviceEffectProxy::create(
         const AudioDeviceTypeAddr& device,
-        const sp</* DeviceEffectManagerCallback */ RefBase>& callback,  // TODO(b/288339104) type
+        const sp<DeviceEffectManagerCallback>& callback,
         effect_descriptor_t *desc, int id, bool notifyFramesProcessed)
 {
     return sp<DeviceEffectProxy>::make(device,
-            sp<AudioFlinger::DeviceEffectManagerCallback>::cast(callback),
+            callback,
             desc, id, notifyFramesProcessed);
 }
 
