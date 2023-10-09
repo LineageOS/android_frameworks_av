@@ -131,6 +131,7 @@
 // Classes that depend on IAf* interfaces but are not cross-dependent.
 #include "PatchCommandThread.h"
 #include "DeviceEffectManager.h"
+#include "MelReporter.h"
 
 namespace android {
 
@@ -165,6 +166,7 @@ class AudioFlinger : public AudioFlingerServerAdapter::Delegate
     friend class Client; // removeClient_l();
     friend class DeviceEffectManager;
     friend class DeviceEffectManagerCallback;
+    friend class MelReporter;
     friend class PatchPanel;
     // TODO(b/291012167) replace the Thread friends with an interface.
     friend class DirectOutputThread;
@@ -586,8 +588,6 @@ private:
 public:
     using TeePatches = std::vector<TeePatch>;
 private:
-
-#include "MelReporter.h"
 
     // Find io handle by session id.
     // Preference is given to an io handle with a matching effect chain to session id.
