@@ -22,6 +22,8 @@ namespace android {
 
 class IAfDirectOutputThread;
 class IAfDuplicatingThread;
+class IAfMmapCaptureThread;
+class IAfMmapPlaybackThread;
 class IAfPlaybackThread;
 class IAfRecordThread;
 
@@ -427,6 +429,57 @@ public:
             audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
             int64_t sharedAudioStartMs = -1) = 0;
     virtual void resetAudioHistory_l() = 0;
+};
+
+class IAfMmapThread : public virtual IAfThreadBase {
+public:
+    // createIAudioTrackAdapter() is a static constructor which creates an
+    // MmapStreamInterface AIDL interface adapter from the MmapThread object that
+    // may be passed back to the client.
+    //
+    // Only one AIDL MmapStreamInterface interface adapter should be created per MmapThread.
+    static sp<MmapStreamInterface> createMmapStreamInterfaceAdapter(
+            const sp<IAfMmapThread>& mmapThread);
+
+    virtual void configure(
+            const audio_attributes_t* attr,
+            audio_stream_type_t streamType,
+            audio_session_t sessionId,
+            const sp<MmapStreamCallback>& callback,
+            audio_port_handle_t deviceId,
+            audio_port_handle_t portId) = 0;
+    virtual void disconnect() = 0;
+
+    // MmapStreamInterface handling (see adapter)
+    virtual status_t createMmapBuffer(
+            int32_t minSizeFrames, struct audio_mmap_buffer_info* info) = 0;
+    virtual status_t getMmapPosition(struct audio_mmap_position* position) const = 0;
+    virtual status_t start(
+            const AudioClient& client, const audio_attributes_t* attr,
+            audio_port_handle_t* handle) = 0;
+    virtual status_t stop(audio_port_handle_t handle) = 0;
+    virtual status_t standby() = 0;
+    virtual status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
+    virtual status_t reportData(const void* buffer, size_t frameCount) = 0;
+
+    // TODO(b/288339104)  move to IAfThreadBase?
+    virtual void invalidateTracks(std::set<audio_port_handle_t>& portIds) = 0;
+
+    // Sets the UID records silence - TODO(b/288339104)  move to IAfMmapCaptureThread
+    virtual void setRecordSilenced(audio_port_handle_t portId, bool silenced) = 0;
+
+    virtual sp<IAfMmapPlaybackThread> asIAfMmapPlaybackThread() { return nullptr; }
+    virtual sp<IAfMmapCaptureThread> asIAfMmapCaptureThread() { return nullptr; }
+};
+
+class IAfMmapPlaybackThread : public virtual IAfMmapThread, public virtual VolumeInterface {
+public:
+    virtual AudioStreamOut* clearOutput() = 0;
+};
+
+class IAfMmapCaptureThread : public virtual IAfMmapThread {
+public:
+    virtual AudioStreamIn* clearInput() = 0;
 };
 
 }  // namespace android

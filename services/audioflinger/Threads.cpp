@@ -9795,51 +9795,80 @@ void AudioFlinger::RecordThread::toAudioPortConfig(struct audio_port_config *con
 //      Mmap
 // ----------------------------------------------------------------------------
 
-AudioFlinger::MmapThreadHandle::MmapThreadHandle(const sp<MmapThread>& thread)
+// Mmap stream control interface implementation. Each MmapThreadHandle controls one
+// MmapPlaybackThread or MmapCaptureThread instance.
+class MmapThreadHandle : public MmapStreamInterface {
+public:
+    explicit MmapThreadHandle(const sp<IAfMmapThread>& thread);
+    ~MmapThreadHandle() override;
+
+    // MmapStreamInterface virtuals
+    status_t createMmapBuffer(int32_t minSizeFrames,
+        struct audio_mmap_buffer_info* info) final;
+    status_t getMmapPosition(struct audio_mmap_position* position) final;
+    status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) final;
+    status_t start(const AudioClient& client,
+           const audio_attributes_t* attr, audio_port_handle_t* handle) final;
+    status_t stop(audio_port_handle_t handle) final;
+    status_t standby() final;
+    status_t reportData(const void* buffer, size_t frameCount) final;
+private:
+    const sp<IAfMmapThread> mThread;
+};
+
+/* static */
+sp<MmapStreamInterface> IAfMmapThread::createMmapStreamInterfaceAdapter(
+        const sp<IAfMmapThread>& mmapThread) {
+    return sp<MmapThreadHandle>::make(mmapThread);
+}
+
+MmapThreadHandle::MmapThreadHandle(const sp<IAfMmapThread>& thread)
     : mThread(thread)
 {
     assert(thread != 0); // thread must start non-null and stay non-null
 }
 
-AudioFlinger::MmapThreadHandle::~MmapThreadHandle()
+// MmapStreamInterface could be directly implemented by MmapThread excepting this
+// special handling on adapter dtor.
+MmapThreadHandle::~MmapThreadHandle()
 {
     mThread->disconnect();
 }
 
-status_t AudioFlinger::MmapThreadHandle::createMmapBuffer(int32_t minSizeFrames,
+status_t MmapThreadHandle::createMmapBuffer(int32_t minSizeFrames,
                                   struct audio_mmap_buffer_info *info)
 {
     return mThread->createMmapBuffer(minSizeFrames, info);
 }
 
-status_t AudioFlinger::MmapThreadHandle::getMmapPosition(struct audio_mmap_position *position)
+status_t MmapThreadHandle::getMmapPosition(struct audio_mmap_position* position)
 {
     return mThread->getMmapPosition(position);
 }
 
-status_t AudioFlinger::MmapThreadHandle::getExternalPosition(uint64_t *position,
+status_t MmapThreadHandle::getExternalPosition(uint64_t* position,
                                                              int64_t *timeNanos) {
     return mThread->getExternalPosition(position, timeNanos);
 }
 
-status_t AudioFlinger::MmapThreadHandle::start(const AudioClient& client,
+status_t MmapThreadHandle::start(const AudioClient& client,
         const audio_attributes_t *attr, audio_port_handle_t *handle)
-
 {
     return mThread->start(client, attr, handle);
 }
 
-status_t AudioFlinger::MmapThreadHandle::stop(audio_port_handle_t handle)
+status_t MmapThreadHandle::stop(audio_port_handle_t handle)
 {
     return mThread->stop(handle);
 }
 
-status_t AudioFlinger::MmapThreadHandle::standby()
+status_t MmapThreadHandle::standby()
 {
     return mThread->standby();
 }
 
-status_t AudioFlinger::MmapThreadHandle::reportData(const void* buffer, size_t frameCount) {
+status_t MmapThreadHandle::reportData(const void* buffer, size_t frameCount)
+{
     return mThread->reportData(buffer, frameCount);
 }
 
@@ -9913,7 +9942,7 @@ status_t AudioFlinger::MmapThread::createMmapBuffer(int32_t minSizeFrames,
     return mHalStream->createMmapBuffer(minSizeFrames, info);
 }
 
-status_t AudioFlinger::MmapThread::getMmapPosition(struct audio_mmap_position *position)
+status_t AudioFlinger::MmapThread::getMmapPosition(struct audio_mmap_position* position) const
 {
     if (mHalStream == 0) {
         return NO_INIT;
