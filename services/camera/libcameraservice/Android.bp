@@ -37,7 +37,7 @@ license {
 
 cc_defaults {
     name: "libcameraservice_deps",
-
+    defaults: ["android.hardware.graphics.common-ndk_shared"],
     shared_libs: [
         "libactivitymanager_aidl",
         "libbase",
@@ -83,7 +83,6 @@ cc_defaults {
         "android.hardware.camera.device@3.7",
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
-        "android.hardware.graphics.common-V5-ndk",
         "camera_platform_flags_c_lib",
         "media_permission-aidl-cpp",
     ],
