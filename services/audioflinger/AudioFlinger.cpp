@@ -329,7 +329,6 @@ AudioFlinger::AudioFlinger()
       mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
       mPatchCommandThread(sp<PatchCommandThread>::make()),
-      mMelReporter(sp<MelReporter>::make(*this)),
       mSystemReady(false),
       mBluetoothLatencyModesEnabled(true)
 {
@@ -412,6 +411,8 @@ void AudioFlinger::onFirstRef()
         mAAudioBurstsPerBuffer = getAAudioMixerBurstCountFromSystemProperty();
         mAAudioHwBurstMinMicros = getAAudioHardwareBurstMinUsecFromSystemProperty();
     }
+
+    mMelReporter = sp<MelReporter>::make(sp<IAfMelReporterCallback>::fromExisting(this));
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
