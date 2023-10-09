@@ -86,6 +86,7 @@
 #include <private/android_filesystem_config.h>
 
 //#define BUFLOG_NDEBUG 0
+#include <afutils/DumpTryLock.h>
 #include <afutils/BufLog.h>
 #include <afutils/TypedLogger.h>
 
@@ -858,12 +859,6 @@ void AudioFlinger::dumpPermissionDenial(int fd, const Vector<String16>& args __u
     write(fd, result.c_str(), result.size());
 }
 
-bool AudioFlinger::dumpTryLock(Mutex& mutex)
-{
-    status_t err = mutex.timedLock(kDumpLockTimeoutNs);
-    return err == NO_ERROR;
-}
-
 status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
 NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 {
@@ -871,7 +866,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
         dumpPermissionDenial(fd, args);
     } else {
         // get state of hardware lock
-        bool hardwareLocked = dumpTryLock(mHardwareLock);
+        const bool hardwareLocked = afutils::dumpTryLock(mHardwareLock);
         if (!hardwareLocked) {
             String8 result(kHardwareLockedString);
             write(fd, result.c_str(), result.size());
@@ -879,7 +874,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             mHardwareLock.unlock();
         }
 
-        const bool locked = dumpTryLock(mLock);
+        const bool locked = afutils::dumpTryLock(mLock);
 
         // failed to lock - AudioFlinger is probably deadlocked
         if (!locked) {
@@ -887,7 +882,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             write(fd, result.c_str(), result.size());
         }
 
-        bool clientLocked = dumpTryLock(mClientLock);
+        const bool clientLocked = afutils::dumpTryLock(mClientLock);
         if (!clientLocked) {
             String8 result(kClientLockedString);
             write(fd, result.c_str(), result.size());

@@ -30,6 +30,7 @@
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_spatializer.h>
 #include <system/audio_effects/effect_visualizer.h>
+#include <afutils/DumpTryLock.h>
 #include <audio_utils/channels.h>
 #include <audio_utils/primitives.h>
 #include <media/AudioCommonTypes.h>
@@ -507,7 +508,7 @@ NO_THREAD_SAFETY_ANALYSIS // conditional try lock
 
     result.appendFormat("\tEffect ID %d:\n", mId);
 
-    bool locked = AudioFlinger::dumpTryLock(mLock);
+    const bool locked = afutils::dumpTryLock(mLock);
     // failed to lock - AudioFlinger is probably deadlocked
     if (!locked) {
         result.append("\t\tCould not lock Fx mutex:\n");
@@ -1617,7 +1618,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     EffectBase::dump(fd, args);
 
     String8 result;
-    bool locked = AudioFlinger::dumpTryLock(mLock);
+    const bool locked = afutils::dumpTryLock(mLock);
 
     result.append("\t\tStatus Engine:\n");
     result.appendFormat("\t\t%03d    %p\n",
@@ -2091,7 +2092,7 @@ void EffectHandle::framesProcessed(int32_t frames) const
 void EffectHandle::dumpToBuffer(char* buffer, size_t size) const
 NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 {
-    bool locked = mCblk != NULL && AudioFlinger::dumpTryLock(mCblk->lock);
+    const bool locked = mCblk != nullptr && afutils::dumpTryLock(mCblk->lock);
 
     snprintf(buffer, size, "\t\t\t%5d    %5d  %3s    %3s  %5u  %5u\n",
             (mClient == 0) ? getpid() : mClient->pid(),
@@ -2658,7 +2659,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     result.appendFormat("    %zu effects for session %d\n", numEffects, mSessionId);
 
     if (numEffects) {
-        bool locked = AudioFlinger::dumpTryLock(mLock);
+        const bool locked = afutils::dumpTryLock(mLock);
         // failed to lock - AudioFlinger is probably deadlocked
         if (!locked) {
             result.append("\tCould not lock mutex:\n");
@@ -3494,7 +3495,7 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
     const Vector<String16> args;
     EffectBase::dump(fd, args);
 
-    const bool locked = AudioFlinger::dumpTryLock(mProxyLock);
+    const bool locked = afutils::dumpTryLock(mProxyLock);
     if (!locked) {
         String8 result("DeviceEffectProxy may be deadlocked\n");
         write(fd, result.c_str(), result.size());

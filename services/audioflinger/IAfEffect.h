@@ -16,9 +16,22 @@
 
 #pragma once
 
+#include "IAfPatchPanel.h"  // full class Patch definition needed
+
+#include <android/media/AudioVibratorInfo.h>
+#include <android/media/BnEffect.h>
+#include <android/media/BnEffectClient.h>
+#include <media/AudioCommonTypes.h>  // product_strategy_t
+#include <media/AudioDeviceTypeAddr.h>
+#include <media/audiohal/EffectHalInterface.h>
+#include <utils/RefBase.h>
+#include <vibrator/ExternalVibration.h>
+
 namespace android {
 
+class Client;
 class DeviceEffectManagerCallback;
+
 class IAfDeviceEffectProxy;
 class IAfEffectBase;
 class IAfEffectChain;
