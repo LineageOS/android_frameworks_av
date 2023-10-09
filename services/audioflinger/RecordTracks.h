@@ -15,16 +15,16 @@
 ** limitations under the License.
 */
 
+#pragma once
+
 #include <android/content/AttributionSourceState.h>
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+namespace android {
 
 // record track
 class RecordTrack : public TrackBase, public virtual IAfRecordTrack {
 public:
-                        RecordTrack(RecordThread *thread,
+                        RecordTrack(AudioFlinger::RecordThread* thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& attr,
                                 uint32_t sampleRate,
@@ -85,14 +85,26 @@ public:
     using MetadataInserter = std::back_insert_iterator<SinkMetadatas>;
     void copyMetadataTo(MetadataInserter& backInserter) const final;
 
+    AudioBufferProvider::Buffer& sinkBuffer() final { return mSink; }
+    audioflinger::SynchronizedRecordState& synchronizedRecordState() final {
+        return mSynchronizedRecordState;
+    }
+    RecordBufferConverter* recordBufferConverter() const final { return mRecordBufferConverter; }
+    ResamplerBufferProvider* resamplerBufferProvider() const final {
+        return mResamplerBufferProvider;
+    }
+
 private:
     friend class AudioFlinger;  // for mState
 
     DISALLOW_COPY_AND_ASSIGN(RecordTrack);
 
+protected:
     // AudioBufferProvider interface
-    virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
     // releaseBuffer() not overridden
+
+private:
 
     bool                mOverflow;  // overflow on most recent attempt to fill client buffer
 
@@ -106,7 +118,7 @@ private:
                     mSynchronizedRecordState{mSampleRate}; // sampleRate defined in base
 
             // used by resampler to find source frames
-            ResamplerBufferProvider            *mResamplerBufferProvider;
+            ResamplerBufferProvider* mResamplerBufferProvider;
 
             // used by the record thread to convert frames to proper destination format
             RecordBufferConverter              *mRecordBufferConverter;
@@ -121,8 +133,7 @@ private:
 // playback track, used by PatchPanel
 class PatchRecord : public RecordTrack, public PatchTrackBase, public IAfPatchRecord {
 public:
-
-    PatchRecord(RecordThread *recordThread,
+    PatchRecord(AudioFlinger::RecordThread* recordThread,
                 uint32_t sampleRate,
                 audio_channel_mask_t channelMask,
                 audio_format_t format,
@@ -158,7 +169,7 @@ protected:
 
 class PassthruPatchRecord : public PatchRecord, public Source {
 public:
-    PassthruPatchRecord(RecordThread *recordThread,
+    PassthruPatchRecord(AudioFlinger::RecordThread* recordThread,
                         uint32_t sampleRate,
                         audio_channel_mask_t channelMask,
                         audio_format_t format,
@@ -201,7 +212,7 @@ private:
         PassthruPatchRecord& mPassthru;
     };
 
-    sp<StreamInHalInterface> obtainStream(sp<ThreadBase>* thread);
+    sp<StreamInHalInterface> obtainStream(sp<AudioFlinger::ThreadBase>* thread);
 
     PatchRecordAudioBufferProvider mPatchRecordAudioBufferProvider;
     std::unique_ptr<void, decltype(free)*> mSinkBuffer;  // frame size aligned continuous buffer
@@ -213,3 +224,5 @@ private:
     status_t mReadError = NO_ERROR; // GUARDED_BY(mReadLock)
     int64_t mLastReadFrames = 0;  // accessed on RecordThread only
 };
+
+} // namespace android

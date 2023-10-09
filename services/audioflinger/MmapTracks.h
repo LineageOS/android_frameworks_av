@@ -15,14 +15,14 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
+
+namespace android {
 
 // playback track
 class MmapTrack : public TrackBase, public IAfMmapTrack {
 public:
-                MmapTrack(ThreadBase *thread,
+                MmapTrack(AudioFlinger::ThreadBase* thread,
                             const audio_attributes_t& attr,
                             uint32_t sampleRate,
                             audio_format_t format,
@@ -87,3 +87,4 @@ private:
             GUARDED_BY(AudioFlinger::MmapPlaybackThread::mLock);
 };  // end of Track
 
+} // namespace android

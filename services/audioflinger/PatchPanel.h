@@ -216,9 +216,9 @@ public:
         // the objects are created by createConnections() and released by clearConnections()
         // playback thread is created if no existing playback thread can be used
         // connects playback thread output to sink device
-        Endpoint<PlaybackThread, PlaybackThread::PatchTrack> mPlayback;
+        Endpoint<PlaybackThread, IAfPatchTrack> mPlayback;
         // connects source device to record thread input
-        Endpoint<RecordThread, RecordThread::PatchRecord> mRecord;
+        Endpoint<RecordThread, IAfPatchRecord> mRecord;
 
         wp<ThreadBase> mThread;
         bool mIsEndpointPatch;
