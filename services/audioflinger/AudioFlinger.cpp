@@ -127,8 +127,6 @@ static constexpr char kAudioServiceName[] = "audio";
 
 nsecs_t AudioFlinger::mStandbyTimeInNsecs = kDefaultStandbyTimeInNsecs;
 
-uint32_t AudioFlinger::mScreenState;
-
 // In order to avoid invalidating offloaded tracks each time a Visualizer is turned on and off
 // we define a minimum time during which a global effect is considered enabled.
 static const nsecs_t kMinGlobalEffectEnabletimeNs = seconds(7200);
@@ -1950,8 +1948,8 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
         String8 screenState;
         if (param.get(String8(AudioParameter::keyScreenState), screenState) == NO_ERROR) {
             bool isOff = (screenState == AudioParameter::valueOff);
-            if (isOff != (AudioFlinger::mScreenState & 1)) {
-                AudioFlinger::mScreenState = ((AudioFlinger::mScreenState & ~1) + 2) | isOff;
+            if (isOff != (mScreenState & 1)) {
+                mScreenState = ((mScreenState & ~1) + 2) | isOff;
             }
         }
         return final_result;
