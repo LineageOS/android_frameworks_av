@@ -435,7 +435,7 @@ status_t AudioFlinger::updateSecondaryOutputs(
         for (; i < mPlaybackThreads.size(); ++i) {
             PlaybackThread *thread = mPlaybackThreads.valueAt(i).get();
             Mutex::Autolock _tl(thread->mLock);
-            sp<PlaybackThread::Track> track = thread->getTrackById_l(trackId);
+            sp<IAfTrack> track = thread->getTrackById_l(trackId);
             if (track != nullptr) {
                 ALOGD("%s trackId: %u", __func__, trackId);
                 updateSecondaryOutputsForTrack_l(track.get(), thread, secondaryOutputs);
@@ -1107,7 +1107,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
     CreateTrackInput input = VALUE_OR_RETURN_STATUS(CreateTrackInput::fromAidl(_input));
     CreateTrackOutput output;
 
-    sp<PlaybackThread::Track> track;
+    sp<IAfTrack> track;
     sp<Client> client;
     status_t lStatus;
     audio_stream_type_t streamType;
@@ -1297,7 +1297,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         AudioSystem::moveEffectsToIo(effectIds, effectThreadId);
     }
 
-    output.audioTrack = PlaybackThread::Track::createIAudioTrackAdapter(track);
+    output.audioTrack = IAfTrack::createIAudioTrackAdapter(track);
     _output = VALUE_OR_FATAL(output.toAidl());
 
 Exit:
@@ -2549,7 +2549,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     output.buffers = recordTrack->getBuffers();
     output.portId = portId;
 
-    output.audioRecord = RecordThread::RecordTrack::createIAudioRecordAdapter(recordTrack);
+    output.audioRecord = IAfRecordTrack::createIAudioRecordAdapter(recordTrack);
     _output = VALUE_OR_FATAL(output.toAidl());
 
 Exit:
@@ -3899,7 +3899,7 @@ AudioFlinger::ThreadBase *AudioFlinger::hapticPlaybackThread_l() const {
 }
 
 void AudioFlinger::updateSecondaryOutputsForTrack_l(
-        PlaybackThread::Track* track,
+        IAfTrack* track,
         PlaybackThread* thread,
         const std::vector<audio_io_handle_t> &secondaryOutputs) const {
     TeePatches teePatches;
@@ -3989,14 +3989,14 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
         patchTrack->setPeerProxy(patchRecord, true /* holdReference */);
         patchRecord->setPeerProxy(patchTrack, false /* holdReference */);
     }
-    track->setTeePatchesToUpdate(std::move(teePatches));
+    track->setTeePatchesToUpdate(&teePatches);  // TODO(b/288339104) void* to std::move()
 }
 
 sp<audioflinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_event_t type,
                                     audio_session_t triggerSession,
                                     audio_session_t listenerSession,
                                     const audioflinger::SyncEventCallback& callBack,
-                                    const wp<RefBase>& cookie)
+                                    const wp<IAfTrackBase>& cookie)
 {
     Mutex::Autolock _l(mLock);
 

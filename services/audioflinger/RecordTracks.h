@@ -22,15 +22,8 @@
 #endif
 
 // record track
-class RecordTrack : public TrackBase {
+class RecordTrack : public TrackBase, public IAfRecordTrack {
 public:
-    // createIAudioRecordAdapter() is a static constructor which creates an
-    // IAudioRecord AIDL interface wrapper from the RecordTrack object that
-    // may be passed back to the client (if needed).
-    //
-    // Only one AIDL IAudioRecord interface wrapper should be created per RecordTrack.
-    static sp<media::IAudioRecord> createIAudioRecordAdapter(const sp<RecordTrack>& recordTrack);
-
                         RecordTrack(RecordThread *thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& attr,
@@ -47,57 +40,50 @@ public:
                                 track_type type,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 int32_t startFrames = -1);
-    virtual             ~RecordTrack();
-    virtual status_t    initCheck() const;
+    ~RecordTrack() override;
+    status_t initCheck() const final;
 
-    virtual status_t    start(AudioSystem::sync_event_t event, audio_session_t triggerSession);
-    virtual void        stop();
+    status_t start(AudioSystem::sync_event_t event, audio_session_t triggerSession) final;
+    void stop() final;
+    void destroy() final;
+    void invalidate() final;
 
-            void        destroy();
-
-    virtual void        invalidate();
             // clear the buffer overflow flag
-            void        clearOverflow() { mOverflow = false; }
+    void clearOverflow() final { mOverflow = false; }
             // set the buffer overflow flag and return previous value
-            bool        setOverflow() { bool tmp = mOverflow; mOverflow = true;
+    bool setOverflow() final { bool tmp = mOverflow; mOverflow = true;
                                                 return tmp; }
 
-            void        appendDumpHeader(String8& result);
-            void        appendDump(String8& result, bool active);
+    void appendDumpHeader(String8& result) const final;
+    void appendDump(String8& result, bool active) const final;
 
-            void        handleSyncStartEvent(const sp<audioflinger::SyncEvent>& event);
-            void        clearSyncStartEvent();
+    void handleSyncStartEvent(const sp<audioflinger::SyncEvent>& event) final;
+    void clearSyncStartEvent() final;
 
-            void        updateTrackFrameInfo(int64_t trackFramesReleased,
+    void updateTrackFrameInfo(int64_t trackFramesReleased,
                                              int64_t sourceFramesRead,
                                              uint32_t halSampleRate,
-                                             const ExtendedTimestamp &timestamp);
+                                             const ExtendedTimestamp &timestamp) final;
 
-    virtual bool        isFastTrack() const { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
-            bool        isDirect() const override
+    bool isFastTrack() const final { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
+    bool isDirect() const final
                                 { return (mFlags & AUDIO_INPUT_FLAG_DIRECT) != 0; }
 
-            void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
-            bool        isSilenced() const { return mSilenced; }
+    void setSilenced(bool silenced) final { if (!isPatchTrack()) mSilenced = silenced; }
+    bool isSilenced() const final { return mSilenced; }
 
-            status_t    getActiveMicrophones(
-                    std::vector<media::MicrophoneInfoFw>* activeMicrophones);
+    status_t getActiveMicrophones(
+            std::vector<media::MicrophoneInfoFw>* activeMicrophones) const final;
 
-            status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
-            status_t    setPreferredMicrophoneFieldDimension(float zoom);
-            status_t    shareAudioHistory(const std::string& sharedAudioPackageName,
-                                          int64_t sharedAudioStartMs);
-            int32_t     startFrames() { return mStartFrames; }
+    status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction) final;
+    status_t setPreferredMicrophoneFieldDimension(float zoom) final;
+    status_t shareAudioHistory(const std::string& sharedAudioPackageName,
+            int64_t sharedAudioStartMs) final;
+    int32_t startFrames() const final { return mStartFrames; }
 
-    static  bool        checkServerLatencySupported(
-                                audio_format_t format, audio_input_flags_t flags) {
-                            return audio_is_linear_pcm(format)
-                                    && (flags & AUDIO_INPUT_FLAG_HW_AV_SYNC) == 0;
-                        }
-
-            using SinkMetadatas = std::vector<record_track_metadata_v7_t>;
-            using MetadataInserter = std::back_insert_iterator<SinkMetadatas>;
-            virtual void    copyMetadataTo(MetadataInserter& backInserter) const;
+    using SinkMetadatas = std::vector<record_track_metadata_v7_t>;
+    using MetadataInserter = std::back_insert_iterator<SinkMetadatas>;
+    void copyMetadataTo(MetadataInserter& backInserter) const final;
 
 private:
     friend class AudioFlinger;  // for mState

@@ -35,7 +35,7 @@ struct FastMixerDumpState;
 class VolumeProvider {
 public:
     // The provider implementation is responsible for validating that the return value is in range.
-    virtual gain_minifloat_packed_t getVolumeLR() = 0;
+    virtual gain_minifloat_packed_t getVolumeLR() const = 0;
 protected:
     VolumeProvider() = default;
     virtual ~VolumeProvider() = default;
