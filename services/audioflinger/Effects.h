@@ -659,22 +659,11 @@ public:
     status_t setEnabled(bool enabled, bool fromHandle) final;
     sp<IAfDeviceEffectProxy> asDeviceEffectProxy() final { return this; }
 
-    // TODO(b/288339104) type
-    status_t init(const /* std::map<audio_patch_handle_t,
-            PatchPanel::Patch>& */ void * patches) final {
-        return init(*reinterpret_cast<const std::map<
-                audio_patch_handle_t, AudioFlinger::PatchPanel::Patch> *>(patches));
-    }
-    // TODO(b/288339104) type
-    status_t onCreatePatch(audio_patch_handle_t patchHandle,
-            /* const PatchPanel::Patch& */ const void * patch) final {
-        return onCreatePatch(patchHandle,
-                *reinterpret_cast<const AudioFlinger::PatchPanel::Patch *>(patch));
-    }
+    status_t init(const std::map<audio_patch_handle_t,
+            IAfPatchPanel::Patch>& patches) final;
 
-    status_t init(const std::map<audio_patch_handle_t, AudioFlinger::PatchPanel::Patch>& patches);
-    status_t onCreatePatch(
-            audio_patch_handle_t patchHandle, const AudioFlinger::PatchPanel::Patch& patch);
+    status_t onCreatePatch(audio_patch_handle_t patchHandle,
+            const IAfPatchPanel::Patch& patch) final;
 
     void onReleasePatch(audio_patch_handle_t patchHandle) final;
 
@@ -752,7 +741,7 @@ private:
         const sp<AudioFlinger::DeviceEffectManagerCallback> mManagerCallback;
     };
 
-    status_t checkPort(const AudioFlinger::PatchPanel::Patch& patch,
+    status_t checkPort(const IAfPatchPanel::Patch& patch,
             const struct audio_port_config *port, sp<IAfEffectHandle> *handle);
 
     const AudioDeviceTypeAddr mDevice;

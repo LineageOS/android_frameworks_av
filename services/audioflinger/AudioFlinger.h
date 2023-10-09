@@ -159,6 +159,7 @@ class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
     friend class sp<AudioFlinger>;
     friend class Client; // removeClient_l();
+    friend class PatchPanel;
     // TODO(b/291012167) replace the Thread friends with an interface.
     friend class DirectOutputThread;
     friend class MixerThread;
@@ -577,15 +578,12 @@ private:
     class DeviceEffectManager;
     // TODO(b/288339104) these should be separate files
 public:
-    class PatchPanel;
     class DeviceEffectManagerCallback;
 private:
     struct TeePatch;
 public:
     using TeePatches = std::vector<TeePatch>;
 private:
-
-#include "PatchPanel.h"
 
 #include "PatchCommandThread.h"
 

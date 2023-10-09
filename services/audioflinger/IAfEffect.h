@@ -341,13 +341,13 @@ public:
                 effect_descriptor_t *desc, int id, bool notifyFramesProcessed);
 
     virtual status_t init(
-            const /* std::map<audio_patch_handle_t,
-            PatchPanel::Patch>& */ void * patches) = 0; // TODO(b/288339104) type
+            const std::map<audio_patch_handle_t,
+            IAfPatchPanel::Patch>& patches) = 0;
     virtual const AudioDeviceTypeAddr& device() const = 0;
 
     virtual status_t onCreatePatch(
             audio_patch_handle_t patchHandle,
-            /* const PatchPanel::Patch& */ const void * patch) = 0;
+            const IAfPatchPanel::Patch& patch) = 0;
     virtual void onReleasePatch(audio_patch_handle_t patchHandle) = 0;
 
     virtual void dump2(int fd, int spaces) const = 0; // TODO(b/288339104) naming?
