@@ -18,6 +18,7 @@
 
 namespace android {
 
+class DeviceEffectManagerCallback;
 class IAfDeviceEffectProxy;
 class IAfEffectBase;
 class IAfEffectChain;
@@ -335,9 +336,8 @@ private:
 
 class IAfDeviceEffectProxy : public virtual IAfEffectBase {
 public:
-    // TODO(b/288339104) type
     static sp<IAfDeviceEffectProxy> create(const AudioDeviceTypeAddr& device,
-                const sp</* DeviceEffectManagerCallback */ RefBase>& callback,
+                const sp<DeviceEffectManagerCallback>& callback,
                 effect_descriptor_t *desc, int id, bool notifyFramesProcessed);
 
     virtual status_t init(

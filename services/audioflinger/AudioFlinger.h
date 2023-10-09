@@ -130,6 +130,7 @@
 
 // Classes that depend on IAf* interfaces but are not cross-dependent.
 #include "PatchCommandThread.h"
+#include "DeviceEffectManager.h"
 
 namespace android {
 
@@ -162,6 +163,8 @@ class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
     friend class sp<AudioFlinger>;
     friend class Client; // removeClient_l();
+    friend class DeviceEffectManager;
+    friend class DeviceEffectManagerCallback;
     friend class PatchPanel;
     // TODO(b/291012167) replace the Thread friends with an interface.
     friend class DirectOutputThread;
@@ -578,17 +581,11 @@ private:
     void requestLogMerge();
 
     // TODO(b/288339104) replace these forward declaration classes with interfaces.
-    class DeviceEffectManager;
-    // TODO(b/288339104) these should be separate files
-public:
-    class DeviceEffectManagerCallback;
 private:
     struct TeePatch;
 public:
     using TeePatches = std::vector<TeePatch>;
 private:
-
-#include "DeviceEffectManager.h"
 
 #include "MelReporter.h"
 
