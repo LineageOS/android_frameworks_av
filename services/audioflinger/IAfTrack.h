@@ -19,9 +19,18 @@
 namespace android {
 
 class IAfDuplicatingThread;
+class IAfPatchRecord;
+class IAfPatchTrack;
 class IAfPlaybackThread;
 class IAfRecordThread;
 class IAfThreadBase;
+
+struct TeePatch {
+    sp<IAfPatchRecord> patchRecord;
+    sp<IAfPatchTrack> patchTrack;
+};
+
+using TeePatches = std::vector<TeePatch>;
 
 // Common interface to all Playback and Record tracks.
 class IAfTrackBase : public virtual RefBase {
@@ -313,9 +322,8 @@ public:
     // This function should be called with holding thread lock.
     virtual void updateTeePatches() = 0;
 
-    // TODO(b/288339104) type
-    virtual void setTeePatchesToUpdate(
-            const void* teePatchesToUpdate /* TeePatches& teePatchesToUpdate */) = 0;
+    // Argument teePatchesToUpdate is by value, use std::move to optimize.
+    virtual void setTeePatchesToUpdate(TeePatches teePatchesToUpdate) = 0;
 
     static bool checkServerLatencySupported(audio_format_t format, audio_output_flags_t flags) {
         return audio_is_linear_pcm(format) && (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) == 0;
