@@ -1882,7 +1882,7 @@ void EffectHandle::disconnect(bool unpinIfLast)
         }
         mCblkMemory.clear();    // free the shared memory before releasing the heap it belongs to
         // Client destructor must run with AudioFlinger client mutex locked
-        Mutex::Autolock _l2(mClient->audioFlinger()->mClientLock);
+        Mutex::Autolock _l2(mClient->afClientCallback()->clientMutex());
         mClient.clear();
     }
 }

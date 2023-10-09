@@ -19,23 +19,34 @@
 // TODO(b/291318727) Move to nested namespace
 namespace android {
 
-class AudioFlinger;
+class IAfPlaybackThread;
+
+class IAfClientCallback : public virtual RefBase {
+public:
+    virtual Mutex& clientMutex() const = 0;
+    virtual void removeClient_l(pid_t pid) = 0;
+    virtual void removeNotificationClient(pid_t pid) = 0;
+    virtual status_t moveAuxEffectToIo(
+            int effectId,
+            const sp<IAfPlaybackThread>& dstThread,
+            sp<IAfPlaybackThread>* srcThread) = 0;
+};
 
 class Client : public RefBase {
 public:
-    Client(const sp<AudioFlinger>& audioFlinger, pid_t pid);
+    Client(const sp<IAfClientCallback>& audioFlinger, pid_t pid);
 
     // TODO(b/289139675) make Client container.
     // Client destructor must be called with AudioFlinger::mClientLock held
     ~Client() override;
     AllocatorFactory::ClientAllocator& allocator();
     pid_t pid() const { return mPid; }
-    sp<AudioFlinger> audioFlinger() const { return mAudioFlinger; }
+    const auto& afClientCallback() const { return mAfClientCallback; }
 
 private:
     DISALLOW_COPY_AND_ASSIGN(Client);
 
-    const sp<AudioFlinger> mAudioFlinger;
+    const sp<IAfClientCallback> mAfClientCallback;
     const pid_t mPid;
     AllocatorFactory::ClientAllocator mClientAllocator;
 };
