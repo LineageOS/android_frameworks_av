@@ -135,7 +135,7 @@ status_t AudioFlinger::PatchPanel::getAudioPort(struct audio_port_v7 *port)
 status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *patch,
                                    audio_patch_handle_t *handle,
                                    bool endpointPatch)
- //unlocks AudioFlinger::mLock when calling ThreadBase::sendCreateAudioPatchConfigEvent
+ //unlocks AudioFlinger::mLock when calling IAfThreadBase::sendCreateAudioPatchConfigEvent
  //to avoid deadlocks if the thread loop needs to acquire AudioFlinger::mLock
  //before processing the create patch request.
  NO_THREAD_SAFETY_ANALYSIS
@@ -249,7 +249,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         status = INVALID_OPERATION;
                         goto exit;
                     }
-                    sp<ThreadBase> thread =
+                    const sp<IAfThreadBase> thread =
                             mAudioFlinger.checkPlaybackThread_l(patch->sources[1].ext.mix.handle);
                     if (thread == 0) {
                         ALOGW("%s() cannot get playback thread", __func__);
@@ -258,7 +258,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     }
                     // existing playback thread is reused, so it is not closed when patch is cleared
                     newPatch.mPlayback.setThread(
-                            reinterpret_cast<PlaybackThread*>(thread.get()), false /*closeThread*/);
+                            thread->asIAfPlaybackThread().get(), false /*closeThread*/);
                 } else {
                     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
                     audio_config_base_t mixerConfig = AUDIO_CONFIG_BASE_INITIALIZER;
@@ -276,7 +276,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     if (patch->sinks[0].config_mask & AUDIO_PORT_CONFIG_FLAGS) {
                         flags = patch->sinks[0].flags.output;
                     }
-                    sp<ThreadBase> thread = mAudioFlinger.openOutput_l(
+                    const sp<IAfThreadBase> thread = mAudioFlinger.openOutput_l(
                                                             patch->sinks[0].ext.device.hw_module,
                                                             &output,
                                                             &config,
@@ -289,7 +289,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         status = NO_MEMORY;
                         goto exit;
                     }
-                    newPatch.mPlayback.setThread(reinterpret_cast<PlaybackThread*>(thread.get()));
+                    newPatch.mPlayback.setThread(thread->asIAfPlaybackThread().get());
                 }
                 audio_devices_t device = patch->sources[0].ext.device.type;
                 String8 address = String8(patch->sources[0].ext.device.address);
@@ -323,7 +323,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                                 == AUDIO_STREAM_VOICE_CALL) {
                     source = AUDIO_SOURCE_VOICE_COMMUNICATION;
                 }
-                sp<ThreadBase> thread = mAudioFlinger.openInput_l(srcModule,
+                const sp<IAfThreadBase> thread = mAudioFlinger.openInput_l(srcModule,
                                                                     &input,
                                                                     &config,
                                                                     device,
@@ -338,7 +338,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     status = NO_MEMORY;
                     goto exit;
                 }
-                newPatch.mRecord.setThread(reinterpret_cast<RecordThread*>(thread.get()));
+                newPatch.mRecord.setThread(thread->asIAfRecordThread().get());
                 status = newPatch.createConnections(this);
                 if (status != NO_ERROR) {
                     goto exit;
@@ -348,7 +348,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 }
             } else {
                 if (patch->sinks[0].type == AUDIO_PORT_TYPE_MIX) {
-                    sp<ThreadBase> thread = mAudioFlinger.checkRecordThread_l(
+                    sp<IAfThreadBase> thread = mAudioFlinger.checkRecordThread_l(
                                                               patch->sinks[0].ext.mix.handle);
                     if (thread == 0) {
                         thread = mAudioFlinger.checkMmapThread_l(patch->sinks[0].ext.mix.handle);
@@ -411,7 +411,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 device->applyAudioPortConfig(&patch->sinks[i]);
                 devices.push_back(device);
             }
-            sp<ThreadBase> thread =
+            sp<IAfThreadBase> thread =
                             mAudioFlinger.checkPlaybackThread_l(patch->sources[0].ext.mix.handle);
             if (thread == 0) {
                 thread = mAudioFlinger.checkMmapThread_l(patch->sources[0].ext.mix.handle);
@@ -735,7 +735,7 @@ String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle) con
 
 /* Disconnect a patch */
 status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle)
- //unlocks AudioFlinger::mLock when calling ThreadBase::sendReleaseAudioPatchConfigEvent
+ //unlocks AudioFlinger::mLock when calling IAfThreadBase::sendReleaseAudioPatchConfigEvent
  //to avoid deadlocks if the thread loop needs to acquire AudioFlinger::mLock
  //before processing the release patch request.
  NO_THREAD_SAFETY_ANALYSIS
@@ -767,7 +767,7 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
 
             if (patch.sinks[0].type == AUDIO_PORT_TYPE_MIX) {
                 audio_io_handle_t ioHandle = patch.sinks[0].ext.mix.handle;
-                sp<ThreadBase> thread = mAudioFlinger.checkRecordThread_l(ioHandle);
+                sp<IAfThreadBase> thread = mAudioFlinger.checkRecordThread_l(ioHandle);
                 if (thread == 0) {
                     thread = mAudioFlinger.checkMmapThread_l(ioHandle);
                     if (thread == 0) {
@@ -790,7 +790,7 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
                 break;
             }
             audio_io_handle_t ioHandle = src.ext.mix.handle;
-            sp<ThreadBase> thread = mAudioFlinger.checkPlaybackThread_l(ioHandle);
+            sp<IAfThreadBase> thread = mAudioFlinger.checkPlaybackThread_l(ioHandle);
             if (thread == 0) {
                 thread = mAudioFlinger.checkMmapThread_l(ioHandle);
                 if (thread == 0) {

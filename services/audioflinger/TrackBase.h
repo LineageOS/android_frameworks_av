@@ -22,7 +22,7 @@ namespace android {
 // base for record and playback
 class TrackBase : public ExtendedAudioBufferProvider, public virtual IAfTrackBase {
 public:
-                        TrackBase(AudioFlinger::ThreadBase* thread,
+    TrackBase(IAfThreadBase* thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& mAttr,
                                 uint32_t sampleRate,
@@ -69,8 +69,7 @@ public:
     bool isSpatialized() const override { return false; }
     bool isBitPerfect() const override { return false; }
 
-    // TODO(b/288339104) type
-    wp<Thread> thread() const final { return mThread; }
+    wp<IAfThreadBase> thread() const final { return mThread; }
 
     const sp<ServerProxy>& serverProxy() const final { return mServerProxy; }
 
@@ -306,7 +305,7 @@ protected:
                                     // true for Track, false for RecordTrack,
                                     // this could be a track type if needed later
 
-    const wp<AudioFlinger::ThreadBase> mThread;
+    const wp<IAfThreadBase> mThread;
     const alloc_type     mAllocType;
     /*const*/ sp<Client> mClient;   // see explanation at ~TrackBase() why not const
     sp<IMemory>         mCblkMemory;
@@ -374,7 +373,7 @@ class PatchTrackBase : public PatchProxyBufferProvider, public virtual IAfPatchT
 {
 public:
                         PatchTrackBase(const sp<ClientProxy>& proxy,
-                                       const AudioFlinger::ThreadBase& thread,
+                                       const IAfThreadBase& thread,
                                        const Timeout& timeout);
             void setPeerTimeout(std::chrono::nanoseconds timeout) final;
             void setPeerProxy(const sp<IAfPatchTrackBase>& proxy, bool holdReference) final {

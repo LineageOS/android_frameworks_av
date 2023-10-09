@@ -22,7 +22,7 @@ namespace android {
 // playback track
 class MmapTrack : public TrackBase, public IAfMmapTrack {
 public:
-                MmapTrack(AudioFlinger::ThreadBase* thread,
+    MmapTrack(IAfThreadBase* thread,
                             const audio_attributes_t& attr,
                             uint32_t sampleRate,
                             audio_format_t format,
