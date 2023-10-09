@@ -22,7 +22,7 @@
 #endif
 
 // record track
-class RecordTrack : public TrackBase, public IAfRecordTrack {
+class RecordTrack : public TrackBase, public virtual IAfRecordTrack {
 public:
                         RecordTrack(RecordThread *thread,
                                 const sp<Client>& client,
@@ -119,7 +119,7 @@ private:
 };
 
 // playback track, used by PatchPanel
-class PatchRecord : public RecordTrack, public PatchTrackBase {
+class PatchRecord : public RecordTrack, public PatchTrackBase, public IAfPatchRecord {
 public:
 
     PatchRecord(RecordThread *recordThread,
@@ -132,20 +132,20 @@ public:
                 audio_input_flags_t flags,
                 const Timeout& timeout = {},
                 audio_source_t source = AUDIO_SOURCE_DEFAULT);
-    virtual             ~PatchRecord();
+    ~PatchRecord() override;
 
-    virtual Source* getSource() { return nullptr; }
+    Source* getSource() override { return nullptr; }
 
     // AudioBufferProvider interface
-    virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
-    virtual void releaseBuffer(AudioBufferProvider::Buffer* buffer);
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
 
     // PatchProxyBufferProvider interface
-    virtual status_t    obtainBuffer(Proxy::Buffer *buffer,
-                                     const struct timespec *timeOut = NULL);
-    virtual void        releaseBuffer(Proxy::Buffer *buffer);
+    status_t obtainBuffer(Proxy::Buffer* buffer,
+                                     const struct timespec* timeOut = nullptr) override;
+    void releaseBuffer(Proxy::Buffer* buffer) override;
 
-    size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) {
+    size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) final {
         return writeFrames(this, src, frameCount, frameSize);
     }
 
@@ -166,25 +166,25 @@ public:
                         audio_input_flags_t flags,
                         audio_source_t source = AUDIO_SOURCE_DEFAULT);
 
-    Source* getSource() override { return static_cast<Source*>(this); }
+    Source* getSource() final { return static_cast<Source*>(this); }
 
     // Source interface
-    status_t read(void *buffer, size_t bytes, size_t *read) override;
-    status_t getCapturePosition(int64_t *frames, int64_t *time) override;
-    status_t standby() override;
+    status_t read(void* buffer, size_t bytes, size_t* read) final;
+    status_t getCapturePosition(int64_t* frames, int64_t* time) final;
+    status_t standby() final;
 
     // AudioBufferProvider interface
     // This interface is used by RecordThread to pass the data obtained
     // from HAL or other source to the client. PassthruPatchRecord receives
     // the data in 'obtainBuffer' so these calls are stubbed out.
-    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
-    void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) final;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) final;
 
     // PatchProxyBufferProvider interface
     // This interface is used from DirectOutputThread to acquire data from HAL.
-    bool producesBufferOnDemand() const override { return true; }
-    status_t obtainBuffer(Proxy::Buffer *buffer, const struct timespec *timeOut = nullptr) override;
-    void releaseBuffer(Proxy::Buffer *buffer) override;
+    bool producesBufferOnDemand() const final { return true; }
+    status_t obtainBuffer(Proxy::Buffer* buffer, const struct timespec* timeOut = nullptr) final;
+    void releaseBuffer(Proxy::Buffer* buffer) final;
 
 private:
     // This is to use with PatchRecord::writeFrames

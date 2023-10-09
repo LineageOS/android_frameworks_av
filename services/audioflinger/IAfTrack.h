@@ -376,4 +376,40 @@ public:
     virtual void copyMetadataTo(MetadataInserter& backInserter) const = 0; // see IAfTrack
 };
 
+// PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.
+// it provides buffer access methods that map those of a ClientProxy (see AudioTrackShared.h)
+class PatchProxyBufferProvider {
+public:
+    virtual ~PatchProxyBufferProvider() = default;
+    virtual bool producesBufferOnDemand() const = 0;
+    virtual status_t obtainBuffer(
+            Proxy::Buffer* buffer, const struct timespec* requested = nullptr) = 0;
+    virtual void releaseBuffer(Proxy::Buffer* buffer) = 0;
+};
+
+class IAfPatchTrackBase : public virtual RefBase {
+public:
+    virtual void setPeerTimeout(std::chrono::nanoseconds timeout) = 0;
+    virtual void setPeerProxy(const sp<IAfPatchTrackBase>& proxy, bool holdReference) = 0;
+    virtual void clearPeerProxy() = 0;
+    virtual PatchProxyBufferProvider* asPatchProxyBufferProvider() = 0;
+};
+
+class IAfPatchTrack : public virtual IAfTrack, public virtual IAfPatchTrackBase {};
+
+// Abstraction for the Audio Source for the RecordThread (HAL or PassthruPatchRecord).
+struct Source {
+    virtual ~Source() = default;
+    // The following methods have the same signatures as in StreamHalInterface.
+    virtual status_t read(void* buffer, size_t bytes, size_t* read) = 0;
+    virtual status_t getCapturePosition(int64_t* frames, int64_t* time) = 0;
+    virtual status_t standby() = 0;
+};
+
+class IAfPatchRecord : public virtual IAfRecordTrack, public virtual IAfPatchTrackBase {
+public:
+    virtual Source* getSource() = 0;
+    virtual size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) = 0;
+};
+
 }  // namespace android

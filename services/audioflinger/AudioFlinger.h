@@ -593,16 +593,6 @@ private:
         bool        mute;
     };
 
-    // Abstraction for the Audio Source for the RecordThread (HAL or PassthruPatchRecord).
-    struct Source
-    {
-        virtual ~Source() = default;
-        // The following methods have the same signatures as in StreamHalInterface.
-        virtual status_t read(void *buffer, size_t bytes, size_t *read) = 0;
-        virtual status_t getCapturePosition(int64_t *frames, int64_t *time) = 0;
-        virtual status_t standby() = 0;
-    };
-
     // --- PlaybackThread ---
 
 #include "Threads.h"
