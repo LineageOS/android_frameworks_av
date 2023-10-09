@@ -62,8 +62,6 @@ public:
                             mute_state_t muteState)
                             /* REQUIRES(MmapPlaybackThread::mLock) */ final;
 private:
-    friend class MmapThread;
-
     DISALLOW_COPY_AND_ASSIGN(MmapTrack);
 
     // AudioBufferProvider interface

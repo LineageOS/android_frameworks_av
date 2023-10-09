@@ -486,10 +486,10 @@ public:
     virtual status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
     virtual status_t reportData(const void* buffer, size_t frameCount) = 0;
 
-    // TODO(b/288339104)  move to IAfThreadBase?
+    // TODO(b/291317898)  move to IAfThreadBase?
     virtual void invalidateTracks(std::set<audio_port_handle_t>& portIds) = 0;
 
-    // Sets the UID records silence - TODO(b/288339104)  move to IAfMmapCaptureThread
+    // Sets the UID records silence - TODO(b/291317898)  move to IAfMmapCaptureThread
     virtual void setRecordSilenced(audio_port_handle_t portId, bool silenced) = 0;
 
     virtual sp<IAfMmapPlaybackThread> asIAfMmapPlaybackThread() { return nullptr; }

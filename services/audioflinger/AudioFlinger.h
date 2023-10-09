@@ -151,8 +151,6 @@ class ServerProxy;
 
 static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
-#define INCLUDING_FROM_AUDIOFLINGER_H
-
 using android::content::AttributionSourceState;
 
 struct stream_type_t {
@@ -163,6 +161,7 @@ struct stream_type_t {
 class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
     friend class sp<AudioFlinger>;
+    // TODO(b/291319167) Create interface and remove friends.
     friend class Client; // removeClient_l();
     friend class DeviceEffectManager;
     friend class DeviceEffectManagerCallback;
@@ -513,7 +512,7 @@ private:
     // Internal dump utilities.
     static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
 public:
-    // TODO(b/288339104) extract to afutils
+    // TODO(b/291319167) extract to afutils
     static bool dumpTryLock(Mutex& mutex);
 private:
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
@@ -657,7 +656,7 @@ private:
             IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread);
 
 public:
-    // TODO(b/288339104) cluster together
+    // TODO(b/291319167) cluster together
               status_t moveAuxEffectToIo(int EffectId,
             const sp<IAfPlaybackThread>& dstThread, sp<IAfPlaybackThread>* srcThread);
 private:
@@ -682,7 +681,7 @@ private:
                 void        removeClient_l(pid_t pid);
                 void        removeNotificationClient(pid_t pid);
 public:
-    // TODO(b/288339104) cluster together
+    // TODO(b/291319167) cluster together
                 bool isNonOffloadableGlobalEffectEnabled_l();
 private:
                 void onNonOffloadableGlobalEffectEnable();
@@ -704,7 +703,7 @@ private:
                 // and removed from mOrphanEffectChains if it does not contain any effect.
                 // Return true if the effect was found in mOrphanEffectChains, false otherwise.
 public:
-// TODO(b/288339104) suggest better grouping
+// TODO(b/291319167) suggest better grouping
                 bool updateOrphanEffectChains(const sp<IAfEffectModule>& effect);
 private:
                 std::vector< sp<IAfEffectModule> > purgeStaleEffects_l();
@@ -726,13 +725,13 @@ private:
     };
 
 public:
-    // TODO(b/288339104) access by getter,
+    // TODO(b/291319167) access by getter,
     mutable     Mutex                               mLock;
                 // protects mClients and mNotificationClients.
                 // must be locked after mLock and ThreadBase::mLock if both must be locked
                 // avoids acquiring AudioFlinger::mLock from inside thread loop.
 
-    // TODO(b/288339104) access by getter,
+    // TODO(b/291319167) access by getter,
     mutable     Mutex                               mClientLock;
 private:
                 // protected by mClientLock
@@ -861,7 +860,7 @@ private:
     const sp<IAfPatchPanel> mPatchPanel = IAfPatchPanel::create(this);
 
 public:
-    // TODO(b/288339104) access by getter.
+    // TODO(b/291319167) access by getter.
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 private:
 
@@ -896,8 +895,6 @@ private:
     // Bluetooth Variable latency control logic is enabled or disabled
     std::atomic_bool mBluetoothLatencyModesEnabled;
 };
-
-#undef INCLUDING_FROM_AUDIOFLINGER_H
 
 std::string formatToString(audio_format_t format);
 std::string inputFlagsToString(audio_input_flags_t flags);

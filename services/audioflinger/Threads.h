@@ -22,10 +22,6 @@ namespace android {
 class AsyncCallbackThread;
 
 class ThreadBase : public virtual IAfThreadBase, public Thread {
-    // TODO(b/288339104) remove friends
-    friend class RecordTrack;
-    friend class Track;
-    friend class TrackBase;
 public:
     static const char *threadTypeToString(type_t type);
 
@@ -421,7 +417,7 @@ public:
     void disconnectEffectHandle(IAfEffectHandle* handle, bool unpinIfLast) final;
                 // detach all tracks connected to an auxiliary effect
     void detachAuxEffect_l(int /* effectId */) override {}
-    // TODO(b/288339104) - remove hasAudioSession_l below.
+    // TODO(b/291317898) - remove hasAudioSession_l below.
     uint32_t hasAudioSession_l(audio_session_t sessionId) const override = 0;
     uint32_t hasAudioSession(audio_session_t sessionId) const final {
                     Mutex::Autolock _l(mLock);
@@ -571,7 +567,7 @@ protected:
                                 return INVALID_OPERATION;
                             }
 public:
-// TODO(b/288339104) organize with publics
+// TODO(b/291317898) organize with publics
                 product_strategy_t getStrategyForStream(audio_stream_type_t stream) const;
 protected:
 
@@ -580,9 +576,6 @@ protected:
     virtual     void        dumpInternals_l(int fd __unused, const Vector<String16>& args __unused)
                             { }
     virtual     void        dumpTracks_l(int fd __unused, const Vector<String16>& args __unused) { }
-
-
-    friend class AudioFlinger;      // for mEffectChains and mAudioManager
 
                 const type_t            mType;
 
@@ -793,9 +786,6 @@ private:
 class PlaybackThread : public ThreadBase, public virtual IAfPlaybackThread,
                        public StreamOutHalInterfaceCallback,
                        public virtual VolumeInterface, public StreamOutHalInterfaceEventCallback {
-    // TODO(b/288339104) remove friends
-    friend class OutputTrack;
-    friend class Track;
 public:
     sp<IAfPlaybackThread> asIAfPlaybackThread() final {
         return sp<IAfPlaybackThread>::fromExisting(this);
@@ -1235,8 +1225,6 @@ protected:
     audio_session_t sessionId) const override {
                                 ThreadBase::invalidateTracksForAudioSession_l(sessionId, mTracks);
                             }
-
-    friend class AudioFlinger;      // for numerous
 
     DISALLOW_COPY_AND_ASSIGN(PlaybackThread);
 
@@ -1806,9 +1794,6 @@ private:
 // record thread
 class RecordThread : public IAfRecordThread, public ThreadBase
 {
-    // TODO(b/288339104) remove friends
-    friend class PassthruPatchRecord;
-    friend class RecordTrack;
     friend class ResamplerBufferProvider;
 public:
     sp<IAfRecordThread> asIAfRecordThread() final {
@@ -1866,7 +1851,7 @@ public:
     AudioStreamIn* getInput() const final { return mInput; }
     AudioStreamIn* clearInput() final;
 
-            // TODO(b/288339104) Unify with IAfThreadBase
+            // TODO(b/291317898) Unify with IAfThreadBase
             virtual sp<StreamHalInterface> stream() const;
 
 

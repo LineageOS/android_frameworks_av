@@ -95,8 +95,6 @@ public:
     }
 
 private:
-    friend class AudioFlinger;  // for mState
-
     DISALLOW_COPY_AND_ASSIGN(RecordTrack);
 
 protected:

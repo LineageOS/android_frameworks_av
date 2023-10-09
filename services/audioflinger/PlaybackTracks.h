@@ -214,11 +214,6 @@ public:
     void processMuteEvent_l(const sp<IAudioManager>& audioManager, mute_state_t muteState) final;
 
 protected:
-    // for numerous
-    friend class PlaybackThread;
-    friend class MixerThread;
-    friend class DirectOutputThread;
-    friend class OffloadThread;
 
     DISALLOW_COPY_AND_ASSIGN(Track);
 
