@@ -31,7 +31,6 @@
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/nblog/NBLog.h>
 #include <timing/SyncEvent.h>
-#include <utils/Mutex.h>
 #include <utils/RefBase.h>
 #include <vibrator/ExternalVibration.h>
 
@@ -311,7 +310,7 @@ public:
     // deliver stats to mediametrics.
     virtual void sendStatistics(bool force) = 0;
 
-    virtual Mutex& mutex() const = 0;
+    virtual audio_utils::mutex& mutex() const = 0;
 
     virtual void onEffectEnable(const sp<IAfEffectModule>& effect) = 0;
     virtual void onEffectDisable() = 0;

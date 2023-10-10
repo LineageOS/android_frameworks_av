@@ -77,20 +77,20 @@ public:
 
     // Config event sequence by client if status needed (e.g binder thread calling setParameters()):
     //  1. create SetParameterConfigEvent. This sets mWaitStatus in config event
-    //  2. Lock mLock
+    //  2. Lock mutex()
     //  3. Call sendConfigEvent_l(): Append to mConfigEvents and mWaitWorkCV.signal
     //  4. sendConfigEvent_l() reads status from event->mStatus;
     //  5. sendConfigEvent_l() returns status
     //  6. Unlock
     //
     // Parameter sequence by server: threadLoop calling processConfigEvents_l():
-    // 1. Lock mLock
+    // 1. Lock mutex()
     // 2. If there is an entry in mConfigEvents proceed ...
     // 3. Read first entry in mConfigEvents
     // 4. Remove first entry from mConfigEvents
     // 5. Process
     // 6. Set event->mStatus
-    // 7. event->mCond.signal
+    // 7. event->mCondition.notify_one()
     // 8. Unlock
 
     class ConfigEvent: public RefBase {
@@ -103,9 +103,10 @@ public:
             }
         }
 
+        audio_utils::mutex& mutex() const { return mMutex; }
         const int mType; // event type e.g. CFG_EVENT_IO
-        Mutex mLock;     // mutex associated with mCond
-        Condition mCond; // condition for status return
+        mutable audio_utils::mutex mMutex; // mutex associated with mCondition
+        audio_utils::condition_variable mCondition; // condition for status return
         status_t mStatus; // status communicated to sender
         bool mWaitStatus; // true if sender is waiting for status
         bool mRequiresSystemReady; // true if must wait for system ready to enter event queue
@@ -322,7 +323,7 @@ public:
     void exit() final;
     status_t setParameters(const String8& keyValuePairs) final;
 
-                // sendConfigEvent_l() must be called with ThreadBase::mLock held
+                // sendConfigEvent_l() must be called with ThreadBase::mutex() held
                 // Can temporarily release the lock if waiting for a reply from
                 // processConfigEvents_l().
     status_t sendConfigEvent_l(sp<ConfigEvent>& event);
@@ -439,7 +440,7 @@ public:
     // TODO(b/291317898) - remove hasAudioSession_l below.
     uint32_t hasAudioSession_l(audio_session_t sessionId) const override = 0;
     uint32_t hasAudioSession(audio_session_t sessionId) const final {
-                    Mutex::Autolock _l(mLock);
+                    std::lock_guard _l(mutex());
                     return hasAudioSession_l(sessionId);
                 }
 
@@ -507,19 +508,19 @@ public:
                 // deliver stats to mediametrics.
     void sendStatistics(bool force) final;
 
-    Mutex& mutex() const final {
-        return mLock;
+    audio_utils::mutex& mutex() const final {
+        return mMutex;
     }
-    mutable     Mutex                   mLock;
+    mutable audio_utils::mutex mMutex;
 
     void onEffectEnable(const sp<IAfEffectModule>& effect) final;
     void onEffectDisable() final;
 
-                // invalidateTracksForAudioSession_l must be called with holding mLock.
+                // invalidateTracksForAudioSession_l must be called with holding mutex().
     void invalidateTracksForAudioSession_l(audio_session_t /* sessionId */) const override {}
                 // Invalidate all the tracks with the given audio session.
     void invalidateTracksForAudioSession(audio_session_t sessionId) const final {
-                    Mutex::Autolock _l(mLock);
+                    std::lock_guard _l(mutex());
                     invalidateTracksForAudioSession_l(sessionId);
                 }
 
@@ -599,7 +600,7 @@ protected:
                 const type_t            mType;
 
                 // Used by parameters, config events, addTrack_l, exit
-                Condition               mWaitWorkCV;
+                audio_utils::condition_variable mWaitWorkCV;
 
                 const sp<IAfThreadCallback>  mAfThreadCallback;
                 ThreadMetrics           mThreadMetrics;
@@ -1041,7 +1042,7 @@ public:
                 }
 
     void setDownStreamPatch(const struct audio_patch* patch) final {
-                    Mutex::Autolock _l(mLock);
+                    std::lock_guard _l(mutex());
                     mDownStreamPatch = *patch;
                 }
 
@@ -1067,7 +1068,7 @@ public:
     void stopMelComputation_l() override;
 
     void setStandby() final {
-                    Mutex::Autolock _l(mLock);
+                    std::lock_guard _l(mutex());
                     setStandby_l();
                 }
 
@@ -1079,7 +1080,7 @@ public:
                 }
 
     bool waitForHalStart() final {
-                    Mutex::Autolock _l(mLock);
+                    audio_utils::unique_lock _l(mutex());
                     static const nsecs_t kWaitHalTimeoutNs = seconds(2);
                     nsecs_t endWaitTimetNs = systemTime() + kWaitHalTimeoutNs;
                     while (!mHalStarted) {
@@ -1088,7 +1089,7 @@ public:
                             break;
                         }
                         nsecs_t waitTimeLeftNs = endWaitTimetNs - timeNs;
-                        mWaitHalStartCV.waitRelative(mLock, waitTimeLeftNs);
+                        mWaitHalStartCV.wait_for(_l, std::chrono::nanoseconds(waitTimeLeftNs));
                     }
                     return mHalStarted;
                 }
@@ -1369,7 +1370,8 @@ protected:
 
     sp<AsyncCallbackThread>         mCallbackThread;
 
-    Mutex                                    mAudioTrackCbLock;
+    audio_utils::mutex& audioTrackCbMutex() const { return mAudioTrackCbMutex; }
+    mutable audio_utils::mutex mAudioTrackCbMutex;
     // Record of IAudioTrackCallback
     std::map<sp<IAfTrack>, sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
@@ -1390,7 +1392,7 @@ protected:
 
     // output stream start detection based on render position returned by the kernel
     // condition signalled when the output stream has started
-    Condition                mWaitHalStartCV;
+    audio_utils::condition_variable mWaitHalStartCV;
     // true when the output stream render position has moved, reset to false in standby
     bool                     mHalStarted = false;
     // last kernel render position saved when entering standby
@@ -1717,9 +1719,11 @@ private:
     // setDraining(). The sequence is shifted one bit to the left and the lsb is used
     // to indicate that the callback has been received via resetDraining()
     uint32_t                   mDrainSequence;
-    Condition                  mWaitWorkCV;
-    Mutex                      mLock;
+    audio_utils::condition_variable mWaitWorkCV;
+    mutable audio_utils::mutex mMutex;
     bool                       mAsyncError;
+
+    audio_utils::mutex& mutex() const { return mMutex; }
 };
 
 class DuplicatingThread : public MixerThread, public IAfDuplicatingThread {
@@ -1976,10 +1980,10 @@ private:
             Source                              *mSource;
             SortedVector <sp<IAfRecordTrack>>    mTracks;
             // mActiveTracks has dual roles:  it indicates the current active track(s), and
-            // is used together with mStartStopCond to indicate start()/stop() progress
+            // is used together with mStartStopCV to indicate start()/stop() progress
             ActiveTracks<IAfRecordTrack>           mActiveTracks;
 
-            Condition                           mStartStopCond;
+            audio_utils::condition_variable mStartStopCV;
 
             // resampler converts input at HAL Hz to output at AudioRecord client Hz
             void                               *mRsmpInBuffer;  // size = mRsmpInFramesOA
@@ -2081,7 +2085,7 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
     virtual void threadLoop_exit() final;
     virtual void threadLoop_standby() final;
     virtual bool shouldStandby_l() final { return false; }
-    virtual status_t exitStandby_l() REQUIRES(mLock);
+    virtual status_t exitStandby_l() REQUIRES(mutex());
 
     status_t initCheck() const final { return mHalStream == nullptr ? NO_INIT : NO_ERROR; }
     size_t frameCount() const final { return mFrameCount; }
@@ -2245,7 +2249,7 @@ public:
 
     AudioStreamIn* clearInput() final;
 
-    status_t exitStandby_l() REQUIRES(mLock) final;
+    status_t exitStandby_l() REQUIRES(mutex()) final;
 
     MetadataUpdate updateMetadata_l() final;
     void processVolume_l() final;
