@@ -17,8 +17,8 @@
 #pragma once
 
 #include <afutils/AllocatorFactory.h>
+#include <audio_utils/mutex.h>
 #include <android-base/macros.h>  // DISALLOW_COPY_AND_ASSIGN
-#include <utils/Mutex.h>
 #include <utils/RefBase.h>        // avoid transitive dependency
 
 // TODO(b/291318727) Move to nested namespace
@@ -28,7 +28,7 @@ class IAfPlaybackThread;
 
 class IAfClientCallback : public virtual RefBase {
 public:
-    virtual Mutex& clientMutex() const = 0;
+    virtual audio_utils::mutex& clientMutex() const = 0;
     virtual void removeClient_l(pid_t pid) = 0;
     virtual void removeNotificationClient(pid_t pid) = 0;
     virtual status_t moveAuxEffectToIo(
