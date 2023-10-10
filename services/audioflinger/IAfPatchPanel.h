@@ -45,8 +45,7 @@ public:
           mRecordThreadHandle(recordThreadHandle) {}
     SoftwarePatch(const SoftwarePatch&) = default;
 
-    // Must be called under AudioFlinger::mLock
-    status_t getLatencyMs_l(double* latencyMs) const;
+    status_t getLatencyMs_l(double* latencyMs) const REQUIRES(audio_utils::AudioFlinger_Mutex);
     audio_patch_handle_t getPatchHandle() const { return mPatchHandle; };
     audio_io_handle_t getPlaybackThreadHandle() const { return mPlaybackThreadHandle; };
     audio_io_handle_t getRecordThreadHandle() const { return mRecordThreadHandle; };
@@ -60,12 +59,14 @@ private:
 
 class IAfPatchPanelCallback : public virtual RefBase {
 public:
-    virtual void closeThreadInternal_l(const sp<IAfPlaybackThread>& thread) = 0;
-    virtual void closeThreadInternal_l(const sp<IAfRecordThread>& thread) = 0;
-    virtual IAfPlaybackThread* primaryPlaybackThread_l() const = 0;
-    virtual IAfPlaybackThread* checkPlaybackThread_l(audio_io_handle_t output) const = 0;
-    virtual IAfRecordThread* checkRecordThread_l(audio_io_handle_t input) const = 0;
-    virtual IAfMmapThread* checkMmapThread_l(audio_io_handle_t io) const = 0;
+    virtual void closeThreadInternal_l(const sp<IAfPlaybackThread>& thread) REQUIRES(mutex()) = 0;
+    virtual void closeThreadInternal_l(const sp<IAfRecordThread>& thread) REQUIRES(mutex()) = 0;
+    virtual IAfPlaybackThread* primaryPlaybackThread_l() const REQUIRES(mutex()) = 0;
+    virtual IAfPlaybackThread* checkPlaybackThread_l(audio_io_handle_t output) const
+            REQUIRES(mutex()) = 0;
+    virtual IAfRecordThread* checkRecordThread_l(audio_io_handle_t input) const
+            REQUIRES(mutex()) = 0;
+    virtual IAfMmapThread* checkMmapThread_l(audio_io_handle_t io) const REQUIRES(mutex()) = 0;
     virtual sp<IAfThreadBase> openInput_l(audio_module_handle_t module,
             audio_io_handle_t* input,
             audio_config_t* config,
@@ -74,22 +75,25 @@ public:
             audio_source_t source,
             audio_input_flags_t flags,
             audio_devices_t outputDevice,
-            const String8& outputDeviceAddress) = 0;
+            const String8& outputDeviceAddress) REQUIRES(mutex()) = 0;
     virtual sp<IAfThreadBase> openOutput_l(audio_module_handle_t module,
             audio_io_handle_t* output,
             audio_config_t* halConfig,
             audio_config_base_t* mixerConfig,
             audio_devices_t deviceType,
             const String8& address,
-            audio_output_flags_t flags) = 0;
-    virtual audio_utils::mutex& mutex() const = 0;
+            audio_output_flags_t flags) REQUIRES(mutex()) = 0;
+    virtual audio_utils::mutex& mutex() const
+            RETURN_CAPABILITY(audio_utils::AudioFlinger_Mutex) = 0;
     virtual const DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*>&
-            getAudioHwDevs_l() const = 0;
+            getAudioHwDevs_l() const REQUIRES(mutex()) = 0;
     virtual audio_unique_id_t nextUniqueId(audio_unique_id_use_t use) = 0;
     virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
     virtual void updateDownStreamPatches_l(
-            const struct audio_patch* patch, const std::set<audio_io_handle_t>& streams) = 0;
-    virtual void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices) = 0;
+            const struct audio_patch* patch, const std::set<audio_io_handle_t>& streams)
+            REQUIRES(mutex()) = 0;
+    virtual void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices)
+            REQUIRES(mutex()) = 0;
 };
 
 class IAfPatchPanel : public virtual RefBase {
@@ -133,9 +137,12 @@ public:
         sp<const ThreadType> const_thread() const { return mThread; }
         sp<const TrackType> const_track() const { return mTrack; }
 
-        void closeConnections(const sp<IAfPatchPanel>& panel) {
+        void closeConnections_l(const sp<IAfPatchPanel>& panel)
+                REQUIRES(audio_utils::AudioFlinger_Mutex)
+                NO_THREAD_SAFETY_ANALYSIS // this is broken in clang
+        {
             if (mHandle != AUDIO_PATCH_HANDLE_NONE) {
-                panel->releaseAudioPatch(mHandle);
+                panel->releaseAudioPatch_l(mHandle);
                 mHandle = AUDIO_PATCH_HANDLE_NONE;
             }
             if (mThread != nullptr) {
@@ -217,8 +224,10 @@ public:
 
         friend void swap(Patch& a, Patch& b) noexcept { a.swap(b); }
 
-        status_t createConnections(const sp<IAfPatchPanel>& panel);
-        void clearConnections(const sp<IAfPatchPanel>& panel);
+        status_t createConnections_l(const sp<IAfPatchPanel>& panel)
+                REQUIRES(audio_utils::AudioFlinger_Mutex);
+        void clearConnections_l(const sp<IAfPatchPanel>& panel)
+                REQUIRES(audio_utils::AudioFlinger_Mutex);
         bool isSoftware() const {
             return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
                    mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE;
@@ -250,22 +259,27 @@ public:
     };
 
     /* List connected audio ports and their attributes */
-    virtual status_t listAudioPorts(unsigned int* num_ports, struct audio_port* ports) = 0;
+    virtual status_t listAudioPorts_l(unsigned int* num_ports, struct audio_port* ports)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     /* Get supported attributes for a given audio port */
-    virtual status_t getAudioPort(struct audio_port_v7* port) = 0;
+    virtual status_t getAudioPort_l(struct audio_port_v7* port)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     /* Create a patch between several source and sink ports */
-    virtual status_t createAudioPatch(
+    virtual status_t createAudioPatch_l(
             const struct audio_patch* patch,
             audio_patch_handle_t* handle,
-            bool endpointPatch = false) = 0;
+            bool endpointPatch = false)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     /* Release a patch */
-    virtual status_t releaseAudioPatch(audio_patch_handle_t handle) = 0;
+    virtual status_t releaseAudioPatch_l(audio_patch_handle_t handle)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     /* List connected audio devices and they attributes */
-    virtual status_t listAudioPatches(unsigned int* num_patches, struct audio_patch* patches) = 0;
+    virtual status_t listAudioPatches_l(unsigned int* num_patches, struct audio_patch* patches)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     // Retrieves all currently estrablished software patches for a stream
     // opened on an intermediate module.
@@ -280,13 +294,14 @@ public:
 
     virtual void dump(int fd) const = 0;
 
-    // Must be called under AudioFlinger::mLock
+    virtual const std::map<audio_patch_handle_t, Patch>& patches_l() const
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
-    virtual const std::map<audio_patch_handle_t, Patch>& patches_l() const = 0;
+    virtual status_t getLatencyMs_l(audio_patch_handle_t patchHandle, double* latencyMs) const
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
-    virtual status_t getLatencyMs_l(audio_patch_handle_t patchHandle, double* latencyMs) const = 0;
-
-    virtual void closeThreadInternal_l(const sp<IAfThreadBase>& thread) const = 0;
+    virtual void closeThreadInternal_l(const sp<IAfThreadBase>& thread) const
+            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 };
 
 }  // namespace android
