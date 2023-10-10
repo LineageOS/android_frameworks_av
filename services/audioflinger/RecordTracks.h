@@ -20,6 +20,7 @@
 #include "TrackBase.h"
 
 #include <android/content/AttributionSourceState.h>
+#include <audio_utils/mutex.h>
 #include <datapath/AudioStreamIn.h> // struct Source
 
 namespace android {
@@ -214,15 +215,16 @@ private:
     };
 
     sp<StreamInHalInterface> obtainStream(sp<IAfThreadBase>* thread);
+    audio_utils::mutex& readMutex() const { return mReadMutex; }
 
     PatchRecordAudioBufferProvider mPatchRecordAudioBufferProvider;
     std::unique_ptr<void, decltype(free)*> mSinkBuffer;  // frame size aligned continuous buffer
     std::unique_ptr<void, decltype(free)*> mStubBuffer;  // buffer used for AudioBufferProvider
     size_t mUnconsumedFrames = 0;
-    std::mutex mReadLock;
-    std::condition_variable mReadCV;
-    size_t mReadBytes = 0; // GUARDED_BY(mReadLock)
-    status_t mReadError = NO_ERROR; // GUARDED_BY(mReadLock)
+    mutable audio_utils::mutex mReadMutex;
+    audio_utils::condition_variable mReadCV;
+    size_t mReadBytes = 0; // GUARDED_BY(readMutex())
+    status_t mReadError = NO_ERROR; // GUARDED_BY(readMutex())
     int64_t mLastReadFrames = 0;  // accessed on RecordThread only
 };
 
