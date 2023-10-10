@@ -560,6 +560,9 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         return ret;
     }
 
+    // use unique_lock as we may selectively unlock.
+    audio_utils::unique_lock l(mutex());
+
     // at this stage, a MmapThread was created when openOutput() or openInput() was called by
     // audio policy manager and we can retrieve it
     const sp<IAfMmapThread> thread = mMmapThreads.valueFor(io);
@@ -572,12 +575,14 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         config->channel_mask = thread->channelMask();
         config->format = thread->format();
     } else {
+        l.unlock();
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
             AudioSystem::releaseOutput(portId);
         } else {
             AudioSystem::releaseInput(portId);
         }
         ret = NO_INIT;
+        // we don't reacquire the lock here as nothing left to do.
     }
 
     ALOGV("%s done status %d portId %d", __FUNCTION__, ret, portId);
@@ -621,7 +626,7 @@ AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
     if (module == 0) {
         ALOGW("findSuitableHwDev_l() loading well know audio hw modules");
         for (size_t i = 0; i < arraysize(audio_interfaces); i++) {
-            loadHwModule_l(audio_interfaces[i]);
+            loadHwModule_ll(audio_interfaces[i]);
         }
         // then try to find a module supporting the requested device.
         for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
@@ -644,7 +649,7 @@ AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
     return NULL;
 }
 
-void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::dumpClients_ll(int fd, const Vector<String16>& args __unused)
 {
     String8 result;
 
@@ -678,7 +683,7 @@ void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
 }
 
 
-void AudioFlinger::dumpInternals(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::dumpInternals_l(int fd, const Vector<String16>& args __unused)
 {
     const size_t SIZE = 256;
     char buffer[SIZE];
@@ -746,12 +751,12 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             write(fd, result.c_str(), result.size());
         }
 
-        dumpClients(fd, args);
+        dumpClients_ll(fd, args);
         if (clientLocked) {
             clientMutex().unlock();
         }
 
-        dumpInternals(fd, args);
+        dumpInternals_l(fd, args);
 
         // dump playback threads
         for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
@@ -1474,7 +1479,8 @@ bool AudioFlinger::masterMute_l() const
     return mMasterMute;
 }
 
-status_t AudioFlinger::checkStreamType(audio_stream_type_t stream) const
+/* static */
+status_t AudioFlinger::checkStreamType(audio_stream_type_t stream)
 {
     if (uint32_t(stream) >= AUDIO_STREAM_CNT) {
         ALOGW("checkStreamType() invalid stream %d", stream);
@@ -1570,7 +1576,7 @@ status_t AudioFlinger::supportsBluetoothVariableLatency(bool* support) const {
     if (support == nullptr) {
         return BAD_VALUE;
     }
-    audio_utils::lock_guard _l(mutex());
+    audio_utils::lock_guard _l(hardwareMutex());
     *support = false;
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         if (mAudioHwDevs.valueAt(i)->supportsBluetoothVariableLatency()) {
@@ -1831,6 +1837,7 @@ status_t AudioFlinger::setParameters(audio_io_handle_t ioHandle, const String8& 
     }
     if (thread != 0) {
         status_t result = thread->setParameters(filteredKeyValuePairs);
+        audio_utils::lock_guard _l(mutex());
         forwardParametersToDownstreamPatches_l(thread->id(), filteredKeyValuePairs);
         return result;
     }
@@ -2417,7 +2424,7 @@ status_t AudioFlinger::getAudioPolicyConfig(media::AudioPolicyConfig *config)
     RETURN_STATUS_IF_ERROR(mDevicesFactoryHal->getDeviceNames(&hwModuleNames));
     std::set<AudioMode> allSupportedModes;
     for (const auto& name : hwModuleNames) {
-        AudioHwDevice* module = loadHwModule_l(name.c_str());
+        AudioHwDevice* module = loadHwModule_ll(name.c_str());
         if (module == nullptr) continue;
         media::AudioHwModule aidlModule;
         if (module->hwDevice()->getAudioPorts(&aidlModule.ports) == OK &&
@@ -2454,13 +2461,13 @@ audio_module_handle_t AudioFlinger::loadHwModule(const char *name)
     }
     audio_utils::lock_guard _l(mutex());
     audio_utils::lock_guard lock(hardwareMutex());
-    AudioHwDevice* module = loadHwModule_l(name);
+    AudioHwDevice* module = loadHwModule_ll(name);
     return module != nullptr ? module->handle() : AUDIO_MODULE_HANDLE_NONE;
 }
 
 // loadHwModule_l() must be called with AudioFlinger::mutex()
 // and AudioFlinger::hardwareMutex() held
-AudioHwDevice* AudioFlinger::loadHwModule_l(const char *name)
+AudioHwDevice* AudioFlinger::loadHwModule_ll(const char *name)
 {
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         if (strncmp(mAudioHwDevs.valueAt(i)->moduleName(), name, strlen(name)) == 0) {
@@ -3064,6 +3071,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
     return NO_ERROR;
 }
 
+/* static */
 void AudioFlinger::closeOutputFinish(const sp<IAfPlaybackThread>& thread)
 {
     AudioStreamOut *out = thread->clearOutput();
@@ -3999,7 +4007,11 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             lStatus = BAD_VALUE;
             goto Exit;
         }
-        IAfPlaybackThread* const thread = checkPlaybackThread_l(io);
+        IAfPlaybackThread* thread;
+        {
+            audio_utils::lock_guard l(mutex());
+            thread = checkPlaybackThread_l(io);
+        }
         if (thread == nullptr) {
             ALOGE("%s: invalid output %d specified for AUDIO_SESSION_OUTPUT_STAGE", __func__, io);
             lStatus = BAD_VALUE;
