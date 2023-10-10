@@ -23,7 +23,6 @@
 #include <audio_utils/mutex.h>
 #include <sounddose/SoundDoseManager.h>
 
-#include <mutex>
 #include <unordered_map>
 
 namespace android {
@@ -100,30 +99,32 @@ private:
     bool shouldComputeMelForDeviceType(audio_devices_t device);
 
     void stopInternalMelComputation();
+    audio_utils::mutex& mutex() const { return mMutex; }
 
-    /** Should be called with the following order of locks: mAudioFlinger.mLock -> mLock. */
-    void stopMelComputationForPatch_l(const ActiveMelPatch& patch) REQUIRES(mLock);
+    /** Should be called with the following order of locks: mAudioFlinger.mutex() -> mutex(). */
+    void stopMelComputationForPatch_l(const ActiveMelPatch& patch) REQUIRES(mutex());
 
-    /** Should be called with the following order of locks: mAudioFlinger.mLock -> mLock. */
-    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch) REQUIRES(mLock);
+    /** Should be called with the following order of locks: mAudioFlinger.mutex() -> mutex(). */
+    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch) REQUIRES(mutex());
 
     std::optional<audio_patch_handle_t>
-    activePatchStreamHandle_l(audio_io_handle_t streamHandle) REQUIRES(mLock);
+    activePatchStreamHandle_l(audio_io_handle_t streamHandle) REQUIRES(mutex());
 
-    bool useHalSoundDoseInterface_l() REQUIRES(mLock);
+    bool useHalSoundDoseInterface_l() REQUIRES(mutex());
 
     const sp<IAfMelReporterCallback> mAfMelReporterCallback;
 
-    sp<SoundDoseManager> mSoundDoseManager;
+    /* const */ sp<SoundDoseManager> mSoundDoseManager;  // set onFirstRef
 
     /**
      * Lock for protecting the active mel patches. Do not mix with the AudioFlinger lock.
-     * Locking order AudioFlinger::mLock -> PatchCommandThread::mLock -> MelReporter::mLock.
+     * Locking order AudioFlinger::mutex() -> PatchCommandThread::mutex() -> MelReporter::mutex().
      */
-    std::mutex mLock;
-    std::unordered_map<audio_patch_handle_t, ActiveMelPatch> mActiveMelPatches GUARDED_BY(mLock);
-    std::unordered_map<audio_port_handle_t, int> mActiveDevices GUARDED_BY(mLock);
-    bool mUseHalSoundDoseInterface GUARDED_BY(mLock) = false;
+    mutable audio_utils::mutex mMutex;
+    std::unordered_map<audio_patch_handle_t, ActiveMelPatch> mActiveMelPatches
+            GUARDED_BY(mutex());
+    std::unordered_map<audio_port_handle_t, int> mActiveDevices GUARDED_BY(mutex());
+    bool mUseHalSoundDoseInterface GUARDED_BY(mutex()) = false;
 };
 
 }  // namespace android
