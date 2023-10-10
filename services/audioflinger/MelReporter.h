@@ -31,9 +31,11 @@ constexpr static int kMaxTimestampDeltaInSec = 120;
 
 class IAfMelReporterCallback : public virtual RefBase {
 public:
-    virtual audio_utils::mutex& mutex() const = 0;
+    virtual audio_utils::mutex& mutex() const
+            RETURN_CAPABILITY(audio_utils::AudioFlinger_Mutex) = 0;
     virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
-    virtual sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const = 0;
+    virtual sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const
+            REQUIRES(mutex()) = 0;
 };
 
 /**
