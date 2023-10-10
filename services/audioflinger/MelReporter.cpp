@@ -111,7 +111,7 @@ void MelReporter::updateMetadataForCsd(audio_io_handle_t streamHandle,
         return;
     }
 
-    audio_utils::lock_guard _laf(mAfMelReporterCallback->mutex());
+    audio_utils::lock_guard _laf(mAfMelReporterCallback->mutex());  // AudioFlinger_Mutex
     audio_utils::lock_guard _l(mutex());
     auto activeMelPatchId = activePatchStreamHandle_l(streamHandle);
     if (!activeMelPatchId) {
@@ -171,7 +171,7 @@ void MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
     }
 
     if (!newPatch.deviceHandles.empty()) {
-        audio_utils::lock_guard _afl(mAfMelReporterCallback->mutex());
+        audio_utils::lock_guard _afl(mAfMelReporterCallback->mutex());  // AudioFlinger_Mutex
         audio_utils::lock_guard _l(mutex());
         ALOGV("%s add patch handle %d to active devices", __func__, handle);
         startMelComputationForActivePatch_l(newPatch);
@@ -226,7 +226,7 @@ void MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle) {
         mActiveMelPatches.erase(patchIt);
     }
 
-    audio_utils::lock_guard _afl(mAfMelReporterCallback->mutex());
+    audio_utils::lock_guard _afl(mAfMelReporterCallback->mutex());  // AudioFlinger_Mutex
     audio_utils::lock_guard _l(mutex());
     stopMelComputationForPatch_l(melPatch);
 }
