@@ -4389,7 +4389,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
         // If we do not take the dstChain lock, it is possible that processing is ongoing
         // while we are starting the effect.  This can cause glitches with volume,
         // see b/202360137.
-        dstChain->lock();
+        dstChain->mutex().lock();
         for (const auto& effect : removed) {
             if (effect->state() == IAfEffectModule::ACTIVE ||
                     effect->state() == IAfEffectModule::STOPPING) {
@@ -4397,7 +4397,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
                 effect->start();
             }
         }
-        dstChain->unlock();
+        dstChain->mutex().unlock();
     }
 
     if (status != NO_ERROR) {

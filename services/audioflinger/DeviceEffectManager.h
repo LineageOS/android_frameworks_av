@@ -20,8 +20,6 @@
 #include "IAfEffect.h"
 #include "PatchCommandThread.h"
 
-#include <utils/Mutex.h>  // avoid transitive dependency
-
 namespace android {
 
 class IAfDeviceEffectManagerCallback : public virtual RefBase {
@@ -77,7 +75,8 @@ public:
 private:
     status_t checkEffectCompatibility(const effect_descriptor_t *desc);
 
-    Mutex mLock;
+    audio_utils::mutex& mutex() const { return mMutex; }
+    mutable audio_utils::mutex mMutex;
     const sp<IAfDeviceEffectManagerCallback> mAfDeviceEffectManagerCallback;
     const sp<DeviceEffectManagerCallback> mMyCallback;
     std::map<AudioDeviceTypeAddr, sp<IAfDeviceEffectProxy>> mDeviceEffects;
