@@ -1102,8 +1102,9 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
             // move effect chain to this output thread if an effect on same session was waiting
             // for a track to be created
             if (effectThread != nullptr) {
-                audio_utils::lock_guard _sl(effectThread->mutex());
-                if (moveEffectChain_l(sessionId, effectThread, thread) == NO_ERROR) {
+                // No thread safety analysis: double lock on a thread capability.
+                audio_utils::lock_guard_no_thread_safety_analysis _sl(effectThread->mutex());
+                if (moveEffectChain_ll(sessionId, effectThread, thread) == NO_ERROR) {
                     effectThreadId = thread->id();
                     effectIds = thread->getEffectIds_l(sessionId);
                 }
@@ -3034,7 +3035,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
                     audio_utils::scoped_lock sl(dstThread->mutex(), playbackThread->mutex());
                     Vector<sp<IAfEffectChain>> effectChains = playbackThread->getEffectChains_l();
                     for (size_t i = 0; i < effectChains.size(); i ++) {
-                        moveEffectChain_l(effectChains[i]->sessionId(), playbackThread.get(),
+                        moveEffectChain_ll(effectChains[i]->sessionId(), playbackThread.get(),
                                 dstThread);
                     }
                 }
@@ -4298,7 +4299,7 @@ status_t AudioFlinger::moveEffects(audio_session_t sessionId, audio_io_handle_t 
     }
 
     audio_utils::scoped_lock _ll(dstThread->mutex(), srcThread->mutex());
-    return moveEffectChain_l(sessionId, srcThread, dstThread);
+    return moveEffectChain_ll(sessionId, srcThread, dstThread);
 }
 
 
@@ -4318,25 +4319,26 @@ void AudioFlinger::setEffectSuspended(int effectId,
 }
 
 
-// moveEffectChain_l must be called with both srcThread and dstThread mutex()s held
-status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
+// moveEffectChain_ll must be called with the AudioFlinger::mutex()
+// and both srcThread and dstThread mutex()s held
+status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
         IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread)
 {
-    ALOGV("moveEffectChain_l() session %d from thread %p to thread %p",
-            sessionId, srcThread, dstThread);
+    ALOGV("%s: session %d from thread %p to thread %p",
+            __func__, sessionId, srcThread, dstThread);
 
     sp<IAfEffectChain> chain = srcThread->getEffectChain_l(sessionId);
     if (chain == 0) {
-        ALOGW("moveEffectChain_l() effect chain for session %d not on source thread %p",
-                sessionId, srcThread);
+        ALOGW("%s: effect chain for session %d not on source thread %p",
+                __func__, sessionId, srcThread);
         return INVALID_OPERATION;
     }
 
     // Check whether the destination thread and all effects in the chain are compatible
     if (!chain->isCompatibleWithThread_l(dstThread)) {
-        ALOGW("moveEffectChain_l() effect chain failed because"
+        ALOGW("%s: effect chain failed because"
                 " destination thread %p is not compatible with effects in the chain",
-                dstThread);
+                __func__, dstThread);
         return INVALID_OPERATION;
     }
 
@@ -4358,7 +4360,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
             effect = chain->getEffectFromId_l(0)) {
         srcThread->removeEffect_l(effect);
         removed.add(effect);
-        status = dstThread->addEffect_l(effect);
+        status = dstThread->addEffect_ll(effect);
         if (status != NO_ERROR) {
             errorString = StringPrintf(
                     "cannot add effect %p to destination thread", effect.get());
@@ -4384,7 +4386,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
         for (const auto& effect : removed) {
             dstThread->removeEffect_l(effect); // Note: Depending on error location, the last
                                                // effect may not have been placed on dstThread.
-            if (srcThread->addEffect_l(effect) == NO_ERROR) {
+            if (srcThread->addEffect_ll(effect) == NO_ERROR) {
                 ++restored;
                 if (dstChain == nullptr) {
                     dstChain = effect->getCallback()->chain().promote();
@@ -4449,16 +4451,16 @@ status_t AudioFlinger::moveAuxEffectToIo(int EffectId,
             return INVALID_OPERATION;
         }
         thread->removeEffect_l(effect);
-        status = dstThread->addEffect_l(effect);
+        status = dstThread->addEffect_ll(effect);
         if (status != NO_ERROR) {
-            thread->addEffect_l(effect);
+            thread->addEffect_ll(effect);
             status = INVALID_OPERATION;
             goto Exit;
         }
 
         dstChain = effect->getCallback()->chain().promote();
         if (dstChain == 0) {
-            thread->addEffect_l(effect);
+            thread->addEffect_ll(effect);
             status = INVALID_OPERATION;
         }
 
