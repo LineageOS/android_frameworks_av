@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "09a2b44e_7211eb59",
+        "filename": "media/libstagefright/wifi-display/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 28223
+      },
+      "writtenOn": "2023-10-10T18:37:31Z",
+      "side": 1,
+      "message": "Errors here, libstagefright should be changed to module as it was moved there",
+      "range": {
+        "startLine": 21,
+        "startChar": 29,
+        "endLine": 21,
+        "endChar": 43
+      },
+      "revId": "3183f380b0d2541dd340e7dd6b6c2bcdaf192ff0",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
