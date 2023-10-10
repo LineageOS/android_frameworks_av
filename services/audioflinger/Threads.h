@@ -390,7 +390,8 @@ public:
                                     status_t *status /*non-NULL*/,
                                     bool pinned,
                                     bool probe,
-                                    bool notifyFramesProcessed) final;
+                                    bool notifyFramesProcessed) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
                 // return values for hasAudioSession (bit field)
                 enum effect_state {
@@ -429,7 +430,8 @@ public:
                 // add and effect module. Also creates the effect chain is none exists for
                 // the effects audio session. Only called in a context of moving an effect
                 // from one thread to another
-    status_t addEffect_l(const sp<IAfEffectModule>& effect) final;
+    status_t addEffect_ll(const sp<IAfEffectModule>& effect) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex, mutex());
                 // remove and effect module. Also removes the effect chain is this was the last
                 // effect
     void removeEffect_l(const sp<IAfEffectModule>& effect, bool release = false) final;
@@ -508,7 +510,7 @@ public:
                 // deliver stats to mediametrics.
     void sendStatistics(bool force) final;
 
-    audio_utils::mutex& mutex() const final {
+    audio_utils::mutex& mutex() const final RETURN_CAPABILITY(audio_utils::ThreadBase_Mutex) {
         return mMutex;
     }
     mutable audio_utils::mutex mMutex;
@@ -535,8 +537,10 @@ public:
                     }
                 }
 
-    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override;
-    void stopMelComputation_l() override;
+    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    void stopMelComputation_l() override
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
 protected:
 
@@ -938,7 +942,8 @@ public:
                                 audio_port_handle_t portId,
                                 const sp<media::IAudioTrackCallback>& callback,
                                 bool isSpatialized,
-                                bool isBitPerfect) final;
+                                bool isBitPerfect) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     bool isTrackActive(const sp<IAfTrack>& track) const final {
         return mActiveTracks.indexOf(track) >= 0;
@@ -1064,8 +1069,10 @@ public:
                     return INVALID_OPERATION;
                 }
 
-    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override;
-    void stopMelComputation_l() override;
+    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    void stopMelComputation_l() override
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     void setStandby() final {
                     std::lock_guard _l(mutex());
@@ -1863,7 +1870,8 @@ public:
                     pid_t tid,
                     status_t *status /*non-NULL*/,
                     audio_port_handle_t portId,
-                    int32_t maxSharedAudioHistoryMs) final;
+                    int32_t maxSharedAudioHistoryMs) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
             status_t start(IAfRecordTrack* recordTrack,
                               AudioSystem::sync_event_t event,
@@ -2221,8 +2229,10 @@ public:
 
     status_t reportData(const void* buffer, size_t frameCount) final;
 
-    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) final;
-    void stopMelComputation_l() final;
+    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    void stopMelComputation_l() final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
 protected:
     void dumpInternals_l(int fd, const Vector<String16>& args) final;
