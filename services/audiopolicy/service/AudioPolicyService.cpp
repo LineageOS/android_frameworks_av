@@ -967,7 +967,8 @@ void AudioPolicyService::updateUidStates_l()
                 }
             }
         }
-        if (current->attributes.source != AUDIO_SOURCE_HOTWORD) {
+        if (current->attributes.source != AUDIO_SOURCE_HOTWORD &&
+                !isVirtualSource(current->attributes.source)) {
             onlyHotwordActive = false;
         }
         if (currentUid == mPhoneStateOwnerUid &&
