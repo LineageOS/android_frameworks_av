@@ -16,8 +16,7 @@
 
 package android.media;
 
-import android.media.SpatializationLevel;
-import android.media.SpatializerHeadTrackingMode;
+import android.media.audio.common.Spatialization;
 
 /**
  * The INativeSpatializerCallback interface is a callback associated to the
@@ -30,7 +29,7 @@ oneway interface INativeSpatializerCallback {
     /** Called when the spatialization level applied by the spatializer changes
      * (e.g. when the spatializer is enabled or disabled)
      */
-    void onLevelChanged(SpatializationLevel level);
+    void onLevelChanged(Spatialization.Level level);
 
     /** Called when the output stream the Spatializer is attached to changes.
      * Indicates the IO Handle of the new output.
