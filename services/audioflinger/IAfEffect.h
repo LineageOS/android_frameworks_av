@@ -21,6 +21,7 @@
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnEffect.h>
 #include <android/media/BnEffectClient.h>
+#include <audio_utils/mutex.h>
 #include <media/AudioCommonTypes.h>  // product_strategy_t
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -141,8 +142,7 @@ private:
     virtual ssize_t removeHandle_l(IAfEffectHandle *handle) = 0;
     virtual IAfEffectHandle* controlHandle_l() = 0;
 
-    virtual void lock() = 0;
-    virtual void unlock() = 0;
+    virtual audio_utils::mutex& mutex() const = 0;
 };
 
 class IAfEffectModule : public virtual IAfEffectBase {
@@ -218,8 +218,7 @@ public:
 
     virtual void process_l() = 0;
 
-    virtual void lock() = 0;
-    virtual void unlock() = 0;
+    virtual audio_utils::mutex& mutex() const = 0;
 
     virtual status_t createEffect_l(sp<IAfEffectModule>& effect,
                             effect_descriptor_t *desc,
