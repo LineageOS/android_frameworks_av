@@ -642,7 +642,7 @@ void OpPlayAudioMonitor::checkPlayAudioForUsage(bool doBroadcast)
             auto thread = mThread.promote();
             if (thread != nullptr && thread->type() == IAfThreadBase::OFFLOAD) {
                 // Wake up Thread if offloaded, otherwise it may be several seconds for update.
-                Mutex::Autolock _l(thread->mutex());
+                audio_utils::lock_guard _l(thread->mutex());
                 thread->broadcast_l();
             }
         }
@@ -889,7 +889,7 @@ void Track::destroy()
         bool wasActive = false;
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != 0) {
-            Mutex::Autolock _l(thread->mutex());
+            audio_utils::lock_guard _l(thread->mutex());
             auto* const playbackThread = thread->asIAfPlaybackThread().get();
             wasActive = playbackThread->destroyTrack_l(this);
         }
@@ -1170,7 +1170,7 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
     if (thread != 0) {
         if (isOffloaded()) {
             audio_utils::lock_guard _laf(thread->afThreadCallback()->mutex());
-            Mutex::Autolock _lth(thread->mutex());
+            audio_utils::lock_guard _lth(thread->mutex());
             sp<IAfEffectChain> ec = thread->getEffectChain_l(mSessionId);
             if (thread->afThreadCallback()->isNonOffloadableGlobalEffectEnabled_l() ||
                     (ec != 0 && ec->isNonOffloadableEnabled())) {
@@ -1178,7 +1178,7 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
                 return PERMISSION_DENIED;
             }
         }
-        Mutex::Autolock _lth(thread->mutex());
+        audio_utils::lock_guard _lth(thread->mutex());
         track_state state = mState;
         // here the track could be either new, or restarted
         // in both cases "unstop" the track
@@ -1302,7 +1302,7 @@ void Track::stop()
     ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        Mutex::Autolock _l(thread->mutex());
+        audio_utils::lock_guard _l(thread->mutex());
         track_state state = mState;
         if (state == RESUMING || state == ACTIVE || state == PAUSING || state == PAUSED) {
             // If the track is not active (PAUSED and buffers full), flush buffers
@@ -1335,7 +1335,7 @@ void Track::pause()
     ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        Mutex::Autolock _l(thread->mutex());
+        audio_utils::lock_guard _l(thread->mutex());
         auto* const playbackThread = thread->asIAfPlaybackThread().get();
         switch (mState) {
         case STOPPING_1:
@@ -1372,7 +1372,7 @@ void Track::flush()
     ALOGV("%s(%d)", __func__, mId);
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        Mutex::Autolock _l(thread->mutex());
+        audio_utils::lock_guard _l(thread->mutex());
         auto* const playbackThread = thread->asIAfPlaybackThread().get();
 
         // Flush the ring buffer now if the track is not active in the PlaybackThread.
@@ -1503,7 +1503,7 @@ VolumeShaper::Status Track::applyVolumeShaper(
         // Signal thread to fetch new volume.
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != 0) {
-            Mutex::Autolock _l(thread->mutex());
+            audio_utils::lock_guard _l(thread->mutex());
             thread->broadcast_l();
         }
     }
@@ -1667,7 +1667,7 @@ status_t Track::getTimestamp(AudioTimestamp& timestamp)
         return INVALID_OPERATION;
     }
 
-    Mutex::Autolock _l(thread->mutex());
+    audio_utils::lock_guard _l(thread->mutex());
     auto* const playbackThread = thread->asIAfPlaybackThread().get();
     return playbackThread->getTimestamp_l(timestamp);
 }
@@ -1870,7 +1870,7 @@ void Track::signal()
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
         auto* const t = thread->asIAfPlaybackThread().get();
-        Mutex::Autolock _l(t->mutex());
+        audio_utils::lock_guard _l(t->mutex());
         t->broadcast_l();
     }
 }
@@ -1882,7 +1882,7 @@ status_t Track::getDualMonoMode(audio_dual_mono_mode_t* mode) const
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != nullptr) {
             auto* const t = thread->asIAfPlaybackThread().get();
-            Mutex::Autolock _l(t->mutex());
+            audio_utils::lock_guard _l(t->mutex());
             status = t->getOutput_l()->stream->getDualMonoMode(mode);
             ALOGD_IF((status == NO_ERROR) && (mDualMonoMode != *mode),
                     "%s: mode %d inconsistent", __func__, mDualMonoMode);
@@ -1898,7 +1898,7 @@ status_t Track::setDualMonoMode(audio_dual_mono_mode_t mode)
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != nullptr) {
             auto* const t = thread->asIAfPlaybackThread().get();
-            Mutex::Autolock lock(t->mutex());
+            audio_utils::lock_guard lock(t->mutex());
             status = t->getOutput_l()->stream->setDualMonoMode(mode);
             if (status == NO_ERROR) {
                 mDualMonoMode = mode;
@@ -1915,7 +1915,7 @@ status_t Track::getAudioDescriptionMixLevel(float* leveldB) const
         sp<IAfThreadBase> thread = mThread.promote();
         if (thread != nullptr) {
             auto* const t = thread->asIAfPlaybackThread().get();
-            Mutex::Autolock lock(t->mutex());
+            audio_utils::lock_guard lock(t->mutex());
             status = t->getOutput_l()->stream->getAudioDescriptionMixLevel(leveldB);
             ALOGD_IF((status == NO_ERROR) && (mAudioDescriptionMixLevel != *leveldB),
                     "%s: level %.3f inconsistent", __func__, mAudioDescriptionMixLevel);
@@ -1931,7 +1931,7 @@ status_t Track::setAudioDescriptionMixLevel(float leveldB)
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != nullptr) {
             auto* const t = thread->asIAfPlaybackThread().get();
-            Mutex::Autolock lock(t->mutex());
+            audio_utils::lock_guard lock(t->mutex());
             status = t->getOutput_l()->stream->setAudioDescriptionMixLevel(leveldB);
             if (status == NO_ERROR) {
                 mAudioDescriptionMixLevel = leveldB;
@@ -1949,7 +1949,7 @@ status_t Track::getPlaybackRateParameters(
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != nullptr) {
             auto* const t = thread->asIAfPlaybackThread().get();
-            Mutex::Autolock lock(t->mutex());
+            audio_utils::lock_guard lock(t->mutex());
             status = t->getOutput_l()->stream->getPlaybackRateParameters(playbackRate);
             ALOGD_IF((status == NO_ERROR) &&
                     !isAudioPlaybackRateEqual(mPlaybackRateParameters, *playbackRate),
@@ -1967,7 +1967,7 @@ status_t Track::setPlaybackRateParameters(
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != nullptr) {
             auto* const t = thread->asIAfPlaybackThread().get();
-            Mutex::Autolock lock(t->mutex());
+            audio_utils::lock_guard lock(t->mutex());
             status = t->getOutput_l()->stream->setPlaybackRateParameters(playbackRate);
             if (status == NO_ERROR) {
                 mPlaybackRateParameters = playbackRate;
@@ -2090,7 +2090,7 @@ bool Track::AudioVibrationController::setMute(bool muted) {
     const sp<IAfThreadBase> thread = mTrack->mThread.promote();
     if (thread != 0) {
         // Lock for updating mHapticPlaybackEnabled.
-        Mutex::Autolock _l(thread->mutex());
+        audio_utils::lock_guard _l(thread->mutex());
         auto* const playbackThread = thread->asIAfPlaybackThread().get();
         if ((mTrack->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
                 && playbackThread->hapticChannelCount() > 0) {
@@ -2353,13 +2353,13 @@ void OutputTrack::queueBuffer(Buffer& inBuffer) {
 
 void OutputTrack::copyMetadataTo(MetadataInserter& backInserter) const
 {
-    audio_utils::lock_guard lock(mTrackMetadatasMutex);
+    audio_utils::lock_guard lock(trackMetadataMutex());
     backInserter = std::copy(mTrackMetadatas.begin(), mTrackMetadatas.end(), backInserter);
 }
 
 void OutputTrack::setMetadatas(const SourceMetadatas& metadatas) {
     {
-        audio_utils::lock_guard lock(mTrackMetadatasMutex);
+        audio_utils::lock_guard lock(trackMetadataMutex());
         mTrackMetadatas = metadatas;
     }
     // No need to adjust metadata track volumes as OutputTrack volumes are always 0dBFS.
@@ -2846,7 +2846,7 @@ void RecordTrack::destroy()
         track_state priorState = mState;
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != 0) {
-            Mutex::Autolock _l(thread->mutex());
+            audio_utils::lock_guard _l(thread->mutex());
             auto* const recordThread = thread->asIAfRecordThread().get();
             priorState = mState;
             if (!mSharedAudioPackageName.empty()) {
@@ -3270,7 +3270,7 @@ sp<StreamInHalInterface> PassthruPatchRecord::obtainStream(
     *thread = mThread.promote();
     if (!*thread) return nullptr;
     auto* const recordThread = (*thread)->asIAfRecordThread().get();
-    Mutex::Autolock _l(recordThread->mutex());
+    audio_utils::lock_guard _l(recordThread->mutex());
     return recordThread->getInput() ? recordThread->getInput()->stream : nullptr;
 }
 

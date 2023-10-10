@@ -318,7 +318,7 @@ status_t AudioFlinger::updateSecondaryOutputs(
         size_t i = 0;
         for (; i < mPlaybackThreads.size(); ++i) {
             IAfPlaybackThread* thread = mPlaybackThreads.valueAt(i).get();
-            Mutex::Autolock _tl(thread->mutex());
+            audio_utils::lock_guard _tl(thread->mutex());
             sp<IAfTrack> track = thread->getTrackById_l(trackId);
             if (track != nullptr) {
                 ALOGD("%s trackId: %u", __func__, trackId);
@@ -1089,7 +1089,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
 
         if (lStatus == NO_ERROR) {
             // no risk of deadlock because AudioFlinger::mutex() is held
-            Mutex::Autolock _dl(thread->mutex());
+            audio_utils::lock_guard _dl(thread->mutex());
             // Connect secondary outputs. Failure on a secondary output must not imped the primary
             // Any secondary output setup failure will lead to a desync between the AP and AF until
             // the track is destroyed.
@@ -1097,7 +1097,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
             // move effect chain to this output thread if an effect on same session was waiting
             // for a track to be created
             if (effectThread != nullptr) {
-                Mutex::Autolock _sl(effectThread->mutex());
+                audio_utils::lock_guard _sl(effectThread->mutex());
                 if (moveEffectChain_l(sessionId, effectThread, thread) == NO_ERROR) {
                     effectThreadId = thread->id();
                     effectIds = thread->getEffectIds_l(sessionId);
@@ -2364,7 +2364,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
         // session and move it to this thread.
         sp<IAfEffectChain> chain = getOrphanEffectChain_l(sessionId);
         if (chain != 0) {
-            Mutex::Autolock _l2(thread->mutex());
+            audio_utils::lock_guard _l2(thread->mutex());
             thread->addEffectChain_l(chain);
         }
         break;
@@ -3023,8 +3023,8 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
                         checkPlaybackThread_l(mPlaybackThreads.keyAt(0));
                 if (dstThread != NULL) {
                     // audioflinger lock is held so order of thread lock acquisition doesn't matter
-                    Mutex::Autolock _dl(dstThread->mutex());
-                    Mutex::Autolock _sl(playbackThread->mutex());
+                    audio_utils::lock_guard _dl(dstThread->mutex());
+                    audio_utils::lock_guard _sl(playbackThread->mutex());
                     Vector<sp<IAfEffectChain>> effectChains = playbackThread->getEffectChains_l();
                     for (size_t i = 0; i < effectChains.size(); i ++) {
                         moveEffectChain_l(effectChains[i]->sessionId(), playbackThread.get(),
@@ -3263,7 +3263,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
             // new capture on the same session
             sp<IAfEffectChain> chain;
             {
-                Mutex::Autolock _sl(recordThread->mutex());
+                audio_utils::lock_guard _sl(recordThread->mutex());
                 const Vector<sp<IAfEffectChain>> effectChains = recordThread->getEffectChains_l();
                 // Note: maximum one chain per record thread
                 if (effectChains.size() != 0) {
@@ -3281,7 +3281,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
                         continue;
                     }
                     if (t->hasAudioSession(chain->sessionId()) != 0) {
-                        Mutex::Autolock _l2(t->mutex());
+                        audio_utils::lock_guard _l2(t->mutex());
                         ALOGV("closeInput() found thread %d for effect session %d",
                               t->id(), chain->sessionId());
                         t->addEffectChain_l(chain);
@@ -3465,7 +3465,7 @@ std::vector<sp<IAfEffectModule>> AudioFlinger::purgeStaleEffects_l() {
 
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
         sp<IAfPlaybackThread> t = mPlaybackThreads.valueAt(i);
-        Mutex::Autolock _l(t->mutex());
+        audio_utils::lock_guard _l(t->mutex());
         const Vector<sp<IAfEffectChain>> threadChains = t->getEffectChains_l();
         for (size_t j = 0; j < threadChains.size(); j++) {
             sp<IAfEffectChain> ec = threadChains[j];
@@ -3477,7 +3477,7 @@ std::vector<sp<IAfEffectModule>> AudioFlinger::purgeStaleEffects_l() {
 
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
         sp<IAfRecordThread> t = mRecordThreads.valueAt(i);
-        Mutex::Autolock _l(t->mutex());
+        audio_utils::lock_guard _l(t->mutex());
         const Vector<sp<IAfEffectChain>> threadChains = t->getEffectChains_l();
         for (size_t j = 0; j < threadChains.size(); j++) {
             sp<IAfEffectChain> ec = threadChains[j];
@@ -3487,7 +3487,7 @@ std::vector<sp<IAfEffectModule>> AudioFlinger::purgeStaleEffects_l() {
 
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
         const sp<IAfMmapThread> t = mMmapThreads.valueAt(i);
-        Mutex::Autolock _l(t->mutex());
+        audio_utils::lock_guard _l(t->mutex());
         const Vector<sp<IAfEffectChain>> threadChains = t->getEffectChains_l();
         for (size_t j = 0; j < threadChains.size(); j++) {
             sp<IAfEffectChain> ec = threadChains[j];
@@ -3515,7 +3515,7 @@ std::vector<sp<IAfEffectModule>> AudioFlinger::purgeStaleEffects_l() {
             }
         }
         if (!found) {
-            Mutex::Autolock _l(t->mutex());
+            audio_utils::lock_guard _l(t->mutex());
             // remove all effects from the chain
             while (ec->numberOfEffects()) {
                 sp<IAfEffectModule> effect = ec->getEffectModule(0);
@@ -3747,7 +3747,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
         // The frameCount should also not be smaller than the secondary thread min frame
         // count
         size_t minFrameCount = AudioSystem::calculateMinFrameCount(
-                    [&] { Mutex::Autolock _l(secondaryThread->mutex());
+                    [&] { audio_utils::lock_guard _l(secondaryThread->mutex());
                           return secondaryThread->latency_l(); }(),
                     secondaryThread->frameCount(), // normal frame count
                     secondaryThread->sampleRate(),
@@ -4193,7 +4193,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             // session and used it instead of creating a new one.
             sp<IAfEffectChain> chain = getOrphanEffectChain_l(sessionId);
             if (chain != 0) {
-                Mutex::Autolock _l2(thread->mutex());
+                audio_utils::lock_guard _l2(thread->mutex());
                 thread->addEffectChain_l(chain);
             }
         }
@@ -4285,8 +4285,8 @@ status_t AudioFlinger::moveEffects(audio_session_t sessionId, audio_io_handle_t 
         return BAD_VALUE;
     }
 
-    Mutex::Autolock _dl(dstThread->mutex());
-    Mutex::Autolock _sl(srcThread->mutex());
+    audio_utils::lock_guard _dl(dstThread->mutex());
+    audio_utils::lock_guard _sl(srcThread->mutex());
     return moveEffectChain_l(sessionId, srcThread, dstThread);
 }
 
@@ -4301,7 +4301,7 @@ void AudioFlinger::setEffectSuspended(int effectId,
     if (thread == nullptr) {
       return;
     }
-    Mutex::Autolock _sl(thread->mutex());
+    audio_utils::lock_guard _sl(thread->mutex());
     sp<IAfEffectModule> effect = thread->getEffect_l(sessionId, effectId);
     thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
 }
@@ -4426,8 +4426,8 @@ status_t AudioFlinger::moveAuxEffectToIo(int EffectId,
     const sp<IAfPlaybackThread> thread = threadBase ? threadBase->asIAfPlaybackThread() : nullptr;
 
     if (EffectId != 0 && thread != 0 && dstThread != thread.get()) {
-        Mutex::Autolock _dl(dstThread->mutex());
-        Mutex::Autolock _sl(thread->mutex());
+        audio_utils::lock_guard _dl(dstThread->mutex());
+        audio_utils::lock_guard _sl(thread->mutex());
         sp<IAfEffectChain> srcChain = thread->getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
         sp<IAfEffectChain> dstChain;
         if (srcChain == 0) {
