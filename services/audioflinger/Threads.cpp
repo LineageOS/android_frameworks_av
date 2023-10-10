@@ -2921,7 +2921,7 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mLock
             {
                 // TODO(b/184194780): Use the vibrator information from the vibrator that will be
                 // used to play this track.
-                Mutex::Autolock _l(mAfThreadCallback->mutex());
+                audio_utils::lock_guard _l(mAfThreadCallback->mutex());
                 vibratorInfo = std::move(mAfThreadCallback->getDefaultVibratorInfo_l());
             }
             mLock.lock();
@@ -3977,7 +3977,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
         if (isMsdDevice() && outDeviceTypes().count(AUDIO_DEVICE_OUT_BUS) != 0) {
             // Here, we try for the AF lock, but do not block on it as the latency
             // is more informational.
-            if (mAfThreadCallback->mutex().tryLock() == NO_ERROR) {
+            if (mAfThreadCallback->mutex().try_lock()) {
                 std::vector<SoftwarePatch> swPatches;
                 double latencyMs = 0.; // not required; initialized for clang-tidy
                 status_t status = INVALID_OPERATION;
