@@ -23,7 +23,6 @@
 
 #include "Configuration.h"
 #include "AudioFlinger.h"
-#include "EffectConfiguration.h"
 
 //#define BUFLOG_NDEBUG 0
 #include <afutils/BufLog.h>
@@ -232,23 +231,6 @@ void AudioFlinger::instantiate() {
 }
 
 AudioFlinger::AudioFlinger()
-    : mMediaLogNotifier(new AudioFlinger::MediaLogNotifier()),
-      mPrimaryHardwareDev(NULL),
-      mAudioHwDevs(NULL),
-      mHardwareStatus(AUDIO_HW_IDLE),
-      mMasterVolume(1.0f),
-      mMasterMute(false),
-      // mNextUniqueId(AUDIO_UNIQUE_ID_USE_MAX),
-      mMode(AUDIO_MODE_INVALID),
-      mBtNrecIsOff(false),
-      mIsLowRamDevice(true),
-      mIsDeviceTypeKnown(false),
-      mTotalMemory(0),
-      mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
-      mGlobalEffectEnableTime(0),
-      mPatchCommandThread(sp<PatchCommandThread>::make()),
-      mSystemReady(false),
-      mBluetoothLatencyModesEnabled(true)
 {
     // Move the audio session unique ID generator start base as time passes to limit risk of
     // generating the same ID again after an audioserver restart.
@@ -284,9 +266,6 @@ AudioFlinger::AudioFlinger()
     // if the audio service has crashed, battery stats could be left
     // in bad state, reset the state upon service start.
     BatteryNotifier::getInstance().noteResetAudio();
-
-    mDevicesFactoryHal = DevicesFactoryHalInterface::create();
-    mEffectsFactoryHal = audioflinger::EffectConfiguration::getEffectsFactoryHal();
 
     mMediaLogNotifier->run("MediaLogNotifier");
     std::vector<pid_t> halPids;
@@ -1329,7 +1308,7 @@ status_t AudioFlinger::setMode(audio_mode_t mode)
         if (mPrimaryHardwareDev == nullptr) {
             return INVALID_OPERATION;
         }
-        sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
+        sp<DeviceHalInterface> dev = mPrimaryHardwareDev.load()->hwDevice();
         mHardwareStatus = AUDIO_HW_SET_MODE;
         ret = dev->setMode(mode);
         mHardwareStatus = AUDIO_HW_IDLE;
@@ -1366,7 +1345,7 @@ status_t AudioFlinger::setMicMute(bool state)
     if (mPrimaryHardwareDev == nullptr) {
         return INVALID_OPERATION;
     }
-    sp<DeviceHalInterface> primaryDev = mPrimaryHardwareDev->hwDevice();
+    sp<DeviceHalInterface> primaryDev = mPrimaryHardwareDev.load()->hwDevice();
     if (primaryDev == nullptr) {
         ALOGW("%s: no primary HAL device", __func__);
         return INVALID_OPERATION;
@@ -1394,7 +1373,7 @@ bool AudioFlinger::getMicMute() const
     if (mPrimaryHardwareDev == nullptr) {
         return false;
     }
-    sp<DeviceHalInterface> primaryDev = mPrimaryHardwareDev->hwDevice();
+    sp<DeviceHalInterface> primaryDev = mPrimaryHardwareDev.load()->hwDevice();
     if (primaryDev == nullptr) {
         ALOGW("%s: no primary HAL device", __func__);
         return false;
@@ -1912,7 +1891,7 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     }
     mHardwareStatus = AUDIO_HW_GET_INPUT_BUFFER_SIZE;
 
-    sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
+    sp<DeviceHalInterface> dev = mPrimaryHardwareDev.load()->hwDevice();
 
     std::vector<audio_channel_mask_t> channelMasks = {channelMask};
     if (channelMask != AUDIO_CHANNEL_IN_MONO) {
@@ -2003,7 +1982,7 @@ status_t AudioFlinger::setVoiceVolume(float value)
     if (mPrimaryHardwareDev == nullptr) {
         return INVALID_OPERATION;
     }
-    sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
+    sp<DeviceHalInterface> dev = mPrimaryHardwareDev.load()->hwDevice();
     mHardwareStatus = AUDIO_HW_SET_VOICE_VOLUME;
     ret = dev->setVoiceVolume(value);
     mHardwareStatus = AUDIO_HW_IDLE;
@@ -2558,7 +2537,7 @@ AudioHwDevice* AudioFlinger::loadHwModule_l(const char *name)
     if (strcmp(name, AUDIO_HARDWARE_MODULE_ID_PRIMARY) == 0) {
         mPrimaryHardwareDev = audioDevice;
         mHardwareStatus = AUDIO_HW_SET_MODE;
-        mPrimaryHardwareDev->hwDevice()->setMode(mMode);
+        mPrimaryHardwareDev.load()->hwDevice()->setMode(mMode);
         mHardwareStatus = AUDIO_HW_IDLE;
     }
 
@@ -2692,7 +2671,7 @@ audio_hw_sync_t AudioFlinger::getAudioHwSyncForSession(audio_session_t sessionId
         if (mPrimaryHardwareDev == nullptr) {
             return AUDIO_HW_SYNC_INVALID;
         }
-        dev = mPrimaryHardwareDev->hwDevice();
+        dev = mPrimaryHardwareDev.load()->hwDevice();
     }
     if (dev == nullptr) {
         return AUDIO_HW_SYNC_INVALID;
@@ -2964,7 +2943,7 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
                 mPrimaryHardwareDev = playbackThread->getOutput()->audioHwDev;
 
                 mHardwareStatus = AUDIO_HW_SET_MODE;
-                mPrimaryHardwareDev->hwDevice()->setMode(mMode);
+                mPrimaryHardwareDev.load()->hwDevice()->setMode(mMode);
                 mHardwareStatus = AUDIO_HW_IDLE;
             }
         } else {
