@@ -20,10 +20,9 @@
 #include <android-base/stringprintf.h>
 #include <android/media/BnEffect.h>
 #include <android/media/BnSpatializer.h>
-#include <android/media/SpatializationLevel.h>
-#include <android/media/SpatializationMode.h>
-#include <android/media/SpatializerHeadTrackingMode.h>
 #include <android/media/audio/common/AudioLatencyMode.h>
+#include <android/media/audio/common/HeadTracking.h>
+#include <android/media/audio/common/Spatialization.h>
 #include <audio_utils/SimpleLog.h>
 #include <math.h>
 #include <media/AudioEffect.h>
@@ -106,16 +105,17 @@ class Spatializer : public media::BnSpatializer,
 
     /** ISpatializer, see ISpatializer.aidl */
     binder::Status release() override;
-    binder::Status getSupportedLevels(std::vector<media::SpatializationLevel>* levels) override;
-    binder::Status setLevel(media::SpatializationLevel level) override;
-    binder::Status getLevel(media::SpatializationLevel *level) override;
+    binder::Status getSupportedLevels(
+            std::vector<media::audio::common::Spatialization::Level>* levels) override;
+    binder::Status setLevel(media::audio::common::Spatialization::Level level) override;
+    binder::Status getLevel(media::audio::common::Spatialization::Level *level) override;
     binder::Status isHeadTrackingSupported(bool *supports);
     binder::Status getSupportedHeadTrackingModes(
-            std::vector<media::SpatializerHeadTrackingMode>* modes) override;
+            std::vector<media::audio::common::HeadTracking::Mode>* modes) override;
     binder::Status setDesiredHeadTrackingMode(
-            media::SpatializerHeadTrackingMode mode) override;
+            media::audio::common::HeadTracking::Mode mode) override;
     binder::Status getActualHeadTrackingMode(
-            media::SpatializerHeadTrackingMode* mode) override;
+            media::audio::common::HeadTracking::Mode* mode) override;
     binder::Status recenterHeadTracker() override;
     binder::Status setGlobalTransform(const std::vector<float>& screenToStage) override;
     binder::Status setHeadSensor(int sensorHandle) override;
@@ -123,7 +123,8 @@ class Spatializer : public media::BnSpatializer,
     binder::Status setDisplayOrientation(float physicalToLogicalAngle) override;
     binder::Status setHingeAngle(float hingeAngle) override;
     binder::Status setFoldState(bool folded) override;
-    binder::Status getSupportedModes(std::vector<media::SpatializationMode>* modes) override;
+    binder::Status getSupportedModes(
+            std::vector<media::audio::common::Spatialization::Mode>* modes) override;
     binder::Status registerHeadTrackingCallback(
         const sp<media::ISpatializerHeadTrackingCallback>& callback) override;
     binder::Status setParameter(int key, const std::vector<unsigned char>& value) override;
@@ -145,7 +146,10 @@ class Spatializer : public media::BnSpatializer,
     status_t loadEngineConfiguration(sp<EffectHalInterface> effect);
 
     /** Level getter for use by local classes. */
-    media::SpatializationLevel getLevel() const { std::lock_guard lock(mLock); return mLevel; }
+    media::audio::common::Spatialization::Level getLevel() const {
+        std::lock_guard lock(mLock);
+        return mLevel;
+    }
 
     /** Called by audio policy service when the special output mixer dedicated to spatialization
      * is opened and the spatializer engine must be created.
@@ -360,7 +364,8 @@ private:
     sp<media::ISpatializerHeadTrackingCallback> mHeadTrackingCallback GUARDED_BY(mLock);
 
     /** Requested spatialization level */
-    media::SpatializationLevel mLevel GUARDED_BY(mLock) = media::SpatializationLevel::NONE;
+    media::audio::common::Spatialization::Level mLevel GUARDED_BY(mLock) =
+            media::audio::common::Spatialization::Level::NONE;
 
     /** Control logic for head-tracking, etc. */
     std::shared_ptr<SpatializerPoseController> mPoseController GUARDED_BY(mLock);
@@ -370,8 +375,8 @@ private:
             = media::HeadTrackingMode::STATIC;
 
     /** Last-reported actual head-tracking mode. */
-    media::SpatializerHeadTrackingMode mActualHeadTrackingMode GUARDED_BY(mLock)
-            = media::SpatializerHeadTrackingMode::DISABLED;
+    media::audio::common::HeadTracking::Mode mActualHeadTrackingMode GUARDED_BY(mLock)
+            = media::audio::common::HeadTracking::Mode::DISABLED;
 
     /** Selected Head pose sensor */
     int32_t mHeadSensor GUARDED_BY(mLock) = SpatializerPoseController::INVALID_SENSOR;
@@ -388,9 +393,9 @@ private:
     /** Last hinge angle */
     float mHingeAngle GUARDED_BY(mLock) = 0.f;  // foldable: 0.f is closed, M_PI flat open.
 
-    std::vector<media::SpatializationLevel> mLevels;
-    std::vector<media::SpatializerHeadTrackingMode> mHeadTrackingModes;
-    std::vector<media::SpatializationMode> mSpatializationModes;
+    std::vector<media::audio::common::Spatialization::Level> mLevels;
+    std::vector<media::audio::common::HeadTracking::Mode> mHeadTrackingModes;
+    std::vector<media::audio::common::Spatialization::Mode> mSpatializationModes;
     std::vector<audio_channel_mask_t> mChannelMasks;
     bool mSupportsHeadTracking;
 
