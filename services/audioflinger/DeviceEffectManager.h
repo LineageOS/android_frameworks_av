@@ -53,10 +53,10 @@ public:
                 int *enabled,
                 status_t *status,
                 bool probe,
-                bool notifyFramesProcessed);
+                bool notifyFramesProcessed) REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     size_t removeEffect(const sp<IAfDeviceEffectProxy>& effect);
-    status_t createEffectHal(const effect_uuid_t *pEffectUuid,
+    static status_t createEffectHal(const effect_uuid_t *pEffectUuid,
            int32_t sessionId, int32_t deviceId,
            sp<EffectHalInterface> *effect);
     status_t addEffectToHal(const struct audio_port_config *device,
@@ -71,17 +71,21 @@ public:
     // PatchCommandThread::PatchCommandListener implementation
 
     void onCreateAudioPatch(audio_patch_handle_t handle,
-            const IAfPatchPanel::Patch& patch) final;
-    void onReleaseAudioPatch(audio_patch_handle_t handle) final;
+            const IAfPatchPanel::Patch& patch) final
+            EXCLUDES_DeviceEffectManager_Mutex;
+    void onReleaseAudioPatch(audio_patch_handle_t handle) final
+            EXCLUDES_DeviceEffectManager_Mutex;
 
 private:
-    status_t checkEffectCompatibility(const effect_descriptor_t *desc);
+    static status_t checkEffectCompatibility(const effect_descriptor_t *desc);
 
-    audio_utils::mutex& mutex() const { return mMutex; }
+    audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::DeviceEffectManager_Mutex) {
+       return mMutex;
+   }
     mutable audio_utils::mutex mMutex;
     const sp<IAfDeviceEffectManagerCallback> mAfDeviceEffectManagerCallback;
     const sp<DeviceEffectManagerCallback> mMyCallback;
-    std::map<AudioDeviceTypeAddr, sp<IAfDeviceEffectProxy>> mDeviceEffects;
+    std::map<AudioDeviceTypeAddr, sp<IAfDeviceEffectProxy>> mDeviceEffects GUARDED_BY(mutex());
 };
 
 class DeviceEffectManagerCallback : public EffectCallbackInterface {
@@ -90,55 +94,54 @@ public:
         : mManager(manager) {}
 
     status_t createEffectHal(const effect_uuid_t *pEffectUuid,
-           int32_t sessionId, int32_t deviceId,
-           sp<EffectHalInterface> *effect) override {
+            int32_t sessionId, int32_t deviceId, sp<EffectHalInterface> *effect) final {
                 return mManager.createEffectHal(pEffectUuid, sessionId, deviceId, effect);
             }
     status_t allocateHalBuffer(size_t size __unused,
-            sp<EffectBufferHalInterface>* buffer __unused) override { return NO_ERROR; }
-    bool updateOrphanEffectChains(const sp<IAfEffectBase>& effect __unused) override {
+            sp<EffectBufferHalInterface>* buffer __unused) final { return NO_ERROR; }
+    bool updateOrphanEffectChains(const sp<IAfEffectBase>& effect __unused) final {
         return false;
     }
 
-    audio_io_handle_t io() const override  { return AUDIO_IO_HANDLE_NONE; }
-    bool isOutput() const override { return false; }
-    bool isOffload() const override { return false; }
-    bool isOffloadOrDirect() const override { return false; }
-    bool isOffloadOrMmap() const override { return false; }
-    bool isSpatializer() const override { return false; }
+    audio_io_handle_t io() const final { return AUDIO_IO_HANDLE_NONE; }
+    bool isOutput() const final { return false; }
+    bool isOffload() const final { return false; }
+    bool isOffloadOrDirect() const final { return false; }
+    bool isOffloadOrMmap() const final { return false; }
+    bool isSpatializer() const final { return false; }
 
-    uint32_t  sampleRate() const override { return 0; }
-    audio_channel_mask_t inChannelMask(int id __unused) const override {
+    uint32_t sampleRate() const final { return 0; }
+    audio_channel_mask_t inChannelMask(int id __unused) const final {
         return AUDIO_CHANNEL_NONE;
     }
-    uint32_t inChannelCount(int id __unused) const override { return 0; }
-    audio_channel_mask_t outChannelMask() const override { return AUDIO_CHANNEL_NONE; }
-    uint32_t outChannelCount() const override { return 0; }
+    uint32_t inChannelCount(int id __unused) const final { return 0; }
+    audio_channel_mask_t outChannelMask() const final { return AUDIO_CHANNEL_NONE; }
+    uint32_t outChannelCount() const final { return 0; }
 
-    audio_channel_mask_t hapticChannelMask() const override { return AUDIO_CHANNEL_NONE; }
-    size_t    frameCount() const override  { return 0; }
-    uint32_t  latency() const override  { return 0; }
+    audio_channel_mask_t hapticChannelMask() const final { return AUDIO_CHANNEL_NONE; }
+    size_t frameCount() const final { return 0; }
+    uint32_t latency() const final { return 0; }
 
-    status_t addEffectToHal(const sp<EffectHalInterface>& /* effect */) override {
+    status_t addEffectToHal(const sp<EffectHalInterface>& /* effect */) final {
         return NO_ERROR;
     }
-    status_t removeEffectFromHal(const sp<EffectHalInterface>& /* effect */) override {
+    status_t removeEffectFromHal(const sp<EffectHalInterface>& /* effect */) final {
         return NO_ERROR;
     }
 
-    bool disconnectEffectHandle(IAfEffectHandle *handle, bool unpinIfLast) override;
-    void setVolumeForOutput(float left __unused, float right __unused) const override {}
+    bool disconnectEffectHandle(IAfEffectHandle *handle, bool unpinIfLast) final;
+    void setVolumeForOutput(float left __unused, float right __unused) const final {}
 
     // check if effects should be suspended or restored when a given effect is enable or disabled
     void checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect __unused,
-                          bool enabled __unused, bool threadLocked __unused) override {}
-    void resetVolume() override {}
-    product_strategy_t strategy() const override  { return static_cast<product_strategy_t>(0); }
-    int32_t activeTrackCnt() const override { return 0; }
-    void onEffectEnable(const sp<IAfEffectBase>& effect __unused) override {}
-    void onEffectDisable(const sp<IAfEffectBase>& effect __unused) override {}
+                          bool enabled __unused, bool threadLocked __unused) final {}
+    void resetVolume() final {}
+    product_strategy_t strategy() const final { return static_cast<product_strategy_t>(0); }
+    int32_t activeTrackCnt() const final { return 0; }
+    void onEffectEnable(const sp<IAfEffectBase>& effect __unused) final {}
+    void onEffectDisable(const sp<IAfEffectBase>& effect __unused) final {}
 
-    wp<IAfEffectChain> chain() const override { return nullptr; }
+    wp<IAfEffectChain> chain() const final { return nullptr; }
 
     bool isAudioPolicyReady() const final;
 
