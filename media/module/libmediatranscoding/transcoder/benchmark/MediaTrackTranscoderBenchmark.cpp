@@ -44,6 +44,8 @@
 #include <media/PassthroughTrackTranscoder.h>
 #include <media/VideoTrackTranscoder.h>
 
+#include "BenchmarkCommon.h"
+
 using namespace android;
 
 typedef enum {
@@ -249,9 +251,6 @@ static std::shared_ptr<AMediaFormat> GetDefaultTrackFormat(MediaType mediaType,
 /** Gets a MediaSampleReader for the source file */
 static std::shared_ptr<MediaSampleReader> GetSampleReader(const std::string& srcFileName,
                                                           bool mock) {
-    // Asset directory
-    static const std::string kAssetDirectory = "/data/local/tmp/TranscodingBenchmark/";
-
     int srcFd = 0;
     std::string srcPath = kAssetDirectory + srcFileName;
 
@@ -362,7 +361,7 @@ static void BenchmarkTranscoder(benchmark::State& state, const std::string& srcF
 
         std::shared_ptr<MediaSampleReader> sampleReader = GetSampleReader(srcFileName, mockReader);
         if (sampleReader == nullptr) {
-            state.SkipWithError("Unable to create sample reader");
+            state.SkipWithError("Unable to create sample reader: " + srcFileName);
             return;
         }
 
