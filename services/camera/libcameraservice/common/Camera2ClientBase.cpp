@@ -157,16 +157,6 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         return res;
     }
 
-    /** Start watchdog thread */
-    mCameraServiceWatchdog = new CameraServiceWatchdog(TClientBase::mCameraIdStr,
-            mCameraServiceProxyWrapper);
-    res = mCameraServiceWatchdog->run("Camera2ClientBaseWatchdog");
-    if (res != OK) {
-        ALOGE("%s: Unable to start camera service watchdog thread: %s (%d)",
-                __FUNCTION__, strerror(-res), res);
-        return res;
-    }
-
     return OK;
 }
 
@@ -177,11 +167,6 @@ Camera2ClientBase<TClientBase>::~Camera2ClientBase() {
     TClientBase::mDestructionStarted = true;
 
     disconnect();
-
-    if (mCameraServiceWatchdog != NULL) {
-        mCameraServiceWatchdog->requestExit();
-        mCameraServiceWatchdog.clear();
-    }
 
     ALOGI("%s: Client object's dtor for Camera Id %s completed. Client was: %s (PID %d, UID %u)",
             __FUNCTION__, TClientBase::mCameraIdStr.c_str(),
@@ -268,10 +253,7 @@ status_t Camera2ClientBase<TClientBase>::dumpDevice(
 
 template <typename TClientBase>
 binder::Status Camera2ClientBase<TClientBase>::disconnect() {
-    if (mCameraServiceWatchdog != nullptr && mDevice != nullptr) {
-        // Initialization from hal succeeded, time disconnect.
-        return mCameraServiceWatchdog->WATCH(disconnectImpl());
-    }
+
     return disconnectImpl();
 }
 

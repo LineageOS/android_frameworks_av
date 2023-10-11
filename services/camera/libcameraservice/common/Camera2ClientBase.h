@@ -184,9 +184,6 @@ private:
 
     binder::Status disconnectImpl();
 
-    // Watchdog thread
-    sp<CameraServiceWatchdog> mCameraServiceWatchdog;
-
 };
 
 }; // namespace android
