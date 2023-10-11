@@ -1708,8 +1708,8 @@ DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(
             [&](const auto& pair) {
                 const auto& p = pair.second;
                 LOG_ALWAYS_FATAL_IF(p.ext.getTag() == Tag::mix &&
-                        !p.sampleRate.has_value() || !p.channelMask.has_value() ||
-                        !p.format.has_value() || !p.flags.has_value(),
+                        (!p.sampleRate.has_value() || !p.channelMask.has_value() ||
+                                !p.format.has_value() || !p.flags.has_value()),
                         "%s: stored mix port config is not fully specified: %s",
                         __func__, p.toString().c_str());
                 return p.ext.getTag() == Tag::mix &&
