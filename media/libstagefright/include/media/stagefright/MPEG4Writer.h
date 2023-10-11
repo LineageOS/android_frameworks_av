@@ -241,6 +241,8 @@ private:
     std::map<uint32_t, ItemInfo> mItems;
     Vector<ItemProperty> mProperties;
 
+    bool mHasDolbyVision;
+
     // Writer thread handling
     status_t startWriterThread();
     status_t stopWriterThread();
