@@ -39,6 +39,7 @@
 #include "IMediaResourceMonitor.h"
 #include "ResourceManagerMetrics.h"
 #include "ResourceManagerService.h"
+#include "ResourceManagerServiceUtils.h"
 #include "ResourceObserverService.h"
 #include "ServiceLog.h"
 
@@ -158,87 +159,6 @@ void OverrideProcessInfoDeathNotifier::binderDied() {
     }
 
     service->removeProcessInfoOverride(mClientInfo.pid);
-}
-
-template <typename T>
-static String8 getString(const std::vector<T>& items) {
-    String8 itemsStr;
-    for (size_t i = 0; i < items.size(); ++i) {
-        itemsStr.appendFormat("%s ", toString(items[i]).c_str());
-    }
-    return itemsStr;
-}
-
-static bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
-        const MediaResourceParcel& resource) {
-    if (type != resource.type) {
-      return false;
-    }
-    switch (type) {
-        // Codec subtypes (e.g. video vs. audio) are each considered separate resources, so
-        // compare the subtypes as well.
-        case MediaResource::Type::kSecureCodec:
-        case MediaResource::Type::kNonSecureCodec:
-            if (resource.subType == subType) {
-                return true;
-            }
-            break;
-        // Non-codec resources are not segregated by the subtype (e.g. video vs. audio).
-        default:
-            return true;
-    }
-    return false;
-}
-
-static bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
-        const ResourceList& resources) {
-    for (auto it = resources.begin(); it != resources.end(); it++) {
-        if (hasResourceType(type, subType, it->second)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
-        const ResourceInfos& infos) {
-    for (const auto& [id, info] : infos) {
-        if (hasResourceType(type, subType, info.resources)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static ResourceInfos& getResourceInfosForEdit(int pid, PidResourceInfosMap& map) {
-    PidResourceInfosMap::iterator found = map.find(pid);
-    if (found == map.end()) {
-        // new pid
-        ResourceInfos infosForPid;
-        auto [it, inserted] = map.emplace(pid, infosForPid);
-        found = it;
-    }
-
-    return found->second;
-}
-
-static ResourceInfo& getResourceInfoForEdit(uid_t uid, int64_t clientId,
-                                            const std::string& name,
-        const std::shared_ptr<IResourceManagerClient>& client, ResourceInfos& infos) {
-    ResourceInfos::iterator found = infos.find(clientId);
-
-    if (found == infos.end()) {
-        ResourceInfo info{.uid = uid,
-                          .clientId = clientId,
-                          .name = name.empty()? "<unknown client>" : name,
-                          .client = client,
-                          .deathNotifier = nullptr,
-                          .pendingRemoval = false};
-        auto [it, inserted] = infos.emplace(clientId, info);
-        found = it;
-    }
-
-    return found->second;
 }
 
 static void notifyResourceGranted(int pid, const std::vector<MediaResourceParcel>& resources) {
@@ -488,7 +408,6 @@ Status ResourceManagerService::addResource(const ClientInfoParcel& clientInfo,
     int32_t pid = clientInfo.pid;
     int32_t uid = clientInfo.uid;
     int64_t clientId = clientInfo.id;
-    const std::string& name = clientInfo.name;
     String8 log = String8::format("addResource(pid %d, uid %d clientId %lld, resources %s)",
             pid, uid, (long long) clientId, getString(resources).c_str());
     mServiceLog->add(log);
@@ -503,7 +422,7 @@ Status ResourceManagerService::addResource(const ClientInfoParcel& clientInfo,
         uid = callingUid;
     }
     ResourceInfos& infos = getResourceInfosForEdit(pid, mMap);
-    ResourceInfo& info = getResourceInfoForEdit(uid, clientId, name, client, infos);
+    ResourceInfo& info = getResourceInfoForEdit(clientInfo, client, infos);
     ResourceList resourceAdded;
 
     for (size_t i = 0; i < resources.size(); ++i) {
