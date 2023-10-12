@@ -30,7 +30,7 @@ namespace android {
 
 bool MelReporter::activateHalSoundDoseComputation(const std::string& module,
         const sp<DeviceHalInterface>& device) {
-    if (mSoundDoseManager->forceUseFrameworkMel()) {
+    if (mSoundDoseManager->isFrameworkMelForced()) {
         ALOGD("%s: Forcing use of internal MEL computation.", __func__);
         activateInternalSoundDoseComputation();
         return false;
@@ -318,7 +318,7 @@ std::optional<audio_patch_handle_t> MelReporter::activePatchStreamHandle_l(
 }
 
 bool MelReporter::useHalSoundDoseInterface_l() {
-    return !mSoundDoseManager->forceUseFrameworkMel() & mUseHalSoundDoseInterface;
+    return !mSoundDoseManager->isFrameworkMelForced() & mUseHalSoundDoseInterface;
 }
 
 std::string MelReporter::dump() {
