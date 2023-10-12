@@ -33,23 +33,23 @@ parcelable ClientConfigParcel {
     /**
      * Type of codec (Audio/Video/Image).
      */
-    MediaResourceSubType codecType;
+    MediaResourceSubType codecType = MediaResourceSubType.kUnspecifiedSubType;
 
     /**
      * true if this is an encoder, false if this is a decoder.
      */
-    boolean isEncoder;
+    boolean isEncoder = false;
 
     /*
      * Video Resolution of the codec when it was configured, as width and height (in pixels).
      */
-    int width;
-    int height;
+    int width = 0;
+    int height = 0;
 
     /*
      * Timestamp (in microseconds) when this configuration is created.
      */
-    long timeStamp;
+    long timeStamp = 0;
 
     /*
      * ID associated with the Codec.
@@ -57,5 +57,5 @@ parcelable ClientConfigParcel {
      * - Associate MediaCodecStarted with MediaCodecStopped Atom.
      * - Correlate MediaCodecReported Atom for codec configuration parameters.
      */
-    long id;
+    long id = 0;
 }
