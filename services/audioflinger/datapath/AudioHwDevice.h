@@ -101,6 +101,9 @@ public:
 
     [[nodiscard]] int32_t getAAudioHardwareBurstMinUsec() const;
 
+    [[nodiscard]] status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                           struct audio_port_v7 *mixPort) const;
+
 private:
     const audio_module_handle_t mHandle;
     const char * const          mModuleName;

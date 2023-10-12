@@ -43,3 +43,30 @@ cc_test {
 
     test_suites: ["device-tests"],
 }
+
+cc_test {
+    name: "audiofoundation_containers_test",
+
+    shared_libs: [
+        "liblog",
+    ],
+
+    static_libs: [
+        "libaudiofoundation",
+    ],
+
+    header_libs: [
+        "libaudio_system_headers",
+    ],
+
+    srcs: [
+        "audiofoundation_containers_test.cpp",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    test_suites: ["device-tests"],
+}
