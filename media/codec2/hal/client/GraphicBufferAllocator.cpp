@@ -13,6 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+//#define LOG_NDEBUG 0
+#define LOG_TAG "Codec2-GraphicBufferAllocator"
+
 
 #include <gui/IProducerListener.h>
 #include <media/stagefright/foundation/ADebug.h>
