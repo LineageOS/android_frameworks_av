@@ -35,23 +35,13 @@
 #include "binder/Status.h"
 #include "FrameProducer.h"
 #include "utils/IPCTransport.h"
+#include "utils/SessionConfigurationUtils.h"
 
 #include "CameraOfflineSessionBase.h"
 
 namespace android {
 
 namespace camera3 {
-
-typedef enum camera_request_template {
-    CAMERA_TEMPLATE_PREVIEW = 1,
-    CAMERA_TEMPLATE_STILL_CAPTURE = 2,
-    CAMERA_TEMPLATE_VIDEO_RECORD = 3,
-    CAMERA_TEMPLATE_VIDEO_SNAPSHOT = 4,
-    CAMERA_TEMPLATE_ZERO_SHUTTER_LAG = 5,
-    CAMERA_TEMPLATE_MANUAL = 6,
-    CAMERA_TEMPLATE_COUNT,
-    CAMERA_VENDOR_TEMPLATE_START = 0x40000000
-} camera_request_template_t;
 
 typedef enum camera_stream_configuration_mode {
     CAMERA_STREAM_CONFIGURATION_NORMAL_MODE = 0,

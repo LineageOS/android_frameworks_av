@@ -64,12 +64,6 @@ class VirtualCameraSession
       std::vector<::aidl::android::hardware::camera::device::HalStream>*
           _aidl_return) override EXCLUDES(mLock);
 
-  ndk::ScopedAStatus configureStreamsV2(
-      const ::aidl::android::hardware::camera::device::StreamConfiguration&,
-      ::aidl::android::hardware::camera::device::ConfigureStreamsRet*) override {
-    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
-  };
-
   ndk::ScopedAStatus constructDefaultRequestSettings(
       ::aidl::android::hardware::camera::device::RequestTemplate in_type,
       ::aidl::android::hardware::camera::device::CameraMetadata* _aidl_return)

@@ -397,7 +397,7 @@ status_t CameraProviderManager::getCameraInfo(const std::string &id,
 
 status_t CameraProviderManager::isSessionConfigurationSupported(const std::string& id,
         const SessionConfiguration &configuration, bool overrideForPerfClass,
-        metadataGetter getMetadata, bool *status /*out*/) const {
+        bool checkSessionParams, bool *status /*out*/) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) {
@@ -405,7 +405,41 @@ status_t CameraProviderManager::isSessionConfigurationSupported(const std::strin
     }
 
     return deviceInfo->isSessionConfigurationSupported(configuration,
-            overrideForPerfClass, getMetadata, status);
+            overrideForPerfClass, checkSessionParams, status);
+}
+
+status_t  CameraProviderManager::createDefaultRequest(const std::string& cameraId,
+        camera_request_template_t templateId,
+        CameraMetadata* metadata) const {
+    ATRACE_CALL();
+    if (templateId <= 0 || templateId >= CAMERA_TEMPLATE_COUNT) {
+        return BAD_VALUE;
+    }
+
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    auto deviceInfo = findDeviceInfoLocked(cameraId);
+    if (deviceInfo == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+
+    camera_metadata_t *rawRequest;
+    status_t res = deviceInfo->createDefaultRequest(templateId,
+            &rawRequest);
+
+    if (res == BAD_VALUE) {
+        ALOGI("%s: template %d is not supported on this camera device",
+              __FUNCTION__, templateId);
+        return res;
+    } else if (res != OK) {
+        ALOGE("Unable to construct request template %d: %s (%d)",
+                templateId, strerror(-res), res);
+        return res;
+    }
+
+    set_camera_metadata_vendor_id(rawRequest, deviceInfo->mProviderTagid);
+    metadata->acquire(rawRequest);
+
+    return OK;
 }
 
 status_t CameraProviderManager::getCameraIdIPCTransport(const std::string &id,
@@ -1007,6 +1041,20 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::queryPhysicalCameraIds() 
                 mPhysicalIds.push_back((const char*)ids+start);
             }
             start = i+1;
+        }
+    }
+}
+
+CameraMetadata CameraProviderManager::ProviderInfo::DeviceInfo3::deviceInfo(
+        const std::string &id) {
+    if (id.empty()) {
+        return mCameraCharacteristics;
+    } else {
+        if (mPhysicalCameraCharacteristics.find(id) != mPhysicalCameraCharacteristics.end()) {
+            return mPhysicalCameraCharacteristics.at(id);
+        } else {
+            ALOGE("%s: Invalid physical camera id %s", __FUNCTION__, id.c_str());
+            return mCameraCharacteristics;
         }
     }
 }
@@ -1753,6 +1801,26 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addReadoutTimestampTa
     }
 
     res = c.update(ANDROID_SENSOR_READOUT_TIMESTAMP, &readoutTimestamp, 1);
+
+    return res;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addSessionConfigQueryVersionTag() {
+    sp<ProviderInfo> parentProvider = mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+
+    int versionCode = ANDROID_INFO_SESSION_CONFIGURATION_QUERY_VERSION_UPSIDE_DOWN_CAKE;
+    IPCTransport ipcTransport = parentProvider->getIPCTransport();
+    int deviceVersion = HARDWARE_DEVICE_API_VERSION(mVersion.get_major(), mVersion.get_minor());
+    if (ipcTransport == IPCTransport::AIDL
+            && deviceVersion >= CAMERA_DEVICE_API_VERSION_1_3) {
+        versionCode = ANDROID_INFO_SESSION_CONFIGURATION_QUERY_VERSION_VANILLA_ICE_CREAM;
+    }
+
+    auto& c = mCameraCharacteristics;
+    status_t res = c.update(ANDROID_INFO_SESSION_CONFIGURATION_QUERY_VERSION, &versionCode, 1);
 
     return res;
 }
