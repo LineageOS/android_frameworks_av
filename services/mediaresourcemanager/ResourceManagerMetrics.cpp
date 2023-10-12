@@ -426,9 +426,9 @@ void ResourceManagerMetrics::pushConcurrentUsageReport(int32_t pid, uid_t uid) {
 }
 
 void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
-                        const std::vector<int>& priorities,
-                        const std::vector<std::shared_ptr<IResourceManagerClient>>& clients,
-                        const PidUidVector& idList, bool reclaimed) {
+                                             const std::vector<int>& priorities,
+                                             const std::vector<ClientInfo>& targetClients,
+                                             bool reclaimed) {
     // Construct the metrics for codec reclaim as a pushed atom.
     // 1. Information about the requester.
     //  - UID and the priority (oom score)
@@ -453,7 +453,7 @@ void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
     //    - UID and the Priority (oom score)
     int32_t reclaimStatus = MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_SUCCESS;
     if (!reclaimed) {
-      if (clients.size() == 0) {
+      if (targetClients.size() == 0) {
         // No clients to reclaim from
         reclaimStatus =
             MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_NO_CLIENTS;
@@ -463,10 +463,9 @@ void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
             MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_RECLAIM_RESOURCES;
       }
     }
-    int32_t noOfCodecsReclaimed = clients.size();
+    int32_t noOfCodecsReclaimed = targetClients.size();
     int32_t targetIndex = 1;
-    for (PidUidVector::const_reference id : idList) {
-        int32_t targetUid = id.second;
+    for (const ClientInfo& targetClient : targetClients) {
         int targetPriority = priorities[targetIndex];
         // Post the pushed atom
         int result = stats_write(
@@ -478,7 +477,7 @@ void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
             reclaimStatus,
             noOfCodecsReclaimed,
             targetIndex,
-            targetUid,
+            targetClient.mUid,
             targetPriority);
         ALOGI("%s: Pushed MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED atom: "
               "Requester[pid(%d): uid(%d): priority(%d)] "
@@ -490,7 +489,7 @@ void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
               __func__, callingPid, requesterUid, requesterPriority,
               clientName.c_str(), noOfConcurrentCodecs,
               reclaimStatus, noOfCodecsReclaimed,
-              targetIndex, id.first, targetUid, targetPriority, result);
+              targetIndex, targetClient.mPid, targetClient.mUid, targetPriority, result);
         targetIndex++;
     }
 }
