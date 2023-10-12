@@ -107,7 +107,7 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
 
     addParameter(DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
                          .withDefault(new C2StreamProfileLevelInfo::output(0u, PROFILE_AV1_0,
-                                                                           LEVEL_AV1_4_1))
+                                                                           LEVEL_AV1_2))
                          .withFields({
                                  C2F(mProfileLevel, profile).equalTo(PROFILE_AV1_0),
                                  C2F(mProfileLevel, level)
@@ -305,6 +305,10 @@ C2R C2SoftAomEnc::IntfImpl::CodedColorAspectsSetter(
     return C2R::Ok();
 }
 
+uint32_t C2SoftAomEnc::IntfImpl::getLevel_l() const {
+        return mProfileLevel->level - LEVEL_AV1_2;
+}
+
 C2SoftAomEnc::C2SoftAomEnc(const char* name, c2_node_id_t id,
                            const std::shared_ptr<IntfImpl>& intfImpl)
     : SimpleC2Component(std::make_shared<SimpleInterface<IntfImpl>>(name, id, intfImpl)),
@@ -380,6 +384,9 @@ static int MapC2ComplexityToAOMSpeed (int c2Complexity) {
 
 aom_codec_err_t C2SoftAomEnc::setupCodecParameters() {
     aom_codec_err_t codec_return = AOM_CODEC_OK;
+
+    codec_return = aom_codec_control(mCodecContext, AV1E_SET_TARGET_SEQ_LEVEL_IDX, mAV1EncLevel);
+    if (codec_return != AOM_CODEC_OK) goto BailOut;
 
     codec_return = aom_codec_control(mCodecContext, AOME_SET_CPUUSED,
                                      MapC2ComplexityToAOMSpeed(mComplexity->value));
@@ -535,6 +542,7 @@ status_t C2SoftAomEnc::initEncoder() {
         mColorAspects = mIntf->getCodedColorAspects_l();
         mQuality = mIntf->getQuality_l();
         mComplexity = mIntf->getComplexity_l();
+        mAV1EncLevel = mIntf->getLevel_l();
     }
 
 
