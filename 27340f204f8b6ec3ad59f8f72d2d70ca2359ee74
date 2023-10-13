@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5519bd8a_4f4f4c8d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 24438
+      },
+      "writtenOn": "2023-10-13T18:34:53Z",
+      "side": 1,
+      "message": "Seems to fix video freezing on 8475",
+      "revId": "27340f204f8b6ec3ad59f8f72d2d70ca2359ee74",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
