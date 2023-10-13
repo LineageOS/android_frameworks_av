@@ -130,11 +130,12 @@ private:
         return mListenerMutex;
     }
 
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kPatchCommandThread_Mutex};
     audio_utils::condition_variable mWaitWorkCV;
     std::deque<sp<Command>> mCommands GUARDED_BY(mutex()); // list of pending commands
 
-    mutable audio_utils::mutex mListenerMutex;
+    mutable audio_utils::mutex mListenerMutex{
+            audio_utils::MutexOrder::kPatchCommandThread_ListenerMutex};
     std::vector<wp<PatchCommandListener>> mListeners GUARDED_BY(listenerMutex());
 };
 

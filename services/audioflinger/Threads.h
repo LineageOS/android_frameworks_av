@@ -112,7 +112,8 @@ public:
             return mMutex;
         }
         const int mType; // event type e.g. CFG_EVENT_IO
-        mutable audio_utils::mutex mMutex; // mutex associated with mCondition
+        // mutex associated with mCondition
+        mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kConfigEvent_Mutex};
         audio_utils::condition_variable mCondition; // condition for status return
 
         // NO_THREAD_SAFETY_ANALYSIS Can we add GUARDED_BY?
@@ -537,7 +538,7 @@ public:
     audio_utils::mutex& mutex() const final RETURN_CAPABILITY(audio_utils::ThreadBase_Mutex) {
         return mMutex;
     }
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kThreadBase_Mutex};
 
     void onEffectEnable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
     void onEffectDisable() final EXCLUDES_ThreadBase_Mutex;
@@ -1454,7 +1455,8 @@ protected:
     sp<AsyncCallbackThread>         mCallbackThread;
 
     audio_utils::mutex& audioTrackCbMutex() const { return mAudioTrackCbMutex; }
-    mutable audio_utils::mutex mAudioTrackCbMutex;
+    mutable audio_utils::mutex mAudioTrackCbMutex{
+            audio_utils::MutexOrder::kPlaybackThread_AudioTrackCbMutex};
     // Record of IAudioTrackCallback
     std::map<sp<IAfTrack>, sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
@@ -1809,7 +1811,7 @@ private:
     // to indicate that the callback has been received via resetDraining()
     uint32_t                   mDrainSequence;
     audio_utils::condition_variable mWaitWorkCV;
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAsyncCallbackThread_Mutex};
     bool                       mAsyncError;
 
     audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::AsyncCallbackThread_Mutex) {

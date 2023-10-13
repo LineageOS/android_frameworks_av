@@ -221,7 +221,8 @@ private:
     std::unique_ptr<void, decltype(free)*> mSinkBuffer;  // frame size aligned continuous buffer
     std::unique_ptr<void, decltype(free)*> mStubBuffer;  // buffer used for AudioBufferProvider
     size_t mUnconsumedFrames = 0;
-    mutable audio_utils::mutex mReadMutex;
+    mutable audio_utils::mutex mReadMutex{
+            audio_utils::MutexOrder::kPassthruPatchRecord_ReadMutex};
     audio_utils::condition_variable mReadCV;
     size_t mReadBytes = 0; // GUARDED_BY(readMutex())
     status_t mReadError = NO_ERROR; // GUARDED_BY(readMutex())
