@@ -785,6 +785,7 @@ enum {
     kWhatOutputBuffersChanged = 'outC',
     kWhatFirstTunnelFrameReady = 'ftfR',
     kWhatPollForRenderedBuffers = 'plrb',
+    kWhatMetricsUpdated      = 'mtru',
 };
 
 class CryptoAsyncCallback : public CryptoAsync::CryptoAsyncCallback {
@@ -882,6 +883,7 @@ public:
     virtual void onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &done) override;
     virtual void onOutputBuffersChanged() override;
     virtual void onFirstTunnelFrameReady() override;
+    virtual void onMetricsUpdated(const sp<AMessage> &updatedMetrics) override;
 private:
     const sp<AMessage> mNotify;
 };
@@ -1005,6 +1007,13 @@ void CodecCallback::onOutputBuffersChanged() {
 void CodecCallback::onFirstTunnelFrameReady() {
     sp<AMessage> notify(mNotify->dup());
     notify->setInt32("what", kWhatFirstTunnelFrameReady);
+    notify->post();
+}
+
+void CodecCallback::onMetricsUpdated(const sp<AMessage> &updatedMetrics) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatMetricsUpdated);
+    notify->setMessage("updated-metrics", updatedMetrics);
     notify->post();
 }
 
@@ -4378,6 +4387,49 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         postActivityNotificationIfPossible();
                     }
 
+                    break;
+                }
+
+                case kWhatMetricsUpdated:
+                {
+                    sp<AMessage> updatedMetrics;
+                    CHECK(msg->findMessage("updated-metrics", &updatedMetrics));
+
+                    size_t numEntries = updatedMetrics->countEntries();
+                    AMessage::Type type;
+                    for (size_t i = 0; i < numEntries; ++i) {
+                        const char *name = updatedMetrics->getEntryNameAt(i, &type);
+                        AMessage::ItemData itemData = updatedMetrics->getEntryAt(i);
+                        switch (type) {
+                            case AMessage::kTypeInt32: {
+                                int32_t metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setInt32(mMetricsHandle, name, metricValue);
+                                break;
+                            }
+                            case AMessage::kTypeInt64: {
+                                int64_t metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setInt64(mMetricsHandle, name, metricValue);
+                                break;
+                            }
+                            case AMessage::kTypeDouble: {
+                                double metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setDouble(mMetricsHandle, name, metricValue);
+                                break;
+                            }
+                            case AMessage::kTypeString: {
+                                AString metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setCString(mMetricsHandle, name, metricValue.c_str());
+                                break;
+                            }
+                            // ToDo: add support for other types
+                            default:
+                                ALOGW("Updated metrics type not supported.");
+                        }
+                    }
                     break;
                 }
 
