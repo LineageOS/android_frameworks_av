@@ -877,6 +877,9 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             write(fd, timeCheckStats.c_str(), timeCheckStats.size());
             dprintf(fd, "\n");
         }
+        // dump mutex stats
+        const auto mutexStats = audio_utils::mutex::all_stats_to_string();
+        write(fd, mutexStats.c_str(), mutexStats.size());
     }
     return NO_ERROR;
 }
