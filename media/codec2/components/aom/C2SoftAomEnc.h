@@ -98,6 +98,8 @@ struct C2SoftAomEnc : public SimpleC2Component {
 
     bool mIs10Bit;
 
+    uint32_t mAV1EncLevel;
+
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
@@ -152,6 +154,7 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input>& me);
     static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output>& me,
                                        const C2P<C2StreamColorAspectsInfo::input>& coded);
+    uint32_t getLevel_l() const;
 
   private:
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
