@@ -185,6 +185,8 @@ private:
     status_t parseSampleEncryption(off64_t offset, off64_t size);
     // returns -1 for invalid layer ID
     int32_t parseHEVCLayerId(const uint8_t *data, size_t size);
+    size_t getNALLengthSizeFromAvcCsd(const uint8_t *data, const size_t size) const;
+    size_t getNALLengthSizeFromHevcCsd(const uint8_t *data, const size_t size) const;
 
     struct TrackFragmentHeaderInfo {
         enum Flags {
@@ -5158,24 +5160,13 @@ MPEG4Source::MPEG4Source(
         size_t size;
         CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
 
-        const uint8_t *ptr = (const uint8_t *)data;
-
-        CHECK(size >= 7);
-        CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
-
-        // The number of bytes used to encode the length of a NAL unit.
-        mNALLengthSize = 1 + (ptr[4] & 3);
+        mNALLengthSize = getNALLengthSizeFromAvcCsd((const uint8_t *)data, size);
     } else if (mIsHEVC) {
         void *data;
         size_t size;
         CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size));
 
-        const uint8_t *ptr = (const uint8_t *)data;
-
-        CHECK(size >= 22);
-        CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
-
-        mNALLengthSize = 1 + (ptr[14 + 7] & 3);
+        mNALLengthSize = getNALLengthSizeFromHevcCsd((const uint8_t *)data, size);
     } else if (mIsDolbyVision) {
         ALOGV("%s DolbyVision stream detected", __FUNCTION__);
         void *data;
@@ -5190,27 +5181,25 @@ MPEG4Source::MPEG4Source(
         CHECK(!((ptr[0] != 1 || ptr[1] != 0) && (ptr[0] != 2 || ptr[1] != 1)));
 
         const uint8_t profile = ptr[2] >> 1;
-        // profile == (unknown,1,9) --> AVC; profile = (2,3,4,5,6,7,8) --> HEVC;
-        // profile == (10) --> AV1
-        if (profile > 1 && profile < 9) {
+        // profile == (4,5,6,7,8) --> HEVC; profile == (9) --> AVC; profile == (10) --> AV1
+        if (profile > 3 && profile < 9) {
             CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size));
 
-            const uint8_t *ptr = (const uint8_t *)data;
+            mNALLengthSize = getNALLengthSizeFromHevcCsd((const uint8_t *)data, size);
+        } else if (9 == profile) {
+            CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
 
-            CHECK(size >= 22);
-            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
-
-            mNALLengthSize = 1 + (ptr[14 + 7] & 3);
+            mNALLengthSize = getNALLengthSizeFromAvcCsd((const uint8_t *)data, size);
         } else if (10 == profile) {
             /* AV1 profile nothing to do */
         } else {
-            CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
-            const uint8_t *ptr = (const uint8_t *)data;
-
-            CHECK(size >= 7);
-            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
-            // The number of bytes used to encode the length of a NAL unit.
-            mNALLengthSize = 1 + (ptr[4] & 3);
+            if (AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size)) {
+                mNALLengthSize = getNALLengthSizeFromHevcCsd((const uint8_t *)data, size);
+            } else if (AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size)) {
+                mNALLengthSize = getNALLengthSizeFromAvcCsd((const uint8_t *)data, size);
+            } else {
+                LOG_ALWAYS_FATAL("Invalid Dolby Vision profile = %d", profile);
+            }
         }
     }
 
@@ -6133,6 +6122,24 @@ int32_t MPEG4Source::parseHEVCLayerId(const uint8_t *data, size_t size) {
         return layerIdPlusOne - 1;
     }
     return 0;
+}
+
+size_t MPEG4Source::getNALLengthSizeFromAvcCsd(const uint8_t *data, const size_t size) const {
+    CHECK(data != nullptr);
+    CHECK(size >= 7);
+    CHECK_EQ((unsigned)data[0], 1u);  // configurationVersion == 1
+
+    // The number of bytes used to encode the length of a NAL unit.
+    return 1 + (data[4] & 3);
+}
+
+size_t MPEG4Source::getNALLengthSizeFromHevcCsd(const uint8_t *data, const size_t size) const {
+    CHECK(data != nullptr);
+    CHECK(size >= 22);
+    CHECK_EQ((unsigned)data[0], 1u);  // configurationVersion == 1
+
+    // The number of bytes used to encode the length of a NAL unit.
+    return 1 + (data[14 + 7] & 3);
 }
 
 media_status_t MPEG4Source::read(
