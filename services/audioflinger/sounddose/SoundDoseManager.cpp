@@ -33,6 +33,10 @@ using aidl::android::media::audio::common::AudioDevice;
 
 namespace {
 
+// Port handle used when CSD is computed on all devices. Should be a different value than
+// AUDIO_PORT_HANDLE_NONE which is associated with a sound dose callback failure
+constexpr audio_port_handle_t CSD_ON_ALL_DEVICES_PORT_HANDLE = -1;
+
 int64_t getMonotonicSecond() {
     struct timespec now_ts;
     if (clock_gettime(CLOCK_MONOTONIC, &now_ts) != 0) {
@@ -175,6 +179,13 @@ void SoundDoseManager::removeStreamProcessor(audio_io_handle_t streamHandle) {
 }
 
 audio_port_handle_t SoundDoseManager::getIdForAudioDevice(const AudioDevice& audioDevice) const {
+    if (isComputeCsdForcedOnAllDevices()) {
+        // If CSD is forced on all devices return random port id. Used only in testing.
+        // This is necessary since the patches that are registered before
+        // setComputeCsdOnAllDevices will not be contributing to mActiveDevices
+        return CSD_ON_ALL_DEVICES_PORT_HANDLE;
+    }
+
     const std::lock_guard _l(mLock);
 
     audio_devices_t type;
@@ -491,7 +502,7 @@ bool SoundDoseManager::shouldComputeCsdForDeviceType(audio_devices_t device) {
         ALOGV("%s csd is disabled", __func__);
         return false;
     }
-    if (forceComputeCsdOnAllDevices()) {
+    if (isComputeCsdForcedOnAllDevices()) {
         return true;
     }
 
@@ -515,7 +526,7 @@ bool SoundDoseManager::shouldComputeCsdForDeviceWithAddress(const audio_devices_
         ALOGV("%s csd is disabled", __func__);
         return false;
     }
-    if (forceComputeCsdOnAllDevices()) {
+    if (isComputeCsdForcedOnAllDevices()) {
         return true;
     }
 
@@ -536,7 +547,7 @@ void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
     mUseFrameworkMel = useFrameworkMel;
 }
 
-bool SoundDoseManager::forceUseFrameworkMel() const {
+bool SoundDoseManager::isFrameworkMelForced() const {
     const std::lock_guard _l(mLock);
     return mUseFrameworkMel;
 }
@@ -546,7 +557,7 @@ void SoundDoseManager::setComputeCsdOnAllDevices(bool computeCsdOnAllDevices) {
     mComputeCsdOnAllDevices = computeCsdOnAllDevices;
 }
 
-bool SoundDoseManager::forceComputeCsdOnAllDevices() const {
+bool SoundDoseManager::isComputeCsdForcedOnAllDevices() const {
     const std::lock_guard _l(mLock);
     return mComputeCsdOnAllDevices;
 }
