@@ -163,14 +163,10 @@ cc_fuzz {
     defaults: [
         "libcodec2-aidl-defaults",
         "service_fuzzer_defaults",
+        "libcodec2-runtime-libs",
     ],
     shared_libs: [
         "libcodec2_vndk",
-
-        "libcodec2_soft_avcdec",
-        "libcodec2_soft_avcenc",
-        "libcodec2_soft_aacdec",
-        "libcodec2_soft_aacenc",
     ],
     fuzz_config: {
         cc: [
