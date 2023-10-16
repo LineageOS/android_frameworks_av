@@ -23,3 +23,17 @@ cc_aconfig_library {
         "//apex_available:platform",
     ],
 }
+
+aconfig_declarations {
+    name: "aconfig_midi_flags",
+    package: "com.android.media.midi.flags",
+    srcs: [
+      "midi_flags.aconfig",
+    ],
+}
+
+java_aconfig_library {
+    name: "aconfig_midi_flags_java_lib",
+    aconfig_declarations: "aconfig_midi_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
