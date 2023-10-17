@@ -29,6 +29,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     std::shared_ptr<C2ComponentStore> store = ::android::GetCodec2PlatformComponentStore();
     std::shared_ptr<ComponentStore> binder = SharedRefBase::make<ComponentStore>(store);
 
+    signal(SIGPIPE, SIG_IGN);
     fuzzService(binder->asBinder().get(), FuzzedDataProvider(data, size));
 
     return 0;
