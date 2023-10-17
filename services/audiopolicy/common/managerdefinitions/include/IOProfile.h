@@ -63,13 +63,7 @@ public:
         if (getRole() == AUDIO_PORT_ROLE_SINK && (flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             maxActiveCount = 0;
         }
-        if (getRole() == AUDIO_PORT_ROLE_SOURCE) {
-            mMixerBehaviors.clear();
-            mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_DEFAULT);
-            if (mFlags.output & AUDIO_OUTPUT_FLAG_BIT_PERFECT) {
-                mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_BIT_PERFECT);
-            }
-        }
+        refreshMixerBehaviors();
     }
 
     const MixerBehaviorSet& getMixerBehaviors() const {
@@ -222,6 +216,8 @@ public:
 
     void toSupportedMixerAttributes(std::vector<audio_mixer_attributes_t>* mixerAttributes) const;
 
+    status_t readFromParcelable(const media::AudioPortFw& parcelable);
+
     // Number of streams currently opened for this profile.
     uint32_t     curOpenCount;
     // Number of streams currently active for this profile. This is not the number of active clients
@@ -229,6 +225,8 @@ public:
     uint32_t     curActiveCount;
 
 private:
+    void refreshMixerBehaviors();
+
     DeviceVector mSupportedDevices; // supported devices: this input/output can be routed from/to
 
     MixerBehaviorSet mMixerBehaviors;

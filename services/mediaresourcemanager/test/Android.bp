@@ -20,7 +20,6 @@ cc_test {
         "libmedia",
         "libmediautils",
         "libutils",
-        "libmediautils",
         "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",

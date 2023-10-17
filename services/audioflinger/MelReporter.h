@@ -42,11 +42,11 @@ public:
  * Class for listening to new patches and starting the MEL computation. MelReporter is
  * concealed within AudioFlinger, their lifetimes are the same.
  */
-class MelReporter : public PatchCommandThread::PatchCommandListener {
+class MelReporter : public PatchCommandThread::PatchCommandListener,
+                    public IMelReporterCallback {
 public:
     explicit MelReporter(const sp<IAfMelReporterCallback>& afMelReporterCallback)
-        : mAfMelReporterCallback(afMelReporterCallback),
-         mSoundDoseManager(sp<SoundDoseManager>::make()) {}
+        : mAfMelReporterCallback(afMelReporterCallback) {}
 
     void onFirstRef() override;
 
@@ -78,6 +78,12 @@ public:
 
     std::string dump();
 
+    // IMelReporterCallback methods
+    void stopMelComputationForDeviceId(audio_port_handle_t deviceId) final
+            EXCLUDES_MelReporter_Mutex;
+    void startMelComputationForDeviceId(audio_port_handle_t deviceId) final
+            EXCLUDES_MelReporter_Mutex;
+
     // PatchCommandListener methods
     void onCreateAudioPatch(audio_patch_handle_t handle,
             const IAfPatchPanel::Patch& patch) final
@@ -96,12 +102,14 @@ public:
 private:
     struct ActiveMelPatch {
         audio_io_handle_t streamHandle{AUDIO_IO_HANDLE_NONE};
-        std::vector<audio_port_handle_t> deviceHandles;
+        /**
+         * Stores device ids and whether they are compatible for CSD calculation.
+         * The boolean value can change since BT audio device types are user-configurable
+         * to headphones/headsets or other device types.
+         */
+        std::vector<std::pair<audio_port_handle_t,bool>> deviceStates;
         bool csdActive;
     };
-
-    /** Returns true if we should compute MEL for the given device. */
-    bool shouldComputeMelForDeviceType(audio_devices_t device);
 
     void stopInternalMelComputation();
     audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::MelReporter_Mutex) {

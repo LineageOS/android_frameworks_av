@@ -99,7 +99,8 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         uid_t clientUid,
         int servicePid,
         bool overrideForPerfClass,
-        bool overrideToPortrait) :
+        bool overrideToPortrait,
+        const std::string& originalCameraId) :
     Camera2ClientBase(cameraService, remoteCallback, cameraServiceProxyWrapper, clientPackageName,
             systemNativeClient, clientFeatureId, cameraId, /*API1 camera ID*/ -1, cameraFacing,
             sensorOrientation, clientPid, clientUid, servicePid, overrideForPerfClass,
@@ -107,8 +108,8 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
     mInputStream(),
     mStreamingRequestId(REQUEST_ID_NONE),
     mRequestIdCounter(0),
-    mOverrideForPerfClass(overrideForPerfClass) {
-
+    mOverrideForPerfClass(overrideForPerfClass),
+    mOriginalCameraId(originalCameraId) {
     ATRACE_CALL();
     ALOGI("CameraDeviceClient %s: Opened", cameraId.c_str());
 }
@@ -323,7 +324,7 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         //The first capture settings should always match the logical camera id
         const std::string &logicalId = request.mPhysicalCameraSettings.begin()->id;
-        if (mDevice->getId() != logicalId) {
+        if (mDevice->getId() != logicalId && mOriginalCameraId != logicalId) {
             ALOGE("%s: Camera %s: Invalid camera request settings.", __FUNCTION__,
                     mCameraIdStr.c_str());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
@@ -438,6 +439,7 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         CameraDeviceBase::PhysicalCameraSettingsList physicalSettingsList;
         for (const auto& it : request.mPhysicalCameraSettings) {
+            std::string resolvedId = (mOriginalCameraId == it.id) ? mDevice->getId() : it.id;
             if (it.settings.isEmpty()) {
                 ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
                         __FUNCTION__, mCameraIdStr.c_str());
@@ -448,7 +450,7 @@ binder::Status CameraDeviceClient::submitRequestList(
             // Check whether the physical / logical stream has settings
             // consistent with the sensor pixel mode(s) it was configured with.
             // mCameraIdToStreamSet will only have ids that are high resolution
-            const auto streamIdSetIt = mHighResolutionCameraIdToStreamIdSet.find(it.id);
+            const auto streamIdSetIt = mHighResolutionCameraIdToStreamIdSet.find(resolvedId);
             if (streamIdSetIt != mHighResolutionCameraIdToStreamIdSet.end()) {
                 std::list<int> streamIdsUsedInRequest = getIntersection(streamIdSetIt->second,
                         outputStreamIds);
@@ -456,26 +458,25 @@ binder::Status CameraDeviceClient::submitRequestList(
                         !isSensorPixelModeConsistent(streamIdsUsedInRequest, it.settings)) {
                      ALOGE("%s: Camera %s: Request settings CONTROL_SENSOR_PIXEL_MODE not "
                             "consistent with configured streams. Rejecting request.",
-                            __FUNCTION__, it.id.c_str());
+                            __FUNCTION__, resolvedId.c_str());
                     return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                         "Request settings CONTROL_SENSOR_PIXEL_MODE are not consistent with "
                         "streams configured");
                 }
             }
 
-            const std::string &physicalId = it.id;
             bool hasTestPatternModePhysicalKey = std::find(mSupportedPhysicalRequestKeys.begin(),
                     mSupportedPhysicalRequestKeys.end(), ANDROID_SENSOR_TEST_PATTERN_MODE) !=
                     mSupportedPhysicalRequestKeys.end();
             bool hasTestPatternDataPhysicalKey = std::find(mSupportedPhysicalRequestKeys.begin(),
                     mSupportedPhysicalRequestKeys.end(), ANDROID_SENSOR_TEST_PATTERN_DATA) !=
                     mSupportedPhysicalRequestKeys.end();
-            if (physicalId != mDevice->getId()) {
+            if (resolvedId != mDevice->getId()) {
                 auto found = std::find(requestedPhysicalIds.begin(), requestedPhysicalIds.end(),
-                        it.id);
+                        resolvedId);
                 if (found == requestedPhysicalIds.end()) {
                     ALOGE("%s: Camera %s: Physical camera id: %s not part of attached outputs.",
-                            __FUNCTION__, mCameraIdStr.c_str(), physicalId.c_str());
+                            __FUNCTION__, mCameraIdStr.c_str(), resolvedId.c_str());
                     return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                             "Invalid physical camera id");
                 }
@@ -495,11 +496,11 @@ binder::Status CameraDeviceClient::submitRequestList(
                         }
                     }
 
-                    physicalSettingsList.push_back({it.id, filteredParams,
+                    physicalSettingsList.push_back({resolvedId, filteredParams,
                             hasTestPatternModePhysicalKey, hasTestPatternDataPhysicalKey});
                 }
             } else {
-                physicalSettingsList.push_back({it.id, it.settings});
+                physicalSettingsList.push_back({resolvedId, it.settings});
             }
         }
 
@@ -1760,11 +1761,11 @@ status_t CameraDeviceClient::setCameraServiceWatchdog(bool enabled) {
     return mDevice->setCameraServiceWatchdog(enabled);
 }
 
-status_t CameraDeviceClient::setRotateAndCropOverride(uint8_t rotateAndCrop) {
+status_t CameraDeviceClient::setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal) {
     if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
 
     return mDevice->setRotateAndCropAutoBehavior(
-        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
+        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop), fromHal);
 }
 
 status_t CameraDeviceClient::setAutoframingOverride(uint8_t autoframingValue) {

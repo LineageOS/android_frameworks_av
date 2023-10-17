@@ -584,6 +584,19 @@ typedef enum acamera_metadata_tag {
      * <p>Only constrains auto-exposure (AE) algorithm, not
      * manual control of ACAMERA_SENSOR_EXPOSURE_TIME and
      * ACAMERA_SENSOR_FRAME_DURATION.</p>
+     * <p>Note that the actual achievable max framerate also depends on the minimum frame
+     * duration of the output streams. The max frame rate will be
+     * <code>min(aeTargetFpsRange.maxFps, 1 / max(individual stream min durations)</code>. For example,
+     * if the application sets this key to <code>{60, 60}</code>, but the maximum minFrameDuration among
+     * all configured streams is 33ms, the maximum framerate won't be 60fps, but will be
+     * 30fps.</p>
+     * <p>To start a CaptureSession with a target FPS range different from the
+     * capture request template's default value, the application
+     * is strongly recommended to call
+     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }
+     * with the target fps range before creating the capture session. The aeTargetFpsRange is
+     * typically a session parameter. Specifying it at session creation time helps avoid
+     * session reconfiguration delays in cases like 60fps or high speed recording.</p>
      *
      * @see ACAMERA_SENSOR_EXPOSURE_TIME
      * @see ACAMERA_SENSOR_FRAME_DURATION
@@ -1128,6 +1141,12 @@ typedef enum acamera_metadata_tag {
      * ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE field will return
      * OFF if the recording output is not stabilized, or if there are no output
      * Surface types that can be stabilized.</p>
+     * <p>The application is strongly recommended to call
+     * {@link ACameraDevice_createCaptureSessionWithSessionParameters }
+     * with the desired video stabilization mode before creating the capture session.
+     * Video stabilization mode is a session parameter on many devices. Specifying
+     * it at session creation time helps avoid reconfiguration delay caused by difference
+     * between the default value and the first CaptureRequest.</p>
      * <p>If a camera device supports both this mode and OIS
      * (ACAMERA_LENS_OPTICAL_STABILIZATION_MODE), turning both modes on may
      * produce undesirable interaction, so it is recommended not to enable
@@ -5384,7 +5403,7 @@ typedef enum acamera_metadata_tag {
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#SENSOR_PIXEL_MODE_DEFAULT">CameraMetadata#SENSOR_PIXEL_MODE_DEFAULT</a> mode.
      * They can be queried through
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#get">CameraCharacteristics#get</a> with
-     * <a href="https://developer.android.com/reference/CameraCharacteristics.html#SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION)">CameraCharacteristics#SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION)</a>.
+     * <a href="https://developer.android.com/reference/CameraCharacteristics.html#SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION">CameraCharacteristics#SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION</a>.
      * Unless reported by both
      * <a href="https://developer.android.com/reference/android/hardware/camera2/params/StreamConfigurationMap.html">StreamConfigurationMap</a>s, the outputs from
      * <code>android.scaler.streamConfigurationMapMaximumResolution</code> and
@@ -5399,13 +5418,12 @@ typedef enum acamera_metadata_tag {
      * <ul>
      * <li>
      * <p>The mandatory stream combinations listed in
-     *   <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics/mandatoryMaximumResolutionStreamCombinations.html">mandatoryMaximumResolutionStreamCombinations</a>
-     *   would not apply.</p>
+     *   android.scaler.mandatoryMaximumResolutionStreamCombinations  would not apply.</p>
      * </li>
      * <li>
      * <p>The bayer pattern of {@code RAW} streams when
      *   <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION">CameraMetadata#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION</a>
-     *   is selected will be the one listed in <a href="https://developer.android.com/reference/android/sensor/info/binningFactor.html">binningFactor</a>.</p>
+     *   is selected will be the one listed in ACAMERA_SENSOR_INFO_BINNING_FACTOR.</p>
      * </li>
      * <li>
      * <p>The following keys will always be present:</p>
@@ -5419,6 +5437,7 @@ typedef enum acamera_metadata_tag {
      * </ul>
      *
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION
+     * @see ACAMERA_SENSOR_INFO_BINNING_FACTOR
      * @see ACAMERA_SENSOR_INFO_PIXEL_ARRAY_SIZE_MAXIMUM_RESOLUTION
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION
      */

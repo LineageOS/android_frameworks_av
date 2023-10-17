@@ -227,6 +227,18 @@ public:
     virtual void setMetadataHasChanged() = 0;
 
     /**
+     * Called when a track moves to active state to record its contribution to battery usage.
+     * Track state transitions should eventually be handled within the track class.
+     */
+    virtual void beginBatteryAttribution() = 0;
+
+    /**
+     * Called when a track moves out of the active state to record its contribution
+     * to battery usage.
+     */
+    virtual void endBatteryAttribution() = 0;
+
+    /**
      * For RecordTrack
      * TODO(b/291317964) either use this or add asRecordTrack or asTrack etc.
      */
@@ -339,10 +351,10 @@ public:
     virtual sp<os::ExternalVibration> getExternalVibration() const = 0;
 
     // This function should be called with holding thread lock.
-    virtual void updateTeePatches() = 0;
+    virtual void updateTeePatches_l() = 0;
 
     // Argument teePatchesToUpdate is by value, use std::move to optimize.
-    virtual void setTeePatchesToUpdate(TeePatches teePatchesToUpdate) = 0;
+    virtual void setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate) = 0;
 
     static bool checkServerLatencySupported(audio_format_t format, audio_output_flags_t flags) {
         return audio_is_linear_pcm(format) && (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) == 0;
