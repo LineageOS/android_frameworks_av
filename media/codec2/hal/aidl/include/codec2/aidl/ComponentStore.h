@@ -50,8 +50,7 @@ struct Component;
 
 using ::aidl::android::hardware::media::bufferpool2::IClientManager;
 
-struct ComponentStore : public BnComponentStore,
-                        public std::enable_shared_from_this<ComponentStore> {
+struct ComponentStore : public BnComponentStore {
     ComponentStore(const std::shared_ptr<C2ComponentStore>& store);
     virtual ~ComponentStore();
 
