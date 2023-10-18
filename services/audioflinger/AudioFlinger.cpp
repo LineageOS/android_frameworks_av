@@ -880,6 +880,10 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
         // dump mutex stats
         const auto mutexStats = audio_utils::mutex::all_stats_to_string();
         write(fd, mutexStats.c_str(), mutexStats.size());
+
+        // dump held mutexes
+        const auto mutexThreadInfo = audio_utils::mutex::all_threads_to_string();
+        write(fd, mutexThreadInfo.c_str(), mutexThreadInfo.size());
     }
     return NO_ERROR;
 }
