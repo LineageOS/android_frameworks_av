@@ -175,6 +175,9 @@ void MtpPacket::setParameter(int index, uint32_t value) {
 
 #ifdef MTP_HOST
 int MtpPacket::transfer(struct usb_request* request) {
+    if (request->dev == NULL) {
+        return -1;
+    }
     int result = usb_device_bulk_transfer(request->dev,
                             request->endpoint,
                             request->buffer,
