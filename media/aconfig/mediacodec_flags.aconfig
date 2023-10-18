@@ -13,3 +13,10 @@ flag {
   description: "Feature flags for media codec importance"
   bug: "297929011"
 }
+
+flag {
+  name: "aidl_hal"
+  namespace: "codec_fwk"
+  description: "Feature flags for enabling AIDL HAL handling"
+  bug: "251850069"
+}
