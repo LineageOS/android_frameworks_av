@@ -8178,6 +8178,12 @@ reacquire_wakelock:
                 case IAfTrackBase::PAUSING:
                     mActiveTracks.remove(activeTrack);
                     activeTrack->setState(IAfTrackBase::PAUSED);
+                    if (activeTrack->isFastTrack()) {
+                        ALOGV("%s fast track is paused, thus removed from active list", __func__);
+                        // Keep a ref on fast track to wait for FastCapture thread to get updated
+                        // state before potential track removal
+                        fastTrackToRemove = activeTrack;
+                    }
                     doBroadcast = true;
                     size--;
                     continue;
