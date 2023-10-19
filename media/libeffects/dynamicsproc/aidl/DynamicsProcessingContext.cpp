@@ -416,14 +416,25 @@ std::vector<DynamicsProcessing::EqBandConfig> DynamicsProcessingContext::getEqBa
 template <typename T>
 bool DynamicsProcessingContext::validateBandConfig(const std::vector<T>& bands, int maxChannel,
                                                    int maxBand) {
-    std::vector<float> freqs(bands.size(), -1);
+    std::map<int, float> freqs;
     for (auto band : bands) {
-        if (!validateChannel(band.channel, maxChannel)) return false;
-        if (!validateBand(band.band, maxBand)) return false;
+        if (!validateChannel(band.channel, maxChannel)) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " invalid, maxCh " << maxChannel;
+            return false;
+        }
+        if (!validateBand(band.band, maxBand)) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " invalid, maxBand " << maxBand;
+            return false;
+        }
+        if (freqs.find(band.band) != freqs.end()) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " found duplicate";
+            return false;
+        }
         freqs[band.band] = band.cutoffFrequencyHz;
     }
-    if (std::count(freqs.begin(), freqs.end(), -1)) return false;
-    return std::is_sorted(freqs.begin(), freqs.end());
+    return std::is_sorted(freqs.begin(), freqs.end(), [](const auto& a, const auto& b) {
+        return a.second <= b.second; //index is already sorted as map key
+    });
 }
 
 bool DynamicsProcessingContext::validateLimiterConfig(
