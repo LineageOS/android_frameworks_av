@@ -55,6 +55,30 @@ interface ISoundDose {
      */
     oneway void setCsdEnabled(boolean enabled);
 
+    /**
+     * Structure containing a device identifier by address and type together with
+     * the categorization whether it is a headphone or not.
+     */
+    @JavaDerive(toString = true)
+    parcelable AudioDeviceCategory {
+        @utf8InCpp String address;
+        int internalAudioType;
+        boolean csdCompatible;
+    }
+
+    /**
+     * Resets the list of stored device categories for the native layer. Should
+     * only be called once at boot time after parsing the existing AudioDeviceCategories.
+     */
+    oneway void initCachedAudioDeviceCategories(in AudioDeviceCategory[] audioDevices);
+
+    /**
+     * Sets whether a device for a given address and type is a headphone or not.
+     * This is used to determine whether we compute the CSD on the given device
+     * since we can not rely completely on the device annotations.
+     */
+    oneway void setAudioDeviceCategory(in AudioDeviceCategory audioDevice);
+
     /* -------------------------- Test API methods --------------------------
     /** Get the currently used RS2 upper bound. */
     float getOutputRs2UpperBound();

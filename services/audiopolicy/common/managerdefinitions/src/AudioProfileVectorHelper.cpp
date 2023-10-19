@@ -115,12 +115,22 @@ void addProfilesForFormats(AudioProfileVector &audioProfileVector, const FormatV
         profile->setDynamicFormat(true);
         profile->setDynamicChannels(dynamicFormatProfile->isDynamicChannels());
         profile->setDynamicRate(dynamicFormatProfile->isDynamicRate());
-        addAudioProfileAndSort(audioProfileVector, profile);
+        size_t profileIndex = 0;
+        for (; profileIndex < audioProfileVector.size(); profileIndex++) {
+            if (profile->equals(audioProfileVector.at(profileIndex))) {
+                // The dynamic profile is already there
+                break;
+            }
+        }
+        if (profileIndex >= audioProfileVector.size()) {
+            // Only add when the dynamic profile is not there
+            addAudioProfileAndSort(audioProfileVector, profile);
+        }
     }
 }
 
 void addDynamicAudioProfileAndSort(AudioProfileVector &audioProfileVector,
-                                      const sp<AudioProfile> &profileToAdd)
+                                   const sp<AudioProfile> &profileToAdd)
 {
     // Check valid profile to add:
     if (!profileToAdd->hasValidFormat()) {
@@ -143,11 +153,15 @@ void addDynamicAudioProfileAndSort(AudioProfileVector &audioProfileVector,
                 audioProfileVector, profileToAdd->getChannels(), profileToAdd->getFormat());
         return;
     }
+    const bool originalIsDynamicFormat = profileToAdd->isDynamicFormat();
+    profileToAdd->setDynamicFormat(true); // set the format as dynamic to allow removal
     // Go through the list of profile to avoid duplicates
     for (size_t profileIndex = 0; profileIndex < audioProfileVector.size(); profileIndex++) {
         const sp<AudioProfile> &profile = audioProfileVector.at(profileIndex);
-        if (profile->isValid() && profile == profileToAdd) {
-            // Nothing to do
+        if (profile->isValid() && profile->equals(profileToAdd)) {
+            // The same profile is already there, no need to add.
+            // Reset `isDynamicProfile` as original value.
+            profileToAdd->setDynamicFormat(originalIsDynamicFormat);
             return;
         }
     }

@@ -20,6 +20,7 @@
 #include <android/hardware/BnCameraService.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
+#include <android/hardware/CameraIdRemapping.h>
 #include <android/hardware/camera2/BnCameraInjectionSession.h>
 #include <android/hardware/camera2/ICameraInjectionCallback.h>
 
@@ -61,6 +62,7 @@
 #include <utility>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace android {
 
@@ -138,6 +140,9 @@ public:
 
     /////////////////////////////////////////////////////////////////////
     // ICameraService
+    // IMPORTANT: All binder calls that deal with logicalCameraId should use
+    // resolveCameraId(logicalCameraId) to arrive at the correct cameraId to
+    // perform the operation on (in case of Id Remapping).
     virtual binder::Status     getNumberOfCameras(int32_t type, int32_t* numCameras);
 
     virtual binder::Status     getCameraInfo(int cameraId, bool overrideToPortrait,
@@ -221,6 +226,9 @@ public:
 
     virtual binder::Status reportExtensionSessionStats(
             const hardware::CameraExtensionSessionStats& stats, std::string* sessionKey /*out*/);
+
+    virtual binder::Status remapCameraIds(const hardware::CameraIdRemapping&
+        cameraIdRemapping);
 
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
@@ -355,7 +363,7 @@ public:
         static bool isValidAudioRestriction(int32_t mode);
 
         // Override rotate-and-crop AUTO behavior
-        virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop) = 0;
+        virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal = false) = 0;
 
         // Override autoframing AUTO behaviour
         virtual status_t setAutoframingOverride(uint8_t autoframingValue) = 0;
@@ -915,7 +923,7 @@ private:
             int api1CameraId, const std::string& clientPackageNameMaybe, bool systemNativeClient,
             const std::optional<std::string>& clientFeatureId, int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
-            bool overrideToPortrait, bool forceSlowJpegMode,
+            bool overrideToPortrait, bool forceSlowJpegMode, const std::string& originalCameraId,
             /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
@@ -942,6 +950,46 @@ private:
 
     // Mutex guarding mCameraStates map
     mutable Mutex mCameraStatesLock;
+
+    /**
+     * Mapping from packageName -> {cameraIdToReplace -> newCameraIdtoUse}.
+     *
+     * This specifies that for packageName, for every binder operation targeting
+     * cameraIdToReplace, use newCameraIdToUse instead.
+     */
+    typedef std::map<std::string, std::map<std::string, std::string>> TCameraIdRemapping;
+    TCameraIdRemapping mCameraIdRemapping{};
+    /** Mutex guarding mCameraIdRemapping. */
+    Mutex mCameraIdRemappingLock;
+
+    /** Parses cameraIdRemapping parcelable into the native cameraIdRemappingMap. */
+    binder::Status parseCameraIdRemapping(
+            const hardware::CameraIdRemapping& cameraIdRemapping,
+            /* out */ TCameraIdRemapping* cameraIdRemappingMap);
+
+    /**
+     * Resolve the (potentially remapped) camera Id to use for packageName.
+     *
+     * This returns the Camera Id to use in case inputCameraId was remapped to a
+     * different Id for the given packageName. Otherwise, it returns the inputCameraId.
+     *
+     * If the packageName is not provided, it will be inferred from the clientUid.
+     */
+    std::string resolveCameraId(
+            const std::string& inputCameraId,
+            int clientUid,
+            const std::string& packageName = "");
+
+    /**
+     * Updates the state of mCameraIdRemapping, while disconnecting active clients as necessary.
+     */
+    void remapCameraIds(const TCameraIdRemapping& cameraIdRemapping);
+
+    /**
+     * Finds the Camera Ids that were remapped to the inputCameraId for the given client.
+     */
+    std::vector<std::string> findOriginalIdsForRemappedCameraId(
+        const std::string& inputCameraId, int clientUid);
 
     // Circular buffer for storing event logging for dumps
     RingBuffer<std::string> mEventLog;
@@ -1325,6 +1373,9 @@ private:
     // Set or clear the zoom override flag
     status_t handleSetZoomOverride(const Vector<String16>& args);
 
+    // Set Camera Id remapping using 'cmd'
+    status_t handleCameraIdRemapping(const Vector<String16>& args, int errFd);
+
     // Handle 'watch' command as passed through 'cmd'
     status_t handleWatchCommand(const Vector<String16> &args, int inFd, int outFd);
 
@@ -1370,14 +1421,15 @@ private:
      */
     static std::string getFormattedCurrentTime();
 
-    static binder::Status makeClient(const sp<CameraService>& cameraService,
-            const sp<IInterface>& cameraCb, const std::string& packageName,
-            bool systemNativeClient, const std::optional<std::string>& featureId,
-            const std::string& cameraId, int api1CameraId, int facing, int sensorOrientation,
-            int clientPid, uid_t clientUid, int servicePid,
+    static binder::Status makeClient(
+            const sp<CameraService>& cameraService, const sp<IInterface>& cameraCb,
+            const std::string& packageName, bool systemNativeClient,
+            const std::optional<std::string>& featureId, const std::string& cameraId, int api1CameraId,
+            int facing, int sensorOrientation, int clientPid, uid_t clientUid, int servicePid,
             std::pair<int, IPCTransport> deviceVersionAndIPCTransport, apiLevel effectiveApiLevel,
             bool overrideForPerfClass, bool overrideToPortrait, bool forceSlowJpegMode,
-            /*out*/sp<BasicClient>* client);
+            const std::string& originalCameraId,
+            /*out*/ sp<BasicClient>* client);
 
     static std::string toString(std::set<userid_t> intSet);
     static int32_t mapToInterface(TorchModeStatus status);

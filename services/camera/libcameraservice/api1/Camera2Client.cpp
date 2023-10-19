@@ -73,7 +73,9 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
                 cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
                 clientUid, servicePid, overrideForPerfClass, overrideToPortrait,
                 /*legacyClient*/ true),
-        mParameters(api1CameraId, cameraFacing)
+        mParameters(api1CameraId, cameraFacing),
+        mLatestRequestIds(kMaxRequestIds),
+        mLatestFailedRequestIds(kMaxRequestIds)
 {
     ATRACE_CALL();
 
@@ -1835,7 +1837,7 @@ void Camera2Client::notifyError(int32_t errorCode,
                     (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT == errorCode)) {
                 Mutex::Autolock al(mLatestRequestMutex);
 
-                mLatestFailedRequestId = resultExtras.requestId;
+                mLatestFailedRequestIds.add(resultExtras.requestId);
                 mLatestRequestSignal.signal();
             }
             mCaptureSequencer->notifyError(errorCode, resultExtras);
@@ -2340,7 +2342,7 @@ status_t Camera2Client::setCameraServiceWatchdog(bool enabled) {
     return mDevice->setCameraServiceWatchdog(enabled);
 }
 
-status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
+status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal) {
     if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
 
     {
@@ -2354,7 +2356,7 @@ status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
     }
 
     return mDevice->setRotateAndCropAutoBehavior(
-        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
+        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop), fromHal);
 }
 
 status_t Camera2Client::setAutoframingOverride(uint8_t autoframingValue) {
@@ -2410,7 +2412,10 @@ status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
 
 status_t Camera2Client::waitUntilRequestIdApplied(int32_t requestId, nsecs_t timeout) {
     Mutex::Autolock l(mLatestRequestMutex);
-    while ((mLatestRequestId != requestId) && (mLatestFailedRequestId != requestId)) {
+    while ((std::find(mLatestRequestIds.begin(), mLatestRequestIds.end(), requestId) ==
+            mLatestRequestIds.end()) &&
+           (std::find(mLatestFailedRequestIds.begin(), mLatestFailedRequestIds.end(), requestId) ==
+            mLatestFailedRequestIds.end())) {
         nsecs_t startTime = systemTime();
 
         auto res = mLatestRequestSignal.waitRelative(mLatestRequestMutex, timeout);
@@ -2419,13 +2424,14 @@ status_t Camera2Client::waitUntilRequestIdApplied(int32_t requestId, nsecs_t tim
         timeout -= (systemTime() - startTime);
     }
 
-    return (mLatestRequestId == requestId) ? OK : DEAD_OBJECT;
+    return (std::find(mLatestRequestIds.begin(), mLatestRequestIds.end(), requestId) !=
+             mLatestRequestIds.end()) ? OK : DEAD_OBJECT;
 }
 
 void Camera2Client::notifyRequestId(int32_t requestId) {
     Mutex::Autolock al(mLatestRequestMutex);
 
-    mLatestRequestId = requestId;
+    mLatestRequestIds.add(requestId);
     mLatestRequestSignal.signal();
 }
 
