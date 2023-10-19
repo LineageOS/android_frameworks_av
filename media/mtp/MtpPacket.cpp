@@ -97,7 +97,7 @@ uint16_t MtpPacket::getUInt16(int offset) const {
     }
     else {
         ALOGE("offset for buffer read is greater than buffer size!");
-        abort();
+        return 0;
     }
 }
 
@@ -108,7 +108,7 @@ uint32_t MtpPacket::getUInt32(int offset) const {
     }
     else {
         ALOGE("offset for buffer read is greater than buffer size!");
-        abort();
+        return 0;
     }
 }
 
