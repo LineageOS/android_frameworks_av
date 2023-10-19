@@ -112,7 +112,7 @@ static const DynamicsProcessing::EqBandConfig kEqBandConfigMax =
         DynamicsProcessing::EqBandConfig({.channel = std::numeric_limits<int>::max(),
                                           .band = std::numeric_limits<int>::max(),
                                           .enable = true,
-                                          .cutoffFrequencyHz = 20000,
+                                          .cutoffFrequencyHz = 20000.1,
                                           .gainDb = 200});
 
 static const Range::DynamicsProcessingRange kPreEqBandConfigRange = {
@@ -144,7 +144,7 @@ static const Range::DynamicsProcessingRange kMbcBandConfigRange = {
                         {.channel = std::numeric_limits<int>::max(),
                          .band = std::numeric_limits<int>::max(),
                          .enable = true,
-                         .cutoffFrequencyHz = 20000,
+                         .cutoffFrequencyHz = 20000.1,
                          .attackTimeMs = 60000,
                          .releaseTimeMs = 60000,
                          .ratio = 50,
