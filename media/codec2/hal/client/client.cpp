@@ -1438,35 +1438,35 @@ std::shared_ptr<C2ParamReflector> Codec2Client::getParamReflector() {
 std::vector<std::string> Codec2Client::CacheServiceNames() {
     std::vector<std::string> names;
 
-    if (c2_aidl::utils::IsEnabled()) {
+    if (c2_aidl::utils::IsSelected()) {
         // Get AIDL service names
         AServiceManager_forEachDeclaredInstance(
                 AidlBase::descriptor, &names, [](const char *name, void *context) {
                     std::vector<std::string> *names = (std::vector<std::string> *)context;
                     names->emplace_back(name);
                 });
-    }
+    } else {
+        // Get HIDL service names
+        using ::android::hardware::media::c2::V1_0::IComponentStore;
+        using ::android::hidl::manager::V1_2::IServiceManager;
+        while (true) {
+            sp<IServiceManager> serviceManager = IServiceManager::getService();
+            CHECK(serviceManager) << "Hardware service manager is not running.";
 
-    // Get HIDL service names
-    using ::android::hardware::media::c2::V1_0::IComponentStore;
-    using ::android::hidl::manager::V1_2::IServiceManager;
-    while (true) {
-        sp<IServiceManager> serviceManager = IServiceManager::getService();
-        CHECK(serviceManager) << "Hardware service manager is not running.";
-
-        Return<void> transResult;
-        transResult = serviceManager->listManifestByInterface(
-                IComponentStore::descriptor,
-                [&names](
-                        hidl_vec<hidl_string> const& instanceNames) {
-                    names.insert(names.end(), instanceNames.begin(), instanceNames.end());
-                });
-        if (transResult.isOk()) {
-            break;
+            Return<void> transResult;
+            transResult = serviceManager->listManifestByInterface(
+                    IComponentStore::descriptor,
+                    [&names](
+                            hidl_vec<hidl_string> const& instanceNames) {
+                        names.insert(names.end(), instanceNames.begin(), instanceNames.end());
+                    });
+            if (transResult.isOk()) {
+                break;
+            }
+            LOG(ERROR) << "Could not retrieve the list of service instances of "
+                       << IComponentStore::descriptor
+                       << ". Retrying...";
         }
-        LOG(ERROR) << "Could not retrieve the list of service instances of "
-                   << IComponentStore::descriptor
-                   << ". Retrying...";
     }
     // Sort service names in each category.
     std::stable_sort(
@@ -1545,7 +1545,7 @@ std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
     std::string const& name = GetServiceNames()[index];
     LOG(VERBOSE) << "Creating a Codec2 client to service \"" << name << "\"";
 
-    if (c2_aidl::utils::IsEnabled()) {
+    if (c2_aidl::utils::IsSelected()) {
         std::string instanceName =
             ::android::base::StringPrintf("%s/%s", AidlBase::descriptor, name.c_str());
         if (AServiceManager_isDeclared(instanceName.c_str())) {
@@ -1559,20 +1559,23 @@ std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
             CHECK(transStatus.isOk()) << "Codec2 AIDL service \"" << name << "\""
                                         "does not have IConfigurable.";
             return std::make_shared<Codec2Client>(baseStore, configurable, index);
+        } else {
+            LOG(ERROR) << "Codec2 AIDL service \"" << name << "\" is not declared";
         }
+    } else {
+        std::string instanceName = "android.hardware.media.c2/" + name;
+        sp<HidlBase> baseStore = HidlBase::getService(name);
+        CHECK(baseStore) << "Codec2 service \"" << name << "\""
+                            " inaccessible for unknown reasons.";
+        LOG(VERBOSE) << "Client to Codec2 service \"" << name << "\" created";
+        Return<sp<c2_hidl::IConfigurable>> transResult = baseStore->getConfigurable();
+        CHECK(transResult.isOk()) << "Codec2 service \"" << name << "\""
+                                    "does not have IConfigurable.";
+        sp<c2_hidl::IConfigurable> configurable =
+            static_cast<sp<c2_hidl::IConfigurable>>(transResult);
+        return std::make_shared<Codec2Client>(baseStore, configurable, index);
     }
-
-    std::string instanceName = "android.hardware.media.c2/" + name;
-    sp<HidlBase> baseStore = HidlBase::getService(name);
-    CHECK(baseStore) << "Codec2 service \"" << name << "\""
-                        " inaccessible for unknown reasons.";
-    LOG(VERBOSE) << "Client to Codec2 service \"" << name << "\" created";
-    Return<sp<c2_hidl::IConfigurable>> transResult = baseStore->getConfigurable();
-    CHECK(transResult.isOk()) << "Codec2 service \"" << name << "\""
-                                "does not have IConfigurable.";
-    sp<c2_hidl::IConfigurable> configurable =
-        static_cast<sp<c2_hidl::IConfigurable>>(transResult);
-    return std::make_shared<Codec2Client>(baseStore, configurable, index);
+    return nullptr;
 }
 
 c2_status_t Codec2Client::ForAllServices(
