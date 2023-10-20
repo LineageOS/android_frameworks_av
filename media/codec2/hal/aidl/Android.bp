@@ -36,6 +36,7 @@ cc_library {
     ],
 
     static_libs: [
+        "libPlatformProperties",
         "libaidlcommonsupport",
     ],
 
@@ -97,6 +98,7 @@ cc_library {
     ],
 
     static_libs: [
+        "libPlatformProperties",
         "libaidlcommonsupport",
     ],
 
