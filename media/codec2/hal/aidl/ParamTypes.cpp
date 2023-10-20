@@ -18,6 +18,8 @@
 #define LOG_TAG "Codec2-AIDL-ParamTypes"
 #include <android-base/logging.h>
 
+#include <android/binder_manager.h>
+#include <android/sysprop/MediaProperties.sysprop.h>
 #include <codec2/aidl/ParamTypes.h>
 #include <codec2/common/ParamTypes.h>
 
@@ -157,8 +159,30 @@ namespace media {
 namespace c2 {
 namespace utils {
 
-// TODO: read it from aconfig flags
-bool IsEnabled() { return false; }
+bool IsSelected() {
+    // TODO: read from aconfig flags
+    const bool enabled = false;
+
+    if (!enabled) {
+        // Cannot select AIDL if not enabled
+        return false;
+    }
+    using ::android::sysprop::MediaProperties::codec2_hal_selection;
+    using ::android::sysprop::MediaProperties::codec2_hal_selection_values;
+    constexpr codec2_hal_selection_values AIDL = codec2_hal_selection_values::AIDL;
+    constexpr codec2_hal_selection_values HIDL = codec2_hal_selection_values::HIDL;
+    codec2_hal_selection_values selection = codec2_hal_selection().value_or(HIDL);
+    switch (selection) {
+    case AIDL:
+        return true;
+    case HIDL:
+        return false;
+    default:
+        LOG(FATAL) << "Unexpected codec2 HAL selection value: " << (int)selection;
+    }
+
+    return false;
+}
 
 const char* asString(Status status, const char* def) {
     return asString(static_cast<c2_status_t>(status.status), def);
