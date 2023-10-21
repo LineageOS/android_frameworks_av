@@ -52,6 +52,7 @@
 
 namespace android {
 using binder::Status;
+using media::audio::common::Spatialization;
 
 static const char kDeadlockedString[] = "AudioPolicyService may be deadlocked\n";
 static const char kCmdDeadlockedString[] = "AudioPolicyService command thread may be deadlocked\n";
@@ -557,7 +558,7 @@ void AudioPolicyService::doOnCheckSpatializer()
 
     if (mSpatializer != nullptr) {
         // Note: mSpatializer != nullptr =>  mAudioPolicyManager != nullptr
-        if (mSpatializer->getLevel() != media::SpatializationLevel::NONE) {
+        if (mSpatializer->getLevel() != Spatialization::Level::NONE) {
             audio_io_handle_t currentOutput = mSpatializer->getOutput();
             audio_io_handle_t newOutput;
             const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
@@ -582,8 +583,8 @@ void AudioPolicyService::doOnCheckSpatializer()
             if (status != NO_ERROR) {
                 mAudioPolicyManager->releaseSpatializerOutput(newOutput);
             }
-        } else if (mSpatializer->getLevel() == media::SpatializationLevel::NONE
-                               && mSpatializer->getOutput() != AUDIO_IO_HANDLE_NONE) {
+        } else if (mSpatializer->getLevel() == Spatialization::Level::NONE &&
+                   mSpatializer->getOutput() != AUDIO_IO_HANDLE_NONE) {
             audio_io_handle_t output = mSpatializer->detachOutput();
 
             if (output != AUDIO_IO_HANDLE_NONE) {

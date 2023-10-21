@@ -189,10 +189,11 @@ cc_library {
     name: "libaudioflinger",
 
     defaults: [
-        "libaudioflinger_dependencies",
-        "latest_android_media_audio_common_types_cpp_shared",
-        "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "audioflinger_flags_defaults",
+        "latest_android_hardware_audio_core_sounddose_ndk_export_shared_lib_header",
+        "latest_android_hardware_audio_core_sounddose_ndk_shared",
+        "latest_android_media_audio_common_types_cpp_shared",
+        "libaudioflinger_dependencies",
     ],
 
     srcs: [
@@ -227,7 +228,6 @@ cc_library {
 
     export_shared_lib_headers: [
         "libpermission",
-        "android.hardware.audio.core.sounddose-V1-ndk",
     ],
 
     cflags: [
