@@ -1,22 +1,21 @@
 /*
-**
-** Copyright 2007, The Android Open Source Project
-**
-** Licensed under the Apache License, Version 2.0 (the "License");
-** you may not use this file except in compliance with the License.
-** You may obtain a copy of the License at
-**
-**     http://www.apache.org/licenses/LICENSE-2.0
-**
-** Unless required by applicable law or agreed to in writing, software
-** distributed under the License is distributed on an "AS IS" BASIS,
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-** See the License for the specific language governing permissions and
-** limitations under the License.
-*/
+ *
+ * Copyright 2007, The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-#ifndef ANDROID_AUDIO_HW_DEVICE_H
-#define ANDROID_AUDIO_HW_DEVICE_H
+#pragma once
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -30,6 +29,7 @@
 
 namespace android {
 
+class AudioStreamIn;
 class AudioStreamOut;
 
 class AudioHwDevice {
@@ -89,6 +89,17 @@ public:
             struct audio_config *config,
             const char *address);
 
+    status_t openInputStream(
+            AudioStreamIn **ppStreamIn,
+            audio_io_handle_t handle,
+            audio_devices_t deviceType,
+            audio_input_flags_t flags,
+            struct audio_config *config,
+            const char *address,
+            audio_source_t source,
+            audio_devices_t outputDevice,
+            const char *outputDeviceAddress);
+
     [[nodiscard]] bool supportsAudioPatches() const;
 
     [[nodiscard]] status_t getAudioPort(struct audio_port_v7 *port) const;
@@ -112,5 +123,3 @@ private:
 };
 
 } // namespace android
-
-#endif // ANDROID_AUDIO_HW_DEVICE_H
