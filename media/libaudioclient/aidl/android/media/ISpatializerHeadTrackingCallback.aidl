@@ -16,7 +16,8 @@
 
 package android.media;
 
-import android.media.audio.common.HeadTracking;
+import android.media.SpatializationLevel;
+import android.media.SpatializerHeadTrackingMode;
 
 /**
  * The ISpatializerHeadTrackingCallback interface is a callback associated to the
@@ -27,7 +28,7 @@ import android.media.audio.common.HeadTracking;
 oneway interface ISpatializerHeadTrackingCallback {
     /** Called when the head tracking mode has changed
      */
-    void onHeadTrackingModeChanged(HeadTracking.Mode mode);
+    void onHeadTrackingModeChanged(SpatializerHeadTrackingMode mode);
 
     /** Called when the head to stage pose hase been updated
      * The head to stage pose is conveyed as a vector of 6 elements,
