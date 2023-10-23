@@ -46,8 +46,7 @@ namespace utils {
 
 struct ComponentStore;
 
-struct Component : public BnComponent,
-                   public std::enable_shared_from_this<Component> {
+struct Component : public BnComponent {
     Component(
             const std::shared_ptr<C2Component>&,
             const std::shared_ptr<IComponentListener>& listener,
