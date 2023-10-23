@@ -43,16 +43,16 @@
 
 namespace android {
 
-using aidl_utils::binderStatusFromStatusT;
 using aidl_utils::statusTFromBinderStatus;
+using aidl_utils::binderStatusFromStatusT;
 using android::content::AttributionSourceState;
 using binder::Status;
 using media::HeadTrackingMode;
 using media::Pose3f;
+using media::SpatializationLevel;
+using media::SpatializationMode;
+using media::SpatializerHeadTrackingMode;
 using media::SensorPoseProvider;
-using media::audio::common::HeadTracking;
-using media::audio::common::Spatialization;
-using ::android::internal::ToString;
 
 using namespace std::chrono_literals;
 
@@ -302,7 +302,7 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     }
     mSupportsHeadTracking = supportsHeadTracking[0];
 
-    std::vector<Spatialization::Level> spatializationLevels;
+    std::vector<media::SpatializationLevel> spatializationLevels;
     status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_LEVELS,
             &spatializationLevels);
     if (status != NO_ERROR) {
@@ -316,7 +316,7 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
             ALOGW("%s: ignoring spatializationLevel:%d", __func__, (int)spatializationLevel);
             continue;
         }
-        if (spatializationLevel == Spatialization::Level::NONE) {
+        if (spatializationLevel == media::SpatializationLevel::NONE) {
             noneLevelFound = true;
         } else {
             activeLevelFound = true;
@@ -330,7 +330,7 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
         return BAD_VALUE;
     }
 
-    std::vector<Spatialization::Mode> spatializationModes;
+    std::vector<media::SpatializationMode> spatializationModes;
     status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_SPATIALIZATION_MODES,
             &spatializationModes);
     if (status != NO_ERROR) {
@@ -373,9 +373,9 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
 
     // Currently we expose only RELATIVE_WORLD.
     // This is a limitation of the head tracking library based on a UX choice.
-    mHeadTrackingModes.push_back(HeadTracking::Mode::DISABLED);
+    mHeadTrackingModes.push_back(SpatializerHeadTrackingMode::DISABLED);
     if (mSupportsHeadTracking) {
-        mHeadTrackingModes.push_back(HeadTracking::Mode::RELATIVE_WORLD);
+        mHeadTrackingModes.push_back(SpatializerHeadTrackingMode::RELATIVE_WORLD);
     }
     mediametrics::LogItem(mMetricsId)
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
@@ -440,7 +440,7 @@ status_t Spatializer::registerCallback(
 void Spatializer::binderDied(__unused const wp<IBinder> &who) {
     {
         std::lock_guard lock(mLock);
-        mLevel = Spatialization::Level::NONE;
+        mLevel = SpatializationLevel::NONE;
         mSpatializerCallback.clear();
     }
     ALOGV("%s", __func__);
@@ -448,20 +448,20 @@ void Spatializer::binderDied(__unused const wp<IBinder> &who) {
 }
 
 // ISpatializer
-Status Spatializer::getSupportedLevels(std::vector<Spatialization::Level> *levels) {
+Status Spatializer::getSupportedLevels(std::vector<SpatializationLevel> *levels) {
     ALOGV("%s", __func__);
     if (levels == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
-    // Spatialization::Level::NONE is already required from the effect or we don't load it.
+    // SpatializationLevel::NONE is already required from the effect or we don't load it.
     levels->insert(levels->end(), mLevels.begin(), mLevels.end());
     return Status::ok();
 }
 
-Status Spatializer::setLevel(Spatialization::Level level) {
-    ALOGV("%s level %s", __func__,  ToString(level).c_str());
-    mLocalLog.log("%s with %s", __func__, ToString(level).c_str());
-    if (level != Spatialization::Level::NONE
+Status Spatializer::setLevel(SpatializationLevel level) {
+    ALOGV("%s level %s", __func__, media::toString(level).c_str());
+    mLocalLog.log("%s with %s", __func__, media::toString(level).c_str());
+    if (level != SpatializationLevel::NONE
             && std::find(mLevels.begin(), mLevels.end(), level) == mLevels.end()) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
@@ -488,7 +488,7 @@ Status Spatializer::setLevel(Spatialization::Level level) {
     return Status::ok();
 }
 
-Status Spatializer::getLevel(Spatialization::Level *level) {
+Status Spatializer::getLevel(SpatializationLevel *level) {
     if (level == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
@@ -509,7 +509,7 @@ Status Spatializer::isHeadTrackingSupported(bool *supports) {
 }
 
 Status Spatializer::getSupportedHeadTrackingModes(
-        std::vector<HeadTracking::Mode>* modes) {
+        std::vector<SpatializerHeadTrackingMode>* modes) {
     std::lock_guard lock(mLock);
     ALOGV("%s", __func__);
     if (modes == nullptr) {
@@ -519,24 +519,24 @@ Status Spatializer::getSupportedHeadTrackingModes(
     return Status::ok();
 }
 
-Status Spatializer::setDesiredHeadTrackingMode(HeadTracking::Mode mode) {
-    ALOGV("%s mode %s", __func__, ToString(mode).c_str());
+Status Spatializer::setDesiredHeadTrackingMode(SpatializerHeadTrackingMode mode) {
+    ALOGV("%s mode %s", __func__, media::toString(mode).c_str());
 
     if (!mSupportsHeadTracking) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
-    mLocalLog.log("%s with %s", __func__, ToString(mode).c_str());
+    mLocalLog.log("%s with %s", __func__, media::toString(mode).c_str());
     std::lock_guard lock(mLock);
     switch (mode) {
-        case HeadTracking::Mode::OTHER:
+        case SpatializerHeadTrackingMode::OTHER:
             return binderStatusFromStatusT(BAD_VALUE);
-        case HeadTracking::Mode::DISABLED:
+        case SpatializerHeadTrackingMode::DISABLED:
             mDesiredHeadTrackingMode = HeadTrackingMode::STATIC;
             break;
-        case HeadTracking::Mode::RELATIVE_WORLD:
+        case SpatializerHeadTrackingMode::RELATIVE_WORLD:
             mDesiredHeadTrackingMode = HeadTrackingMode::WORLD_RELATIVE;
             break;
-        case HeadTracking::Mode::RELATIVE_SCREEN:
+        case SpatializerHeadTrackingMode::RELATIVE_SCREEN:
             mDesiredHeadTrackingMode = HeadTrackingMode::SCREEN_RELATIVE;
             break;
     }
@@ -547,7 +547,7 @@ Status Spatializer::setDesiredHeadTrackingMode(HeadTracking::Mode mode) {
     return Status::ok();
 }
 
-Status Spatializer::getActualHeadTrackingMode(HeadTracking::Mode *mode) {
+Status Spatializer::getActualHeadTrackingMode(SpatializerHeadTrackingMode *mode) {
     if (mode == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
@@ -600,8 +600,8 @@ Status Spatializer::release() {
         binder->unlinkToDeath(this);
         mSpatializerCallback.clear();
 
-        levelChanged = mLevel != Spatialization::Level::NONE;
-        mLevel = Spatialization::Level::NONE;
+        levelChanged = mLevel != SpatializationLevel::NONE;
+        mLevel = SpatializationLevel::NONE;
     }
 
     if (levelChanged) {
@@ -690,7 +690,7 @@ Status Spatializer::setFoldState(bool folded) {
     return Status::ok();
 }
 
-Status Spatializer::getSupportedModes(std::vector<Spatialization::Mode> *modes) {
+Status Spatializer::getSupportedModes(std::vector<SpatializationMode> *modes) {
     ALOGV("%s", __func__);
     if (modes == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
@@ -771,7 +771,7 @@ void Spatializer::resetEngineHeadPose_l() {
     const std::vector<float> headToStage(6, 0.0);
     setEffectParameter_l(SPATIALIZER_PARAM_HEAD_TO_STAGE, headToStage);
     setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
-            std::vector<HeadTracking::Mode>{HeadTracking::Mode::DISABLED});
+            std::vector<SpatializerHeadTrackingMode>{SpatializerHeadTrackingMode::DISABLED});
 }
 
 void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
@@ -804,21 +804,21 @@ void Spatializer::onActualModeChange(HeadTrackingMode mode) {
 void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
     ALOGV("%s(%d)", __func__, (int) mode);
     sp<media::ISpatializerHeadTrackingCallback> callback;
-    HeadTracking::Mode spatializerMode;
+    SpatializerHeadTrackingMode spatializerMode;
     {
         std::lock_guard lock(mLock);
         if (!mSupportsHeadTracking) {
-            spatializerMode = HeadTracking::Mode::DISABLED;
+            spatializerMode = SpatializerHeadTrackingMode::DISABLED;
         } else {
             switch (mode) {
                 case HeadTrackingMode::STATIC:
-                    spatializerMode = HeadTracking::Mode::DISABLED;
+                    spatializerMode = SpatializerHeadTrackingMode::DISABLED;
                     break;
                 case HeadTrackingMode::WORLD_RELATIVE:
-                    spatializerMode = HeadTracking::Mode::RELATIVE_WORLD;
+                    spatializerMode = SpatializerHeadTrackingMode::RELATIVE_WORLD;
                     break;
                 case HeadTrackingMode::SCREEN_RELATIVE:
-                    spatializerMode = HeadTracking::Mode::RELATIVE_SCREEN;
+                    spatializerMode = SpatializerHeadTrackingMode::RELATIVE_SCREEN;
                     break;
                 default:
                     LOG_ALWAYS_FATAL("Unknown mode: %d", mode);
@@ -826,11 +826,11 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
         }
         mActualHeadTrackingMode = spatializerMode;
         if (mEngine != nullptr) {
-            if (spatializerMode == HeadTracking::Mode::DISABLED) {
+            if (spatializerMode == SpatializerHeadTrackingMode::DISABLED) {
                 resetEngineHeadPose_l();
             } else {
                 setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
-                                     std::vector<HeadTracking::Mode>{spatializerMode});
+                                     std::vector<SpatializerHeadTrackingMode>{spatializerMode});
             }
         }
         callback = mHeadTrackingCallback;
@@ -974,12 +974,12 @@ void Spatializer::checkSensorsState_l() {
         if (mPoseController != nullptr) {
             // TODO(b/253297301, b/255433067) reenable low latency condition check
             // for Head Tracking after Bluetooth HAL supports it correctly.
-            if (mNumActiveTracks > 0 && mLevel != Spatialization::Level::NONE
+            if (mNumActiveTracks > 0 && mLevel != SpatializationLevel::NONE
                 && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
                 && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
                 if (mEngine != nullptr) {
                     setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
-                            std::vector<HeadTracking::Mode>{mActualHeadTrackingMode});
+                            std::vector<SpatializerHeadTrackingMode>{mActualHeadTrackingMode});
                 }
                 mPoseController->setHeadSensor(mHeadSensor);
                 mPoseController->setScreenSensor(mScreenSensor);
@@ -996,20 +996,20 @@ void Spatializer::checkSensorsState_l() {
     if (mOutput != AUDIO_IO_HANDLE_NONE && supportsSetLatencyMode) {
         const status_t status =
                 AudioSystem::setRequestedLatencyMode(mOutput, requestedLatencyMode);
-        ALOGD("%s: setRequestedLatencyMode for output thread(%d) to %s returned %d", __func__,
-              mOutput, toString(requestedLatencyMode).c_str(), status);
+        ALOGD("%s: setRequestedLatencyMode for output thread(%d) to %s returned %d",
+                __func__, mOutput, toString(requestedLatencyMode).c_str(), status);
     }
 }
 
 void Spatializer::checkEngineState_l() {
     if (mEngine != nullptr) {
-        if (mLevel != Spatialization::Level::NONE && mNumActiveTracks > 0) {
+        if (mLevel != SpatializationLevel::NONE && mNumActiveTracks > 0) {
             mEngine->setEnabled(true);
             setEffectParameter_l(SPATIALIZER_PARAM_LEVEL,
-                    std::vector<Spatialization::Level>{mLevel});
+                    std::vector<SpatializationLevel>{mLevel});
         } else {
             setEffectParameter_l(SPATIALIZER_PARAM_LEVEL,
-                    std::vector<Spatialization::Level>{Spatialization::Level::NONE});
+                    std::vector<SpatializationLevel>{SpatializationLevel::NONE});
             mEngine->setEnabled(false);
         }
     }
@@ -1067,21 +1067,21 @@ std::string Spatializer::toString(unsigned level) const {
     // 1. Capabilities (mLevels, mHeadTrackingModes, mSpatializationModes, mChannelMasks, etc)
     ss.append(prefixSpace).append("Supported levels: [");
     for (auto& level : mLevels) {
-        base::StringAppendF(&ss, " %s", ToString(level).c_str());
+        base::StringAppendF(&ss, " %s", media::toString(level).c_str());
     }
-    base::StringAppendF(&ss, "], mLevel: %s", ToString(mLevel).c_str());
+    base::StringAppendF(&ss, "], mLevel: %s", media::toString(mLevel).c_str());
 
     base::StringAppendF(&ss, "\n%smHeadTrackingModes: [", prefixSpace.c_str());
     for (auto& mode : mHeadTrackingModes) {
-        base::StringAppendF(&ss, " %s", ToString(mode).c_str());
+        base::StringAppendF(&ss, " %s", media::toString(mode).c_str());
     }
     base::StringAppendF(&ss, "], Desired: %s, Actual %s\n",
                         media::toString(mDesiredHeadTrackingMode).c_str(),
-                        ToString(mActualHeadTrackingMode).c_str());
+                        media::toString(mActualHeadTrackingMode).c_str());
 
     base::StringAppendF(&ss, "%smSpatializationModes: [", prefixSpace.c_str());
     for (auto& mode : mSpatializationModes) {
-        base::StringAppendF(&ss, " %s", ToString(mode).c_str());
+        base::StringAppendF(&ss, " %s", media::toString(mode).c_str());
     }
     ss += "]\n";
 
