@@ -23,7 +23,7 @@ cc_library {
         "-Wno-unused-variable",
     ],
 
-    srcs: ["C2SoftDav1dDec.cpp"],
+    srcs: ["C2SoftDav1dDec.cpp", "C2SoftDav1dDump.cpp"],
     static_libs: [
         "libdav1d_8bit",
         "libdav1d_16bit",

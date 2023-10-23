@@ -33,14 +33,6 @@
 
 namespace android {
 
-// Flag to enable dumping the bitsteram and the decoded pictures to files.
-static const bool ENABLE_DUMPING_FILES_DEFAULT = false;
-static const char ENABLE_DUMPING_FILES_PROPERTY[] = "debug.dav1d.enabledumping";
-
-// The number of frames to dump to a file
-static const int NUM_FRAMES_TO_DUMP_DEFAULT = INT_MAX;
-static const char NUM_FRAMES_TO_DUMP_PROPERTY[] = "debug.dav1d.numframestodump";
-
 // The number of threads used for the dav1d decoder.
 static const int NUM_THREADS_DAV1D_DEFAULT = 0;
 static const char NUM_THREADS_DAV1D_PROPERTY[] = "debug.dav1d.numthreads";
@@ -513,37 +505,8 @@ static int GetCPUCoreCount() {
 }
 
 bool C2SoftDav1dDec::initDecoder() {
-    nsecs_t now = systemTime();
 #ifdef FILE_DUMP_ENABLE
-    snprintf(mInDataFileName, 256, "%s_%" PRId64 "d.%s", DUMP_FILE_PATH, now, INPUT_DATA_DUMP_EXT);
-    snprintf(mInSizeFileName, 256, "%s_%" PRId64 "d.%s", DUMP_FILE_PATH, now, INPUT_SIZE_DUMP_EXT);
-    snprintf(mDav1dOutYuvFileName, 256, "%s_%" PRId64 "dx.%s", DUMP_FILE_PATH, now,
-             OUTPUT_YUV_DUMP_EXT);
-
-    bool enableDumping = android::base::GetBoolProperty(ENABLE_DUMPING_FILES_PROPERTY,
-                                                        ENABLE_DUMPING_FILES_DEFAULT);
-
-    num_frames_to_dump =
-            android::base::GetIntProperty(NUM_FRAMES_TO_DUMP_PROPERTY, NUM_FRAMES_TO_DUMP_DEFAULT);
-
-    if (enableDumping) {
-        ALOGD("enableDumping = %d, num_frames_to_dump = %d", enableDumping, num_frames_to_dump);
-
-        mInDataFile = fopen(mInDataFileName, "wb");
-        if (mInDataFile == nullptr) {
-            ALOGD("Could not open file %s", mInDataFileName);
-        }
-
-        mInSizeFile = fopen(mInSizeFileName, "wb");
-        if (mInSizeFile == nullptr) {
-            ALOGD("Could not open file %s", mInSizeFileName);
-        }
-
-        mDav1dOutYuvFile = fopen(mDav1dOutYuvFileName, "wb");
-        if (mDav1dOutYuvFile == nullptr) {
-            ALOGD("Could not open file %s", mDav1dOutYuvFileName);
-        }
-    }
+    mC2SoftDav1dDump.initDumping();
 #endif
     mSignalledError = false;
     mSignalledOutputEos = false;
@@ -592,20 +555,7 @@ void C2SoftDav1dDec::destroyDecoder() {
         mInputBufferIndex = 0;
     }
 #ifdef FILE_DUMP_ENABLE
-    if (mInDataFile != nullptr) {
-        fclose(mInDataFile);
-        mInDataFile = nullptr;
-    }
-
-    if (mInSizeFile != nullptr) {
-        fclose(mInSizeFile);
-        mInSizeFile = nullptr;
-    }
-
-    if (mDav1dOutYuvFile != nullptr) {
-        fclose(mDav1dOutYuvFile);
-        mDav1dOutYuvFile = nullptr;
-    }
+    mC2SoftDav1dDump.destroyDumping();
 #endif
 }
 
@@ -737,24 +687,7 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
 
                 // Dump the bitstream data (inputBuffer) if dumping is enabled.
 #ifdef FILE_DUMP_ENABLE
-                if (mInDataFile) {
-                    int ret = fwrite(ptr, 1, new_Size, mInDataFile);
-
-                    if (ret != new_Size) {
-                        ALOGE("Error in fwrite %s, requested %d, returned %d", mInDataFileName,
-                              new_Size, ret);
-                    }
-                }
-
-                // Dump the size per inputBuffer if dumping is enabled.
-                if (mInSizeFile) {
-                    int ret = fwrite(&new_Size, 1, 4, mInSizeFile);
-
-                    if (ret != 4) {
-                        ALOGE("Error in fwrite %s, requested %d, returned %d", mInSizeFileName, 4,
-                              ret);
-                    }
-                }
+                mC2SoftDav1dDump.dumpInput(ptr, new_Size);
 #endif
 
                 bool b_draining = false;
@@ -1001,49 +934,6 @@ bool C2SoftDav1dDec::allocTmpFrameBuffer(size_t size) {
     return true;
 }
 
-#ifdef FILE_DUMP_ENABLE
-void C2SoftDav1dDec::writeDav1dOutYuvFile(const Dav1dPicture& p) {
-    if (mDav1dOutYuvFile != NULL) {
-        uint8_t* ptr;
-        const int hbd = p.p.bpc > 8;
-
-        ptr = (uint8_t*)p.data[0];
-        for (int y = 0; y < p.p.h; y++) {
-            int iSize = p.p.w << hbd;
-            int ret = fwrite(ptr, 1, iSize, mDav1dOutYuvFile);
-            if (ret != iSize) {
-                ALOGE("Error in fwrite %s, requested %d, returned %d", mDav1dOutYuvFileName, iSize,
-                      ret);
-                break;
-            }
-
-            ptr += p.stride[0];
-        }
-
-        if (p.p.layout != DAV1D_PIXEL_LAYOUT_I400) {
-            // u/v
-            const int ss_ver = p.p.layout == DAV1D_PIXEL_LAYOUT_I420;
-            const int ss_hor = p.p.layout != DAV1D_PIXEL_LAYOUT_I444;
-            const int cw = (p.p.w + ss_hor) >> ss_hor;
-            const int ch = (p.p.h + ss_ver) >> ss_ver;
-            for (int pl = 1; pl <= 2; pl++) {
-                ptr = (uint8_t*)p.data[pl];
-                for (int y = 0; y < ch; y++) {
-                    int iSize = cw << hbd;
-                    int ret = fwrite(ptr, 1, cw << hbd, mDav1dOutYuvFile);
-                    if (ret != iSize) {
-                        ALOGE("Error in fwrite %s, requested %d, returned %d", mDav1dOutYuvFileName,
-                              iSize, ret);
-                        break;
-                    }
-                    ptr += p.stride[1];
-                }
-            }
-        }
-    }
-}
-#endif
-
 bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
                                   const std::unique_ptr<C2Work>& work) {
     if (!(work && pool)) return false;
@@ -1252,40 +1142,15 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
                                   isMonochrome, convFormat, mTmpFrameBuffer.get(), tmpSize);
         }
 
-        // Dump the output buffer if dumping is enabled (debug only).
-#ifdef FILE_DUMP_ENABLE
-        FILE* fp_out = mDav1dOutYuvFile;
-
         // if(mOutputBufferIndex % 100 == 0)
         ALOGV("output a 10bit picture %dx%d from dav1d "
               "(mInputBufferIndex=%d,mOutputBufferIndex=%d,format=%d).",
               mWidth, mHeight, mInputBufferIndex, mOutputBufferIndex, format);
 
-        if (fp_out && mOutputBufferIndex <= num_frames_to_dump) {
-            for (int i = 0; i < mHeight; i++) {
-                int ret = fwrite((uint8_t*)srcY + i * srcYStride * 2, 1, mWidth * 2, fp_out);
-                if (ret != mWidth * 2) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth * 2, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcU + i * srcUStride * 2, 1, mWidth, fp_out);
-                if (ret != mWidth) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcV + i * srcVStride * 2, 1, mWidth, fp_out);
-                if (ret != mWidth) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth, ret);
-                    break;
-                }
-            }
-        }
+        // Dump the output buffer if dumping is enabled (debug only).
+#ifdef FILE_DUMP_ENABLE
+        mC2SoftDav1dDump.dumpOutput<uint16_t>(srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                                              mWidth, mHeight);
 #endif
     } else {
         const uint8_t* srcY = (const uint8_t*)img.data[0];
@@ -1296,39 +1161,15 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
         size_t srcUStride = img.stride[1];
         size_t srcVStride = img.stride[1];
 
-        // Dump the output buffer is dumping is enabled (debug only)
-#ifdef FILE_DUMP_ENABLE
-        FILE* fp_out = mDav1dOutYuvFile;
         // if(mOutputBufferIndex % 100 == 0)
         ALOGV("output a 8bit picture %dx%d from dav1d "
               "(mInputBufferIndex=%d,mOutputBufferIndex=%d,format=%d).",
               mWidth, mHeight, mInputBufferIndex, mOutputBufferIndex, format);
 
-        if (fp_out && mOutputBufferIndex <= num_frames_to_dump) {
-            for (int i = 0; i < mHeight; i++) {
-                int ret = fwrite((uint8_t*)srcY + i * srcYStride, 1, mWidth, fp_out);
-                if (ret != mWidth) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcU + i * srcUStride, 1, mWidth / 2, fp_out);
-                if (ret != mWidth / 2) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth / 2, ret);
-                    break;
-                }
-            }
-
-            for (int i = 0; i < mHeight / 2; i++) {
-                int ret = fwrite((uint8_t*)srcV + i * srcVStride, 1, mWidth / 2, fp_out);
-                if (ret != mWidth / 2) {
-                    ALOGE("Error in fwrite, requested %d, returned %d", mWidth / 2, ret);
-                    break;
-                }
-            }
-        }
+        // Dump the output buffer is dumping is enabled (debug only)
+#ifdef FILE_DUMP_ENABLE
+        mC2SoftDav1dDump.dumpOutput<uint8_t>(srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                                             mWidth, mHeight);
 #endif
         convertPlanar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
                              dstYStride, dstUStride, dstVStride, mWidth, mHeight, isMonochrome,
