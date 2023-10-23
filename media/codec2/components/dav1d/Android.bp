@@ -15,6 +15,7 @@ cc_library {
     defaults: [
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_all-defaults",
+        "libcodec2_soft_sanitize_cfi-defaults",
     ],
 
     cflags: [
@@ -24,7 +25,6 @@ cc_library {
 
     srcs: ["C2SoftDav1dDec.cpp"],
     static_libs: [
-        "libyuv_static",
         "libdav1d_8bit",
         "libdav1d_16bit",
     ],
