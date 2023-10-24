@@ -16,11 +16,9 @@
 
 package android.media;
 
+import android.media.audio.common.HeadTracking;
+import android.media.audio.common.Spatialization;
 import android.media.ISpatializerHeadTrackingCallback;
-import android.media.SpatializationLevel;
-import android.media.SpatializationMode;
-import android.media.SpatializerHeadTrackingMode;
-
 
 /**
  * The ISpatializer interface is used to control the native audio service implementation
@@ -34,21 +32,25 @@ interface ISpatializer {
     /** Releases a ISpatializer interface previously acquired. */
     void release();
 
-    /** Reports the list of supported spatialization levels (see SpatializationLevel.aidl).
+    /**
+     * Reports the list of supported spatialization levels.
      * The list should never be empty if an ISpatializer interface was successfully
      * retrieved with IAudioPolicyService.getSpatializer().
      */
-    SpatializationLevel[] getSupportedLevels();
+    Spatialization.Level[] getSupportedLevels();
 
-    /** Selects the desired spatialization level (see SpatializationLevel.aidl). Selecting a level
-     * different from SpatializationLevel.NONE with create the specialized multichannel output
+    /**
+     * Selects the desired spatialization level. Selecting a level
+     * different from Spatializer.Level.NONE with create the specialized multichannel output
      * mixer, create and enable the spatializer effect and let the audio policy attach eligible
      * AudioTrack to this output stream.
      */
-    void setLevel(SpatializationLevel level);
+    void setLevel(Spatialization.Level level);
 
-    /** Gets the selected spatialization level (see SpatializationLevel.aidl) */
-    SpatializationLevel getLevel();
+    /**
+     * Gets the selected spatialization level.
+     */
+    Spatialization.Level getLevel();
 
     /** Reports if the spatializer engine supports head tracking or not.
      * This is a pre condition independent of the fact that a head tracking sensor is
@@ -56,26 +58,33 @@ interface ISpatializer {
      */
     boolean isHeadTrackingSupported();
 
-    /** Reports the list of supported head tracking modes (see SpatializerHeadTrackingMode.aidl).
+    /**
+     * Reports the list of supported head tracking modes.
      * The list always contains SpatializerHeadTrackingMode.DISABLED and can include other modes
      * if the spatializer effect implementation supports head tracking.
      * The result does not depend on currently connected sensors but reflects the capabilities
      * when sensors are available.
      */
-    SpatializerHeadTrackingMode[] getSupportedHeadTrackingModes();
+    HeadTracking.Mode[] getSupportedHeadTrackingModes();
 
-    /** Selects the desired head tracking mode (see SpatializerHeadTrackingMode.aidl) */
-    void setDesiredHeadTrackingMode(SpatializerHeadTrackingMode mode);
+    /**
+     * Selects the desired head tracking mode.
+     */
+    void setDesiredHeadTrackingMode(HeadTracking.Mode mode);
 
-    /** Gets the actual head tracking mode. Can be different from the desired mode if conditions to
+    /**
+     * Gets the actual head tracking mode. Can be different from the desired mode if conditions to
      * enable the desired mode are not met (e.g if the head tracking device was removed)
      */
-    SpatializerHeadTrackingMode getActualHeadTrackingMode();
+    HeadTracking.Mode getActualHeadTrackingMode();
 
-    /** Reset the head tracking algorithm to consider current head pose as neutral */
+    /**
+     * Reset the head tracking algorithm to consider current head pose as neutral
+     */
     void recenterHeadTracker();
 
-    /** Set the screen to stage transform to use by the head tracking algorithm
+    /**
+     * Set the screen to stage transform to use by the head tracking algorithm
      * The screen to stage transform is conveyed as a vector of 6 elements,
      * where the first three are a translation vector and
      * the last three are a rotation vector.
@@ -123,11 +132,12 @@ interface ISpatializer {
      */
     void setFoldState(boolean folded);
 
-    /** Reports the list of supported spatialization modess (see SpatializationMode.aidl).
+    /**
+     * Reports the list of supported spatialization modess.
      * The list should never be empty if an ISpatializer interface was successfully
      * retrieved with IAudioPolicyService.getSpatializer().
      */
-    SpatializationMode[] getSupportedModes();
+    Spatialization.Mode[] getSupportedModes();
 
     /**
      * Registers a callback to monitor head tracking functions.

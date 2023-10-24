@@ -8106,6 +8106,9 @@ reacquire_wakelock:
     // used to request a deferred sleep, to be executed later while mutex is unlocked
     uint32_t sleepUs = 0;
 
+    // timestamp correction enable is determined under lock, used in processing step.
+    bool timestampCorrectionEnabled = false;
+
     int64_t lastLoopCountRead = -2;  // never matches "previous" loop, when loopCount = 0.
 
     // loop while there is work to do
@@ -8276,6 +8279,7 @@ reacquire_wakelock:
             }
             sleepUs = 0;
 
+            timestampCorrectionEnabled = isTimestampCorrectionEnabled_l();
             lockEffectChains_l(effectChains);
         }
 
@@ -8432,13 +8436,6 @@ reacquire_wakelock:
                     && time > mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL]) {
 
                 mTimestampVerifier.add(position, time, mSampleRate);
-
-                // Correct timestamps
-                bool timestampCorrectionEnabled = false;
-                {
-                    audio_utils::lock_guard l(mutex());
-                    timestampCorrectionEnabled = isTimestampCorrectionEnabled_l();
-                }
                 if (timestampCorrectionEnabled) {
                     ALOGVV("TS_BEFORE: %d %lld %lld",
                             id(), (long long)time, (long long)position);
