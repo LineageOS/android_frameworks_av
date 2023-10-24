@@ -185,6 +185,8 @@ DownmixerBufferProvider::DownmixerBufferProvider(
      mDownmixConfig.inputCfg.mask = EFFECT_CONFIG_SMP_RATE | EFFECT_CONFIG_CHANNELS |
              EFFECT_CONFIG_FORMAT | EFFECT_CONFIG_ACC_MODE;
      mDownmixConfig.outputCfg.mask = mDownmixConfig.inputCfg.mask;
+     mDownmixConfig.inputCfg.buffer.frameCount = bufferFrameCount;
+     mDownmixConfig.outputCfg.buffer.frameCount = bufferFrameCount;
 
      mInFrameSize =
              audio_bytes_per_sample(format) * audio_channel_count_from_out_mask(inputChannelMask);
