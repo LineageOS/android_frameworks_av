@@ -21,26 +21,17 @@
 #define LOG_TAG "CameraServiceFuzzer"
 //#define LOG_NDEBUG 0
 
-#include <AudioFlinger.h>
 #include <CameraService.h>
-#include <ISchedulingPolicyService.h>
-#include <MediaPlayerService.h>
-#include <android-base/logging.h>
-#include <android/hardware/BnCameraServiceListener.h>
-#include <android/hardware/ICameraServiceListener.h>
-#include <android/hardware/camera2/BnCameraDeviceCallbacks.h>
-#include <android/hardware/camera2/ICameraDeviceUser.h>
-#include <binder/IActivityManager.h>
-#include <binder/IAppOpsService.h>
-#include <camera/camera2/OutputConfiguration.h>
 #include <device3/Camera3StreamInterface.h>
-#include <fakeservicemanager/FakeServiceManager.h>
-#include <fuzzbinder/random_binder.h>
+#include <android/hardware/BnCameraServiceListener.h>
+#include <android/hardware/camera2/BnCameraDeviceCallbacks.h>
+#include <android/hardware/ICameraServiceListener.h>
+#include <android/hardware/camera2/ICameraDeviceUser.h>
+#include <camera/camera2/OutputConfiguration.h>
 #include <gui/BufferItemConsumer.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
-#include <media/IAudioFlinger.h>
 #include <private/android_filesystem_config.h>
 #include "fuzzer/FuzzedDataProvider.h"
 
@@ -103,174 +94,6 @@ const size_t kNumLayerMetaData = size(kLayerMetadata);
 const size_t kNumCameraMsg = size(kCameraMsg);
 const size_t kNumSoundKind = size(kSoundKind);
 const size_t kNumShellCmd = size(kShellCmd);
-static std::once_flag gSmOnce;
-sp<FakeServiceManager> gFakeServiceManager;
-
-void addService(const String16& serviceName, const sp<FakeServiceManager>& fakeServiceManager,
-                FuzzedDataProvider* fdp) {
-    sp<IBinder> binder = getRandomBinder(fdp);
-    if (!binder) {
-        return;
-    }
-
-    CHECK_EQ(NO_ERROR, fakeServiceManager->addService(serviceName, binder));
-    return;
-}
-
-class FuzzerActivityManager : public BnInterface<IActivityManager> {
-  public:
-    int32_t openContentUri(const String16& /*stringUri*/) override { return 0; }
-
-    status_t registerUidObserver(const sp<IUidObserver>& /*observer*/, const int32_t /*event*/,
-                                 const int32_t /*cutpoint*/,
-                                 const String16& /*callingPackage*/) override {
-        return OK;
-    }
-
-    status_t unregisterUidObserver(const sp<IUidObserver>& /*observer*/) override { return OK; }
-
-    status_t registerUidObserverForUids(const sp<IUidObserver>& /*observer*/,
-                                        const int32_t /*event*/, const int32_t /*cutpoint*/,
-                                        const String16& /*callingPackage*/,
-                                        const int32_t* /*uids[]*/, size_t /*nUids*/,
-                                        /*out*/ sp<IBinder>& /*observerToken*/) override {
-        return OK;
-    }
-
-    status_t addUidToObserver(const sp<IBinder>& /*observerToken*/,
-                              const String16& /*callingPackage*/, int32_t /*uid*/) override {
-        return OK;
-    }
-
-    status_t removeUidFromObserver(const sp<IBinder>& /*observerToken*/,
-                                   const String16& /*callingPackage*/, int32_t /*uid*/) override {
-        return OK;
-    }
-
-    bool isUidActive(const uid_t /*uid*/, const String16& /*callingPackage*/) override {
-        return true;
-    }
-
-    int32_t getUidProcessState(const uid_t /*uid*/, const String16& /*callingPackage*/) override {
-        return ActivityManager::PROCESS_STATE_UNKNOWN;
-    }
-
-    status_t checkPermission(const String16& /*permission*/, const pid_t /*pid*/,
-                             const uid_t /*uid*/, int32_t* /*outResult*/) override {
-        return NO_ERROR;
-    }
-
-    status_t logFgsApiBegin(int32_t /*apiType*/, int32_t /*appUid*/, int32_t /*appPid*/) override {
-        return OK;
-    }
-    status_t logFgsApiEnd(int32_t /*apiType*/, int32_t /*appUid*/, int32_t /*appPid*/) override {
-        return OK;
-    }
-    status_t logFgsApiStateChanged(int32_t /*apiType*/, int32_t /*state*/, int32_t /*appUid*/,
-                                   int32_t /*appPid*/) override {
-        return OK;
-    }
-};
-
-class FuzzerSensorPrivacyManager : public BnInterface<hardware::ISensorPrivacyManager> {
-  public:
-    binder::Status supportsSensorToggle(int32_t /*toggleType*/, int32_t /*sensor*/,
-                                        bool* /*_aidl_return*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    binder::Status addSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return binder::Status::fromStatusT(::android::UNKNOWN_TRANSACTION);
-    }
-    binder::Status addToggleSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    binder::Status removeSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return binder::Status::fromStatusT(::android::UNKNOWN_TRANSACTION);
-    }
-    binder::Status removeToggleSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return binder::Status::fromStatusT(::android::UNKNOWN_TRANSACTION);
-    }
-    binder::Status isSensorPrivacyEnabled(bool* /*_aidl_return*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    binder::Status isCombinedToggleSensorPrivacyEnabled(int32_t /*sensor*/,
-                                                        bool* /*_aidl_return*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    binder::Status isToggleSensorPrivacyEnabled(int32_t /*toggleType*/, int32_t /*sensor*/,
-                                                bool* /*_aidl_return*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    binder::Status setSensorPrivacy(bool /*enable*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    binder::Status setToggleSensorPrivacy(int32_t /*userId*/, int32_t /*source*/,
-                                          int32_t /*sensor*/, bool /*enable*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    binder::Status setToggleSensorPrivacyForProfileGroup(int32_t /*userId*/, int32_t /*source*/,
-                                                         int32_t /*sensor*/,
-                                                         bool /*enable*/) override {
-        return binder::Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-};
-
-class FuzzAppOpsService : public BnAppOpsService {
-  public:
-    int32_t checkOperation(int32_t /*code*/, int32_t /*uid*/,
-                           const String16& /*packageName*/) override {
-        return 0;
-    }
-
-    int32_t noteOperation(int32_t /*code*/, int32_t /*uid*/, const String16& /*packageName*/,
-                          const std::optional<String16>& /*attributionTag*/,
-                          bool /*shouldCollectAsyncNotedOp*/, const String16& /*message*/,
-                          bool /*shouldCollectMessage*/) override {
-        return 0;
-    }
-
-    void startWatchingModeWithFlags(int32_t /*op*/, const String16& /*packageName*/,
-                                    int32_t /*flags*/,
-                                    const sp<IAppOpsCallback>& /*callback*/) override {
-        return;
-    }
-
-    int32_t startOperation(const sp<IBinder>& /*token*/, int32_t /*code*/, int32_t /*uid*/,
-                           const String16& /*packageName*/,
-                           const std::optional<String16>& /*attributionTag*/,
-                           bool /*startIfModeDefault*/, bool /*shouldCollectAsyncNotedOp*/,
-                           const String16& /*message*/, bool /*shouldCollectMessage*/) override {
-        return 0;
-    }
-
-    void finishOperation(const sp<IBinder>& /*token*/, int32_t /*code*/, int32_t /*uid*/,
-                         const String16& /*packageName*/,
-                         const std::optional<String16>& /*attributionTag*/) override {
-        return;
-    }
-
-    void startWatchingMode(int32_t /*op*/, const String16& /*packageName*/,
-                           const sp<IAppOpsCallback>& /*callback*/) override {
-        return;
-    }
-
-    void stopWatchingMode(const sp<IAppOpsCallback>& /*callback*/) override { return; }
-
-    int32_t permissionToOpCode(const String16& /*permission*/) override { return 0; }
-
-    int32_t checkAudioOperation(int32_t /*code*/, int32_t /*usage*/, int32_t /*uid*/,
-                                const String16& /*packageName*/) override {
-        return 0;
-    }
-
-    void setCameraAudioRestriction(int32_t /*mode*/) override { return; }
-
-    bool shouldCollectNotes(int32_t /*opCode*/) override { return true; }
-};
 
 class CameraFuzzer : public ::android::hardware::BnCameraClient {
    public:
@@ -819,42 +642,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
     setuid(AID_CAMERASERVER);
     std::shared_ptr<FuzzedDataProvider> fp = std::make_shared<FuzzedDataProvider>(data, size);
-
-    std::call_once(gSmOnce, [&] {
-        /* Create a FakeServiceManager instance and add required services */
-        gFakeServiceManager = sp<FakeServiceManager>::make();
-        setDefaultServiceManager(gFakeServiceManager);
-    });
-    gFakeServiceManager->clear();
-
-    for (const char* service :
-         {"sensor_privacy", "permission", "media.camera.proxy", "batterystats", "media.metrics",
-          "media.extractor", "drm.drmManager", "permission_checker"}) {
-        addService(String16(service), gFakeServiceManager, fp.get());
-    }
-
-    const auto audioFlinger = sp<AudioFlinger>::make();
-    const auto afAdapter = sp<AudioFlingerServerAdapter>::make(audioFlinger);
-
-    CHECK_EQ(NO_ERROR,
-             gFakeServiceManager->addService(
-                     String16(IAudioFlinger::DEFAULT_SERVICE_NAME), IInterface::asBinder(afAdapter),
-                     false /* allowIsolated */, IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
-
-    sp<FuzzerActivityManager> am = new FuzzerActivityManager();
-    CHECK_EQ(NO_ERROR,
-             gFakeServiceManager->addService(String16("activity"), IInterface::asBinder(am)));
-
-    sp<FuzzerSensorPrivacyManager> sensorPrivacyManager = new FuzzerSensorPrivacyManager();
-    CHECK_EQ(NO_ERROR, gFakeServiceManager->addService(String16("sensor_privacy"),
-                                                       IInterface::asBinder(sensorPrivacyManager)));
-
-    sp<FuzzAppOpsService> appops = new FuzzAppOpsService();
-    CHECK_EQ(NO_ERROR,
-             gFakeServiceManager->addService(String16("appops"), IInterface::asBinder(appops)));
-
-    MediaPlayerService::instantiate();
-
     sp<CameraService> cs = new CameraService();
     cs->clearCachedVariables();
     sp<CameraFuzzer> camerafuzzer = new CameraFuzzer(cs, fp);
