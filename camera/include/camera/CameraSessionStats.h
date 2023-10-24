@@ -162,6 +162,7 @@ public:
     std::string mUserTag;
     int mVideoStabilizationMode;
     bool mUsedUltraWide;
+    bool mUsedZoomOverride;
     int mSessionIndex;
 
     CameraExtensionSessionStats mCameraExtensionSessionStats;
