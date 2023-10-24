@@ -61,6 +61,7 @@ cc_library {
         "libcodec2_soft_vp9dec",
         // "libcodec2_soft_av1dec_aom",  // replaced by the gav1 implementation
         "libcodec2_soft_av1dec_gav1",
+        "libcodec2_soft_av1dec_dav1d",
         "libcodec2_soft_av1enc",
         "libcodec2_soft_vp8enc",
         "libcodec2_soft_vp9enc",
