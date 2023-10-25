@@ -216,7 +216,7 @@ ScopedAStatus ComponentStore::createComponent(
 #endif
         onInterfaceLoaded(c2component->intf());
         std::shared_ptr<Component> comp =
-            SharedRefBase::make<Component>(c2component, listener, shared_from_this(), pool);
+            SharedRefBase::make<Component>(c2component, listener, ref<ComponentStore>(), pool);
         *component = comp;
         if (!component) {
             status = C2_CORRUPTED;

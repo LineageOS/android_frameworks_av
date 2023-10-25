@@ -411,7 +411,7 @@ void Component::initListener(const std::shared_ptr<Component>& self) {
 
         mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
                 AIBinder_DeathRecipient_new(OnBinderDied));
-        mDeathContext = new DeathContext{weak_from_this()};
+        mDeathContext = new DeathContext{ref<Component>()};
         AIBinder_DeathRecipient_setOnUnlinked(mDeathRecipient.get(), OnBinderUnlinked);
         AIBinder_linkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
     } else {
