@@ -93,6 +93,7 @@ cc_library {
         "liblog",
         "libpermission",
         "libutils",
+        "aconfig_audio_flags_c_lib",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
         "packagemanager_aidl-cpp",

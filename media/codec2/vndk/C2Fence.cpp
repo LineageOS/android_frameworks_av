@@ -378,7 +378,7 @@ private:
         struct timespec ts;
         if (timeoutNs >= 0) {
             ts.tv_sec = int(timeoutNs / 1000000000);
-            ts.tv_nsec = timeoutNs;
+            ts.tv_nsec = timeoutNs % 1000000000;
         } else {
             ALOGD("polling for indefinite duration requested, but changed to wait for %d sec",
                   kPipeFenceWaitLimitSecs);
