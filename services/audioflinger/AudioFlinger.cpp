@@ -3585,10 +3585,10 @@ void AudioFlinger::dumpToThreadLog_l(const sp<IAfThreadBase> &thread)
 {
     constexpr int THREAD_DUMP_TIMEOUT_MS = 2;
     audio_utils::FdToString fdToString("- ", THREAD_DUMP_TIMEOUT_MS);
-    const int fd = fdToString.fd();
+    const int fd = fdToString.borrowFdUnsafe();
     if (fd >= 0) {
         thread->dump(fd, {} /* args */);
-        mThreadLog.logs(-1 /* time */, fdToString.getStringAndClose());
+        mThreadLog.logs(-1 /* time */, fdToString.closeAndGetString());
     }
 }
 
