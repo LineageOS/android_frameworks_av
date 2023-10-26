@@ -41,3 +41,10 @@ This feature helps reduce audio glitching caused by low priority \
 blocking threads."
     bug: "209491695"
 }
+
+flag {
+    name: "auto_public_volume_api_hardening"
+    namespace: "media_audio"
+    description: "On AAOS, make volume and ringer SDK APIs in AudioManager no-ops."
+    bug: "302751899"
+}
