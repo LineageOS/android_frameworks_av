@@ -26,3 +26,12 @@ flag {
     bug: "301713440"
 }
 
+flag {
+    name: "loudness_configurator_api"
+    namespace: "media_audio"
+    description: "\
+Enable the API for providing loudness metadata and CTA-2075 \
+support."
+    bug: "298463873"
+}
+
