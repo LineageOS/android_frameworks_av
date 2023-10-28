@@ -292,7 +292,7 @@ ScopedAStatus Component::createBlockPool(
     static constexpr IComponent::BlockPoolAllocator::Tag ALLOCATOR_ID =
         IComponent::BlockPoolAllocator::allocatorId;
     static constexpr IComponent::BlockPoolAllocator::Tag IGBA =
-        IComponent::BlockPoolAllocator::igba;
+        IComponent::BlockPoolAllocator::allocator;
     c2_status_t status = C2_OK;
     switch (allocator.getTag()) {
         case ALLOCATOR_ID:
