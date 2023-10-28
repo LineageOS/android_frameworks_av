@@ -1466,7 +1466,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
     // limit this WA to qc hw decoder only
     // if feedInputBufferIfAvailableInternal() successfully (has available input buffer),
     // mLastInputBufferAvailableTs would be updated. otherwise, not input buffer available
-    std::regex pattern{"c2\\.qti\\..*\\.decoder.*"};
+    std::regex pattern{"c2\\.(mtk|qti)\\..*\\.decoder.*"};
     if (std::regex_match(mComponentName, pattern)) {
         std::lock_guard<std::mutex> tsLock(mTsLock);
         uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
