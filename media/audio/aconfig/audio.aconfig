@@ -1,0 +1,15 @@
+# Audio flags intended for general consumption (cross-cutting), but NOT included in framework.
+#
+# Please add flags in alphabetical order.
+
+package: "com.android.media.audio"
+
+flag {
+    name: "bluetooth_mac_address_anonymization"
+    namespace: "media_audio"
+    description:
+        "Enable Bluetooth MAC address anonymization when reporting "
+        "audio device descriptors to non privileged apps."
+    bug: "285588444"
+}
+
