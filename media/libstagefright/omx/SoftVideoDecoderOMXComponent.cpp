@@ -616,6 +616,10 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getConfig(
                 DescribeHDR10PlusInfoParams* outParams =
                         (DescribeHDR10PlusInfoParams *)params;
 
+                if (!isValidOMXParam(outParams)) {
+                    return OMX_ErrorBadParameter;
+                }
+
                 outParams->nParamSizeUsed = info->size();
 
                 // If the buffer provided by the client does not have enough
@@ -693,6 +697,10 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::internalSetConfig(
 
             const DescribeHDR10PlusInfoParams* inParams =
                     (DescribeHDR10PlusInfoParams *)params;
+
+            if (!isValidOMXParam(inParams)) {
+                return OMX_ErrorBadParameter;
+            }
 
             if (*frameConfig) {
                 // This is a request to append to the current frame config set.
