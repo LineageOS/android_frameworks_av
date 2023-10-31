@@ -372,6 +372,8 @@ private:
     int mVideoStabilizationMode = -1;
     // Whether a zoom_ratio < 1.0 has been used during this session
     bool mUsedUltraWide = false;
+    // Whether a zoom settings override has been used during this session
+    bool mUsedSettingsOverrideZoom = false;
 
     // This only exists in case of camera ID Remapping.
     const std::string mOriginalCameraId;

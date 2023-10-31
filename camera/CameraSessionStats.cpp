@@ -421,6 +421,12 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    bool usedZoomOverride = false;
+    if ((err = parcel->readBool(&usedZoomOverride)) != OK) {
+        ALOGE("%s: Failed to read zoom override usage from parcel", __FUNCTION__);
+        return err;
+    }
+
     int32_t sessionIdx;
     if ((err = parcel->readInt32(&sessionIdx)) != OK) {
         ALOGE("%s: Failed to read session index from parcel", __FUNCTION__);
@@ -451,6 +457,7 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
     mUserTag = toStdString(userTag);
     mVideoStabilizationMode = videoStabilizationMode;
     mUsedUltraWide = usedUltraWide;
+    mUsedZoomOverride = usedZoomOverride;
     mSessionIndex = sessionIdx;
     mCameraExtensionSessionStats = extStats;
 
@@ -549,8 +556,14 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
         ALOGE("%s: Failed to write video stabilization mode!", __FUNCTION__);
         return err;
     }
+
     if ((err = parcel->writeBool(mUsedUltraWide)) != OK) {
         ALOGE("%s: Failed to write ultrawide usage!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeBool(mUsedZoomOverride)) != OK) {
+        ALOGE("%s: Failed to write zoom override usage!", __FUNCTION__);
         return err;
     }
 

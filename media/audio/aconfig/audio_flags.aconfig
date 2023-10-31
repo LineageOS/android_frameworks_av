@@ -14,11 +14,10 @@ audio mixing rules."
 }
 
 flag {
-    name: "configurable_prescale_absolute_volume"
+    name: "auto_public_volume_api_hardening"
     namespace: "media_audio"
-    description: "\
-Enable configurable pre-scale absolute volume."
-    bug: "302553525"
+    description: "On AAOS, make volume and ringer SDK APIs in AudioManager no-ops."
+    bug: "302751899"
 }
 
 flag {
@@ -31,6 +30,27 @@ audio device descriptors to non privileged apps."
 }
 
 flag {
+    name: "configurable_prescale_absolute_volume"
+    namespace: "media_audio"
+    description: "\
+Enable configurable pre-scale absolute volume."
+    bug: "302553525"
+}
+
+flag {
+    name: "focus_freeze_test_api"
+    namespace: "media_audio"
+    description: "\
+ AudioManager audio focus test APIs:\
+ AudioManager.enterAudioFocusFreezeForTest(java.util.List)\
+ AudioManager.exitAudioFocusFreezeForTest()\
+ AudioManager.getFocusDuckedUidsForTest()\
+ AudioManager.getFocusFadeOutDurationForTest()\
+ AudioManager.getFocusUnmuteDelayAfterFadeOutForTest()"
+    bug: "301713440"
+}
+
+flag {
     name: "mutex_priority_inheritance"
     namespace: "media_audio"
     description: "\
@@ -40,11 +60,4 @@ the blocked thread to the blocking thread).  \
 This feature helps reduce audio glitching caused by low priority \
 blocking threads."
     bug: "209491695"
-}
-
-flag {
-    name: "auto_public_volume_api_hardening"
-    namespace: "media_audio"
-    description: "On AAOS, make volume and ringer SDK APIs in AudioManager no-ops."
-    bug: "302751899"
 }

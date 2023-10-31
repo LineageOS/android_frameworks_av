@@ -549,6 +549,14 @@ binder::Status CameraDeviceClient::submitRequestList(
                 mUsedUltraWide = true;
             }
         }
+        if (!mUsedSettingsOverrideZoom && flags::log_zoom_override_usage()) {
+            entry = physicalSettingsList.begin()->metadata.find(
+                    ANDROID_CONTROL_SETTINGS_OVERRIDE);
+            if (entry.count == 1 && entry.data.i32[0] ==
+                    ANDROID_CONTROL_SETTINGS_OVERRIDE_ZOOM) {
+                mUsedSettingsOverrideZoom = true;
+            }
+        }
     }
     mRequestIdCounter++;
 
@@ -2061,7 +2069,8 @@ void CameraDeviceClient::notifyIdle(
         }
     }
     Camera2ClientBase::notifyIdleWithUserTag(requestCount, resultErrorCount, deviceError,
-            fullStreamStats, mUserTag, mVideoStabilizationMode, mUsedUltraWide);
+            fullStreamStats, mUserTag, mVideoStabilizationMode, mUsedUltraWide,
+            mUsedSettingsOverrideZoom);
 }
 
 void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,

@@ -98,7 +98,7 @@ public:
                                      bool deviceError,
                                      const std::vector<hardware::CameraStreamStats>& streamStats,
                                      const std::string& userTag, int videoStabilizationMode,
-                                     bool usedUltraWide);
+                                     bool usedUltraWide, bool usedZoomOverride);
 
     int                   getCameraId() const;
     const sp<CameraDeviceBase>&

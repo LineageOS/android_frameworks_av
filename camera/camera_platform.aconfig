@@ -27,3 +27,10 @@ flag {
      description: "Use waitForService instead of getService with lazy AIDL HALs"
      bug: "285546208"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "log_zoom_override_usage"
+     description: "Enable measuring how much usage there is for zoom settings overrde"
+     bug: "307409002"
+}
