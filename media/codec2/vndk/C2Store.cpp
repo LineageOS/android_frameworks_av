@@ -1081,6 +1081,7 @@ C2PlatformComponentStore::C2PlatformComponentStore()
     emplace("libcodec2_soft_amrwbenc.so");
     //emplace("libcodec2_soft_av1dec_aom.so"); // deprecated for the gav1 implementation
     emplace("libcodec2_soft_av1dec_gav1.so");
+    emplace("libcodec2_soft_av1dec_dav1d.so");
     emplace("libcodec2_soft_av1enc.so");
     emplace("libcodec2_soft_avcdec.so");
     emplace("libcodec2_soft_avcenc.so");
