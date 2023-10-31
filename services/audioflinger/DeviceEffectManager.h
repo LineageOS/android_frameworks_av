@@ -85,7 +85,7 @@ private:
     audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::DeviceEffectManager_Mutex) {
        return mMutex;
    }
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kDeviceEffectManager_Mutex};
     const sp<IAfDeviceEffectManagerCallback> mAfDeviceEffectManagerCallback;
     const sp<DeviceEffectManagerCallback> mMyCallback;
     std::map<AudioDeviceTypeAddr, std::vector<sp<IAfDeviceEffectProxy>>>
