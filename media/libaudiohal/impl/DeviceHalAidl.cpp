@@ -1033,6 +1033,14 @@ status_t DeviceHalAidl::getSoundDoseInterface(const std::string& module,
             return BAD_VALUE;
         }
     }
+
+    if (mSoundDose == nullptr) {
+        ALOGE("%s failed to return the sound dose interface for module %s: not implemented",
+                  __func__,
+                  module.c_str());
+        return NO_INIT;
+    }
+
     *soundDoseBinder = mSoundDose->asBinder();
     ALOGI("%s using audio AIDL HAL sound dose interface", __func__);
 
