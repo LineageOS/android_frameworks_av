@@ -10297,7 +10297,7 @@ status_t MmapThread::standby()
 NO_THREAD_SAFETY_ANALYSIS  // clang bug
 {
     ALOGV("%s", __FUNCTION__);
-    audio_utils::lock_guard(mutex());
+    audio_utils::lock_guard l_{mutex()};
 
     if (mHalStream == 0) {
         return NO_INIT;
