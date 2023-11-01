@@ -243,7 +243,7 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithImplUuid(const AudioUuid& uu
                                 [&](const auto& desc) { return desc.common.id.uuid == uuid; });
     if (matchIt == list.end()) {
         ALOGE("%s UUID not found in HAL and proxy list %s", __func__, toString(uuid).c_str());
-        return BAD_VALUE;
+        return NAME_NOT_FOUND;
     }
     ALOGI("%s UUID impl found %s", __func__, toString(uuid).c_str());
 
