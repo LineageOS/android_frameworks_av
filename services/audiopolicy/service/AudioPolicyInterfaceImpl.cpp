@@ -1810,6 +1810,23 @@ Status AudioPolicyService::registerPolicyMixes(const std::vector<media::AudioMix
     }
 }
 
+Status
+AudioPolicyService::getRegisteredPolicyMixes(std::vector<::android::media::AudioMix>* mixesAidl) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+
+    std::vector<AudioMix> mixes;
+    int status = mAudioPolicyManager->getRegisteredPolicyMixes(mixes);
+
+    for (const auto& mix : mixes) {
+        media::AudioMix aidlMix = VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_AudioMix(mix));
+        mixesAidl->push_back(aidlMix);
+    }
+
+    return binderStatusFromStatusT(status);
+}
+
 Status AudioPolicyService::updatePolicyMixes(
         const ::std::vector<::android::media::AudioMixUpdate>& updates) {
     audio_utils::lock_guard _l(mMutex);

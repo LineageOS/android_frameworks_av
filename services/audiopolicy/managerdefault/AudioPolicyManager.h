@@ -292,6 +292,7 @@ public:
 
         virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes);
         virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes);
+        virtual status_t getRegisteredPolicyMixes(std::vector<AudioMix>& mixes) override;
         virtual status_t updatePolicyMix(
                 const AudioMix& mix,
                 const std::vector<AudioMixMatchCriterion>& updatedCriteria) override;

@@ -67,6 +67,7 @@ cc_library {
         "libaudioclient_aidl_conversion",
         "libaudioutils",
         "libbinder",
+        "libbinder_ndk",
         "libcutils",
         "liblog",
         "libutils",
@@ -121,6 +122,7 @@ cc_library {
         "latest_android_media_audio_common_types_cpp_shared",
     ],
     shared_libs: [
+        "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",

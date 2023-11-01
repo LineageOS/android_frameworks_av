@@ -6,6 +6,14 @@
 package: "android.media.audiopolicy"
 
 flag {
+    name: "audio_mix_test_api"
+    namespace: "media_audio"
+    description: "Enable new Test APIs that provide access to registered AudioMixes on system server and native side."
+    bug: "309080867"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "audio_policy_update_mixing_rules_api"
     namespace: "media_audio"
     description: "Enable AudioPolicy.updateMixingRules API for hot-swapping audio mixing rules."

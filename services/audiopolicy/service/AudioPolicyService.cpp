@@ -166,7 +166,8 @@ BINDER_METHOD_ENTRY(getSupportedMixerAttributes) \
 BINDER_METHOD_ENTRY(setPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(getPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(clearPreferredMixerAttributes) \
-
+BINDER_METHOD_ENTRY(getRegisteredPolicyMixes) \
+                                                     \
 // singleton for Binder Method Statistics for IAudioPolicyService
 static auto& getIAudioPolicyServiceStatistics() {
     using Code = int;
@@ -1348,7 +1349,8 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_getDevicesForRoleAndCapturePreset:
         case TRANSACTION_getSpatializer:
         case TRANSACTION_setPreferredMixerAttributes:
-        case TRANSACTION_clearPreferredMixerAttributes: {
+        case TRANSACTION_clearPreferredMixerAttributes:
+        case TRANSACTION_getRegisteredPolicyMixes: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
