@@ -474,6 +474,10 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     void stopUsingOutputSurface(
             C2BlockPool::local_id_t blockPoolId);
 
+    // Notify a buffer is released from output surface.
+    void onBufferReleasedFromOutputSurface(
+            uint32_t generation);
+
     // Connect to a given InputSurface.
     c2_status_t connectToInputSurface(
             const std::shared_ptr<InputSurface>& inputSurface,
