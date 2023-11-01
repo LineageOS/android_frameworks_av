@@ -8541,9 +8541,11 @@ reacquire_wakelock:
                 // from framesIn.
                 // This isn't strictly necessary but helps limit buffer resizing in
                 // RecordBufferConverter.  TODO: remove when no longer needed.
-                framesOut = min(framesOut,
-                        destinationFramesPossible(
-                                framesIn, mSampleRate, activeTrack->sampleRate()));
+                if (audio_is_linear_pcm(activeTrack->format())) {
+                    framesOut = min(framesOut,
+                            destinationFramesPossible(
+                                    framesIn, mSampleRate, activeTrack->sampleRate()));
+                }
 
                 if (activeTrack->isDirect()) {
                     // No RecordBufferConverter used for direct streams. Pass
