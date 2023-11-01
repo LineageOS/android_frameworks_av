@@ -3584,7 +3584,7 @@ std::vector< sp<IAfEffectModule> > AudioFlinger::purgeOrphanEffectChains_l()
 void AudioFlinger::dumpToThreadLog_l(const sp<IAfThreadBase> &thread)
 {
     constexpr int THREAD_DUMP_TIMEOUT_MS = 2;
-    audio_utils::FdToString fdToString("- ", THREAD_DUMP_TIMEOUT_MS);
+    audio_utils::FdToStringOldImpl fdToString("- ", THREAD_DUMP_TIMEOUT_MS);
     const int fd = fdToString.borrowFdUnsafe();
     if (fd >= 0) {
         thread->dump(fd, {} /* args */);
