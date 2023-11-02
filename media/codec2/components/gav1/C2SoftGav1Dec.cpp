@@ -18,6 +18,7 @@
 #define LOG_TAG "C2SoftGav1Dec"
 #include "C2SoftGav1Dec.h"
 
+#include <android-base/properties.h>
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
 #include <Codec2BufferUtils.h>
@@ -38,6 +39,9 @@
 #endif
 
 namespace android {
+
+// Property used to control the number of threads used in the gav1 decoder.
+constexpr char kNumThreadsProperty[] = "debug.c2.gav1.numthreads";
 
 // codecname set and passed in as a compile flag from Android.bp
 constexpr char COMPONENT_NAME[] = CODECNAME;
@@ -506,6 +510,10 @@ bool C2SoftGav1Dec::initDecoder() {
 
   libgav1::DecoderSettings settings = {};
   settings.threads = GetCPUCoreCount();
+  int32_t numThreads = android::base::GetIntProperty(kNumThreadsProperty, 0);
+  if (numThreads > 0 && numThreads < settings.threads) {
+    settings.threads = numThreads;
+  }
 
   ALOGV("Using libgav1 AV1 software decoder.");
   Libgav1StatusCode status = mCodecCtx->Init(&settings);
