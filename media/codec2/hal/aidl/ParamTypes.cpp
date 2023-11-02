@@ -19,9 +19,7 @@
 #include <android-base/logging.h>
 
 #include <android/binder_manager.h>
-// NOTE: due to dependency from mainline modules cannot use libsysprop
-// #include <android/sysprop/MediaProperties.sysprop.h>
-#include <android-base/properties.h>
+#include <android/sysprop/MediaProperties.sysprop.h>
 #include <codec2/aidl/ParamTypes.h>
 #include <codec2/common/ParamTypes.h>
 
@@ -169,8 +167,6 @@ bool IsSelected() {
         // Cannot select AIDL if not enabled
         return false;
     }
-#if 0
-    // NOTE: due to dependency from mainline modules cannot use libsysprop
     using ::android::sysprop::MediaProperties::codec2_hal_selection;
     using ::android::sysprop::MediaProperties::codec2_hal_selection_values;
     constexpr codec2_hal_selection_values AIDL = codec2_hal_selection_values::AIDL;
@@ -184,16 +180,6 @@ bool IsSelected() {
     default:
         LOG(FATAL) << "Unexpected codec2 HAL selection value: " << (int)selection;
     }
-#else
-    std::string selection = ::android::base::GetProperty("media.c2.hal.selection", "hidl");
-    if (selection == "aidl") {
-        return true;
-    } else if (selection == "hidl") {
-        return false;
-    } else {
-        LOG(FATAL) << "Unexpected codec2 HAL selection value: " << selection;
-    }
-#endif
 
     return false;
 }
