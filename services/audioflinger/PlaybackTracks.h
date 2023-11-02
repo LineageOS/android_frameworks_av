@@ -470,7 +470,8 @@ private:
     SourceMetadatas mTrackMetadatas;
     /** Protects mTrackMetadatas against concurrent access. */
     audio_utils::mutex& trackMetadataMutex() const { return mTrackMetadataMutex; }
-    mutable audio_utils::mutex mTrackMetadataMutex;
+    mutable audio_utils::mutex mTrackMetadataMutex{
+            audio_utils::MutexOrder::kOutputTrack_TrackMetadataMutex};
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel

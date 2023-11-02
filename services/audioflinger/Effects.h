@@ -135,7 +135,7 @@ protected:
     DISALLOW_COPY_AND_ASSIGN(EffectBase);
 
     // mutex for process, commands and handles list protection
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kEffectBase_Mutex};
     mediautils::atomic_sp<EffectCallbackInterface> mCallback; // parent effect chain
     const int                 mId;        // this instance unique ID
     const audio_session_t     mSessionId; // audio session ID
@@ -151,7 +151,7 @@ protected:
     // Mutex protecting transactions with audio policy manager as mutex() cannot
     // be held to avoid cross deadlocks with audio policy mutex
     audio_utils::mutex& policyMutex() const { return mPolicyMutex; }
-    mutable audio_utils::mutex mPolicyMutex;
+    mutable audio_utils::mutex mPolicyMutex{audio_utils::MutexOrder::kEffectBase_PolicyMutex};
     // Effect is registered in APM or not
     bool                      mPolicyRegistered = false;
     // Effect enabled state communicated to APM. Enabled state corresponds to
@@ -367,7 +367,8 @@ private:
     DISALLOW_COPY_AND_ASSIGN(EffectHandle);
 
     audio_utils::mutex& mutex() const { return mMutex; }
-    mutable audio_utils::mutex mMutex; // protects IEffect method calls
+    // protects IEffect method calls
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kEffectHandle_Mutex};
     const wp<IAfEffectBase> mEffect;               // pointer to controlled EffectModule
     const sp<media::IEffectClient> mEffectClient;  // callback interface for client notifications
     /*const*/ sp<Client> mClient;            // client for shared memory allocation, see
@@ -625,7 +626,8 @@ private:
 
     std::optional<size_t> findVolumeControl_l(size_t from, size_t to) const;
 
-    mutable audio_utils::mutex mMutex; // mutex protecting effect list
+    // mutex protecting effect list
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kEffectChain_Mutex};
              Vector<sp<IAfEffectModule>> mEffects; // list of effect modules
              audio_session_t mSessionId; // audio session ID
              sp<EffectBufferHalInterface> mInBuffer;  // chain input buffer
@@ -764,7 +766,8 @@ private:
     const sp<ProxyCallback> mMyCallback;
 
     audio_utils::mutex& proxyMutex() const { return mProxyMutex; }
-    mutable audio_utils::mutex mProxyMutex;
+    mutable audio_utils::mutex mProxyMutex{
+            audio_utils::MutexOrder::kDeviceEffectProxy_ProxyMutex};
     std::map<audio_patch_handle_t, sp<IAfEffectHandle>> mEffectHandles; // protected by mProxyMutex
     sp<IAfEffectModule> mHalEffect; // protected by mProxyMutex
     struct audio_port_config mDevicePort = { .id = AUDIO_PORT_HANDLE_NONE };

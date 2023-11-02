@@ -138,7 +138,7 @@ private:
      * Lock for protecting the active mel patches. Do not mix with the AudioFlinger lock.
      * Locking order AudioFlinger::mutex() -> PatchCommandThread::mutex() -> MelReporter::mutex().
      */
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kMelReporter_Mutex};
     std::unordered_map<audio_patch_handle_t, ActiveMelPatch> mActiveMelPatches
             GUARDED_BY(mutex());
     std::unordered_map<audio_port_handle_t, int> mActiveDevices GUARDED_BY(mutex());
