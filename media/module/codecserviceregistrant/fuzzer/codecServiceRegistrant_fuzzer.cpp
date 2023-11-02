@@ -86,8 +86,8 @@ void CodecServiceRegistrantFuzzer::initH2C2ComponentStore() {
   }
 
   string const preferredStoreName = string(kServiceName);
-  sp<IComponentStore> preferredStore =
-      IComponentStore::getService(preferredStoreName.c_str());
+  sp<V1_0::IComponentStore> preferredStore =
+      V1_0::IComponentStore::getService(preferredStoreName.c_str());
   mH2C2 = new H2C2ComponentStore(preferredStore);
 }
 
