@@ -27,6 +27,7 @@
 //#define BUFLOG_NDEBUG 0
 #include <afutils/BufLog.h>
 #include <afutils/DumpTryLock.h>
+#include <afutils/NBAIO_Tee.h>
 #include <afutils/Permission.h>
 #include <afutils/PropertyUtils.h>
 #include <afutils/TypedLogger.h>
