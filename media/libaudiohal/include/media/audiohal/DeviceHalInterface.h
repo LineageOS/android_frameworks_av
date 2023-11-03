@@ -160,6 +160,9 @@ class DeviceHalInterface : public virtual RefBase
 
     virtual status_t prepareToDisconnectExternalDevice(const struct audio_port_v7* port) = 0;
 
+    virtual status_t getAudioMixPort(const struct audio_port_v7* devicePort,
+                                     struct audio_port_v7* mixPort) = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     DeviceHalInterface() {}

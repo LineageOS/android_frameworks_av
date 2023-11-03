@@ -1040,9 +1040,9 @@ private:
         void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
         void modifySurroundChannelMasks(ChannelMaskSet *channelMasksPtr);
 
-        // If any, resolve any "dynamic" fields of an Audio Profiles collection
+        // If any, resolve any "dynamic" fields of the Audio Profiles collection of and IOProfile
         void updateAudioProfiles(const sp<DeviceDescriptor>& devDesc, audio_io_handle_t ioHandle,
-                AudioProfileVector &profiles);
+                const sp<IOProfile> &profiles);
 
         // Notify the policy client to prepare for disconnecting external device.
         void prepareToDisconnectExternalDevice(const sp<DeviceDescriptor> &device);

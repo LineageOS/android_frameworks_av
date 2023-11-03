@@ -255,6 +255,10 @@ private:
     status_t getAudioPolicyConfig(media::AudioPolicyConfig* config) final
             EXCLUDES_AudioFlinger_Mutex;
 
+    // Get the attributes of the mix port when connecting to the given device port.
+    status_t getAudioMixPort(const struct audio_port_v7* devicePort,
+                             struct audio_port_v7* mixPort) const final EXCLUDES_AudioFlinger_Mutex;
+
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
             const std::function<status_t()>& delegate) final EXCLUDES_AudioFlinger_Mutex;
 
