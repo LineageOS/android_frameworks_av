@@ -250,8 +250,10 @@ TEST(AudioEffectTest, ManageSourceDefaultEffects) {
             if (!isEffectDefaultOnRecord(&descriptors[i].type, &descriptors[i].uuid,
                                          capture->getAudioRecordHandle())) {
                 selectedEffect = i;
+                EXPECT_EQ(OK, capture->stop());
                 break;
             }
+            EXPECT_EQ(OK, capture->stop());
         }
     }
     if (selectedEffect == -1) GTEST_SKIP() << " expected at least one preprocessing effect";
