@@ -27,6 +27,7 @@
 //#define BUFLOG_NDEBUG 0
 #include <afutils/BufLog.h>
 #include <afutils/DumpTryLock.h>
+#include <afutils/NBAIO_Tee.h>
 #include <afutils/Permission.h>
 #include <afutils/PropertyUtils.h>
 #include <afutils/TypedLogger.h>
@@ -877,6 +878,9 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             write(fd, timeCheckStats.c_str(), timeCheckStats.size());
             dprintf(fd, "\n");
         }
+        // dump mutex stats
+        const auto mutexStats = audio_utils::mutex::all_stats_to_string();
+        write(fd, mutexStats.c_str(), mutexStats.size());
     }
     return NO_ERROR;
 }
