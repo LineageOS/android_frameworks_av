@@ -1202,10 +1202,15 @@ status_t DeviceHalAidl::filterAndRetrieveBtA2dpParameters(
     TIME_CHECK();
     if (String8 key = String8(AudioParameter::keyReconfigA2dpSupported); keys.containsKey(key)) {
         keys.remove(key);
-        bool supports;
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                        mBluetoothA2dp->supportsOffloadReconfiguration(&supports)));
-        result->addInt(key, supports ? 1 : 0);
+        if (mBluetoothA2dp != nullptr) {
+            bool supports;
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                            mBluetoothA2dp->supportsOffloadReconfiguration(&supports)));
+            result->addInt(key, supports ? 1 : 0);
+        } else {
+            ALOGI("%s: no IBluetoothA2dp on %s", __func__, mInstance.c_str());
+            result->addInt(key, 0);
+        }
     }
     return OK;
 }
