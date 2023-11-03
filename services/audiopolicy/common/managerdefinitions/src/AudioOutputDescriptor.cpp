@@ -323,7 +323,7 @@ SwAudioOutputDescriptor::SwAudioOutputDescriptor(const sp<IOProfile>& profile,
     mOutput1(0), mOutput2(0), mDirectOpenCount(0),
     mDirectClientSession(AUDIO_SESSION_NONE)
 {
-    if (profile != NULL) {
+    if (profile != nullptr) {
         // By default, opening the output without immutable flags, the bit-perfect flags should be
         // applied when the apps explicitly request.
         mFlags = (audio_output_flags_t)(profile->getFlags() & (~AUDIO_OUTPUT_FLAG_BIT_PERFECT));
@@ -377,7 +377,10 @@ DeviceVector SwAudioOutputDescriptor::supportedDevices() const
         supportedDevices.merge(mOutput2->supportedDevices());
         return supportedDevices;
     }
-    return mProfile->getSupportedDevices();
+    if (mProfile != nullptr) {
+        return mProfile->getSupportedDevices();
+    }
+    return DeviceVector();
 }
 
 bool SwAudioOutputDescriptor::supportsDevice(const sp<DeviceDescriptor> &device) const
@@ -413,9 +416,10 @@ bool SwAudioOutputDescriptor::devicesSupportEncodedFormats(const DeviceTypeSet& 
     if (isDuplicated()) {
         return (mOutput1->devicesSupportEncodedFormats(deviceTypes)
                     || mOutput2->devicesSupportEncodedFormats(deviceTypes));
-    } else {
+    } else if (mProfile != nullptr) {
        return mProfile->devicesSupportEncodedFormats(deviceTypes);
     }
+    return false;
 }
 
 bool SwAudioOutputDescriptor::containsSingleDeviceSupportingEncodedFormats(
@@ -425,7 +429,10 @@ bool SwAudioOutputDescriptor::containsSingleDeviceSupportingEncodedFormats(
         return (mOutput1->containsSingleDeviceSupportingEncodedFormats(device) &&
                 mOutput2->containsSingleDeviceSupportingEncodedFormats(device));
     }
-    return mProfile->containsSingleDeviceSupportingEncodedFormats(device);
+    if (mProfile != nullptr) {
+        return mProfile->containsSingleDeviceSupportingEncodedFormats(device);
+    }
+    return false;
 }
 
 uint32_t SwAudioOutputDescriptor::latency()
@@ -589,6 +596,11 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
                         "with the requested devices, all device types: %s",
                         __func__, dumpDeviceTypes(devices.types()).c_str());
 
+    if (mProfile == nullptr) {
+        ALOGE("%s : Cannot open descriptor without a profile ", __func__);
+        return INVALID_OPERATION;
+    }
+
     audio_config_t lHalConfig;
     if (halConfig == nullptr) {
         lHalConfig = AUDIO_CONFIG_INITIALIZER;
@@ -673,7 +685,7 @@ status_t SwAudioOutputDescriptor::start()
         }
         return NO_ERROR;
     }
-    if (!isActive()) {
+    if (mProfile != nullptr && !isActive()) {
         if (!mProfile->canStartNewIo()) {
             return INVALID_OPERATION;
         }
@@ -690,7 +702,7 @@ void SwAudioOutputDescriptor::stop()
         return;
     }
 
-    if (!isActive()) {
+    if (mProfile != nullptr && !isActive()) {
         LOG_ALWAYS_FATAL_IF(mProfile->curActiveCount < 1,
                             "%s invalid profile active count %u",
                             __func__, mProfile->curActiveCount);
@@ -713,10 +725,11 @@ void SwAudioOutputDescriptor::close()
         }
 
         mClientInterface->closeOutput(mIoHandle);
-
-        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
-                            __FUNCTION__, mProfile->curOpenCount);
-        mProfile->curOpenCount--;
+        if (mProfile != nullptr) {
+            LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
+                                __FUNCTION__, mProfile->curOpenCount);
+            mProfile->curOpenCount--;
+        }
         mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
 }
@@ -751,7 +764,10 @@ uint32_t SwAudioOutputDescriptor::getRecommendedMuteDurationMs() const
         return std::max(mOutput1->getRecommendedMuteDurationMs(),
                 mOutput2->getRecommendedMuteDurationMs());
     }
-    return mProfile->recommendedMuteDurationMs;
+    if (mProfile != nullptr) {
+        return mProfile->recommendedMuteDurationMs;
+    }
+    return 0;
 }
 
 void SwAudioOutputDescriptor::setTracksInvalidatedStatusByStrategy(product_strategy_t strategy) {
