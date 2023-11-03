@@ -1,8 +1,9 @@
-package: "com.android.media.midi.flags"
-
-# MIDI flags.
+# MIDI flags
+# Only add flags here which must be included in framework.jar
 #
 # Please add flags in alphabetical order.
+
+package: "android.media.midi"
 
 flag {
     name: "virtual_ump"
