@@ -21,14 +21,16 @@ cc_aconfig_library {
     name: "com.android.media.audioserver-aconfig-cc",
     aconfig_declarations: "com.android.media.audioserver-aconfig",
     defaults: ["audio-aconfig-cc-defaults"],
-
-    // TODO(b/308061678) remove vndk dependency
     double_loadable: true,
+    host_supported: true,
     product_available: true,
     vendor_available: true,
     apex_available: [
         "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
     ],
+    min_sdk_version: "29",
 }
 
 cc_aconfig_library {
