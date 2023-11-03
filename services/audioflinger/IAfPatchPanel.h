@@ -302,6 +302,13 @@ public:
 
     virtual void closeThreadInternal_l(const sp<IAfThreadBase>& thread) const
             REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
+
+    /**
+     * Get the attributes of the mix port when connecting to the given device port.
+     */
+    virtual status_t getAudioMixPort_l(
+            const struct audio_port_v7* devicePort,
+            struct audio_port_v7* mixPort) REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 };
 
 }  // namespace android

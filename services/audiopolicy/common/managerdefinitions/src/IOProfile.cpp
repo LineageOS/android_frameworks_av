@@ -189,6 +189,31 @@ status_t IOProfile::readFromParcelable(const media::AudioPortFw &parcelable) {
     return status;
 }
 
+void IOProfile::importAudioPort(const audio_port_v7 &port) {
+    if (mProfiles.hasDynamicFormat()) {
+        std::set<audio_format_t> formats;
+        for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+            formats.insert(port.audio_profiles[i].format);
+        }
+        addProfilesForFormats(mProfiles, FormatVector(formats.begin(), formats.end()));
+    }
+    for (audio_format_t format : mProfiles.getSupportedFormats()) {
+        for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+            if (port.audio_profiles[i].format == format) {
+                ChannelMaskSet channelMasks(port.audio_profiles[i].channel_masks,
+                        port.audio_profiles[i].channel_masks +
+                                port.audio_profiles[i].num_channel_masks);
+                SampleRateSet sampleRates(port.audio_profiles[i].sample_rates,
+                        port.audio_profiles[i].sample_rates +
+                                port.audio_profiles[i].num_sample_rates);
+                addDynamicAudioProfileAndSort(
+                        mProfiles, sp<AudioProfile>::make(
+                                format, channelMasks, sampleRates));
+            }
+        }
+    }
+}
+
 void IOProfile::dump(String8 *dst, int spaces) const
 {
     String8 extraInfo;

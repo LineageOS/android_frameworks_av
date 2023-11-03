@@ -340,4 +340,14 @@ status_t AudioPolicyService::AudioPolicyClient::invalidateTracks(
     return af->invalidateTracks(portIds);
 }
 
+status_t AudioPolicyService::AudioPolicyClient::getAudioMixPort(
+        const struct audio_port_v7 *devicePort,
+        struct audio_port_v7 *port) {
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == 0) {
+        return PERMISSION_DENIED;
+    }
+    return af->getAudioMixPort(devicePort, port);
+}
+
 } // namespace android
