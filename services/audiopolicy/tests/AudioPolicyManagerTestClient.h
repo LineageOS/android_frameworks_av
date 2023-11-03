@@ -201,6 +201,26 @@ public:
         return mAudioParameters.toString();
     }
 
+    status_t getAudioMixPort(const struct audio_port_v7 *devicePort __unused,
+                             struct audio_port_v7 *mixPort) override {
+        mixPort->num_audio_profiles = 0;
+        for (auto format : mSupportedFormats) {
+            const int i = mixPort->num_audio_profiles;
+            mixPort->audio_profiles[i].format = format;
+            mixPort->audio_profiles[i].num_sample_rates = 1;
+            mixPort->audio_profiles[i].sample_rates[0] = 48000;
+            mixPort->audio_profiles[i].num_channel_masks = 0;
+            for (const auto& cm : mSupportedChannelMasks) {
+                if (audio_channel_mask_is_valid(cm)) {
+                    mixPort->audio_profiles[i].channel_masks[
+                            mixPort->audio_profiles[i].num_channel_masks++] = cm;
+                }
+            }
+            mixPort->num_audio_profiles++;
+        }
+        return NO_ERROR;
+    }
+
     void addSupportedFormat(audio_format_t format) {
         mSupportedFormats.insert(format);
     }

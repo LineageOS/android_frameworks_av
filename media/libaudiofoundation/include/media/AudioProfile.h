@@ -149,6 +149,8 @@ public:
     bool equals(const AudioProfileVector& other) const;
     void addAllValidProfiles(const AudioProfileVector& audioProfiles);
 
+    ChannelMaskSet getSupportedChannelMasks() const;
+
     using Aidl = std::pair<
             std::vector<media::audio::common::AudioProfile>,
             std::vector<media::AudioProfileSys>>;

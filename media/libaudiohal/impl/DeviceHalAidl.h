@@ -176,6 +176,9 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
 
     status_t setSimulateDeviceConnections(bool enabled) override;
 
+    status_t getAudioMixPort(const struct audio_port_v7* devicePort,
+                             struct audio_port_v7* mixPort) override;
+
     status_t dump(int __unused, const Vector<String16>& __unused) override;
 
   private:
@@ -260,7 +263,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     PortConfigs::iterator findPortConfig(
             const ::aidl::android::media::audio::common::AudioDevice& device);
     PortConfigs::iterator findPortConfig(
-            const ::aidl::android::media::audio::common::AudioConfig& config,
+            const std::optional<::aidl::android::media::audio::common::AudioConfig>& config,
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle);
     bool isPortHeldByAStream(int32_t portId);
@@ -280,6 +283,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     void resetUnusedPatchesAndPortConfigs();
     void resetUnusedPortConfigs();
     status_t updateRoutes();
+    status_t getAudioPort(int32_t portId, ::aidl::android::media::audio::common::AudioPort* port);
 
     // CallbackBroker implementation
     void clearCallbacks(void* cookie) override;
