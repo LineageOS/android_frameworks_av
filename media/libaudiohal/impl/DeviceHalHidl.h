@@ -21,6 +21,7 @@
 #include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
+#include <media/audiohal/StreamHalInterface.h>
 
 #include "CoreConversionHelperHidl.h"
 
@@ -127,10 +128,7 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
         return INVALID_OPERATION;
     }
 
-    int32_t supportsBluetoothVariableLatency(bool* supports __unused) override {
-        // TODO: Implement the HAL query when moving to AIDL HAL.
-        return INVALID_OPERATION;
-    }
+    status_t supportsBluetoothVariableLatency(bool* supports) override;
 
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
 
@@ -148,6 +146,9 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
 
     status_t prepareToDisconnectExternalDevice(const struct audio_port_v7* port) override;
 
+    status_t getAudioMixPort(const struct audio_port_v7* devicePort,
+                             struct audio_port_v7* mixPort) override;
+
   private:
     friend class DevicesFactoryHalHidl;
     sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;
@@ -157,11 +158,14 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     class SoundDoseWrapper;
     const std::unique_ptr<SoundDoseWrapper> mSoundDoseWrapper;
     std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
+    std::map<audio_io_handle_t, wp<StreamHalInterface>> mStreams;
 
     // Can not be constructed directly by clients.
     explicit DeviceHalHidl(const sp<::android::hardware::audio::CPP_VERSION::IDevice>& device);
     explicit DeviceHalHidl(
             const sp<::android::hardware::audio::CPP_VERSION::IPrimaryDevice>& device);
+
+    void cleanupStreams();
 
     // The destructor automatically closes the device.
     virtual ~DeviceHalHidl();

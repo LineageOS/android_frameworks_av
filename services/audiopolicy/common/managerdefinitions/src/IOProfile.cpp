@@ -171,6 +171,49 @@ void IOProfile::toSupportedMixerAttributes(
     }
 }
 
+void IOProfile::refreshMixerBehaviors() {
+    if (getRole() == AUDIO_PORT_ROLE_SOURCE) {
+        mMixerBehaviors.clear();
+        mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_DEFAULT);
+        if (mFlags.output & AUDIO_OUTPUT_FLAG_BIT_PERFECT) {
+            mMixerBehaviors.insert(AUDIO_MIXER_BEHAVIOR_BIT_PERFECT);
+        }
+    }
+}
+
+status_t IOProfile::readFromParcelable(const media::AudioPortFw &parcelable) {
+    status_t status = AudioPort::readFromParcelable(parcelable);
+    if (status == OK) {
+        refreshMixerBehaviors();
+    }
+    return status;
+}
+
+void IOProfile::importAudioPort(const audio_port_v7 &port) {
+    if (mProfiles.hasDynamicFormat()) {
+        std::set<audio_format_t> formats;
+        for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+            formats.insert(port.audio_profiles[i].format);
+        }
+        addProfilesForFormats(mProfiles, FormatVector(formats.begin(), formats.end()));
+    }
+    for (audio_format_t format : mProfiles.getSupportedFormats()) {
+        for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+            if (port.audio_profiles[i].format == format) {
+                ChannelMaskSet channelMasks(port.audio_profiles[i].channel_masks,
+                        port.audio_profiles[i].channel_masks +
+                                port.audio_profiles[i].num_channel_masks);
+                SampleRateSet sampleRates(port.audio_profiles[i].sample_rates,
+                        port.audio_profiles[i].sample_rates +
+                                port.audio_profiles[i].num_sample_rates);
+                addDynamicAudioProfileAndSort(
+                        mProfiles, sp<AudioProfile>::make(
+                                format, channelMasks, sampleRates));
+            }
+        }
+    }
+}
+
 void IOProfile::dump(String8 *dst, int spaces) const
 {
     String8 extraInfo;
@@ -195,6 +238,10 @@ void IOProfile::dump(String8 *dst, int spaces) const
             spaces - 2, "", maxActiveCount, curActiveCount);
     dst->appendFormat("%*s- recommendedMuteDurationMs: %u ms\n",
             spaces - 2, "", recommendedMuteDurationMs);
+    if (hasDynamicAudioProfile() && !mMixerBehaviors.empty()) {
+        dst->appendFormat("%*s- mixerBehaviors: %s\n",
+                spaces - 2, "", dumpMixerBehaviors(mMixerBehaviors).c_str());
+    }
 }
 
 void IOProfile::log()

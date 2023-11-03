@@ -106,6 +106,10 @@ public:
     status_t invalidateTracks(const std::vector<audio_port_handle_t>& /*portIds*/) override {
         return NO_INIT;
     }
+    status_t getAudioMixPort(const struct audio_port_v7 *devicePort __unused,
+                             struct audio_port_v7 *mixPort __unused) override {
+        return INVALID_OPERATION;
+    }
 };
 
 } // namespace android

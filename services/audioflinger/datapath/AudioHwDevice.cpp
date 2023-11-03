@@ -118,5 +118,10 @@ int32_t AudioHwDevice::getAAudioHardwareBurstMinUsec() const {
     return mHwDevice->getAAudioHardwareBurstMinUsec();
 }
 
+status_t AudioHwDevice::getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                        struct audio_port_v7 *mixPort) const {
+    return mHwDevice->getAudioMixPort(devicePort, mixPort);
+}
+
 
 }; // namespace android

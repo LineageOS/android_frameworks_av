@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -34,6 +35,8 @@ using SampleRateSet = std::set<uint32_t>;
 using MixerBehaviorSet = std::set<audio_mixer_behavior_t>;
 
 using FormatVector = std::vector<audio_format_t>;
+using AudioProfileAttributesMultimap =
+        std::multimap<audio_format_t, std::pair<SampleRateSet, ChannelMaskSet>>;
 
 const DeviceTypeSet& getAudioDeviceOutAllSet();
 const DeviceTypeSet& getAudioDeviceOutAllA2dpSet();
@@ -126,12 +129,58 @@ bool deviceTypesToString(const DeviceTypeSet& deviceTypes, std::string &str);
 
 std::string dumpDeviceTypes(const DeviceTypeSet& deviceTypes);
 
+std::string dumpMixerBehaviors(const MixerBehaviorSet& mixerBehaviors);
+
 /**
  * Return human readable string for device types.
  */
 inline std::string toString(const DeviceTypeSet& deviceTypes) {
     return deviceTypesToString(deviceTypes);
 }
+
+/**
+ * Create audio profile attributes map by given audio profile array from the range of [first, last).
+ *
+ * @param profiles the array of audio profiles.
+ * @param first the first index of the profile.
+ * @param last the last index of the profile.
+ * @return a multipmap of audio format to pair of corresponding sample rates and channel masks set.
+ */
+AudioProfileAttributesMultimap createAudioProfilesAttrMap(audio_profile profiles[],
+                                                          uint32_t first,
+                                                          uint32_t last);
+
+/**
+ * Populate audio profiles according to given profile attributes, format, channel masks and
+ * sample rates.
+ *
+ * The function will first go over all pairs of channel masks and sample rates that are present in
+ * the profile attributes of the given map. Note that the channel masks and the sample rates that
+ * are not present in the collections of all valid channel masks and all valid sample rates will be
+ * excluded. After that, if there are channel masks and sample rates that present in the all values
+ * collection but not in profile attributes, they will also be place in a new audio profile in the
+ * profile array.
+ *
+ * Note that if the resulting index of the audio profile exceeds the maximum, no new audio profiles
+ * will be placed in the array.
+ *
+ * @param profileAttrs a multimap that contains format and its corresponding channel masks and
+ *                     sample rates.
+ * @param format the targeted audio format.
+ * @param allChannelMasks all valid channel masks for the format.
+ * @param allSampleRates all valid sample rates for the format.
+ * @param audioProfiles the audio profile array.
+ * @param numAudioProfiles the start index to put audio profile in the array. The value will be
+ *                         updated if there is new audio profile placed.
+ * @param maxAudioProfiles the maximum number of audio profile.
+ */
+void populateAudioProfiles(const AudioProfileAttributesMultimap& profileAttrs,
+                           audio_format_t format,
+                           ChannelMaskSet allChannelMasks,
+                           SampleRateSet allSampleRates,
+                           audio_profile audioProfiles[],
+                           uint32_t* numAudioProfiles,
+                           uint32_t maxAudioProfiles = AUDIO_PORT_MAX_AUDIO_PROFILES);
 
 
 } // namespace android

@@ -142,7 +142,7 @@ class DeviceHalInterface : public virtual RefBase
     virtual int32_t getAAudioMixerBurstCount() = 0;
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
 
-    virtual int32_t supportsBluetoothVariableLatency(bool* supports) = 0;
+    virtual status_t supportsBluetoothVariableLatency(bool* supports) = 0;
 
     // Update the connection status of an external device.
     virtual status_t setConnectedState(const struct audio_port_v7* port, bool connected) = 0;
@@ -159,6 +159,9 @@ class DeviceHalInterface : public virtual RefBase
                                            ::ndk::SpAIBinder* soundDoseBinder) = 0;
 
     virtual status_t prepareToDisconnectExternalDevice(const struct audio_port_v7* port) = 0;
+
+    virtual status_t getAudioMixPort(const struct audio_port_v7* devicePort,
+                                     struct audio_port_v7* mixPort) = 0;
 
   protected:
     // Subclasses can not be constructed directly by clients.
