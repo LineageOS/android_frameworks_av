@@ -383,6 +383,16 @@ void AudioProfileVector::addAllValidProfiles(const AudioProfileVector& audioProf
     }
 }
 
+ChannelMaskSet AudioProfileVector::getSupportedChannelMasks() const {
+    ChannelMaskSet channelMasks;
+    for (const auto& profile : *this) {
+        if (profile->isValid()) {
+            channelMasks.insert(profile->getChannels().begin(), profile->getChannels().end());
+        }
+    }
+    return channelMasks;
+}
+
 ConversionResult<AudioProfileVector>
 aidl2legacy_AudioProfileVector(const AudioProfileVector::Aidl& aidl, bool isInput) {
     return convertContainers<AudioProfileVector>(aidl.first, aidl.second,

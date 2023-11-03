@@ -73,6 +73,12 @@ public:
     void closeThreadInternal_l(const sp<IAfThreadBase>& thread) const final
             REQUIRES(audio_utils::AudioFlinger_Mutex);
 
+    /**
+     * Get the attributes of the mix port when connecting to the given device port
+     */
+    status_t getAudioMixPort_l(const audio_port_v7* devicePort, audio_port_v7* mixPort) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+
 private:
     AudioHwDevice* findAudioHwDeviceByModule_l(audio_module_handle_t module)
             REQUIRES(audio_utils::AudioFlinger_Mutex);

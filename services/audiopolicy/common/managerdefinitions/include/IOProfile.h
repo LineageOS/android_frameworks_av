@@ -218,6 +218,8 @@ public:
 
     status_t readFromParcelable(const media::AudioPortFw& parcelable);
 
+    void importAudioPort(const audio_port_v7& port) override;
+
     // Number of streams currently opened for this profile.
     uint32_t     curOpenCount;
     // Number of streams currently active for this profile. This is not the number of active clients
