@@ -17,6 +17,8 @@
 
 #include <C2Buffer.h>
 
+#include <android-base/unique_fd.h>
+
 #include <memory>
 
 namespace aidl::android::hardware::media::c2 {
@@ -32,8 +34,9 @@ class C2IgbaBlockPool : public C2BlockPool {
 public:
     explicit C2IgbaBlockPool(
             const std::shared_ptr<C2Allocator> &allocator,
-            const std::shared_ptr<
-                    ::aidl::android::hardware::media::c2::IGraphicBufferAllocator> &igba,
+            const std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator>
+                    &igba,
+            ::android::base::unique_fd &&ufd,
             const local_id_t localId);
 
     virtual ~C2IgbaBlockPool() = default;
@@ -89,8 +92,7 @@ struct C2IgbaBlockPoolData : public _C2BlockPoolData {
 
     C2IgbaBlockPoolData(
             const AHardwareBuffer *buffer,
-            const std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator>
-                &igba);
+            std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> &igba);
 
     virtual ~C2IgbaBlockPoolData() override;
 
@@ -103,7 +105,10 @@ private:
 
     void disown();
 
+    void registerIgba(std::shared_ptr<
+            ::aidl::android::hardware::media::c2::IGraphicBufferAllocator> &igba);
+
     bool mOwned;
     const AHardwareBuffer *mBuffer;
-    const std::weak_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> mIgba;
+    std::weak_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> mIgba;
 };
