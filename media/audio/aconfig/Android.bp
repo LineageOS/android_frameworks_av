@@ -1,22 +1,29 @@
 // media_audio namespace flags
 
-// aconfig_audio_flags is for general multi-project audio flags.
+cc_defaults {
+    name: "audio-aconfig-cc-defaults",
+    host_supported: true,
+}
+
 aconfig_declarations {
-    name: "aconfig_audio_flags",
-    package: "com.android.media.audio.flags",
-    srcs: ["audio_flags.aconfig"],
+    name: "com.android.media.audioserver-aconfig",
+    package: "com.android.media.audioserver",
+    srcs: ["audioserver.aconfig"],
+}
+
+aconfig_declarations {
+    name: "com.android.media.audio-aconfig",
+    package: "com.android.media.audio",
+    srcs: ["audio.aconfig"],
 }
 
 cc_aconfig_library {
-    name: "aconfig_audio_flags_c_lib",
-    aconfig_declarations: "aconfig_audio_flags",
+    name: "com.android.media.audioserver-aconfig-cc",
+    aconfig_declarations: "com.android.media.audioserver-aconfig",
+    defaults: ["audio-aconfig-cc-defaults"],
 
-    // This does not properly link with the
-    // libaudioutils library -- the vndk
-    // requirement needs a signature update.
-
+    // TODO(b/308061678) remove vndk dependency
     double_loadable: true,
-    host_supported: true,
     product_available: true,
     vendor_available: true,
     apex_available: [
@@ -24,16 +31,65 @@ cc_aconfig_library {
     ],
 }
 
-aconfig_declarations {
-    name: "aconfig_midi_flags",
-    package: "com.android.media.midi.flags",
-    srcs: [
-      "midi_flags.aconfig",
-    ],
+cc_aconfig_library {
+    name: "com.android.media.audio-aconfig-cc",
+    aconfig_declarations: "com.android.media.audio-aconfig",
+    defaults: ["audio-aconfig-cc-defaults"],
 }
 
 java_aconfig_library {
-    name: "aconfig_midi_flags_java_lib",
-    aconfig_declarations: "aconfig_midi_flags",
+    name: "com.android.media.audio-aconfig-java",
+    aconfig_declarations: "com.android.media.audio-aconfig",
+}
+
+// Framework available flags to follow
+// Care must be taken to avoid namespace conflicts.
+// These flags are accessible outside of the platform! Limit usage to @FlaggedApi wherever possible
+
+aconfig_declarations {
+    name: "android.media.audio-aconfig",
+    package: "android.media.audio",
+    srcs: ["audio_framework.aconfig"],
+    visibility: ["//visibility:private"],
+}
+
+aconfig_declarations {
+    name: "android.media.audiopolicy-aconfig",
+    package: "android.media.audiopolicy",
+    srcs: ["audiopolicy_framework.aconfig"],
+    visibility: ["//visibility:private"],
+}
+
+aconfig_declarations {
+    name: "android.media.midi-aconfig",
+    package: "android.media.midi",
+    srcs: ["midi_flags.aconfig"],
+    visibility: ["//visibility:private"],
+}
+
+java_aconfig_library {
+    name: "android.media.audio-aconfig-java",
+    aconfig_declarations: "android.media.audio-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "android.media.audiopolicy-aconfig-java",
+    aconfig_declarations: "android.media.audiopolicy-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "android.media.midi-aconfig-java",
+    aconfig_declarations: "android.media.midi-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+filegroup {
+    name: "audio-framework-aconfig",
+    srcs: [
+        ":android.media.audio-aconfig-java{.generated_srcjars}",
+        ":android.media.audiopolicy-aconfig-java{.generated_srcjars}",
+        ":android.media.midi-aconfig-java{.generated_srcjars}",
+    ],
 }

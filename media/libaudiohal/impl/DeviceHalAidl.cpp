@@ -836,6 +836,33 @@ status_t DeviceHalAidl::getAudioPort(struct audio_port_v7 *port) {
     return OK;
 }
 
+status_t DeviceHalAidl::getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                        struct audio_port_v7 *mixPort) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    if (devicePort->type != AUDIO_PORT_TYPE_DEVICE) {
+        return BAD_VALUE;
+    }
+    if (mixPort->type != AUDIO_PORT_TYPE_MIX) {
+        return BAD_VALUE;
+    }
+    const int32_t aidlHandle = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::legacy2aidl_audio_io_handle_t_int32_t(mixPort->ext.mix.handle));
+    auto it = findPortConfig(std::nullopt /*config*/, std::nullopt/*flags*/, aidlHandle);
+    if (it == mPortConfigs.end()) {
+        ALOGE("%s, cannot find mix port config for handle=%u", __func__, aidlHandle);
+        return BAD_VALUE;
+    }
+    AudioPort port;
+    if (status_t status = getAudioPort(it->second.portId, &port); status != NO_ERROR) {
+        return status;
+    }
+    const bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(
+            mixPort->role, mixPort->type)) == ::aidl::android::AudioPortDirection::INPUT;
+    *mixPort = VALUE_OR_RETURN_STATUS(::aidl::android::aidl2legacy_AudioPort_audio_port_v7(
+            port, isInput));
+    return NO_ERROR;
+}
+
 status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* config) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
@@ -1202,10 +1229,15 @@ status_t DeviceHalAidl::filterAndRetrieveBtA2dpParameters(
     TIME_CHECK();
     if (String8 key = String8(AudioParameter::keyReconfigA2dpSupported); keys.containsKey(key)) {
         keys.remove(key);
-        bool supports;
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                        mBluetoothA2dp->supportsOffloadReconfiguration(&supports)));
-        result->addInt(key, supports ? 1 : 0);
+        if (mBluetoothA2dp != nullptr) {
+            bool supports;
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                            mBluetoothA2dp->supportsOffloadReconfiguration(&supports)));
+            result->addInt(key, supports ? 1 : 0);
+        } else {
+            ALOGI("%s: no IBluetoothA2dp on %s", __func__, mInstance.c_str());
+            result->addInt(key, 0);
+        }
     }
     return OK;
 }
@@ -1710,7 +1742,9 @@ DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(const AudioDe
 }
 
 DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(
-            const AudioConfig& config, const std::optional<AudioIoFlags>& flags, int32_t ioHandle) {
+            const std::optional<AudioConfig>& config,
+            const std::optional<AudioIoFlags>& flags,
+            int32_t ioHandle) {
     using Tag = AudioPortExt::Tag;
     return std::find_if(mPortConfigs.begin(), mPortConfigs.end(),
             [&](const auto& pair) {
@@ -1721,7 +1755,8 @@ DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(
                         "%s: stored mix port config is not fully specified: %s",
                         __func__, p.toString().c_str());
                 return p.ext.getTag() == Tag::mix &&
-                        isConfigEqualToPortConfig(config, p) &&
+                        (!config.has_value() ||
+                                isConfigEqualToPortConfig(config.value(), p)) &&
                         (!flags.has_value() || p.flags.value() == flags.value()) &&
                         p.ext.template get<Tag::mix>().handle == ioHandle; });
 }
@@ -1846,6 +1881,25 @@ status_t DeviceHalAidl::updateRoutes() {
         }
     }
     return OK;
+}
+
+status_t DeviceHalAidl::getAudioPort(int32_t portId, AudioPort* port) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (!mModule) {
+        return NO_INIT;
+    }
+    const status_t status = statusTFromBinderStatus(mModule->getAudioPort(portId, port));
+    if (status == OK) {
+        auto portIt = mPorts.find(portId);
+        if (portIt != mPorts.end()) {
+            portIt->second = *port;
+        } else {
+            ALOGW("%s, port(%d) returned successfully from the HAL but not it is not cached",
+                  __func__, portId);
+        }
+    }
+    return status;
 }
 
 void DeviceHalAidl::clearCallbacks(void* cookie) {

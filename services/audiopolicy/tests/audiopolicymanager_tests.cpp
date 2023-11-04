@@ -1442,6 +1442,7 @@ void AudioPolicyManagerTestForHdmi::SetUp() {
     ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTest::SetUp());
     mClient->addSupportedFormat(AUDIO_FORMAT_AC3);
     mClient->addSupportedFormat(AUDIO_FORMAT_E_AC3);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
     mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
             "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT);
@@ -1567,13 +1568,13 @@ TEST_P(AudioPolicyManagerTestForHdmi,
     mManager->setForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
 
-    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(GetParam(), false /*enabled*/));
-    auto formats = getFormatsFromPorts();
-    ASSERT_EQ(0, formats.count(GetParam()));
-
     ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(GetParam(), true /*enabled*/));
-    formats = getFormatsFromPorts();
+    auto formats = getFormatsFromPorts();
     ASSERT_EQ(1, formats.count(GetParam()));
+
+    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(GetParam(), false /*enabled*/));
+    formats = getFormatsFromPorts();
+    ASSERT_EQ(0, formats.count(GetParam()));
 }
 
 TEST_P(AudioPolicyManagerTestForHdmi,

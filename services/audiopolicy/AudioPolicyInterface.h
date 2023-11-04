@@ -578,6 +578,10 @@ public:
                                              media::DeviceConnectedState state) = 0;
 
     virtual status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) = 0;
+
+    // Get the attributes of the mix port when connecting to the given device port.
+    virtual status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                     struct audio_port_v7 *mixPort) = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager

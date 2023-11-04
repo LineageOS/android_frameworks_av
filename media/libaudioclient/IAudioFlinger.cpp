@@ -902,6 +902,22 @@ status_t AudioFlingerClientAdapter::getAudioPolicyConfig(media::AudioPolicyConfi
     return NO_ERROR;
 }
 
+status_t AudioFlingerClientAdapter::getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                                    struct audio_port_v7 *mixPort) const {
+    if (devicePort == nullptr || mixPort == nullptr) {
+        return BAD_VALUE;
+    }
+    media::AudioPortFw devicePortAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPortFw(*devicePort));
+    media::AudioPortFw mixPortAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_v7_AudioPortFw(*mixPort));
+    media::AudioPortFw aidlRet;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            mDelegate->getAudioMixPort(devicePortAidl, mixPortAidl, &aidlRet)));
+    *mixPort = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortFw_audio_port_v7(aidlRet));
+    return OK;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1446,6 +1462,18 @@ Status AudioFlingerServerAdapter::invalidateTracks(const std::vector<int32_t>& p
 
 Status AudioFlingerServerAdapter::getAudioPolicyConfig(media::AudioPolicyConfig* _aidl_return) {
     return Status::fromStatusT(mDelegate->getAudioPolicyConfig(_aidl_return));
+}
+
+Status AudioFlingerServerAdapter::getAudioMixPort(const media::AudioPortFw &devicePort,
+                                                  const media::AudioPortFw &mixPort,
+                                                  media::AudioPortFw *_aidl_return) {
+    audio_port_v7 devicePortLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_AudioPortFw_audio_port_v7(devicePort));
+    audio_port_v7 mixPortLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_AudioPortFw_audio_port_v7(mixPort));
+    RETURN_BINDER_IF_ERROR(mDelegate->getAudioMixPort(&devicePortLegacy, &mixPortLegacy));
+    *_aidl_return = VALUE_OR_RETURN_BINDER(legacy2aidl_audio_port_v7_AudioPortFw(mixPortLegacy));
+    return Status::ok();
 }
 
 } // namespace android

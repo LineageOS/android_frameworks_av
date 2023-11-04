@@ -174,5 +174,6 @@ cc_fuzz {
         cc: [
             "wonsik@google.com",
         ],
+        triage_assignee: "waghpawan@google.com",
     },
 }

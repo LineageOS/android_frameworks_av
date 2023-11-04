@@ -304,7 +304,12 @@ status_t DeviceHalHidl::openOutputStream(
                 }
                 HidlUtils::audioConfigToHal(suggestedConfig, config);
             });
-    return processReturn("openOutputStream", ret, retval);
+    const status_t status = processReturn("openOutputStream", ret, retval);
+    cleanupStreams();
+    if (status == NO_ERROR) {
+        mStreams.insert({handle, *outStream});
+    }
+    return status;
 }
 
 status_t DeviceHalHidl::openInputStream(
@@ -377,7 +382,12 @@ status_t DeviceHalHidl::openInputStream(
                 }
                 HidlUtils::audioConfigToHal(suggestedConfig, config);
             });
-    return processReturn("openInputStream", ret, retval);
+    const status_t status = processReturn("openInputStream", ret, retval);
+    cleanupStreams();
+    if (status == NO_ERROR) {
+        mStreams.insert({handle, *inStream});
+    }
+    return status;
 }
 
 status_t DeviceHalHidl::supportsAudioPatches(bool *supportsPatches) {
@@ -706,4 +716,126 @@ status_t DeviceHalHidl::supportsBluetoothVariableLatency(bool* supports) {
     *supports = trueOrFalse == AudioParameter::valueTrue;
     return NO_ERROR;
 }
+
+namespace {
+
+status_t getParametersFromStream(
+        sp<StreamHalInterface> stream,
+        const char* parameters,
+        const char* extraParameters,
+        String8* reply) {
+    String8 request(parameters);
+    if (extraParameters != nullptr) {
+        request.append(";");
+        request.append(extraParameters);
+    }
+    status_t status = stream->getParameters(request, reply);
+    if (status != NO_ERROR) {
+        ALOGW("%s, failed to query %s, status=%d", __func__, parameters, status);
+        return status;
+    }
+    AudioParameter repliedParameters(*reply);
+    status = repliedParameters.get(String8(parameters), *reply);
+    if (status != NO_ERROR) {
+        ALOGW("%s: failed to retrieve %s, bailing out", __func__, parameters);
+    }
+    return status;
+}
+
+} // namespace
+
+status_t DeviceHalHidl::getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                        struct audio_port_v7 *mixPort) {
+    // For HIDL HAL, querying mix port information is not supported. If the HAL supports
+    // `getAudioPort` API to query the device port attributes, use the structured audio profiles
+    // that have the same attributes reported by the `getParameters` API. Otherwise, only use
+    // the attributes reported by `getParameters` API.
+    struct audio_port_v7 temp = *devicePort;
+    AudioProfileAttributesMultimap attrsFromDevice;
+    status_t status = getAudioPort(&temp);
+    if (status == NO_ERROR) {
+        attrsFromDevice = createAudioProfilesAttrMap(temp.audio_profiles, 0 /*first*/,
+                                                     temp.num_audio_profiles);
+    }
+    auto streamIt = mStreams.find(mixPort->ext.mix.handle);
+    if (streamIt == mStreams.end()) {
+        return BAD_VALUE;
+    }
+    auto stream = streamIt->second.promote();
+    if (stream == nullptr) {
+        return BAD_VALUE;
+    }
+
+    String8 formatsStr;
+    status = getParametersFromStream(
+            stream, AudioParameter::keyStreamSupportedFormats, nullptr /*extraParameters*/,
+            &formatsStr);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    FormatVector formats = formatsFromString(formatsStr.c_str());
+
+    mixPort->num_audio_profiles = 0;
+    for (audio_format_t format : formats) {
+        if (mixPort->num_audio_profiles >= AUDIO_PORT_MAX_AUDIO_PROFILES) {
+            ALOGW("%s, too many audio profiles", __func__);
+            break;
+        }
+        AudioParameter formatParameter;
+        formatParameter.addInt(String8(AudioParameter::keyFormat), format);
+
+        String8 samplingRatesStr;
+        status = getParametersFromStream(
+                stream, AudioParameter::keyStreamSupportedSamplingRates,
+                formatParameter.toString(), &samplingRatesStr);
+        if (status != NO_ERROR) {
+            // Failed to query supported sample rate for current format, may succeed with
+            // other formats.
+            ALOGW("Skip adding format=%#x, status=%d", format, status);
+            continue;
+        }
+        SampleRateSet sampleRatesFromStream = samplingRatesFromString(samplingRatesStr.c_str());
+        if (sampleRatesFromStream.empty()) {
+            ALOGW("Skip adding format=%#x as the returned sampling rates are empty", format);
+            continue;
+        }
+        String8 channelMasksStr;
+        status = getParametersFromStream(
+                stream, AudioParameter::keyStreamSupportedChannels,
+                formatParameter.toString(), &channelMasksStr);
+        if (status != NO_ERROR) {
+            // Failed to query supported channel masks for current format, may succeed with
+            // other formats.
+            ALOGW("Skip adding format=%#x, status=%d", format, status);
+            continue;
+        }
+        ChannelMaskSet channelMasksFromStream = channelMasksFromString(channelMasksStr.c_str());
+        if (channelMasksFromStream.empty()) {
+            ALOGW("Skip adding format=%#x as the returned channel masks are empty", format);
+            continue;
+        }
+
+        // For an audio format, all audio profiles from the device port with the same format will
+        // be added to mix port after filtering sample rates, channel masks according to the reply
+        // of getParameters API. If there is any sample rate or channel mask reported by
+        // getParameters API but not reported by the device, additional audio profiles will be
+        // added.
+        populateAudioProfiles(attrsFromDevice, format, channelMasksFromStream,
+                              sampleRatesFromStream, mixPort->audio_profiles,
+                              &mixPort->num_audio_profiles);
+    }
+
+    return NO_ERROR;
+}
+
+void DeviceHalHidl::cleanupStreams() {
+    for (auto it = mStreams.begin(); it != mStreams.end();) {
+        if (it->second.promote() == nullptr) {
+            it = mStreams.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 } // namespace android

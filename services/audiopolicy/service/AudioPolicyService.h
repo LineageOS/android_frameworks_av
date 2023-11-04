@@ -863,6 +863,9 @@ private:
 
         status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
 
+        status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                 struct audio_port_v7 *port) override;
+
      private:
         AudioPolicyService *mAudioPolicyService;
     };

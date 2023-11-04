@@ -385,6 +385,9 @@ public:
     virtual status_t supportsBluetoothVariableLatency(bool* support) const = 0;
 
     virtual status_t getAudioPolicyConfig(media::AudioPolicyConfig* output) = 0;
+
+    virtual status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                     struct audio_port_v7 *mixPort) const = 0;
 };
 
 /**
@@ -499,6 +502,8 @@ public:
                                    sp<media::ISoundDose>* soundDose) const override;
     status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) override;
     status_t getAudioPolicyConfig(media::AudioPolicyConfig* output) override;
+    status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
+                             struct audio_port_v7 *mixPort) const override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -600,6 +605,7 @@ public:
             INVALIDATE_TRACKS = media::BnAudioFlingerService::TRANSACTION_invalidateTracks,
             GET_AUDIO_POLICY_CONFIG =
                     media::BnAudioFlingerService::TRANSACTION_getAudioPolicyConfig,
+            GET_AUDIO_MIX_PORT = media::BnAudioFlingerService::TRANSACTION_getAudioMixPort,
         };
 
     protected:
@@ -733,6 +739,9 @@ public:
                                  sp<media::ISoundDose>* _aidl_return) override;
     Status invalidateTracks(const std::vector<int32_t>& portIds) override;
     Status getAudioPolicyConfig(media::AudioPolicyConfig* _aidl_return) override;
+    Status getAudioMixPort(const media::AudioPortFw& devicePort,
+                           const media::AudioPortFw& mixPort,
+                           media::AudioPortFw* _aidl_return) override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };
