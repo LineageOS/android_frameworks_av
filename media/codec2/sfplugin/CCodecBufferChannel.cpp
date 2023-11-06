@@ -598,6 +598,8 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
     size_t bufferSize = 0;
     c2_status_t blockRes = C2_OK;
     bool copied = false;
+    ScopedTrace trace(ATRACE_TAG, android::base::StringPrintf(
+            "CCodecBufferChannel::decrypt(%s)", mName).c_str());
     if (mSendEncryptedInfoBuffer) {
         static const C2MemoryUsage kDefaultReadWriteUsage{
             C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
