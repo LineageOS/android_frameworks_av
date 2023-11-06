@@ -79,6 +79,7 @@ device_out_group_t LastRemovableMediaDevices::getDeviceOutGroup(audio_devices_t 
     case AUDIO_DEVICE_OUT_USB_ACCESSORY:
     case AUDIO_DEVICE_OUT_USB_DEVICE:
     case AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET:
+    case AUDIO_DEVICE_OUT_AUX_DIGITAL:
         return GROUP_WIRED;
     case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
     case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
