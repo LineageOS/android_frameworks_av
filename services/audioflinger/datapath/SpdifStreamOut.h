@@ -25,6 +25,7 @@
 
 #include "AudioStreamOut.h"
 
+#include <afutils/NBAIO_Tee.h>
 #include <audio_utils/spdif/SPDIFEncoder.h>
 
 namespace android {
@@ -115,6 +116,10 @@ private:
 
     ssize_t  writeDataBurst(const void* data, size_t bytes);
     ssize_t  writeInternal(const void* buffer, size_t bytes);
+
+#ifdef TEE_SINK
+    NBAIO_Tee mTee;
+#endif
 
 };
 
