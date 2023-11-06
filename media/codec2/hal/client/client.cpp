@@ -16,8 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "Codec2Client"
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <android-base/logging.h>
-
+#include <utils/Trace.h>
 #include <codec2/hidl/client.h>
 #include <C2Debug.h>
 #include <C2BufferPriv.h>
@@ -2324,6 +2325,7 @@ status_t Codec2Client::Component::queueToOutputSurface(
         const C2ConstGraphicBlock& block,
         const QueueBufferInput& input,
         QueueBufferOutput* output) {
+    ScopedTrace trace(ATRACE_TAG,"Codec2Client::Component::queueToOutputSurface");
     return mOutputBufferQueue->outputBuffer(block, input, output);
 }
 

@@ -16,7 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2Buffer"
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <list>
 #include <map>
@@ -33,6 +35,7 @@
 
 namespace {
 
+using android::ScopedTrace;
 using android::C2AllocatorBlob;
 using android::C2AllocatorGralloc;
 using android::C2AllocatorIon;
@@ -1159,6 +1162,7 @@ c2_status_t C2PooledBlockPool::fetchLinearBlock(
         uint32_t capacity,
         C2MemoryUsage usage,
         std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
+    ScopedTrace trace(ATRACE_TAG,"C2PooledBlockPool::fetchLinearBlock");
     if (mBufferPoolVer == VER_HIDL && mImpl) {
         return mImpl->fetchLinearBlock(capacity, usage, block);
     }
@@ -1174,6 +1178,7 @@ c2_status_t C2PooledBlockPool::fetchGraphicBlock(
         uint32_t format,
         C2MemoryUsage usage,
         std::shared_ptr<C2GraphicBlock> *block) {
+    ScopedTrace trace(ATRACE_TAG,"C2PooledBlockPool::fetchGraphicBlock");
     if (mBufferPoolVer == VER_HIDL && mImpl) {
         return mImpl->fetchGraphicBlock(width, height, format, usage, block);
     }
