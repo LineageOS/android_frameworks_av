@@ -221,9 +221,9 @@ AMediaFormat* AMediaExtractor_getFileFormat(AMediaExtractor*) __INTRODUCED_IN(28
  * available (end of stream). This API can be used in in conjunction with
  * AMediaExtractor_readSampleData:
  *
- * ssize_t sampleSize = AMediaExtractor_getSampleSize(ex);
+ * <pre>ssize_t sampleSize = AMediaExtractor_getSampleSize(ex);
  * uint8_t *buf = new uint8_t[sampleSize];
- * AMediaExtractor_readSampleData(ex, buf, sampleSize);
+ * AMediaExtractor_readSampleData(ex, buf, sampleSize);</pre>
  *
  * Available since API level 28.
  */
@@ -245,13 +245,13 @@ ssize_t AMediaExtractor_getSampleSize(AMediaExtractor*) __INTRODUCED_IN(28);
 int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *) __INTRODUCED_IN(28);
 
 /**
- * Read the current sample's metadata format into |fmt|. Examples of sample metadata are
+ * Read the current sample's metadata format into `fmt`. Examples of sample metadata are
  * SEI (supplemental enhancement information) and MPEG user data, both of which can embed
  * closed-caption data.
  *
  * Returns AMEDIA_OK on success or AMEDIA_ERROR_* to indicate failure reason.
- * Existing key-value pairs in |fmt| would be removed if this API returns AMEDIA_OK.
- * The contents of |fmt| is undefined if this API returns AMEDIA_ERROR_*.
+ * Existing key-value pairs in `fmt` would be removed if this API returns AMEDIA_OK.
+ * The contents of `fmt` is undefined if this API returns AMEDIA_ERROR_*.
  *
  * Available since API level 28.
  */
