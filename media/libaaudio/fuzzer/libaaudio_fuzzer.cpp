@@ -20,7 +20,7 @@
 #include <fuzzer/FuzzedDataProvider.h>
 
 constexpr int32_t kRandomStringLength = 256;
-
+constexpr int32_t kMaxRuns = 100;
 constexpr int64_t kNanosPerMillisecond = 1000 * 1000;
 
 constexpr aaudio_direction_t kDirections[] = {
@@ -97,6 +97,7 @@ class LibAaudioFuzzer {
 public:
   ~LibAaudioFuzzer() { deInit(); }
   bool init();
+  void invokeAAudioSetAPIs(FuzzedDataProvider &fdp);
   void process(const uint8_t *data, size_t size);
   void deInit();
 
@@ -113,160 +114,208 @@ bool LibAaudioFuzzer::init() {
   return true;
 }
 
-void LibAaudioFuzzer::process(const uint8_t *data, size_t size) {
-  FuzzedDataProvider fdp(data, size);
-  aaudio_performance_mode_t mode =
-      fdp.PickValueInArray({fdp.PickValueInArray(kPerformanceModes),
-                            fdp.ConsumeIntegral<int32_t>()});
+void LibAaudioFuzzer::invokeAAudioSetAPIs(FuzzedDataProvider &fdp){
+  aaudio_performance_mode_t mode = fdp.PickValueInArray(
+          {fdp.PickValueInArray(kPerformanceModes), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setPerformanceMode(mAaudioBuilder, mode);
 
-  int32_t deviceId = fdp.PickValueInArray(
-      {AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
+  int32_t deviceId = fdp.PickValueInArray({AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setDeviceId(mAaudioBuilder, deviceId);
 
-  std::string packageName = fdp.PickValueInArray<std::string>(
-      {"android.nativemedia.aaudio", "android.app.appops.cts",
-       fdp.ConsumeRandomLengthString(kRandomStringLength)});
+  std::string packageName =
+          fdp.PickValueInArray<std::string>({"android.nativemedia.aaudio", "android.app.appops.cts",
+                                             fdp.ConsumeRandomLengthString(kRandomStringLength)});
   AAudioStreamBuilder_setPackageName(mAaudioBuilder, packageName.c_str());
 
-  std::string attributionTag =
-      fdp.ConsumeRandomLengthString(kRandomStringLength);
+  std::string attributionTag = fdp.ConsumeRandomLengthString(kRandomStringLength);
   AAudioStreamBuilder_setAttributionTag(mAaudioBuilder, attributionTag.c_str());
 
   int32_t sampleRate = fdp.PickValueInArray(kSampleRates);
   AAudioStreamBuilder_setSampleRate(mAaudioBuilder, sampleRate);
 
-  int32_t channelCount = fdp.PickValueInArray(
-      {AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
+  int32_t channelCount = fdp.PickValueInArray({AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setChannelCount(mAaudioBuilder, channelCount);
 
-  aaudio_direction_t direction = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kDirections), fdp.ConsumeIntegral<int32_t>()});
+  aaudio_direction_t direction =
+          fdp.PickValueInArray({fdp.PickValueInArray(kDirections), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setDirection(mAaudioBuilder, direction);
 
-  aaudio_format_t format = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kFormats), fdp.ConsumeIntegral<int32_t>()});
+  aaudio_format_t format =
+          fdp.PickValueInArray({fdp.PickValueInArray(kFormats), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setFormat(mAaudioBuilder, format);
 
   aaudio_sharing_mode_t sharingMode = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kSharingModes), fdp.ConsumeIntegral<int32_t>()});
+          {fdp.PickValueInArray(kSharingModes), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setSharingMode(mAaudioBuilder, sharingMode);
 
-  aaudio_usage_t usage = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kUsages), fdp.ConsumeIntegral<int32_t>()});
+  aaudio_usage_t usage =
+          fdp.PickValueInArray({fdp.PickValueInArray(kUsages), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setUsage(mAaudioBuilder, usage);
 
   aaudio_content_type_t contentType = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kContentTypes), fdp.ConsumeIntegral<int32_t>()});
+          {fdp.PickValueInArray(kContentTypes), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setContentType(mAaudioBuilder, contentType);
 
   aaudio_input_preset_t inputPreset = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kInputPresets), fdp.ConsumeIntegral<int32_t>()});
+          {fdp.PickValueInArray(kInputPresets), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setInputPreset(mAaudioBuilder, inputPreset);
 
   bool privacySensitive = fdp.ConsumeBool();
   AAudioStreamBuilder_setPrivacySensitive(mAaudioBuilder, privacySensitive);
 
-  int32_t frames = fdp.PickValueInArray(
-      {AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
+  int32_t frames = fdp.PickValueInArray({AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setBufferCapacityInFrames(mAaudioBuilder, frames);
 
-  aaudio_allowed_capture_policy_t allowedCapturePolicy =
-      fdp.PickValueInArray({fdp.PickValueInArray(kAllowedCapturePolicies),
-                            fdp.ConsumeIntegral<int32_t>()});
-  AAudioStreamBuilder_setAllowedCapturePolicy(mAaudioBuilder,
-                                              allowedCapturePolicy);
+  aaudio_allowed_capture_policy_t allowedCapturePolicy = fdp.PickValueInArray(
+          {fdp.PickValueInArray(kAllowedCapturePolicies), fdp.ConsumeIntegral<int32_t>()});
+  AAudioStreamBuilder_setAllowedCapturePolicy(mAaudioBuilder, allowedCapturePolicy);
 
-  aaudio_session_id_t sessionId = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kSessionIds), fdp.ConsumeIntegral<int32_t>()});
+  aaudio_session_id_t sessionId =
+          fdp.PickValueInArray({fdp.PickValueInArray(kSessionIds), fdp.ConsumeIntegral<int32_t>()});
   AAudioStreamBuilder_setSessionId(mAaudioBuilder, sessionId);
 
   AAudioStreamBuilder_setDataCallback(mAaudioBuilder, nullptr, nullptr);
   AAudioStreamBuilder_setErrorCallback(mAaudioBuilder, nullptr, nullptr);
 
-  int32_t framesPerDataCallback = fdp.PickValueInArray(
-      {AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
-  AAudioStreamBuilder_setFramesPerDataCallback(mAaudioBuilder,
-                                               framesPerDataCallback);
+  int32_t framesPerDataCallback =
+          fdp.PickValueInArray({AAUDIO_UNSPECIFIED, fdp.ConsumeIntegral<int32_t>()});
+  AAudioStreamBuilder_setFramesPerDataCallback(mAaudioBuilder, framesPerDataCallback);
 
-  aaudio_policy_t policy = fdp.PickValueInArray(
-      {fdp.PickValueInArray(kPolicies), fdp.ConsumeIntegral<int32_t>()});
+  aaudio_policy_t policy =
+          fdp.PickValueInArray({fdp.PickValueInArray(kPolicies), fdp.ConsumeIntegral<int32_t>()});
   AAudio_setMMapPolicy(policy);
-  (void)AAudio_getMMapPolicy();
+}
 
-  aaudio_result_t result =
-      AAudioStreamBuilder_openStream(mAaudioBuilder, &mAaudioStream);
+void LibAaudioFuzzer::process(const uint8_t *data, size_t size) {
+  FuzzedDataProvider fdp(data, size);
+  int32_t maxFrames = 0;
+  int32_t count = 0;
+  aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
+
+  invokeAAudioSetAPIs(fdp);
+
+  aaudio_result_t result = AAudioStreamBuilder_openStream(mAaudioBuilder, &mAaudioStream);
   if ((result != AAUDIO_OK) || (!mAaudioStream)) {
     return;
   }
+  /* The 'runs' variable serves to set an upper limit on the loop iterations, preventing excessive
+   * execution.
+   */
+  int32_t runs = kMaxRuns;
+  while (fdp.remaining_bytes() > 0 && --runs) {
+    auto AAudioapi = fdp.PickValueInArray<const std::function<void()>>({
+            [&]() { (void)AAudio_getMMapPolicy(); },
 
-  int32_t framesPerBurst = AAudioStream_getFramesPerBurst(mAaudioStream);
-  uint8_t numberOfBursts = fdp.ConsumeIntegral<uint8_t>();
-  int32_t maxFrames = numberOfBursts * framesPerBurst;
-  int32_t requestedBufferSize =
-      fdp.ConsumeIntegral<uint16_t>() * framesPerBurst;
-  AAudioStream_setBufferSizeInFrames(mAaudioStream, requestedBufferSize);
+            [&]() {
+                int32_t framesPerBurst = AAudioStream_getFramesPerBurst(mAaudioStream);
+                uint8_t numberOfBursts = fdp.ConsumeIntegral<uint8_t>();
+                maxFrames = numberOfBursts * framesPerBurst;
+                int32_t requestedBufferSize = fdp.ConsumeIntegral<uint16_t>() * framesPerBurst;
+                AAudioStream_setBufferSizeInFrames(mAaudioStream, requestedBufferSize);
+            },
+            [&]() {
+                int64_t position = 0, nanoseconds = 0;
+                AAudioStream_getTimestamp(mAaudioStream, CLOCK_MONOTONIC, &position, &nanoseconds);
+            },
+            [&]() {
+                AAudioStream_requestStart(mAaudioStream);
+            },
+            [&]() {
+                AAudioStream_requestPause(mAaudioStream);
+            },
+            [&]() {
+                AAudioStream_requestFlush(mAaudioStream);
+            },
+            [&]() {
+                AAudioStream_requestStop(mAaudioStream);
+            },
+            [&]() {
+                aaudio_format_t actualFormat = AAudioStream_getFormat(mAaudioStream);
+                int32_t actualChannelCount = AAudioStream_getChannelCount(mAaudioStream);
 
-  int64_t position = 0, nanoseconds = 0;
-  AAudioStream_getTimestamp(mAaudioStream, CLOCK_MONOTONIC, &position,
-                            &nanoseconds);
+                count = fdp.ConsumeIntegral<int32_t>();
+                aaudio_direction_t direction = AAudioStream_getDirection(mAaudioStream);
 
-  AAudioStream_requestStart(mAaudioStream);
-
-  aaudio_format_t actualFormat = AAudioStream_getFormat(mAaudioStream);
-  int32_t actualChannelCount = AAudioStream_getChannelCount(mAaudioStream);
-
-  int32_t count = fdp.ConsumeIntegral<int32_t>();
-  direction = AAudioStream_getDirection(mAaudioStream);
-
-  if (actualFormat == AAUDIO_FORMAT_PCM_I16) {
-      std::vector<int16_t> inputShortData(maxFrames * actualChannelCount, 0x0);
-      if (direction == AAUDIO_DIRECTION_INPUT) {
-          AAudioStream_read(mAaudioStream, inputShortData.data(), maxFrames,
-                            count * kNanosPerMillisecond);
-    } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
-        AAudioStream_write(mAaudioStream, inputShortData.data(), maxFrames,
-                           count * kNanosPerMillisecond);
-    }
-  } else if (actualFormat == AAUDIO_FORMAT_PCM_FLOAT) {
-      std::vector<float> inputFloatData(maxFrames * actualChannelCount, 0x0);
-      if (direction == AAUDIO_DIRECTION_INPUT) {
-          AAudioStream_read(mAaudioStream, inputFloatData.data(), maxFrames,
-                            count * kNanosPerMillisecond);
-    } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
-        AAudioStream_write(mAaudioStream, inputFloatData.data(), maxFrames,
-                           count * kNanosPerMillisecond);
-    }
+                if (actualFormat == AAUDIO_FORMAT_PCM_I16) {
+                    std::vector<int16_t> inputShortData(maxFrames * actualChannelCount, 0x0);
+                    if (direction == AAUDIO_DIRECTION_INPUT) {
+                        AAudioStream_read(mAaudioStream, inputShortData.data(), maxFrames,
+                                          count * kNanosPerMillisecond);
+                    } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
+                        AAudioStream_write(mAaudioStream, inputShortData.data(), maxFrames,
+                                           count * kNanosPerMillisecond);
+                    }
+                } else if (actualFormat == AAUDIO_FORMAT_PCM_FLOAT) {
+                    std::vector<float> inputFloatData(maxFrames * actualChannelCount, 0x0);
+                    if (direction == AAUDIO_DIRECTION_INPUT) {
+                        AAudioStream_read(mAaudioStream, inputFloatData.data(), maxFrames,
+                                          count * kNanosPerMillisecond);
+                    } else if (direction == AAUDIO_DIRECTION_OUTPUT) {
+                        AAudioStream_write(mAaudioStream, inputFloatData.data(), maxFrames,
+                                           count * kNanosPerMillisecond);
+                    }
+                }
+            },
+            [&]() {
+                AAudioStream_waitForStateChange(mAaudioStream, AAUDIO_STREAM_STATE_UNKNOWN, &state,
+                                                count * kNanosPerMillisecond);
+            },
+            [&]() { (void)AAudio_convertStreamStateToText(state); },
+            [&]() {
+                (void)AAudioStream_getState(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getUsage(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getSamplesPerFrame(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getContentType(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getInputPreset(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_isPrivacySensitive(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getAllowedCapturePolicy(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getPerformanceMode(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getDeviceId(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getSharingMode(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getSessionId(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getFramesRead(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getXRunCount(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getFramesWritten(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getBufferCapacityInFrames(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_getBufferSizeInFrames(mAaudioStream);
+            },
+            [&]() {
+                (void)AAudioStream_isMMapUsed(mAaudioStream);
+            },
+    });
+    AAudioapi();
   }
-
-  aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
-  AAudioStream_waitForStateChange(mAaudioStream, AAUDIO_STREAM_STATE_UNKNOWN,
-                                  &state, count * kNanosPerMillisecond);
-  (void)AAudio_convertStreamStateToText(state);
-
-  (void)AAudioStream_getUsage(mAaudioStream);
-  (void)AAudioStream_getSampleRate(mAaudioStream);
-  (void)AAudioStream_getState(mAaudioStream);
-  (void)AAudioStream_getSamplesPerFrame(mAaudioStream);
-  (void)AAudioStream_getContentType(mAaudioStream);
-  (void)AAudioStream_getInputPreset(mAaudioStream);
-  (void)AAudioStream_isPrivacySensitive(mAaudioStream);
-  (void)AAudioStream_getAllowedCapturePolicy(mAaudioStream);
-  (void)AAudioStream_getPerformanceMode(mAaudioStream);
-  (void)AAudioStream_getDeviceId(mAaudioStream);
-  (void)AAudioStream_getSharingMode(mAaudioStream);
-  (void)AAudioStream_getSessionId(mAaudioStream);
-  (void)AAudioStream_getFramesRead(mAaudioStream);
-  (void)AAudioStream_getFramesWritten(mAaudioStream);
-  (void)AAudioStream_getXRunCount(mAaudioStream);
-  (void)AAudioStream_getBufferCapacityInFrames(mAaudioStream);
-  (void)AAudioStream_getBufferSizeInFrames(mAaudioStream);
-  (void)AAudioStream_isMMapUsed(mAaudioStream);
-
-  AAudioStream_requestPause(mAaudioStream);
-  AAudioStream_requestFlush(mAaudioStream);
   AAudioStream_release(mAaudioStream);
-  AAudioStream_requestStop(mAaudioStream);
 }
 
 void LibAaudioFuzzer::deInit() {
