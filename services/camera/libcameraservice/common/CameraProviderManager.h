@@ -683,7 +683,7 @@ private:
             SystemCameraKind getSystemCameraKind();
             status_t fixupMonochromeTags();
             status_t fixupTorchStrengthTags();
-            status_t fixupManualFlashStrengthControlTags();
+            status_t fixupManualFlashStrengthControlTags(CameraMetadata& ch);
             status_t addDynamicDepthTags(bool maxResolution = false);
             status_t deriveHeicTags(bool maxResolution = false);
             status_t deriveJpegRTags(bool maxResolution = false);
