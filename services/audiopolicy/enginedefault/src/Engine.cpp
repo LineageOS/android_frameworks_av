@@ -299,7 +299,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                             // excluding HEARING_AID and BLE_HEADSET because Dialer uses
                             // setCommunicationDevice to select them explicitly
                             AUDIO_DEVICE_OUT_HEARING_AID,
-                            AUDIO_DEVICE_OUT_BLE_HEADSET
+                            AUDIO_DEVICE_OUT_BLE_HEADSET,
+                            AUDIO_DEVICE_OUT_AUX_DIGITAL
                             }));
         if (!devices.isEmpty()) break;
         devices = availableOutputDevices.getFirstDevicesFromTypes({
@@ -402,19 +403,20 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         }
 
         if (devices2.isEmpty() && (getLastRemovableMediaDevices().size() > 0)) {
+            std::vector<audio_devices_t> excludedDevices;
+            // no sonification on aux digital (e.g. HDMI)
+            if (strategy == STRATEGY_SONIFICATION) {
+                excludedDevices.push_back(AUDIO_DEVICE_OUT_AUX_DIGITAL);
+            }
             if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
                 // Get the last connected device of wired and bluetooth a2dp
                 devices2 = availableOutputDevices.getFirstDevicesFromTypes(
-                        getLastRemovableMediaDevices());
+                        getLastRemovableMediaDevices(GROUP_NONE, excludedDevices));
             } else {
                 // Get the last connected device of wired except bluetooth a2dp
                 devices2 = availableOutputDevices.getFirstDevicesFromTypes(
-                        getLastRemovableMediaDevices(GROUP_WIRED));
+                        getLastRemovableMediaDevices(GROUP_WIRED, excludedDevices));
             }
-        }
-        if ((devices2.isEmpty()) && (strategy != STRATEGY_SONIFICATION)) {
-            // no sonification on aux digital (e.g. HDMI)
-            devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_AUX_DIGITAL);
         }
         if ((devices2.isEmpty()) &&
                 (getForceUse(AUDIO_POLICY_FORCE_FOR_DOCK) == AUDIO_POLICY_FORCE_ANALOG_DOCK)) {
