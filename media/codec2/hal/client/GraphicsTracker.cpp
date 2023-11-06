@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+//#define LOG_NDEBUG 0
+#define LOG_TAG "GraphicsTracker"
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -73,11 +75,19 @@ GraphicsTracker::BufferItem::BufferItem(
 }
 
 GraphicsTracker::BufferItem::BufferItem(
-        uint32_t generation,
-        AHardwareBuffer_Desc *desc, AHardwareBuffer *pBuf) :
+        uint32_t generation, AHardwareBuffer *pBuf, uint64_t usage) :
         mInit{true}, mGeneration{generation}, mSlot{-1},
-        mBuf{pBuf}, mUsage{::android::AHardwareBuffer_convertToGrallocUsageBits(desc->usage)},
+        mBuf{pBuf}, mUsage{usage},
         mFence{Fence::NO_FENCE} {
+    if (__builtin_available(android __ANDROID_API_T__, *)) {
+        int ret = AHardwareBuffer_getId(mBuf, &mId);
+        if (ret != ::android::OK) {
+            mInit = false;
+            mBuf = nullptr;
+            return;
+        }
+    }
+    AHardwareBuffer_acquire(mBuf);
 }
 
 GraphicsTracker::BufferItem::~BufferItem() {
@@ -86,7 +96,8 @@ GraphicsTracker::BufferItem::~BufferItem() {
     }
 }
 
-sp<GraphicBuffer> GraphicsTracker::BufferItem::updateBuffer(
+
+std::shared_ptr<GraphicsTracker::BufferItem> GraphicsTracker::BufferItem::migrateBuffer(
         uint64_t newUsage, uint32_t newGeneration) {
     if (!mInit) {
         return nullptr;
@@ -111,19 +122,26 @@ sp<GraphicBuffer> GraphicsTracker::BufferItem::updateBuffer(
         return nullptr;
     }
 
-    GraphicBuffer *gb = ::android::AHardwareBuffer_to_GraphicBuffer(newBuf);
-    if (!gb) {
-        AHardwareBuffer_release(newBuf);
+    std::shared_ptr<BufferItem> newBuffer =
+            std::make_shared<BufferItem>(newGeneration, newBuf, newUsage);
+    AHardwareBuffer_release(newBuf);
+    return newBuffer;
+}
+
+sp<GraphicBuffer> GraphicsTracker::BufferItem::getGraphicBuffer() {
+    if (!mInit) {
         return nullptr;
     }
-
-    gb->setGenerationNumber(newGeneration);
-    mUsage = newUsage;
-    mGeneration = newGeneration;
-    AHardwareBuffer_release(mBuf);
-    // acquire is already done when creating.
-    mBuf = newBuf;
+    GraphicBuffer *gb = ::android::AHardwareBuffer_to_GraphicBuffer(mBuf);
+    if (!gb) {
+        return nullptr;
+    }
+    gb->setGenerationNumber(mGeneration);
     return gb;
+}
+
+GraphicsTracker::BufferCache::~BufferCache() {
+    ALOGV("BufferCache destruction: generation(%d), igbp(%d)", mGeneration, (bool)mIgbp);
 }
 
 void GraphicsTracker::BufferCache::waitOnSlot(int slot) {
@@ -138,6 +156,7 @@ void GraphicsTracker::BufferCache::waitOnSlot(int slot) {
 
 void GraphicsTracker::BufferCache::blockSlot(int slot) {
     CHECK(0 <= slot && slot < kNumSlots);
+    ALOGV("block slot %d", slot);
     BlockedSlot *p = &mBlockedSlots[slot];
     std::unique_lock<std::mutex> l(p->l);
     p->blocked = true;
@@ -145,6 +164,7 @@ void GraphicsTracker::BufferCache::blockSlot(int slot) {
 
 void GraphicsTracker::BufferCache::unblockSlot(int slot) {
     CHECK(0 <= slot && slot < kNumSlots);
+    ALOGV("unblock slot %d", slot);
     BlockedSlot *p = &mBlockedSlots[slot];
     std::unique_lock<std::mutex> l(p->l);
     p->blocked = false;
@@ -153,7 +173,8 @@ void GraphicsTracker::BufferCache::unblockSlot(int slot) {
 }
 
 GraphicsTracker::GraphicsTracker(int maxDequeueCount)
-    : mMaxDequeue{maxDequeueCount}, mMaxDequeueRequested{maxDequeueCount},
+    : mBufferCache(new BufferCache()), mMaxDequeue{maxDequeueCount},
+    mMaxDequeueRequested{maxDequeueCount},
     mMaxDequeueCommitted{maxDequeueCount},
     mMaxDequeueRequestedSeqId{0UL}, mMaxDequeueCommittedSeqId{0ULL},
     mDequeueable{maxDequeueCount},
@@ -177,6 +198,7 @@ GraphicsTracker::GraphicsTracker(int maxDequeueCount)
     mWritePipeFd.reset(pipefd[1]);
 
     mEventQueueThread = std::thread([this](){processEvent();});
+    writeIncDequeueable(mDequeueable);
 
     CHECK(ret >= 0);
     CHECK(mEventQueueThread.joinable());
@@ -185,9 +207,6 @@ GraphicsTracker::GraphicsTracker(int maxDequeueCount)
 GraphicsTracker::~GraphicsTracker() {
     stop();
     if (mEventQueueThread.joinable()) {
-        std::unique_lock<std::mutex> l(mEventLock);
-        l.unlock();
-        mEventCv.notify_one();
         mEventQueueThread.join();
     }
 }
@@ -327,6 +346,7 @@ c2_status_t GraphicsTracker::configureMaxDequeueCount(int maxDequeueCount) {
 void GraphicsTracker::updateDequeueConf() {
     std::shared_ptr<BufferCache> cache;
     int dequeueCommit;
+    ALOGV("trying to update max dequeue count");
     std::unique_lock<std::mutex> cl(mConfigLock);
     {
         std::unique_lock<std::mutex> l(mLock);
@@ -374,6 +394,11 @@ void GraphicsTracker::updateDequeueConf() {
 
 }
 
+int GraphicsTracker::getCurDequeueable() {
+    std::unique_lock<std::mutex> l(mLock);
+    return mDequeueable;
+}
+
 void GraphicsTracker::stop() {
     bool expected = false;
     std::unique_lock<std::mutex> l(mEventLock);
@@ -381,6 +406,9 @@ void GraphicsTracker::stop() {
     if (updated) {
         int writeFd = mWritePipeFd.release();
         ::close(writeFd);
+        int readFd = mReadPipeFd.release();
+        ::close(readFd);
+        mEventCv.notify_one();
     }
 }
 
@@ -470,6 +498,7 @@ c2_status_t GraphicsTracker::requestAllocate(std::shared_ptr<BufferCache> *cache
         }
         if (ret == 0) {
             // writing end is closed
+            ALOGE("writing end for the waitable object seems to be closed");
             return C2_BAD_STATE;
         }
         mDequeueable--;
@@ -492,6 +521,7 @@ void GraphicsTracker::commitAllocate(c2_status_t res, const std::shared_ptr<Buff
             CHECK(it != cache->mBuffers.end());
             it->second->mFence = fence;
             *pBuffer = it->second;
+            ALOGV("an allocated buffer already cached, updated Fence");
         } else if (cache.get() == mBufferCache.get() && mBufferCache->mIgbp) {
             // Cache the buffer if it is allocated from the current IGBP
             CHECK(slot >= 0);
@@ -499,6 +529,7 @@ void GraphicsTracker::commitAllocate(c2_status_t res, const std::shared_ptr<Buff
             if (!ret.second) {
                 ret.first->second = *pBuffer;
             }
+            ALOGV("an allocated buffer not cached from the current IGBP");
         }
         uint64_t bid = (*pBuffer)->mId;
         auto mapRet = mDequeued.emplace(bid, *pBuffer);
@@ -520,7 +551,7 @@ void GraphicsTracker::commitAllocate(c2_status_t res, const std::shared_ptr<Buff
 // retrieved by commitAllocate();
 c2_status_t GraphicsTracker::_allocate(const std::shared_ptr<BufferCache> &cache,
                                       uint32_t width, uint32_t height, PixelFormat format,
-                                      int64_t usage,
+                                      uint64_t usage,
                                       bool *cached,
                                       int *rSlotId,
                                       sp<Fence> *rFence,
@@ -545,11 +576,21 @@ c2_status_t GraphicsTracker::_allocate(const std::shared_ptr<BufferCache> &cache
             return ret == ::android::NO_MEMORY ? C2_NO_MEMORY : C2_CORRUPTED;
         }
         *cached = false;
-        *buffer = std::make_shared<BufferItem>(generation, &desc, buf);
+        *rSlotId = -1;
+        *rFence = Fence::NO_FENCE;
+        *buffer = std::make_shared<BufferItem>(generation, buf, usage);
+        AHardwareBuffer_release(buf); // remove an acquire count from
+                                      // AHwb_allocate().
         if (!*buffer) {
-            AHardwareBuffer_release(buf);
+            ALOGE("direct allocation of AHB successful, but failed to create BufferItem");
             return C2_NO_MEMORY;
         }
+        if (!(*buffer)->mInit) {
+            ALOGE("direct allocation of AHB successful, but BufferItem init failed");
+            buffer->reset();
+            return C2_CORRUPTED;
+        }
+        ALOGV("allocate: direct allocate without igbp");
         return C2_OK;
     }
 
@@ -578,19 +619,29 @@ c2_status_t GraphicsTracker::_allocate(const std::shared_ptr<BufferCache> &cache
         sp<GraphicBuffer> realloced;
         status = igbp->requestBuffer(slotId, &realloced);
         if (status != ::android::OK) {
+            ALOGE("allocate by dequeueBuffer() successful, but requestBuffer() failed %d",
+                  status);
             igbp->cancelBuffer(slotId, fence);
             return C2_CORRUPTED;
         }
         *buffer = std::make_shared<BufferItem>(generation, slotId, realloced, fence);
+        if (!*buffer) {
+            ALOGE("allocate by dequeueBuffer() successful, but creating BufferItem failed");
+            igbp->cancelBuffer(slotId, fence);
+            return C2_NO_MEMORY;
+        }
         if (!(*buffer)->mInit) {
+            ALOGE("allocate by dequeueBuffer() successful, but BufferItem init failed");
             buffer->reset();
             igbp->cancelBuffer(slotId, fence);
             return C2_CORRUPTED;
         }
         *cached = false;
-        return C2_OK;
+    } else {
+        *cached = true;
     }
-    *cached = true;
+    ALOGV("allocate: a new allocated buffer from igbp cached %d, slot: %d",
+          *cached, slotId);
     *rSlotId = slotId;
     *rFence = fence;
     return C2_OK;
@@ -600,6 +651,7 @@ c2_status_t GraphicsTracker::allocate(
         uint32_t width, uint32_t height, PixelFormat format, uint64_t usage,
         AHardwareBuffer **buf, sp<Fence> *rFence) {
     if (mStopped.load() == true) {
+        ALOGE("cannot allocate due to being stopped");
         return C2_BAD_STATE;
     }
     std::shared_ptr<BufferCache> cache;
@@ -607,6 +659,7 @@ c2_status_t GraphicsTracker::allocate(
     if (res != C2_OK) {
         return res;
     }
+    ALOGV("allocatable or dequeueable");
 
     bool cached = false;
     int slotId;
@@ -616,6 +669,8 @@ c2_status_t GraphicsTracker::allocate(
     res = _allocate(cache, width, height, format, usage, &cached, &slotId, &fence, &buffer);
     commitAllocate(res, cache, cached, slotId, fence, &buffer, &updateDequeue);
     if (res == C2_OK) {
+        ALOGV("allocated a buffer width:%u height:%u pixelformat:%d usage:%llu",
+              width, height, format, (unsigned long long)usage);
         *buf = buffer->mBuf;
         *rFence = buffer->mFence;
         // *buf should be valid even if buffer is dtor-ed.
@@ -668,14 +723,16 @@ c2_status_t GraphicsTracker::requestDeallocate(uint64_t bid, const sp<Fence> &fe
 
 void GraphicsTracker::commitDeallocate(
         std::shared_ptr<BufferCache> &cache, int slotId, uint64_t bid) {
-    std::lock_guard<std::mutex> l(mLock);
+    std::unique_lock<std::mutex> l(mLock);
     size_t del1 = mDequeued.erase(bid);
     size_t del2 = mDeallocating.erase(bid);
     CHECK(del1 > 0 && del2 > 0);
-    mDequeueable++;
     if (cache) {
         cache->unblockSlot(slotId);
     }
+    mDequeueable++;
+    l.unlock();
+    writeIncDequeueable(1);
 }
 
 
@@ -707,6 +764,7 @@ c2_status_t GraphicsTracker::deallocate(uint64_t bid, const sp<Fence> &fence) {
 
 c2_status_t GraphicsTracker::requestRender(uint64_t bid, std::shared_ptr<BufferCache> *cache,
                                           std::shared_ptr<BufferItem> *pBuffer,
+                                          bool *fromCache,
                                           bool *updateDequeue) {
     std::unique_lock<std::mutex> l(mLock);
     if (mDeallocating.find(bid) != mDeallocating.end()) {
@@ -737,23 +795,35 @@ c2_status_t GraphicsTracker::requestRender(uint64_t bid, std::shared_ptr<BufferC
         auto it = mBufferCache->mBuffers.find(buffer->mSlot);
         CHECK(it != mBufferCache->mBuffers.end() && it->second.get() == buffer.get());
         mBufferCache->blockSlot(buffer->mSlot);
+        *fromCache = true;
+    } else {
+        *fromCache = false;
     }
     *pBuffer = buffer;
     mDeallocating.emplace(bid);
     return C2_OK;
 }
 
-void GraphicsTracker::commitRender(uint64_t origBid,
-                                  const std::shared_ptr<BufferCache> &cache,
+void GraphicsTracker::commitRender(const std::shared_ptr<BufferCache> &cache,
                                   const std::shared_ptr<BufferItem> &buffer,
+                                  const std::shared_ptr<BufferItem> &oldBuffer,
+                                  bool bufferReplaced,
                                   bool *updateDequeue) {
     std::unique_lock<std::mutex> l(mLock);
-    uint64_t bid = buffer->mId;
+    uint64_t origBid = oldBuffer ? oldBuffer->mId : buffer->mId;
 
-    if (cache.get() != mBufferCache.get()) {
+    if (cache) {
+        cache->unblockSlot(buffer->mSlot);
+        if (oldBuffer) {
+            // migrated, register the new buffer to the cache.
+            cache->mBuffers.emplace(buffer->mSlot, buffer);
+        }
+    }
+    mDeallocating.erase(origBid);
+    mDequeued.erase(origBid);
+
+    if (cache.get() != mBufferCache.get() || bufferReplaced) {
         // Surface changed, no need to wait for buffer being released.
-        mDeallocating.erase(bid);
-        mDequeued.erase(bid);
         if (adjustDequeueConfLocked(updateDequeue)) {
             return;
         }
@@ -762,13 +832,6 @@ void GraphicsTracker::commitRender(uint64_t origBid,
         writeIncDequeueable(1);
         return;
     }
-
-    if (origBid != bid) {
-        // migration happened, need to register the buffer to Cache
-        mBufferCache->mBuffers.emplace(buffer->mSlot, buffer);
-    }
-    mDeallocating.erase(bid);
-    mDequeued.erase(bid);
 }
 
 c2_status_t GraphicsTracker::render(const C2ConstGraphicBlock& blk,
@@ -782,56 +845,59 @@ c2_status_t GraphicsTracker::render(const C2ConstGraphicBlock& blk,
     }
     std::shared_ptr<BufferCache> cache;
     std::shared_ptr<BufferItem> buffer;
+    std::shared_ptr<BufferItem> oldBuffer;
     bool updateDequeue = false;
-    res = requestRender(bid, &cache, &buffer, &updateDequeue);
+    bool fromCache = false;
+    res = requestRender(bid, &cache, &buffer, &fromCache, &updateDequeue);
     if (res != C2_OK) {
         if (updateDequeue) {
             updateDequeueConf();
         }
         return res;
     }
-    ::android::status_t migrateRes = ::android::OK;
-    ::android::status_t renderRes = ::android::OK;
-    if (cache->mGeneration != buffer->mGeneration) {
+    int cacheSlotId = fromCache ? buffer->mSlot : -1;
+    ALOGV("render prepared: igbp(%d) slot(%d)", bool(cache->mIgbp), cacheSlotId);
+    if (!fromCache) {
+        // The buffer does not come from the current cache.
+        // The buffer is needed to be migrated(attached).
         uint64_t newUsage = 0ULL;
-        int slotId = -1;;
 
         (void) cache->mIgbp->getConsumerUsage(&newUsage);
-        sp<GraphicBuffer> gb = buffer->updateBuffer(newUsage, cache->mGeneration);
-        if (gb) {
-            migrateRes = cache->mIgbp->attachBuffer(&(buffer->mSlot), gb);
-        } else {
-            ALOGW("realloc-ing a new buffer for migration failed");
-            migrateRes = ::android::INVALID_OPERATION;
-        }
-    }
-    if (migrateRes == ::android::OK) {
-        renderRes = cache->mIgbp->queueBuffer(buffer->mSlot, input, output);
-        if (renderRes != ::android::OK) {
-            CHECK(renderRes != ::android::BAD_VALUE);
-        }
-    }
-    if (migrateRes != ::android::OK || renderRes != ::android::OK) {
-        // since it is not renderable, just de-allocate
-        if (migrateRes != ::android::OK) {
+        std::shared_ptr<BufferItem> newBuffer =
+                buffer->migrateBuffer(newUsage, cache->mGeneration);
+        sp<GraphicBuffer> gb = newBuffer ? newBuffer->getGraphicBuffer() : nullptr;
+
+        if (!gb) {
+            ALOGE("render: realloc-ing a new buffer for migration failed");
             std::shared_ptr<BufferCache> nullCache;
             commitDeallocate(nullCache, -1, bid);
-        } else {
-            (void) cache->mIgbp->cancelBuffer(buffer->mSlot, input.fence);
-            commitDeallocate(cache, buffer->mSlot, bid);
+            return C2_REFUSED;
         }
-        ALOGE("migration error(%d), render error(%d)", (int)migrateRes, (int)renderRes);
+        if (cache->mIgbp->attachBuffer(&(newBuffer->mSlot), gb) != ::android::OK) {
+            ALOGE("render: attaching a new buffer to IGBP failed");
+            std::shared_ptr<BufferCache> nullCache;
+            commitDeallocate(nullCache, -1, bid);
+            return C2_REFUSED;
+        }
+        cache->waitOnSlot(newBuffer->mSlot);
+        cache->blockSlot(newBuffer->mSlot);
+        oldBuffer = buffer;
+        buffer = newBuffer;
+    }
+    ::android::status_t renderRes = cache->mIgbp->queueBuffer(buffer->mSlot, input, output);
+    ALOGV("render done: migration(%d), render(err = %d)", !fromCache, renderRes);
+    if (renderRes != ::android::OK) {
+        CHECK(renderRes != ::android::BAD_VALUE);
+        ALOGE("render: failed to queueBuffer() err = %d", renderRes);
+        (void) cache->mIgbp->cancelBuffer(buffer->mSlot, input.fence);
+        commitDeallocate(cache, buffer->mSlot, bid);
         return C2_REFUSED;
     }
 
     updateDequeue = false;
-    commitRender(bid, cache, buffer, &updateDequeue);
+    commitRender(cache, buffer, oldBuffer, output->bufferReplaced, &updateDequeue);
     if (updateDequeue) {
         updateDequeueConf();
-    }
-    if (output->bufferReplaced) {
-        // in case of buffer drop during render
-        onReleased(cache->mGeneration);
     }
     return C2_OK;
 }
