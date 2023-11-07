@@ -16,7 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "FrameDecoder"
-
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include "include/FrameDecoder.h"
 #include "include/FrameCaptureLayer.h"
 #include "include/HevcUtils.h"
@@ -41,6 +41,7 @@
 #include <media/stagefright/Utils.h>
 #include <private/media/VideoFrame.h>
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 namespace android {
 
@@ -340,6 +341,7 @@ status_t FrameDecoder::init(
 }
 
 sp<IMemory> FrameDecoder::extractFrame(FrameRect *rect) {
+    ScopedTrace trace(ATRACE_TAG, "FrameDecoder::ExtractFrame");
     status_t err = onExtractRect(rect);
     if (err == OK) {
         err = extractInternal();
@@ -713,6 +715,7 @@ status_t VideoFrameDecoder::onOutputReceived(
     }
     converter.setSrcColorSpace(standard, range, transfer);
     if (converter.isValid()) {
+        ScopedTrace trace(ATRACE_TAG, "FrameDecoder::ColorConverter");
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
                 width, height, stride,

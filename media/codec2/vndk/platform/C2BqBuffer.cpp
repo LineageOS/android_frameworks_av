@@ -16,8 +16,10 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2BqBuffer"
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <android/hardware_buffer.h>
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <ui/BufferQueueDefs.h>
 #include <ui/GraphicBuffer.h>
@@ -37,6 +39,7 @@
 #include <map>
 #include <mutex>
 
+using ::android::ScopedTrace;
 using ::android::BufferQueueDefs::NUM_BUFFER_SLOTS;
 using ::android::C2AllocatorGralloc;
 using ::android::C2AndroidMemoryUsage;
@@ -1063,6 +1066,7 @@ c2_status_t C2BufferQueueBlockPool::fetchGraphicBlock(
         uint32_t format,
         C2MemoryUsage usage,
         std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
+    ScopedTrace trace(ATRACE_TAG,"C2BufferQueueBlockPool::fetchGraphicBlock");
     if (mImpl) {
         return mImpl->fetchGraphicBlock(width, height, format, usage, block, nullptr);
     }
