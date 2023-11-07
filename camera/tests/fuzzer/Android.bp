@@ -153,3 +153,13 @@ cc_fuzz {
         "camera_defaults",
     ],
 }
+
+cc_fuzz {
+    name: "camera_utils_fuzzer",
+    srcs: [
+        "camera_utils_fuzzer.cpp",
+    ],
+    defaults: [
+        "camera_defaults",
+    ],
+}
