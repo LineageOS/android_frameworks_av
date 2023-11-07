@@ -108,7 +108,7 @@ status_t AudioSystem::setLocalAudioFlinger(const sp<IAudioFlinger>& af) {
 }
 
 // establish binder interface to AudioFlinger service
-const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
+const sp<IAudioFlinger> AudioSystem::getAudioFlingerImpl(bool canStartThreadPool = true) {
     sp<IAudioFlinger> af;
     sp<AudioFlingerClient> afc;
     bool reportNoError = false;
@@ -147,13 +147,23 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
         afc = gAudioFlingerClient;
         af = gAudioFlinger;
         // Make sure callbacks can be received by gAudioFlingerClient
-        ProcessState::self()->startThreadPool();
+        if(canStartThreadPool) {
+            ProcessState::self()->startThreadPool();
+        }
     }
     const int64_t token = IPCThreadState::self()->clearCallingIdentity();
     af->registerClient(afc);
     IPCThreadState::self()->restoreCallingIdentity(token);
     if (reportNoError) reportError(NO_ERROR);
     return af;
+}
+
+const sp<IAudioFlinger> AudioSystem:: get_audio_flinger() {
+    return getAudioFlingerImpl();
+}
+
+const sp<IAudioFlinger> AudioSystem:: get_audio_flinger_for_fuzzer() {
+    return getAudioFlingerImpl(false);
 }
 
 const sp<AudioSystem::AudioFlingerClient> AudioSystem::getAudioFlingerClient() {

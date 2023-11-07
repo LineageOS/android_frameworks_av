@@ -1,0 +1,95 @@
+/*
+ * Copyright (C) 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+cc_defaults {
+    name: "libaudioclient_aidl_fuzzer_defaults",
+    static_libs: [
+        "android.hardware.audio.common@7.0-enums",
+        "effect-aidl-cpp",
+        "libcgrouprc",
+        "libcgrouprc_format",
+        "libfakeservicemanager",
+        "libjsoncpp",
+        "liblog",
+        "libmediametricsservice",
+        "libmedia_helper",
+        "libprocessgroup",
+        "shared-file-region-aidl-cpp",
+    ],
+    shared_libs: [
+        "android.hardware.audio.common-util",
+        "audioclient-types-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "audiopolicy-types-aidl-cpp",
+        "av-types-aidl-cpp",
+        "capture_state_listener-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libaudioclient",
+        "audioflinger-aidl-cpp",
+        "libaudioflinger",
+        "libaudioclient_aidl_conversion",
+        "libaudiofoundation",
+        "libaudiomanager",
+        "libaudiopolicy",
+        "libaudioutils",
+        "libaudiopolicyservice",
+        "libaudiopolicymanagerdefault",
+        "libaudiohal",
+        "libaudioprocessing",
+        "libactivitymanager_aidl",
+        "libdl",
+        "libheadtracking",
+        "libmediautils",
+        "libmediametrics",
+        "libnblog",
+        "libnbaio",
+        "libpowermanager",
+        "libvibrator",
+        "libvndksupport",
+        "libxml2",
+        "mediametricsservice-aidl-cpp",
+        "packagemanager_aidl-cpp",
+    ],
+    header_libs: [
+        "libaudiopolicymanager_interface_headers",
+        "libaudiofoundation_headers",
+        "libaudiohal_headers",
+        "libaudioflinger_headers",
+        "libbinder_headers",
+        "libmedia_headers",
+    ],
+     fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+        hotlists: ["4593311"],
+        description: "The fuzzer targets the APIs of libaudioflinger",
+        vector: "local_no_privileges_required",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
+    },
+}
+
+cc_fuzz {
+    name: "audioflinger_aidl_fuzzer",
+    srcs: ["audioflinger_aidl_fuzzer.cpp"],
+    defaults: [
+        "libaudioclient_aidl_fuzzer_defaults",
+        "service_fuzzer_defaults"
+    ],
+}
