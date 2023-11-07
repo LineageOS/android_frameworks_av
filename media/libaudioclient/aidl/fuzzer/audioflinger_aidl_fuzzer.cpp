@@ -15,204 +15,74 @@
  *
  */
 #include <AudioFlinger.h>
-#include <ISchedulingPolicyService.h>
-#include <fakeservicemanager/FakeServiceManager.h>
 #include <android-base/logging.h>
 #include <android/binder_interface_utils.h>
 #include <android/binder_process.h>
 #include <android/media/IAudioPolicyService.h>
-#include <binder/IActivityManager.h>
-#include <binder/IPermissionController.h>
-#include <binder/IServiceManager.h>
-#include <binder/PermissionController.h>
+#include <fakeservicemanager/FakeServiceManager.h>
 #include <fuzzbinder/libbinder_driver.h>
+#include <fuzzbinder/random_binder.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <media/IAudioFlinger.h>
-#include <mediautils/SchedulingPolicyService.h>
-#include <sensorprivacy/SensorPrivacyManager.h>
 #include <service/AudioPolicyService.h>
 
 using namespace android;
 using namespace android::binder;
 using android::fuzzService;
 
-static sp<media::IAudioFlingerService> gAudioFlingerService;
+[[clang::no_destroy]] static std::once_flag gSmOnce;
+sp<FakeServiceManager> gFakeServiceManager;
 
-class FuzzerSchedulingPolicyService : public BnInterface<ISchedulingPolicyService> {
-    int32_t requestPriority(int32_t /*pid_t*/, int32_t /*tid*/, int32_t /*prio*/, bool /*isForApp*/,
-                            bool /*asynchronous*/) {
-        return 0;
+bool addService(const String16& serviceName, const sp<FakeServiceManager>& fakeServiceManager,
+                FuzzedDataProvider& fdp) {
+    sp<IBinder> binder = getRandomBinder(&fdp);
+    if (binder == nullptr) {
+        return false;
     }
-
-    int32_t requestCpusetBoost(bool /*enable*/, const sp<IBinder>& /*client*/) { return 0; }
-};
-
-class FuzzerPermissionController : public BnInterface<IPermissionController> {
-  public:
-    bool checkPermission(const String16& /*permission*/, int32_t /*pid*/, int32_t /*uid*/) {
-        return true;
-    }
-    int32_t noteOp(const String16& /*op*/, int32_t /*uid*/, const String16& /*packageName*/) {
-        return 0;
-    }
-    void getPackagesForUid(const uid_t /*uid*/, Vector<String16>& /*packages*/) {}
-    bool isRuntimePermission(const String16& /*permission*/) { return true; }
-    int32_t getPackageUid(const String16& /*package*/, int /*flags*/) { return 0; }
-};
-
-class FuzzerSensorPrivacyManager : public BnInterface<hardware::ISensorPrivacyManager> {
-  public:
-    Status supportsSensorToggle(int32_t /*toggleType*/, int32_t /*sensor*/,
-                                bool* /*_aidl_return*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    Status addSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return Status::fromStatusT(::android::UNKNOWN_TRANSACTION);
-    }
-    Status addToggleSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    Status removeSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return Status::fromStatusT(::android::UNKNOWN_TRANSACTION);
-    }
-    Status removeToggleSensorPrivacyListener(
-            const sp<hardware::ISensorPrivacyListener>& /*listener*/) override {
-        return Status::fromStatusT(::android::UNKNOWN_TRANSACTION);
-    }
-    Status isSensorPrivacyEnabled(bool* /*_aidl_return*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    Status isCombinedToggleSensorPrivacyEnabled(int32_t /*sensor*/,
-                                                bool* /*_aidl_return*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    Status isToggleSensorPrivacyEnabled(int32_t /*toggleType*/, int32_t /*sensor*/,
-                                        bool* /*_aidl_return*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    Status setSensorPrivacy(bool /*enable*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    Status setToggleSensorPrivacy(int32_t /*userId*/, int32_t /*source*/, int32_t /*sensor*/,
-                                  bool /*enable*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-    Status setToggleSensorPrivacyForProfileGroup(int32_t /*userId*/, int32_t /*source*/,
-                                                 int32_t /*sensor*/, bool /*enable*/) override {
-        return Status::fromStatusT(UNKNOWN_TRANSACTION);
-    }
-};
-
-class FuzzerActivityManager : public BnInterface<IActivityManager> {
-  public:
-    int32_t openContentUri(const String16& /*stringUri*/) override { return 0; }
-
-    status_t registerUidObserver(const sp<IUidObserver>& /*observer*/, const int32_t /*event*/,
-                                 const int32_t /*cutpoint*/,
-                                 const String16& /*callingPackage*/) override {
-        return OK;
-    }
-
-    status_t unregisterUidObserver(const sp<IUidObserver>& /*observer*/) override { return OK; }
-
-    bool isUidActive(const uid_t /*uid*/, const String16& /*callingPackage*/) override {
-        return true;
-    }
-
-    int32_t getUidProcessState(const uid_t /*uid*/, const String16& /*callingPackage*/) override {
-        return ActivityManager::PROCESS_STATE_UNKNOWN;
-    }
-
-    status_t checkPermission(const String16& /*permission*/, const pid_t /*pid*/,
-                             const uid_t /*uid*/, int32_t* /*outResult*/) override {
-        return NO_ERROR;
-    }
-
-    status_t registerUidObserverForUids(const sp<IUidObserver>& /*observer*/ ,
-                                        const int32_t /*event*/ ,
-                                        const int32_t /*cutpoint*/ ,
-                                        const String16& /*callingPackage*/ ,
-                                        const int32_t uids[] ,
-                                        size_t /*nUids*/ ,
-                                        /*out*/ sp<IBinder>& /*observerToken*/ ) {
-        (void)uids;
-        return OK;
-    }
-
-    status_t addUidToObserver(const sp<IBinder>& /*observerToken*/ ,
-                              const String16& /*callingPackage*/ ,
-                              int32_t /*uid*/ ) override {
-        return NO_ERROR;
-    }
-
-    status_t removeUidFromObserver(const sp<IBinder>& /*observerToken*/ ,
-                                   const String16& /*callingPackage*/ ,
-                                   int32_t /*uid*/ ) override {
-        return NO_ERROR;
-    }
-
-    status_t logFgsApiBegin(int32_t /*apiType*/ , int32_t /*appUid*/ ,
-                            int32_t /*appPid*/ ) override {
-        return NO_ERROR;
-    }
-    status_t logFgsApiEnd(int32_t /*apiType*/ , int32_t /*appUid*/ ,
-                          int32_t /*appPid*/ ) override {
-        return NO_ERROR;
-    }
-    status_t logFgsApiStateChanged(int32_t /*apiType*/ , int32_t /*state*/ ,
-                                   int32_t /*appUid*/ ,
-                                   int32_t /*appPid*/ ) override {
-        return NO_ERROR;
-    }
-};
-
-extern "C" int LLVMFuzzerInitialize(int* /* argc */, char*** /* argv */) {
-    /* Create a FakeServiceManager instance and add required services */
-    sp<FakeServiceManager> fakeServiceManager = new FakeServiceManager();
-    setDefaultServiceManager(fakeServiceManager);
-    ABinderProcess_setThreadPoolMaxThreadCount(0);
-    sp<FuzzerActivityManager> am = new FuzzerActivityManager();
-    fakeServiceManager->addService(String16("activity"), IInterface::asBinder(am));
-
-    sp<FuzzerSensorPrivacyManager> sensorPrivacyManager = new FuzzerSensorPrivacyManager();
-    fakeServiceManager->addService(String16("sensor_privacy"),
-                                   IInterface::asBinder(sensorPrivacyManager));
-    sp<FuzzerPermissionController> permissionController = new FuzzerPermissionController();
-    fakeServiceManager->addService(String16("permission"),
-                                   IInterface::asBinder(permissionController));
-
-    sp<FuzzerSchedulingPolicyService> schedulingService = new FuzzerSchedulingPolicyService();
-    fakeServiceManager->addService(String16("scheduling_policy"),
-                                   IInterface::asBinder(schedulingService));
-
-    const auto audioFlingerObj = sp<AudioFlinger>::make();
-    const auto afAdapter = sp<AudioFlingerServerAdapter>::make(audioFlingerObj);
-
-    fakeServiceManager->addService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME),
-                                   IInterface::asBinder(afAdapter), false /* allowIsolated */,
-                                   IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT);
-
-    const auto audioPolicyService = sp<AudioPolicyService>::make();
-    fakeServiceManager->addService(String16("media.audio_policy"), audioPolicyService,
-                                   false /* allowIsolated */,
-                                   IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT);
-
-    sp<IBinder> binder =
-            fakeServiceManager->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
-    gAudioFlingerService = interface_cast<media::IAudioFlingerService>(binder);
-    return 0;
+    CHECK_EQ(NO_ERROR, fakeServiceManager->addService(serviceName, binder));
+    return true;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-    if (!gAudioFlingerService) {
-        return 0;
+    FuzzedDataProvider fdp(data, size);
+
+    std::call_once(gSmOnce, [&] {
+        /* Create a FakeServiceManager instance and add required services */
+        gFakeServiceManager = sp<FakeServiceManager>::make();
+        setDefaultServiceManager(gFakeServiceManager);
+    });
+    gFakeServiceManager->clear();
+
+    for (const char* service :
+         {"activity", "sensor_privacy", "permission", "scheduling_policy",
+          "android.hardware.audio.core.IConfig", "batterystats", "media.metrics"}) {
+        if (!addService(String16(service), gFakeServiceManager, fdp)) {
+            return 0;
+        }
     }
 
-    fuzzService(media::IAudioFlingerService::asBinder(gAudioFlingerService),
-                FuzzedDataProvider(data, size));
+    const auto audioFlinger = sp<AudioFlinger>::make();
+    const auto afAdapter = sp<AudioFlingerServerAdapter>::make(audioFlinger);
+
+    CHECK_EQ(NO_ERROR,
+             gFakeServiceManager->addService(
+                     String16(IAudioFlinger::DEFAULT_SERVICE_NAME), IInterface::asBinder(afAdapter),
+                     false /* allowIsolated */, IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
+
+    AudioSystem::get_audio_flinger_for_fuzzer();
+    const auto audioPolicyService = sp<AudioPolicyService>::make();
+
+    CHECK_EQ(NO_ERROR,
+             gFakeServiceManager->addService(String16("media.audio_policy"), audioPolicyService,
+                                             false /* allowIsolated */,
+                                             IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
+
+    sp<IBinder> audioFlingerServiceBinder =
+            gFakeServiceManager->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
+    sp<media::IAudioFlingerService> audioFlingerService =
+            interface_cast<media::IAudioFlingerService>(audioFlingerServiceBinder);
+
+    fuzzService(media::IAudioFlingerService::asBinder(audioFlingerService), std::move(fdp));
 
     return 0;
 }
