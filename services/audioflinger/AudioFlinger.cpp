@@ -4270,7 +4270,7 @@ Register:
 
     response->id = idOut;
     response->enabled = enabledOut != 0;
-    response->effect = handle->asIEffect();
+    response->effect = handle.get() ? handle->asIEffect() : nullptr;
     response->desc = VALUE_OR_RETURN_STATUS(
             legacy2aidl_effect_descriptor_t_EffectDescriptor(descOut));
 
