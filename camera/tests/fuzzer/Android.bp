@@ -26,6 +26,7 @@ cc_defaults {
     name: "camera_defaults",
     static_libs: [
         "libcamera_client",
+        "libbinder_random_parcel",
     ],
     shared_libs: [
         "camera_platform_flags_c_lib",
@@ -37,6 +38,9 @@ cc_defaults {
         "libgui",
         "libcamera_metadata",
         "libnativewindow",
+    ],
+    header_libs: [
+        "libbinder_headers",
     ],
     fuzz_config: {
         cc: [
