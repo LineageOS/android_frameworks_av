@@ -681,4 +681,26 @@ status_t DeviceHalHidl::getSoundDoseInterface(const std::string& module,
 }
 #endif
 
+status_t DeviceHalHidl::supportsBluetoothVariableLatency(bool* supports) {
+    if (supports == nullptr) {
+        return BAD_VALUE;
+    }
+    *supports = false;
+
+    String8 reply;
+    status_t status = getParameters(
+            String8(AUDIO_PARAMETER_BT_VARIABLE_LATENCY_SUPPORTED), &reply);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    AudioParameter replyParams(reply);
+    String8 trueOrFalse;
+    status = replyParams.get(
+            String8(AUDIO_PARAMETER_BT_VARIABLE_LATENCY_SUPPORTED), trueOrFalse);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    *supports = trueOrFalse == AudioParameter::valueTrue;
+    return NO_ERROR;
+}
 } // namespace android
