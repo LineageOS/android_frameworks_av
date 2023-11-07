@@ -153,6 +153,11 @@ public:
     c2_status_t getWaitableFd(int *pipeFd);
 
     /**
+     * Get the current max allocatable/dequeueable buffer count without de-allocating.
+     */
+    int getCurDequeueable();
+
+    /**
      *  Ends to use the class. after the call, allocate will fail.
      */
     void stop();
@@ -177,12 +182,15 @@ private:
         // Create from an AHB (no slot information)
         // Should be attached to IGBP for rendering
         BufferItem(uint32_t generation,
-                   AHardwareBuffer_Desc *desc,
-                   AHardwareBuffer *pBuf);
+                   AHardwareBuffer *pBuf,
+                   uint64_t usage);
 
         ~BufferItem();
 
-        sp<GraphicBuffer> updateBuffer(uint64_t newUsage, uint32_t newGeneration);
+        std::shared_ptr<BufferItem> migrateBuffer(uint64_t newUsage, uint32_t newGeneration);
+
+        sp<GraphicBuffer> getGraphicBuffer();
+
     };
 
     struct BufferCache {
@@ -211,6 +219,8 @@ private:
         BufferCache() : mBqId{0ULL}, mGeneration{0}, mIgbp{nullptr} {}
         BufferCache(uint64_t bqId, uint32_t generation, const sp<IGraphicBufferProducer>& igbp) :
             mBqId{bqId}, mGeneration{generation}, mIgbp{igbp} {}
+
+        ~BufferCache();
 
         void waitOnSlot(int slot);
 
@@ -287,6 +297,7 @@ private:
                                   sp<Fence> *rFence);
     c2_status_t requestRender(uint64_t bid, std::shared_ptr<BufferCache> *cache,
                               std::shared_ptr<BufferItem> *pBuffer,
+                              bool *fromCache,
                               bool *updateDequeue);
 
     void commitAllocate(c2_status_t res,
@@ -295,14 +306,15 @@ private:
                         std::shared_ptr<BufferItem> *buffer,
                         bool *updateDequeue);
     void commitDeallocate(std::shared_ptr<BufferCache> &cache, int slotId, uint64_t bid);
-    void commitRender(uint64_t origBid,
-                      const std::shared_ptr<BufferCache> &cache,
+    void commitRender(const std::shared_ptr<BufferCache> &cache,
                       const std::shared_ptr<BufferItem> &buffer,
+                      const std::shared_ptr<BufferItem> &oldBuffer,
+                      bool bufferReplaced,
                       bool *updateDequeue);
 
     c2_status_t _allocate(
             const std::shared_ptr<BufferCache> &cache,
-            uint32_t width, uint32_t height, PixelFormat format, int64_t usage,
+            uint32_t width, uint32_t height, PixelFormat format, uint64_t usage,
             bool *cached, int *rSlotId, sp<Fence> *rFence,
             std::shared_ptr<BufferItem> *buffer);
 
