@@ -163,3 +163,13 @@ cc_fuzz {
         "camera_defaults",
     ],
 }
+
+cc_fuzz {
+    name: "camera_metadata_fuzzer",
+    srcs: [
+        "camera_metadata_fuzzer.cpp",
+    ],
+    defaults: [
+        "camera_defaults",
+    ],
+}

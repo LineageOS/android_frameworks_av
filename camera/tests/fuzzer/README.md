@@ -53,6 +53,7 @@ Build the fuzzer
   $ mm -j$(nproc) camera_SessionStats_fuzzer
   $ mm -j$(nproc) camera_captureResult_fuzzer
   $ mm -j$(nproc) camera_utils_fuzzer
+  $ mm -j$(nproc) camera_metadata_fuzzer
 ```
 #### Steps to run
 To run on device
@@ -69,6 +70,7 @@ To run on device
   $ adb shell /data/fuzz/${TARGET_ARCH}/camera_SessionStats_fuzzer/camera_SessionStats_fuzzer
   $ adb shell /data/fuzz/${TARGET_ARCH}/camera_captureResult_fuzzer/camera_captureResult_fuzzer
   $ adb shell /data/fuzz/${TARGET_ARCH}/camera_utils_fuzzer/camera_utils_fuzzer
+  $ adb shell /data/fuzz/${TARGET_ARCH}/camera_metadata_fuzzer/camera_metadata_fuzzer
 ```
 
 ## References:
