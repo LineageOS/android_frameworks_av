@@ -616,7 +616,7 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
         return;
     }
     if (flags::camera_manual_flash_strength_control()) {
-        res = fixupManualFlashStrengthControlTags();
+        res = fixupManualFlashStrengthControlTags(mCameraCharacteristics);
         if (OK != res) {
             ALOGE("%s: Unable to fix up manual flash strength control tags: %s (%d)",
                     __FUNCTION__, strerror(-res), res);
@@ -771,6 +771,15 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
             if (OK != res) {
                 ALOGE("%s: Unable to override zoomRatio related tags: %s (%d)",
                         __FUNCTION__, strerror(-res), res);
+            }
+
+            if (flags::camera_manual_flash_strength_control()) {
+                res = fixupManualFlashStrengthControlTags(mPhysicalCameraCharacteristics[id]);
+                if (OK != res) {
+                    ALOGE("%s: Unable to fix up manual flash strength control tags: %s (%d)",
+                            __FUNCTION__, strerror(-res), res);
+                    return;
+                }
             }
         }
     }
