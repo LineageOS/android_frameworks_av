@@ -1,3 +1,5 @@
-ytai@google.com
+# Bug component: 48436
+atneya@google.com
 mnaganov@google.com
-elaurent@google.com
+yaoshunkai@google.com
+include platform/frameworks/av:/media/janitors/audio_OWNERS #{LAST_RESORT_SUGGESTION}
