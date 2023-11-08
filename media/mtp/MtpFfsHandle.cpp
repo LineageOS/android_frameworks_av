@@ -591,6 +591,9 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
 
     // Send the header data
     mtp_data_header *header = reinterpret_cast<mtp_data_header*>(mIobuf[0].bufs.data());
+    if (header == NULL) {
+        return -1;
+    }
     header->length = htole32(given_length);
     header->type = htole16(2); // data packet
     header->command = htole16(mfr.command);
