@@ -52,8 +52,8 @@ aidl_interface {
         "aidl/android/media/VolumeShaperOperationFlag.aidl",
         "aidl/android/media/VolumeShaperState.aidl",
     ],
-    imports: [
-        "android.media.audio.common.types-V2",
+    defaults: [
+        "latest_android_media_audio_common_types_import_interface",
     ],
     backend: {
         cpp: {
@@ -113,8 +113,8 @@ aidl_interface {
     srcs: [
         "aidl/android/media/audio/IHalAdapterVendorExtension.aidl",
     ],
-    imports: [
-        "android.hardware.audio.core-V1",
+    defaults: [
+        "latest_android_hardware_audio_core_import_interface",
     ],
     backend: {
         // The C++ backend is disabled transitively due to use of FMQ by the audio core HAL.
