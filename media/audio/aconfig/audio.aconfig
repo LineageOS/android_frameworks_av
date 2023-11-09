@@ -13,3 +13,10 @@ flag {
     bug: "285588444"
 }
 
+flag {
+    name: "disable_prescale_absolute_volume"
+    namespace: "media_audio"
+    description:
+        "Disable pre-scale absolute volume."
+    bug: "302553525"
+}
