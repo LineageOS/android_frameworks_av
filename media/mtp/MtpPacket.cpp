@@ -92,24 +92,46 @@ void MtpPacket::copyFrom(const MtpPacket& src) {
 }
 
 uint16_t MtpPacket::getUInt16(int offset) const {
-    return ((uint16_t)mBuffer[offset + 1] << 8) | (uint16_t)mBuffer[offset];
+    if ((unsigned long)(offset+2) <= mBufferSize) {
+        return ((uint16_t)mBuffer[offset + 1] << 8) | (uint16_t)mBuffer[offset];
+    }
+    else {
+        ALOGE("offset for buffer read is greater than buffer size!");
+        abort();
+    }
 }
 
 uint32_t MtpPacket::getUInt32(int offset) const {
-    return ((uint32_t)mBuffer[offset + 3] << 24) | ((uint32_t)mBuffer[offset + 2] << 16) |
-           ((uint32_t)mBuffer[offset + 1] << 8)  | (uint32_t)mBuffer[offset];
+    if ((unsigned long)(offset+4) <= mBufferSize) {
+        return ((uint32_t)mBuffer[offset + 3] << 24) | ((uint32_t)mBuffer[offset + 2] << 16) |
+               ((uint32_t)mBuffer[offset + 1] << 8)  | (uint32_t)mBuffer[offset];
+    }
+    else {
+        ALOGE("offset for buffer read is greater than buffer size!");
+        abort();
+    }
 }
 
 void MtpPacket::putUInt16(int offset, uint16_t value) {
-    mBuffer[offset++] = (uint8_t)(value & 0xFF);
-    mBuffer[offset++] = (uint8_t)((value >> 8) & 0xFF);
+    if ((unsigned long)(offset+2) <= mBufferSize) {
+        mBuffer[offset++] = (uint8_t)(value & 0xFF);
+        mBuffer[offset++] = (uint8_t)((value >> 8) & 0xFF);
+    }
+    else {
+        ALOGE("offset for buffer write is greater than buffer size!");
+    }
 }
 
 void MtpPacket::putUInt32(int offset, uint32_t value) {
-    mBuffer[offset++] = (uint8_t)(value & 0xFF);
-    mBuffer[offset++] = (uint8_t)((value >> 8) & 0xFF);
-    mBuffer[offset++] = (uint8_t)((value >> 16) & 0xFF);
-    mBuffer[offset++] = (uint8_t)((value >> 24) & 0xFF);
+    if ((unsigned long)(offset+4) <= mBufferSize) {
+        mBuffer[offset++] = (uint8_t)(value & 0xFF);
+        mBuffer[offset++] = (uint8_t)((value >> 8) & 0xFF);
+        mBuffer[offset++] = (uint8_t)((value >> 16) & 0xFF);
+        mBuffer[offset++] = (uint8_t)((value >> 24) & 0xFF);
+    }
+    else {
+        ALOGE("offset for buffer write is greater than buffer size!");
+    }
 }
 
 uint16_t MtpPacket::getContainerCode() const {
