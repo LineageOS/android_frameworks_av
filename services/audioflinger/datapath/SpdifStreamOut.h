@@ -114,7 +114,6 @@ private:
     audio_channel_mask_t mApplicationChannelMask = AUDIO_CHANNEL_NONE;
 
     ssize_t  writeDataBurst(const void* data, size_t bytes);
-    ssize_t  writeInternal(const void* buffer, size_t bytes);
 
 };
 
