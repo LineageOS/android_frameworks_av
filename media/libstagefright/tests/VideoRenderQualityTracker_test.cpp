@@ -298,7 +298,7 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) 
     Configuration::GetServerConfigurableFlagFn getServerConfigurableFlagFn{
         [](const std::string &, const std::string &flag, const std::string &) -> std::string {
             if (flag == "render_metrics_enabled") {
-                return "false";
+                return "true";
             } else if (flag == "render_metrics_are_skipped_frames_dropped") {
                 return "false";
             } else if (flag == "render_metrics_max_expected_content_frame_duration_us") {
@@ -349,7 +349,7 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) 
     // default - if we are accidentally configuring to the default then we're not necessarily
     // testing the parsing.
     Configuration d;
-    EXPECT_EQ(c.enabled, false);
+    EXPECT_EQ(c.enabled, true);
     EXPECT_NE(c.enabled, d.enabled);
     EXPECT_EQ(c.areSkippedFramesDropped, false);
     EXPECT_NE(c.areSkippedFramesDropped, d.areSkippedFramesDropped);
@@ -407,6 +407,7 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) 
 
 TEST_F(VideoRenderQualityTrackerTest, countsReleasedFrames) {
     Configuration c;
+    c.enabled = true;
     Helper h(16.66, c);
     h.drop(10);
     h.render({16.66, 16.66, 16.66});
@@ -418,6 +419,7 @@ TEST_F(VideoRenderQualityTrackerTest, countsReleasedFrames) {
 
 TEST_F(VideoRenderQualityTrackerTest, countsSkippedFrames) {
     Configuration c;
+    c.enabled = true;
     Helper h(16.66, c);
     h.drop(10); // dropped frames are not counted
     h.skip(10); // frames skipped before rendering a frame are not counted
@@ -432,6 +434,7 @@ TEST_F(VideoRenderQualityTrackerTest, countsSkippedFrames) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenSkippedFramesAreDropped_countsDroppedFrames) {
     Configuration c;
+    c.enabled = true;
     c.areSkippedFramesDropped = true;
     Helper h(16.66, c);
     h.skip(10); // skipped frames at the beginning of playback are not counted
@@ -448,6 +451,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenSkippedFramesAreDropped_countsDroppedF
 
 TEST_F(VideoRenderQualityTrackerTest, whenNotSkippedFramesAreDropped_countsDroppedFrames) {
     Configuration c;
+    c.enabled = true;
     c.areSkippedFramesDropped = false;
     Helper h(16.66, c);
     h.skip(10); // skipped frames at the beginning of playback are not counted
@@ -464,6 +468,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenNotSkippedFramesAreDropped_countsDropp
 
 TEST_F(VideoRenderQualityTrackerTest, countsRenderedFrames) {
     Configuration c;
+    c.enabled = true;
     Helper h(16.66, c);
     h.drop(10); // dropped frames are not counted
     h.render({16.66, 16.66, 16.66});
@@ -475,6 +480,7 @@ TEST_F(VideoRenderQualityTrackerTest, countsRenderedFrames) {
 
 TEST_F(VideoRenderQualityTrackerTest, detectsFrameRate) {
     Configuration c;
+    c.enabled = true;
     c.frameRateDetectionToleranceUs = 2 * 1000; // 2 ms
     Helper h(16.66, c);
     h.render({16.6, 16.7, 16.6, 16.7});
@@ -484,6 +490,7 @@ TEST_F(VideoRenderQualityTrackerTest, detectsFrameRate) {
 
 TEST_F(VideoRenderQualityTrackerTest, handlesSeeking) {
     Configuration c;
+    c.enabled = true;
     c.maxExpectedContentFrameDurationUs = 30;
     VideoRenderQualityTracker v(c);
     v.onFrameReleased(0, 0);
@@ -522,6 +529,7 @@ TEST_F(VideoRenderQualityTrackerTest, handlesSeeking) {
 
 TEST_F(VideoRenderQualityTrackerTest, withSkipping_handlesSeeking) {
     Configuration c;
+    c.enabled = true;
     c.maxExpectedContentFrameDurationUs = 30;
     VideoRenderQualityTracker v(c);
     v.onFrameReleased(0, 0);
@@ -558,6 +566,7 @@ TEST_F(VideoRenderQualityTrackerTest, withSkipping_handlesSeeking) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenLowTolerance_doesntDetectFrameRate) {
     Configuration c;
+    c.enabled = true;
     c.frameRateDetectionToleranceUs = 0;
     Helper h(16.66, c);
     h.render({16.6, 16.7, 16.6, 16.7});
@@ -567,6 +576,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenLowTolerance_doesntDetectFrameRate) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenFrameRateDestabilizes_detectsFrameRate) {
     Configuration c;
+    c.enabled = true;
     c.frameRateDetectionToleranceUs = 2 * 1000; // 2 ms
     Helper h(16.66, c);
     h.render({16.6, 16.7, 16.6, 16.7});
@@ -577,6 +587,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenFrameRateDestabilizes_detectsFrameRate
 
 TEST_F(VideoRenderQualityTrackerTest, detects32Pulldown) {
     Configuration c;
+    c.enabled = true;
     c.frameRateDetectionToleranceUs = 2 * 1000; // 2 ms
     Helper h(41.66, c);
     h.render({49.9, 33.2, 50.0, 33.4, 50.1, 33.2});
@@ -586,6 +597,7 @@ TEST_F(VideoRenderQualityTrackerTest, detects32Pulldown) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenBad32Pulldown_doesntDetect32Pulldown) {
     Configuration c;
+    c.enabled = true;
     c.frameRateDetectionToleranceUs = 2 * 1000; // 2 ms
     Helper h(41.66, c);
     h.render({50.0, 33.33, 33.33, 50.00, 33.33, 50.00});
@@ -595,6 +607,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenBad32Pulldown_doesntDetect32Pulldown) 
 
 TEST_F(VideoRenderQualityTrackerTest, whenFrameRateChanges_detectsMostRecentFrameRate) {
     Configuration c;
+    c.enabled = true;
     c.frameRateDetectionToleranceUs = 2 * 1000; // 2 ms
     Helper h(16.66, c);
     h.render({16.6, 16.7, 16.6, 16.7});
@@ -608,6 +621,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenFrameRateChanges_detectsMostRecentFram
 
 TEST_F(VideoRenderQualityTrackerTest, whenFrameRateIsUnstable_doesntDetectFrameRate) {
     Configuration c;
+    c.enabled = true;
     c.frameRateDetectionToleranceUs = 2 * 1000; // 2 ms
     Helper h(16.66, c);
     h.render({16.66, 30.0, 16.66, 30.0, 16.66});
@@ -617,6 +631,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenFrameRateIsUnstable_doesntDetectFrameR
 
 TEST_F(VideoRenderQualityTrackerTest, capturesFreezeRate) {
     Configuration c;
+    c.enabled = true;
     Helper h(20, c);
     h.render(3);
     EXPECT_EQ(h.getMetrics().freezeRate, 0);
@@ -629,6 +644,7 @@ TEST_F(VideoRenderQualityTrackerTest, capturesFreezeRate) {
 
 TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDurationHistogram) {
     Configuration c;
+    c.enabled = true;
     // +17 because freeze durations include the render time of the previous frame
     c.freezeDurationMsHistogramBuckets = {2 * 17 + 17, 3 * 17 + 17, 6 * 17 + 17};
     Helper h(17, c);
@@ -662,6 +678,7 @@ TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDurationHistogram) {
 
 TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDistanceHistogram) {
     Configuration c;
+    c.enabled = true;
     c.freezeDistanceMsHistogramBuckets = {1 * 17, 5 * 17, 6 * 17};
     Helper h(17, c);
     h.render(1);
@@ -693,6 +710,7 @@ TEST_F(VideoRenderQualityTrackerTest, capturesFreezeDistanceHistogram) {
 
 TEST_F(VideoRenderQualityTrackerTest, when60hz_hasNoJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(16.66, c); // ~24Hz
     h.render({16.66, 16.66, 16.66, 16.66, 16.66, 16.66, 16.66});
     EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
@@ -701,6 +719,7 @@ TEST_F(VideoRenderQualityTrackerTest, when60hz_hasNoJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenSmallVariance60hz_hasNoJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(16.66, c); // ~24Hz
     h.render({14, 18, 14, 18, 14, 18, 14, 18});
     EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
@@ -709,6 +728,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenSmallVariance60hz_hasNoJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenBadSmallVariance60Hz_hasJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(16.66, c); // ~24Hz
     h.render({14, 18, 14, /* no 18 between 14s */ 14, 18, 14, 18});
     EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 1);
@@ -716,6 +736,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenBadSmallVariance60Hz_hasJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, when30Hz_hasNoJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(33.33, c);
     h.render({33.33, 33.33, 33.33, 33.33, 33.33, 33.33});
     EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
@@ -724,6 +745,7 @@ TEST_F(VideoRenderQualityTrackerTest, when30Hz_hasNoJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenSmallVariance30Hz_hasNoJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(33.33, c);
     h.render({29.0, 35.0, 29.0, 35.0, 29.0, 35.0});
     EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
@@ -732,6 +754,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenSmallVariance30Hz_hasNoJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenBadSmallVariance30Hz_hasJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(33.33, c);
     h.render({29.0, 35.0, 29.0, /* no 35 between 29s */ 29.0, 35.0, 29.0, 35.0});
     EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 1);
@@ -739,6 +762,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenBadSmallVariance30Hz_hasJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenBad30HzTo60Hz_hasJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(33.33, c);
     h.render({33.33, 33.33, 50.0, /* frame stayed 1 vsync too long */ 16.66, 33.33, 33.33});
     EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 2); // note: 2 counts of judder
@@ -746,6 +770,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenBad30HzTo60Hz_hasJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, when24HzTo60Hz_hasNoJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(41.66, c);
     h.render({50.0, 33.33, 50.0, 33.33, 50.0, 33.33});
     EXPECT_LE(h.getMetrics().judderScoreHistogram.getMax(), 0);
@@ -754,6 +779,7 @@ TEST_F(VideoRenderQualityTrackerTest, when24HzTo60Hz_hasNoJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, when25HzTo60Hz_hasJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(40, c);
     h.render({33.33, 33.33, 50.0});
     h.render({33.33, 33.33, 50.0});
@@ -766,6 +792,7 @@ TEST_F(VideoRenderQualityTrackerTest, when25HzTo60Hz_hasJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, when50HzTo60Hz_hasJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(20, c);
     h.render({16.66, 16.66, 16.66, 33.33});
     h.render({16.66, 16.66, 16.66, 33.33});
@@ -778,6 +805,7 @@ TEST_F(VideoRenderQualityTrackerTest, when50HzTo60Hz_hasJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, when30HzTo50Hz_hasJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(33.33, c);
     h.render({40.0, 40.0, 40.0, 60.0});
     h.render({40.0, 40.0, 40.0, 60.0});
@@ -789,6 +817,7 @@ TEST_F(VideoRenderQualityTrackerTest, when30HzTo50Hz_hasJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, whenSmallVariancePulldown24HzTo60Hz_hasNoJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(41.66, c);
     h.render({52.0, 31.33, 52.0, 31.33, 52.0, 31.33});
     EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 0);
@@ -796,6 +825,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenSmallVariancePulldown24HzTo60Hz_hasNoJ
 
 TEST_F(VideoRenderQualityTrackerTest, whenBad24HzTo60Hz_hasJudder) {
     Configuration c;
+    c.enabled = true;
     Helper h(41.66, c);
     h.render({50.0, 33.33, 50.0, 33.33, /* no 50 between 33s */ 33.33, 50.0, 33.33});
     EXPECT_EQ(h.getMetrics().judderScoreHistogram.getCount(), 1);
@@ -803,6 +833,7 @@ TEST_F(VideoRenderQualityTrackerTest, whenBad24HzTo60Hz_hasJudder) {
 
 TEST_F(VideoRenderQualityTrackerTest, capturesJudderScoreHistogram) {
     Configuration c;
+    c.enabled = true;
     c.judderErrorToleranceUs = 2000;
     c.judderScoreHistogramBuckets = {1, 5, 8};
     Helper h(16, c);
@@ -817,6 +848,7 @@ TEST_F(VideoRenderQualityTrackerTest, capturesJudderScoreHistogram) {
 TEST_F(VideoRenderQualityTrackerTest, ranksJudderScoresInOrder) {
     // Each rendering is ranked from best to worst from a user experience
     Configuration c;
+    c.enabled = true;
     c.judderErrorToleranceUs = 2000;
     c.judderScoreHistogramBuckets = {0, 1000};
     int64_t previousScore = 0;
@@ -896,6 +928,7 @@ TEST_F(VideoRenderQualityTrackerTest, ranksJudderScoresInOrder) {
 
 TEST_F(VideoRenderQualityTrackerTest, capturesFreezeEvents) {
     Configuration c;
+    c.enabled = true;
     c.freezeEventMax = 5;
     c.freezeEventDetailsMax = 4;
     c.freezeEventDistanceToleranceMs = 1000;
@@ -988,6 +1021,7 @@ TEST_F(VideoRenderQualityTrackerTest, capturesFreezeEvents) {
 
 TEST_F(VideoRenderQualityTrackerTest, capturesJudderEvents) {
     Configuration c;
+    c.enabled = true;
     c.judderEventMax = 4;
     c.judderEventDetailsMax = 3;
     c.judderEventDistanceToleranceMs = 100;
@@ -1038,6 +1072,7 @@ TEST_F(VideoRenderQualityTrackerTest, capturesJudderEvents) {
 
 TEST_F(VideoRenderQualityTrackerTest, capturesOverallFreezeScore) {
     Configuration c;
+    c.enabled = true;
     // # drops * 20ms + 20ms because current frame is frozen + 1 for bucket threshold
     c.freezeDurationMsHistogramBuckets = {1 * 20 + 21, 5 * 20 + 21, 10 * 20 + 21};
     c.freezeDurationMsHistogramToScore = {10, 100, 1000};
@@ -1062,6 +1097,7 @@ TEST_F(VideoRenderQualityTrackerTest, capturesOverallFreezeScore) {
 
 TEST_F(VideoRenderQualityTrackerTest, capturesOverallJudderScore) {
     Configuration c;
+    c.enabled = true;
     c.judderScoreHistogramBuckets = {0, 6, 10};
     c.judderScoreHistogramToScore = {10, 100, 1000};
     Helper h(20, c);
