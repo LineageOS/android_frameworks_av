@@ -51,6 +51,7 @@ status_t AidlConversionSpatializer::setParameter(EffectParamReader& param) {
 status_t AidlConversionSpatializer::getParameter(EffectParamWriter& param) {
     DefaultExtension defaultExt;
     // read parameters into DefaultExtension vector<uint8_t>
+    defaultExt.bytes.resize(param.getParameterSize());
     if (OK != param.readFromParameter(defaultExt.bytes.data(), param.getParameterSize())) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());
         param.setStatus(BAD_VALUE);
