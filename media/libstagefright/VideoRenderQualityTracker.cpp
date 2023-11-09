@@ -28,6 +28,7 @@
 #include <cmath>
 #include <stdio.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 
 #include <android-base/macros.h>
 #include <android-base/parsebool.h>
@@ -801,19 +802,28 @@ void VideoRenderQualityTracker::triggerTraceWithThrottle(const TraceTriggerFn tr
 void VideoRenderQualityTracker::triggerTrace() {
     // Trigger perfetto to stop always-on-tracing (AOT) to collect trace into a file for video
     // freeze event, the collected trace categories are configured by AOT.
-    const char* args[] = {"/system/bin/trigger_perfetto", "com.android.codec-video-freeze", NULL};
+    static const char* args[] = {"/system/bin/trigger_perfetto",
+                                 "com.android.codec-video-freeze", NULL};
+
     pid_t pid = fork();
     if (pid < 0) {
         ALOGI("Failed to fork for triggering trace");
-        return;
-    }
-    if (pid == 0) {
-        // child process.
+    } else if (pid == 0) {
+        // Child process.
+        ALOGI("Trigger trace %s", args[1]);
         execvp(args[0], const_cast<char**>(args));
         ALOGW("Failed to trigger trace %s", args[1]);
         _exit(1);
+    } else {
+        // Parent process.
+        int status;
+        // Wait for the child process (pid) gets terminated, and allow the system to release
+        // the resource associated with the child. Or the child process will remain in a
+        // zombie state and get killed by llkd to cause foreground app crash.
+        if (waitpid(pid, &status, 0) < 0) {
+            ALOGW("Failed to waitpid for triggering trace");
+        }
     }
-    ALOGI("Triggered trace %s", args[1]);
 }
 
 } // namespace android
