@@ -273,6 +273,8 @@ static const char *kJudderEventDetailsDistanceMs =
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
 
+typedef WrapperObject<std::vector<AccessUnitInfo>> BufferInfosWrapper;
+
 static int64_t getId(IResourceManagerClient const * client) {
     return (int64_t) client;
 }
@@ -3176,7 +3178,49 @@ status_t MediaCodec::queueInputBuffer(
     msg->setInt64("timeUs", presentationTimeUs);
     msg->setInt32("flags", flags);
     msg->setPointer("errorDetailMsg", errorDetailMsg);
+    sp<AMessage> response;
+    return PostAndAwaitResponse(msg, &response);
+}
 
+status_t MediaCodec::queueInputBuffers(
+        size_t index,
+        size_t offset,
+        size_t size,
+        const sp<BufferInfosWrapper> &infos,
+        AString *errorDetailMsg) {
+    sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
+    uint32_t bufferFlags = 0;
+    uint32_t flagsinAllAU = BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_CODECCONFIG;
+    uint32_t andFlags = flagsinAllAU;
+    if (infos == nullptr || infos->value.empty()) {
+        ALOGE("ERROR: Large Audio frame with no BufferInfo");
+        return BAD_VALUE;
+    }
+    int infoIdx = 0;
+    std::vector<AccessUnitInfo> &accessUnitInfo = infos->value;
+    int64_t minTimeUs = accessUnitInfo.front().mTimestamp;
+    bool foundEndOfStream = false;
+    for ( ; infoIdx < accessUnitInfo.size() && !foundEndOfStream; ++infoIdx) {
+        bufferFlags |= accessUnitInfo[infoIdx].mFlags;
+        andFlags &= accessUnitInfo[infoIdx].mFlags;
+        if (bufferFlags & BUFFER_FLAG_END_OF_STREAM) {
+            foundEndOfStream = true;
+        }
+    }
+    bufferFlags = bufferFlags & (andFlags | (~flagsinAllAU));
+    if (infoIdx != accessUnitInfo.size()) {
+        ALOGE("queueInputBuffers has incorrect access-units");
+        return -EINVAL;
+    }
+    msg->setSize("index", index);
+    msg->setSize("offset", offset);
+    msg->setSize("size", size);
+    msg->setInt64("timeUs", minTimeUs);
+    // Make this represent flags for the entire buffer
+    // decodeOnly Flag is set only when all buffers are decodeOnly
+    msg->setInt32("flags", bufferFlags);
+    msg->setObject("accessUnitInfo", infos);
+    msg->setPointer("errorDetailMsg", errorDetailMsg);
     sp<AMessage> response;
     return PostAndAwaitResponse(msg, &response);
 }
@@ -4760,6 +4804,33 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
                 }
             }
+            int32_t largeFrameParam;
+            if (format->findInt32(KEY_BUFFER_BATCH_MAX_OUTPUT_SIZE, &largeFrameParam) ||
+                    format->findInt32(KEY_BUFFER_BATCH_THRESHOLD_OUTPUT_SIZE,
+                    &largeFrameParam)) {
+                if(mComponentName.startsWith("OMX")) {
+                    mErrorLog.log(LOG_TAG,
+                            "Large Frame params are not supported on OMX codecs."
+                            "Currently only supported on C2 audio codec.");
+                    PostReplyWithError(replyID, INVALID_OPERATION);
+                    break;
+                }
+                AString mime;
+                CHECK(format->findString("mime", &mime));
+                if (!mime.startsWith("audio")) {
+                    mErrorLog.log(LOG_TAG,
+                            "Large Frame params only works with audio codec");
+                    PostReplyWithError(replyID, INVALID_OPERATION);
+                    break;
+                }
+                if (!(mFlags & kFlagIsAsync)) {
+                        mErrorLog.log(LOG_TAG, "Large Frame audio" \
+                                "config works only with async mode");
+                    PostReplyWithError(replyID, INVALID_OPERATION);
+                    break;
+                }
+            }
+
             mReplyID = replyID;
             setState(CONFIGURING);
 
@@ -5908,10 +5979,10 @@ size_t MediaCodec::updateBuffers(
 
 status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     size_t index;
-    size_t offset;
-    size_t size;
-    int64_t timeUs;
-    uint32_t flags;
+    size_t offset = 0;
+    size_t size = 0;
+    int64_t timeUs = 0;
+    uint32_t flags = 0;
     CHECK(msg->findSize("index", &index));
     CHECK(msg->findInt64("timeUs", &timeUs));
     CHECK(msg->findInt32("flags", (int32_t *)&flags));
@@ -5993,9 +6064,13 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 "client does not own the buffer #%zu", index));
         return -EACCES;
     }
-    auto setInputBufferParams = [this, &buffer]
+    auto setInputBufferParams = [this, &msg, &buffer]
         (int64_t timeUs, uint32_t flags = 0) -> status_t {
         status_t err = OK;
+        sp<RefBase> obj;
+        if (msg->findObject("accessUnitInfo", &obj)) {
+                buffer->meta()->setObject("accessUnitInfo", obj);
+        }
         buffer->meta()->setInt64("timeUs", timeUs);
         if (flags & BUFFER_FLAG_EOS) {
             buffer->meta()->setInt32("eos", true);
@@ -6505,10 +6580,11 @@ void MediaCodec::onOutputBufferAvailable() {
         if (discardDecodeOnlyOutputBuffer(index)) {
             continue;
         }
+        sp<AMessage> msg = mCallback->dup();
         const sp<MediaCodecBuffer> &buffer =
             mPortBuffers[kPortIndexOutput][index].mData;
-        sp<AMessage> msg = mCallback->dup();
-        msg->setInt32("callbackID", CB_OUTPUT_AVAILABLE);
+        int32_t outputCallbackID = CB_OUTPUT_AVAILABLE;
+        sp<RefBase> accessUnitInfoObj;
         msg->setInt32("index", index);
         msg->setSize("offset", buffer->offset());
         msg->setSize("size", buffer->size());
@@ -6522,6 +6598,15 @@ void MediaCodec::onOutputBufferAvailable() {
         CHECK(buffer->meta()->findInt32("flags", &flags));
 
         msg->setInt32("flags", flags);
+        buffer->meta()->findObject("accessUnitInfo", &accessUnitInfoObj);
+        if (accessUnitInfoObj) {
+            outputCallbackID = CB_LARGE_FRAME_OUTPUT_AVAILABLE;
+            msg->setObject("accessUnitInfo", accessUnitInfoObj);
+             sp<BufferInfosWrapper> auInfo(
+                    (decltype(auInfo.get()))accessUnitInfoObj.get());
+             auInfo->value.back().mFlags |= flags & BUFFER_FLAG_END_OF_STREAM;
+        }
+        msg->setInt32("callbackID", outputCallbackID);
 
         statsBufferReceived(timeUs, buffer);
 
