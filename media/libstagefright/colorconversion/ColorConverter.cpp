@@ -648,7 +648,8 @@ status_t ColorConverter::convertYUV420Planar16ToY410(
 
         uint32_t u01, v01, y01, y23, y45, y67, uv0, uv1;
         size_t x = 0;
-        for (; x < src.cropWidth() - 3; x += 4) {
+        // x % 4 is always 0 so x + 3 will never overflow.
+        for (; x + 3 < src.cropWidth(); x += 4) {
             u01 = *((uint32_t*)ptr_u); ptr_u += 2;
             v01 = *((uint32_t*)ptr_v); ptr_v += 2;
 
