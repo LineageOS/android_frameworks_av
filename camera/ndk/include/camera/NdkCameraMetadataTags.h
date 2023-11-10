@@ -4716,8 +4716,8 @@ typedef enum acamera_metadata_tag {
     ACAMERA_SENSOR_EXPOSURE_TIME =                              // int64
             ACAMERA_SENSOR_START,
     /**
-     * <p>Duration from start of frame exposure to
-     * start of next frame exposure.</p>
+     * <p>Duration from start of frame readout to
+     * start of next frame readout.</p>
      *
      * <p>Type: int64</p>
      *
@@ -4787,6 +4787,10 @@ typedef enum acamera_metadata_tag {
      * <p>For more details about stalling, see {@link ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS }.</p>
      * <p>This control is only effective if ACAMERA_CONTROL_AE_MODE or ACAMERA_CONTROL_MODE is set to
      * OFF; otherwise the auto-exposure algorithm will override this value.</p>
+     * <p><em>Note:</em> Prior to Android 13, this field was described as measuring the duration from
+     * start of frame exposure to start of next frame exposure, which doesn't reflect the
+     * definition from sensor manufacturer. A mobile sensor defines the frame duration as
+     * intervals between sensor readouts.</p>
      *
      * @see ACAMERA_CONTROL_AE_MODE
      * @see ACAMERA_CONTROL_MODE
