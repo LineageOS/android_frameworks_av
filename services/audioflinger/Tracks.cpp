@@ -1311,7 +1311,9 @@ void Track::stop()
             if (!playbackThread->isTrackActive(this)) {
                 reset();
                 mState = STOPPED;
-            } else if (!isFastTrack() && !isOffloaded() && !isDirect()) {
+            } else if (isPatchTrack() || (!isFastTrack() && !isOffloaded() && !isDirect())) {
+                // for a PatchTrack (whatever fast ot not), do not drain but move directly
+                // to STOPPED to avoid closing while active.
                 mState = STOPPED;
             } else {
                 // For fast tracks prepareTracks_l() will set state to STOPPING_2
