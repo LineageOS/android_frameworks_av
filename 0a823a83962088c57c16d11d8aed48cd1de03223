@@ -16,6 +16,24 @@
       "message": "I\u0027m currently unable to build. Repo was advertising an update (2.39), and now repopick won\u0027t work anymore. Looks like conflicting python version requirements, repopick using python 2 and repo itself python 3. Is there a newer version of repopick available? Or an older version of repo?",
       "revId": "0a823a83962088c57c16d11d8aed48cd1de03223",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f4ac86fa_9cf57957",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2023-11-11T19:56:00Z",
+      "side": 1,
+      "message": "yes, I have noticed that the new version of repo does not work with python 2.7. I have created a file like this: /usr/local/bin/repo\n\npython3.6 /path/to/repo-2.39 \"$@\"\n\nSo, when I run \"repo\", it uses the alias from /usr/local/bin and calls python 3.6 to run it.",
+      "parentUuid": "3106d5af_edc21394",
+      "revId": "0a823a83962088c57c16d11d8aed48cd1de03223",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
