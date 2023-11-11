@@ -85,6 +85,7 @@
 #include <utils/Trace.h>
 
 #include <fcntl.h>
+#include <future>
 #include <linux/futex.h>
 #include <math.h>
 #include <memory>
@@ -3899,15 +3900,25 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 {
     aflog::setThreadWriter(mNBLogWriter.get());
 
+    std::future<void> priorityBoostFuture; // joined on dtor; this is a one-shot boost.
     if (mType == SPATIALIZER) {
         const pid_t tid = getTid();
         if (tid == -1) {  // odd: we are here, we must be a running thread.
             ALOGW("%s: Cannot update Spatializer mixer thread priority, no tid", __func__);
         } else {
-            const int priorityBoost = requestSpatializerPriority(getpid(), tid);
-            if (priorityBoost > 0) {
-                stream()->setHalThreadPriority(priorityBoost);
-            }
+            // We launch the priority boost request in a separate thread because
+            // the SchedulingPolicyService may not be available during early
+            // boot time, with a wait causing boot delay.
+            // There is also a PrioConfigEvent that does this, but it will also
+            // block other config events.  This command should be able
+            // to run concurrent with other stream commands.
+            priorityBoostFuture = std::async(std::launch::async,
+                    [tid, output_sp = stream()]() {
+                const int priorityBoost = requestSpatializerPriority(getpid(), tid);
+                if (priorityBoost > 0) {
+                    output_sp->setHalThreadPriority(priorityBoost);
+                }
+            });
         }
     }
 
