@@ -34,6 +34,24 @@
       "parentUuid": "3106d5af_edc21394",
       "revId": "0a823a83962088c57c16d11d8aed48cd1de03223",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9858ecb8_a797fbfc",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2023-11-11T19:57:58Z",
+      "side": 1,
+      "message": "The same method above would also work with repopick.",
+      "parentUuid": "f4ac86fa_9cf57957",
+      "revId": "0a823a83962088c57c16d11d8aed48cd1de03223",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
