@@ -214,6 +214,8 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
         int32_t framesAvailableInWrappingBuffer = totalFramesInWrappingBuffer;
         uint8_t *currentWrappingBuffer = (uint8_t *) wrappingBuffer.data[partIndex];
 
+        if (framesAvailableInWrappingBuffer <= 0) break;
+
         // Put data from the wrapping buffer into the flowgraph 8 frames at a time.
         // Continuously pull as much data as possible from the flowgraph into the byte buffer.
         // The return value of mFlowGraph.process is the number of frames actually pulled.

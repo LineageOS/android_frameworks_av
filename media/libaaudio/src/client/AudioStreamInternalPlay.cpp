@@ -258,14 +258,20 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
             currentWrappingBuffer += numBytesActuallyWrittenToWrappingBuffer;
             framesAvailableInWrappingBuffer -= framesActuallyWrittenToWrappingBuffer;
             framesWrittenToAudioEndpoint += framesActuallyWrittenToWrappingBuffer;
+        } else {
+            break;
         }
 
         // Put data from byteBuffer into the flowgraph one buffer (8 frames) at a time.
         // Continuously pull as much data as possible from the flowgraph into the wrapping buffer.
         // The return value of mFlowGraph.process is the number of frames actually pulled.
         while (framesAvailableInWrappingBuffer > 0 && framesLeftInByteBuffer > 0) {
-            const int32_t framesToWriteFromByteBuffer = std::min(flowgraph::kDefaultBufferSize,
+            int32_t framesToWriteFromByteBuffer = std::min(flowgraph::kDefaultBufferSize,
                     framesLeftInByteBuffer);
+            // If the wrapping buffer is running low, write one frame at a time.
+            if (framesAvailableInWrappingBuffer < flowgraph::kDefaultBufferSize) {
+                framesToWriteFromByteBuffer = 1;
+            }
 
             const int32_t numBytesToWriteFromByteBuffer = getBytesPerFrame() *
                     framesToWriteFromByteBuffer;
