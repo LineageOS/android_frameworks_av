@@ -52,6 +52,24 @@
       "parentUuid": "f4ac86fa_9cf57957",
       "revId": "0a823a83962088c57c16d11d8aed48cd1de03223",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "5886d2a9_d8bded75",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 25691
+      },
+      "writtenOn": "2023-11-12T08:33:53Z",
+      "side": 1,
+      "message": "I\u0027ve got python-alternatives installed and set to python2. Repo works now with the modified file in /usr/local/bin, but repopick still doesn\u0027t, regardless of python version:\nekkehard@ektus-mini-pc:~/nougat/lineage14$ repopick_topic n-asb-2023-11\n  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n100     8  100     8    0     0     33      0 --:--:-- --:--:-- --:--:--    34\nTraceback (most recent call last):\n  File \"./repopick.py\", line 238, in \u003cmodule\u003e\n    xml_root \u003d ElementTree.fromstring(manifest)\n  File \"/usr/lib/python2.7/xml/etree/ElementTree.py\", line 1311, in XML\n    parser.feed(text)\n  File \"/usr/lib/python2.7/xml/etree/ElementTree.py\", line 1659, in feed\n    self._raiseerror(v)\n  File \"/usr/lib/python2.7/xml/etree/ElementTree.py\", line 1523, in _raiseerror\n    raise err\nxml.etree.ElementTree.ParseError: syntax error: line 1, column 0\nekkehard@ektus-mini-pc:~/nougat/lineage14$\n\nTry with python3 active:\n\nekkehard@ektus-mini-pc:~/nougat/lineage14$ repopick_topic n-asb-2023-11\n  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n100     8  100     8    0     0     41      0 --:--:-- --:--:-- --:--:--    41\nTraceback (most recent call last):\n  File \"/home/ekkehard/nougat/lineage14/./repopick.py\", line 238, in \u003cmodule\u003e\n    xml_root \u003d ElementTree.fromstring(manifest)\n  File \"/usr/lib/python3.10/xml/etree/ElementTree.py\", line 1342, in XML\n    parser.feed(text)\nxml.etree.ElementTree.ParseError: syntax error: line 1, column 0",
+      "parentUuid": "9858ecb8_a797fbfc",
+      "revId": "0a823a83962088c57c16d11d8aed48cd1de03223",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
