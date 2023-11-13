@@ -5,6 +5,13 @@
 package: "com.android.media.audio"
 
 flag {
+    name: "alarm_min_volume_zero"
+    namespace: "media_audio"
+    description: "Support configuring alarm min vol to zero"
+    bug: "296884402"
+}
+
+flag {
     name: "bluetooth_mac_address_anonymization"
     namespace: "media_audio"
     description:
