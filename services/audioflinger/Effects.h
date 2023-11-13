@@ -648,7 +648,7 @@ private:
 
              const sp<EffectCallback> mEffectCallback;
 
-             wp<EffectModule> mVolumeControlEffect;
+             wp<IAfEffectModule> mVolumeControlEffect;
 };
 
 class DeviceEffectProxy : public IAfDeviceEffectProxy, public EffectBase {
