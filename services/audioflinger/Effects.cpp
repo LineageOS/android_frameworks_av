@@ -2572,6 +2572,7 @@ bool EffectChain::setVolume_l(uint32_t *left, uint32_t *right, bool force)
             uint32_t rightZero = 0;
             volumeControlEffect->setVolume(&leftZero, &rightZero, true /*controller*/);
         }
+        mVolumeControlEffect = volumeControlEffect;
     }
     mLeftVolume = newLeft;
     mRightVolume = newRight;
