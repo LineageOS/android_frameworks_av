@@ -225,6 +225,13 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
         return err;
     };
 
+    // We need to set sidebandStream to nullptr before pushing blank buffers
+    err = native_window_set_sideband_stream(nativeWindow, nullptr);
+    if (err != NO_ERROR) {
+        ALOGE("error setting sidebandStream to nullptr: %s (%d)", strerror(-err), -err);
+        return err;
+    }
+
     // We need to reconnect to the ANativeWindow as a CPU client to ensure that
     // no frames get dropped by SurfaceFlinger assuming that these are video
     // frames.
