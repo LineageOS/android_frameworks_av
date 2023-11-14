@@ -213,7 +213,7 @@ camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
 EXPORT
 camera_status_t ACameraCaptureSession_prepareWindow(
         ACameraCaptureSession* session,
-        ACameraWindowType *window) {
+        ANativeWindow *window) {
     ATRACE_CALL();
     if (session == nullptr || window == nullptr) {
         ALOGE("%s: Error: session %p / window %p is null", __FUNCTION__, session, window);

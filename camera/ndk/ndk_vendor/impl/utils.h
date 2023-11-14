@@ -38,53 +38,14 @@ using ::aidl::android::frameworks::cameraservice::common::Status;
 using ::aidl::android::frameworks::cameraservice::device::OutputConfiguration;
 using ::aidl::android::frameworks::cameraservice::device::PhysicalCameraSettings;
 using ::aidl::android::frameworks::cameraservice::device::TemplateId;
-using ::aidl::android::hardware::common::NativeHandle;
 using ::android::hardware::camera::common::V1_0::helper::CameraMetadata;
 using AidlCameraMetadata = ::aidl::android::frameworks::cameraservice::device::CameraMetadata;
 using AidlCaptureRequest = ::aidl::android::frameworks::cameraservice::device::CaptureRequest;
 
-bool isWindowNativeHandleEqual(const native_handle_t *nh1, const native_handle_t *nh2);
-
-bool isWindowNativeHandleEqual(const native_handle_t* nh1, const NativeHandle& nh2);
-
-bool isWindowNativeHandleLessThan(const native_handle_t *nh1, const native_handle_t *nh2);
-
-// Convenience wrapper over isWindowNativeHandleLessThan and isWindowNativeHandleEqual
-bool isWindowNativeHandleGreaterThan(const native_handle_t *nh1, const native_handle_t *nh2);
-
-// Utility class so the native_handle_t can be compared with  its contents instead
-// of just raw pointer comparisons.
-struct native_handle_ptr_wrapper {
-    const native_handle_t *mWindow = nullptr;
-
-    native_handle_ptr_wrapper(const native_handle_t *nh) : mWindow(nh) { }
-
-    native_handle_ptr_wrapper() = default;
-
-    operator const native_handle_t *() const { return mWindow; }
-
-    bool operator ==(const native_handle_ptr_wrapper other) const {
-        return isWindowNativeHandleEqual(mWindow, other.mWindow);
-    }
-
-    bool operator != (const native_handle_ptr_wrapper& other) const {
-        return !isWindowNativeHandleEqual(mWindow, other.mWindow);
-    }
-
-    bool operator < (const native_handle_ptr_wrapper& other) const {
-        return isWindowNativeHandleLessThan(mWindow, other.mWindow);
-    }
-
-    bool operator > (const native_handle_ptr_wrapper& other) const {
-        return !isWindowNativeHandleGreaterThan(mWindow, other.mWindow);
-    }
-
-};
-
 // Utility class so that CaptureRequest can be stored by sp<>
 struct CaptureRequest: public RefBase {
   AidlCaptureRequest mCaptureRequest;
-  std::vector<native_handle_ptr_wrapper> mSurfaceList;
+  std::vector<ANativeWindow *> mSurfaceList;
   // Physical camera settings metadata is stored here, as the capture request
   // might not contain it. That's since, fmq might have consumed it.
   std::vector<PhysicalCameraSettings> mPhysicalCameraSettings;
