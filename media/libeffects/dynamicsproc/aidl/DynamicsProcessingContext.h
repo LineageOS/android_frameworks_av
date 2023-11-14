@@ -45,8 +45,6 @@ class DynamicsProcessingContext final : public EffectContext {
 
     // override EffectContext::setCommon to update mChannelCount
     RetCode setCommon(const Parameter::Common& common) override;
-    RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
-    Parameter::VolumeStereo getVolumeStereo() override;
 
     RetCode setEngineArchitecture(const DynamicsProcessing::EngineArchitecture& engineArchitecture);
     RetCode setPreEq(const std::vector<DynamicsProcessing::ChannelConfig>& eqChannels);
@@ -68,7 +66,7 @@ class DynamicsProcessingContext final : public EffectContext {
     std::vector<DynamicsProcessing::LimiterConfig> getLimiter();
     std::vector<DynamicsProcessing::InputGain> getInputGain();
 
-    IEffect::Status dpeProcess(float* in, float* out, int samples);
+    IEffect::Status lvmProcess(float* in, float* out, int samples);
 
   private:
     static constexpr float kPreferredProcessingDurationMs = 10.0f;
