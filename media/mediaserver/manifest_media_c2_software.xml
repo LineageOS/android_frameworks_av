@@ -8,4 +8,9 @@
             <instance>software</instance>
         </interface>
     </hal>
+    <hal format="aidl">
+        <name>android.hardware.media.c2</name>
+        <version>1</version>
+        <fqname>IComponentStore/software</fqname>
+    </hal>
 </manifest>
