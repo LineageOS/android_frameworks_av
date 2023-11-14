@@ -2991,12 +2991,6 @@ status_t MediaCodec::start() {
                 ALOGE("retrying start: failed to reset codec");
                 break;
             }
-            sp<AMessage> response;
-            err = PostAndAwaitResponse(mConfigureMsg, &response);
-            if (err != OK) {
-                ALOGE("retrying start: failed to configure codec");
-                break;
-            }
             if (callback != nullptr) {
                 err = setCallback(callback);
                 if (err != OK) {
@@ -3004,6 +2998,12 @@ status_t MediaCodec::start() {
                     break;
                 }
                 ALOGD("succeed to set callback for reclaim");
+            }
+            sp<AMessage> response;
+            err = PostAndAwaitResponse(mConfigureMsg, &response);
+            if (err != OK) {
+                ALOGE("retrying start: failed to configure codec");
+                break;
             }
         }
 
