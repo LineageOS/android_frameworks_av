@@ -19,7 +19,6 @@
 #include "DynamicsProcessingContext.h"
 #include "DynamicsProcessing.h"
 
-#include <audio_utils/power.h>
 #include <sys/param.h>
 #include <functional>
 #include <unordered_set>
@@ -67,23 +66,6 @@ RetCode DynamicsProcessingContext::setCommon(const Parameter::Common& common) {
     init();
     LOG(INFO) << __func__ << common.toString();
     return RetCode::SUCCESS;
-}
-
-RetCode DynamicsProcessingContext::setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) {
-    std::lock_guard lg(mMutex);
-    dp_fx::DPChannel* leftChannel = mDpFreq->getChannel(0);
-    dp_fx::DPChannel* rightChannel = mDpFreq->getChannel(1);
-    if (leftChannel != nullptr) {
-        leftChannel->setOutputGain(audio_utils_power_from_amplitude(volumeStereo.left));
-    }
-    if (rightChannel != nullptr) {
-        rightChannel->setOutputGain(audio_utils_power_from_amplitude(volumeStereo.right));
-    }
-    return RetCode::SUCCESS;
-}
-
-Parameter::VolumeStereo DynamicsProcessingContext::getVolumeStereo() {
-    return {1.0f, 1.0f};
 }
 
 void DynamicsProcessingContext::dpSetFreqDomainVariant_l(
@@ -291,7 +273,7 @@ std::vector<DynamicsProcessing::InputGain> DynamicsProcessingContext::getInputGa
     return ret;
 }
 
-IEffect::Status DynamicsProcessingContext::dpeProcess(float* in, float* out, int samples) {
+IEffect::Status DynamicsProcessingContext::lvmProcess(float* in, float* out, int samples) {
     LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
 
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
@@ -477,11 +459,6 @@ RetCode DynamicsProcessingContext::setDpChannels_l(
         StageType type) {
     RetCode ret = RetCode::SUCCESS;
     std::unordered_set<int> channelSet;
-
-    if (!stageInUse) {
-        LOG(WARNING) << __func__ << " not in use " << ::android::internal::ToString(channels);
-        return RetCode::SUCCESS;
-    }
 
     RETURN_VALUE_IF(!stageInUse, RetCode::ERROR_ILLEGAL_PARAMETER, "stageNotInUse");
     for (auto& it : channels) {
