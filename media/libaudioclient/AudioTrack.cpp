@@ -594,18 +594,13 @@ status_t AudioTrack::set(
     channelCount = audio_channel_count_from_out_mask(channelMask);
     mChannelCount = channelCount;
 
-    if (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
-        if (audio_has_proportional_frames(format)) {
-            mFrameSize = channelCount * audio_bytes_per_sample(format);
-        } else {
-            mFrameSize = sizeof(uint8_t);
-        }
-    } else {
-        ALOG_ASSERT(audio_has_proportional_frames(format));
-        mFrameSize = channelCount * audio_bytes_per_sample(format);
+    if (!(mFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
         // createTrack will return an error if PCM format is not supported by server,
         // so no need to check for specific PCM formats here
+        ALOGW_IF(!audio_has_proportional_frames(format), "%s(): no direct flag for format 0x%x",
+            __func__, format);
     }
+    mFrameSize = audio_bytes_per_frame(channelCount, format);
 
     // sampling rate must be specified for direct outputs
     if (sampleRate == 0 && (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
