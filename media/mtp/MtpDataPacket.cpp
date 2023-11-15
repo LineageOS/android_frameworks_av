@@ -420,8 +420,10 @@ void MtpDataPacket::putString(const MtpStringBuffer& string) {
 }
 
 void MtpDataPacket::putString(const char* s) {
-    MtpStringBuffer string(s);
-    string.writeToPacket(this);
+    if (s != NULL) {
+        MtpStringBuffer string(s);
+        string.writeToPacket(this);
+    }
 }
 
 void MtpDataPacket::putString(const uint16_t* string) {
