@@ -223,6 +223,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t createOrUpdatePortConfig(
             const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
             PortConfigs::iterator* result, bool *created);
+    void eraseConnectedPort(int32_t portId);
     status_t filterAndRetrieveBtA2dpParameters(AudioParameter &keys, AudioParameter *result);
     status_t filterAndUpdateBtA2dpParameters(AudioParameter &parameters);
     status_t filterAndUpdateBtHfpParameters(AudioParameter &parameters);
@@ -313,6 +314,10 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     std::shared_ptr<::aidl::android::hardware::audio::core::sounddose::ISoundDose>
         mSoundDose = nullptr;
     Ports mPorts;
+    // Remote submix "template" ports (no address specified, no profiles).
+    // They are excluded from `mPorts` as their presence confuses the framework code.
+    std::optional<::aidl::android::media::audio::common::AudioPort> mRemoteSubmixIn;
+    std::optional<::aidl::android::media::audio::common::AudioPort> mRemoteSubmixOut;
     int32_t mDefaultInputPortId = -1;
     int32_t mDefaultOutputPortId = -1;
     PortConfigs mPortConfigs;
@@ -326,6 +331,8 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
     std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
     ConnectedPorts mConnectedPorts;
+    std::pair<int32_t, ::aidl::android::media::audio::common::AudioPort>
+            mDisconnectedPortReplacement;
 };
 
 } // namespace android
