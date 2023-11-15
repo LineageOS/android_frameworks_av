@@ -2174,15 +2174,18 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
     void disconnect() final EXCLUDES_ThreadBase_Mutex;
 
     // MmapStreamInterface for adapter.
-    status_t createMmapBuffer(int32_t minSizeFrames, struct audio_mmap_buffer_info* info) final;
-    status_t getMmapPosition(struct audio_mmap_position* position) const override;
+    status_t createMmapBuffer(int32_t minSizeFrames, struct audio_mmap_buffer_info* info) final
+            EXCLUDES_ThreadBase_Mutex;
+    status_t getMmapPosition(struct audio_mmap_position* position) const override
+            EXCLUDES_ThreadBase_Mutex;
     status_t start(const AudioClient& client,
                    const audio_attributes_t *attr,
             audio_port_handle_t* handle) final EXCLUDES_ThreadBase_Mutex;
     status_t stop(audio_port_handle_t handle) final EXCLUDES_ThreadBase_Mutex;
     status_t standby() final EXCLUDES_ThreadBase_Mutex;
-    status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
-    status_t reportData(const void* buffer, size_t frameCount) override;
+    status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const
+            EXCLUDES_ThreadBase_Mutex = 0;
+    status_t reportData(const void* buffer, size_t frameCount) override EXCLUDES_ThreadBase_Mutex;
 
     // RefBase
     void onFirstRef() final;
@@ -2211,6 +2214,7 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
             REQUIRES(mutex());
     status_t releaseAudioPatch_l(const audio_patch_handle_t handle) final
             REQUIRES(mutex());
+    // NO_THREAD_SAFETY_ANALYSIS
     void toAudioPortConfig(struct audio_port_config* config) override;
 
     sp<StreamHalInterface> stream() const final { return mHalStream; }
@@ -2231,7 +2235,9 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
     void checkInvalidTracks_l() REQUIRES(mutex());
 
     // Not in ThreadBase
-    virtual audio_stream_type_t streamType() const { return AUDIO_STREAM_DEFAULT; }
+    virtual audio_stream_type_t streamType_l() const REQUIRES(mutex()) {
+        return AUDIO_STREAM_DEFAULT;
+    }
     virtual void invalidateTracks(audio_stream_type_t /* streamType */)
             EXCLUDES_ThreadBase_Mutex {}
     void invalidateTracks(std::set<audio_port_handle_t>& /* portIds */) override
@@ -2272,22 +2278,22 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
                 /**
                  * @brief mDeviceId  current device port unique identifier
                  */
-                audio_port_handle_t     mDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t mDeviceId GUARDED_BY(mutex()) = AUDIO_PORT_HANDLE_NONE;
 
-                audio_attributes_t      mAttr;
-                audio_session_t         mSessionId;
-                audio_port_handle_t     mPortId;
+    audio_attributes_t mAttr GUARDED_BY(mutex());
+    audio_session_t mSessionId GUARDED_BY(mutex());
+    audio_port_handle_t mPortId GUARDED_BY(mutex());
 
-                wp<MmapStreamCallback>  mCallback;
-                sp<StreamHalInterface>  mHalStream;
-                sp<DeviceHalInterface>  mHalDevice;
-                AudioHwDevice* const    mAudioHwDev;
-                ActiveTracks<IAfMmapTrack> mActiveTracks;
-                float                   mHalVolFloat;
-                std::map<audio_port_handle_t, bool> mClientSilencedStates;
+    wp<MmapStreamCallback> mCallback GUARDED_BY(mutex());
+    sp<StreamHalInterface> mHalStream; // NO_THREAD_SAFETY_ANALYSIS
+    sp<DeviceHalInterface> mHalDevice GUARDED_BY(mutex());
+    AudioHwDevice* const mAudioHwDev GUARDED_BY(mutex());
+    ActiveTracks<IAfMmapTrack> mActiveTracks GUARDED_BY(mutex());
+    float mHalVolFloat GUARDED_BY(mutex());
+    std::map<audio_port_handle_t, bool> mClientSilencedStates GUARDED_BY(mutex());
 
-                int32_t                 mNoCallbackWarningCount;
-     static     constexpr int32_t       kMaxNoCallbackWarnings = 5;
+    int32_t mNoCallbackWarningCount GUARDED_BY(mutex());
+    static constexpr int32_t kMaxNoCallbackWarnings = 5;
 };
 
 class MmapPlaybackThread : public MmapThread, public IAfMmapPlaybackThread,
@@ -2323,8 +2329,7 @@ public:
     void invalidateTracks(audio_stream_type_t streamType) final EXCLUDES_ThreadBase_Mutex;
     void invalidateTracks(std::set<audio_port_handle_t>& portIds) final EXCLUDES_ThreadBase_Mutex;
 
-    audio_stream_type_t streamType() const final EXCLUDES_ThreadBase_Mutex {
-        audio_utils::lock_guard l(mutex());
+    audio_stream_type_t streamType_l() const final REQUIRES(mutex()) {
         return mStreamType;
     }
     void checkSilentMode_l() final REQUIRES(mutex());
