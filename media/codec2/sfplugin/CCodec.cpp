@@ -2326,9 +2326,12 @@ status_t CCodec::unsubscribeFromParameters(const std::vector<std::string> &names
 void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
     if (!workItems.empty()) {
         Mutexed<std::list<std::unique_ptr<C2Work>>>::Locked queue(mWorkDoneQueue);
+        bool shouldPost = queue->empty();
         queue->splice(queue->end(), workItems);
+        if (shouldPost) {
+            (new AMessage(kWhatWorkDone, this))->post();
+        }
     }
-    (new AMessage(kWhatWorkDone, this))->post();
 }
 
 void CCodec::onInputBufferDone(uint64_t frameIndex, size_t arrayIndex) {
