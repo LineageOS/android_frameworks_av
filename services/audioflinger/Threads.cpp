@@ -2338,10 +2338,7 @@ void PlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
     dprintf(fd, "  Total writes: %d\n", mNumWrites);
     dprintf(fd, "  Delayed writes: %d\n", mNumDelayedWrites);
     dprintf(fd, "  Blocked in write: %s\n", mInWrite ? "yes" : "no");
-    dprintf(fd, "  Suspend count: %d\n", mSuspended);
-    dprintf(fd, "  Sink buffer : %p\n", mSinkBuffer);
-    dprintf(fd, "  Mixer buffer: %p\n", mMixerBuffer);
-    dprintf(fd, "  Effect buffer: %p\n", mEffectBuffer);
+    dprintf(fd, "  Suspend count: %d\n", (int32_t)mSuspended);
     dprintf(fd, "  Fast track availMask=%#x\n", mFastTrackAvailMask);
     dprintf(fd, "  Standby delay ns=%lld\n", (long long)mStandbyDelayNs);
     AudioStreamOut *output = mOutput;
@@ -2414,6 +2411,7 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
     }
 
     if (isBitPerfect) {
+        audio_utils::lock_guard _l(mutex());
         sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
         if (chain.get() != nullptr) {
             // Bit-perfect is required according to the configuration and preferred mixer
@@ -2840,7 +2838,6 @@ void PlaybackThread::setVolumeForOutput_l(float left, float right) const
 
 // addTrack_l() must be called with ThreadBase::mutex() held
 status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
-NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
 {
     status_t status = ALREADY_EXISTS;
 
@@ -4668,7 +4665,7 @@ void PlaybackThread::collectTimestamps_l()
             // and we use systemTime().
             mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] = mFramesWritten;
             mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = mLastIoBeginNs == -1
-                    ? systemTime() : mLastIoBeginNs;
+                    ? systemTime() : (int64_t)mLastIoBeginNs;
         }
 
         for (const sp<IAfTrack>& t : mActiveTracks) {
@@ -5309,7 +5306,8 @@ bool PlaybackThread::waitingAsyncCallback()
 // shared by MIXER and DIRECT, overridden by DUPLICATING
 void PlaybackThread::threadLoop_standby()
 {
-    ALOGV("Audio hardware entering standby, mixer %p, suspend count %d", this, mSuspended);
+    ALOGV("%s: audio hardware entering standby, mixer %p, suspend count %d",
+            __func__, this, (int32_t)mSuspended);
     mOutput->standby();
     if (mUseAsyncWrite != 0) {
         // discard any pending drain or write ack by incrementing sequence
@@ -6350,7 +6348,7 @@ bool MixerThread::checkForNewParameter_l(const String8& keyValuePair,
 void MixerThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     PlaybackThread::dumpInternals_l(fd, args);
-    dprintf(fd, "  Thread throttle time (msecs): %u\n", mThreadThrottleTimeMs);
+    dprintf(fd, "  Thread throttle time (msecs): %u\n", (uint32_t)mThreadThrottleTimeMs);
     dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
     dprintf(fd, "  Master balance: %f (%s)\n", mMasterBalance.load(),
@@ -7688,8 +7686,13 @@ void DuplicatingThread::removeOutputTrack(IAfPlaybackThread* thread)
             mOutputTracks[i]->destroy();
             mOutputTracks.removeAt(i);
             updateWaitTime_l();
-            if (thread->getOutput() == mOutput) {
-                mOutput = NULL;
+            // NO_THREAD_SAFETY_ANALYSIS
+            // Lambda workaround: as thread != this
+            // we can safely call the remote thread getOutput.
+            const bool equalOutput =
+                    [&](){ return thread->getOutput() == mOutput; }();
+            if (equalOutput) {
+                mOutput = nullptr;
             }
             return;
         }
@@ -10021,7 +10024,7 @@ void MmapThread::disconnect()
 }
 
 
-void MmapThread::configure(const audio_attributes_t* attr,
+void MmapThread::configure_l(const audio_attributes_t* attr,
                                                 audio_stream_type_t streamType __unused,
                                                 audio_session_t sessionId,
                                                 const sp<MmapStreamCallback>& callback,
@@ -10690,7 +10693,6 @@ status_t MmapThread::checkEffectCompatibility_l(
 }
 
 void MmapThread::checkInvalidTracks_l()
-NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
 {
     sp<MmapStreamCallback> callback;
     for (const sp<IAfMmapTrack>& track : mActiveTracks) {
@@ -10788,7 +10790,8 @@ void MmapPlaybackThread::configure(const audio_attributes_t* attr,
                                                 audio_port_handle_t deviceId,
                                                 audio_port_handle_t portId)
 {
-    MmapThread::configure(attr, streamType, sessionId, callback, deviceId, portId);
+    audio_utils::lock_guard l(mutex());
+    MmapThread::configure_l(attr, streamType, sessionId, callback, deviceId, portId);
     mStreamType = streamType;
 }
 
