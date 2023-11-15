@@ -6246,7 +6246,9 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
             // presentation timestamp is used instead, which almost certainly occurs in the past,
             // since it's almost always a zero-based offset from the start of the stream. In these
             // scenarios, we expect the frame to be rendered with no delay.
-            int64_t delayUs = noRenderTime ? 0 : renderTimeNs / 1000 - ALooper::GetNowUs();
+            int64_t nowUs = ALooper::GetNowUs();
+            int64_t renderTimeUs = renderTimeNs / 1000;
+            int64_t delayUs = renderTimeUs < nowUs ? 0 : renderTimeUs - nowUs;
             delayUs += 100 * 1000; /* 100ms in microseconds */
             status_t err =
                     mMsgPollForRenderedBuffers->postUnique(/* token= */ mMsgPollForRenderedBuffers,
