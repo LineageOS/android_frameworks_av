@@ -464,8 +464,8 @@ public:
     virtual void addOutputTrack_l(const sp<IAfTrack>& track) REQUIRES(mutex()) = 0;
 
     virtual AudioStreamOut* getOutput_l() const REQUIRES(mutex()) = 0;
-    virtual AudioStreamOut* getOutput() const = 0;
-    virtual AudioStreamOut* clearOutput() = 0;
+    virtual AudioStreamOut* getOutput() const EXCLUDES_ThreadBase_Mutex = 0;
+    virtual AudioStreamOut* clearOutput() EXCLUDES_ThreadBase_Mutex = 0;
 
     // a very large number of suspend() will eventually wraparound, but unlikely
     virtual void suspend() = 0;
