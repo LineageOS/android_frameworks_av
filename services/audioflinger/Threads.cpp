@@ -10760,14 +10760,24 @@ MmapPlaybackThread::MmapPlaybackThread(
         AudioHwDevice *hwDev,  AudioStreamOut *output, bool systemReady)
     : MmapThread(afThreadCallback, id, hwDev, output->stream, systemReady, true /* isOut */),
       mStreamType(AUDIO_STREAM_MUSIC),
-      mStreamVolume(1.0),
-      mStreamMute(false),
       mOutput(output)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioMmapOut_%X", id);
     mChannelCount = audio_channel_count_from_out_mask(mChannelMask);
     mMasterVolume = afThreadCallback->masterVolume_l();
     mMasterMute = afThreadCallback->masterMute_l();
+
+    for (int i = AUDIO_STREAM_MIN; i < AUDIO_STREAM_FOR_POLICY_CNT; ++i) {
+        const audio_stream_type_t stream{static_cast<audio_stream_type_t>(i)};
+        mStreamTypes[stream].volume = 0.0f;
+        mStreamTypes[stream].mute = mAfThreadCallback->streamMute_l(stream);
+    }
+    // Audio patch and call assistant volume are always max
+    mStreamTypes[AUDIO_STREAM_PATCH].volume = 1.0f;
+    mStreamTypes[AUDIO_STREAM_PATCH].mute = false;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].volume = 1.0f;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].mute = false;
+
     if (mAudioHwDev) {
         if (mAudioHwDev->canSetMasterVolume()) {
             mMasterVolume = 1.0;
@@ -10824,8 +10834,8 @@ void MmapPlaybackThread::setMasterMute(bool muted)
 void MmapPlaybackThread::setStreamVolume(audio_stream_type_t stream, float value)
 {
     audio_utils::lock_guard _l(mutex());
+    mStreamTypes[stream].volume = value;
     if (stream == mStreamType) {
-        mStreamVolume = value;
         broadcast_l();
     }
 }
@@ -10833,17 +10843,14 @@ void MmapPlaybackThread::setStreamVolume(audio_stream_type_t stream, float value
 float MmapPlaybackThread::streamVolume(audio_stream_type_t stream) const
 {
     audio_utils::lock_guard _l(mutex());
-    if (stream == mStreamType) {
-        return mStreamVolume;
-    }
-    return 0.0f;
+    return mStreamTypes[stream].volume;
 }
 
 void MmapPlaybackThread::setStreamMute(audio_stream_type_t stream, bool muted)
 {
     audio_utils::lock_guard _l(mutex());
+    mStreamTypes[stream].mute = muted;
     if (stream == mStreamType) {
-        mStreamMute= muted;
         broadcast_l();
     }
 }
@@ -10883,14 +10890,13 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent_l
 {
     float volume;
 
-    if (mMasterMute || mStreamMute) {
+    if (mMasterMute || streamMuted_l()) {
         volume = 0;
     } else {
-        volume = mMasterVolume * mStreamVolume;
+        volume = mMasterVolume * streamVolume_l();
     }
 
     if (volume != mHalVolFloat) {
-
         // Convert volumes from float to 8.24
         uint32_t vol = (uint32_t)(volume * (1 << 24));
 
@@ -10924,8 +10930,8 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent_l
             track->setMetadataHasChanged();
             track->processMuteEvent_l(mAfThreadCallback->getOrCreateAudioManager(),
                 /*muteState=*/{mMasterMute,
-                               mStreamVolume == 0.f,
-                               mStreamMute,
+                               streamVolume_l() == 0.f,
+                               streamMuted_l(),
                                // TODO(b/241533526): adjust logic to include mute from AppOps
                                false /*muteFromPlaybackRestricted*/,
                                false /*muteFromClientVolume*/,
@@ -11038,7 +11044,7 @@ void MmapPlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
     MmapThread::dumpInternals_l(fd, args);
 
     dprintf(fd, "  Stream type: %d Stream volume: %f HAL volume: %f Stream mute %d\n",
-            mStreamType, mStreamVolume, mHalVolFloat, mStreamMute);
+            mStreamType, streamVolume_l(), mHalVolFloat, streamMuted_l());
     dprintf(fd, "  Master volume: %f Master mute %d\n", mMasterVolume, mMasterMute);
 }
 
