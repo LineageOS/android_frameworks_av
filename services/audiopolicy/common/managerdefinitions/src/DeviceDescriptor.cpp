@@ -154,6 +154,12 @@ void DeviceDescriptor::importAudioPortAndPickAudioProfile(
     policyPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
 }
 
+status_t DeviceDescriptor::readFromParcelable(const media::AudioPortFw& parcelable) {
+    RETURN_STATUS_IF_ERROR(DeviceDescriptorBase::readFromParcelable(parcelable));
+    mDeclaredAddress = DeviceDescriptorBase::address();
+    return OK;
+}
+
 void DeviceDescriptor::setEncapsulationInfoFromHal(
         AudioPolicyClientInterface *clientInterface) {
     AudioParameter param(String8(mDeviceTypeAddr.getAddress()));
