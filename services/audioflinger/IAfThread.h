@@ -603,8 +603,8 @@ public:
             EXCLUDES_ThreadBase_Mutex = 0;
     virtual bool hasFastCapture() const = 0;
 
-    virtual void checkBtNrec() = 0;
-    virtual uint32_t getInputFramesLost() const = 0;
+    virtual void checkBtNrec() EXCLUDES_ThreadBase_Mutex = 0;
+    virtual uint32_t getInputFramesLost() const EXCLUDES_ThreadBase_Mutex = 0;
 
     virtual status_t shareAudioHistory(
             const std::string& sharedAudioPackageName,
@@ -629,20 +629,24 @@ public:
             audio_session_t sessionId,
             const sp<MmapStreamCallback>& callback,
             audio_port_handle_t deviceId,
-            audio_port_handle_t portId) = 0;
+            audio_port_handle_t portId) EXCLUDES_ThreadBase_Mutex = 0;
     virtual void disconnect() EXCLUDES_ThreadBase_Mutex = 0;
 
     // MmapStreamInterface handling (see adapter)
     virtual status_t createMmapBuffer(
-            int32_t minSizeFrames, struct audio_mmap_buffer_info* info) = 0;
-    virtual status_t getMmapPosition(struct audio_mmap_position* position) const = 0;
+            int32_t minSizeFrames, struct audio_mmap_buffer_info* info)
+            EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t getMmapPosition(struct audio_mmap_position* position) const
+            EXCLUDES_ThreadBase_Mutex = 0;
     virtual status_t start(
             const AudioClient& client, const audio_attributes_t* attr,
-            audio_port_handle_t* handle) = 0;
-    virtual status_t stop(audio_port_handle_t handle) = 0;
-    virtual status_t standby() = 0;
-    virtual status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const = 0;
-    virtual status_t reportData(const void* buffer, size_t frameCount) = 0;
+            audio_port_handle_t* handle) EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t stop(audio_port_handle_t handle) EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t standby() EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t getExternalPosition(uint64_t* position, int64_t* timeNanos) const
+            EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t reportData(const void* buffer, size_t frameCount)
+            EXCLUDES_ThreadBase_Mutex = 0;
 
     // TODO(b/291317898)  move to IAfThreadBase?
     virtual void invalidateTracks(std::set<audio_port_handle_t>& portIds)
