@@ -29,6 +29,8 @@
 
 namespace android {
 
+using media::audio::common::AudioDeviceAddress;
+using media::audio::common::AudioDeviceType;
 using media::audio::common::AudioIoFlags;
 using media::audio::common::AudioPortDeviceExt;
 using media::audio::common::AudioPortExt;
@@ -113,12 +115,17 @@ status_t aidl2legacy_AudioHwModule_HwModule(const media::AudioHwModule& aidl,
             ports.emplace(aidlPort.id, devicePort);
 
             if (const auto& deviceExt = aidlPort.ext.get<AudioPortExt::device>();
-                    deviceExt.device.type.connection.empty()) {  // Attached device
+                    deviceExt.device.type.connection.empty() ||
+                    // DeviceHalAidl connects remote submix input with an address.
+                    (deviceExt.device.type.type == AudioDeviceType::IN_SUBMIX &&
+                            deviceExt.device.address != AudioDeviceAddress())) {
+                // Attached device.
                 if (isInput) {
                     attachedInputDevices->add(devicePort);
                 } else {
                     attachedOutputDevices->add(devicePort);
-                    if ((deviceExt.flags & defaultDeviceFlag) != 0) {
+                    if (*defaultOutputDevice == nullptr &&
+                            (deviceExt.flags & defaultDeviceFlag) != 0) {
                         *defaultOutputDevice = devicePort;
                     }
                 }
