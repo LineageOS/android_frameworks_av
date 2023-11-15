@@ -63,6 +63,7 @@ namespace flags = com::android::internal::camera::flags;
 namespace {
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
 const std::string kExternalProviderName = "external/0";
+const std::string kVirtualProviderName = "virtual/0";
 } // anonymous namespace
 
 const float CameraProviderManager::kDepthARTolerance = .1f;
@@ -71,6 +72,8 @@ const bool CameraProviderManager::kFrameworkJpegRDisabled =
 
 CameraProviderManager::HidlServiceInteractionProxyImpl
 CameraProviderManager::sHidlServiceInteractionProxy{};
+CameraProviderManager::AidlServiceInteractionProxyImpl
+CameraProviderManager::sAidlServiceInteractionProxy{};
 
 CameraProviderManager::~CameraProviderManager() {
 }
@@ -133,6 +136,29 @@ status_t CameraProviderManager::tryToInitAndAddHidlProvidersLocked(
     return OK;
 }
 
+std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+CameraProviderManager::AidlServiceInteractionProxyImpl::getAidlService(
+        const std::string& serviceName) {
+    using aidl::android::hardware::camera::provider::ICameraProvider;
+
+    AIBinder* binder = nullptr;
+    if (flags::lazy_aidl_wait_for_service()) {
+        binder = AServiceManager_waitForService(serviceName.c_str());
+    } else {
+        binder = AServiceManager_getService(serviceName.c_str());
+    }
+
+    if (binder == nullptr) {
+        ALOGD("%s: AIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
+              serviceName.c_str());
+        return nullptr;
+    }
+    std::shared_ptr<ICameraProvider> interface =
+            ICameraProvider::fromBinder(ndk::SpAIBinder(binder));
+
+    return interface;
+};
+
 static std::string getFullAidlProviderName(const std::string instance) {
     std::string aidlHalServiceDescriptor =
             std::string(aidl::android::hardware::camera::provider::ICameraProvider::descriptor);
@@ -145,6 +171,13 @@ status_t CameraProviderManager::tryToAddAidlProvidersLocked() {
     auto sm = defaultServiceManager();
     auto aidlProviders = sm->getDeclaredInstances(
             String16(aidlHalServiceDescriptor));
+
+    if (isVirtualCameraHalEnabled()) {
+        // Virtual Camera provider is not declared in the VINTF manifest so we
+        // manually add it if the binary is present.
+        aidlProviders.push_back(String16(kVirtualProviderName.c_str()));
+    }
+
     for (const auto &aidlInstance : aidlProviders) {
         std::string aidlServiceName =
                 getFullAidlProviderName(toStdString(aidlInstance));
@@ -160,12 +193,19 @@ status_t CameraProviderManager::tryToAddAidlProvidersLocked() {
 }
 
 status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListener> listener,
-        HidlServiceInteractionProxy* hidlProxy) {
+        HidlServiceInteractionProxy* hidlProxy, AidlServiceInteractionProxy* aidlProxy) {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     if (hidlProxy == nullptr) {
-        ALOGE("%s: No valid service interaction proxy provided", __FUNCTION__);
+        ALOGE("%s: No valid service Hidl interaction proxy provided", __FUNCTION__);
         return BAD_VALUE;
     }
+
+    if (aidlProxy == nullptr) {
+        ALOGE("%s: No valid service Aidl interaction proxy provided", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    mAidlServiceProxy = aidlProxy;
+
     mListener = listener;
     mDeviceState = 0;
     auto res = tryToInitAndAddHidlProvidersLocked(hidlProxy);
@@ -1974,14 +2014,8 @@ status_t CameraProviderManager::tryToInitializeAidlProviderLocked(
         const std::string& providerName, const sp<ProviderInfo>& providerInfo) {
     using aidl::android::hardware::camera::provider::ICameraProvider;
 
-    AIBinder *binder = nullptr;
-    if (flags::lazy_aidl_wait_for_service()) {
-        binder = AServiceManager_waitForService(providerName.c_str());
-    } else {
-        binder = AServiceManager_getService(providerName.c_str());
-    }
     std::shared_ptr<ICameraProvider> interface =
-            ICameraProvider::fromBinder(ndk::SpAIBinder(binder));
+            mAidlServiceProxy->getAidlService(providerName.c_str());
 
     if (interface == nullptr) {
         ALOGW("%s: AIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
@@ -3125,6 +3159,10 @@ void CameraProviderManager::filterLogicalCameraIdsLocked(
                 return removedIds.find(s) != removedIds.end();}),
                 deviceIds.end());
     }
+}
+
+bool CameraProviderManager::isVirtualCameraHalEnabled() {
+    return flags::virtual_camera_service_discovery();
 }
 
 } // namespace android
