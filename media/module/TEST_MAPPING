@@ -1,0 +1,8 @@
+{
+  "postsubmit": [
+    {
+      "name": "hal_implementation_test"
+    }
+  ]
+}
+
