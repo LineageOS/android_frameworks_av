@@ -1173,9 +1173,11 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
     if (thread != 0) {
         if (isOffloaded()) {
             audio_utils::lock_guard _laf(thread->afThreadCallback()->mutex());
+            const bool nonOffloadableGlobalEffectEnabled =
+                    thread->afThreadCallback()->isNonOffloadableGlobalEffectEnabled_l();
             audio_utils::lock_guard _lth(thread->mutex());
             sp<IAfEffectChain> ec = thread->getEffectChain_l(mSessionId);
-            if (thread->afThreadCallback()->isNonOffloadableGlobalEffectEnabled_l() ||
+            if (nonOffloadableGlobalEffectEnabled ||
                     (ec != 0 && ec->isNonOffloadableEnabled())) {
                 invalidate();
                 return PERMISSION_DENIED;

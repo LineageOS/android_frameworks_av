@@ -875,7 +875,7 @@ void ThreadBase::processConfigEvents_l()
         } break;
         case CFG_EVENT_IO: {
             IoConfigEventData *data = (IoConfigEventData *)event->mData.get();
-            ioConfigChanged(data->mEvent, data->mPid, data->mPortId);
+            ioConfigChanged_l(data->mEvent, data->mPid, data->mPortId);
         } break;
         case CFG_EVENT_SET_PARAMETER: {
             SetParameterConfigEventData *data = (SetParameterConfigEventData *)event->mData.get();
@@ -886,22 +886,22 @@ void ThreadBase::processConfigEvents_l()
             }
         } break;
         case CFG_EVENT_CREATE_AUDIO_PATCH: {
-            const DeviceTypeSet oldDevices = getDeviceTypes();
+            const DeviceTypeSet oldDevices = getDeviceTypes_l();
             CreateAudioPatchConfigEventData *data =
                                             (CreateAudioPatchConfigEventData *)event->mData.get();
             event->mStatus = createAudioPatch_l(&data->mPatch, &data->mHandle);
-            const DeviceTypeSet newDevices = getDeviceTypes();
+            const DeviceTypeSet newDevices = getDeviceTypes_l();
             configChanged = oldDevices != newDevices;
             mLocalLog.log("CFG_EVENT_CREATE_AUDIO_PATCH: old device %s (%s) new device %s (%s)",
                     dumpDeviceTypes(oldDevices).c_str(), toString(oldDevices).c_str(),
                     dumpDeviceTypes(newDevices).c_str(), toString(newDevices).c_str());
         } break;
         case CFG_EVENT_RELEASE_AUDIO_PATCH: {
-            const DeviceTypeSet oldDevices = getDeviceTypes();
+            const DeviceTypeSet oldDevices = getDeviceTypes_l();
             ReleaseAudioPatchConfigEventData *data =
                                             (ReleaseAudioPatchConfigEventData *)event->mData.get();
             event->mStatus = releaseAudioPatch_l(data->mHandle);
-            const DeviceTypeSet newDevices = getDeviceTypes();
+            const DeviceTypeSet newDevices = getDeviceTypes_l();
             configChanged = oldDevices != newDevices;
             mLocalLog.log("CFG_EVENT_RELEASE_AUDIO_PATCH: old device %s (%s) new device %s (%s)",
                     dumpDeviceTypes(oldDevices).c_str(), toString(oldDevices).c_str(),
@@ -1089,9 +1089,9 @@ void ThreadBase::dumpBase_l(int fd, const Vector<String16>& /* args */)
     }
     // Note: output device may be used by capture threads for effects such as AEC.
     dprintf(fd, "  Output devices: %s (%s)\n",
-            dumpDeviceTypes(outDeviceTypes()).c_str(), toString(outDeviceTypes()).c_str());
+            dumpDeviceTypes(outDeviceTypes_l()).c_str(), toString(outDeviceTypes_l()).c_str());
     dprintf(fd, "  Input device: %#x (%s)\n",
-            inDeviceType(), toString(inDeviceType()).c_str());
+            inDeviceType_l(), toString(inDeviceType_l()).c_str());
     dprintf(fd, "  Audio source: %d (%s)\n", mAudioSource, toString(mAudioSource).c_str());
 
     // Dump timestamp statistics for the Thread types that support it.
@@ -1102,7 +1102,8 @@ void ThreadBase::dumpBase_l(int fd, const Vector<String16>& /* args */)
             || mType == OFFLOAD
             || mType == SPATIALIZER) {
         dprintf(fd, "  Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
-        dprintf(fd, "  Timestamp corrected: %s\n", isTimestampCorrectionEnabled() ? "yes" : "no");
+        dprintf(fd, "  Timestamp corrected: %s\n",
+                isTimestampCorrectionEnabled_l() ? "yes" : "no");
     }
 
     if (mLastIoBeginNs > 0) { // MMAP may not set this
@@ -1978,7 +1979,7 @@ void ThreadBase::ActiveTracks<T>::clear() {
 }
 
 template <typename T>
-void ThreadBase::ActiveTracks<T>::updatePowerState(
+void ThreadBase::ActiveTracks<T>::updatePowerState_l(
         const sp<ThreadBase>& thread, bool force) {
     // Updates ActiveTracks client uids to the thread wakelock.
     if (mActiveTracksGeneration != mLastActiveTracksGeneration || force) {
@@ -2023,6 +2024,7 @@ void ThreadBase::broadcast_l()
 // Call only from threadLoop() or when it is idle.
 // Do not call from high performance code as this may do binder rpc to the MediaMetrics service.
 void ThreadBase::sendStatistics(bool force)
+NO_THREAD_SAFETY_ANALYSIS
 {
     // Do not log if we have no stats.
     // We choose the timestamp verifier because it is the most likely item to be present.
@@ -2054,8 +2056,8 @@ void ThreadBase::sendStatistics(bool force)
     item->setInt64(MM_PREFIX "channelMask", (int64_t)mChannelMask);
     item->setCString(MM_PREFIX "encoding", toString(mFormat).c_str());
     item->setInt32(MM_PREFIX "frameCount", (int32_t)mFrameCount);
-    item->setCString(MM_PREFIX "outDevice", toString(outDeviceTypes()).c_str());
-    item->setCString(MM_PREFIX "inDevice", toString(inDeviceType()).c_str());
+    item->setCString(MM_PREFIX "outDevice", toString(outDeviceTypes_l()).c_str());
+    item->setCString(MM_PREFIX "inDevice", toString(inDeviceType_l()).c_str());
 
     // thread statistics
     if (mIoJitterMs.getN() > 0) {
@@ -2769,6 +2771,8 @@ uint32_t PlaybackThread::latency() const
     return latency_l();
 }
 uint32_t PlaybackThread::latency_l() const
+NO_THREAD_SAFETY_ANALYSIS
+// Fix later.
 {
     uint32_t latency;
     if (initCheck() == NO_ERROR && mOutput->stream->getLatency(&latency) == OK) {
@@ -3004,7 +3008,7 @@ status_t DirectOutputThread::selectPresentation(int presentationId, int programI
     return mOutput->stream->selectPresentation(presentationId, programId);
 }
 
-void PlaybackThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
+void PlaybackThread::ioConfigChanged_l(audio_io_config_event_t event, pid_t pid,
                                                    audio_port_handle_t portId) {
     ALOGV("PlaybackThread::ioConfigChanged, thread %p, event %d", this, event);
     sp<AudioIoDescriptor> desc;
@@ -3026,7 +3030,7 @@ void PlaybackThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
         desc = sp<AudioIoDescriptor>::make(mId);
         break;
     }
-    mAfThreadCallback->ioConfigChanged(event, desc, pid);
+    mAfThreadCallback->ioConfigChanged_l(event, desc, pid);
 }
 
 void PlaybackThread::onWriteReady()
@@ -3212,8 +3216,8 @@ NO_THREAD_SAFETY_ANALYSIS
     if (hasMixer()) {
         mNormalFrameCount = (mNormalFrameCount + 15) & ~15;
     }
-    ALOGI("HAL output buffer size %zu frames, normal sink buffer size %zu frames", mFrameCount,
-            mNormalFrameCount);
+    ALOGI("HAL output buffer size %zu frames, normal sink buffer size %zu frames",
+            (size_t)mFrameCount, mNormalFrameCount);
 
     // Check if we want to throttle the processing to no more than 2x normal rate
     mThreadThrottle = property_get_bool("af.thread.throttle", true /* default_value */);
@@ -3450,7 +3454,7 @@ void PlaybackThread::checkSilentMode_l()
             ALOGD("ro.audio.silent is ignored since no output device is set");
             return;
         }
-        if (isSingleDeviceType(outDeviceTypes(), AUDIO_DEVICE_OUT_REMOTE_SUBMIX)) {
+        if (isSingleDeviceType(outDeviceTypes_l(), AUDIO_DEVICE_OUT_REMOTE_SUBMIX)) {
             ALOGD("ro.audio.silent will be ignored for threads on AUDIO_DEVICE_OUT_REMOTE_SUBMIX");
             return;
         }
@@ -3620,7 +3624,7 @@ void PlaybackThread::cacheParameters_l()
 
     // make sure standby delay is not too short when connected to an A2DP sink to avoid
     // truncating audio when going to standby.
-    if (!Intersection(outDeviceTypes(),  getAudioDeviceOutAllA2dpSet()).empty()) {
+    if (!Intersection(outDeviceTypes_l(),  getAudioDeviceOutAllA2dpSet()).empty()) {
         if (mStandbyDelayNs < kDefaultStandbyTimeInNsecs) {
             mStandbyDelayNs = kDefaultStandbyTimeInNsecs;
         }
@@ -3968,7 +3972,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
         // If the device is AUDIO_DEVICE_OUT_BUS, check for downstream latency.
         //
         // Note: we access outDeviceTypes() outside of mutex().
-        if (isMsdDevice() && outDeviceTypes().count(AUDIO_DEVICE_OUT_BUS) != 0) {
+        if (isMsdDevice() && outDeviceTypes_l().count(AUDIO_DEVICE_OUT_BUS) != 0) {
             // Here, we try for the AF lock, but do not block on it as the latency
             // is more informational.
             if (mAfThreadCallback->mutex().try_lock()) {
@@ -4113,7 +4117,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             // mMixerStatusIgnoringFastTracks is also updated internally
             mMixerStatus = prepareTracks_l(&tracksToRemove);
 
-            mActiveTracks.updatePowerState(this);
+            mActiveTracks.updatePowerState_l(this);
 
             metadataUpdate = updateMetadata_l();
 
@@ -4486,9 +4490,10 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                                 // notify of throttle end on debug log
                                 // but prevent spamming for bluetooth
                                 ALOGD_IF(!isSingleDeviceType(
-                                                 outDeviceTypes(), audio_is_a2dp_out_device) &&
+                                                 outDeviceTypes_l(), audio_is_a2dp_out_device) &&
                                          !isSingleDeviceType(
-                                                 outDeviceTypes(), audio_is_hearing_aid_out_device),
+                                                 outDeviceTypes_l(),
+                                                 audio_is_hearing_aid_out_device),
                                         "mixer(%p) throttle end: throttle time(%u)", this, diff);
                                 mThreadThrottleEndMs = mThreadThrottleTimeMs;
                             }
@@ -4584,7 +4589,7 @@ void PlaybackThread::collectTimestamps_l()
                 timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
                 mSampleRate);
 
-        if (isTimestampCorrectionEnabled()) {
+        if (isTimestampCorrectionEnabled_l()) {
             ALOGVV("TS_BEFORE: %d %lld %lld", id(),
                     (long long)timestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
                     (long long)timestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL]);
@@ -7196,6 +7201,7 @@ void OffloadThread::threadLoop_exit()
 {
     if (mFlushPending || mHwPaused) {
         // If a flush is pending or track was paused, just discard buffered data
+        audio_utils::lock_guard l(mutex());
         flushHw_l();
     } else {
         mMixerStatus = MIXER_DRAIN_ALL;
@@ -8239,7 +8245,7 @@ reacquire_wakelock:
 
             }
 
-            mActiveTracks.updatePowerState(this);
+            mActiveTracks.updatePowerState_l(this);
 
             updateMetadata_l();
 
@@ -8417,7 +8423,12 @@ reacquire_wakelock:
                 mTimestampVerifier.add(position, time, mSampleRate);
 
                 // Correct timestamps
-                if (isTimestampCorrectionEnabled()) {
+                bool timestampCorrectionEnabled = false;
+                {
+                    audio_utils::lock_guard l(mutex());
+                    timestampCorrectionEnabled = isTimestampCorrectionEnabled_l();
+                }
+                if (timestampCorrectionEnabled) {
                     ALOGVV("TS_BEFORE: %d %lld %lld",
                             id(), (long long)time, (long long)position);
                     auto correctedTimestamp = mTimestampVerifier.getLastCorrectedTimestamp();
@@ -9396,7 +9407,7 @@ void RecordThread::checkBtNrec_l()
 {
     // disable AEC and NS if the device is a BT SCO headset supporting those
     // pre processings
-    bool suspend = audio_is_bluetooth_sco_device(inDeviceType()) &&
+    bool suspend = audio_is_bluetooth_sco_device(inDeviceType_l()) &&
                         mAfThreadCallback->btNrecIsOff();
     if (mBtNrecSuspended.exchange(suspend) != suspend) {
         for (size_t i = 0; i < mEffectChains.size(); i++) {
@@ -9507,7 +9518,7 @@ String8 RecordThread::getParameters(const String8& keys)
     return {};
 }
 
-void RecordThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
+void RecordThread::ioConfigChanged_l(audio_io_config_event_t event, pid_t pid,
                                                  audio_port_handle_t portId) {
     sp<AudioIoDescriptor> desc;
     switch (event) {
@@ -9525,7 +9536,7 @@ void RecordThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
         desc = sp<AudioIoDescriptor>::make(mId);
         break;
     }
-    mAfThreadCallback->ioConfigChanged(event, desc, pid);
+    mAfThreadCallback->ioConfigChanged_l(event, desc, pid);
 }
 
 void RecordThread::readInputParameters_l()
@@ -10323,7 +10334,10 @@ void MmapThread::readHalParameters_l()
 
 bool MmapThread::threadLoop()
 {
-    checkSilentMode_l();
+    {
+        audio_utils::unique_lock _l(mutex());
+        checkSilentMode_l();
+    }
 
     const String8 myName(String8::format("thread %p type %d TID %d", this, mType, gettid()));
 
@@ -10363,7 +10377,7 @@ bool MmapThread::threadLoop()
 
         checkInvalidTracks_l();
 
-        mActiveTracks.updatePowerState(this);
+        mActiveTracks.updatePowerState_l(this);
 
         updateMetadata_l();
 
@@ -10420,7 +10434,7 @@ String8 MmapThread::getParameters(const String8& keys)
     return {};
 }
 
-void MmapThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
+void MmapThread::ioConfigChanged_l(audio_io_config_event_t event, pid_t pid,
                                                audio_port_handle_t portId __unused) {
     sp<AudioIoDescriptor> desc;
     bool isInput = false;
@@ -10442,7 +10456,7 @@ void MmapThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
         desc = sp<AudioIoDescriptor>::make(mId);
         break;
     }
-    mAfThreadCallback->ioConfigChanged(event, desc, pid);
+    mAfThreadCallback->ioConfigChanged_l(event, desc, pid);
 }
 
 status_t MmapThread::createAudioPatch_l(const struct audio_patch* patch,
