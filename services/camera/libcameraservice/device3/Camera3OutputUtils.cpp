@@ -159,6 +159,23 @@ status_t fixupAutoframingTags(CameraMetadata& resultMetadata) {
     return res;
 }
 
+status_t fixupManualFlashStrengthControlTags(CameraMetadata& resultMetadata) {
+    status_t res = OK;
+    camera_metadata_entry strengthLevelEntry =
+            resultMetadata.find(ANDROID_FLASH_STRENGTH_LEVEL);
+    if (strengthLevelEntry.count == 0) {
+        const int32_t defaultStrengthLevelEntry = ANDROID_FLASH_STRENGTH_LEVEL;
+        res = resultMetadata.update(ANDROID_FLASH_STRENGTH_LEVEL, &defaultStrengthLevelEntry, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_FLASH_STRENGTH_LEVEL: %s (%d)",
+                  __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+
+    return res;
+}
+
 void correctMeteringRegions(camera_metadata_t *meta) {
     if (meta == nullptr) return;
 
@@ -382,6 +399,22 @@ void sendCaptureResult(
                         frameNumber, strerror(-res), res);
                 return;
             }
+        }
+    }
+
+    // Fix up manual flash strength control metadata
+    res = fixupManualFlashStrengthControlTags(captureResult.mMetadata);
+    if (res != OK) {
+        SET_ERR("Failed to set flash strength level defaults in result metadata: %s (%d)",
+                strerror(-res), res);
+        return;
+    }
+    for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
+        res = fixupManualFlashStrengthControlTags(physicalMetadata.mPhysicalCameraMetadata);
+        if (res != OK) {
+            SET_ERR("Failed to set flash strength level defaults in physical result"
+                    " metadata: %s (%d)", strerror(-res), res);
+            return;
         }
     }
 
