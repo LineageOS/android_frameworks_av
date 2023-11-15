@@ -2274,8 +2274,8 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     }
     adjAttributionSource = afutils::checkAttributionSourcePackage(
             adjAttributionSource);
-    // we don't yet support anything other than linear PCM
-    if (!audio_is_valid_format(input.config.format) || !audio_is_linear_pcm(input.config.format)) {
+    // further format checks are performed by createRecordTrack_l()
+    if (!audio_is_valid_format(input.config.format)) {
         ALOGE("createRecord() invalid format %#x", input.config.format);
         lStatus = BAD_VALUE;
         goto Exit;
