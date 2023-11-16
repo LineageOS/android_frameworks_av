@@ -1890,7 +1890,7 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
         return 0;
     }
     if ((sampleRate == 0) ||
-            !audio_is_valid_format(format) || !audio_has_proportional_frames(format) ||
+            !audio_is_valid_format(format) ||
             !audio_is_input_channel(channelMask)) {
         return 0;
     }
@@ -1913,6 +1913,10 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
 
     std::vector<audio_format_t> formats = {format};
     if (format != AUDIO_FORMAT_PCM_16_BIT) {
+        // For compressed format, buffer size may be queried using PCM. Allow this for compatibility
+        // in cases the primary hw dev does not support the format.
+        // TODO: replace with a table of formats and nominal buffer sizes (based on nominal bitrate
+        // and codec frame size).
         formats.push_back(AUDIO_FORMAT_PCM_16_BIT);
     }
 
