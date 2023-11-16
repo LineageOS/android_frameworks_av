@@ -68,22 +68,29 @@ public:
     [[nodiscard]] size_t getFrameSize() const override { return sizeof(int8_t); }
 
     /**
+     * @return audio_config_base_t from the perspective of the application and the AudioFlinger.
+     */
+    [[nodiscard]] audio_config_base_t getAudioProperties() const override {
+        return mApplicationConfig;
+    }
+
+    /**
      * @return format from the perspective of the application and the AudioFlinger.
      */
-    [[nodiscard]] virtual audio_format_t getFormat() const { return mApplicationFormat; }
+    [[nodiscard]] virtual audio_format_t getFormat() const { return mApplicationConfig.format; }
 
     /**
      * The HAL may be running at a higher sample rate if, for example, playing wrapped EAC3.
      * @return sample rate from the perspective of the application and the AudioFlinger.
      */
-    [[nodiscard]] virtual uint32_t getSampleRate() const { return mApplicationSampleRate; }
+    [[nodiscard]] virtual uint32_t getSampleRate() const { return mApplicationConfig.sample_rate; }
 
     /**
      * The HAL is in stereo mode when playing multi-channel compressed audio over HDMI.
      * @return channel mask from the perspective of the application and the AudioFlinger.
      */
     [[nodiscard]] virtual audio_channel_mask_t getChannelMask() const {
-        return mApplicationChannelMask;
+        return mApplicationConfig.channel_mask;
     }
 
     status_t flush() override;
@@ -109,9 +116,7 @@ private:
     };
 
     MySPDIFEncoder       mSpdifEncoder;
-    audio_format_t       mApplicationFormat = AUDIO_FORMAT_DEFAULT;
-    uint32_t             mApplicationSampleRate = 0;
-    audio_channel_mask_t mApplicationChannelMask = AUDIO_CHANNEL_NONE;
+    audio_config_base_t  mApplicationConfig = AUDIO_CONFIG_BASE_INITIALIZER;
 
     ssize_t  writeDataBurst(const void* data, size_t bytes);
     ssize_t  writeInternal(const void* buffer, size_t bytes);
