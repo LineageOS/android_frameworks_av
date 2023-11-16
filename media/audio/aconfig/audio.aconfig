@@ -20,3 +20,11 @@ flag {
         "Disable pre-scale absolute volume."
     bug: "302553525"
 }
+
+flag {
+    name: "dsa_over_bt_le_audio"
+    namespace: "media_audio"
+    description:
+        "Enable dynamic spatial audio over Bluetooth LE Audio."
+    bug: "307588546"
+}
