@@ -48,9 +48,9 @@ status_t SpdifStreamOut::open(
 {
     struct audio_config customConfig = *config;
 
-    mApplicationFormat = config->format;
-    mApplicationSampleRate = config->sample_rate;
-    mApplicationChannelMask = config->channel_mask;
+    mApplicationConfig.format = config->format;
+    mApplicationConfig.sample_rate = config->sample_rate;
+    mApplicationConfig.channel_mask = config->channel_mask;
 
     // Some data bursts run at a higher sample rate.
     // TODO Move this into the audio_utils as a static method.
