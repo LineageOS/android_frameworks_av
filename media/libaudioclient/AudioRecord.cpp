@@ -1225,8 +1225,12 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize, bool blocking)
         }
 
         size_t bytesRead = audioBuffer.frameCount * mFrameSize;
-        memcpy_by_audio_format(buffer, mFormat, audioBuffer.raw, mServerConfig.format,
-                               audioBuffer.mSize / mServerSampleSize);
+        if (audio_is_linear_pcm(mFormat)) {
+            memcpy_by_audio_format(buffer, mFormat, audioBuffer.raw, mServerConfig.format,
+                                audioBuffer.mSize / mServerSampleSize);
+        } else {
+            memcpy(buffer, audioBuffer.raw, audioBuffer.mSize);
+        }
         buffer = ((char *) buffer) + bytesRead;
         userSize -= bytesRead;
         read += bytesRead;
