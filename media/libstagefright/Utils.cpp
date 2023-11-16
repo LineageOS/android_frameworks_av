@@ -2483,6 +2483,11 @@ bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
                       bool isStreaming, audio_stream_type_t streamType)
 {
     audio_offload_info_t info = AUDIO_INFO_INITIALIZER;
+    const char *mime;
+    if (meta->findCString(kKeyMIMEType, &mime)
+        && strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_OPUS) == 0) {
+        return false;
+    }
     if (OK != getAudioOffloadInfo(meta, hasVideo, isStreaming, streamType, &info)) {
         return false;
     }
