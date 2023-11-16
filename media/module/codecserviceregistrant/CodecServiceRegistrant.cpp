@@ -737,6 +737,12 @@ extern "C" void RegisterCodecServices() {
     using namespace ::android::hardware::media::c2;
 
     int platformVersion = android_get_device_api_level();
+    // STOPSHIP: Remove code name checking once platform version bumps up to 35.
+    std::string codeName =
+        android::base::GetProperty("ro.build.version.codename", "");
+    if (codeName == "VanillaIceCream") {
+        platformVersion = __ANDROID_API_V__;
+    }
 
     android::sp<V1_0::IComponentStore> hidlStore;
     std::shared_ptr<c2_aidl::IComponentStore> aidlStore;
@@ -797,17 +803,19 @@ extern "C" void RegisterCodecServices() {
         }
     }
 
-    if (!aidlStore) {
-        aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
-                std::make_shared<H2C2ComponentStore>(nullptr));
-    }
-    const std::string serviceName =
-        std::string(c2_aidl::IComponentStore::descriptor) + "/software";
-    binder_exception_t ex = AServiceManager_addService(
-            aidlStore->asBinder().get(), serviceName.c_str());
-    if (ex != EX_NONE) {
-        LOG(ERROR) << "Cannot register software Codec2 AIDL service.";
-        return;
+    if (platformVersion >= __ANDROID_API_V__) {
+        if (!aidlStore) {
+            aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
+                    std::make_shared<H2C2ComponentStore>(nullptr));
+        }
+        const std::string serviceName =
+            std::string(c2_aidl::IComponentStore::descriptor) + "/software";
+        binder_exception_t ex = AServiceManager_addService(
+                aidlStore->asBinder().get(), serviceName.c_str());
+        if (ex != EX_NONE) {
+            LOG(ERROR) << "Cannot register software Codec2 AIDL service.";
+            return;
+        }
     }
 
     if (!hidlStore) {
