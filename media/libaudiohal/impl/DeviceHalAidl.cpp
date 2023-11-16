@@ -477,7 +477,7 @@ status_t DeviceHalAidl::openOutputStream(
     {
         std::lock_guard l(mLock);
         mCallbacks.emplace(cbCookie, Callbacks{});
-        mMapper.addStream(*outStream, aidlPatch.id);
+        mMapper.addStream(*outStream, mixPortConfig.id, aidlPatch.id);
     }
     if (streamCb) streamCb->setCookie(cbCookie);
     eventCb->setCookie(cbCookie);
@@ -543,7 +543,7 @@ status_t DeviceHalAidl::openInputStream(
             std::move(ret.stream), mVendorExt, this /*micInfoProvider*/);
     {
         std::lock_guard l(mLock);
-        mMapper.addStream(*inStream, aidlPatch.id);
+        mMapper.addStream(*inStream, mixPortConfig.id, aidlPatch.id);
     }
     cleanups.disarmAll();
     return OK;

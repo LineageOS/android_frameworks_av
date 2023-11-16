@@ -44,7 +44,7 @@ class Hal2AidlMapper {
             const std::string& instance,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& module);
 
-    void addStream(const sp<StreamHalInterface>& stream, int32_t patchId);
+    void addStream(const sp<StreamHalInterface>& stream, int32_t portConfigId, int32_t patchId);
     status_t createOrUpdatePatch(
             const std::vector<::aidl::android::media::audio::common::AudioPortConfig>& sources,
             const std::vector<::aidl::android::media::audio::common::AudioPortConfig>& sinks,
@@ -114,7 +114,12 @@ class Hal2AidlMapper {
     // Answers the question "whether portID 'first' is reachable from portID 'second'?"
     // It's not a map because both portIDs are known. The matrix is symmetric.
     using RoutingMatrix = std::set<std::pair<int32_t, int32_t>>;
-    using Streams = std::map<wp<StreamHalInterface>, int32_t /*patch ID*/>;
+    // There is always a port config ID set. The patch ID is set after stream
+    // creation, and can be set to '-1' later if the framework happens to create
+    // a patch between the same endpoints. In that case, the ownership of the patch
+    // is on the framework.
+    using Streams = std::map<wp<StreamHalInterface>,
+            std::pair<int32_t /*port config ID*/, int32_t /*patch ID*/>>;
 
     const std::string mInstance;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
@@ -147,10 +152,14 @@ class Hal2AidlMapper {
             const std::optional<::aidl::android::media::audio::common::AudioConfig>& config,
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle);
-    bool isPortHeldByAStream(int32_t portId);
-    void resetPatch(int32_t patchId);
+    bool isPortBeingHeld(int32_t portId);
+    bool portConfigBelongsToPort(int32_t portConfigId, int32_t portId) {
+        auto it = mPortConfigs.find(portConfigId);
+        return it != mPortConfigs.end() && it->second.portId == portId;
+    }
+    status_t releaseAudioPatches(const std::set<int32_t>& patchIds);
+    void resetPatch(int32_t patchId) { (void)releaseAudioPatch(patchId); }
     void resetPortConfig(int32_t portConfigId);
-    void resetUnusedPatches();
     void resetUnusedPortConfigs();
     status_t updateAudioPort(
             int32_t portId, ::aidl::android::media::audio::common::AudioPort* port);
