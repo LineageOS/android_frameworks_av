@@ -43,6 +43,7 @@ namespace android {
  "aftee_Date_ThreadId_C_reason.wav" RecordThread
  "aftee_Date_ThreadId_M_reason.wav" MixerThread (Normal)
  "aftee_Date_ThreadId_F_reason.wav" MixerThread (Fast)
+ "aftee_Date_ThreadId_D_reason.raw" DirectOutputThread (SpdifStreamOut)
  "aftee_Date_ThreadId_TrackId_R_reason.wav" RecordTrack
  "aftee_Date_ThreadId_TrackId_TrackName_T_reason.wav" PlaybackTrack
 
@@ -120,7 +121,7 @@ private:
         return directory.size() > 0 && directory[0] == '/';
     }
 
-    std::string generateFilename(const std::string &suffix) const {
+    std::string generateFilename(const std::string &suffix, audio_format_t format) const {
         char fileTime[sizeof("YYYYmmdd_HHMMSS_\0")];
         struct timeval tv;
         gettimeofday(&tv, nullptr /* struct timezone */);
@@ -130,7 +131,7 @@ private:
             "incorrect fileTime buffer");
         char msec[4];
         (void)snprintf(msec, sizeof(msec), "%03d", (int)(tv.tv_usec / 1000));
-        return mPrefix + fileTime + msec + suffix + ".wav";
+        return mPrefix + fileTime + msec + suffix + (audio_is_linear_pcm(format) ? ".wav" : ".raw");
     }
 
     bool isManagedFilename(const char *name) {
@@ -225,7 +226,7 @@ void NBAIO_Tee::NBAIO_TeeImpl::dumpTee(
 NBAIO_Tee::NBAIO_TeeImpl::NBAIO_SinkSource NBAIO_Tee::NBAIO_TeeImpl::makeSinkSource(
         const NBAIO_Format &format, size_t frames, bool *enabled)
 {
-    if (Format_isValid(format) && audio_is_linear_pcm(format.mFormat)) {
+    if (Format_isValid(format) && audio_has_proportional_frames(format.mFormat)) {
         Pipe *pipe = new Pipe(frames, format);
         size_t numCounterOffers = 0;
         const NBAIO_Format offers[1] = {format};
@@ -259,7 +260,7 @@ std::string AudioFileHandler::create(
         audio_format_t format,
         const std::string &suffix)
 {
-    std::string filename = generateFilename(suffix);
+    std::string filename = generateFilename(suffix, format);
 
     if (mThreadPool.launch(std::string("create ") + filename,
             [=]() { return createInternal(reader, sampleRate, channelCount, format, filename); })
@@ -406,6 +407,7 @@ status_t AudioFileHandler::createInternal(
     switch (format) {
     case AUDIO_FORMAT_PCM_8_BIT:
     case AUDIO_FORMAT_PCM_16_BIT:
+    case AUDIO_FORMAT_IEC61937:
         sf_format = SF_FORMAT_PCM_16;
         writeFormat = AUDIO_FORMAT_PCM_16_BIT;
         ALOGV("%s: %s using PCM_16 for format %#x", __func__, filename.c_str(), format);
@@ -424,7 +426,6 @@ status_t AudioFileHandler::createInternal(
         break;
     default:
         // TODO:
-        // handle audio_has_proportional_frames() formats.
         // handle compressed formats as single byte files.
         return BAD_VALUE;
     }
@@ -440,7 +441,7 @@ status_t AudioFileHandler::createInternal(
         .frames = 0,
         .samplerate = (int)sampleRate,
         .channels = (int)channelCount,
-        .format = SF_FORMAT_WAV | sf_format,
+        .format = sf_format | (audio_is_linear_pcm(format) ? SF_FORMAT_WAV : 0 /* RAW */),
     };
     SNDFILE *sf = sf_open(path.c_str(), SFM_WRITE, &info);
     if (sf == nullptr) {
@@ -463,7 +464,7 @@ status_t AudioFileHandler::createInternal(
         }
 
         // Convert input format to writeFormat as needed.
-        if (format != writeFormat) {
+        if (format != writeFormat && audio_is_linear_pcm(format)) {
             memcpy_by_audio_format(
                     buffer, writeFormat, buffer, format, actualRead * info.channels);
         }
