@@ -565,7 +565,8 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_PROXY, AUDIO_DEVICE_OUT_PROXY,
-                AudioDeviceType::IN_AFE_PROXY, AudioDeviceType::OUT_AFE_PROXY);
+                AudioDeviceType::IN_AFE_PROXY, AudioDeviceType::OUT_AFE_PROXY,
+                GET_DEVICE_DESC_CONNECTION(VIRTUAL));
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_OUT_USB_HEADSET,
                 AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,

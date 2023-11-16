@@ -130,11 +130,15 @@ status_t AidlProviderInfo::initializeAidlProvider(
     }
 
     mDeathRecipient = ndk::ScopedAIBinder_DeathRecipient(AIBinder_DeathRecipient_new(binderDied));
-    auto link = AIBinder_linkToDeath(interface->asBinder().get(), mDeathRecipient.get(), this);
-    if (link != STATUS_OK) {
-        ALOGW("%s: Unable to link to provider '%s' death notifications",
-                __FUNCTION__, mProviderName.c_str());
-        return DEAD_OBJECT;
+
+    if (!flags::virtual_camera_service_discovery() || interface->isRemote()) {
+        binder_status_t link =
+                AIBinder_linkToDeath(interface->asBinder().get(), mDeathRecipient.get(), this);
+        if (link != STATUS_OK) {
+            ALOGW("%s: Unable to link to provider '%s' death notifications (%d)", __FUNCTION__,
+                  mProviderName.c_str(), link);
+            return DEAD_OBJECT;
+        }
     }
 
     if (!kEnableLazyHal) {
@@ -284,13 +288,12 @@ const std::shared_ptr<ICameraProvider> AidlProviderInfo::startProviderInterface(
         if (interface == nullptr) {
             ALOGV("Camera provider actually needs restart, calling getService(%s)",
                   mProviderName.c_str());
-            AIBinder * binder = nullptr;
-            if (flags::lazy_aidl_wait_for_service()) {
-                binder = AServiceManager_waitForService(mProviderName.c_str());
-            } else {
-                binder = AServiceManager_getService(mProviderName.c_str());
+            interface = mManager->mAidlServiceProxy->getAidlService(mProviderName.c_str());
+
+            if (interface == nullptr) {
+                ALOGD("%s: %s service not started", __FUNCTION__, mProviderName.c_str());
+                return nullptr;
             }
-            interface = ICameraProvider::fromBinder(ndk::SpAIBinder(binder));
 
             // Set all devices as ENUMERATING, provider should update status
             // to PRESENT after initializing.

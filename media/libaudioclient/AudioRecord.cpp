@@ -68,10 +68,9 @@ status_t AudioRecord::getMinFrameCount(
     }
 
     // We double the size of input buffer for ping pong use of record buffer.
-    // Assumes audio_is_linear_pcm(format)
-    const auto sampleSize = audio_channel_count_from_in_mask(channelMask) *
-                                      audio_bytes_per_sample(format);
-    if (sampleSize == 0 || ((*frameCount = (size * 2) / sampleSize) == 0)) {
+    const auto frameSize = audio_bytes_per_frame(
+            audio_channel_count_from_in_mask(channelMask), format);
+    if (frameSize == 0 || ((*frameCount = (size * 2) / frameSize) == 0)) {
         ALOGE("%s(): Unsupported configuration: sampleRate %u, format %#x, channelMask %#x",
                 __func__, sampleRate, format, channelMask);
         return BAD_VALUE;
@@ -353,12 +352,7 @@ status_t AudioRecord::set(
     }
 
     mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
-
-    if (audio_is_linear_pcm(mFormat)) {
-        mFrameSize = mChannelCount * audio_bytes_per_sample(mFormat);
-    } else {
-        mFrameSize = sizeof(uint8_t);
-    }
+    mFrameSize = audio_bytes_per_frame(mChannelCount, mFormat);
 
     // mFrameCount is initialized in createRecord_l
     mReqFrameCount = frameCount;

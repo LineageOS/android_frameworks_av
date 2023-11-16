@@ -55,8 +55,7 @@ NBAIO_Format Format_from_SR_C(unsigned sampleRate, unsigned channelCount,
     ret.mSampleRate = sampleRate;
     ret.mChannelCount = channelCount;
     ret.mFormat = format;
-    ret.mFrameSize = audio_is_linear_pcm(format) ?
-            channelCount * audio_bytes_per_sample(format) : sizeof(uint8_t);
+    ret.mFrameSize = audio_bytes_per_frame(channelCount, format);
     return ret;
 }
 

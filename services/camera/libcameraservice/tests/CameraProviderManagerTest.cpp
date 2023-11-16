@@ -18,24 +18,40 @@
 #define LOG_TAG "CameraProviderManagerTest"
 
 #include "../common/CameraProviderManager.h"
-#include <android/hidl/manager/1.0/IServiceManager.h>
-#include <android/hidl/manager/1.0/IServiceNotification.h>
+#include <aidl/android/hardware/camera/device/BnCameraDevice.h>
+#include <aidl/android/hardware/camera/provider/BnCameraProvider.h>
+#include <android/binder_auto_utils.h>
+#include <android/binder_ibinder.h>
+#include <android/binder_interface_utils.h>
+#include <android/binder_libbinder.h>
+#include <android/binder_manager.h>
+#include <android/binder_parcel.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceSession.h>
+#include <android/hidl/manager/1.0/IServiceManager.h>
+#include <android/hidl/manager/1.0/IServiceNotification.h>
+#include <binder/IServiceManager.h>
 #include <camera_metadata_hidden.h>
-#include <hidl/HidlBinderSupport.h>
+#include <com_android_internal_camera_flags.h>
+#include <flag_macros.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <hidl/HidlBinderSupport.h>
 #include <utility>
 
 using namespace android;
 using namespace android::hardware::camera;
+using ::aidl::android::hardware::camera::provider::ICameraProviderCallback;
+using android::hardware::camera::common::V1_0::CameraMetadataType;
 using android::hardware::camera::common::V1_0::Status;
 using android::hardware::camera::common::V1_0::VendorTag;
 using android::hardware::camera::common::V1_0::VendorTagSection;
-using android::hardware::camera::common::V1_0::CameraMetadataType;
 using android::hardware::camera::device::V3_2::ICameraDeviceCallback;
 using android::hardware::camera::device::V3_2::ICameraDeviceSession;
 using android::hardware::camera::provider::V2_5::DeviceState;
+using ::testing::ElementsAre;
+
+namespace flags = com::android::internal::camera::flags;
 
 /**
  * Basic test implementation of a camera ver. 3.2 device interface
@@ -241,18 +257,120 @@ struct TestICameraProvider : virtual public provider::V2_5::ICameraProvider {
     hardware::hidl_bitfield<DeviceState> mCurrentState = 0xFFFFFFFF; // Unlikely to be a real state
 };
 
+struct TestAidlCameraDevice : public aidl::android::hardware::camera::device::BnCameraDevice {
+    ::ndk::ScopedAStatus getCameraCharacteristics(
+            ::aidl::android::hardware::camera::device::CameraMetadata*) override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus getPhysicalCameraCharacteristics(
+            const std::string&,
+            ::aidl::android::hardware::camera::device::CameraMetadata*) override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus getResourceCost(
+            ::aidl::android::hardware::camera::common::CameraResourceCost* aidl_return) override {
+        auto cost = ::aidl::android::hardware::camera::common::CameraResourceCost();
+        aidl_return->resourceCost = 100;
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus isStreamCombinationSupported(
+            const ::aidl::android::hardware::camera::device::StreamConfiguration&, bool*) override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus
+    open(const std::shared_ptr<::aidl::android::hardware::camera::device::ICameraDeviceCallback>&,
+         std::shared_ptr<::aidl::android::hardware::camera::device::ICameraDeviceSession>*)
+            override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus openInjectionSession(
+            const std::shared_ptr<
+                    ::aidl::android::hardware::camera::device::ICameraDeviceCallback>&,
+            std::shared_ptr<::aidl::android::hardware::camera::device::ICameraInjectionSession>*)
+            override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus setTorchMode(bool) override { return ndk::ScopedAStatus::ok(); }
+    ::ndk::ScopedAStatus turnOnTorchWithStrengthLevel(int32_t) override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus getTorchStrengthLevel(int32_t*) override {
+        return ndk::ScopedAStatus::ok();
+    }
+};
+
+/**
+ * Basic test implementation of a AIDL camera provider
+ */
+class TestAidlICameraProvider : public aidl::android::hardware::camera::provider::BnCameraProvider {
+  public:
+    std::shared_ptr<ICameraProviderCallback> mCallback;
+    std::vector<std::string> mDeviceNames;
+
+    TestAidlICameraProvider(const std::vector<std::string>& deviceNames) {
+        mDeviceNames = deviceNames;
+    }
+
+    ::ndk::ScopedAStatus setCallback(
+            const std::shared_ptr<
+                    ::aidl::android::hardware::camera::provider::ICameraProviderCallback>& callback)
+            override {
+        mCallback = callback;
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus getVendorTags(
+            std::vector<::aidl::android::hardware::camera::common::VendorTagSection>*) override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus getCameraIdList(std::vector<std::string>* camera_list) override {
+        ALOGW("getCameraIdList");
+        for (size_t i = 0; i < mDeviceNames.size(); i++) {
+            camera_list->push_back(mDeviceNames.at(i));
+        }
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus getCameraDeviceInterface(
+            const std::string&,
+            std::shared_ptr<::aidl::android::hardware::camera::device::ICameraDevice>* device)
+            override {
+        *device = ndk::SharedRefBase::make<TestAidlCameraDevice>();
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus notifyDeviceStateChange(int64_t) override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus getConcurrentCameraIds(
+            std::vector<
+                    ::aidl::android::hardware::camera::provider::ConcurrentCameraIdCombination>*)
+            override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus isConcurrentStreamCombinationSupported(
+            const std::vector<
+                    ::aidl::android::hardware::camera::provider::CameraIdAndStreamCombination>&,
+            bool*) override {
+        return ndk::ScopedAStatus::ok();
+    }
+};
+
 /**
  * Simple test version of the interaction proxy, to use to inject onRegistered calls to the
  * CameraProviderManager
  */
-struct TestInteractionProxy : public CameraProviderManager::HidlServiceInteractionProxy {
+struct TestInteractionProxy : public CameraProviderManager::HidlServiceInteractionProxy,
+                              public CameraProviderManager::AidlServiceInteractionProxy {
     sp<hidl::manager::V1_0::IServiceNotification> mManagerNotificationInterface;
     sp<TestICameraProvider> mTestCameraProvider;
+    std::shared_ptr<TestAidlICameraProvider> mTestAidlCameraProvider;
 
     TestInteractionProxy() {}
 
     void setProvider(sp<TestICameraProvider> provider) {
         mTestCameraProvider = provider;
+    }
+
+    void setAidlProvider(std::shared_ptr<TestAidlICameraProvider> provider) {
+        mTestAidlCameraProvider = provider;
     }
 
     std::vector<std::string> mLastRequestedServiceNames;
@@ -295,6 +413,10 @@ struct TestInteractionProxy : public CameraProviderManager::HidlServiceInteracti
         return ret;
     }
 
+    virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+    getAidlService(const std::string&) {
+        return mTestAidlCameraProvider;
+    }
 };
 
 struct TestStatusListener : public CameraProviderManager::StatusListener {
@@ -712,4 +834,50 @@ TEST(CameraProviderManagerTest, PhysicalCameraAvailabilityCallbackRaceTest) {
     auto cameraIds = providerManager->getCameraDeviceIds(&unavailablePhysicalIds);
     ASSERT_TRUE(unavailablePhysicalIds.count("0") > 0 && unavailablePhysicalIds["0"].count("2") > 0)
         << "Unavailable physical camera Ids not set properly.";
+}
+TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscovered,
+                REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(flags, virtual_camera_service_discovery))) {
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+
+    status_t res = providerManager->initialize(statusListener, &serviceProxy, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+
+    std::vector<std::string> cameraList = {"device@1.1/virtual/123"};
+
+    std::shared_ptr<TestAidlICameraProvider> aidlProvider =
+            ndk::SharedRefBase::make<TestAidlICameraProvider>(cameraList);
+    ndk::SpAIBinder spBinder = aidlProvider->asBinder();
+    AIBinder* aiBinder = spBinder.get();
+    serviceProxy.setAidlProvider(aidlProvider);
+    providerManager->onServiceRegistration(
+            String16("android.hardware.camera.provider.ICameraProvider/virtual/0"),
+            AIBinder_toPlatformBinder(aiBinder));
+
+    std::unordered_map<std::string, std::set<std::string>> unavailableDeviceIds;
+    auto cameraIds = providerManager->getCameraDeviceIds(&unavailableDeviceIds);
+
+    EXPECT_THAT(cameraIds, ElementsAre("123"));
+}
+
+TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscoveredOnInit,
+                REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(flags, virtual_camera_service_discovery))) {
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+
+    std::vector<std::string> cameraList = {"device@1.1/virtual/123"};
+
+    std::shared_ptr<TestAidlICameraProvider> aidlProvider =
+            ndk::SharedRefBase::make<TestAidlICameraProvider>(cameraList);
+    serviceProxy.setAidlProvider(aidlProvider);
+
+    status_t res = providerManager->initialize(statusListener, &serviceProxy, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+
+    std::unordered_map<std::string, std::set<std::string>> unavailableDeviceIds;
+    std::vector<std::string> cameraIds = providerManager->getCameraDeviceIds(&unavailableDeviceIds);
+
+    EXPECT_THAT(cameraIds, ElementsAre("123"));
 }

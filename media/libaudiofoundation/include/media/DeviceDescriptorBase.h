@@ -79,8 +79,8 @@ public:
 
     bool equals(const sp<DeviceDescriptorBase>& other) const;
 
-    status_t writeToParcelable(media::AudioPortFw* parcelable) const;
-    status_t readFromParcelable(const media::AudioPortFw& parcelable);
+    virtual status_t writeToParcelable(media::AudioPortFw* parcelable) const;
+    virtual status_t readFromParcelable(const media::AudioPortFw& parcelable);
 
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;

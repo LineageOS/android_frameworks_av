@@ -53,6 +53,7 @@ cc_test {
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.device@3.7",
         "android.hidl.token@1.0-utils",
+        "camera_platform_flags_c_lib",
     ],
 
     static_libs: [
@@ -63,6 +64,7 @@ cc_test {
         "android.hardware.camera.provider-V2-ndk",
         "libcameraservice",
         "libgmock",
+        "libflagtest",
     ],
 
     srcs: [
