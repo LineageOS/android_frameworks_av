@@ -7970,10 +7970,11 @@ RecordThread::RecordThread(const sp<IAfThreadCallback>& afThreadCallback,
         break;
     case FastCapture_Static:
         initFastCapture = !mIsMsdDevice // Disable fast capture for MSD BUS devices.
+                && audio_is_linear_pcm(mFormat)
                 && (mFrameCount * 1000) / mSampleRate < kMinNormalCaptureBufferSizeMs;
-        ALOGV("%p kUseFastCapture = Static, (%lld * 1000) / %u vs %u, initFastCapture = %d "
-                "mIsMsdDevice = %d", this, (long long)mFrameCount, mSampleRate,
-                kMinNormalCaptureBufferSizeMs, initFastCapture, mIsMsdDevice);
+        ALOGV("%p kUseFastCapture = Static, format = 0x%x, (%lld * 1000) / %u vs %u, "
+                "initFastCapture = %d, mIsMsdDevice = %d", this, mFormat, (long long)mFrameCount,
+                mSampleRate, kMinNormalCaptureBufferSizeMs, initFastCapture, mIsMsdDevice);
         break;
     // case FastCapture_Dynamic:
     }
