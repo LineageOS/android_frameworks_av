@@ -28,32 +28,32 @@ class ResourceManagerServiceTest : public ResourceManagerServiceTestBase {
 private:
     static MediaResource createSecureVideoCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kSecureCodec,
-            MediaResource::SubType::kVideoCodec, amount);
+            MediaResource::SubType::kHwVideoCodec, amount);
     }
 
     static MediaResource createNonSecureVideoCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kNonSecureCodec,
-            MediaResource::SubType::kVideoCodec, amount);
+            MediaResource::SubType::kHwVideoCodec, amount);
     }
 
     static MediaResource createSecureAudioCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kSecureCodec,
-            MediaResource::SubType::kAudioCodec, amount);
+            MediaResource::SubType::kHwAudioCodec, amount);
     }
 
     static MediaResource createNonSecureAudioCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kNonSecureCodec,
-            MediaResource::SubType::kAudioCodec, amount);
+            MediaResource::SubType::kHwAudioCodec, amount);
     }
 
     static MediaResource createSecureImageCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kSecureCodec,
-            MediaResource::SubType::kImageCodec, amount);
+            MediaResource::SubType::kHwImageCodec, amount);
     }
 
     static MediaResource createNonSecureImageCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kNonSecureCodec,
-            MediaResource::SubType::kImageCodec, amount);
+            MediaResource::SubType::kHwImageCodec, amount);
     }
 
     static MediaResource createGraphicMemoryResource(int amount = 1) {
@@ -272,13 +272,15 @@ public:
 
         // test adding new types (including types that differs only in subType)
         resources11.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
-        resources11.push_back(MediaResource(MediaResource::Type::kSecureCodec, MediaResource::SubType::kVideoCodec, 1));
+        resources11.push_back(MediaResource(MediaResource::Type::kSecureCodec,
+                                            MediaResource::SubType::kHwVideoCodec, 1));
         mService->addResource(client1Info, mTestClient1, resources11);
 
         expected.clear();
         expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, 2));
         expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
-        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, MediaResource::SubType::kVideoCodec, 1));
+        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec,
+                                         MediaResource::SubType::kHwVideoCodec, 1));
         expected.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 500));
         expectEqResourceInfo(infos1.at(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
     }
@@ -476,21 +478,25 @@ public:
 
     void testGetAllClients() {
         addResource();
-        MediaResource::Type type = MediaResource::Type::kSecureCodec;
-        MediaResource::SubType subType = MediaResource::SubType::kUnspecifiedSubType;
 
-        std::vector<std::shared_ptr<IResourceManagerClient> > clients;
-        PidUidVector idList;
-        EXPECT_FALSE(mService->getAllClients_l(kLowPriorityPid, type, subType, &idList, &clients));
+        std::vector<ClientInfo> targetClients;
+        MediaResource resource(MediaResource::Type::kSecureCodec,
+                               MediaResource::SubType::kUnspecifiedSubType,
+                               1);
+        ResourceRequestInfo requestInfoHigh { kHighPriorityPid, &resource};
+        ResourceRequestInfo requestInfoMid { kMidPriorityPid, &resource};
+        ResourceRequestInfo requestInfoLow { kLowPriorityPid, &resource};
+
+        EXPECT_FALSE(mService->getAllClients_l(requestInfoLow, targetClients));
         // some higher priority process (e.g. kTestPid2) owns the resource, so getAllClients_l
         // will fail.
-        EXPECT_FALSE(mService->getAllClients_l(kMidPriorityPid, type, subType, &idList, &clients));
-        EXPECT_TRUE(mService->getAllClients_l(kHighPriorityPid, type, subType, &idList, &clients));
+        EXPECT_FALSE(mService->getAllClients_l(requestInfoMid, targetClients));
+        EXPECT_TRUE(mService->getAllClients_l(requestInfoHigh, targetClients));
 
-        EXPECT_EQ(2u, clients.size());
+        EXPECT_EQ(2u, targetClients.size());
         // (OK to require ordering in clients[], as the pid map is sorted)
-        EXPECT_EQ(mTestClient3, clients[0]);
-        EXPECT_EQ(mTestClient1, clients[1]);
+        EXPECT_EQ(mTestClient3, targetClients[0].mClient);
+        EXPECT_EQ(mTestClient1, targetClients[1].mClient);
     }
 
     void testReclaimResourceSecure() {
@@ -754,23 +760,22 @@ public:
     }
 
     void testGetLowestPriorityBiggestClient() {
-        MediaResource::Type type = MediaResource::Type::kGraphicMemory;
-        MediaResource::SubType subType = MediaResource::SubType::kUnspecifiedSubType;
-        std::shared_ptr<IResourceManagerClient> client;
-        PidUidVector idList;
-        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, subType,
-                &idList, &client));
+        ClientInfo clientInfo;
+        MediaResource resource(MediaResource::Type::kGraphicMemory,
+                               MediaResource::SubType::kUnspecifiedSubType,
+                               1);
+        ResourceRequestInfo requestInfoHigh { kHighPriorityPid, &resource};
+        ResourceRequestInfo requestInfoLow { kLowPriorityPid, &resource};
+        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(requestInfoHigh, clientInfo));
 
         addResource();
 
-        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kLowPriorityPid, type, subType,
-                &idList, &client));
-        EXPECT_TRUE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, subType,
-                &idList, &client));
+        EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(requestInfoLow, clientInfo));
+        EXPECT_TRUE(mService->getLowestPriorityBiggestClient_l(requestInfoHigh, clientInfo));
 
         // kTestPid1 is the lowest priority process with MediaResource::Type::kGraphicMemory.
         // mTestClient1 has the largest MediaResource::Type::kGraphicMemory within kTestPid1.
-        EXPECT_EQ(mTestClient1, client);
+        EXPECT_EQ(mTestClient1, clientInfo.mClient);
     }
 
     void testGetLowestPriorityPid() {
@@ -811,7 +816,8 @@ public:
 
         // new client request should cause VIDEO_ON
         std::vector<MediaResourceParcel> resources1;
-        resources1.push_back(MediaResource(MediaResource::Type::kBattery, MediaResource::SubType::kVideoCodec, 1));
+        resources1.push_back(MediaResource(MediaResource::Type::kBattery,
+                                           MediaResource::SubType::kHwVideoCodec, 1));
         ClientInfoParcel client1Info{.pid = static_cast<int32_t>(kTestPid1),
                                      .uid = static_cast<int32_t>(kTestUid1),
                                      .id = getId(mTestClient1),
@@ -826,7 +832,8 @@ public:
 
         // new client request should cause VIDEO_ON
         std::vector<MediaResourceParcel> resources2;
-        resources2.push_back(MediaResource(MediaResource::Type::kBattery, MediaResource::SubType::kVideoCodec, 2));
+        resources2.push_back(MediaResource(MediaResource::Type::kBattery,
+                                           MediaResource::SubType::kHwVideoCodec, 2));
         ClientInfoParcel client2Info{.pid = static_cast<int32_t>(kTestPid2),
                                      .uid = static_cast<int32_t>(kTestUid2),
                                      .id = getId(mTestClient2),
@@ -1372,9 +1379,9 @@ public:
                                        int64_t id,
                                        const ClientInfoParcel& clientInfo,
                                        ClientConfigParcel& clientConfig) {
-        clientConfig.codecType = MediaResource::SubType::kVideoCodec;
+        clientConfig.codecType = hw? MediaResource::SubType::kHwVideoCodec :
+                                     MediaResource::SubType::kSwVideoCodec;
         clientConfig.isEncoder = encoder;
-        clientConfig.isHardware = hw;
         clientConfig.width = width;
         clientConfig.height = height;
         clientConfig.timeStamp = systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;
