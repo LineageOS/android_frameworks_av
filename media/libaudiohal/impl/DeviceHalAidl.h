@@ -17,7 +17,9 @@
 #pragma once
 
 #include <map>
-#include <set>
+#include <memory>
+#include <mutex>
+#include <string>
 #include <vector>
 
 #include <aidl/android/media/audio/IHalAdapterVendorExtension.h>
@@ -26,9 +28,10 @@
 #include <android-base/thread_annotations.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
-#include <media/audiohal/StreamHalInterface.h>
 
+#include "Cleanups.h"
 #include "ConversionHelperAidl.h"
+#include "Hal2AidlMapper.h"
 
 namespace android {
 
@@ -194,19 +197,6 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
         Status status = Status::UNKNOWN;
         MicrophoneInfoProvider::Info info;
     };
-    // IDs of ports for connected external devices, and whether they are held by streams.
-    using ConnectedPorts = std::map<int32_t /*port ID*/, bool>;
-    using Patches = std::map<int32_t /*patch ID*/,
-            ::aidl::android::hardware::audio::core::AudioPatch>;
-    using PortConfigs = std::map<int32_t /*port config ID*/,
-            ::aidl::android::media::audio::common::AudioPortConfig>;
-    using Ports = std::map<int32_t /*port ID*/, ::aidl::android::media::audio::common::AudioPort>;
-    using Routes = std::vector<::aidl::android::hardware::audio::core::AudioRoute>;
-    // Answers the question "whether portID 'first' is reachable from portID 'second'?"
-    // It's not a map because both portIDs are known. The matrix is symmetric.
-    using RoutingMatrix = std::set<std::pair<int32_t, int32_t>>;
-    using Streams = std::map<wp<StreamHalInterface>, int32_t /*patch ID*/>;
-    class Cleanups;
 
     // Must not be constructed directly by clients.
     DeviceHalAidl(
@@ -216,14 +206,6 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
 
     ~DeviceHalAidl() override = default;
 
-    bool audioDeviceMatches(const ::aidl::android::media::audio::common::AudioDevice& device,
-            const ::aidl::android::media::audio::common::AudioPort& p);
-    bool audioDeviceMatches(const ::aidl::android::media::audio::common::AudioDevice& device,
-            const ::aidl::android::media::audio::common::AudioPortConfig& p);
-    status_t createOrUpdatePortConfig(
-            const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
-            PortConfigs::iterator* result, bool *created);
-    void eraseConnectedPort(int32_t portId);
     status_t filterAndRetrieveBtA2dpParameters(AudioParameter &keys, AudioParameter *result);
     status_t filterAndUpdateBtA2dpParameters(AudioParameter &parameters);
     status_t filterAndUpdateBtHfpParameters(AudioParameter &parameters);
@@ -231,60 +213,6 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t filterAndUpdateBtScoParameters(AudioParameter &parameters);
     status_t filterAndUpdateScreenParameters(AudioParameter &parameters);
     status_t filterAndUpdateTelephonyParameters(AudioParameter &parameters);
-    status_t findOrCreatePatch(
-        const std::set<int32_t>& sourcePortConfigIds,
-        const std::set<int32_t>& sinkPortConfigIds,
-        ::aidl::android::hardware::audio::core::AudioPatch* patch, bool* created);
-    status_t findOrCreatePatch(
-        const ::aidl::android::hardware::audio::core::AudioPatch& requestedPatch,
-        ::aidl::android::hardware::audio::core::AudioPatch* patch, bool* created);
-    status_t findOrCreatePortConfig(
-            const ::aidl::android::media::audio::common::AudioDevice& device,
-            const ::aidl::android::media::audio::common::AudioConfig* config,
-            ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
-            bool* created);
-    status_t findOrCreatePortConfig(
-            const ::aidl::android::media::audio::common::AudioConfig& config,
-            const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
-            int32_t ioHandle,
-            ::aidl::android::media::audio::common::AudioSource aidlSource,
-            const std::set<int32_t>& destinationPortIds,
-            ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
-    status_t findOrCreatePortConfig(
-        const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
-        const std::set<int32_t>& destinationPortIds,
-        ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
-    Patches::iterator findPatch(const std::set<int32_t>& sourcePortConfigIds,
-            const std::set<int32_t>& sinkPortConfigIds);
-    Ports::iterator findPort(const ::aidl::android::media::audio::common::AudioDevice& device);
-    Ports::iterator findPort(
-            const ::aidl::android::media::audio::common::AudioConfig& config,
-            const ::aidl::android::media::audio::common::AudioIoFlags& flags,
-            const std::set<int32_t>& destinationPortIds);
-    PortConfigs::iterator findPortConfig(
-            const ::aidl::android::media::audio::common::AudioDevice& device);
-    PortConfigs::iterator findPortConfig(
-            const std::optional<::aidl::android::media::audio::common::AudioConfig>& config,
-            const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
-            int32_t ioHandle);
-    bool isPortHeldByAStream(int32_t portId);
-    status_t prepareToOpenStream(
-        int32_t aidlHandle,
-        const ::aidl::android::media::audio::common::AudioDevice& aidlDevice,
-        const ::aidl::android::media::audio::common::AudioIoFlags& aidlFlags,
-        ::aidl::android::media::audio::common::AudioSource aidlSource,
-        struct audio_config* config,
-        Cleanups* cleanups,
-        ::aidl::android::media::audio::common::AudioConfig* aidlConfig,
-        ::aidl::android::media::audio::common::AudioPortConfig* mixPortConfig,
-        ::aidl::android::hardware::audio::core::AudioPatch* aidlPatch);
-    void resetPatch(int32_t patchId);
-    void resetPortConfig(int32_t portConfigId);
-    void resetUnusedPatches();
-    void resetUnusedPatchesAndPortConfigs();
-    void resetUnusedPortConfigs();
-    status_t updateRoutes();
-    status_t getAudioPort(int32_t portId, ::aidl::android::media::audio::common::AudioPort* port);
 
     // CallbackBroker implementation
     void clearCallbacks(void* cookie) override;
@@ -311,28 +239,14 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetooth> mBluetooth;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetoothA2dp> mBluetoothA2dp;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IBluetoothLe> mBluetoothLe;
-    std::shared_ptr<::aidl::android::hardware::audio::core::sounddose::ISoundDose>
-        mSoundDose = nullptr;
-    Ports mPorts;
-    // Remote submix "template" ports (no address specified, no profiles).
-    // They are excluded from `mPorts` as their presence confuses the framework code.
-    std::optional<::aidl::android::media::audio::common::AudioPort> mRemoteSubmixIn;
-    std::optional<::aidl::android::media::audio::common::AudioPort> mRemoteSubmixOut;
-    int32_t mDefaultInputPortId = -1;
-    int32_t mDefaultOutputPortId = -1;
-    PortConfigs mPortConfigs;
-    std::set<int32_t> mInitialPortConfigIds;
-    Patches mPatches;
-    Routes mRoutes;
-    RoutingMatrix mRoutingMatrix;
-    Streams mStreams;
-    Microphones mMicrophones;
+    const std::shared_ptr<::aidl::android::hardware::audio::core::sounddose::ISoundDose> mSoundDose;
+
     std::mutex mLock;
     std::map<void*, Callbacks> mCallbacks GUARDED_BY(mLock);
-    std::set<audio_port_handle_t> mDeviceDisconnectionNotified;
-    ConnectedPorts mConnectedPorts;
-    std::pair<int32_t, ::aidl::android::media::audio::common::AudioPort>
-            mDisconnectedPortReplacement;
+    std::set<audio_port_handle_t> mDeviceDisconnectionNotified GUARDED_BY(mLock);
+    Hal2AidlMapper mMapper GUARDED_BY(mLock);
+    LockedAccessor<Hal2AidlMapper> mMapperAccessor;
+    Microphones mMicrophones GUARDED_BY(mLock);
 };
 
 } // namespace android
