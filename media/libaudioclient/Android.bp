@@ -68,7 +68,6 @@ cc_library {
         "libaudioclient_aidl_conversion",
         "libaudioutils",
         "libbinder",
-        "libbinder_ndk",
         "libcutils",
         "liblog",
         "libutils",
