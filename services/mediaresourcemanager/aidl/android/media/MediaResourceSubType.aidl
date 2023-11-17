@@ -24,7 +24,10 @@ package android.media;
 @Backing(type="int")
 enum MediaResourceSubType {
     kUnspecifiedSubType = 0,
-    kAudioCodec = 1,
-    kVideoCodec = 2,
-    kImageCodec = 3,
+    kHwAudioCodec = 1,
+    kSwAudioCodec = 2,
+    kHwVideoCodec = 3,
+    kSwVideoCodec = 4,
+    kHwImageCodec = 5,
+    kSwImageCodec = 6,
 }

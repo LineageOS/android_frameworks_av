@@ -1017,12 +1017,19 @@ void CodecCallback::onMetricsUpdated(const sp<AMessage> &updatedMetrics) {
     notify->post();
 }
 
-static MediaResourceSubType toMediaResourceSubType(MediaCodec::Domain domain) {
+static MediaResourceSubType toMediaResourceSubType(bool isHardware, MediaCodec::Domain domain) {
     switch (domain) {
-        case MediaCodec::DOMAIN_VIDEO: return MediaResourceSubType::kVideoCodec;
-        case MediaCodec::DOMAIN_AUDIO: return MediaResourceSubType::kAudioCodec;
-        case MediaCodec::DOMAIN_IMAGE: return MediaResourceSubType::kImageCodec;
-        default:                       return MediaResourceSubType::kUnspecifiedSubType;
+    case MediaCodec::DOMAIN_VIDEO:
+        return isHardware? MediaResourceSubType::kHwVideoCodec :
+                           MediaResourceSubType::kSwVideoCodec;
+    case MediaCodec::DOMAIN_AUDIO:
+        return isHardware? MediaResourceSubType::kHwAudioCodec :
+                           MediaResourceSubType::kSwAudioCodec;
+    case MediaCodec::DOMAIN_IMAGE:
+        return isHardware? MediaResourceSubType::kHwImageCodec :
+                           MediaResourceSubType::kSwImageCodec;
+    default:
+        return MediaResourceSubType::kUnspecifiedSubType;
     }
 }
 
@@ -1791,7 +1798,7 @@ void MediaCodec::statsBufferSent(int64_t presentationUs, const sp<MediaCodecBuff
 
     if (mBatteryChecker != nullptr) {
         mBatteryChecker->onCodecActivity([this] () {
-            mResourceManagerProxy->addResource(MediaResource::VideoBatteryResource());
+            mResourceManagerProxy->addResource(MediaResource::VideoBatteryResource(mIsHardware));
         });
     }
 
@@ -1863,7 +1870,7 @@ void MediaCodec::statsBufferReceived(int64_t presentationUs, const sp<MediaCodec
 
     if (mBatteryChecker != nullptr) {
         mBatteryChecker->onCodecActivity([this] () {
-            mResourceManagerProxy->addResource(MediaResource::VideoBatteryResource());
+            mResourceManagerProxy->addResource(MediaResource::VideoBatteryResource(mIsHardware));
         });
     }
 
@@ -2118,13 +2125,16 @@ status_t MediaCodec::init(const AString &name) {
         mBatteryChecker = new BatteryChecker(new AMessage(kWhatCheckBatteryStats, this));
     }
 
-    std::vector<MediaResourceParcel> resources;
-    resources.push_back(MediaResource::CodecResource(secureCodec, toMediaResourceSubType(mDomain)));
-
     // If the ComponentName is not set yet, use the name passed by the user.
     if (mComponentName.empty()) {
+        mIsHardware = !MediaCodecList::isSoftwareCodec(name);
         mResourceManagerProxy->setCodecName(name.c_str());
     }
+
+    std::vector<MediaResourceParcel> resources;
+    resources.push_back(MediaResource::CodecResource(secureCodec,
+                                                     toMediaResourceSubType(mIsHardware, mDomain)));
+
     for (int i = 0; i <= kMaxRetry; ++i) {
         if (i > 0) {
             // Don't try to reclaim resource for the first time.
@@ -2368,7 +2378,7 @@ status_t MediaCodec::configure(
     status_t err;
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(mFlags & kFlagIsSecure,
-            toMediaResourceSubType(mDomain)));
+            toMediaResourceSubType(mIsHardware, mDomain)));
     if (mDomain == DOMAIN_VIDEO || mDomain == DOMAIN_IMAGE) {
         // Don't know the buffer size at this point, but it's fine to use 1 because
         // the reclaimResource call doesn't consider the requester's buffer size for now.
@@ -2973,7 +2983,7 @@ status_t MediaCodec::start() {
     status_t err;
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(mFlags & kFlagIsSecure,
-            toMediaResourceSubType(mDomain)));
+            toMediaResourceSubType(mIsHardware, mDomain)));
     if (mDomain == DOMAIN_VIDEO || mDomain == DOMAIN_IMAGE) {
         // Don't know the buffer size at this point, but it's fine to use 1 because
         // the reclaimResource call doesn't consider the requester's buffer size for now.
@@ -3729,9 +3739,8 @@ MediaCodec::DequeueOutputResult MediaCodec::handleDequeueOutputBuffer(
 
 
 inline void MediaCodec::initClientConfigParcel(ClientConfigParcel& clientConfig) {
-    clientConfig.codecType = toMediaResourceSubType(mDomain);
+    clientConfig.codecType = toMediaResourceSubType(mIsHardware, mDomain);
     clientConfig.isEncoder = mFlags & kFlagIsEncoder;
-    clientConfig.isHardware = !MediaCodecList::isSoftwareCodec(mComponentName);
     clientConfig.width = mWidth;
     clientConfig.height = mHeight;
     clientConfig.timeStamp = systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;
@@ -3960,6 +3969,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK(msg->findString("componentName", &mComponentName));
 
                     if (mComponentName.c_str()) {
+                        mIsHardware = !MediaCodecList::isSoftwareCodec(mComponentName);
                         mediametrics_setCString(mMetricsHandle, kCodecCodec,
                                                 mComponentName.c_str());
                         // Update the codec name.
@@ -3987,7 +3997,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                           MediaCodecList::isSoftwareCodec(mComponentName) ? 0 : 1);
 
                     mResourceManagerProxy->addResource(MediaResource::CodecResource(
-                            mFlags & kFlagIsSecure, toMediaResourceSubType(mDomain)));
+                            mFlags & kFlagIsSecure, toMediaResourceSubType(mIsHardware, mDomain)));
 
                     postPendingRepliesAndDeferredMessages("kWhatComponentAllocated");
                     break;
@@ -5506,7 +5516,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             if (mBatteryChecker != nullptr) {
                 mBatteryChecker->onCheckBatteryTimer(msg, [this] () {
                     mResourceManagerProxy->removeResource(
-                            MediaResource::VideoBatteryResource());
+                            MediaResource::VideoBatteryResource(mIsHardware));
                 });
             }
             break;
