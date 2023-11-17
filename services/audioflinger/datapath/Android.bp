@@ -55,10 +55,18 @@ cc_library {
     shared_libs: [
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
+        "libaudioflinger_utils", // NBAIO_Tee
+        "libaudioprocessing",
         "libaudiospdif",
         "libaudioutils",
         "libbase",
+        "libcutils",
         "liblog",
+        "libnbaio",
         "libutils", // refbase
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audioflinger",  // for configuration
     ],
 }
