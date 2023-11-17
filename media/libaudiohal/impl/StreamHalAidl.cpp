@@ -83,6 +83,7 @@ StreamHalAidl::StreamHalAidl(
           mContext(std::move(context)),
           mStream(stream),
           mVendorExt(vext) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     {
         std::lock_guard l(mLock);
         mLastReply.latencyMs = nominalLatency;
@@ -97,6 +98,7 @@ StreamHalAidl::StreamHalAidl(
 }
 
 StreamHalAidl::~StreamHalAidl() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     if (mStream != nullptr) {
         ndk::ScopedAStatus status = mStream->close();
         ALOGE_IF(!status.isOk(), "%s: status %s", __func__, status.getDescription().c_str());
