@@ -32,6 +32,7 @@
 #include <dlfcn.h>
 #include <future>
 #include <inttypes.h>
+#include <android_companion_virtualdevice_flags.h>
 #include <android/binder_manager.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
@@ -59,6 +60,7 @@ using std::literals::chrono_literals::operator""s;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 
 namespace flags = com::android::internal::camera::flags;
+namespace vd_flags = android::companion::virtualdevice::flags;
 
 namespace {
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
@@ -3162,7 +3164,7 @@ void CameraProviderManager::filterLogicalCameraIdsLocked(
 }
 
 bool CameraProviderManager::isVirtualCameraHalEnabled() {
-    return flags::virtual_camera_service_discovery();
+    return vd_flags::virtual_camera_service_discovery();
 }
 
 } // namespace android

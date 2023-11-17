@@ -47,6 +47,7 @@ cc_test {
         "libutils",
         "libjpeg",
         "libexif",
+        "android.companion.virtualdevice.flags-aconfig-cc",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
