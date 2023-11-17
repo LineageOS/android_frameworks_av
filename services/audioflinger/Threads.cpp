@@ -7970,10 +7970,11 @@ RecordThread::RecordThread(const sp<IAfThreadCallback>& afThreadCallback,
         break;
     case FastCapture_Static:
         initFastCapture = !mIsMsdDevice // Disable fast capture for MSD BUS devices.
+                && audio_is_linear_pcm(mFormat)
                 && (mFrameCount * 1000) / mSampleRate < kMinNormalCaptureBufferSizeMs;
-        ALOGV("%p kUseFastCapture = Static, (%lld * 1000) / %u vs %u, initFastCapture = %d "
-                "mIsMsdDevice = %d", this, (long long)mFrameCount, mSampleRate,
-                kMinNormalCaptureBufferSizeMs, initFastCapture, mIsMsdDevice);
+        ALOGV("%p kUseFastCapture = Static, format = 0x%x, (%lld * 1000) / %u vs %u, "
+                "initFastCapture = %d, mIsMsdDevice = %d", this, mFormat, (long long)mFrameCount,
+                mSampleRate, kMinNormalCaptureBufferSizeMs, initFastCapture, mIsMsdDevice);
         break;
     // case FastCapture_Dynamic:
     }
@@ -8549,9 +8550,11 @@ reacquire_wakelock:
                 // from framesIn.
                 // This isn't strictly necessary but helps limit buffer resizing in
                 // RecordBufferConverter.  TODO: remove when no longer needed.
-                framesOut = min(framesOut,
-                        destinationFramesPossible(
-                                framesIn, mSampleRate, activeTrack->sampleRate()));
+                if (audio_is_linear_pcm(activeTrack->format())) {
+                    framesOut = min(framesOut,
+                            destinationFramesPossible(
+                                    framesIn, mSampleRate, activeTrack->sampleRate()));
+                }
 
                 if (activeTrack->isDirect()) {
                     // No RecordBufferConverter used for direct streams. Pass
