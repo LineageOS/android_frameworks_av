@@ -135,8 +135,8 @@ public:
     // To be called when after a reclaim event.
     void pushReclaimAtom(const ClientInfoParcel& clientInfo,
                          const std::vector<int>& priorities,
-                         const std::vector<std::shared_ptr<IResourceManagerClient>>& clients,
-                         const PidUidVector& idList, bool reclaimed);
+                         const std::vector<ClientInfo>& targetClients,
+                         bool reclaimed);
 
     // Add this pid/uid set to monitor for the process termination state.
     void addPid(int pid, uid_t uid = 0);

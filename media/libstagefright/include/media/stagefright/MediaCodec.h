@@ -720,6 +720,7 @@ private:
 
     // An unique ID for the codec - Used by the metrics.
     uint64_t mCodecId = 0;
+    bool     mIsHardware = false;
 
     std::function<sp<CodecBase>(const AString &, const char *)> mGetCodecBase;
     std::function<status_t(const AString &, sp<MediaCodecInfo> *)> mGetCodecInfo;
