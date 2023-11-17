@@ -144,15 +144,24 @@ void SoundDoseManager::setOutputRs2UpperBound(float rs2Value) {
     const std::lock_guard _l(mLock);
 
     if (mHalSoundDose.size() > 0) {
+        bool success = true;
         for (auto& halSoundDose : mHalSoundDose) {
             // using the HAL sound dose interface
             if (!halSoundDose.second->setOutputRs2UpperBound(rs2Value).isOk()) {
                 ALOGE("%s: Cannot set RS2 value for momentary exposure %f", __func__, rs2Value);
-                continue;
+                success = false;
+                break;
             }
         }
 
-        mRs2UpperBound = rs2Value;
+        if (success) {
+            mRs2UpperBound = rs2Value;
+        } else {
+            // restore all RS2 upper bounds to the previous value
+            for (auto& halSoundDose : mHalSoundDose) {
+                halSoundDose.second->setOutputRs2UpperBound(mRs2UpperBound);
+            }
+        }
         return;
     }
 
