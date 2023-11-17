@@ -61,8 +61,9 @@ MediaResource MediaResource::CpuBoostResource() {
 }
 
 //static
-MediaResource MediaResource::VideoBatteryResource() {
-    return MediaResource(Type::kBattery, SubType::kVideoCodec, 1);
+MediaResource MediaResource::VideoBatteryResource(bool isHardware) {
+    SubType subType = isHardware ? SubType::kHwVideoCodec : SubType::kSwVideoCodec;
+    return MediaResource(Type::kBattery, subType, 1);
 }
 
 //static
