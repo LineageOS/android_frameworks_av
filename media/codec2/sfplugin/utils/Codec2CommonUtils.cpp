@@ -47,35 +47,12 @@ bool isAtLeastU() {
 }
 
 static bool isP010Allowed() {
-    // The first SDK the device shipped with.
-    static const int32_t kProductFirstApiLevel =
-        base::GetIntProperty<int32_t>("ro.product.first_api_level", 0);
+    // The Vendor API level which is min(ro.product.first_api_level, ro.board.[first_]api_level).
+    // This is the api level to which VSR requirement the device conform.
+    static const int32_t kVendorApiLevel =
+        base::GetIntProperty<int32_t>("ro.vendor.api_level", 0);
 
-    // GRF devices (introduced in Android 11) list the first and possibly the current api levels
-    // to signal which VSR requirements they conform to even if the first device SDK was higher.
-    static const int32_t kBoardFirstApiLevel =
-        base::GetIntProperty<int32_t>("ro.board.first_api_level", 0);
-
-    // Some devices that launched prior to Android S may not support P010 correctly, even
-    // though they may advertise it as supported.
-    if (kProductFirstApiLevel != 0 && kProductFirstApiLevel < __ANDROID_API_S__) {
-        return false;
-    }
-
-    if (kBoardFirstApiLevel != 0 && kBoardFirstApiLevel < __ANDROID_API_S__) {
-        return false;
-    }
-
-    static const int32_t kBoardApiLevel =
-        base::GetIntProperty<int32_t>("ro.board.api_level", 0);
-
-    // For non-GRF devices, use the first SDK version by the product.
-    static const int32_t kFirstApiLevel =
-        kBoardApiLevel != 0 ? kBoardApiLevel :
-        kBoardFirstApiLevel != 0 ? kBoardFirstApiLevel :
-        kProductFirstApiLevel;
-
-    return kFirstApiLevel >= __ANDROID_API_T__;
+    return kVendorApiLevel >= __ANDROID_API_T__;
 }
 
 bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
