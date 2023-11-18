@@ -162,7 +162,11 @@ ndk::ScopedAStatus EffectProxy::buildDescriptor(const AudioUuid& uuid,
 
 Descriptor::Common EffectProxy::buildDescriptorCommon(
         const AudioUuid& uuid, const std::vector<Descriptor>& subEffectDescs) {
-    Descriptor::Common common;
+    // initial flag values before we know which sub-effect to active (with setOffloadParam)
+    // align to HIDL EffectProxy flags
+    Descriptor::Common common = {.flags = {.type = Flags::Type::INSERT,
+                                           .insert = Flags::Insert::LAST,
+                                           .volume = Flags::Volume::CTRL}};
 
     for (const auto& desc : subEffectDescs) {
         if (desc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL) {
@@ -174,13 +178,11 @@ Descriptor::Common EffectProxy::buildDescriptorCommon(
         common.flags.deviceIndication |= desc.common.flags.deviceIndication;
         common.flags.audioModeIndication |= desc.common.flags.audioModeIndication;
         common.flags.audioSourceIndication |= desc.common.flags.audioSourceIndication;
+        // Set to NONE if any sub-effect not supporting any Volume command
+        if (desc.common.flags.volume == Flags::Volume::NONE) {
+            common.flags.volume = Flags::Volume::NONE;
+        }
     }
-
-    // initial flag values before we know which sub-effect to active (with setOffloadParam)
-    // same as HIDL EffectProxy flags
-    common.flags.type = Flags::Type::INSERT;
-    common.flags.insert = Flags::Insert::LAST;
-    common.flags.volume = Flags::Volume::CTRL;
 
     // copy type UUID from any of sub-effects, all sub-effects should have same type
     common.id.type = subEffectDescs[0].common.id.type;
