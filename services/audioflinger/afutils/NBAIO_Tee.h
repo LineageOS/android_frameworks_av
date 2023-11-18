@@ -48,7 +48,7 @@ namespace android {
  *
  * Some AudioFlinger specific notes:
  *
- * 1) Tees capture only linear PCM data.
+ * 1) Tees capture only linear PCM or IEC61937 data.
  * 2) Tees without any data written are considered empty and do not generate
  *    any output files.
  * 2) Once a Tee dumps data, it is considered "emptied" and new data
@@ -58,6 +58,7 @@ namespace android {
  *    WAV integer PCM 32 bit for AUDIO_FORMAT_PCM_8_24_BIT, AUDIO_FORMAT_PCM_24_BIT_PACKED
  *                               AUDIO_FORMAT_PCM_32_BIT.
  *    WAV float PCM 32 bit for AUDIO_FORMAT_PCM_FLOAT.
+ *    RAW for AUDIO_FORMAT_IEC61937.
  *
  * Input_Thread:
  * 1) Capture buffer is teed when read from the HAL, before resampling for the AudioRecord
@@ -68,8 +69,8 @@ namespace android {
  *    NormalMixer output (if no FastMixer).
  * 2) DuplicatingThreads do not tee any mixed data. Apply a tee on the downstream OutputTrack
  *    or on the upstream playback Tracks.
- * 3) DirectThreads and OffloadThreads do not tee any data. The upstream track
- *    (if linear PCM format) may be teed to discover data.
+ * 3) DirectThreads and OffloadThreads with SpdifStreamOut will tee IEC61937 wrapped data.
+ *    Otherwise, the upstream track (if linear PCM format) may be teed to discover data.
  * 4) MmapThreads are not supported.
  *
  * Tracks:
@@ -198,8 +199,8 @@ private:
 
             // determine number of frames for Tee
             if (frames == 0) {
-                // TODO: consider varying frame count based on type.
-                frames = DEFAULT_TEE_FRAMES;
+                frames = (static_cast<long long>(DEFAULT_TEE_DURATION_MS) * format.mSampleRate)
+                            / MILLIS_PER_SECOND;
             }
 
             // TODO: should we check minimum number of frames?
@@ -260,8 +261,7 @@ private:
         static NBAIO_SinkSource makeSinkSource(
                 const NBAIO_Format &format, size_t frames, bool *enabled);
 
-        // 0x200000 stereo 16-bit PCM frames = 47.5 seconds at 44.1 kHz, 8 megabytes
-        static constexpr size_t DEFAULT_TEE_FRAMES = 0x200000;
+        static constexpr size_t DEFAULT_TEE_DURATION_MS = 60'000;
 
         // atomic status checking
         std::atomic<bool> mEnabled{false};

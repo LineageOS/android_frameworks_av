@@ -17,6 +17,7 @@
 
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
+#include "Configuration.h"
 #include <system/audio.h>
 #include <utils/Log.h>
 
@@ -48,9 +49,9 @@ status_t SpdifStreamOut::open(
 {
     struct audio_config customConfig = *config;
 
-    mApplicationFormat = config->format;
-    mApplicationSampleRate = config->sample_rate;
-    mApplicationChannelMask = config->channel_mask;
+    mApplicationConfig.format = config->format;
+    mApplicationConfig.sample_rate = config->sample_rate;
+    mApplicationConfig.channel_mask = config->channel_mask;
 
     // Some data bursts run at a higher sample rate.
     // TODO Move this into the audio_utils as a static method.
@@ -96,6 +97,16 @@ status_t SpdifStreamOut::open(
 
     ALOGI("SpdifStreamOut::open() status = %d", status);
 
+#ifdef TEE_SINK
+    if (status == OK) {
+        // Don't use PCM 16-bit format to avoid WAV encoding IEC61937 data.
+        mTee.set(customConfig.sample_rate,
+                audio_channel_count_from_out_mask(customConfig.channel_mask),
+                AUDIO_FORMAT_IEC61937, NBAIO_Tee::TEE_FLAG_OUTPUT_THREAD);
+        mTee.setId(std::string("_") + std::to_string(handle) + "_D");
+    }
+#endif
+
     return status;
 }
 
@@ -113,7 +124,15 @@ int SpdifStreamOut::standby()
 
 ssize_t SpdifStreamOut::writeDataBurst(const void* buffer, size_t bytes)
 {
-    return AudioStreamOut::write(buffer, bytes);
+    const ssize_t written = AudioStreamOut::write(buffer, bytes);
+
+#ifdef TEE_SINK
+    if (written > 0) {
+        mTee.write(reinterpret_cast<const char *>(buffer),
+                written / AudioStreamOut::getFrameSize());
+    }
+#endif
+    return written;
 }
 
 ssize_t SpdifStreamOut::write(const void* buffer, size_t numBytes)

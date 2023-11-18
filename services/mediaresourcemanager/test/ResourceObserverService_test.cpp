@@ -118,22 +118,22 @@ const EventTracker::Event EventTracker::NoEvent;
 
 static MediaResource createSecureVideoCodecResource(int amount = 1) {
     return MediaResource(MediaResource::Type::kSecureCodec,
-        MediaResource::SubType::kVideoCodec, amount);
+        MediaResource::SubType::kHwVideoCodec, amount);
 }
 
 static MediaResource createNonSecureVideoCodecResource(int amount = 1) {
     return MediaResource(MediaResource::Type::kNonSecureCodec,
-        MediaResource::SubType::kVideoCodec, amount);
+        MediaResource::SubType::kHwVideoCodec, amount);
 }
 
 static MediaResource createSecureAudioCodecResource(int amount = 1) {
     return MediaResource(MediaResource::Type::kSecureCodec,
-        MediaResource::SubType::kAudioCodec, amount);
+        MediaResource::SubType::kHwAudioCodec, amount);
 }
 
 static MediaResource createNonSecureAudioCodecResource(int amount = 1) {
     return MediaResource(MediaResource::Type::kNonSecureCodec,
-        MediaResource::SubType::kAudioCodec, amount);
+        MediaResource::SubType::kHwAudioCodec, amount);
 }
 
 // Operators for GTest macros.

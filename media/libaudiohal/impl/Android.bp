@@ -319,6 +319,7 @@ filegroup {
         "ConversionHelperAidl.cpp",
         "DeviceHalAidl.cpp",
         "DevicesFactoryHalAidl.cpp",
+        "Hal2AidlMapper.cpp",
         "StreamHalAidl.cpp",
     ],
 }
