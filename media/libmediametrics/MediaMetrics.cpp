@@ -87,7 +87,7 @@ void mediametrics_setRate(mediametrics_handle_t handle, attr_t attr,
 }
 
 void mediametrics_setString(mediametrics_handle_t handle, attr_t attr,
-                                 const std::string &string) {
+                            const std::string &string) {
     mediametrics_setCString(handle, attr, string.c_str());
 }
 
