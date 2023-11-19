@@ -4,6 +4,8 @@ service audioserver /system/bin/audioserver
     # media gid needed for /dev/fm (radio) and for /data/misc/media (tee)
     group audio camera drmrpc media mediadrm net_bt net_bt_admin net_bw_acct wakelock
     capabilities BLOCK_SUSPEND
+    # match rtprio cur / max with sensor service as we handle AR/VR HID sensor data.
+    rlimit rtprio 10 10
     ioprio rt 4
     task_profiles ProcessCapacityHigh HighPerformance
     onrestart restart vendor.audio-hal
