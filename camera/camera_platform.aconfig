@@ -69,3 +69,10 @@ flag {
      description: "An AE mode that enables increased brightening in low light scenes"
      bug: "312803148"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "multiresolution_imagereader_usage_config"
+     description: "Enable creating MultiResolutionImageReader with usage flag configuration"
+     bug: "301588215"
+}
