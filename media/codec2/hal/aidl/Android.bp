@@ -7,6 +7,10 @@ package {
 cc_library {
     name: "libcodec2_aidl_client",
 
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
+
     srcs: [
         "BufferTypes.cpp",
         "ParamTypes.cpp",
@@ -58,7 +62,10 @@ cc_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.media.swcodec",
-        "test_com.android.media.swcodec",
+    ],
+
+    defaults: [
+        "libcodec2_hal_selection",
     ],
 
     srcs: [
