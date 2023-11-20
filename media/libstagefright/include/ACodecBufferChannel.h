@@ -72,8 +72,8 @@ public:
     void setCrypto(const sp<ICrypto> &crypto) override;
     void setDescrambler(const sp<IDescrambler> &descrambler) override;
 
-    virtual status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) override;
-    virtual status_t queueSecureInputBuffer(
+    status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) override;
+    status_t queueSecureInputBuffer(
             const sp<MediaCodecBuffer> &buffer,
             bool secure,
             const uint8_t *key,
@@ -83,10 +83,10 @@ public:
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
             AString *errorDetailMsg) override;
-    virtual status_t attachBuffer(
+    status_t attachBuffer(
             const std::shared_ptr<C2Buffer> &c2Buffer,
             const sp<MediaCodecBuffer> &buffer) override;
-    virtual status_t attachEncryptedBuffer(
+    status_t attachEncryptedBuffer(
             const sp<hardware::HidlMemory> &memory,
             bool secure,
             const uint8_t *key,
@@ -98,12 +98,12 @@ public:
             size_t numSubSamples,
             const sp<MediaCodecBuffer> &buffer,
             AString* errorDetailMsg) override;
-    virtual status_t renderOutputBuffer(
+    status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
-    virtual void pollForRenderedBuffers() override;
-    virtual status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override;
-    virtual void getInputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
-    virtual void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
+    void pollForRenderedBuffers() override;
+    status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override;
+    void getInputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
+    void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
 
     // Methods below are interface for ACodec to use.
 

@@ -245,7 +245,7 @@ static const char *kCodecJudderScoreHistogramBuckets =
         "android.media.mediacodec.judder-score-histogram-buckets";
 // Freeze event
 static const char *kCodecFreezeEventCount = "android.media.mediacodec.freeze-event-count";
-static const char *kFreezeEventKeyName = "freeze";
+static const char *kFreezeEventKeyName = "videofreeze";
 static const char *kFreezeEventInitialTimeUs = "android.media.mediacodec.freeze.initial-time-us";
 static const char *kFreezeEventDurationMs = "android.media.mediacodec.freeze.duration-ms";
 static const char *kFreezeEventCount = "android.media.mediacodec.freeze.count";
@@ -257,7 +257,7 @@ static const char *kFreezeEventDetailsDistanceMs =
         "android.media.mediacodec.freeze.details-distance-ms";
 // Judder event
 static const char *kCodecJudderEventCount = "android.media.mediacodec.judder-event-count";
-static const char *kJudderEventKeyName = "judder";
+static const char *kJudderEventKeyName = "videojudder";
 static const char *kJudderEventInitialTimeUs = "android.media.mediacodec.judder.initial-time-us";
 static const char *kJudderEventDurationMs = "android.media.mediacodec.judder.duration-ms";
 static const char *kJudderEventCount = "android.media.mediacodec.judder.count";
