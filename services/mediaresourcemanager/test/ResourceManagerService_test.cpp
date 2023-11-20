@@ -495,8 +495,8 @@ public:
 
         EXPECT_EQ(2u, targetClients.size());
         // (OK to require ordering in clients[], as the pid map is sorted)
-        EXPECT_EQ(mTestClient3, targetClients[0].mClient);
-        EXPECT_EQ(mTestClient1, targetClients[1].mClient);
+        EXPECT_EQ(getId(mTestClient3), targetClients[0].mClientId);
+        EXPECT_EQ(getId(mTestClient1), targetClients[1].mClientId);
     }
 
     void testReclaimResourceSecure() {
@@ -775,7 +775,7 @@ public:
 
         // kTestPid1 is the lowest priority process with MediaResource::Type::kGraphicMemory.
         // mTestClient1 has the largest MediaResource::Type::kGraphicMemory within kTestPid1.
-        EXPECT_EQ(mTestClient1, clientInfo.mClient);
+        EXPECT_EQ(getId(mTestClient1), clientInfo.mClientId);
     }
 
     void testGetLowestPriorityPid() {
