@@ -186,6 +186,10 @@ private:
     long getPeakConcurrentPixelCount(int pid) const;
     // Get the current concurrent pixel count (associated with the video codecs) for the process.
     long getCurrentConcurrentPixelCount(int pid) const;
+    // To create object of type ResourceManagerServiceNew
+    static std::shared_ptr<ResourceManagerService> CreateNew(
+        const sp<ProcessInfoInterface>& processInfo,
+        const sp<SystemCallbackInterface>& systemResource);
 
     mutable std::mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;

@@ -29,11 +29,15 @@
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/ProcessInfo.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <com_android_media_codec_flags.h>
 
 #include "IMediaResourceMonitor.h"
 #include "ResourceManagerMetrics.h"
+#include "ResourceManagerServiceNew.h"
 #include "ResourceObserverService.h"
 #include "ServiceLog.h"
+
+namespace CodecFeatureFlags = com::android::media::codec::flags;
 
 namespace android {
 
@@ -212,7 +216,18 @@ std::shared_ptr<ResourceManagerService> ResourceManagerService::Create() {
 std::shared_ptr<ResourceManagerService> ResourceManagerService::Create(
         const sp<ProcessInfoInterface>& processInfo,
         const sp<SystemCallbackInterface>& systemResource) {
+    // If codec importance feature is on, create the refactored implementation.
+    if (CodecFeatureFlags::codec_importance()) {
+        return ::ndk::SharedRefBase::make<ResourceManagerServiceNew>(processInfo, systemResource);
+    }
     return ::ndk::SharedRefBase::make<ResourceManagerService>(processInfo, systemResource);
+}
+
+// TEST only function.
+std::shared_ptr<ResourceManagerService> ResourceManagerService::CreateNew(
+        const sp<ProcessInfoInterface>& processInfo,
+        const sp<SystemCallbackInterface>& systemResource) {
+    return ::ndk::SharedRefBase::make<ResourceManagerServiceNew>(processInfo, systemResource);
 }
 
 ResourceManagerService::~ResourceManagerService() {}

@@ -76,6 +76,7 @@ cc_library {
     srcs: [
         "ResourceManagerMetrics.cpp",
         "ResourceManagerService.cpp",
+        "ResourceManagerServiceNew.cpp",
         "ResourceObserverService.cpp",
         "ResourceManagerServiceUtils.cpp",
         "ServiceLog.cpp",
@@ -97,6 +98,7 @@ cc_library {
         "libstatssocket",
         "libprotobuf-cpp-lite",
         "libactivitymanager_aidl",
+        "aconfig_mediacodec_flags_c_lib",
     ],
 
     static_libs: [
