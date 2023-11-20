@@ -270,10 +270,10 @@ cc_library {
         "SurfaceUtils.cpp",
         "ThrottledSource.cpp",
         "Utils.cpp",
-        "VideoRenderQualityTracker.cpp",
         "VideoFrameSchedulerBase.cpp",
         "VideoFrameScheduler.cpp",
-    ],
+        "VideoRenderQualityTracker.cpp",
+      ],
 
     shared_libs: [
         "libstagefright_framecapture_utils",
