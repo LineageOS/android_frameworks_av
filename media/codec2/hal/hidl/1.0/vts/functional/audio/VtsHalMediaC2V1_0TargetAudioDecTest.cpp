@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "codec2_hidl_hal_audio_dec_test"
 
 #include <android-base/logging.h>
+#include <android/binder_process.h>
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
@@ -27,6 +28,7 @@
 #include <C2BufferPriv.h>
 #include <C2Config.h>
 #include <C2Debug.h>
+#include <codec2/aidl/ParamTypes.h>
 #include <codec2/hidl/client.h>
 
 #include "media_c2_hidl_test_common.h"
@@ -88,7 +90,8 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
 
         std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
         CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mLinearAllocator), C2_OK);
-        mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
+        mLinearPool = std::make_shared<C2PooledBlockPool>(
+                mLinearAllocator, mBlockPoolId++, getBufferPoolVer());
         ASSERT_NE(mLinearPool, nullptr);
 
         std::vector<std::unique_ptr<C2Param>> queried;
@@ -864,5 +867,6 @@ int main(int argc, char** argv) {
     }
 
     ::testing::InitGoogleTest(&argc, argv);
+    ABinderProcess_startThreadPool();
     return RUN_ALL_TESTS();
 }
