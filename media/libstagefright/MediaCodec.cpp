@@ -211,6 +211,7 @@ static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
 // Render metrics
 static const char *kCodecPlaybackDurationSec = "android.media.mediacodec.playback-duration-sec";
 static const char *kCodecFirstRenderTimeUs = "android.media.mediacodec.first-render-time-us";
+static const char *kCodecLastRenderTimeUs = "android.media.mediacodec.last-render-time-us";
 static const char *kCodecFramesReleased = "android.media.mediacodec.frames-released";
 static const char *kCodecFramesRendered = "android.media.mediacodec.frames-rendered";
 static const char *kCodecFramesDropped = "android.media.mediacodec.frames-dropped";
@@ -1345,6 +1346,7 @@ void MediaCodec::updateMediametrics() {
         const VideoRenderQualityMetrics &m = mVideoRenderQualityTracker.getMetrics();
         if (m.frameReleasedCount > 0) {
             mediametrics_setInt64(mMetricsHandle, kCodecFirstRenderTimeUs, m.firstRenderTimeUs);
+            mediametrics_setInt64(mMetricsHandle, kCodecLastRenderTimeUs, m.lastRenderTimeUs);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesReleased, m.frameReleasedCount);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesRendered, m.frameRenderedCount);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesSkipped, m.frameSkippedCount);
