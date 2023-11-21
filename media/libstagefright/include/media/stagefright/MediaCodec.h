@@ -449,6 +449,7 @@ private:
     int64_t mPresentationTimeUs = 0;
     status_t mStickyError;
     sp<Surface> mSurface;
+    uint32_t mSurfaceGeneration = 0;
     SoftwareRenderer *mSoftRenderer;
 
     Mutex mMetricsLock;
@@ -617,7 +618,7 @@ private:
     status_t queueCSDInputBuffer(size_t bufferIndex);
 
     status_t handleSetSurface(const sp<Surface> &surface);
-    status_t connectToSurface(const sp<Surface> &surface);
+    status_t connectToSurface(const sp<Surface> &surface, uint32_t *generation);
     status_t disconnectFromSurface();
 
     bool hasCryptoOrDescrambler() {
