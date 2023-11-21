@@ -28,6 +28,7 @@
 #include <C2Config.h>
 #include <C2PlatformStorePluginLoader.h>
 #include <C2PlatformSupport.h>
+#include <codec2/common/HalSelection.h>
 #include <cutils/properties.h>
 #include <util/C2InterfaceHelper.h>
 
@@ -447,6 +448,12 @@ C2PlatformAllocatorStore::id_t GetPreferredLinearAllocatorId(int poolMask) {
 
 namespace {
 
+static C2PooledBlockPool::BufferPoolVer GetBufferPoolVer() {
+    static C2PooledBlockPool::BufferPoolVer sVer =
+        IsCodec2AidlHalSelected() ? C2PooledBlockPool::VER_AIDL2 : C2PooledBlockPool::VER_HIDL;
+    return sVer;
+}
+
 class _C2BlockPoolCache {
 public:
     _C2BlockPoolCache() : mBlockPoolSeqId(C2BlockPool::PLATFORM_START + 1) {}
@@ -477,7 +484,7 @@ private:
                         C2PlatformAllocatorStore::ION, &allocator);
                 if (res == C2_OK) {
                     std::shared_ptr<C2BlockPool> ptr(
-                            new C2PooledBlockPool(allocator, poolId), deleter);
+                            new C2PooledBlockPool(allocator, poolId, GetBufferPoolVer()), deleter);
                     *pool = ptr;
                     mBlockPools[poolId] = ptr;
                     mComponents[poolId].insert(
@@ -490,7 +497,7 @@ private:
                         C2PlatformAllocatorStore::BLOB, &allocator);
                 if (res == C2_OK) {
                     std::shared_ptr<C2BlockPool> ptr(
-                            new C2PooledBlockPool(allocator, poolId), deleter);
+                            new C2PooledBlockPool(allocator, poolId, GetBufferPoolVer()), deleter);
                     *pool = ptr;
                     mBlockPools[poolId] = ptr;
                     mComponents[poolId].insert(
@@ -504,7 +511,7 @@ private:
                         C2AllocatorStore::DEFAULT_GRAPHIC, &allocator);
                 if (res == C2_OK) {
                     std::shared_ptr<C2BlockPool> ptr(
-                        new C2PooledBlockPool(allocator, poolId), deleter);
+                            new C2PooledBlockPool(allocator, poolId, GetBufferPoolVer()), deleter);
                     *pool = ptr;
                     mBlockPools[poolId] = ptr;
                     mComponents[poolId].insert(

@@ -183,7 +183,8 @@ bool addBaseBlock(
                 baseBlocks, baseBlockIndices);
     }
     switch (blockPoolData->getType()) {
-    case _C2BlockPoolData::TYPE_BUFFERPOOL: {
+    case _C2BlockPoolData::TYPE_BUFFERPOOL:
+    case _C2BlockPoolData::TYPE_BUFFERPOOL2: {
             // BufferPoolData
             std::shared_ptr<typename BufferPoolTypes::BufferPoolData> bpData;
             if (!GetBufferPoolData<BufferPoolTypes>(blockPoolData, &bpData) || !bpData) {
@@ -194,28 +195,30 @@ bool addBaseBlock(
                     index, bpData,
                     bufferPoolSender, baseBlocks, baseBlockIndices);
         }
-    case _C2BlockPoolData::TYPE_BUFFERQUEUE:
-        uint32_t gen;
-        uint64_t bqId;
-        int32_t bqSlot;
-        // Update handle if migration happened.
-        if (_C2BlockFactory::GetBufferQueueData(
-                blockPoolData, &gen, &bqId, &bqSlot)) {
-            android::MigrateNativeCodec2GrallocHandle(
-                    const_cast<native_handle_t*>(handle), gen, bqId, bqSlot);
+    case _C2BlockPoolData::TYPE_BUFFERQUEUE: {
+            uint32_t gen;
+            uint64_t bqId;
+            int32_t bqSlot;
+            // Update handle if migration happened.
+            if (_C2BlockFactory::GetBufferQueueData(
+                    blockPoolData, &gen, &bqId, &bqSlot)) {
+                android::MigrateNativeCodec2GrallocHandle(
+                        const_cast<native_handle_t*>(handle), gen, bqId, bqSlot);
+            }
+            return _addBaseBlock(
+                    index, handle,
+                    baseBlocks, baseBlockIndices);
         }
-        return _addBaseBlock(
-                index, handle,
-                baseBlocks, baseBlockIndices);
-    case _C2BlockPoolData::TYPE_AHWBUFFER:
-        AHardwareBuffer *pBuf;
-        if (!_C2BlockFactory::GetAHardwareBuffer(blockPoolData, &pBuf)) {
-            LOG(ERROR) << "AHardwareBuffer unavailable in a block.";
-            return false;
+    case _C2BlockPoolData::TYPE_AHWBUFFER: {
+            AHardwareBuffer *pBuf;
+            if (!_C2BlockFactory::GetAHardwareBuffer(blockPoolData, &pBuf)) {
+                LOG(ERROR) << "AHardwareBuffer unavailable in a block.";
+                return false;
+            }
+            return _addBaseBlock(
+                    index, pBuf,
+                    baseBlocks, baseBlockIndices);
         }
-        return _addBaseBlock(
-                index, pBuf,
-                baseBlocks, baseBlockIndices);
     default:
         LOG(ERROR) << "Unknown C2BlockPoolData type.";
         return false;
