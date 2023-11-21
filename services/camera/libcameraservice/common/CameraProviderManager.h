@@ -317,6 +317,14 @@ public:
             bool *status /*out*/) const;
 
     /**
+     * Get session characteristics for a particular session.
+     */
+     status_t getSessionCharacteristics(const std::string& id,
+            const SessionConfiguration &configuration,
+            bool overrideForPerfClass, camera3::metadataGetter getMetadata,
+            CameraMetadata* sessionCharacteristics /*out*/) const;
+
+    /**
      * Return the highest supported device interface version for this ID
      */
     status_t getHighestSupportedVersion(const std::string &id,
@@ -632,6 +640,15 @@ private:
                     bool * /*status*/) {
                 return INVALID_OPERATION;
             }
+
+            virtual status_t getSessionCharacteristics(
+                    const SessionConfiguration &/*configuration*/,
+                    bool /*overrideForPerfClass*/,
+                    camera3::metadataGetter /*getMetadata*/,
+                    CameraMetadata* /*sessionCharacteristics*/) {
+                return INVALID_OPERATION;
+            }
+
             virtual status_t filterSmallJpegSizes() = 0;
             virtual void notifyDeviceStateChange(int64_t /*newState*/) {}
             virtual status_t createDefaultRequest(

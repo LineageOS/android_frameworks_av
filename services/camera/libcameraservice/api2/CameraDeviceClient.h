@@ -109,6 +109,11 @@ public:
             /*out*/
             bool* streamStatus) override;
 
+    virtual binder::Status getSessionCharacteristics(
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/
+            hardware::camera2::impl::CameraMetadataNative* sessionCharacteristics) override;
+
     // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;
 

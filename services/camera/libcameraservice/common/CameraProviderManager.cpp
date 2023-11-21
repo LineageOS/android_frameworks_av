@@ -442,6 +442,23 @@ status_t  CameraProviderManager::createDefaultRequest(const std::string& cameraI
     return OK;
 }
 
+status_t CameraProviderManager::getSessionCharacteristics(const std::string& id,
+        const SessionConfiguration &configuration, bool overrideForPerfClass,
+        metadataGetter getMetadata,
+        CameraMetadata* sessionCharacteristics /*out*/) const {
+    if (!flags::feature_combination_query()) {
+        return INVALID_OPERATION;
+    }
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+
+    return deviceInfo->getSessionCharacteristics(configuration,
+            overrideForPerfClass, getMetadata, sessionCharacteristics);
+}
+
 status_t CameraProviderManager::getCameraIdIPCTransport(const std::string &id,
         IPCTransport *providerTransport) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);

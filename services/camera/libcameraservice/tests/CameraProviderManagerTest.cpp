@@ -309,6 +309,12 @@ struct TestAidlCameraDevice : public aidl::android::hardware::camera::device::Bn
             bool*) override {
         return ndk::ScopedAStatus::ok();
     }
+
+    ::ndk::ScopedAStatus getSessionCharacteristics(
+        const ::aidl::android::hardware::camera::device::StreamConfiguration&,
+        ::aidl::android::hardware::camera::device::CameraMetadata*) override {
+        return ndk::ScopedAStatus::ok();
+    }
 };
 
 /**
