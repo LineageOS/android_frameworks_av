@@ -46,6 +46,7 @@
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/PersistentSurface.h>
+#include <media/stagefright/RenderedFrameInfo.h>
 #include <utils/NativeHandle.h>
 
 #include "C2OMXNode.h"
@@ -672,8 +673,7 @@ public:
     }
 
     void onOutputFramesRendered(int64_t mediaTimeUs, nsecs_t renderTimeNs) override {
-        mCodec->mCallback->onOutputFramesRendered(
-                {RenderedFrameInfo(mediaTimeUs, renderTimeNs)});
+        mCodec->mCallback->onOutputFramesRendered({RenderedFrameInfo(mediaTimeUs, renderTimeNs)});
     }
 
     void onOutputBuffersChanged() override {
