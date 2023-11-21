@@ -15,7 +15,11 @@
  */
 
 #define LOG_TAG "VideoRenderQualityTracker"
+#define ATRACE_TAG ATRACE_TAG_VIDEO
+
 #include <utils/Log.h>
+#include <utils/Trace.h>
+#include <utils/Mutex.h>
 
 #include <media/stagefright/VideoRenderQualityTracker.h>
 
@@ -25,8 +29,10 @@
 #include <stdio.h>
 #include <sys/time.h>
 
+#include <android-base/macros.h>
 #include <android-base/parsebool.h>
 #include <android-base/parseint.h>
+#include <android-base/properties.h>
 
 namespace android {
 
@@ -38,6 +44,7 @@ static constexpr float FRAME_RATE_24_3_2_PULLDOWN =
 
 typedef VideoRenderQualityTracker::Configuration::GetServerConfigurableFlagFn
         GetServerConfigurableFlagFn;
+typedef VideoRenderQualityTracker::TraceTriggerFn TraceTriggerFn;
 
 static void getServerConfigurableFlag(GetServerConfigurableFlagFn getServerConfigurableFlagFn,
                                       char const *flagNameSuffix, bool *value) {
@@ -149,6 +156,10 @@ VideoRenderQualityTracker::Configuration
     getFlag(judderEventMax, "judder_event_max");
     getFlag(judderEventDetailsMax, "judder_event_details_max");
     getFlag(judderEventDistanceToleranceMs, "judder_event_distance_tolerance_ms");
+    getFlag(traceTriggerEnabled, "trace_trigger_enabled");
+    getFlag(traceTriggerThrottleMs, "trace_trigger_throttle_ms");
+    getFlag(traceMinFreezeDurationMs, "trace_minimum_freeze_duration_ms");
+    getFlag(traceMaxFreezeDurationMs, "trace_maximum_freeze_duration_ms");
 #undef getFlag
     return c;
 }
@@ -186,15 +197,25 @@ VideoRenderQualityTracker::Configuration::Configuration() {
     judderEventMax = 0; // enabled only when debugging
     judderEventDetailsMax = 20;
     judderEventDistanceToleranceMs = 5000; // lump judder occurrences together when 5s or less
+
+    // Perfetto trigger configuration.
+    traceTriggerEnabled = android::base::GetProperty(
+        "ro.build.type", "user") != "user"; // Enabled for non-user builds for debugging.
+    traceTriggerThrottleMs = 5 * 60 * 1000; // 5 mins.
+    traceMinFreezeDurationMs = 400;
+    traceMaxFreezeDurationMs = 1500;
 }
 
-VideoRenderQualityTracker::VideoRenderQualityTracker() : mConfiguration(Configuration()) {
+VideoRenderQualityTracker::VideoRenderQualityTracker()
+    : mConfiguration(Configuration()), mTraceTriggerFn(triggerTrace) {
     configureHistograms(mMetrics, mConfiguration);
     clear();
 }
 
-VideoRenderQualityTracker::VideoRenderQualityTracker(const Configuration &configuration) :
-        mConfiguration(configuration) {
+VideoRenderQualityTracker::VideoRenderQualityTracker(const Configuration &configuration,
+                                                     const TraceTriggerFn traceTriggerFn)
+    : mConfiguration(configuration),
+      mTraceTriggerFn(traceTriggerFn == nullptr ? triggerTrace : traceTriggerFn) {
     configureHistograms(mMetrics, mConfiguration);
     clear();
 }
@@ -231,6 +252,11 @@ void VideoRenderQualityTracker::onFrameSkipped(int64_t contentTimeUs) {
 
     resetIfDiscontinuity(contentTimeUs, -1);
 
+    if (mTraceFrameSkippedToken == -1) {
+       mTraceFrameSkippedToken = contentTimeUs;
+       ATRACE_ASYNC_BEGIN("Video frame(s) skipped", mTraceFrameSkippedToken);
+    }
+
     // Frames skipped at the end of playback shouldn't be counted as skipped frames, since the
     // app could be terminating the playback. The pending count will be added to the metrics if and
     // when the next frame is rendered.
@@ -261,11 +287,25 @@ void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t a
         return;
     }
 
+    if (mTraceFrameSkippedToken != -1) {
+        ATRACE_ASYNC_END("Video frame(s) skipped", mTraceFrameSkippedToken);
+        mTraceFrameSkippedToken = -1;
+    }
+
     int64_t actualRenderTimeUs = actualRenderTimeNs / 1000;
 
     if (mLastRenderTimeUs != -1) {
-        mRenderDurationMs += (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
+        int64_t frameRenderDurationMs = (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
+        mRenderDurationMs += frameRenderDurationMs;
+        if (mConfiguration.traceTriggerEnabled
+            // Threshold for visible video freeze.
+            && frameRenderDurationMs >= mConfiguration.traceMinFreezeDurationMs
+            // Threshold for removing long render durations which could be video pause.
+            && frameRenderDurationMs < mConfiguration.traceMaxFreezeDurationMs) {
+            triggerTraceWithThrottle(mTraceTriggerFn, mConfiguration, actualRenderTimeUs);
+        }
     }
+
     // Now that a frame has been rendered, the previously skipped frames can be processed as skipped
     // frames since the app is not skipping them to terminate playback.
     for (int64_t contentTimeUs : mPendingSkippedFrameContentTimeUsList) {
@@ -455,6 +495,8 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     if (mMetrics.firstRenderTimeUs == 0) {
         mMetrics.firstRenderTimeUs = actualRenderTimeUs;
     }
+    // Capture the timestamp at which the last frame was rendered
+    mMetrics.lastRenderTimeUs = actualRenderTimeUs;
 
     mMetrics.frameRenderedCount++;
 
@@ -734,6 +776,44 @@ bool VideoRenderQualityTracker::is32pulldown(const FrameDurationUs &durationUs,
         return true;
     }
     return false;
+}
+
+void VideoRenderQualityTracker::triggerTraceWithThrottle(const TraceTriggerFn traceTriggerFn,
+                                                         const Configuration &c,
+                                                         const int64_t triggerTimeUs) {
+    static int64_t lastTriggerUs = -1;
+    static Mutex updateLastTriggerLock;
+
+    Mutex::Autolock autoLock(updateLastTriggerLock);
+    if (lastTriggerUs != -1) {
+        int32_t sinceLastTriggerMs = int32_t((triggerTimeUs - lastTriggerUs) / 1000);
+        // Throttle the trace trigger calls to reduce continuous PID fork calls in a short time
+        // to impact device performance, and reduce spamming trace reports.
+        if (sinceLastTriggerMs < c.traceTriggerThrottleMs) {
+            ALOGI("Not triggering trace - not enough time since last trigger");
+            return;
+        }
+    }
+    lastTriggerUs = triggerTimeUs;
+    (*traceTriggerFn)();
+}
+
+void VideoRenderQualityTracker::triggerTrace() {
+    // Trigger perfetto to stop always-on-tracing (AOT) to collect trace into a file for video
+    // freeze event, the collected trace categories are configured by AOT.
+    const char* args[] = {"/system/bin/trigger_perfetto", "com.android.codec-video-freeze", NULL};
+    pid_t pid = fork();
+    if (pid < 0) {
+        ALOGI("Failed to fork for triggering trace");
+        return;
+    }
+    if (pid == 0) {
+        // child process.
+        execvp(args[0], const_cast<char**>(args));
+        ALOGW("Failed to trigger trace %s", args[1]);
+        _exit(1);
+    }
+    ALOGI("Triggered trace %s", args[1]);
 }
 
 } // namespace android
