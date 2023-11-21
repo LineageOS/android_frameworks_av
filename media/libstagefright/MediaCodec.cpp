@@ -822,6 +822,37 @@ private:
     const sp<AMessage> mNotify;
 };
 
+class OnBufferReleasedListener : public ::android::BnProducerListener{
+private:
+    uint32_t mGeneration;
+    std::weak_ptr<BufferChannelBase> mBufferChannel;
+
+    void notifyBufferReleased() {
+        auto p = mBufferChannel.lock();
+        if (p) {
+            p->onBufferReleasedFromOutputSurface(mGeneration);
+        }
+    }
+
+public:
+    explicit OnBufferReleasedListener(
+            uint32_t generation,
+            const std::shared_ptr<BufferChannelBase> &bufferChannel)
+            : mGeneration(generation), mBufferChannel(bufferChannel) {}
+
+    virtual ~OnBufferReleasedListener() = default;
+
+    void onBufferReleased() override {
+        notifyBufferReleased();
+    }
+
+    void onBufferDetached([[maybe_unused]] int slot) override {
+        notifyBufferReleased();
+    }
+
+    bool needsReleaseNotify() override { return true; }
+};
+
 class BufferCallback : public CodecBase::BufferCallback {
 public:
     explicit BufferCallback(const sp<AMessage> &notify);
@@ -4682,6 +4713,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     PostReplyWithError(replyID, err);
                     break;
                 }
+                uint32_t generation = mSurfaceGeneration;
+                format->setInt32("native-window-generation", generation);
             } else {
                 // we are not using surface so this variable is not used, but initialize sensibly anyway
                 mAllowFrameDroppingBySurface = false;
@@ -4810,7 +4843,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mErrorLog.log(LOG_TAG, "Unsetting surface is not supported");
                         err = BAD_VALUE;
                     } else {
-                        err = connectToSurface(surface);
+                        uint32_t generation;
+                        err = connectToSurface(surface, &generation);
                         if (err == ALREADY_EXISTS) {
                             // reconnecting to same surface
                             err = OK;
@@ -4825,12 +4859,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                     mSoftRenderer = new SoftwareRenderer(surface);
                                     // TODO: check if this was successful
                                 } else {
-                                    err = mCodec->setSurface(surface);
+                                    err = mCodec->setSurface(surface, generation);
                                 }
                             }
                             if (err == OK) {
                                 (void)disconnectFromSurface();
                                 mSurface = surface;
+                                mSurfaceGeneration = generation;
                             }
                             mReliabilityContextMetrics.setOutputSurfaceCount++;
                         }
@@ -5068,15 +5103,17 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     mReleaseSurface.reset(new ReleaseSurface(usage));
                 }
                 if (mSurface != mReleaseSurface->getSurface()) {
-                    status_t err = connectToSurface(mReleaseSurface->getSurface());
+                    uint32_t generation;
+                    status_t err = connectToSurface(mReleaseSurface->getSurface(), &generation);
                     ALOGW_IF(err != OK, "error connecting to release surface: err = %d", err);
                     if (err == OK && !(mFlags & kFlagUsesSoftwareRenderer)) {
-                        err = mCodec->setSurface(mReleaseSurface->getSurface());
+                        err = mCodec->setSurface(mReleaseSurface->getSurface(), generation);
                         ALOGW_IF(err != OK, "error setting release surface: err = %d", err);
                     }
                     if (err == OK) {
                         (void)disconnectFromSurface();
                         mSurface = mReleaseSurface->getSurface();
+                        mSurfaceGeneration = generation;
                     } else {
                         // We were not able to switch the surface, so force
                         // synchronous release.
@@ -6346,7 +6383,7 @@ ssize_t MediaCodec::dequeuePortBuffer(int32_t portIndex) {
     return index;
 }
 
-status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
+status_t MediaCodec::connectToSurface(const sp<Surface> &surface, uint32_t *generation) {
     status_t err = OK;
     if (surface != NULL) {
         uint64_t oldId, newId;
@@ -6368,21 +6405,26 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             // number. Rely on the fact that max supported process id by Linux is 2^22.
             // PID is never 0 so we don't have to worry that we use the default generation of 0.
             // TODO: come up with a unique scheme if other producers also set the generation number.
-            static uint32_t mSurfaceGeneration = 0;
-            uint32_t generation = (getpid() << 10) | (++mSurfaceGeneration & ((1 << 10) - 1));
-            surface->setGenerationNumber(generation);
-            ALOGI("[%s] setting surface generation to %u", mComponentName.c_str(), generation);
+            static uint32_t sSurfaceGeneration = 0;
+            *generation = (getpid() << 10) | (++sSurfaceGeneration & ((1 << 10) - 1));
+            surface->setGenerationNumber(*generation);
+            ALOGI("[%s] setting surface generation to %u", mComponentName.c_str(), *generation);
 
             // HACK: clear any free buffers. Remove when connect will automatically do this.
             // This is needed as the consumer may be holding onto stale frames that it can reattach
             // to this surface after disconnect/connect, and those free frames would inherit the new
             // generation number. Disconnecting after setting a unique generation prevents this.
             nativeWindowDisconnect(surface.get(), "connectToSurface(reconnect)");
-            err = nativeWindowConnect(surface.get(), "connectToSurface(reconnect)");
+            sp<IProducerListener> listener =
+                    new OnBufferReleasedListener(*generation, mBufferChannel);
+            err = surfaceConnectWithListener(
+                    surface, listener, "connectToSurface(reconnect-with-listener)");
         }
 
         if (err != OK) {
-            ALOGE("nativeWindowConnect returned an error: %s (%d)", strerror(-err), err);
+            *generation = 0;
+            ALOGE("nativeWindowConnect/surfaceConnectWithListener returned an error: %s (%d)",
+                    strerror(-err), err);
         } else {
             if (!mAllowFrameDroppingBySurface) {
                 disableLegacyBufferDropPostQ(surface);
@@ -6408,6 +6450,7 @@ status_t MediaCodec::disconnectFromSurface() {
         }
         // assume disconnected even on error
         mSurface.clear();
+        mSurfaceGeneration = 0;
         mIsSurfaceToDisplay = false;
     }
     return err;
@@ -6419,9 +6462,11 @@ status_t MediaCodec::handleSetSurface(const sp<Surface> &surface) {
         (void)disconnectFromSurface();
     }
     if (surface != NULL) {
-        err = connectToSurface(surface);
+        uint32_t generation;
+        err = connectToSurface(surface, &generation);
         if (err == OK) {
             mSurface = surface;
+            mSurfaceGeneration = generation;
         }
     }
     return err;
