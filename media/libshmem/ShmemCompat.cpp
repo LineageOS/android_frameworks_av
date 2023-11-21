@@ -84,11 +84,11 @@ bool convertIMemoryToSharedFileRegion(const sp<IMemory>& mem,
             return false;
         }
 
-        const int fd = fcntl(heap->getHeapID(), F_DUPFD_CLOEXEC, 0);
-        if (fd < 0) {
+        base::unique_fd fd(fcntl(heap->getHeapID(), F_DUPFD_CLOEXEC, 0));
+        if (!fd.ok()) {
             return false;
         }
-        result->fd.reset(base::unique_fd(fd));
+        result->fd.reset(std::move(fd));
         result->size = size;
         result->offset = heap->getOffset() + offset;
         result->writeable = (heap->getFlags() & IMemoryHeap::READ_ONLY) == 0;
