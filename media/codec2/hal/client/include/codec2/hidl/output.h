@@ -65,6 +65,10 @@ struct OutputBufferQueue {
             const BnGraphicBufferProducer::QueueBufferInput& input,
             BnGraphicBufferProducer::QueueBufferOutput* output);
 
+    // Nofify a buffer is released from the output surface. If HAL ver is 1.2
+    // update the number of dequeueable/allocatable buffers.
+    void onBufferReleased(uint32_t generation);
+
     // Retrieve frame event history from the output surface.
     void pollForRenderedFrames(FrameEventHistoryDelta* delta);
 
