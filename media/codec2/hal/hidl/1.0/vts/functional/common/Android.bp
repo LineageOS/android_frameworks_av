@@ -11,6 +11,7 @@ cc_library_static {
     name: "VtsHalMediaC2V1_0CommonUtil",
     defaults: [
         "VtsHalTargetTestDefaults",
+        "libcodec2-aidl-client-defaults",
         "libcodec2-hidl-client-defaults",
     ],
 
@@ -29,6 +30,7 @@ cc_defaults {
     name: "VtsHalMediaC2V1_0Defaults",
     defaults: [
         "VtsHalTargetTestDefaults",
+        "libcodec2-aidl-client-defaults",
         "libcodec2-hidl-client-defaults",
     ],
 
@@ -38,6 +40,7 @@ cc_defaults {
     ],
 
     shared_libs: [
+        "libbinder_ndk",
         "libcodec2_client",
     ],
     test_suites: [

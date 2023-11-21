@@ -18,6 +18,7 @@
 #define LOG_TAG "codec2_hidl_hal_video_dec_test"
 
 #include <android-base/logging.h>
+#include <android/binder_process.h>
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
@@ -119,7 +120,8 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
 
         std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
         CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mLinearAllocator), C2_OK);
-        mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
+        mLinearPool = std::make_shared<C2PooledBlockPool>(
+                mLinearAllocator, mBlockPoolId++, getBufferPoolVer());
         ASSERT_NE(mLinearPool, nullptr);
 
         std::vector<std::unique_ptr<C2Param>> queried;
@@ -1132,5 +1134,6 @@ int main(int argc, char** argv) {
     }
 
     ::testing::InitGoogleTest(&argc, argv);
+    ABinderProcess_startThreadPool();
     return RUN_ALL_TESTS();
 }
