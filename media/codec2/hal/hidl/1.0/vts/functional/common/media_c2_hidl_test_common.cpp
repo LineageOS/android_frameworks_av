@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "media_c2_hidl_test_common"
 #include <stdio.h>
 
 #include "media_c2_hidl_test_common.h"
 
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
+#include <codec2/aidl/ParamTypes.h>
 
 std::string sResourceDir = "";
 
@@ -42,6 +43,14 @@ void printUsage(char* me) {
     std::cerr << "\t                    Eg: c2.android - test codecs starting with c2.android \n";
     std::cerr << "\t                    Eg: c2.android.aac.decoder - test a specific codec \n";
     std::cerr << "\t -h,  --help:   Print usage \n";
+}
+
+C2PooledBlockPool::BufferPoolVer getBufferPoolVer() {
+    if (::aidl::android::hardware::media::c2::utils::IsSelected()) {
+        return C2PooledBlockPool::VER_AIDL2;
+    } else {
+        return C2PooledBlockPool::VER_HIDL;
+    }
 }
 
 void parseArgs(int argc, char** argv) {

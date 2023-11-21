@@ -201,7 +201,7 @@ bool objcpy(C2Fence* d, const AidlNativeHandle& s) {
 
 template<>
 void SetHandle(BaseBlock *block, const C2Handle *handle) {
-    block->set<BaseBlock::nativeBlock>(makeToAidl(handle));
+    block->set<BaseBlock::nativeBlock>(dupToAidl(handle));
 }
 
 template<>
