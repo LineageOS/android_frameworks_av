@@ -862,6 +862,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
         sp<Surface> surface;
         if (msg->findObject("native-window", &obj)) {
             surface = static_cast<Surface *>(obj.get());
+            int32_t generation;
+            (void)msg->findInt32("native-window-generation", &generation);
             // setup tunneled playback
             if (surface != nullptr) {
                 Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -896,7 +898,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     }
                 }
             }
-            setSurface(surface);
+            setSurface(surface, (uint32_t)generation);
         }
 
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -2033,7 +2035,7 @@ void CCodec::release(bool sendCallback, bool pushBlankBuffer) {
     }
 }
 
-status_t CCodec::setSurface(const sp<Surface> &surface) {
+status_t CCodec::setSurface(const sp<Surface> &surface, uint32_t generation) {
     bool pushBlankBuffer = false;
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -2062,7 +2064,7 @@ status_t CCodec::setSurface(const sp<Surface> &surface) {
         }
         pushBlankBuffer = config->mPushBlankBuffersOnStop;
     }
-    return mChannel->setSurface(surface, pushBlankBuffer);
+    return mChannel->setSurface(surface, generation, pushBlankBuffer);
 }
 
 void CCodec::signalFlush() {
