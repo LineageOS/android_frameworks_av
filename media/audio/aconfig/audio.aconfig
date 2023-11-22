@@ -42,3 +42,10 @@ flag {
     description: "Enable spatializer offload"
     bug: "307842941"
 }
+
+flag {
+    name: "stereo_spatialization"
+    namespace: "media_audio"
+    description: "Enable stereo channel mask for spatialization."
+    bug: "303920722"
+}
