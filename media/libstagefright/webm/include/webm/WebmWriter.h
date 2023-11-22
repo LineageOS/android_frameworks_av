@@ -40,6 +40,9 @@ public:
     // which is compatible with WebmWriter.
     // Note that this overloads that method in the base class.
     static bool isFdOpenModeValid(int fd);
+    // Returns true if the timestamp is valid which is compatible with the WebmWriter.
+    // Note that this overloads that method in the base class.
+    bool isSampleMetadataValid(size_t trackIndex, int64_t timeUs);
     explicit WebmWriter(int fd);
     ~WebmWriter() { reset(); }
 
@@ -67,6 +70,7 @@ private:
     uint64_t mInfoSize;
     uint64_t mTracksOffset;
     uint64_t mCuesOffset;
+    std::map<size_t, int64_t> mLastTimestampUsByTrackIndex;
 
     bool mPaused;
     bool mStarted;
