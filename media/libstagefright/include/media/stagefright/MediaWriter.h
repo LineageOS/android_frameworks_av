@@ -54,6 +54,12 @@ struct MediaWriter : public RefBase {
         return true;
     }
 
+    // Returns true if the sample data is valid.
+    virtual bool isSampleMetadataValid([[maybe_unused]] size_t trackIndex,
+                                       [[maybe_unused]] int64_t timeUs) {
+        return true;
+    }
+
     virtual status_t addSource(const sp<MediaSource> &source) = 0;
     virtual bool reachedEOS() = 0;
     virtual status_t start(MetaData *params = NULL) = 0;
