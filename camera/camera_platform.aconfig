@@ -35,9 +35,3 @@ flag {
      bug: "307409002"
 }
 
-flag {
-     namespace: "camera_platform"
-     name: "virtual_camera_service_discovery"
-     description: "Enable discovery of the Virtual Camera HAL without a VINTF entry"
-     bug: "305170199"
-}

@@ -20,6 +20,7 @@
 #include "../common/CameraProviderManager.h"
 #include <aidl/android/hardware/camera/device/BnCameraDevice.h>
 #include <aidl/android/hardware/camera/provider/BnCameraProvider.h>
+#include <android_companion_virtualdevice_flags.h>
 #include <android/binder_auto_utils.h>
 #include <android/binder_ibinder.h>
 #include <android/binder_interface_utils.h>
@@ -52,6 +53,7 @@ using android::hardware::camera::provider::V2_5::DeviceState;
 using ::testing::ElementsAre;
 
 namespace flags = com::android::internal::camera::flags;
+namespace vd_flags = android::companion::virtualdevice::flags;
 
 /**
  * Basic test implementation of a camera ver. 3.2 device interface
@@ -836,7 +838,7 @@ TEST(CameraProviderManagerTest, PhysicalCameraAvailabilityCallbackRaceTest) {
         << "Unavailable physical camera Ids not set properly.";
 }
 TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscovered,
-                REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(flags, virtual_camera_service_discovery))) {
+                REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(vd_flags, virtual_camera_service_discovery))) {
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
     TestInteractionProxy serviceProxy;
@@ -862,7 +864,7 @@ TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscovered,
 }
 
 TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscoveredOnInit,
-                REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(flags, virtual_camera_service_discovery))) {
+                REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(vd_flags, virtual_camera_service_discovery))) {
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
     TestInteractionProxy serviceProxy;
