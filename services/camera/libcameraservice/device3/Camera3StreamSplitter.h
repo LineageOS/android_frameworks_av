@@ -94,6 +94,8 @@ public:
     // Disconnect the buffer queue from output surfaces.
     void disconnect();
 
+    void setHalBufferManager(bool enabled);
+
 private:
     // From IConsumerListener
     //
@@ -291,7 +293,7 @@ private:
 
     std::string mConsumerName;
 
-    const bool mUseHalBufManager;
+    bool mUseHalBufManager;
 };
 
 } // namespace android
