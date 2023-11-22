@@ -441,11 +441,9 @@ status_t OutputBufferQueue::outputBuffer(
             status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
                                          input, output);
             if (status == OK) {
-                if (output->bufferReplaced) {
-                    syncVar->lock();
-                    syncVar->notifyQueuedLocked();
-                    syncVar->unlock();
-                }
+                syncVar->lock();
+                syncVar->notifyQueuedLocked();
+                syncVar->unlock();
             }
         } else {
             status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
@@ -498,11 +496,9 @@ status_t OutputBufferQueue::outputBuffer(
         status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
                                                   input, output);
         if (status == OK) {
-            if (output->bufferReplaced) {
-                syncVar->lock();
-                syncVar->notifyQueuedLocked();
-                syncVar->unlock();
-            }
+            syncVar->lock();
+            syncVar->notifyQueuedLocked();
+            syncVar->unlock();
         }
     } else {
         status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
@@ -516,27 +512,6 @@ status_t OutputBufferQueue::outputBuffer(
         return status;
     }
     return OK;
-}
-
-void OutputBufferQueue::onBufferReleased(uint32_t generation) {
-    std::shared_ptr<C2SurfaceSyncMemory> syncMem;
-    mMutex.lock();
-    if (mStopped) {
-        return;
-    }
-    sp<IGraphicBufferProducer> outputIgbp = mIgbp;
-    uint32_t outputGeneration = mGeneration;
-    syncMem = mSyncMem;
-    mMutex.unlock();
-
-    if (outputIgbp && generation == outputGeneration) {
-        auto syncVar = syncMem ? syncMem->mem() : nullptr;
-        if (syncVar) {
-            syncVar->lock();
-            syncVar->notifyQueuedLocked();
-            syncVar->unlock();
-        }
-    }
 }
 
 void OutputBufferQueue::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
