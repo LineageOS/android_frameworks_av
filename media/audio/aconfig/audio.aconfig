@@ -28,3 +28,10 @@ flag {
         "Enable dynamic spatial audio over Bluetooth LE Audio."
     bug: "307588546"
 }
+
+flag {
+    name: "spatializer_offload"
+    namespace: "media_audio"
+    description: "Enable spatializer offload"
+    bug: "307842941"
+}
