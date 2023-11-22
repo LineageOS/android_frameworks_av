@@ -79,6 +79,7 @@ cc_library {
         "ResourceManagerServiceNew.cpp",
         "ResourceObserverService.cpp",
         "ResourceManagerServiceUtils.cpp",
+        "ResourceTracker.cpp",
         "ServiceLog.cpp",
         "UidObserver.cpp",
 

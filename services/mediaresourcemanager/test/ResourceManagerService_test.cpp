@@ -129,7 +129,7 @@ public:
         resources3.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 100));
         mService->addResource(client3Info, mTestClient3, resources3);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(2u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -159,7 +159,7 @@ public:
         // Expected result:
         // 1) the client should have been added;
         // 2) both resource entries should have been rejected, resource list should be empty.
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(1u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -254,7 +254,7 @@ public:
         resources11.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
         mService->addResource(client1Info, mTestClient1, resources11);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(1u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -299,7 +299,7 @@ public:
         resources11.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
         mService->addResource(client1Info, mTestClient1, resources11);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(1u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -466,7 +466,7 @@ public:
                                      .name = "none"};
         mService->removeClient(client2Info);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(2u, map.size());
         const ResourceInfos &infos1 = map.at(kTestPid1);
         const ResourceInfos &infos2 = map.at(kTestPid2);

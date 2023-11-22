@@ -22,6 +22,8 @@
 
 namespace android {
 
+class ResourceTracker;
+
 //
 // A newer implementation of IResourceManagerService, which
 // eventually will replace the older implementation in ResourceManagerService.
@@ -66,8 +68,6 @@ public:
 
     Status reclaimResourcesFromClientsPendingRemoval(int32_t pid) override;
 
-    Status removeResource(const ClientInfoParcel& clientInfo, bool checkValid);
-
     Status notifyClientCreated(const ClientInfoParcel& clientInfo) override;
 
     Status notifyClientStarted(const ClientConfigParcel& clientConfig) override;
@@ -77,6 +77,64 @@ public:
     Status notifyClientConfigChanged(const ClientConfigParcel& clientConfig) override;
 
     binder_status_t dump(int fd, const char** args, uint32_t numArgs) override;
+
+    friend class ResourceTracker;
+
+private:
+
+    // Initializes the internal state of the ResourceManagerService
+    void init() override;
+
+    void setObserverService(
+            const std::shared_ptr<ResourceObserverService>& observerService) override;
+
+    // Removes the pid from the override map.
+    void removeProcessInfoOverride(int pid) override;
+
+    // Gets the list of all the clients who own the specified resource type.
+    // Returns false if any client belongs to a process with higher priority than the
+    // calling process. The clients will remain unchanged if returns false.
+    bool getAllClients_l(const ResourceRequestInfo& resourceRequestInfo,
+                         std::vector<ClientInfo>& clientsInfo) override;
+
+    // Gets the client who owns biggest piece of specified resource type from pid.
+    // Returns false with no change to client if there are no clients holding resources of this
+    // type.
+    bool getBiggestClient_l(int pid, MediaResource::Type type,
+                            MediaResource::SubType subType,
+                            ClientInfo& clientsInfo,
+                            bool pendingRemovalOnly = false) override;
+
+    bool overridePid_l(int32_t originalPid, int32_t newPid) override;
+
+    bool overrideProcessInfo_l(const std::shared_ptr<IResourceManagerClient>& client,
+                               int pid, int procState, int oomScore) override;
+
+    // Get priority from process's pid
+    bool getPriority_l(int pid, int* priority) const override;
+
+    // Gets lowest priority process that has the specified resource type.
+    // Returns false if failed. The output parameters will remain unchanged if failed.
+    bool getLowestPriorityPid_l(MediaResource::Type type, MediaResource::SubType subType,
+                                int* lowestPriorityPid, int* lowestPriority) override;
+
+    // Get the client for given pid and the clientId from the map
+    std::shared_ptr<IResourceManagerClient> getClient(
+        int pid, const int64_t& clientId) const override;
+
+    // Remove the client for given pid and the clientId from the map
+    bool removeClient(int pid, const int64_t& clientId) override;
+
+    // Get all the resource status for dump
+    void getResourceDump(std::string& resourceLog) const override;
+
+    // Returns a unmodifiable reference to the internal resource state as a map
+    const std::map<int, ResourceInfos>& getResourceMap() const override;
+
+    Status removeResource(const ClientInfoParcel& clientInfo, bool checkValid) override;
+
+private:
+    std::shared_ptr<ResourceTracker> mResourceTracker;
 };
 
 // ----------------------------------------------------------------------------

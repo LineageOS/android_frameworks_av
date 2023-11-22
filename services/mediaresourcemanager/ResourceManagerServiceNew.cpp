@@ -20,6 +20,8 @@
 #include <utils/Log.h>
 
 #include "ResourceManagerServiceNew.h"
+#include "ResourceTracker.h"
+#include "ServiceLog.h"
 
 namespace android {
 
@@ -30,30 +32,74 @@ ResourceManagerServiceNew::ResourceManagerServiceNew(
 
 ResourceManagerServiceNew::~ResourceManagerServiceNew() {}
 
+void ResourceManagerServiceNew::init() {
+    // Create the Resource Tracker
+    mResourceTracker = std::make_shared<ResourceTracker>(ref<ResourceManagerServiceNew>(),
+                                                         mProcessInfo);
+}
+
 Status ResourceManagerServiceNew::config(const std::vector<MediaResourcePolicyParcel>& policies) {
     return ResourceManagerService::config(policies);
+}
+
+void ResourceManagerServiceNew::setObserverService(
+        const std::shared_ptr<ResourceObserverService>& observerService) {
+    ResourceManagerService::setObserverService(observerService);
+    mResourceTracker->setResourceObserverService(observerService);
 }
 
 Status ResourceManagerServiceNew::addResource(
         const ClientInfoParcel& clientInfo,
         const std::shared_ptr<IResourceManagerClient>& client,
         const std::vector<MediaResourceParcel>& resources) {
-    return ResourceManagerService::addResource(clientInfo, client, resources);
+    int32_t pid = clientInfo.pid;
+    int32_t uid = clientInfo.uid;
+    int64_t clientId = clientInfo.id;
+    String8 log = String8::format("addResource(pid %d, uid %d clientId %lld, resources %s)",
+            pid, uid, (long long) clientId, getString(resources).c_str());
+    mServiceLog->add(log);
+
+    std::scoped_lock lock{mLock};
+    mResourceTracker->addResource(clientInfo, client, resources);
+    notifyResourceGranted(pid, resources);
+
+    return Status::ok();
 }
 
 Status ResourceManagerServiceNew::removeResource(
         const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources) {
-    return ResourceManagerService::removeResource(clientInfo, resources);
+    int32_t pid = clientInfo.pid;
+    int32_t uid = clientInfo.uid;
+    int64_t clientId = clientInfo.id;
+    String8 log = String8::format("removeResource(pid %d, uid %d clientId %lld, resources %s)",
+            pid, uid, (long long) clientId, getString(resources).c_str());
+    mServiceLog->add(log);
+
+    std::scoped_lock lock{mLock};
+    mResourceTracker->removeResource(clientInfo, resources);
+    return Status::ok();
 }
 
 Status ResourceManagerServiceNew::removeClient(const ClientInfoParcel& clientInfo) {
-    return ResourceManagerService::removeClient(clientInfo);
+    removeResource(clientInfo, true /*checkValid*/);
+    return Status::ok();
 }
 
 Status ResourceManagerServiceNew::removeResource(const ClientInfoParcel& clientInfo,
                                                  bool checkValid) {
-    return ResourceManagerService::removeResource(clientInfo, checkValid);
+    int32_t pid = clientInfo.pid;
+    int32_t uid = clientInfo.uid;
+    int64_t clientId = clientInfo.id;
+    String8 log = String8::format("removeResource(pid %d, uid %d clientId %lld)",
+            pid, uid, (long long) clientId);
+    mServiceLog->add(log);
+
+    std::scoped_lock lock{mLock};
+    if (mResourceTracker->removeResource(clientInfo, checkValid)) {
+        notifyClientReleased(clientInfo);
+    }
+    return Status::ok();
 }
 
 Status ResourceManagerServiceNew::reclaimResource(
@@ -63,8 +109,20 @@ Status ResourceManagerServiceNew::reclaimResource(
     return ResourceManagerService::reclaimResource(clientInfo, resources, _aidl_return);
 }
 
+bool ResourceManagerServiceNew::overridePid_l(int32_t originalPid, int32_t newPid) {
+    return mResourceTracker->overridePid(originalPid, newPid);
+}
+
 Status ResourceManagerServiceNew::overridePid(int originalPid, int newPid) {
     return ResourceManagerService::overridePid(originalPid, newPid);
+}
+
+bool ResourceManagerServiceNew::overrideProcessInfo_l(
+        const std::shared_ptr<IResourceManagerClient>& client,
+        int pid,
+        int procState,
+        int oomScore) {
+    return mResourceTracker->overrideProcessInfo(client, pid, procState, oomScore);
 }
 
 Status ResourceManagerServiceNew::overrideProcessInfo(
@@ -75,12 +133,39 @@ Status ResourceManagerServiceNew::overrideProcessInfo(
     return ResourceManagerService::overrideProcessInfo(client, pid, procState, oomScore);
 }
 
+void ResourceManagerServiceNew::removeProcessInfoOverride(int pid) {
+    std::scoped_lock lock{mLock};
+
+    mResourceTracker->removeProcessInfoOverride(pid);
+}
+
 Status ResourceManagerServiceNew::markClientForPendingRemoval(const ClientInfoParcel& clientInfo) {
-    return ResourceManagerService::markClientForPendingRemoval(clientInfo);
+    int32_t pid = clientInfo.pid;
+    int64_t clientId = clientInfo.id;
+    String8 log = String8::format(
+            "markClientForPendingRemoval(pid %d, clientId %lld)",
+            pid, (long long) clientId);
+    mServiceLog->add(log);
+
+    std::scoped_lock lock{mLock};
+    mResourceTracker->markClientForPendingRemoval(clientInfo);
+    return Status::ok();
 }
 
 Status ResourceManagerServiceNew::reclaimResourcesFromClientsPendingRemoval(int32_t pid) {
-    return ResourceManagerService::reclaimResourcesFromClientsPendingRemoval(pid);
+    String8 log = String8::format("reclaimResourcesFromClientsPendingRemoval(pid %d)", pid);
+    mServiceLog->add(log);
+
+    std::vector<ClientInfo> targetClients;
+    {
+        std::scoped_lock lock{mLock};
+        mResourceTracker->getClientsMarkedPendingRemoval(pid, targetClients);
+    }
+
+    if (!targetClients.empty()) {
+        reclaimUnconditionallyFrom(targetClients);
+    }
+    return Status::ok();
 }
 
 Status ResourceManagerServiceNew::notifyClientCreated(const ClientInfoParcel& clientInfo) {
@@ -100,8 +185,68 @@ Status ResourceManagerServiceNew::notifyClientConfigChanged(
     return ResourceManagerService::notifyClientConfigChanged(clientConfig);
 }
 
+void ResourceManagerServiceNew::getResourceDump(std::string& resourceLog) const {
+    std::scoped_lock lock{mLock};
+    mResourceTracker->dump(resourceLog);
+}
+
 binder_status_t ResourceManagerServiceNew::dump(int fd, const char** args, uint32_t numArgs) {
     return ResourceManagerService::dump(fd, args, numArgs);
+}
+
+bool ResourceManagerServiceNew::getPriority_l(int pid, int* priority) const {
+    return mResourceTracker->getPriority(pid, priority);
+}
+
+bool ResourceManagerServiceNew::getLowestPriorityPid_l(
+        MediaResource::Type type, MediaResource::SubType subType,
+        int* lowestPriorityPid, int* lowestPriority) {
+    return mResourceTracker->getLowestPriorityPid(type, subType,
+                                                  *lowestPriorityPid,
+                                                  *lowestPriority);
+}
+
+bool ResourceManagerServiceNew::getBiggestClient_l(int pid, MediaResource::Type type,
+        MediaResource::SubType subType, ClientInfo& clientInfo, bool pendingRemovalOnly) {
+    return mResourceTracker->getBiggestClient(pid, type, subType,
+                                              clientInfo, pendingRemovalOnly);
+}
+
+bool ResourceManagerServiceNew::getAllClients_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        std::vector<ClientInfo>& clientsInfo) {
+    MediaResource::Type type = resourceRequestInfo.mResource->type;
+    // Get list of all the clients that has requested resources.
+    std::vector<ClientInfo> clients;
+    mResourceTracker->getAllClients(resourceRequestInfo, clients);
+
+    // Check is there any high priority process holding up the resources already.
+    for (const ClientInfo& info : clients) {
+        if (!isCallingPriorityHigher_l(resourceRequestInfo.mCallingPid, info.mPid)) {
+            // some higher/equal priority process owns the resource,
+            // this request can't be fulfilled.
+            ALOGE("%s: can't reclaim resource %s from pid %d", __func__, asString(type), info.mPid);
+            return false;
+        }
+        clientsInfo.emplace_back(info);
+    }
+    if (clientsInfo.size() == 0) {
+        ALOGV("%s: didn't find any resource %s", __func__, asString(type));
+    }
+    return true;
+}
+
+std::shared_ptr<IResourceManagerClient> ResourceManagerServiceNew::getClient(
+        int pid, const int64_t& clientId) const {
+    return mResourceTracker->getClient(pid, clientId);
+}
+
+bool ResourceManagerServiceNew::removeClient(int pid, const int64_t& clientId) {
+    return mResourceTracker->removeClient(pid, clientId);
+}
+
+const std::map<int, ResourceInfos>& ResourceManagerServiceNew::getResourceMap() const {
+    return mResourceTracker->getResourceMap();
 }
 
 } // namespace android

@@ -31,7 +31,6 @@
 #include <mediautils/SchedulingPolicyService.h>
 #include <com_android_media_codec_flags.h>
 
-#include "IMediaResourceMonitor.h"
 #include "ResourceManagerMetrics.h"
 #include "ResourceManagerServiceNew.h"
 #include "ResourceObserverService.h"
@@ -41,29 +40,52 @@ namespace CodecFeatureFlags = com::android::media::codec::flags;
 
 namespace android {
 
-static void notifyResourceGranted(int pid, const std::vector<MediaResourceParcel>& resources) {
-    static const char* const kServiceName = "media_resource_monitor";
-    sp<IBinder> binder = defaultServiceManager()->checkService(String16(kServiceName));
-    if (binder != NULL) {
-        sp<IMediaResourceMonitor> service = interface_cast<IMediaResourceMonitor>(binder);
-        for (size_t i = 0; i < resources.size(); ++i) {
-            switch (resources[i].subType) {
-                case MediaResource::SubType::kHwAudioCodec:
-                case MediaResource::SubType::kSwAudioCodec:
-                    service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_AUDIO_CODEC);
-                    break;
-                case MediaResource::SubType::kHwVideoCodec:
-                case MediaResource::SubType::kSwVideoCodec:
-                    service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_VIDEO_CODEC);
-                    break;
-                case MediaResource::SubType::kHwImageCodec:
-                case MediaResource::SubType::kSwImageCodec:
-                    service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_IMAGE_CODEC);
-                    break;
-                case MediaResource::SubType::kUnspecifiedSubType:
-                    break;
+void ResourceManagerService::getResourceDump(std::string& resourceLog) const {
+    PidResourceInfosMap mapCopy;
+    std::map<int, int> overridePidMapCopy;
+    {
+        std::scoped_lock lock{mLock};
+        mapCopy = mMap;  // Shadow copy, real copy will happen on write.
+        overridePidMapCopy = mOverridePidMap;
+    }
+
+    const size_t SIZE = 256;
+    char buffer[SIZE];
+    resourceLog.append("  Processes:\n");
+    for (const auto& [pid, infos] : mapCopy) {
+        snprintf(buffer, SIZE, "    Pid: %d\n", pid);
+        resourceLog.append(buffer);
+        int priority = 0;
+        if (getPriority_l(pid, &priority)) {
+            snprintf(buffer, SIZE, "    Priority: %d\n", priority);
+        } else {
+            snprintf(buffer, SIZE, "    Priority: <unknown>\n");
+        }
+        resourceLog.append(buffer);
+
+        for (const auto& [infoKey, info] : infos) {
+            resourceLog.append("      Client:\n");
+            snprintf(buffer, SIZE, "        Id: %lld\n", (long long)info.clientId);
+            resourceLog.append(buffer);
+
+            std::string clientName = info.name;
+            snprintf(buffer, SIZE, "        Name: %s\n", clientName.c_str());
+            resourceLog.append(buffer);
+
+            const ResourceList& resources = info.resources;
+            resourceLog.append("        Resources:\n");
+            for (auto it = resources.begin(); it != resources.end(); it++) {
+                snprintf(buffer, SIZE, "          %s\n", toString(it->second).c_str());
+                resourceLog.append(buffer);
             }
         }
+    }
+
+    resourceLog.append("  Process Pid override:\n");
+    for (auto it = overridePidMapCopy.begin(); it != overridePidMapCopy.end(); ++it) {
+        snprintf(buffer, SIZE, "    Original Pid: %d,  Override Pid: %d\n",
+            it->first, it->second);
+        resourceLog.append(buffer);
     }
 }
 
@@ -79,19 +101,19 @@ binder_status_t ResourceManagerService::dump(int fd, const char** /*args*/, uint
         return PERMISSION_DENIED;
     }
 
-    PidResourceInfosMap mapCopy;
     bool supportsMultipleSecureCodecs;
     bool supportsSecureWithNonSecureCodec;
-    std::map<int, int> overridePidMapCopy;
     String8 serviceLog;
     {
         std::scoped_lock lock{mLock};
-        mapCopy = mMap;  // Shadow copy, real copy will happen on write.
         supportsMultipleSecureCodecs = mSupportsMultipleSecureCodecs;
         supportsSecureWithNonSecureCodec = mSupportsSecureWithNonSecureCodec;
         serviceLog = mServiceLog->toString("    " /* linePrefix */);
-        overridePidMapCopy = mOverridePidMap;
     }
+
+    // Get all the resource (and overload pid) logs
+    std::string resourceLog;
+    getResourceDump(resourceLog);
 
     const size_t SIZE = 256;
     char buffer[SIZE];
@@ -104,41 +126,8 @@ binder_status_t ResourceManagerService::dump(int fd, const char** /*args*/, uint
             supportsSecureWithNonSecureCodec);
     result.append(buffer);
 
-    result.append("  Processes:\n");
-    for (const auto& [pid, infos] : mapCopy) {
-        snprintf(buffer, SIZE, "    Pid: %d\n", pid);
-        result.append(buffer);
-        int priority = 0;
-        if (getPriority_l(pid, &priority)) {
-            snprintf(buffer, SIZE, "    Priority: %d\n", priority);
-        } else {
-            snprintf(buffer, SIZE, "    Priority: <unknown>\n");
-        }
-        result.append(buffer);
+    result.append(resourceLog.c_str());
 
-        for (const auto& [infoKey, info] : infos) {
-            result.append("      Client:\n");
-            snprintf(buffer, SIZE, "        Id: %lld\n", (long long)info.clientId);
-            result.append(buffer);
-
-            std::string clientName = info.name;
-            snprintf(buffer, SIZE, "        Name: %s\n", clientName.c_str());
-            result.append(buffer);
-
-            const ResourceList& resources = info.resources;
-            result.append("        Resources:\n");
-            for (auto it = resources.begin(); it != resources.end(); it++) {
-                snprintf(buffer, SIZE, "          %s\n", toString(it->second).c_str());
-                result.append(buffer);
-            }
-        }
-    }
-    result.append("  Process Pid override:\n");
-    for (auto it = overridePidMapCopy.begin(); it != overridePidMapCopy.end(); ++it) {
-        snprintf(buffer, SIZE, "    Original Pid: %d,  Override Pid: %d\n",
-            it->first, it->second);
-        result.append(buffer);
-    }
     result.append("  Events logs (most recent at top):\n");
     result.append(serviceLog);
 
@@ -216,19 +205,34 @@ std::shared_ptr<ResourceManagerService> ResourceManagerService::Create() {
 std::shared_ptr<ResourceManagerService> ResourceManagerService::Create(
         const sp<ProcessInfoInterface>& processInfo,
         const sp<SystemCallbackInterface>& systemResource) {
+    std::shared_ptr<ResourceManagerService> service = nullptr;
     // If codec importance feature is on, create the refactored implementation.
     if (CodecFeatureFlags::codec_importance()) {
-        return ::ndk::SharedRefBase::make<ResourceManagerServiceNew>(processInfo, systemResource);
+        service = ::ndk::SharedRefBase::make<ResourceManagerServiceNew>(processInfo,
+                                                                        systemResource);
+    } else {
+        service = ::ndk::SharedRefBase::make<ResourceManagerService>(processInfo,
+                                                                     systemResource);
     }
-    return ::ndk::SharedRefBase::make<ResourceManagerService>(processInfo, systemResource);
+
+    if (service != nullptr) {
+        service->init();
+    }
+
+    return service;
 }
 
 // TEST only function.
 std::shared_ptr<ResourceManagerService> ResourceManagerService::CreateNew(
         const sp<ProcessInfoInterface>& processInfo,
         const sp<SystemCallbackInterface>& systemResource) {
-    return ::ndk::SharedRefBase::make<ResourceManagerServiceNew>(processInfo, systemResource);
+    std::shared_ptr<ResourceManagerService> service =
+        ::ndk::SharedRefBase::make<ResourceManagerServiceNew>(processInfo, systemResource);
+    service->init();
+    return service;
 }
+
+void ResourceManagerService::init() {}
 
 ResourceManagerService::~ResourceManagerService() {}
 
@@ -701,6 +705,16 @@ bool ResourceManagerService::reclaimUnconditionallyFrom(
     return false;
 }
 
+bool ResourceManagerService::overridePid_l(int32_t originalPid, int32_t newPid) {
+    mOverridePidMap.erase(originalPid);
+    if (newPid != -1) {
+        mOverridePidMap.emplace(originalPid, newPid);
+        return true;
+    }
+
+    return false;
+}
+
 Status ResourceManagerService::overridePid(int originalPid, int newPid) {
     String8 log = String8::format("overridePid(originalPid %d, newPid %d)",
             originalPid, newPid);
@@ -720,14 +734,35 @@ Status ResourceManagerService::overridePid(int originalPid, int newPid) {
 
     {
         std::scoped_lock lock{mLock};
-        mOverridePidMap.erase(originalPid);
-        if (newPid != -1) {
-            mOverridePidMap.emplace(originalPid, newPid);
+        if (overridePid_l(originalPid, newPid)) {
             mResourceManagerMetrics->addPid(newPid);
         }
     }
 
     return Status::ok();
+}
+
+bool ResourceManagerService::overrideProcessInfo_l(
+        const std::shared_ptr<IResourceManagerClient>& client,
+        int pid,
+        int procState,
+        int oomScore) {
+    removeProcessInfoOverride_l(pid);
+
+    if (!mProcessInfo->overrideProcessInfo(pid, procState, oomScore)) {
+        // Override value is rejected by ProcessInfo.
+        return false;
+    }
+
+    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(pid),
+                                .uid = 0,
+                                .id = 0,
+                                .name = "<unknown client>"};
+    auto deathNotifier = DeathNotifier::Create(
+        client, ref<ResourceManagerService>(), clientInfo, true);
+
+    mProcessInfoOverrideMap.emplace(pid, ProcessInfoOverride{deathNotifier, client});
+    return true;
 }
 
 Status ResourceManagerService::overrideProcessInfo(
@@ -750,23 +785,12 @@ Status ResourceManagerService::overrideProcessInfo(
     }
 
     std::scoped_lock lock{mLock};
-    removeProcessInfoOverride_l(pid);
-
-    if (!mProcessInfo->overrideProcessInfo(pid, procState, oomScore)) {
+    if (!overrideProcessInfo_l(client, pid, procState, oomScore)) {
         // Override value is rejected by ProcessInfo.
         return Status::fromServiceSpecificError(BAD_VALUE);
     }
-
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(pid),
-                                .uid = 0,
-                                .id = 0,
-                                .name = "<unknown client>"};
-    auto deathNotifier = DeathNotifier::Create(
-        client, ref<ResourceManagerService>(), clientInfo, true);
-
-    mProcessInfoOverrideMap.emplace(pid, ProcessInfoOverride{deathNotifier, client});
-
     return Status::ok();
+
 }
 
 void ResourceManagerService::removeProcessInfoOverride(int pid) {
@@ -872,11 +896,12 @@ Status ResourceManagerService::reclaimResourcesFromClientsPendingRemoval(int32_t
     return Status::ok();
 }
 
-bool ResourceManagerService::getPriority_l(int pid, int* priority) {
+bool ResourceManagerService::getPriority_l(int pid, int* priority) const {
     int newPid = pid;
 
-    if (mOverridePidMap.find(pid) != mOverridePidMap.end()) {
-        newPid = mOverridePidMap[pid];
+    std::map<int, int>::const_iterator found = mOverridePidMap.find(pid);
+    if (found != mOverridePidMap.end()) {
+        newPid = found->second;
         ALOGD("getPriority_l: use override pid %d instead original pid %d",
                 newPid, pid);
     }
@@ -1066,6 +1091,10 @@ long ResourceManagerService::getPeakConcurrentPixelCount(int pid) const {
 
 long ResourceManagerService::getCurrentConcurrentPixelCount(int pid) const {
     return mResourceManagerMetrics->getCurrentConcurrentPixelCount(pid);
+}
+
+void ResourceManagerService::notifyClientReleased(const ClientInfoParcel& clientInfo) {
+    mResourceManagerMetrics->notifyClientReleased(clientInfo);
 }
 
 } // namespace android
