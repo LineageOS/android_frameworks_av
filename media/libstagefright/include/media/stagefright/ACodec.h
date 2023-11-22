@@ -83,7 +83,7 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
             const char* mime, bool isEncoder,
             MediaCodecInfo::CapabilitiesWriter* caps);
 
-    virtual status_t setSurface(const sp<Surface> &surface);
+    virtual status_t setSurface(const sp<Surface> &surface, uint32_t /*generation*/);
 
     virtual void signalFlush();
     virtual void signalResume();

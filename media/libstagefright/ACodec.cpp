@@ -670,7 +670,7 @@ void ACodec::initiateConfigureComponent(const sp<AMessage> &msg) {
     msg->post();
 }
 
-status_t ACodec::setSurface(const sp<Surface> &surface) {
+status_t ACodec::setSurface(const sp<Surface> &surface, uint32_t /*generation*/) {
     sp<AMessage> msg = new AMessage(kWhatSetSurface, this);
     msg->setObject("surface", surface);
 
