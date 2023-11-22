@@ -1,8 +1,7 @@
 {
-  "postsubmit": [
+  "presubmit": [
     {
       "name": "hal_implementation_test"
     }
   ]
 }
-
