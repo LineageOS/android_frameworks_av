@@ -2372,7 +2372,7 @@ void Codec2Client::Component::stopUsingOutputSurface(
 
 void Codec2Client::Component::onBufferReleasedFromOutputSurface(
         uint32_t generation) {
-    mOutputBufferQueue->onBufferReleased(generation);
+    (void) generation;
 }
 
 c2_status_t Codec2Client::Component::connectToInputSurface(
