@@ -28,7 +28,6 @@ namespace android {
 
 namespace camera3 {
 
-
 DistortionMapper::DistortionMapper() {
     initRemappedKeys();
 }
@@ -44,6 +43,9 @@ void DistortionMapper::initRemappedKeys() {
             kResultPointsToCorrectNoClamp.begin(),
             kResultPointsToCorrectNoClamp.end());
     mRemappedKeys.insert(ANDROID_DISTORTION_CORRECTION_MODE);
+    if (flags::concert_mode()) {
+        mRemappedKeys.insert(ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_SENSOR_CROP_REGION);
+    }
 }
 
 bool DistortionMapper::isDistortionSupported(const CameraMetadata &deviceInfo) {
