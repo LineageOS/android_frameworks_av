@@ -82,6 +82,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
         return false;
     }
 
+    // Default scenario --- the consumer is display or GPU
     const AHardwareBuffer_Desc desc = {
             .width = 320,
             .height = 240,
@@ -96,7 +97,40 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
             .rfu1 = 0,
     };
 
-    return AHardwareBuffer_isSupported(&desc);
+    // The consumer is a HW encoder
+    const AHardwareBuffer_Desc descHwEncoder = {
+            .width = 320,
+            .height = 240,
+            .format = format,
+            .layers = 1,
+            .usage = AHARDWAREBUFFER_USAGE_CPU_READ_RARELY |
+                     AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
+                     AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+                     AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY |
+                     AHARDWAREBUFFER_USAGE_VIDEO_ENCODE,
+            .stride = 0,
+            .rfu0 = 0,
+            .rfu1 = 0,
+    };
+
+    // The consumer is a SW encoder
+    const AHardwareBuffer_Desc descSwEncoder = {
+            .width = 320,
+            .height = 240,
+            .format = format,
+            .layers = 1,
+            .usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
+                     AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
+                     AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+                     AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY,
+            .stride = 0,
+            .rfu0 = 0,
+            .rfu1 = 0,
+    };
+
+    return AHardwareBuffer_isSupported(&desc)
+            && AHardwareBuffer_isSupported(&descHwEncoder)
+            && AHardwareBuffer_isSupported(&descSwEncoder);
 }
 
 }  // namespace android

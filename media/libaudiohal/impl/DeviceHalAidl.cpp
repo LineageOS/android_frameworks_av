@@ -951,7 +951,7 @@ status_t DeviceHalAidl::dump(int fd, const Vector<String16>& args) {
     return mModule->dump(fd, Args(args).args(), args.size());
 }
 
-int32_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports) {
+status_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports) {
     TIME_CHECK();
     if (!mModule) return NO_INIT;
     if (supports == nullptr) {
