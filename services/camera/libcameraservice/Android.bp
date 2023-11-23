@@ -74,6 +74,7 @@ cc_defaults {
         "libstagefright_foundation",
         "libxml2",
         "libyuv",
+        "android.companion.virtualdevice.flags-aconfig-cc",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",

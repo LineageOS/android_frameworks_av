@@ -63,6 +63,11 @@ struct VideoRenderQualityMetrics {
     // post-render.
     float actualFrameRate;
 
+    // The amount of content duration skipped by the app after a pause when video was trying to
+    // resume. This sometimes happen when catching up to the audio position which continued playing
+    // after video pauses.
+    int32_t maxContentDroppedAfterPauseMs;
+
     // A histogram of the durations of freezes due to dropped/skipped frames.
     MediaHistogram<int32_t> freezeDurationMsHistogram;
     // The computed overall freeze score using the above histogram and score conversion table. The
@@ -154,6 +159,11 @@ public:
         // short, but the content frame duration is large, it is assumed the app is intentionally
         // seeking forward.
         int32_t liveContentFrameDropToleranceUs;
+
+        // The amount of time it takes for audio to stop playback after a pause is initiated. Used
+        // for providing some allowance of dropped video frames to catch back up to the audio
+        // position when resuming playback.
+        int32_t pauseAudioLatencyUs;
 
         // Freeze configuration
         //
@@ -441,8 +451,8 @@ private:
     // The render duration of the playback.
     int64_t mRenderDurationMs;
 
-    // True if the previous frame was dropped.
-    bool mWasPreviousFrameDropped;
+    // The duration of the content that was dropped.
+    int64_t mDroppedContentDurationUs;
 
     // The freeze event that's currently being tracked.
     FreezeEvent mFreezeEvent;

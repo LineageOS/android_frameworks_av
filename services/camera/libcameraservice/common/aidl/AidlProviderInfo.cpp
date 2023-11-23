@@ -21,6 +21,7 @@
 #include <cutils/properties.h>
 
 #include <aidlcommonsupport/NativeHandle.h>
+#include <android_companion_virtualdevice_flags.h>
 #include <android/binder_manager.h>
 #include <android/hardware/ICameraService.h>
 #include <camera_metadata_hidden.h>
@@ -35,9 +36,9 @@ const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
 
 namespace android {
 
-namespace flags = com::android::internal::camera::flags;
 namespace SessionConfigurationUtils = ::android::camera3::SessionConfigurationUtils;
 namespace flags = com::android::internal::camera::flags;
+namespace vd_flags = android::companion::virtualdevice::flags;
 
 using namespace aidl::android::hardware;
 using namespace hardware::camera;
@@ -131,7 +132,7 @@ status_t AidlProviderInfo::initializeAidlProvider(
 
     mDeathRecipient = ndk::ScopedAIBinder_DeathRecipient(AIBinder_DeathRecipient_new(binderDied));
 
-    if (!flags::virtual_camera_service_discovery() || interface->isRemote()) {
+    if (!vd_flags::virtual_camera_service_discovery() || interface->isRemote()) {
         binder_status_t link =
                 AIBinder_linkToDeath(interface->asBinder().get(), mDeathRecipient.get(), this);
         if (link != STATUS_OK) {
