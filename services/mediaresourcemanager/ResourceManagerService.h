@@ -137,22 +137,30 @@ private:
     friend class DeathNotifier;
     friend class OverrideProcessInfoDeathNotifier;
 
-    // Gets the client who owns specified resource type from lowest possible priority process.
-    // Returns false if the calling process priority is not higher than the lowest process
-    // priority. The client will remain unchanged if returns false.
-    bool getLowestPriorityBiggestClient_l(
-        const ResourceRequestInfo& resourceRequestInfo,
-        ClientInfo& clientInfo);
+    // Gets the client who owns biggest piece of specified resource type from pid.
+    // Returns false with no change to client if there are no clients holding resources of this
+    // type.
+    bool getBiggestClient_l(int pid, MediaResource::Type type,
+                            MediaResource::SubType subType,
+                            ClientInfo& clientsInfo,
+                            bool pendingRemovalOnly = false);
 
-    // Same method as above, but with pendingRemovalOnly as true.
+    // A helper function that gets the biggest clients of the process pid that
+    // is marked to be (pending) removed and has the needed resources.
     bool getBiggestClientPendingRemoval_l(int pid, MediaResource::Type type,
                                           MediaResource::SubType subType,
                                           ClientInfo& clientsInfo);
 
-    // A helper function basically calls getLowestPriorityBiggestClient_l and adds
-    // the result client to the given Vector.
+    // From the list of clients, pick/select client(s) based on the reclaim policy.
     void getClientForResource_l(const ResourceRequestInfo& resourceRequestInfo,
                                 std::vector<ClientInfo>& clientsInfo);
+    // A helper function that pushes Reclaim Atom (for metric collection).
+    void pushReclaimAtom(const ClientInfoParcel& clientInfo,
+                         const std::vector<ClientInfo>& targetClients,
+                         bool reclaimed);
+
+    // Remove the override info for the given process
+    void removeProcessInfoOverride_l(int pid);
 
     // Eventually we want to phase out this implementation of IResourceManagerService
     // (ResourceManagerService) and replace that with the newer implementation
@@ -163,22 +171,30 @@ private:
     // Initializes the internal state of the ResourceManagerService
     virtual void init();
 
+    // Gets the list of all the clients who own the list of specified resource type
+    // and satisfy the resource model and the reclaim policy.
+    virtual bool getTargetClients(
+        int32_t callingPid,
+        const std::vector<MediaResourceParcel>& resources,
+        std::vector<ClientInfo>& targetClients);
+
     // Gets the list of all the clients who own the specified resource type.
     // Returns false if any client belongs to a process with higher priority than the
     // calling process. The clients will remain unchanged if returns false.
     virtual bool getAllClients_l(const ResourceRequestInfo& resourceRequestInfo,
                                  std::vector<ClientInfo>& clientsInfo);
 
-    // Gets the client who owns biggest piece of specified resource type from pid.
-    // Returns false with no change to client if there are no clients holding resources of this
-    // type.
-    virtual bool getBiggestClient_l(int pid, MediaResource::Type type,
-                                    MediaResource::SubType subType,
-                                    ClientInfo& clientsInfo,
-                                    bool pendingRemovalOnly = false);
+    // Gets the client who owns specified resource type from lowest possible priority process.
+    // Returns false if the calling process priority is not higher than the lowest process
+    // priority. The client will remain unchanged if returns false.
+    virtual bool getLowestPriorityBiggestClient_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        ClientInfo& clientInfo);
 
+    // override the pid of given process
     virtual bool overridePid_l(int32_t originalPid, int32_t newPid);
 
+    // override the process info of given process
     virtual bool overrideProcessInfo_l(const std::shared_ptr<IResourceManagerClient>& client,
                                        int pid, int procState, int oomScore);
 
@@ -203,14 +219,8 @@ private:
     // Get all the resource status for dump
     virtual void getResourceDump(std::string& resourceLog) const;
 
-    void removeProcessInfoOverride_l(int pid);
-
-    // A helper function that pushes Reclaim Atom (for metric collection).
-    void pushReclaimAtom(const ClientInfoParcel& clientInfo,
-                         const std::vector<ClientInfo>& targetClients,
-                         bool reclaimed);
-
     // The following utility functions are used only for testing by ResourceManagerServiceTest
+    // START: TEST only functions
     // Get the peak concurrent pixel count (associated with the video codecs) for the process.
     long getPeakConcurrentPixelCount(int pid) const;
     // Get the current concurrent pixel count (associated with the video codecs) for the process.
@@ -223,6 +233,7 @@ private:
     virtual const std::map<int, ResourceInfos>& getResourceMap() const {
         return mMap;
     }
+    // END: TEST only functions
 
 protected:
     mutable std::mutex mLock;

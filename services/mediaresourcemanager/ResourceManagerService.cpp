@@ -491,6 +491,111 @@ void ResourceManagerService::getClientForResource_l(
     }
 }
 
+bool ResourceManagerService::getTargetClients(
+        int32_t callingPid,
+        const std::vector<MediaResourceParcel>& resources,
+        std::vector<ClientInfo>& targetClients) {
+    std::scoped_lock lock{mLock};
+    if (!mProcessInfo->isPidTrusted(callingPid)) {
+        pid_t actualCallingPid = IPCThreadState::self()->getCallingPid();
+        ALOGW("%s called with untrusted pid %d, using actual calling pid %d", __FUNCTION__,
+                callingPid, actualCallingPid);
+        callingPid = actualCallingPid;
+    }
+    const MediaResourceParcel *secureCodec = NULL;
+    const MediaResourceParcel *nonSecureCodec = NULL;
+    const MediaResourceParcel *graphicMemory = NULL;
+    const MediaResourceParcel *drmSession = NULL;
+    for (size_t i = 0; i < resources.size(); ++i) {
+        switch (resources[i].type) {
+            case MediaResource::Type::kSecureCodec:
+                secureCodec = &resources[i];
+                break;
+            case MediaResource::Type::kNonSecureCodec:
+                nonSecureCodec = &resources[i];
+                break;
+            case MediaResource::Type::kGraphicMemory:
+                graphicMemory = &resources[i];
+                break;
+            case MediaResource::Type::kDrmSession:
+                drmSession = &resources[i];
+                break;
+            default:
+                break;
+        }
+    }
+
+    // first pass to handle secure/non-secure codec conflict
+    if (secureCodec != NULL) {
+        MediaResourceParcel mediaResource{.type = MediaResource::Type::kSecureCodec,
+                                          .subType = secureCodec->subType};
+        ResourceRequestInfo resourceRequestInfo{callingPid, &mediaResource};
+        if (!mSupportsMultipleSecureCodecs) {
+            if (!getAllClients_l(resourceRequestInfo, targetClients)) {
+                return false;
+            }
+        }
+        if (!mSupportsSecureWithNonSecureCodec) {
+            mediaResource.type = MediaResource::Type::kNonSecureCodec;
+            if (!getAllClients_l(resourceRequestInfo, targetClients)) {
+                return false;
+            }
+        }
+    }
+    if (nonSecureCodec != NULL) {
+        if (!mSupportsSecureWithNonSecureCodec) {
+            MediaResourceParcel mediaResource{.type = MediaResource::Type::kSecureCodec,
+                                              .subType = nonSecureCodec->subType};
+            ResourceRequestInfo resourceRequestInfo{callingPid, &mediaResource};
+            if (!getAllClients_l(resourceRequestInfo, targetClients)) {
+                return false;
+            }
+        }
+    }
+
+    if (drmSession != NULL) {
+        ResourceRequestInfo resourceRequestInfo{callingPid, drmSession};
+        getClientForResource_l(resourceRequestInfo, targetClients);
+        if (targetClients.size() == 0) {
+            return false;
+        }
+    }
+
+    if (targetClients.size() == 0 && graphicMemory != nullptr) {
+        // if no secure/non-secure codec conflict, run second pass to handle other resources.
+        ResourceRequestInfo resourceRequestInfo{callingPid, graphicMemory};
+        getClientForResource_l(resourceRequestInfo, targetClients);
+    }
+
+    if (targetClients.size() == 0) {
+        // if we are here, run the third pass to free one codec with the same type.
+        if (secureCodec != nullptr) {
+            ResourceRequestInfo resourceRequestInfo{callingPid, secureCodec};
+            getClientForResource_l(resourceRequestInfo, targetClients);
+        }
+        if (nonSecureCodec != nullptr) {
+            ResourceRequestInfo resourceRequestInfo{callingPid, nonSecureCodec};
+            getClientForResource_l(resourceRequestInfo, targetClients);
+        }
+    }
+
+    if (targetClients.size() == 0) {
+        // if we are here, run the fourth pass to free one codec with the different type.
+        if (secureCodec != nullptr) {
+            MediaResource temp(MediaResource::Type::kNonSecureCodec, secureCodec->subType, 1);
+            ResourceRequestInfo resourceRequestInfo{callingPid, &temp};
+            getClientForResource_l(resourceRequestInfo, targetClients);
+        }
+        if (nonSecureCodec != nullptr) {
+            MediaResource temp(MediaResource::Type::kSecureCodec, nonSecureCodec->subType, 1);
+            ResourceRequestInfo resourceRequestInfo{callingPid, &temp};
+            getClientForResource_l(resourceRequestInfo, targetClients);
+        }
+    }
+
+    return !targetClients.empty();
+}
+
 Status ResourceManagerService::reclaimResource(const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources, bool* _aidl_return) {
     int32_t callingPid = clientInfo.pid;
@@ -500,105 +605,16 @@ Status ResourceManagerService::reclaimResource(const ClientInfoParcel& clientInf
     mServiceLog->add(log);
     *_aidl_return = false;
 
+    // Check if there are any resources to be reclaimed before processing.
+    if (resources.empty()) {
+        return Status::ok();
+    }
+
     std::vector<ClientInfo> targetClients;
-    {
-        std::scoped_lock lock{mLock};
-        if (!mProcessInfo->isPidTrusted(callingPid)) {
-            pid_t actualCallingPid = IPCThreadState::self()->getCallingPid();
-            ALOGW("%s called with untrusted pid %d, using actual calling pid %d", __FUNCTION__,
-                    callingPid, actualCallingPid);
-            callingPid = actualCallingPid;
-        }
-        const MediaResourceParcel *secureCodec = NULL;
-        const MediaResourceParcel *nonSecureCodec = NULL;
-        const MediaResourceParcel *graphicMemory = NULL;
-        const MediaResourceParcel *drmSession = NULL;
-        for (size_t i = 0; i < resources.size(); ++i) {
-            switch (resources[i].type) {
-                case MediaResource::Type::kSecureCodec:
-                    secureCodec = &resources[i];
-                    break;
-                case MediaResource::Type::kNonSecureCodec:
-                    nonSecureCodec = &resources[i];
-                    break;
-                case MediaResource::Type::kGraphicMemory:
-                    graphicMemory = &resources[i];
-                    break;
-                case MediaResource::Type::kDrmSession:
-                    drmSession = &resources[i];
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        // first pass to handle secure/non-secure codec conflict
-        if (secureCodec != NULL) {
-            MediaResourceParcel mediaResource{.type = MediaResource::Type::kSecureCodec,
-                                              .subType = secureCodec->subType};
-            ResourceRequestInfo resourceRequestInfo{callingPid, &mediaResource};
-            if (!mSupportsMultipleSecureCodecs) {
-                if (!getAllClients_l(resourceRequestInfo, targetClients)) {
-                    return Status::ok();
-                }
-            }
-            if (!mSupportsSecureWithNonSecureCodec) {
-                mediaResource.type = MediaResource::Type::kNonSecureCodec;
-                if (!getAllClients_l(resourceRequestInfo, targetClients)) {
-                    return Status::ok();
-                }
-            }
-        }
-        if (nonSecureCodec != NULL) {
-            if (!mSupportsSecureWithNonSecureCodec) {
-                MediaResourceParcel mediaResource{.type = MediaResource::Type::kSecureCodec,
-                                                  .subType = nonSecureCodec->subType};
-                ResourceRequestInfo resourceRequestInfo{callingPid, &mediaResource};
-                if (!getAllClients_l(resourceRequestInfo, targetClients)) {
-                    return Status::ok();
-                }
-            }
-        }
-
-        if (drmSession != NULL) {
-            ResourceRequestInfo resourceRequestInfo{callingPid, drmSession};
-            getClientForResource_l(resourceRequestInfo, targetClients);
-            if (targetClients.size() == 0) {
-                return Status::ok();
-            }
-        }
-
-        if (targetClients.size() == 0 && graphicMemory != nullptr) {
-            // if no secure/non-secure codec conflict, run second pass to handle other resources.
-            ResourceRequestInfo resourceRequestInfo{callingPid, graphicMemory};
-            getClientForResource_l(resourceRequestInfo, targetClients);
-        }
-
-        if (targetClients.size() == 0) {
-            // if we are here, run the third pass to free one codec with the same type.
-            if (secureCodec != nullptr) {
-                ResourceRequestInfo resourceRequestInfo{callingPid, secureCodec};
-                getClientForResource_l(resourceRequestInfo, targetClients);
-            }
-            if (nonSecureCodec != nullptr) {
-                ResourceRequestInfo resourceRequestInfo{callingPid, nonSecureCodec};
-                getClientForResource_l(resourceRequestInfo, targetClients);
-            }
-        }
-
-        if (targetClients.size() == 0) {
-            // if we are here, run the fourth pass to free one codec with the different type.
-            if (secureCodec != nullptr) {
-                MediaResource temp(MediaResource::Type::kNonSecureCodec, secureCodec->subType, 1);
-                ResourceRequestInfo resourceRequestInfo{callingPid, &temp};
-                getClientForResource_l(resourceRequestInfo, targetClients);
-            }
-            if (nonSecureCodec != nullptr) {
-                MediaResource temp(MediaResource::Type::kSecureCodec, nonSecureCodec->subType, 1);
-                ResourceRequestInfo resourceRequestInfo{callingPid, &temp};
-                getClientForResource_l(resourceRequestInfo, targetClients);
-            }
-        }
+    if (!getTargetClients(callingPid, resources, targetClients)) {
+        // Nothing to reclaim from.
+        ALOGI("%s: There aren't any clients to reclaim from", __func__);
+        return Status::ok();
     }
 
     *_aidl_return = reclaimUnconditionallyFrom(targetClients);

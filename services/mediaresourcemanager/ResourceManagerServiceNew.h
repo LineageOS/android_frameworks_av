@@ -22,6 +22,7 @@
 
 namespace android {
 
+class IResourceModel;
 class ResourceTracker;
 
 //
@@ -82,11 +83,36 @@ public:
 
 private:
 
+    // Set up the Resource models.
+    void setUpResourceModels();
+
+    // From the list of clients, pick/select client(s) based on the reclaim policy.
+    void getClientForResource_l(
+        const ReclaimRequestInfo& reclaimRequestInfo,
+        const std::vector<ClientInfo>& clients,
+        std::vector<ClientInfo>& targetClients);
+
+    // Gets the client who owns specified resource type from lowest possible priority process.
+    // Returns false if the calling process priority is not higher than the lowest process
+    // priority. The client will remain unchanged if returns false.
+    bool getLowestPriorityProcessBiggestClient_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        const std::vector<ClientInfo>& clients,
+        ClientInfo& clientInfo);
+
     // Initializes the internal state of the ResourceManagerService
     void init() override;
 
     void setObserverService(
             const std::shared_ptr<ResourceObserverService>& observerService) override;
+
+    // Gets the list of all the clients who own the specified resource type.
+    // Returns false if any client belongs to a process with higher priority than the
+    // calling process. The clients will remain unchanged if returns false.
+    bool getTargetClients(
+        int32_t callingPid,
+        const std::vector<MediaResourceParcel>& resources,
+        std::vector<ClientInfo>& targetClients) override;
 
     // Removes the pid from the override map.
     void removeProcessInfoOverride(int pid) override;
@@ -97,16 +123,18 @@ private:
     bool getAllClients_l(const ResourceRequestInfo& resourceRequestInfo,
                          std::vector<ClientInfo>& clientsInfo) override;
 
-    // Gets the client who owns biggest piece of specified resource type from pid.
-    // Returns false with no change to client if there are no clients holding resources of this
-    // type.
-    bool getBiggestClient_l(int pid, MediaResource::Type type,
-                            MediaResource::SubType subType,
-                            ClientInfo& clientsInfo,
-                            bool pendingRemovalOnly = false) override;
+    // Gets the client who owns specified resource type from lowest possible priority process.
+    // Returns false if the calling process priority is not higher than the lowest process
+    // priority. The client will remain unchanged if returns false.
+    // This function is used only by the unit test.
+    bool getLowestPriorityBiggestClient_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        ClientInfo& clientInfo) override;
 
+    // override the pid of given process
     bool overridePid_l(int32_t originalPid, int32_t newPid) override;
 
+    // override the process info of given process
     bool overrideProcessInfo_l(const std::shared_ptr<IResourceManagerClient>& client,
                                int pid, int procState, int oomScore) override;
 
@@ -135,6 +163,7 @@ private:
 
 private:
     std::shared_ptr<ResourceTracker> mResourceTracker;
+    std::unique_ptr<IResourceModel> mDefaultResourceModel;
 };
 
 // ----------------------------------------------------------------------------

@@ -18,6 +18,8 @@
 #ifndef ANDROID_MEDIA_RESOURCEMANAGERSERVICEUTILS_H_
 #define ANDROID_MEDIA_RESOURCEMANAGERSERVICEUTILS_H_
 
+#include <map>
+#include <memory>
 #include <vector>
 
 #include <aidl/android/media/BnResourceManagerService.h>
@@ -120,6 +122,16 @@ struct ResourceInfo {
     std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
     ResourceList resources;
     bool pendingRemoval{false};
+};
+
+/*
+ * Resource Reclaim request info that encapsulates
+ *  - the calling/requesting process pid.
+ *  - the list of resources requesting (to be reclaimed from others)
+ */
+struct ReclaimRequestInfo {
+    int mCallingPid = -1;
+    const std::vector<::aidl::android::media::MediaResourceParcel>& mResources;
 };
 
 /*

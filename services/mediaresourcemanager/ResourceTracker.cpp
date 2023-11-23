@@ -27,6 +27,45 @@
 
 namespace android {
 
+inline bool isHwCodec(MediaResource::SubType subType) {
+    return subType == MediaResource::SubType::kHwImageCodec ||
+           subType == MediaResource::SubType::kHwVideoCodec;
+}
+
+// Check whether a given resource (of type and subtype) is found in given resource list
+// that also has the given Primary SubType.
+static bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
+                            const ResourceList& resources, MediaResource::SubType primarySubType) {
+    bool foundResource = false;
+    bool matchedPrimary =
+        (primarySubType == MediaResource::SubType::kUnspecifiedSubType) ?  true : false;
+    for (auto it = resources.begin(); it != resources.end(); it++) {
+        if (hasResourceType(type, subType, it->second)) {
+            foundResource = true;
+        } else if (it->second.subType == primarySubType) {
+            matchedPrimary = true;
+        } else if (isHwCodec(it->second.subType) == isHwCodec(primarySubType)) {
+            matchedPrimary = true;
+        }
+        if (matchedPrimary && foundResource) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// See if the given client is already in the list of clients.
+inline bool contains(const std::vector<ClientInfo>& clients, const int64_t& clientId) {
+    std::vector<ClientInfo>::const_iterator found =
+        std::find_if(clients.begin(), clients.end(),
+                     [clientId](const ClientInfo& client) -> bool {
+                         return client.mClientId == clientId;
+                     });
+
+    return found != clients.end();
+}
+
+
 ResourceTracker::ResourceTracker(const std::shared_ptr<ResourceManagerServiceNew>& service,
                                  const sp<ProcessInfoInterface>& processInfo) :
         mService(service),
@@ -297,8 +336,10 @@ bool ResourceTracker::getClientsMarkedPendingRemoval(int32_t pid,
                                                    MediaResource::SubType::kHwImageCodec,
                                                    MediaResource::SubType::kSwImageCodec}) {
                 ClientInfo clientInfo;
-                if (getBiggestClient(pid, type, subType, clientInfo, true)) {
-                    targetClients.emplace_back(clientInfo);
+                if (getBiggestClientPendingRemoval(pid, type, subType, clientInfo)) {
+                    if (!contains(targetClients, clientInfo.mClientId)) {
+                        targetClients.emplace_back(clientInfo);
+                    }
                     continue;
                 }
             }
@@ -307,8 +348,10 @@ bool ResourceTracker::getClientsMarkedPendingRemoval(int32_t pid,
         default:
             ClientInfo clientInfo;
             MediaResource::SubType subType = MediaResource::SubType::kUnspecifiedSubType;
-            if (getBiggestClient(pid, type, subType, clientInfo, true)) {
-                targetClients.emplace_back(clientInfo);
+            if (getBiggestClientPendingRemoval(pid, type, subType, clientInfo)) {
+                if (!contains(targetClients, clientInfo.mClientId)) {
+                    targetClients.emplace_back(clientInfo);
+                }
             }
             break;
         }
@@ -358,16 +401,19 @@ void ResourceTracker::removeProcessInfoOverride(int pid) {
 }
 
 bool ResourceTracker::getAllClients(const ResourceRequestInfo& resourceRequestInfo,
-                                    std::vector<ClientInfo>& clients) {
+                                    std::vector<ClientInfo>& clients,
+                                    MediaResource::SubType primarySubType) {
     MediaResource::Type type = resourceRequestInfo.mResource->type;
     MediaResource::SubType subType = resourceRequestInfo.mResource->subType;
     bool foundClient = false;
 
     for (auto& [pid, /* ResourceInfos */ infos] : mMap) {
         for (auto& [id, /* ResourceInfo */ info] : infos) {
-            if (hasResourceType(type, subType, info.resources)) {
-                clients.emplace_back(info.pid, info.uid, info.clientId);
-                foundClient = true;
+            if (hasResourceType(type, subType, info.resources, primarySubType)) {
+                if (!contains(clients, info.clientId)) {
+                    clients.emplace_back(info.pid, info.uid, info.clientId);
+                    foundClient = true;
+                }
             }
         }
     }
@@ -410,12 +456,38 @@ bool ResourceTracker::getLowestPriorityPid(MediaResource::Type type, MediaResour
     return success;
 }
 
-bool ResourceTracker::getBiggestClient(int pid, MediaResource::Type type,
-                                       MediaResource::SubType subType,
-                                       ClientInfo& clientInfo, bool pendingRemovalOnly) {
+bool ResourceTracker::getLowestPriorityPid(const std::vector<ClientInfo>& clients,
+                                           int& lowestPriorityPid, int& lowestPriority) {
+    int pid = -1;
+    int priority = -1;
+    for (const ClientInfo& client : clients) {
+        int tempPriority = -1;
+        if (!getPriority(client.mPid, &tempPriority)) {
+            ALOGV("%s: can't get priority of pid %d, skipped", __func__, client.mPid);
+            // TODO: remove this pid from mMap?
+            continue;
+        }
+        if (pid == -1 || tempPriority > priority) {
+            // initial the value
+            pid = client.mPid;
+            priority = tempPriority;
+        }
+    }
+
+    bool success = (pid != -1);
+
+    if (success) {
+        lowestPriorityPid = pid;
+        lowestPriority = priority;
+    }
+    return success;
+}
+
+bool ResourceTracker::getBiggestClientPendingRemoval(int pid, MediaResource::Type type,
+                                                     MediaResource::SubType subType,
+                                                     ClientInfo& clientInfo) {
     std::map<int, ResourceInfos>::iterator found = mMap.find(pid);
     if (found == mMap.end()) {
-        ALOGE_IF(!pendingRemovalOnly, "%s: can't find resource info for pid %d", __func__, pid);
         return false;
     }
 
@@ -425,9 +497,47 @@ bool ResourceTracker::getBiggestClient(int pid, MediaResource::Type type,
     const ResourceInfos& infos = found->second;
     for (const auto& [id, /* ResourceInfo */ info] : infos) {
         const ResourceList& resources = info.resources;
-        if (pendingRemovalOnly && !info.pendingRemoval) {
+        // Skip if the client is not marked pending removal.
+        if (!info.pendingRemoval) {
             continue;
         }
+        for (auto it = resources.begin(); it != resources.end(); it++) {
+            const MediaResourceParcel& resource = it->second;
+            if (hasResourceType(type, subType, resource)) {
+                if (resource.value > largestValue) {
+                    largestValue = resource.value;
+                    clientId = info.clientId;
+                    uid = info.uid;
+                }
+            }
+        }
+    }
+
+    if (clientId == -1) {
+        return false;
+    }
+
+    clientInfo.mPid = pid;
+    clientInfo.mUid = uid;
+    clientInfo.mClientId = clientId;
+    return true;
+}
+
+bool ResourceTracker::getBiggestClient(int pid, MediaResource::Type type,
+                                       MediaResource::SubType subType,
+                                       ClientInfo& clientInfo) {
+    std::map<int, ResourceInfos>::iterator found = mMap.find(pid);
+    if (found == mMap.end()) {
+        ALOGE("%s: can't find resource info for pid %d", __func__, pid);
+        return false;
+    }
+
+    uid_t   uid = -1;
+    int64_t clientId = -1;
+    uint64_t largestValue = 0;
+    const ResourceInfos& infos = found->second;
+    for (const auto& [id, info] : infos) {
+        const ResourceList& resources = info.resources;
         for (auto it = resources.begin(); it != resources.end(); it++) {
             const MediaResourceParcel &resource = it->second;
             if (hasResourceType(type, subType, resource)) {
@@ -441,9 +551,8 @@ bool ResourceTracker::getBiggestClient(int pid, MediaResource::Type type,
     }
 
     if (clientId == -1) {
-        ALOGE_IF(!pendingRemovalOnly,
-                 "%s: can't find resource type %s and subtype %s for pid %d",
-                 __func__, asString(type), asString(subType), pid);
+        ALOGE("%s: can't find resource type %s and subtype %s for pid %d",
+              __func__, asString(type), asString(subType), pid);
         return false;
     }
 

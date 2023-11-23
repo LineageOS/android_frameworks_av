@@ -18,7 +18,10 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ResourceManagerServiceNew"
 #include <utils/Log.h>
+#include <binder/IPCThreadState.h>
+#include <mediautils/ProcessInfo.h>
 
+#include "DefaultResourceModel.h"
 #include "ResourceManagerServiceNew.h"
 #include "ResourceTracker.h"
 #include "ServiceLog.h"
@@ -36,10 +39,29 @@ void ResourceManagerServiceNew::init() {
     // Create the Resource Tracker
     mResourceTracker = std::make_shared<ResourceTracker>(ref<ResourceManagerServiceNew>(),
                                                          mProcessInfo);
+    setUpResourceModels();
+}
+
+void ResourceManagerServiceNew::setUpResourceModels() {
+    std::scoped_lock lock{mLock};
+    // Create/Configure the default resource model.
+    if (mDefaultResourceModel == nullptr) {
+        mDefaultResourceModel = std::make_unique<DefaultResourceModel>(
+                mResourceTracker,
+                mSupportsMultipleSecureCodecs,
+                mSupportsSecureWithNonSecureCodec);
+    } else {
+        DefaultResourceModel* resourceModel =
+            static_cast<DefaultResourceModel*>(mDefaultResourceModel.get());
+        resourceModel->config(mSupportsMultipleSecureCodecs, mSupportsSecureWithNonSecureCodec);
+    }
 }
 
 Status ResourceManagerServiceNew::config(const std::vector<MediaResourcePolicyParcel>& policies) {
-    return ResourceManagerService::config(policies);
+    Status status = ResourceManagerService::config(policies);
+    // Change in the config dictates update to the resource model.
+    setUpResourceModels();
+    return status;
 }
 
 void ResourceManagerServiceNew::setObserverService(
@@ -194,6 +216,120 @@ binder_status_t ResourceManagerServiceNew::dump(int fd, const char** args, uint3
     return ResourceManagerService::dump(fd, args, numArgs);
 }
 
+bool ResourceManagerServiceNew::getTargetClients(
+        int callingPid,
+        const std::vector<MediaResourceParcel>& resources,
+        std::vector<ClientInfo>& targetClients) {
+    std::scoped_lock lock{mLock};
+    if (!mProcessInfo->isPidTrusted(callingPid)) {
+        pid_t actualCallingPid = IPCThreadState::self()->getCallingPid();
+        ALOGW("%s called with untrusted pid %d, using actual calling pid %d", __FUNCTION__,
+                callingPid, actualCallingPid);
+        callingPid = actualCallingPid;
+    }
+
+    // Use the Resource Model to get a list of all the clients that hold the
+    // needed/requested resources.
+    ReclaimRequestInfo reclaimRequestInfo{callingPid, resources};
+    std::vector<ClientInfo> clients;
+    if (!mDefaultResourceModel->getAllClients(reclaimRequestInfo, clients)) {
+        if (clients.empty()) {
+            ALOGI("%s: There aren't any clients with given resources. Nothing to reclaim",
+                  __func__);
+            return false;
+        }
+        // Since there was a conflict, we need to reclaim all elements.
+        targetClients = std::move(clients);
+    } else {
+        getClientForResource_l(reclaimRequestInfo, clients, targetClients);
+    }
+    return !targetClients.empty();
+}
+
+void ResourceManagerServiceNew::getClientForResource_l(
+        const ReclaimRequestInfo& reclaimRequestInfo,
+        const std::vector<ClientInfo>& clients,
+        std::vector<ClientInfo>& targetClients) {
+    int callingPid = reclaimRequestInfo.mCallingPid;
+
+    // Before looking into other processes, check if we have clients marked for
+    // pending removal in the same process.
+    ClientInfo targetClient;
+    for (const MediaResourceParcel& resource : reclaimRequestInfo.mResources) {
+        if (mResourceTracker->getBiggestClientPendingRemoval(callingPid, resource.type,
+                                                             resource.subType, targetClient)) {
+            targetClients.emplace_back(targetClient);
+            return;
+        }
+    }
+
+    // Now find client(s) from a lowest priority process that has needed resources.
+    ResourceRequestInfo resourceRequestInfo {callingPid, nullptr};
+    for (const MediaResourceParcel& resource : reclaimRequestInfo.mResources) {
+        resourceRequestInfo.mResource = &resource;
+        if (getLowestPriorityProcessBiggestClient_l(resourceRequestInfo, clients, targetClient)) {
+            targetClients.emplace_back(targetClient);
+            return;
+        }
+    }
+}
+
+// Process priority (oom score) based reclaim:
+//   - Find a process with lowest priority (than that of calling process).
+//   - Find the bigegst client (with required resources) from that process.
+bool ResourceManagerServiceNew::getLowestPriorityProcessBiggestClient_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        const std::vector<ClientInfo>& clients,
+        ClientInfo& clientInfo) {
+    int callingPid = resourceRequestInfo.mCallingPid;
+    MediaResource::Type type = resourceRequestInfo.mResource->type;
+    MediaResource::SubType subType = resourceRequestInfo.mResource->subType;
+    int lowestPriorityPid;
+    int lowestPriority;
+    int callingPriority;
+
+    if (!mResourceTracker->getPriority(callingPid, &callingPriority)) {
+        ALOGE("%s: can't get process priority for pid %d", __func__, callingPid);
+        return false;
+    }
+
+    // Find the lowest priority process among all the clients.
+    if (!mResourceTracker->getLowestPriorityPid(clients, lowestPriorityPid, lowestPriority)) {
+        ALOGE("%s: can't find a process with lower priority than that of the process[%d:%d]",
+              __func__, callingPid, callingPriority);
+        return false;
+    }
+
+    if (lowestPriority <= callingPriority) {
+        ALOGE("%s: lowest priority %d vs caller priority %d",
+              __func__, lowestPriority, callingPriority);
+        return false;
+    }
+
+    // Get the biggest client from this process.
+    if (!mResourceTracker->getBiggestClient(lowestPriorityPid, type, subType, clientInfo)) {
+        return false;
+    }
+
+    ALOGI("%s: CallingProcess(%d:%d) will reclaim from the lowestPriorityProcess(%d:%d)",
+          __func__, callingPid, callingPriority, lowestPriorityPid, lowestPriority);
+    return true;
+}
+
+bool ResourceManagerServiceNew::getLowestPriorityBiggestClient_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        ClientInfo& clientInfo) {
+    //NOTE: This function is used only by the test: ResourceManagerServiceTest
+    if (resourceRequestInfo.mResource == nullptr) {
+        return false;
+    }
+    std::vector<MediaResourceParcel> resources{*resourceRequestInfo.mResource};
+    ReclaimRequestInfo reclaimRequestInfo{resourceRequestInfo.mCallingPid, resources};
+    std::vector<ClientInfo> clients;
+    mDefaultResourceModel->getAllClients(reclaimRequestInfo, clients);
+    return getLowestPriorityProcessBiggestClient_l(resourceRequestInfo, clients, clientInfo);
+}
+
 bool ResourceManagerServiceNew::getPriority_l(int pid, int* priority) const {
     return mResourceTracker->getPriority(pid, priority);
 }
@@ -201,22 +337,18 @@ bool ResourceManagerServiceNew::getPriority_l(int pid, int* priority) const {
 bool ResourceManagerServiceNew::getLowestPriorityPid_l(
         MediaResource::Type type, MediaResource::SubType subType,
         int* lowestPriorityPid, int* lowestPriority) {
+    //NOTE: This function is used only by the test: ResourceManagerServiceTest
     return mResourceTracker->getLowestPriorityPid(type, subType,
                                                   *lowestPriorityPid,
                                                   *lowestPriority);
 }
 
-bool ResourceManagerServiceNew::getBiggestClient_l(int pid, MediaResource::Type type,
-        MediaResource::SubType subType, ClientInfo& clientInfo, bool pendingRemovalOnly) {
-    return mResourceTracker->getBiggestClient(pid, type, subType,
-                                              clientInfo, pendingRemovalOnly);
-}
-
 bool ResourceManagerServiceNew::getAllClients_l(
         const ResourceRequestInfo& resourceRequestInfo,
         std::vector<ClientInfo>& clientsInfo) {
+    //NOTE: This function is used only by the test: ResourceManagerServiceTest
     MediaResource::Type type = resourceRequestInfo.mResource->type;
-    // Get list of all the clients that has requested resources.
+    // Get the list of all clients that has requested resources.
     std::vector<ClientInfo> clients;
     mResourceTracker->getAllClients(resourceRequestInfo, clients);
 
