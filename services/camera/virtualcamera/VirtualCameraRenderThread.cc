@@ -357,6 +357,11 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     sp<Fence> fence) {
   ALOGV("%s", __func__);
   sp<GraphicBuffer> gBuffer = mEglSurfaceTexture->getCurrentBuffer();
+  if (gBuffer == nullptr) {
+    // Most probably nothing was yet written to input surface if we reached this.
+    ALOGE("%s: Cannot fetch most recent buffer from SurfaceTexture", __func__);
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
   std::shared_ptr<AHardwareBuffer> hwBuffer =
       mSessionContext.fetchHardwareBuffer(streamId, bufferId);
 
