@@ -147,6 +147,18 @@ bool ResourceTracker::addResource(const ClientInfoParcel& clientInfo,
     return !resourceAdded.empty();
 }
 
+bool ResourceTracker::updateResource(const aidl::android::media::ClientInfoParcel& clientInfo) {
+    ResourceInfos& infos = getResourceInfosForEdit(clientInfo.pid);
+
+    ResourceInfos::iterator found = infos.find(clientInfo.id);
+    if (found == infos.end()) {
+        return false;
+    }
+    // Update the client importance.
+    found->second.importance = std::max(0, clientInfo.importance);
+    return true;
+}
+
 bool ResourceTracker::removeResource(const ClientInfoParcel& clientInfo,
                                      const std::vector<MediaResourceParcel>& resources) {
     int32_t pid = clientInfo.pid;
@@ -552,6 +564,68 @@ bool ResourceTracker::getBiggestClient(int targetPid,
             continue;
         }
 
+        const ResourceList& resources = info->resources;
+        bool matchedPrimary =
+            (primarySubType == MediaResource::SubType::kUnspecifiedSubType) ?  true : false;
+        for (auto it = resources.begin(); !matchedPrimary && it != resources.end(); it++) {
+            if (it->second.subType == primarySubType) {
+                matchedPrimary = true;
+            } else if (isHwCodec(it->second.subType) == isHwCodec(primarySubType)) {
+                matchedPrimary = true;
+            }
+        }
+        // Primary type doesn't match, skip the client
+        if (!matchedPrimary) {
+            continue;
+        }
+        for (auto it = resources.begin(); it != resources.end(); it++) {
+            const MediaResourceParcel& resource = it->second;
+            if (hasResourceType(type, subType, resource)) {
+                if (resource.value > largestValue) {
+                    largestValue = resource.value;
+                    clientId = info->clientId;
+                    uid = info->uid;
+                }
+            }
+        }
+    }
+
+    if (clientId == -1) {
+        ALOGE("%s: can't find resource type %s and subtype %s for pid %d",
+                 __func__, asString(type), asString(subType), targetPid);
+        return false;
+    }
+
+    clientInfo.mPid = targetPid;
+    clientInfo.mUid = uid;
+    clientInfo.mClientId = clientId;
+    return true;
+}
+
+bool ResourceTracker::getLeastImportantBiggestClient(int targetPid, int32_t importance,
+                                                     MediaResource::Type type,
+                                                     MediaResource::SubType subType,
+                                                     MediaResource::SubType primarySubType,
+                                                     const std::vector<ClientInfo>& clients,
+                                                     ClientInfo& clientInfo) {
+    uid_t   uid = -1;
+    int64_t clientId = -1;
+    uint64_t largestValue = 0;
+
+    for (const ClientInfo& client : clients) {
+        // Skip the clients that doesn't belong go the targetPid
+        if (client.mPid != targetPid) {
+            continue;
+        }
+        const ResourceInfo* info = getResourceInfo(client.mPid, client.mClientId);
+        if (info == nullptr) {
+            continue;
+        }
+
+        // Make sure the importance is lower.
+        if (info->importance <= importance) {
+            continue;
+        }
         const ResourceList& resources = info->resources;
         bool matchedPrimary =
             (primarySubType == MediaResource::SubType::kUnspecifiedSubType) ?  true : false;
