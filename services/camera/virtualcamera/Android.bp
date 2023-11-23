@@ -1,0 +1,99 @@
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+cc_defaults {
+    name: "libvirtualcamera_defaults",
+    shared_libs: [
+        "android.hardware.common-V2-ndk",
+        "android.hardware.common.fmq-V1-ndk",
+        "libbinder",
+        "libbinder_ndk",
+        "libcamera_metadata",
+        "liblog",
+        "libfmq",
+        "libgui",
+        "libjpeg",
+        "libnativewindow",
+        "libbase",
+        "libcutils",
+        "libui",
+        "libutils",
+        "libEGL",
+        "libGLESv2",
+        "libGLESv3",
+    ],
+    static_libs: [
+        "android.hardware.camera.common@1.0-helper",
+        "android.hardware.camera.common-V1-ndk",
+        "android.hardware.camera.device-V2-ndk",
+        "android.hardware.camera.metadata-V2-ndk",
+        "android.hardware.camera.provider-V2-ndk",
+        "libaidlcommonsupport",
+        "virtual_camera_service_aidl-ndk",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wformat",
+        "-Wthread-safety",
+        "-DLOG_NDEBUG=0"
+    ],
+}
+
+cc_library_static {
+    name: "libvirtualcamera_utils",
+    srcs: [
+        "util/JpegUtil.cc",
+        "util/MetadataBuilder.cc",
+        "util/Util.cc",
+        "util/TestPatternHelper.cc",
+        "util/EglDisplayContext.cc",
+        "util/EglFramebuffer.cc",
+        "util/EglProgram.cc",
+        "util/EglSurfaceTexture.cc",
+        "util/EglUtil.cc",
+    ],
+    defaults: [
+        "libvirtualcamera_defaults",
+    ],
+}
+
+cc_library_static {
+    name: "libvirtualcamera",
+    srcs: [
+        "VirtualCameraProvider.cc",
+        "VirtualCameraDevice.cc",
+        "VirtualCameraSession.cc",
+        "VirtualCameraStream.cc",
+        "VirtualCameraService.cc",
+        "VirtualCameraSessionContext.cc",
+        "VirtualCameraRenderThread.cc",
+    ],
+    defaults: [
+        "libvirtualcamera_defaults",
+    ],
+    static_libs: [
+        "libvirtualcamera_utils",
+    ],
+    export_include_dirs: ["."],
+    min_sdk_version: "current",
+}
+
+cc_binary {
+    name: "virtual_camera",
+    srcs: ["main.cc"],
+    defaults: [
+        "libvirtualcamera_defaults",
+    ],
+    static_libs: [
+        "libvirtualcamera",
+        "libvirtualcamera_utils",
+    ],
+    // Remove before flight.
+    // We don't want the service to be started and discovered
+    // yet - remove comments on the lines below in order to
+    // test locally.
+    // init_rc: ["virtual_camera.hal.rc"],
+}
