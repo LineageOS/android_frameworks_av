@@ -18,10 +18,19 @@
 
 #include <unistd.h>
 
+#include "jpeglib.h"
+
 namespace android {
 namespace companion {
 namespace virtualcamera {
 
+// Lower bound for maximal supported texture size is at least 2048x2048
+// but on most platforms will be more.
+// TODO(b/301023410) - Query actual max texture size.
+constexpr int kMaxTextureSize = 2048;
+constexpr int kLibJpegDctSize = DCTSIZE;
+
+using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::hardware::common::NativeHandle;
 
 sp<Fence> importFence(const NativeHandle& aidlHandle) {
@@ -30,6 +39,29 @@ sp<Fence> importFence(const NativeHandle& aidlHandle) {
   }
 
   return sp<Fence>::make(::dup(aidlHandle.fds[0].get()));
+}
+
+// Returns true if specified format is supported for virtual camera input.
+bool isFormatSupportedForInput(const int width, const int height,
+                               const Format format) {
+  if (format != Format::YUV_420_888) {
+    // For now only YUV_420_888 is supported for input.
+    return false;
+  }
+
+  if (width <= 0 || height <= 0 || width > kMaxTextureSize ||
+      height > kMaxTextureSize) {
+    return false;
+  }
+
+  if (width % kLibJpegDctSize != 0 || height % kLibJpegDctSize != 0) {
+    // Input dimension needs to be multiple of libjpeg DCT size.
+    // TODO(b/301023410) This restriction can be removed once we add support for
+    // unaligned jpeg compression.
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace virtualcamera
