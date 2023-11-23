@@ -456,11 +456,21 @@ bool ResourceTracker::getLowestPriorityPid(MediaResource::Type type, MediaResour
     return success;
 }
 
-bool ResourceTracker::getLowestPriorityPid(const std::vector<ClientInfo>& clients,
+bool ResourceTracker::getLowestPriorityPid(MediaResource::Type type, MediaResource::SubType subType,
+                                           MediaResource::SubType primarySubType,
+                                           const std::vector<ClientInfo>& clients,
                                            int& lowestPriorityPid, int& lowestPriority) {
     int pid = -1;
     int priority = -1;
     for (const ClientInfo& client : clients) {
+        const ResourceInfo* info = getResourceInfo(client.mPid, client.mClientId);
+        if (info == nullptr) {
+            continue;
+        }
+        if (!hasResourceType(type, subType, info->resources, primarySubType)) {
+            // doesn't have the requested resource type
+            continue;
+        }
         int tempPriority = -1;
         if (!getPriority(client.mPid, &tempPriority)) {
             ALOGV("%s: can't get priority of pid %d, skipped", __func__, client.mPid);
@@ -523,28 +533,46 @@ bool ResourceTracker::getBiggestClientPendingRemoval(int pid, MediaResource::Typ
     return true;
 }
 
-bool ResourceTracker::getBiggestClient(int pid, MediaResource::Type type,
-                                       MediaResource::SubType subType,
-                                       ClientInfo& clientInfo) {
-    std::map<int, ResourceInfos>::iterator found = mMap.find(pid);
-    if (found == mMap.end()) {
-        ALOGE("%s: can't find resource info for pid %d", __func__, pid);
-        return false;
-    }
-
+bool ResourceTracker::getBiggestClient(int targetPid,
+                                       MediaResource::Type type, MediaResource::SubType subType,
+                                       const std::vector<ClientInfo>& clients,
+                                       ClientInfo& clientInfo,
+                                       MediaResource::SubType primarySubType) {
     uid_t   uid = -1;
     int64_t clientId = -1;
     uint64_t largestValue = 0;
-    const ResourceInfos& infos = found->second;
-    for (const auto& [id, info] : infos) {
-        const ResourceList& resources = info.resources;
+
+    for (const ClientInfo& client : clients) {
+        // Skip the clients that doesn't belong go the targetPid
+        if (client.mPid != targetPid) {
+            continue;
+        }
+        const ResourceInfo* info = getResourceInfo(client.mPid, client.mClientId);
+        if (info == nullptr) {
+            continue;
+        }
+
+        const ResourceList& resources = info->resources;
+        bool matchedPrimary =
+            (primarySubType == MediaResource::SubType::kUnspecifiedSubType) ?  true : false;
+        for (auto it = resources.begin(); !matchedPrimary && it != resources.end(); it++) {
+            if (it->second.subType == primarySubType) {
+                matchedPrimary = true;
+            } else if (isHwCodec(it->second.subType) == isHwCodec(primarySubType)) {
+                matchedPrimary = true;
+            }
+        }
+        // Primary type doesn't match, skip the client
+        if (!matchedPrimary) {
+            continue;
+        }
         for (auto it = resources.begin(); it != resources.end(); it++) {
-            const MediaResourceParcel &resource = it->second;
+            const MediaResourceParcel& resource = it->second;
             if (hasResourceType(type, subType, resource)) {
                 if (resource.value > largestValue) {
                     largestValue = resource.value;
-                    clientId = info.clientId;
-                    uid = info.uid;
+                    clientId = info->clientId;
+                    uid = info->uid;
                 }
             }
         }
@@ -552,11 +580,11 @@ bool ResourceTracker::getBiggestClient(int pid, MediaResource::Type type,
 
     if (clientId == -1) {
         ALOGE("%s: can't find resource type %s and subtype %s for pid %d",
-              __func__, asString(type), asString(subType), pid);
+                 __func__, asString(type), asString(subType), targetPid);
         return false;
     }
 
-    clientInfo.mPid = pid;
+    clientInfo.mPid = targetPid;
     clientInfo.mUid = uid;
     clientInfo.mClientId = clientId;
     return true;
@@ -647,13 +675,32 @@ bool ResourceTracker::getNonConflictingClients(const ResourceRequestInfo& resour
                     clients.clear();
                     return false;
                 } else {
-                    clients.emplace_back(info.pid, info.uid, info.clientId);
+                    if (!contains(clients, info.clientId)) {
+                        clients.emplace_back(info.pid, info.uid, info.clientId);
+                    }
                 }
             }
         }
     }
 
     return true;
+}
+
+const ResourceInfo* ResourceTracker::getResourceInfo(int pid, const int64_t& clientId) const {
+    std::map<int, ResourceInfos>::const_iterator found = mMap.find(pid);
+    if (found == mMap.end()) {
+        ALOGV("%s: didn't find pid %d for clientId %lld", __func__, pid, (long long) clientId);
+        return nullptr;
+    }
+
+    const ResourceInfos& infos = found->second;
+    ResourceInfos::const_iterator foundClient = infos.find(clientId);
+    if (foundClient == infos.end()) {
+        ALOGV("%s: didn't find clientId %lld", __func__, (long long) clientId);
+        return nullptr;
+    }
+
+    return &foundClient->second;
 }
 
 bool ResourceTracker::isCallingPriorityHigher(int callingPid, int pid) {

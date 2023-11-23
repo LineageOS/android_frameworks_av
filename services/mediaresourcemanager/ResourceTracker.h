@@ -102,8 +102,8 @@ public:
     // Override the process info {state, oom score} of the process with pid.
     // returns true on success, false otherwise.
     bool overrideProcessInfo(
-        const std::shared_ptr<aidl::android::media::IResourceManagerClient>& client,
-        int pid, int procState, int oomScore);
+            const std::shared_ptr<aidl::android::media::IResourceManagerClient>& client,
+            int pid, int procState, int oomScore);
 
     // Remove the overridden process info.
     void removeProcessInfoOverride(int pid);
@@ -115,9 +115,9 @@ public:
     // returns true upon finding at lease one client with the given resource request info,
     // false otherwise (no clients)
     bool getAllClients(
-        const ResourceRequestInfo& resourceRequestInfo,
-        std::vector<ClientInfo>& clients,
-        MediaResource::SubType primarySubType = MediaResource::SubType::kUnspecifiedSubType);
+            const ResourceRequestInfo& resourceRequestInfo,
+            std::vector<ClientInfo>& clients,
+            MediaResource::SubType primarySubType = MediaResource::SubType::kUnspecifiedSubType);
 
     // Look for the lowest priority process with the given resources.
     // Upon success lowestPriorityPid and lowestPriority are
@@ -127,31 +127,42 @@ public:
     bool getLowestPriorityPid(MediaResource::Type type, MediaResource::SubType subType,
                               int& lowestPriorityPid, int& lowestPriority);
 
-    // Look for the lowest priority process with the given client list.
+    // Look for the lowest priority process with the given resources
+    // among the given client list.
+    // If applicable, match the primary type too.
     // returns true on success, false otherwise.
-    bool getLowestPriorityPid(const std::vector<ClientInfo>& clients,
-                              int& lowestPriorityPid, int& lowestPriority);
+    bool getLowestPriorityPid(
+            MediaResource::Type type, MediaResource::SubType subType,
+            MediaResource::SubType primarySubType,
+            const std::vector<ClientInfo>& clients,
+            int& lowestPriorityPid, int& lowestPriority);
 
     // Find the biggest client of the given process with given resources,
     // that is marked as pending to be removed.
     // returns true on success, false otherwise.
     bool getBiggestClientPendingRemoval(
-        int pid, MediaResource::Type type, MediaResource::SubType subType,
-        ClientInfo& clientInfo);
+            int pid, MediaResource::Type type,
+            MediaResource::SubType subType,
+            ClientInfo& clientInfo);
 
-    // Find the biggest client of the given process with given resources.
-    // If pendingRemovalOnly is set, then it will look for only those clients
-    // that are marked for removing.
+    // Find the biggest client from the process pid, selecting them from the list of clients.
+    // If applicable, match the primary type too.
     // Returns true when a client is found and clientInfo is updated accordingly.
     // Upon failure to find a client, it will return false without updating
     // clientInfo.
-    bool getBiggestClient(int pid, MediaResource::Type type, MediaResource::SubType subType,
-                          ClientInfo& clientInfo);
+    // Upon failure to find a client, it will return false.
+    bool getBiggestClient(
+            int targetPid,
+            MediaResource::Type type,
+            MediaResource::SubType subType,
+            const std::vector<ClientInfo>& clients,
+            ClientInfo& clientInfo,
+            MediaResource::SubType primarySubType = MediaResource::SubType::kUnspecifiedSubType);
 
     // Find the client that belongs to given process(pid) and with the given clientId.
     // A nullptr is returned upon failure to find the client.
     std::shared_ptr<::aidl::android::media::IResourceManagerClient> getClient(
-        int pid, const int64_t& clientId) const;
+            int pid, const int64_t& clientId) const;
 
     // Removes the client from the given process(pid) with the given clientId.
     // returns true on success, false otherwise.
@@ -160,7 +171,7 @@ public:
     // Set the resource observer service, to which to notify when the resources
     // are added and removed.
     void setResourceObserverService(
-        const std::shared_ptr<ResourceObserverService>& observerService);
+            const std::shared_ptr<ResourceObserverService>& observerService);
 
     // Dump all the resource allocations for all the processes into a given string
     void dump(std::string& resourceLogs);
@@ -194,6 +205,10 @@ private:
     // A helper function that returns true if the callingPid has higher priority than pid.
     // Returns false otherwise.
     bool isCallingPriorityHigher(int callingPid, int pid);
+
+    // Locate the resource info corresponding to the process pid and
+    // the client clientId.
+    const ResourceInfo* getResourceInfo(int pid, const int64_t& clientId) const;
 
     // Notify when a resource is added for the first time.
     void onFirstAdded(const MediaResourceParcel& resource, uid_t uid);

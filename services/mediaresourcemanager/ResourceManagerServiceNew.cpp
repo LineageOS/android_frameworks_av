@@ -22,6 +22,7 @@
 #include <mediautils/ProcessInfo.h>
 
 #include "DefaultResourceModel.h"
+#include "ProcessPriorityReclaimPolicy.h"
 #include "ResourceManagerServiceNew.h"
 #include "ResourceTracker.h"
 #include "ServiceLog.h"
@@ -40,6 +41,7 @@ void ResourceManagerServiceNew::init() {
     mResourceTracker = std::make_shared<ResourceTracker>(ref<ResourceManagerServiceNew>(),
                                                          mProcessInfo);
     setUpResourceModels();
+    setUpReclaimPolicies();
 }
 
 void ResourceManagerServiceNew::setUpResourceModels() {
@@ -55,6 +57,12 @@ void ResourceManagerServiceNew::setUpResourceModels() {
             static_cast<DefaultResourceModel*>(mDefaultResourceModel.get());
         resourceModel->config(mSupportsMultipleSecureCodecs, mSupportsSecureWithNonSecureCodec);
     }
+}
+
+void ResourceManagerServiceNew::setUpReclaimPolicies() {
+    mReclaimPolicies.clear();
+    // Process priority (oom score) as the Default reclaim policy.
+    mReclaimPolicies.push_back(std::make_unique<ProcessPriorityReclaimPolicy>(mResourceTracker));
 }
 
 Status ResourceManagerServiceNew::config(const std::vector<MediaResourcePolicyParcel>& policies) {
@@ -241,6 +249,7 @@ bool ResourceManagerServiceNew::getTargetClients(
         // Since there was a conflict, we need to reclaim all elements.
         targetClients = std::move(clients);
     } else {
+        // Select a client among those have the needed resources.
         getClientForResource_l(reclaimRequestInfo, clients, targetClients);
     }
     return !targetClients.empty();
@@ -263,57 +272,12 @@ void ResourceManagerServiceNew::getClientForResource_l(
         }
     }
 
-    // Now find client(s) from a lowest priority process that has needed resources.
-    ResourceRequestInfo resourceRequestInfo {callingPid, nullptr};
-    for (const MediaResourceParcel& resource : reclaimRequestInfo.mResources) {
-        resourceRequestInfo.mResource = &resource;
-        if (getLowestPriorityProcessBiggestClient_l(resourceRequestInfo, clients, targetClient)) {
-            targetClients.emplace_back(targetClient);
+    // Run through all the reclaim policies until a client to reclaim from is identified.
+    for (std::unique_ptr<IReclaimPolicy>& reclaimPolicy : mReclaimPolicies) {
+        if (reclaimPolicy->getClients(reclaimRequestInfo, clients, targetClients)) {
             return;
         }
     }
-}
-
-// Process priority (oom score) based reclaim:
-//   - Find a process with lowest priority (than that of calling process).
-//   - Find the bigegst client (with required resources) from that process.
-bool ResourceManagerServiceNew::getLowestPriorityProcessBiggestClient_l(
-        const ResourceRequestInfo& resourceRequestInfo,
-        const std::vector<ClientInfo>& clients,
-        ClientInfo& clientInfo) {
-    int callingPid = resourceRequestInfo.mCallingPid;
-    MediaResource::Type type = resourceRequestInfo.mResource->type;
-    MediaResource::SubType subType = resourceRequestInfo.mResource->subType;
-    int lowestPriorityPid;
-    int lowestPriority;
-    int callingPriority;
-
-    if (!mResourceTracker->getPriority(callingPid, &callingPriority)) {
-        ALOGE("%s: can't get process priority for pid %d", __func__, callingPid);
-        return false;
-    }
-
-    // Find the lowest priority process among all the clients.
-    if (!mResourceTracker->getLowestPriorityPid(clients, lowestPriorityPid, lowestPriority)) {
-        ALOGE("%s: can't find a process with lower priority than that of the process[%d:%d]",
-              __func__, callingPid, callingPriority);
-        return false;
-    }
-
-    if (lowestPriority <= callingPriority) {
-        ALOGE("%s: lowest priority %d vs caller priority %d",
-              __func__, lowestPriority, callingPriority);
-        return false;
-    }
-
-    // Get the biggest client from this process.
-    if (!mResourceTracker->getBiggestClient(lowestPriorityPid, type, subType, clientInfo)) {
-        return false;
-    }
-
-    ALOGI("%s: CallingProcess(%d:%d) will reclaim from the lowestPriorityProcess(%d:%d)",
-          __func__, callingPid, callingPriority, lowestPriorityPid, lowestPriority);
-    return true;
 }
 
 bool ResourceManagerServiceNew::getLowestPriorityBiggestClient_l(
@@ -323,11 +287,25 @@ bool ResourceManagerServiceNew::getLowestPriorityBiggestClient_l(
     if (resourceRequestInfo.mResource == nullptr) {
         return false;
     }
+
+    // Use the DefaultResourceModel to get all the clients with the resources requested.
     std::vector<MediaResourceParcel> resources{*resourceRequestInfo.mResource};
     ReclaimRequestInfo reclaimRequestInfo{resourceRequestInfo.mCallingPid, resources};
     std::vector<ClientInfo> clients;
     mDefaultResourceModel->getAllClients(reclaimRequestInfo, clients);
-    return getLowestPriorityProcessBiggestClient_l(resourceRequestInfo, clients, clientInfo);
+
+    // Use the ProcessPriorityReclaimPolicy to select a client to reclaim from.
+    std::unique_ptr<IReclaimPolicy> reclaimPolicy
+        = std::make_unique<ProcessPriorityReclaimPolicy>(mResourceTracker);
+    std::vector<ClientInfo> targetClients;
+    if (reclaimPolicy->getClients(reclaimRequestInfo, clients, targetClients)) {
+        if (!targetClients.empty()) {
+            clientInfo = targetClients[0];
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool ResourceManagerServiceNew::getPriority_l(int pid, int* priority) const {

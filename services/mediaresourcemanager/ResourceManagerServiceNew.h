@@ -22,6 +22,7 @@
 
 namespace android {
 
+class IReclaimPolicy;
 class IResourceModel;
 class ResourceTracker;
 
@@ -86,19 +87,14 @@ private:
     // Set up the Resource models.
     void setUpResourceModels();
 
+    // Set up the Reclaim Policies.
+    void setUpReclaimPolicies();
+
     // From the list of clients, pick/select client(s) based on the reclaim policy.
     void getClientForResource_l(
         const ReclaimRequestInfo& reclaimRequestInfo,
         const std::vector<ClientInfo>& clients,
         std::vector<ClientInfo>& targetClients);
-
-    // Gets the client who owns specified resource type from lowest possible priority process.
-    // Returns false if the calling process priority is not higher than the lowest process
-    // priority. The client will remain unchanged if returns false.
-    bool getLowestPriorityProcessBiggestClient_l(
-        const ResourceRequestInfo& resourceRequestInfo,
-        const std::vector<ClientInfo>& clients,
-        ClientInfo& clientInfo);
 
     // Initializes the internal state of the ResourceManagerService
     void init() override;
@@ -164,6 +160,7 @@ private:
 private:
     std::shared_ptr<ResourceTracker> mResourceTracker;
     std::unique_ptr<IResourceModel> mDefaultResourceModel;
+    std::vector<std::unique_ptr<IReclaimPolicy>> mReclaimPolicies;
 };
 
 // ----------------------------------------------------------------------------
