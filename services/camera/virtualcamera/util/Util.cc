@@ -14,13 +14,9 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
-#define LOG_TAG "VirtualCameraUtil"
 #include "Util.h"
 
 #include <unistd.h>
-
-#include "log/log.h"
 
 namespace android {
 namespace companion {
@@ -30,10 +26,6 @@ using ::aidl::android::hardware::common::NativeHandle;
 
 sp<Fence> importFence(const NativeHandle& aidlHandle) {
   if (aidlHandle.fds.size() != 1) {
-    ALOGE(
-        "%s: Cannot import fence from aidlHandle containing %d file "
-        "descriptors.",
-        __func__, static_cast<int>(aidlHandle.fds.size()));
     return sp<Fence>::make();
   }
 
