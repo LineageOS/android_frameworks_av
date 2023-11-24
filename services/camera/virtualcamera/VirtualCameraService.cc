@@ -109,6 +109,27 @@ ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
   return ndk::ScopedAStatus::ok();
 }
 
+ndk::ScopedAStatus VirtualCameraService::getCameraId(
+        const ::ndk::SpAIBinder& token, int32_t* _aidl_return) {
+  if (_aidl_return == nullptr) {
+    return ndk::ScopedAStatus::fromServiceSpecificError(
+            Status::EX_ILLEGAL_ARGUMENT);
+  }
+
+  auto camera = getCamera(token);
+  if (camera == nullptr) {
+    ALOGE(
+        "Attempt to get camera id corresponding to unknown binder token: "
+        "0x%" PRIxPTR,
+        reinterpret_cast<uintptr_t>(token.get()));
+    return ndk::ScopedAStatus::ok();
+  }
+
+  *_aidl_return = camera->getCameraId();
+
+  return ndk::ScopedAStatus::ok();
+}
+
 std::shared_ptr<VirtualCameraDevice> VirtualCameraService::getCamera(
     const ::ndk::SpAIBinder& token) {
   if (token == nullptr) {
