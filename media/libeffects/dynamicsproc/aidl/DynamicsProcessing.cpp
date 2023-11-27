@@ -105,14 +105,14 @@ static const DynamicsProcessing::EqBandConfig kEqBandConfigMin =
         DynamicsProcessing::EqBandConfig({.channel = 0,
                                           .band = 0,
                                           .enable = false,
-                                          .cutoffFrequencyHz = 20,
+                                          .cutoffFrequencyHz = 0,
                                           .gainDb = -200});
 
 static const DynamicsProcessing::EqBandConfig kEqBandConfigMax =
         DynamicsProcessing::EqBandConfig({.channel = std::numeric_limits<int>::max(),
                                           .band = std::numeric_limits<int>::max(),
                                           .enable = true,
-                                          .cutoffFrequencyHz = 20000.1,
+                                          .cutoffFrequencyHz = 192000,
                                           .gainDb = 200});
 
 static const Range::DynamicsProcessingRange kPreEqBandConfigRange = {
@@ -129,7 +129,7 @@ static const Range::DynamicsProcessingRange kMbcBandConfigRange = {
                         {.channel = 0,
                          .band = 0,
                          .enable = false,
-                         .cutoffFrequencyHz = 20,
+                         .cutoffFrequencyHz = 0,
                          .attackTimeMs = 0,
                          .releaseTimeMs = 0,
                          .ratio = 1,
@@ -144,7 +144,7 @@ static const Range::DynamicsProcessingRange kMbcBandConfigRange = {
                         {.channel = std::numeric_limits<int>::max(),
                          .band = std::numeric_limits<int>::max(),
                          .enable = true,
-                         .cutoffFrequencyHz = 20000.1,
+                         .cutoffFrequencyHz = 192000,
                          .attackTimeMs = 60000,
                          .releaseTimeMs = 60000,
                          .ratio = 50,
@@ -443,7 +443,7 @@ RetCode DynamicsProcessingImpl::releaseContext() {
 IEffect::Status DynamicsProcessingImpl::effectProcessImpl(float* in, float* out, int samples) {
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!mContext, status, "nullContext");
-    return mContext->lvmProcess(in, out, samples);
+    return mContext->dpeProcess(in, out, samples);
 }
 
 }  // namespace aidl::android::hardware::audio::effect
