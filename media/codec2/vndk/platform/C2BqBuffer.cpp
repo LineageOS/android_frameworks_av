@@ -33,6 +33,7 @@
 #include <C2FenceFactory.h>
 #include <C2SurfaceSyncObj.h>
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <mutex>
@@ -750,8 +751,8 @@ public:
     }
 
     void invalidate() {
-        std::scoped_lock<std::mutex> lock(mMutex);
         mInvalidated = true;
+        mIgbpValidityToken.reset();
     }
 
 private:
@@ -791,7 +792,7 @@ private:
     // if the token has been expired, the buffers will not call IGBP::cancelBuffer()
     // when they are no longer used.
     std::shared_ptr<int> mIgbpValidityToken;
-    bool mInvalidated{false};
+    std::atomic<bool> mInvalidated{false};
 };
 
 C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
