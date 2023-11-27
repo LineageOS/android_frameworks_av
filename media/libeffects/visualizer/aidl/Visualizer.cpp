@@ -73,7 +73,7 @@ const Descriptor VisualizerImpl::kDescriptor = {
                           .proxy = std::nullopt},
                    .flags = {.type = Flags::Type::INSERT,
                              .insert = Flags::Insert::LAST,
-                             .volume = Flags::Volume::CTRL},
+                             .volume = Flags::Volume::NONE},
                    .name = VisualizerImpl::kEffectName,
                    .implementor = "The Android Open Source Project"},
         .capability = VisualizerImpl::kCapability};
