@@ -274,13 +274,6 @@ private:
     ::android::base::unique_fd mWritePipeFd;  // The writing end file descriptor
 
     std::atomic<bool> mStopped;
-    std::thread mEventQueueThread; // Thread to handle interrupted
-                                   // writes to the writing end.
-    std::mutex mEventLock;
-    std::condition_variable mEventCv;
-
-    bool mStopEventThread;
-    int mIncDequeueable; // pending # of write to increase dequeueable eventfd
 
 private:
     explicit GraphicsTracker(int maxDequeueCount);
@@ -326,9 +319,8 @@ private:
             bool *cached, int *rSlotId, sp<Fence> *rFence,
             std::shared_ptr<BufferItem> *buffer);
 
-    void writeIncDequeueable(int inc);
+    void writeIncDequeueableLocked(int inc);
     void drainDequeueableLocked(int dec);
-    void processEvent();
 };
 
 } // namespace aidl::android::hardware::media::c2::implementation
