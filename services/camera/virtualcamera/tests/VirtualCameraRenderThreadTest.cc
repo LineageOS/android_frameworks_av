@@ -46,6 +46,7 @@ using ::aidl::android::hardware::camera::device::BufferRequest;
 using ::aidl::android::hardware::camera::device::BufferRequestStatus;
 using ::aidl::android::hardware::camera::device::BufferStatus;
 using ::aidl::android::hardware::camera::device::CaptureResult;
+using ::aidl::android::hardware::camera::device::ErrorCode;
 using ::aidl::android::hardware::camera::device::ErrorMsg;
 using ::aidl::android::hardware::camera::device::NotifyMsg;
 using ::aidl::android::hardware::camera::device::StreamBuffer;
@@ -73,7 +74,11 @@ Matcher<StreamBuffer> IsStreamBufferWithStatus(const int streamId,
 Matcher<NotifyMsg> IsRequestErrorNotifyMsg(const int frameId) {
   return AllOf(Property(&NotifyMsg::getTag, Eq(NotifyMsg::error)),
                Property(&NotifyMsg::get<NotifyMsg::error>,
-                        Field(&ErrorMsg::frameNumber, Eq(frameId))));
+                        Field(&ErrorMsg::frameNumber, Eq(frameId))),
+               Property(&NotifyMsg::get<NotifyMsg::error>,
+                        Field(&ErrorMsg::errorStreamId, Eq(-1))),
+               Property(&NotifyMsg::get<NotifyMsg::error>,
+                        Field(&ErrorMsg::errorCode, Eq(ErrorCode::ERROR_REQUEST))));
 }
 
 class MockCameraDeviceCallback : public BnCameraDeviceCallback {

@@ -100,7 +100,11 @@ NotifyMsg createBufferErrorNotifyMsg(int frameNumber, int streamId) {
 NotifyMsg createRequestErrorNotifyMsg(int frameNumber) {
   NotifyMsg msg;
   msg.set<NotifyMsg::Tag::error>(ErrorMsg{
-      .frameNumber = frameNumber, .errorCode = ErrorCode::ERROR_REQUEST});
+      .frameNumber = frameNumber,
+      // errorStreamId needs to be set to -1 for ERROR_REQUEST
+      // (not tied to specific stream).
+      .errorStreamId = -1,
+      .errorCode = ErrorCode::ERROR_REQUEST});
   return msg;
 }
 
@@ -164,8 +168,9 @@ void VirtualCameraRenderThread::enqueueTask(
 
 void VirtualCameraRenderThread::flush() {
   std::lock_guard<std::mutex> lock(mLock);
-  for (auto task = std::move(mQueue.front()); !mQueue.empty();
-       mQueue.pop_front()) {
+  while (!mQueue.empty()) {
+    std::unique_ptr<ProcessCaptureRequestTask> task = std::move(mQueue.front());
+    mQueue.pop_front();
     flushCaptureRequest(*task);
   }
 }
@@ -233,6 +238,7 @@ void VirtualCameraRenderThread::processCaptureRequest(
   CaptureResult captureResult;
   captureResult.fmqResultSize = 0;
   captureResult.frameNumber = request.getFrameNumber();
+  // Partial result needs to be set to 1 when metadata are present.
   captureResult.partialResult = 1;
   captureResult.inputBuffer.streamId = -1;
   captureResult.physicalCameraMetadata.resize(0);
@@ -308,15 +314,10 @@ void VirtualCameraRenderThread::processCaptureRequest(
 
 void VirtualCameraRenderThread::flushCaptureRequest(
     const ProcessCaptureRequestTask& request) {
-  const std::chrono::nanoseconds timestamp =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::steady_clock::now().time_since_epoch());
-
   CaptureResult captureResult;
   captureResult.fmqResultSize = 0;
   captureResult.frameNumber = request.getFrameNumber();
   captureResult.inputBuffer.streamId = -1;
-  captureResult.result = createCaptureResultMetadata(timestamp);
 
   const std::vector<CaptureRequestBuffer>& buffers = request.getBuffers();
   captureResult.outputBuffers.resize(buffers.size());
