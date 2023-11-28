@@ -179,6 +179,14 @@ ndk::ScopedAStatus VirtualCameraSession::close() {
     mVirtualCameraClientCallback->onStreamClosed(/*streamId=*/0);
   }
 
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (mRenderThread != nullptr) {
+      mRenderThread->stop();
+      mRenderThread = nullptr;
+    }
+  }
+
   mSessionContext.closeAllStreams();
   return ndk::ScopedAStatus::ok();
 }
@@ -275,7 +283,9 @@ ndk::ScopedAStatus VirtualCameraSession::constructDefaultRequestSettings(
 ndk::ScopedAStatus VirtualCameraSession::flush() {
   ALOGV("%s", __func__);
   std::lock_guard<std::mutex> lock(mLock);
-  mRenderThread->flush();
+  if (mRenderThread != nullptr) {
+    mRenderThread->flush();
+  }
   return ndk::ScopedAStatus::ok();
 }
 

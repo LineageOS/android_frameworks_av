@@ -175,6 +175,14 @@ TEST_F(VirtualCameraSessionTest, CloseTriggersClientTerminateCallback) {
   ASSERT_TRUE(mVirtualCameraSession->close().isOk());
 }
 
+TEST_F(VirtualCameraSessionTest, FlushBeforeConfigure) {
+  // Flush request coming before the configure request finished
+  // (so potentially the thread is not yet running) should be
+  // gracefully handled.
+
+  EXPECT_TRUE(mVirtualCameraSession->flush().isOk());
+}
+
 TEST_F(VirtualCameraSessionTest, onProcessCaptureRequestTriggersClientCallback) {
   StreamConfiguration streamConfiguration;
   streamConfiguration.streams = {

@@ -56,7 +56,7 @@ class VirtualCameraSession
 
   virtual ~VirtualCameraSession() override = default;
 
-  ndk::ScopedAStatus close() override;
+  ndk::ScopedAStatus close() override EXCLUDES(mLock);
 
   ndk::ScopedAStatus configureStreams(
       const ::aidl::android::hardware::camera::device::StreamConfiguration&
