@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <vector>
 
+#include <audio_utils/mutex.h>
 #include <mediautils/MediaUtilsDelayed.h>
 #include <mediautils/TidWrapper.h>
 #include <mediautils/TimerThread.h>
@@ -59,14 +60,14 @@ bool TimerThread::cancelTask(Handle handle) {
     return true;
 }
 
-
-std::string TimerThread::SnapshotAnalysis::toString() const {
+std::string TimerThread::SnapshotAnalysis::toString(bool showTimeoutStack) const {
     // Note: These request queues are snapshot very close together but
     // not at "identical" times as we don't use a class-wide lock.
     std::string analysisSummary = std::string("\nanalysis [ ").append(description).append(" ]");
     std::string timeoutStack;
     std::string blockedStack;
-    if (timeoutTid != -1) {
+    std::string mutexWaitChainStack;
+    if (showTimeoutStack && timeoutTid != -1) {
         timeoutStack = std::string(suspectTid == timeoutTid ? "\ntimeout/blocked(" : "\ntimeout(")
                 .append(std::to_string(timeoutTid)).append(") callstack [\n")
                 .append(getCallStackStringForTid(timeoutTid)).append("]");
@@ -76,6 +77,29 @@ std::string TimerThread::SnapshotAnalysis::toString() const {
         blockedStack = std::string("\nblocked(")
                 .append(std::to_string(suspectTid)).append(")  callstack [\n")
                 .append(getCallStackStringForTid(suspectTid)).append("]");
+    }
+
+    if (!mutexWaitChain.empty()) {
+        mutexWaitChainStack.append("\nmutex wait chain [\n");
+        // the wait chain omits the initial timeout tid (which is good as we don't
+        // need to suppress it).
+        for (size_t i = 0; i < mutexWaitChain.size(); ++i) {
+            const auto& [tid, name] = mutexWaitChain[i];
+            mutexWaitChainStack.append("{ tid: ").append(std::to_string(tid))
+                    .append(" (holding ").append(name).append(")");
+            if (tid == timeoutTid) {
+                mutexWaitChainStack.append(" TIMEOUT_STACK }\n");
+            } else if (tid == suspectTid) {
+                mutexWaitChainStack.append(" BLOCKED_STACK }\n");
+            } else if (hasMutexCycle && i == mutexWaitChain.size() - 1) {
+                // for a cycle, the last pid in the chain is repeated.
+                mutexWaitChainStack.append(" CYCLE_STACK }\n");
+            } else {
+                mutexWaitChainStack.append(" callstack [\n")
+                        .append(getCallStackStringForTid(tid)).append("] }\n");
+            }
+        }
+        mutexWaitChainStack.append("]");
     }
 
     return std::string("now ")
@@ -91,7 +115,8 @@ std::string TimerThread::SnapshotAnalysis::toString() const {
             .append(requestsToString(retiredRequests))
             .append(" ]")
             .append(timeoutStack)
-            .append(blockedStack);
+            .append(blockedStack)
+            .append(mutexWaitChainStack);
 }
 
 // A HAL method is where the substring "Hidl" is in the class name.
@@ -121,13 +146,33 @@ struct TimerThread::SnapshotAnalysis TimerThread::getSnapshotAnalysis(size_t ret
     analysis.pendingRequests = getPendingRequests();
     analysis.secondChanceCount = mMonitorThread.getSecondChanceCount();
     // No call has timed out, so there is no analysis to be done.
-    if (analysis.timeoutRequests.empty())
+    if (analysis.timeoutRequests.empty()) {
         return analysis;
+    }
+
     // for now look at last timeout (in our case, the only timeout)
     const std::shared_ptr<const Request> timeout = analysis.timeoutRequests.back();
     analysis.timeoutTid = timeout->tid;
-    if (analysis.pendingRequests.empty())
-      return analysis;
+
+    std::string& description = analysis.description;
+
+    // audio mutex specific wait chain analysis
+    auto deadlockInfo = audio_utils::mutex::deadlock_detection(analysis.timeoutTid);
+    ALOGD("%s: deadlockInfo: %s", __func__, deadlockInfo.to_string().c_str());
+
+    if (!deadlockInfo.empty()) {
+        if (!description.empty()) description.append("\n");
+        description.append(deadlockInfo.to_string());
+    }
+
+    analysis.hasMutexCycle = deadlockInfo.has_cycle;
+    analysis.mutexWaitChain = std::move(deadlockInfo.chain);
+
+    // no pending requests, we don't attempt to use temporal correlation between a recent call.
+    if (analysis.pendingRequests.empty()) {
+        return analysis;
+    }
+
     // pending Requests that are problematic.
     std::vector<std::shared_ptr<const Request>> pendingExact;
     std::vector<std::shared_ptr<const Request>> pendingPossible;
@@ -151,15 +196,15 @@ struct TimerThread::SnapshotAnalysis TimerThread::getSnapshotAnalysis(size_t ret
         }
     }
 
-    std::string& description = analysis.description;
     if (!pendingExact.empty()) {
         const auto& request = pendingExact.front();
         const bool hal = isRequestFromHal(request);
 
         if (hal) {
-            description = std::string("Blocked directly due to HAL call: ")
+            if (!description.empty()) description.append("\n");
+            description.append("Blocked directly due to HAL call: ")
                 .append(request->toString());
-            analysis.suspectTid= request->tid;
+            analysis.suspectTid = request->tid;
         }
     }
     if (description.empty() && !pendingPossible.empty()) {
