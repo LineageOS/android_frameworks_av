@@ -35,4 +35,10 @@ interface IVirtualCameraService {
      * be visible to the camera framework anymore.
      */
     void unregisterCamera(in IBinder token);
+
+    /**
+     * Returns the camera id for a given binder token. Note that this id corresponds to the id of
+     * the camera device in the camera framework.
+     */
+    int getCameraId(in IBinder token);
 }

@@ -95,6 +95,8 @@ class VirtualCameraDevice
   // "device@{major}.{minor}/virtual/{numerical_id}"
   std::string getCameraName() const;
 
+  uint32_t getCameraId() const { return mCameraId; }
+
  private:
   const uint32_t mCameraId;
   const std::shared_ptr<

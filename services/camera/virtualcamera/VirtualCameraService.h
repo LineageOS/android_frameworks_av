@@ -47,6 +47,10 @@ class VirtualCameraService
   ndk::ScopedAStatus unregisterCamera(const ::ndk::SpAIBinder& token) override
       EXCLUDES(mLock);
 
+  // Returns the camera id corresponding to the binder token.
+  ndk::ScopedAStatus getCameraId(
+      const ::ndk::SpAIBinder& token, int32_t* _aidl_return) override EXCLUDES(mLock);
+
   // Returns VirtualCameraDevice corresponding to binder token or nullptr if
   // there's no camera asociated with the token.
   std::shared_ptr<VirtualCameraDevice> getCamera(const ::ndk::SpAIBinder& token)
