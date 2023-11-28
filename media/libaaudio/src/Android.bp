@@ -173,6 +173,7 @@ cc_library {
         "aaudio-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "com.android.media.aaudio-aconfig-cc",
     ],
 
     cflags: [
