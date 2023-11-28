@@ -34,6 +34,7 @@ namespace companion {
 namespace virtualcamera {
 
 using ::aidl::android::companion::virtualcamera::IVirtualCameraCallback;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::hardware::camera::common::CameraDeviceStatus;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::common::VendorTagSection;
@@ -154,9 +155,10 @@ ndk::ScopedAStatus VirtualCameraProvider::isConcurrentStreamCombinationSupported
 }
 
 std::shared_ptr<VirtualCameraDevice> VirtualCameraProvider::createCamera(
+    const std::vector<SupportedStreamConfiguration>& supportedInputConfig,
     std::shared_ptr<IVirtualCameraCallback> virtualCameraClientCallback) {
   auto camera = ndk::SharedRefBase::make<VirtualCameraDevice>(
-      sNextId++, virtualCameraClientCallback);
+      sNextId++, supportedInputConfig, virtualCameraClientCallback);
   std::shared_ptr<ICameraProviderCallback> callback;
   {
     const std::lock_guard<std::mutex> lock(mLock);

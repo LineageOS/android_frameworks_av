@@ -18,13 +18,19 @@
 #define LOG_TAG "VirtualCameraDevice"
 #include "VirtualCameraDevice.h"
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
+#include <iterator>
+#include <optional>
 #include <string>
 
 #include "VirtualCameraSession.h"
+#include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
+#include "aidl/android/hardware/camera/device/StreamConfiguration.h"
 #include "android/binder_auto_utils.h"
 #include "android/binder_status.h"
 #include "log/log.h"
@@ -36,13 +42,16 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
+using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::companion::virtualcamera::IVirtualCameraCallback;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::hardware::camera::common::CameraResourceCost;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
 using ::aidl::android::hardware::camera::device::ICameraDeviceCallback;
 using ::aidl::android::hardware::camera::device::ICameraDeviceSession;
 using ::aidl::android::hardware::camera::device::ICameraInjectionSession;
+using ::aidl::android::hardware::camera::device::Stream;
 using ::aidl::android::hardware::camera::device::StreamConfiguration;
 using ::aidl::android::hardware::camera::device::StreamRotation;
 using ::aidl::android::hardware::camera::device::StreamType;
@@ -55,16 +64,68 @@ using namespace std::chrono_literals;
 // Prefix of camera name - "device@1.1/virtual/{numerical_id}"
 const char* kDevicePathPrefix = "device@1.1/virtual/";
 
-constexpr int32_t kVgaWidth = 640;
-constexpr int32_t kVgaHeight = 480;
 constexpr std::chrono::nanoseconds kMinFrameDuration30Fps = 1s / 30;
 constexpr int32_t kMaxJpegSize = 3 * 1024 * 1024 /*3MiB*/;
 
 constexpr MetadataBuilder::ControlRegion kDefaultEmptyControlRegion{};
 
+struct Resolution {
+  Resolution(const int w, const int h) : width(w), height(h) {
+  }
+
+  bool operator<(const Resolution& other) const {
+    return width * height < other.width * other.height;
+  }
+
+  bool operator==(const Resolution& other) const {
+    return width == other.width && height == other.height;
+  }
+
+  const int width;
+  const int height;
+};
+
+std::optional<Resolution> getMaxResolution(
+    const std::vector<SupportedStreamConfiguration>& configs) {
+  auto itMax = std::max_element(configs.begin(), configs.end(),
+                                [](const SupportedStreamConfiguration& a,
+                                   const SupportedStreamConfiguration& b) {
+                                  return a.width * b.height < a.width * b.height;
+                                });
+  if (itMax == configs.end()) {
+    ALOGE(
+        "%s: empty vector of supported configurations, cannot find largest "
+        "resolution.",
+        __func__);
+    return std::nullopt;
+  }
+
+  return Resolution(itMax->width, itMax->height);
+}
+
+std::set<Resolution> getUniqueResolutions(
+    const std::vector<SupportedStreamConfiguration>& configs) {
+  std::set<Resolution> uniqueResolutions;
+  std::transform(configs.begin(), configs.end(),
+                 std::inserter(uniqueResolutions, uniqueResolutions.begin()),
+                 [](const SupportedStreamConfiguration& config) {
+                   return Resolution(config.width, config.height);
+                 });
+  return uniqueResolutions;
+}
+
 // TODO(b/301023410) - Populate camera characteristics according to camera configuration.
-CameraMetadata initCameraCharacteristics() {
-  auto metadata =
+std::optional<CameraMetadata> initCameraCharacteristics(
+    const std::vector<SupportedStreamConfiguration>& supportedInputConfig) {
+  if (!std::all_of(supportedInputConfig.begin(), supportedInputConfig.end(),
+                   [](const SupportedStreamConfiguration& config) {
+                     return config.pixelFormat == Format::YUV_420_888;
+                   })) {
+    ALOGE("%s: input configuration contains unsupported pixel format", __func__);
+    return std::nullopt;
+  }
+
+  MetadataBuilder builder =
       MetadataBuilder()
           .setSupportedHardwareLevel(
               ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL)
@@ -73,29 +134,8 @@ CameraMetadata initCameraCharacteristics() {
           .setSensorOrientation(0)
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
           .setControlAfAvailableModes({ANDROID_CONTROL_AF_MODE_OFF})
-          .setAvailableOutputStreamConfigurations(
-              {MetadataBuilder::StreamConfiguration{
-                   .width = kVgaWidth,
-                   .height = kVgaHeight,
-                   .format =
-                       ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
-                   .minFrameDuration = kMinFrameDuration30Fps,
-                   .minStallDuration = 0s},
-               MetadataBuilder::StreamConfiguration{
-                   .width = kVgaWidth,
-                   .height = kVgaHeight,
-                   .format = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888,
-                   .minFrameDuration = kMinFrameDuration30Fps,
-                   .minStallDuration = 0s},
-               {MetadataBuilder::StreamConfiguration{
-                   .width = kVgaWidth,
-                   .height = kVgaHeight,
-                   .format = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB,
-                   .minFrameDuration = kMinFrameDuration30Fps,
-                   .minStallDuration = 0s}}})
           .setControlAeAvailableFpsRange(10, 30)
           .setControlMaxRegions(0, 0, 0)
-          .setSensorActiveArraySize(0, 0, kVgaWidth, kVgaHeight)
           .setControlAfRegions({kDefaultEmptyControlRegion})
           .setControlAeRegions({kDefaultEmptyControlRegion})
           .setControlAwbRegions({kDefaultEmptyControlRegion})
@@ -106,9 +146,66 @@ CameraMetadata initCameraCharacteristics() {
           .setAvailableResultKeys({ANDROID_CONTROL_AF_MODE})
           .setAvailableCapabilities(
               {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE})
-          .setAvailableCharacteristicKeys()
-          .build();
+          .setAvailableCharacteristicKeys();
 
+  // Active array size must correspond to largest supported input resolution.
+  std::optional<Resolution> maxResolution =
+      getMaxResolution(supportedInputConfig);
+  if (!maxResolution.has_value()) {
+    return std::nullopt;
+  }
+  builder.setSensorActiveArraySize(0, 0, maxResolution->width,
+                                   maxResolution->height);
+
+  std::vector<MetadataBuilder::StreamConfiguration> outputConfigurations;
+
+  // TODO(b/301023410) Add also all "standard" resolutions we can rescale the
+  // streams to (all standard resolutions with same aspect ratio).
+
+  // Add IMPLEMENTATION_DEFINED format for all supported input resolutions.
+  std::set<Resolution> uniqueResolutions =
+      getUniqueResolutions(supportedInputConfig);
+  std::transform(
+      uniqueResolutions.begin(), uniqueResolutions.end(),
+      std::back_inserter(outputConfigurations),
+      [](const Resolution& resolution) {
+        return MetadataBuilder::StreamConfiguration{
+            .width = resolution.width,
+            .height = resolution.height,
+            .format = ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
+            .minFrameDuration = kMinFrameDuration30Fps,
+            .minStallDuration = 0s};
+      });
+
+  // Add all supported configuration with explicit pixel format.
+  std::transform(supportedInputConfig.begin(), supportedInputConfig.end(),
+                 std::back_inserter(outputConfigurations),
+                 [](const SupportedStreamConfiguration& config) {
+                   return MetadataBuilder::StreamConfiguration{
+                       .width = config.width,
+                       .height = config.height,
+                       .format = static_cast<int>(config.pixelFormat),
+                       .minFrameDuration = kMinFrameDuration30Fps,
+                       .minStallDuration = 0s};
+                 });
+
+  // TODO(b/301023410) We currently don't support rescaling for still capture,
+  // so only announce BLOB support for formats exactly matching the input.
+  std::transform(uniqueResolutions.begin(), uniqueResolutions.end(),
+                 std::back_inserter(outputConfigurations),
+                 [](const Resolution& resolution) {
+                   return MetadataBuilder::StreamConfiguration{
+                       .width = resolution.width,
+                       .height = resolution.height,
+                       .format = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB,
+                       .minFrameDuration = kMinFrameDuration30Fps,
+                       .minStallDuration = 0s};
+                 });
+
+  ALOGV("Adding %zu output configurations", outputConfigurations.size());
+  builder.setAvailableOutputStreamConfigurations(outputConfigurations);
+
+  auto metadata = builder.build();
   if (metadata == nullptr) {
     ALOGE("Failed to build metadata!");
     return CameraMetadata();
@@ -121,10 +218,21 @@ CameraMetadata initCameraCharacteristics() {
 
 VirtualCameraDevice::VirtualCameraDevice(
     const uint32_t cameraId,
+    const std::vector<SupportedStreamConfiguration>& supportedInputConfig,
     std::shared_ptr<IVirtualCameraCallback> virtualCameraClientCallback)
     : mCameraId(cameraId),
-      mVirtualCameraClientCallback(virtualCameraClientCallback) {
-  mCameraCharacteristics = initCameraCharacteristics();
+      mVirtualCameraClientCallback(virtualCameraClientCallback),
+      mSupportedInputConfigurations(supportedInputConfig) {
+  std::optional<CameraMetadata> metadata =
+      initCameraCharacteristics(mSupportedInputConfigurations);
+  if (metadata.has_value()) {
+    mCameraCharacteristics = *metadata;
+  } else {
+    ALOGE(
+        "%s: Failed to initialize camera characteristic based on provided "
+        "configuration.",
+        __func__);
+  }
 }
 
 ndk::ScopedAStatus VirtualCameraDevice::getCameraCharacteristics(
@@ -168,29 +276,42 @@ ndk::ScopedAStatus VirtualCameraDevice::isStreamCombinationSupported(
     return cameraStatus(Status::ILLEGAL_ARGUMENT);
   }
 
-  for (const auto& stream : in_streams.streams) {
+  *_aidl_return = isStreamCombinationSupported(in_streams);
+  return ndk::ScopedAStatus::ok();
+};
+
+bool VirtualCameraDevice::isStreamCombinationSupported(
+    const StreamConfiguration& streamConfiguration) const {
+  for (const Stream& stream : streamConfiguration.streams) {
     ALOGV("%s: Configuration queried: %s", __func__, stream.toString().c_str());
 
     if (stream.streamType == StreamType::INPUT) {
       ALOGW("%s: Input stream type is not supported", __func__);
-      *_aidl_return = false;
-      return ndk::ScopedAStatus::ok();
+      return false;
     }
 
     // TODO(b/301023410) remove hardcoded format checks, verify against configuration.
-    if (stream.width != 640 || stream.height != 480 ||
-        stream.rotation != StreamRotation::ROTATION_0 ||
+    if (stream.rotation != StreamRotation::ROTATION_0 ||
         (stream.format != PixelFormat::IMPLEMENTATION_DEFINED &&
          stream.format != PixelFormat::YCBCR_420_888 &&
          stream.format != PixelFormat::BLOB)) {
-      *_aidl_return = false;
-      return ndk::ScopedAStatus::ok();
+      ALOGV("Unsupported output stream type");
+      return false;
+    }
+
+    auto matchesSupportedInputConfig =
+        [&stream](const SupportedStreamConfiguration& config) {
+          return stream.width == config.width && stream.height == config.height;
+        };
+    if (std::none_of(mSupportedInputConfigurations.begin(),
+                     mSupportedInputConfigurations.end(),
+                     matchesSupportedInputConfig)) {
+      ALOGV("Requested config doesn't match any supported input config");
+      return false;
     }
   }
-
-  *_aidl_return = true;
-  return ndk::ScopedAStatus::ok();
-};
+  return true;
+}
 
 ndk::ScopedAStatus VirtualCameraDevice::open(
     const std::shared_ptr<ICameraDeviceCallback>& in_callback,
@@ -198,7 +319,7 @@ ndk::ScopedAStatus VirtualCameraDevice::open(
   ALOGV("%s", __func__);
 
   *_aidl_return = ndk::SharedRefBase::make<VirtualCameraSession>(
-      std::to_string(mCameraId), in_callback, mVirtualCameraClientCallback);
+      *this, in_callback, mVirtualCameraClientCallback);
 
   return ndk::ScopedAStatus::ok();
 };

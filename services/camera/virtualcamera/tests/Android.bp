@@ -15,6 +15,7 @@ cc_test {
         "libgmock",
     ],
     srcs: ["EglUtilTest.cc",
+           "VirtualCameraDeviceTest.cc",
            "VirtualCameraProviderTest.cc",
            "VirtualCameraRenderThreadTest.cc",
            "VirtualCameraServiceTest.cc",

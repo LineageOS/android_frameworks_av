@@ -19,6 +19,7 @@
 
 #include <cstdint>
 
+#include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "android/binder_auto_utils.h"
@@ -41,6 +42,11 @@ inline ndk::ScopedAStatus cameraStatus(
 // only single fd) this function will return Fence instance in invalid state.
 sp<Fence> importFence(
     const ::aidl::android::hardware::common::NativeHandle& handle);
+
+// Returns true if specified format is supported for virtual camera input.
+bool isFormatSupportedForInput(
+    int width, int height,
+    ::aidl::android::companion::virtualcamera::Format format);
 
 }  // namespace virtualcamera
 }  // namespace companion
