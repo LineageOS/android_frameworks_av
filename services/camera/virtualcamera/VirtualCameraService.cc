@@ -185,6 +185,8 @@ binder_status_t VirtualCameraService::handleShellCommand(int in, int out,
                                                          uint32_t numArgs) {
   if (numArgs <= 0) {
     dprintf(out, kShellCmdHelp);
+    fsync(out);
+    return STATUS_OK;
   }
 
   if (args == nullptr || args[0] == nullptr) {

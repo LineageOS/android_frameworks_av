@@ -267,6 +267,13 @@ TEST_F(VirtualCameraServiceTest, ShellCmdWithNullArgs) {
             STATUS_BAD_VALUE);
 }
 
+TEST_F(VirtualCameraServiceTest, ShellCmdWithNoArgs) {
+  EXPECT_EQ(mCameraService->handleShellCommand(
+                /*in=*/mDevNullFd, /*out=*/mDevNullFd, /*err=*/mDevNullFd,
+                /*args=*/nullptr, /*numArgs=*/0),
+            STATUS_OK);
+}
+
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmd) {
   execute_shell_command("enable_test_camera");
 
