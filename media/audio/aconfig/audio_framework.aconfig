@@ -12,6 +12,15 @@ flag {
     bug: "302751899"
 }
 
+flag {
+    name: "automatic_bt_device_type"
+    namespace: "media_audio"
+    description:
+        "Enable the automatic Bluetooth audio device type "
+        "categorization based on BluetoothDevice class metadata."
+    bug: "302323921"
+}
+
 # TODO remove
 flag {
     name: "focus_freeze_test_api"
