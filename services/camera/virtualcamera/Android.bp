@@ -34,11 +34,11 @@ cc_defaults {
         "virtual_camera_service_aidl-ndk",
     ],
     cflags: [
+        "-DANDROID_UTILS_REF_BASE_DISABLE_IMPLICIT_CONSTRUCTION",
         "-Wall",
         "-Werror",
         "-Wformat",
         "-Wthread-safety",
-        "-DLOG_NDEBUG=0"
     ],
 }
 
