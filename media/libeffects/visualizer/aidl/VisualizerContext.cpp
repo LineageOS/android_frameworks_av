@@ -61,6 +61,7 @@ RetCode VisualizerContext::initParams(const Parameter::Common& common) {
 #endif
     mChannelCount = channelCount;
     mCommon = common;
+    std::fill(mCaptureBuf.begin(), mCaptureBuf.end(), 0x80);
     return RetCode::SUCCESS;
 }
 
@@ -84,7 +85,7 @@ RetCode VisualizerContext::disable() {
 
 void VisualizerContext::reset() {
     std::lock_guard lg(mMutex);
-    std::fill_n(mCaptureBuf.begin(), kMaxCaptureBufSize, 0x80);
+    std::fill(mCaptureBuf.begin(), mCaptureBuf.end(), 0x80);
 }
 
 RetCode VisualizerContext::setCaptureSamples(int samples) {
@@ -190,13 +191,12 @@ Visualizer::Measurement VisualizerContext::getMeasure() {
 }
 
 std::vector<uint8_t> VisualizerContext::capture() {
-    std::vector<uint8_t> result;
     std::lock_guard lg(mMutex);
+    uint32_t captureSamples = mCaptureSamples;
+    std::vector<uint8_t> result(captureSamples, 0x80);
     // cts android.media.audio.cts.VisualizerTest expecting silence data when effect not running
     // RETURN_VALUE_IF(mState != State::ACTIVE, result, "illegalState");
     if (mState != State::ACTIVE) {
-        result.resize(mCaptureSamples);
-        memset(result.data(), 0x80, mCaptureSamples);
         return result;
     }
 
@@ -214,7 +214,7 @@ std::vector<uint8_t> VisualizerContext::capture() {
     if (latencyMs < 0) {
         latencyMs = 0;
     }
-    uint32_t deltaSamples = mCaptureSamples + mCommon.input.base.sampleRate * latencyMs / 1000;
+    uint32_t deltaSamples = captureSamples + mCommon.input.base.sampleRate * latencyMs / 1000;
 
     // large sample rate, latency, or capture size, could cause overflow.
     // do not offset more than the size of buffer.
@@ -224,21 +224,21 @@ std::vector<uint8_t> VisualizerContext::capture() {
     }
 
     int32_t capturePoint;
-    //capturePoint = (int32_t)mCaptureIdx - deltaSamples;
     __builtin_sub_overflow((int32_t) mCaptureIdx, deltaSamples, &capturePoint);
     // a negative capturePoint means we wrap the buffer.
     if (capturePoint < 0) {
         uint32_t size = -capturePoint;
-        if (size > mCaptureSamples) {
-            size = mCaptureSamples;
+        if (size > captureSamples) {
+            size = captureSamples;
         }
-        result.insert(result.end(), &mCaptureBuf[kMaxCaptureBufSize + capturePoint],
-                        &mCaptureBuf[kMaxCaptureBufSize + capturePoint + size]);
-        mCaptureSamples -= size;
+        std::copy(std::begin(mCaptureBuf) + kMaxCaptureBufSize - size,
+                  std::begin(mCaptureBuf) + kMaxCaptureBufSize, result.begin());
+        captureSamples -= size;
         capturePoint = 0;
     }
-    result.insert(result.end(), &mCaptureBuf[capturePoint],
-                    &mCaptureBuf[capturePoint + mCaptureSamples]);
+    std::copy(std::begin(mCaptureBuf) + capturePoint,
+              std::begin(mCaptureBuf) + capturePoint + captureSamples,
+              result.begin() + mCaptureSamples - captureSamples);
     mLastCaptureIdx = mCaptureIdx;
     return result;
 }
@@ -256,16 +256,15 @@ IEffect::Status VisualizerContext::process(float* in, float* out, int samples) {
         // find the peak and RMS squared for the new buffer
         float rmsSqAcc = 0;
         float maxSample = 0.f;
-        for (size_t inIdx = 0; inIdx < (unsigned)samples; ++inIdx) {
+        for (size_t inIdx = 0; inIdx < (unsigned) samples; ++inIdx) {
             maxSample = fmax(maxSample, fabs(in[inIdx]));
             rmsSqAcc += in[inIdx] * in[inIdx];
         }
         maxSample *= 1 << 15; // scale to int16_t, with exactly 1 << 15 representing positive num.
         rmsSqAcc *= 1 << 30; // scale to int16_t * 2
-        mPastMeasurements[mMeasurementBufferIdx] = {
-                .mPeakU16 = (uint16_t)maxSample,
-                .mRmsSquared = rmsSqAcc / samples,
-                .mIsValid = true };
+        mPastMeasurements[mMeasurementBufferIdx] = {.mIsValid = true,
+                                                    .mPeakU16 = (uint16_t)maxSample,
+                                                    .mRmsSquared = rmsSqAcc / samples};
         if (++mMeasurementBufferIdx >= mMeasurementWindowSizeInBuffers) {
             mMeasurementBufferIdx = 0;
         }
