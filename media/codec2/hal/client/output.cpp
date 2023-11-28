@@ -441,9 +441,11 @@ status_t OutputBufferQueue::outputBuffer(
             status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
                                          input, output);
             if (status == OK) {
-                syncVar->lock();
-                syncVar->notifyQueuedLocked();
-                syncVar->unlock();
+                if (output->bufferReplaced) {
+                    syncVar->lock();
+                    syncVar->notifyQueuedLocked();
+                    syncVar->unlock();
+                }
             }
         } else {
             status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
@@ -496,9 +498,11 @@ status_t OutputBufferQueue::outputBuffer(
         status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
                                                   input, output);
         if (status == OK) {
-            syncVar->lock();
-            syncVar->notifyQueuedLocked();
-            syncVar->unlock();
+            if (output->bufferReplaced) {
+                syncVar->lock();
+                syncVar->notifyQueuedLocked();
+                syncVar->unlock();
+            }
         }
     } else {
         status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
@@ -512,6 +516,30 @@ status_t OutputBufferQueue::outputBuffer(
         return status;
     }
     return OK;
+}
+
+void OutputBufferQueue::onBufferReleased(uint32_t generation) {
+    std::shared_ptr<C2SurfaceSyncMemory> syncMem;
+    sp<IGraphicBufferProducer> outputIgbp;
+    uint32_t outputGeneration = 0;
+    {
+        std::unique_lock<std::mutex> l(mMutex);
+        if (mStopped) {
+            return;
+        }
+        outputIgbp = mIgbp;
+        outputGeneration = mGeneration;
+        syncMem = mSyncMem;
+    }
+
+    if (outputIgbp && generation == outputGeneration) {
+        auto syncVar = syncMem ? syncMem->mem() : nullptr;
+        if (syncVar) {
+            syncVar->lock();
+            syncVar->notifyQueuedLocked();
+            syncVar->unlock();
+        }
+    }
 }
 
 void OutputBufferQueue::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
