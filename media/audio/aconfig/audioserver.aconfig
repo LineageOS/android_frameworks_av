@@ -14,3 +14,9 @@ flag {
     bug: "209491695"
 }
 
+flag {
+    name: "fdtostring_timeout_fix"
+    namespace: "media_audio"
+    description: "Improve fdtostring implementation to properly handle timing out."
+    bug: "306283018"
+}
