@@ -15,7 +15,6 @@
  */
 
 // #define LOG_NDEBUG 0
-#include "android/binder_status.h"
 #define LOG_TAG "VirtualCameraService"
 #include "VirtualCameraService.h"
 
@@ -27,9 +26,12 @@
 
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraProvider.h"
+#include "aidl/android/companion/virtualcamera/Format.h"
+#include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "android/binder_auto_utils.h"
 #include "android/binder_libbinder.h"
 #include "binder/Status.h"
+#include "util/Util.h"
 
 using ::android::binder::Status;
 
@@ -37,10 +39,14 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
+using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 
 namespace {
 
+constexpr int kVgaWidth = 640;
+constexpr int kVgaHeight = 480;
 constexpr char kEnableTestCameraCmd[] = "enable_test_camera";
 constexpr char kDisableTestCameraCmd[] = "disable_test_camera";
 constexpr char kShellCmdHelp[] = R"(
@@ -48,6 +54,27 @@ Available commands:
  * enable_test_camera
  * disable_test_camera
 )";
+
+ndk::ScopedAStatus validateConfiguration(
+    const VirtualCameraConfiguration& configuration) {
+  if (configuration.supportedStreamConfigs.empty()) {
+    ALOGE("%s: No supported input configuration specified", __func__);
+    return ndk::ScopedAStatus::fromServiceSpecificError(
+        Status::EX_ILLEGAL_ARGUMENT);
+  }
+
+  for (const SupportedStreamConfiguration& config :
+       configuration.supportedStreamConfigs) {
+    if (!isFormatSupportedForInput(config.width, config.height,
+                                   config.pixelFormat)) {
+      ALOGE("%s: Requested unsupported input format: %d x %d (%d)", __func__,
+            config.width, config.height, static_cast<int>(config.pixelFormat));
+      return ndk::ScopedAStatus::fromServiceSpecificError(
+          Status::EX_ILLEGAL_ARGUMENT);
+    }
+  }
+  return ndk::ScopedAStatus::ok();
+}
 
 }  // namespace
 
@@ -59,12 +86,17 @@ VirtualCameraService::VirtualCameraService(
 ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
     const VirtualCameraConfiguration& configuration, bool* _aidl_return) {
-  (void)configuration;
   if (_aidl_return == nullptr) {
     return ndk::ScopedAStatus::fromServiceSpecificError(
         Status::EX_ILLEGAL_ARGUMENT);
   }
   *_aidl_return = true;
+
+  auto status = validateConfiguration(configuration);
+  if (!status.isOk()) {
+    *_aidl_return = false;
+    return status;
+  }
 
   std::lock_guard lock(mLock);
   if (mTokenToCameraName.find(token) != mTokenToCameraName.end()) {
@@ -74,11 +106,13 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
         "0x%" PRIxPTR,
         reinterpret_cast<uintptr_t>(token.get()));
     *_aidl_return = false;
+    return ndk::ScopedAStatus::ok();
   }
 
   // TODO(b/301023410) Validate configuration and pass it to the camera.
   std::shared_ptr<VirtualCameraDevice> camera =
-      mVirtualCameraProvider->createCamera(configuration.virtualCameraCallback);
+      mVirtualCameraProvider->createCamera(configuration.supportedStreamConfigs,
+                                           configuration.virtualCameraCallback);
   if (camera == nullptr) {
     ALOGE("Failed to create camera for binder token 0x%" PRIxPTR,
           reinterpret_cast<uintptr_t>(token.get()));
@@ -109,6 +143,27 @@ ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
   return ndk::ScopedAStatus::ok();
 }
 
+ndk::ScopedAStatus VirtualCameraService::getCameraId(
+        const ::ndk::SpAIBinder& token, int32_t* _aidl_return) {
+  if (_aidl_return == nullptr) {
+    return ndk::ScopedAStatus::fromServiceSpecificError(
+            Status::EX_ILLEGAL_ARGUMENT);
+  }
+
+  auto camera = getCamera(token);
+  if (camera == nullptr) {
+    ALOGE(
+        "Attempt to get camera id corresponding to unknown binder token: "
+        "0x%" PRIxPTR,
+        reinterpret_cast<uintptr_t>(token.get()));
+    return ndk::ScopedAStatus::ok();
+  }
+
+  *_aidl_return = camera->getCameraId();
+
+  return ndk::ScopedAStatus::ok();
+}
+
 std::shared_ptr<VirtualCameraDevice> VirtualCameraService::getCamera(
     const ::ndk::SpAIBinder& token) {
   if (token == nullptr) {
@@ -130,6 +185,8 @@ binder_status_t VirtualCameraService::handleShellCommand(int in, int out,
                                                          uint32_t numArgs) {
   if (numArgs <= 0) {
     dprintf(out, kShellCmdHelp);
+    fsync(out);
+    return STATUS_OK;
   }
 
   if (args == nullptr || args[0] == nullptr) {
@@ -159,7 +216,10 @@ void VirtualCameraService::enableTestCameraCmd(const int out, const int err) {
   mTestCameraToken.set(AIBinder_fromPlatformBinder(token));
 
   bool ret;
-  registerCamera(mTestCameraToken, VirtualCameraConfiguration(), &ret);
+  VirtualCameraConfiguration configuration;
+  configuration.supportedStreamConfigs.push_back(
+      {.width = kVgaWidth, .height = kVgaHeight, Format::YUV_420_888});
+  registerCamera(mTestCameraToken, configuration, &ret);
   if (ret) {
     dprintf(out, "Successfully registered test camera %s",
             getCamera(mTestCameraToken)->getCameraName().c_str());

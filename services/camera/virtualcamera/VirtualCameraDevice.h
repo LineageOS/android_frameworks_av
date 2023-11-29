@@ -21,6 +21,7 @@
 #include <memory>
 
 #include "aidl/android/companion/virtualcamera/IVirtualCameraCallback.h"
+#include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/hardware/camera/device/BnCameraDevice.h"
 
 namespace android {
@@ -34,6 +35,9 @@ class VirtualCameraDevice
  public:
   explicit VirtualCameraDevice(
       uint32_t cameraId,
+      const std::vector<
+          aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
+          supportedInputConfig,
       std::shared_ptr<
           ::aidl::android::companion::virtualcamera::IVirtualCameraCallback>
           virtualCameraClientCallback = nullptr);
@@ -57,6 +61,10 @@ class VirtualCameraDevice
       const ::aidl::android::hardware::camera::device::StreamConfiguration&
           in_streams,
       bool* _aidl_return) override;
+
+  bool isStreamCombinationSupported(
+      const ::aidl::android::hardware::camera::device::StreamConfiguration&
+          in_streams) const;
 
   ndk::ScopedAStatus open(
       const std::shared_ptr<
@@ -87,6 +95,8 @@ class VirtualCameraDevice
   // "device@{major}.{minor}/virtual/{numerical_id}"
   std::string getCameraName() const;
 
+  uint32_t getCameraId() const { return mCameraId; }
+
  private:
   const uint32_t mCameraId;
   const std::shared_ptr<
@@ -94,6 +104,10 @@ class VirtualCameraDevice
       mVirtualCameraClientCallback;
 
   ::aidl::android::hardware::camera::device::CameraMetadata mCameraCharacteristics;
+
+  const std::vector<
+      aidl::android::companion::virtualcamera::SupportedStreamConfiguration>
+      mSupportedInputConfigurations;
 };
 
 }  // namespace virtualcamera

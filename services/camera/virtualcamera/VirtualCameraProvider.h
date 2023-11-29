@@ -77,6 +77,9 @@ class VirtualCameraProvider
   //
   // TODO(b/301023410) - Add camera configuration.
   std::shared_ptr<VirtualCameraDevice> createCamera(
+      const std::vector<
+          aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
+          supportedInputConfig,
       std::shared_ptr<aidl::android::companion::virtualcamera::IVirtualCameraCallback>
           virtualCameraClientCallback = nullptr);
 

@@ -32,6 +32,8 @@ namespace companion {
 namespace virtualcamera {
 namespace {
 
+using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::hardware::camera::common::CameraDeviceStatus;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::common::TorchModeStatus;
@@ -45,6 +47,8 @@ using ::testing::MatchesRegex;
 using ::testing::Not;
 using ::testing::Return;
 
+constexpr int kVgaWidth = 640;
+constexpr int kVgaHeight = 480;
 constexpr char kVirtualCameraNameRegex[] =
     "device@[0-9]+\\.[0-9]+/virtual/[0-9]+";
 
@@ -75,6 +79,10 @@ class VirtualCameraProviderTest : public ::testing::Test {
   std::shared_ptr<VirtualCameraProvider> mCameraProvider;
   std::shared_ptr<MockCameraProviderCallback> mMockCameraProviderCallback =
       ndk::SharedRefBase::make<MockCameraProviderCallback>();
+  std::vector<SupportedStreamConfiguration> mInputConfigs = {
+      SupportedStreamConfiguration{.width = kVgaWidth,
+                                   .height = kVgaHeight,
+                                   .pixelFormat = Format::YUV_420_888}};
 };
 
 TEST_F(VirtualCameraProviderTest, SetNullCameraCallbackFails) {
@@ -100,7 +108,8 @@ TEST_F(VirtualCameraProviderTest, CreateCamera) {
       .WillOnce(Return(ndk::ScopedAStatus::ok()));
 
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
-  std::shared_ptr<VirtualCameraDevice> camera = mCameraProvider->createCamera();
+  std::shared_ptr<VirtualCameraDevice> camera =
+      mCameraProvider->createCamera(mInputConfigs);
   EXPECT_THAT(camera, Not(IsNull()));
   EXPECT_THAT(camera->getCameraName(), MatchesRegex(kVirtualCameraNameRegex));
 
@@ -117,7 +126,8 @@ TEST_F(VirtualCameraProviderTest, CreateCameraBeforeCallbackIsSet) {
               cameraDeviceStatusChange(_, CameraDeviceStatus::PRESENT))
       .WillOnce(Return(ndk::ScopedAStatus::ok()));
 
-  std::shared_ptr<VirtualCameraDevice> camera = mCameraProvider->createCamera();
+  std::shared_ptr<VirtualCameraDevice> camera =
+      mCameraProvider->createCamera(mInputConfigs);
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
 
   // Created camera should be in the list of cameras.
@@ -128,7 +138,8 @@ TEST_F(VirtualCameraProviderTest, CreateCameraBeforeCallbackIsSet) {
 
 TEST_F(VirtualCameraProviderTest, RemoveCamera) {
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
-  std::shared_ptr<VirtualCameraDevice> camera = mCameraProvider->createCamera();
+  std::shared_ptr<VirtualCameraDevice> camera =
+      mCameraProvider->createCamera(mInputConfigs);
 
   EXPECT_CALL(*mMockCameraProviderCallback,
               cameraDeviceStatusChange(Eq(camera->getCameraName()),
@@ -144,7 +155,8 @@ TEST_F(VirtualCameraProviderTest, RemoveCamera) {
 
 TEST_F(VirtualCameraProviderTest, RemoveNonExistingCamera) {
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
-  std::shared_ptr<VirtualCameraDevice> camera = mCameraProvider->createCamera();
+  std::shared_ptr<VirtualCameraDevice> camera =
+      mCameraProvider->createCamera(mInputConfigs);
 
   // Removing non-existing camera should fail.
   const std::string cameraName = "DefinitelyNoTCamera";

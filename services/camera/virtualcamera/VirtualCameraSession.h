@@ -34,6 +34,8 @@ struct AidlMessageQueue;
 namespace companion {
 namespace virtualcamera {
 
+class VirtualCameraDevice;
+
 // Implementation of ICameraDeviceSession AIDL interface to allow camera
 // framework to read image data from open virtual camera device. This class
 // encapsulates possibly several image streams for the same session.
@@ -44,7 +46,7 @@ class VirtualCameraSession
   // When virtualCameraClientCallback is null, the input surface will be filled
   // with test pattern.
   VirtualCameraSession(
-      const std::string& cameraId,
+      VirtualCameraDevice& mCameraDevice,
       std::shared_ptr<
           ::aidl::android::hardware::camera::device::ICameraDeviceCallback>
           cameraDeviceCallback,
@@ -54,7 +56,7 @@ class VirtualCameraSession
 
   virtual ~VirtualCameraSession() override = default;
 
-  ndk::ScopedAStatus close() override;
+  ndk::ScopedAStatus close() override EXCLUDES(mLock);
 
   ndk::ScopedAStatus configureStreams(
       const ::aidl::android::hardware::camera::device::StreamConfiguration&
@@ -114,7 +116,7 @@ class VirtualCameraSession
       const ::aidl::android::hardware::camera::device::CaptureRequest& request)
       EXCLUDES(mLock);
 
-  const std::string mCameraId;
+  VirtualCameraDevice& mCameraDevice;
 
   mutable std::mutex mLock;
 

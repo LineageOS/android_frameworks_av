@@ -34,11 +34,11 @@ cc_defaults {
         "virtual_camera_service_aidl-ndk",
     ],
     cflags: [
+        "-DANDROID_UTILS_REF_BASE_DISABLE_IMPLICIT_CONSTRUCTION",
         "-Wall",
         "-Werror",
         "-Wformat",
         "-Wthread-safety",
-        "-DLOG_NDEBUG=0"
     ],
 }
 
@@ -91,9 +91,5 @@ cc_binary {
         "libvirtualcamera",
         "libvirtualcamera_utils",
     ],
-    // Remove before flight.
-    // We don't want the service to be started and discovered
-    // yet - remove comments on the lines below in order to
-    // test locally.
-    // init_rc: ["virtual_camera.hal.rc"],
+    init_rc: ["virtual_camera.hal.rc"],
 }

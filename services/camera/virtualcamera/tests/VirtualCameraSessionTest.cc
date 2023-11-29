@@ -17,9 +17,11 @@
 #include <cstdint>
 #include <memory>
 
+#include "VirtualCameraDevice.h"
 #include "VirtualCameraSession.h"
 #include "aidl/android/companion/virtualcamera/BnVirtualCameraCallback.h"
 #include "aidl/android/companion/virtualcamera/IVirtualCameraCallback.h"
+#include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/hardware/camera/device/BnCameraDeviceCallback.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
 #include "aidl/android/hardware/graphics/common/PixelFormat.h"
@@ -37,10 +39,11 @@ namespace {
 constexpr int kWidth = 640;
 constexpr int kHeight = 480;
 constexpr int kStreamId = 0;
-const std::string kCameraName = "virtual_camera";
+constexpr int kCameraId = 42;
 
 using ::aidl::android::companion::virtualcamera::BnVirtualCameraCallback;
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::hardware::camera::device::BnCameraDeviceCallback;
 using ::aidl::android::hardware::camera::device::BufferRequest;
 using ::aidl::android::hardware::camera::device::BufferRequestStatus;
@@ -99,8 +102,15 @@ class VirtualCameraSessionTest : public ::testing::Test {
         ndk::SharedRefBase::make<MockCameraDeviceCallback>();
     mMockVirtualCameraClientCallback =
         ndk::SharedRefBase::make<MockVirtualCameraCallback>();
+    mVirtualCameraDevice = ndk::SharedRefBase::make<VirtualCameraDevice>(
+        kCameraId,
+        std::vector<SupportedStreamConfiguration>{
+            SupportedStreamConfiguration{.width = kWidth,
+                                         .height = kHeight,
+                                         .pixelFormat = Format::YUV_420_888}},
+        mMockVirtualCameraClientCallback);
     mVirtualCameraSession = ndk::SharedRefBase::make<VirtualCameraSession>(
-        kCameraName, mMockCameraDeviceCallback,
+        *mVirtualCameraDevice, mMockCameraDeviceCallback,
         mMockVirtualCameraClientCallback);
 
     ON_CALL(*mMockVirtualCameraClientCallback, onStreamConfigured)
@@ -112,6 +122,7 @@ class VirtualCameraSessionTest : public ::testing::Test {
  protected:
   std::shared_ptr<MockCameraDeviceCallback> mMockCameraDeviceCallback;
   std::shared_ptr<MockVirtualCameraCallback> mMockVirtualCameraClientCallback;
+  std::shared_ptr<VirtualCameraDevice> mVirtualCameraDevice;
   std::shared_ptr<VirtualCameraSession> mVirtualCameraSession;
 };
 
@@ -162,6 +173,14 @@ TEST_F(VirtualCameraSessionTest, CloseTriggersClientTerminateCallback) {
       .WillOnce(Return(ndk::ScopedAStatus::ok()));
 
   ASSERT_TRUE(mVirtualCameraSession->close().isOk());
+}
+
+TEST_F(VirtualCameraSessionTest, FlushBeforeConfigure) {
+  // Flush request coming before the configure request finished
+  // (so potentially the thread is not yet running) should be
+  // gracefully handled.
+
+  EXPECT_TRUE(mVirtualCameraSession->flush().isOk());
 }
 
 TEST_F(VirtualCameraSessionTest, onProcessCaptureRequestTriggersClientCallback) {

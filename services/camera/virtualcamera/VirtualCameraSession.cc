@@ -34,6 +34,7 @@
 
 #include "CameraMetadata.h"
 #include "EGL/egl.h"
+#include "VirtualCameraDevice.h"
 #include "VirtualCameraRenderThread.h"
 #include "VirtualCameraStream.h"
 #include "aidl/android/hardware/camera/common/Status.h"
@@ -152,10 +153,10 @@ HalStream getHalStream(const Stream& stream) {
 }  // namespace
 
 VirtualCameraSession::VirtualCameraSession(
-    const std::string& cameraId,
+    VirtualCameraDevice& cameraDevice,
     std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback,
     std::shared_ptr<IVirtualCameraCallback> virtualCameraClientCallback)
-    : mCameraId(cameraId),
+    : mCameraDevice(cameraDevice),
       mCameraDeviceCallback(cameraDeviceCallback),
       mVirtualCameraClientCallback(virtualCameraClientCallback) {
   mRequestMetadataQueue = std::make_unique<RequestMetadataQueue>(
@@ -176,6 +177,14 @@ ndk::ScopedAStatus VirtualCameraSession::close() {
 
   if (mVirtualCameraClientCallback != nullptr) {
     mVirtualCameraClientCallback->onStreamClosed(/*streamId=*/0);
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (mRenderThread != nullptr) {
+      mRenderThread->stop();
+      mRenderThread = nullptr;
+    }
   }
 
   mSessionContext.closeAllStreams();
@@ -204,18 +213,14 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
   int inputWidth;
   int inputHeight;
 
+  if (!mCameraDevice.isStreamCombinationSupported(in_requestedConfiguration)) {
+    ALOGE("%s: Requested stream configuration is not supported", __func__);
+    return cameraStatus(Status::ILLEGAL_ARGUMENT);
+  }
+
   {
     std::lock_guard<std::mutex> lock(mLock);
     for (int i = 0; i < in_requestedConfiguration.streams.size(); ++i) {
-      // TODO(b/301023410) remove hardcoded format checks, verify against configuration.
-      if (streams[i].width != 640 || streams[i].height != 480 ||
-          streams[i].rotation != StreamRotation::ROTATION_0 ||
-          (streams[i].format != PixelFormat::IMPLEMENTATION_DEFINED &&
-           streams[i].format != PixelFormat::YCBCR_420_888 &&
-           streams[i].format != PixelFormat::BLOB)) {
-        halStreams.clear();
-        return cameraStatus(Status::ILLEGAL_ARGUMENT);
-      }
       halStreams[i] = getHalStream(streams[i]);
       if (mSessionContext.initializeStream(streams[i])) {
         ALOGV("Configured new stream: %s", streams[i].toString().c_str());
@@ -278,7 +283,9 @@ ndk::ScopedAStatus VirtualCameraSession::constructDefaultRequestSettings(
 ndk::ScopedAStatus VirtualCameraSession::flush() {
   ALOGV("%s", __func__);
   std::lock_guard<std::mutex> lock(mLock);
-  mRenderThread->flush();
+  if (mRenderThread != nullptr) {
+    mRenderThread->flush();
+  }
   return ndk::ScopedAStatus::ok();
 }
 
