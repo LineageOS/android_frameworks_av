@@ -220,11 +220,6 @@ public:
         //
         // The minimum frame render duration to recognize video freeze event to collect trace.
         int32_t traceMinFreezeDurationMs;
-        //
-        // The maximum frame render duration to recognize video freeze event. A frame render
-        // duration that is larger than the max duration would not trigger trace collection for
-        // video freeze because it's highly possible a video pause.
-        int32_t traceMaxFreezeDurationMs;
     };
 
     struct FreezeEvent {
@@ -380,7 +375,8 @@ private:
     // Process a frame freeze.
     static void processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
                               int64_t lastFreezeEndTimeUs, FreezeEvent &e,
-                              VideoRenderQualityMetrics &m, const Configuration &c);
+                              VideoRenderQualityMetrics &m, const Configuration &c,
+                              const TraceTriggerFn traceTriggerFn);
 
     // Retrieve a freeze event if an event just finished.
     static void maybeCaptureFreezeEvent(int64_t actualRenderTimeUs, int64_t lastFreezeEndTimeUs,

@@ -162,7 +162,6 @@ VideoRenderQualityTracker::Configuration
     getFlag(traceTriggerEnabled, "trace_trigger_enabled");
     getFlag(traceTriggerThrottleMs, "trace_trigger_throttle_ms");
     getFlag(traceMinFreezeDurationMs, "trace_minimum_freeze_duration_ms");
-    getFlag(traceMaxFreezeDurationMs, "trace_maximum_freeze_duration_ms");
 #undef getFlag
     return c;
 }
@@ -209,7 +208,6 @@ VideoRenderQualityTracker::Configuration::Configuration() {
         "ro.build.type", "user") != "user"; // Enabled for non-user builds for debugging.
     traceTriggerThrottleMs = 5 * 60 * 1000; // 5 mins.
     traceMinFreezeDurationMs = 400;
-    traceMaxFreezeDurationMs = 1500;
 }
 
 VideoRenderQualityTracker::VideoRenderQualityTracker()
@@ -301,15 +299,7 @@ void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t a
     int64_t actualRenderTimeUs = actualRenderTimeNs / 1000;
 
     if (mLastRenderTimeUs != -1) {
-        int64_t frameRenderDurationMs = (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
-        mRenderDurationMs += frameRenderDurationMs;
-        if (mConfiguration.traceTriggerEnabled
-            // Threshold for visible video freeze.
-            && frameRenderDurationMs >= mConfiguration.traceMinFreezeDurationMs
-            // Threshold for removing long render durations which could be video pause.
-            && frameRenderDurationMs < mConfiguration.traceMaxFreezeDurationMs) {
-            triggerTraceWithThrottle(mTraceTriggerFn, mConfiguration, actualRenderTimeUs);
-        }
+        mRenderDurationMs += (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
     }
 
     // Now that a frame has been rendered, the previously skipped frames can be processed as skipped
@@ -550,7 +540,7 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
         }
         if (!isLikelyCatchingUpAfterPause) {
             processFreeze(actualRenderTimeUs, mLastRenderTimeUs, mLastFreezeEndTimeUs, mFreezeEvent,
-                        mMetrics, mConfiguration);
+                        mMetrics, mConfiguration, mTraceTriggerFn);
             mLastFreezeEndTimeUs = actualRenderTimeUs;
         }
     }
@@ -576,8 +566,8 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
 
 void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
                                               int64_t lastFreezeEndTimeUs, FreezeEvent &e,
-                                              VideoRenderQualityMetrics &m,
-                                              const Configuration &c) {
+                                              VideoRenderQualityMetrics &m, const Configuration &c,
+                                              const TraceTriggerFn traceTriggerFn) {
     int32_t durationMs = int32_t((actualRenderTimeUs - lastRenderTimeUs) / 1000);
     m.freezeDurationMsHistogram.insert(durationMs);
     int32_t distanceMs = -1;
@@ -612,6 +602,11 @@ void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_
             e.details.durationMs.push_back(durationMs);
             e.details.distanceMs.push_back(distanceMs); // -1 for first detail in the first event
         }
+    }
+
+    if (c.traceTriggerEnabled && durationMs >= c.traceMinFreezeDurationMs) {
+        ALOGI("Video freezed %lld ms", (long long) durationMs);
+        triggerTraceWithThrottle(traceTriggerFn, c, actualRenderTimeUs);
     }
 }
 
@@ -819,17 +814,20 @@ void VideoRenderQualityTracker::triggerTraceWithThrottle(const TraceTriggerFn tr
     static int64_t lastTriggerUs = -1;
     static Mutex updateLastTriggerLock;
 
-    Mutex::Autolock autoLock(updateLastTriggerLock);
-    if (lastTriggerUs != -1) {
-        int32_t sinceLastTriggerMs = int32_t((triggerTimeUs - lastTriggerUs) / 1000);
-        // Throttle the trace trigger calls to reduce continuous PID fork calls in a short time
-        // to impact device performance, and reduce spamming trace reports.
-        if (sinceLastTriggerMs < c.traceTriggerThrottleMs) {
-            ALOGI("Not triggering trace - not enough time since last trigger");
-            return;
+    {
+        Mutex::Autolock autoLock(updateLastTriggerLock);
+        if (lastTriggerUs != -1) {
+            int32_t sinceLastTriggerMs = int32_t((triggerTimeUs - lastTriggerUs) / 1000);
+            // Throttle the trace trigger calls to reduce continuous PID fork calls in a short time
+            // to impact device performance, and reduce spamming trace reports.
+            if (sinceLastTriggerMs < c.traceTriggerThrottleMs) {
+                ALOGI("Not triggering trace - not enough time since last trigger");
+                return;
+            }
         }
+        lastTriggerUs = triggerTimeUs;
     }
-    lastTriggerUs = triggerTimeUs;
+
     (*traceTriggerFn)();
 }
 
