@@ -29,6 +29,7 @@
 #include "binder/Binder.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "util/Permissions.h"
 #include "utils/Errors.h"
 
 namespace android {
@@ -50,10 +51,13 @@ using ::testing::Ge;
 using ::testing::IsEmpty;
 using ::testing::IsNull;
 using ::testing::Not;
+using ::testing::Return;
 using ::testing::SizeIs;
 
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
+constexpr char kCreateVirtualDevicePermissions[] =
+    "android.permission.CREATE_VIRTUAL_DEVICE";
 
 const VirtualCameraConfiguration kEmptyVirtualCameraConfiguration;
 
@@ -76,6 +80,12 @@ class MockCameraProviderCallback : public BnCameraProviderCallback {
               (override));
 };
 
+class MockPermissionsProxy : public PermissionsProxy {
+ public:
+  MOCK_METHOD(bool, checkCallingPermission, (const std::string&),
+              (const override));
+};
+
 class VirtualCameraServiceTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -87,8 +97,11 @@ class VirtualCameraServiceTest : public ::testing::Test {
           return ndk::ScopedAStatus::ok();
         });
     mCameraProvider->setCallback(mMockCameraProviderCallback);
-    mCameraService =
-        ndk::SharedRefBase::make<VirtualCameraService>(mCameraProvider);
+    mCameraService = ndk::SharedRefBase::make<VirtualCameraService>(
+        mCameraProvider, mMockPermissionsProxy);
+
+    ON_CALL(mMockPermissionsProxy, checkCallingPermission)
+        .WillByDefault(Return(true));
 
     mDevNullFd = open("/dev/null", O_RDWR);
     ASSERT_THAT(mDevNullFd, Ge(0));
@@ -129,6 +142,7 @@ class VirtualCameraServiceTest : public ::testing::Test {
   std::shared_ptr<VirtualCameraProvider> mCameraProvider;
   std::shared_ptr<MockCameraProviderCallback> mMockCameraProviderCallback =
       ndk::SharedRefBase::make<MockCameraProviderCallback>();
+  MockPermissionsProxy mMockPermissionsProxy;
 
   sp<BBinder> mOwnerToken;
   ndk::SpAIBinder mNdkOwnerToken;
@@ -240,6 +254,40 @@ TEST_F(VirtualCameraServiceTest, UnregisterCamera) {
   mCameraService->unregisterCamera(mNdkOwnerToken);
 
   EXPECT_THAT(mCameraService->getCamera(mNdkOwnerToken), IsNull());
+}
+
+TEST_F(VirtualCameraServiceTest, RegisterCameraWithoutPermissionFails) {
+  bool aidlRet;
+  EXPECT_CALL(mMockPermissionsProxy,
+              checkCallingPermission(kCreateVirtualDevicePermissions))
+      .WillOnce(Return(false));
+
+  EXPECT_THAT(mCameraService
+                  ->registerCamera(mNdkOwnerToken, mVgaYUV420OnlyConfiguration,
+                                   &aidlRet)
+                  .getExceptionCode(),
+              Eq(EX_SECURITY));
+}
+
+TEST_F(VirtualCameraServiceTest, UnregisterCameraWithoutPermissionFails) {
+  EXPECT_CALL(mMockPermissionsProxy,
+              checkCallingPermission(kCreateVirtualDevicePermissions))
+      .WillOnce(Return(false));
+
+  EXPECT_THAT(
+      mCameraService->unregisterCamera(mNdkOwnerToken).getExceptionCode(),
+      Eq(EX_SECURITY));
+}
+
+TEST_F(VirtualCameraServiceTest, GetIdWithoutPermissionFails) {
+  int32_t aidlRet;
+  EXPECT_CALL(mMockPermissionsProxy,
+              checkCallingPermission(kCreateVirtualDevicePermissions))
+      .WillOnce(Return(false));
+
+  EXPECT_THAT(
+      mCameraService->getCameraId(mNdkOwnerToken, &aidlRet).getExceptionCode(),
+      Eq(EX_SECURITY));
 }
 
 TEST_F(VirtualCameraServiceTest, UnregisterCameraWithUnknownToken) {
