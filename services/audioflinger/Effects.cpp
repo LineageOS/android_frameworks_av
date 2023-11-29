@@ -2152,27 +2152,31 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 /* static */
 sp<IAfEffectChain> IAfEffectChain::create(
         const sp<IAfThreadBase>& thread,
-        audio_session_t sessionId)
+        audio_session_t sessionId,
+        const sp<IAfThreadCallback>& afThreadCallback)
 {
-    return sp<EffectChain>::make(thread, sessionId);
+    return sp<EffectChain>::make(thread, sessionId, afThreadCallback);
 }
 
-EffectChain::EffectChain(const sp<IAfThreadBase>& thread,
-                                       audio_session_t sessionId)
+EffectChain::EffectChain(const sp<IAfThreadBase>& thread, audio_session_t sessionId,
+                         const sp<IAfThreadCallback>& afThreadCallback)
     : mSessionId(sessionId), mActiveTrackCnt(0), mTrackCnt(0), mTailBufferCount(0),
       mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
       mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX),
-      mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread))
+      mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread, afThreadCallback))
 {
-    mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
-    mMaxTailBuffers = ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
-                                    thread->frameCount();
+    if (thread != nullptr) {
+        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
+        mMaxTailBuffers =
+            ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
+                thread->frameCount();
+    }
 }
 
-// getEffectFromDesc_l() must be called with IAfThreadBase::mutex() held
-sp<IAfEffectModule> EffectChain::getEffectFromDesc_l(
+sp<IAfEffectModule> EffectChain::getEffectFromDesc(
         effect_descriptor_t *descriptor) const
 {
+    audio_utils::lock_guard _l(mutex());
     size_t size = mEffects.size();
 
     for (size_t i = 0; i < size; i++) {
@@ -2186,6 +2190,7 @@ sp<IAfEffectModule> EffectChain::getEffectFromDesc_l(
 // getEffectFromId_l() must be called with IAfThreadBase::mutex() held
 sp<IAfEffectModule> EffectChain::getEffectFromId_l(int id) const
 {
+    audio_utils::lock_guard _l(mutex());
     size_t size = mEffects.size();
 
     for (size_t i = 0; i < size; i++) {
@@ -2201,6 +2206,7 @@ sp<IAfEffectModule> EffectChain::getEffectFromId_l(int id) const
 sp<IAfEffectModule> EffectChain::getEffectFromType_l(
         const effect_uuid_t *type) const
 {
+    audio_utils::lock_guard _l(mutex());
     size_t size = mEffects.size();
 
     for (size_t i = 0; i < size; i++) {
@@ -2291,8 +2297,7 @@ void EffectChain::process_l() {
     }
 }
 
-// createEffect_l() must be called with IAfThreadBase::mutex() held
-status_t EffectChain::createEffect_l(sp<IAfEffectModule>& effect,
+status_t EffectChain::createEffect(sp<IAfEffectModule>& effect,
                                                    effect_descriptor_t *desc,
                                                    int id,
                                                    audio_session_t sessionId,
@@ -2302,7 +2307,7 @@ status_t EffectChain::createEffect_l(sp<IAfEffectModule>& effect,
     effect = new EffectModule(mEffectCallback, desc, id, sessionId, pinned, AUDIO_PORT_HANDLE_NONE);
     status_t lStatus = effect->status();
     if (lStatus == NO_ERROR) {
-        lStatus = addEffect_ll(effect);
+        lStatus = addEffect_l(effect);
     }
     if (lStatus != NO_ERROR) {
         effect.clear();
@@ -2310,14 +2315,13 @@ status_t EffectChain::createEffect_l(sp<IAfEffectModule>& effect,
     return lStatus;
 }
 
-// addEffect_l() must be called with IAfThreadBase::mutex() held
-status_t EffectChain::addEffect_l(const sp<IAfEffectModule>& effect)
+status_t EffectChain::addEffect(const sp<IAfEffectModule>& effect)
 {
     audio_utils::lock_guard _l(mutex());
-    return addEffect_ll(effect);
+    return addEffect_l(effect);
 }
-// addEffect_l() must be called with IAfThreadBase::mutex() and EffectChain::mutex() held
-status_t EffectChain::addEffect_ll(const sp<IAfEffectModule>& effect)
+// addEffect_l() must be called with EffectChain::mutex() held
+status_t EffectChain::addEffect_l(const sp<IAfEffectModule>& effect)
 {
     effect->setCallback(mEffectCallback);
 
@@ -2345,7 +2349,7 @@ status_t EffectChain::addEffect_ll(const sp<IAfEffectModule>& effect)
         // by insert effects
         effect->setOutBuffer(mInBuffer);
     } else {
-        ssize_t idx_insert = getInsertIndex_ll(desc);
+        ssize_t idx_insert = getInsertIndex_l(desc);
         if (idx_insert < 0) {
             return INVALID_OPERATION;
         }
@@ -2406,7 +2410,7 @@ std::optional<size_t> EffectChain::findVolumeControl_l(size_t from, size_t to) c
     return std::nullopt;
 }
 
-ssize_t EffectChain::getInsertIndex_ll(const effect_descriptor_t& desc) {
+ssize_t EffectChain::getInsertIndex_l(const effect_descriptor_t& desc) {
     // Insert effects are inserted at the end of mEffects vector as they are processed
     //  after track and auxiliary effects.
     // Insert effect order as a function of indicated preference:
@@ -2479,8 +2483,7 @@ ssize_t EffectChain::getInsertIndex_ll(const effect_descriptor_t& desc) {
     return idx_insert;
 }
 
-// removeEffect_l() must be called with IAfThreadBase::mutex() held
-size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
+size_t EffectChain::removeEffect(const sp<IAfEffectModule>& effect,
                                                  bool release)
 {
     audio_utils::lock_guard _l(mutex());
@@ -2531,6 +2534,7 @@ size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
 // setDevices_l() must be called with IAfThreadBase::mutex() held
 void EffectChain::setDevices_l(const AudioDeviceTypeAddrVector &devices)
 {
+    audio_utils::lock_guard _l(mutex());
     size_t size = mEffects.size();
     for (size_t i = 0; i < size; i++) {
         mEffects[i]->setDevices(devices);
@@ -2540,6 +2544,7 @@ void EffectChain::setDevices_l(const AudioDeviceTypeAddrVector &devices)
 // setInputDevice_l() must be called with IAfThreadBase::mutex() held
 void EffectChain::setInputDevice_l(const AudioDeviceTypeAddr &device)
 {
+    audio_utils::lock_guard _l(mutex());
     size_t size = mEffects.size();
     for (size_t i = 0; i < size; i++) {
         mEffects[i]->setInputDevice(device);
@@ -2549,6 +2554,7 @@ void EffectChain::setInputDevice_l(const AudioDeviceTypeAddr &device)
 // setMode_l() must be called with IAfThreadBase::mutex() held
 void EffectChain::setMode_l(audio_mode_t mode)
 {
+    audio_utils::lock_guard _l(mutex());
     size_t size = mEffects.size();
     for (size_t i = 0; i < size; i++) {
         mEffects[i]->setMode(mode);
@@ -2558,6 +2564,7 @@ void EffectChain::setMode_l(audio_mode_t mode)
 // setAudioSource_l() must be called with IAfThreadBase::mutex() held
 void EffectChain::setAudioSource_l(audio_source_t source)
 {
+    audio_utils::lock_guard _l(mutex());
     size_t size = mEffects.size();
     for (size_t i = 0; i < size; i++) {
         mEffects[i]->setAudioSource(source);
@@ -2663,8 +2670,12 @@ void EffectChain::resetVolume_l()
     }
 }
 
-// containsHapticGeneratingEffect_l must be called with
-// IAfThreadBase::mutex() or EffectChain::mutex() held
+bool EffectChain::containsHapticGeneratingEffect()
+{
+    audio_utils::lock_guard _l(mutex());
+    return containsHapticGeneratingEffect_l();
+}
+// containsHapticGeneratingEffect_l must be called with EffectChain::mutex() held
 bool EffectChain::containsHapticGeneratingEffect_l()
 {
     for (size_t i = 0; i < mEffects.size(); ++i) {
@@ -2805,7 +2816,7 @@ void EffectChain::setEffectSuspendedAll_l(bool suspend)
         }
         if (desc->mRefCount++ == 0) {
             Vector< sp<IAfEffectModule> > effects;
-            getSuspendEligibleEffects_l(effects);
+            getSuspendEligibleEffects(effects);
             for (size_t i = 0; i < effects.size(); i++) {
                 setEffectSuspended_l(&effects[i]->desc().type, true);
             }
@@ -2855,7 +2866,7 @@ bool EffectChain::isEffectEligibleForBtNrecSuspend_l(const effect_uuid_t* type) 
     return false;
 }
 
-bool EffectChain::isEffectEligibleForSuspend_l(const effect_descriptor_t& desc)
+bool EffectChain::isEffectEligibleForSuspend(const effect_descriptor_t& desc)
 {
     // auxiliary effects and visualizer are never suspended on output mix
     if ((mSessionId == AUDIO_SESSION_OUTPUT_MIX) &&
@@ -2868,12 +2879,13 @@ bool EffectChain::isEffectEligibleForSuspend_l(const effect_descriptor_t& desc)
     return true;
 }
 
-void EffectChain::getSuspendEligibleEffects_l(
+void EffectChain::getSuspendEligibleEffects(
         Vector< sp<IAfEffectModule> > &effects)
 {
     effects.clear();
+    audio_utils::lock_guard _l(mutex());
     for (size_t i = 0; i < mEffects.size(); i++) {
-        if (isEffectEligibleForSuspend_l(mEffects[i]->desc())) {
+        if (isEffectEligibleForSuspend(mEffects[i]->desc())) {
             effects.add(mEffects[i]);
         }
     }
@@ -2894,7 +2906,7 @@ void EffectChain::checkSuspendOnEffectEnabled_l(const sp<IAfEffectModule>& effec
             if (index < 0) {
                 return;
             }
-            if (!isEffectEligibleForSuspend_l(effect->desc())) {
+            if (!isEffectEligibleForSuspend(effect->desc())) {
                 return;
             }
             setEffectSuspended_l(&effect->desc().type, enabled);
@@ -2942,6 +2954,12 @@ bool EffectChain::isNonOffloadableEnabled_l() const
 
 void EffectChain::setThread(const sp<IAfThreadBase>& thread)
 {
+    if (thread != nullptr) {
+        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
+        mMaxTailBuffers =
+            ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
+                thread->frameCount();
+    }
     audio_utils::lock_guard _l(mutex());
     mEffectCallback->setThread(thread);
 }
@@ -3131,7 +3149,7 @@ bool EffectChain::EffectCallback::isSpatializer() const {
 uint32_t EffectChain::EffectCallback::sampleRate() const {
     const sp<IAfThreadBase> t = thread().promote();
     if (t == nullptr) {
-        return 0;
+        return DEFAULT_OUTPUT_SAMPLE_RATE;
     }
     return t->sampleRate();
 }
@@ -3139,6 +3157,7 @@ uint32_t EffectChain::EffectCallback::sampleRate() const {
 audio_channel_mask_t EffectChain::EffectCallback::inChannelMask(int id) const
 NO_THREAD_SAFETY_ANALYSIS
 // calling function 'hasAudioSession_l' requires holding mutex 'ThreadBase_Mutex' exclusively
+// calling function 'isFirstEffect_l' requires holding mutex 'EffectChain_Mutex' exclusively
 {
     const sp<IAfThreadBase> t = thread().promote();
     if (t == nullptr) {
@@ -3151,7 +3170,7 @@ NO_THREAD_SAFETY_ANALYSIS
 
     if (mThreadType == IAfThreadBase::SPATIALIZER) {
         if (c->sessionId() == AUDIO_SESSION_OUTPUT_STAGE) {
-            if (c->isFirstEffect(id)) {
+            if (c->isFirstEffect_l(id)) {
                 return t->mixerChannelMask();
             } else {
                 return t->channelMask();
@@ -3219,7 +3238,8 @@ audio_channel_mask_t EffectChain::EffectCallback::hapticChannelMask() const {
 size_t EffectChain::EffectCallback::frameCount() const {
     const sp<IAfThreadBase> t = thread().promote();
     if (t == nullptr) {
-        return 0;
+        // frameCount cannot be zero.
+        return 1;
     }
     return t->frameCount();
 }
