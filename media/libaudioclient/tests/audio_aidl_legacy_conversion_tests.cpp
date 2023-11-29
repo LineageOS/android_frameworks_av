@@ -43,7 +43,9 @@ using media::audio::common::AudioFormatType;
 using media::audio::common::AudioGain;
 using media::audio::common::AudioGainConfig;
 using media::audio::common::AudioGainMode;
+using media::audio::common::AudioInputFlags;
 using media::audio::common::AudioIoFlags;
+using media::audio::common::AudioOutputFlags;
 using media::audio::common::AudioPortDeviceExt;
 using media::audio::common::AudioProfile;
 using media::audio::common::AudioStandard;
@@ -830,4 +832,28 @@ TEST(AudioMicrophoneInfoFw, ChannelMapping) {
     EXPECT_EQ(MicrophoneDynamicInfo::ChannelMapping::DIRECT, aidl.dynamic.channelMapping[1]);
     EXPECT_EQ(MicrophoneDynamicInfo::ChannelMapping::UNUSED, aidl.dynamic.channelMapping[2]);
     EXPECT_EQ(MicrophoneDynamicInfo::ChannelMapping::PROCESSED, aidl.dynamic.channelMapping[3]);
+}
+
+TEST(AudioInputFlags, Aidl2Legacy2Aidl) {
+    for (auto flag : enum_range<AudioInputFlags>()) {
+        int32_t aidlMask = 1 << static_cast<int32_t>(flag);
+        auto convMask = aidl2legacy_int32_t_audio_input_flags_t_mask(aidlMask);
+        ASSERT_TRUE(convMask.ok());
+        ASSERT_EQ(1, __builtin_popcount(convMask.value()));
+        auto convFlag = legacy2aidl_audio_input_flags_t_AudioInputFlags(convMask.value());
+        ASSERT_TRUE(convFlag.ok());
+        EXPECT_EQ(flag, convFlag.value());
+    }
+}
+
+TEST(AudioOutputFlags, Aidl2Legacy2Aidl) {
+    for (auto flag : enum_range<AudioOutputFlags>()) {
+        int32_t aidlMask = 1 << static_cast<int32_t>(flag);
+        auto convMask = aidl2legacy_int32_t_audio_output_flags_t_mask(aidlMask);
+        ASSERT_TRUE(convMask.ok());
+        ASSERT_EQ(1, __builtin_popcount(convMask.value()));
+        auto convFlag = legacy2aidl_audio_output_flags_t_AudioOutputFlags(convMask.value());
+        ASSERT_TRUE(convFlag.ok());
+        EXPECT_EQ(flag, convFlag.value());
+    }
 }
