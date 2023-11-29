@@ -7747,7 +7747,8 @@ void DuplicatingThread::sendMetadataToBackend_l(
 
 uint32_t DuplicatingThread::activeSleepTimeUs() const
 {
-    return (mWaitTimeMs * 1000) / 2;
+    // return half the wait time in microseconds.
+    return std::min(mWaitTimeMs * 500ULL, (unsigned long long)UINT32_MAX);  // prevent overflow.
 }
 
 void DuplicatingThread::cacheParameters_l()
