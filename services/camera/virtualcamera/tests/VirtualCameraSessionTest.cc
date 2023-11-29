@@ -113,9 +113,24 @@ class VirtualCameraSessionTest : public ::testing::Test {
         *mVirtualCameraDevice, mMockCameraDeviceCallback,
         mMockVirtualCameraClientCallback);
 
+    // Explicitly defining default actions below to prevent gmock from
+    // default-constructing ndk::ScopedAStatus, because default-constructed
+    // status wraps nullptr AStatus and causes crash when attempting to print
+    // it in gtest report.
+    ON_CALL(*mMockCameraDeviceCallback, notify)
+        .WillByDefault(ndk::ScopedAStatus::ok);
+    ON_CALL(*mMockCameraDeviceCallback, processCaptureResult)
+        .WillByDefault(ndk::ScopedAStatus::ok);
+    ON_CALL(*mMockCameraDeviceCallback, requestStreamBuffers)
+        .WillByDefault(ndk::ScopedAStatus::ok);
+    ON_CALL(*mMockCameraDeviceCallback, returnStreamBuffers)
+        .WillByDefault(ndk::ScopedAStatus::ok);
+
     ON_CALL(*mMockVirtualCameraClientCallback, onStreamConfigured)
         .WillByDefault(ndk::ScopedAStatus::ok);
     ON_CALL(*mMockVirtualCameraClientCallback, onProcessCaptureRequest)
+        .WillByDefault(ndk::ScopedAStatus::ok);
+    ON_CALL(*mMockVirtualCameraClientCallback, onStreamClosed)
         .WillByDefault(ndk::ScopedAStatus::ok);
   }
 
