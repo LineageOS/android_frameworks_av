@@ -74,10 +74,7 @@ void ResourceManagerService::getResourceDump(std::string& resourceLog) const {
 
             const ResourceList& resources = info.resources;
             resourceLog.append("        Resources:\n");
-            for (auto it = resources.begin(); it != resources.end(); it++) {
-                snprintf(buffer, SIZE, "          %s\n", toString(it->second).c_str());
-                resourceLog.append(buffer);
-            }
+            resourceLog.append(resources.toString());
         }
     }
 
@@ -315,31 +312,21 @@ Status ResourceManagerService::addResource(const ClientInfoParcel& clientInfo,
 
     for (size_t i = 0; i < resources.size(); ++i) {
         const auto &res = resources[i];
-        const auto resType = std::tuple(res.type, res.subType, res.id);
 
         if (res.value < 0 && res.type != MediaResource::Type::kDrmSession) {
             ALOGW("Ignoring request to remove negative value of non-drm resource");
             continue;
         }
-        if (info.resources.find(resType) == info.resources.end()) {
-            if (res.value <= 0) {
-                // We can't init a new entry with negative value, although it's allowed
-                // to merge in negative values after the initial add.
-                ALOGW("Ignoring request to add new resource entry with value <= 0");
-                continue;
-            }
+        bool isNewEntry = false;
+        if (!info.resources.add(res, &isNewEntry)) {
+            continue;
+        }
+        if (isNewEntry) {
             onFirstAdded(res, info.uid);
-            info.resources[resType] = res;
-        } else {
-            mergeResources(info.resources[resType], res);
         }
+
         // Add it to the list of added resources for observers.
-        auto it = resourceAdded.find(resType);
-        if (it == resourceAdded.end()) {
-            resourceAdded[resType] = res;
-        } else {
-            mergeResources(it->second, res);
-        }
+        resourceAdded.add(res);
     }
     if (info.deathNotifier == nullptr && client != nullptr) {
         info.deathNotifier = DeathNotifier::Create(
@@ -386,31 +373,22 @@ Status ResourceManagerService::removeResource(const ClientInfoParcel& clientInfo
     ResourceList resourceRemoved;
     for (size_t i = 0; i < resources.size(); ++i) {
         const auto &res = resources[i];
-        const auto resType = std::tuple(res.type, res.subType, res.id);
 
         if (res.value < 0) {
             ALOGW("Ignoring request to remove negative value of resource");
             continue;
         }
-        // ignore if we don't have it
-        if (info.resources.find(resType) != info.resources.end()) {
-            MediaResourceParcel &resource = info.resources[resType];
+
+        long removedEntryValue = -1;
+        if (info.resources.remove(res, &removedEntryValue)) {
             MediaResourceParcel actualRemoved = res;
-            if (resource.value > res.value) {
-                resource.value -= res.value;
-            } else {
+            if (removedEntryValue != -1) {
                 onLastRemoved(res, info.uid);
-                actualRemoved.value = resource.value;
-                info.resources.erase(resType);
+                actualRemoved.value = removedEntryValue;
             }
 
             // Add it to the list of removed resources for observers.
-            auto it = resourceRemoved.find(resType);
-            if (it == resourceRemoved.end()) {
-                resourceRemoved[resType] = actualRemoved;
-            } else {
-                mergeResources(it->second, actualRemoved);
-            }
+            resourceRemoved.add(actualRemoved);
         }
     }
     if (mObserverService != nullptr && !resourceRemoved.empty()) {
@@ -453,8 +431,8 @@ Status ResourceManagerService::removeResource(const ClientInfoParcel& clientInfo
     }
 
     const ResourceInfo& info = foundClient->second;
-    for (auto it = info.resources.begin(); it != info.resources.end(); it++) {
-        onLastRemoved(it->second, info.uid);
+    for (const MediaResourceParcel& res : info.resources.getResources()) {
+        onLastRemoved(res, info.uid);
     }
 
     // Since this client has been removed, update the metrics collector.
@@ -1056,8 +1034,7 @@ bool ResourceManagerService::getBiggestClient_l(int pid, MediaResource::Type typ
         if (pendingRemovalOnly && !info.pendingRemoval) {
             continue;
         }
-        for (auto it = resources.begin(); it != resources.end(); it++) {
-            const MediaResourceParcel &resource = it->second;
+        for (const MediaResourceParcel& resource : resources.getResources()) {
             if (hasResourceType(type, subType, resource)) {
                 if (resource.value > largestValue) {
                     largestValue = resource.value;
