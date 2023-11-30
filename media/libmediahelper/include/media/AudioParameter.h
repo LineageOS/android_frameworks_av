@@ -121,10 +121,14 @@ public:
     // keyReconfigA2dp: Ask HwModule to reconfigure A2DP offloaded codec
     // keyReconfigA2dpSupported: Query if HwModule supports A2DP offload codec config
     // keyBtLeSuspended: 'true' or 'false'
+    // keyReconfigLe: Ask HwModule to reconfigure LE offloaded codec
+    // keyReconfigLeSupported: Query if HwModule supports LE offload codec config
     static const char * const keyBtA2dpSuspended;
     static const char * const keyReconfigA2dp;
     static const char * const keyReconfigA2dpSupported;
     static const char * const keyBtLeSuspended;
+    static const char * const keyReconfigLe;
+    static const char * const keyReconfigLeSupported;
 
     // For querying device supported encapsulation capabilities. All returned values are integer,
     // which are bit fields composed from using encapsulation capability values as position bits.

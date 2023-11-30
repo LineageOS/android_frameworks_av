@@ -511,11 +511,6 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
                                                       const char *device_name,
                                                       audio_format_t encodedFormat)
 {
-    status_t status;
-    String8 reply;
-    AudioParameter param;
-    int isReconfigA2dpSupported = 0;
-
     ALOGV("handleDeviceConfigChange(() device: 0x%X, address %s name %s encodedFormat: 0x%X",
           device, device_address, device_name, encodedFormat);
 
@@ -537,19 +532,22 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     // Case 1: A2DP active device switches from primary to primary
     // module
     // Case 2: A2DP device config changes on primary module.
-    if (audio_is_a2dp_out_device(device) && hasPrimaryOutput()) {
+    if (device_has_encoding_capability(device) && hasPrimaryOutput()) {
         sp<HwModule> module = mHwModules.getModuleForDeviceType(device, encodedFormat);
         audio_module_handle_t primaryHandle = mPrimaryOutput->getModuleHandle();
         if (availablePrimaryOutputDevices().contains(devDesc) &&
            (module != 0 && module->getHandle() == primaryHandle)) {
-            reply = mpClientInterface->getParameters(
-                        AUDIO_IO_HANDLE_NONE,
-                        String8(AudioParameter::keyReconfigA2dpSupported));
+            bool isA2dp = audio_is_a2dp_out_device(device);
+            const String8 supportKey = isA2dp ? String8(AudioParameter::keyReconfigA2dpSupported)
+                    : String8(AudioParameter::keyReconfigLeSupported);
+            String8 reply = mpClientInterface->getParameters(AUDIO_IO_HANDLE_NONE, supportKey);
             AudioParameter repliedParameters(reply);
-            repliedParameters.getInt(
-                    String8(AudioParameter::keyReconfigA2dpSupported), isReconfigA2dpSupported);
-            if (isReconfigA2dpSupported) {
-                const String8 key(AudioParameter::keyReconfigA2dp);
+            int isReconfigSupported;
+            repliedParameters.getInt(supportKey, isReconfigSupported);
+            if (isReconfigSupported) {
+                const String8 key = isA2dp ? String8(AudioParameter::keyReconfigA2dp)
+                        : String8(AudioParameter::keyReconfigLe);
+                AudioParameter param;
                 param.add(key, String8("true"));
                 mpClientInterface->setParameters(AUDIO_IO_HANDLE_NONE, param.toString());
                 devDesc->setEncodedFormat(encodedFormat);
@@ -569,7 +567,7 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     }
     // Toggle the device state: UNAVAILABLE -> AVAILABLE
     // This will force reading again the device configuration
-    status = setDeviceConnectionState(device,
+    status_t status = setDeviceConnectionState(device,
                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                       device_address, device_name,
                                       devDesc->getEncodedFormat());
