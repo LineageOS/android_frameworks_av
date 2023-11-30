@@ -156,7 +156,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withDefault
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withEmpty) {
@@ -188,7 +187,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withEmpty) 
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withInvalid) {
@@ -220,7 +218,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withInvalid
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withAlmostValid) {
@@ -297,7 +294,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withAlmostV
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) {
@@ -412,7 +408,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) 
     EXPECT_EQ(c.traceTriggerEnabled, true);
     EXPECT_EQ(c.traceTriggerThrottleMs, 50000);
     EXPECT_EQ(c.traceMinFreezeDurationMs, 1000);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, 5000);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, countsReleasedFrames) {
@@ -1126,53 +1121,34 @@ TEST_F(VideoRenderQualityTrackerTest,
     c.enabled = true;
     c.traceTriggerEnabled = true; // The trigger is enabled, so traces should be triggered.
     // The value of traceTriggerThrottleMs must be larger than traceMinFreezeDurationMs. Otherwise,
-    // the throttle does work.
+    // the throttle does not work.
     c.traceTriggerThrottleMs = 200;
-    c.traceMinFreezeDurationMs = 40;
-    int32_t freeze = c.traceMinFreezeDurationMs;
+    c.traceMinFreezeDurationMs = 4 * 20; // 4 frames.
 
     Helper h(20, c);
-    // Freeze triggers separated by 80ms which is less than the threshold.
-    h.render({
-        freeze, // Freeze duration does not check trace trigger.
-        20,     // Trace triggered.
-        20,     // Throttle time:  20/200ms
-        20,     // Throttle time:  40/200ms
-        freeze, // Throttle time:  80/200ms
-        20,     // Throttle time: 100/200ms (Trace not triggered)
-    });
+    // Freeze triggers separated by 100ms which is less than the threshold.
+    h.render(1); // Video start.
+    h.drop(3);   // Freeze.
+    h.render(1); // Trace triggered.
+    h.render(1); // Throttle time:  20/200ms
+    h.drop(3);   // Throttle time:  80/200ms
+    h.render(1); // Throttle time: 100/200ms (Trace not triggered)
     EXPECT_EQ(h.getTraceTriggeredCount(), 1);
     // Next freeze trigger is separated by 200ms which breaks the throttle threshold.
-    h.render({
-        20,     // Throttle time: 120/200ms
-        20,     // Throttle time: 140/200ms
-        20,     // Throttle time: 160/200ms
-        freeze, // Throttle time: 200/200ms
-        20,     // Trace triggered.
-    });
+    h.render(1); // Throttle time: 120/200ms
+    h.drop(3);   // Throttle time: 180/200ms
+    h.render(1); // Throttle time: 200/200ms (Trace triggered)
     EXPECT_EQ(h.getTraceTriggeredCount(), 2);
-    // Next freeze trigger is separated by 80ms which is less than the threshold.
-    h.render({
-        20,     // Throttle time:  20/200ms
-        20,     // Throttle time:  40/200ms
-        freeze, // Throttle time:  80/200ms
-        20,     // Throttle time: 100/200ms (Trace not triggered)
-    });
+    // Next freeze trigger is separated by 100ms which is less than the threshold.
+    h.render(1); // Throttle time:  20/200ms
+    h.drop(3);   // Throttle time:  80/200ms
+    h.render(1); // Throttle time: 100/200ms (Trace not triggered)
     EXPECT_EQ(h.getTraceTriggeredCount(), 2);
-}
-
-TEST_F(VideoRenderQualityTrackerTest, freezeForTraceDuration_triggersTrace) {
-    Configuration c;
-    c.enabled = true;
-    c.traceTriggerEnabled = true; // The trigger is enabled, so traces should be triggered.
-    c.traceTriggerThrottleMs = 0; // Disable throttle in the test case.
-    int32_t freeze1 = c.traceMinFreezeDurationMs;
-    int32_t freeze2 = c.traceMaxFreezeDurationMs - 1;
-    int32_t couldBeAPause = c.traceMaxFreezeDurationMs + 1;
-
-    Helper h(20, c);
-    h.render({freeze1, 20, freeze2, 20, couldBeAPause, 20});
-
+    // Freeze duration is less than traceMinFreezeDurationMs and throttle ends.
+    h.render(1); // Throttle time: 120/200ms
+    h.render(1); // Throttle time: 140/200ms
+    h.drop(2);   // Throttle time: 180/200ms
+    h.render(1); // Throttle time: 200/200ms (Trace not triggered, freeze duration = 60ms)
     EXPECT_EQ(h.getTraceTriggeredCount(), 2);
 }
 
@@ -1182,12 +1158,14 @@ TEST_F(VideoRenderQualityTrackerTest,
     c.enabled = true;
     c.traceTriggerEnabled = false; // The trigger is disabled, so no traces should be triggered.
     c.traceTriggerThrottleMs = 0; // Disable throttle in the test case.
-    int32_t freeze1 = c.traceMinFreezeDurationMs;
-    int32_t freeze2 = c.traceMaxFreezeDurationMs - 1;
-    int32_t couldBeAPause = c.traceMaxFreezeDurationMs + 1;
+    c.traceMinFreezeDurationMs = 4 * 20; // 4 frames.
 
     Helper h(20, c);
-    h.render({freeze1, 20, freeze2, 20, couldBeAPause, 20});
+    h.render(1);
+    h.drop(3);
+    h.render(1); // Render duration is 80 ms.
+    h.drop(4);
+    h.render(1); // Render duration is 100 ms.
 
     EXPECT_EQ(h.getTraceTriggeredCount(), 0);
 }
