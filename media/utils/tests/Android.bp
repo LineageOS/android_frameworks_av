@@ -13,7 +13,6 @@ cc_defaults {
 
     host_supported: true,
 
-    cpp_std: "gnu++17",
     cflags: [
         "-Wall",
         "-Werror",
