@@ -101,8 +101,13 @@ struct FixedString
         return strncmp(c_str(), s, capacity() + 1) == 0;
     }
 
-    bool operator==(std::string_view s) const {
+    bool operator==(const std::string_view s) const {
         return size() == s.size() && memcmp(data(), s.data(), size()) == 0;
+    }
+
+    template <uint32_t N_>
+    bool operator==(const FixedString<N_>& s) const {
+        return operator==(s.asStringView());
     }
 
     // operator not-equals
