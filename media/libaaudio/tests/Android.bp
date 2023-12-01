@@ -241,3 +241,10 @@ cc_test {
         "libaaudio_internal",
     ],
 }
+
+cc_binary {
+    name: "test_idle_disconnected_shared_stream",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_idle_disconnected_shared_stream.cpp"],
+    shared_libs: ["libaaudio"],
+}
