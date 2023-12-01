@@ -781,6 +781,14 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     return false;
   }
 
+  if (buffer->bitdepth > 10) {
+    ALOGE("bitdepth %d is not supported", buffer->bitdepth);
+    mSignalledError = true;
+    work->workletsProcessed = 1u;
+    work->result = C2_CORRUPTED;
+    return false;
+  }
+
   const int width = buffer->displayed_width[0];
   const int height = buffer->displayed_height[0];
   if (width != mWidth || height != mHeight) {
