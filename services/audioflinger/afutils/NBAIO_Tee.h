@@ -24,6 +24,7 @@
 #include <mutex>
 #include <set>
 
+#include <audio_utils/clock.h>
 #include <cutils/properties.h>
 #include <media/nbaio/NBAIO.h>
 
