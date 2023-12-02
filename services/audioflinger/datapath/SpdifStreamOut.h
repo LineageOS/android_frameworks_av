@@ -120,7 +120,6 @@ private:
     audio_config_base_t  mApplicationConfig = AUDIO_CONFIG_BASE_INITIALIZER;
 
     ssize_t  writeDataBurst(const void* data, size_t bytes);
-    ssize_t  writeInternal(const void* buffer, size_t bytes);
 
 #ifdef TEE_SINK
     NBAIO_Tee mTee;
