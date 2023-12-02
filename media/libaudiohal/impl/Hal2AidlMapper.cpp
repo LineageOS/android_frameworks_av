@@ -82,6 +82,16 @@ void setPortConfigFromConfig(AudioPortConfig* portConfig, const AudioConfig& con
     }
 }
 
+bool containHapticChannel(AudioChannelLayout channel) {
+    return channel.getTag() == AudioChannelLayout::Tag::layoutMask &&
+            ((channel.get<AudioChannelLayout::Tag::layoutMask>()
+                    & AudioChannelLayout::CHANNEL_HAPTIC_A)
+                    == AudioChannelLayout::CHANNEL_HAPTIC_A ||
+             (channel.get<AudioChannelLayout::Tag::layoutMask>()
+                    & AudioChannelLayout::CHANNEL_HAPTIC_B)
+                    == AudioChannelLayout::CHANNEL_HAPTIC_B);
+}
+
 }  // namespace
 
 Hal2AidlMapper::Hal2AidlMapper(const std::string& instance, const std::shared_ptr<IModule>& module)
@@ -438,11 +448,20 @@ Hal2AidlMapper::Ports::iterator Hal2AidlMapper::findPort(const AudioDevice& devi
 Hal2AidlMapper::Ports::iterator Hal2AidlMapper::findPort(
             const AudioConfig& config, const AudioIoFlags& flags,
             const std::set<int32_t>& destinationPortIds) {
-    auto belongsToProfile = [&config](const AudioProfile& prof) {
+    auto channelMaskMatches = [](const std::vector<AudioChannelLayout>& channelMasks,
+                                 const AudioChannelLayout& channelMask) {
+        // Return true when 1) the channel mask is none and none of the channel mask from the
+        // collection contains haptic channel mask, or 2) the channel mask collection contains
+        // the queried channel mask.
+        return (channelMask.getTag() == AudioChannelLayout::none &&
+                        std::none_of(channelMasks.begin(), channelMasks.end(),
+                                     containHapticChannel)) ||
+                std::find(channelMasks.begin(), channelMasks.end(), channelMask)
+                    != channelMasks.end();
+    };
+    auto belongsToProfile = [&config, &channelMaskMatches](const AudioProfile& prof) {
         return (isDefaultAudioFormat(config.base.format) || prof.format == config.base.format) &&
-                (config.base.channelMask.getTag() == AudioChannelLayout::none ||
-                        std::find(prof.channelMasks.begin(), prof.channelMasks.end(),
-                                config.base.channelMask) != prof.channelMasks.end()) &&
+                channelMaskMatches(prof.channelMasks, config.base.channelMask) &&
                 (config.base.sampleRate == 0 ||
                         std::find(prof.sampleRates.begin(), prof.sampleRates.end(),
                                 config.base.sampleRate) != prof.sampleRates.end());
