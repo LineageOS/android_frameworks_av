@@ -26,7 +26,7 @@ using android::ResourceManagerService;
 using ndk::SharedRefBase;
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-   auto service = SharedRefBase::make<ResourceManagerService>();
+   std::shared_ptr<ResourceManagerService> service = ResourceManagerService::Create();
    fuzzService(service->asBinder().get(), FuzzedDataProvider(data, size));
    return 0;
 }
