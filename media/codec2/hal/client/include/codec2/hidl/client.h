@@ -478,6 +478,14 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     void onBufferReleasedFromOutputSurface(
             uint32_t generation);
 
+    // When the client received \p workList and the blocks inside
+    // \p workList are IGBA based graphic blocks, specify the owner
+    // as the current IGBA for the future operations.
+    // Future operations could be rendering the blocks to the surface
+    // or deallocating blocks to the surface.
+    void holdIgbaBlocks(
+            const std::list<std::unique_ptr<C2Work>>& workList);
+
     // Connect to a given InputSurface.
     c2_status_t connectToInputSurface(
             const std::shared_ptr<InputSurface>& inputSurface,
@@ -516,6 +524,9 @@ protected:
     // setSurface and setSurface with ReleaseSurface due to timing issues.
     // In order to prevent the race condition mutex is added.
     std::mutex mOutputMutex;
+
+    struct GraphicBufferAllocators;
+    std::unique_ptr<GraphicBufferAllocators> mGraphicBufferAllocators;
 
     class AidlDeathManager;
     static AidlDeathManager *GetAidlDeathManager();
