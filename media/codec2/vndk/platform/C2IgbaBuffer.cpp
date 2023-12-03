@@ -67,7 +67,8 @@ c2_status_t static CreateGraphicBlockFromAhwb(AHardwareBuffer *ahwb,
             return err;
         }
         std::shared_ptr<C2IgbaBlockPoolData> poolData =
-                std::make_shared<C2IgbaBlockPoolData>(ahwb, igba);
+                std::make_shared<C2IgbaBlockPoolData>(
+                        ahwb, const_cast<std::shared_ptr<C2IGBA>&>(igba));
         *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
         return C2_OK;
     } else {
@@ -79,7 +80,7 @@ c2_status_t static CreateGraphicBlockFromAhwb(AHardwareBuffer *ahwb,
 
 C2IgbaBlockPoolData::C2IgbaBlockPoolData(
         const AHardwareBuffer *buffer,
-        const std::shared_ptr<C2IGBA> &igba) : mOwned(true), mBuffer(buffer), mIgba(igba) {
+        std::shared_ptr<C2IGBA> &igba) : mOwned(true), mBuffer(buffer), mIgba(igba) {
     CHECK(mBuffer);
     AHardwareBuffer_acquire(const_cast<AHardwareBuffer *>(mBuffer));
 }
@@ -115,6 +116,10 @@ void C2IgbaBlockPoolData::disown() {
     mOwned = false;
 }
 
+void C2IgbaBlockPoolData::registerIgba(std::shared_ptr<C2IGBA> &igba) {
+    mIgba = igba;
+}
+
 std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(AHardwareBuffer *ahwb) {
     // TODO: get proper allocator? and synchronization? or allocator-less?
     static std::shared_ptr<C2AllocatorAhwb> sAllocator = std::make_shared<C2AllocatorAhwb>(0);
@@ -148,22 +153,30 @@ void _C2BlockFactory::DisownIgbaBlock(
     }
 }
 
+void _C2BlockFactory::RegisterIgba(
+        const std::shared_ptr<_C2BlockPoolData>& data,
+        std::shared_ptr<C2IGBA> &igba) {
+    if (data && data->getType() == _C2BlockPoolData::TYPE_AHWBUFFER) {
+        const std::shared_ptr<C2IgbaBlockPoolData> poolData =
+                std::static_pointer_cast<C2IgbaBlockPoolData>(data);
+        poolData->registerIgba(igba);
+    }
+}
+
 C2IgbaBlockPool::C2IgbaBlockPool(
         const std::shared_ptr<C2Allocator> &allocator,
         const std::shared_ptr<C2IGBA> &igba,
+        ::android::base::unique_fd &&ufd,
         const local_id_t localId) : mAllocator(allocator), mIgba(igba), mLocalId(localId) {
     if (!mIgba) {
         mValid = false;
         return;
     }
-    // TODO: Remove IPC (This is a nested IPC call during c2aidl creatBlockPool().
-    ::ndk::ScopedFileDescriptor fd;
-    ::ndk::ScopedAStatus status = mIgba->getWaitableFd(&fd);
-    if (!status.isOk()) {
+    if (ufd.get() < 0) {
         mValid = false;
         return;
     }
-    mWaitFence = _C2FenceFactory::CreatePipeFence(fd.release());
+    mWaitFence = _C2FenceFactory::CreatePipeFence(std::move(ufd));
     if (!mWaitFence.valid()) {
         mValid = false;
         return;
