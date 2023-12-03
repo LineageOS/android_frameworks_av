@@ -19,6 +19,8 @@
 #define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <android-base/logging.h>
 #include <utils/Trace.h>
+
+#include <codec2/aidl/GraphicBufferAllocator.h>
 #include <codec2/hidl/client.h>
 #include <C2Debug.h>
 #include <C2BufferPriv.h>
@@ -74,6 +76,7 @@
 #include <limits>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <thread>
 #include <type_traits>
@@ -95,6 +98,9 @@ using B2HGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
 using H2BGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
         V2_0::utils::H2BGraphicBufferProducer;
 using ::android::hardware::media::c2::V1_2::SurfaceSyncObj;
+
+using AidlGraphicBufferAllocator = ::aidl::android::hardware::media::c2::
+        implementation::GraphicBufferAllocator;
 
 namespace bufferpool2_aidl = ::aidl::android::hardware::media::bufferpool2;
 namespace bufferpool_hidl = ::android::hardware::media::bufferpool::V2_0;
@@ -1041,6 +1047,85 @@ struct Codec2Client::Component::OutputBufferQueue :
     }
 };
 
+// The class holds GraphicBufferAllocator and the associated id of
+// HAL side BlockPool.
+// This is tightly coupled with BlockPool creation and destruction.
+// The life cycle inside class will be as follows.
+//
+// On createBlockPool client request.
+//    1. this::create() creates a GraphicBufferAllocator and set it as
+//        the current.
+//    2. C2AIDL_HAL::createBlockPool() creates a C2BlockPool using
+//        the GraphicBufferAllocator created in #1.
+//    3. this::setCurrentId() associates the id returned in #2 to the current
+//
+// On destroyBlockPool cliet request
+//    1. C2AIDL_HAL::destroyBlockPool() destroys the block pool
+//       from HAL process.
+//    2. this::remove() destroys GraphicBufferAllocator which is associatted
+//       with the C2BlockPool in #1.
+//
+struct Codec2Client::Component::GraphicBufferAllocators {
+private:
+    std::optional<C2BlockPool::local_id_t> mCurrentId;
+    std::shared_ptr<AidlGraphicBufferAllocator> mCurrent;
+
+    // A new BlockPool is created before the old BlockPool is destroyed.
+    // This holds the reference of the old BlockPool when a new BlockPool is
+    // created until the old BlockPool is explicitly requested for destruction.
+    std::map<C2BlockPool::local_id_t, std::shared_ptr<AidlGraphicBufferAllocator>> mOlds;
+    std::mutex mMutex;
+
+public:
+    // Creates a GraphicBufferAllocator which will be passed to HAL
+    // for creating C2BlockPool. And the created GraphicBufferAllocator
+    // will be used afterwards by current().
+    std::shared_ptr<AidlGraphicBufferAllocator> create() {
+        std::unique_lock<std::mutex> l(mMutex);
+        if (mCurrent) {
+            // If this is not stopped.
+            mCurrent->reset();
+            if (mCurrentId.has_value()) {
+                mOlds.emplace(mCurrentId.value(), mCurrent);
+            }
+            mCurrentId.reset();
+            mCurrent.reset();
+        }
+        // TODO: integrate initial value with CCodec/CCodecBufferChannel
+        mCurrent =
+                AidlGraphicBufferAllocator::CreateGraphicBufferAllocator(3 /* maxDequeueCount */);
+        ALOGD("GraphicBufferAllocator created");
+        return mCurrent;
+    }
+
+    // Associates the blockpool Id returned from HAL to the
+    // current GraphicBufferAllocator.
+    void setCurrentId(C2BlockPool::local_id_t id) {
+        std::unique_lock<std::mutex> l(mMutex);
+        CHECK(!mCurrentId.has_value());
+        mCurrentId = id;
+    }
+
+    // Returns the current GraphicBufferAllocator.
+    std::shared_ptr<AidlGraphicBufferAllocator> current() {
+        std::unique_lock<std::mutex> l(mMutex);
+        return mCurrent;
+    }
+
+    // Removes the GraphicBufferAllocator associated with given \p id.
+    void remove(C2BlockPool::local_id_t id) {
+        std::unique_lock<std::mutex> l(mMutex);
+        mOlds.erase(id);
+        if (mCurrentId == id) {
+            if (mCurrent) {
+                mCurrent->reset();
+                mCurrent.reset();
+            }
+            mCurrentId.reset();
+        }
+    }
+};
+
 // Codec2Client
 Codec2Client::Codec2Client(sp<HidlBase> const& base,
                            sp<c2_hidl::IConfigurable> const& configurable,
@@ -1125,6 +1210,7 @@ c2_status_t Codec2Client::createComponent(
                        << status << ".";
         }
         (*component)->mAidlBufferPoolSender->setReceiver(mAidlHostPoolManager);
+        aidlListener->component = *component;
         return status;
     }
 
@@ -1951,7 +2037,7 @@ Codec2Client::Component::Component(const std::shared_ptr<AidlBase> &base)
         },
         mAidlBase{base},
         mAidlBufferPoolSender{std::make_unique<AidlBufferPoolSender>()},
-        mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
+        mGraphicBufferAllocators{std::make_unique<GraphicBufferAllocators>()} {
 }
 
 Codec2Client::Component::~Component() {
@@ -1966,11 +2052,42 @@ c2_status_t Codec2Client::Component::createBlockPool(
         std::shared_ptr<Codec2Client::Configurable>* configurable) {
     if (mAidlBase) {
         c2_aidl::IComponent::BlockPool aidlBlockPool;
-        ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(static_cast<int32_t>(id),
-                                                                      &aidlBlockPool);
-        c2_status_t status = GetC2Status(transStatus, "createBlockPool");
-        if (status != C2_OK) {
-            return status;
+        c2_status_t status = C2_OK;
+
+        // TODO: Temporary mapping for the current CCodecBufferChannel.
+        // Handle this properly and remove this temporary allocator mapping.
+        id = id == C2PlatformAllocatorStore::BUFFERQUEUE ?
+                C2PlatformAllocatorStore::IGBA : id;
+
+        if (id == C2PlatformAllocatorStore::IGBA)  {
+            std::shared_ptr<AidlGraphicBufferAllocator> gba =
+                    mGraphicBufferAllocators->create();
+            ::ndk::ScopedFileDescriptor waitableFd;
+            ::ndk::ScopedAStatus ret = gba->getWaitableFd(&waitableFd);
+            status = GetC2Status(ret, "Gba::getWaitableFd");
+            if (status != C2_OK) {
+                return status;
+            }
+            c2_aidl::IComponent::BlockPoolAllocator allocator;
+            allocator.set<c2_aidl::IComponent::BlockPoolAllocator::allocator>();
+            allocator.get<c2_aidl::IComponent::BlockPoolAllocator::allocator>().igba =
+                    c2_aidl::IGraphicBufferAllocator::fromBinder(gba->asBinder());
+            allocator.get<c2_aidl::IComponent::BlockPoolAllocator::allocator>().waitableFd =
+                    std::move(waitableFd);
+            ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(
+                    allocator, &aidlBlockPool);
+            status = GetC2Status(transStatus, "createBlockPool");
+            if (status != C2_OK) {
+                return status;
+            }
+            mGraphicBufferAllocators->setCurrentId(aidlBlockPool.blockPoolId);
+        } else {
+            ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(
+                    static_cast<int32_t>(id), &aidlBlockPool);
+            status = GetC2Status(transStatus, "createBlockPool");
+            if (status != C2_OK) {
+                return status;
+            }
         }
         *blockPoolId = aidlBlockPool.blockPoolId;
         *configurable = std::make_shared<Configurable>(aidlBlockPool.configurable);
@@ -2003,6 +2120,7 @@ c2_status_t Codec2Client::Component::createBlockPool(
 c2_status_t Codec2Client::Component::destroyBlockPool(
         C2BlockPool::local_id_t localId) {
     if (mAidlBase) {
+        mGraphicBufferAllocators->remove(localId);
         ::ndk::ScopedAStatus transStatus = mAidlBase->destroyBlockPool(localId);
         return GetC2Status(transStatus, "destroyBlockPool");
     }
@@ -2017,8 +2135,12 @@ c2_status_t Codec2Client::Component::destroyBlockPool(
 
 void Codec2Client::Component::handleOnWorkDone(
         const std::list<std::unique_ptr<C2Work>> &workItems) {
-    // Output bufferqueue-based blocks' lifetime management
-    mOutputBufferQueue->holdBufferQueueBlocks(workItems);
+    if (mAidlBase) {
+        holdIgbaBlocks(workItems);
+    } else {
+        // Output bufferqueue-based blocks' lifetime management
+        mOutputBufferQueue->holdBufferQueueBlocks(workItems);
+    }
 }
 
 c2_status_t Codec2Client::Component::queue(
@@ -2102,8 +2224,12 @@ c2_status_t Codec2Client::Component::flush(
         }
     }
 
-    // Output bufferqueue-based blocks' lifetime management
-    mOutputBufferQueue->holdBufferQueueBlocks(*flushedWork);
+    if (mAidlBase) {
+        holdIgbaBlocks(*flushedWork);
+    } else {
+        // Output bufferqueue-based blocks' lifetime management
+        mOutputBufferQueue->holdBufferQueueBlocks(*flushedWork);
+    }
 
     return status;
 }
@@ -2242,6 +2368,17 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         const sp<IGraphicBufferProducer>& surface,
         uint32_t generation,
         int maxDequeueCount) {
+    if (mAidlBase) {
+        std::shared_ptr<AidlGraphicBufferAllocator> gba =
+              mGraphicBufferAllocators->current();
+        if (!gba) {
+            LOG(ERROR) << "setOutputSurface for AIDL -- "
+                       "GraphicBufferAllocator was not created.";
+            return C2_CORRUPTED;
+        }
+        bool ret = gba->configure(surface, generation, maxDequeueCount);
+        return ret ? C2_OK : C2_CORRUPTED;
+    }
     uint64_t bqId = 0;
     sp<IGraphicBufferProducer> nullIgbp;
     sp<HGraphicBufferProducer2> nullHgbp;
@@ -2303,10 +2440,6 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     ALOGD("setOutputSurface -- generation=%u consumer usage=%#llx%s",
             generation, (long long)consumerUsage, syncObj ? " sync" : "");
 
-    if (mAidlBase) {
-        // FIXME
-        return C2_OMITTED;
-    }
     Return<c2_hidl::Status> transStatus = syncObj ?
             mHidlBase1_2->setOutputSurfaceWithSyncObj(
                     static_cast<uint64_t>(blockPoolId),
@@ -2335,26 +2468,51 @@ status_t Codec2Client::Component::queueToOutputSurface(
         const QueueBufferInput& input,
         QueueBufferOutput* output) {
     ScopedTrace trace(ATRACE_TAG,"Codec2Client::Component::queueToOutputSurface");
+    if (mAidlBase) {
+        std::shared_ptr<AidlGraphicBufferAllocator> gba =
+                mGraphicBufferAllocators->current();
+        if (gba) {
+            return gba->displayBuffer(block, input, output);
+        } else {
+            return C2_NOT_FOUND;
+        }
+    }
     return mOutputBufferQueue->outputBuffer(block, input, output);
 }
 
 void Codec2Client::Component::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
+    if (mAidlBase) {
+        // TODO b/311348680
+        return;
+    }
     mOutputBufferQueue->pollForRenderedFrames(delta);
 }
 
 void Codec2Client::Component::setOutputSurfaceMaxDequeueCount(
         int maxDequeueCount) {
+    if (mAidlBase) {
+        std::shared_ptr<AidlGraphicBufferAllocator> gba =
+                mGraphicBufferAllocators->current();
+        if (gba) {
+            gba->updateMaxDequeueBufferCount(maxDequeueCount);
+        }
+        return;
+    }
     mOutputBufferQueue->updateMaxDequeueBufferCount(maxDequeueCount);
 }
 
 void Codec2Client::Component::stopUsingOutputSurface(
         C2BlockPool::local_id_t blockPoolId) {
-    std::scoped_lock lock(mOutputMutex);
-    mOutputBufferQueue->stop();
     if (mAidlBase) {
-        // FIXME
+        std::shared_ptr<AidlGraphicBufferAllocator> gba =
+                mGraphicBufferAllocators->current();
+        if (gba) {
+            gba->reset();
+        }
         return;
     }
+    std::scoped_lock lock(mOutputMutex);
+    mOutputBufferQueue->stop();
     Return<c2_hidl::Status> transStatus = mHidlBase1_0->setOutputSurface(
             static_cast<uint64_t>(blockPoolId), nullptr);
     if (!transStatus.isOk()) {
@@ -2372,7 +2530,48 @@ void Codec2Client::Component::stopUsingOutputSurface(
 
 void Codec2Client::Component::onBufferReleasedFromOutputSurface(
         uint32_t generation) {
+    if (mAidlBase) {
+        std::shared_ptr<AidlGraphicBufferAllocator> gba =
+                mGraphicBufferAllocators->current();
+        if (gba) {
+            gba->onBufferReleased(generation);
+        }
+        return;
+    }
     mOutputBufferQueue->onBufferReleased(generation);
+}
+
+void Codec2Client::Component::holdIgbaBlocks(
+        const std::list<std::unique_ptr<C2Work>>& workList) {
+    if (!mAidlBase) {
+        return;
+    }
+    std::shared_ptr<AidlGraphicBufferAllocator> gba =
+            mGraphicBufferAllocators->current();
+    if (!gba) {
+        return;
+    }
+    std::shared_ptr<c2_aidl::IGraphicBufferAllocator> igba =
+            c2_aidl::IGraphicBufferAllocator::fromBinder(gba->asBinder());
+    for (const std::unique_ptr<C2Work>& work : workList) {
+        if (!work) [[unlikely]] {
+            continue;
+        }
+        for (const std::unique_ptr<C2Worklet>& worklet : work->worklets) {
+            if (!worklet) {
+                continue;
+            }
+            for (const std::shared_ptr<C2Buffer>& buffer : worklet->output.buffers) {
+                if (buffer) {
+                    for (const C2ConstGraphicBlock& block : buffer->data().graphicBlocks()) {
+                        std::shared_ptr<_C2BlockPoolData> poolData =
+                              _C2BlockFactory::GetGraphicBlockPoolData(block);
+                        _C2BlockFactory::RegisterIgba(poolData, igba);
+                    }
+                }
+            }
+        }
+    }
 }
 
 c2_status_t Codec2Client::Component::connectToInputSurface(

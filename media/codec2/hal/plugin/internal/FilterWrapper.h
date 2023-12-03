@@ -90,6 +90,14 @@ public:
             std::shared_ptr<C2BlockPool> *pool);
 
     /**
+     * Create a C2BlockPool object with |allocatorParam| for |component|.
+     */
+    c2_status_t createBlockPool(
+            C2PlatformAllocatorDesc &allocatorParam,
+            std::shared_ptr<const C2Component> component,
+            std::shared_ptr<C2BlockPool> *pool);
+
+    /**
      * Query parameters that |intf| wants from the previous component.
      */
     c2_status_t queryParamsForPreviousComponent(

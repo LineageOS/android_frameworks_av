@@ -45,7 +45,16 @@ c2_status_t FilterWrapper::createBlockPool(
         C2PlatformAllocatorStore::id_t allocatorId,
         std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
-    return CreateCodec2BlockPool(allocatorId, component, pool);
+    C2PlatformAllocatorDesc allocatorParam;
+    allocatorParam.allocatorId = allocatorId;
+    return createBlockPool(allocatorParam, component, pool);
+}
+
+c2_status_t FilterWrapper::createBlockPool(
+        C2PlatformAllocatorDesc &allocatorParam,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
+    return CreateCodec2BlockPool(allocatorParam, component, pool);
 }
 
 }  // namespace android

@@ -39,6 +39,12 @@ struct BufferPoolData;
 
 }
 
+namespace aidl::android::hardware::media::c2 {
+
+// IGraphicBufferAllocator for media.c2 aidl
+class IGraphicBufferAllocator;
+}
+
 typedef struct AHardwareBuffer AHardwareBuffer;
 
 using bufferpool_BufferPoolData = android::hardware::media::bufferpool::BufferPoolData;
@@ -472,6 +478,16 @@ struct _C2BlockFactory {
      */
     static void DisownIgbaBlock(
             const std::shared_ptr<_C2BlockPoolData>& poolData);
+
+    /**
+     * When the client receives a block from HAL, the client needs to store
+     * IGraphicBufferAllocator from which the block was originally allocated.
+     * The stored \p igba will be used in the dtor to deallocate the buffer.
+     * (calling IGraphicBufferAllocator::deallocate to reclaim.)
+     */
+    static void RegisterIgba(
+            const std::shared_ptr<_C2BlockPoolData>& poolData,
+            std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> &igba);
 };
 
 #endif // ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
