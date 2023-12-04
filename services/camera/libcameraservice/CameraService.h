@@ -232,7 +232,11 @@ public:
             const hardware::CameraExtensionSessionStats& stats, std::string* sessionKey /*out*/);
 
     virtual binder::Status remapCameraIds(const hardware::CameraIdRemapping&
-        cameraIdRemapping);
+            cameraIdRemapping);
+
+    virtual binder::Status injectSessionParams(
+            const std::string& cameraId,
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams);
 
     virtual binder::Status createDefaultRequest(const std::string& cameraId, int templateId,
             /*out*/
@@ -411,6 +415,10 @@ public:
 
         // Stop the injection camera and restore to internal camera session.
         virtual status_t stopInjection() = 0;
+
+        // Inject session parameters into an existing session.
+        virtual status_t injectSessionParams(
+                const hardware::camera2::impl::CameraMetadataNative& sessionParams) = 0;
 
     protected:
         BasicClient(const sp<CameraService>& cameraService,
