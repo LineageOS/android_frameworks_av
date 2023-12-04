@@ -95,6 +95,14 @@ MetadataBuilder& MetadataBuilder::setAvailableFaceDetectModes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setControlAvailableModes(
+    const std::vector<camera_metadata_enum_android_control_mode_t>&
+        availableModes) {
+  mEntryMap[ANDROID_CONTROL_AVAILABLE_MODES] =
+      convertTo<uint8_t>(availableModes);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setControlAfAvailableModes(
     const std::vector<camera_metadata_enum_android_control_af_mode_t>&
         availableModes) {

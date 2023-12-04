@@ -260,11 +260,11 @@ ndk::ScopedAStatus VirtualCameraSession::constructDefaultRequestSettings(
   switch (in_type) {
     case RequestTemplate::PREVIEW:
     case RequestTemplate::STILL_CAPTURE:
-    case RequestTemplate::VIDEO_RECORD: {
+    case RequestTemplate::VIDEO_RECORD:
+    case RequestTemplate::VIDEO_SNAPSHOT: {
       *_aidl_return = createDefaultRequestSettings(in_type);
       return ndk::ScopedAStatus::ok();
     }
-    case RequestTemplate::VIDEO_SNAPSHOT:
     case RequestTemplate::MANUAL:
     case RequestTemplate::ZERO_SHUTTER_LAG:
       // Don't support VIDEO_SNAPSHOT, MANUAL, ZSL templates
