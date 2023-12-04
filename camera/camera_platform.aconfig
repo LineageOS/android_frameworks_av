@@ -9,6 +9,12 @@ flag {
 
 flag {
      namespace: "camera_platform"
+     name: "concert_mode"
+     description: "Introduces a new concert mode camera extension type"
+     bug: "297083874"
+}
+flag {
+     namespace: "camera_platform"
      name: "log_ultrawide_usage"
      description: "Enable measuring how much usage there is for ultrawide-angle cameras"
      bug: "300515796"

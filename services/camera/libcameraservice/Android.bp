@@ -260,6 +260,7 @@ cc_library_static {
         "liblog",
         "libutils",
         "libxml2",
+        "camera_platform_flags_c_lib"
     ],
 
     include_dirs: [
