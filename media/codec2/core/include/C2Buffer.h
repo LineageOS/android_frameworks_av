@@ -1046,13 +1046,9 @@ public:
      *                      (unexpected)
      */
     virtual c2_status_t fetchLinearBlock(
-            uint32_t capacity __unused, C2MemoryUsage usage __unused,
+            uint32_t capacity, C2MemoryUsage usage,
             std::shared_ptr<C2LinearBlock> *block /* nonnull */,
-            C2Fence *fence /* nonnull */) {
-        *block = nullptr;
-        (void) fence;
-        return C2_OMITTED;
-    }
+            C2Fence *fence /* nonnull */);
 
     /**
      * Blocking fetch for 2D graphic block. Obtains a 2D graphic writable block of given |capacity|
@@ -1096,14 +1092,10 @@ public:
      *                      (unexpected)
      */
     virtual c2_status_t fetchGraphicBlock(
-            uint32_t width __unused, uint32_t height __unused, uint32_t format __unused,
-            C2MemoryUsage usage __unused,
+            uint32_t width, uint32_t height, uint32_t format,
+            C2MemoryUsage usage,
             std::shared_ptr<C2GraphicBlock> *block /* nonnull */,
-            C2Fence *fence /* nonnull */) {
-        *block = nullptr;
-        (void) fence;
-        return C2_OMITTED;
-    }
+            C2Fence *fence /* nonnull */);
 protected:
     C2BlockPool() = default;
 };
