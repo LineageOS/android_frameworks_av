@@ -72,19 +72,22 @@ class AidlCamera3Device :
             /*out*/ sp<CameraOfflineSessionBase>* /*session*/) override;
 
     status_t initialize(sp<CameraProviderManager> manager, const std::string& monitorTags) override;
+
     class AidlHalInterface : public Camera3Device::HalInterface {
      public:
         AidlHalInterface(std::shared_ptr<
                 aidl::android::hardware::camera::device::ICameraDeviceSession> &session,
                 std::shared_ptr<AidlRequestMetadataQueue> queue,
-                bool useHalBufManager, bool supportOfflineProcessing);
+                bool useHalBufManager, bool supportOfflineProcessing,
+                bool supportSessionHalBufManager);
         AidlHalInterface(
                 std::shared_ptr<aidl::android::hardware::camera::device::ICameraDeviceSession>
                     &deviceSession,
                 std::shared_ptr<
                 aidl::android::hardware::camera::device::ICameraInjectionSession> &injectionSession,
                 std::shared_ptr<AidlRequestMetadataQueue> queue,
-                bool useHalBufManager, bool supportOfflineProcessing);
+                bool useHalBufManager, bool supportOfflineProcessing,
+                bool supportSessionHalBufManager);
 
         virtual IPCTransport getTransportType() const override {return IPCTransport::AIDL; }
 
@@ -153,6 +156,7 @@ class AidlCamera3Device :
                 /*out*/std::vector<std::pair<int32_t, int32_t>>* inflightBuffers);
 
         std::shared_ptr<AidlRequestMetadataQueue> mRequestMetadataQueue;
+        bool mSupportSessionHalBufManager = false;
     }; // class AidlHalInterface
 
     /**

@@ -54,6 +54,7 @@
 #include <android-base/properties.h>
 #include <android/hardware/camera/device/3.7/ICameraInjectionSession.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
+#include <com_android_internal_camera_flags.h>
 
 #include "CameraService.h"
 #include "aidl/android/hardware/graphics/common/Dataspace.h"
@@ -76,6 +77,7 @@
 using namespace android::camera3;
 using namespace android::hardware::camera;
 
+namespace flags = com::android::internal::camera::flags;
 namespace android {
 
 Camera3Device::Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
@@ -2545,6 +2547,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     }
 
     config.streams = streams.editArray();
+    config.use_hal_buf_manager = mUseHalBufManager;
 
     // Do the HAL configuration; will potentially touch stream
     // max_buffers, usage, and priv fields, as well as data_space and format
@@ -2568,7 +2571,22 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
                 strerror(-res), res);
         return res;
     }
-
+    if (flags::session_hal_buf_manager()) {
+        bool prevSessionHalBufManager = mUseHalBufManager;
+        // It is possible that configureStreams() changed config.use_hal_buf_manager
+        mUseHalBufManager = config.use_hal_buf_manager;
+        if (prevSessionHalBufManager && !mUseHalBufManager) {
+            mRequestBufferSM.deInit();
+        } else if (!prevSessionHalBufManager && mUseHalBufManager) {
+            res = mRequestBufferSM.initialize(mStatusTracker);
+            if (res != OK) {
+                SET_ERR_L("%s: Camera %s: RequestBuffer State machine couldn't be initialized!",
+                          __FUNCTION__, mId.c_str());
+                return res;
+            }
+        }
+        mRequestThread->setHalBufferManager(mUseHalBufManager);
+    }
     // Finish all stream configuration immediately.
     // TODO: Try to relax this later back to lazy completion, which should be
     // faster
@@ -3276,6 +3294,10 @@ void Camera3Device::RequestThread::setPaused(bool paused) {
     Mutex::Autolock l(mPauseLock);
     mDoPause = paused;
     mDoPauseSignal.signal();
+}
+
+void Camera3Device::RequestThread::setHalBufferManager(bool enabled) {
+    mUseHalBufManager = enabled;
 }
 
 status_t Camera3Device::RequestThread::waitUntilRequestProcessed(
@@ -5228,6 +5250,27 @@ status_t Camera3Device::RequestBufferStateMachine::initialize(
     std::lock_guard<std::mutex> lock(mLock);
     mStatusTracker = statusTracker;
     mRequestBufferStatusId = statusTracker->addComponent("BufferRequestSM");
+    return OK;
+}
+
+status_t Camera3Device::RequestBufferStateMachine::deInit() {
+    std::lock_guard<std::mutex> lock(mLock);
+    sp<StatusTracker> statusTracker = mStatusTracker.promote();
+    if (statusTracker == nullptr) {
+        ALOGE("%s: statusTracker is null", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+    if (mRequestBufferStatusId == StatusTracker::NO_STATUS_ID) {
+        ALOGE("%s: RequestBufferStateMachine not initialized", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+    statusTracker->removeComponent(mRequestBufferStatusId);
+    // Bring back to de-initialized state
+    mRequestBufferStatusId = StatusTracker::NO_STATUS_ID;
+    mRequestThreadPaused = true;
+    mInflightMapEmpty = true;
+    mRequestBufferOngoing = false;
+    mSwitchedToOffline = false;
     return OK;
 }
 
