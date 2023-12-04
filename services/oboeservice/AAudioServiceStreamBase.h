@@ -76,7 +76,8 @@ public:
     /**
      * Open the device.
      */
-    virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request) = 0;
+    virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request)
+            EXCLUDES(mUpMessageQueueLock);
 
     // We log the CLOSE from the close() method. We needed this separate method to log the OPEN
     // because we had to wait until we generated the handle.
@@ -269,7 +270,8 @@ protected:
 
         AudioEndpointParcelable* mParcelable;
     };
-    aaudio_result_t getDescription_l(AudioEndpointParcelable* parcelable) REQUIRES(mLock);
+    aaudio_result_t getDescription_l(AudioEndpointParcelable* parcelable)
+            REQUIRES(mLock) EXCLUDES(mUpMessageQueueLock);
 
     void setState(aaudio_stream_state_t state);
 
@@ -279,7 +281,8 @@ protected:
      */
     virtual aaudio_result_t startDevice();
 
-    aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
+    aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command)
+            EXCLUDES(mUpMessageQueueLock);
 
     aaudio_result_t sendCurrentTimestamp_l() REQUIRES(mLock);
 
@@ -342,7 +345,7 @@ protected:
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     std::mutex              mUpMessageQueueLock;
-    std::shared_ptr<SharedRingBuffer> mUpMessageQueue;
+    std::shared_ptr<SharedRingBuffer> mUpMessageQueue PT_GUARDED_BY(mUpMessageQueueLock);
 
     enum : int32_t {
         START,
@@ -402,7 +405,7 @@ private:
     /**
      * @return true if the queue is getting full.
      */
-    bool isUpMessageQueueBusy();
+    bool isUpMessageQueueBusy() EXCLUDES(mUpMessageQueueLock);
 
     aaudio_handle_t         mHandle = -1;
     bool                    mFlowing = false;

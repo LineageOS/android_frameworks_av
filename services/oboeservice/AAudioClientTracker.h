@@ -110,7 +110,7 @@ private:
     private:
         mutable std::mutex                              mLock;
         const pid_t                                     mProcessId;
-        std::set<android::sp<AAudioServiceStreamBase>>  mStreams;
+        std::set<android::sp<AAudioServiceStreamBase>>  mStreams GUARDED_BY(mLock);
         // hold onto binder to receive death notifications
         android::sp<IBinder>                            mBinder;
         bool                                            mExclusiveEnabled = true;
