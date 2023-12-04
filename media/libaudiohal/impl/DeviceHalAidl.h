@@ -207,6 +207,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     ~DeviceHalAidl() override = default;
 
     status_t filterAndRetrieveBtA2dpParameters(AudioParameter &keys, AudioParameter *result);
+    status_t filterAndRetrieveBtLeParameters(AudioParameter &keys, AudioParameter *result);
     status_t filterAndUpdateBtA2dpParameters(AudioParameter &parameters);
     status_t filterAndUpdateBtHfpParameters(AudioParameter &parameters);
     status_t filterAndUpdateBtLeParameters(AudioParameter &parameters);

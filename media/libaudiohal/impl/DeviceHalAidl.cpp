@@ -267,6 +267,9 @@ status_t DeviceHalAidl::getParameters(const String8& keys, String8 *values) {
     if (status_t status = filterAndRetrieveBtA2dpParameters(parameterKeys, &result); status != OK) {
         ALOGW("%s: filtering or retrieving BT A2DP parameters failed: %d", __func__, status);
     }
+    if (status_t status = filterAndRetrieveBtLeParameters(parameterKeys, &result); status != OK) {
+        ALOGW("%s: filtering or retrieving BT LE parameters failed: %d", __func__, status);
+    }
     *values = result.toString();
     return parseAndGetVendorParameters(mVendorExt, mModule, parameterKeys, values);
 }
@@ -988,6 +991,23 @@ status_t DeviceHalAidl::filterAndRetrieveBtA2dpParameters(
     return OK;
 }
 
+status_t DeviceHalAidl::filterAndRetrieveBtLeParameters(
+        AudioParameter &keys, AudioParameter *result) {
+    if (String8 key = String8(AudioParameter::keyReconfigLeSupported); keys.containsKey(key)) {
+        keys.remove(key);
+        if (mBluetoothLe != nullptr) {
+            bool supports;
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                            mBluetoothLe->supportsOffloadReconfiguration(&supports)));
+            result->addInt(key, supports ? 1 : 0);
+        } else {
+            ALOGI("%s: no mBluetoothLe on %s", __func__, mInstance.c_str());
+            result->addInt(key, 0);
+        }
+    }
+    return OK;
+}
+
 status_t DeviceHalAidl::filterAndUpdateBtA2dpParameters(AudioParameter &parameters) {
     std::optional<bool> a2dpEnabled;
     std::optional<std::vector<VendorParameter>> reconfigureOffload;
@@ -1069,6 +1089,7 @@ status_t DeviceHalAidl::filterAndUpdateBtHfpParameters(AudioParameter &parameter
 
 status_t DeviceHalAidl::filterAndUpdateBtLeParameters(AudioParameter &parameters) {
     std::optional<bool> leEnabled;
+    std::optional<std::vector<VendorParameter>> reconfigureOffload;
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
                     parameters, String8(AudioParameter::keyBtLeSuspended),
                     [&leEnabled](const String8& trueOrFalse) {
@@ -1083,8 +1104,26 @@ status_t DeviceHalAidl::filterAndUpdateBtLeParameters(AudioParameter &parameters
                                 AudioParameter::keyBtLeSuspended, trueOrFalse.c_str());
                         return BAD_VALUE;
                     }));
+    (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
+                    parameters, String8(AudioParameter::keyReconfigLe),
+                    [&](const String8& value) -> status_t {
+                        if (mVendorExt != nullptr) {
+                            std::vector<VendorParameter> result;
+                            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                                    mVendorExt->parseBluetoothLeReconfigureOffload(
+                                            std::string(value.c_str()), &result)));
+                            reconfigureOffload = std::move(result);
+                        } else {
+                            reconfigureOffload = std::vector<VendorParameter>();
+                        }
+                        return OK;
+                    }));
     if (mBluetoothLe != nullptr && leEnabled.has_value()) {
         return statusTFromBinderStatus(mBluetoothLe->setEnabled(leEnabled.value()));
+    }
+    if (mBluetoothLe != nullptr && reconfigureOffload.has_value()) {
+        return statusTFromBinderStatus(mBluetoothLe->reconfigureOffload(
+                        reconfigureOffload.value()));
     }
     return OK;
 }
