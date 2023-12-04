@@ -366,14 +366,15 @@ status_t AudioEffect::command(uint32_t cmdCode,
         return mStatus;
     }
 
+    std::unique_lock ul(mLock, std::defer_lock);
     if (cmdCode == EFFECT_CMD_ENABLE || cmdCode == EFFECT_CMD_DISABLE) {
+        ul.lock();
         if (mEnabled == (cmdCode == EFFECT_CMD_ENABLE)) {
             return NO_ERROR;
         }
         if (replySize == nullptr || *replySize != sizeof(status_t) || replyData == nullptr) {
             return BAD_VALUE;
         }
-        mLock.lock();
     }
 
     std::vector<uint8_t> data;
@@ -398,7 +399,6 @@ status_t AudioEffect::command(uint32_t cmdCode,
         if (status == NO_ERROR) {
             mEnabled = (cmdCode == EFFECT_CMD_ENABLE);
         }
-        mLock.unlock();
     }
 
     return status;
