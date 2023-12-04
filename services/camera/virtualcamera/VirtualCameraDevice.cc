@@ -133,6 +133,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setLensFacing(ANDROID_LENS_FACING_EXTERNAL)
           .setSensorOrientation(0)
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
+          .setAvailableMaxDigitalZoom(1.0)
+          .setControlAvailableModes({ANDROID_CONTROL_MODE_AUTO})
           .setControlAfAvailableModes({ANDROID_CONTROL_AF_MODE_OFF})
           .setControlAeAvailableFpsRange(10, 30)
           .setControlMaxRegions(0, 0, 0)
