@@ -117,8 +117,6 @@ private:
     bool                    mFreeRunning{false};
     android::fifo_counter_t mDataReadCounter{0}; // only used if free-running
     android::fifo_counter_t mDataWriteCounter{0}; // only used if free-running
-
-    std::mutex mDataQueueLock;
 };
 
 } // namespace aaudio
