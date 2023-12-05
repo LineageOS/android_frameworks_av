@@ -361,7 +361,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
         DeviceVector moduleDevices = hwModule->getAllDevices();
         auto moduleDevice = moduleDevices.getDevice(deviceType, devAddress, encodedFormat);
 
-        // Prevent overwritting moduleDevice address if connected device does not have the same
+        // Prevent overwriting moduleDevice address if connected device does not have the same
         // address (since getDevice with empty address ignores match on address), use dynamic device
         if (moduleDevice && allowToCreate &&
                 (!moduleDevice->address().empty() &&
