@@ -109,6 +109,7 @@ cc_test_host {
         "libjpeg",
         "liblog",
         "libutils",
+        "camera_platform_flags_c_lib",
     ],
 
     static_libs: [
