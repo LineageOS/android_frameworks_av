@@ -48,7 +48,10 @@ public:
     audio_port_role_t getRole() const { return mRole; }
 
     virtual void setFlags(uint32_t flags);
-    uint32_t getFlags() const { return useInputChannelMask() ? mFlags.input : mFlags.output; }
+    uint32_t getFlags() const {
+        return useInputChannelMask() ? static_cast<uint32_t>(mFlags.input)
+                                     : static_cast<uint32_t>(mFlags.output);
+    }
 
     void setGains(const AudioGains &gains) { mGains = gains; }
     const AudioGains &getGains() const { return mGains; }
