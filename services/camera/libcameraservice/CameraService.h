@@ -234,6 +234,16 @@ public:
     virtual binder::Status remapCameraIds(const hardware::CameraIdRemapping&
         cameraIdRemapping);
 
+    virtual binder::Status createDefaultRequest(const std::string& cameraId, int templateId,
+            /*out*/
+            hardware::camera2::impl::CameraMetadataNative* request);
+
+    virtual binder::Status isSessionConfigurationWithParametersSupported(
+            const std::string& cameraId,
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/
+            bool* supported);
+
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
                                    Parcel* reply, uint32_t flags);
@@ -662,6 +672,7 @@ private:
     bool hasPermissionsForCameraHeadlessSystemUser(const std::string& cameraId, int callingPid,
             int callingUid) const;
 
+    bool hasCameraPermissions() const;
    /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
      * layer values.

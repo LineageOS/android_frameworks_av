@@ -851,33 +851,15 @@ status_t AidlCamera3Device::AidlHalInterface::constructDefaultRequestSettings(
     ATRACE_NAME("CameraAidlHal::constructDefaultRequestSettings");
     using aidl::android::hardware::camera::device::RequestTemplate;
     if (!valid()) return INVALID_OPERATION;
-    status_t res = OK;
 
     RequestTemplate id;
-    aidl::android::hardware::camera::device::CameraMetadata request;
-    switch (templateId) {
-        case CAMERA_TEMPLATE_PREVIEW:
-            id = RequestTemplate::PREVIEW;
-            break;
-        case CAMERA_TEMPLATE_STILL_CAPTURE:
-            id = RequestTemplate::STILL_CAPTURE;
-            break;
-        case CAMERA_TEMPLATE_VIDEO_RECORD:
-            id = RequestTemplate::VIDEO_RECORD;
-            break;
-        case CAMERA_TEMPLATE_VIDEO_SNAPSHOT:
-            id = RequestTemplate::VIDEO_SNAPSHOT;
-            break;
-        case CAMERA_TEMPLATE_ZERO_SHUTTER_LAG:
-            id = RequestTemplate::ZERO_SHUTTER_LAG;
-            break;
-        case CAMERA_TEMPLATE_MANUAL:
-            id = RequestTemplate::MANUAL;
-            break;
-        default:
-            // Unknown template ID, or this HAL is too old to support it
-            return BAD_VALUE;
+    status_t res = SessionConfigurationUtils::mapRequestTemplateToAidl(
+            templateId, &id);
+    if (res != OK) {
+        return res;
     }
+
+    aidl::android::hardware::camera::device::CameraMetadata request;
     auto err = mAidlSession->constructDefaultRequestSettings(id, &request);
 
     if (!err.isOk()) {

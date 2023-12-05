@@ -853,13 +853,21 @@ status_t HidlProviderInfo::HidlDeviceInfo3::dumpState(int fd) {
 
 status_t HidlProviderInfo::HidlDeviceInfo3::isSessionConfigurationSupported(
         const SessionConfiguration &configuration, bool overrideForPerfClass,
-        metadataGetter getMetadata, bool *status) {
+        bool checkSessionParams, bool *status) {
+
+    if (checkSessionParams) {
+        // HIDL device doesn't support checking session parameters
+        return INVALID_OPERATION;
+    }
 
     hardware::camera::device::V3_7::StreamConfiguration configuration_3_7;
     bool earlyExit = false;
+    camera3::metadataGetter getMetadata = [this](const std::string &id,
+            bool /*overrideForPerfClass*/) {return this->deviceInfo(id);};
     auto bRes = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
             mId, mCameraCharacteristics, getMetadata, mPhysicalIds,
-            configuration_3_7, overrideForPerfClass, &earlyExit);
+            configuration_3_7, overrideForPerfClass, mProviderTagid,
+            &earlyExit);
 
     if (!bRes.isOk()) {
         return UNKNOWN_ERROR;
@@ -961,7 +969,7 @@ status_t HidlProviderInfo::convertToHALStreamCombinationAndCameraIdsLocked(
                     cameraIdAndSessionConfig.mSessionConfiguration,
                     cameraId, deviceInfo, getMetadata,
                     physicalCameraIds, streamConfiguration,
-                    overrideForPerfClass, &shouldExit);
+                    overrideForPerfClass, mProviderTagid, &shouldExit);
         if (!bStatus.isOk()) {
             ALOGE("%s: convertToHALStreamCombination failed", __FUNCTION__);
             return INVALID_OPERATION;

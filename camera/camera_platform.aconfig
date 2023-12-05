@@ -13,6 +13,14 @@ flag {
      description: "Introduces a new concert mode camera extension type"
      bug: "297083874"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "feature_combination_query"
+     description: "Query feature combination support and session specific characteristics"
+     bug: "309627704"
+}
+
 flag {
      namespace: "camera_platform"
      name: "log_ultrawide_usage"

@@ -22,9 +22,12 @@
 
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/OutputConfiguration.h>
+#include <com_android_internal_camera_flags.h>
 #include <binder/Parcel.h>
 
 namespace android {
+
+namespace flags = com::android::internal::camera::flags;
 
 status_t SessionConfiguration::readFromParcel(const android::Parcel* parcel) {
     status_t err = OK;
@@ -67,6 +70,22 @@ status_t SessionConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    bool hasSessionParameters = false;
+    CameraMetadata settings;
+    if (flags::feature_combination_query()) {
+        if ((err = parcel->readBool(&hasSessionParameters)) != OK) {
+            ALOGE("%s: Failed to read hasSessionParameters flag from parcel", __FUNCTION__);
+            return err;
+        }
+
+        if (hasSessionParameters) {
+            if ((err = settings.readFromParcel(parcel)) != OK) {
+                ALOGE("%s: Failed to read metadata flag from parcel", __FUNCTION__);
+                return err;
+            }
+        }
+    }
+
     mOperatingMode = operatingMode;
     mInputWidth = inputWidth;
     mInputHeight = inputHeight;
@@ -75,7 +94,10 @@ status_t SessionConfiguration::readFromParcel(const android::Parcel* parcel) {
     for (auto& stream : outputStreams) {
         mOutputStreams.push_back(stream);
     }
-
+    if (flags::feature_combination_query()) {
+        mHasSessionParameters = hasSessionParameters;
+        mSessionParameters = std::move(settings);
+    }
 
     return err;
 }
@@ -102,6 +124,16 @@ status_t SessionConfiguration::writeToParcel(android::Parcel* parcel) const {
 
     err = parcel->writeParcelableVector(mOutputStreams);
     if (err != OK) return err;
+
+    if (flags::feature_combination_query()) {
+        err = parcel->writeBool(mHasSessionParameters);
+        if (err != OK) return err;
+
+        if (mHasSessionParameters) {
+            err = mSessionParameters.writeToParcel(parcel);
+            if (err != OK) return err;
+        }
+    }
 
     return OK;
 }
