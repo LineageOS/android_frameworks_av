@@ -126,7 +126,6 @@ class VirtualCameraRenderThread {
   // Always called on render thread.
   ndk::ScopedAStatus renderIntoBlobStreamBuffer(const int streamId,
                                                 const int bufferId,
-                                                const size_t bufferSize,
                                                 sp<Fence> fence = nullptr);
 
   // Render current image to the YCbCr buffer.
