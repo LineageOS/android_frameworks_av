@@ -562,7 +562,7 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 GET_DEVICE_DESC_CONNECTION(IP_V4));
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_BUS, AUDIO_DEVICE_OUT_BUS,
-                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE);
+                AudioDeviceType::IN_BUS, AudioDeviceType::OUT_BUS);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_PROXY, AUDIO_DEVICE_OUT_PROXY,
                 AudioDeviceType::IN_AFE_PROXY, AudioDeviceType::OUT_AFE_PROXY,
