@@ -49,7 +49,8 @@ public:
                             bool inService);
     ~AAudioServiceStreamMMAP() override = default;
 
-    aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
+    aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override
+            EXCLUDES(mUpMessageQueueLock);
 
     aaudio_result_t startClient(const android::AudioClient& client,
                                 const audio_attributes_t *attr,

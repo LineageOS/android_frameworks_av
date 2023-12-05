@@ -18,7 +18,6 @@
 #define AAUDIO_SERVICE_ENDPOINT_SHARED_H
 
 #include <atomic>
-#include <mutex>
 
 #include <android-base/thread_annotations.h>
 

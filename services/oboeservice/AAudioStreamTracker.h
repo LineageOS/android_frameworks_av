@@ -37,7 +37,7 @@ public:
      * @param streamHandle
      * @return number of streams removed
      */
-    int32_t removeStreamByHandle(aaudio_handle_t streamHandle);
+    int32_t removeStreamByHandle(aaudio_handle_t streamHandle) EXCLUDES(mHandleLock);
 
     /**
      * Look up a stream based on the handle.
@@ -46,7 +46,7 @@ public:
      * @return strong pointer to the stream if found, or nullptr
      */
     android::sp<aaudio::AAudioServiceStreamBase> getStreamByHandle(
-            aaudio_handle_t streamHandle);
+            aaudio_handle_t streamHandle) EXCLUDES(mHandleLock);
 
     /**
      * Look up a stream based on the AudioPolicy portHandle.
@@ -56,7 +56,7 @@ public:
      * @return strong pointer to the stream if found, or nullptr
      */
     android::sp<aaudio::AAudioServiceStreamBase> findStreamByPortHandle(
-            audio_port_handle_t portHandle);
+            audio_port_handle_t portHandle) EXCLUDES(mHandleLock);
 
     /**
      * Store a strong pointer to the stream and return a unique handle for future reference.
@@ -64,7 +64,8 @@ public:
      * @param serviceStream
      * @return handle for identifying the stream
      */
-    aaudio_handle_t addStreamForHandle(const android::sp<AAudioServiceStreamBase>& serviceStream);
+    aaudio_handle_t addStreamForHandle(const android::sp<AAudioServiceStreamBase>& serviceStream)
+            EXCLUDES(mHandleLock);
 
     /**
      * @return string that can be added to dumpsys
