@@ -151,6 +151,9 @@ class MetadataBuilder {
   // See ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM in CameraMetadataTag.aidl.
   MetadataBuilder& setAvailableMaxDigitalZoom(const float maxZoom);
 
+  // See ANDROID_CONTROL_ZOOM_RATIO_RANGE in CameraMetadataTag.aidl.
+  MetadataBuilder& setControlZoomRatioRange(float min, float max);
+
   // A list of all keys that the camera device has available to use with
   // CaptureRequest.
   //
