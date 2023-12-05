@@ -233,6 +233,12 @@ MetadataBuilder& MetadataBuilder::setAvailableMaxDigitalZoom(const float maxZoom
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setControlZoomRatioRange(const float min,
+                                                           const float max) {
+  mEntryMap[ANDROID_CONTROL_ZOOM_RATIO_RANGE] = std::vector<float>({min, max});
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setSensorActiveArraySize(int x0, int y0,
                                                            int x1, int y1) {
   mEntryMap[ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE] =

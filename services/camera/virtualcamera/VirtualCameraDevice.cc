@@ -143,6 +143,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setControlAwbRegions({kDefaultEmptyControlRegion})
           .setControlAeCompensationRange(0, 1)
           .setControlAeCompensationStep(camera_metadata_rational_t{0, 1})
+          .setControlZoomRatioRange(/*min=*/1.0, /*max=*/1.0)
           .setMaxJpegSize(kMaxJpegSize)
           .setAvailableRequestKeys({ANDROID_CONTROL_AF_MODE})
           .setAvailableResultKeys({ANDROID_CONTROL_AF_MODE})
