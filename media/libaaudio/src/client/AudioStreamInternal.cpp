@@ -64,6 +64,9 @@ using namespace aaudio;
 
 #define LOG_TIMESTAMPS            0
 
+// Minimum number of bursts to use when sample rate conversion is used.
+#define MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS    3
+
 AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService)
         : AudioStream()
         , mClockModel()
@@ -908,6 +911,12 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     // Use at least one burst
     if (numBursts == 0) {
         numBursts = 1;
+    }
+
+    // Set a minimum number of bursts if sample rate conversion is used.
+    if ((getSampleRate() != getDeviceSampleRate()) &&
+            (numBursts < MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS)) {
+        numBursts = MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS;
     }
 
     if (mAudioEndpoint) {
