@@ -49,16 +49,16 @@ int main() {
 
   auto aidlBinder = defaultProvider->asBinder();
   AIBinder_forceDowngradeToLocalStability(aidlBinder.get());
-  binder_exception_t ret =
-      AServiceManager_addService(aidlBinder.get(), serviceName.c_str());
+  binder_exception_t ret = AServiceManager_registerLazyService(
+      aidlBinder.get(), serviceName.c_str());
   LOG_ALWAYS_FATAL_IF(
       ret != EX_NONE,
       "Error while registering virtual camera provider service: %d", ret);
 
   std::shared_ptr<VirtualCameraService> virtualCameraService =
       ndk::SharedRefBase::make<VirtualCameraService>(defaultProvider);
-  ret = AServiceManager_addService(virtualCameraService->asBinder().get(),
-                                   kVirtualCameraServiceName);
+  ret = AServiceManager_registerLazyService(
+      virtualCameraService->asBinder().get(), kVirtualCameraServiceName);
   LOG_ALWAYS_FATAL_IF(ret != EX_NONE,
                       "Error while registering virtual camera service: %d", ret);
 
