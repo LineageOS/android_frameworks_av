@@ -172,7 +172,7 @@ public:
         return createThread_l(periodNanoseconds, threadProc, threadArg);
     }
 
-    aaudio_result_t joinThread(void **returnArg);
+    aaudio_result_t joinThread(void **returnArg) EXCLUDES(mStreamLock);
 
     virtual aaudio_result_t registerThread() {
         return AAUDIO_OK;
@@ -424,7 +424,7 @@ public:
     }
 
     // This is used by the AudioManager to duck and mute the stream when changing audio focus.
-    void setDuckAndMuteVolume(float duckAndMuteVolume);
+    void setDuckAndMuteVolume(float duckAndMuteVolume) EXCLUDES(mStreamLock);
 
     float getDuckAndMuteVolume() const {
         return mDuckAndMuteVolume;
@@ -459,11 +459,11 @@ public:
         mPlayerBase->unregisterWithAudioManager();
     }
 
-    aaudio_result_t systemStart();
+    aaudio_result_t systemStart() EXCLUDES(mStreamLock);
 
-    aaudio_result_t systemPause();
+    aaudio_result_t systemPause() EXCLUDES(mStreamLock);
 
-    aaudio_result_t safeFlush();
+    aaudio_result_t safeFlush() EXCLUDES(mStreamLock);
 
     /**
      * This is called when an app calls AAudioStream_requestStop();
@@ -474,14 +474,14 @@ public:
     /**
      * This is called internally when an app callback returns AAUDIO_CALLBACK_RESULT_STOP.
      */
-    aaudio_result_t systemStopInternal();
+    aaudio_result_t systemStopInternal() EXCLUDES(mStreamLock);
 
     /**
      * Safely RELEASE a stream after taking mStreamLock and checking
      * to make sure we are not being called from a callback.
      * @return AAUDIO_OK or a negative error
      */
-    aaudio_result_t safeRelease();
+    aaudio_result_t safeRelease() EXCLUDES(mStreamLock);
 
     /**
      * Safely RELEASE and CLOSE a stream after taking mStreamLock and checking
@@ -490,7 +490,7 @@ public:
      */
     aaudio_result_t safeReleaseClose();
 
-    aaudio_result_t safeReleaseCloseInternal();
+    aaudio_result_t safeReleaseCloseInternal() EXCLUDES(mStreamLock);
 
 protected:
 

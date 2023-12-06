@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "android/hardware_buffer.h"
 #include "jpeglib.h"
@@ -37,10 +38,9 @@ constexpr int kJpegQuality = 80;
 
 class LibJpegContext {
  public:
-  LibJpegContext(int width, int height, const android_ycbcr& ycbcr,
-                 const size_t outBufferSize, void* outBuffer)
-      : mYCbCr(ycbcr),
-        mWidth(width),
+  LibJpegContext(int width, int height, const size_t outBufferSize,
+                 void* outBuffer)
+      : mWidth(width),
         mHeight(height),
         mDstBufferSize(outBufferSize),
         mDstBuffer(outBuffer) {
@@ -94,15 +94,15 @@ class LibJpegContext {
     mCompressStruct.comp_info[2].v_samp_factor = 1;
   }
 
-  bool compress() {
+  bool compress(const android_ycbcr& ycbr) {
     // Prepare arrays of pointers to scanlines of each plane.
     std::vector<JSAMPROW> yLines(mHeight);
     std::vector<JSAMPROW> cbLines(mHeight / 2);
     std::vector<JSAMPROW> crLines(mHeight / 2);
 
-    uint8_t* y = static_cast<uint8_t*>(mYCbCr.y);
-    uint8_t* cb = static_cast<uint8_t*>(mYCbCr.cb);
-    uint8_t* cr = static_cast<uint8_t*>(mYCbCr.cr);
+    uint8_t* y = static_cast<uint8_t*>(ycbr.y);
+    uint8_t* cb = static_cast<uint8_t*>(ycbr.cb);
+    uint8_t* cr = static_cast<uint8_t*>(ycbr.cr);
 
     // Since UV samples might be interleaved (semiplanar) we need to copy
     // them to separate planes, since libjpeg doesn't directly
@@ -115,20 +115,59 @@ class LibJpegContext {
     for (int i = 0; i < c_samples; ++i) {
       cb_plane[i] = *cb;
       cr_plane[i] = *cr;
-      cb += mYCbCr.chroma_step;
-      cr += mYCbCr.chroma_step;
+      cb += ycbr.chroma_step;
+      cr += ycbr.chroma_step;
     }
 
     // Collect pointers to individual scanline of each plane.
     for (int i = 0; i < mHeight; ++i) {
-      yLines[i] = y + i * mYCbCr.ystride;
+      yLines[i] = y + i * ycbr.ystride;
     }
     for (int i = 0; i < (mHeight / 2); ++i) {
       cbLines[i] = cb_plane.data() + i * (mWidth / 2);
       crLines[i] = cr_plane.data() + i * (mWidth / 2);
     }
 
-    // Perform actual compression.
+    return compress(yLines, cbLines, crLines);
+  }
+
+  bool compressBlackImage() {
+    // We only really need to prepare one scanline for Y and one shared scanline
+    // for Cb & Cr.
+    std::vector<uint8_t> yLine(mWidth, 0);
+    std::vector<uint8_t> chromaLine(mWidth / 2, 0xff / 2);
+
+    std::vector<JSAMPROW> yLines(mHeight, yLine.data());
+    std::vector<JSAMPROW> cLines(mHeight / 2, chromaLine.data());
+
+    return compress(yLines, cLines, cLines);
+  }
+
+ private:
+  void setSuccess(const boolean success) {
+    mSuccess = success;
+  }
+
+  void initDestination() {
+    mDestinationMgr.next_output_byte = reinterpret_cast<JOCTET*>(mDstBuffer);
+    mDestinationMgr.free_in_buffer = mDstBufferSize;
+    ALOGV("%s:%d jpeg start: %p [%zu]", __FUNCTION__, __LINE__, mDstBuffer,
+          mDstBufferSize);
+  }
+
+  void termDestination() {
+    mEncodedSize = mDstBufferSize - mDestinationMgr.free_in_buffer;
+    ALOGV("%s:%d Done with jpeg: %zu", __FUNCTION__, __LINE__, mEncodedSize);
+  }
+
+  // Perform actual compression.
+  //
+  // Takes vector of pointers to Y / Cb / Cr scanlines as an input. Length of
+  // each vector needs to correspond to height of corresponding plane.
+  //
+  // Returns true if compression is successful, false otherwise.
+  bool compress(std::vector<JSAMPROW>& yLines, std::vector<JSAMPROW>& cbLines,
+                std::vector<JSAMPROW>& crLines) {
     jpeg_start_compress(&mCompressStruct, TRUE);
 
     while (mCompressStruct.next_scanline < mCompressStruct.image_height) {
@@ -147,23 +186,6 @@ class LibJpegContext {
     }
     jpeg_finish_compress(&mCompressStruct);
     return mSuccess;
-  }
-
- private:
-  void setSuccess(const boolean success) {
-    mSuccess = success;
-  }
-
-  void initDestination() {
-    mDestinationMgr.next_output_byte = reinterpret_cast<JOCTET*>(mDstBuffer);
-    mDestinationMgr.free_in_buffer = mDstBufferSize;
-    ALOGV("%s:%d jpeg start: %p [%zu]", __FUNCTION__, __LINE__, mDstBuffer,
-          mDstBufferSize);
-  }
-
-  void termDestination() {
-    mEncodedSize = mDstBufferSize - mDestinationMgr.free_in_buffer;
-    ALOGV("%s:%d Done with jpeg: %zu", __FUNCTION__, __LINE__, mEncodedSize);
   }
 
   // === libjpeg callbacks below ===
@@ -195,9 +217,6 @@ class LibJpegContext {
   jpeg_error_mgr mErrorMgr;
   jpeg_destination_mgr mDestinationMgr;
 
-  // Layout of the input image.
-  android_ycbcr mYCbCr;
-
   // Dimensions of the input image.
   int mWidth;
   int mHeight;
@@ -216,11 +235,15 @@ class LibJpegContext {
 
 }  // namespace
 
-// Returns true if the EGL is in an error state and logs the error.
 bool compressJpeg(int width, int height, const android_ycbcr& ycbcr,
                   size_t outBufferSize, void* outBuffer) {
-  return LibJpegContext(width, height, ycbcr, outBufferSize, outBuffer)
-      .compress();
+  return LibJpegContext(width, height, outBufferSize, outBuffer).compress(ycbcr);
+}
+
+bool compressBlackJpeg(int width, int height, size_t outBufferSize,
+                       void* outBuffer) {
+  return LibJpegContext(width, height, outBufferSize, outBuffer)
+      .compressBlackImage();
 }
 
 }  // namespace virtualcamera

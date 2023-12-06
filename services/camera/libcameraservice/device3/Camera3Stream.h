@@ -414,6 +414,11 @@ class Camera3Stream :
     virtual status_t setStatusTracker(sp<StatusTracker> statusTracker);
 
     /**
+     * Toggle the state of hal buffer manager
+     */
+    virtual void setHalBufferManager(bool /*enabled*/) {/* No-op */ }
+
+    /**
      * Disconnect stream from its non-HAL endpoint. After this,
      * start/finishConfiguration must be called before the stream can be used
      * again. This cannot be called if the stream has outstanding dequeued

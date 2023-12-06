@@ -24,6 +24,7 @@
 #include <mutex>
 #include <thread>
 
+#include "GLES/gl.h"
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
@@ -271,9 +272,9 @@ void VirtualCameraRenderThread::processCaptureRequest(
     }
 
     auto status = streamConfig->format == PixelFormat::BLOB
-                      ? renderIntoBlobStreamBuffer(
-                            reqBuffer.getStreamId(), reqBuffer.getBufferId(),
-                            streamConfig->bufferSize, reqBuffer.getFence())
+                      ? renderIntoBlobStreamBuffer(reqBuffer.getStreamId(),
+                                                   reqBuffer.getBufferId(),
+                                                   reqBuffer.getFence())
                       : renderIntoImageStreamBuffer(reqBuffer.getStreamId(),
                                                     reqBuffer.getBufferId(),
                                                     reqBuffer.getFence());
@@ -354,17 +355,21 @@ void VirtualCameraRenderThread::flushCaptureRequest(
 }
 
 ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
-    const int streamId, const int bufferId, const size_t bufferSize,
-    sp<Fence> fence) {
+    const int streamId, const int bufferId, sp<Fence> fence) {
   ALOGV("%s", __func__);
-  sp<GraphicBuffer> gBuffer = mEglSurfaceTexture->getCurrentBuffer();
-  if (gBuffer == nullptr) {
-    // Most probably nothing was yet written to input surface if we reached this.
-    ALOGE("%s: Cannot fetch most recent buffer from SurfaceTexture", __func__);
-    return cameraStatus(Status::INTERNAL_ERROR);
-  }
   std::shared_ptr<AHardwareBuffer> hwBuffer =
       mSessionContext.fetchHardwareBuffer(streamId, bufferId);
+  if (hwBuffer == nullptr) {
+    ALOGE("%s: Failed to fetch hardware buffer %d for streamId %d", __func__,
+          bufferId, streamId);
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  std::optional<Stream> stream = mSessionContext.getStreamConfig(streamId);
+  if (!stream.has_value()) {
+    ALOGE("%s, failed to fetch information about stream %d", __func__, streamId);
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
 
   AHardwareBuffer_Planes planes_info;
 
@@ -377,27 +382,36 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
-  android_ycbcr ycbcr;
-  status_t status =
-      gBuffer->lockYCbCr(AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, &ycbcr);
-  ALOGV("Locked buffers");
-  if (status != NO_ERROR) {
-    AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
-    ALOGE("%s: Failed to lock graphic buffer: %d", __func__, status);
-    return cameraStatus(Status::INTERNAL_ERROR);
-  }
+  sp<GraphicBuffer> gBuffer = mEglSurfaceTexture->getCurrentBuffer();
+  bool compressionSuccess = true;
+  if (gBuffer != nullptr) {
+    android_ycbcr ycbcr;
+    status_t status =
+        gBuffer->lockYCbCr(AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, &ycbcr);
+    ALOGV("Locked buffers");
+    if (status != NO_ERROR) {
+      AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
+      ALOGE("%s: Failed to lock graphic buffer: %d", __func__, status);
+      return cameraStatus(Status::INTERNAL_ERROR);
+    }
 
-  bool success = compressJpeg(gBuffer->getWidth(), gBuffer->getHeight(), ycbcr,
-                              bufferSize, planes_info.planes[0].data);
+    compressionSuccess =
+        compressJpeg(gBuffer->getWidth(), gBuffer->getHeight(), ycbcr,
+                     stream->bufferSize, planes_info.planes[0].data);
 
-  status_t res = gBuffer->unlock();
-  if (res != NO_ERROR) {
-    ALOGE("Failed to unlock graphic buffer: %d", res);
+    status_t res = gBuffer->unlock();
+    if (res != NO_ERROR) {
+      ALOGE("Failed to unlock graphic buffer: %d", res);
+    }
+  } else {
+    compressionSuccess =
+        compressBlackJpeg(stream->width, stream->height, stream->bufferSize,
+                          planes_info.planes[0].data);
   }
   AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
   ALOGV("Unlocked buffers");
-  return success ? ndk::ScopedAStatus::ok()
-                 : cameraStatus(Status::INTERNAL_ERROR);
+  return compressionSuccess ? ndk::ScopedAStatus::ok()
+                            : cameraStatus(Status::INTERNAL_ERROR);
 }
 
 ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoImageStreamBuffer(
@@ -435,7 +449,15 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoImageStreamBuffer(
   mEglDisplayContext->makeCurrent();
   framebuffer->beforeDraw();
 
-  mEglTextureProgram->draw(mEglSurfaceTexture->updateTexture());
+  if (mEglSurfaceTexture->getCurrentBuffer() == nullptr) {
+    // If there's no current buffer, nothing was written to the surface and
+    // texture is not initialized yet. Let's render the framebuffer black
+    // instead of rendering the texture.
+    glClearColor(0.0f, 0.5f, 0.5f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+  } else {
+    mEglTextureProgram->draw(mEglSurfaceTexture->updateTexture());
+  }
   framebuffer->afterDraw();
 
   const std::chrono::nanoseconds after =

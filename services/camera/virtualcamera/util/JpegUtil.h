@@ -27,8 +27,14 @@ namespace companion {
 namespace virtualcamera {
 
 // Jpeg-compress image into the output buffer.
+// Returns true if the compression was successful, false otherwise.
 bool compressJpeg(int width, int height, const android_ycbcr& ycbcr,
                   size_t outBufferSize, void* outBuffer);
+
+// Jpeg-compress all-black image into the output buffer.
+// Returns true if the compression was successful, false otherwise.
+bool compressBlackJpeg(int width, int height, size_t outBufferSize,
+                       void* outBuffer);
 
 }  // namespace virtualcamera
 }  // namespace companion

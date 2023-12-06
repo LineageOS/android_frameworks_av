@@ -543,7 +543,7 @@ class Camera3Device :
 
         uint32_t mNextStreamConfigCounter = 1;
 
-        const bool mUseHalBufManager;
+        bool mUseHalBufManager = false;
         bool mIsReconfigurationQuerySupported;
 
         const bool mSupportOfflineProcessing;
@@ -942,6 +942,13 @@ class Camera3Device :
         void     setPaused(bool paused);
 
         /**
+         * Set Hal buffer manager behavior
+         * @param enabled Whether HAL buffer manager is enabled for the current session.
+         *
+         */
+        void setHalBufferManager(bool enabled);
+
+        /**
          * Wait until thread processes the capture request with settings'
          * android.request.id == requestId.
          *
@@ -1181,7 +1188,7 @@ class Camera3Device :
 
         std::map<int32_t, std::set<std::string>> mGroupIdPhysicalCameraMap;
 
-        const bool         mUseHalBufManager;
+        bool               mUseHalBufManager = false;
         const bool         mSupportCameraMute;
         const bool         mOverrideToPortrait;
         const bool         mSupportSettingsOverride;
@@ -1372,7 +1379,7 @@ class Camera3Device :
 
     // Whether HAL request buffers through requestStreamBuffers API
     bool mUseHalBufManager = false;
-
+    bool mSessionHalBufManager = false;
     // Lock to ensure requestStreamBuffers() callbacks are serialized
     std::mutex mRequestBufferInterfaceLock;
 
@@ -1407,6 +1414,8 @@ class Camera3Device :
     class RequestBufferStateMachine {
       public:
         status_t initialize(sp<camera3::StatusTracker> statusTracker);
+
+        status_t deInit();
 
         // Return if the state machine currently allows for requestBuffers
         // If the state allows for it, mRequestBufferOngoing will be set to true
