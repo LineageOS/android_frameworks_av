@@ -829,7 +829,7 @@ struct WakeUpCallbackData {
 
     void waitForFinished() {
         std::unique_lock <std::mutex> aLock(mutex);
-        conditionVariable.wait(aLock, [=] { return finished; });
+        conditionVariable.wait(aLock, [this] { return finished; });
     }
 
     // For signalling foreground test when callback finished
