@@ -1900,6 +1900,8 @@ protected:
             REQUIRES(ThreadBase_ThreadLoop) EXCLUDES_ThreadBase_Mutex;
     void setHalLatencyMode_l() final REQUIRES(mutex());
 
+    void threadLoop_exit() final REQUIRES(ThreadBase_ThreadLoop);
+
 private:
             // Do not request a specific mode by default
             audio_latency_mode_t mRequestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
