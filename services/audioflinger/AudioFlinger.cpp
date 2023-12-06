@@ -31,6 +31,7 @@
 #include <afutils/Permission.h>
 #include <afutils/PropertyUtils.h>
 #include <afutils/TypedLogger.h>
+#include <android-base/errors.h>
 #include <android-base/stringprintf.h>
 #include <android/media/IAudioPolicyService.h>
 #include <audiomanager/IAudioManager.h>
@@ -38,6 +39,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/Parcel.h>
 #include <cutils/properties.h>
+#include <com_android_media_audioserver.h>
 #include <media/AidlConversion.h>
 #include <media/AudioParameter.h>
 #include <media/AudioValidator.h>
@@ -208,6 +210,20 @@ static auto& getIAudioFlingerStatistics() {
 #pragma pop_macro("BINDER_METHOD_ENTRY")
 
     return methodStatistics;
+}
+
+namespace base {
+template <typename T>
+struct OkOrFail<std::optional<T>> {
+    using opt_t = std::optional<T>;
+    OkOrFail() = delete;
+    OkOrFail(const opt_t&) = delete;
+
+    static bool IsOk(const opt_t& opt) { return opt.has_value(); }
+    static T Unwrap(opt_t&& opt) { return std::move(opt.value()); }
+    static std::string ErrorMessage(const opt_t&) { return "Empty optional"; }
+    static void Fail(opt_t&&) {}
+};
 }
 
 class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
@@ -3597,11 +3613,20 @@ std::vector< sp<IAfEffectModule> > AudioFlinger::purgeOrphanEffectChains_l()
 void AudioFlinger::dumpToThreadLog_l(const sp<IAfThreadBase> &thread)
 {
     constexpr int THREAD_DUMP_TIMEOUT_MS = 2;
-    audio_utils::FdToStringOldImpl fdToString("- ", THREAD_DUMP_TIMEOUT_MS);
-    const int fd = fdToString.borrowFdUnsafe();
-    if (fd >= 0) {
-        thread->dump(fd, {} /* args */);
-        mThreadLog.logs(-1 /* time */, fdToString.closeAndGetString());
+    constexpr auto PREFIX = "- ";
+    if (com::android::media::audioserver::fdtostring_timeout_fix()) {
+        using ::android::audio_utils::FdToString;
+
+        auto writer = OR_RETURN(FdToString::createWriter(PREFIX));
+        thread->dump(writer.borrowFdUnsafe(), {} /* args */);
+        mThreadLog.logs(-1 /* time */, FdToString::closeWriterAndGetString(std::move(writer)));
+    } else {
+        audio_utils::FdToStringOldImpl fdToString("- ", THREAD_DUMP_TIMEOUT_MS);
+        const int fd = fdToString.borrowFdUnsafe();
+        if (fd >= 0) {
+            thread->dump(fd, {} /* args */);
+            mThreadLog.logs(-1 /* time */, fdToString.closeAndGetString());
+        }
     }
 }
 
