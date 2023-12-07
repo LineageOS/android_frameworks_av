@@ -31,14 +31,16 @@
 #include "flowgraph/Limiter.h"
 #include "flowgraph/MonoBlend.h"
 #include "flowgraph/MonoToMultiConverter.h"
-#include "flowgraph/SourceFloat.h"
 #include "flowgraph/RampLinear.h"
 #include "flowgraph/SinkFloat.h"
 #include "flowgraph/SinkI16.h"
 #include "flowgraph/SinkI24.h"
 #include "flowgraph/SinkI32.h"
+#include "flowgraph/SinkI8_24.h"
+#include "flowgraph/SourceFloat.h"
 #include "flowgraph/SourceI16.h"
 #include "flowgraph/SourceI24.h"
+#include "flowgraph/SourceI8_24.h"
 #include "flowgraph/resampler/IntegerRatio.h"
 
 using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
@@ -52,6 +54,9 @@ enum {
     PARAM_RESAMPLER_QUALITY
 };
 
+constexpr int kInt24Min = 0xff800000;
+constexpr int kInt24Max = 0x007fffff;
+
 constexpr int kBytesPerI24Packed = 3;
 
 constexpr int kNumSamples = 8;
@@ -59,14 +64,18 @@ constexpr std::array<float, kNumSamples> kInputFloat = {
     1.0f, 0.5f, -0.25f, -1.0f,
     0.0f, 53.9f, -87.2f, -1.02f};
 
-// Corresponding PCM values  as integers.
-constexpr std::array<int16_t, kNumSamples>  kExpectedI16 = {
+// Corresponding PCM values as integers.
+constexpr std::array<int16_t, kNumSamples> kExpectedI16 = {
     INT16_MAX, 1 << 14, INT16_MIN / 4, INT16_MIN,
     0, INT16_MAX, INT16_MIN, INT16_MIN};
 
-constexpr std::array<int32_t, kNumSamples>  kExpectedI32 = {
+constexpr std::array<int32_t, kNumSamples> kExpectedI32 = {
     INT32_MAX, 1 << 30, INT32_MIN / 4, INT32_MIN,
     0, INT32_MAX, INT32_MIN, INT32_MIN};
+
+constexpr std::array<int32_t, kNumSamples> kExpectedI8_24 = {
+    kInt24Max, 1 << 22, kInt24Min / 4, kInt24Min,
+    0, kInt24Max, kInt24Min, kInt24Min};
 
 // =================================== FLOAT to I16 ==============
 
@@ -215,6 +224,8 @@ TEST(test_flowgraph, module_mono_to_stereo) {
     EXPECT_EQ(input[0], output[1]);
     EXPECT_EQ(input[1], output[2]);
     EXPECT_EQ(input[1], output[3]);
+    EXPECT_EQ(input[2], output[4]);
+    EXPECT_EQ(input[2], output[5]);
 }
 
 TEST(test_flowgraph, module_ramp_linear) {
@@ -431,6 +442,70 @@ TEST(test_flowgraph, module_sinki16_multiple_reads) {
     ASSERT_EQ(kNumSamples / 2, numRead);
     for (int i = 0; i < numRead; i++) {
         EXPECT_EQ(kExpectedI16.at(i + kNumSamples / 2), output.at(i)) << ", i = " << i;
+    }
+}
+
+// =================================== FLOAT to Q8.23 ==============
+__attribute__((noinline))
+static int32_t clamp24FromFloat(float f)
+{
+    static const float scale = 1 << 23;
+    return (int32_t) lroundf(fmaxf(fminf(f * scale, scale - 1.f), -scale));
+}
+
+void local_convert_float_to_i8_24(const float *input,
+                                  int32_t *output,
+                                  int count) {
+    for (int i = 0; i < count; i++) {
+        *output++ = clamp24FromFloat(*input++);
+    }
+}
+
+TEST(test_flowgraph, local_convert_float_to_i8_24) {
+    std::array<int32_t, kNumSamples> output;
+    // Convert audio signal using the function.
+    output.fill(777);
+    local_convert_float_to_i8_24(kInputFloat.data(), output.data(), kNumSamples);
+    for (int i = 0; i < kNumSamples; i++) {
+        EXPECT_EQ(kExpectedI8_24.at(i), output.at(i)) << ", i = " << i;
+    }
+}
+
+TEST(test_flowgraph, module_sinkI8_24) {
+    std::array<int32_t, kNumSamples + 10> output; // larger than input
+
+    SourceFloat sourceFloat{2};
+    SinkI8_24 sinkI8_24{2};
+
+    sourceFloat.setData(kInputFloat.data(), kNumSamples);
+    sourceFloat.output.connect(&sinkI8_24.input);
+
+    output.fill(777);
+    int32_t numRead = sinkI8_24.read(output.data(), output.size());
+    ASSERT_EQ(kNumSamples, numRead);
+    for (int i = 0; i < numRead; i++) {
+        EXPECT_EQ(kExpectedI8_24.at(i), output.at(i)) << ", i = " << i;
+    }
+}
+
+TEST(test_flowgraph, module_sourceI8_24) {
+    static const int32_t input[] = {1 << 23, 1 << 22, -(1 << 21), -(1 << 23), 0, 1 << 25,
+            -(1 << 25)};
+    static const float expected[] = {1.0f, 0.5f, -0.25f, -1.0f, 0.0f, 4.0f, -4.0f};
+    float output[100];
+
+    SourceI8_24 sourceI8_24{1};
+    SinkFloat sinkFloat{1};
+
+    int numSamples = std::size(input);
+
+    sourceI8_24.setData(input, numSamples);
+    sourceI8_24.output.connect(&sinkFloat.input);
+
+    int32_t numRead = sinkFloat.read(output, numSamples);
+    ASSERT_EQ(numSamples, numRead);
+    for (int i = 0; i < numRead; i++) {
+        EXPECT_EQ(expected[i], output[i]) << ", i = " << i;
     }
 }
 
