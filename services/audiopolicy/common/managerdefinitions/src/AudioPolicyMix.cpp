@@ -272,12 +272,33 @@ status_t AudioPolicyMixCollection::getAudioPolicyMix(audio_devices_t deviceType,
     return BAD_VALUE;
 }
 
-void AudioPolicyMixCollection::closeOutput(sp<SwAudioOutputDescriptor> &desc)
+void AudioPolicyMixCollection::closeOutput(sp<SwAudioOutputDescriptor> &desc,
+                                           const SwAudioOutputCollection& allOutputs)
 {
     for (size_t i = 0; i < size(); i++) {
         sp<AudioPolicyMix> policyMix = itemAt(i);
-        if (policyMix->getOutput() == desc) {
-            policyMix->clearOutput();
+        if (policyMix->getOutput() != desc) {
+            continue;
+        }
+        policyMix->clearOutput();
+        if (policyMix->mRouteFlags != MIX_ROUTE_FLAG_RENDER) {
+            continue;
+        }
+        auto device = desc->supportedDevices().getDevice(
+                policyMix->mDeviceType, policyMix->mDeviceAddress, AUDIO_FORMAT_DEFAULT);
+        if (device == nullptr) {
+            // This must not happen
+            ALOGE("%s, the rerouted device is not found", __func__);
+            continue;
+        }
+        // Restore the policy mix mix output to the first opened output supporting a route to
+        // the mix device. This is because the current mix output can be changed to a direct output.
+        for (size_t j = 0; j < allOutputs.size(); ++j) {
+            if (allOutputs[i] != desc && !allOutputs[i]->isDuplicated() &&
+                allOutputs[i]->supportedDevices().contains(device)) {
+                policyMix->setOutput(allOutputs[i]);
+                break;
+            }
         }
     }
 }
@@ -333,13 +354,6 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
                 // using dynamic audio policy.
                 ALOGD("%s: Rejecting MMAP_NOIRQ request matched to loopback dynamic "
                       "audio policy mix.", __func__);
-                return INVALID_OPERATION;
-            }
-            if (mixDevice != nullptr) {
-                // TODO(b/301619865): Only disallow the device that doesn't support MMAP.
-                ALOGD("%s: Rejecting MMAP_NOIRQ request matched to dynamic audio policy "
-                      "mix pointing to device %s which the mmap support is unknown at this moment",
-                      __func__, mixDevice->toString(false).c_str());
                 return INVALID_OPERATION;
             }
         }
