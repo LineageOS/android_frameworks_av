@@ -24,6 +24,7 @@
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraProvider.h"
 #include "aidl/android/companion/virtualcamera/BnVirtualCameraService.h"
+#include "util/Permissions.h"
 
 namespace android {
 namespace companion {
@@ -34,7 +35,8 @@ class VirtualCameraService
     : public aidl::android::companion::virtualcamera::BnVirtualCameraService {
  public:
   VirtualCameraService(
-      std::shared_ptr<VirtualCameraProvider> virtualCameraProvider);
+      std::shared_ptr<VirtualCameraProvider> virtualCameraProvider,
+      const PermissionsProxy& permissionProxy = PermissionsProxy::get());
 
   // Register camera corresponding to the binder token.
   ndk::ScopedAStatus registerCamera(
@@ -67,6 +69,8 @@ class VirtualCameraService
   void disableTestCameraCmd(int out);
 
   std::shared_ptr<VirtualCameraProvider> mVirtualCameraProvider;
+
+  const PermissionsProxy& mPermissionProxy;
 
   std::mutex mLock;
   struct BinderTokenHash {

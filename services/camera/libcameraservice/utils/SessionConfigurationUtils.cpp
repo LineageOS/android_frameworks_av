@@ -34,6 +34,7 @@
 using android::camera3::OutputStreamInfo;
 using android::camera3::OutputStreamInfo;
 using android::hardware::camera2::ICameraDeviceUser;
+using aidl::android::hardware::camera::device::RequestTemplate;
 
 namespace android {
 namespace camera3 {
@@ -682,7 +683,8 @@ convertToHALStreamCombination(
         bool isCompositeJpegRDisabled,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
-        bool overrideForPerfClass, bool *earlyExit) {
+        bool overrideForPerfClass, metadata_vendor_id_t vendorTagId,
+        bool checkSessionParams, bool *earlyExit) {
     using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
     auto operatingMode = sessionConfiguration.getOperatingMode();
     binder::Status res = checkOperatingMode(operatingMode, deviceInfo,
@@ -875,6 +877,21 @@ convertToHALStreamCombination(
             }
         }
     }
+
+    if (checkSessionParams) {
+        const CameraMetadata &deviceInfo = getMetadata(logicalCameraId,
+                /*overrideForPerfClass*/false);
+        CameraMetadata filteredParams;
+
+        filterParameters(sessionConfiguration.getSessionParameters(), deviceInfo,
+                vendorTagId, filteredParams);
+
+        camera_metadata_t* metadata = const_cast<camera_metadata_t*>(filteredParams.getAndLock());
+        uint8_t *metadataP = reinterpret_cast<uint8_t*>(metadata);
+        streamConfiguration.sessionParams.metadata.assign(metadataP,
+                metadataP + get_camera_metadata_size(metadata));
+    }
+
     return binder::Status::ok();
 }
 
@@ -1047,6 +1064,92 @@ bool targetPerfClassPrimaryCamera(
     bool isPerfClassPrimaryCamera =
             perfClassPrimaryCameraIds.find(cameraId) != perfClassPrimaryCameraIds.end();
     return targetSdkVersion >= SDK_VERSION_S && isPerfClassPrimaryCamera;
+}
+
+binder::Status mapRequestTemplateFromClient(const std::string& cameraId, int templateId,
+        camera_request_template_t* tempId /*out*/) {
+    binder::Status ret = binder::Status::ok();
+
+    if (tempId == nullptr) {
+        ret = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "Camera %s: Invalid template argument", cameraId.c_str());
+        return ret;
+    }
+    switch(templateId) {
+        case ICameraDeviceUser::TEMPLATE_PREVIEW:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_PREVIEW;
+            break;
+        case ICameraDeviceUser::TEMPLATE_RECORD:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_VIDEO_RECORD;
+            break;
+        case ICameraDeviceUser::TEMPLATE_STILL_CAPTURE:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_STILL_CAPTURE;
+            break;
+        case ICameraDeviceUser::TEMPLATE_VIDEO_SNAPSHOT:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_VIDEO_SNAPSHOT;
+            break;
+        case ICameraDeviceUser::TEMPLATE_ZERO_SHUTTER_LAG:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_ZERO_SHUTTER_LAG;
+            break;
+        case ICameraDeviceUser::TEMPLATE_MANUAL:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_MANUAL;
+            break;
+        default:
+            ret = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "Camera %s: Template ID %d is invalid or not supported",
+                    cameraId.c_str(), templateId);
+            return ret;
+    }
+
+    return ret;
+}
+
+status_t mapRequestTemplateToAidl(camera_request_template_t templateId,
+        RequestTemplate* id /*out*/) {
+    switch (templateId) {
+        case CAMERA_TEMPLATE_PREVIEW:
+            *id = RequestTemplate::PREVIEW;
+            break;
+        case CAMERA_TEMPLATE_STILL_CAPTURE:
+            *id = RequestTemplate::STILL_CAPTURE;
+            break;
+        case CAMERA_TEMPLATE_VIDEO_RECORD:
+            *id = RequestTemplate::VIDEO_RECORD;
+            break;
+        case CAMERA_TEMPLATE_VIDEO_SNAPSHOT:
+            *id = RequestTemplate::VIDEO_SNAPSHOT;
+            break;
+        case CAMERA_TEMPLATE_ZERO_SHUTTER_LAG:
+            *id = RequestTemplate::ZERO_SHUTTER_LAG;
+            break;
+        case CAMERA_TEMPLATE_MANUAL:
+            *id = RequestTemplate::MANUAL;
+            break;
+        default:
+            // Unknown template ID, or this HAL is too old to support it
+            return BAD_VALUE;
+    }
+    return OK;
+}
+
+void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
+        int vendorTagId, CameraMetadata& dst) {
+    const CameraMetadata params(src);
+    camera_metadata_ro_entry_t availableSessionKeys = deviceInfo.find(
+            ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    CameraMetadata filteredParams(availableSessionKeys.count);
+    camera_metadata_t *meta = const_cast<camera_metadata_t *>(
+            filteredParams.getAndLock());
+    set_camera_metadata_vendor_id(meta, vendorTagId);
+    filteredParams.unlock(meta);
+    for (size_t i = 0; i < availableSessionKeys.count; i++) {
+        camera_metadata_ro_entry entry = params.find(
+                availableSessionKeys.data.i32[i]);
+        if (entry.count > 0) {
+            filteredParams.update(entry);
+        }
+    }
+    dst = std::move(filteredParams);
 }
 
 } // namespace SessionConfigurationUtils

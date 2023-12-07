@@ -312,10 +312,6 @@ private:
             /*out*/SurfaceMap* surfaceMap, /*out*/Vector<int32_t>* streamIds,
             /*out*/int32_t*  currentStreamId);
 
-    // Utility method that maps AIDL request templates.
-    binder::Status mapRequestTemplate(int templateId,
-            camera_request_template_t* tempId /*out*/);
-
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;
 

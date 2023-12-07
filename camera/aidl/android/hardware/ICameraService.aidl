@@ -22,6 +22,7 @@ import android.hardware.camera2.ICameraDeviceUser;
 import android.hardware.camera2.ICameraDeviceCallbacks;
 import android.hardware.camera2.ICameraInjectionCallback;
 import android.hardware.camera2.ICameraInjectionSession;
+import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.VendorTagDescriptor;
 import android.hardware.camera2.params.VendorTagDescriptorCache;
 import android.hardware.camera2.utils.ConcurrentCameraIdCombination;
@@ -261,4 +262,18 @@ interface ICameraService
     const int DEVICE_STATE_FOLDED = 4;
     const int DEVICE_STATE_LAST_FRAMEWORK_BIT = 0x80000000; // 1 << 31;
 
+    // Create a CaptureRequest metadata based on template id
+    CameraMetadataNative createDefaultRequest(@utf8InCpp String cameraId, int templateId);
+
+    /**
+      * Check whether a particular session configuration with optional session parameters
+      * has camera device support.
+      *
+      * @param cameraId The camera id to query session configuration on
+      * @param sessionConfiguration Specific session configuration to be verified.
+      * @return true  - in case the stream combination is supported.
+      *         false - in case there is no device support.
+      */
+    boolean isSessionConfigurationWithParametersSupported(@utf8InCpp String cameraId,
+            in SessionConfiguration sessionConfiguration);
 }

@@ -31,6 +31,7 @@
 #include "android/binder_auto_utils.h"
 #include "android/binder_libbinder.h"
 #include "binder/Status.h"
+#include "util/Permissions.h"
 #include "util/Util.h"
 
 using ::android::binder::Status;
@@ -54,6 +55,8 @@ Available commands:
  * enable_test_camera
  * disable_test_camera
 )";
+constexpr char kCreateVirtualDevicePermission[] =
+    "android.permission.CREATE_VIRTUAL_DEVICE";
 
 ndk::ScopedAStatus validateConfiguration(
     const VirtualCameraConfiguration& configuration) {
@@ -79,17 +82,26 @@ ndk::ScopedAStatus validateConfiguration(
 }  // namespace
 
 VirtualCameraService::VirtualCameraService(
-    std::shared_ptr<VirtualCameraProvider> virtualCameraProvider)
-    : mVirtualCameraProvider(virtualCameraProvider) {
+    std::shared_ptr<VirtualCameraProvider> virtualCameraProvider,
+    const PermissionsProxy& permissionProxy)
+    : mVirtualCameraProvider(virtualCameraProvider),
+      mPermissionProxy(permissionProxy) {
 }
 
 ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
     const VirtualCameraConfiguration& configuration, bool* _aidl_return) {
+  if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
+    ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
+          getpid(), getuid(), kCreateVirtualDevicePermission);
+    return ndk::ScopedAStatus::fromExceptionCode(EX_SECURITY);
+  }
+
   if (_aidl_return == nullptr) {
     return ndk::ScopedAStatus::fromServiceSpecificError(
         Status::EX_ILLEGAL_ARGUMENT);
   }
+
   *_aidl_return = true;
 
   auto status = validateConfiguration(configuration);
@@ -127,6 +139,12 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
 
 ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
     const ::ndk::SpAIBinder& token) {
+  if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
+    ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
+          getpid(), getuid(), kCreateVirtualDevicePermission);
+    return ndk::ScopedAStatus::fromExceptionCode(EX_SECURITY);
+  }
+
   std::lock_guard lock(mLock);
 
   auto it = mTokenToCameraName.find(token);
@@ -145,6 +163,12 @@ ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
 
 ndk::ScopedAStatus VirtualCameraService::getCameraId(
         const ::ndk::SpAIBinder& token, int32_t* _aidl_return) {
+  if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
+    ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
+          getpid(), getuid(), kCreateVirtualDevicePermission);
+    return ndk::ScopedAStatus::fromExceptionCode(EX_SECURITY);
+  }
+
   if (_aidl_return == nullptr) {
     return ndk::ScopedAStatus::fromServiceSpecificError(
             Status::EX_ILLEGAL_ARGUMENT);

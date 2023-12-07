@@ -299,6 +299,16 @@ struct TestAidlCameraDevice : public aidl::android::hardware::camera::device::Bn
     ::ndk::ScopedAStatus getTorchStrengthLevel(int32_t*) override {
         return ndk::ScopedAStatus::ok();
     }
+    ::ndk::ScopedAStatus constructDefaultRequestSettings(
+            ::aidl::android::hardware::camera::device::RequestTemplate,
+            ::aidl::android::hardware::camera::device::CameraMetadata*) override {
+        return ndk::ScopedAStatus::ok();
+    }
+    ::ndk::ScopedAStatus isStreamCombinationWithSettingsSupported(
+            const ::aidl::android::hardware::camera::device::StreamConfiguration&,
+            bool*) override {
+        return ndk::ScopedAStatus::ok();
+    }
 };
 
 /**
