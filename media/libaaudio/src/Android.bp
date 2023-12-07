@@ -41,10 +41,10 @@ tidy_errors = [
     "modernize-use-emplace",
     "modernize-use-equals-default",
     "modernize-use-equals-delete",
-    // "modernize-use-nodiscard", // found in aidl generated files
+    "modernize-use-nodiscard",
     "modernize-use-noexcept",
     "modernize-use-nullptr",
-    // "modernize-use-override", // found in aidl generated files
+    "modernize-use-override",
     // "modernize-use-trailing-return-type", // not necessarily more readable
     "modernize-use-transparent-functors",
     "modernize-use-uncaught-exceptions",
