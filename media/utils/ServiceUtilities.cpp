@@ -113,8 +113,9 @@ std::optional<AttributionSourceState> resolveAttributionSource(
     return std::optional<AttributionSourceState>{myAttributionSource};
 }
 
-static bool checkRecordingInternal(const AttributionSourceState& attributionSource,
-        const String16& msg, bool start, audio_source_t source) {
+    static bool checkRecordingInternal(const AttributionSourceState &attributionSource,
+                                       const uint32_t virtualDeviceId,
+                                       const String16 &msg, bool start, audio_source_t source) {
     // Okay to not track in app ops as audio server or media server is us and if
     // device is rooted security model is considered compromised.
     // system_server loses its RECORD_AUDIO permission when a secondary
@@ -126,7 +127,7 @@ static bool checkRecordingInternal(const AttributionSourceState& attributionSour
     // We specify a pid and uid here as mediaserver (aka MediaRecorder or StageFrightRecorder)
     // may open a record track on behalf of a client. Note that pid may be a tid.
     // IMPORTANT: DON'T USE PermissionCache - RUNTIME PERMISSIONS CHANGE.
-    const std::optional<AttributionSourceState> resolvedAttributionSource =
+    std::optional<AttributionSourceState> resolvedAttributionSource =
             resolveAttributionSource(attributionSource);
     if (!resolvedAttributionSource.has_value()) {
         return false;
@@ -135,6 +136,7 @@ static bool checkRecordingInternal(const AttributionSourceState& attributionSour
     const int32_t attributedOpCode = getOpForSource(source);
 
     permission::PermissionChecker permissionChecker;
+    resolvedAttributionSource.value().deviceId = virtualDeviceId;
     bool permitted = false;
     if (start) {
         permitted = (permissionChecker.checkPermissionForStartDataDeliveryFromDatasource(
@@ -149,13 +151,24 @@ static bool checkRecordingInternal(const AttributionSourceState& attributionSour
     return permitted;
 }
 
-bool recordingAllowed(const AttributionSourceState& attributionSource, audio_source_t source) {
-    return checkRecordingInternal(attributionSource, String16(), /*start*/ false, source);
+static constexpr int DEVICE_ID_DEFAULT = 0;
+
+bool recordingAllowed(const AttributionSourceState &attributionSource, audio_source_t source) {
+    return checkRecordingInternal(attributionSource, DEVICE_ID_DEFAULT, String16(), /*start*/ false,
+                                  source);
+}
+
+bool recordingAllowed(const AttributionSourceState &attributionSource,
+                      const uint32_t virtualDeviceId,
+                      audio_source_t source) {
+    return checkRecordingInternal(attributionSource, virtualDeviceId,
+                                  String16(), /*start*/ false, source);
 }
 
 bool startRecording(const AttributionSourceState& attributionSource, const String16& msg,
         audio_source_t source) {
-    return checkRecordingInternal(attributionSource, msg, /*start*/ true, source);
+    return checkRecordingInternal(attributionSource, DEVICE_ID_DEFAULT, msg, /*start*/ true,
+                                  source);
 }
 
 void finishRecording(const AttributionSourceState& attributionSource, audio_source_t source) {

@@ -39,6 +39,7 @@ cc_defaults {
         "libstagefright_foundation",
         "libutils",
         "libxml2",
+        "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
