@@ -560,6 +560,7 @@ private:
     int32_t mTunneledInputHeight;
     bool mTunneled;
     TunnelPeekState mTunnelPeekState;
+    bool mTunnelPeekEnabled;
 
     sp<IDescrambler> mDescrambler;
 
