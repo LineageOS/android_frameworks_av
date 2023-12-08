@@ -53,7 +53,7 @@ public:
     int32_t addFileDescriptor(const android::base::unique_fd& fd, int32_t sizeInBytes);
 
     /**
-     * Close current data file descriptor. The duplicated file descriptor will be close.
+     * Close current data file descriptor. The duplicated file descriptor will be closed.
      */
     void closeDataFileDescriptor();
 
