@@ -148,8 +148,8 @@ static const std::vector<uint8_t> kTestSessionId3{9, 0};
 class DrmSessionManagerTest : public ::testing::Test {
 public:
     DrmSessionManagerTest()
-        : mService(::ndk::SharedRefBase::make<ResourceManagerService>
-            (new FakeProcessInfo(), new FakeSystemCallback())),
+        : mService(ResourceManagerService::Create(
+                  new FakeProcessInfo(), new FakeSystemCallback())),
           mDrmSessionManager(new DrmSessionManager(mService)),
           mTestDrm1(::ndk::SharedRefBase::make<FakeDrm>(
                   kTestSessionId1, mDrmSessionManager)),

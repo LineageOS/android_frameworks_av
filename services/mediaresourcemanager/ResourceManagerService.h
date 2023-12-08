@@ -30,9 +30,10 @@
 #include <utils/String8.h>
 #include <utils/threads.h>
 
+#include "ResourceManagerServiceUtils.h"
+
 namespace android {
 
-class DeathNotifier;
 class ResourceObserverService;
 class ServiceLog;
 struct ProcessInfoInterface;
@@ -46,57 +47,6 @@ using ::aidl::android::media::MediaResourcePolicyParcel;
 using ::aidl::android::media::ClientInfoParcel;
 using ::aidl::android::media::ClientConfigParcel;
 
-typedef std::map<std::tuple<
-        MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>,
-        MediaResourceParcel> ResourceList;
-
-struct ResourceInfo {
-    uid_t uid;
-    int64_t clientId;
-    std::string name;
-    std::shared_ptr<IResourceManagerClient> client;
-    std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
-    ResourceList resources;
-    bool pendingRemoval{false};
-};
-
-/*
- * Resource request info that encapsulates
- *  - the calling/requesting process pid.
- *  - the resource requesting (to be reclaimed from others)
- */
-struct ResourceRequestInfo {
-    // uid of the calling/requesting process.
-    int mCallingPid = -1;
-    // resources requested.
-    const ::aidl::android::media::MediaResourceParcel* mResource;
-};
-
-/*
- * Structure that defines the Client - a possible target to relcaim from.
- * This encapsulates pid, uid of the process and the client.
- * based on the reclaim policy.
- */
-struct ClientInfo {
-    // pid of the process.
-    pid_t mPid;
-    // uid of the process.
-    uid_t mUid;
-    // Client to relcaim from.
-    std::shared_ptr<::aidl::android::media::IResourceManagerClient> mClient;
-    ClientInfo(
-        pid_t pid = -1,
-        uid_t uid = -1,
-        const std::shared_ptr<::aidl::android::media::IResourceManagerClient>& client = nullptr)
-        : mPid(pid),
-          mUid(uid),
-          mClient(client) {
-    }
-};
-
-typedef std::map<int64_t, ResourceInfo> ResourceInfos;
-typedef std::map<int, ResourceInfos> PidResourceInfosMap;
-
 class ResourceManagerService : public BnResourceManagerService {
 public:
     struct SystemCallbackInterface : public RefBase {
@@ -109,13 +59,20 @@ public:
     static char const *getServiceName() { return "media.resource_manager"; }
     static void instantiate();
 
-    virtual inline binder_status_t dump(
+        // Static creation methods.
+    static std::shared_ptr<ResourceManagerService> Create();
+    static std::shared_ptr<ResourceManagerService> Create(
+        const sp<ProcessInfoInterface>& processInfo,
+        const sp<SystemCallbackInterface>& systemResource);
+
+    virtual binder_status_t dump(
             int /*fd*/, const char** /*args*/, uint32_t /*numArgs*/);
 
     ResourceManagerService();
     explicit ResourceManagerService(const sp<ProcessInfoInterface> &processInfo,
             const sp<SystemCallbackInterface> &systemResource);
     virtual ~ResourceManagerService();
+
     void setObserverService(const std::shared_ptr<ResourceObserverService>& observerService);
 
     // IResourceManagerService interface
@@ -158,6 +115,7 @@ public:
 
 private:
     friend class ResourceManagerServiceTest;
+    friend class ResourceManagerServiceTestBase;
     friend class DeathNotifier;
     friend class OverrideProcessInfoDeathNotifier;
 
@@ -183,12 +141,12 @@ private:
     // Returns false with no change to client if there are no clients holding resources of this
     // type.
     bool getBiggestClient_l(int pid, MediaResource::Type type, MediaResource::SubType subType,
-                            uid_t& uid, std::shared_ptr<IResourceManagerClient> *client,
+                            ClientInfo& clientsInfo,
                             bool pendingRemovalOnly = false);
     // Same method as above, but with pendingRemovalOnly as true.
     bool getBiggestClientPendingRemoval_l(int pid, MediaResource::Type type,
-                                          MediaResource::SubType subType, uid_t& uid,
-                                          std::shared_ptr<IResourceManagerClient>* client);
+                                          MediaResource::SubType subType,
+                                          ClientInfo& clientsInfo);
 
     // A helper function that returns true if the callingPid has higher priority than pid.
     // Returns false otherwise.
@@ -199,11 +157,8 @@ private:
     void getClientForResource_l(const ResourceRequestInfo& resourceRequestInfo,
                                 std::vector<ClientInfo>& clientsInfo);
 
-    void onFirstAdded(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
-    void onLastRemoved(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
-
-    // Merge r2 into r1
-    void mergeResources(MediaResourceParcel& r1, const MediaResourceParcel& r2);
+    void onFirstAdded(const MediaResourceParcel& res, uid_t uid);
+    void onLastRemoved(const MediaResourceParcel& res, uid_t uid);
 
     // Get priority from process's pid
     bool getPriority_l(int pid, int* priority);
@@ -215,6 +170,12 @@ private:
     void pushReclaimAtom(const ClientInfoParcel& clientInfo,
                          const std::vector<ClientInfo>& targetClients,
                          bool reclaimed);
+
+    // Get the client for given pid and the clientId from the map
+    std::shared_ptr<IResourceManagerClient> getClient(int pid, const int64_t& clientId) const;
+
+    // Remove the client for given pid and the clientId from the map
+    bool removeClient(int pid, const int64_t& clientId);
 
     // The following utility functions are used only for testing by ResourceManagerServiceTest
     // Gets lowest priority process that has the specified resource type.
@@ -234,7 +195,6 @@ private:
     bool mSupportsMultipleSecureCodecs;
     bool mSupportsSecureWithNonSecureCodec;
     int32_t mCpuBoostCount;
-    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
     struct ProcessInfoOverride {
         std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
         std::shared_ptr<IResourceManagerClient> client;
