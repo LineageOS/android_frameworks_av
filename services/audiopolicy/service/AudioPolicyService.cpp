@@ -299,7 +299,11 @@ void AudioPolicyService::onFirstRef()
         AudioDeviceTypeAddrVector devices;
         bool hasSpatializer = mAudioPolicyManager->canBeSpatialized(&attr, nullptr, devices);
         if (hasSpatializer) {
+            // Unlock as Spatializer::create() will use the callback and acquire the
+            // AudioPolicyService_Mutex.
+            mLock.unlock();
             mSpatializer = Spatializer::create(this, effectsFactoryHal);
+            mLock.lock();
         }
         if (mSpatializer == nullptr) {
             // No spatializer created, signal the reason: NO_INIT a failure, OK means intended.
