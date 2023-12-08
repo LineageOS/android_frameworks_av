@@ -7608,6 +7608,23 @@ void DuplicatingThread::threadLoop_standby()
     }
 }
 
+void DuplicatingThread::threadLoop_exit()
+{
+    // Prevent calling the OutputTrack dtor in the DuplicatingThread dtor
+    // where other mutexes (i.e. AudioPolicyService_Mutex) may be held.
+    // Do so here in the threadLoop_exit().
+
+    SortedVector <sp<IAfOutputTrack>> localTracks;
+    {
+        audio_utils::lock_guard l(mutex());
+        localTracks = std::move(mOutputTracks);
+        mOutputTracks.clear();
+    }
+    localTracks.clear();
+    outputTracks.clear();
+    PlaybackThread::threadLoop_exit();
+}
+
 void DuplicatingThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     MixerThread::dumpInternals_l(fd, args);
