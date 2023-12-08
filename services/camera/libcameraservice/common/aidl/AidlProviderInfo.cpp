@@ -900,6 +900,54 @@ status_t AidlProviderInfo::AidlDeviceInfo3::createDefaultRequest(
     return res;
 }
 
+status_t AidlProviderInfo::AidlDeviceInfo3::getSessionCharacteristics(
+        const SessionConfiguration &configuration, bool overrideForPerfClass,
+        camera3::metadataGetter getMetadata, CameraMetadata *sessionCharacteristics) {
+    camera::device::StreamConfiguration streamConfiguration;
+    bool earlyExit = false;
+    auto res = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
+            mId, mCameraCharacteristics, mCompositeJpegRDisabled, getMetadata,
+            mPhysicalIds, streamConfiguration, overrideForPerfClass, mProviderTagid,
+            /*checkSessionParams*/true, &earlyExit);
+
+    if (!res.isOk()) {
+        return UNKNOWN_ERROR;
+    }
+
+    if (earlyExit) {
+        return BAD_VALUE;
+    }
+
+    const std::shared_ptr<camera::device::ICameraDevice> interface =
+            startDeviceInterface();
+
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+
+    aidl::android::hardware::camera::device::CameraMetadata chars;
+    ::ndk::ScopedAStatus ret =
+        interface->getSessionCharacteristics(streamConfiguration, &chars);
+    std::vector<uint8_t> &metadata = chars.metadata;
+
+    camera_metadata_t *buffer = reinterpret_cast<camera_metadata_t*>(metadata.data());
+    size_t expectedSize = metadata.size();
+    int resV = validate_camera_metadata_structure(buffer, &expectedSize);
+    if (resV == OK || resV == CAMERA_METADATA_VALIDATION_SHIFTED) {
+        set_camera_metadata_vendor_id(buffer, mProviderTagid);
+        *sessionCharacteristics = buffer;
+    } else {
+        ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (!ret.isOk()) {
+        ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.getMessage());
+        return mapToStatusT(ret);
+    }
+    return OK;
+}
+
 status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
         const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
         const std::set<std::string>& perfClassPrimaryCameraIds,

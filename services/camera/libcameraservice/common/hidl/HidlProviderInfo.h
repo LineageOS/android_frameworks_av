@@ -107,6 +107,7 @@ struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
                 const SessionConfiguration &/*configuration*/,
                 bool overrideForPerfClass, bool checkSessionParams,
                 bool *status/*status*/);
+
         sp<hardware::camera::device::V3_2::ICameraDevice> startDeviceInterface();
     };
 

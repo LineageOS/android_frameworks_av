@@ -55,7 +55,7 @@ tidy_errors = [
     "modernize-use-emplace",
     "modernize-use-equals-default",
     "modernize-use-equals-delete",
-    // "modernize-use-nodiscard", // Maybe add this in the future
+    "modernize-use-nodiscard",
     "modernize-use-noexcept",
     "modernize-use-nullptr",
     "modernize-use-override",

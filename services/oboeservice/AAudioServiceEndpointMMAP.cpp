@@ -76,7 +76,8 @@ namespace {
 const static std::map<audio_format_t, audio_format_t> NEXT_FORMAT_TO_TRY = {
         {AUDIO_FORMAT_PCM_FLOAT,         AUDIO_FORMAT_PCM_32_BIT},
         {AUDIO_FORMAT_PCM_32_BIT,        AUDIO_FORMAT_PCM_24_BIT_PACKED},
-        {AUDIO_FORMAT_PCM_24_BIT_PACKED, AUDIO_FORMAT_PCM_16_BIT}
+        {AUDIO_FORMAT_PCM_24_BIT_PACKED, AUDIO_FORMAT_PCM_8_24_BIT},
+        {AUDIO_FORMAT_PCM_8_24_BIT,      AUDIO_FORMAT_PCM_16_BIT}
 };
 
 audio_format_t getNextFormatToTry(audio_format_t curFormat) {
