@@ -383,5 +383,12 @@ status_t CameraOfflineSessionClient::stopInjection() {
     return OK;
 }
 
+status_t CameraOfflineSessionClient::injectSessionParams(
+        const hardware::camera2::impl::CameraMetadataNative& sessionParams) {
+    ALOGV("%s: This client doesn't support the injecting session parameters camera.",
+            __FUNCTION__);
+    (void)sessionParams;
+    return OK;
+}
 // ----------------------------------------------------------------------------
 }; // namespace android

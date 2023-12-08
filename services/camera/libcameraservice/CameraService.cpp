@@ -1092,6 +1092,39 @@ void CameraService::remapCameraIds(const TCameraIdRemapping& cameraIdRemapping) 
     }
 }
 
+Status CameraService::injectSessionParams(
+            const std::string& cameraId,
+            const CameraMetadata& sessionParams) {
+   if (!checkCallingPermission(toString16(sCameraInjectExternalCameraPermission))) {
+        const int pid = CameraThreadState::getCallingPid();
+        const int uid = CameraThreadState::getCallingUid();
+        ALOGE("%s: Permission Denial: can't inject session params pid=%d, uid=%d",
+                __FUNCTION__, pid, uid);
+        return STATUS_ERROR(ERROR_PERMISSION_DENIED,
+                "Permission Denial: no permission to inject session params");
+    }
+
+    std::unique_ptr<AutoConditionLock> serviceLockWrapper =
+            AutoConditionLock::waitAndAcquire(mServiceLockWrapper);
+
+    auto clientDescriptor = mActiveClientManager.get(cameraId);
+    if (clientDescriptor == nullptr) {
+        ALOGI("%s: No active client for camera id %s", __FUNCTION__, cameraId.c_str());
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                "No active client for camera id %s", cameraId.c_str());
+    }
+
+    sp<BasicClient> clientSp = clientDescriptor->getValue();
+    status_t res = clientSp->injectSessionParams(sessionParams);
+
+    if (res != OK) {
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                "Error injecting session params into camera \"%s\": %s (%d)",
+                cameraId.c_str(), strerror(-res), res);
+    }
+    return Status::ok();
+}
+
 std::vector<std::string> CameraService::findOriginalIdsForRemappedCameraId(
     const std::string& inputCameraId, int clientUid) {
     std::string packageName = getPackageNameFromUid(clientUid);
