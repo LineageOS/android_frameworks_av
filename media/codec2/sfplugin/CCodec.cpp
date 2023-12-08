@@ -45,6 +45,7 @@
 #include <media/stagefright/CCodec.h>
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/MediaCodecMetricsConstants.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/RenderedFrameInfo.h>
 #include <utils/NativeHandle.h>
@@ -428,6 +429,10 @@ public:
 
     android_dataspace getDataspace() override {
         return mNode->getDataspace();
+    }
+
+    uint32_t getPixelFormat() override {
+        return mNode->getPixelFormat();
     }
 
 private:
@@ -1538,6 +1543,9 @@ void CCodec::configure(const sp<AMessage> &msg) {
 
     config->queryConfiguration(comp);
 
+    mMetrics = new AMessage;
+    mChannel->resetBuffersPixelFormat((config->mDomain & Config::IS_ENCODER) ? true : false);
+
     mCallback->onComponentConfigured(config->mInputFormat, config->mOutputFormat);
 }
 
@@ -2154,7 +2162,7 @@ void CCodec::signalResume() {
     }
 
     std::map<size_t, sp<MediaCodecBuffer>> clientInputBuffers;
-    status_t err = mChannel->prepareInitialInputBuffers(&clientInputBuffers);
+    status_t err = mChannel->prepareInitialInputBuffers(&clientInputBuffers, true);
     if (err != OK) {
         if (err == NO_MEMORY) {
             // NO_MEMORY happens here when all the buffers are still
@@ -2177,7 +2185,6 @@ void CCodec::signalResume() {
         const std::unique_ptr<Config> &config = *configLocked;
         return config->mBuffersBoundToCodec;
     }());
-
     {
         Mutexed<State>::Locked state(mState);
         if (state->get() != RESUMING) {
@@ -2520,6 +2527,21 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
             mChannel->onWorkDone(
                     std::move(work), outputFormat, initData ? initData.get() : nullptr);
+            // log metrics to MediaCodec
+            if (mMetrics->countEntries() == 0) {
+                Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+                const std::unique_ptr<Config> &config = *configLocked;
+                uint32_t pf = PIXEL_FORMAT_UNKNOWN;
+                if (!config->mInputSurface) {
+                    pf = mChannel->getBuffersPixelFormat(config->mDomain & Config::IS_ENCODER);
+                } else {
+                    pf = config->mInputSurface->getPixelFormat();
+                }
+                if (pf != PIXEL_FORMAT_UNKNOWN) {
+                    mMetrics->setInt64(kCodecPixelFormat, pf);
+                    mCallback->onMetricsUpdated(mMetrics);
+                }
+            }
             break;
         }
         case kWhatWatch: {

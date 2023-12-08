@@ -70,6 +70,7 @@
 #include "utils/TraceHFR.h"
 
 #include <algorithm>
+#include <optional>
 #include <tuple>
 
 using namespace android::camera3;
@@ -3038,6 +3039,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mPrevTriggers(0),
         mFrameNumber(0),
         mLatestRequestId(NAME_NOT_FOUND),
+        mLatestFailedRequestId(NAME_NOT_FOUND),
         mCurrentAfTriggerId(0),
         mCurrentPreCaptureTriggerId(0),
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
@@ -3288,7 +3290,7 @@ status_t Camera3Device::RequestThread::waitUntilRequestProcessed(
     ATRACE_CALL();
     Mutex::Autolock l(mLatestRequestMutex);
     status_t res;
-    while (mLatestRequestId != requestId) {
+    while (mLatestRequestId != requestId && mLatestFailedRequestId != requestId) {
         nsecs_t startTime = systemTime();
 
         res = mLatestRequestSignal.waitRelative(mLatestRequestMutex, timeout);
@@ -4017,8 +4019,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 sp<Camera3Device> parent = mParent.promote();
                 if (parent != nullptr) {
                     const std::string& streamCameraId = outputStream->getPhysicalCameraId();
+                    // Consider the case where clients are sending a single logical camera request
+                    // to physical output/outputs
+                    bool singleRequest = captureRequest->mSettingsList.size() == 1;
                     for (const auto& settings : captureRequest->mSettingsList) {
-                        if ((streamCameraId.empty() &&
+                        if (((streamCameraId.empty() || singleRequest) &&
                                 parent->getId() == settings.cameraId) ||
                                 streamCameraId == settings.cameraId) {
                             outputStream->fireBufferRequestForFrameNumber(
@@ -4361,6 +4366,12 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
                 listener->notifyError(
                         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST,
                         captureRequest->mResultExtras);
+            }
+            {
+                Mutex::Autolock al(mLatestRequestMutex);
+
+                mLatestFailedRequestId = captureRequest->mResultExtras.requestId;
+                mLatestRequestSignal.signal();
             }
         }
 
@@ -5392,9 +5403,13 @@ void Camera3Device::getOfflineStreamIds(std::vector<int> *offlineStreamIds) {
 }
 
 status_t Camera3Device::setRotateAndCropAutoBehavior(
-    camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) {
+    camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue, bool fromHal) {
     ATRACE_CALL();
-    Mutex::Autolock il(mInterfaceLock);
+    // We shouldn't hold mInterfaceLock when called as an effect of a HAL
+    // callback since this can lead to a deadlock : b/299348355.
+    // mLock still protects state.
+    std::optional<Mutex::Autolock> maybeMutex =
+        fromHal ? std::nullopt : std::optional<Mutex::Autolock>(mInterfaceLock);
     Mutex::Autolock l(mLock);
     if (mRequestThread == nullptr) {
         return INVALID_OPERATION;

@@ -363,6 +363,7 @@ struct ColorConverter::Coeffs {
     int32_t _g_u;
     int32_t _g_v;
     int32_t _b_u;
+    int32_t _c16;  // 16 for limited range matrix, 0 for full rance
 };
 
 /*
@@ -425,18 +426,18 @@ namespace {
  *
  * clip range 8-bit: [-277, 535], 10-bit: [-1111, 2155]
  */
-const struct ColorConverter::Coeffs BT601_FULL      = { 256, 359,  88, 183, 454 };
-const struct ColorConverter::Coeffs BT601_LIMITED   = { 298, 409, 100, 208, 516 };
-const struct ColorConverter::Coeffs BT601_LTD_10BIT = { 299, 410, 101, 209, 518 };
+const struct ColorConverter::Coeffs BT601_FULL      = { 256, 359,  88, 183, 454, 0 };
+const struct ColorConverter::Coeffs BT601_LIMITED   = { 298, 409, 100, 208, 516, 16 };
+const struct ColorConverter::Coeffs BT601_LTD_10BIT = { 299, 410, 101, 209, 518, 16 };
 
 /**
  * BT.709:  K_R = 0.2126; K_B = 0.0722
  *
  * clip range 8-bit: [-289, 547], 10-bit: [-1159, 2202]
  */
-const struct ColorConverter::Coeffs BT709_FULL      = { 256, 403,  48, 120, 475 };
-const struct ColorConverter::Coeffs BT709_LIMITED   = { 298, 459,  55, 136, 541 };
-const struct ColorConverter::Coeffs BT709_LTD_10BIT = { 290, 460,  55, 137, 542 };
+const struct ColorConverter::Coeffs BT709_FULL      = { 256, 403,  48, 120, 475, 0 };
+const struct ColorConverter::Coeffs BT709_LIMITED   = { 298, 459,  55, 136, 541, 16 };
+const struct ColorConverter::Coeffs BT709_LTD_10BIT = { 299, 460,  55, 137, 542, 16 };
 
 /**
  * BT.2020:  K_R = 0.2627; K_B = 0.0593
@@ -445,9 +446,9 @@ const struct ColorConverter::Coeffs BT709_LTD_10BIT = { 290, 460,  55, 137, 542 
  *
  * This is the largest clip range.
  */
-const struct ColorConverter::Coeffs BT2020_FULL      = { 256, 377,  42, 146, 482 };
-const struct ColorConverter::Coeffs BT2020_LIMITED   = { 298, 430,  48, 167, 548 };
-const struct ColorConverter::Coeffs BT2020_LTD_10BIT = { 299, 431,  48, 167, 550 };
+const struct ColorConverter::Coeffs BT2020_FULL      = { 256, 377,  42, 146, 482, 0 };
+const struct ColorConverter::Coeffs BT2020_LIMITED   = { 298, 430,  48, 167, 548, 16 };
+const struct ColorConverter::Coeffs BT2020_LTD_10BIT = { 299, 431,  48, 167, 550, 16 };
 
 constexpr int CLIP_RANGE_MIN_8BIT = -294;
 constexpr int CLIP_RANGE_MAX_8BIT = 552;
@@ -781,7 +782,7 @@ status_t ColorConverter::convertCbYCrY(
     signed _neg_g_v = -matrix->_g_v;
     signed _r_v = matrix->_r_v;
     signed _y = matrix->_y;
-    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
+    signed _c16 = matrix->_c16;
 
     uint8_t *kAdjustedClip = initClip();
 
@@ -1257,6 +1258,7 @@ status_t ColorConverter::convertYUVMediaImage(
     signed _neg_g_v = -matrix->_g_v;
     signed _r_v = matrix->_r_v;
     signed _y = matrix->_y;
+    signed _c16 = matrix->_c16;
 
     uint8_t *dst_ptr = (uint8_t *)dst.mBits
             + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
@@ -1275,13 +1277,12 @@ status_t ColorConverter::convertYUVMediaImage(
 
     //TODO: optimize for chroma sampling, reading and writing multiple pixels
     //      within the same loop
-    signed _c16 = 0;
+
     void *kAdjustedClip = nullptr;
     if (mSrcImage->getBitDepth() != ImageBitDepth8) {
         ALOGE("BitDepth != 8 for MediaImage2");
         return ERROR_UNSUPPORTED;
     }
-    _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
     kAdjustedClip = initClip();
 
     auto writeToDst = getWriteToDst(mDstFormat, (void *)kAdjustedClip);
@@ -1388,7 +1389,7 @@ status_t ColorConverter::convertYUV420Planar16(
     signed _neg_g_v = -matrix->_g_v;
     signed _r_v = matrix->_r_v;
     signed _y = matrix->_y;
-    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 16 : 0;
+    signed _c16 = matrix->_c16;
 
     uint8_t *kAdjustedClip = initClip();
 
@@ -1463,7 +1464,7 @@ status_t ColorConverter::convertYUVP010ToRGBA1010102(
     signed _neg_g_v = -matrix->_g_v;
     signed _r_v = matrix->_r_v;
     signed _y = matrix->_y;
-    signed _c16 = mSrcColorSpace.mRange == ColorUtils::kColorRangeLimited ? 64 : 0;
+    signed _c64 = matrix->_c16 * 4;
 
     uint16_t *kAdjustedClip10bit = initClip10Bit();
 
@@ -1483,8 +1484,8 @@ status_t ColorConverter::convertYUVP010ToRGBA1010102(
     for (size_t y = 0; y < src.cropHeight(); ++y) {
         for (size_t x = 0; x < src.cropWidth(); x += 2) {
             signed y1, y2, u, v;
-            y1 = (src_y[x] >> 6) - _c16;
-            y2 = (src_y[x + 1] >> 6) - _c16;
+            y1 = (src_y[x] >> 6) - _c64;
+            y2 = (src_y[x + 1] >> 6) - _c64;
             u = int(src_uv[x] >> 6) - 512;
             v = int(src_uv[x + 1] >> 6) - 512;
 

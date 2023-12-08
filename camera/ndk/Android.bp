@@ -178,6 +178,7 @@ cc_test {
     shared_libs: [
         "libcamera2ndk_vendor",
         "libcamera_metadata",
+        "libhidlbase",
         "libmediandk",
         "libnativewindow",
         "libutils",
@@ -187,6 +188,7 @@ cc_test {
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
+        "android.hidl.token@1.0",
     ],
     cflags: [
         "-D__ANDROID_VNDK__",

@@ -1232,6 +1232,19 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, BitPerfectPlayback) {
     EXPECT_FALSE(isBitPerfect);
     EXPECT_EQ(bitPerfectOutput, output);
 
+    const audio_attributes_t dtmfAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_UNKNOWN,
+            .usage = AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING,
+    };
+    audio_io_handle_t dtmfOutput = AUDIO_IO_HANDLE_NONE;
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    portId = AUDIO_PORT_HANDLE_NONE;
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            48000, AUDIO_OUTPUT_FLAG_NONE, &dtmfOutput, &portId, dtmfAttr,
+            AUDIO_SESSION_NONE, anotherUid, &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_EQ(bitPerfectOutput, dtmfOutput);
+
     // When configuration matches preferred mixer attributes, which is bit-perfect, but the client
     // is not the owner of preferred mixer attributes, the playback will not be bit-perfect.
     getOutputForAttr(&selectedDeviceId, bitPerfectFormat, bitPerfectChannelMask,
