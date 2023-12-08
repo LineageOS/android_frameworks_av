@@ -117,6 +117,11 @@ struct C2SyncVariables {
      */
     void notifyAll();
 
+    /**
+     * Invalide current sync variables on the death of the other process.
+     */
+    void invalidate();
+
     C2SyncVariables() {}
 
 private:
