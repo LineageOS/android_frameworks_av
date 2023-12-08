@@ -62,3 +62,10 @@ flag {
     description: "Enable session parameter injection via reconfiguration"
     bug: "308984721"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_ae_mode_low_light_boost"
+     description: "An AE mode that enables increased brightening in low light scenes"
+     bug: "312803148"
+}
