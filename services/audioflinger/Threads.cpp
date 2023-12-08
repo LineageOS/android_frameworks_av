@@ -7881,6 +7881,15 @@ NO_THREAD_SAFETY_ANALYSIS
     }
 }
 
+void SpatializerThread::threadLoop_exit()
+{
+    // The Spatializer EffectHandle must be released on the PlaybackThread
+    // threadLoop() to prevent lock inversion in the SpatializerThread dtor.
+    mFinalDownMixer.clear();
+
+    PlaybackThread::threadLoop_exit();
+}
+
 // ----------------------------------------------------------------------------
 //      Record
 // ----------------------------------------------------------------------------
