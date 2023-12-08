@@ -284,6 +284,11 @@ void C2SyncVariables::notifyAll() {
     this->unlock();
 }
 
+void C2SyncVariables::invalidate() {
+    mCond++;
+    (void) syscall(__NR_futex, &mCond, FUTEX_REQUEUE, INT_MAX, (void *)INT_MAX, &mLock, 0);
+}
+
 int C2SyncVariables::signal() {
     mCond++;
 
