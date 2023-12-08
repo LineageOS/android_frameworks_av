@@ -208,9 +208,9 @@ class ResourceManagerServiceFuzzer {
         return nullptr;
     }
 
-    shared_ptr<ResourceManagerService> mService =
-        ::ndk::SharedRefBase::make<ResourceManagerService>(new TestProcessInfo(),
-                                                           new TestSystemCallback());
+    shared_ptr<ResourceManagerService> mService = ResourceManagerService::Create(
+            new TestProcessInfo(),
+            new TestSystemCallback());
     FuzzedDataProvider* mFuzzedDataProvider = nullptr;
 };
 
