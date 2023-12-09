@@ -25,6 +25,7 @@
 #include <sys/time.h>
 #include <dlfcn.h>
 
+#include <android/content/pm/IPackageManagerNative.h>
 #include <audio_utils/clock.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
@@ -216,6 +217,27 @@ static void destroyAudioPolicyManager(AudioPolicyInterface *interface)
 {
     delete interface;
 }
+
+namespace {
+int getTargetSdkForPackageName(std::string_view packageName) {
+    const auto binder = defaultServiceManager()->checkService(String16{"package_native"});
+    int targetSdk = -1;
+    if (binder != nullptr) {
+        const auto pm = interface_cast<content::pm::IPackageManagerNative>(binder);
+        if (pm != nullptr) {
+            const auto status = pm->getTargetSdkVersionForPackage(
+                    String16{packageName.data(), packageName.size()}, &targetSdk);
+            ALOGI("Capy check package %s, sdk %d", packageName.data(), targetSdk);
+            return status.isOk() ? targetSdk : -1;
+        }
+    }
+    return targetSdk;
+}
+
+bool doesPackageTargetAtLeastU(std::string_view packageName) {
+    return getTargetSdkForPackageName(packageName) >= __ANDROID_API_U__;
+}
+} // anonymous
 // ----------------------------------------------------------------------------
 
 AudioPolicyService::AudioPolicyService()
@@ -1927,10 +1949,14 @@ void AudioPolicyService::OpRecordAudioMonitor::onFirstRef()
     checkOp();
     mOpCallback = new RecordAudioOpCallback(this);
     ALOGV("start watching op %d for %s", mAppOp, mAttributionSource.toString().c_str());
+    int flags = doesPackageTargetAtLeastU(
+            mAttributionSource.packageName.value_or("")) ?
+            AppOpsManager::WATCH_FOREGROUND_CHANGES : 0;
     // TODO: We need to always watch AppOpsManager::OP_RECORD_AUDIO too
     // since it controls the mic permission for legacy apps.
     mAppOpsManager.startWatchingMode(mAppOp, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
         mAttributionSource.packageName.value_or(""))),
+        flags,
         mOpCallback);
 }
 

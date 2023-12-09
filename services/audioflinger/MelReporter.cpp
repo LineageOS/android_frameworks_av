@@ -38,24 +38,21 @@ bool MelReporter::activateHalSoundDoseComputation(const std::string& module,
 
     ndk::SpAIBinder soundDoseBinder;
     if (device->getSoundDoseInterface(module, &soundDoseBinder) != OK) {
-        ALOGW("%s: HAL cannot provide sound dose interface for module %s, use internal MEL",
+        ALOGW("%s: HAL cannot provide sound dose interface for module %s",
               __func__, module.c_str());
-        activateInternalSoundDoseComputation();
         return false;
     }
 
     if (soundDoseBinder == nullptr) {
-         ALOGW("%s: HAL doesn't implement a sound dose interface for module %s, use internal MEL",
+         ALOGW("%s: HAL doesn't implement a sound dose interface for module %s",
               __func__, module.c_str());
-        activateInternalSoundDoseComputation();
         return false;
     }
 
     std::shared_ptr<ISoundDose> soundDoseInterface = ISoundDose::fromBinder(soundDoseBinder);
 
-    if (!mSoundDoseManager->setHalSoundDoseInterface(soundDoseInterface)) {
+    if (!mSoundDoseManager->setHalSoundDoseInterface(module, soundDoseInterface)) {
         ALOGW("%s: cannot activate HAL MEL reporting for module %s", __func__, module.c_str());
-        activateInternalSoundDoseComputation();
         return false;
     }
 
@@ -73,35 +70,14 @@ void MelReporter::activateInternalSoundDoseComputation() {
         mUseHalSoundDoseInterface = false;
     }
 
-    mSoundDoseManager->setHalSoundDoseInterface(nullptr);
+    // reset the HAL interfaces and use internal MELs
+    mSoundDoseManager->resetHalSoundDoseInterfaces();
 }
 
 void MelReporter::onFirstRef() {
     mAfMelReporterCallback->getPatchCommandThread()->addListener(this);
-}
 
-bool MelReporter::shouldComputeMelForDeviceType(audio_devices_t device) {
-    if (!mSoundDoseManager->isCsdEnabled()) {
-        ALOGV("%s csd is disabled", __func__);
-        return false;
-    }
-    if (mSoundDoseManager->forceComputeCsdOnAllDevices()) {
-        return true;
-    }
-
-    switch (device) {
-        case AUDIO_DEVICE_OUT_WIRED_HEADSET:
-        case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
-        // TODO(b/278265907): enable A2DP when we can distinguish A2DP headsets
-        // case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
-        case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
-        case AUDIO_DEVICE_OUT_USB_HEADSET:
-        case AUDIO_DEVICE_OUT_BLE_HEADSET:
-        case AUDIO_DEVICE_OUT_BLE_BROADCAST:
-            return true;
-        default:
-            return false;
-    }
+    mSoundDoseManager = sp<SoundDoseManager>::make(sp<IMelReporterCallback>::fromExisting(this));
 }
 
 void MelReporter::updateMetadataForCsd(audio_io_handle_t streamHandle,
@@ -127,16 +103,17 @@ void MelReporter::updateMetadataForCsd(audio_io_handle_t streamHandle,
     }
 
     auto activeMelPatchIt = mActiveMelPatches.find(activeMelPatchId.value());
-    if (activeMelPatchIt != mActiveMelPatches.end()
-        && shouldActivateCsd != activeMelPatchIt->second.csdActive) {
-        if (activeMelPatchIt->second.csdActive) {
-            ALOGV("%s should not compute CSD for stream handle %d", __func__, streamHandle);
-            stopMelComputationForPatch_l(activeMelPatchIt->second);
-        } else {
-            ALOGV("%s should compute CSD for stream handle %d", __func__, streamHandle);
-            startMelComputationForActivePatch_l(activeMelPatchIt->second);
+    if (activeMelPatchIt != mActiveMelPatches.end()) {
+        if (shouldActivateCsd != activeMelPatchIt->second.csdActive) {
+            if (activeMelPatchIt->second.csdActive) {
+                ALOGV("%s should not compute CSD for stream handle %d", __func__, streamHandle);
+                stopMelComputationForPatch_l(activeMelPatchIt->second);
+            } else {
+                ALOGV("%s should compute CSD for stream handle %d", __func__, streamHandle);
+                startMelComputationForActivePatch_l(activeMelPatchIt->second);
+            }
+            activeMelPatchIt->second.csdActive = shouldActivateCsd;
         }
-        activeMelPatchIt->second.csdActive = shouldActivateCsd;
     }
 }
 
@@ -159,23 +136,28 @@ void MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
     audio_io_handle_t streamHandle = patch.mAudioPatch.sources[0].ext.mix.handle;
     ActiveMelPatch newPatch;
     newPatch.streamHandle = streamHandle;
+    newPatch.csdActive = false;
     for (size_t i = 0; i < patch.mAudioPatch.num_sinks; ++i) {
-        if (patch.mAudioPatch.sinks[i].type == AUDIO_PORT_TYPE_DEVICE
-            && shouldComputeMelForDeviceType(patch.mAudioPatch.sinks[i].ext.device.type)) {
+        if (patch.mAudioPatch.sinks[i].type == AUDIO_PORT_TYPE_DEVICE &&
+                mSoundDoseManager->shouldComputeCsdForDeviceType(
+                        patch.mAudioPatch.sinks[i].ext.device.type)) {
             audio_port_handle_t deviceId = patch.mAudioPatch.sinks[i].id;
-            newPatch.deviceHandles.push_back(deviceId);
+            bool shouldComputeCsd = mSoundDoseManager->shouldComputeCsdForDeviceWithAddress(
+                    patch.mAudioPatch.sinks[i].ext.device.type,
+                    patch.mAudioPatch.sinks[i].ext.device.address);
+            newPatch.deviceStates.push_back({deviceId, shouldComputeCsd});
+            newPatch.csdActive |= shouldComputeCsd;
             AudioDeviceTypeAddr adt{patch.mAudioPatch.sinks[i].ext.device.type,
                                     patch.mAudioPatch.sinks[i].ext.device.address};
             mSoundDoseManager->mapAddressToDeviceId(adt, deviceId);
         }
     }
 
-    if (!newPatch.deviceHandles.empty()) {
+    if (!newPatch.deviceStates.empty() && newPatch.csdActive) {
         audio_utils::lock_guard _afl(mAfMelReporterCallback->mutex());  // AudioFlinger_Mutex
         audio_utils::lock_guard _l(mutex());
         ALOGV("%s add patch handle %d to active devices", __func__, handle);
         startMelComputationForActivePatch_l(newPatch);
-        newPatch.csdActive = true;
         mActiveMelPatches[handle] = newPatch;
     }
 }
@@ -189,18 +171,41 @@ NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
         return;
     }
 
-    for (const auto& deviceHandle : patch.deviceHandles) {
-        ++mActiveDevices[deviceHandle];
-        ALOGI("%s add stream %d that uses device %d for CSD, nr of streams: %d", __func__,
-              patch.streamHandle, deviceHandle, mActiveDevices[deviceHandle]);
+    for (const auto& device : patch.deviceStates) {
+        if (device.second) {
+            ++mActiveDevices[device.first];
+            ALOGI("%s add stream %d that uses device %d for CSD, nr of streams: %d", __func__,
+                  patch.streamHandle, device.first, mActiveDevices[device.first]);
 
-        if (outputThread != nullptr && !useHalSoundDoseInterface_l()) {
-            outputThread->startMelComputation_l(mSoundDoseManager->getOrCreateProcessorForDevice(
-                deviceHandle,
-                patch.streamHandle,
-                outputThread->sampleRate(),
-                outputThread->channelCount(),
-                outputThread->format()));
+            if (outputThread != nullptr && !useHalSoundDoseInterface_l()) {
+                outputThread->startMelComputation_l(
+                        mSoundDoseManager->getOrCreateProcessorForDevice(
+                                device.first,
+                                patch.streamHandle,
+                                outputThread->sampleRate(),
+                                outputThread->channelCount(),
+                                outputThread->format()));
+            }
+        }
+    }
+}
+
+void MelReporter::startMelComputationForDeviceId(audio_port_handle_t deviceId) {
+    ALOGV("%s(%d)", __func__, deviceId);
+    audio_utils::lock_guard _laf(mAfMelReporterCallback->mutex());
+    audio_utils::lock_guard _l(mutex());
+
+    for (auto& activeMelPatch : mActiveMelPatches) {
+        bool csdActive = false;
+        for (auto& device: activeMelPatch.second.deviceStates) {
+            if (device.first == deviceId && !device.second) {
+                device.second = true;
+            }
+            csdActive |= device.second;
+        }
+        if (csdActive && !activeMelPatch.second.csdActive) {
+            activeMelPatch.second.csdActive = csdActive;
+            startMelComputationForActivePatch_l(activeMelPatch.second);
         }
     }
 }
@@ -240,6 +245,9 @@ sp<media::ISoundDose> MelReporter::getSoundDoseInterface(
 void MelReporter::stopInternalMelComputation() {
     ALOGV("%s", __func__);
     audio_utils::lock_guard _l(mutex());
+    if (mUseHalSoundDoseInterface) {
+        return;
+    }
     mActiveMelPatches.clear();
     mUseHalSoundDoseInterface = true;
 }
@@ -247,28 +255,46 @@ void MelReporter::stopInternalMelComputation() {
 void MelReporter::stopMelComputationForPatch_l(const ActiveMelPatch& patch)
 NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
 {
-    if (!patch.csdActive) {
-        // no need to stop CSD inactive patches
-        return;
-    }
-
     auto outputThread = mAfMelReporterCallback->checkOutputThread_l(patch.streamHandle);
 
     ALOGV("%s: stop MEL for stream id: %d", __func__, patch.streamHandle);
-    for (const auto& deviceId : patch.deviceHandles) {
-        if (mActiveDevices[deviceId] > 0) {
-            --mActiveDevices[deviceId];
-            if (mActiveDevices[deviceId] == 0) {
+    for (const auto& device : patch.deviceStates) {
+        if (mActiveDevices[device.first] > 0) {
+            --mActiveDevices[device.first];
+            if (mActiveDevices[device.first] == 0) {
                 // no stream is using deviceId anymore
-                ALOGI("%s removing device %d from active CSD devices", __func__, deviceId);
-                mSoundDoseManager->clearMapDeviceIdEntries(deviceId);
+                ALOGI("%s removing device %d from active CSD devices", __func__, device.first);
+                mSoundDoseManager->clearMapDeviceIdEntries(device.first);
             }
         }
     }
 
+    mSoundDoseManager->removeStreamProcessor(patch.streamHandle);
     if (outputThread != nullptr && !useHalSoundDoseInterface_l()) {
         outputThread->stopMelComputation_l();
     }
+}
+
+void MelReporter::stopMelComputationForDeviceId(audio_port_handle_t deviceId) {
+    ALOGV("%s(%d)", __func__, deviceId);
+    audio_utils::lock_guard _laf(mAfMelReporterCallback->mutex());
+    audio_utils::lock_guard _l(mutex());
+
+    for (auto& activeMelPatch : mActiveMelPatches) {
+        bool csdActive = false;
+        for (auto& device: activeMelPatch.second.deviceStates) {
+            if (device.first == deviceId && device.second) {
+                device.second = false;
+            }
+            csdActive |= device.second;
+        }
+
+        if (!csdActive && activeMelPatch.second.csdActive) {
+            activeMelPatch.second.csdActive = csdActive;
+            stopMelComputationForPatch_l(activeMelPatch.second);
+        }
+    }
+
 }
 
 std::optional<audio_patch_handle_t> MelReporter::activePatchStreamHandle_l(

@@ -827,8 +827,6 @@ protected:
                         return wakeLockUids; // moved by underlying SharedBuffer
                     }
 
-                    std::map<uid_t, std::pair<ssize_t /* previous */, ssize_t /* current */>>
-                                        mBatteryCounter;
                     SortedVector<sp<T>> mActiveTracks;
                     int                 mActiveTracksGeneration;
                     int                 mLastActiveTracksGeneration;

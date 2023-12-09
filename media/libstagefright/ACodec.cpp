@@ -65,11 +65,14 @@
 #include "include/SharedMemoryBuffer.h"
 #include <media/stagefright/omx/OMXUtils.h>
 
+#include <server_configurable_flags/get_flags.h>
+
 namespace android {
 
 typedef hardware::media::omx::V1_0::IGraphicBufferSource HGraphicBufferSource;
 
 using hardware::media::omx::V1_0::Status;
+using server_configurable_flags::GetServerConfigurableFlag;
 
 enum {
     kMaxIndicesToCheck = 32, // used when enumerating supported formats and profiles
@@ -80,6 +83,11 @@ namespace {
 constexpr char TUNNEL_PEEK_KEY[] = "android._trigger-tunnel-peek";
 constexpr char TUNNEL_PEEK_SET_LEGACY_KEY[] = "android._tunnel-peek-set-legacy";
 
+}
+
+static bool areRenderMetricsEnabled() {
+    std::string v = GetServerConfigurableFlag("media_native", "render_metrics_enabled", "false");
+    return v == "true";
 }
 
 // OMX errors are directly mapped into status_t range if
@@ -564,6 +572,9 @@ void ACodec::BufferInfo::checkReadFence(const char *dbg) {
 ACodec::ACodec()
     : mSampleRate(0),
       mNodeGeneration(0),
+      mAreRenderMetricsEnabled(areRenderMetricsEnabled()),
+      mIsWindowToDisplay(false),
+      mHasPresentFenceTimes(false),
       mUsingNativeWindow(false),
       mNativeWindowUsageBits(0),
       mLastNativeWindowDataSpace(HAL_DATASPACE_UNKNOWN),
@@ -6872,7 +6883,7 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
 
         int64_t mediaTimeUs = -1;
         buffer->meta()->findInt64("timeUs", &mediaTimeUs);
-        if (mCodec->mIsWindowToDisplay) {
+        if (mCodec->mAreRenderMetricsEnabled && mCodec->mIsWindowToDisplay) {
             mCodec->trackReleasedFrame(frameId, mediaTimeUs, timestampNs);
             mCodec->pollForRenderedFrames();
         } else {

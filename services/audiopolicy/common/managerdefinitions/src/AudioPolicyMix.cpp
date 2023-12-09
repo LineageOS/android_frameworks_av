@@ -642,7 +642,7 @@ status_t AudioPolicyMixCollection::removeUserIdDeviceAffinities(int userId) {
 }
 
 status_t AudioPolicyMixCollection::getDevicesForUserId(int userId,
-        Vector<AudioDeviceTypeAddr>& devices) const {
+        AudioDeviceTypeAddrVector& devices) const {
     // for each player mix:
     // find rules that don't exclude this userId, and add the device to the list
     for (size_t i = 0; i < size(); i++) {
@@ -660,7 +660,7 @@ status_t AudioPolicyMixCollection::getDevicesForUserId(int userId,
             }
         }
         if (ruleAllowsUserId) {
-            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.c_str()));
+            devices.push_back(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.c_str()));
         }
     }
     return NO_ERROR;

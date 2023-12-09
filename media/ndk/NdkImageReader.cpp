@@ -570,6 +570,9 @@ AImageReader::releaseImageLocked(AImage* image, int releaseFenceFd, bool clearCa
     }
 }
 
+// The LL-NDK API is now deprecated. New devices will no longer have the token
+// manager service installed, so createHalToken will return false and this
+// will return AMEDIA_ERROR_UNKNOWN on those devices.
 media_status_t AImageReader::getWindowNativeHandle(native_handle **handle) {
     if (mWindowHandle != nullptr) {
         *handle = mWindowHandle;

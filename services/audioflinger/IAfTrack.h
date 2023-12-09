@@ -227,6 +227,18 @@ public:
     virtual void setMetadataHasChanged() = 0;
 
     /**
+     * Called when a track moves to active state to record its contribution to battery usage.
+     * Track state transitions should eventually be handled within the track class.
+     */
+    virtual void beginBatteryAttribution() = 0;
+
+    /**
+     * Called when a track moves out of the active state to record its contribution
+     * to battery usage.
+     */
+    virtual void endBatteryAttribution() = 0;
+
+    /**
      * For RecordTrack
      * TODO(b/291317964) either use this or add asRecordTrack or asTrack etc.
      */
