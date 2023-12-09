@@ -149,6 +149,18 @@ interface ICameraService
     void remapCameraIds(in CameraIdRemapping cameraIdRemapping);
 
     /**
+     * Inject Session Params into an existing camera session.
+     *
+     * @param cameraId the camera id session to inject session params into. Note that
+     *                 if there is no active session for the input cameraid, this operation
+     *                 will be a no-op. In addition, future camera sessions for cameraid will
+     *                 not be affected.
+     * @param sessionParams the session params to override for the existing session.
+     */
+    void injectSessionParams(@utf8InCpp String cameraId,
+            in CameraMetadataNative sessionParams);
+
+    /**
      * Remove listener for changes to camera device and flashlight state.
      */
     void removeListener(ICameraServiceListener listener);

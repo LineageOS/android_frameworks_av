@@ -211,7 +211,7 @@ class AudioPolicyManagerTest : public testing::Test {
     std::unique_ptr<AudioPolicyManagerTestClient> mClient;
     std::unique_ptr<AudioPolicyTestManager> mManager;
 
-    const uint32_t k48000SamplingRate = 48000;
+    constexpr static const uint32_t k48000SamplingRate = 48000;
 };
 
 void AudioPolicyManagerTest::SetUp() {
@@ -1274,13 +1274,30 @@ protected:
             std::string mixAddress, const audio_config_t& audioConfig,
             const std::vector<AudioMixMatchCriterion>& matchCriteria);
     void clearPolicyMix();
+    void addPolicyMixAndStartInputForLoopback(
+            int mixType, int mixFlag, audio_devices_t deviceType, std::string mixAddress,
+            const audio_config_t& audioConfig,
+            const std::vector<AudioMixMatchCriterion>& matchCriteria,
+            audio_session_t session=AUDIO_SESSION_NONE,
+            audio_config_base_t config=DEFAULT_INPUT_CONFIG,
+            audio_input_flags_t inputFlags=AUDIO_INPUT_FLAG_NONE);
 
     Vector<AudioMix> mAudioMixes;
     const std::string mMixAddress = "remote_submix_media";
+
+    audio_port_handle_t mLoopbackInputPortId = AUDIO_PORT_HANDLE_NONE;
+    std::unique_ptr<RecordingActivityTracker> mTracker;
+    struct audio_port_v7 mInjectionPort;
+
+    constexpr static const audio_config_base_t DEFAULT_INPUT_CONFIG = {
+            .sample_rate = k48000SamplingRate,
+            .channel_mask = AUDIO_CHANNEL_IN_STEREO,
+            .format = AUDIO_FORMAT_PCM_16_BIT
+    };
 };
 
 void AudioPolicyManagerTestDynamicPolicy::TearDown() {
-    mManager->unregisterPolicyMixes(mAudioMixes);
+    clearPolicyMix();
     AudioPolicyManagerTestWithConfigurationFile::TearDown();
 }
 
@@ -1302,9 +1319,43 @@ status_t AudioPolicyManagerTestDynamicPolicy::addPolicyMix(int mixType, int mixF
 
 void AudioPolicyManagerTestDynamicPolicy::clearPolicyMix() {
     if (mManager != nullptr) {
+        mManager->stopInput(mLoopbackInputPortId);
         mManager->unregisterPolicyMixes(mAudioMixes);
     }
     mAudioMixes.clear();
+}
+
+void AudioPolicyManagerTestDynamicPolicy::addPolicyMixAndStartInputForLoopback(
+        int mixType, int mixFlag, audio_devices_t deviceType, std::string mixAddress,
+        const audio_config_t& audioConfig,
+        const std::vector<AudioMixMatchCriterion>& matchCriteria, audio_session_t session,
+        audio_config_base_t config, audio_input_flags_t inputFlags) {
+    ASSERT_EQ(NO_ERROR,
+              addPolicyMix(mixType, mixFlag, deviceType, mixAddress, audioConfig, matchCriteria));
+    if ((mixFlag & MIX_ROUTE_FLAG_LOOP_BACK) != MIX_ROUTE_FLAG_LOOP_BACK) {
+        return;
+    }
+
+    mTracker.reset(new RecordingActivityTracker());
+    struct audio_port_v7 extractionPort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+                               mixAddress, &extractionPort));
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_source_t source = AUDIO_SOURCE_REMOTE_SUBMIX;
+    audio_attributes_t attr = {
+            AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, source, AUDIO_FLAG_NONE, ""};
+    std::string tags = "addr=" + mMixAddress;
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    strncpy(attr.tags, tags.c_str(), AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1);
+    ASSERT_NO_FATAL_FAILURE(
+            getInputForAttr(attr, &input, session, mTracker->getRiid(),
+                            &selectedDeviceId, config.format, config.channel_mask,
+                            config.sample_rate, inputFlags, &mLoopbackInputPortId));
+    ASSERT_EQ(NO_ERROR, mManager->startInput(mLoopbackInputPortId));
+    ASSERT_EQ(extractionPort.id, selectedDeviceId);
+
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                               mMixAddress, &mInjectionPort));
 }
 
 TEST_F(AudioPolicyManagerTestDynamicPolicy, InitSuccess) {
@@ -1684,11 +1735,6 @@ class AudioPolicyManagerTestDPPlaybackReRouting : public AudioPolicyManagerTestD
         public testing::WithParamInterface<DPTestParam> {
 protected:
     void SetUp() override;
-    void TearDown() override;
-
-    std::unique_ptr<RecordingActivityTracker> mTracker;
-    struct audio_port_v7 mInjectionPort;
-    audio_port_handle_t mPortId = AUDIO_PORT_HANDLE_NONE;
 };
 
 void AudioPolicyManagerTestDPPlaybackReRouting::SetUp() {
@@ -1702,34 +1748,10 @@ void AudioPolicyManagerTestDPPlaybackReRouting::SetUp() {
     audioConfig.sample_rate = k48000SamplingRate;
 
     DPTestParam param = GetParam();
-    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
-            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig, param.mixCriteria);
-    ASSERT_EQ(NO_ERROR, ret);
-
-    struct audio_port_v7 extractionPort;
-    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                    mMixAddress, &extractionPort));
-
-    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    audio_source_t source = AUDIO_SOURCE_REMOTE_SUBMIX;
-    audio_attributes_t attr = {
-        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, source, AUDIO_FLAG_NONE, ""};
-    std::string tags = "addr=" + mMixAddress;
-    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
-    strncpy(attr.tags, tags.c_str(), AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1);
-    getInputForAttr(attr, &input, param.session, mTracker->getRiid(),
-                    &selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
-                    k48000SamplingRate, AUDIO_INPUT_FLAG_NONE, &mPortId);
-    ASSERT_EQ(NO_ERROR, mManager->startInput(mPortId));
-    ASSERT_EQ(extractionPort.id, selectedDeviceId);
-
-    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                    mMixAddress, &mInjectionPort));
-}
-
-void AudioPolicyManagerTestDPPlaybackReRouting::TearDown() {
-    mManager->stopInput(mPortId);
-    AudioPolicyManagerTestDynamicPolicy::TearDown();
+    ASSERT_NO_FATAL_FAILURE(
+            addPolicyMixAndStartInputForLoopback(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_LOOP_BACK,
+            AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig, param.mixCriteria,
+            param.session));
 }
 
 TEST_P(AudioPolicyManagerTestDPPlaybackReRouting, PlaybackReRouting) {
@@ -1924,12 +1946,14 @@ TEST_P(AudioPolicyManagerTestMMapPlaybackRerouting, MmapPlaybackStreamMatchingLo
     // Add mix matching the test uid.
     const int testUid = 12345;
     const auto param = GetParam();
-    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, param.mixRouteFlags, param.deviceType,
-                                param.deviceAddress, audioConfig, {createUidCriterion(testUid)});
-    ASSERT_EQ(NO_ERROR, ret);
+    ASSERT_NO_FATAL_FAILURE(
+            addPolicyMixAndStartInputForLoopback(MIX_TYPE_PLAYERS, param.mixRouteFlags,
+                                                 param.deviceType, param.deviceAddress, audioConfig,
+                                                 {createUidCriterion(testUid)}));
 
-    // Geting output for matching uid and mmap-ed stream should fail.
-    audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
+    // Getting output for matching uid and mmap-ed stream should fail.
+    audio_output_flags_t outputFlags =
+            (audio_output_flags_t) (AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
     ASSERT_EQ(INVALID_OPERATION,
               mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
                                          createAttributionSourceState(testUid), &audioConfig,
@@ -1942,11 +1966,12 @@ TEST_P(AudioPolicyManagerTestMMapPlaybackRerouting,
     // Add mix matching the test uid.
     const int testUid = 12345;
     const auto param = GetParam();
-    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, param.mixRouteFlags, param.deviceType,
-                                param.deviceAddress, audioConfig, {createUidCriterion(testUid)});
-    ASSERT_EQ(NO_ERROR, ret);
+    ASSERT_NO_FATAL_FAILURE(
+            addPolicyMixAndStartInputForLoopback(MIX_TYPE_PLAYERS, param.mixRouteFlags,
+                                                 param.deviceType,param.deviceAddress, audioConfig,
+                                                 {createUidCriterion(testUid)}));
 
-    // Geting output for matching uid should succeed for non-mmaped stream.
+    // Getting output for matching uid should succeed for non-mmaped stream.
     audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_NONE;
     ASSERT_EQ(NO_ERROR,
               mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
@@ -1957,23 +1982,57 @@ TEST_P(AudioPolicyManagerTestMMapPlaybackRerouting,
 
 TEST_F(AudioPolicyManagerTestMMapPlaybackRerouting,
         MmapPlaybackStreamMatchingRenderDapMixSupportingMmapSucceeds) {
+    const std::string usbAddress = "card=1;device=0";
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            usbAddress.c_str(), "", AUDIO_FORMAT_DEFAULT));
+    audio_port_v7 usbDevicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_USB_DEVICE,
+                               usbAddress, &usbDevicePort));
+
     // Add render-only mix matching the test uid.
     const int testUid = 12345;
     // test_audio_policy_configuration.xml declares mmap-capable mix port
     // for AUDIO_DEVICE_OUT_USB_DEVICE.
-    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
-                                AUDIO_DEVICE_OUT_USB_DEVICE, /*mixAddress=*/"",
-                                audioConfig, {createUidCriterion(testUid)});
-    ASSERT_EQ(NO_ERROR, ret);
+    ASSERT_EQ(NO_ERROR,
+              addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+                           AUDIO_DEVICE_OUT_USB_DEVICE, /*mixAddress=*/"",
+                           audioConfig, {createUidCriterion(testUid)}));
 
-    // Geting output for matching uid should succeed for mmaped stream, because matched mix
+    static const audio_output_flags_t mmapDirectFlags =
+            (audio_output_flags_t) (AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
+    // Getting output for matching uid should succeed for mmaped stream, because matched mix
     // redirects to mmap capable device.
-    audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
+    audio_output_flags_t outputFlags = mmapDirectFlags;
     ASSERT_EQ(NO_ERROR,
               mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
                                          createAttributionSourceState(testUid), &audioConfig,
                                          &outputFlags, &mSelectedDeviceId, &mPortId, {},
                                          &mOutputType, &mIsSpatialized, &mIsBitPerfect));
+    ASSERT_EQ(usbDevicePort.id, mSelectedDeviceId);
+    auto outputDesc = mManager->getOutputs().valueFor(mOutput);
+    ASSERT_NE(nullptr, outputDesc);
+    ASSERT_EQ(mmapDirectFlags, outputDesc->getFlags().output);
+
+    // After releasing the client, the output is closed. APM should reselect output for the policy
+    // mix.
+    mManager->releaseOutput(mPortId);
+    ASSERT_EQ(nullptr, mManager->getOutputs().valueFor(mOutput));
+    outputFlags = AUDIO_OUTPUT_FLAG_NONE;
+    mPortId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_EQ(NO_ERROR,
+              mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
+                                         createAttributionSourceState(testUid), &audioConfig,
+                                         &outputFlags, &mSelectedDeviceId, &mPortId, {},
+                                         &mOutputType, &mIsSpatialized, &mIsBitPerfect));
+    ASSERT_EQ(usbDevicePort.id, mSelectedDeviceId);
+    outputDesc = mManager->getOutputs().valueFor(mOutput);
+    ASSERT_NE(nullptr, outputDesc);
+    ASSERT_NE(mmapDirectFlags, outputDesc->getFlags().output);
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            usbAddress.c_str(), "", AUDIO_FORMAT_DEFAULT));
 }
 
 TEST_F(AudioPolicyManagerTestMMapPlaybackRerouting,
@@ -1981,14 +2040,15 @@ TEST_F(AudioPolicyManagerTestMMapPlaybackRerouting,
     // Add render-only mix matching the test uid.
     const int testUid = 12345;
     // Per test_audio_policy_configuration.xml AUDIO_DEVICE_OUT_SPEAKER doesn't support mmap.
-    status_t ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
-                                AUDIO_DEVICE_OUT_SPEAKER, /*mixAddress=*/"", audioConfig,
-                                {createUidCriterion(testUid)});
-    ASSERT_EQ(NO_ERROR, ret);
+    ASSERT_EQ(NO_ERROR,
+              addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+                           AUDIO_DEVICE_OUT_SPEAKER, /*mixAddress=*/"", audioConfig,
+                           {createUidCriterion(testUid)}));
 
-    // Geting output for matching uid should fail for mmaped stream, because
+    // Getting output for matching uid should fail for mmaped stream, because
     // matched mix redirects to device which doesn't support mmap.
-    audio_output_flags_t outputFlags = AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
+    audio_output_flags_t outputFlags =
+            (audio_output_flags_t) (AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
     ASSERT_EQ(INVALID_OPERATION,
               mManager->getOutputForAttr(&attr, &mOutput, AUDIO_SESSION_NONE, &mStream,
                                          createAttributionSourceState(testUid), &audioConfig,
@@ -2322,6 +2382,7 @@ protected:
     static const std::string sCarBusNavigationOutput;
     static const std::string sCarRearZoneOneOutput;
     static const std::string sCarRearZoneTwoOutput;
+    static const std::string sCarBusMmapOutput;
 };
 
 const std::string AudioPolicyManagerCarTest::sCarConfig =
@@ -2334,6 +2395,8 @@ const std::string AudioPolicyManagerCarTest::sCarBusNavigationOutput = "bus1_nav
 const std::string AudioPolicyManagerCarTest::sCarRearZoneOneOutput = "bus100_audio_zone_1";
 
 const std::string AudioPolicyManagerCarTest::sCarRearZoneTwoOutput = "bus200_audio_zone_2";
+
+const std::string AudioPolicyManagerCarTest::sCarBusMmapOutput = "bus8_mmap_out";
 
 TEST_F(AudioPolicyManagerCarTest, InitSuccess) {
     // SetUp must finish with no assertions.
@@ -2782,6 +2845,37 @@ TEST_F(AudioPolicyManagerCarTest, GetOutputForAttrWithNoMatchingMix) {
             k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT, &output, &portId, alarmAttribute);
 
     ASSERT_EQ(navDevicePort.id, selectedDeviceId);
+}
+
+TEST_F(AudioPolicyManagerCarTest, GetOutputForAttrForMMapWithPolicyMatched) {
+    status_t ret;
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+    std::vector<AudioMixMatchCriterion> mediaMatchCriteria = {
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/ false)};
+    ret = addPolicyMix(MIX_TYPE_PLAYERS, MIX_ROUTE_FLAG_RENDER,
+                       AUDIO_DEVICE_OUT_BUS, sCarBusMmapOutput, audioConfig, mediaMatchCriteria);
+    ASSERT_EQ(NO_ERROR, ret);
+    ASSERT_EQ(NO_ERROR, ret);
+    audio_port_v7 mmapDevicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_BUS,
+                               sCarBusMmapOutput, &mmapDevicePort));
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t output;
+    audio_port_handle_t portId;
+    const audio_attributes_t mediaAttribute = {
+            AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_MEDIA,
+            AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""};
+
+    getOutputForAttr(
+            &selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+            k48000SamplingRate,
+            (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT),
+            &output, &portId, mediaAttribute);
+
+    ASSERT_EQ(mmapDevicePort.id, selectedDeviceId);
 }
 
 class AudioPolicyManagerTVTest : public AudioPolicyManagerTestWithConfigurationFile {

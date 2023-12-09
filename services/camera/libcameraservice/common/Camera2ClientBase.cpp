@@ -509,6 +509,12 @@ status_t Camera2ClientBase<TClientBase>::stopInjection() {
     return mDevice->stopInjection();
 }
 
+template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::injectSessionParams(
+    const CameraMetadata& sessionParams) {
+    return mDevice->injectSessionParams(sessionParams);
+}
+
 template class Camera2ClientBase<CameraService::Client>;
 template class Camera2ClientBase<CameraDeviceClientBase>;
 

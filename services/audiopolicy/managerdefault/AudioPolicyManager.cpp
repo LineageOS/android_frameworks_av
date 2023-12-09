@@ -1217,13 +1217,14 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         return BAD_VALUE;
     }
     if (usePrimaryOutputFromPolicyMixes) {
-        sp<DeviceDescriptor> deviceDesc =
+        sp<DeviceDescriptor> policyMixDevice =
                 mAvailableOutputDevices.getDevice(primaryMix->mDeviceType,
                                                   primaryMix->mDeviceAddress,
                                                   AUDIO_FORMAT_DEFAULT);
         sp<SwAudioOutputDescriptor> policyDesc = primaryMix->getOutput();
         bool tryDirectForFlags = policyDesc == nullptr ||
-                (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT);
+                (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) ||
+                (*flags & (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ));
         // if a direct output can be opened to deliver the track's multi-channel content to the
         // output rather than being downmixed by the primary output, then use this direct
         // output by by-passing the primary mix if possible, otherwise fall-through to primary
@@ -1231,23 +1232,29 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         bool tryDirectForChannelMask = policyDesc != nullptr
                     && (audio_channel_count_from_out_mask(policyDesc->getConfig().channel_mask) <
                         audio_channel_count_from_out_mask(config->channel_mask));
-        if (deviceDesc != nullptr && (tryDirectForFlags || tryDirectForChannelMask)) {
+        if (policyMixDevice != nullptr && (tryDirectForFlags || tryDirectForChannelMask)) {
             audio_io_handle_t newOutput;
             status = openDirectOutput(
                     *stream, session, config,
                     (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_DIRECT),
-                    DeviceVector(deviceDesc), &newOutput);
+                    DeviceVector(policyMixDevice), &newOutput);
             if (status == NO_ERROR) {
                 policyDesc = mOutputs.valueFor(newOutput);
                 primaryMix->setOutput(policyDesc);
             } else if (tryDirectForFlags) {
+                ALOGW("%s, failed open direct, status: %d", __func__, status);
                 policyDesc = nullptr;
             } // otherwise use primary if available.
         }
         if (policyDesc != nullptr) {
             policyDesc->mPolicyMix = primaryMix;
             *output = policyDesc->mIoHandle;
-            *selectedDeviceId = deviceDesc != 0 ? deviceDesc->getId() : AUDIO_PORT_HANDLE_NONE;
+            *selectedDeviceId = policyMixDevice != nullptr ? policyMixDevice->getId()
+                                                           : AUDIO_PORT_HANDLE_NONE;
+            if ((policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != AUDIO_OUTPUT_FLAG_DIRECT) {
+                // Remove direct flag as it is not on a direct output.
+                *flags = (audio_output_flags_t) (*flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
+            }
 
             ALOGV("getOutputForAttr() returns output %d", *output);
             if (resultAttr->usage == AUDIO_USAGE_VIRTUAL_SOURCE) {
@@ -1256,6 +1263,13 @@ status_t AudioPolicyManager::getOutputForAttrInt(
                 *outputType = API_OUTPUT_LEGACY;
             }
             return NO_ERROR;
+        } else {
+            if (policyMixDevice != nullptr) {
+                ALOGE("%s, try to use primary mix but no output found", __func__);
+                return INVALID_OPERATION;
+            }
+            // Fallback to default engine selection as the selected primary mix device is not
+            // available.
         }
     }
     // Virtual sources must always be dynamicaly or explicitly routed
@@ -6689,7 +6703,7 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
         return;
     }
     const bool closingOutputWasActive = closingOutput->isActive();
-    mPolicyMixes.closeOutput(closingOutput);
+    mPolicyMixes.closeOutput(closingOutput, mOutputs);
 
     // look for duplicated outputs connected to the output being removed.
     for (size_t i = 0; i < mOutputs.size(); i++) {
