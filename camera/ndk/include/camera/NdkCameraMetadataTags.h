@@ -4658,8 +4658,8 @@ typedef enum acamera_metadata_tag {
      * <p>The guaranteed stream combinations related to stream use case for a camera device with
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE">CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE</a>
      * capability is documented in the camera device
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#stream-use-case-capability-additional-guaranteed-configurations">guideline</a>. The application is strongly recommended to use one of the guaranteed stream
-     * combinations.
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#stream-use-case-capability-additional-guaranteed-configurations">guideline</a>.
+     * The application is strongly recommended to use one of the guaranteed stream combinations.
      * If the application creates a session with a stream combination not in the guaranteed
      * list, or with mixed DEFAULT and non-DEFAULT use cases within the same session,
      * the camera device may ignore some stream use cases due to hardware constraints
@@ -10175,8 +10175,8 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * </ul>
      * <p><a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#SCALER_AVAILABLE_STREAM_USE_CASES">CameraCharacteristics#SCALER_AVAILABLE_STREAM_USE_CASES</a>
      * lists all of the supported stream use cases.</p>
-     * <p>Refer to
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#stream-use-case-capability-additional-guaranteed-configurations">CameraDevice#stream-use-case-capability-additional-guaranteed-configurations</a>
+     * <p>Refer to the
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#stream-use-case-capability-additional-guaranteed-configurations">guideline</a>
      * for the mandatory stream combinations involving stream use cases, which can also be
      * queried via <a href="https://developer.android.com/reference/android/hardware/camera2/params/MandatoryStreamCombination.html">MandatoryStreamCombination</a>.</p>
      */
@@ -11037,9 +11037,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
     /**
      * <p>This camera device does not have enough capabilities to qualify as a <code>FULL</code> device or
      * better.</p>
-     * <p>Only the stream configurations listed in the <code>LEGACY</code> and <code>LIMITED</code> tables in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are guaranteed to be supported.</p>
+     * <p>Only the stream configurations listed in the <code>LEGACY</code> and <code>LIMITED</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#limited-level-additional-guaranteed-configurations">tables</a>
+     * in the documentation are guaranteed to be supported.</p>
      * <p>All <code>LIMITED</code> devices support the <code>BACKWARDS_COMPATIBLE</code> capability, indicating basic
      * support for color image capture. The only exception is that the device may
      * alternatively support only the <code>DEPTH_OUTPUT</code> capability, if it can only output depth
@@ -11064,9 +11064,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
 
     /**
      * <p>This camera device is capable of supporting advanced imaging applications.</p>
-     * <p>The stream configurations listed in the <code>FULL</code>, <code>LEGACY</code> and <code>LIMITED</code> tables in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are guaranteed to be supported.</p>
+     * <p>The stream configurations listed in the <code>FULL</code>, <code>LEGACY</code> and <code>LIMITED</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#full-level-additional-guaranteed-configurations">tables</a>
+     * in the documentation are guaranteed to be supported.</p>
      * <p>A <code>FULL</code> device will support below capabilities:</p>
      * <ul>
      * <li><code>BURST_CAPTURE</code> capability (ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
@@ -11093,9 +11093,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
 
     /**
      * <p>This camera device is running in backward compatibility mode.</p>
-     * <p>Only the stream configurations listed in the <code>LEGACY</code> table in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are supported.</p>
+     * <p>Only the stream configurations listed in the <code>LEGACY</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#legacy-level-guaranteed-configurations">table</a>
+     * in the documentation are supported.</p>
      * <p>A <code>LEGACY</code> device does not support per-frame control, manual sensor control, manual
      * post-processing, arbitrary cropping regions, and has relaxed performance constraints.
      * No additional capabilities beyond <code>BACKWARD_COMPATIBLE</code> will ever be listed by a
@@ -11117,9 +11117,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
      * <p>This camera device is capable of YUV reprocessing and RAW data capture, in addition to
      * FULL-level capabilities.</p>
      * <p>The stream configurations listed in the <code>LEVEL_3</code>, <code>RAW</code>, <code>FULL</code>, <code>LEGACY</code> and
-     * <code>LIMITED</code> tables in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are guaranteed to be supported.</p>
+     * <code>LIMITED</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#level-3-additional-guaranteed-configurations">tables</a>
+     * in the documentation are guaranteed to be supported.</p>
      * <p>The following additional capabilities are guaranteed to be supported:</p>
      * <ul>
      * <li><code>YUV_REPROCESSING</code> capability (ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
