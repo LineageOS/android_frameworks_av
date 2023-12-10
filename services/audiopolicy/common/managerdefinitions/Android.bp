@@ -7,8 +7,12 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
-cc_library_static {
+cc_library {
     name: "libaudiopolicycomponents",
+
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
 
     srcs: [
         "src/AudioCollections.cpp",
@@ -31,7 +35,11 @@ cc_library_static {
         "src/TypeConverter.cpp",
     ],
     shared_libs: [
+        "audioclient-types-aidl-cpp",
+        "audiopolicy-types-aidl-cpp",
+        "libaudioclient_aidl_conversion",
         "libaudiofoundation",
+        "libaudiopolicy",
         "libbase",
         "libcutils",
         "libhidlbase",

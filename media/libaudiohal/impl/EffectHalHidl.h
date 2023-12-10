@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_EFFECT_HAL_HIDL_H
 #define ANDROID_HARDWARE_EFFECT_HAL_HIDL_H
 
-#include PATH(android/hardware/audio/effect/FILE_VERSION/IEffect.h)
+#include PATH(android/hardware/audio/effect/COMMON_TYPES_FILE_VERSION/IEffect.h)
 #include <media/audiohal/EffectHalInterface.h>
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
@@ -31,7 +31,7 @@ using ::android::hardware::MessageQueue;
 namespace android {
 namespace effect {
 
-using namespace ::android::hardware::audio::effect::CPP_VERSION;
+using namespace ::android::hardware::audio::effect::COMMON_TYPES_CPP_VERSION;
 
 class EffectHalHidl : public EffectHalInterface, public EffectConversionHelperHidl
 {
@@ -59,12 +59,9 @@ class EffectHalHidl : public EffectHalInterface, public EffectConversionHelperHi
     // Free resources on the remote side.
     virtual status_t close();
 
-    // Whether it's a local implementation.
-    virtual bool isLocal() const { return false; }
-
     virtual status_t dump(int fd);
 
-    virtual uint64_t effectId() const { return mEffectId; }
+    uint64_t effectId() const { return mEffectId; }
 
   private:
     friend class EffectsFactoryHalHidl;

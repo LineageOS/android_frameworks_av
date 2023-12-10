@@ -56,7 +56,7 @@ using media::audio::common::AudioUuid;
 
 ConversionResult<media::CreateTrackRequest> IAudioFlinger::CreateTrackInput::toAidl() const {
     media::CreateTrackRequest aidl;
-    aidl.attr = VALUE_OR_RETURN(legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
+    aidl.attr = VALUE_OR_RETURN(legacy2aidl_audio_attributes_t_AudioAttributes(attr));
     // Do not be mislead by 'Input'--this is an input to 'createTrack', which creates output tracks.
     aidl.config = VALUE_OR_RETURN(legacy2aidl_audio_config_t_AudioConfig(
                     config, false /*isInput*/));
@@ -77,7 +77,7 @@ ConversionResult<media::CreateTrackRequest> IAudioFlinger::CreateTrackInput::toA
 ConversionResult<IAudioFlinger::CreateTrackInput>
 IAudioFlinger::CreateTrackInput::fromAidl(const media::CreateTrackRequest& aidl) {
     IAudioFlinger::CreateTrackInput legacy;
-    legacy.attr = VALUE_OR_RETURN(aidl2legacy_AudioAttributesInternal_audio_attributes_t(aidl.attr));
+    legacy.attr = VALUE_OR_RETURN(aidl2legacy_AudioAttributes_audio_attributes_t(aidl.attr));
     // Do not be mislead by 'Input'--this is an input to 'createTrack', which creates output tracks.
     legacy.config = VALUE_OR_RETURN(
             aidl2legacy_AudioConfig_audio_config_t(aidl.config, false /*isInput*/));
@@ -153,7 +153,7 @@ IAudioFlinger::CreateTrackOutput::fromAidl(
 ConversionResult<media::CreateRecordRequest>
 IAudioFlinger::CreateRecordInput::toAidl() const {
     media::CreateRecordRequest aidl;
-    aidl.attr = VALUE_OR_RETURN(legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
+    aidl.attr = VALUE_OR_RETURN(legacy2aidl_audio_attributes_t_AudioAttributes(attr));
     aidl.config = VALUE_OR_RETURN(
             legacy2aidl_audio_config_base_t_AudioConfigBase(config, true /*isInput*/));
     aidl.clientInfo = VALUE_OR_RETURN(legacy2aidl_AudioClient_AudioClient(clientInfo));
@@ -174,7 +174,7 @@ IAudioFlinger::CreateRecordInput::fromAidl(
         const media::CreateRecordRequest& aidl) {
     IAudioFlinger::CreateRecordInput legacy;
     legacy.attr = VALUE_OR_RETURN(
-            aidl2legacy_AudioAttributesInternal_audio_attributes_t(aidl.attr));
+            aidl2legacy_AudioAttributes_audio_attributes_t(aidl.attr));
     legacy.config = VALUE_OR_RETURN(
             aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.config, true /*isInput*/));
     legacy.clientInfo = VALUE_OR_RETURN(aidl2legacy_AudioClient_AudioClient(aidl.clientInfo));

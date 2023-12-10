@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioAttributesInternal;
+import android.media.audio.common.AudioAttributes;
 import android.media.AudioClient;
 import android.media.IAudioTrackCallback;
 import android.media.SharedFileRegion;
@@ -30,7 +30,7 @@ import android.media.audio.common.AudioConfig;
  * {@hide}
  */
 parcelable CreateTrackRequest {
-    AudioAttributesInternal attr;
+    AudioAttributes attr;
     AudioConfig config;
     AudioClient clientInfo;
     @nullable SharedFileRegion sharedBuffer;

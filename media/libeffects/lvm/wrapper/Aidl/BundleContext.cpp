@@ -15,9 +15,11 @@
  */
 
 #include <cstddef>
+#include <cstdio>
 
 #define LOG_TAG "BundleContext"
 #include <android-base/logging.h>
+#include <audio_utils/power.h>
 #include <Utils.h>
 
 #include "BundleContext.h"
@@ -34,7 +36,7 @@ RetCode BundleContext::init() {
     std::lock_guard lg(mMutex);
     // init with pre-defined preset NORMAL
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        mBandGaindB[i] = lvm::kSoftPresets[0 /* normal */][i];
+        mBandGainMdB[i] = lvm::kSoftPresets[0 /* normal */][i] * 100;
     }
 
     // allocate lvm instance
@@ -212,7 +214,7 @@ RetCode BundleContext::limitLevel() {
 
         if (eqEnabled) {
             for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-                float bandFactor = mBandGaindB[i] / 15.0;
+                float bandFactor = mBandGainMdB[i] / 1500.0;
                 float bandCoefficient = lvm::kBandEnergyCoefficient[i];
                 float bandEnergy = bandFactor * bandCoefficient * bandCoefficient;
                 if (bandEnergy > 0) energyContribution += bandEnergy;
@@ -221,8 +223,8 @@ RetCode BundleContext::limitLevel() {
             // cross EQ coefficients
             float bandFactorSum = 0;
             for (int i = 0; i < lvm::MAX_NUM_BANDS - 1; i++) {
-                float bandFactor1 = mBandGaindB[i] / 15.0;
-                float bandFactor2 = mBandGaindB[i + 1] / 15.0;
+                float bandFactor1 = mBandGainMdB[i] / 1500.0;
+                float bandFactor2 = mBandGainMdB[i + 1] / 1500.0;
 
                 if (bandFactor1 > 0 && bandFactor2 > 0) {
                     float crossEnergy =
@@ -244,7 +246,7 @@ RetCode BundleContext::limitLevel() {
 
             if (eqEnabled) {
                 for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-                    float bandFactor = mBandGaindB[i] / 15.0;
+                    float bandFactor = mBandGainMdB[i] / 1500.0;
                     float bandCrossCoefficient = lvm::kBassBoostEnergyCrossCoefficient[i];
                     float bandEnergy = boostFactor * bandFactor * bandCrossCoefficient;
                     if (bandEnergy > 0) energyBassBoost += bandEnergy;
@@ -397,15 +399,10 @@ LVM_INT16 BundleContext::LVC_ToDB_s32Tos16(LVM_INT32 Lin_fix) const {
     return db_fix;
 }
 
-// TODO: replace with more generic approach, like: audio_utils_power_from_amplitude
-int16_t BundleContext::VolToDb(uint32_t vol) const {
-    int16_t dB;
-
-    dB = LVC_ToDB_s32Tos16(vol << 7);
-    dB = (dB + 8) >> 4;
-    dB = (dB < -96) ? -96 : dB;
-
-    return dB;
+/* static */
+float BundleContext::VolToDb(float vol) {
+    float dB = audio_utils_power_from_amplitude(vol);
+    return std::max(dB, -96.f);
 }
 
 RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
@@ -413,11 +410,12 @@ RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
     LVM_ReturnStatus_en status = LVM_SUCCESS;
 
     // Convert volume to dB
-    int leftdB = VolToDb(volume.left);
-    int rightdB = VolToDb(volume.right);
-    int maxdB = std::max(leftdB, rightdB);
-    int pandB = rightdB - leftdB;
-    setVolumeLevel(maxdB * 100);
+    float leftdB = VolToDb(volume.left);
+    float rightdB = VolToDb(volume.right);
+
+    float maxdB = std::max(leftdB, rightdB);
+    float pandB = rightdB - leftdB;
+    setVolumeLevel(maxdB);
     LOG(DEBUG) << __func__ << " pandB: " << pandB << " maxdB " << maxdB;
 
     {
@@ -441,8 +439,8 @@ RetCode BundleContext::setEqualizerPreset(const std::size_t presetIdx) {
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(
-                Equalizer::BandLevel{static_cast<int32_t>(i), lvm::kSoftPresets[presetIdx][i]});
+        bandLevels.emplace_back(Equalizer::BandLevel{static_cast<int32_t>(i),
+                                                     lvm::kSoftPresets[presetIdx][i] * 100});
     }
 
     RetCode ret = updateControlParameter(bandLevels);
@@ -472,7 +470,8 @@ std::vector<Equalizer::BandLevel> BundleContext::getEqualizerBandLevels() const 
     std::vector<Equalizer::BandLevel> bandLevels;
     bandLevels.reserve(lvm::MAX_NUM_BANDS);
     for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
-        bandLevels.emplace_back(Equalizer::BandLevel{static_cast<int32_t>(i), mBandGaindB[i]});
+        bandLevels.emplace_back(
+                Equalizer::BandLevel{static_cast<int32_t>(i), mBandGainMdB[i]});
     }
     return bandLevels;
 }
@@ -506,7 +505,7 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
     RETURN_VALUE_IF(!isBandLevelIndexInRange(bandLevels), RetCode::ERROR_ILLEGAL_PARAMETER,
                     "indexOutOfRange");
 
-    std::array<int, lvm::MAX_NUM_BANDS> tempLevel;
+    std::array<int, lvm::MAX_NUM_BANDS> tempLevel(mBandGainMdB);
     for (const auto& it : bandLevels) {
         tempLevel[it.index] = it.levelMb;
     }
@@ -520,14 +519,16 @@ RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandL
         for (std::size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
             params.pEQNB_BandDefinition[i].Frequency = lvm::kPresetsFrequencies[i];
             params.pEQNB_BandDefinition[i].QFactor = lvm::kPresetsQFactors[i];
-            params.pEQNB_BandDefinition[i].Gain = tempLevel[i];
+            params.pEQNB_BandDefinition[i].Gain =
+                    tempLevel[i] > 0 ? (tempLevel[i] + 50) / 100 : (tempLevel[i] - 50) / 100;
         }
 
         RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
                         RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     }
-    mBandGaindB = tempLevel;
-    LOG(INFO) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGaindB);
+    mBandGainMdB = tempLevel;
+    LOG(DEBUG) << __func__ << " update bandGain to " << ::android::internal::ToString(mBandGainMdB)
+               << "mdB";
 
     return RetCode::SUCCESS;
 }
@@ -551,18 +552,18 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
     return limitLevel();
 }
 
-RetCode BundleContext::setVolumeLevel(int level) {
+RetCode BundleContext::setVolumeLevel(float level) {
     if (mMuteEnabled) {
-        mLevelSaved = level / 100;
+        mLevelSaved = level;
     } else {
-        mVolume = level / 100;
+        mVolume = level;
     }
     LOG(INFO) << __func__ << " success with level " << level;
     return limitLevel();
 }
 
-int BundleContext::getVolumeLevel() const {
-    return (mMuteEnabled ? mLevelSaved * 100 : mVolume * 100);
+float BundleContext::getVolumeLevel() const {
+    return (mMuteEnabled ? mLevelSaved : mVolume);
 }
 
 RetCode BundleContext::setVolumeMute(bool mute) {

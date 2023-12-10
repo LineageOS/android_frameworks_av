@@ -27,8 +27,8 @@ class AidlConversionEnvReverb : public EffectConversionHelperAidl {
     AidlConversionEnvReverb(
             std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> effect,
             int32_t sessionId, int32_t ioId,
-            const ::aidl::android::hardware::audio::effect::Descriptor& desc)
-        : EffectConversionHelperAidl(effect, sessionId, ioId, desc) {}
+            const ::aidl::android::hardware::audio::effect::Descriptor& desc, bool isProxyEffect)
+        : EffectConversionHelperAidl(effect, sessionId, ioId, desc, isProxyEffect) {}
     ~AidlConversionEnvReverb() {}
 
   private:

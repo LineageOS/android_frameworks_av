@@ -79,6 +79,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/PersistentSurface.h>
+#include <media/stagefright/RenderedFrameInfo.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <nativeloader/dlext_namespaces.h>
 #include <private/android_filesystem_config.h>
@@ -210,6 +211,7 @@ static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
 // Render metrics
 static const char *kCodecPlaybackDurationSec = "android.media.mediacodec.playback-duration-sec";
 static const char *kCodecFirstRenderTimeUs = "android.media.mediacodec.first-render-time-us";
+static const char *kCodecLastRenderTimeUs = "android.media.mediacodec.last-render-time-us";
 static const char *kCodecFramesReleased = "android.media.mediacodec.frames-released";
 static const char *kCodecFramesRendered = "android.media.mediacodec.frames-rendered";
 static const char *kCodecFramesDropped = "android.media.mediacodec.frames-dropped";
@@ -662,6 +664,7 @@ enum {
     kWhatOutputBuffersChanged = 'outC',
     kWhatFirstTunnelFrameReady = 'ftfR',
     kWhatPollForRenderedBuffers = 'plrb',
+    kWhatMetricsUpdated      = 'mtru',
 };
 
 class CryptoAsyncCallback : public CryptoAsync::CryptoAsyncCallback {
@@ -756,9 +759,10 @@ public:
             const sp<AMessage> &outputFormat) override;
     virtual void onInputSurfaceDeclined(status_t err) override;
     virtual void onSignaledInputEOS(status_t err) override;
-    virtual void onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &done) override;
+    virtual void onOutputFramesRendered(const std::list<RenderedFrameInfo> &done) override;
     virtual void onOutputBuffersChanged() override;
     virtual void onFirstTunnelFrameReady() override;
+    virtual void onMetricsUpdated(const sp<AMessage> &updatedMetrics) override;
 private:
     const sp<AMessage> mNotify;
 };
@@ -865,7 +869,7 @@ void CodecCallback::onSignaledInputEOS(status_t err) {
     notify->post();
 }
 
-void CodecCallback::onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &done) {
+void CodecCallback::onOutputFramesRendered(const std::list<RenderedFrameInfo> &done) {
     sp<AMessage> notify(mNotify->dup());
     notify->setInt32("what", kWhatOutputFramesRendered);
     if (MediaCodec::CreateFramesRenderedMessage(done, notify)) {
@@ -882,6 +886,13 @@ void CodecCallback::onOutputBuffersChanged() {
 void CodecCallback::onFirstTunnelFrameReady() {
     sp<AMessage> notify(mNotify->dup());
     notify->setInt32("what", kWhatFirstTunnelFrameReady);
+    notify->post();
+}
+
+void CodecCallback::onMetricsUpdated(const sp<AMessage> &updatedMetrics) {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatMetricsUpdated);
+    notify->setMessage("updated-metrics", updatedMetrics);
     notify->post();
 }
 
@@ -1174,6 +1185,7 @@ void MediaCodec::updateMediametrics() {
         const VideoRenderQualityMetrics &m = mVideoRenderQualityTracker.getMetrics();
         if (m.frameReleasedCount > 0) {
             mediametrics_setInt64(mMetricsHandle, kCodecFirstRenderTimeUs, m.firstRenderTimeUs);
+            mediametrics_setInt64(mMetricsHandle, kCodecLastRenderTimeUs, m.lastRenderTimeUs);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesReleased, m.frameReleasedCount);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesRendered, m.frameRenderedCount);
             mediametrics_setInt64(mMetricsHandle, kCodecFramesSkipped, m.frameSkippedCount);
@@ -4254,6 +4266,49 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
+                case kWhatMetricsUpdated:
+                {
+                    sp<AMessage> updatedMetrics;
+                    CHECK(msg->findMessage("updated-metrics", &updatedMetrics));
+
+                    size_t numEntries = updatedMetrics->countEntries();
+                    AMessage::Type type;
+                    for (size_t i = 0; i < numEntries; ++i) {
+                        const char *name = updatedMetrics->getEntryNameAt(i, &type);
+                        AMessage::ItemData itemData = updatedMetrics->getEntryAt(i);
+                        switch (type) {
+                            case AMessage::kTypeInt32: {
+                                int32_t metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setInt32(mMetricsHandle, name, metricValue);
+                                break;
+                            }
+                            case AMessage::kTypeInt64: {
+                                int64_t metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setInt64(mMetricsHandle, name, metricValue);
+                                break;
+                            }
+                            case AMessage::kTypeDouble: {
+                                double metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setDouble(mMetricsHandle, name, metricValue);
+                                break;
+                            }
+                            case AMessage::kTypeString: {
+                                AString metricValue;
+                                itemData.find(&metricValue);
+                                mediametrics_setCString(mMetricsHandle, name, metricValue.c_str());
+                                break;
+                            }
+                            // ToDo: add support for other types
+                            default:
+                                ALOGW("Updated metrics type not supported.");
+                        }
+                    }
+                    break;
+                }
+
                 case kWhatEOS:
                 {
                     // We already notify the client of this by using the
@@ -5960,12 +6015,10 @@ status_t MediaCodec::handleLeftover(size_t index) {
     return onQueueInputBuffer(msg);
 }
 
-//static
-size_t MediaCodec::CreateFramesRenderedMessage(
-        const std::list<FrameRenderTracker::Info> &done, sp<AMessage> &msg) {
+template<typename T>
+static size_t CreateFramesRenderedMessageInternal(const std::list<T> &done, sp<AMessage> &msg) {
     size_t index = 0;
-    for (std::list<FrameRenderTracker::Info>::const_iterator it = done.cbegin();
-            it != done.cend(); ++it) {
+    for (typename std::list<T>::const_iterator it = done.cbegin(); it != done.cend(); ++it) {
         if (it->getRenderTimeNs() < 0) {
             continue; // dropped frame from tracking
         }
@@ -5974,6 +6027,18 @@ size_t MediaCodec::CreateFramesRenderedMessage(
         ++index;
     }
     return index;
+}
+
+//static
+size_t MediaCodec::CreateFramesRenderedMessage(
+        const std::list<RenderedFrameInfo> &done, sp<AMessage> &msg) {
+    return CreateFramesRenderedMessageInternal(done, msg);
+}
+
+//static
+size_t MediaCodec::CreateFramesRenderedMessage(
+        const std::list<FrameRenderTracker::Info> &done, sp<AMessage> &msg) {
+    return CreateFramesRenderedMessageInternal(done, msg);
 }
 
 status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
@@ -6067,7 +6132,9 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
             // presentation timestamp is used instead, which almost certainly occurs in the past,
             // since it's almost always a zero-based offset from the start of the stream. In these
             // scenarios, we expect the frame to be rendered with no delay.
-            int64_t delayUs = noRenderTime ? 0 : renderTimeNs / 1000 - ALooper::GetNowUs();
+            int64_t nowUs = ALooper::GetNowUs();
+            int64_t renderTimeUs = renderTimeNs / 1000;
+            int64_t delayUs = renderTimeUs < nowUs ? 0 : renderTimeUs - nowUs;
             delayUs += 100 * 1000; /* 100ms in microseconds */
             status_t err =
                     mMsgPollForRenderedBuffers->postUnique(/* token= */ mMsgPollForRenderedBuffers,

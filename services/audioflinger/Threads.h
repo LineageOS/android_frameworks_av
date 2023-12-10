@@ -826,8 +826,6 @@ protected:
                         return wakeLockUids; // moved by underlying SharedBuffer
                     }
 
-                    std::map<uid_t, std::pair<ssize_t /* previous */, ssize_t /* current */>>
-                                        mBatteryCounter;
                     SortedVector<sp<T>> mActiveTracks;
                     int                 mActiveTracksGeneration;
                     int                 mLastActiveTracksGeneration;
@@ -2315,12 +2313,17 @@ public:
 
 protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
+                float       streamVolume_l() const {
+                    return mStreamTypes[mStreamType].volume;
+                }
+                bool     streamMuted_l() const {
+                    return mStreamTypes[mStreamType].mute;
+                }
 
+                stream_type_t               mStreamTypes[AUDIO_STREAM_CNT];
                 audio_stream_type_t         mStreamType;
                 float                       mMasterVolume;
-                float                       mStreamVolume;
                 bool                        mMasterMute;
-                bool                        mStreamMute;
                 AudioStreamOut*             mOutput;
 
                 mediautils::atomic_sp<audio_utils::MelProcessor> mMelProcessor;

@@ -105,8 +105,10 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
     // List microphones
     status_t getMicrophones(std::vector<audio_microphone_characteristic_t>* microphones) override;
 
-    status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
-    status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
+    status_t addDeviceEffect(
+            const struct audio_port_config *device, sp<EffectHalInterface> effect) override;
+    status_t removeDeviceEffect(
+            const struct audio_port_config *device, sp<EffectHalInterface> effect) override;
 
     status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType __unused,
@@ -125,10 +127,7 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
         return INVALID_OPERATION;
     }
 
-    int32_t supportsBluetoothVariableLatency(bool* supports __unused) override {
-        // TODO: Implement the HAL query when moving to AIDL HAL.
-        return INVALID_OPERATION;
-    }
+    status_t supportsBluetoothVariableLatency(bool* supports) override;
 
     status_t setConnectedState(const struct audio_port_v7 *port, bool connected) override;
 

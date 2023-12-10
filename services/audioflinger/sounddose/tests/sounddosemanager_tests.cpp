@@ -39,21 +39,39 @@ public:
                 (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>&), (override));
 };
 
+class MelReporterCallback : public IMelReporterCallback {
+public:
+    MOCK_METHOD(void, startMelComputationForDeviceId, (audio_port_handle_t), (override));
+    MOCK_METHOD(void, stopMelComputationForDeviceId, (audio_port_handle_t), (override));
+};
+
+constexpr char kPrimaryModule[] = "primary";
+constexpr char kSecondaryModule[] = "secondary";
+
 class SoundDoseManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        mSoundDoseManager = sp<SoundDoseManager>::make();
+        mMelReporterCallback = sp<MelReporterCallback>::make();
+        mSoundDoseManager = sp<SoundDoseManager>::make(mMelReporterCallback);
         mHalSoundDose = ndk::SharedRefBase::make<HalSoundDoseMock>();
+        mSecondaryHalSoundDose = ndk::SharedRefBase::make<HalSoundDoseMock>();
 
         ON_CALL(*mHalSoundDose.get(), setOutputRs2UpperBound)
             .WillByDefault([] (float rs2) {
                 EXPECT_EQ(rs2, ISoundDose::DEFAULT_MAX_RS2);
                 return ndk::ScopedAStatus::ok();
             });
+        ON_CALL(*mSecondaryHalSoundDose.get(), setOutputRs2UpperBound)
+                .WillByDefault([] (float rs2) {
+                    EXPECT_EQ(rs2, ISoundDose::DEFAULT_MAX_RS2);
+                    return ndk::ScopedAStatus::ok();
+                });
     }
 
+    sp<MelReporterCallback> mMelReporterCallback;
     sp<SoundDoseManager> mSoundDoseManager;
     std::shared_ptr<HalSoundDoseMock> mHalSoundDose;
+    std::shared_ptr<HalSoundDoseMock> mSecondaryHalSoundDose;
 };
 
 TEST_F(SoundDoseManagerTest, GetProcessorForExistingStream) {
@@ -101,7 +119,7 @@ TEST_F(SoundDoseManagerTest, NewMelValuesCacheNewRecord) {
 }
 
 TEST_F(SoundDoseManagerTest, InvalidHalInterfaceIsNotSet) {
-    EXPECT_FALSE(mSoundDoseManager->setHalSoundDoseInterface(nullptr));
+    EXPECT_FALSE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, nullptr));
 }
 
 TEST_F(SoundDoseManagerTest, SetHalSoundDoseDisablesNewMelProcessorCallbacks) {
@@ -113,7 +131,7 @@ TEST_F(SoundDoseManagerTest, SetHalSoundDoseDisablesNewMelProcessorCallbacks) {
             return ndk::ScopedAStatus::ok();
         });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
 
     EXPECT_EQ(nullptr, mSoundDoseManager->getOrCreateProcessorForDevice(/*deviceId=*/2,
             /*streamHandle=*/1,
@@ -130,8 +148,17 @@ TEST_F(SoundDoseManagerTest, SetHalSoundDoseRegistersHalCallbacks) {
             EXPECT_NE(nullptr, callback);
             return ndk::ScopedAStatus::ok();
         });
+    EXPECT_CALL(*mSecondaryHalSoundDose.get(), setOutputRs2UpperBound).Times(1);
+    EXPECT_CALL(*mSecondaryHalSoundDose.get(), registerSoundDoseCallback)
+            .Times(1)
+            .WillOnce([&] (const std::shared_ptr<ISoundDose::IHalSoundDoseCallback>& callback) {
+                EXPECT_NE(nullptr, callback);
+                return ndk::ScopedAStatus::ok();
+        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kSecondaryModule,
+                                                            mSecondaryHalSoundDose));
 }
 
 TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalWithNoAddressIllegalArgument) {
@@ -145,7 +172,7 @@ TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalWithNoAddressIllegalArgumen
            return ndk::ScopedAStatus::ok();
        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
 
     EXPECT_NE(nullptr, halCallback);
     AudioDevice audioDevice = {};
@@ -166,9 +193,9 @@ TEST_F(SoundDoseManagerTest, MomentaryExposureFromHalAfterInternalSelectedReturn
            return ndk::ScopedAStatus::ok();
        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
     EXPECT_NE(nullptr, halCallback);
-    EXPECT_FALSE(mSoundDoseManager->setHalSoundDoseInterface(nullptr));
+    mSoundDoseManager->resetHalSoundDoseInterfaces();
 
     AudioDevice audioDevice = {};
     audioDevice.address.set<AudioDeviceAddress::id>("test");
@@ -188,7 +215,7 @@ TEST_F(SoundDoseManagerTest, OnNewMelValuesFromHalWithNoAddressIllegalArgument) 
            return ndk::ScopedAStatus::ok();
        });
 
-    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(mHalSoundDose));
+    EXPECT_TRUE(mSoundDoseManager->setHalSoundDoseInterface(kPrimaryModule, mHalSoundDose));
 
     EXPECT_NE(nullptr, halCallback);
     AudioDevice audioDevice = {};
@@ -239,9 +266,56 @@ TEST_F(SoundDoseManagerTest, GetDefaultForceComputeCsdOnAllDevices) {
 }
 
 TEST_F(SoundDoseManagerTest, GetDefaultForceUseFrameworkMel) {
-    // TODO: for now dogfooding with internal MEL. Revert to false when using the HAL MELs
-    EXPECT_TRUE(mSoundDoseManager->forceUseFrameworkMel());
+    EXPECT_FALSE(mSoundDoseManager->forceUseFrameworkMel());
 }
+
+TEST_F(SoundDoseManagerTest, SetAudioDeviceCategoryStopsNonHeadphone) {
+    media::ISoundDose::AudioDeviceCategory device1;
+    device1.address = "dev1";
+    device1.csdCompatible = false;
+    device1.internalAudioType = AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
+    const AudioDeviceTypeAddr dev1Adt{AUDIO_DEVICE_OUT_BLUETOOTH_A2DP, device1.address};
+
+    // this will mark the device as active
+    mSoundDoseManager->mapAddressToDeviceId(dev1Adt, /*deviceId=*/1);
+    EXPECT_CALL(*mMelReporterCallback.get(), stopMelComputationForDeviceId).Times(1);
+
+    mSoundDoseManager->setAudioDeviceCategory(device1);
+}
+
+TEST_F(SoundDoseManagerTest, SetAudioDeviceCategoryStartsHeadphone) {
+    media::ISoundDose::AudioDeviceCategory device1;
+    device1.address = "dev1";
+    device1.csdCompatible = true;
+    device1.internalAudioType = AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
+    const AudioDeviceTypeAddr dev1Adt{AUDIO_DEVICE_OUT_BLUETOOTH_A2DP, device1.address};
+
+        // this will mark the device as active
+    mSoundDoseManager->mapAddressToDeviceId(dev1Adt, /*deviceId=*/1);
+    EXPECT_CALL(*mMelReporterCallback.get(), startMelComputationForDeviceId).Times(1);
+
+    mSoundDoseManager->setAudioDeviceCategory(device1);
+}
+
+TEST_F(SoundDoseManagerTest, InitCachedAudioDevicesStartsOnlyActiveDevices) {
+    media::ISoundDose::AudioDeviceCategory device1;
+    media::ISoundDose::AudioDeviceCategory device2;
+    device1.address = "dev1";
+    device1.csdCompatible = true;
+    device1.internalAudioType = AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
+    device2.address = "dev2";
+    device2.csdCompatible = true;
+    device2.internalAudioType = AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
+    const AudioDeviceTypeAddr dev1Adt{AUDIO_DEVICE_OUT_BLUETOOTH_A2DP, device1.address};
+    std::vector<media::ISoundDose::AudioDeviceCategory> btDevices = {device1, device2};
+
+    // this will mark the device as active
+    mSoundDoseManager->mapAddressToDeviceId(dev1Adt, /*deviceId=*/1);
+    EXPECT_CALL(*mMelReporterCallback.get(), startMelComputationForDeviceId).Times(1);
+
+    mSoundDoseManager->initCachedAudioDeviceCategories(btDevices);
+}
+
 
 }  // namespace
 }  // namespace android

@@ -26,9 +26,11 @@
 #include <aidl/android/hardware/audio/core/BpStreamIn.h>
 #include <aidl/android/hardware/audio/core/BpStreamOut.h>
 #include <aidl/android/hardware/audio/core/MmapBufferDescriptor.h>
+#include <aidl/android/media/audio/IHalAdapterVendorExtension.h>
 #include <fmq/AidlMessageQueue.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
+#include <media/AidlConversionUtil.h>
 #include <media/AudioParameter.h>
 
 #include "ConversionHelperAidl.h"
@@ -48,7 +50,7 @@ class StreamContextAidl {
     typedef AidlMessageQueue<int8_t,
             ::aidl::android::hardware::common::fmq::SynchronizedReadWrite> DataMQ;
 
-    explicit StreamContextAidl(
+    StreamContextAidl(
             ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor,
             bool isAsynchronous)
         : mFrameSizeBytes(descriptor.frameSizeBytes),
@@ -185,6 +187,9 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     status_t legacyReleaseAudioPatch() override;
 
   protected:
+    // For tests.
+    friend class sp<StreamHalAidl>;
+
     template<class T>
     static std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon> getStreamCommon(
             const std::shared_ptr<T>& stream);
@@ -195,7 +200,8 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
             const audio_config& config,
             int32_t nominalLatency,
             StreamContextAidl&& context,
-            const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon>& stream);
+            const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon>& stream,
+            const std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension>& vext);
 
     ~StreamHalAidl() override;
 
@@ -247,6 +253,7 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
             ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply = nullptr);
 
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon> mStream;
+    const std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension> mVendorExt;
     std::mutex mLock;
     ::aidl::android::hardware::audio::core::StreamDescriptor::Reply mLastReply GUARDED_BY(mLock);
     // mStreamPowerLog is used for audio signal power logging.
@@ -349,6 +356,7 @@ class StreamOutHalAidl : public StreamOutHalInterface, public StreamHalAidl {
     StreamOutHalAidl(
             const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamOut>& stream,
+            const std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension>& vext,
             const sp<CallbackBroker>& callbackBroker);
 
     ~StreamOutHalAidl() override;
@@ -401,6 +409,7 @@ class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
     StreamInHalAidl(
             const audio_config& config, StreamContextAidl&& context, int32_t nominalLatency,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamIn>& stream,
+            const std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension>& vext,
             const sp<MicrophoneInfoProvider>& micInfoProvider);
 
     ~StreamInHalAidl() override = default;

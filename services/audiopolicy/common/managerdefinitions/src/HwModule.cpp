@@ -33,6 +33,13 @@ HwModule::HwModule(const char *name, uint32_t halVersionMajor, uint32_t halVersi
     setHalVersion(halVersionMajor, halVersionMinor);
 }
 
+HwModule::HwModule(const char *name, uint32_t halVersion)
+    : mName(String8(name)),
+      mHandle(AUDIO_MODULE_HANDLE_NONE),
+      mHalVersion(halVersion)
+{
+}
+
 HwModule::~HwModule()
 {
     for (size_t i = 0; i < mOutputProfiles.size(); i++) {

@@ -28,6 +28,7 @@
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionEffect.h>
 #include <system/audio.h>
+#include <system/audio_aidl_utils.h>
 #include <utils/Log.h>
 
 #include "EffectBufferHalAidl.h"
@@ -43,6 +44,7 @@ using ::aidl::android::hardware::audio::effect::Processing;
 using ::aidl::android::media::audio::common::AudioSource;
 using ::aidl::android::media::audio::common::AudioStreamType;
 using ::aidl::android::media::audio::common::AudioUuid;
+using ::android::audio::utils::toString;
 using ::android::base::unexpected;
 using ::android::detail::AudioHalVersionInfo;
 
@@ -66,26 +68,28 @@ EffectsFactoryHalAidl::EffectsFactoryHalAidl(std::shared_ptr<IFactory> effectsFa
           }
           return list;
       }()),
-      mUuidProxyMap([this]() {
-          std::map<AudioUuid, std::shared_ptr<EffectProxy>> proxyMap;
-          for (const auto& desc : mHalDescList) {
-              // create EffectProxy
+      mProxyUuidDescriptorMap([this]() {
+          std::map<AudioUuid, std::vector<Descriptor>> proxyUuidMap;
+          for (auto& desc : mHalDescList) {
               if (desc.common.id.proxy.has_value()) {
-                  const auto& uuid = desc.common.id.proxy.value();
-                  if (0 == proxyMap.count(uuid)) {
-                      proxyMap.insert({uuid, ndk::SharedRefBase::make<EffectProxy>(desc.common.id,
-                                                                                   mFactory)});
+                  auto& uuid = desc.common.id.proxy.value();
+                  if (proxyUuidMap.count(uuid) == 0) {
+                      proxyUuidMap.insert({uuid, {desc}});
+                  } else {
+                      proxyUuidMap[uuid].emplace_back(desc);
                   }
-                  proxyMap[uuid]->addSubEffect(desc);
-                  ALOGI("%s addSubEffect %s", __func__, desc.common.toString().c_str());
               }
           }
-          return proxyMap;
+          return proxyUuidMap;
       }()),
       mProxyDescList([this]() {
           std::vector<Descriptor> list;
-          for (const auto& proxy : mUuidProxyMap) {
-              if (Descriptor desc; proxy.second && proxy.second->getDescriptor(&desc).isOk()) {
+          for (const auto& proxy : mProxyUuidDescriptorMap) {
+              if (Descriptor desc;
+                  EffectProxy::buildDescriptor(proxy.first /* uuid */,
+                                               proxy.second /* sub-effect descriptor list */,
+                                               &desc /* proxy descriptor */)
+                          .isOk()) {
                   list.emplace_back(std::move(desc));
               }
           }
@@ -116,7 +120,8 @@ status_t EffectsFactoryHalAidl::queryNumberEffects(uint32_t *pNumEffects) {
     }
 
     *pNumEffects = mEffectCount;
-    ALOGI("%s %d", __func__, *pNumEffects);
+    ALOGD("%s %d non %zu proxyMap %zu proxyDesc %zu", __func__, *pNumEffects,
+          mNonProxyDescList.size(), mProxyUuidDescriptorMap.size(), mProxyDescList.size());
     return OK;
 }
 
@@ -181,38 +186,31 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
     // Use EffectProxy interface instead of IFactory to create
     const bool isProxy = isProxyEffect(aidlUuid);
     if (isProxy) {
-        aidlEffect = mUuidProxyMap.at(aidlUuid);
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mUuidProxyMap.at(aidlUuid)->create()));
+        aidlEffect = ndk::SharedRefBase::make<EffectProxy>(
+                aidlUuid, mProxyUuidDescriptorMap.at(aidlUuid) /* sub-effect descriptor list */,
+                mFactory);
+        mProxyList.emplace_back(std::static_pointer_cast<EffectProxy>(aidlEffect));
     } else {
         RETURN_STATUS_IF_ERROR(
                 statusTFromBinderStatus(mFactory->createEffect(aidlUuid, &aidlEffect)));
     }
     if (aidlEffect == nullptr) {
-        ALOGE("%s failed to create effect with UUID: %s", __func__, aidlUuid.toString().c_str());
+        ALOGE("%s failed to create effect with UUID: %s", __func__, toString(aidlUuid).c_str());
         return NAME_NOT_FOUND;
     }
     Descriptor desc;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(aidlEffect->getDescriptor(&desc)));
 
-    uint64_t effectId;
-    {
-        std::lock_guard lg(mLock);
-        effectId = ++mEffectIdCounter;
-    }
-
-    *effect =
-            sp<EffectHalAidl>::make(mFactory, aidlEffect, effectId, sessionId, ioId, desc, isProxy);
+    *effect = sp<EffectHalAidl>::make(mFactory, aidlEffect, sessionId, ioId, desc, isProxy);
     return OK;
 }
 
 status_t EffectsFactoryHalAidl::dumpEffects(int fd) {
     status_t ret = OK;
     // record the error ret and continue dump as many effects as possible
-    for (const auto& proxy : mUuidProxyMap) {
-        if (proxy.second) {
-            if (status_t temp = proxy.second->dump(fd, nullptr, 0); temp != OK) {
-                ret = temp;
-            }
+    for (const auto& proxy : mProxyList) {
+        if (status_t temp = BAD_VALUE; proxy && (temp = proxy->dump(fd, nullptr, 0)) != OK) {
+            ret = temp;
         }
     }
     RETURN_STATUS_IF_ERROR(mFactory->dump(fd, nullptr, 0));
@@ -244,10 +242,10 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithImplUuid(const AudioUuid& uu
     auto matchIt = std::find_if(list.begin(), list.end(),
                                 [&](const auto& desc) { return desc.common.id.uuid == uuid; });
     if (matchIt == list.end()) {
-        ALOGE("%s UUID not found in HAL and proxy list %s", __func__, uuid.toString().c_str());
+        ALOGE("%s UUID not found in HAL and proxy list %s", __func__, toString(uuid).c_str());
         return BAD_VALUE;
     }
-    ALOGI("%s UUID impl found %s", __func__, uuid.toString().c_str());
+    ALOGI("%s UUID impl found %s", __func__, toString(uuid).c_str());
 
     *pDescriptor = VALUE_OR_RETURN_STATUS(
             ::aidl::android::aidl2legacy_Descriptor_effect_descriptor(*matchIt));
@@ -266,10 +264,10 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithTypeUuid(
     std::copy_if(mProxyDescList.begin(), mProxyDescList.end(), std::back_inserter(result),
                  [&](auto& desc) { return desc.common.id.type == type; });
     if (result.empty()) {
-        ALOGW("%s UUID type not found in HAL and proxy list %s", __func__, type.toString().c_str());
+        ALOGW("%s UUID type not found in HAL and proxy list %s", __func__, toString(type).c_str());
         return BAD_VALUE;
     }
-    ALOGI("%s UUID type found %zu \n %s", __func__, result.size(), type.toString().c_str());
+    ALOGI("%s UUID type found %zu \n %s", __func__, result.size(), toString(type).c_str());
 
     *descriptors = VALUE_OR_RETURN_STATUS(
             aidl::android::convertContainer<std::vector<effect_descriptor_t>>(
@@ -278,7 +276,7 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithTypeUuid(
 }
 
 bool EffectsFactoryHalAidl::isProxyEffect(const AudioUuid& uuid) const {
-    return 0 != mUuidProxyMap.count(uuid);
+    return 0 != mProxyUuidDescriptorMap.count(uuid);
 }
 
 std::shared_ptr<const effectsConfig::Processings> EffectsFactoryHalAidl::getProcessings() const {
@@ -289,7 +287,7 @@ std::shared_ptr<const effectsConfig::Processings> EffectsFactoryHalAidl::getProc
         if (const auto uuid =
                     ::aidl::android::aidl2legacy_AudioUuid_audio_uuid_t(desc.common.id.uuid);
             uuid.ok()) {
-            static_cast<effectsConfig::EffectImpl>(effect).uuid = uuid.value();
+            static_cast<effectsConfig::EffectImpl&>(effect).uuid = uuid.value();
             return std::make_shared<const effectsConfig::Effect>(effect);
         } else {
             return nullptr;

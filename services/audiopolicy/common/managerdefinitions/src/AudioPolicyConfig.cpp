@@ -19,6 +19,9 @@
 #include <AudioPolicyConfig.h>
 #include <IOProfile.h>
 #include <Serializer.h>
+#include <hardware/audio.h>
+#include <media/AidlConversion.h>
+#include <media/AidlConversionUtil.h>
 #include <media/AudioProfile.h>
 #include <system/audio.h>
 #include <system/audio_config.h>
@@ -26,11 +29,162 @@
 
 namespace android {
 
+using media::audio::common::AudioIoFlags;
+using media::audio::common::AudioPortDeviceExt;
+using media::audio::common::AudioPortExt;
+
+namespace {
+
+ConversionResult<sp<PolicyAudioPort>>
+aidl2legacy_portId_PolicyAudioPort(int32_t portId,
+        const std::unordered_map<int32_t, sp<PolicyAudioPort>>& ports) {
+    if (auto it = ports.find(portId); it != ports.end()) {
+        return it->second;
+    }
+    return base::unexpected(BAD_VALUE);
+}
+
+ConversionResult<sp<AudioRoute>>
+aidl2legacy_AudioRoute(const media::AudioRoute& aidl,
+        const std::unordered_map<int32_t, sp<PolicyAudioPort>>& ports) {
+    auto legacy = sp<AudioRoute>::make(aidl.isExclusive ? AUDIO_ROUTE_MUX : AUDIO_ROUTE_MIX);
+    auto legacySink = VALUE_OR_RETURN(aidl2legacy_portId_PolicyAudioPort(aidl.sinkPortId, ports));
+    legacy->setSink(legacySink);
+    PolicyAudioPortVector legacySources;
+    for (int32_t portId : aidl.sourcePortIds) {
+        sp<PolicyAudioPort> legacyPort = VALUE_OR_RETURN(
+                aidl2legacy_portId_PolicyAudioPort(portId, ports));
+        legacySources.add(legacyPort);
+    }
+    legacy->setSources(legacySources);
+    legacySink->addRoute(legacy);
+    for (const auto& legacySource : legacySources) {
+        legacySource->addRoute(legacy);
+    }
+    return legacy;
+}
+
+status_t aidl2legacy_AudioHwModule_HwModule(const media::AudioHwModule& aidl,
+        sp<HwModule>* legacy,
+        DeviceVector* attachedInputDevices, DeviceVector* attachedOutputDevices,
+        sp<DeviceDescriptor>* defaultOutputDevice) {
+    *legacy = sp<HwModule>::make(aidl.name.c_str(), AUDIO_DEVICE_API_VERSION_CURRENT);
+    audio_module_handle_t legacyHandle = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_module_handle_t(aidl.handle));
+    (*legacy)->setHandle(legacyHandle);
+    IOProfileCollection mixPorts;
+    DeviceVector devicePorts;
+    const int defaultDeviceFlag = 1 << AudioPortDeviceExt::FLAG_INDEX_DEFAULT_DEVICE;
+    std::unordered_map<int32_t, sp<PolicyAudioPort>> ports;
+    for (const auto& aidlPort : aidl.ports) {
+        const bool isInput = aidlPort.flags.getTag() == AudioIoFlags::input;
+        audio_port_v7 legacyPort = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioPort_audio_port_v7(aidlPort, isInput));
+        // This conversion fills out both 'hal' and 'sys' parts.
+        media::AudioPortFw fwPort = VALUE_OR_RETURN_STATUS(
+                legacy2aidl_audio_port_v7_AudioPortFw(legacyPort));
+        // Since audio_port_v7 lacks some fields, for example, 'maxOpen/ActiveCount',
+        // replace the converted data with the actual data from the HAL.
+        fwPort.hal = aidlPort;
+        if (aidlPort.ext.getTag() == AudioPortExt::mix) {
+            auto mixPort = sp<IOProfile>::make("", AUDIO_PORT_ROLE_NONE);
+            RETURN_STATUS_IF_ERROR(mixPort->readFromParcelable(fwPort));
+            auto& profiles = mixPort->getAudioProfiles();
+            if (profiles.empty()) {
+                profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
+            } else {
+                sortAudioProfiles(mixPort->getAudioProfiles());
+            }
+            mixPorts.add(mixPort);
+            ports.emplace(aidlPort.id, mixPort);
+        } else if (aidlPort.ext.getTag() == AudioPortExt::device) {
+            // In the legacy XML, device ports use 'tagName' instead of 'AudioPort.name'.
+            auto devicePort =
+                    sp<DeviceDescriptor>::make(AUDIO_DEVICE_NONE, aidlPort.name);
+            RETURN_STATUS_IF_ERROR(devicePort->readFromParcelable(fwPort));
+            devicePort->setName("");
+            auto& profiles = devicePort->getAudioProfiles();
+            if (profiles.empty()) {
+                profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
+            } else {
+                sortAudioProfiles(profiles);
+            }
+            devicePorts.add(devicePort);
+            ports.emplace(aidlPort.id, devicePort);
+
+            if (const auto& deviceExt = aidlPort.ext.get<AudioPortExt::device>();
+                    deviceExt.device.type.connection.empty()) {  // Attached device
+                if (isInput) {
+                    attachedInputDevices->add(devicePort);
+                } else {
+                    attachedOutputDevices->add(devicePort);
+                    if ((deviceExt.flags & defaultDeviceFlag) != 0) {
+                        *defaultOutputDevice = devicePort;
+                    }
+                }
+            }
+        } else {
+            return BAD_VALUE;
+        }
+    }
+    (*legacy)->setProfiles(mixPorts);
+    (*legacy)->setDeclaredDevices(devicePorts);
+    AudioRouteVector routes;
+    for (const auto& aidlRoute : aidl.routes) {
+        sp<AudioRoute> legacy = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioRoute(aidlRoute, ports));
+        routes.add(legacy);
+    }
+    (*legacy)->setRoutes(routes);
+    return OK;
+}
+
+status_t aidl2legacy_AudioHwModules_HwModuleCollection(
+        const std::vector<media::AudioHwModule>& aidl,
+        HwModuleCollection* legacyModules, DeviceVector* attachedInputDevices,
+        DeviceVector* attachedOutputDevices, sp<DeviceDescriptor>* defaultOutputDevice) {
+    for (const auto& aidlModule : aidl) {
+        sp<HwModule> legacy;
+        RETURN_STATUS_IF_ERROR(aidl2legacy_AudioHwModule_HwModule(aidlModule, &legacy,
+                        attachedInputDevices, attachedOutputDevices, defaultOutputDevice));
+        legacyModules->add(legacy);
+    }
+    return OK;
+}
+
+using SurroundFormatFamily = AudioPolicyConfig::SurroundFormats::value_type;
+ConversionResult<SurroundFormatFamily>
+aidl2legacy_SurroundFormatFamily(const media::SurroundSoundConfig::SurroundFormatFamily& aidl) {
+    audio_format_t legacyPrimary = VALUE_OR_RETURN(
+            aidl2legacy_AudioFormatDescription_audio_format_t(aidl.primaryFormat));
+    std::unordered_set<audio_format_t> legacySubs = VALUE_OR_RETURN(
+            convertContainer<std::unordered_set<audio_format_t>>(
+                    aidl.subFormats, aidl2legacy_AudioFormatDescription_audio_format_t));
+    return std::make_pair(legacyPrimary, legacySubs);
+}
+
+ConversionResult<AudioPolicyConfig::SurroundFormats>
+aidl2legacy_SurroundSoundConfig_SurroundFormats(const media::SurroundSoundConfig& aidl) {
+    return convertContainer<AudioPolicyConfig::SurroundFormats>(aidl.formatFamilies,
+            aidl2legacy_SurroundFormatFamily);
+};
+
+}  // namespace
+
 // static
 sp<const AudioPolicyConfig> AudioPolicyConfig::createDefault() {
     auto config = sp<AudioPolicyConfig>::make();
     config->setDefault();
     return config;
+}
+
+// static
+sp<const AudioPolicyConfig> AudioPolicyConfig::loadFromApmAidlConfigWithFallback(
+        const media::AudioPolicyConfig& aidl) {
+    auto config = sp<AudioPolicyConfig>::make();
+    if (status_t status = config->loadFromAidl(aidl); status == NO_ERROR) {
+        return config;
+    }
+    return createDefault();
 }
 
 // static
@@ -100,6 +254,18 @@ void AudioPolicyConfig::augmentData() {
     }
 }
 
+status_t AudioPolicyConfig::loadFromAidl(const media::AudioPolicyConfig& aidl) {
+    RETURN_STATUS_IF_ERROR(aidl2legacy_AudioHwModules_HwModuleCollection(aidl.modules,
+                    &mHwModules, &mInputDevices, &mOutputDevices, &mDefaultOutputDevice));
+    mIsCallScreenModeSupported = std::find(aidl.supportedModes.begin(), aidl.supportedModes.end(),
+            media::audio::common::AudioMode::CALL_SCREEN) != aidl.supportedModes.end();
+    mSurroundFormats = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_SurroundSoundConfig_SurroundFormats(aidl.surroundSoundConfig));
+    mSource = kAidlConfigSource;
+    // No need to augmentData() as AIDL HAL must provide correct mic addresses.
+    return NO_ERROR;
+}
+
 status_t AudioPolicyConfig::loadFromXml(const std::string& xmlFilePath, bool forVts) {
     if (xmlFilePath.empty()) {
         ALOGE("Audio policy configuration file name is empty");
@@ -131,7 +297,8 @@ void AudioPolicyConfig::setDefault() {
     mOutputDevices.add(mDefaultOutputDevice);
     mInputDevices.add(defaultInputDevice);
 
-    sp<HwModule> module = new HwModule(AUDIO_HARDWARE_MODULE_ID_PRIMARY, 2 /*halVersionMajor*/);
+    sp<HwModule> module = new HwModule(
+            AUDIO_HARDWARE_MODULE_ID_PRIMARY, AUDIO_DEVICE_API_VERSION_2_0);
     mHwModules.add(module);
 
     sp<OutputProfile> outProfile = new OutputProfile("primary");

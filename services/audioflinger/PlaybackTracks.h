@@ -23,18 +23,21 @@
 
 // Checks and monitors OP_PLAY_AUDIO
 class OpPlayAudioMonitor : public RefBase {
+    friend class sp<OpPlayAudioMonitor>;
 public:
     ~OpPlayAudioMonitor() override;
     bool hasOpPlayAudio() const;
 
     static sp<OpPlayAudioMonitor> createIfNeeded(
+            AudioFlinger::ThreadBase* thread,
             const AttributionSourceState& attributionSource,
             const audio_attributes_t& attr, int id,
             audio_stream_type_t streamType);
 
 private:
-    OpPlayAudioMonitor(const AttributionSourceState& attributionSource,
-        audio_usage_t usage, int id);
+    OpPlayAudioMonitor(AudioFlinger::ThreadBase* thread,
+                       const AttributionSourceState& attributionSource,
+                       audio_usage_t usage, int id, uid_t uid);
     void onFirstRef() override;
     static void getPackagesForUid(uid_t uid, Vector<String16>& packages);
 
@@ -51,12 +54,15 @@ private:
 
     sp<PlayAudioOpCallback> mOpCallback;
     // called by PlayAudioOpCallback when OP_PLAY_AUDIO is updated in AppOp callback
-    void checkPlayAudioForUsage();
+    void checkPlayAudioForUsage(bool doBroadcast);
 
+    wp<AudioFlinger::ThreadBase> mThread;
     std::atomic_bool mHasOpPlayAudio;
     const AttributionSourceState mAttributionSource;
     const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
     const int mId; // for logging purposes only
+    const uid_t mUid;
+    const String16 mPackageName;
 };
 
 // playback track
@@ -187,8 +193,8 @@ public:
             sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
 
             // This function should be called with holding thread lock.
-            void    updateTeePatches();
-            void    setTeePatchesToUpdate(TeePatches teePatchesToUpdate);
+            void    updateTeePatches_l();
+            void    setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate);
 
     void tallyUnderrunFrames(size_t frames) override {
        if (isOut()) { // we expect this from output tracks only
@@ -335,8 +341,9 @@ protected:
 
 private:
     void                interceptBuffer(const AudioBufferProvider::Buffer& buffer);
+    // Must hold thread lock to access tee patches
     template <class F>
-    void                forEachTeePatchTrack(F f) {
+    void                forEachTeePatchTrack_l(F f) {
         for (auto& tp : mTeePatches) { f(tp.patchTrack); }
     };
 

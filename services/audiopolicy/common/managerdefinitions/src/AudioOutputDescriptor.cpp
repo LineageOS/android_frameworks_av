@@ -163,7 +163,8 @@ bool AudioOutputDescriptor::setVolume(float volumeDb, bool /*muted*/,
                                       const StreamTypeVector &/*streams*/,
                                       const DeviceTypeSet& deviceTypes,
                                       uint32_t delayMs,
-                                      bool force)
+                                      bool force,
+                                      bool isVoiceVolSrc)
 {
 
     if (!supportedDevices().containsDeviceAmongTypes(deviceTypes)) {
@@ -176,7 +177,7 @@ bool AudioOutputDescriptor::setVolume(float volumeDb, bool /*muted*/,
     // - the force flag is set
     if (volumeDb != getCurVolume(volumeSource) || force) {
         ALOGV("%s for volumeSrc %d, volume %f, delay %d", __func__, volumeSource, volumeDb, delayMs);
-        setCurVolume(volumeSource, volumeDb);
+        setCurVolume(volumeSource, volumeDb, isVoiceVolSrc);
         return true;
     }
     return false;
@@ -389,6 +390,11 @@ bool SwAudioOutputDescriptor::supportsAllDevices(const DeviceVector &devices) co
     return supportedDevices().containsAllDevices(devices);
 }
 
+bool SwAudioOutputDescriptor::supportsAtLeastOne(const DeviceVector &devices) const
+{
+    return filterSupportedDevices(devices).size() > 0;
+}
+
 bool SwAudioOutputDescriptor::supportsDevicesForPlayback(const DeviceVector &devices) const
 {
     // No considering duplicated output
@@ -505,11 +511,12 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb, bool muted,
                                         VolumeSource vs, const StreamTypeVector &streamTypes,
                                         const DeviceTypeSet& deviceTypes,
                                         uint32_t delayMs,
-                                        bool force)
+                                        bool force,
+                                        bool isVoiceVolSrc)
 {
     StreamTypeVector streams = streamTypes;
     if (!AudioOutputDescriptor::setVolume(
-            volumeDb, muted, vs, streamTypes, deviceTypes, delayMs, force)) {
+            volumeDb, muted, vs, streamTypes, deviceTypes, delayMs, force, isVoiceVolSrc)) {
         return false;
     }
     if (streams.empty()) {
@@ -555,6 +562,10 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb, bool muted,
     float volumeAmpl = Volume::DbToAmpl(getCurVolume(vs));
     if (hasStream(streams, AUDIO_STREAM_BLUETOOTH_SCO)) {
         mClientInterface->setStreamVolume(AUDIO_STREAM_VOICE_CALL, volumeAmpl, mIoHandle, delayMs);
+        VolumeSource callVolSrc = getVoiceSource();
+        if (callVolSrc != VOLUME_SOURCE_NONE) {
+            setCurVolume(callVolSrc, getCurVolume(vs), true);
+        }
     }
     for (const auto &stream : streams) {
         ALOGV("%s output %d for volumeSource %d, volume %f, delay %d stream=%s", __func__,
@@ -701,12 +712,6 @@ void SwAudioOutputDescriptor::close()
             }
         }
 
-        // TODO(b/73175392) consider improving the AIDL interface.
-        // Signal closing to A2DP HAL.
-        AudioParameter param;
-        param.add(String8(AudioParameter::keyClosing), String8("true"));
-        mClientInterface->setParameters(mIoHandle, param.toString());
-
         mClientInterface->closeOutput(mIoHandle);
 
         LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
@@ -789,10 +794,11 @@ bool HwAudioOutputDescriptor::setVolume(float volumeDb, bool muted,
                                         VolumeSource volumeSource, const StreamTypeVector &streams,
                                         const DeviceTypeSet& deviceTypes,
                                         uint32_t delayMs,
-                                        bool force)
+                                        bool force,
+                                        bool isVoiceVolSrc)
 {
     bool changed = AudioOutputDescriptor::setVolume(
-            volumeDb, muted, volumeSource, streams, deviceTypes, delayMs, force);
+            volumeDb, muted, volumeSource, streams, deviceTypes, delayMs, force, isVoiceVolSrc);
 
     if (changed) {
       // TODO: use gain controller on source device if any to adjust volume

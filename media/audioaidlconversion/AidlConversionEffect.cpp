@@ -52,6 +52,7 @@ using ::android::OK;
 using ::android::status_t;
 using ::android::base::unexpected;
 using ::android::effect::utils::EffectParamReader;
+using ::android::effect::utils::EffectParamWrapper;
 using ::android::effect::utils::EffectParamWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -408,40 +409,7 @@ legacy2aidl_Parameter_Visualizer_uint32_MeasurementMode(uint32_t legacy) {
     }
 }
 
-/**
- * Copy the parameter area of effect_param_t to DefaultExtension::bytes.
- */
-ConversionResult<VendorExtension> legacy2aidl_EffectParameterReader_Param_VendorExtension(
-        EffectParamReader& param) {
-    size_t len = param.getParameterSize();
-    DefaultExtension defaultExt;
-    defaultExt.bytes.resize(len);
-    RETURN_IF_ERROR(param.readFromParameter(defaultExt.bytes.data(), len));
-
-    VendorExtension ext;
-    ext.extension.setParcelable(defaultExt);
-    return ext;
-}
-
-/**
- * Copy the data area of effect_param_t to DefaultExtension::bytes.
- */
-ConversionResult<VendorExtension> legacy2aidl_EffectParameterReader_Data_VendorExtension(
-        EffectParamReader& param) {
-    size_t len = param.getValueSize();
-    DefaultExtension defaultExt;
-    defaultExt.bytes.resize(len);
-    RETURN_IF_ERROR(param.readFromValue(defaultExt.bytes.data(), len));
-
-    VendorExtension ext;
-    ext.extension.setParcelable(defaultExt);
-    return ext;
-}
-
-/**
- * Copy DefaultExtension::bytes to the data area of effect_param_t.
- */
-ConversionResult<status_t> aidl2legacy_VendorExtension_EffectParameterWriter_Data(
+ConversionResult<status_t> aidl2legacy_VendorExtension_EffectParameterWriter(
         EffectParamWriter& param, VendorExtension ext) {
     std::optional<DefaultExtension> defaultExt;
     RETURN_IF_ERROR(ext.extension.getParcelable(&defaultExt));
@@ -449,26 +417,47 @@ ConversionResult<status_t> aidl2legacy_VendorExtension_EffectParameterWriter_Dat
         return unexpected(BAD_VALUE);
     }
 
-    RETURN_IF_ERROR(param.writeToValue(defaultExt->bytes.data(), defaultExt->bytes.size()));
+    // DefaultExtension defaultValue = defaultExt->get();
+    if (defaultExt->bytes.size() < sizeof(effect_param_t)) {
+        return unexpected(BAD_VALUE);
+    }
+    // verify data length with EffectParamWrapper, DefaultExtension array size should not smaller
+    // than (sizeof(effect_param_t) + paddedPSize + vSize)
+    EffectParamWrapper wrapper(*(effect_param_t*)defaultExt->bytes.data());
+    if (sizeof(effect_param_t) + wrapper.getPaddedParameterSize() + wrapper.getValueSize() >
+        defaultExt->bytes.size()) {
+        return unexpected(BAD_VALUE);
+    }
 
+    RETURN_IF_ERROR(param.overwrite(wrapper.getEffectParam()));
     return OK;
 }
 
-ConversionResult<Parameter> legacy2aidl_EffectParameterReader_ParameterExtension(
+ConversionResult<VendorExtension> legacy2aidl_EffectParameterReader_VendorExtension(
         EffectParamReader& param) {
-    VendorExtension ext =
-            VALUE_OR_RETURN(legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
-    return UNION_MAKE(Parameter, specific, UNION_MAKE(Parameter::Specific, vendorEffect, ext));
+    size_t len = param.getTotalSize();
+    DefaultExtension defaultExt;
+    defaultExt.bytes.resize(len);
+
+    std::memcpy(defaultExt.bytes.data(), (void *)&param.getEffectParam(), len);
+
+    VendorExtension ext;
+    ext.extension.setParcelable(defaultExt);
+    return ext;
 }
 
-ConversionResult<::android::status_t> aidl2legacy_ParameterExtension_EffectParameterWriter(
+ConversionResult<::android::status_t> aidl2legacy_Parameter_EffectParameterWriter(
         const ::aidl::android::hardware::audio::effect::Parameter& aidl,
         EffectParamWriter& legacy) {
     VendorExtension ext = VALUE_OR_RETURN(
             (::aidl::android::getParameterSpecific<Parameter, VendorExtension,
                                                    Parameter::Specific::vendorEffect>(aidl)));
-    return VALUE_OR_RETURN_STATUS(
-            aidl2legacy_VendorExtension_EffectParameterWriter_Data(legacy, ext));
+    return VALUE_OR_RETURN_STATUS(aidl2legacy_VendorExtension_EffectParameterWriter(legacy, ext));
+}
+
+ConversionResult<Parameter> legacy2aidl_EffectParameterReader_Parameter(EffectParamReader& param) {
+    VendorExtension ext = VALUE_OR_RETURN(legacy2aidl_EffectParameterReader_VendorExtension(param));
+    return UNION_MAKE(Parameter, specific, UNION_MAKE(Parameter::Specific, vendorEffect, ext));
 }
 
 }  // namespace android

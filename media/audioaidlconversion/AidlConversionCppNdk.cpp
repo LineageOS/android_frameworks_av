@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <map>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -50,6 +51,7 @@ using ::android::String8;
 using ::android::status_t;
 using ::android::base::unexpected;
 
+using media::audio::common::AudioAttributes;
 using media::audio::common::AudioChannelLayout;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
@@ -62,6 +64,7 @@ using media::audio::common::AudioDualMonoMode;
 using media::audio::common::AudioEncapsulationMetadataType;
 using media::audio::common::AudioEncapsulationMode;
 using media::audio::common::AudioEncapsulationType;
+using media::audio::common::AudioFlag;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioFormatType;
 using media::audio::common::AudioGain;
@@ -94,6 +97,20 @@ using media::audio::common::PcmType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Converters
+
+namespace {
+
+std::vector<std::string> splitString(const std::string& s, char separator) {
+    std::istringstream iss(s);
+    std::string t;
+    std::vector<std::string> result;
+    while (std::getline(iss, t, separator)) {
+        result.push_back(std::move(t));
+    }
+    return result;
+}
+
+}  // namespace
 
 ::android::status_t aidl2legacy_string(std::string_view aidl, char* dest, size_t maxSize) {
     if (aidl.size() > maxSize - 1) {
@@ -262,12 +279,17 @@ const detail::AudioChannelPairs& getInAudioChannelPairs() {
 
         DEFINE_INPUT_LAYOUT(MONO),
         DEFINE_INPUT_LAYOUT(STEREO),
+        DEFINE_INPUT_LAYOUT(2POINT1),
         DEFINE_INPUT_LAYOUT(FRONT_BACK),
+        DEFINE_INPUT_LAYOUT(TRI),
+        DEFINE_INPUT_LAYOUT(3POINT1),
         // AUDIO_CHANNEL_IN_6 not supported
         DEFINE_INPUT_LAYOUT(2POINT0POINT2),
         DEFINE_INPUT_LAYOUT(2POINT1POINT2),
         DEFINE_INPUT_LAYOUT(3POINT0POINT2),
         DEFINE_INPUT_LAYOUT(3POINT1POINT2),
+        DEFINE_INPUT_LAYOUT(QUAD),
+        DEFINE_INPUT_LAYOUT(PENTA),
         DEFINE_INPUT_LAYOUT(5POINT1)
 #undef DEFINE_INPUT_LAYOUT
     };
@@ -486,15 +508,6 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
             {
                 AUDIO_DEVICE_IN_ECHO_REFERENCE, make_AudioDeviceDescription(
                         AudioDeviceType::IN_ECHO_REFERENCE)
-            },
-            {
-                AUDIO_DEVICE_IN_REMOTE_SUBMIX, make_AudioDeviceDescription(
-                         AudioDeviceType::IN_SUBMIX)
-            },
-            {
-                AUDIO_DEVICE_OUT_REMOTE_SUBMIX, make_AudioDeviceDescription(
-                        AudioDeviceType::OUT_SUBMIX,
-                        GET_DEVICE_DESC_CONNECTION(VIRTUAL))
             }
         }};
         append_AudioDeviceDescription(pairs,
@@ -570,6 +583,11 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_HEADSET,
                 AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
                 GET_DEVICE_DESC_CONNECTION(BT_LE));
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                AudioDeviceType::IN_SUBMIX, AudioDeviceType::OUT_SUBMIX,
+                GET_DEVICE_DESC_CONNECTION(VIRTUAL));
+
         return pairs;
     }();
     return pairs;
@@ -1799,6 +1817,156 @@ legacy2aidl_audio_usage_t_AudioUsage(audio_usage_t legacy) {
     return unexpected(BAD_VALUE);
 }
 
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_AudioFlag_audio_flags_mask_t(AudioFlag aidl) {
+    switch (aidl) {
+        case AudioFlag::NONE:
+            return AUDIO_FLAG_NONE;
+        case AudioFlag::AUDIBILITY_ENFORCED:
+            return AUDIO_FLAG_AUDIBILITY_ENFORCED;
+        // The is no AudioFlag::SECURE, see the comment in the AudioFlag.aidl
+        //  return AUDIO_FLAG_SECURE;
+        case AudioFlag::SCO:
+            return AUDIO_FLAG_SCO;
+        case AudioFlag::BEACON:
+            return AUDIO_FLAG_BEACON;
+        case AudioFlag::HW_AV_SYNC:
+            return AUDIO_FLAG_HW_AV_SYNC;
+        case AudioFlag::HW_HOTWORD:
+            return AUDIO_FLAG_HW_HOTWORD;
+        case AudioFlag::BYPASS_INTERRUPTION_POLICY:
+            return AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY;
+        case AudioFlag::BYPASS_MUTE:
+            return AUDIO_FLAG_BYPASS_MUTE;
+        case AudioFlag::LOW_LATENCY:
+            return AUDIO_FLAG_LOW_LATENCY;
+        case AudioFlag::DEEP_BUFFER:
+            return AUDIO_FLAG_DEEP_BUFFER;
+        case AudioFlag::NO_MEDIA_PROJECTION:
+            return AUDIO_FLAG_NO_MEDIA_PROJECTION;
+        case AudioFlag::MUTE_HAPTIC:
+            return AUDIO_FLAG_MUTE_HAPTIC;
+        case AudioFlag::NO_SYSTEM_CAPTURE:
+            return AUDIO_FLAG_NO_SYSTEM_CAPTURE;
+        case AudioFlag::CAPTURE_PRIVATE:
+            return AUDIO_FLAG_CAPTURE_PRIVATE;
+        case AudioFlag::CONTENT_SPATIALIZED:
+            return AUDIO_FLAG_CONTENT_SPATIALIZED;
+        case AudioFlag::NEVER_SPATIALIZE:
+            return AUDIO_FLAG_NEVER_SPATIALIZE;
+        case AudioFlag::CALL_REDIRECTION:
+            return AUDIO_FLAG_CALL_REDIRECTION;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<AudioFlag>
+legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy) {
+    switch (legacy) {
+        case AUDIO_FLAG_NONE:
+            return AudioFlag::NONE;
+        case AUDIO_FLAG_AUDIBILITY_ENFORCED:
+            return AudioFlag::AUDIBILITY_ENFORCED;
+        case AUDIO_FLAG_SECURE:
+            return unexpected(BAD_VALUE);
+        case AUDIO_FLAG_SCO:
+            return AudioFlag::SCO;
+        case AUDIO_FLAG_BEACON:
+            return AudioFlag::BEACON;
+        case AUDIO_FLAG_HW_AV_SYNC:
+            return AudioFlag::HW_AV_SYNC;
+        case AUDIO_FLAG_HW_HOTWORD:
+            return AudioFlag::HW_HOTWORD;
+        case AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY:
+            return AudioFlag::BYPASS_INTERRUPTION_POLICY;
+        case AUDIO_FLAG_BYPASS_MUTE:
+            return AudioFlag::BYPASS_MUTE;
+        case AUDIO_FLAG_LOW_LATENCY:
+            return AudioFlag::LOW_LATENCY;
+        case AUDIO_FLAG_DEEP_BUFFER:
+            return AudioFlag::DEEP_BUFFER;
+        case AUDIO_FLAG_NO_MEDIA_PROJECTION:
+            return AudioFlag::NO_MEDIA_PROJECTION;
+        case AUDIO_FLAG_MUTE_HAPTIC:
+            return AudioFlag::MUTE_HAPTIC;
+        case AUDIO_FLAG_NO_SYSTEM_CAPTURE:
+            return AudioFlag::NO_SYSTEM_CAPTURE;
+        case AUDIO_FLAG_CAPTURE_PRIVATE:
+            return AudioFlag::CAPTURE_PRIVATE;
+        case AUDIO_FLAG_CONTENT_SPATIALIZED:
+            return AudioFlag::CONTENT_SPATIALIZED;
+        case AUDIO_FLAG_NEVER_SPATIALIZE:
+            return AudioFlag::NEVER_SPATIALIZE;
+        case AUDIO_FLAG_CALL_REDIRECTION:
+            return AudioFlag::CALL_REDIRECTION;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_int32_t_audio_flags_mask_t_mask(int32_t aidl) {
+    return convertBitmask<audio_flags_mask_t, int32_t, audio_flags_mask_t, AudioFlag>(
+            aidl, aidl2legacy_AudioFlag_audio_flags_mask_t, indexToEnum_bitmask<AudioFlag>,
+            enumToMask_bitmask<audio_flags_mask_t, audio_flags_mask_t>);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_audio_flags_mask_t_int32_t_mask(audio_flags_mask_t legacy) {
+    return convertBitmask<int32_t, audio_flags_mask_t, AudioFlag, audio_flags_mask_t>(
+            legacy, legacy2aidl_audio_flags_mask_t_AudioFlag,
+            indexToEnum_bitmask<audio_flags_mask_t>,
+            enumToMask_bitmask<int32_t, AudioFlag>);
+}
+
+ConversionResult<std::string>
+aidl2legacy_AudioTags_string(const std::vector<std::string>& aidl) {
+    std::ostringstream tagsBuffer;
+    bool hasValue = false;
+    for (const auto& tag : aidl) {
+        if (hasValue) {
+            tagsBuffer << AUDIO_ATTRIBUTES_TAGS_SEPARATOR;
+        }
+        if (strchr(tag.c_str(), AUDIO_ATTRIBUTES_TAGS_SEPARATOR) == nullptr) {
+            tagsBuffer << tag;
+            hasValue = true;
+        } else {
+            ALOGE("Tag is ill-formed: \"%s\"", tag.c_str());
+            return unexpected(BAD_VALUE);
+        }
+    }
+    return tagsBuffer.str();
+}
+
+ConversionResult<std::vector<std::string>>
+legacy2aidl_string_AudioTags(const std::string& legacy) {
+    return splitString(legacy, AUDIO_ATTRIBUTES_TAGS_SEPARATOR);
+}
+
+ConversionResult<audio_attributes_t>
+aidl2legacy_AudioAttributes_audio_attributes_t(const AudioAttributes& aidl) {
+    audio_attributes_t legacy;
+    legacy.content_type = VALUE_OR_RETURN(
+            aidl2legacy_AudioContentType_audio_content_type_t(aidl.contentType));
+    legacy.usage = VALUE_OR_RETURN(aidl2legacy_AudioUsage_audio_usage_t(aidl.usage));
+    legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSource_audio_source_t(aidl.source));
+    legacy.flags = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_flags_mask_t_mask(aidl.flags));
+    auto tagsString = VALUE_OR_RETURN(aidl2legacy_AudioTags_string(aidl.tags));
+    RETURN_IF_ERROR(aidl2legacy_string(tagsString, legacy.tags, sizeof(legacy.tags)));
+    return legacy;
+}
+
+ConversionResult<AudioAttributes>
+legacy2aidl_audio_attributes_t_AudioAttributes(const audio_attributes_t& legacy) {
+    AudioAttributes aidl;
+    aidl.contentType = VALUE_OR_RETURN(
+            legacy2aidl_audio_content_type_t_AudioContentType(legacy.content_type));
+    aidl.usage = VALUE_OR_RETURN(legacy2aidl_audio_usage_t_AudioUsage(legacy.usage));
+    aidl.source = VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSource(legacy.source));
+    aidl.flags = VALUE_OR_RETURN(legacy2aidl_audio_flags_mask_t_int32_t_mask(legacy.flags));
+    auto tagsString = VALUE_OR_RETURN(legacy2aidl_string(legacy.tags, sizeof(legacy.tags)));
+    aidl.tags = VALUE_OR_RETURN(legacy2aidl_string_AudioTags(tagsString));
+    return aidl;
+}
 
 ConversionResult<audio_encapsulation_mode_t>
 aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t(AudioEncapsulationMode aidl) {

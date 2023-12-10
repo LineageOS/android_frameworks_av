@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -24,8 +25,11 @@
 #define LOG_TAG "EffectsFactoryHalInterfaceTest"
 
 #include <aidl/android/media/audio/common/AudioUuid.h>
+#include <gtest/gtest.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <system/audio_aidl_utils.h>
+#include <system/audio_effect.h>
 #include <system/audio_effects/audio_effects_utils.h>
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio_effects/effect_agc.h>
@@ -36,17 +40,15 @@
 #include <system/audio_effects/effect_hapticgenerator.h>
 #include <system/audio_effects/effect_loudnessenhancer.h>
 #include <system/audio_effects/effect_ns.h>
-#include <system/audio_effect.h>
-
-#include <gtest/gtest.h>
 #include <utils/RefBase.h>
 #include <vibrator/ExternalVibrationUtils.h>
 
 namespace android {
 
+using ::aidl::android::media::audio::common::AudioUuid;
+using ::android::audio::utils::toString;
 using effect::utils::EffectParamReader;
 using effect::utils::EffectParamWriter;
-using ::aidl::android::media::audio::common::AudioUuid;
 
 // EffectsFactoryHalInterface
 TEST(libAudioHalTest, createEffectsFactoryHalInterface) {
@@ -195,7 +197,8 @@ using EffectParamTestTuple =
 
 static const effect_uuid_t EXTEND_EFFECT_TYPE_UUID = {
         0xfa81dbde, 0x588b, 0x11ed, 0x9b6a, {0x02, 0x42, 0xac, 0x12, 0x00, 0x02}};
-
+constexpr std::array<uint8_t, 10> kVendorExtensionData({0xff, 0x5, 0x50, 0xab, 0xcd, 0x00, 0xbd,
+                                                        0xdb, 0xee, 0xff});
 std::vector<EffectParamTestTuple> testPairs = {
         std::make_tuple(FX_IID_AEC,
                         createEffectParamCombination(AEC_PARAM_ECHO_DELAY, 0xff /* echoDelayMs */,
@@ -203,12 +206,9 @@ std::vector<EffectParamTestTuple> testPairs = {
         std::make_tuple(FX_IID_AGC,
                         createEffectParamCombination(AGC_PARAM_TARGET_LEVEL, 20 /* targetLevel */,
                                                      sizeof(int16_t) /* returnValueSize */)),
-        std::make_tuple(FX_IID_AGC2, createEffectParamCombination(
-                                             AGC2_PARAM_FIXED_DIGITAL_GAIN, 15 /* digitalGainDb */,
-                                             sizeof(int32_t) /* returnValueSize */)),
         std::make_tuple(SL_IID_BASSBOOST,
                         createEffectParamCombination(BASSBOOST_PARAM_STRENGTH, 20 /* strength */,
-                                                     sizeof(int32_t) /* returnValueSize */)),
+                                                     sizeof(int16_t) /* returnValueSize */)),
         std::make_tuple(EFFECT_UIID_DOWNMIX,
                         createEffectParamCombination(DOWNMIX_PARAM_TYPE, DOWNMIX_TYPE_FOLD,
                                                      sizeof(int16_t) /* returnValueSize */)),
@@ -217,13 +217,6 @@ std::vector<EffectParamTestTuple> testPairs = {
                                 std::array<uint32_t, 2>({DP_PARAM_INPUT_GAIN, 0 /* channel */}),
                                 30 /* gainDb */, sizeof(int32_t) /* returnValueSize */)),
         std::make_tuple(
-                FX_IID_HAPTICGENERATOR,
-                createEffectParamCombination(
-                        HG_PARAM_HAPTIC_INTENSITY,
-                        std::array<uint32_t, 2>(
-                                {1, uint32_t(::android::os::HapticScale::HIGH) /* scale */}),
-                        0 /* returnValueSize */)),
-        std::make_tuple(
                 FX_IID_LOUDNESS_ENHANCER,
                 createEffectParamCombination(LOUDNESS_ENHANCER_PARAM_TARGET_GAIN_MB, 5 /* gain */,
                                              sizeof(int32_t) /* returnValueSize */)),
@@ -231,7 +224,8 @@ std::vector<EffectParamTestTuple> testPairs = {
                         createEffectParamCombination(NS_PARAM_LEVEL, 1 /* level */,
                                                      sizeof(int32_t) /* returnValueSize */)),
         std::make_tuple(&EXTEND_EFFECT_TYPE_UUID,
-                        createEffectParamCombination(1, 0xbead, sizeof(int32_t)))};
+                        createEffectParamCombination(8, kVendorExtensionData,
+                                                     sizeof(kVendorExtensionData)))};
 
 class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTestTuple> {
   public:
@@ -255,7 +249,9 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
           }()) {}
 
     void SetUp() override {
-        ASSERT_NE(0ul, mDescs.size());
+        if (0ul == mDescs.size()) {
+            GTEST_SKIP() << "Effect type not available on device, skipping";
+        }
         for (const auto& desc : mDescs) {
             sp<EffectHalInterface> interface = createEffectHal(desc);
             ASSERT_NE(nullptr, interface);
@@ -264,9 +260,11 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
     }
 
     void initEffect(const sp<EffectHalInterface>& interface) {
-        uint32_t initReply = 0;
-        uint32_t initReplySize = sizeof(initReply);
-        ASSERT_EQ(OK, interface->command(EFFECT_CMD_INIT, 0, nullptr, &initReplySize, &initReply));
+        uint32_t reply = 0;
+        uint32_t replySize = sizeof(reply);
+        ASSERT_EQ(OK, interface->command(EFFECT_CMD_INIT, 0, nullptr, &replySize, &reply));
+        ASSERT_EQ(OK, interface->command(EFFECT_CMD_SET_CONFIG, sizeof(mEffectConfig),
+                                         &mEffectConfig, &replySize, &reply));
     }
 
     void TearDown() override {
@@ -311,7 +309,7 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
             std::vector<uint8_t> response(mCombination->valueSize);
             EXPECT_EQ(OK, parameterGet.readFromValue(response.data(), mCombination->valueSize))
                     << " try get valueSize " << mCombination->valueSize << " from "
-                    << parameterGet.toString();
+                    << parameterGet.toString() << " set " << parameterSet->toString();
             EXPECT_EQ(response, mExpectedValue);
         }
     }
@@ -323,6 +321,23 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
     const std::vector<uint8_t> mExpectedValue;
     const std::vector<effect_descriptor_t> mDescs;
     std::vector<sp<EffectHalInterface>> mHalInterfaces;
+    effect_config_t mEffectConfig = {.inputCfg = {.accessMode = EFFECT_BUFFER_ACCESS_READ,
+                                                  .format = AUDIO_FORMAT_PCM_FLOAT,
+                                                  .bufferProvider.getBuffer = nullptr,
+                                                  .bufferProvider.releaseBuffer = nullptr,
+                                                  .bufferProvider.cookie = nullptr,
+                                                  .mask = EFFECT_CONFIG_ALL,
+                                                  .samplingRate = 48000,
+                                                  .channels = AUDIO_CHANNEL_IN_STEREO},
+
+                                     .outputCfg = {.accessMode = EFFECT_BUFFER_ACCESS_WRITE,
+                                                   .format = AUDIO_FORMAT_PCM_FLOAT,
+                                                   .bufferProvider.getBuffer = nullptr,
+                                                   .bufferProvider.releaseBuffer = nullptr,
+                                                   .bufferProvider.cookie = nullptr,
+                                                   .mask = EFFECT_CONFIG_ALL,
+                                                   .samplingRate = 48000,
+                                                   .channels = AUDIO_CHANNEL_OUT_STEREO}};
 };
 
 TEST_P(libAudioHalEffectParamTest, setAndGetParam) {
@@ -332,13 +347,52 @@ TEST_P(libAudioHalEffectParamTest, setAndGetParam) {
     }
 }
 
+TEST_P(libAudioHalEffectParamTest, deviceIndicationUpdate) {
+    for (auto& interface : mHalInterfaces) {
+        EXPECT_NO_FATAL_FAILURE(initEffect(interface));
+
+        // output device
+        uint32_t deviceTypes = AUDIO_DEVICE_OUT_SPEAKER | AUDIO_DEVICE_OUT_BLE_SPEAKER;
+        status_t cmdStatus;
+        uint32_t replySize = sizeof(cmdStatus);
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_DEVICE, sizeof(uint32_t), &deviceTypes,
+                                         &replySize, &cmdStatus));
+        // input device
+        deviceTypes = AUDIO_DEVICE_IN_WIRED_HEADSET | AUDIO_DEVICE_IN_BLUETOOTH_BLE;
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_DEVICE, sizeof(uint32_t), &deviceTypes,
+                                         &replySize, &cmdStatus));
+    }
+}
+
+TEST_P(libAudioHalEffectParamTest, audioModeIndicationUpdate) {
+    for (auto& interface : mHalInterfaces) {
+        EXPECT_NO_FATAL_FAILURE(initEffect(interface));
+        uint32_t mode = AUDIO_MODE_IN_CALL;
+        status_t cmdStatus;
+        uint32_t replySize = sizeof(cmdStatus);
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_AUDIO_MODE, sizeof(uint32_t), &mode,
+                                         &replySize, &cmdStatus));
+    }
+}
+
+TEST_P(libAudioHalEffectParamTest, audioSourceIndicationUpdate) {
+    for (auto& interface : mHalInterfaces) {
+        EXPECT_NO_FATAL_FAILURE(initEffect(interface));
+        uint32_t source = AUDIO_SOURCE_MIC;
+        status_t cmdStatus;
+        uint32_t replySize = sizeof(cmdStatus);
+        EXPECT_EQ(OK, interface->command(EFFECT_CMD_SET_AUDIO_SOURCE, sizeof(uint32_t), &source,
+                                         &replySize, &cmdStatus));
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(
         libAudioHalEffectParamTest, libAudioHalEffectParamTest, ::testing::ValuesIn(testPairs),
         [](const testing::TestParamInfo<libAudioHalEffectParamTest::ParamType>& info) {
             AudioUuid uuid = ::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid(
                                      *std::get<TUPLE_UUID>(info.param))
                                      .value();
-            std::string name = "UUID_" + uuid.toString();
+            std::string name = "UUID_" + toString(uuid);
             std::replace_if(
                     name.begin(), name.end(), [](const char c) { return !std::isalnum(c); }, '_');
             return name;

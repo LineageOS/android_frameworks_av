@@ -74,6 +74,7 @@
 #include <media/DeviceDescriptorBase.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/VolumeShaper.h>
+#include <mediautils/BatteryNotifier.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/SharedMemoryAllocator.h>
 #include <mediautils/Synchronization.h>
@@ -344,10 +345,10 @@ public:
         const sp<os::ExternalVibration>& externalVibration);
     static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
 
-    status_t addEffectToHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect);
-    status_t removeEffectFromHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect);
+    status_t addEffectToHal(
+            const struct audio_port_config *device, const sp<EffectHalInterface>& effect);
+    status_t removeEffectFromHal(
+            const struct audio_port_config *device, const sp<EffectHalInterface>& effect);
 
     void updateDownStreamPatches_l(const struct audio_patch *patch,
                                    const std::set<audio_io_handle_t>& streams);

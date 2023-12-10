@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <functional>
+
+#include <android/media/audio/common/AudioHalEngineConfig.h>
 #include <EngineConfig.h>
 #include <EngineInterface.h>
 #include <ProductStrategy.h>
@@ -113,6 +116,9 @@ public:
     status_t getDevicesForRoleAndStrategy(product_strategy_t strategy, device_role_t role,
             AudioDeviceTypeAddrVector &devices) const override;
 
+    engineConfig::ParsingResult loadAudioPolicyEngineConfig(
+            const media::audio::common::AudioHalEngineConfig& aidlConfig);
+
     engineConfig::ParsingResult loadAudioPolicyEngineConfig(const std::string& xmlFilePath = "");
 
     const ProductStrategyMap &getProductStrategies() const { return mProductStrategies; }
@@ -176,6 +182,8 @@ protected:
         const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
 
 private:
+    engineConfig::ParsingResult processParsingResult(engineConfig::ParsingResult&& rawResult);
+
     /**
      * Get media devices as the given role
      *

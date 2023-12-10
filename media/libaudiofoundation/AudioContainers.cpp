@@ -119,4 +119,15 @@ std::string dumpDeviceTypes(const DeviceTypeSet &deviceTypes) {
     return ss.str();
 }
 
+std::string dumpMixerBehaviors(const MixerBehaviorSet& mixerBehaviors) {
+    std::stringstream ss;
+    for (auto it = mixerBehaviors.begin(); it != mixerBehaviors.end(); ++it) {
+        if (it != mixerBehaviors.begin()) {
+            ss << ", ";
+        }
+        ss << (*it);
+    }
+    return ss.str();
+}
+
 } // namespace android

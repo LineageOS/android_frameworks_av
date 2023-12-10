@@ -22,11 +22,7 @@
 #include "common/Camera2ClientBase.h"
 #include "api1/client2/Parameters.h"
 #include "api1/client2/FrameProcessor.h"
-//#include "api1/client2/StreamingProcessor.h"
-//#include "api1/client2/JpegProcessor.h"
-//#include "api1/client2/ZslProcessor.h"
-//#include "api1/client2/CaptureSequencer.h"
-//#include "api1/client2/CallbackProcessor.h"
+#include <media/RingBuffer.h>
 
 namespace android {
 
@@ -85,7 +81,7 @@ public:
     virtual status_t        setVideoTarget(const sp<IGraphicBufferProducer>& bufferProducer);
     virtual status_t        setAudioRestriction(int mode);
     virtual int32_t         getGlobalAudioRestriction();
-    virtual status_t        setRotateAndCropOverride(uint8_t rotateAndCrop);
+    virtual status_t        setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal = false);
     virtual status_t        setAutoframingOverride(uint8_t autoframingMode);
 
     virtual bool            supportsCameraMute();
@@ -263,8 +259,8 @@ private:
 
     mutable Mutex mLatestRequestMutex;
     Condition mLatestRequestSignal;
-    int32_t mLatestRequestId = -1;
-    int32_t mLatestFailedRequestId = -1;
+    static constexpr size_t kMaxRequestIds = BufferQueueDefs::NUM_BUFFER_SLOTS;
+    RingBuffer<int32_t> mLatestRequestIds, mLatestFailedRequestIds;
     status_t waitUntilRequestIdApplied(int32_t requestId, nsecs_t timeout);
     status_t waitUntilCurrentRequestIdLocked();
 };

@@ -38,6 +38,7 @@ cc_fuzz {
         "capture_state_listener-aidl-cpp",
         "libaudioclient",
         "libaudiofoundation",
+        "libaudiopolicycomponents",
         "libbase",
         "libcutils",
         "libhidlbase",
@@ -54,7 +55,6 @@ cc_fuzz {
     ],
     static_libs: [
         "android.hardware.audio.common@7.0-enums",
-        "libaudiopolicycomponents",
     ],
     header_libs: [
         "libaudiopolicycommon",

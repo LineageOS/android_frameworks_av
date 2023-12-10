@@ -103,7 +103,7 @@ void FillAudioAttributes::fillAudioAttributes(audio_attributes_t& attr) {
     attr.usage = kUsages[rand() % kUsages.size()];
     attr.source = kInputSources[rand() % kInputSources.size()];
     // attr.flags -> [0, (1 << (CAPTURE_PRIVATE + 1) - 1)]
-    attr.flags = static_cast<audio_flags_mask_t>(rand() & 0x3fff);
+    attr.flags = static_cast<audio_flags_mask_t>(rand() & 0x3ffd);  // exclude AUDIO_FLAG_SECURE
     sprintf(attr.tags, "%s",
             CreateRandomString((int)rand() % (AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1)).c_str());
 }
@@ -119,6 +119,7 @@ class SerializationTest : public FillAudioAttributes, public ::testing::Test {
 TEST_F(SerializationTest, AudioProductStrategyBinderization) {
     for (int j = 0; j < 512; j++) {
         const std::string name{"Test APSBinderization for seed::" + std::to_string(mSeed)};
+        SCOPED_TRACE(name);
         std::vector<VolumeGroupAttributes> volumeGroupAttrVector;
         for (auto i = 0; i < 16; i++) {
             audio_attributes_t attributes;
@@ -132,20 +133,19 @@ TEST_F(SerializationTest, AudioProductStrategyBinderization) {
         AudioProductStrategy aps{name, volumeGroupAttrVector, psId};
 
         Parcel p;
-        EXPECT_EQ(NO_ERROR, aps.writeToParcel(&p)) << name;
+        EXPECT_EQ(NO_ERROR, aps.writeToParcel(&p));
 
         AudioProductStrategy apsCopy;
         p.setDataPosition(0);
-        EXPECT_EQ(NO_ERROR, apsCopy.readFromParcel(&p)) << name;
-        EXPECT_EQ(apsCopy.getName(), name) << name;
-        EXPECT_EQ(apsCopy.getId(), psId) << name;
+        EXPECT_EQ(NO_ERROR, apsCopy.readFromParcel(&p));
+        EXPECT_EQ(apsCopy.getName(), name);
+        EXPECT_EQ(apsCopy.getId(), psId);
         auto avec = apsCopy.getVolumeGroupAttributes();
-        EXPECT_EQ(avec.size(), volumeGroupAttrVector.size()) << name;
-        for (int i = 0; i < volumeGroupAttrVector.size(); i++) {
-            EXPECT_EQ(avec[i].getGroupId(), volumeGroupAttrVector[i].getGroupId()) << name;
-            EXPECT_EQ(avec[i].getStreamType(), volumeGroupAttrVector[i].getStreamType()) << name;
-            EXPECT_TRUE(avec[i].getAttributes() == volumeGroupAttrVector[i].getAttributes())
-                    << name;
+        EXPECT_EQ(avec.size(), volumeGroupAttrVector.size());
+        for (int i = 0; i < std::min(avec.size(), volumeGroupAttrVector.size()); i++) {
+            EXPECT_EQ(avec[i].getGroupId(), volumeGroupAttrVector[i].getGroupId());
+            EXPECT_EQ(avec[i].getStreamType(), volumeGroupAttrVector[i].getStreamType());
+            EXPECT_TRUE(avec[i].getAttributes() == volumeGroupAttrVector[i].getAttributes());
         }
     }
 }

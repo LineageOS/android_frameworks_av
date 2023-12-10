@@ -49,9 +49,9 @@ legacy2aidl_AudioVolumeGroup(const AudioVolumeGroup& legacy) {
     aidl.groupId = VALUE_OR_RETURN(legacy2aidl_volume_group_t_int32_t(legacy.getId()));
     aidl.name = legacy.getName();
     aidl.audioAttributes = VALUE_OR_RETURN(
-            convertContainer<std::vector<media::AudioAttributesInternal>>(
+            convertContainer<std::vector<media::audio::common::AudioAttributes>>(
                     legacy.getAudioAttributes(),
-                    legacy2aidl_audio_attributes_t_AudioAttributesInternal));
+                    legacy2aidl_audio_attributes_t_AudioAttributes));
     aidl.streams = VALUE_OR_RETURN(
             convertContainer<std::vector<AudioStreamType>>(legacy.getStreamTypes(),
             legacy2aidl_audio_stream_type_t_AudioStreamType));
@@ -65,7 +65,7 @@ aidl2legacy_AudioVolumeGroup(const media::AudioVolumeGroup& aidl) {
             VALUE_OR_RETURN(aidl2legacy_int32_t_volume_group_t(aidl.groupId)),
             VALUE_OR_RETURN(convertContainer<AttributesVector>(
                     aidl.audioAttributes,
-                    aidl2legacy_AudioAttributesInternal_audio_attributes_t)),
+                    aidl2legacy_AudioAttributes_audio_attributes_t)),
             VALUE_OR_RETURN(convertContainer<StreamTypeVector>(
                     aidl.streams,
                     aidl2legacy_AudioStreamType_audio_stream_type_t))

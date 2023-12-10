@@ -115,10 +115,53 @@ product_strategy_t EngineBase::getProductStrategyByName(const std::string &name)
     return PRODUCT_STRATEGY_NONE;
 }
 
+engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig(
+        const media::audio::common::AudioHalEngineConfig& aidlConfig)
+{
+    engineConfig::ParsingResult result = engineConfig::convert(aidlConfig);
+    if (result.parsedConfig == nullptr) {
+        ALOGE("%s: There was an error parsing AIDL data", __func__);
+        result = {std::make_unique<engineConfig::Config>(gDefaultEngineConfig), 1};
+    } else {
+        // It is allowed for the HAL to return an empty list of strategies.
+        if (result.parsedConfig->productStrategies.empty()) {
+            result.parsedConfig->productStrategies = gDefaultEngineConfig.productStrategies;
+        }
+    }
+    return processParsingResult(std::move(result));
+}
+
 engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig(const std::string& xmlFilePath)
 {
+    auto fileExists = [](const char* path) {
+        struct stat fileStat;
+        return stat(path, &fileStat) == 0 && S_ISREG(fileStat.st_mode);
+    };
+    const std::string filePath = xmlFilePath.empty() ? engineConfig::DEFAULT_PATH : xmlFilePath;
+    engineConfig::ParsingResult result =
+            fileExists(filePath.c_str()) ?
+            engineConfig::parse(filePath.c_str()) : engineConfig::ParsingResult{};
+    if (result.parsedConfig == nullptr) {
+        ALOGD("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
+        engineConfig::Config config = gDefaultEngineConfig;
+        android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
+        result = {std::make_unique<engineConfig::Config>(config),
+                  static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
+    } else {
+        // Append for internal use only volume groups (e.g. rerouting/patch)
+        result.parsedConfig->volumeGroups.insert(
+                    std::end(result.parsedConfig->volumeGroups),
+                    std::begin(gSystemVolumeGroups), std::end(gSystemVolumeGroups));
+    }
+    ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
+    return processParsingResult(std::move(result));
+}
+
+engineConfig::ParsingResult EngineBase::processParsingResult(
+        engineConfig::ParsingResult&& rawResult)
+{
     auto loadVolumeConfig = [](auto &volumeGroups, auto &volumeConfig) {
-        // Ensure name unicity to prevent duplicate
+        // Ensure volume group name uniqueness.
         LOG_ALWAYS_FATAL_IF(std::any_of(std::begin(volumeGroups), std::end(volumeGroups),
                                      [&volumeConfig](const auto &volumeGroup) {
                 return volumeConfig.name == volumeGroup.second->getName(); }),
@@ -158,42 +201,21 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig(const std::s
         });
         return iter != end(volumeGroups);
     };
-    auto fileExists = [](const char* path) {
-        struct stat fileStat;
-        return stat(path, &fileStat) == 0 && S_ISREG(fileStat.st_mode);
-    };
 
-    const std::string filePath = xmlFilePath.empty() ? engineConfig::DEFAULT_PATH : xmlFilePath;
-    auto result = fileExists(filePath.c_str()) ?
-            engineConfig::parse(filePath.c_str()) : engineConfig::ParsingResult{};
-    if (result.parsedConfig == nullptr) {
-        ALOGD("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
-        engineConfig::Config config = gDefaultEngineConfig;
-        android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
-        result = {std::make_unique<engineConfig::Config>(config),
-                  static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
-    } else {
-        // Append for internal use only volume groups (e.g. rerouting/patch)
-        result.parsedConfig->volumeGroups.insert(
-                    std::end(result.parsedConfig->volumeGroups),
-                    std::begin(gSystemVolumeGroups), std::end(gSystemVolumeGroups));
-    }
+    auto result = std::move(rawResult);
     // Append for internal use only strategies (e.g. rerouting/patch)
     result.parsedConfig->productStrategies.insert(
                 std::end(result.parsedConfig->productStrategies),
                 std::begin(gOrderedSystemStrategies), std::end(gOrderedSystemStrategies));
 
-
-    ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
-
     engineConfig::VolumeGroup defaultVolumeConfig;
     engineConfig::VolumeGroup defaultSystemVolumeConfig;
     for (auto &volumeConfig : result.parsedConfig->volumeGroups) {
         // save default volume config for streams not defined in configuration
-        if (volumeConfig.name.compare("AUDIO_STREAM_MUSIC") == 0) {
+        if (volumeConfig.name.compare(audio_stream_type_to_string(AUDIO_STREAM_MUSIC)) == 0) {
             defaultVolumeConfig = volumeConfig;
         }
-        if (volumeConfig.name.compare("AUDIO_STREAM_PATCH") == 0) {
+        if (volumeConfig.name.compare(audio_stream_type_to_string(AUDIO_STREAM_PATCH)) == 0) {
             defaultSystemVolumeConfig = volumeConfig;
         }
         loadVolumeConfig(mVolumeGroups, volumeConfig);

@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <map>
 #include <memory>
+#include <string>
 
 #define LOG_TAG "DevicesFactoryHalAidl"
 //#define LOG_NDEBUG 0
@@ -34,7 +37,8 @@ using aidl::android::hardware::audio::core::IConfig;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::SurroundSoundConfig;
 using aidl::android::media::audio::common::AudioHalEngineConfig;
-using ::android::detail::AudioHalVersionInfo;
+using aidl::android::media::audio::IHalAdapterVendorExtension;
+using android::detail::AudioHalVersionInfo;
 
 namespace android {
 
@@ -74,6 +78,21 @@ status_t DevicesFactoryHalAidl::getDeviceNames(std::vector<std::string> *names) 
                 if (strcmp(instance, "default") == 0) instance = "primary";
                 static_cast<decltype(names)>(context)->push_back(instance);
             });
+    std::sort(names->begin(), names->end(), [](const std::string& lhs,
+                    const std::string& rhs) {
+        // This order corresponds to the canonical order of modules as specified in
+        // the reference 'audio_policy_configuration_7_0.xml' file.
+        static const std::map<std::string, int> kPriorities{
+            { "primary", 0 }, { "a2dp", 1 }, { "usb", 2 }, { "r_submix", 3 },
+            { "bluetooth", 4 }, { "hearing_aid", 5 }, { "msd", 6 }, { "stub", 7 }
+        };
+        auto lhsIt = kPriorities.find(lhs);
+        auto rhsIt = kPriorities.find(rhs);
+        if (lhsIt != kPriorities.end() && rhsIt != kPriorities.end()) {
+            return lhsIt->second < rhsIt->second;
+        }
+        return lhsIt != kPriorities.end();
+    });
     return OK;
 }
 
@@ -83,25 +102,16 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
     if (name == nullptr || device == nullptr) {
         return BAD_VALUE;
     }
-
-    // FIXME: Remove this call and the check for the supported module names
-    // after implementing retrieval of module names on the framework side.
-    // Currently it is still using the legacy XML config.
-    std::vector<std::string> deviceNames;
-    if (status_t status = getDeviceNames(&deviceNames); status != OK) {
-        return status;
-    }
     std::shared_ptr<IModule> service;
-    if (std::find(deviceNames.begin(), deviceNames.end(), name) != deviceNames.end()) {
-        if (strcmp(name, "primary") == 0) name = "default";
-        auto serviceName = std::string(IModule::descriptor) + "/" + name;
-        service = IModule::fromBinder(
-                ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
-        ALOGE_IF(service == nullptr, "%s fromBinder %s failed", __func__, serviceName.c_str());
+    if (strcmp(name, "primary") == 0) name = "default";
+    auto serviceName = std::string(IModule::descriptor) + "/" + name;
+    service = IModule::fromBinder(
+            ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
+    if (service == nullptr) {
+        ALOGE("%s fromBinder %s failed", __func__, serviceName.c_str());
+        return NO_INIT;
     }
-    // If the service is a nullptr, the device object will not be really functional,
-    // but will not crash either.
-    *device = sp<DeviceHalAidl>::make(name, service);
+    *device = sp<DeviceHalAidl>::make(name, service, getVendorExtension());
     return OK;
 }
 
@@ -161,6 +171,20 @@ status_t DevicesFactoryHalAidl::getEngineConfig(
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mConfig->getEngineConfig(&ndkConfig)));
     *config = VALUE_OR_RETURN_STATUS(ndk2cpp_AudioHalEngineConfig(ndkConfig));
     return OK;
+}
+
+std::shared_ptr<IHalAdapterVendorExtension> DevicesFactoryHalAidl::getVendorExtension() {
+    if (!mVendorExt.has_value()) {
+        auto serviceName = std::string(IHalAdapterVendorExtension::descriptor) + "/default";
+        if (AServiceManager_isDeclared(serviceName.c_str())) {
+            mVendorExt = std::shared_ptr<IHalAdapterVendorExtension>(
+                    IHalAdapterVendorExtension::fromBinder(ndk::SpAIBinder(
+                                    AServiceManager_waitForService(serviceName.c_str()))));
+        } else {
+            mVendorExt = nullptr;
+        }
+    }
+    return mVendorExt.value();
 }
 
 // Main entry-point to the shared library.

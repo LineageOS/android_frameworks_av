@@ -33,6 +33,7 @@
 #include <util/CoreUtils.h>
 
 #include "DeviceHalHidl.h"
+#include "EffectHalHidl.h"
 #include "ParameterUtils.h"
 #include "StreamHalHidl.h"
 
@@ -144,13 +145,15 @@ status_t StreamHalHidl::getParameters(const String8& keys, String8 *values) {
 status_t StreamHalHidl::addEffect(sp<EffectHalInterface> effect) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return processReturn("addEffect", mStream->addEffect(effect->effectId()));
+    auto hidlEffect = sp<effect::EffectHalHidl>::cast(effect);
+    return processReturn("addEffect", mStream->addEffect(hidlEffect->effectId()));
 }
 
 status_t StreamHalHidl::removeEffect(sp<EffectHalInterface> effect) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return processReturn("removeEffect", mStream->removeEffect(effect->effectId()));
+    auto hidlEffect = sp<effect::EffectHalHidl>::cast(effect);
+    return processReturn("removeEffect", mStream->removeEffect(hidlEffect->effectId()));
 }
 
 status_t StreamHalHidl::standby() {
@@ -979,9 +982,10 @@ void StreamOutHalHidl::onRecommendedLatencyModeChanged(
 }
 
 status_t StreamOutHalHidl::exit() {
-    // Signal exiting to remote_submix HAL.
+    // Signal exiting to HALs that use intermediate pipes to close them.
     AudioParameter param;
     param.addInt(String8(AudioParameter::keyExiting), 1);
+    param.add(String8(AudioParameter::keyClosing), String8(AudioParameter::valueTrue));
     return setParameters(param.toString());
 }
 

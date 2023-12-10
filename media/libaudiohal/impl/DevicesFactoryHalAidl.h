@@ -17,6 +17,7 @@
 #pragma once
 
 #include <aidl/android/hardware/audio/core/IConfig.h>
+#include <aidl/android/media/audio/IHalAdapterVendorExtension.h>
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/RefBase.h>
 
@@ -46,6 +47,11 @@ class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
 
   private:
     const std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> mConfig;
+    std::optional<std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension>>
+            mVendorExt;
+
+    std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension> getVendorExtension();
+
     ~DevicesFactoryHalAidl() = default;
 };
 

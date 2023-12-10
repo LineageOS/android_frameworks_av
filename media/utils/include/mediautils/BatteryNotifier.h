@@ -68,6 +68,38 @@ private:
     sp<IBatteryStats> getBatteryService_l();
 };
 
+namespace mediautils {
+class BatteryStatsAudioHandle {
+  public:
+    static constexpr uid_t INVALID_UID = static_cast<uid_t>(-1);
+
+    explicit BatteryStatsAudioHandle(uid_t uid) : mUid(uid) {
+        if (uid != INVALID_UID) {
+            BatteryNotifier::getInstance().noteStartAudio(mUid);
+        }
+    }
+
+    BatteryStatsAudioHandle(BatteryStatsAudioHandle&& other) : mUid(other.mUid) {
+        other.mUid = INVALID_UID;
+    }
+
+    BatteryStatsAudioHandle(const BatteryStatsAudioHandle& other) = delete;
+
+    BatteryStatsAudioHandle& operator=(const BatteryStatsAudioHandle& other) = delete;
+
+    BatteryStatsAudioHandle& operator=(BatteryStatsAudioHandle&& other) = delete;
+
+    ~BatteryStatsAudioHandle() {
+        if (mUid != INVALID_UID) {
+            BatteryNotifier::getInstance().noteStopAudio(mUid);
+        }
+    }
+
+  private:
+    // Logically const
+    uid_t mUid = INVALID_UID;
+};
+}  // namespace mediautils
 }  // namespace android
 
 #endif // MEDIA_BATTERY_NOTIFIER_H

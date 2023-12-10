@@ -125,3 +125,12 @@ TEST_P(AudioFormatDescriptionRoundTripTest, Ndk2Cpp2Ndk) {
 INSTANTIATE_TEST_SUITE_P(AudioFormatDescriptionRoundTrip, AudioFormatDescriptionRoundTripTest,
         testing::Values(make_AFD_Invalid(), make_AFD_Default(), make_AFD_Pcm16Bit(),
                 make_AFD_Bitstream(), make_AFD_Encap(), make_AFD_Encap_with_Enc()));
+
+TEST(AudioPortRoundTripTest, Ndk2Cpp2Ndk) {
+    const AudioPort initial;
+    auto conv = ndk2cpp_AudioPort(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = cpp2ndk_AudioPort(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}

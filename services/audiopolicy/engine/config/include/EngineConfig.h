@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <system/audio.h>
-
 #include <string>
 #include <vector>
+
+#include <android/media/audio/common/AudioHalEngineConfig.h>
+#include <system/audio.h>
 #include <utils/Errors.h>
 
 struct _xmlNode;
@@ -116,6 +117,7 @@ struct ParsingResult {
  */
 ParsingResult parse(const char* path = DEFAULT_PATH);
 android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups);
+ParsingResult convert(const ::android::media::audio::common::AudioHalEngineConfig& aidlConfig);
 // Exposed for testing.
 android::status_t parseLegacyVolumeFile(const char* path, VolumeGroups &volumeGroups);
 

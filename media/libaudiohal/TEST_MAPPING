@@ -16,6 +16,9 @@
           "include-filter": "android.nativemedia.aaudio.AAudioTests#AAudioBasic_TestAAudioBasic_TestBasic_LOW_LATENCY__OUTPUT"
         }
       ]
+    },
+    {
+      "name": "CoreAudioHalAidlTest"
     }
   ]
 }

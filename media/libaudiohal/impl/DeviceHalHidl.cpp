@@ -32,6 +32,7 @@
 #include <util/CoreUtils.h>
 
 #include "DeviceHalHidl.h"
+#include "EffectHalHidl.h"
 #include "ParameterUtils.h"
 #include "StreamHalHidl.h"
 
@@ -523,30 +524,32 @@ status_t DeviceHalHidl::getMicrophones(
 
 #if MAJOR_VERSION >= 6
 status_t DeviceHalHidl::addDeviceEffect(
-        audio_port_handle_t device, sp<EffectHalInterface> effect) {
+        const struct audio_port_config *device, sp<EffectHalInterface> effect) {
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
+    auto hidlEffect = sp<effect::EffectHalHidl>::cast(effect);
     return processReturn("addDeviceEffect", mDevice->addDeviceEffect(
-            static_cast<AudioPortHandle>(device), effect->effectId()));
+            static_cast<AudioPortHandle>(device->id), hidlEffect->effectId()));
 }
 #else
 status_t DeviceHalHidl::addDeviceEffect(
-        audio_port_handle_t device __unused, sp<EffectHalInterface> effect __unused) {
+        const struct audio_port_config *device __unused, sp<EffectHalInterface> effect __unused) {
     return INVALID_OPERATION;
 }
 #endif
 
 #if MAJOR_VERSION >= 6
 status_t DeviceHalHidl::removeDeviceEffect(
-        audio_port_handle_t device, sp<EffectHalInterface> effect) {
+        const struct audio_port_config *device, sp<EffectHalInterface> effect) {
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
+    auto hidlEffect = sp<effect::EffectHalHidl>::cast(effect);
     return processReturn("removeDeviceEffect", mDevice->removeDeviceEffect(
-            static_cast<AudioPortHandle>(device), effect->effectId()));
+            static_cast<AudioPortHandle>(device->id), hidlEffect->effectId()));
 }
 #else
 status_t DeviceHalHidl::removeDeviceEffect(
-        audio_port_handle_t device __unused, sp<EffectHalInterface> effect __unused) {
+        const struct audio_port_config *device __unused, sp<EffectHalInterface> effect __unused) {
     return INVALID_OPERATION;
 }
 #endif
@@ -681,4 +684,26 @@ status_t DeviceHalHidl::getSoundDoseInterface(const std::string& module,
 }
 #endif
 
+status_t DeviceHalHidl::supportsBluetoothVariableLatency(bool* supports) {
+    if (supports == nullptr) {
+        return BAD_VALUE;
+    }
+    *supports = false;
+
+    String8 reply;
+    status_t status = getParameters(
+            String8(AUDIO_PARAMETER_BT_VARIABLE_LATENCY_SUPPORTED), &reply);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    AudioParameter replyParams(reply);
+    String8 trueOrFalse;
+    status = replyParams.get(
+            String8(AUDIO_PARAMETER_BT_VARIABLE_LATENCY_SUPPORTED), trueOrFalse);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    *supports = trueOrFalse == AudioParameter::valueTrue;
+    return NO_ERROR;
+}
 } // namespace android

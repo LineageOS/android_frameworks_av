@@ -35,6 +35,7 @@ cc_library_shared {
         "libaudiofoundation",
         "libaudiohal",
         "libaudiopolicy",
+        "libaudiopolicycomponents",
         "libaudiopolicymanagerdefault",
         "libaudiousecasevalidation",
         "libaudioutils",
@@ -66,7 +67,6 @@ cc_library_shared {
     ],
 
     static_libs: [
-        "libaudiopolicycomponents",
         "framework-permission-aidl-cpp",
     ],
 

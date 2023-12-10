@@ -103,6 +103,13 @@ public:
 
     virtual void getConsumerUsage(uint64_t *consumerUsage);
 
+    /**
+     * Invalidate the class.
+     *
+     * After the call, fetchGraphicBlock() will return C2_BAD_STATE.
+     */
+    virtual void invalidate();
+
 private:
     const std::shared_ptr<C2Allocator> mAllocator;
     const local_id_t mLocalId;

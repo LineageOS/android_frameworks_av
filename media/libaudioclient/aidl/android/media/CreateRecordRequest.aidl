@@ -16,8 +16,8 @@
 
 package android.media;
 
-import android.media.AudioAttributesInternal;
 import android.media.AudioClient;
+import android.media.audio.common.AudioAttributes;
 import android.media.audio.common.AudioConfigBase;
 
 /**
@@ -28,7 +28,7 @@ import android.media.audio.common.AudioConfigBase;
  * {@hide}
  */
 parcelable CreateRecordRequest {
-    AudioAttributesInternal attr;
+    AudioAttributes attr;
     AudioConfigBase config;
     AudioClient clientInfo;
     /** Interpreted as audio_unique_id_t. */

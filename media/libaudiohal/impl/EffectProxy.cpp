@@ -15,15 +15,19 @@
  */
 
 #include <algorithm>
+#include <cstddef>
+#include <iterator>
 #include <memory>
 #define LOG_TAG "EffectProxy"
-//#define LOG_NDEBUG 0
+// #define LOG_NDEBUG 0
 
 #include <fmq/AidlMessageQueue.h>
+#include <system/audio_aidl_utils.h>
 #include <utils/Log.h>
 
 #include "EffectProxy.h"
 
+using ::aidl::android::hardware::audio::effect::Capability;
 using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::Flags;
@@ -33,17 +37,27 @@ using ::aidl::android::hardware::audio::effect::Parameter;
 using ::aidl::android::hardware::audio::effect::State;
 using ::aidl::android::media::audio::common::AudioUuid;
 
-namespace android {
-namespace effect {
+namespace android::effect {
 
-EffectProxy::EffectProxy(const Descriptor::Identity& id, const std::shared_ptr<IFactory>& factory)
-    : mIdentity([](const Descriptor::Identity& subId) {
-          // update EffectProxy implementation UUID to the sub-effect proxy UUID
-          ALOG_ASSERT(subId.proxy.has_value(), "Sub-effect Identity must have valid proxy UUID");
-          Descriptor::Identity tempId = subId;
-          tempId.uuid = subId.proxy.value();
-          return tempId;
-      }(id)),
+EffectProxy::EffectProxy(const AudioUuid& uuid, const std::vector<Descriptor>& descriptors,
+                         const std::shared_ptr<IFactory>& factory)
+    : mDescriptorCommon(buildDescriptorCommon(uuid, descriptors)),
+      mSubEffects(
+              [](const std::vector<Descriptor>& descs, const std::shared_ptr<IFactory>& factory) {
+                  std::vector<SubEffect> subEffects;
+                  ALOG_ASSERT(factory, "invalid EffectFactory handle");
+                  ndk::ScopedAStatus status = ndk::ScopedAStatus::ok();
+                  for (const auto& desc : descs) {
+                      SubEffect sub({.descriptor = desc});
+                      status = factory->createEffect(desc.common.id.uuid, &sub.handle);
+                      if (!status.isOk() || !sub.handle) {
+                          ALOGW("%s create sub-effect %s failed", __func__,
+                                ::android::audio::utils::toString(desc.common.id.uuid).c_str());
+                      }
+                      subEffects.emplace_back(sub);
+                  }
+                  return subEffects;
+              }(descriptors, factory)),
       mFactory(factory) {}
 
 EffectProxy::~EffectProxy() {
@@ -52,68 +66,9 @@ EffectProxy::~EffectProxy() {
     mSubEffects.clear();
 }
 
-// sub effect must have same proxy UUID as EffectProxy, and the type UUID must match.
-ndk::ScopedAStatus EffectProxy::addSubEffect(const Descriptor& sub) {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
-    if (0 != mSubEffects.count(sub.common.id) || !sub.common.id.proxy.has_value() ||
-        sub.common.id.proxy.value() != mIdentity.uuid) {
-        ALOGE("%s sub effect already exist or mismatch %s", __func__, sub.toString().c_str());
-        return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
-                                                                "illegalSubEffect");
-    }
-
-    // not create sub-effect yet
-    std::get<SubEffectTupleIndex::HANDLE>(mSubEffects[sub.common.id]) = nullptr;
-    std::get<SubEffectTupleIndex::DESCRIPTOR>(mSubEffects[sub.common.id]) = sub;
-    // set the last added sub-effect to active before setOffloadParam()
-    mActiveSub = sub.common.id;
-    ALOGI("%s add %s to proxy %s flag %s", __func__, mActiveSub.toString().c_str(),
-          mIdentity.toString().c_str(), sub.common.flags.toString().c_str());
-
-    if (sub.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL) {
-        mSubFlags.hwAcceleratorMode = Flags::HardwareAccelerator::TUNNEL;
-    }
-
-    // initial flag values before we know which sub-effect to active (with setOffloadParam)
-    // same as HIDL EffectProxy flags
-    mSubFlags.type = Flags::Type::INSERT;
-    mSubFlags.insert = Flags::Insert::LAST;
-    mSubFlags.volume = Flags::Volume::CTRL;
-
-    // set indication if any sub-effect indication was set
-    mSubFlags.offloadIndication |= sub.common.flags.offloadIndication;
-    mSubFlags.deviceIndication |= sub.common.flags.deviceIndication;
-    mSubFlags.audioModeIndication |= sub.common.flags.audioModeIndication;
-    mSubFlags.audioSourceIndication |= sub.common.flags.audioSourceIndication;
-
-    // set bypass when all sub-effects are bypassing
-    mSubFlags.bypass &= sub.common.flags.bypass;
-    return ndk::ScopedAStatus::ok();
-}
-
-ndk::ScopedAStatus EffectProxy::create() {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
-    ndk::ScopedAStatus status = ndk::ScopedAStatus::ok();
-
-    for (auto& sub : mSubEffects) {
-        auto& effectHandle = std::get<SubEffectTupleIndex::HANDLE>(sub.second);
-        ALOGI("%s sub-effect %s", __func__, sub.first.uuid.toString().c_str());
-        status = mFactory->createEffect(sub.first.uuid, &effectHandle);
-        if (!status.isOk() || !effectHandle) {
-            ALOGE("%s sub-effect failed %s", __func__, sub.first.uuid.toString().c_str());
-            break;
-        }
-    }
-
-    // destroy all created effects if failure
-    if (!status.isOk()) {
-        destroy();
-    }
-    return status;
-}
-
 ndk::ScopedAStatus EffectProxy::destroy() {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
+    ALOGV("%s: %s", __func__,
+          ::android::audio::utils::toString(mDescriptorCommon.id.type).c_str());
     return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
         ndk::ScopedAStatus status = mFactory->destroyEffect(effect);
         if (status.isOk()) {
@@ -123,49 +78,53 @@ ndk::ScopedAStatus EffectProxy::destroy() {
     });
 }
 
-const IEffect::OpenEffectReturn* EffectProxy::getEffectReturnParam() {
-    return &std::get<SubEffectTupleIndex::RETURN>(mSubEffects[mActiveSub]);
-}
-
 ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* offload) {
     const auto& itor = std::find_if(mSubEffects.begin(), mSubEffects.end(), [&](const auto& sub) {
-        const auto& desc = std::get<SubEffectTupleIndex::DESCRIPTOR>(sub.second);
-        ALOGI("%s: isOffload %d sub-effect: %s, flags %s", __func__, offload->isOffload,
-              desc.common.id.uuid.toString().c_str(), desc.common.flags.toString().c_str());
+        const auto& desc = sub.descriptor;
         return offload->isOffload ==
                (desc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL);
     });
     if (itor == mSubEffects.end()) {
         ALOGE("%s no %soffload sub-effect found", __func__, offload->isOffload ? "" : "non-");
+        mActiveSubIdx = 0;
         return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_NULL_POINTER,
                                                                 "noActiveEffctFound");
     }
 
-    mActiveSub = itor->first;
-    ALOGI("%s: active %soffload sub-effect: %s, flags %s", __func__,
-          offload->isOffload ? "" : "non-", mActiveSub.uuid.toString().c_str(),
-          std::get<SubEffectTupleIndex::DESCRIPTOR>(itor->second).common.flags.toString().c_str());
-    return ndk::ScopedAStatus::ok();
+    const size_t newIndex = std::distance(mSubEffects.begin(), itor);
+    mActiveSubIdx = newIndex;
+
+    ALOGI("%s: active %soffload sub-effect %zu descriptor: %s", __func__,
+          offload->isOffload ? "" : "non-", mActiveSubIdx,
+          ::android::audio::utils::toString(mSubEffects[mActiveSubIdx].descriptor.common.id.uuid)
+                  .c_str());
+    return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
+        return effect->setParameter(Parameter::make<Parameter::offload>(offload->isOffload));
+    });
 }
 
 // EffectProxy go over sub-effects and call IEffect interfaces
 ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
                                      const std::optional<Parameter::Specific>& specific,
                                      IEffect::OpenEffectReturn* ret __unused) {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
     ndk::ScopedAStatus status = ndk::ScopedAStatus::fromExceptionCodeWithMessage(
             EX_ILLEGAL_ARGUMENT, "nullEffectHandle");
     for (auto& sub : mSubEffects) {
-        auto& effect = std::get<SubEffectTupleIndex::HANDLE>(sub.second);
-        auto& openRet = std::get<SubEffectTupleIndex::RETURN>(sub.second);
-        if (!effect || !(status = effect->open(common, specific, &openRet)).isOk()) {
-            ALOGE("%s: failed to open UUID %s", __func__, sub.first.uuid.toString().c_str());
+        IEffect::OpenEffectReturn openReturn;
+        if (!sub.handle || !(status = sub.handle->open(common, specific, &openReturn)).isOk()) {
+            ALOGE("%s: failed to open %p UUID %s", __func__, sub.handle.get(),
+                  ::android::audio::utils::toString(sub.descriptor.common.id.uuid).c_str());
             break;
         }
+        sub.effectMq.statusQ = std::make_shared<StatusMQ>(openReturn.statusMQ);
+        sub.effectMq.inputQ = std::make_shared<DataMQ>(openReturn.inputDataMQ);
+        sub.effectMq.outputQ = std::make_shared<DataMQ>(openReturn.outputDataMQ);
     }
 
     // close all opened effects if failure
     if (!status.isOk()) {
+        ALOGE("%s: closing all sub-effects with error %s", __func__,
+              status.getDescription().c_str());
         close();
     }
 
@@ -173,38 +132,62 @@ ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
 }
 
 ndk::ScopedAStatus EffectProxy::close() {
-    ALOGV("%s: %s", __func__, mIdentity.type.toString().c_str());
     return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
         return effect->close();
     });
 }
 
 ndk::ScopedAStatus EffectProxy::getDescriptor(Descriptor* desc) {
+    *desc = mSubEffects[mActiveSubIdx].descriptor;
+    desc->common.id.uuid = desc->common.id.proxy.value();
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus EffectProxy::buildDescriptor(const AudioUuid& uuid,
+                                                const std::vector<Descriptor>& subEffectDescs,
+                                                Descriptor* desc) {
     if (!desc) {
-        ALOGE("%s: nuull descriptor pointer", __func__);
+        ALOGE("%s: null descriptor pointer", __func__);
         return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_NULL_POINTER, "nullptr");
     }
 
-    auto& activeSubEffect = std::get<SubEffectTupleIndex::HANDLE>(mSubEffects[mActiveSub]);
-    // return initial descriptor if no active sub-effect exist
-    if (!activeSubEffect) {
-        desc->common.id = mIdentity;
-        desc->common.flags = mSubFlags;
-        desc->common.name = "Proxy";
-        desc->common.implementor = "AOSP";
-    } else {
-        *desc = std::get<SubEffectTupleIndex::DESCRIPTOR>(mSubEffects[mActiveSub]);
-        desc->common.id = mIdentity;
+    if (subEffectDescs.size() < 2) {
+        ALOGE("%s: proxy need at least 2 sub-effects, got %zu", __func__, subEffectDescs.size());
+        return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
+                                                                "needMoreSubEffects");
     }
 
-    ALOGI("%s with %s", __func__, desc->toString().c_str());
+    desc->common = buildDescriptorCommon(uuid, subEffectDescs);
     return ndk::ScopedAStatus::ok();
+}
+
+Descriptor::Common EffectProxy::buildDescriptorCommon(
+        const AudioUuid& uuid, const std::vector<Descriptor>& subEffectDescs) {
+    Descriptor::Common common;
+    for (const auto& desc : subEffectDescs) {
+        if (desc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL) {
+            common.flags.hwAcceleratorMode = Flags::HardwareAccelerator::TUNNEL;
+        }
+
+        // set indication if any sub-effect indication was set
+        common.flags.offloadIndication |= desc.common.flags.offloadIndication;
+        common.flags.deviceIndication |= desc.common.flags.deviceIndication;
+        common.flags.audioModeIndication |= desc.common.flags.audioModeIndication;
+        common.flags.audioSourceIndication |= desc.common.flags.audioSourceIndication;
+    }
+
+    // copy type UUID from any of sub-effects, all sub-effects should have same type
+    common.id.type = subEffectDescs[0].common.id.type;
+    // replace implementation UUID with proxy UUID.
+    common.id.uuid = uuid;
+    common.id.proxy = std::nullopt;
+    common.name = "Proxy";
+    common.implementor = "AOSP";
+    return common;
 }
 
 // Handle with active sub-effect first, only send to other sub-effects when success
 ndk::ScopedAStatus EffectProxy::command(CommandId id) {
-    ALOGV("%s: %s, command %s", __func__, mIdentity.type.toString().c_str(),
-          android::internal::ToString(id).c_str());
     return runWithActiveSubEffectThenOthers(
             [&](const std::shared_ptr<IEffect>& effect) -> ndk::ScopedAStatus {
                 return effect->command(id);
@@ -239,34 +222,33 @@ ndk::ScopedAStatus EffectProxy::runWithActiveSubEffectThenOthers(
         std::function<ndk::ScopedAStatus(const std::shared_ptr<IEffect>&)> const& func) {
     ndk::ScopedAStatus status = runWithActiveSubEffect(func);
     if (!status.isOk()) {
-        return status;
+        ALOGE("%s active sub-effect return error %s", __func__, status.getDescription().c_str());
     }
 
-    // proceed with others if active sub-effect success
-    for (const auto& sub : mSubEffects) {
-        auto& effect = std::get<SubEffectTupleIndex::HANDLE>(sub.second);
-        if (sub.first != mActiveSub) {
-            if (!effect) {
-                ALOGE("%s null sub-effect interface for %s", __func__,
-                      sub.first.toString().c_str());
-                continue;
-            }
-            func(effect);
+    // proceed with others
+    for (size_t i = 0; i < mSubEffects.size(); i++) {
+        if (i == mActiveSubIdx) {
+            continue;
         }
+        if (!mSubEffects[i].handle) {
+            ALOGE("%s null sub-effect interface for %s", __func__,
+                  mSubEffects[i].descriptor.common.id.uuid.toString().c_str());
+            continue;
+        }
+        func(mSubEffects[i].handle);
     }
     return status;
 }
 
 ndk::ScopedAStatus EffectProxy::runWithActiveSubEffect(
         std::function<ndk::ScopedAStatus(const std::shared_ptr<IEffect>&)> const& func) {
-    auto& effect = std::get<SubEffectTupleIndex::HANDLE>(mSubEffects[mActiveSub]);
-    if (!effect) {
+    if (!mSubEffects[mActiveSubIdx].handle) {
         ALOGE("%s null active sub-effect interface, active %s", __func__,
-              mActiveSub.toString().c_str());
+              mSubEffects[mActiveSubIdx].descriptor.toString().c_str());
         return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_NULL_POINTER,
                                                                 "activeSubEffectNull");
     }
-    return func(effect);
+    return func(mSubEffects[mActiveSubIdx].handle);
 }
 
 ndk::ScopedAStatus EffectProxy::runWithAllSubEffects(
@@ -274,12 +256,11 @@ ndk::ScopedAStatus EffectProxy::runWithAllSubEffects(
     ndk::ScopedAStatus status = ndk::ScopedAStatus::ok();
     // proceed with others if active sub-effect success
     for (auto& sub : mSubEffects) {
-        auto& effect = std::get<SubEffectTupleIndex::HANDLE>(sub.second);
-        if (!effect) {
-            ALOGW("%s null sub-effect interface for %s", __func__, sub.first.toString().c_str());
+        if (!sub.handle) {
+            ALOGW("%s null sub-effect interface %s", __func__, sub.descriptor.toString().c_str());
             continue;
         }
-        ndk::ScopedAStatus temp = func(effect);
+        ndk::ScopedAStatus temp = func(sub.handle);
         if (!temp.isOk()) {
             status = ndk::ScopedAStatus::fromStatus(temp.getStatus());
         }
@@ -287,5 +268,34 @@ ndk::ScopedAStatus EffectProxy::runWithAllSubEffects(
     return status;
 }
 
-} // namespace effect
-} // namespace android
+bool EffectProxy::isBypassing() const {
+    return mSubEffects[mActiveSubIdx].descriptor.common.flags.bypass;
+}
+
+binder_status_t EffectProxy::dump(int fd, const char** args, uint32_t numArgs) {
+    const std::string dumpString = toString();
+    write(fd, dumpString.c_str(), dumpString.size());
+
+    return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
+               return ndk::ScopedAStatus::fromStatus(effect->dump(fd, args, numArgs));
+           })
+            .getStatus();
+}
+
+std::string EffectProxy::toString(size_t level) const {
+    std::string prefixSpace(level, ' ');
+    std::string ss = prefixSpace + "EffectProxy:\n";
+    prefixSpace += " ";
+    base::StringAppendF(&ss, "%sDescriptorCommon: %s\n", prefixSpace.c_str(),
+                        mDescriptorCommon.toString().c_str());
+    base::StringAppendF(&ss, "%sActiveSubIdx: %zu\n", prefixSpace.c_str(), mActiveSubIdx);
+    base::StringAppendF(&ss, "%sAllSubEffects:\n", prefixSpace.c_str());
+    for (size_t i = 0; i < mSubEffects.size(); i++) {
+        base::StringAppendF(&ss, "%s[%zu] - Handle: %p, %s\n", prefixSpace.c_str(), i,
+                            mSubEffects[i].handle ? mSubEffects[i].handle.get() : nullptr,
+                            mSubEffects[i].descriptor.toString().c_str());
+    }
+    return ss;
+}
+
+} // namespace android::effect

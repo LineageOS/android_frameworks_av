@@ -29,10 +29,8 @@ filegroup {
     srcs: [
         "res/bbb_aac_stereo_128kbps_48000hz.aac",
         "res/bbb_aac_stereo_128kbps_48000hz.info",
-        "res/bbb_aac_stereo_128kbps_48000hz_multi_frame.info",
         "res/bbb_amrwb_1ch_14kbps_16000hz.amrwb",
         "res/bbb_amrwb_1ch_14kbps_16000hz.info",
-        "res/bbb_amrwb_1ch_14kbps_16000hz_multi_frame.info",
         "res/bbb_flac_stereo_680kbps_48000hz.flac",
         "res/bbb_flac_stereo_680kbps_48000hz.info",
         "res/bbb_g711alaw_1ch_8khz.info",
@@ -43,7 +41,6 @@ filegroup {
         "res/bbb_gsm_1ch_8khz_13kbps.raw",
         "res/bbb_mp3_stereo_192kbps_48000hz.info",
         "res/bbb_mp3_stereo_192kbps_48000hz.mp3",
-        "res/bbb_mp3_stereo_192kbps_48000hz_multi_frame.info",
         "res/bbb_opus_stereo_128kbps_48000hz.info",
         "res/bbb_opus_stereo_128kbps_48000hz.opus",
         "res/bbb_raw_1ch_8khz_s32le.info",
@@ -52,7 +49,6 @@ filegroup {
         "res/bbb_vorbis_stereo_128kbps_48000hz.vorbis",
         "res/sine_amrnb_1ch_12kbps_8000hz.amrnb",
         "res/sine_amrnb_1ch_12kbps_8000hz.info",
-        "res/sine_amrnb_1ch_12kbps_8000hz_multi_frame.info",
     ],
 }
 

@@ -21,9 +21,9 @@
 #include <set>
 
 #include <gtest/gtest.h>
+#include <log/log.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/IAudioFlinger.h>
-#include <utils/Log.h>
 
 #include "audio_test_utils.h"
 
@@ -277,23 +277,30 @@ TEST_F(AudioSystemTest, CreateAndReleaseAudioPatch) {
         GTEST_SKIP() << "No output devices returned by the audio system";
     }
 
+    bool sourceFound = false, sinkFound = false;
     for (const auto& port : ports) {
         if (port.role == AUDIO_PORT_ROLE_SOURCE && port.type == AUDIO_PORT_TYPE_DEVICE) {
             sourcePort = port;
+            sourceFound = true;
         }
         if (port.role == AUDIO_PORT_ROLE_SINK && port.type == AUDIO_PORT_TYPE_DEVICE &&
             port.ext.device.type == AUDIO_DEVICE_OUT_SPEAKER) {
             sinkPort = port;
+            sinkFound = true;
         }
+        if (sourceFound && sinkFound) break;
+    }
+    if (!sourceFound || !sinkFound) {
+        GTEST_SKIP() << "No ports suitable for testing";
     }
 
     audioPatch.sources[0] = sourcePort.active_config;
     audioPatch.sinks[0] = sinkPort.active_config;
 
     status = AudioSystem::createAudioPatch(&audioPatch, &audioPatchHandle);
-    EXPECT_EQ(OK, status) << "AudioSystem::createAudiopatch failed between source "
-                          << sourcePort.ext.device.address << " and sink "
-                          << sinkPort.ext.device.address;
+    EXPECT_EQ(OK, status) << "AudioSystem::createAudioPatch failed between source "
+                          << audio_device_to_string(sourcePort.ext.device.type) << " and sink "
+                          << audio_device_to_string(sinkPort.ext.device.type);
 
     // verify that patch is established between source and the sink.
     ASSERT_NO_FATAL_FAILURE(anyPatchContainsInputDevice(sourcePort.id, patchFound));
@@ -302,8 +309,8 @@ TEST_F(AudioSystemTest, CreateAndReleaseAudioPatch) {
     EXPECT_NE(AUDIO_PORT_HANDLE_NONE, audioPatchHandle);
     status = AudioSystem::releaseAudioPatch(audioPatchHandle);
     EXPECT_EQ(OK, status) << "AudioSystem::releaseAudioPatch failed between source "
-                          << sourcePort.ext.device.address << " and sink "
-                          << sinkPort.ext.device.address;
+                          << audio_device_to_string(sourcePort.ext.device.type) << " and sink "
+                          << audio_device_to_string(sinkPort.ext.device.type);
 
     // verify that no patch is established between source and the sink after releaseAudioPatch.
     ASSERT_NO_FATAL_FAILURE(anyPatchContainsInputDevice(sourcePort.id, patchFound));
@@ -608,28 +615,37 @@ class WithSimulatedDeviceConnections {
 
 android::media::audio::common::AudioPort GenerateUniqueDeviceAddress(
         const android::media::audio::common::AudioPort& port) {
+    // Point-to-point connections do not use addresses.
+    static const std::set<std::string> kPointToPointConnections = {
+            AudioDeviceDescription::CONNECTION_ANALOG(), AudioDeviceDescription::CONNECTION_HDMI(),
+            AudioDeviceDescription::CONNECTION_HDMI_ARC(),
+            AudioDeviceDescription::CONNECTION_HDMI_EARC(),
+            AudioDeviceDescription::CONNECTION_SPDIF()};
     static int nextId = 0;
     using Tag = AudioDeviceAddress::Tag;
+    const auto& deviceDescription = port.ext.get<AudioPortExt::Tag::device>().device.type;
     AudioDeviceAddress address;
-    switch (suggestDeviceAddressTag(port.ext.get<AudioPortExt::Tag::device>().device.type)) {
-        case Tag::id:
-            address = AudioDeviceAddress::make<Tag::id>(std::to_string(++nextId));
-            break;
-        case Tag::mac:
-            address = AudioDeviceAddress::make<Tag::mac>(
-                    std::vector<uint8_t>{1, 2, 3, 4, 5, static_cast<uint8_t>(++nextId & 0xff)});
-            break;
-        case Tag::ipv4:
-            address = AudioDeviceAddress::make<Tag::ipv4>(
-                    std::vector<uint8_t>{192, 168, 0, static_cast<uint8_t>(++nextId & 0xff)});
-            break;
-        case Tag::ipv6:
-            address = AudioDeviceAddress::make<Tag::ipv6>(std::vector<int32_t>{
-                    0xfc00, 0x0123, 0x4567, 0x89ab, 0xcdef, 0, 0, ++nextId & 0xffff});
-            break;
-        case Tag::alsa:
-            address = AudioDeviceAddress::make<Tag::alsa>(std::vector<int32_t>{1, ++nextId});
-            break;
+    if (kPointToPointConnections.count(deviceDescription.connection) == 0) {
+        switch (suggestDeviceAddressTag(deviceDescription)) {
+            case Tag::id:
+                address = AudioDeviceAddress::make<Tag::id>(std::to_string(++nextId));
+                break;
+            case Tag::mac:
+                address = AudioDeviceAddress::make<Tag::mac>(
+                        std::vector<uint8_t>{1, 2, 3, 4, 5, static_cast<uint8_t>(++nextId & 0xff)});
+                break;
+            case Tag::ipv4:
+                address = AudioDeviceAddress::make<Tag::ipv4>(
+                        std::vector<uint8_t>{192, 168, 0, static_cast<uint8_t>(++nextId & 0xff)});
+                break;
+            case Tag::ipv6:
+                address = AudioDeviceAddress::make<Tag::ipv6>(std::vector<int32_t>{
+                        0xfc00, 0x0123, 0x4567, 0x89ab, 0xcdef, 0, 0, ++nextId & 0xffff});
+                break;
+            case Tag::alsa:
+                address = AudioDeviceAddress::make<Tag::alsa>(std::vector<int32_t>{1, ++nextId});
+                break;
+        }
     }
     android::media::audio::common::AudioPort result = port;
     result.ext.get<AudioPortExt::Tag::device>().device.address = std::move(address);
@@ -688,4 +704,25 @@ TEST_F(AudioSystemTest, SetDeviceConnectedState) {
         deviceState = AudioSystem::getDeviceConnectionState(type, address);
         EXPECT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, deviceState);
     }
+}
+
+class TestExecutionTracer : public ::testing::EmptyTestEventListener {
+  public:
+    void OnTestStart(const ::testing::TestInfo& test_info) override {
+        TraceTestState("Started", test_info);
+    }
+    void OnTestEnd(const ::testing::TestInfo& test_info) override {
+        TraceTestState("Completed", test_info);
+    }
+
+  private:
+    static void TraceTestState(const std::string& state, const ::testing::TestInfo& test_info) {
+        ALOGI("%s %s::%s", state.c_str(), test_info.test_suite_name(), test_info.name());
+    }
+};
+
+int main(int argc, char** argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
 }

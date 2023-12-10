@@ -11,6 +11,7 @@ cc_test {
     name: "audiopolicy_engineconfig_tests",
 
     shared_libs: [
+        "libaudiopolicycomponents",
         "libbase",
         "liblog",
         "libmedia_helper",

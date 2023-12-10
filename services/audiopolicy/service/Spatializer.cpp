@@ -236,18 +236,15 @@ sp<Spatializer> Spatializer::create(SpatializerPolicyCallback* callback,
     sp<EffectHalInterface> effect;
     status = effectsFactoryHal->createEffect(&descriptors[0].uuid, AUDIO_SESSION_OUTPUT_STAGE,
             AUDIO_IO_HANDLE_NONE, AUDIO_PORT_HANDLE_NONE, &effect);
-    ALOGI("%s FX create status %d effect ID %" PRId64, __func__, status,
-          effect ? effect->effectId() : 0);
+    ALOGI("%s FX create status %d effect %p", __func__, status, effect.get());
 
     if (status == NO_ERROR && effect != nullptr) {
         spatializer = new Spatializer(descriptors[0], callback);
         if (spatializer->loadEngineConfiguration(effect) != NO_ERROR) {
             spatializer.clear();
-            ALOGW("%s loadEngine error: %d  effect Id %" PRId64,
-                    __func__, status, effect ? effect->effectId() : 0);
+            ALOGW("%s loadEngine error: %d  effect %p", __func__, status, effect.get());
         } else {
-            spatializer->mLocalLog.log("%s with effect Id %" PRId64, __func__,
-                                       effect ? effect->effectId() : 0);
+            spatializer->mLocalLog.log("%s with effect Id %p", __func__, effect.get());
         }
     }
 

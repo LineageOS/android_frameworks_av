@@ -103,7 +103,7 @@ status_t AidlConversionEq::setParameter(EffectParamReader& param) {
         default: {
             // for vendor extension, copy data area to the DefaultExtension, parameter ignored
             VendorExtension ext = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
+                    aidl::android::legacy2aidl_EffectParameterReader_VendorExtension(param));
             aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, vendor, ext);
             break;
         }
@@ -161,6 +161,9 @@ status_t AidlConversionEq::getParameter(EffectParamWriter& param) {
             return param.writeToValue(&bands);
         }
         case EQ_PARAM_LEVEL_RANGE: {
+            if (mDesc.capability.range.getTag() != Range::equalizer) {
+                return OK;
+            }
             const auto& ranges = mDesc.capability.range.get<Range::equalizer>();
             for (const auto& r : ranges) {
                 if (r.min.getTag() == Equalizer::bandLevels &&

@@ -67,7 +67,7 @@ ConversionResult<F> getParameterSpecificField(const P& u) {
 #define VENDOR_EXTENSION_GET_AND_RETURN(_effect, _tag, _param)                                    \
     {                                                                                             \
         aidl::android::hardware::audio::effect::VendorExtension _extId = VALUE_OR_RETURN_STATUS(  \
-                aidl::android::legacy2aidl_EffectParameterReader_Param_VendorExtension(_param));  \
+                aidl::android::legacy2aidl_EffectParameterReader_VendorExtension(_param));        \
         aidl::android::hardware::audio::effect::Parameter::Id _id =                               \
                 MAKE_EXTENSION_PARAMETER_ID(_effect, _tag##Tag, _extId);                          \
         aidl::android::hardware::audio::effect::Parameter _aidlParam;                             \
@@ -76,8 +76,7 @@ ConversionResult<F> getParameterSpecificField(const P& u) {
                 VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(                              \
                         _aidlParam, _effect, _tag, _effect::vendor, VendorExtension));            \
         return VALUE_OR_RETURN_STATUS(                                                            \
-                aidl::android::aidl2legacy_ParameterExtension_EffectParameterWriter(_aidlParam,   \
-                                                                                    _param));     \
+                aidl::android::aidl2legacy_Parameter_EffectParameterWriter(_aidlParam, _param));  \
     }
 
 ConversionResult<uint32_t> aidl2legacy_Flags_Type_uint32(
@@ -157,26 +156,26 @@ ConversionResult<uint32_t> aidl2legacy_Parameter_Visualizer_MeasurementMode_uint
 ConversionResult<::aidl::android::hardware::audio::effect::Visualizer::MeasurementMode>
 legacy2aidl_Parameter_Visualizer_uint32_MeasurementMode(uint32_t legacy);
 
-ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
-legacy2aidl_EffectParameterReader_ParameterExtension(
-        ::android::effect::utils::EffectParamReader& param);
-ConversionResult<::android::status_t> aidl2legacy_ParameterExtension_EffectParameterWriter(
-        const ::aidl::android::hardware::audio::effect::Parameter& aidl,
-        ::android::effect::utils::EffectParamWriter& legacy);
-
-ConversionResult<::aidl::android::hardware::audio::effect::VendorExtension>
-legacy2aidl_EffectParameterReader_Param_VendorExtension(
-        ::android::effect::utils::EffectParamReader& param);
-ConversionResult<::aidl::android::hardware::audio::effect::VendorExtension>
-legacy2aidl_EffectParameterReader_Data_VendorExtension(
-        ::android::effect::utils::EffectParamReader& param);
-
+/**
+ * Read DefaultExtension from VendorExtension, and overwrite to the entire effect_param_t (both
+ * parameter and data area) with EffectParamWriter::overwrite.
+ */
 ConversionResult<::android::status_t> aidl2legacy_VendorExtension_EffectParameterWriter_Data(
         ::android::effect::utils::EffectParamWriter& param,
         ::aidl::android::hardware::audio::effect::VendorExtension ext);
-ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
-legacy2aidl_EffectParameterReader_ParameterExtension(
+/**
+ * Copy the entire effect_param_t (both parameter and data area) to DefaultExtension::bytes, and
+ * write into VendorExtension.
+ */
+ConversionResult<::aidl::android::hardware::audio::effect::VendorExtension>
+legacy2aidl_EffectParameterReader_VendorExtension(
         ::android::effect::utils::EffectParamReader& param);
 
+ConversionResult<::android::status_t> aidl2legacy_Parameter_EffectParameterWriter(
+        const ::aidl::android::hardware::audio::effect::Parameter& aidl,
+        ::android::effect::utils::EffectParamWriter& legacy);
+ConversionResult<::aidl::android::hardware::audio::effect::Parameter>
+legacy2aidl_EffectParameterReader_Parameter(
+        ::android::effect::utils::EffectParamReader& param);
 }  // namespace android
 }  // namespace aidl

@@ -119,7 +119,7 @@ status_t AidlConversionDp::setParameter(EffectParamReader& param) {
         default: {
             // for vendor extension, copy data area to the DefaultExtension, parameter ignored
             VendorExtension ext = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
+                    aidl::android::legacy2aidl_EffectParameterReader_VendorExtension(param));
             aidlParam =
                     MAKE_SPECIFIC_PARAMETER(DynamicsProcessing, dynamicsProcessing, vendor, ext);
             break;
@@ -227,7 +227,7 @@ AidlConversionDp::readChannelConfigFromParam(EffectParamReader& param) {
     RETURN_IF_ERROR(param.readFromValue(&enable));
 
     return DynamicsProcessing::ChannelConfig(
-            {.enable = VALUE_OR_RETURN(convertIntegral<bool>(enable)), .channel = channel});
+            {.channel = channel, .enable = VALUE_OR_RETURN(convertIntegral<bool>(enable))});
 }
 
 ConversionResult<DynamicsProcessing::EqBandConfig>

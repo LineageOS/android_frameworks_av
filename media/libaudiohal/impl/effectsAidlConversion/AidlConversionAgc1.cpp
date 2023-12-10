@@ -90,7 +90,7 @@ status_t AidlConversionAgc1::setParameter(EffectParamReader& param) {
         default: {
             // for vendor extension, copy data area to the DefaultExtension, parameter ignored
             VendorExtension ext = VALUE_OR_RETURN_STATUS(
-                    aidl::android::legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
+                    aidl::android::legacy2aidl_EffectParameterReader_VendorExtension(param));
             Parameter aidlParam = MAKE_SPECIFIC_PARAMETER(AutomaticGainControlV1,
                                                           automaticGainControlV1, vendor, ext);
             return statusTFromBinderStatus(mEffect->setParameter(aidlParam));

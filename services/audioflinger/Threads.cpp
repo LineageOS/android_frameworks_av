@@ -1847,7 +1847,7 @@ void AudioFlinger::ThreadBase::toAudioPortConfig(struct audio_port_config *confi
     config->type = AUDIO_PORT_TYPE_MIX;
     config->ext.mix.handle = mId;
     config->sample_rate = mSampleRate;
-    config->format = mFormat;
+    config->format = mHALFormat;
     config->channel_mask = mChannelMask;
     config->config_mask = AUDIO_PORT_CONFIG_SAMPLE_RATE|AUDIO_PORT_CONFIG_CHANNEL_MASK|
                             AUDIO_PORT_CONFIG_FORMAT;
@@ -1877,7 +1877,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::add(const sp<T> &track) {
     logTrack("add", track);
     mActiveTracksGeneration++;
     mLatestActiveTrack = track;
-    ++mBatteryCounter[track->uid()].second;
+    track->beginBatteryAttribution();
     mHasChanged = true;
     return mActiveTracks.add(track);
 }
@@ -1891,7 +1891,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
     }
     logTrack("remove", track);
     mActiveTracksGeneration++;
-    --mBatteryCounter[track->uid()].second;
+    track->endBatteryAttribution();
     // mLatestActiveTrack is not cleared even if is the same as track.
     mHasChanged = true;
 #ifdef TEE_SINK
@@ -1904,14 +1904,13 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
 template <typename T>
 void AudioFlinger::ThreadBase::ActiveTracks<T>::clear() {
     for (const sp<T> &track : mActiveTracks) {
-        BatteryNotifier::getInstance().noteStopAudio(track->uid());
+        track->endBatteryAttribution();
         logTrack("clear", track);
     }
     mLastActiveTracksGeneration = mActiveTracksGeneration;
     if (!mActiveTracks.empty()) { mHasChanged = true; }
     mActiveTracks.clear();
     mLatestActiveTrack.clear();
-    mBatteryCounter.clear();
 }
 
 template <typename T>
@@ -1921,27 +1920,6 @@ void AudioFlinger::ThreadBase::ActiveTracks<T>::updatePowerState(
     if (mActiveTracksGeneration != mLastActiveTracksGeneration || force) {
         thread->updateWakeLockUids_l(getWakeLockUids());
         mLastActiveTracksGeneration = mActiveTracksGeneration;
-    }
-
-    // Updates BatteryNotifier uids
-    for (auto it = mBatteryCounter.begin(); it != mBatteryCounter.end();) {
-        const uid_t uid = it->first;
-        ssize_t &previous = it->second.first;
-        ssize_t &current = it->second.second;
-        if (current > 0) {
-            if (previous == 0) {
-                BatteryNotifier::getInstance().noteStartAudio(uid);
-            }
-            previous = current;
-            ++it;
-        } else if (current == 0) {
-            if (previous > 0) {
-                BatteryNotifier::getInstance().noteStopAudio(uid);
-            }
-            it = mBatteryCounter.erase(it); // std::map<> is stable on iterator erase.
-        } else /* (current < 0) */ {
-            LOG_ALWAYS_FATAL("negative battery count %zd", current);
-        }
     }
 }
 
@@ -4100,7 +4078,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             setHalLatencyMode_l();
 
             for (const auto &track : mActiveTracks ) {
-                track->updateTeePatches();
+                track->updateTeePatches_l();
             }
 
             // signal actual start of output stream when the render position reported by the kernel
@@ -9533,6 +9511,7 @@ AudioFlinger::AudioStreamIn* AudioFlinger::RecordThread::clearInput()
     Mutex::Autolock _l(mLock);
     AudioStreamIn *input = mInput;
     mInput = NULL;
+    mInputSource.clear();
     return input;
 }
 
@@ -10636,14 +10615,24 @@ AudioFlinger::MmapPlaybackThread::MmapPlaybackThread(
         AudioHwDevice *hwDev,  AudioStreamOut *output, bool systemReady)
     : MmapThread(audioFlinger, id, hwDev, output->stream, systemReady, true /* isOut */),
       mStreamType(AUDIO_STREAM_MUSIC),
-      mStreamVolume(1.0),
-      mStreamMute(false),
       mOutput(output)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioMmapOut_%X", id);
     mChannelCount = audio_channel_count_from_out_mask(mChannelMask);
     mMasterVolume = audioFlinger->masterVolume_l();
     mMasterMute = audioFlinger->masterMute_l();
+
+    for (int i = AUDIO_STREAM_MIN; i < AUDIO_STREAM_FOR_POLICY_CNT; ++i) {
+        const audio_stream_type_t stream{static_cast<audio_stream_type_t>(i)};
+        mStreamTypes[stream].volume = 0.0f;
+        mStreamTypes[stream].mute = mAudioFlinger->streamMute_l(stream);
+    }
+    // Audio patch and call assistant volume are always max
+    mStreamTypes[AUDIO_STREAM_PATCH].volume = 1.0f;
+    mStreamTypes[AUDIO_STREAM_PATCH].mute = false;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].volume = 1.0f;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].mute = false;
+
     if (mAudioHwDev) {
         if (mAudioHwDev->canSetMasterVolume()) {
             mMasterVolume = 1.0;
@@ -10700,8 +10689,8 @@ void AudioFlinger::MmapPlaybackThread::setMasterMute(bool muted)
 void AudioFlinger::MmapPlaybackThread::setStreamVolume(audio_stream_type_t stream, float value)
 {
     Mutex::Autolock _l(mLock);
+    mStreamTypes[stream].volume = value;
     if (stream == mStreamType) {
-        mStreamVolume = value;
         broadcast_l();
     }
 }
@@ -10709,17 +10698,14 @@ void AudioFlinger::MmapPlaybackThread::setStreamVolume(audio_stream_type_t strea
 float AudioFlinger::MmapPlaybackThread::streamVolume(audio_stream_type_t stream) const
 {
     Mutex::Autolock _l(mLock);
-    if (stream == mStreamType) {
-        return mStreamVolume;
-    }
-    return 0.0f;
+    return mStreamTypes[stream].volume;
 }
 
 void AudioFlinger::MmapPlaybackThread::setStreamMute(audio_stream_type_t stream, bool muted)
 {
     Mutex::Autolock _l(mLock);
+    mStreamTypes[stream].mute = muted;
     if (stream == mStreamType) {
-        mStreamMute= muted;
         broadcast_l();
     }
 }
@@ -10759,14 +10745,13 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent_l
 {
     float volume;
 
-    if (mMasterMute || mStreamMute) {
+    if (mMasterMute || streamMuted_l()) {
         volume = 0;
     } else {
-        volume = mMasterVolume * mStreamVolume;
+        volume = mMasterVolume * streamVolume_l();
     }
 
     if (volume != mHalVolFloat) {
-
         // Convert volumes from float to 8.24
         uint32_t vol = (uint32_t)(volume * (1 << 24));
 
@@ -10800,8 +10785,8 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent_l
             track->setMetadataHasChanged();
             track->processMuteEvent_l(mAudioFlinger->getOrCreateAudioManager(),
                 /*muteState=*/{mMasterMute,
-                               mStreamVolume == 0.f,
-                               mStreamMute,
+                               streamVolume_l() == 0.f,
+                               streamMuted_l(),
                                // TODO(b/241533526): adjust logic to include mute from AppOps
                                false /*muteFromPlaybackRestricted*/,
                                false /*muteFromClientVolume*/,
@@ -10914,7 +10899,7 @@ void AudioFlinger::MmapPlaybackThread::dumpInternals_l(int fd, const Vector<Stri
     MmapThread::dumpInternals_l(fd, args);
 
     dprintf(fd, "  Stream type: %d Stream volume: %f HAL volume: %f Stream mute %d\n",
-            mStreamType, mStreamVolume, mHalVolFloat, mStreamMute);
+            mStreamType, streamVolume_l(), mHalVolFloat, streamMuted_l());
     dprintf(fd, "  Master volume: %f Master mute %d\n", mMasterVolume, mMasterMute);
 }
 

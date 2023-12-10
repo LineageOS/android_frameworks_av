@@ -28,6 +28,8 @@
 #include <fstream>
 
 #define FLAG_NON_DISPLAY_FRAME (1 << 4)
+#define FLAG_CONFIG_DATA (1 << 5)
+
 #define MAX_RETRY 20
 #define TIME_OUT 400ms
 #define MAX_INPUT_BUFFERS 8

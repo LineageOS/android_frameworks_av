@@ -41,12 +41,15 @@ public:
     ///
     /// from EngineInterface
     ///
-    android::status_t loadFromXmlConfigWithFallback(const std::string& xmlFilePath = "") override;
+    status_t loadFromHalConfigWithFallback(
+            const media::audio::common::AudioHalEngineConfig& config) override;
+
+    status_t loadFromXmlConfigWithFallback(const std::string& xmlFilePath = "") override;
 
     ///
     /// from EngineBase
     ///
-    android::status_t initCheck() override;
+    status_t initCheck() override;
 
     status_t setPhoneState(audio_mode_t mode) override;
 
@@ -56,8 +59,8 @@ public:
 
     audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage) const override;
 
-    android::status_t setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
-                                               audio_policy_dev_state_t state) override;
+    status_t setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
+                                      audio_policy_dev_state_t state) override;
 
     DeviceVector getOutputDevicesForAttributes(const audio_attributes_t &attr,
                                                const sp<DeviceDescriptor> &preferedDevice = nullptr,

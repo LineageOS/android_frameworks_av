@@ -37,6 +37,7 @@
 #define PREFIX(f) <f>
 #endif
 
+#include PREFIX(android/media/audio/common/AudioAttributes.h)
 #include PREFIX(android/media/audio/common/AudioChannelLayout.h)
 #include PREFIX(android/media/audio/common/AudioConfig.h)
 #include PREFIX(android/media/audio/common/AudioConfigBase.h)
@@ -46,6 +47,7 @@
 #include PREFIX(android/media/audio/common/AudioEncapsulationMetadataType.h)
 #include PREFIX(android/media/audio/common/AudioEncapsulationMode.h)
 #include PREFIX(android/media/audio/common/AudioEncapsulationType.h)
+#include PREFIX(android/media/audio/common/AudioFlag.h)
 #include PREFIX(android/media/audio/common/AudioFormatDescription.h)
 #include PREFIX(android/media/audio/common/AudioGain.h)
 #include PREFIX(android/media/audio/common/AudioGainConfig.h)
@@ -354,6 +356,26 @@ ConversionResult<audio_usage_t> aidl2legacy_AudioUsage_audio_usage_t(
         media::audio::common::AudioUsage aidl);
 ConversionResult<media::audio::common::AudioUsage> legacy2aidl_audio_usage_t_AudioUsage(
         audio_usage_t legacy);
+
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_AudioFlag_audio_flags_mask_t(media::audio::common::AudioFlag aidl);
+ConversionResult<media::audio::common::AudioFlag>
+legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy);
+
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_int32_t_audio_flags_mask_t_mask(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_audio_flags_mask_t_int32_t_mask(audio_flags_mask_t legacy);
+
+ConversionResult<std::string>
+aidl2legacy_AudioTags_string(const std::vector<std::string>& aidl);
+ConversionResult<std::vector<std::string>>
+legacy2aidl_string_AudioTags(const std::string& legacy);
+
+ConversionResult<audio_attributes_t>
+aidl2legacy_AudioAttributes_audio_attributes_t(const media::audio::common::AudioAttributes& aidl);
+ConversionResult<media::audio::common::AudioAttributes>
+legacy2aidl_audio_attributes_t_AudioAttributes(const audio_attributes_t& legacy);
 
 ConversionResult<audio_uuid_t> aidl2legacy_AudioUuid_audio_uuid_t(
         const media::audio::common::AudioUuid &aidl);

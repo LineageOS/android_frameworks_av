@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-#include "BundleTypes.h"
-#define LOG_TAG "EffectBundleAidl"
-#include <Utils.h>
 #include <algorithm>
+#include <limits.h>
 #include <unordered_set>
+#define LOG_TAG "EffectBundleAidl"
 
-#include <android-base/logging.h>
-#include <fmq/AidlMessageQueue.h>
 #include <audio_effects/effect_bassboost.h>
 #include <audio_effects/effect_equalizer.h>
 #include <audio_effects/effect_virtualizer.h>
-
-#include "EffectBundleAidl.h"
+#include <android-base/logging.h>
+#include <fmq/AidlMessageQueue.h>
 #include <LVM.h>
-#include <limits.h>
+#include <Utils.h>
+
+#include "BundleTypes.h"
+#include "EffectBundleAidl.h"
 
 using aidl::android::hardware::audio::effect::getEffectImplUuidBassBoostBundle;
 using aidl::android::hardware::audio::effect::Descriptor;
@@ -355,7 +355,7 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterVolume(const Volume::Id& id,
     auto tag = id.get<Volume::Id::commonTag>();
     switch (tag) {
         case Volume::levelDb: {
-            volParam.set<Volume::levelDb>(mContext->getVolumeLevel());
+            volParam.set<Volume::levelDb>(static_cast<int>(mContext->getVolumeLevel()));
             break;
         }
         case Volume::mute: {
@@ -384,6 +384,7 @@ ndk::ScopedAStatus EffectBundleAidl::getParameterVirtualizer(const Virtualizer::
 
     if (id.getTag() == Virtualizer::Id::speakerAnglesPayload) {
         auto angles = mContext->getSpeakerAngles(id.get<Virtualizer::Id::speakerAnglesPayload>());
+        RETURN_IF(angles.size() == 0, EX_ILLEGAL_ARGUMENT, "getSpeakerAnglesFailed");
         Virtualizer param = Virtualizer::make<Virtualizer::speakerAngles>(angles);
         specific->set<Parameter::Specific::virtualizer>(param);
         return ndk::ScopedAStatus::ok();

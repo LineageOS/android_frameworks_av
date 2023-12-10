@@ -21,6 +21,7 @@
 #include <string>
 
 #include <EngineInterface.h>
+#include <android/media/audio/common/AudioHalEngineConfig.h>
 
 namespace android {
 
@@ -28,6 +29,8 @@ using EngineInstance = std::unique_ptr<EngineInterface, std::function<void (Engi
 
 EngineInstance loadApmEngineLibraryAndCreateEngine(const std::string& librarySuffix,
         const std::string& configXmlFilePath = "");
+EngineInstance loadApmEngineLibraryAndCreateEngine(const std::string& librarySuffix,
+        const media::audio::common::AudioHalEngineConfig& config);
 
 class EngineLibrary : public std::enable_shared_from_this<EngineLibrary> {
 public:
@@ -40,6 +43,8 @@ public:
     EngineLibrary& operator=(EngineLibrary&&) = delete;
 
     EngineInstance createEngineUsingXmlConfig(const std::string& xmlFilePath);
+    EngineInstance createEngineUsingHalConfig(
+            const media::audio::common::AudioHalEngineConfig& config);
 
 private:
     EngineLibrary() = default;

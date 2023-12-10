@@ -14,26 +14,30 @@
  * limitations under the License.
  */
 
+#include <cstdint>
+#include <istream>
+#include <map>
+#include <sstream>
+#include <stdarg.h>
+#include <string>
+#include <string>
+#include <vector>
+
 #define LOG_TAG "APM::AudioPolicyEngine/Config"
 //#define LOG_NDEBUG 0
 
 #include "EngineConfig.h"
+#include <TypeConverter.h>
+#include <Volume.h>
 #include <cutils/properties.h>
+#include <libxml/parser.h>
+#include <libxml/xinclude.h>
+#include <media/AidlConversion.h>
+#include <media/AidlConversionUtil.h>
 #include <media/TypeConverter.h>
 #include <media/convert.h>
 #include <system/audio_config.h>
 #include <utils/Log.h>
-#include <libxml/parser.h>
-#include <libxml/xinclude.h>
-#include <string>
-#include <vector>
-#include <map>
-#include <sstream>
-#include <istream>
-
-#include <cstdint>
-#include <stdarg.h>
-#include <string>
 
 namespace android {
 
@@ -44,6 +48,85 @@ namespace engineConfig {
 static constexpr const char *gVersionAttribute = "version";
 static const char *const gReferenceElementName = "reference";
 static const char *const gReferenceAttributeName = "name";
+
+namespace {
+
+ConversionResult<AttributesGroup> aidl2legacy_AudioHalAttributeGroup_AttributesGroup(
+        const media::audio::common::AudioHalAttributesGroup& aidl) {
+    AttributesGroup legacy;
+    legacy.stream = VALUE_OR_RETURN(
+            aidl2legacy_AudioStreamType_audio_stream_type_t(aidl.streamType));
+    legacy.volumeGroup = aidl.volumeGroupName;
+    legacy.attributesVect = VALUE_OR_RETURN(convertContainer<AttributesVector>(
+                    aidl.attributes, aidl2legacy_AudioAttributes_audio_attributes_t));
+    return legacy;
+}
+
+ConversionResult<ProductStrategy> aidl2legacy_AudioHalProductStrategy_ProductStrategy(
+        const media::audio::common::AudioHalProductStrategy& aidl) {
+    ProductStrategy legacy;
+    legacy.name = "strategy_" + std::to_string(aidl.id);
+    legacy.attributesGroups = VALUE_OR_RETURN(convertContainer<AttributesGroups>(
+                    aidl.attributesGroups,
+                    aidl2legacy_AudioHalAttributeGroup_AttributesGroup));
+    return legacy;
+}
+
+ConversionResult<std::string> legacy_device_category_to_string(device_category legacy) {
+    std::string s;
+    if (DeviceCategoryConverter::toString(legacy, s)) {
+        return s;
+    }
+    return base::unexpected(BAD_VALUE);
+}
+
+ConversionResult<std::string> aidl2legacy_DeviceCategory(
+        const media::audio::common::AudioHalVolumeCurve::DeviceCategory aidl) {
+    using DeviceCategory = media::audio::common::AudioHalVolumeCurve::DeviceCategory;
+    switch (aidl) {
+        case DeviceCategory::HEADSET:
+            return legacy_device_category_to_string(DEVICE_CATEGORY_HEADSET);
+        case DeviceCategory::SPEAKER:
+            return legacy_device_category_to_string(DEVICE_CATEGORY_SPEAKER);
+        case DeviceCategory::EARPIECE:
+            return legacy_device_category_to_string(DEVICE_CATEGORY_EARPIECE);
+        case DeviceCategory::EXT_MEDIA:
+            return legacy_device_category_to_string(DEVICE_CATEGORY_EXT_MEDIA);
+        case DeviceCategory::HEARING_AID:
+            return legacy_device_category_to_string(DEVICE_CATEGORY_HEARING_AID);
+    }
+    return base::unexpected(BAD_VALUE);
+}
+
+ConversionResult<CurvePoint> aidl2legacy_AudioHalCurvePoint_CurvePoint(
+        const media::audio::common::AudioHalVolumeCurve::CurvePoint& aidl) {
+    CurvePoint legacy;
+    legacy.index = VALUE_OR_RETURN(convertIntegral<int>(aidl.index));
+    legacy.attenuationInMb = aidl.attenuationMb;
+    return legacy;
+}
+
+ConversionResult<VolumeCurve> aidl2legacy_AudioHalVolumeCurve_VolumeCurve(
+        const media::audio::common::AudioHalVolumeCurve& aidl) {
+    VolumeCurve legacy;
+    legacy.deviceCategory = VALUE_OR_RETURN(aidl2legacy_DeviceCategory(aidl.deviceCategory));
+    legacy.curvePoints = VALUE_OR_RETURN(convertContainer<CurvePoints>(
+                    aidl.curvePoints, aidl2legacy_AudioHalCurvePoint_CurvePoint));
+    return legacy;
+}
+
+ConversionResult<VolumeGroup> aidl2legacy_AudioHalVolumeGroup_VolumeGroup(
+        const media::audio::common::AudioHalVolumeGroup& aidl) {
+    VolumeGroup legacy;
+    legacy.name = aidl.name;
+    legacy.indexMin = aidl.minIndex;
+    legacy.indexMax = aidl.maxIndex;
+    legacy.volumeCurves = VALUE_OR_RETURN(convertContainer<VolumeCurves>(
+                    aidl.volumeCurves, aidl2legacy_AudioHalVolumeCurve_VolumeCurve));
+    return legacy;
+}
+
+}  // namespace
 
 template<typename E, typename C>
 struct BaseSerializerTraits {
@@ -723,6 +806,26 @@ android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups) {
         return BAD_VALUE;
     }
 }
+
+ParsingResult convert(const ::android::media::audio::common::AudioHalEngineConfig& aidlConfig) {
+    auto config = std::make_unique<engineConfig::Config>();
+    config->version = 1.0f;
+    if (auto conv = convertContainer<engineConfig::ProductStrategies>(
+                    aidlConfig.productStrategies,
+                    aidl2legacy_AudioHalProductStrategy_ProductStrategy); conv.ok()) {
+        config->productStrategies = std::move(conv.value());
+    } else {
+        return ParsingResult{};
+    }
+    if (auto conv = convertContainer<engineConfig::VolumeGroups>(
+                    aidlConfig.volumeGroups,
+                    aidl2legacy_AudioHalVolumeGroup_VolumeGroup); conv.ok()) {
+        config->volumeGroups = std::move(conv.value());
+    } else {
+        return ParsingResult{};
+    }
+    return {.parsedConfig=std::move(config), .nbSkippedElement=0};
+ }
 
 } // namespace engineConfig
 } // namespace android

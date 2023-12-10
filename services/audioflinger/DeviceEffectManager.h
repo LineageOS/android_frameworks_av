@@ -44,13 +44,13 @@ public:
     status_t createEffectHal(const effect_uuid_t *pEffectUuid,
            int32_t sessionId, int32_t deviceId,
            sp<EffectHalInterface> *effect);
-    status_t addEffectToHal(audio_port_handle_t deviceId, audio_module_handle_t hwModuleId,
+    status_t addEffectToHal(const struct audio_port_config *device,
             const sp<EffectHalInterface>& effect) {
-        return mAudioFlinger.addEffectToHal(deviceId, hwModuleId, effect);
+        return mAudioFlinger.addEffectToHal(device, effect);
     };
-    status_t removeEffectFromHal(audio_port_handle_t deviceId, audio_module_handle_t hwModuleId,
+    status_t removeEffectFromHal(const struct audio_port_config *device,
             const sp<EffectHalInterface>& effect) {
-        return mAudioFlinger.removeEffectFromHal(deviceId, hwModuleId, effect);
+        return mAudioFlinger.removeEffectFromHal(device, effect);
     };
 
     AudioFlinger& audioFlinger() const { return mAudioFlinger; }
@@ -132,13 +132,13 @@ public:
 
     int newEffectId() { return mManager.audioFlinger().nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT); }
 
-    status_t addEffectToHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
-        return mManager.addEffectToHal(deviceId, hwModuleId, effect);
+    status_t addEffectToHal(const struct audio_port_config *device,
+            const sp<EffectHalInterface>& effect) {
+        return mManager.addEffectToHal(device, effect);
     }
-    status_t removeEffectFromHal(audio_port_handle_t deviceId,
-            audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
-        return mManager.removeEffectFromHal(deviceId, hwModuleId, effect);
+    status_t removeEffectFromHal(const struct audio_port_config *device,
+            const sp<EffectHalInterface>& effect) {
+        return mManager.removeEffectFromHal(device, effect);
     }
 private:
     DeviceEffectManager& mManager;

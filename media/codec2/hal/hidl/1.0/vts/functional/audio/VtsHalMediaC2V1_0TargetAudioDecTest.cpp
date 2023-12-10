@@ -44,17 +44,9 @@ struct CompToFiles {
 
 std::vector<CompToFiles> gCompToFiles = {
         {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac", "bbb_aac_stereo_128kbps_48000hz.info"},
-        {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac",
-         "bbb_aac_stereo_128kbps_48000hz_multi_frame.info"},
         {"mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz.info"},
-        {"mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3",
-         "bbb_mp3_stereo_192kbps_48000hz_multi_frame.info"},
         {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb", "sine_amrnb_1ch_12kbps_8000hz.info"},
-        {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb",
-         "sine_amrnb_1ch_12kbps_8000hz_multi_frame.info"},
         {"amr-wb", "bbb_amrwb_1ch_14kbps_16000hz.amrwb", "bbb_amrwb_1ch_14kbps_16000hz.info"},
-        {"amr-wb", "bbb_amrwb_1ch_14kbps_16000hz.amrwb",
-         "bbb_amrwb_1ch_14kbps_16000hz_multi_frame.info"},
         {"vorbis", "bbb_vorbis_stereo_128kbps_48000hz.vorbis",
          "bbb_vorbis_stereo_128kbps_48000hz.info"},
         {"opus", "bbb_opus_stereo_128kbps_48000hz.opus", "bbb_opus_stereo_128kbps_48000hz.info"},
@@ -341,7 +333,7 @@ void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
             ASSERT_TRUE(false) << "Wait for generating C2Work exceeded timeout";
         }
         int64_t timestamp = (*Info)[frameID].timestamp;
-        if ((*Info)[frameID].flags) flags = 1u << ((*Info)[frameID].flags - 1);
+        flags = ((*Info)[frameID].flags == FLAG_CONFIG_DATA) ? C2FrameData::FLAG_CODEC_CONFIG : 0;
         if (signalEOS && ((frameID == (int)Info->size() - 1) || (frameID == (offset + range - 1))))
             flags |= C2FrameData::FLAG_END_OF_STREAM;
 

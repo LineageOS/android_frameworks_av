@@ -140,7 +140,8 @@ public:
      *                                  initial input buffers.
      */
     status_t prepareInitialInputBuffers(
-            std::map<size_t, sp<MediaCodecBuffer>> *clientInputBuffers);
+            std::map<size_t, sp<MediaCodecBuffer>> *clientInputBuffers,
+            bool retry = false);
 
     /**
      * Request initial input buffers as prepared in clientInputBuffers.
@@ -206,7 +207,20 @@ public:
 
     void setMetaMode(MetaMode mode);
 
+    /**
+     * get pixel format from output buffers.
+     *
+     * @return 0 if no valid pixel format found.
+     */
+    uint32_t getBuffersPixelFormat(bool isEncoder);
+
+    void resetBuffersPixelFormat(bool isEncoder);
+
 private:
+    uint32_t getInputBuffersPixelFormat();
+
+    uint32_t getOutputBuffersPixelFormat();
+
     class QueueGuard;
 
     /**

@@ -480,129 +480,6 @@ ConversionResult<media::AudioClient> legacy2aidl_AudioClient_AudioClient(
     return aidl;
 }
 
-ConversionResult<audio_flags_mask_t>
-aidl2legacy_AudioFlag_audio_flags_mask_t(media::AudioFlag aidl) {
-    switch (aidl) {
-        case media::AudioFlag::AUDIBILITY_ENFORCED:
-            return AUDIO_FLAG_AUDIBILITY_ENFORCED;
-        case media::AudioFlag::SECURE:
-            return AUDIO_FLAG_SECURE;
-        case media::AudioFlag::SCO:
-            return AUDIO_FLAG_SCO;
-        case media::AudioFlag::BEACON:
-            return AUDIO_FLAG_BEACON;
-        case media::AudioFlag::HW_AV_SYNC:
-            return AUDIO_FLAG_HW_AV_SYNC;
-        case media::AudioFlag::HW_HOTWORD:
-            return AUDIO_FLAG_HW_HOTWORD;
-        case media::AudioFlag::BYPASS_INTERRUPTION_POLICY:
-            return AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY;
-        case media::AudioFlag::BYPASS_MUTE:
-            return AUDIO_FLAG_BYPASS_MUTE;
-        case media::AudioFlag::LOW_LATENCY:
-            return AUDIO_FLAG_LOW_LATENCY;
-        case media::AudioFlag::DEEP_BUFFER:
-            return AUDIO_FLAG_DEEP_BUFFER;
-        case media::AudioFlag::NO_MEDIA_PROJECTION:
-            return AUDIO_FLAG_NO_MEDIA_PROJECTION;
-        case media::AudioFlag::MUTE_HAPTIC:
-            return AUDIO_FLAG_MUTE_HAPTIC;
-        case media::AudioFlag::NO_SYSTEM_CAPTURE:
-            return AUDIO_FLAG_NO_SYSTEM_CAPTURE;
-        case media::AudioFlag::CAPTURE_PRIVATE:
-            return AUDIO_FLAG_CAPTURE_PRIVATE;
-        case media::AudioFlag::CONTENT_SPATIALIZED:
-            return AUDIO_FLAG_CONTENT_SPATIALIZED;
-        case media::AudioFlag::NEVER_SPATIALIZE:
-            return AUDIO_FLAG_NEVER_SPATIALIZE;
-        case media::AudioFlag::CALL_REDIRECTION:
-            return AUDIO_FLAG_CALL_REDIRECTION;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<media::AudioFlag>
-legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy) {
-    switch (legacy) {
-        case AUDIO_FLAG_NONE:
-            return unexpected(BAD_VALUE);
-        case AUDIO_FLAG_AUDIBILITY_ENFORCED:
-            return media::AudioFlag::AUDIBILITY_ENFORCED;
-        case AUDIO_FLAG_SECURE:
-            return media::AudioFlag::SECURE;
-        case AUDIO_FLAG_SCO:
-            return media::AudioFlag::SCO;
-        case AUDIO_FLAG_BEACON:
-            return media::AudioFlag::BEACON;
-        case AUDIO_FLAG_HW_AV_SYNC:
-            return media::AudioFlag::HW_AV_SYNC;
-        case AUDIO_FLAG_HW_HOTWORD:
-            return media::AudioFlag::HW_HOTWORD;
-        case AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY:
-            return media::AudioFlag::BYPASS_INTERRUPTION_POLICY;
-        case AUDIO_FLAG_BYPASS_MUTE:
-            return media::AudioFlag::BYPASS_MUTE;
-        case AUDIO_FLAG_LOW_LATENCY:
-            return media::AudioFlag::LOW_LATENCY;
-        case AUDIO_FLAG_DEEP_BUFFER:
-            return media::AudioFlag::DEEP_BUFFER;
-        case AUDIO_FLAG_NO_MEDIA_PROJECTION:
-            return media::AudioFlag::NO_MEDIA_PROJECTION;
-        case AUDIO_FLAG_MUTE_HAPTIC:
-            return media::AudioFlag::MUTE_HAPTIC;
-        case AUDIO_FLAG_NO_SYSTEM_CAPTURE:
-            return media::AudioFlag::NO_SYSTEM_CAPTURE;
-        case AUDIO_FLAG_CAPTURE_PRIVATE:
-            return media::AudioFlag::CAPTURE_PRIVATE;
-        case AUDIO_FLAG_CONTENT_SPATIALIZED:
-            return media::AudioFlag::CONTENT_SPATIALIZED;
-        case AUDIO_FLAG_NEVER_SPATIALIZE:
-            return media::AudioFlag::NEVER_SPATIALIZE;
-        case AUDIO_FLAG_CALL_REDIRECTION:
-            return media::AudioFlag::CALL_REDIRECTION;
-    }
-    return unexpected(BAD_VALUE);
-}
-
-ConversionResult<audio_flags_mask_t>
-aidl2legacy_int32_t_audio_flags_mask_t_mask(int32_t aidl) {
-    return convertBitmask<audio_flags_mask_t, int32_t, audio_flags_mask_t, media::AudioFlag>(
-            aidl, aidl2legacy_AudioFlag_audio_flags_mask_t, indexToEnum_index<media::AudioFlag>,
-            enumToMask_bitmask<audio_flags_mask_t, audio_flags_mask_t>);
-}
-
-ConversionResult<int32_t>
-legacy2aidl_audio_flags_mask_t_int32_t_mask(audio_flags_mask_t legacy) {
-    return convertBitmask<int32_t, audio_flags_mask_t, media::AudioFlag, audio_flags_mask_t>(
-            legacy, legacy2aidl_audio_flags_mask_t_AudioFlag,
-            indexToEnum_bitmask<audio_flags_mask_t>,
-            enumToMask_index<int32_t, media::AudioFlag>);
-}
-
-ConversionResult<audio_attributes_t>
-aidl2legacy_AudioAttributesInternal_audio_attributes_t(const media::AudioAttributesInternal& aidl) {
-    audio_attributes_t legacy;
-    legacy.content_type = VALUE_OR_RETURN(
-            aidl2legacy_AudioContentType_audio_content_type_t(aidl.contentType));
-    legacy.usage = VALUE_OR_RETURN(aidl2legacy_AudioUsage_audio_usage_t(aidl.usage));
-    legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSource_audio_source_t(aidl.source));
-    legacy.flags = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_flags_mask_t_mask(aidl.flags));
-    RETURN_IF_ERROR(aidl2legacy_string(aidl.tags, legacy.tags, sizeof(legacy.tags)));
-    return legacy;
-}
-
-ConversionResult<media::AudioAttributesInternal>
-legacy2aidl_audio_attributes_t_AudioAttributesInternal(const audio_attributes_t& legacy) {
-    media::AudioAttributesInternal aidl;
-    aidl.contentType = VALUE_OR_RETURN(
-            legacy2aidl_audio_content_type_t_AudioContentType(legacy.content_type));
-    aidl.usage = VALUE_OR_RETURN(legacy2aidl_audio_usage_t_AudioUsage(legacy.usage));
-    aidl.source = VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSource(legacy.source));
-    aidl.flags = VALUE_OR_RETURN(legacy2aidl_audio_flags_mask_t_int32_t_mask(legacy.flags));
-    aidl.tags = VALUE_OR_RETURN(legacy2aidl_string(legacy.tags, sizeof(legacy.tags)));
-    return aidl;
-}
-
 ConversionResult<sp<IMemory>>
 aidl2legacy_SharedFileRegion_IMemory(const media::SharedFileRegion& aidl) {
     sp<IMemory> legacy;
@@ -651,7 +528,7 @@ aidl2legacy_AudioTimestampInternal_AudioTimestamp(const media::AudioTimestampInt
 ConversionResult<media::AudioTimestampInternal>
 legacy2aidl_AudioTimestamp_AudioTimestampInternal(const AudioTimestamp& legacy) {
     media::AudioTimestampInternal aidl;
-    aidl.position = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mPosition));
+    aidl.position = VALUE_OR_RETURN(convertIntegral<int64_t>(legacy.mPosition));
     aidl.sec = VALUE_OR_RETURN(convertIntegral<int64_t>(legacy.mTime.tv_sec));
     aidl.nsec = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mTime.tv_nsec));
     return aidl;

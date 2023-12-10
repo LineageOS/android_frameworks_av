@@ -25,12 +25,13 @@ cc_library_shared {
         "libaudiopolicyengine_interface_headers",
     ],
     static_libs: [
-        "libaudiopolicycomponents",
         "libaudiopolicyengine_common",
         "libaudiopolicyengine_config",
     ],
     shared_libs: [
+        "libaudio_aidl_conversion_common_cpp",
         "libaudiofoundation",
+        "libaudiopolicycomponents",
         "libbase",
         "liblog",
         "libcutils",

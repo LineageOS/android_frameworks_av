@@ -731,24 +731,24 @@ void AudioFlinger::onExternalVibrationStop(const sp<os::ExternalVibration>& exte
     }
 }
 
-status_t AudioFlinger::addEffectToHal(audio_port_handle_t deviceId,
-        audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
+status_t AudioFlinger::addEffectToHal(
+        const struct audio_port_config *device, const sp<EffectHalInterface>& effect) {
     AutoMutex lock(mHardwareLock);
-    AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(hwModuleId);
+    AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(device->ext.device.hw_module);
     if (audioHwDevice == nullptr) {
         return NO_INIT;
     }
-    return audioHwDevice->hwDevice()->addDeviceEffect(deviceId, effect);
+    return audioHwDevice->hwDevice()->addDeviceEffect(device, effect);
 }
 
-status_t AudioFlinger::removeEffectFromHal(audio_port_handle_t deviceId,
-        audio_module_handle_t hwModuleId, const sp<EffectHalInterface>& effect) {
+status_t AudioFlinger::removeEffectFromHal(
+        const struct audio_port_config *device, const sp<EffectHalInterface>& effect) {
     AutoMutex lock(mHardwareLock);
-    AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(hwModuleId);
+    AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(device->ext.device.hw_module);
     if (audioHwDevice == nullptr) {
         return NO_INIT;
     }
-    return audioHwDevice->hwDevice()->removeDeviceEffect(deviceId, effect);
+    return audioHwDevice->hwDevice()->removeDeviceEffect(device, effect);
 }
 
 static const char * const audio_interfaces[] = {
@@ -4000,7 +4000,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
         patchTrack->setPeerProxy(patchRecord, true /* holdReference */);
         patchRecord->setPeerProxy(patchTrack, false /* holdReference */);
     }
-    track->setTeePatchesToUpdate(std::move(teePatches));
+    track->setTeePatchesToUpdate_l(std::move(teePatches));
 }
 
 sp<AudioFlinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_event_t type,

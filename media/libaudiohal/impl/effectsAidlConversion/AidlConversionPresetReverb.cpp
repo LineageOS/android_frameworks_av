@@ -61,7 +61,7 @@ status_t AidlConversionPresetReverb::setParameter(EffectParamReader& param) {
     } else {
         // for vendor extension, copy data area to the DefaultExtension, parameter ignored
         VendorExtension ext = VALUE_OR_RETURN_STATUS(
-                aidl::android::legacy2aidl_EffectParameterReader_Data_VendorExtension(param));
+                aidl::android::legacy2aidl_EffectParameterReader_VendorExtension(param));
         aidlParam = MAKE_SPECIFIC_PARAMETER(PresetReverb, presetReverb, vendor, ext);
     }
 

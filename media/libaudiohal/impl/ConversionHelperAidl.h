@@ -18,8 +18,12 @@
 
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
 
+#include <aidl/android/hardware/audio/core/IModule.h>
+#include <aidl/android/hardware/audio/core/IStreamCommon.h>
+#include <aidl/android/media/audio/IHalAdapterVendorExtension.h>
 #include <android-base/expected.h>
 #include <error/Result.h>
 #include <media/AudioParameter.h>
@@ -73,5 +77,19 @@ error::Result<bool> filterOutAndProcessParameter(
     }
     return false;
 }
+
+// Must use the same order of elements as IHalAdapterVendorExtension::ParameterScope.
+using VendorParametersRecipient = std::variant<
+        std::shared_ptr<::aidl::android::hardware::audio::core::IModule>,
+        std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon>>;
+status_t parseAndGetVendorParameters(
+        std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension> vendorExt,
+        const VendorParametersRecipient& recipient,
+        const AudioParameter& parameterKeys,
+        String8* values);
+status_t parseAndSetVendorParameters(
+        std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension> vendorExt,
+        const VendorParametersRecipient& recipient,
+        const AudioParameter& parameters);
 
 }  // namespace android

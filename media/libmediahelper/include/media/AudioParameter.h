@@ -41,6 +41,7 @@ public:
     //  keyInputSource: to change audio input source, value is an int in audio_source_t
     //     (defined in media/mediarecorder.h)
     //  keyScreenState: either "on" or "off"
+    //  keyScreenRotation: one of: 0, 90, 180, 270
     static const char * const keyRouting;
     static const char * const keySamplingRate;
     static const char * const keyFormat;
@@ -48,9 +49,9 @@ public:
     static const char * const keyFrameCount;
     static const char * const keyInputSource;
     static const char * const keyScreenState;
+    static const char * const keyScreenRotation;
 
-    // TODO(b/73175392) consider improvement to AIDL StreamOut interface.
-    // keyClosing: "true" when AudioOutputDescriptor is closing.  Used by A2DP HAL.
+    // keyClosing: "true" on AudioFlinger Thread preExit.  Used by A2DP HAL.
     // keyExiting: "1" on AudioFlinger Thread preExit.  Used by remote_submix and A2DP HAL.
     static const char * const keyClosing;
     static const char * const keyExiting;
@@ -67,6 +68,22 @@ public:
     static const char * const keyBtHfpEnable;
     static const char * const keyBtHfpSamplingRate;
     static const char * const keyBtHfpVolume;
+
+#ifndef __ANDROID_VNDK__
+    // These static fields are not used by vendor code, they were added to make
+    // the framework code consistent. There is no plan to expose them to vendors
+    // because they were used by HIDL get/setParameters interface which does not
+    // exist in the AIDL HAL interface.
+    static const char * const keyTtyMode;
+    static const char * const valueTtyModeOff;
+    static const char * const valueTtyModeFull;
+    static const char * const valueTtyModeHco;
+    static const char * const valueTtyModeVco;
+
+    static const char * const keyHacSetting;
+    static const char * const valueHacOff;
+    static const char * const valueHacOn;
+#endif  // __ANDROID_VNDK__
 
     //  keyHwAvSync: get HW synchronization source identifier from a device
     //  keyMonoOutput: Enable mono audio playback

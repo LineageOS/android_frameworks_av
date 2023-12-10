@@ -94,6 +94,11 @@ AudioChannelLayout make_ACL_Stereo() {
             AudioChannelLayout::LAYOUT_STEREO);
 }
 
+AudioChannelLayout make_ACL_Tri() {
+    return AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
+            AudioChannelLayout::LAYOUT_TRI);
+}
+
 AudioChannelLayout make_ACL_LayoutArbitrary() {
     return AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
             // Use channels that exist both for input and output,
@@ -138,7 +143,8 @@ AudioDeviceDescription make_ADD_MicIn() {
 }
 
 AudioDeviceDescription make_ADD_RSubmixIn() {
-    return make_AudioDeviceDescription(AudioDeviceType::IN_SUBMIX);
+    return make_AudioDeviceDescription(AudioDeviceType::IN_SUBMIX,
+                                       AudioDeviceDescription::CONNECTION_VIRTUAL());
 }
 
 AudioDeviceDescription make_ADD_DefaultOut() {
@@ -311,8 +317,8 @@ INSTANTIATE_TEST_SUITE_P(
         AudioChannelLayoutRoundTrip, AudioChannelLayoutRoundTripTest,
         testing::Combine(
                 testing::Values(AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
-                                make_ACL_LayoutArbitrary(), make_ACL_ChannelIndex2(),
-                                make_ACL_ChannelIndexArbitrary(),
+                                make_ACL_Tri(), make_ACL_LayoutArbitrary(),
+                                make_ACL_ChannelIndex2(), make_ACL_ChannelIndexArbitrary(),
                                 AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(
                                         AudioChannelLayout::CHANNEL_FRONT_LEFT),
                                 AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>(

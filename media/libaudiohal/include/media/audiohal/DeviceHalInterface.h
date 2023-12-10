@@ -132,9 +132,9 @@ class DeviceHalInterface : public virtual RefBase
             std::vector<audio_microphone_characteristic_t>* microphones) = 0;
 
     virtual status_t addDeviceEffect(
-            audio_port_handle_t device, sp<EffectHalInterface> effect) = 0;
+            const struct audio_port_config *device, sp<EffectHalInterface> effect) = 0;
     virtual status_t removeDeviceEffect(
-            audio_port_handle_t device, sp<EffectHalInterface> effect) = 0;
+            const struct audio_port_config *device, sp<EffectHalInterface> effect) = 0;
 
     virtual status_t getMmapPolicyInfos(
             media::audio::common::AudioMMapPolicyType policyType,
@@ -142,7 +142,7 @@ class DeviceHalInterface : public virtual RefBase
     virtual int32_t getAAudioMixerBurstCount() = 0;
     virtual int32_t getAAudioHardwareBurstMinUsec() = 0;
 
-    virtual int32_t supportsBluetoothVariableLatency(bool* supports) = 0;
+    virtual status_t supportsBluetoothVariableLatency(bool* supports) = 0;
 
     // Update the connection status of an external device.
     virtual status_t setConnectedState(const struct audio_port_v7* port, bool connected) = 0;

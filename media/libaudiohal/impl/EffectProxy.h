@@ -40,27 +40,10 @@ namespace effect {
  */
 class EffectProxy final : public ::aidl::android::hardware::audio::effect::BnEffect {
   public:
-    EffectProxy(const ::aidl::android::hardware::audio::effect::Descriptor::Identity& id,
-                const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory);
-
-    /**
-     * Add a sub effect into the proxy, the descriptor of candidate sub-effect need to have same
-     * proxy UUID as mUuid.
-     */
-    ndk::ScopedAStatus addSubEffect(
-            const ::aidl::android::hardware::audio::effect::Descriptor& sub);
-
-    /**
-     * Create all sub-effects via AIDL IFactory, always call create() after all sub-effects added
-     * successfully with addSubEffect.
-     */
-    ndk::ScopedAStatus create();
-
-    /**
-     * Destroy all sub-effects via AIDL IFactory, always call create() after all sub-effects added
-     * successfully with addSubEffect.
-     */
-    ndk::ScopedAStatus destroy();
+    EffectProxy(
+            const ::aidl::android::media::audio::common::AudioUuid& uuid,
+            const std::vector<::aidl::android::hardware::audio::effect::Descriptor>& descriptors,
+            const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory);
 
     /**
      * Handle offload parameter setting from framework.
@@ -68,11 +51,9 @@ class EffectProxy final : public ::aidl::android::hardware::audio::effect::BnEff
     ndk::ScopedAStatus setOffloadParam(const effect_offload_param_t* offload);
 
     /**
-     * Get the const reference of the active sub-effect return parameters.
-     * Always use this interface to get the effect open return parameters (FMQs) after a success
-     * setOffloadParam() call.
+     * Destroy all sub-effects via AIDL IFactory.
      */
-    const IEffect::OpenEffectReturn* getEffectReturnParam();
+    ndk::ScopedAStatus destroy();
 
     // IEffect interfaces override
     ndk::ScopedAStatus open(
@@ -91,25 +72,59 @@ class EffectProxy final : public ::aidl::android::hardware::audio::effect::BnEff
             const ::aidl::android::hardware::audio::effect::Parameter::Id& id,
             ::aidl::android::hardware::audio::effect::Parameter* param) override;
 
+    static ndk::ScopedAStatus buildDescriptor(
+            const ::aidl::android::media::audio::common::AudioUuid& uuid,
+            const std::vector<::aidl::android::hardware::audio::effect::Descriptor>& subEffectDescs,
+            ::aidl::android::hardware::audio::effect::Descriptor* desc);
+
+    /**
+     * Get the const reference of the active sub-effect return parameters.
+     * Always use this interface to get the effect open return parameters (FMQs) after a success
+     * setOffloadParam() call.
+     */
+    using StatusMQ = ::android::AidlMessageQueue<
+            ::aidl::android::hardware::audio::effect::IEffect::Status,
+            ::aidl::android::hardware::common::fmq::SynchronizedReadWrite>;
+    using DataMQ = ::android::AidlMessageQueue<
+            float, ::aidl::android::hardware::common::fmq::SynchronizedReadWrite>;
+    const std::shared_ptr<StatusMQ>& getStatusMQ() const {
+        return mSubEffects[mActiveSubIdx].effectMq.statusQ;
+    }
+    const std::shared_ptr<DataMQ>& getInputMQ() const {
+        return mSubEffects[mActiveSubIdx].effectMq.inputQ;
+    }
+    const std::shared_ptr<DataMQ>& getOutputMQ() const {
+        return mSubEffects[mActiveSubIdx].effectMq.outputQ;
+    }
+
+    bool isBypassing() const;
+
+    // call dump for all sub-effects
+    binder_status_t dump(int fd, const char** args, uint32_t numArgs) override;
+
+    std::string toString(size_t indent = 0) const;
+
   private:
-    // Proxy identity, copy from one sub-effect, and update the implementation UUID to proxy UUID
-    const ::aidl::android::hardware::audio::effect::Descriptor::Identity mIdentity;
+    // Proxy descriptor common part, copy from one sub-effect, and update the implementation UUID to
+    // proxy UUID, proxy descriptor capability part comes from the active sub-effect capability
+    const ::aidl::android::hardware::audio::effect::Descriptor::Common mDescriptorCommon;
+
+    struct EffectMQ {
+        std::shared_ptr<StatusMQ> statusQ;
+        std::shared_ptr<DataMQ> inputQ, outputQ;
+    };
+    struct SubEffect {
+        const ::aidl::android::hardware::audio::effect::Descriptor descriptor;
+        std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> handle;
+        EffectMQ effectMq;
+    };
+    std::vector<SubEffect> mSubEffects;
+
     const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory> mFactory;
 
-    // A map of sub effects descriptor to the IEffect handle and return FMQ
-    enum SubEffectTupleIndex { HANDLE, DESCRIPTOR, RETURN };
-    using EffectProxySub =
-            std::tuple<std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect>,
-                       ::aidl::android::hardware::audio::effect::Descriptor,
-                       ::aidl::android::hardware::audio::effect::IEffect::OpenEffectReturn>;
-    std::map<const ::aidl::android::hardware::audio::effect::Descriptor::Identity, EffectProxySub>
-            mSubEffects;
-
-    // Descriptor of the only active effect in the mSubEffects map
-    ::aidl::android::hardware::audio::effect::Descriptor::Identity mActiveSub;
-
-    // keep the flag of sub-effects
-    ::aidl::android::hardware::audio::effect::Flags mSubFlags;
+    // index of the active sub-effects, by default use the first one (index 0)
+    // It's safe to assume there will always at least two SubEffects in mSubEffects
+    size_t mActiveSubIdx = 0;
 
     ndk::ScopedAStatus runWithActiveSubEffectThenOthers(
             std::function<ndk::ScopedAStatus(
@@ -121,6 +136,12 @@ class EffectProxy final : public ::aidl::android::hardware::audio::effect::BnEff
 
     ndk::ScopedAStatus runWithAllSubEffects(
             std::function<ndk::ScopedAStatus(std::shared_ptr<IEffect>&)> const& func);
+
+    // build Descriptor.Common with all sub-effect descriptors
+    static ::aidl::android::hardware::audio::effect::Descriptor::Common buildDescriptorCommon(
+            const ::aidl::android::media::audio::common::AudioUuid& uuid,
+            const std::vector<::aidl::android::hardware::audio::effect::Descriptor>&
+                    subEffectDescs);
 
     // close and release all sub-effects
     ~EffectProxy();

@@ -56,12 +56,7 @@ class EffectHalAidl : public EffectHalInterface {
     // Free resources on the remote side.
     status_t close() override;
 
-    // Whether it's a local implementation.
-    bool isLocal() const override { return false; }
-
     status_t dump(int fd) override;
-
-    uint64_t effectId() const override { return mEffectId; }
 
     const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> getIEffect() const {
         return mEffect;
@@ -75,10 +70,8 @@ class EffectHalAidl : public EffectHalInterface {
 
     const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory> mFactory;
     const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect> mEffect;
-    const uint64_t mEffectId;
     const int32_t mSessionId;
     const int32_t mIoId;
-    const ::aidl::android::hardware::audio::effect::Descriptor mDesc;
     const bool mIsProxyEffect;
 
     std::unique_ptr<EffectConversionHelperAidl> mConversion;
@@ -93,7 +86,7 @@ class EffectHalAidl : public EffectHalInterface {
     EffectHalAidl(
             const std::shared_ptr<::aidl::android::hardware::audio::effect::IFactory>& factory,
             const std::shared_ptr<::aidl::android::hardware::audio::effect::IEffect>& effect,
-            uint64_t effectId, int32_t sessionId, int32_t ioId,
+            int32_t sessionId, int32_t ioId,
             const ::aidl::android::hardware::audio::effect::Descriptor& desc,
             bool isProxyEffect);
     bool setEffectReverse(bool reverse);

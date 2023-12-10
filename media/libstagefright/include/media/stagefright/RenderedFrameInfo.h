@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright 2015 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,24 @@
  * limitations under the License.
  */
 
-package android.media;
+#ifndef RENDERED_FRAME_INFO_H
+#define RENDERED_FRAME_INFO_H
 
-import android.media.audio.common.AudioContentType;
-import android.media.audio.common.AudioSource;
-import android.media.audio.common.AudioUsage;
+namespace android {
 
-/**
- * The "Internal" suffix of this type name is to disambiguate it from the
- * android.media.AudioAttributes SDK type.
- * {@hide}
- */
-parcelable AudioAttributesInternal {
-    AudioContentType contentType;
-    AudioUsage usage;
-    AudioSource source;
-    // Bitmask, indexed by AudioFlag.
-    int flags;
-    @utf8InCpp String tags; /* UTF8 */
-}
+class RenderedFrameInfo {
+public:
+    RenderedFrameInfo(int64_t mediaTimeUs, int64_t renderTimeNs)
+        : mMediaTimeUs(mediaTimeUs), mRenderTimeNs(renderTimeNs) {}
+
+    int64_t getMediaTimeUs() const  { return mMediaTimeUs; }
+    nsecs_t getRenderTimeNs() const { return mRenderTimeNs;}
+
+private:
+    int64_t mMediaTimeUs;
+    nsecs_t mRenderTimeNs;
+};
+
+} // android
+
+#endif // RENDERED_FRAME_INFO_H

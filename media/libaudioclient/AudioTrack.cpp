@@ -178,8 +178,8 @@ bool AudioTrack::isDirectOutputSupported(const audio_config_base_t& config,
     auto result = [&]() -> ConversionResult<bool> {
         media::audio::common::AudioConfigBase configAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_config_base_t_AudioConfigBase(config, false /*isInput*/));
-        media::AudioAttributesInternal attributesAidl = VALUE_OR_RETURN(
-                legacy2aidl_audio_attributes_t_AudioAttributesInternal(attributes));
+        media::audio::common::AudioAttributes attributesAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_attributes_t_AudioAttributes(attributes));
         bool retAidl;
         RETURN_IF_ERROR(aidl_utils::statusTFromBinderStatus(
                 aps->isDirectOutputSupported(configAidl, attributesAidl, &retAidl)));
