@@ -98,6 +98,8 @@ class VirtualCameraDevice
   uint32_t getCameraId() const { return mCameraId; }
 
  private:
+  std::shared_ptr<VirtualCameraDevice> sharedFromThis();
+
   const uint32_t mCameraId;
   const std::shared_ptr<
       ::aidl::android::companion::virtualcamera::IVirtualCameraCallback>

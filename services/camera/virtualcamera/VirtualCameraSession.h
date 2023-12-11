@@ -17,6 +17,7 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERASESSION_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERASESSION_H
 
+#include <atomic>
 #include <memory>
 #include <set>
 
@@ -46,7 +47,7 @@ class VirtualCameraSession
   // When virtualCameraClientCallback is null, the input surface will be filled
   // with test pattern.
   VirtualCameraSession(
-      VirtualCameraDevice& mCameraDevice,
+      std::shared_ptr<VirtualCameraDevice> mCameraDevice,
       std::shared_ptr<
           ::aidl::android::hardware::camera::device::ICameraDeviceCallback>
           cameraDeviceCallback,
@@ -116,7 +117,7 @@ class VirtualCameraSession
       const ::aidl::android::hardware::camera::device::CaptureRequest& request)
       EXCLUDES(mLock);
 
-  VirtualCameraDevice& mCameraDevice;
+  std::weak_ptr<VirtualCameraDevice> mCameraDevice;
 
   mutable std::mutex mLock;
 

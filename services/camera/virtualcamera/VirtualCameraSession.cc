@@ -153,7 +153,7 @@ HalStream getHalStream(const Stream& stream) {
 }  // namespace
 
 VirtualCameraSession::VirtualCameraSession(
-    VirtualCameraDevice& cameraDevice,
+    std::shared_ptr<VirtualCameraDevice> cameraDevice,
     std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback,
     std::shared_ptr<IVirtualCameraCallback> virtualCameraClientCallback)
     : mCameraDevice(cameraDevice),
@@ -201,6 +201,12 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
     return cameraStatus(Status::ILLEGAL_ARGUMENT);
   }
 
+  std::shared_ptr<VirtualCameraDevice> virtualCamera = mCameraDevice.lock();
+  if (virtualCamera == nullptr) {
+    ALOGW("%s: configure called on already unregistered camera", __func__);
+    return cameraStatus(Status::CAMERA_DISCONNECTED);
+  }
+
   mSessionContext.removeStreamsNotInStreamConfiguration(
       in_requestedConfiguration);
 
@@ -213,7 +219,7 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
   int inputWidth;
   int inputHeight;
 
-  if (!mCameraDevice.isStreamCombinationSupported(in_requestedConfiguration)) {
+  if (!virtualCamera->isStreamCombinationSupported(in_requestedConfiguration)) {
     ALOGE("%s: Requested stream configuration is not supported", __func__);
     return cameraStatus(Status::ILLEGAL_ARGUMENT);
   }

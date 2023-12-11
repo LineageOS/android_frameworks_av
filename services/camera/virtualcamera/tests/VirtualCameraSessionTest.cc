@@ -20,8 +20,8 @@
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraSession.h"
 #include "aidl/android/companion/virtualcamera/BnVirtualCameraCallback.h"
-#include "aidl/android/companion/virtualcamera/IVirtualCameraCallback.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
+#include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BnCameraDeviceCallback.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
 #include "aidl/android/hardware/graphics/common/PixelFormat.h"
@@ -44,6 +44,7 @@ constexpr int kCameraId = 42;
 using ::aidl::android::companion::virtualcamera::BnVirtualCameraCallback;
 using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BnCameraDeviceCallback;
 using ::aidl::android::hardware::camera::device::BufferRequest;
 using ::aidl::android::hardware::camera::device::BufferRequestStatus;
@@ -110,7 +111,7 @@ class VirtualCameraSessionTest : public ::testing::Test {
                                          .pixelFormat = Format::YUV_420_888}},
         mMockVirtualCameraClientCallback);
     mVirtualCameraSession = ndk::SharedRefBase::make<VirtualCameraSession>(
-        *mVirtualCameraDevice, mMockCameraDeviceCallback,
+        mVirtualCameraDevice, mMockCameraDeviceCallback,
         mMockVirtualCameraClientCallback);
 
     // Explicitly defining default actions below to prevent gmock from
@@ -221,6 +222,22 @@ TEST_F(VirtualCameraSessionTest, onProcessCaptureRequestTriggersClientCallback) 
                                           &aidlReturn)
                   .isOk());
   EXPECT_THAT(aidlReturn, Eq(requests.size()));
+}
+
+TEST_F(VirtualCameraSessionTest, configureAfterCameraRelease) {
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createStream(kStreamId, kWidth, kHeight, PixelFormat::YCBCR_420_888)};
+  std::vector<HalStream> halStreams;
+
+  // Release virtual camera.
+  mVirtualCameraDevice.reset();
+
+  // Expect configuration attempt returns CAMERA_DISCONNECTED service specific code.
+  EXPECT_THAT(
+      mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::CAMERA_DISCONNECTED)));
 }
 
 }  // namespace
