@@ -1977,6 +1977,8 @@ status_t NuPlayer::instantiateDecoder(
         if (rate > 0) {
             format->setFloat("operating-rate", rate * mPlaybackSettings.mSpeed);
         }
+
+        format->setInt32("android._video-scaling", mVideoScalingMode);
     }
 
     Mutex::Autolock autoLock(mDecoderLock);
