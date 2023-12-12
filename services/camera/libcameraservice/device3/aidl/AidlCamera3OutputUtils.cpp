@@ -143,12 +143,6 @@ void requestStreamBuffers(RequestBufferStates& states,
     std::lock_guard<std::mutex> lock(states.reqBufferLock);
     std::vector<StreamBufferRet> bufRets;
     outBuffers->clear();
-    if (!states.useHalBufManager) {
-        ALOGE("%s: Camera %s does not support HAL buffer management",
-                __FUNCTION__, states.cameraId.c_str());
-        *status = BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS;
-        return;
-    }
 
     SortedVector<int32_t> streamIds;
     ssize_t sz = streamIds.setCapacity(bufReqs.size());
@@ -171,6 +165,13 @@ void requestStreamBuffers(RequestBufferStates& states,
         if (streamIds.indexOf(bufReq.streamId) != NAME_NOT_FOUND) {
             ALOGE("%s: Stream %d appear multiple times in buffer requests",
                     __FUNCTION__, bufReq.streamId);
+            *status = BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS;
+            return;
+        }
+        if (!states.useHalBufManager &&
+                !contains(states.halBufManagedStreamIds, bufReq.streamId)) {
+            ALOGE("%s: Camera %s does not support HAL buffer management for stream id %d",
+                  __FUNCTION__, states.cameraId.c_str(), bufReq.streamId);
             *status = BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS;
             return;
         }
@@ -316,7 +317,7 @@ void requestStreamBuffers(RequestBufferStates& states,
                 sb.acquire_fence = -1;
                 sb.status = CAMERA_BUFFER_STATUS_ERROR;
             }
-            returnOutputBuffers(states.useHalBufManager, nullptr,
+            returnOutputBuffers(states.useHalBufManager,states.halBufManagedStreamIds, nullptr,
                     streamBuffers.data(), numAllocatedBuffers, 0,
                     0, false,
                     0, states.sessionStatsBuilder);

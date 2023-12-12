@@ -45,13 +45,17 @@
 #include <camera/CameraUtils.h>
 #include <camera/StringUtils.h>
 #include <camera_metadata_hidden.h>
+#include <com_android_internal_camera_flags.h>
 
 #include "device3/Camera3OutputUtils.h"
+#include "utils/SessionConfigurationUtils.h"
 
 #include "system/camera_metadata.h"
 
 using namespace android::camera3;
+using namespace android::camera3::SessionConfigurationUtils;
 using namespace android::hardware::camera;
+namespace flags = com::android::internal::camera::flags;
 
 namespace android {
 namespace camera3 {
@@ -534,7 +538,8 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
                request.pendingOutputBuffers.size() == 0);
 
         returnOutputBuffers(
-            states.useHalBufManager, states.listener,
+            states.useHalBufManager, states.halBufManagedStreamIds,
+            states.listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(), /*timestamp*/0, /*readoutTimestamp*/0,
             /*requested*/true, request.requestTimeNs, states.sessionStatsBuilder,
@@ -794,7 +799,8 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                 result->num_output_buffers);
         if (shutterTimestamp != 0) {
             returnAndRemovePendingOutputBuffers(
-                states.useHalBufManager, states.listener,
+                states.useHalBufManager, states.halBufManagedStreamIds,
+                states.listener,
                 request, states.sessionStatsBuilder);
         }
 
@@ -845,6 +851,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
 
 void returnOutputBuffers(
         bool useHalBufManager,
+        const std::set<int32_t> &halBufferManagedStreams,
         sp<NotificationListener> listener,
         const camera_stream_buffer_t *outputBuffers, size_t numBuffers,
         nsecs_t timestamp, nsecs_t readoutTimestamp, bool requested,
@@ -871,7 +878,9 @@ void returnOutputBuffers(
         }
 
         if (outputBuffers[i].buffer == nullptr) {
-            if (!useHalBufManager) {
+            if (!useHalBufManager &&
+                    !(flags::session_hal_buf_manager() &&
+                            contains(halBufferManagedStreams, streamId))) {
                 // With HAL buffer management API, HAL sometimes will have to return buffers that
                 // has not got a output buffer handle filled yet. This is though illegal if HAL
                 // buffer management API is not being used.
@@ -944,13 +953,14 @@ void returnOutputBuffers(
 }
 
 void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
+        const std::set<int32_t> &halBufferManagedStreams,
         sp<NotificationListener> listener, InFlightRequest& request,
         SessionStatsBuilder& sessionStatsBuilder) {
     bool timestampIncreasing =
             !((request.zslCapture && request.stillCapture) || request.hasInputBuffer);
     nsecs_t readoutTimestamp = request.resultExtras.hasReadoutTimestamp ?
             request.resultExtras.readoutTimestamp : 0;
-    returnOutputBuffers(useHalBufManager, listener,
+    returnOutputBuffers(useHalBufManager, halBufferManagedStreams, listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(),
             request.shutterTimestamp, readoutTimestamp,
@@ -1052,7 +1062,8 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                     r.rotateAndCropAuto, cameraIdsWithZoom, r.physicalMetadatas);
             }
             returnAndRemovePendingOutputBuffers(
-                    states.useHalBufManager, states.listener, r, states.sessionStatsBuilder);
+                    states.useHalBufManager, states.halBufManagedStreamIds,
+                    states.listener, r, states.sessionStatsBuilder);
 
             removeInFlightRequestIfReadyLocked(states, idx);
         }
@@ -1193,7 +1204,8 @@ void flushInflightRequests(FlushInflightReqStates& states) {
         for (size_t idx = 0; idx < states.inflightMap.size(); idx++) {
             const InFlightRequest &request = states.inflightMap.valueAt(idx);
             returnOutputBuffers(
-                states.useHalBufManager, states.listener,
+                states.useHalBufManager, states.halBufManagedStreamIds,
+                states.listener,
                 request.pendingOutputBuffers.array(),
                 request.pendingOutputBuffers.size(), /*timestamp*/0, /*readoutTimestamp*/0,
                 /*requested*/true, request.requestTimeNs, states.sessionStatsBuilder,

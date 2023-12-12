@@ -58,6 +58,7 @@ Camera3OfflineSession::Camera3OfflineSession(const std::string &id,
         mTagMonitor(offlineStates.mTagMonitor),
         mVendorTagId(offlineStates.mVendorTagId),
         mUseHalBufManager(offlineStates.mUseHalBufManager),
+        mHalBufManagedStreamIds(offlineStates.mHalBufManagedStreamIds),
         mNeedFixupMonochromeTags(offlineStates.mNeedFixupMonochromeTags),
         mUsePartialResult(offlineStates.mUsePartialResult),
         mNumPartialResults(offlineStates.mNumPartialResults),
@@ -136,7 +137,7 @@ status_t Camera3OfflineSession::disconnectImpl() {
 
     FlushInflightReqStates states {
         mId, mOfflineReqsLock, mOfflineReqs, mUseHalBufManager,
-        listener, *this, mBufferRecords, *this, mSessionStatsBuilder};
+        mHalBufManagedStreamIds, listener, *this, mBufferRecords, *this, mSessionStatsBuilder};
 
     camera3::flushInflightRequests(states);
 
