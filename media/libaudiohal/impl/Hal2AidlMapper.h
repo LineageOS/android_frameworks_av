@@ -36,6 +36,11 @@ class StreamHalInterface;
 // structures directly. Mapper does the job of translating the "legacy" way of identifying ports
 // and port configs (by device addresses and I/O handles) into AIDL IDs. Once the framework will
 // be updated to provide these IDs directly to libaudiohal, the need for the mapper will cease.
+//
+// Note that unlike DeviceHalInterface, which sometimes allows a method to return an error,
+// but still consider some of the outputs to be valid (for example, in 'open{Input|Output}Stream'),
+// 'Hal2AidlMapper' follows the Binder convention. It means that if a method returns an error,
+// the outputs may not be initialized at all and should not be considered by the caller.
 class Hal2AidlMapper {
   public:
     using Cleanups = Cleanups<Hal2AidlMapper>;
@@ -49,27 +54,6 @@ class Hal2AidlMapper {
             const std::vector<::aidl::android::media::audio::common::AudioPortConfig>& sources,
             const std::vector<::aidl::android::media::audio::common::AudioPortConfig>& sinks,
             int32_t* patchId, Cleanups* cleanups);
-    status_t findOrCreatePortConfig(
-            const ::aidl::android::media::audio::common::AudioDevice& device,
-            const ::aidl::android::media::audio::common::AudioConfig* config,
-            ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
-            bool* created);
-    status_t findOrCreatePortConfig(
-            const ::aidl::android::media::audio::common::AudioConfig& config,
-            const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
-            int32_t ioHandle,
-            ::aidl::android::media::audio::common::AudioSource source,
-            const std::set<int32_t>& destinationPortIds,
-            ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
-    status_t findOrCreatePortConfig(
-        const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
-        const std::set<int32_t>& destinationPortIds,
-        ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
-    status_t findOrCreatePortConfig(
-        const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
-        const std::set<int32_t>& destinationPortIds,
-        ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
-        Cleanups* cleanups = nullptr);
     status_t findPortConfig(
             const ::aidl::android::media::audio::common::AudioDevice& device,
             ::aidl::android::media::audio::common::AudioPortConfig* portConfig);
@@ -88,6 +72,8 @@ class Hal2AidlMapper {
         return ::aidl::android::convertContainer(mRoutes, routes, converter);
     }
     status_t initialize();
+    // If the resulting 'mixPortConfig->id' is 0, that means the stream was not created,
+    // and 'config' is a suggested config.
     status_t prepareToOpenStream(
         int32_t ioHandle,
         const ::aidl::android::media::audio::common::AudioDevice& device,
@@ -97,6 +83,11 @@ class Hal2AidlMapper {
         ::aidl::android::media::audio::common::AudioConfig* config,
         ::aidl::android::media::audio::common::AudioPortConfig* mixPortConfig,
         ::aidl::android::hardware::audio::core::AudioPatch* patch);
+    status_t setPortConfig(
+        const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
+        const std::set<int32_t>& destinationPortIds,
+        ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
+        Cleanups* cleanups = nullptr);
     status_t releaseAudioPatch(int32_t patchId);
     void resetUnusedPatchesAndPortConfigs();
     status_t setDevicePortConnectedState(
@@ -128,9 +119,11 @@ class Hal2AidlMapper {
             const ::aidl::android::media::audio::common::AudioPort& p);
     bool audioDeviceMatches(const ::aidl::android::media::audio::common::AudioDevice& device,
             const ::aidl::android::media::audio::common::AudioPortConfig& p);
+    // If the 'result->id' is 0, that means, the config was not created/updated,
+    // and the 'result' is a suggestion from the HAL.
     status_t createOrUpdatePortConfig(
             const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
-            PortConfigs::iterator* result, bool *created);
+            ::aidl::android::media::audio::common::AudioPortConfig* result, bool *created);
     void eraseConnectedPort(int32_t portId);
     status_t findOrCreatePatch(
         const std::set<int32_t>& sourcePortConfigIds,
@@ -139,6 +132,24 @@ class Hal2AidlMapper {
     status_t findOrCreatePatch(
         const ::aidl::android::hardware::audio::core::AudioPatch& requestedPatch,
         ::aidl::android::hardware::audio::core::AudioPatch* patch, bool* created);
+    status_t findOrCreateDevicePortConfig(
+            const ::aidl::android::media::audio::common::AudioDevice& device,
+            const ::aidl::android::media::audio::common::AudioConfig* config,
+            ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
+            bool* created);
+    // If the resulting 'portConfig->id' is 0, that means the config was not created,
+    // and 'portConfig' is a suggested config.
+    status_t findOrCreateMixPortConfig(
+            const ::aidl::android::media::audio::common::AudioConfig& config,
+            const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
+            int32_t ioHandle,
+            ::aidl::android::media::audio::common::AudioSource source,
+            const std::set<int32_t>& destinationPortIds,
+            ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
+    status_t findOrCreatePortConfig(
+        const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
+        const std::set<int32_t>& destinationPortIds,
+        ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
     Patches::iterator findPatch(const std::set<int32_t>& sourcePortConfigIds,
             const std::set<int32_t>& sinkPortConfigIds);
     Ports::iterator findPort(const ::aidl::android::media::audio::common::AudioDevice& device);
