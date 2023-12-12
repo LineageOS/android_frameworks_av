@@ -107,7 +107,7 @@ public:
      */
     void eraseDataMemory();
 
-    void freeDataQueue();
+    void freeDataQueue() { mDataQueue.reset(); }
 
     void dump() const;
 

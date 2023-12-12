@@ -273,7 +273,8 @@ int64_t AudioStreamInternalCapture::getFramesWritten() {
 
 int64_t AudioStreamInternalCapture::getFramesRead() {
     if (mAudioEndpoint) {
-        mLastFramesRead = mAudioEndpoint->getDataReadCounter() + mFramesOffsetFromService;
+        mLastFramesRead = std::max(mLastFramesRead,
+                                   mAudioEndpoint->getDataReadCounter() + mFramesOffsetFromService);
     }
     return mLastFramesRead;
 }

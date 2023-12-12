@@ -399,6 +399,12 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     uint8_t buffer[getDeviceBufferCapacity() * getBytesPerFrame()];
     android::fifo_frames_t fullFramesAvailable = mAudioEndpoint->read(buffer,
             getDeviceBufferCapacity());
+    // Before releasing the data queue, update the frames read and written.
+    getFramesRead();
+    getFramesWritten();
+    // Call freeDataQueue() here because the following call to
+    // closeDataFileDescriptor() will invalidate the pointers used by the data queue.
+    mAudioEndpoint->freeDataQueue();
     mEndPointParcelable.closeDataFileDescriptor();
     aaudio_result_t result = mServiceInterface.exitStandby(
             mServiceStreamHandleInfo, endpointParcelable);

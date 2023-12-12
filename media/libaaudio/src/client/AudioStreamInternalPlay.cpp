@@ -329,8 +329,9 @@ int64_t AudioStreamInternalPlay::getFramesRead() {
 
 int64_t AudioStreamInternalPlay::getFramesWritten() {
     if (mAudioEndpoint) {
-        mLastFramesWritten = mAudioEndpoint->getDataWriteCounter()
-                             + mFramesOffsetFromService;
+        mLastFramesWritten = std::max(
+                mLastFramesWritten,
+                mAudioEndpoint->getDataWriteCounter() + mFramesOffsetFromService);
     }
     return mLastFramesWritten;
 }
