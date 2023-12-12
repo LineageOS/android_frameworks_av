@@ -386,6 +386,13 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
   bool compressionSuccess = true;
   if (gBuffer != nullptr) {
     android_ycbcr ycbcr;
+    if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+      ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
+            gBuffer->getPixelFormat());
+      AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
+      return cameraStatus(Status::INTERNAL_ERROR);
+    }
+
     status_t status =
         gBuffer->lockYCbCr(AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, &ycbcr);
     ALOGV("Locked buffers");
