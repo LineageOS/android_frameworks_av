@@ -53,6 +53,7 @@
 
 #include <utils/Errors.h>
 #include <utils/threads.h>
+#include <utils/RWLock.h>
 #include <utils/SortedVector.h>
 #include <utils/TypeHelpers.h>
 #include <utils/Vector.h>

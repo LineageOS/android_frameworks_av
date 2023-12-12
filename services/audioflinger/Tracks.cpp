@@ -978,7 +978,13 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
         // Additionally PatchProxyBufferProvider::obtainBuffer (called by PathTrack::getNextBuffer)
         // does not allow 0 frame size request contrary to getNextBuffer
     }
-    for (auto& teePatch : mTeePatches) {
+    TeePatches teePatches;
+    if (mTeePatchesRWLock.tryReadLock() == NO_ERROR) {
+        // Cache a copy of tee patches in case it is updated while using.
+        teePatches = mTeePatches;
+        mTeePatchesRWLock.unlock();
+    }
+    for (auto& teePatch : teePatches) {
         RecordThread::PatchRecord* patchRecord = teePatch.patchRecord.get();
         const size_t framesWritten = patchRecord->writeFrames(
                 sourceBuffer.i8, frameCount, mFrameSize);
@@ -991,7 +997,7 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
     using namespace std::chrono_literals;
     // Average is ~20us per track, this should virtually never be logged (Logging takes >200us)
     ALOGD_IF(spent > 500us, "%s: took %lldus to intercept %zu tracks", __func__,
-             spent.count(), mTeePatches.size());
+             spent.count(), teePatches.size());
 }
 
 // ExtendedAudioBufferProvider interface
@@ -1509,7 +1515,10 @@ void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backI
 void AudioFlinger::PlaybackThread::Track::updateTeePatches_l() {
     if (mTeePatchesToUpdate.has_value()) {
         forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->destroy(); });
-        mTeePatches = mTeePatchesToUpdate.value();
+        {
+            RWLock::AutoWLock writeLock(mTeePatchesRWLock);
+            mTeePatches = std::move(mTeePatchesToUpdate.value());
+        }
         if (mState == TrackBase::ACTIVE || mState == TrackBase::RESUMING ||
                 mState == TrackBase::STOPPING_1) {
             forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->start(); });

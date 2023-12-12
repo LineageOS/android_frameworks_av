@@ -344,6 +344,7 @@ private:
     // Must hold thread lock to access tee patches
     template <class F>
     void                forEachTeePatchTrack_l(F f) {
+        RWLock::AutoRLock readLock(mTeePatchesRWLock);
         for (auto& tp : mTeePatches) { f(tp.patchTrack); }
     };
 
@@ -379,6 +380,7 @@ private:
     audio_output_flags_t mFlags;
     TeePatches  mTeePatches;
     std::optional<TeePatches> mTeePatchesToUpdate;
+    RWLock              mTeePatchesRWLock;
     const float         mSpeed;
     const bool          mIsSpatialized;
     const bool          mIsBitPerfect;
