@@ -254,8 +254,7 @@ c2_status_t GraphicsTracker::configureGraphics(
         ret = igbp->getUniqueId(&bqId);
     }
     if (ret != ::android::OK ||
-            prevCache->mGeneration == generation ||
-            (bqId != 0 && prevCache->mBqId == bqId)) {
+            prevCache->mGeneration == generation) {
         ALOGE("new surface configure fail due to wrong or same bqId or same generation:"
               "igbp(%d:%llu -> %llu), gen(%lu -> %lu)", (bool)igbp,
               (unsigned long long)prevCache->mBqId, (unsigned long long)bqId,
