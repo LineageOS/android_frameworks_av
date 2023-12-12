@@ -43,6 +43,10 @@ inline ndk::ScopedAStatus cameraStatus(
 sp<Fence> importFence(
     const ::aidl::android::hardware::common::NativeHandle& handle);
 
+// Returns true if specified pixel format is supported for virtual camera input.
+bool isPixelFormatSupportedForInput(
+    ::aidl::android::companion::virtualcamera::Format format);
+
 // Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(
     int width, int height,
