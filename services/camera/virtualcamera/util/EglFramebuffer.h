@@ -50,6 +50,9 @@ class EglFrameBuffer {
   // Return height of framebuffer (in pixels).
   int getHeight() const;
 
+  // Return underlying hardware buffer.
+  std::shared_ptr<AHardwareBuffer> getHardwareBuffer();
+
  private:
   // Keeping shared_ptr to hardware buffer instance here prevents it from being
   // freed while tied to EGL framebufer / EGL texture.

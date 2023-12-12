@@ -153,7 +153,7 @@ class VirtualCameraServiceTest : public ::testing::Test {
       createConfiguration(kVgaWidth, kVgaHeight, Format::YUV_420_888);
 };
 
-TEST_F(VirtualCameraServiceTest, RegisterCameraSucceeds) {
+TEST_F(VirtualCameraServiceTest, RegisterCameraWithYuvInputSucceeds) {
   sp<BBinder> token = sp<BBinder>::make();
   ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
   bool aidlRet;
@@ -162,6 +162,20 @@ TEST_F(VirtualCameraServiceTest, RegisterCameraSucceeds) {
       mCameraService
           ->registerCamera(ndkToken, mVgaYUV420OnlyConfiguration, &aidlRet)
           .isOk());
+
+  EXPECT_TRUE(aidlRet);
+  EXPECT_THAT(getCameraIds(), SizeIs(1));
+}
+
+TEST_F(VirtualCameraServiceTest, RegisterCameraWithRgbaInputSucceeds) {
+  sp<BBinder> token = sp<BBinder>::make();
+  ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
+  bool aidlRet;
+
+  VirtualCameraConfiguration config =
+      createConfiguration(kVgaWidth, kVgaHeight, Format::RGBA_8888);
+
+  ASSERT_TRUE(mCameraService->registerCamera(ndkToken, config, &aidlRet).isOk());
 
   EXPECT_TRUE(aidlRet);
   EXPECT_THAT(getCameraIds(), SizeIs(1));

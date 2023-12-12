@@ -18,11 +18,17 @@
 
 #include <unistd.h>
 
+#include <algorithm>
+#include <array>
+
 #include "jpeglib.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
+
+using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::hardware::common::NativeHandle;
 
 // Lower bound for maximal supported texture size is at least 2048x2048
 // but on most platforms will be more.
@@ -30,8 +36,8 @@ namespace virtualcamera {
 constexpr int kMaxTextureSize = 2048;
 constexpr int kLibJpegDctSize = DCTSIZE;
 
-using ::aidl::android::companion::virtualcamera::Format;
-using ::aidl::android::hardware::common::NativeHandle;
+constexpr std::array<Format, 2> kSupportedFormats{Format::YUV_420_888,
+                                                  Format::RGBA_8888};
 
 sp<Fence> importFence(const NativeHandle& aidlHandle) {
   if (aidlHandle.fds.size() != 1) {
@@ -41,11 +47,15 @@ sp<Fence> importFence(const NativeHandle& aidlHandle) {
   return sp<Fence>::make(::dup(aidlHandle.fds[0].get()));
 }
 
+bool isPixelFormatSupportedForInput(const Format format) {
+  return std::find(kSupportedFormats.begin(), kSupportedFormats.end(),
+                   format) != kSupportedFormats.end();
+}
+
 // Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(const int width, const int height,
                                const Format format) {
-  if (format != Format::YUV_420_888) {
-    // For now only YUV_420_888 is supported for input.
+  if (!isPixelFormatSupportedForInput(format)) {
     return false;
   }
 

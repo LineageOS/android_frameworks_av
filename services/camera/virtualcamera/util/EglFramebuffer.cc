@@ -112,6 +112,10 @@ int EglFrameBuffer::getHeight() const {
   return mHeight;
 }
 
+std::shared_ptr<AHardwareBuffer> EglFrameBuffer::getHardwareBuffer() {
+  return mHardwareBuffer;
+}
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android

@@ -24,7 +24,9 @@
 
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/hardware/camera/device/ICameraDeviceCallback.h"
+#include "android/binder_auto_utils.h"
 #include "util/EglDisplayContext.h"
+#include "util/EglFramebuffer.h"
 #include "util/EglProgram.h"
 #include "util/EglSurfaceTexture.h"
 
@@ -135,6 +137,13 @@ class VirtualCameraRenderThread {
   ndk::ScopedAStatus renderIntoImageStreamBuffer(int streamId, int bufferId,
                                                  sp<Fence> fence = nullptr);
 
+  // Render current image into provided EglFramebuffer.
+  // If fence is specified, this function will block until the fence is cleared
+  // before writing to the buffer.
+  // Always called on the render thread.
+  ndk::ScopedAStatus renderIntoEglFramebuffer(EglFrameBuffer& framebuffer,
+                                              sp<Fence> fence = nullptr);
+
   // Camera callback
   const std::shared_ptr<
       ::aidl::android::hardware::camera::device::ICameraDeviceCallback>
@@ -156,7 +165,8 @@ class VirtualCameraRenderThread {
 
   // EGL helpers - constructed and accessed only from rendering thread.
   std::unique_ptr<EglDisplayContext> mEglDisplayContext;
-  std::unique_ptr<EglTextureProgram> mEglTextureProgram;
+  std::unique_ptr<EglTextureProgram> mEglTextureYuvProgram;
+  std::unique_ptr<EglTextureProgram> mEglTextureRgbProgram;
   std::unique_ptr<EglSurfaceTexture> mEglSurfaceTexture;
 
   std::promise<sp<Surface>> mInputSurfacePromise;
