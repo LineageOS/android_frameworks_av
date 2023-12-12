@@ -295,8 +295,10 @@ void *AudioStreamInternalCapture::callbackLoop() {
         if ((result != mCallbackFrames)) {
             ALOGE("callbackLoop: read() returned %d", result);
             if (result >= 0) {
-                // Only read some of the frames requested. Must have timed out.
-                result = AAUDIO_ERROR_TIMEOUT;
+                // Only read some of the frames requested. The stream can be disconnected
+                // or timed out.
+                processCommands();
+                result = isDisconnected() ? AAUDIO_ERROR_DISCONNECTED : AAUDIO_ERROR_TIMEOUT;
             }
             maybeCallErrorCallback(result);
             break;

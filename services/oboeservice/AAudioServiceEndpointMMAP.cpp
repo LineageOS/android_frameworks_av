@@ -422,10 +422,17 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle)
     ALOGD("%s() called with dev %d, old = %d", __func__, deviceId, getDeviceId());
     if (getDeviceId() != deviceId) {
         if (getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
+            // When there is a routing changed, mmap stream should be disconnected. Set `mConnected`
+            // as false here so that there won't be a new stream connect to this endpoint.
+            mConnected.store(false);
             const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
             std::thread asyncTask([holdEndpoint, deviceId]() {
                 ALOGD("onRoutingChanged() asyncTask launched");
-                holdEndpoint->disconnectRegisteredStreams();
+                // When routing changed, the stream is disconnected and cannot be used except for
+                // closing. In that case, it should be safe to release all registered streams.
+                // This can help release service side resource in case the client doesn't close
+                // the stream after receiving disconnect event.
+                holdEndpoint->releaseRegisteredStreams();
                 holdEndpoint->setDeviceId(deviceId);
             });
             asyncTask.detach();
