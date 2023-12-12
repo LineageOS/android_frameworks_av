@@ -37,6 +37,14 @@ flag {
 }
 
 flag {
+    name: "ringer_mode_affects_alarm"
+    namespace: "media_audio"
+    description:
+        "Support a configuration where ringer mode affects alarm stream"
+    bug: "312456558"
+}
+
+flag {
     name: "spatializer_offload"
     namespace: "media_audio"
     description: "Enable spatializer offload"
