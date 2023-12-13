@@ -101,7 +101,7 @@ cc_defaults {
         "android.frameworks.cameraservice.device-V2-ndk",
         "android.hardware.camera.common-V1-ndk",
         "android.hardware.camera.device-V3-ndk",
-        "android.hardware.camera.metadata-V2-ndk",
+        "android.hardware.camera.metadata-V3-ndk",
         "android.hardware.camera.provider@2.4",
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
