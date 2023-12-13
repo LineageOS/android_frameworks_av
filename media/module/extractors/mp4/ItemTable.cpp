@@ -1452,9 +1452,9 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
                     info.isExif(), (long long)offset, (long long)size);
             if ((info.isExif() && size > 4) || (info.isXmp() && size > 0)) {
                 ExternalMetaItem metaItem = {
-                        .isExif = info.isExif(),
                         .offset = offset,
                         .size = size,
+                        .isExif = info.isExif(),
                 };
                 mItemIdToMetaMap.add(info.itemId, metaItem);
             }
