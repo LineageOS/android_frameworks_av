@@ -201,6 +201,9 @@ class ModuleMock : public ::aidl::android::hardware::audio::core::BnModule,
     ndk::ScopedAStatus getAAudioHardwareBurstMinUsec(int32_t*) override {
         return ndk::ScopedAStatus::ok();
     }
+    ndk::ScopedAStatus prepareToDisconnectExternalDevice(int32_t) override {
+        return ndk::ScopedAStatus::ok();
+    }
 
     bool mIsScreenTurnedOn = false;
     ScreenRotation mScreenRotation = ScreenRotation::DEG_0;
