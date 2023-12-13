@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -38,6 +39,7 @@
 #include "android-base/thread_annotations.h"
 #include "android/binder_auto_utils.h"
 #include "android/hardware_buffer.h"
+#include "ui/GraphicBuffer.h"
 #include "util/EglFramebuffer.h"
 #include "util/JpegUtil.h"
 #include "util/MetadataBuilder.h"
@@ -107,6 +109,45 @@ NotifyMsg createRequestErrorNotifyMsg(int frameNumber) {
       .errorStreamId = -1,
       .errorCode = ErrorCode::ERROR_REQUEST});
   return msg;
+}
+
+std::shared_ptr<EglFrameBuffer> allocateTemporaryFramebuffer(
+    EGLDisplay eglDisplay, const uint width, const int height) {
+  const AHardwareBuffer_Desc desc{
+      .width = static_cast<uint32_t>(width),
+      .height = static_cast<uint32_t>(height),
+      .layers = 1,
+      .format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420,
+      .usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER |
+               AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN,
+      .rfu0 = 0,
+      .rfu1 = 0};
+
+  AHardwareBuffer* hwBufferPtr;
+  int status = AHardwareBuffer_allocate(&desc, &hwBufferPtr);
+  if (status != NO_ERROR) {
+    ALOGE(
+        "%s: Failed to allocate hardware buffer for temporary framebuffer: %d",
+        __func__, status);
+    return nullptr;
+  }
+
+  return std::make_shared<EglFrameBuffer>(
+      eglDisplay,
+      std::shared_ptr<AHardwareBuffer>(hwBufferPtr, AHardwareBuffer_release));
+}
+
+bool isYuvFormat(const PixelFormat pixelFormat) {
+  switch (static_cast<android_pixel_format_t>(pixelFormat)) {
+    case HAL_PIXEL_FORMAT_YCBCR_422_I:
+    case HAL_PIXEL_FORMAT_YCBCR_422_SP:
+    case HAL_PIXEL_FORMAT_Y16:
+    case HAL_PIXEL_FORMAT_YV12:
+    case HAL_PIXEL_FORMAT_YCBCR_420_888:
+      return true;
+    default:
+      return false;
+  }
 }
 
 }  // namespace
@@ -218,7 +259,10 @@ void VirtualCameraRenderThread::threadLoop() {
   ALOGV("Render thread starting");
 
   mEglDisplayContext = std::make_unique<EglDisplayContext>();
-  mEglTextureProgram = std::make_unique<EglTextureProgram>();
+  mEglTextureYuvProgram =
+      std::make_unique<EglTextureProgram>(EglTextureProgram::TextureFormat::YUV);
+  mEglTextureRgbProgram = std::make_unique<EglTextureProgram>(
+      EglTextureProgram::TextureFormat::RGBA);
   mEglSurfaceTexture = std::make_unique<EglSurfaceTexture>(mInputSurfaceWidth,
                                                            mInputSurfaceHeight);
   mInputSurfacePromise.set_value(mEglSurfaceTexture->getSurface());
@@ -371,6 +415,22 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
+  // Let's create YUV framebuffer and render the surface into this.
+  // This will take care about rescaling as well as potential format conversion.
+  std::shared_ptr<EglFrameBuffer> framebuffer = allocateTemporaryFramebuffer(
+      mEglDisplayContext->getEglDisplay(), stream->width, stream->height);
+  if (framebuffer == nullptr) {
+    ALOGE("Failed to allocate temporary framebuffer for JPEG compression");
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  // Render into temporary framebuffer.
+  ndk::ScopedAStatus status = renderIntoEglFramebuffer(*framebuffer);
+  if (!status.isOk()) {
+    ALOGE("Failed to render input texture into temporary framebuffer");
+    return status;
+  }
+
   AHardwareBuffer_Planes planes_info;
 
   int32_t rawFence = fence != nullptr ? fence->get() : -1;
@@ -382,10 +442,21 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
-  sp<GraphicBuffer> gBuffer = mEglSurfaceTexture->getCurrentBuffer();
+  std::shared_ptr<AHardwareBuffer> inHwBuffer = framebuffer->getHardwareBuffer();
+  GraphicBuffer* gBuffer = GraphicBuffer::fromAHardwareBuffer(inHwBuffer.get());
+
   bool compressionSuccess = true;
   if (gBuffer != nullptr) {
     android_ycbcr ycbcr;
+    if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+      // This should never happen since we're allocating the temporary buffer
+      // with YUV420 layout above.
+      ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
+            gBuffer->getPixelFormat());
+      AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
+      return cameraStatus(Status::INTERNAL_ERROR);
+    }
+
     status_t status =
         gBuffer->lockYCbCr(AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, &ycbcr);
     ALOGV("Locked buffers");
@@ -434,31 +505,7 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoImageStreamBuffer(
     return cameraStatus(Status::ILLEGAL_ARGUMENT);
   }
 
-  // Wait for fence to clear.
-  if (fence != nullptr && fence->isValid()) {
-    status_t ret = fence->wait(kAcquireFenceTimeout.count());
-    if (ret != 0) {
-      ALOGE(
-          "Timeout while waiting for the acquire fence for buffer %d"
-          " for streamId %d",
-          bufferId, streamId);
-      return cameraStatus(Status::INTERNAL_ERROR);
-    }
-  }
-
-  mEglDisplayContext->makeCurrent();
-  framebuffer->beforeDraw();
-
-  if (mEglSurfaceTexture->getCurrentBuffer() == nullptr) {
-    // If there's no current buffer, nothing was written to the surface and
-    // texture is not initialized yet. Let's render the framebuffer black
-    // instead of rendering the texture.
-    glClearColor(0.0f, 0.5f, 0.5f, 0.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-  } else {
-    mEglTextureProgram->draw(mEglSurfaceTexture->updateTexture());
-  }
-  framebuffer->afterDraw();
+  ndk::ScopedAStatus status = renderIntoEglFramebuffer(*framebuffer, fence);
 
   const std::chrono::nanoseconds after =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -466,6 +513,43 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoImageStreamBuffer(
 
   ALOGV("Rendering to buffer %d, stream %d took %lld ns", bufferId, streamId,
         after.count() - before.count());
+
+  return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoEglFramebuffer(
+    EglFrameBuffer& framebuffer, sp<Fence> fence) {
+  ALOGV("%s", __func__);
+  // Wait for fence to clear.
+  if (fence != nullptr && fence->isValid()) {
+    status_t ret = fence->wait(kAcquireFenceTimeout.count());
+    if (ret != 0) {
+      ALOGE("Timeout while waiting for the acquire fence for buffer");
+      return cameraStatus(Status::INTERNAL_ERROR);
+    }
+  }
+
+  mEglDisplayContext->makeCurrent();
+  framebuffer.beforeDraw();
+
+  sp<GraphicBuffer> textureBuffer = mEglSurfaceTexture->getCurrentBuffer();
+  if (textureBuffer == nullptr) {
+    // If there's no current buffer, nothing was written to the surface and
+    // texture is not initialized yet. Let's render the framebuffer black
+    // instead of rendering the texture.
+    glClearColor(0.0f, 0.5f, 0.5f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+  } else {
+    const bool renderSuccess =
+        isYuvFormat(static_cast<PixelFormat>(textureBuffer->getPixelFormat()))
+            ? mEglTextureYuvProgram->draw(mEglSurfaceTexture->updateTexture())
+            : mEglTextureRgbProgram->draw(mEglSurfaceTexture->updateTexture());
+    if (!renderSuccess) {
+      ALOGE("%s: Failed to render texture", __func__);
+      return cameraStatus(Status::INTERNAL_ERROR);
+    }
+  }
+  framebuffer.afterDraw();
 
   return ndk::ScopedAStatus::ok();
 }

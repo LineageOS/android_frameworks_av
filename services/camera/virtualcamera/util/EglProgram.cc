@@ -76,15 +76,27 @@ constexpr char kExternalTextureVertexShader[] = R"(#version 300 es
     vTextureCoord = aTextureCoord;
   })";
 
-constexpr char kExternalTextureFragmentShader[] = R"(#version 300 es
+constexpr char kExternalYuvTextureFragmentShader[] = R"(#version 300 es
     #extension GL_OES_EGL_image_external_essl3 : require
     #extension GL_EXT_YUV_target : require
     precision mediump float;
     in vec2 vTextureCoord;
-    out vec4 fragColor;
+    layout (yuv) out vec4 fragColor;
     uniform __samplerExternal2DY2YEXT uTexture;
     void main() {
       fragColor = texture(uTexture, vTextureCoord);
+    })";
+
+constexpr char kExternalRgbaTextureFragmentShader[] = R"(#version 300 es
+    #extension GL_OES_EGL_image_external : require
+    #extension GL_EXT_YUV_target : require
+    precision mediump float;
+    in vec2 vTextureCoord;
+    layout (yuv) out vec4 fragColor;
+    uniform samplerExternalOES uTexture;
+    void main() {
+      vec4 rgbaColor = texture(uTexture, vTextureCoord);
+      fragColor = vec4(rgb_2_yuv(rgbaColor.xyz, itu_601_full_range), 0.0);
     })";
 
 constexpr int kCoordsPerVertex = 3;
@@ -237,7 +249,7 @@ bool EglTestPatternProgram::draw(int width, int height, int frameNumber) {
   return true;
 }
 
-EglTextureProgram::EglTextureProgram() {
+EglTextureProgram::EglTextureProgram(const TextureFormat textureFormat) {
   if (!isGlExtensionSupported(kGlExtYuvTarget)) {
     ALOGE(
         "Cannot initialize external texture program due to missing "
@@ -245,7 +257,10 @@ EglTextureProgram::EglTextureProgram() {
     return;
   }
 
-  if (initialize(kExternalTextureVertexShader, kExternalTextureFragmentShader)) {
+  const char* fragmentShaderSrc = textureFormat == TextureFormat::YUV
+                                      ? kExternalYuvTextureFragmentShader
+                                      : kExternalRgbaTextureFragmentShader;
+  if (initialize(kExternalTextureVertexShader, fragmentShaderSrc)) {
     ALOGV("Successfully initialized EGL shaders for external texture program.");
   } else {
     ALOGE("External texture EGL shader program initialization failed.");

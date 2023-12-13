@@ -55,7 +55,9 @@ class EglTestPatternProgram : public EglProgram {
 // TODO(b/301023410) Add support for translation / cropping.
 class EglTextureProgram : public EglProgram {
  public:
-  EglTextureProgram();
+  enum class TextureFormat { RGBA, YUV };
+
+  EglTextureProgram(TextureFormat textureFormat = TextureFormat::YUV);
 
   bool draw(GLuint textureId);
 };

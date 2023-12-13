@@ -61,12 +61,24 @@ TEST_F(EglTest, EglTestPatternProgramSuccessfulInit) {
   EXPECT_TRUE(eglTestPatternProgram.isInitialized());
 }
 
-TEST_F(EglTest, EglTextureProgramSuccessfulInit) {
+TEST_F(EglTest, EglTextureProgramYuvSuccessfulInit) {
   if (!isGlExtensionSupported(kGlExtYuvTarget)) {
       GTEST_SKIP() << "Skipping test because of missing required GL extension " << kGlExtYuvTarget;
   }
 
-  EglTextureProgram eglTextureProgram;
+  EglTextureProgram eglTextureProgram(EglTextureProgram::TextureFormat::YUV);
+
+  // Verify the shaders compiled and linked successfully.
+  EXPECT_TRUE(eglTextureProgram.isInitialized());
+}
+
+TEST_F(EglTest, EglTextureProgramRgbaSuccessfulInit) {
+  if (!isGlExtensionSupported(kGlExtYuvTarget)) {
+      GTEST_SKIP() << "Skipping test because of missing required GL extension "
+                   << kGlExtYuvTarget;
+  }
+
+  EglTextureProgram eglTextureProgram(EglTextureProgram::TextureFormat::RGBA);
 
   // Verify the shaders compiled and linked successfully.
   EXPECT_TRUE(eglTextureProgram.isInitialized());

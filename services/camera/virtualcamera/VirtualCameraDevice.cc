@@ -119,9 +119,10 @@ std::optional<CameraMetadata> initCameraCharacteristics(
     const std::vector<SupportedStreamConfiguration>& supportedInputConfig) {
   if (!std::all_of(supportedInputConfig.begin(), supportedInputConfig.end(),
                    [](const SupportedStreamConfiguration& config) {
-                     return config.pixelFormat == Format::YUV_420_888;
+                     return isFormatSupportedForInput(
+                         config.width, config.height, config.pixelFormat);
                    })) {
-    ALOGE("%s: input configuration contains unsupported pixel format", __func__);
+    ALOGE("%s: input configuration contains unsupported format", __func__);
     return std::nullopt;
   }
 
