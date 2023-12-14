@@ -131,6 +131,7 @@ ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
 }
 
 ndk::ScopedAStatus EffectProxy::close() {
+    command(CommandId::STOP);
     return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
         return effect->close();
     });
