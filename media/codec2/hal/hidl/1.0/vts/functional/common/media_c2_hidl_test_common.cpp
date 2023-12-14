@@ -233,18 +233,24 @@ int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameIn
     int32_t numCsds = 0;
     int32_t bytesCount = 0;
     uint32_t flags = 0;
+    uint32_t vtsFlags = 0;
     uint32_t timestamp = 0;
     while (1) {
         if (!(eleInfo >> bytesCount)) break;
         eleInfo >> flags;
+        vtsFlags = mapInfoFlagstoVtsFlags(flags);
+        if (vtsFlags == 0xFF) {
+            ALOGE("unrecognized flag entry in info file %s", info.c_str());
+            return -1;
+        }
         eleInfo >> timestamp;
-        bool codecConfig = flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
+        bool codecConfig = (vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME)) != 0 ;
         if (codecConfig) numCsds++;
-        bool nonDisplayFrame = ((flags & FLAG_NON_DISPLAY_FRAME) != 0);
+        bool nonDisplayFrame = (vtsFlags & (1 << VTS_BIT_FLAG_NO_SHOW_FRAME)) != 0;
         if (timestampDevTest && !codecConfig && !nonDisplayFrame) {
             timestampUslist->push_back(timestamp);
         }
-        frameInfo->push_back({bytesCount, flags, timestamp});
+        frameInfo->push_back({bytesCount, vtsFlags, timestamp});
     }
     ALOGV("numCsds : %d", numCsds);
     eleInfo.close();
@@ -272,4 +278,12 @@ void verifyFlushOutput(std::list<std::unique_ptr<C2Work>>& flushedWork,
     }
     ASSERT_EQ(flushedIndices.empty(), true);
     flushedWork.clear();
+}
+
+int mapInfoFlagstoVtsFlags(int infoFlags) {
+    if (infoFlags == 0) return 0;
+    else if (infoFlags == 0x1) return (1 << VTS_BIT_FLAG_SYNC_FRAME);
+    else if (infoFlags == 0x10) return (1 << VTS_BIT_FLAG_NO_SHOW_FRAME);
+    else if (infoFlags == 0x20) return (1 << VTS_BIT_FLAG_CSD_FRAME);
+    return 0xFF;
 }
