@@ -71,7 +71,6 @@ cc_defaults {
         "libmemunreachable",
         "libnetd_client",
         "libpowermanager",
-        "libsfplugin_ccodec_utils",
         "libstagefright",
         "libstagefright_foundation",
         "libstagefright_httplive",
