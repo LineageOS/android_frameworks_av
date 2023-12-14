@@ -39,7 +39,6 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 #include <media/CharacterEncodingDetector.h>
-#include <Codec2CommonUtils.h>
 
 namespace android {
 
@@ -238,13 +237,6 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
                     AV1ProfileMain10HDR10Plus == profile) {
                   bitDepth = 10;
             }
-        }
-    }
-    if (bitDepth == 10) {
-        static const bool isP010Supported =
-            isHalPixelFormatSupported(AHARDWAREBUFFER_FORMAT_YCbCr_P010);
-        if (!isP010Supported) {
-            bitDepth = 8;
         }
     }
 
