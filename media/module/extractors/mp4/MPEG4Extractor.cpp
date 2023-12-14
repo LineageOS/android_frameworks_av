@@ -522,7 +522,7 @@ media_status_t MPEG4Extractor::getTrackMetaData(
         return AMEDIA_ERROR_UNKNOWN;
     }
 
-    [=] {
+    [this, &track] {
         int64_t duration;
         int32_t samplerate;
         // Only for audio track.

@@ -451,6 +451,7 @@ status_t DeviceHalAidl::openOutputStream(
     }
     *config = VALUE_OR_RETURN_STATUS(
             ::aidl::android::aidl2legacy_AudioConfig_audio_config_t(aidlConfig, isInput));
+    if (mixPortConfig.id == 0) return BAD_VALUE;  // HAL suggests a different config.
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     const bool isOffload = isBitPositionFlagSet(
@@ -523,6 +524,7 @@ status_t DeviceHalAidl::openInputStream(
     }
     *config = VALUE_OR_RETURN_STATUS(
             ::aidl::android::aidl2legacy_AudioConfig_audio_config_t(aidlConfig, isInput));
+    if (mixPortConfig.id == 0) return BAD_VALUE;  // HAL suggests a different config.
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     RecordTrackMetadata aidlTrackMetadata{
@@ -707,8 +709,7 @@ status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* confi
                     *config, isInput, 0 /*portId*/));
     AudioPortConfig portConfig;
     std::lock_guard l(mLock);
-    return mMapper.findOrCreatePortConfig(
-            requestedPortConfig, std::set<int32_t>(), &portConfig);
+    return mMapper.setPortConfig(requestedPortConfig, std::set<int32_t>(), &portConfig);
 }
 
 MicrophoneInfoProvider::Info const* DeviceHalAidl::getMicrophoneInfo() {
@@ -780,7 +781,7 @@ status_t DeviceHalAidl::addDeviceEffect(
     Hal2AidlMapper::Cleanups cleanups(mMapperAccessor);
     {
         std::lock_guard l(mLock);
-        RETURN_STATUS_IF_ERROR(mMapper.findOrCreatePortConfig(
+        RETURN_STATUS_IF_ERROR(mMapper.setPortConfig(
                     requestedPortConfig, {} /*destinationPortIds*/, &devicePortConfig, &cleanups));
     }
     auto aidlEffect = sp<effect::EffectHalAidl>::cast(effect);
