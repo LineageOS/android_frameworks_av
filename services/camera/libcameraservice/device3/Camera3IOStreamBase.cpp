@@ -84,10 +84,10 @@ void Camera3IOStreamBase::dump(int fd, [[maybe_unused]] const Vector<String16> &
     status_t res = getEndpointUsage(&consumerUsage);
     if (res != OK) consumerUsage = 0;
 
-    lines << fmt::sprintf("      State: %d\n", mState);
+    lines << fmt::sprintf("      State: %d\n", static_cast<int>(mState));
     lines << fmt::sprintf("      Dims: %d x %d, format 0x%x, dataspace 0x%x\n",
             camera_stream::width, camera_stream::height,
-            camera_stream::format, camera_stream::data_space);
+            camera_stream::format, static_cast<int>(camera_stream::data_space));
     lines << fmt::sprintf("      Max size: %zu\n", mMaxSize);
     lines << fmt::sprintf("      Combined usage: 0x%" PRIx64 ", max HAL buffers: %d\n",
             mUsage | consumerUsage, camera_stream::max_buffers);

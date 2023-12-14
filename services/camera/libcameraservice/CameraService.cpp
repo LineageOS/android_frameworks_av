@@ -117,6 +117,10 @@ static void setLogLevel(int level) {
     android_atomic_write(level, &gLogLevel);
 }
 
+int32_t format_as(CameraService::StatusInternal s) {
+  return fmt::underlying(s);
+}
+
 // ----------------------------------------------------------------------------
 
 static const std::string sDumpPermission("android.permission.DUMP");
@@ -502,8 +506,8 @@ void CameraService::onDeviceStatusChanged(const std::string& cameraId,
     }
 
     if (newStatus == StatusInternal::NOT_PRESENT) {
-        logDeviceRemoved(cameraId, fmt::sprintf("Device status changed from %d to %d", oldStatus,
-                newStatus));
+        logDeviceRemoved(cameraId, fmt::format("Device status changed from {} to {}",
+                oldStatus, newStatus));
 
         // Set the device status to NOT_PRESENT, clients will no longer be able to connect
         // to this device until the status changes
@@ -529,8 +533,8 @@ void CameraService::onDeviceStatusChanged(const std::string& cameraId,
         removeStates(cameraId);
     } else {
         if (oldStatus == StatusInternal::NOT_PRESENT) {
-            logDeviceAdded(cameraId, fmt::sprintf("Device status changed from %d to %d", oldStatus,
-                    newStatus));
+            logDeviceAdded(cameraId, fmt::format("Device status changed from {} to {}",
+                    oldStatus, newStatus));
         }
         updateStatus(newStatus, cameraId);
     }
@@ -570,9 +574,9 @@ void CameraService::onDeviceStatusChanged(const std::string& id,
     if (updated) {
         std::string idCombo = id + " : " + physicalId;
         if (newStatus == StatusInternal::PRESENT) {
-            logDeviceAdded(idCombo, fmt::sprintf("Device status changed to %d", newStatus));
+            logDeviceAdded(idCombo, fmt::format("Device status changed to {}", newStatus));
         } else {
-            logDeviceRemoved(idCombo, fmt::sprintf("Device status changed to %d", newStatus));
+            logDeviceRemoved(idCombo, fmt::format("Device status changed to {}", newStatus));
         }
         // Avoid calling getSystemCameraKind() with mStatusListenerLock held (b/141756275)
         SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
