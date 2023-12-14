@@ -3586,6 +3586,7 @@ bool Camera3Device::RequestThread::threadLoop() {
         captureRequest->mRotateAndCropChanged = (mComposerOutput && !mOverrideToPortrait) ? false :
             overrideAutoRotateAndCrop(captureRequest);
         captureRequest->mAutoframingChanged = overrideAutoframing(captureRequest);
+        captureRequest->mTestPatternChanged = overrideTestPattern(captureRequest);
     }
 
     // 'mNextRequests' will at this point contain either a set of HFR batched requests
@@ -3732,7 +3733,6 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         bool triggersMixedIn = (triggerCount > 0 || mPrevTriggers > 0);
         mPrevTriggers = triggerCount;
 
-        bool testPatternChanged = overrideTestPattern(captureRequest);
         bool settingsOverrideChanged = overrideSettingsOverride(captureRequest);
 
         // If the request is the same as last, or we had triggers now or last time or
@@ -3741,7 +3741,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 (mPrevRequest != captureRequest || triggersMixedIn ||
                          captureRequest->mRotateAndCropChanged ||
                          captureRequest->mAutoframingChanged ||
-                         testPatternChanged || settingsOverrideChanged) &&
+                         captureRequest->mTestPatternChanged || settingsOverrideChanged) &&
                 // Request settings are all the same within one batch, so only treat the first
                 // request in a batch as new
                 !(batchedRequest && i > 0);
