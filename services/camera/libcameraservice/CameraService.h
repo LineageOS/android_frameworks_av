@@ -644,6 +644,8 @@ private:
         UNKNOWN = static_cast<int32_t>(hardware::ICameraServiceListener::STATUS_UNKNOWN)
     };
 
+    friend int32_t format_as(StatusInternal s);
+
     /**
      * Container class for the state of each logical camera device, including: ID, status, and
      * dependencies on other devices.  The mapping of camera ID -> state saved in mCameraStates
