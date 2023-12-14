@@ -655,6 +655,8 @@ class Camera3Device :
         bool                                mAutoframingAuto;
         // Indicates that the auto framing value within 'mSettingsList' was modified
         bool                                mAutoframingChanged = false;
+        // Indicates that the camera test pattern setting is modified
+        bool                                mTestPatternChanged = false;
 
         // Whether this capture request has its zoom ratio set to 1.0x before
         // the framework overrides it for camera HAL consumption.
