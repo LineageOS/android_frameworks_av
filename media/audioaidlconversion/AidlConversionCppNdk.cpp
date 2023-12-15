@@ -28,7 +28,6 @@
 
 #include "media/AidlConversionCppNdk.h"
 
-#include <media/ShmemCompat.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
