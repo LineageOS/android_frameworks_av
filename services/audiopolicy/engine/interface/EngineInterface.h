@@ -126,21 +126,28 @@ public:
                                               audio_policy_dev_state_t state) = 0;
 
     /**
-     * Get the strategy selected for a given audio attributes.
+     * Get the strategy selected for a given audio attributes and uid.
+     * Note: the routing may depend on uid / user id in case of routing rules established using
+     * dynamic policy mixes or using mapping between user id and strategy via the zone id.
      *
-     * @param[in] audio attributes to get the selected @product_strategy_t followed by.
-     * @param fallbackOnDefault if true, will return the fallback strategy if the attributes
+     * @param attr to consider
+     * @param uid to consider. If UID is 0, the legacy behavior considering only one default zone is
+     * implemented.
+     * @param fallbackOnDefault if true, will return the fallback strategy if the attributes / uid
      * are not explicitly assigned to a given strategy.
      * @return @product_strategy_t to be followed.
+     *
+     * @FlaggedApi("android.media.audiopolicy.multi_zone_audio")
      */
     virtual product_strategy_t getProductStrategyForAttributes(
-            const audio_attributes_t &attr, bool fallbackOnDefault = true) const = 0;
+            const audio_attributes_t &attr, uid_t uid = 0, bool fallbackOnDefault = true) const = 0;
 
     /**
-     * @brief getOutputDevicesForAttributes retrieves the devices to be used for given
-     * audio attributes.
-     * @param attributes of the output requesting Device(s) selection
-     * @param preferedDevice valid reference if a prefered device is requested, nullptr otherwise.
+     * Gets the devices to be used for given audio attributes and uid/user id
+     *
+     * @param attributes of the client requesting Device(s) selection
+     * @param uid of the client requesting an output
+     * @param preferredDevice valid reference if a preferred device is requested, nullptr otherwise.
      * @param fromCache if true, the device is returned from internal cache,
      *                  otherwise it is determined by current state (device connected,phone state,
      *                  force use, a2dp output...)
@@ -156,10 +163,38 @@ public:
      *      "future" device selection (fromCache == false) when called from a context
      *      where conditions are changing (setDeviceConnectionState(), setPhoneState()...) AND
      *      before manager updates its outputs.
+     *
+     * @FlaggedApi("android.media.audiopolicy.multi_zone_audio")
      */
     virtual DeviceVector getOutputDevicesForAttributes(
             const audio_attributes_t &attributes,
-            const sp<DeviceDescriptor> &preferedDevice = nullptr,
+            uid_t uid = 0,
+            const sp<DeviceDescriptor> &preferredDevice = nullptr,
+            bool fromCache = false) const = 0;
+
+    /**
+     * Gets the devices to be used for given product strategy id.
+     * @param strategy
+     * @param preferredDevice  valid reference if a preferred device is requested, nullptr otherwise
+     * @param fromCache if true, the device is returned from internal cache,
+     *                  otherwise it is determined by current state (device connected,phone state,
+     *                  force use, a2dp output...)
+     * @return vector of selected device descriptors.
+     *         Appropriate device for strategy according
+     *         to current phone state, forced states, connected devices...
+     *         if fromCache is true, the device is returned from internal cache,
+     *         otherwise it is determined by current state (device connected,phone state, force use,
+     *         a2dp output...)
+     * This allows to:
+     *      1 speed up process when the state is stable (when starting or stopping an output)
+     *      2 access to either current device selection (fromCache == true) or
+     *      "future" device selection (fromCache == false) when called from a context
+     *      where conditions are changing (setDeviceConnectionState(), setPhoneState()...) AND
+     *      before manager updates its outputs.
+     */
+    virtual DeviceVector getOutputDevicesForStrategy(
+            product_strategy_t strategy,
+            const sp<DeviceDescriptor> &preferredDevice = nullptr,
             bool fromCache = false) const = 0;
 
     /**
@@ -262,6 +297,28 @@ public:
      * @return OK if the list has been retrieved, error code otherwise
      */
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) const = 0;
+
+    /**
+     * Maps a given user id to a given zone id, thus to the strategy(ies) attached to this zone.
+     *
+     * @param userId to map to the given zone
+     * @param zoneId to be mapped
+     * @return OK if the mapping was set successfully.
+     *
+     * @FlaggedApi("android.media.audiopolicy.multi_zone_audio")
+     */
+    virtual status_t setProductStrategiesZoneIdForUserId(userid_t userId, int zoneId) = 0;
+
+    /**
+     * Removes the mapping of the given user id to any zone id previously set by
+     * {@link setProductStrategiesZoneIdForUserId}.
+     *
+     * @param userId to consider
+     * @return OK if the mapping was removed successfully.
+     *
+     * @FlaggedApi("android.media.audiopolicy.multi_zone_audio")
+     */
+    virtual status_t resetProductStrategiesZoneIdForUserId(userid_t userId) = 0;
 
     /**
      * @brief getVolumeCurvesForAttributes retrieves the Volume Curves interface for the
