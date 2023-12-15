@@ -40,7 +40,6 @@ cc_defaults {
         "libmedia",
         "libstagefright",
         "libutils",
-        "libsfplugin_ccodec_utils",
         "libstagefright_foundation",
     ],
     fuzz_config: {
