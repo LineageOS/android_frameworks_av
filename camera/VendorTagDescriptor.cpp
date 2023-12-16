@@ -466,7 +466,7 @@ const char* VendorTagDescriptorCache::getTagName(uint32_t tag,
 
 int VendorTagDescriptorCache::getTagType(uint32_t tag,
         metadata_vendor_id_t id) const {
-    int ret = 0;
+    int ret = -1;
     auto desc = mVendorMap.find(id);
     if (desc != mVendorMap.end()) {
         ret = desc->second->getTagType(tag);

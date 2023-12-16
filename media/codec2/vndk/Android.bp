@@ -52,6 +52,9 @@ cc_library {
         "com.android.media.swcodec",
     ],
 
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
 
     srcs: [
         "C2AllocatorBlob.cpp",
@@ -129,6 +132,10 @@ cc_library {
 cc_defaults {
     name: "libcodec2-static-defaults",
 
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
+
     static_libs: [
         "liblog",
         "libion",
@@ -172,6 +179,10 @@ cc_defaults {
 cc_defaults {
     name: "libcodec2-impl-defaults",
     cpp_std: "gnu++17",
+
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
 
     shared_libs: [
         "libbase", // for C2_LOG

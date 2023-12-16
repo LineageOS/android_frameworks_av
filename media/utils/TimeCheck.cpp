@@ -287,6 +287,11 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
             .append(halPids).append("\n")
             .append(snapshotAnalysis.toString());
 
+    // In many cases, the initial timeout stack differs from the abort backtrace because
+    // (1) the time difference between initial timeout and the final abort signal
+    // and (2) signalling the HAL audio service may cause
+    // the thread to unblock and continue.
+
     // Note: LOG_ALWAYS_FATAL limits the size of the string - per log/log.h:
     // Log message text may be truncated to less than an
     // implementation-specific limit (1023 bytes).

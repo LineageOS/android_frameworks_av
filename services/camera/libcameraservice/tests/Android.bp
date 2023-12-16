@@ -47,6 +47,7 @@ cc_test {
         "libutils",
         "libjpeg",
         "libexif",
+        "android.companion.virtualdevice.flags-aconfig-cc",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
@@ -61,7 +62,7 @@ cc_test {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.provider-V2-ndk",
+        "android.hardware.camera.provider-V3-ndk",
         "libcameraservice",
         "libgmock",
         "libflagtest",
@@ -108,6 +109,7 @@ cc_test_host {
         "libjpeg",
         "liblog",
         "libutils",
+        "camera_platform_flags_c_lib",
     ],
 
     static_libs: [

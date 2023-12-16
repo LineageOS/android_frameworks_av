@@ -59,12 +59,13 @@ std::string HwModule::getTagForDevice(audio_devices_t device, const String8 &add
 }
 
 status_t HwModule::addOutputProfile(const std::string& name, const audio_config_t *config,
-                                    audio_devices_t device, const String8& address)
+                                    audio_devices_t device, const String8& address,
+                                    audio_output_flags_t flags)
 {
     sp<IOProfile> profile = new OutputProfile(name);
-
     profile->addAudioProfile(new AudioProfile(config->format, config->channel_mask,
                                               config->sample_rate));
+    profile->setFlags(flags);
 
     sp<DeviceDescriptor> devDesc =
             new DeviceDescriptor(device, getTagForDevice(device), address.c_str());
@@ -128,11 +129,13 @@ status_t HwModule::removeOutputProfile(const std::string& name)
 }
 
 status_t HwModule::addInputProfile(const std::string& name, const audio_config_t *config,
-                                   audio_devices_t device, const String8& address)
+                                   audio_devices_t device, const String8& address,
+                                   audio_input_flags_t flags)
 {
     sp<IOProfile> profile = new InputProfile(name);
     profile->addAudioProfile(new AudioProfile(config->format, config->channel_mask,
                                               config->sample_rate));
+    profile->setFlags(flags);
 
     sp<DeviceDescriptor> devDesc =
             new DeviceDescriptor(device, getTagForDevice(device), address.c_str());
@@ -361,7 +364,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
         DeviceVector moduleDevices = hwModule->getAllDevices();
         auto moduleDevice = moduleDevices.getDevice(deviceType, devAddress, encodedFormat);
 
-        // Prevent overwritting moduleDevice address if connected device does not have the same
+        // Prevent overwriting moduleDevice address if connected device does not have the same
         // address (since getDevice with empty address ignores match on address), use dynamic device
         if (moduleDevice && allowToCreate &&
                 (!moduleDevice->address().empty() &&

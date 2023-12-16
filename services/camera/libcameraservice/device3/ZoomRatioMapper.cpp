@@ -38,6 +38,9 @@ void ZoomRatioMapper::initRemappedKeys() {
             kResultPointsToCorrectNoClamp.end());
 
     mRemappedKeys.insert(ANDROID_CONTROL_ZOOM_RATIO);
+    if (flags::concert_mode()) {
+        mRemappedKeys.insert(ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_SENSOR_CROP_REGION);
+    }
 }
 
 status_t ZoomRatioMapper::initZoomRatioInTemplate(CameraMetadata *request) {

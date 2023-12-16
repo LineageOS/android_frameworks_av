@@ -969,6 +969,15 @@ c2_status_t FilterWrapper::createBlockPool(
         C2PlatformAllocatorStore::id_t allocatorId,
         std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
+    C2PlatformAllocatorDesc allocatorParam;
+    allocatorParam.allocatorId = allocatorId;
+    return createBlockPool(allocatorParam, component, pool);
+}
+
+c2_status_t FilterWrapper::createBlockPool(
+        C2PlatformAllocatorDesc &allocatorParam,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
     std::unique_lock lock(mWrappedComponentsMutex);
     for (auto it = mWrappedComponents.begin(); it != mWrappedComponents.end(); ) {
         std::shared_ptr<const C2Component> comp = it->front().lock();
@@ -983,13 +992,13 @@ c2_status_t FilterWrapper::createBlockPool(
                     [](const std::weak_ptr<const C2Component> &el) {
                         return el.lock();
                     });
-            if (C2_OK == CreateCodec2BlockPool(allocatorId, components, pool)) {
+            if (C2_OK == CreateCodec2BlockPool(allocatorParam, components, pool)) {
                 return C2_OK;
             }
         }
         ++it;
     }
-    return CreateCodec2BlockPool(allocatorId, component, pool);
+    return CreateCodec2BlockPool(allocatorParam, component, pool);
 }
 
 c2_status_t FilterWrapper::queryParamsForPreviousComponent(

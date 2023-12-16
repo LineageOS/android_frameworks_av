@@ -217,6 +217,7 @@ cc_library {
     ],
     defaults: [
         "audio_aidl_conversion_common_default",
+        "audio_aidl_conversion_common_default_cpp",
         "latest_android_media_audio_common_types_cpp_export_shared",
     ],
 }

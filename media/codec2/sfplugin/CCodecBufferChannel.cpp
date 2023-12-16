@@ -1133,7 +1133,14 @@ void CCodecBufferChannel::pollForRenderedBuffers() {
 }
 
 void CCodecBufferChannel::onBufferReleasedFromOutputSurface(uint32_t generation) {
-    mComponent->onBufferReleasedFromOutputSurface(generation);
+    // Note: Since this is called asynchronously from IProducerListener not
+    // knowing the internal state of CCodec/CCodecBufferChannel,
+    // prevent mComponent from being destroyed by holding the shared reference
+    // during this interface being executed.
+    std::shared_ptr<Codec2Client::Component> comp = mComponent;
+    if (comp) {
+        comp->onBufferReleasedFromOutputSurface(generation);
+    }
 }
 
 status_t CCodecBufferChannel::discardBuffer(const sp<MediaCodecBuffer> &buffer) {

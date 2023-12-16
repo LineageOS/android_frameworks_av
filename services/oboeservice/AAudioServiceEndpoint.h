@@ -55,9 +55,11 @@ public:
      */
     virtual void close() = 0;
 
-    aaudio_result_t registerStream(const android::sp<AAudioServiceStreamBase>& stream);
+    aaudio_result_t registerStream(const android::sp<AAudioServiceStreamBase>& stream)
+            EXCLUDES(mLockStreams);
 
-    aaudio_result_t unregisterStream(const android::sp<AAudioServiceStreamBase>& stream);
+    aaudio_result_t unregisterStream(const android::sp<AAudioServiceStreamBase>& stream)
+            EXCLUDES(mLockStreams);
 
     virtual aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
                                         audio_port_handle_t *clientHandle) = 0;
@@ -148,9 +150,11 @@ protected:
      * @param portHandle
      * @return return true if a stream with the given portHandle is registered
      */
-    bool                     isStreamRegistered(audio_port_handle_t portHandle);
+    bool                     isStreamRegistered(audio_port_handle_t portHandle)
+                                    EXCLUDES(mLockStreams);
 
-    std::vector<android::sp<AAudioServiceStreamBase>> disconnectRegisteredStreams();
+    std::vector<android::sp<AAudioServiceStreamBase>> disconnectRegisteredStreams()
+            EXCLUDES(mLockStreams);
 
     mutable std::mutex       mLockStreams;
     std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams

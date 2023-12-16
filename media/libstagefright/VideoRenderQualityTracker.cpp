@@ -127,6 +127,7 @@ void VideoRenderQualityMetrics::clear() {
     contentFrameRate = FRAME_RATE_UNDETERMINED;
     desiredFrameRate = FRAME_RATE_UNDETERMINED;
     actualFrameRate = FRAME_RATE_UNDETERMINED;
+    maxContentDroppedAfterPauseMs = 0;
     freezeEventCount = 0;
     freezeDurationMsHistogram.clear();
     freezeDistanceMsHistogram.clear();
@@ -145,6 +146,7 @@ VideoRenderQualityTracker::Configuration
     getFlag(maxExpectedContentFrameDurationUs, "max_expected_content_frame_duration_us");
     getFlag(frameRateDetectionToleranceUs, "frame_rate_detection_tolerance_us");
     getFlag(liveContentFrameDropToleranceUs, "live_content_frame_drop_tolerance_us");
+    getFlag(pauseAudioLatencyUs, "pause_audio_latency_us");
     getFlag(freezeDurationMsHistogramBuckets, "freeze_duration_ms_histogram_buckets");
     getFlag(freezeDurationMsHistogramToScore, "freeze_duration_ms_histogram_to_score");
     getFlag(freezeDistanceMsHistogramBuckets, "freeze_distance_ms_histogram_buckets");
@@ -160,7 +162,6 @@ VideoRenderQualityTracker::Configuration
     getFlag(traceTriggerEnabled, "trace_trigger_enabled");
     getFlag(traceTriggerThrottleMs, "trace_trigger_throttle_ms");
     getFlag(traceMinFreezeDurationMs, "trace_minimum_freeze_duration_ms");
-    getFlag(traceMaxFreezeDurationMs, "trace_maximum_freeze_duration_ms");
 #undef getFlag
     return c;
 }
@@ -181,6 +182,9 @@ VideoRenderQualityTracker::Configuration::Configuration() {
     // Allow for a tolerance of 200 milliseconds for determining if we moved forward in content time
     // because of frame drops for live content, or because the user is seeking.
     liveContentFrameDropToleranceUs = 200 * 1000;
+
+    // After a pause is initiated, audio should likely stop playback within 200ms.
+    pauseAudioLatencyUs = 200 * 1000;
 
     // Freeze configuration
     freezeDurationMsHistogramBuckets = {1, 20, 40, 60, 80, 100, 120, 150, 175, 225, 300, 400, 500};
@@ -204,7 +208,6 @@ VideoRenderQualityTracker::Configuration::Configuration() {
         "ro.build.type", "user") != "user"; // Enabled for non-user builds for debugging.
     traceTriggerThrottleMs = 5 * 60 * 1000; // 5 mins.
     traceMinFreezeDurationMs = 400;
-    traceMaxFreezeDurationMs = 1500;
 }
 
 VideoRenderQualityTracker::VideoRenderQualityTracker()
@@ -296,15 +299,7 @@ void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t a
     int64_t actualRenderTimeUs = actualRenderTimeNs / 1000;
 
     if (mLastRenderTimeUs != -1) {
-        int64_t frameRenderDurationMs = (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
-        mRenderDurationMs += frameRenderDurationMs;
-        if (mConfiguration.traceTriggerEnabled
-            // Threshold for visible video freeze.
-            && frameRenderDurationMs >= mConfiguration.traceMinFreezeDurationMs
-            // Threshold for removing long render durations which could be video pause.
-            && frameRenderDurationMs < mConfiguration.traceMaxFreezeDurationMs) {
-            triggerTraceWithThrottle(mTraceTriggerFn, mConfiguration, actualRenderTimeUs);
-        }
+        mRenderDurationMs += (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
     }
 
     // Now that a frame has been rendered, the previously skipped frames can be processed as skipped
@@ -398,13 +393,13 @@ void VideoRenderQualityTracker::resetForDiscontinuity() {
     mLastRenderTimeUs = -1;
     mLastFreezeEndTimeUs = -1;
     mLastJudderEndTimeUs = -1;
-    mWasPreviousFrameDropped = false;
+    mDroppedContentDurationUs = 0;
     mFreezeEvent.valid = false;
     mJudderEvent.valid = false;
 
-    // Don't worry about tracking frame rendering times from now up until playback catches up to the
-    // discontinuity. While stuttering or freezing could be found in the next few frames, the impact
-    // to the user is is minimal, so better to just keep things simple and don't bother.
+    // Don't worry about tracking frame rendering times from now up until playback catches up to
+    // the discontinuity. While stuttering or freezing could be found in the next few frames, the
+    // impact to the user is is minimal, so better to just keep things simple and don't bother.
     mNextExpectedRenderedFrameQueue = {};
     mTunnelFrameQueuedContentTimeUs = -1;
 
@@ -473,7 +468,7 @@ void VideoRenderQualityTracker::processMetricsForSkippedFrame(int64_t contentTim
     updateFrameDurations(mDesiredFrameDurationUs, -1);
     updateFrameDurations(mActualFrameDurationUs, -1);
     updateFrameRate(mMetrics.contentFrameRate, mContentFrameDurationUs, mConfiguration);
-    mWasPreviousFrameDropped = false;
+    mDroppedContentDurationUs = 0;
 }
 
 void VideoRenderQualityTracker::processMetricsForDroppedFrame(int64_t contentTimeUs,
@@ -484,7 +479,9 @@ void VideoRenderQualityTracker::processMetricsForDroppedFrame(int64_t contentTim
     updateFrameDurations(mActualFrameDurationUs, -1);
     updateFrameRate(mMetrics.contentFrameRate, mContentFrameDurationUs, mConfiguration);
     updateFrameRate(mMetrics.desiredFrameRate, mDesiredFrameDurationUs, mConfiguration);
-    mWasPreviousFrameDropped = true;
+    if (mContentFrameDurationUs[0] != -1) {
+        mDroppedContentDurationUs += mContentFrameDurationUs[0];
+    }
 }
 
 void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTimeUs,
@@ -492,6 +489,8 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
                                                                int64_t actualRenderTimeUs,
                                                                FreezeEvent *freezeEventOut,
                                                                JudderEvent *judderEventOut) {
+    const Configuration& c = mConfiguration;
+
     // Capture the timestamp at which the first frame was rendered
     if (mMetrics.firstRenderTimeUs == 0) {
         mMetrics.firstRenderTimeUs = actualRenderTimeUs;
@@ -514,11 +513,36 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     updateFrameRate(mMetrics.desiredFrameRate, mDesiredFrameDurationUs, mConfiguration);
     updateFrameRate(mMetrics.actualFrameRate, mActualFrameDurationUs, mConfiguration);
 
-    // If the previous frame was dropped, there was a freeze if we've already rendered a frame
-    if (mWasPreviousFrameDropped && mLastRenderTimeUs != -1) {
-        processFreeze(actualRenderTimeUs, mLastRenderTimeUs, mLastFreezeEndTimeUs, mFreezeEvent,
-                      mMetrics, mConfiguration);
-        mLastFreezeEndTimeUs = actualRenderTimeUs;
+    // A freeze occurs if frames were dropped NOT after a discontinuity
+    if (mDroppedContentDurationUs != 0 && mLastRenderTimeUs != -1) {
+        // When pausing, audio playback may continue for a brief period of time after video
+        // pauses while the audio buffers drain. When resuming, a small number of video frames
+        // might be dropped to catch up to the audio position. This is acceptable behacvior and
+        // should not count as a freeze.
+        bool isLikelyCatchingUpAfterPause = false;
+        // A pause can be detected if a freeze occurs for a longer period of time than the
+        // content duration of the dropped frames. This strategy works because, for freeze
+        // events (no video pause), the content duration of the dropped frames will closely track
+        // the wall clock time (freeze duration). When pausing, however, the wall clock time
+        // (freeze duration) will be longer than the content duration of the dropped frames
+        // required to catch up to the audio position.
+        const int64_t wallClockDurationUs = actualRenderTimeUs - mLastRenderTimeUs;
+        // 200ms is chosen because it is larger than what a hiccup in the display pipeline could
+        // likely be, but shorter than the duration for which a user could pause for.
+        static const int32_t MAX_PIPELINE_HICCUP_DURATION_US = 200 * 1000;
+        if (wallClockDurationUs > mDroppedContentDurationUs + MAX_PIPELINE_HICCUP_DURATION_US) {
+            // Capture the amount of content that is dropped after pause, so we can push apps to be
+            // better about this behavior.
+            if (mDroppedContentDurationUs / 1000 > mMetrics.maxContentDroppedAfterPauseMs) {
+                mMetrics.maxContentDroppedAfterPauseMs = int32_t(mDroppedContentDurationUs / 1000);
+            }
+            isLikelyCatchingUpAfterPause = mDroppedContentDurationUs <= c.pauseAudioLatencyUs;
+        }
+        if (!isLikelyCatchingUpAfterPause) {
+            processFreeze(actualRenderTimeUs, mLastRenderTimeUs, mLastFreezeEndTimeUs, mFreezeEvent,
+                        mMetrics, mConfiguration, mTraceTriggerFn);
+            mLastFreezeEndTimeUs = actualRenderTimeUs;
+        }
     }
     maybeCaptureFreezeEvent(actualRenderTimeUs, mLastFreezeEndTimeUs, mFreezeEvent, mMetrics,
                             mConfiguration, freezeEventOut);
@@ -537,13 +561,13 @@ void VideoRenderQualityTracker::processMetricsForRenderedFrame(int64_t contentTi
     maybeCaptureJudderEvent(actualRenderTimeUs, mLastJudderEndTimeUs, mJudderEvent, mMetrics,
                             mConfiguration, judderEventOut);
 
-    mWasPreviousFrameDropped = false;
+    mDroppedContentDurationUs = 0;
 }
 
 void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_t lastRenderTimeUs,
                                               int64_t lastFreezeEndTimeUs, FreezeEvent &e,
-                                              VideoRenderQualityMetrics &m,
-                                              const Configuration &c) {
+                                              VideoRenderQualityMetrics &m, const Configuration &c,
+                                              const TraceTriggerFn traceTriggerFn) {
     int32_t durationMs = int32_t((actualRenderTimeUs - lastRenderTimeUs) / 1000);
     m.freezeDurationMsHistogram.insert(durationMs);
     int32_t distanceMs = -1;
@@ -578,6 +602,11 @@ void VideoRenderQualityTracker::processFreeze(int64_t actualRenderTimeUs, int64_
             e.details.durationMs.push_back(durationMs);
             e.details.distanceMs.push_back(distanceMs); // -1 for first detail in the first event
         }
+    }
+
+    if (c.traceTriggerEnabled && durationMs >= c.traceMinFreezeDurationMs) {
+        ALOGI("Video freezed %lld ms", (long long) durationMs);
+        triggerTraceWithThrottle(traceTriggerFn, c, actualRenderTimeUs);
     }
 }
 
@@ -785,17 +814,20 @@ void VideoRenderQualityTracker::triggerTraceWithThrottle(const TraceTriggerFn tr
     static int64_t lastTriggerUs = -1;
     static Mutex updateLastTriggerLock;
 
-    Mutex::Autolock autoLock(updateLastTriggerLock);
-    if (lastTriggerUs != -1) {
-        int32_t sinceLastTriggerMs = int32_t((triggerTimeUs - lastTriggerUs) / 1000);
-        // Throttle the trace trigger calls to reduce continuous PID fork calls in a short time
-        // to impact device performance, and reduce spamming trace reports.
-        if (sinceLastTriggerMs < c.traceTriggerThrottleMs) {
-            ALOGI("Not triggering trace - not enough time since last trigger");
-            return;
+    {
+        Mutex::Autolock autoLock(updateLastTriggerLock);
+        if (lastTriggerUs != -1) {
+            int32_t sinceLastTriggerMs = int32_t((triggerTimeUs - lastTriggerUs) / 1000);
+            // Throttle the trace trigger calls to reduce continuous PID fork calls in a short time
+            // to impact device performance, and reduce spamming trace reports.
+            if (sinceLastTriggerMs < c.traceTriggerThrottleMs) {
+                ALOGI("Not triggering trace - not enough time since last trigger");
+                return;
+            }
         }
+        lastTriggerUs = triggerTimeUs;
     }
-    lastTriggerUs = triggerTimeUs;
+
     (*traceTriggerFn)();
 }
 

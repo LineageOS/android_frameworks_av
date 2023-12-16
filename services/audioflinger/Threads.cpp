@@ -85,7 +85,6 @@
 #include <utils/Trace.h>
 
 #include <fcntl.h>
-#include <future>
 #include <linux/futex.h>
 #include <math.h>
 #include <memory>
@@ -3900,25 +3899,15 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 {
     aflog::setThreadWriter(mNBLogWriter.get());
 
-    std::future<void> priorityBoostFuture; // joined on dtor; this is a one-shot boost.
     if (mType == SPATIALIZER) {
         const pid_t tid = getTid();
         if (tid == -1) {  // odd: we are here, we must be a running thread.
             ALOGW("%s: Cannot update Spatializer mixer thread priority, no tid", __func__);
         } else {
-            // We launch the priority boost request in a separate thread because
-            // the SchedulingPolicyService may not be available during early
-            // boot time, with a wait causing boot delay.
-            // There is also a PrioConfigEvent that does this, but it will also
-            // block other config events.  This command should be able
-            // to run concurrent with other stream commands.
-            priorityBoostFuture = std::async(std::launch::async,
-                    [tid, output_sp = stream()]() {
-                const int priorityBoost = requestSpatializerPriority(getpid(), tid);
-                if (priorityBoost > 0) {
-                    output_sp->setHalThreadPriority(priorityBoost);
-                }
-            });
+            const int priorityBoost = requestSpatializerPriority(getpid(), tid);
+            if (priorityBoost > 0) {
+                stream()->setHalThreadPriority(priorityBoost);
+            }
         }
     }
 
@@ -7619,6 +7608,23 @@ void DuplicatingThread::threadLoop_standby()
     }
 }
 
+void DuplicatingThread::threadLoop_exit()
+{
+    // Prevent calling the OutputTrack dtor in the DuplicatingThread dtor
+    // where other mutexes (i.e. AudioPolicyService_Mutex) may be held.
+    // Do so here in the threadLoop_exit().
+
+    SortedVector <sp<IAfOutputTrack>> localTracks;
+    {
+        audio_utils::lock_guard l(mutex());
+        localTracks = std::move(mOutputTracks);
+        mOutputTracks.clear();
+    }
+    localTracks.clear();
+    outputTracks.clear();
+    PlaybackThread::threadLoop_exit();
+}
+
 void DuplicatingThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     MixerThread::dumpInternals_l(fd, args);
@@ -7758,7 +7764,8 @@ void DuplicatingThread::sendMetadataToBackend_l(
 
 uint32_t DuplicatingThread::activeSleepTimeUs() const
 {
-    return (mWaitTimeMs * 1000) / 2;
+    // return half the wait time in microseconds.
+    return std::min(mWaitTimeMs * 500ULL, (unsigned long long)UINT32_MAX);  // prevent overflow.
 }
 
 void DuplicatingThread::cacheParameters_l()
@@ -7889,6 +7896,15 @@ NO_THREAD_SAFETY_ANALYSIS
         audio_utils::lock_guard _l(mutex());
         mFinalDownMixer = finalDownMixer;
     }
+}
+
+void SpatializerThread::threadLoop_exit()
+{
+    // The Spatializer EffectHandle must be released on the PlaybackThread
+    // threadLoop() to prevent lock inversion in the SpatializerThread dtor.
+    mFinalDownMixer.clear();
+
+    PlaybackThread::threadLoop_exit();
 }
 
 // ----------------------------------------------------------------------------

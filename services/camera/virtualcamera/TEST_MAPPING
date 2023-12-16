@@ -1,0 +1,17 @@
+{
+  "presubmit" : [
+    {
+      "name": "virtual_camera_tests"
+    }
+  ],
+  "postsubmit": [
+    {
+      "name": "CtsVirtualDevicesCameraTestCases",
+      "options": [
+        {
+          "exclude-annotation": "androidx.test.filters.FlakyTest"
+        }
+      ]
+    }
+  ]
+}

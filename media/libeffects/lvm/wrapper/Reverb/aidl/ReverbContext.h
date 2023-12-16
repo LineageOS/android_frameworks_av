@@ -81,7 +81,12 @@ class ReverbContext final : public EffectContext {
     bool getEnvironmentalReverbBypass() const { return mBypass; }
 
     RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
-    Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }
+    Parameter::VolumeStereo getVolumeStereo() override {
+        if (isAuxiliary()) {
+            return mVolumeStereo;
+        }
+        return {1.0f, 1.0f};
+    }
 
     RetCode setReflectionsDelay(int delay) {
         mReflectionsDelayMs = delay;

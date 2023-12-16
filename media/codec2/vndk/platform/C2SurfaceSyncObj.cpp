@@ -26,6 +26,33 @@
 #include <chrono>
 #include <C2SurfaceSyncObj.h>
 
+namespace {
+static inline void timespec_add_ms(timespec& ts, size_t ms) {
+    constexpr int kNanoSecondsPerSec = 1000000000;
+    ts.tv_sec  += ms / 1000;
+    ts.tv_nsec += (ms % 1000) * 1000000;
+    if (ts.tv_nsec >= kNanoSecondsPerSec) {
+        ts.tv_sec++;
+        ts.tv_nsec -= kNanoSecondsPerSec;
+    }
+}
+
+/*
+ * lhs < rhs:  return <0
+ * lhs == rhs: return 0
+ * lhs > rhs:  return >0
+ */
+static inline int timespec_compare(const timespec& lhs, const timespec& rhs) {
+    if (lhs.tv_sec < rhs.tv_sec) {
+        return -1;
+    }
+    if (lhs.tv_sec > rhs.tv_sec) {
+        return 1;
+    }
+    return lhs.tv_nsec - rhs.tv_nsec;
+}
+}
+
 const native_handle_t C2SurfaceSyncMemory::HandleSyncMem::cHeader = {
     C2SurfaceSyncMemory::HandleSyncMem::version,
     C2SurfaceSyncMemory::HandleSyncMem::numFds,
@@ -284,6 +311,26 @@ void C2SyncVariables::notifyAll() {
     this->unlock();
 }
 
+void C2SyncVariables::invalidate() {
+    mCond++;
+    (void) syscall(__NR_futex, &mCond, FUTEX_REQUEUE, INT_MAX, (void *)INT_MAX, &mLock, 0);
+}
+
+void C2SyncVariables::clearLockIfNecessary() {
+    // Note: After waiting for 30ms without acquiring the lock,
+    // we will consider the lock is dangling.
+    // Since the lock duration is very brief to manage the counter,
+    // waiting for 30ms should be more than enough.
+    constexpr size_t kTestLockDurationMs = 30;
+
+    bool locked = tryLockFor(kTestLockDurationMs);
+    unlock();
+
+    if (!locked) {
+        ALOGW("A dead process might be holding the lock");
+    }
+}
+
 int C2SyncVariables::signal() {
     mCond++;
 
@@ -307,4 +354,36 @@ int C2SyncVariables::wait() {
         (void) syscall(__NR_futex, &mLock, FUTEX_WAIT, FUTEX_LOCKED_CONTENDED, NULL, NULL, 0);
     }
     return 0;
+}
+
+bool C2SyncVariables::tryLockFor(size_t ms) {
+    uint32_t old = FUTEX_UNLOCKED;
+
+    if (mLock.compare_exchange_strong(old, FUTEX_LOCKED_UNCONTENDED)) {
+        return true;
+    }
+
+    if (old == FUTEX_LOCKED_UNCONTENDED) {
+        old = mLock.exchange(FUTEX_LOCKED_CONTENDED);
+    }
+
+    struct timespec wait{
+            static_cast<time_t>(ms / 1000),
+            static_cast<long>((ms % 1000) * 1000000)};
+    struct timespec end;
+    clock_gettime(CLOCK_REALTIME, &end);
+    timespec_add_ms(end, ms);
+
+    while (old != FUTEX_UNLOCKED) { // case of EINTR being returned;
+        (void)syscall(__NR_futex, &mLock, FUTEX_WAIT, FUTEX_LOCKED_CONTENDED, &wait, NULL, 0);
+        old = mLock.exchange(FUTEX_LOCKED_CONTENDED);
+
+        struct timespec now;
+        clock_gettime(CLOCK_REALTIME, &now);
+        if (timespec_compare(now, end) >= 0) {
+            break;
+        }
+    }
+
+    return old == FUTEX_UNLOCKED;
 }

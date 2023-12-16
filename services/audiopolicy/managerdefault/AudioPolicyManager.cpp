@@ -511,11 +511,6 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
                                                       const char *device_name,
                                                       audio_format_t encodedFormat)
 {
-    status_t status;
-    String8 reply;
-    AudioParameter param;
-    int isReconfigA2dpSupported = 0;
-
     ALOGV("handleDeviceConfigChange(() device: 0x%X, address %s name %s encodedFormat: 0x%X",
           device, device_address, device_name, encodedFormat);
 
@@ -537,19 +532,22 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     // Case 1: A2DP active device switches from primary to primary
     // module
     // Case 2: A2DP device config changes on primary module.
-    if (audio_is_a2dp_out_device(device) && hasPrimaryOutput()) {
+    if (device_has_encoding_capability(device) && hasPrimaryOutput()) {
         sp<HwModule> module = mHwModules.getModuleForDeviceType(device, encodedFormat);
         audio_module_handle_t primaryHandle = mPrimaryOutput->getModuleHandle();
         if (availablePrimaryOutputDevices().contains(devDesc) &&
            (module != 0 && module->getHandle() == primaryHandle)) {
-            reply = mpClientInterface->getParameters(
-                        AUDIO_IO_HANDLE_NONE,
-                        String8(AudioParameter::keyReconfigA2dpSupported));
+            bool isA2dp = audio_is_a2dp_out_device(device);
+            const String8 supportKey = isA2dp ? String8(AudioParameter::keyReconfigA2dpSupported)
+                    : String8(AudioParameter::keyReconfigLeSupported);
+            String8 reply = mpClientInterface->getParameters(AUDIO_IO_HANDLE_NONE, supportKey);
             AudioParameter repliedParameters(reply);
-            repliedParameters.getInt(
-                    String8(AudioParameter::keyReconfigA2dpSupported), isReconfigA2dpSupported);
-            if (isReconfigA2dpSupported) {
-                const String8 key(AudioParameter::keyReconfigA2dp);
+            int isReconfigSupported;
+            repliedParameters.getInt(supportKey, isReconfigSupported);
+            if (isReconfigSupported) {
+                const String8 key = isA2dp ? String8(AudioParameter::keyReconfigA2dp)
+                        : String8(AudioParameter::keyReconfigLe);
+                AudioParameter param;
                 param.add(key, String8("true"));
                 mpClientInterface->setParameters(AUDIO_IO_HANDLE_NONE, param.toString());
                 devDesc->setEncodedFormat(encodedFormat);
@@ -569,7 +567,7 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     }
     // Toggle the device state: UNAVAILABLE -> AVAILABLE
     // This will force reading again the device configuration
-    status = setDeviceConnectionState(device,
+    status_t status = setDeviceConnectionState(device,
                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                       device_address, device_name,
                                       devDesc->getEncodedFormat());
@@ -1219,13 +1217,14 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         return BAD_VALUE;
     }
     if (usePrimaryOutputFromPolicyMixes) {
-        sp<DeviceDescriptor> deviceDesc =
+        sp<DeviceDescriptor> policyMixDevice =
                 mAvailableOutputDevices.getDevice(primaryMix->mDeviceType,
                                                   primaryMix->mDeviceAddress,
                                                   AUDIO_FORMAT_DEFAULT);
         sp<SwAudioOutputDescriptor> policyDesc = primaryMix->getOutput();
         bool tryDirectForFlags = policyDesc == nullptr ||
-                (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT);
+                (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) ||
+                (*flags & (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ));
         // if a direct output can be opened to deliver the track's multi-channel content to the
         // output rather than being downmixed by the primary output, then use this direct
         // output by by-passing the primary mix if possible, otherwise fall-through to primary
@@ -1233,23 +1232,29 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         bool tryDirectForChannelMask = policyDesc != nullptr
                     && (audio_channel_count_from_out_mask(policyDesc->getConfig().channel_mask) <
                         audio_channel_count_from_out_mask(config->channel_mask));
-        if (deviceDesc != nullptr && (tryDirectForFlags || tryDirectForChannelMask)) {
+        if (policyMixDevice != nullptr && (tryDirectForFlags || tryDirectForChannelMask)) {
             audio_io_handle_t newOutput;
             status = openDirectOutput(
                     *stream, session, config,
                     (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_DIRECT),
-                    DeviceVector(deviceDesc), &newOutput);
+                    DeviceVector(policyMixDevice), &newOutput);
             if (status == NO_ERROR) {
                 policyDesc = mOutputs.valueFor(newOutput);
                 primaryMix->setOutput(policyDesc);
             } else if (tryDirectForFlags) {
+                ALOGW("%s, failed open direct, status: %d", __func__, status);
                 policyDesc = nullptr;
             } // otherwise use primary if available.
         }
         if (policyDesc != nullptr) {
             policyDesc->mPolicyMix = primaryMix;
             *output = policyDesc->mIoHandle;
-            *selectedDeviceId = deviceDesc != 0 ? deviceDesc->getId() : AUDIO_PORT_HANDLE_NONE;
+            *selectedDeviceId = policyMixDevice != nullptr ? policyMixDevice->getId()
+                                                           : AUDIO_PORT_HANDLE_NONE;
+            if ((policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != AUDIO_OUTPUT_FLAG_DIRECT) {
+                // Remove direct flag as it is not on a direct output.
+                *flags = (audio_output_flags_t) (*flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
+            }
 
             ALOGV("getOutputForAttr() returns output %d", *output);
             if (resultAttr->usage == AUDIO_USAGE_VIRTUAL_SOURCE) {
@@ -1258,6 +1263,13 @@ status_t AudioPolicyManager::getOutputForAttrInt(
                 *outputType = API_OUTPUT_LEGACY;
             }
             return NO_ERROR;
+        } else {
+            if (policyMixDevice != nullptr) {
+                ALOGE("%s, try to use primary mix but no output found", __func__);
+                return INVALID_OPERATION;
+            }
+            // Fallback to default engine selection as the selected primary mix device is not
+            // available.
         }
     }
     // Virtual sources must always be dynamicaly or explicitly routed
@@ -3661,9 +3673,13 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             outputConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
             inputConfig.channel_mask = AUDIO_CHANNEL_IN_STEREO;
             rSubmixModule->addOutputProfile(address.c_str(), &outputConfig,
-                    AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address);
+                    AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address,
+                    audio_is_linear_pcm(outputConfig.format)
+                        ? AUDIO_OUTPUT_FLAG_NONE : AUDIO_OUTPUT_FLAG_DIRECT);
             rSubmixModule->addInputProfile(address.c_str(), &inputConfig,
-                    AUDIO_DEVICE_IN_REMOTE_SUBMIX, address);
+                    AUDIO_DEVICE_IN_REMOTE_SUBMIX, address,
+                    audio_is_linear_pcm(inputConfig.format)
+                        ? AUDIO_INPUT_FLAG_NONE : AUDIO_INPUT_FLAG_DIRECT);
 
             if ((res = setDeviceConnectionStateInt(deviceTypeToMakeAvailable,
                     AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
@@ -6691,7 +6707,7 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
         return;
     }
     const bool closingOutputWasActive = closingOutput->isActive();
-    mPolicyMixes.closeOutput(closingOutput);
+    mPolicyMixes.closeOutput(closingOutput, mOutputs);
 
     // look for duplicated outputs connected to the output being removed.
     for (size_t i = 0; i < mOutputs.size(); i++) {

@@ -109,6 +109,11 @@ public:
             /*out*/
             bool* streamStatus) override;
 
+    virtual binder::Status getSessionCharacteristics(
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/
+            hardware::camera2::impl::CameraMetadataNative* sessionCharacteristics) override;
+
     // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;
 
@@ -311,10 +316,6 @@ private:
     binder::Status insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
             /*out*/SurfaceMap* surfaceMap, /*out*/Vector<int32_t>* streamIds,
             /*out*/int32_t*  currentStreamId);
-
-    // Utility method that maps AIDL request templates.
-    binder::Status mapRequestTemplate(int templateId,
-            camera_request_template_t* tempId /*out*/);
 
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;

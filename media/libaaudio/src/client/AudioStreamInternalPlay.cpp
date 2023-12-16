@@ -329,8 +329,9 @@ int64_t AudioStreamInternalPlay::getFramesRead() {
 
 int64_t AudioStreamInternalPlay::getFramesWritten() {
     if (mAudioEndpoint) {
-        mLastFramesWritten = mAudioEndpoint->getDataWriteCounter()
-                             + mFramesOffsetFromService;
+        mLastFramesWritten = std::max(
+                mLastFramesWritten,
+                mAudioEndpoint->getDataWriteCounter() + mFramesOffsetFromService);
     }
     return mLastFramesWritten;
 }
@@ -353,8 +354,10 @@ void *AudioStreamInternalPlay::callbackLoop() {
             result = write(mCallbackBuffer.get(), mCallbackFrames, timeoutNanos);
             if ((result != mCallbackFrames)) {
                 if (result >= 0) {
-                    // Only wrote some of the frames requested. Must have timed out.
-                    result = AAUDIO_ERROR_TIMEOUT;
+                    // Only wrote some of the frames requested. The stream can be disconnected
+                    // or timed out.
+                    processCommands();
+                    result = isDisconnected() ? AAUDIO_ERROR_DISCONNECTED : AAUDIO_ERROR_TIMEOUT;
                 }
                 maybeCallErrorCallback(result);
                 break;

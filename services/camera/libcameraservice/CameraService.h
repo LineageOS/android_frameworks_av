@@ -232,7 +232,21 @@ public:
             const hardware::CameraExtensionSessionStats& stats, std::string* sessionKey /*out*/);
 
     virtual binder::Status remapCameraIds(const hardware::CameraIdRemapping&
-        cameraIdRemapping);
+            cameraIdRemapping);
+
+    virtual binder::Status injectSessionParams(
+            const std::string& cameraId,
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams);
+
+    virtual binder::Status createDefaultRequest(const std::string& cameraId, int templateId,
+            /*out*/
+            hardware::camera2::impl::CameraMetadataNative* request);
+
+    virtual binder::Status isSessionConfigurationWithParametersSupported(
+            const std::string& cameraId,
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/
+            bool* supported);
 
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
@@ -401,6 +415,10 @@ public:
 
         // Stop the injection camera and restore to internal camera session.
         virtual status_t stopInjection() = 0;
+
+        // Inject session parameters into an existing session.
+        virtual status_t injectSessionParams(
+                const hardware::camera2::impl::CameraMetadataNative& sessionParams) = 0;
 
     protected:
         BasicClient(const sp<CameraService>& cameraService,
@@ -662,6 +680,7 @@ private:
     bool hasPermissionsForCameraHeadlessSystemUser(const std::string& cameraId, int callingPid,
             int callingUid) const;
 
+    bool hasCameraPermissions() const;
    /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
      * layer values.
@@ -673,6 +692,8 @@ private:
         NOT_AVAILABLE = static_cast<int32_t>(hardware::ICameraServiceListener::STATUS_NOT_AVAILABLE),
         UNKNOWN = static_cast<int32_t>(hardware::ICameraServiceListener::STATUS_UNKNOWN)
     };
+
+    friend int32_t format_as(StatusInternal s);
 
     /**
      * Container class for the state of each logical camera device, including: ID, status, and

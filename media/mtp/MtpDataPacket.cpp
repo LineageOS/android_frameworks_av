@@ -427,6 +427,9 @@ void MtpDataPacket::putString(const char* s) {
 }
 
 void MtpDataPacket::putString(const uint16_t* string) {
+    if (string == NULL) {
+        return;
+    }
     int count = 0;
     for (int i = 0; i <= MTP_STRING_MAX_CHARACTER_NUMBER; i++) {
         if (string[i])

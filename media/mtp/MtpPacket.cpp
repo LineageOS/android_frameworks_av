@@ -168,8 +168,10 @@ void MtpPacket::setParameter(int index, uint32_t value) {
         return;
     }
     int offset = MTP_CONTAINER_PARAMETER_OFFSET + (index - 1) * sizeof(uint32_t);
-    if (mPacketSize < offset + sizeof(uint32_t))
+    if (mPacketSize < offset + sizeof(uint32_t)) {
         mPacketSize = offset + sizeof(uint32_t);
+        allocate(mPacketSize);
+    }
     putUInt32(offset, value);
 }
 

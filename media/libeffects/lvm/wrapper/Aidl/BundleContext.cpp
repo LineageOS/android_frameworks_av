@@ -32,6 +32,20 @@ using ::aidl::android::media::audio::common::AudioChannelLayout;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
 using ::aidl::android::media::audio::common::AudioDeviceType;
 
+BundleContext::BundleContext(int statusDepth, const Parameter::Common& common,
+              const lvm::BundleEffectType& type)
+        : EffectContext(statusDepth, common), mType(type) {
+    LOG(DEBUG) << __func__ << type;
+    int channelCount = ::aidl::android::hardware::audio::common::getChannelCount(
+            common.input.base.channelMask);
+    mSamplesPerSecond = common.input.base.sampleRate * channelCount;
+}
+
+BundleContext::~BundleContext() {
+    LOG(DEBUG) << __func__;
+    deInit();
+}
+
 RetCode BundleContext::init() {
     std::lock_guard lg(mMutex);
     // init with pre-defined preset NORMAL

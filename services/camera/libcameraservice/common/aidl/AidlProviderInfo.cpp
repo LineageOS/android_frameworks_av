@@ -21,6 +21,7 @@
 #include <cutils/properties.h>
 
 #include <aidlcommonsupport/NativeHandle.h>
+#include <android_companion_virtualdevice_flags.h>
 #include <android/binder_manager.h>
 #include <android/hardware/ICameraService.h>
 #include <camera_metadata_hidden.h>
@@ -35,9 +36,9 @@ const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
 
 namespace android {
 
-namespace flags = com::android::internal::camera::flags;
 namespace SessionConfigurationUtils = ::android::camera3::SessionConfigurationUtils;
 namespace flags = com::android::internal::camera::flags;
+namespace vd_flags = android::companion::virtualdevice::flags;
 
 using namespace aidl::android::hardware;
 using namespace hardware::camera;
@@ -131,7 +132,7 @@ status_t AidlProviderInfo::initializeAidlProvider(
 
     mDeathRecipient = ndk::ScopedAIBinder_DeathRecipient(AIBinder_DeathRecipient_new(binderDied));
 
-    if (!flags::virtual_camera_service_discovery() || interface->isRemote()) {
+    if (!vd_flags::virtual_camera_service_discovery() || interface->isRemote()) {
         binder_status_t link =
                 AIBinder_linkToDeath(interface->asBinder().get(), mDeathRecipient.get(), this);
         if (link != STATUS_OK) {
@@ -385,7 +386,7 @@ const std::shared_ptr<ICameraProvider> AidlProviderInfo::startProviderInterface(
 std::unique_ptr<CameraProviderManager::ProviderInfo::DeviceInfo>
     AidlProviderInfo::initializeDeviceInfo(
         const std::string &name, const metadata_vendor_id_t tagId,
-        const std::string &id, uint16_t minorVersion) {
+        const std::string &id, uint16_t /*minorVersion*/) {
     ::ndk::ScopedAStatus status;
 
     auto cameraInterface = startDeviceInterface(name);
@@ -410,9 +411,18 @@ std::unique_ptr<CameraProviderManager::ProviderInfo::DeviceInfo>
         conflictName = id;
     }
 
+    int32_t interfaceVersion = 0;
+    status = cameraInterface->getInterfaceVersion(&interfaceVersion);
+    if (!status.isOk()) {
+        ALOGE("%s: Unable to obtain interface version for camera device %s: %s", __FUNCTION__,
+                id.c_str(), status.getMessage());
+        return nullptr;
+    }
+
     return std::unique_ptr<DeviceInfo3>(
-        new AidlDeviceInfo3(name, tagId, id, minorVersion, HalToFrameworkResourceCost(resourceCost),
-                this, mProviderPublicCameraIds, cameraInterface));
+        new AidlDeviceInfo3(name, tagId, id, static_cast<uint16_t>(interfaceVersion),
+                HalToFrameworkResourceCost(resourceCost), this,
+                mProviderPublicCameraIds, cameraInterface));
 }
 
 status_t AidlProviderInfo::reCacheConcurrentStreamingCameraIdsLocked() {
@@ -603,6 +613,14 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
         mHasFlashUnit = false;
     }
 
+    if (flags::feature_combination_query()) {
+        res = addSessionConfigQueryVersionTag();
+        if (OK != res) {
+            ALOGE("%s: Unable to add sessionConfigurationQueryVersion tag: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+        }
+    }
+
     camera_metadata_entry entry =
             mCameraCharacteristics.find(ANDROID_FLASH_INFO_STRENGTH_DEFAULT_LEVEL);
     if (entry.count == 1) {
@@ -765,13 +783,24 @@ status_t AidlProviderInfo::AidlDeviceInfo3::dumpState(int fd) {
 
 status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
         const SessionConfiguration &configuration, bool overrideForPerfClass,
-        camera3::metadataGetter getMetadata, bool *status) {
+        bool checkSessionParams, bool *status) {
+
+    auto operatingMode = configuration.getOperatingMode();
+
+    auto res = SessionConfigurationUtils::checkOperatingMode(operatingMode,
+            mCameraCharacteristics, mId);
+    if (!res.isOk()) {
+        return UNKNOWN_ERROR;
+    }
 
     camera::device::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
+    camera3::metadataGetter getMetadata = [this](const std::string &id,
+            bool /*overrideForPerfClass*/) {return this->deviceInfo(id);};
     auto bRes = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
             mId, mCameraCharacteristics, mCompositeJpegRDisabled, getMetadata,
-            mPhysicalIds, streamConfiguration, overrideForPerfClass, &earlyExit);
+            mPhysicalIds, streamConfiguration, overrideForPerfClass, mProviderTagid,
+            checkSessionParams, &earlyExit);
 
     if (!bRes.isOk()) {
         return UNKNOWN_ERROR;
@@ -789,8 +818,25 @@ status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
         return DEAD_OBJECT;
     }
 
-    ::ndk::ScopedAStatus ret =
-        interface->isStreamCombinationSupported(streamConfiguration, status);
+    ::ndk::ScopedAStatus ret;
+    if (checkSessionParams) {
+        // Only interface version 1_3 or greater supports
+        // isStreamCombinationWIthSettingsSupported.
+        int deviceVersion = HARDWARE_DEVICE_API_VERSION(mVersion.get_major(), mVersion.get_minor());
+        if (deviceVersion < CAMERA_DEVICE_API_VERSION_1_3) {
+            ALOGI("%s: Camera device version (major %d, minor %d) doesn't support querying of "
+                    "session configuration!", __FUNCTION__, mVersion.get_major(),
+                    mVersion.get_minor());
+            return INVALID_OPERATION;
+        }
+        if (flags::feature_combination_query()) {
+            ret = interface->isStreamCombinationWithSettingsSupported(streamConfiguration, status);
+        } else {
+            return INVALID_OPERATION;
+        }
+    } else {
+        ret = interface->isStreamCombinationSupported(streamConfiguration, status);
+    }
     if (!ret.isOk()) {
         *status = false;
         ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.getMessage());
@@ -798,6 +844,108 @@ status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
     }
     return OK;
 
+}
+
+status_t AidlProviderInfo::AidlDeviceInfo3::createDefaultRequest(
+        camera3::camera_request_template_t templateId, camera_metadata_t** metadata) {
+    const std::shared_ptr<camera::device::ICameraDevice> interface =
+            startDeviceInterface();
+
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+
+    int deviceVersion = HARDWARE_DEVICE_API_VERSION(mVersion.get_major(), mVersion.get_minor());
+    if (deviceVersion < CAMERA_DEVICE_API_VERSION_1_3) {
+        ALOGI("%s: Camera device minor version 0x%x doesn't support creating "
+                " default request!", __FUNCTION__, mVersion.get_minor());
+        return INVALID_OPERATION;
+    }
+
+    aidl::android::hardware::camera::device::CameraMetadata request;
+
+    using aidl::android::hardware::camera::device::RequestTemplate;
+    RequestTemplate id;
+    status_t res = SessionConfigurationUtils::mapRequestTemplateToAidl(
+            templateId, &id);
+    if (res != OK) {
+        return res;
+    }
+
+    if (!flags::feature_combination_query()) {
+        return INVALID_OPERATION;
+    }
+
+    auto err = interface->constructDefaultRequestSettings(id, &request);
+    if (!err.isOk()) {
+        ALOGE("%s: Transaction error: %s", __FUNCTION__, err.getMessage());
+        return AidlProviderInfo::mapToStatusT(err);
+    }
+    const camera_metadata *r =
+            reinterpret_cast<const camera_metadata_t*>(request.metadata.data());
+    size_t expectedSize = request.metadata.size();
+    int ret = validate_camera_metadata_structure(r, &expectedSize);
+    if (ret == OK || ret == CAMERA_METADATA_VALIDATION_SHIFTED) {
+        *metadata = clone_camera_metadata(r);
+        if (*metadata == nullptr) {
+            ALOGE("%s: Unable to clone camera metadata received from HAL",
+                    __FUNCTION__);
+            res = UNKNOWN_ERROR;
+        }
+    } else {
+        ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
+        res = UNKNOWN_ERROR;
+    }
+
+    return res;
+}
+
+status_t AidlProviderInfo::AidlDeviceInfo3::getSessionCharacteristics(
+        const SessionConfiguration &configuration, bool overrideForPerfClass,
+        camera3::metadataGetter getMetadata, CameraMetadata *sessionCharacteristics) {
+    camera::device::StreamConfiguration streamConfiguration;
+    bool earlyExit = false;
+    auto res = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
+            mId, mCameraCharacteristics, mCompositeJpegRDisabled, getMetadata,
+            mPhysicalIds, streamConfiguration, overrideForPerfClass, mProviderTagid,
+            /*checkSessionParams*/true, &earlyExit);
+
+    if (!res.isOk()) {
+        return UNKNOWN_ERROR;
+    }
+
+    if (earlyExit) {
+        return BAD_VALUE;
+    }
+
+    const std::shared_ptr<camera::device::ICameraDevice> interface =
+            startDeviceInterface();
+
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+
+    aidl::android::hardware::camera::device::CameraMetadata chars;
+    ::ndk::ScopedAStatus ret =
+        interface->getSessionCharacteristics(streamConfiguration, &chars);
+    std::vector<uint8_t> &metadata = chars.metadata;
+
+    camera_metadata_t *buffer = reinterpret_cast<camera_metadata_t*>(metadata.data());
+    size_t expectedSize = metadata.size();
+    int resV = validate_camera_metadata_structure(buffer, &expectedSize);
+    if (resV == OK || resV == CAMERA_METADATA_VALIDATION_SHIFTED) {
+        set_camera_metadata_vendor_id(buffer, mProviderTagid);
+        *sessionCharacteristics = buffer;
+    } else {
+        ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (!ret.isOk()) {
+        ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.getMessage());
+        return mapToStatusT(ret);
+    }
+    return OK;
 }
 
 status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
@@ -839,7 +987,8 @@ status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
                     cameraId, deviceInfo,
                     mManager->isCompositeJpegRDisabledLocked(cameraId), getMetadata,
                     physicalCameraIds, streamConfiguration,
-                    overrideForPerfClass, &shouldExit);
+                    overrideForPerfClass, mProviderTagid,
+                    /*checkSessionParams*/false, &shouldExit);
         if (!bStatus.isOk()) {
             ALOGE("%s: convertToHALStreamCombination failed", __FUNCTION__);
             return INVALID_OPERATION;

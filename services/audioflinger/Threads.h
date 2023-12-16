@@ -1849,6 +1849,7 @@ protected:
     void threadLoop_sleepTime() final REQUIRES(ThreadBase_ThreadLoop);
     ssize_t threadLoop_write() final REQUIRES(ThreadBase_ThreadLoop);
     void threadLoop_standby() final REQUIRES(ThreadBase_ThreadLoop);
+    void threadLoop_exit() final REQUIRES(ThreadBase_ThreadLoop);
     void cacheParameters_l() final REQUIRES(mutex(), ThreadBase_ThreadLoop);
 
 private:
@@ -1899,6 +1900,8 @@ protected:
     void checkOutputStageEffects() final
             REQUIRES(ThreadBase_ThreadLoop) EXCLUDES_ThreadBase_Mutex;
     void setHalLatencyMode_l() final REQUIRES(mutex());
+
+    void threadLoop_exit() final REQUIRES(ThreadBase_ThreadLoop);
 
 private:
             // Do not request a specific mode by default

@@ -169,8 +169,8 @@ status_t AidlConversionVisualizer::visualizerMeasure(uint32_t* replySize, void* 
     const auto& measure = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
             aidlParam, Visualizer, visualizer, Visualizer::measurement, Visualizer::Measurement));
     int32_t* reply = (int32_t *) pReplyData;
-    *reply++ = measure.rms;
-    *reply = measure.peak;
+    *reply++ = measure.peak;
+    *reply = measure.rms;
     return OK;
 }
 

@@ -66,8 +66,8 @@ IEffect::Status DownmixContext::lvmProcess(float* in, float* out, int samples) {
     LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
     IEffect::Status status = {EX_ILLEGAL_ARGUMENT, 0, 0};
 
-    if (in == nullptr || out == nullptr || getInputFrameSize() != getOutputFrameSize() ||
-        getInputFrameSize() == 0) {
+    if (in == nullptr || out == nullptr ||
+        getCommon().input.frameCount != getCommon().output.frameCount || getInputFrameSize() == 0) {
         return status;
     }
 
@@ -112,7 +112,7 @@ IEffect::Status DownmixContext::lvmProcess(float* in, float* out, int samples) {
 void DownmixContext::init_params(const Parameter::Common& common) {
     // when configuring the effect, do not allow a blank or unsupported channel mask
     AudioChannelLayout channelMask = common.input.base.channelMask;
-    if (isChannelMaskValid(channelMask)) {
+    if (!isChannelMaskValid(channelMask)) {
         LOG(ERROR) << "Downmix_Configure error: input channel mask " << channelMask.toString()
                    << " not supported";
     } else {
@@ -123,7 +123,7 @@ void DownmixContext::init_params(const Parameter::Common& common) {
 }
 
 bool DownmixContext::isChannelMaskValid(AudioChannelLayout channelMask) {
-    if (channelMask.getTag() == AudioChannelLayout::layoutMask) return false;
+    if (channelMask.getTag() != AudioChannelLayout::layoutMask) return false;
     int chMask = channelMask.get<AudioChannelLayout::layoutMask>();
     // check against unsupported channels (up to FCC_26)
     constexpr uint32_t MAXIMUM_CHANNEL_MASK = AudioChannelLayout::LAYOUT_22POINT2 |

@@ -89,8 +89,7 @@ float AdaptiveDynamicRangeCompression::Compress(float x) {
   } else {
     state_ = alpha_release_ * state_ + (1.0f - alpha_release_) * cv;
   }
-  compressor_gain_ *=
-      math::ExpApproximationViaTaylorExpansionOrder5(state_ - prev_state);
+  compressor_gain_ *= expf(state_ - prev_state);
   x *= compressor_gain_;
   if (x > kFixedPointLimit) {
     return kFixedPointLimit;
@@ -118,8 +117,7 @@ void AdaptiveDynamicRangeCompression::Compress(float *x1, float *x2) {
   } else {
     state_ = alpha_release_ * state_ + (1.0f - alpha_release_) * cv;
   }
-  compressor_gain_ *=
-      math::ExpApproximationViaTaylorExpansionOrder5(state_ - prev_state);
+  compressor_gain_ *= expf(state_ - prev_state);
   *x1 *= compressor_gain_;
   if (*x1 > kFixedPointLimit) {
     *x1 = kFixedPointLimit;

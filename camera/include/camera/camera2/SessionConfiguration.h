@@ -18,6 +18,7 @@
 #define ANDROID_HARDWARE_CAMERA2_SESSIONCONFIGURATION_H
 
 #include <binder/Parcelable.h>
+#include <camera/CameraMetadata.h>
 
 namespace android {
 
@@ -39,6 +40,8 @@ public:
     int getInputFormat() const { return mInputFormat; }
     int getOperatingMode() const { return mOperatingMode; }
     bool inputIsMultiResolution() const { return mInputIsMultiResolution; }
+    bool hasSessionParameters() const { return mHasSessionParameters; }
+    const CameraMetadata& getSessionParameters() const { return mSessionParameters; }
 
     virtual status_t writeToParcel(android::Parcel* parcel) const override;
     virtual status_t readFromParcel(const android::Parcel* parcel) override;
@@ -111,6 +114,8 @@ private:
     std::vector<OutputConfiguration> mOutputStreams;
     int                              mInputWidth, mInputHeight, mInputFormat, mOperatingMode;
     bool                             mInputIsMultiResolution = false;
+    bool                             mHasSessionParameters = false;
+    CameraMetadata                   mSessionParameters;
 };
 } // namespace params
 } // namespace camera2

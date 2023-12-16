@@ -30,10 +30,12 @@
 #include <flowgraph/SinkI16.h>
 #include <flowgraph/SinkI24.h>
 #include <flowgraph/SinkI32.h>
+#include <flowgraph/SinkI8_24.h>
 #include <flowgraph/SourceFloat.h>
 #include <flowgraph/SourceI16.h>
 #include <flowgraph/SourceI24.h>
 #include <flowgraph/SourceI32.h>
+#include <flowgraph/SourceI8_24.h>
 
 using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 
@@ -67,6 +69,9 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
             break;
         case AUDIO_FORMAT_PCM_32_BIT:
             mSource = std::make_unique<SourceI32>(sourceChannelCount);
+            break;
+        case AUDIO_FORMAT_PCM_8_24_BIT:
+            mSource = std::make_unique<SourceI8_24>(sourceChannelCount);
             break;
         default:
             ALOGE("%s() Unsupported source format = %d", __func__, sourceFormat);
@@ -138,6 +143,9 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
             break;
         case AUDIO_FORMAT_PCM_32_BIT:
             mSink = std::make_unique<SinkI32>(sinkChannelCount);
+            break;
+        case AUDIO_FORMAT_PCM_8_24_BIT:
+            mSink = std::make_unique<SinkI8_24>(sinkChannelCount);
             break;
         default:
             ALOGE("%s() Unsupported sink format = %d", __func__, sinkFormat);

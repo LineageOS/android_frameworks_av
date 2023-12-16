@@ -269,9 +269,12 @@ class TimerThread {
         std::vector<std::shared_ptr<const Request>> timeoutRequests;
         // List of retired requests
         std::vector<std::shared_ptr<const Request>> retiredRequests;
+        // mutex deadlock / wait detection information.
+        bool hasMutexCycle = false;
+        std::vector<std::pair<pid_t, std::string>> mutexWaitChain;
         // Dumps the information contained above as well as additional call
         // stacks where applicable.
-        std::string toString() const;
+        std::string toString(bool showTimeoutStack = true) const;
     };
 
   private:

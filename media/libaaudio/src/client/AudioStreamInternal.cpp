@@ -42,6 +42,7 @@
 #include "fifo/FifoBuffer.h"
 #include "utility/AudioClock.h"
 #include <media/AidlConversion.h>
+#include <com_android_media_aaudio.h>
 
 #include "AudioStreamInternal.h"
 
@@ -63,7 +64,8 @@ using namespace aaudio;
 
 #define LOG_TIMESTAMPS            0
 
-#define ENABLE_SAMPLE_RATE_CONVERTER 1
+// Minimum number of bursts to use when sample rate conversion is used.
+#define MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS    3
 
 AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService)
         : AudioStream()
@@ -193,11 +195,13 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setSampleRate(configurationOutput.getSampleRate());
     }
 
-#if !ENABLE_SAMPLE_RATE_CONVERTER
-    if (getSampleRate() != getDeviceSampleRate()) {
-        goto error;
+    if (!com::android::media::aaudio::sample_rate_conversion()) {
+        if (getSampleRate() != getDeviceSampleRate()) {
+            ALOGD("%s - skipping sample rate converter. SR = %d, Device SR = %d", __func__,
+                    getSampleRate(), getDeviceSampleRate());
+            goto error;
+        }
     }
-#endif
 
     // Save device format so we can do format conversion and volume scaling together.
     setDeviceFormat(configurationOutput.getFormat());
@@ -395,6 +399,12 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     uint8_t buffer[getDeviceBufferCapacity() * getBytesPerFrame()];
     android::fifo_frames_t fullFramesAvailable = mAudioEndpoint->read(buffer,
             getDeviceBufferCapacity());
+    // Before releasing the data queue, update the frames read and written.
+    getFramesRead();
+    getFramesWritten();
+    // Call freeDataQueue() here because the following call to
+    // closeDataFileDescriptor() will invalidate the pointers used by the data queue.
+    mAudioEndpoint->freeDataQueue();
     mEndPointParcelable.closeDataFileDescriptor();
     aaudio_result_t result = mServiceInterface.exitStandby(
             mServiceStreamHandleInfo, endpointParcelable);
@@ -907,6 +917,12 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     // Use at least one burst
     if (numBursts == 0) {
         numBursts = 1;
+    }
+
+    // Set a minimum number of bursts if sample rate conversion is used.
+    if ((getSampleRate() != getDeviceSampleRate()) &&
+            (numBursts < MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS)) {
+        numBursts = MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS;
     }
 
     if (mAudioEndpoint) {

@@ -140,6 +140,7 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withDefault
     EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
     EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
     EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.pauseAudioLatencyUs, d.pauseAudioLatencyUs);
     EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
     EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
     EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
@@ -155,7 +156,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withDefault
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withEmpty) {
@@ -171,6 +171,7 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withEmpty) 
     EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
     EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
     EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.pauseAudioLatencyUs, d.pauseAudioLatencyUs);
     EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
     EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
     EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
@@ -186,7 +187,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withEmpty) 
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withInvalid) {
@@ -202,6 +202,7 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withInvalid
     EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
     EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
     EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.pauseAudioLatencyUs, d.pauseAudioLatencyUs);
     EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
     EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
     EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
@@ -217,7 +218,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withInvalid
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withAlmostValid) {
@@ -233,6 +233,8 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withAlmostV
                 return "10b0";
             } else if (flag == "render_metrics_live_content_frame_drop_tolerance_us") {
                 return "c100";
+            } else if (flag == "render_metrics_pause_audio_latency_us") {
+                return "1ab0";
             } else if (flag == "render_metrics_freeze_duration_ms_histogram_buckets") {
                 return "1,5300,3b400,123";
             } else if (flag == "render_metrics_freeze_duration_ms_histogram_to_score") {
@@ -276,6 +278,7 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withAlmostV
     EXPECT_EQ(c.maxExpectedContentFrameDurationUs, d.maxExpectedContentFrameDurationUs);
     EXPECT_EQ(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
     EXPECT_EQ(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.pauseAudioLatencyUs, d.pauseAudioLatencyUs);
     EXPECT_EQ(c.freezeDurationMsHistogramBuckets, d.freezeDurationMsHistogramBuckets);
     EXPECT_EQ(c.freezeDurationMsHistogramToScore, d.freezeDurationMsHistogramToScore);
     EXPECT_EQ(c.freezeDistanceMsHistogramBuckets, d.freezeDistanceMsHistogramBuckets);
@@ -291,7 +294,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withAlmostV
     EXPECT_EQ(c.traceTriggerEnabled, d.traceTriggerEnabled);
     EXPECT_EQ(c.traceTriggerThrottleMs, d.traceTriggerThrottleMs);
     EXPECT_EQ(c.traceMinFreezeDurationMs, d.traceMinFreezeDurationMs);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, d.traceMaxFreezeDurationMs);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) {
@@ -307,6 +309,8 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) 
                 return "3000";
             } else if (flag == "render_metrics_live_content_frame_drop_tolerance_us") {
                 return "4000";
+            } else if (flag == "render_metrics_pause_audio_latency_us") {
+                return "300000";
             } else if (flag == "render_metrics_freeze_duration_ms_histogram_buckets") {
                 return "100,200,300,400";
             } else if (flag == "render_metrics_freeze_duration_ms_histogram_to_score") {
@@ -359,6 +363,8 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) 
     EXPECT_NE(c.frameRateDetectionToleranceUs, d.frameRateDetectionToleranceUs);
     EXPECT_EQ(c.liveContentFrameDropToleranceUs, 4000);
     EXPECT_NE(c.liveContentFrameDropToleranceUs, d.liveContentFrameDropToleranceUs);
+    EXPECT_EQ(c.pauseAudioLatencyUs, 300000);
+    EXPECT_NE(c.pauseAudioLatencyUs, d.pauseAudioLatencyUs);
     {
         std::vector<int32_t> expected({100,200,300,400});
         EXPECT_EQ(c.freezeDurationMsHistogramBuckets, expected);
@@ -402,7 +408,6 @@ TEST_F(VideoRenderQualityTrackerTest, getFromServerConfigurableFlags_withValid) 
     EXPECT_EQ(c.traceTriggerEnabled, true);
     EXPECT_EQ(c.traceTriggerThrottleMs, 50000);
     EXPECT_EQ(c.traceMinFreezeDurationMs, 1000);
-    EXPECT_EQ(c.traceMaxFreezeDurationMs, 5000);
 }
 
 TEST_F(VideoRenderQualityTrackerTest, countsReleasedFrames) {
@@ -1116,53 +1121,34 @@ TEST_F(VideoRenderQualityTrackerTest,
     c.enabled = true;
     c.traceTriggerEnabled = true; // The trigger is enabled, so traces should be triggered.
     // The value of traceTriggerThrottleMs must be larger than traceMinFreezeDurationMs. Otherwise,
-    // the throttle does work.
+    // the throttle does not work.
     c.traceTriggerThrottleMs = 200;
-    c.traceMinFreezeDurationMs = 40;
-    int32_t freeze = c.traceMinFreezeDurationMs;
+    c.traceMinFreezeDurationMs = 4 * 20; // 4 frames.
 
     Helper h(20, c);
-    // Freeze triggers separated by 80ms which is less than the threshold.
-    h.render({
-        freeze, // Freeze duration does not check trace trigger.
-        20,     // Trace triggered.
-        20,     // Throttle time:  20/200ms
-        20,     // Throttle time:  40/200ms
-        freeze, // Throttle time:  80/200ms
-        20,     // Throttle time: 100/200ms (Trace not triggered)
-    });
+    // Freeze triggers separated by 100ms which is less than the threshold.
+    h.render(1); // Video start.
+    h.drop(3);   // Freeze.
+    h.render(1); // Trace triggered.
+    h.render(1); // Throttle time:  20/200ms
+    h.drop(3);   // Throttle time:  80/200ms
+    h.render(1); // Throttle time: 100/200ms (Trace not triggered)
     EXPECT_EQ(h.getTraceTriggeredCount(), 1);
     // Next freeze trigger is separated by 200ms which breaks the throttle threshold.
-    h.render({
-        20,     // Throttle time: 120/200ms
-        20,     // Throttle time: 140/200ms
-        20,     // Throttle time: 160/200ms
-        freeze, // Throttle time: 200/200ms
-        20,     // Trace triggered.
-    });
+    h.render(1); // Throttle time: 120/200ms
+    h.drop(3);   // Throttle time: 180/200ms
+    h.render(1); // Throttle time: 200/200ms (Trace triggered)
     EXPECT_EQ(h.getTraceTriggeredCount(), 2);
-    // Next freeze trigger is separated by 80ms which is less than the threshold.
-    h.render({
-        20,     // Throttle time:  20/200ms
-        20,     // Throttle time:  40/200ms
-        freeze, // Throttle time:  80/200ms
-        20,     // Throttle time: 100/200ms (Trace not triggered)
-    });
+    // Next freeze trigger is separated by 100ms which is less than the threshold.
+    h.render(1); // Throttle time:  20/200ms
+    h.drop(3);   // Throttle time:  80/200ms
+    h.render(1); // Throttle time: 100/200ms (Trace not triggered)
     EXPECT_EQ(h.getTraceTriggeredCount(), 2);
-}
-
-TEST_F(VideoRenderQualityTrackerTest, freezeForTraceDuration_triggersTrace) {
-    Configuration c;
-    c.enabled = true;
-    c.traceTriggerEnabled = true; // The trigger is enabled, so traces should be triggered.
-    c.traceTriggerThrottleMs = 0; // Disable throttle in the test case.
-    int32_t freeze1 = c.traceMinFreezeDurationMs;
-    int32_t freeze2 = c.traceMaxFreezeDurationMs - 1;
-    int32_t couldBeAPause = c.traceMaxFreezeDurationMs + 1;
-
-    Helper h(20, c);
-    h.render({freeze1, 20, freeze2, 20, couldBeAPause, 20});
-
+    // Freeze duration is less than traceMinFreezeDurationMs and throttle ends.
+    h.render(1); // Throttle time: 120/200ms
+    h.render(1); // Throttle time: 140/200ms
+    h.drop(2);   // Throttle time: 180/200ms
+    h.render(1); // Throttle time: 200/200ms (Trace not triggered, freeze duration = 60ms)
     EXPECT_EQ(h.getTraceTriggeredCount(), 2);
 }
 
@@ -1172,13 +1158,64 @@ TEST_F(VideoRenderQualityTrackerTest,
     c.enabled = true;
     c.traceTriggerEnabled = false; // The trigger is disabled, so no traces should be triggered.
     c.traceTriggerThrottleMs = 0; // Disable throttle in the test case.
-    int32_t freeze1 = c.traceMinFreezeDurationMs;
-    int32_t freeze2 = c.traceMaxFreezeDurationMs - 1;
-    int32_t couldBeAPause = c.traceMaxFreezeDurationMs + 1;
+    c.traceMinFreezeDurationMs = 4 * 20; // 4 frames.
 
     Helper h(20, c);
-    h.render({freeze1, 20, freeze2, 20, couldBeAPause, 20});
+    h.render(1);
+    h.drop(3);
+    h.render(1); // Render duration is 80 ms.
+    h.drop(4);
+    h.render(1); // Render duration is 100 ms.
 
     EXPECT_EQ(h.getTraceTriggeredCount(), 0);
 }
+
+TEST_F(VideoRenderQualityTrackerTest, doesNotCountCatchUpAfterPauseAsFreeze) {
+    Configuration c;
+    c.enabled = true;
+    c.pauseAudioLatencyUs = 200 * 1000; // allows for up to 10 frames to be dropped to catch up
+                                        // to the audio position
+    Helper h(20, c);
+    // A few frames followed by a long pause
+    h.render({20, 20, 1000});
+    h.drop(10); // simulate catching up to audio
+    h.render({20, 20, 1000});
+    h.drop(11); // simulate catching up to audio but then also dropping frames
+    h.render({20});
+
+    // Only 1 freeze is counted because the first freeze (200ms) because it's equal to or below the
+    // pause latency allowance, and the algorithm assumes a legitimate case of the video trying to
+    // catch up to the audio position, which continued to play for a short period of time (less than
+    // 200ms) after the pause was initiated
+    EXPECT_EQ(h.getMetrics().freezeDurationMsHistogram.getCount(), 1);
+}
+
+TEST_F(VideoRenderQualityTrackerTest, capturesMaximumContentDroppedAfterPause) {
+    Configuration c;
+    c.enabled = true;
+    c.pauseAudioLatencyUs = 200 * 1000; // allows for up to 10 frames to be dropped to catch up
+                                        // to the audio position
+    Helper h(20, c);
+
+    // Freezes are below the pause latency are captured
+    h.render({20, 20, 1000});
+    h.drop(6);
+    h.render({20, 20, 1000});
+    h.drop(8);
+    h.render({20, 20, 1000});
+    h.drop(7);
+    h.render({20});
+    EXPECT_EQ(h.getMetrics().maxContentDroppedAfterPauseMs, 8 * 20);
+
+    // Freezes are above the pause latency are also captured
+    h.render({20, 20, 1000});
+    h.drop(10);
+    h.render({20, 20, 1000});
+    h.drop(12);
+    h.render({20, 20, 1000});
+    h.drop(11);
+    h.render({20});
+    EXPECT_EQ(h.getMetrics().maxContentDroppedAfterPauseMs, 12 * 20);
+}
+
 } // android

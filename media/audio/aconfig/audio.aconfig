@@ -5,6 +5,13 @@
 package: "com.android.media.audio"
 
 flag {
+    name: "alarm_min_volume_zero"
+    namespace: "media_audio"
+    description: "Support configuring alarm min vol to zero"
+    bug: "296884402"
+}
+
+flag {
     name: "bluetooth_mac_address_anonymization"
     namespace: "media_audio"
     description:
@@ -27,4 +34,11 @@ flag {
     description:
         "Enable dynamic spatial audio over Bluetooth LE Audio."
     bug: "307588546"
+}
+
+flag {
+    name: "spatializer_offload"
+    namespace: "media_audio"
+    description: "Enable spatializer offload"
+    bug: "307842941"
 }
