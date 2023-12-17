@@ -859,12 +859,15 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             dprintf(fd, "\nIEffect binder call profile:\n");
             write(fd, timeCheckStats.c_str(), timeCheckStats.size());
 
-            // Automatically fetch HIDL statistics.
-            std::shared_ptr<std::vector<std::string>> hidlClassNames =
-                    mediautils::getStatisticsClassesForModule(
-                            METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL);
-            if (hidlClassNames) {
-                for (const auto& className : *hidlClassNames) {
+            // Automatically fetch HIDL or AIDL statistics.
+            const std::string_view halType = (mDevicesFactoryHal->getHalVersion().getType() ==
+                                      AudioHalVersionInfo::Type::HIDL)
+                                             ? METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL
+                                             : METHOD_STATISTICS_MODULE_NAME_AUDIO_AIDL;
+            const std::shared_ptr<std::vector<std::string>> halClassNames =
+                    mediautils::getStatisticsClassesForModule(halType);
+            if (halClassNames) {
+                for (const auto& className : *halClassNames) {
                     auto stats = mediautils::getStatisticsForClass(className);
                     if (stats) {
                         timeCheckStats = stats->dump();
