@@ -9606,10 +9606,24 @@ void RecordThread::ioConfigChanged_l(audio_io_config_event_t event, pid_t pid,
 
 void RecordThread::readInputParameters_l()
 {
-    status_t result = mInput->stream->getAudioProperties(&mSampleRate, &mChannelMask, &mHALFormat);
-    LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving audio properties from HAL: %d", result);
-    mFormat = mHALFormat;
+    const audio_config_base_t audioConfig = mInput->getAudioProperties();
+    mSampleRate = audioConfig.sample_rate;
+    mChannelMask = audioConfig.channel_mask;
+    if (!audio_is_input_channel(mChannelMask)) {
+        LOG_ALWAYS_FATAL("Channel mask %#x not valid for input", mChannelMask);
+    }
+
     mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
+
+    // Get actual HAL format.
+    status_t result = mInput->stream->getAudioProperties(nullptr, nullptr, &mHALFormat);
+    LOG_ALWAYS_FATAL_IF(result != OK, "Error when retrieving input stream format: %d", result);
+    // Get format from the shim, which will be different than the HAL format
+    // if recording compressed audio from IEC61937 wrapped sources.
+    mFormat = audioConfig.format;
+    if (!audio_is_valid_format(mFormat)) {
+        LOG_ALWAYS_FATAL("Format %#x not valid for input", mFormat);
+    }
     if (audio_is_linear_pcm(mFormat)) {
         LOG_ALWAYS_FATAL_IF(mChannelCount > FCC_LIMIT, "HAL channel count %d > %d",
                 mChannelCount, FCC_LIMIT);
@@ -9617,8 +9631,7 @@ void RecordThread::readInputParameters_l()
         // Can have more that FCC_LIMIT channels in encoded streams.
         ALOGI("HAL format %#x is not linear pcm", mFormat);
     }
-    result = mInput->stream->getFrameSize(&mFrameSize);
-    LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving frame size from HAL: %d", result);
+    mFrameSize = mInput->getFrameSize();
     LOG_ALWAYS_FATAL_IF(mFrameSize <= 0, "Error frame size was %zu but must be greater than zero",
             mFrameSize);
     result = mInput->stream->getBufferSize(&mBufferSize);

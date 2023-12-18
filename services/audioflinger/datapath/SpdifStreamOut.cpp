@@ -1,19 +1,19 @@
 /*
-**
-** Copyright 2015, The Android Open Source Project
-**
-** Licensed under the Apache License, Version 2.0 (the "License");
-** you may not use this file except in compliance with the License.
-** You may obtain a copy of the License at
-**
-**     http://www.apache.org/licenses/LICENSE-2.0
-**
-** Unless required by applicable law or agreed to in writing, software
-** distributed under the License is distributed on an "AS IS" BASIS,
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-** See the License for the specific language governing permissions and
-** limitations under the License.
-*/
+ *
+ * Copyright 2015, The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
@@ -42,10 +42,10 @@ SpdifStreamOut::SpdifStreamOut(AudioHwDevice *dev,
 }
 
 status_t SpdifStreamOut::open(
-                              audio_io_handle_t handle,
-                              audio_devices_t devices,
-                              struct audio_config *config,
-                              const char *address)
+        audio_io_handle_t handle,
+        audio_devices_t devices,
+        struct audio_config *config,
+        const char *address)
 {
     struct audio_config customConfig = *config;
 
@@ -53,22 +53,10 @@ status_t SpdifStreamOut::open(
     mApplicationConfig.sample_rate = config->sample_rate;
     mApplicationConfig.channel_mask = config->channel_mask;
 
-    // Some data bursts run at a higher sample rate.
-    // TODO Move this into the audio_utils as a static method.
-    switch(config->format) {
-        case AUDIO_FORMAT_E_AC3:
-        case AUDIO_FORMAT_E_AC3_JOC:
-            mRateMultiplier = 4;
-            break;
-        case AUDIO_FORMAT_AC3:
-        case AUDIO_FORMAT_DTS:
-        case AUDIO_FORMAT_DTS_HD:
-            mRateMultiplier = 1;
-            break;
-        default:
-            ALOGE("ERROR SpdifStreamOut::open() unrecognized format 0x%08X\n",
-                config->format);
-            return BAD_VALUE;
+    mRateMultiplier = spdif_rate_multiplier(config->format);
+    if (mRateMultiplier <= 0) {
+        ALOGE("ERROR SpdifStreamOut::open() unrecognized format 0x%08X\n", config->format);
+        return BAD_VALUE;
     }
     customConfig.sample_rate = config->sample_rate * mRateMultiplier;
 
@@ -78,16 +66,10 @@ status_t SpdifStreamOut::open(
     // Always print this because otherwise it could be very confusing if the
     // HAL and AudioFlinger are using different formats.
     // Print before open() because HAL may modify customConfig.
-    ALOGI("SpdifStreamOut::open() AudioFlinger requested"
-            " sampleRate %d, format %#x, channelMask %#x",
-            config->sample_rate,
-            config->format,
-            config->channel_mask);
-    ALOGI("SpdifStreamOut::open() HAL configured for"
-            " sampleRate %d, format %#x, channelMask %#x",
-            customConfig.sample_rate,
-            customConfig.format,
-            customConfig.channel_mask);
+    ALOGI("SpdifStreamOut::open() AudioFlinger requested sampleRate %d, format %#x,"
+            " channelMask %#x", config->sample_rate, config->format, config->channel_mask);
+    ALOGI("SpdifStreamOut::open() HAL configured for sampleRate %d, format %#x, channelMask %#x",
+            customConfig.sample_rate, customConfig.format, customConfig.channel_mask);
 
     const status_t status = AudioStreamOut::open(
             handle,
