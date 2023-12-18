@@ -43,11 +43,14 @@ cc_library {
 
     srcs: [
         "AudioHwDevice.cpp",
+        "AudioStreamIn.cpp",
         "AudioStreamOut.cpp",
+        "SpdifStreamIn.cpp",
         "SpdifStreamOut.cpp",
     ],
 
     header_libs: [
+        "libaudioclient_headers",
         "libaudiohal_headers",
         "liberror_headers",
     ],

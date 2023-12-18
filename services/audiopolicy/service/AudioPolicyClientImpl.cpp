@@ -164,6 +164,8 @@ status_t AudioPolicyService::AudioPolicyClient::openInput(audio_module_handle_t 
     status_t status = af->openInput(request, &response);
     if (status == OK) {
         *input = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_module_handle_t(response.input));
+        *config = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioConfig_audio_config_t(response.config, true /*isInput*/));
     }
     return status;
 }
