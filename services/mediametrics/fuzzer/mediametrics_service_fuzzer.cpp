@@ -33,6 +33,8 @@ using namespace android;
 constexpr size_t kLogItemsLowWater = 1;
 // high water mark
 constexpr size_t kLogItemsHighWater = 2;
+constexpr size_t kMaxItemLength = 16;
+constexpr size_t kMaxApis = 64;
 
 class MediaMetricsServiceFuzzer {
    public:
@@ -304,10 +306,11 @@ void MediaMetricsServiceFuzzer::invokeAnalyticsAction(const uint8_t *data, size_
     }
 
     FuzzedDataProvider fdp2 = FuzzedDataProvider(data, size);
-
-    while (fdp2.remaining_bytes()) {
+    size_t apiCount = 0;
+    while (fdp2.remaining_bytes() && ++apiCount <= kMaxApis) {
         // make a test item
-        auto item = std::make_shared<mediametrics::Item>(fdp2.ConsumeRandomLengthString().c_str());
+        auto item = std::make_shared<mediametrics::Item>(
+                fdp2.ConsumeRandomLengthString(kMaxItemLength).c_str());
         (*item).set("event", fdp2.ConsumeRandomLengthString().c_str());
 
         // get the actions and execute them
