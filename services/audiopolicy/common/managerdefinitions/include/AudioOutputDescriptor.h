@@ -364,7 +364,7 @@ public:
 
     void dump(String8 *dst, int spaces, const char* extraInfo = nullptr) const override;
     virtual DeviceVector devices() const;
-    void setDevices(const DeviceVector &devices) { mDevices = devices; }
+    void setDevices(const DeviceVector &devices);
     bool sharesHwModuleWith(const sp<SwAudioOutputDescriptor>& outputDesc);
     virtual DeviceVector supportedDevices() const;
     virtual bool devicesSupportEncodedFormats(const DeviceTypeSet& deviceTypes);
