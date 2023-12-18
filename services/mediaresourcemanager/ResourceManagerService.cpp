@@ -620,7 +620,7 @@ void ResourceManagerService::pushReclaimAtom(const ClientInfoParcel& clientInfo,
     mResourceManagerMetrics->pushReclaimAtom(clientInfo, priorities, targetClients, reclaimed);
 }
 
-std::shared_ptr<IResourceManagerClient> ResourceManagerService::getClient(
+std::shared_ptr<IResourceManagerClient> ResourceManagerService::getClient_l(
         int pid, const int64_t& clientId) const {
     std::map<int, ResourceInfos>::const_iterator found = mMap.find(pid);
     if (found == mMap.end()) {
@@ -638,7 +638,7 @@ std::shared_ptr<IResourceManagerClient> ResourceManagerService::getClient(
     return foundClient->second.client;
 }
 
-bool ResourceManagerService::removeClient(int pid, const int64_t& clientId) {
+bool ResourceManagerService::removeClient_l(int pid, const int64_t& clientId) {
     std::map<int, ResourceInfos>::iterator found = mMap.find(pid);
     if (found == mMap.end()) {
         ALOGV("%s: didn't find pid %d for clientId %lld", __func__, pid, (long long) clientId);
@@ -665,8 +665,11 @@ bool ResourceManagerService::reclaimUnconditionallyFrom(
     int64_t failedClientId = -1;
     int32_t failedClientPid = -1;
     for (const ClientInfo& targetClient : targetClients) {
-        std::shared_ptr<IResourceManagerClient> client = getClient(
-            targetClient.mPid, targetClient.mClientId);
+        std::shared_ptr<IResourceManagerClient> client = nullptr;
+        {
+            std::scoped_lock lock{mLock};
+            client = getClient_l(targetClient.mPid, targetClient.mClientId);
+        }
         if (client == nullptr) {
             // skip already released clients.
             continue;
@@ -688,7 +691,7 @@ bool ResourceManagerService::reclaimUnconditionallyFrom(
 
     {
         std::scoped_lock lock{mLock};
-        bool found = removeClient(failedClientPid, failedClientId);
+        bool found = removeClient_l(failedClientPid, failedClientId);
         if (found) {
             ALOGW("Failed to reclaim resources from client with pid %d", failedClientPid);
         } else {
