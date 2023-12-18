@@ -22,6 +22,7 @@ cc_library_shared {
     export_include_dirs: ["."],
 
     shared_libs: [
+        "com.android.media.audio-aconfig-cc",
         "libaudiofoundation",
         "libaudiopolicycomponents",
         "libcutils",
