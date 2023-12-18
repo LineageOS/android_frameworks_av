@@ -890,12 +890,17 @@ void Track::destroy()
         bool wasActive = false;
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != 0) {
-            audio_utils::lock_guard _l(thread->mutex());
+            audio_utils::unique_lock ul(thread->mutex());
+            thread->waitWhileThreadBusy_l(ul);
+
             auto* const playbackThread = thread->asIAfPlaybackThread().get();
             wasActive = playbackThread->destroyTrack_l(this);
             forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->destroy(); });
         }
         if (isExternalTrack() && !wasActive) {
+            // If the track is not active, the TrackHandle is responsible for
+            // releasing the port id, not the ThreadBase::threadLoop().
+            // At this point, there is no concurrency issue as the track is going away.
             AudioSystem::releaseOutput(mPortId);
         }
     }
@@ -1181,7 +1186,9 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
                 return PERMISSION_DENIED;
             }
         }
-        audio_utils::lock_guard _lth(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         track_state state = mState;
         // here the track could be either new, or restarted
         // in both cases "unstop" the track
@@ -1306,7 +1313,9 @@ void Track::stop()
     ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        audio_utils::lock_guard _l(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         track_state state = mState;
         if (state == RESUMING || state == ACTIVE || state == PAUSING || state == PAUSED) {
             // If the track is not active (PAUSED and buffers full), flush buffers
@@ -1341,7 +1350,9 @@ void Track::pause()
     ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        audio_utils::lock_guard _l(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         auto* const playbackThread = thread->asIAfPlaybackThread().get();
         switch (mState) {
         case STOPPING_1:
@@ -1378,7 +1389,9 @@ void Track::flush()
     ALOGV("%s(%d)", __func__, mId);
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        audio_utils::lock_guard _l(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         auto* const playbackThread = thread->asIAfPlaybackThread().get();
 
         // Flush the ring buffer now if the track is not active in the PlaybackThread.
