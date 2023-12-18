@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2015, The Android Open Source Project
+ * Copyright 2023, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@
 
 #include <system/audio.h>
 
-#include "AudioStreamOut.h"
+#include "AudioStreamIn.h"
 
+#include <audio_utils/spdif/SPDIFDecoder.h>
 #include <afutils/NBAIO_Tee.h>
-#include <audio_utils/spdif/SPDIFEncoder.h>
 
 namespace android {
 
@@ -33,21 +33,23 @@ namespace android {
  * Stream that is a PCM data burst in the HAL but looks like an encoded stream
  * to the AudioFlinger. Wraps encoded data in an SPDIF wrapper per IEC61973-3.
  */
-class SpdifStreamOut : public AudioStreamOut {
+class SpdifStreamIn : public AudioStreamIn {
 public:
 
-    SpdifStreamOut(AudioHwDevice *dev, audio_output_flags_t flags,
+    SpdifStreamIn(AudioHwDevice *dev, audio_input_flags_t flags,
             audio_format_t format);
 
     status_t open(
             audio_io_handle_t handle,
             audio_devices_t devices,
             struct audio_config *config,
-            const char *address) override;
+            const char *address,
+            audio_source_t source,
+            audio_devices_t outputDevice,
+            const char* outputDeviceAddress) override;
 
     /**
-    * Write audio buffer to driver. Returns number of bytes written, or a
-    * negative status_t. If at least one frame was written successfully prior to the error,
+    * Read audio buffer from driver. If at least one frame was read successfully prior to the error,
     * it is suggested that the driver return that successful (short) byte count
     * and then return an error in the subsequent call.
     *
@@ -58,7 +60,7 @@ public:
     * callback function must be called when more space is available in the
     * driver/hardware buffer.
     */
-    ssize_t write(const void* buffer, size_t bytes) override;
+    status_t read(void* buffer, size_t bytes, size_t* read) override;
 
     /**
      * @return frame size from the perspective of the application and the AudioFlinger.
@@ -78,45 +80,50 @@ public:
     [[nodiscard]] virtual audio_format_t getFormat() const { return mApplicationConfig.format; }
 
     /**
-     * The HAL may be running at a higher sample rate if, for example, playing wrapped EAC3.
+     * The HAL may be running at a higher sample rate if, for example, reading wrapped EAC3.
      * @return sample rate from the perspective of the application and the AudioFlinger.
      */
     [[nodiscard]] virtual uint32_t getSampleRate() const { return mApplicationConfig.sample_rate; }
 
     /**
-     * The HAL is in stereo mode when playing multi-channel compressed audio over HDMI.
+     * The HAL is in stereo mode when reading multi-channel compressed audio.
      * @return channel mask from the perspective of the application and the AudioFlinger.
      */
     [[nodiscard]] virtual audio_channel_mask_t getChannelMask() const {
         return mApplicationConfig.channel_mask;
     }
 
-    status_t flush() override;
     status_t standby() override;
 
 private:
 
-    class MySPDIFEncoder : public SPDIFEncoder
+    class MySPDIFDecoder : public SPDIFDecoder
     {
     public:
-        MySPDIFEncoder(SpdifStreamOut *spdifStreamOut, audio_format_t format)
-          :  SPDIFEncoder(format)
-          , mSpdifStreamOut(spdifStreamOut)
+        MySPDIFDecoder(SpdifStreamIn *spdifStreamIn, audio_format_t format)
+          :  SPDIFDecoder(format)
+          , mSpdifStreamIn(spdifStreamIn)
         {
         }
 
-        ssize_t writeOutput(const void* buffer, size_t bytes) override
+        ssize_t readInput(void* buffer, size_t bytes) override
         {
-            return mSpdifStreamOut->writeDataBurst(buffer, bytes);
+            size_t bytesRead = 0;
+            const auto result = mSpdifStreamIn->readDataBurst(buffer, bytes, &bytesRead);
+            if (result < 0) {
+                return result;
+            }
+            return bytesRead;
         }
+
     protected:
-        SpdifStreamOut * const mSpdifStreamOut;
+        SpdifStreamIn * const mSpdifStreamIn;
     };
 
-    MySPDIFEncoder mSpdifEncoder;
+    MySPDIFDecoder mSpdifDecoder;
     audio_config_base_t mApplicationConfig = AUDIO_CONFIG_BASE_INITIALIZER;
 
-    ssize_t writeDataBurst(const void* data, size_t bytes);
+    status_t readDataBurst(void* data, size_t bytes, size_t* read);
 
 #ifdef TEE_SINK
     NBAIO_Tee mTee;

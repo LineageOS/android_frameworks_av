@@ -31,30 +31,57 @@ struct Source {
     virtual status_t standby() = 0;
 };
 
-// AudioStreamIn is immutable, so its fields are const.
-// The methods must not be const to match StreamHalInterface signature.
-
-struct AudioStreamIn : public Source {
+/**
+ * Managed access to a HAL input stream.
+ */
+class AudioStreamIn : public Source {
+public:
     const AudioHwDevice* const audioHwDev;
-    const sp<StreamInHalInterface> stream;
+    sp<StreamInHalInterface> stream;
     const audio_input_flags_t flags;
 
-    AudioStreamIn(
-            const AudioHwDevice* dev, const sp<StreamInHalInterface>& in,
-            audio_input_flags_t flags)
-        : audioHwDev(dev), stream(in), flags(flags) {}
+    [[nodiscard]] sp<DeviceHalInterface> hwDev() const;
 
-    status_t read(void* buffer, size_t bytes, size_t* read) final {
-        return stream->read(buffer, bytes, read);
-    }
+    AudioStreamIn(AudioHwDevice *dev, audio_input_flags_t flags);
 
-    status_t getCapturePosition(int64_t* frames, int64_t* time) final {
-        return stream->getCapturePosition(frames, time);
-    }
+    virtual status_t open(
+            audio_io_handle_t handle,
+            audio_devices_t deviceType,
+            struct audio_config *config,
+            const char *address,
+            audio_source_t source,
+            audio_devices_t outputDevice,
+            const char *outputDeviceAddress);
 
-    status_t standby() final { return stream->standby(); }
+    ~AudioStreamIn() override;
 
-    sp<DeviceHalInterface> hwDev() const { return audioHwDev->hwDevice(); }
+    status_t getCapturePosition(int64_t* frames, int64_t* time) override;
+
+    status_t read(void* buffer, size_t bytes, size_t* read) override;
+
+    /**
+     * @return frame size from the perspective of the application and the AudioFlinger.
+     */
+    [[nodiscard]] virtual size_t getFrameSize() const { return mHalFrameSize; }
+
+    /**
+     * @return audio stream configuration: channel mask, format, sample rate:
+     *   - channel mask from the perspective of the application and the AudioFlinger,
+     *     The HAL is in stereo mode when playing multi-channel compressed audio over HDMI;
+     *   - format from the perspective of the application and the AudioFlinger;
+     *   - sample rate from the perspective of the application and the AudioFlinger,
+     *     The HAL may be running at a higher sample rate if, for example, playing wrapped EAC3.
+     */
+    [[nodiscard]] virtual audio_config_base_t getAudioProperties() const;
+
+    status_t standby() override;
+
+protected:
+    uint64_t mFramesRead = 0;
+    int64_t mFramesReadAtStandby = 0;
+    int mRateMultiplier = 1;
+    bool mHalFormatHasProportionalFrames = false;
+    size_t mHalFrameSize = 0;
 };
 
 }  // namespace android
