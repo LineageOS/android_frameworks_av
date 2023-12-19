@@ -50,7 +50,7 @@ bool isPixelFormatSupportedForInput(
 // Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(
     int width, int height,
-    ::aidl::android::companion::virtualcamera::Format format);
+    ::aidl::android::companion::virtualcamera::Format format, int maxFps);
 
 }  // namespace virtualcamera
 }  // namespace companion

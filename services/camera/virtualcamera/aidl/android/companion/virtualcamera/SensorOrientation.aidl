@@ -16,17 +16,15 @@
 
 package android.companion.virtualcamera;
 
-import android.companion.virtualcamera.IVirtualCameraCallback;
-import android.companion.virtualcamera.SensorOrientation;
-import android.companion.virtualcamera.SupportedStreamConfiguration;
-
 /**
- * Configuration of virtual camera instance.
+ * Sensor orientation of a virtual camera.
  *
  * @hide
  */
-parcelable VirtualCameraConfiguration {
-    SupportedStreamConfiguration[] supportedStreamConfigs;
-    IVirtualCameraCallback virtualCameraCallback;
-    SensorOrientation sensorOrientation = SensorOrientation.ORIENTATION_0;
+@Backing(type="int")
+enum SensorOrientation {
+    ORIENTATION_0 = 0,
+    ORIENTATION_90 = 90,
+    ORIENTATION_180 = 180,
+    ORIENTATION_270 = 270,
 }

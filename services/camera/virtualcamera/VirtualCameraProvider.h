@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,14 +74,9 @@ class VirtualCameraProvider
 
   // Create new virtual camera devices
   // Returns nullptr if creation was not successful.
-  //
-  // TODO(b/301023410) - Add camera configuration.
   std::shared_ptr<VirtualCameraDevice> createCamera(
-      const std::vector<
-          aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
-          supportedInputConfig,
-      std::shared_ptr<aidl::android::companion::virtualcamera::IVirtualCameraCallback>
-          virtualCameraClientCallback = nullptr);
+      const aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
+          configuration);
 
   std::shared_ptr<VirtualCameraDevice> getCamera(const std::string& name);
 
@@ -105,4 +100,4 @@ class VirtualCameraProvider
 }  // namespace companion
 }  // namespace android
 
-#endif  // ANDROID_SERVICES_VIRTUAL_CAMERA_VIRTUALCAMERAPROVIDER_H
+#endif  // ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERAPROVIDER_H

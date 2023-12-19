@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ class MetadataBuilder {
     int32_t format = 0;
     // Minimal frame duration - corresponds to maximal FPS for given format.
     // See ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS in CameraMetadataTag.aidl.
-    std::chrono::nanoseconds minFrameDuration{std::chrono::seconds(1) / 30};
+    std::chrono::nanoseconds minFrameDuration{0};
     // Minimal stall duration.
     // See ANDROID_SCALER_AVAILABLE_STALL_DURATIONS in CameraMetadataTag.aidl.
     std::chrono::nanoseconds minStallDuration{0};

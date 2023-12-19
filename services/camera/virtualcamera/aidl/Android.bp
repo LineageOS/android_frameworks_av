@@ -11,6 +11,7 @@ aidl_interface {
         "android/companion/virtualcamera/IVirtualCameraCallback.aidl",
         "android/companion/virtualcamera/IVirtualCameraService.aidl",
         "android/companion/virtualcamera/VirtualCameraConfiguration.aidl",
+        "android/companion/virtualcamera/SensorOrientation.aidl",
         "android/companion/virtualcamera/SupportedStreamConfiguration.aidl",
     ],
     local_include_dir: ".",
