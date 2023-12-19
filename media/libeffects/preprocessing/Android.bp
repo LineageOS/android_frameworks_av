@@ -67,9 +67,7 @@ cc_library_shared {
         ":effectCommonFile",
     ],
     defaults: [
-        "aidlaudioservice_defaults",
-        "latest_android_hardware_audio_effect_ndk_shared",
-        "latest_android_media_audio_common_types_ndk_shared",
+        "aidlaudioeffectservice_defaults",
     ],
     local_include_dirs: ["aidl"],
     shared_libs: [
