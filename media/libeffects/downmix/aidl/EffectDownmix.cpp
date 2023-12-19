@@ -193,6 +193,8 @@ std::shared_ptr<EffectContext> DownmixImpl::createContext(const Parameter::Commo
         return mContext;
     }
 
+    if (!DownmixContext::validateCommonConfig(common)) return nullptr;
+
     mContext = std::make_shared<DownmixContext>(1 /* statusFmqDepth */, common);
     return mContext;
 }
@@ -210,7 +212,7 @@ IEffect::Status DownmixImpl::effectProcessImpl(float* in, float* out, int sample
         LOG(ERROR) << __func__ << " nullContext";
         return {EX_NULL_POINTER, 0, 0};
     }
-    return mContext->lvmProcess(in, out, sampleToProcess);
+    return mContext->downmixProcess(in, out, sampleToProcess);
 }
 
 }  // namespace aidl::android::hardware::audio::effect
