@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cstddef>
 #define LOG_TAG "AHAL_HapticGeneratorContext"
 
 #include <Utils.h>
@@ -162,8 +163,8 @@ IEffect::Status HapticGeneratorContext::lvmProcess(float* in, float* out, int sa
     }
 
     // Construct input buffer according to haptic channel source
-    for (size_t i = 0; i < mFrameCount; ++i) {
-        for (size_t j = 0; j < mParams.mHapticChannelCount; ++j) {
+    for (int64_t i = 0; i < mFrameCount; ++i) {
+        for (int j = 0; j < mParams.mHapticChannelCount; ++j) {
             mInputBuffer[i * mParams.mHapticChannelCount + j] =
                     in[i * mParams.mAudioChannelCount + mParams.mHapticChannelSource[j]];
         }
@@ -180,8 +181,7 @@ IEffect::Status HapticGeneratorContext::lvmProcess(float* in, float* out, int sa
     // buffer, which contains haptic data at the end of the buffer, directly to sink buffer.
     // In that case, copy haptic data to input buffer instead of output buffer.
     // Note: this may not work with rpc/binder calls
-    int offset = samples;
-    for (int i = 0; i < hapticSampleCount; ++i) {
+    for (size_t i = 0; i < hapticSampleCount; ++i) {
         in[samples + i] = hapticOutBuffer[i];
     }
     return {STATUS_OK, samples, static_cast<int32_t>(samples + hapticSampleCount)};
@@ -199,7 +199,7 @@ void HapticGeneratorContext::init_params(media::audio::common::AudioChannelLayou
     mParams.mHapticChannelCount = ::aidl::android::hardware::audio::common::getChannelCount(
             outputChMask, media::audio::common::AudioChannelLayout::LAYOUT_HAPTIC_AB);
     LOG_ALWAYS_FATAL_IF(mParams.mHapticChannelCount > 2, "haptic channel count is too large");
-    for (size_t i = 0; i < mParams.mHapticChannelCount; ++i) {
+    for (int i = 0; i < mParams.mHapticChannelCount; ++i) {
         // By default, use the first audio channel to generate haptic channels.
         mParams.mHapticChannelSource[i] = 0;
     }

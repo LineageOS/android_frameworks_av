@@ -329,7 +329,7 @@ void ReverbContext::initControlParameter(LVREV_ControlParams_st& params) {
  */
 
 int ReverbContext::convertLevel(int level) {
-    for (int i = 0; i < kLevelMapping.size(); i++) {
+    for (std::size_t i = 0; i < kLevelMapping.size(); i++) {
         if (level <= kLevelMapping[i]) {
             return i;
         }
