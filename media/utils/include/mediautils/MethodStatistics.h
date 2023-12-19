@@ -124,6 +124,7 @@ private:
 // Managed Statistics support.
 // Supported Modules
 #define METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL "AudioHidl"
+#define METHOD_STATISTICS_MODULE_NAME_AUDIO_AIDL "AudioAidl"
 
 // Returns a vector of class names for the module, or a nullptr if module not found.
 std::shared_ptr<std::vector<std::string>>
