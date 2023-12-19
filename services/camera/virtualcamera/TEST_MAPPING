@@ -2,9 +2,7 @@
   "presubmit" : [
     {
       "name": "virtual_camera_tests"
-    }
-  ],
-  "postsubmit": [
+    },
     {
       "name": "CtsVirtualDevicesCameraTestCases",
       "options": [

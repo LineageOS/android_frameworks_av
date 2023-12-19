@@ -132,6 +132,20 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
 {
     DeviceDescriptorBase::toAudioPortConfig(dstConfig, srcConfig);
     dstConfig->ext.device.hw_module = getModuleHandle();
+    if (mPreferredConfig.has_value()) {
+        if (mPreferredConfig->format != AUDIO_FORMAT_DEFAULT) {
+            dstConfig->config_mask |= AUDIO_PORT_CONFIG_FORMAT;
+            dstConfig->format = mPreferredConfig->format;
+        }
+        if (mPreferredConfig->sample_rate != 0) {
+            dstConfig->config_mask |= AUDIO_PORT_CONFIG_SAMPLE_RATE;
+            dstConfig->sample_rate = mPreferredConfig->sample_rate;
+        }
+        if (mPreferredConfig->channel_mask != AUDIO_CHANNEL_NONE) {
+            dstConfig->config_mask |= AUDIO_PORT_CONFIG_CHANNEL_MASK;
+            dstConfig->channel_mask = mPreferredConfig->channel_mask;
+        }
+    }
 }
 
 void DeviceDescriptor::toAudioPort(struct audio_port *port) const
@@ -183,6 +197,14 @@ void DeviceDescriptor::setEncapsulationInfoFromHal(
     }
 }
 
+void DeviceDescriptor::setPreferredConfig(const audio_config_base_t* preferredConfig) {
+    if (preferredConfig == nullptr) {
+        mPreferredConfig.reset();
+    } else {
+        mPreferredConfig = *preferredConfig;
+    }
+}
+
 void DeviceDescriptor::dump(String8 *dst, int spaces, bool verbose) const
 {
     String8 extraInfo;
@@ -193,6 +215,13 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, bool verbose) const
     std::string descBaseDumpStr;
     DeviceDescriptorBase::dump(&descBaseDumpStr, spaces, extraInfo.c_str(), verbose);
     dst->append(descBaseDumpStr.c_str());
+
+    if (mPreferredConfig.has_value()) {
+        dst->append(base::StringPrintf(
+                "%*sPreferred Config: format=%#x, channelMask=%#x, sampleRate=%u\n",
+                spaces, "", mPreferredConfig.value().format, mPreferredConfig.value().channel_mask,
+                mPreferredConfig.value().sample_rate).c_str());
+    }
 }
 
 
