@@ -103,6 +103,11 @@ java_aconfig_library {
     name: "android.media.audiopolicy-aconfig-java",
     aconfig_declarations: "android.media.audiopolicy-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "VanillaIceCream",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.car.framework",
+    ],
 }
 
 java_aconfig_library {

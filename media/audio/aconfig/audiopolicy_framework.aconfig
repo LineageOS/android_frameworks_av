@@ -11,3 +11,10 @@ flag {
     description: "Enable AudioPolicy.updateMixingRules API for hot-swapping audio mixing rules."
     bug: "293874525"
 }
+
+flag {
+    name: "enable_fade_manager_configuration"
+    namespace: "media_audio"
+    description: "Enable Fade Manager Configuration support to determine fade properties"
+    bug: "307354764"
+}
