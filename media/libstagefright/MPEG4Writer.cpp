@@ -172,6 +172,7 @@ public:
     const char *getTrackType() const;
     void resetInternal();
     int64_t trackMetaDataSize();
+    bool isTimestampValid(int64_t timeUs);
 
 private:
     // A helper class to handle faster write box with table entries
@@ -2428,6 +2429,42 @@ status_t MPEG4Writer::setNextFd(int fd) {
     }
     mNextFd = dup(fd);
     return OK;
+}
+
+bool MPEG4Writer::isSampleMetadataValid(size_t trackIndex, int64_t timeUs) {
+    // Track Index starts from zero, so it should be at least 1 less than size.
+    if (trackIndex >= mTracks.size()) {
+        ALOGE("Incorrect trackIndex %zu, mTracks->size() %zu", trackIndex, mTracks.size());
+        return false;
+    }
+
+    List<Track *>::iterator it = mTracks.begin();
+
+    // (*it) is already pointing to trackIndex 0.
+    for (int i = 1; i <= trackIndex; i++) {
+        it++;
+    }
+
+    return (*it)->isTimestampValid(timeUs);
+}
+
+bool MPEG4Writer::Track::isTimestampValid(int64_t timeUs) {
+    // No timescale if HEIF
+    if (mIsHeif) {
+        return true;
+    }
+
+    // Ensure that the timeUs value does not have extremely low or high values
+    // that would cause an underflow or overflow, like in the calculation -
+    // mdhdDuration = (trakDurationUs * mTimeScale + 5E5) / 1E6
+    if (abs(timeUs) >= (INT64_MAX - 5E5) / mTimeScale) {
+        return false;
+    }
+    // Limit check for calculations in ctts box
+    if (abs(timeUs) + kMaxCttsOffsetTimeUs >= INT64_MAX / mTimeScale) {
+        return false;
+    }
+    return true;
 }
 
 bool MPEG4Writer::Track::isExifData(
