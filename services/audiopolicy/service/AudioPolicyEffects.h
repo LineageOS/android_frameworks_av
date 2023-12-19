@@ -23,6 +23,7 @@
 #include <future>
 
 #include <android-base/thread_annotations.h>
+#include <audio_utils/mutex.h>
 #include <cutils/misc.h>
 #include <media/AudioEffect.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
@@ -59,7 +60,7 @@ public:
     virtual ~AudioPolicyEffects();
 
     // NOTE: methods on AudioPolicyEffects should never be called with the AudioPolicyService
-    // main mutex (mLock) held as they will indirectly call back into AudioPolicyService when
+    // main mutex (mMutex) held as they will indirectly call back into AudioPolicyService when
     // managing audio effects.
 
     // Return a list of effect descriptors for default input effects
@@ -204,7 +205,7 @@ private:
         void setProcessorEnabled(bool enabled);
 
         const audio_session_t mSessionId;
-        // AudioPolicyManager keeps mLock, no need for lock on reference count here
+        // AudioPolicyManager keeps mMutex, no need for lock on reference count here
         int mRefCount;
         Vector< sp<AudioEffect> >mEffects;
     };
@@ -263,9 +264,9 @@ private:
                          size_t *totSize);
 
     // protects access to mInputSources, mInputSessions, mOutputStreams, mOutputSessions
-    // never hold AudioPolicyService::mLock when calling AudioPolicyEffects methods as
+    // never hold AudioPolicyService::mMutex when calling AudioPolicyEffects methods as
     // those can call back into AudioPolicyService methods and try to acquire the mutex
-    Mutex mLock;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAudioPolicyEffects_Mutex};
     // Automatic input effects are configured per audio_source_t
     KeyedVector< audio_source_t, EffectDescVector* > mInputSources;
     // Automatic input effects are unique for audio_io_handle_t
@@ -279,7 +280,7 @@ private:
     /**
      * @brief mDeviceEffects map of device effects indexed by the device address
      */
-    std::map<std::string, std::unique_ptr<DeviceEffects>> mDeviceEffects GUARDED_BY(mLock);
+    std::map<std::string, std::unique_ptr<DeviceEffects>> mDeviceEffects GUARDED_BY(mMutex);
 
     /**
      * Device Effect initialization must be asynchronous: the audio_policy service parses and init
