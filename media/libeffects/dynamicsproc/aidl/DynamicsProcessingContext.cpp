@@ -313,8 +313,8 @@ IEffect::Status DynamicsProcessingContext::dpeProcess(float* in, float* out, int
 void DynamicsProcessingContext::init() {
     std::lock_guard lg(mMutex);
     mState = DYNAMICS_PROCESSING_STATE_INITIALIZED;
-    mChannelCount = ::aidl::android::hardware::audio::common::getChannelCount(
-            mCommon.input.base.channelMask);
+    mChannelCount = static_cast<int>(::aidl::android::hardware::audio::common::getChannelCount(
+            mCommon.input.base.channelMask));
 }
 
 dp_fx::DPChannel* DynamicsProcessingContext::getChannel_l(int channel) {

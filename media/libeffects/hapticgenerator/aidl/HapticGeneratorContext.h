@@ -92,7 +92,7 @@ class HapticGeneratorContext final : public EffectContext {
     HapticGeneratorState mState;
     HapticGeneratorParam mParams GUARDED_BY(mMutex);
     int mSampleRate;
-    int mFrameCount = 0;
+    int64_t mFrameCount = 0;
 
     // A cache for all shared pointers of the HapticGenerator
     struct HapticGeneratorProcessorsRecord mProcessorsRecord;

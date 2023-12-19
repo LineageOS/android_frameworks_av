@@ -74,7 +74,7 @@ class DynamicsProcessingContext final : public EffectContext {
     static constexpr float kPreferredProcessingDurationMs = 10.0f;
     static constexpr int kBandCount = 5;
     std::mutex mMutex;
-    size_t mChannelCount GUARDED_BY(mMutex) = 0;
+    int mChannelCount GUARDED_BY(mMutex) = 0;
     DynamicsProcessingState mState GUARDED_BY(mMutex) = DYNAMICS_PROCESSING_STATE_UNINITIALIZED;
     std::unique_ptr<dp_fx::DPFrequency> mDpFreq GUARDED_BY(mMutex) = nullptr;
     bool mEngineInited GUARDED_BY(mMutex) = false;

@@ -227,7 +227,7 @@ RetCode BundleContext::limitLevel() {
         bool viEnabled = params.VirtualizerOperatingMode == LVM_MODE_ON;
 
         if (eqEnabled) {
-            for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+            for (size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
                 float bandFactor = mBandGainMdB[i] / 1500.0;
                 float bandCoefficient = lvm::kBandEnergyCoefficient[i];
                 float bandEnergy = bandFactor * bandCoefficient * bandCoefficient;
@@ -236,7 +236,7 @@ RetCode BundleContext::limitLevel() {
 
             // cross EQ coefficients
             float bandFactorSum = 0;
-            for (int i = 0; i < lvm::MAX_NUM_BANDS - 1; i++) {
+            for (size_t i = 0; i < lvm::MAX_NUM_BANDS - 1; i++) {
                 float bandFactor1 = mBandGainMdB[i] / 1500.0;
                 float bandFactor2 = mBandGainMdB[i + 1] / 1500.0;
 
@@ -259,7 +259,7 @@ RetCode BundleContext::limitLevel() {
             energyContribution += boostFactor * boostCoefficient * boostCoefficient;
 
             if (eqEnabled) {
-                for (int i = 0; i < lvm::MAX_NUM_BANDS; i++) {
+                for (size_t i = 0; i < lvm::MAX_NUM_BANDS; i++) {
                     float bandFactor = mBandGainMdB[i] / 1500.0;
                     float bandCrossCoefficient = lvm::kBassBoostEnergyCrossCoefficient[i];
                     float bandEnergy = boostFactor * bandFactor * bandCrossCoefficient;
@@ -421,7 +421,6 @@ float BundleContext::VolToDb(float vol) {
 
 RetCode BundleContext::setVolumeStereo(const Parameter::VolumeStereo& volume) {
     LVM_ControlParams_t params;
-    LVM_ReturnStatus_en status = LVM_SUCCESS;
 
     // Convert volume to dB
     float leftdB = VolToDb(volume.left);
@@ -512,7 +511,7 @@ bool BundleContext::isBandLevelIndexInRange(
     const auto [min, max] =
             std::minmax_element(bandLevels.begin(), bandLevels.end(),
                                 [](const auto& a, const auto& b) { return a.index < b.index; });
-    return min->index >= 0 && max->index < lvm::MAX_NUM_BANDS;
+    return min->index >= 0 && static_cast<size_t>(max->index) < lvm::MAX_NUM_BANDS;
 }
 
 RetCode BundleContext::updateControlParameter(const std::vector<Equalizer::BandLevel>& bandLevels) {
