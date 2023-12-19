@@ -20,6 +20,8 @@ namespace android::mediautils {
 
 // Repository for MethodStatistics Objects
 
+// It's important to have the HAL class name defined with suffix "Hidl/Aidl" because
+// TimerThread::isRequestFromHal use this string to match binder call to/from hal.
 std::shared_ptr<std::vector<std::string>>
 getStatisticsClassesForModule(std::string_view moduleName) {
     static const std::map<std::string, std::shared_ptr<std::vector<std::string>>,
@@ -32,6 +34,15 @@ getStatisticsClassesForModule(std::string_view moduleName) {
                 "EffectHalHidl",
                 "StreamInHalHidl",
                 "StreamOutHalHidl",
+              })
+        },
+        {
+            METHOD_STATISTICS_MODULE_NAME_AUDIO_AIDL,
+            std::shared_ptr<std::vector<std::string>>(
+                new std::vector<std::string>{
+                "DeviceHalAidl",
+                "EffectHalAidl",
+                "StreamHalAidl",
               })
         },
     };
@@ -60,6 +71,9 @@ getStatisticsForClass(std::string_view className) {
             std::map<std::string, std::shared_ptr<MethodStatistics<std::string>>, std::less<>> m;
             addClassesToMap(
                     getStatisticsClassesForModule(METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL),
+                    m);
+            addClassesToMap(
+                    getStatisticsClassesForModule(METHOD_STATISTICS_MODULE_NAME_AUDIO_AIDL),
                     m);
             return m;
         }();
