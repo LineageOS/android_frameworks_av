@@ -41,6 +41,7 @@
 
 #include <Serializer.h>
 #include <android/media/audio/common/AudioPort.h>
+#include <com_android_media_audio.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <media/AudioParameter.h>
@@ -5970,7 +5971,11 @@ bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
     // some positional channel masks and PCM format
 
     if (config != nullptr && *config != AUDIO_CONFIG_INITIALIZER) {
-        if (!audio_is_channel_mask_spatialized(config->channel_mask)) {
+        const bool channel_mask_spatialized =
+                com_android_media_audio_stereo_spatialization()
+                ? audio_channel_mask_contains_stereo(config->channel_mask)
+                : audio_is_channel_mask_spatialized(config->channel_mask);
+        if (!channel_mask_spatialized) {
             return false;
         }
         if (!audio_is_linear_pcm(config->format)) {

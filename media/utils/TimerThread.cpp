@@ -129,11 +129,16 @@ std::string TimerThread::SnapshotAnalysis::toString(bool showTimeoutStack) const
 //
 /* static */
 bool TimerThread::isRequestFromHal(const std::shared_ptr<const Request>& request) {
-    const size_t hidlPos = request->tag.asStringView().find("Hidl");
-    if (hidlPos == std::string::npos) return false;
-    // should be a separator afterwards Hidl which indicates the string was in the class.
-    const size_t separatorPos = request->tag.asStringView().find("::", hidlPos);
-    return separatorPos != std::string::npos;
+    for (const auto& s : {"Hidl", "Aidl"}) {
+        const auto& tagSV = request->tag.asStringView();
+        const size_t halStrPos = tagSV.find(s);
+        // should be a separator afterwards Hidl/Aidl which indicates the string was in the class.
+        if (halStrPos != std::string::npos && tagSV.find("::", halStrPos) != std::string::npos) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 struct TimerThread::SnapshotAnalysis TimerThread::getSnapshotAnalysis(size_t retiredCount) const {

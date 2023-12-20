@@ -875,12 +875,15 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             dprintf(fd, "\nIEffect binder call profile:\n");
             write(fd, timeCheckStats.c_str(), timeCheckStats.size());
 
-            // Automatically fetch HIDL statistics.
-            std::shared_ptr<std::vector<std::string>> hidlClassNames =
-                    mediautils::getStatisticsClassesForModule(
-                            METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL);
-            if (hidlClassNames) {
-                for (const auto& className : *hidlClassNames) {
+            // Automatically fetch HIDL or AIDL statistics.
+            const std::string_view halType = (mDevicesFactoryHal->getHalVersion().getType() ==
+                                      AudioHalVersionInfo::Type::HIDL)
+                                             ? METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL
+                                             : METHOD_STATISTICS_MODULE_NAME_AUDIO_AIDL;
+            const std::shared_ptr<std::vector<std::string>> halClassNames =
+                    mediautils::getStatisticsClassesForModule(halType);
+            if (halClassNames) {
+                for (const auto& className : *halClassNames) {
                     auto stats = mediautils::getStatisticsForClass(className);
                     if (stats) {
                         timeCheckStats = stats->dump();
@@ -3222,41 +3225,19 @@ sp<IAfThreadBase> AudioFlinger::openInput_l(audio_module_handle_t module,
         return 0;
     }
 
-    audio_config_t halconfig = *config;
-    sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice();
-    sp<StreamInHalInterface> inStream;
-    status_t status = inHwHal->openInputStream(
-            *input, devices, &halconfig, flags, address, source,
-            outputDevice, outputDeviceAddress, &inStream);
-    ALOGV("openInput_l() openInputStream returned input %p, devices %#x, SamplingRate %d"
-           ", Format %#x, Channels %#x, flags %#x, status %d addr %s",
-            inStream.get(),
+    AudioStreamIn *inputStream = nullptr;
+    status_t status = inHwDev->openInputStream(
+            &inputStream,
+            *input,
             devices,
-            halconfig.sample_rate,
-            halconfig.format,
-            halconfig.channel_mask,
             flags,
-            status, address);
+            config,
+            address,
+            source,
+            outputDevice,
+            outputDeviceAddress.c_str());
 
-    // If the input could not be opened with the requested parameters and we can handle the
-    // conversion internally, try to open again with the proposed parameters.
-    if (status == BAD_VALUE &&
-        audio_is_linear_pcm(config->format) &&
-        audio_is_linear_pcm(halconfig.format) &&
-        (halconfig.sample_rate <= AUDIO_RESAMPLER_DOWN_RATIO_MAX * config->sample_rate) &&
-        (audio_channel_count_from_in_mask(halconfig.channel_mask) <= FCC_LIMIT) &&
-        (audio_channel_count_from_in_mask(config->channel_mask) <= FCC_LIMIT)) {
-        // FIXME describe the change proposed by HAL (save old values so we can log them here)
-        ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
-        inStream.clear();
-        status = inHwHal->openInputStream(
-                *input, devices, &halconfig, flags, address, source,
-                outputDevice, outputDeviceAddress, &inStream);
-        // FIXME log this new status; HAL should not propose any further changes
-    }
-
-    if (status == NO_ERROR && inStream != 0) {
-        AudioStreamIn *inputStream = new AudioStreamIn(inHwDev, inStream, flags);
+    if (status == NO_ERROR) {
         if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             const sp<IAfMmapCaptureThread> thread =
                     IAfMmapCaptureThread::create(this, *input, inHwDev, inputStream, mSystemReady);

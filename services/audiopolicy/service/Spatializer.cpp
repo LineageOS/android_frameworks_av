@@ -229,7 +229,7 @@ void Spatializer::loadOrderedLowLatencyModes() {
         return;
     }
     auto latencyModesStrs = android::sysprop::BluetoothProperties::dsa_transport_preference();
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     // First load preferred low latency modes ordered from the property
     for (auto str : latencyModesStrs) {
         if (!str.has_value()) continue;
@@ -394,7 +394,11 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
         return status;
     }
     for (const auto channelMask : channelMasks) {
-        if (!audio_is_channel_mask_spatialized(channelMask)) {
+        const bool channel_mask_spatialized =
+                com_android_media_audio_stereo_spatialization()
+                ? audio_channel_mask_contains_stereo(channelMask)
+                : audio_is_channel_mask_spatialized(channelMask);
+        if (!channel_mask_spatialized) {
             ALOGW("%s: ignoring channelMask:%#x", __func__, channelMask);
             continue;
         }
@@ -461,7 +465,7 @@ void Spatializer::sendEmptyCreateSpatializerMetricWithStatus(status_t status) {
 
 /** Gets the channel mask, sampling rate and format set for the spatializer input. */
 audio_config_base_t Spatializer::getAudioInConfig() const {
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
     // For now use highest supported channel count
     config.channel_mask = getMaxChannelMask(mChannelMasks, FCC_LIMIT);
@@ -470,7 +474,7 @@ audio_config_base_t Spatializer::getAudioInConfig() const {
 
 status_t Spatializer::registerCallback(
         const sp<media::INativeSpatializerCallback>& callback) {
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (callback == nullptr) {
         return BAD_VALUE;
     }
@@ -498,7 +502,7 @@ status_t Spatializer::registerCallback(
 // IBinder::DeathRecipient
 void Spatializer::binderDied(__unused const wp<IBinder> &who) {
     {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         mLevel = Spatialization::Level::NONE;
         mSpatializerCallback.clear();
     }
@@ -527,7 +531,7 @@ Status Spatializer::setLevel(Spatialization::Level level) {
     sp<media::INativeSpatializerCallback> callback;
     bool levelChanged = false;
     {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         levelChanged = mLevel != level;
         mLevel = level;
         callback = mSpatializerCallback;
@@ -551,7 +555,7 @@ Status Spatializer::getLevel(Spatialization::Level *level) {
     if (level == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     *level = mLevel;
     ALOGV("%s level %d", __func__, (int)*level);
     return Status::ok();
@@ -562,14 +566,14 @@ Status Spatializer::isHeadTrackingSupported(bool *supports) {
     if (supports == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     *supports = mSupportsHeadTracking;
     return Status::ok();
 }
 
 Status Spatializer::getSupportedHeadTrackingModes(
         std::vector<HeadTracking::Mode>* modes) {
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     ALOGV("%s", __func__);
     if (modes == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
@@ -585,7 +589,7 @@ Status Spatializer::setDesiredHeadTrackingMode(HeadTracking::Mode mode) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
     mLocalLog.log("%s with %s", __func__, ToString(mode).c_str());
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     switch (mode) {
         case HeadTracking::Mode::OTHER:
             return binderStatusFromStatusT(BAD_VALUE);
@@ -610,7 +614,7 @@ Status Spatializer::getActualHeadTrackingMode(HeadTracking::Mode *mode) {
     if (mode == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     *mode = mActualHeadTrackingMode;
     ALOGV("%s mode %d", __func__, (int)*mode);
     return Status::ok();
@@ -620,7 +624,7 @@ Status Spatializer::recenterHeadTracker() {
     if (!mSupportsHeadTracking) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (mPoseController != nullptr) {
         mPoseController->recenter();
     }
@@ -637,7 +641,7 @@ Status Spatializer::setGlobalTransform(const std::vector<float>& screenToStage) 
         ALOGW("Invalid screenToStage vector.");
         return binderStatusFromStatusT(BAD_VALUE);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (mPoseController != nullptr) {
         mLocalLog.log("%s with screenToStage %s", __func__,
                 media::VectorRecorder::toString<float>(screenToStage).c_str());
@@ -650,7 +654,7 @@ Status Spatializer::release() {
     ALOGV("%s", __func__);
     bool levelChanged = false;
     {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         if (mSpatializerCallback == nullptr) {
             return binderStatusFromStatusT(INVALID_OPERATION);
         }
@@ -674,7 +678,7 @@ Status Spatializer::setHeadSensor(int sensorHandle) {
     if (!mSupportsHeadTracking) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (mHeadSensor != sensorHandle) {
         mLocalLog.log("%s with 0x%08x", __func__, sensorHandle);
         mHeadSensor = sensorHandle;
@@ -689,7 +693,7 @@ Status Spatializer::setScreenSensor(int sensorHandle) {
     if (!mSupportsHeadTracking) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (mScreenSensor != sensorHandle) {
         mLocalLog.log("%s with 0x%08x", __func__, sensorHandle);
         mScreenSensor = sensorHandle;
@@ -708,7 +712,7 @@ Status Spatializer::setDisplayOrientation(float physicalToLogicalAngle) {
     // It is possible due to numerical inaccuracies to exceed the boundaries of 0 to 2 * M_PI.
     ALOGI_IF(angle != physicalToLogicalAngle,
             "%s: clamping %f to %f", __func__, physicalToLogicalAngle, angle);
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     mDisplayOrientation = angle;
     if (mPoseController != nullptr) {
         // This turns on the rate-limiter.
@@ -728,7 +732,7 @@ Status Spatializer::setHingeAngle(float hingeAngle) {
     // It is possible due to numerical inaccuracies to exceed the boundaries of 0 to 2 * M_PI.
     ALOGI_IF(angle != hingeAngle,
             "%s: clamping %f to %f", __func__, hingeAngle, angle);
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     mHingeAngle = angle;
     if (mEngine != nullptr) {
         setEffectParameter_l(SPATIALIZER_PARAM_HINGE_ANGLE, std::vector<float>{angle});
@@ -739,7 +743,7 @@ Status Spatializer::setHingeAngle(float hingeAngle) {
 Status Spatializer::setFoldState(bool folded) {
     ALOGV("%s foldState %d", __func__, (int)folded);
     mLocalLog.log("%s with %d", __func__, (int)folded);
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     mFoldedState = folded;
     if (mEngine != nullptr) {
         // we don't suppress multiple calls with the same folded state - that's
@@ -761,7 +765,7 @@ Status Spatializer::getSupportedModes(std::vector<Spatialization::Mode> *modes) 
 Status Spatializer::registerHeadTrackingCallback(
         const sp<media::ISpatializerHeadTrackingCallback>& callback) {
     ALOGV("%s callback %p", __func__, callback.get());
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (!mSupportsHeadTracking) {
         return binderStatusFromStatusT(INVALID_OPERATION);
     }
@@ -771,7 +775,7 @@ Status Spatializer::registerHeadTrackingCallback(
 
 Status Spatializer::setParameter(int key, const std::vector<unsigned char>& value) {
     ALOGV("%s key %d", __func__, key);
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     status_t status = INVALID_OPERATION;
     if (mEngine != nullptr) {
         status = setEffectParameter_l(key, value);
@@ -785,7 +789,7 @@ Status Spatializer::getParameter(int key, std::vector<unsigned char> *value) {
     if (value == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     status_t status = INVALID_OPERATION;
     if (mEngine != nullptr) {
         ALOGV("%s key %d mEngine %p", __func__, key, mEngine.get());
@@ -799,7 +803,7 @@ Status Spatializer::getOutput(int *output) {
     if (output == nullptr) {
         binderStatusFromStatusT(BAD_VALUE);
     }
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     *output = VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_io_handle_t_int32_t(mOutput));
     ALOGV("%s got output %d", __func__, *output);
     return Status::ok();
@@ -837,7 +841,7 @@ void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
     ALOGV("%s", __func__);
     sp<media::ISpatializerHeadTrackingCallback> callback;
     {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         callback = mHeadTrackingCallback;
         if (mEngine != nullptr) {
             setEffectParameter_l(SPATIALIZER_PARAM_HEAD_TO_STAGE, headToStage);
@@ -865,7 +869,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
     sp<media::ISpatializerHeadTrackingCallback> callback;
     HeadTracking::Mode spatializerMode;
     {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         if (!mSupportsHeadTracking) {
             spatializerMode = HeadTracking::Mode::DISABLED;
         } else {
@@ -932,7 +936,7 @@ status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTra
     sp<media::INativeSpatializerCallback> callback;
 
     {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         ALOGV("%s output %d mOutput %d", __func__, (int)output, (int)mOutput);
         mLocalLog.log("%s with output %d tracks %zu (mOutput %d)", __func__, (int)output,
                       numActiveTracks, (int)mOutput);
@@ -998,7 +1002,7 @@ audio_io_handle_t Spatializer::detachOutput() {
     sp<media::INativeSpatializerCallback> callback;
 
     {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         mLocalLog.log("%s with output %d tracks %zu", __func__, (int)mOutput, mNumActiveTracks);
         ALOGV("%s mOutput %d", __func__, (int)mOutput);
         if (mOutput == AUDIO_IO_HANDLE_NONE) {
@@ -1032,7 +1036,7 @@ void Spatializer::onSupportedLatencyModesChanged(
 
 void Spatializer::onSupportedLatencyModesChangedMsg(
         audio_io_handle_t output, std::vector<audio_latency_mode_t>&& modes) {
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     ALOGV("%s output %d mOutput %d num modes %zu",
             __func__, (int)output, (int)mOutput, modes.size());
     if (output == mOutput) {
@@ -1043,7 +1047,7 @@ void Spatializer::onSupportedLatencyModesChangedMsg(
 }
 
 void Spatializer::updateActiveTracks(size_t numActiveTracks) {
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (mNumActiveTracks != numActiveTracks) {
         mLocalLog.log("%s from %zu to %zu", __func__, mNumActiveTracks, numActiveTracks);
         mNumActiveTracks = numActiveTracks;
@@ -1174,7 +1178,7 @@ void Spatializer::checkPoseController_l() {
 
 void Spatializer::calculateHeadPose() {
     ALOGV("%s", __func__);
-    std::lock_guard lock(mLock);
+    audio_utils::lock_guard lock(mMutex);
     if (mPoseController != nullptr) {
         mPoseController->calculateAsync();
     }
@@ -1193,7 +1197,7 @@ std::string Spatializer::toString(unsigned level) const {
     bool needUnlock = false;
 
     prefixSpace += ' ';
-    if (!mLock.try_lock()) {
+    if (!mMutex.try_lock()) {
         // dumpsys even try_lock failed, information dump can be useful although may not accurate
         ss.append(prefixSpace).append("try_lock failed, dumpsys below maybe INACCURATE!\n");
     } else {
@@ -1239,6 +1243,10 @@ std::string Spatializer::toString(unsigned level) const {
     base::StringAppendF(&ss, "%sDisplayOrientation: %f\n", prefixSpace.c_str(),
                         mDisplayOrientation);
 
+    // 4. Show flag or property state.
+    base::StringAppendF(&ss, "%sStereo Spatialization: %s\n", prefixSpace.c_str(),
+            com_android_media_audio_stereo_spatialization() ? "true" : "false");
+
     ss.append(prefixSpace + "CommandLog:\n");
     ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), mMaxLocalLogLine);
 
@@ -1258,7 +1266,7 @@ std::string Spatializer::toString(unsigned level) const {
     }
 
     if (needUnlock) {
-        mLock.unlock();
+        mMutex.unlock();
     }
     return ss;
 }
