@@ -598,10 +598,6 @@ void C2SoftDav1dDec::finishWork(uint64_t index, const std::unique_ptr<C2Work>& w
     }
 }
 
-static void freeCallback(const uint8_t */*data*/, void */*cookie*/) {
-    return;
-}
-
 void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
                              const std::shared_ptr<C2BlockPool>& pool) {
     work->result = C2_OK;
@@ -654,17 +650,40 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
                       seq.max_height, (long)in_frameIndex);
             }
 
+            // insert OBU TD if it is not present.
+            // TODO: b/286852962
+            uint8_t obu_type = (bitstream[0] >> 3) & 0xf;
             Dav1dData data;
 
-            res = dav1d_data_wrap(&data, bitstream, inSize, freeCallback, nullptr);
-            if (res != 0) {
-                ALOGE("Decoder wrap error %s!", strerror(DAV1D_ERR(res)));
+            uint8_t* ptr = (obu_type == DAV1D_OBU_TD) ? dav1d_data_create(&data, inSize)
+                                                      : dav1d_data_create(&data, inSize + 2);
+            if (ptr == nullptr) {
+                ALOGE("dav1d_data_create failed!");
                 i_ret = -1;
+
             } else {
                 data.m.timestamp = in_frameIndex;
-                // ALOGV("inSize=%ld, in_frameIndex=%ld, timestamp=%ld",
-                //       inSize, frameIndex, data.m.timestamp);
 
+                int new_Size;
+                if (obu_type != DAV1D_OBU_TD) {
+                    new_Size = (int)(inSize + 2);
+
+                    // OBU TD
+                    ptr[0] = 0x12;
+                    ptr[1] = 0;
+
+                    memcpy(ptr + 2, bitstream, inSize);
+                } else {
+                    new_Size = (int)(inSize);
+                    // TODO: b/277797541 - investigate how to wrap this pointer in Dav1dData to
+                    // avoid memcopy operations.
+                    memcpy(ptr, bitstream, new_Size);
+                }
+
+                // ALOGV("memcpy(ptr,bitstream,inSize=%ld,new_Size=%d,in_frameIndex=%ld,timestamp=%ld,"
+                //       "ptr[0,1,2,3,4]=%x,%x,%x,%x,%x)",
+                //       inSize, new_Size, frameIndex, data.m.timestamp, ptr[0], ptr[1], ptr[2],
+                //       ptr[3], ptr[4]);
 
                 // Dump the bitstream data (inputBuffer) if dumping is enabled.
 #ifdef FILE_DUMP_ENABLE
@@ -672,6 +691,7 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
 #endif
 
                 bool b_draining = false;
+                int res;
 
                 do {
                     res = dav1d_send_data(mDav1dCtx, &data);
