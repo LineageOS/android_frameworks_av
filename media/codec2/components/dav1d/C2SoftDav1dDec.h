@@ -58,7 +58,6 @@ struct C2SoftDav1dDec : public SimpleC2Component {
     int mOutputBufferIndex = 0;
 
     Dav1dContext* mDav1dCtx = nullptr;
-    std::deque<Dav1dPicture> mDecodedPictures;
 
     // configurations used by component in process
     // (TODO: keep this in intf but make them internal only)
@@ -101,12 +100,13 @@ struct C2SoftDav1dDec : public SimpleC2Component {
     nsecs_t mTimeEnd = 0;    // Time at the end of decode()
 
     bool initDecoder();
-    void getHDRStaticParams(Dav1dPicture* picture, const std::unique_ptr<C2Work>& work);
-    void getHDR10PlusInfoData(Dav1dPicture* picture, const std::unique_ptr<C2Work>& work);
-    void getVuiParams(Dav1dPicture* picture);
+    void getHDRStaticParams(const Dav1dPicture* picture, const std::unique_ptr<C2Work>& work);
+    void getHDR10PlusInfoData(const Dav1dPicture* picture, const std::unique_ptr<C2Work>& work);
+    void getVuiParams(const Dav1dPicture* picture);
     void destroyDecoder();
     void finishWork(uint64_t index, const std::unique_ptr<C2Work>& work,
-                    const std::shared_ptr<C2GraphicBlock>& block);
+                    const std::shared_ptr<C2GraphicBlock>& block,
+                    const Dav1dPicture &img);
     // Sets |work->result| and mSignalledError. Returns false.
     void setError(const std::unique_ptr<C2Work>& work, c2_status_t error);
     bool allocTmpFrameBuffer(size_t size);

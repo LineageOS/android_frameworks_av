@@ -42,6 +42,8 @@ constexpr char COMPONENT_NAME[] = CODECNAME;
 
 constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
 
+constexpr uint32_t kOutputDelay = 4;
+
 class C2SoftDav1dDec::IntfImpl : public SimpleInterface<void>::BaseParams {
   public:
     explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helper)
@@ -239,6 +241,13 @@ class C2SoftDav1dDec::IntfImpl : public SimpleInterface<void>::BaseParams {
                              .withFields({C2F(mPixelFormat, value).oneOf(pixelFormats)})
                              .withSetter((Setter<decltype(*mPixelFormat)>::StrictValueWithNoDeps))
                              .build());
+
+        addParameter(
+                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
+                .withDefault(new C2PortActualDelayTuning::output(kOutputDelay))
+                .withFields({C2F(mActualOutputDelay, value).inRange(0, kOutputDelay)})
+                .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
+                .build());
     }
 
     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::output>& oldMe,
@@ -450,13 +459,6 @@ void C2SoftDav1dDec::flushDav1d() {
     if (mDav1dCtx) {
         Dav1dPicture p;
 
-        while (mDecodedPictures.size() > 0) {
-            p = mDecodedPictures.front();
-            mDecodedPictures.pop_front();
-
-            dav1d_picture_unref(&p);
-        }
-
         int res = 0;
         while (true) {
             memset(&p, 0, sizeof(p));
@@ -527,6 +529,8 @@ bool C2SoftDav1dDec::initDecoder() {
             android::base::GetIntProperty(NUM_THREADS_DAV1D_PROPERTY, NUM_THREADS_DAV1D_DEFAULT);
     if (numThreads > 0) lib_settings.n_threads = numThreads;
 
+    lib_settings.max_frame_delay = kOutputDelay;
+
     int res = 0;
     if ((res = dav1d_open(&mDav1dCtx, &lib_settings))) {
         ALOGE("dav1d_open failed. status: %d.", res);
@@ -540,15 +544,6 @@ bool C2SoftDav1dDec::initDecoder() {
 
 void C2SoftDav1dDec::destroyDecoder() {
     if (mDav1dCtx) {
-        Dav1dPicture p;
-        while (mDecodedPictures.size() > 0) {
-            memset(&p, 0, sizeof(p));
-            p = mDecodedPictures.front();
-            mDecodedPictures.pop_front();
-
-            dav1d_picture_unref(&p);
-        }
-
         dav1d_close(&mDav1dCtx);
         mDav1dCtx = nullptr;
         mOutputBufferIndex = 0;
@@ -572,19 +567,24 @@ void fillEmptyWork(const std::unique_ptr<C2Work>& work) {
 }
 
 void C2SoftDav1dDec::finishWork(uint64_t index, const std::unique_ptr<C2Work>& work,
-                                const std::shared_ptr<C2GraphicBlock>& block) {
+                                const std::shared_ptr<C2GraphicBlock>& block,
+                                const Dav1dPicture &img) {
     std::shared_ptr<C2Buffer> buffer = createGraphicBuffer(block, C2Rect(mWidth, mHeight));
     {
         IntfImpl::Lock lock = mIntf->lock();
         buffer->setInfo(mIntf->getColorAspects_l());
     }
-    auto fillWork = [buffer, index](const std::unique_ptr<C2Work>& work) {
+
+    auto fillWork = [buffer, index, img, this](const std::unique_ptr<C2Work>& work) {
         uint32_t flags = 0;
         if ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) &&
             (c2_cntr64_t(index) == work->input.ordinal.frameIndex)) {
             flags |= C2FrameData::FLAG_END_OF_STREAM;
             ALOGV("signalling end_of_stream.");
         }
+        getHDRStaticParams(&img, work);
+        getHDR10PlusInfoData(&img, work);
+
         work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
         work->worklets.front()->output.buffers.clear();
         work->worklets.front()->output.buffers.push_back(buffer);
@@ -705,39 +705,9 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
                         break;
                     }
 
-                    bool b_output_error = false;
+                    outputBuffer(pool, work);
 
-                    do {
-                        Dav1dPicture img;
-                        memset(&img, 0, sizeof(img));
-
-                        res = dav1d_get_picture(mDav1dCtx, &img);
-                        if (res == 0) {
-                            mDecodedPictures.push_back(img);
-
-                            if (!end_of_stream) break;
-                        } else if (res == DAV1D_ERR(EAGAIN)) {
-                            /* the decoder needs more data to be able to output something.
-                             * if there is more data pending, continue the loop below or
-                             * otherwise break */
-                            if (data.sz != 0) res = 0;
-                            break;
-                        } else {
-                            ALOGE("warning! Decoder error %d!", res);
-                            b_output_error = true;
-                            break;
-                        }
-                    } while (res == 0);
-
-                    if (b_output_error) break;
-
-                    /* on drain, we must ignore the 1st EAGAIN */
-                    if (!b_draining && (res == DAV1D_ERR(EAGAIN) || res == 0) &&
-                        (end_of_stream)) {
-                        b_draining = true;
-                        res = 0;
-                    }
-                } while (res == 0 && ((data.sz != 0) || b_draining));
+                } while (res == DAV1D_ERR(EAGAIN));
 
                 if (data.sz > 0) {
                     ALOGE("unexpected data.sz=%zu after dav1d_send_data", data.sz);
@@ -759,8 +729,6 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
         }
     }
 
-    (void)outputBuffer(pool, work);
-
     if (end_of_stream) {
         drainInternal(DRAIN_COMPONENT_WITH_EOS, pool, work);
         mSignalledOutputEos = true;
@@ -769,7 +737,7 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
     }
 }
 
-void C2SoftDav1dDec::getHDRStaticParams(Dav1dPicture* picture,
+void C2SoftDav1dDec::getHDRStaticParams(const Dav1dPicture* picture,
                                         const std::unique_ptr<C2Work>& work) {
     C2StreamHdrStaticMetadataInfo::output hdrStaticMetadataInfo{};
     bool infoPresent = false;
@@ -833,7 +801,7 @@ void C2SoftDav1dDec::getHDRStaticParams(Dav1dPicture* picture,
     }
 }
 
-void C2SoftDav1dDec::getHDR10PlusInfoData(Dav1dPicture* picture,
+void C2SoftDav1dDec::getHDR10PlusInfoData(const Dav1dPicture* picture,
                                           const std::unique_ptr<C2Work>& work) {
     if (picture != nullptr) {
         if (picture->itut_t35 != nullptr) {
@@ -873,7 +841,7 @@ void C2SoftDav1dDec::getHDR10PlusInfoData(Dav1dPicture* picture,
     }
 }
 
-void C2SoftDav1dDec::getVuiParams(Dav1dPicture* picture) {
+void C2SoftDav1dDec::getVuiParams(const Dav1dPicture* picture) {
     VuiColorAspects vuiColorAspects;
 
     if (picture) {
@@ -944,26 +912,11 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     memset(&img, 0, sizeof(img));
 
     int res = 0;
-    if (mDecodedPictures.size() > 0) {
-        img = mDecodedPictures.front();
-        mDecodedPictures.pop_front();
-        // ALOGD("Got a picture(out_frameIndex=%ld,timestamp=%ld) from the deque for
-        // outputBuffer.",img.m.timestamp,img.m.timestamp);
-    } else {
-        res = dav1d_get_picture(mDav1dCtx, &img);
-        if (res == 0) {
-            // ALOGD("Got a picture(out_frameIndex=%ld,timestamp=%ld) from dav1d for
-            // outputBuffer.",img.m.timestamp,img.m.timestamp);
-        } else {
-            ALOGE("failed to get a picture from dav1d for outputBuffer.");
-        }
-    }
-
+    res = dav1d_get_picture(mDav1dCtx, &img);
     if (res == DAV1D_ERR(EAGAIN)) {
-        ALOGD("Not enough data to output a picture.");
+        ALOGV("Not enough data to output a picture.");
         return false;
-    }
-    if (res != 0) {
+    } else if (res != 0) {
         ALOGE("The AV1 decoder failed to get a picture (res=%s).", strerror(DAV1D_ERR(res)));
         return false;
     }
@@ -989,8 +942,6 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     }
 
     getVuiParams(&img);
-    getHDRStaticParams(&img, work);
-    getHDR10PlusInfoData(&img, work);
 
     // out_frameIndex that the decoded picture returns from dav1d.
     int64_t out_frameIndex = img.m.timestamp;
@@ -1176,9 +1127,8 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
                              convFormat);
     }
 
+    finishWork(out_frameIndex, work, std::move(block), img);
     dav1d_picture_unref(&img);
-
-    finishWork(out_frameIndex, work, std::move(block));
     block = nullptr;
     return true;
 }
