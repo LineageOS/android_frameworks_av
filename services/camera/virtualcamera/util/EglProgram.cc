@@ -68,12 +68,13 @@ constexpr char kJuliaFractalFragmentShader[] = R"(
     })";
 
 constexpr char kExternalTextureVertexShader[] = R"(#version 300 es
+  uniform mat4 aTextureTransformMatrix; // Transform matrix given by surface texture.
   in vec4 aPosition;
   in vec2 aTextureCoord;
   out vec2 vTextureCoord;
   void main() {
     gl_Position = aPosition;
-    vTextureCoord = aTextureCoord;
+    vTextureCoord = (aTextureTransformMatrix * vec4(aTextureCoord, 0.0, 1.0)).xy;
   })";
 
 constexpr char kExternalYuvTextureFragmentShader[] = R"(#version 300 es
@@ -100,10 +101,12 @@ constexpr char kExternalRgbaTextureFragmentShader[] = R"(#version 300 es
     })";
 
 constexpr int kCoordsPerVertex = 3;
-constexpr std::array<float, 12> kSquareCoords{-1.f, 1.0f, 0.0f,  // top left
-                                              -1.f, -1.f, 0.0f,  // bottom left
-                                              1.0f, -1.f, 0.0f,  // bottom right
-                                              1.0f, 1.0f, 0.0f};  // top right
+
+constexpr std::array<float, 12> kSquareCoords{
+    -1.f, -1.0f, 0.0f,   // top left
+    -1.f, 1.f,   0.0f,   // bottom left
+    1.0f, 1.f,   0.0f,   // bottom right
+    1.0f, -1.0f, 0.0f};  // top right
 
 constexpr std::array<float, 8> kTextureCoords{0.0f, 1.0f,   // top left
                                               0.0f, 0.0f,   // bottom left
@@ -267,7 +270,8 @@ EglTextureProgram::EglTextureProgram(const TextureFormat textureFormat) {
   }
 }
 
-bool EglTextureProgram::draw(GLuint textureId) {
+bool EglTextureProgram::draw(GLuint textureId,
+                             const std::array<float, 16>& transformMatrix) {
   // Load compiled shader.
   glUseProgram(mProgram);
   if (checkEglError("glUseProgram")) {
@@ -285,6 +289,12 @@ bool EglTextureProgram::draw(GLuint textureId) {
   glEnableVertexAttribArray(textureCoordHandle);
   glVertexAttribPointer(textureCoordHandle, 2, GL_FLOAT, false,
                         kTextureCoords.size(), kTextureCoords.data());
+
+  // Pass transformation matrix for the texture coordinates.
+  int transformMatrixHandle =
+      glGetUniformLocation(mProgram, "aTextureTransformMatrix");
+  glUniformMatrix4fv(transformMatrixHandle, 1, /*transpose=*/GL_FALSE,
+                     transformMatrix.data());
 
   // Configure texture for the shader.
   int textureHandle = glGetUniformLocation(mProgram, "uTexture");

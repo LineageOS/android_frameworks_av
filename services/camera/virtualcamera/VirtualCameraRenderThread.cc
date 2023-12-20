@@ -542,8 +542,12 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoEglFramebuffer(
   } else {
     const bool renderSuccess =
         isYuvFormat(static_cast<PixelFormat>(textureBuffer->getPixelFormat()))
-            ? mEglTextureYuvProgram->draw(mEglSurfaceTexture->updateTexture())
-            : mEglTextureRgbProgram->draw(mEglSurfaceTexture->updateTexture());
+            ? mEglTextureYuvProgram->draw(
+                  mEglSurfaceTexture->getTextureId(),
+                  mEglSurfaceTexture->getTransformMatrix())
+            : mEglTextureRgbProgram->draw(
+                  mEglSurfaceTexture->getTextureId(),
+                  mEglSurfaceTexture->getTransformMatrix());
     if (!renderSuccess) {
       ALOGE("%s: Failed to render texture", __func__);
       return cameraStatus(Status::INTERNAL_ERROR);

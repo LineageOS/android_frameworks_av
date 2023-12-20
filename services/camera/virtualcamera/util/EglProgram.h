@@ -17,6 +17,8 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_EGLPROGRAM_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_EGLPROGRAM_H
 
+#include <array>
+
 #include "GLES/gl.h"
 
 namespace android {
@@ -59,7 +61,15 @@ class EglTextureProgram : public EglProgram {
 
   EglTextureProgram(TextureFormat textureFormat = TextureFormat::YUV);
 
-  bool draw(GLuint textureId);
+  // Draw texture over whole viewport, applying transformMatrix to texture
+  // coordinates.
+  //
+  // Transform matrix is 4x4 matrix represented in column-major order and is
+  // applied to texture coordinates in (s,t,0,1), s,t from <0,1> range prior to
+  // sampling:
+  //
+  // textureCoord = transformMatrix * vec4(s,t,0,1).xy
+  bool draw(GLuint textureId, const std::array<float, 16>& transformMatrix);
 };
 
 }  // namespace virtualcamera
