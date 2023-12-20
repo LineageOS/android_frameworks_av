@@ -56,7 +56,6 @@ public:
     // First it will look whether vendor specific file exists,
     // otherwise it will parse the system default file.
     explicit AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
-    ~AudioPolicyEffects() override;
 
     // NOTE: methods on AudioPolicyEffects should never be called with the AudioPolicyService
     // main mutex (mMutex) held as they will indirectly call back into AudioPolicyService when
@@ -166,19 +165,8 @@ private:
         std::vector<std::shared_ptr<const effect_param_t>> mParams;
     };
 
-    // class to store voctor of EffectDesc
-    class EffectDescVector {
-    public:
-        EffectDescVector() {}
-        /*virtual*/ ~EffectDescVector() {
-            for (size_t j = 0; j < mEffects.size(); j++) {
-                delete mEffects[j];
-            }
-        }
-        Vector <EffectDesc *> mEffects;
-    };
+    using EffectDescVector = std::vector<std::shared_ptr<EffectDesc>>;
 
-    // class to store voctor of AudioEffects
     class EffectVector {
     public:
         explicit EffectVector(audio_session_t session) : mSessionId(session) {}
@@ -189,7 +177,7 @@ private:
         const audio_session_t mSessionId;
         // AudioPolicyManager keeps mMutex, no need for lock on reference count here
         int mRefCount = 0;
-        Vector< sp<AudioEffect> >mEffects;
+        std::vector<sp<AudioEffect>> mEffects;
     };
 
     /**
@@ -226,10 +214,10 @@ private:
     status_t loadAudioEffectConfigLegacy_l(const char* path) REQUIRES(mMutex);
 
     // Legacy: Load all automatic effect configurations
-    status_t loadInputEffectConfigurations_l(
-            cnode* root, const Vector<EffectDesc*>& effects) REQUIRES(mMutex);
-    status_t loadStreamEffectConfigurations_l(
-            cnode* root, const Vector<EffectDesc*>& effects) REQUIRES(mMutex);
+    status_t loadInputEffectConfigurations_l(cnode* root,
+            const EffectDescVector& effects) REQUIRES(mMutex);
+    status_t loadStreamEffectConfigurations_l(cnode* root,
+            const EffectDescVector& effects) REQUIRES(mMutex);
 
     // Legacy: static methods below.
 
@@ -238,9 +226,10 @@ private:
     static audio_stream_type_t streamNameToEnum(const char* name);
 
     // Load all effects descriptors in configuration file
-    static status_t loadEffects(cnode* root, Vector<EffectDesc*>& effects);
-    static EffectDesc* loadEffect(cnode* root);
-    static EffectDescVector *loadEffectConfig(cnode *root, const Vector <EffectDesc *>& effects);
+    static EffectDescVector loadEffects(cnode* root);
+    static std::shared_ptr<AudioPolicyEffects::EffectDesc> loadEffect(cnode* root);
+    static std::shared_ptr<EffectDescVector> loadEffectConfig(cnode* root,
+            const EffectDescVector& effects);
 
     // Load all automatic effect parameters
     static void loadEffectParameters(
@@ -265,14 +254,17 @@ private:
     // those can call back into AudioPolicyService methods and try to acquire the mutex
     mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAudioPolicyEffects_Mutex};
     // Automatic input effects are configured per audio_source_t
-    KeyedVector<audio_source_t, EffectDescVector*> mInputSources GUARDED_BY(mMutex);
+    KeyedVector<audio_source_t, std::shared_ptr<EffectDescVector>> mInputSources
+            GUARDED_BY(mMutex);
     // Automatic input effects are unique for an audio_session_t.
-    KeyedVector<audio_session_t, EffectVector*> mInputSessions GUARDED_BY(mMutex);
+    KeyedVector<audio_session_t, std::shared_ptr<EffectVector>> mInputSessions GUARDED_BY(mMutex);
 
     // Automatic output effects are organized per audio_stream_type_t
-    KeyedVector<audio_stream_type_t, EffectDescVector*> mOutputStreams GUARDED_BY(mMutex);
+    KeyedVector<audio_stream_type_t, std::shared_ptr<EffectDescVector>> mOutputStreams
+            GUARDED_BY(mMutex);
     // Automatic output effects are unique for an audio_session_t.
-    KeyedVector<audio_session_t, EffectVector*> mOutputSessions GUARDED_BY(mMutex);
+    KeyedVector<audio_session_t, std::shared_ptr<EffectVector>> mOutputSessions
+            GUARDED_BY(mMutex);
 
     /**
      * @brief mDeviceEffects map of device effects indexed by the device address
