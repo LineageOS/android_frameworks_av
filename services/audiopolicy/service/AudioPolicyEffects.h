@@ -134,12 +134,13 @@ private:
                    const effect_uuid_t& uuid,
                    uint32_t priority,
                    audio_unique_id_t id) :
-                        mName(strdup(name)),
+                        mName(name),
                         mTypeUuid(typeUuid),
                         mOpPackageName(opPackageName),
                         mUuid(uuid),
                         mPriority(priority),
                         mId(id) { }
+        // Modern EffectDesc usage:
         EffectDesc(const char *name, const effect_uuid_t& uuid) :
                         EffectDesc(name,
                                    *EFFECT_UUID_NULL,
@@ -148,40 +149,21 @@ private:
                                    0,
                                    AUDIO_UNIQUE_ID_ALLOCATE) { }
         EffectDesc(const EffectDesc& orig) :
-                        mName(strdup(orig.mName)),
+                        mName(orig.mName),
                         mTypeUuid(orig.mTypeUuid),
                         mOpPackageName(orig.mOpPackageName),
                         mUuid(orig.mUuid),
                         mPriority(orig.mPriority),
-                        mId(orig.mId) {
-                            // deep copy mParams
-                            for (size_t k = 0; k < orig.mParams.size(); k++) {
-                                effect_param_t *origParam = orig.mParams[k];
-                                // psize and vsize are rounded up to an int boundary for allocation
-                                size_t origSize = sizeof(effect_param_t) +
-                                                  ((origParam->psize + 3) & ~3) +
-                                                  ((origParam->vsize + 3) & ~3);
-                                effect_param_t *dupParam = (effect_param_t *) malloc(origSize);
-                                memcpy(dupParam, origParam, origSize);
-                                // This works because the param buffer allocation is also done by
-                                // multiples of 4 bytes originally. In theory we should memcpy only
-                                // the actual param size, that is without rounding vsize.
-                                mParams.add(dupParam);
-                            }
-                        }
-        /*virtual*/ ~EffectDesc() {
-            free(mName);
-            for (size_t k = 0; k < mParams.size(); k++) {
-                free(mParams[k]);
-            }
-        }
-        char *mName;
-        effect_uuid_t mTypeUuid;
-        String16 mOpPackageName;
-        effect_uuid_t mUuid;
-        int32_t mPriority;
-        audio_unique_id_t mId;
-        Vector <effect_param_t *> mParams;
+                        mId(orig.mId),
+                        mParams(orig.mParams) { }
+
+        const std::string mName;
+        const effect_uuid_t mTypeUuid;
+        const String16 mOpPackageName;
+        const effect_uuid_t mUuid;
+        const int32_t mPriority;
+        const audio_unique_id_t mId;
+        std::vector<std::shared_ptr<const effect_param_t>> mParams;
     };
 
     // class to store voctor of EffectDesc
@@ -199,15 +181,14 @@ private:
     // class to store voctor of AudioEffects
     class EffectVector {
     public:
-        explicit EffectVector(audio_session_t session) : mSessionId(session), mRefCount(0) {}
-        /*virtual*/ ~EffectVector() {}
+        explicit EffectVector(audio_session_t session) : mSessionId(session) {}
 
         // Enable or disable all effects in effect vector
         void setProcessorEnabled(bool enabled);
 
         const audio_session_t mSessionId;
         // AudioPolicyManager keeps mMutex, no need for lock on reference count here
-        int mRefCount;
+        int mRefCount = 0;
         Vector< sp<AudioEffect> >mEffects;
     };
 
@@ -220,9 +201,8 @@ private:
                                audio_devices_t device, const std::string& address) :
             mEffectDescriptors(std::move(effectDescriptors)),
             mDeviceType(device), mDeviceAddress(address) {}
-        /*virtual*/ ~DeviceEffects() = default;
 
-        std::vector< sp<AudioEffect> > mEffects;
+        std::vector<sp<AudioEffect>> mEffects;
         audio_devices_t getDeviceType() const { return mDeviceType; }
         std::string getDeviceAddress() const { return mDeviceAddress; }
         const std::unique_ptr<EffectDescVector> mEffectDescriptors;
@@ -263,8 +243,12 @@ private:
     static EffectDescVector *loadEffectConfig(cnode *root, const Vector <EffectDesc *>& effects);
 
     // Load all automatic effect parameters
-    static void loadEffectParameters(cnode* root, Vector<effect_param_t*>& params);
-    static effect_param_t* loadEffectParameter(cnode* root);
+    static void loadEffectParameters(
+            cnode* root, std::vector<std::shared_ptr<const effect_param_t>>& params);
+
+    // loadEffectParameter returns a shared_ptr instead of a unique_ptr as there may
+    // be multiple references to the same effect parameter.
+    static std::shared_ptr<const effect_param_t> loadEffectParameter(cnode* root);
     static size_t readParamValue(cnode* node,
                           char **param,
                           size_t *curSize,

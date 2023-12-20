@@ -137,15 +137,16 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
             status_t status = fx->initCheck();
             if (status != NO_ERROR && status != ALREADY_EXISTS) {
                 ALOGW("addInputEffects(): failed to create Fx %s on source %d",
-                      effect->mName, (int32_t)aliasSource);
+                      effect->mName.c_str(), (int32_t)aliasSource);
                 // fx goes out of scope and strong ref on AudioEffect is released
                 continue;
             }
             for (size_t j = 0; j < effect->mParams.size(); j++) {
-                fx->setParameter(effect->mParams[j]);
+                // const_cast here due to API.
+                fx->setParameter(const_cast<effect_param_t*>(effect->mParams[j].get()));
             }
             ALOGV("addInputEffects(): added Fx %s on source: %d",
-                  effect->mName, (int32_t)aliasSource);
+                  effect->mName.c_str(), (int32_t)aliasSource);
             sessionDesc->mEffects.add(fx);
         }
         sessionDesc->setProcessorEnabled(true);
@@ -290,12 +291,12 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
             status_t status = fx->initCheck();
             if (status != NO_ERROR && status != ALREADY_EXISTS) {
                 ALOGE("addOutputSessionEffects(): failed to create Fx  %s on session %d",
-                      effect->mName, audioSession);
+                      effect->mName.c_str(), audioSession);
                 // fx goes out of scope and strong ref on AudioEffect is released
                 continue;
             }
             ALOGV("addOutputSessionEffects(): added Fx %s on session: %d for stream: %d",
-                  effect->mName, audioSession, (int32_t)stream);
+                  effect->mName.c_str(), audioSession, (int32_t)stream);
             procDesc->mEffects.add(fx);
         }
 
@@ -701,7 +702,7 @@ exit:
 }
 
 /* static */
-effect_param_t *AudioPolicyEffects::loadEffectParameter(cnode *root)
+std::shared_ptr<const effect_param_t> AudioPolicyEffects::loadEffectParameter(cnode* root)
 {
     cnode *param;
     cnode *value;
@@ -731,7 +732,7 @@ effect_param_t *AudioPolicyEffects::loadEffectParameter(cnode *root)
             *ptr = atoi(param->value);
             fx_param->psize = sizeof(int);
             fx_param->vsize = sizeof(int);
-            return fx_param;
+            return {fx_param, free};
         }
     }
     if (param == NULL || value == NULL) {
@@ -769,7 +770,7 @@ effect_param_t *AudioPolicyEffects::loadEffectParameter(cnode *root)
         value = value->next;
     }
 
-    return fx_param;
+    return {fx_param, free};
 
 error:
     free(fx_param);
@@ -777,14 +778,15 @@ error:
 }
 
 /* static */
-void AudioPolicyEffects::loadEffectParameters(cnode *root, Vector <effect_param_t *>& params)
+void AudioPolicyEffects::loadEffectParameters(
+        cnode* root, std::vector<std::shared_ptr<const effect_param_t>>& params)
 {
     cnode *node = root->first_child;
     while (node) {
         ALOGV("loadEffectParameters() loading param %s", node->name);
-        effect_param_t *param = loadEffectParameter(node);
-        if (param != NULL) {
-            params.add(param);
+        const auto param = loadEffectParameter(node);
+        if (param != nullptr) {
+            params.push_back(param);
         }
         node = node->next;
     }
@@ -805,7 +807,7 @@ AudioPolicyEffects::EffectDescVector *AudioPolicyEffects::loadEffectConfig(
         size_t i;
 
         for (i = 0; i < effects.size(); i++) {
-            if (strncmp(effects[i]->mName, node->name, EFFECT_STRING_LEN_MAX) == 0) {
+            if (effects[i]->mName == node->name) {
                 ALOGV("loadEffectConfig() found effect %s in list", node->name);
                 break;
             }
@@ -818,7 +820,7 @@ AudioPolicyEffects::EffectDescVector *AudioPolicyEffects::loadEffectConfig(
         EffectDesc *effect = new EffectDesc(*effects[i]);   // deep copy
         loadEffectParameters(node, effect->mParams);
         ALOGV("loadEffectConfig() adding effect %s uuid %08x",
-              effect->mName, effect->mUuid.timeLow);
+              effect->mName.c_str(), effect->mUuid.timeLow);
         desc->mEffects.add(effect);
         node = node->next;
     }
@@ -1013,14 +1015,14 @@ void AudioPolicyEffects::initDefaultDeviceEffects()
             status_t status = fx->initCheck();
             if (status != NO_ERROR && status != ALREADY_EXISTS) {
                 ALOGE("%s(): failed to create Fx %s on port type=%d address=%s", __func__,
-                      effectDesc->mName, deviceEffects->getDeviceType(),
+                      effectDesc->mName.c_str(), deviceEffects->getDeviceType(),
                       deviceEffects->getDeviceAddress().c_str());
                 // fx goes out of scope and strong ref on AudioEffect is released
                 continue;
             }
             fx->setEnabled(true);
             ALOGV("%s(): create Fx %s added on port type=%d address=%s", __func__,
-                  effectDesc->mName, deviceEffects->getDeviceType(),
+                  effectDesc->mName.c_str(), deviceEffects->getDeviceType(),
                   deviceEffects->getDeviceAddress().c_str());
             deviceEffects->mEffects.push_back(fx);
         }
