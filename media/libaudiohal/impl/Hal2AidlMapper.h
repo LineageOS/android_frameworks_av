@@ -126,6 +126,9 @@ class Hal2AidlMapper {
     status_t createOrUpdatePortConfig(
             const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
             ::aidl::android::media::audio::common::AudioPortConfig* result, bool *created);
+    status_t createOrUpdatePortConfigRetry(
+            const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
+            ::aidl::android::media::audio::common::AudioPortConfig* result, bool *created);
     void eraseConnectedPort(int32_t portId);
     status_t findOrCreatePatch(
         const std::set<int32_t>& sourcePortConfigIds,
