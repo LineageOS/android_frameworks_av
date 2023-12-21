@@ -42,6 +42,7 @@
 #include <Serializer.h>
 #include <android/media/audio/common/AudioPort.h>
 #include <com_android_media_audio.h>
+#include <com_android_media_audioserver.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <media/AudioParameter.h>
@@ -1509,11 +1510,30 @@ status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
     }
 
     if (!profile->canOpenNewIo()) {
+        if (!com::android::media::audioserver::direct_track_reprioritization()) {
+            return NAME_NOT_FOUND;
+        } else if ((profile->getFlags() & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) != 0) {
+            // MMAP gracefully handles lack of an exclusive track resource by mixing
+            // above the audio framework. For AAudio to know that the limit is reached,
+            // return an error.
+            return NAME_NOT_FOUND;
+        } else {
+            // Close outputs on this profile, if available, to free resources for this request
+            for (int i = 0; i < mOutputs.size() && !profile->canOpenNewIo(); i++) {
+                const auto desc = mOutputs.valueAt(i);
+                if (desc->mProfile == profile) {
+                    closeOutput(desc->mIoHandle);
+                }
+            }
+        }
+    }
+
+    // Unable to close streams to find free resources for this request
+    if (!profile->canOpenNewIo()) {
         return NAME_NOT_FOUND;
     }
 
-    sp<SwAudioOutputDescriptor> outputDesc =
-            new SwAudioOutputDescriptor(profile, mpClientInterface);
+    auto outputDesc = sp<SwAudioOutputDescriptor>::make(profile, mpClientInterface);
 
     // An MSD patch may be using the only output stream that can service this request. Release
     // all MSD patches to prioritize this request over any active output on MSD.
