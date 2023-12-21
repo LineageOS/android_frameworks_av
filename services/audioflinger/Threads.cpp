@@ -185,7 +185,7 @@ static const nsecs_t kDirectMinSleepTimeUs = 10000;
 // Minimum amount of time between checking to see if the timestamp is advancing
 // for underrun detection. If we check too frequently, we may not detect a
 // timestamp update and will falsely detect underrun.
-static const nsecs_t kMinimumTimeBetweenTimestampChecksNs = 150 /* ms */ * 1000;
+static constexpr nsecs_t kMinimumTimeBetweenTimestampChecksNs = 150 /* ms */ * 1'000'000;
 
 // The universal constant for ubiquitous 20ms value. The value of 20ms seems to provide a good
 // balance between power consumption and latency, and allows threads to be scheduled reliably
