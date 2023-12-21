@@ -2011,9 +2011,19 @@ AAUDIO_API aaudio_session_id_t AAudioStream_getSessionId(AAudioStream* _Nonnull 
         __INTRODUCED_IN(28);
 
 /**
- * Passes back the time at which a particular frame was presented.
+ * Returns the time at which a particular frame was played on a speaker or headset,
+ * or was recorded on a microphone.
+ *
  * This can be used to synchronize audio with video or MIDI.
  * It can also be used to align a recorded stream with a playback stream.
+ *
+ * The framePosition is an index into the stream of audio data.
+ * The first frame played or recorded is at framePosition 0.
+ *
+ * These framePositions are the same units that you get from AAudioStream_getFramesRead()
+ * or AAudioStream_getFramesWritten().
+ * A "frame" is a set of audio sample values that are played simultaneously.
+ * For example, a stereo stream has two samples in a frame, left and right.
  *
  * Timestamps are only valid when the stream is in {@link #AAUDIO_STREAM_STATE_STARTED}.
  * {@link #AAUDIO_ERROR_INVALID_STATE} will be returned if the stream is not started.
@@ -2030,8 +2040,8 @@ AAUDIO_API aaudio_session_id_t AAudioStream_getSessionId(AAudioStream* _Nonnull 
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @param clockid CLOCK_MONOTONIC or CLOCK_BOOTTIME
- * @param framePosition pointer to a variable to receive the position
- * @param timeNanoseconds pointer to a variable to receive the time
+ * @param[out] framePosition pointer to a variable to receive the position
+ * @param[out] timeNanoseconds pointer to a variable to receive the time
  * @return {@link #AAUDIO_OK} or a negative error
  */
 AAUDIO_API aaudio_result_t AAudioStream_getTimestamp(AAudioStream* _Nonnull stream,

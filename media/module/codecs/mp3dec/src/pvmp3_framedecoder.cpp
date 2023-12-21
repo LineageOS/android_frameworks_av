@@ -310,26 +310,31 @@ static uint32_t U32_AT(const uint8_t *ptr) {
 }
 
 // Check if the input is valid by checking if it contains a sync word
-static bool isInputValid(uint8 *buf, uint32 inSize)
+static ERROR_CODE validate_input(uint8 *buf, uint32 inSize)
 {
-    // Buffer needs to contain at least 4 bytes which is the size of
-    // the header
-    if (inSize < 4) return false;
+    /*
+     * Verify that at least the header is complete
+     * Note that SYNC_WORD_LNGTH is in unit of bits, but inSize is in unit of bytes.
+     */
+    if (inSize < ((SYNC_WORD_LNGTH + 21) >> 3))
+    {
+        return NO_ENOUGH_MAIN_DATA_ERROR;
+    }
 
     size_t totalInSize = 0;
     size_t frameSize = 0;
     while (totalInSize <= (inSize - 4)) {
         if (!parseHeader(U32_AT(buf + totalInSize), &frameSize)) {
-            return false;
+            return SYNCH_LOST_ERROR;
         }
         // Buffer needs to be large enough to include complete frame
         if ((frameSize > inSize) || (totalInSize > (inSize - frameSize))) {
-            return false;
+            return SYNCH_LOST_ERROR;
         }
         totalInSize += frameSize;
     }
 
-    return true;
+    return NO_DECODING_ERROR;
 }
 
 ERROR_CODE pvmp3_framedecoder(tPVMP3DecoderExternal *pExt,
@@ -348,10 +353,11 @@ ERROR_CODE pvmp3_framedecoder(tPVMP3DecoderExternal *pExt,
     mp3Header info_data;
     mp3Header *info = &info_data;
 
-    if (!isInputValid(pExt->pInputBuffer, pExt->inputBufferCurrentLength))
+    errorCode = validate_input(pExt->pInputBuffer, pExt->inputBufferCurrentLength);
+    if (errorCode != NO_DECODING_ERROR)
     {
         pExt->outputFrameSize = 0;
-        return SYNCH_LOST_ERROR;
+        return errorCode;
     }
 
     pVars->inputStream.pBuffer  = pExt->pInputBuffer;
