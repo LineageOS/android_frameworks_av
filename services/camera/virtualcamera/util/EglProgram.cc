@@ -268,6 +268,32 @@ EglTextureProgram::EglTextureProgram(const TextureFormat textureFormat) {
   } else {
     ALOGE("External texture EGL shader program initialization failed.");
   }
+
+  // Lookup and cache handles to uniforms & attributes.
+  mPositionHandle = glGetAttribLocation(mProgram, "aPosition");
+  mTextureCoordHandle = glGetAttribLocation(mProgram, "aTextureCoord");
+  mTransformMatrixHandle =
+      glGetUniformLocation(mProgram, "aTextureTransformMatrix");
+  mTextureHandle = glGetUniformLocation(mProgram, "uTexture");
+
+  // Pass vertex array to the shader.
+  glEnableVertexAttribArray(mPositionHandle);
+  glVertexAttribPointer(mPositionHandle, kCoordsPerVertex, GL_FLOAT, false,
+                        kSquareCoords.size(), kSquareCoords.data());
+
+  // Pass texture coordinates corresponding to vertex array to the shader.
+  glEnableVertexAttribArray(mTextureCoordHandle);
+  glVertexAttribPointer(mTextureCoordHandle, 2, GL_FLOAT, false,
+                        kTextureCoords.size(), kTextureCoords.data());
+}
+
+EglTextureProgram::~EglTextureProgram() {
+  if (mPositionHandle != -1) {
+    glDisableVertexAttribArray(mPositionHandle);
+  }
+  if (mTextureCoordHandle != -1) {
+    glDisableVertexAttribArray(mTextureCoordHandle);
+  }
 }
 
 bool EglTextureProgram::draw(GLuint textureId,
@@ -278,29 +304,14 @@ bool EglTextureProgram::draw(GLuint textureId,
     return false;
   }
 
-  // Pass vertex array to the shader.
-  int positionHandle = glGetAttribLocation(mProgram, "aPosition");
-  glEnableVertexAttribArray(positionHandle);
-  glVertexAttribPointer(positionHandle, kCoordsPerVertex, GL_FLOAT, false,
-                        kSquareCoords.size(), kSquareCoords.data());
-
-  // Pass texture coordinates corresponding to vertex array to the shader.
-  int textureCoordHandle = glGetAttribLocation(mProgram, "aTextureCoord");
-  glEnableVertexAttribArray(textureCoordHandle);
-  glVertexAttribPointer(textureCoordHandle, 2, GL_FLOAT, false,
-                        kTextureCoords.size(), kTextureCoords.data());
-
   // Pass transformation matrix for the texture coordinates.
-  int transformMatrixHandle =
-      glGetUniformLocation(mProgram, "aTextureTransformMatrix");
-  glUniformMatrix4fv(transformMatrixHandle, 1, /*transpose=*/GL_FALSE,
+  glUniformMatrix4fv(mTextureCoordHandle, 1, /*transpose=*/GL_FALSE,
                      transformMatrix.data());
 
   // Configure texture for the shader.
-  int textureHandle = glGetUniformLocation(mProgram, "uTexture");
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureId);
-  glUniform1i(textureHandle, 0);
+  glUniform1i(mTextureHandle, 0);
 
   // Draw triangle strip forming a square filling the viewport.
   glDrawElements(GL_TRIANGLES, kDrawOrder.size(), GL_UNSIGNED_BYTE,

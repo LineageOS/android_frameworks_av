@@ -60,6 +60,7 @@ class EglTextureProgram : public EglProgram {
   enum class TextureFormat { RGBA, YUV };
 
   EglTextureProgram(TextureFormat textureFormat = TextureFormat::YUV);
+  virtual ~EglTextureProgram();
 
   // Draw texture over whole viewport, applying transformMatrix to texture
   // coordinates.
@@ -70,6 +71,12 @@ class EglTextureProgram : public EglProgram {
   //
   // textureCoord = transformMatrix * vec4(s,t,0,1).xy
   bool draw(GLuint textureId, const std::array<float, 16>& transformMatrix);
+
+ private:
+  int mPositionHandle = -1;
+  int mTextureCoordHandle = -1;
+  int mTransformMatrixHandle = -1;
+  int mTextureHandle = -1;
 };
 
 }  // namespace virtualcamera
