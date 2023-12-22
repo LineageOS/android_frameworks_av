@@ -666,6 +666,14 @@ bool Hal2AidlMapper::isPortBeingHeld(int32_t portId) {
     return false;
 }
 
+status_t Hal2AidlMapper::prepareToDisconnectExternalDevice(const AudioPort& devicePort) {
+    auto portsIt = findPort(devicePort.ext.get<AudioPortExt::device>().device);
+    if (portsIt == mPorts.end()) {
+        return BAD_VALUE;
+    }
+    return statusTFromBinderStatus(mModule->prepareToDisconnectExternalDevice(portsIt->second.id));
+}
+
 status_t Hal2AidlMapper::prepareToOpenStream(
         int32_t ioHandle, const AudioDevice& device, const AudioIoFlags& flags,
         AudioSource source, Cleanups* cleanups, AudioConfig* config,
