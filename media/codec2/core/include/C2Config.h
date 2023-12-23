@@ -160,6 +160,10 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexSecureMode,
     kParamIndexEncryptedBuffer, // info-buffer, used with SM_READ_PROTECTED_WITH_ENCRYPTED
 
+    /* multiple access unit support */
+    kParamIndexLargeFrame,
+    kParamIndexAccessUnitInfos, // struct
+
     // deprecated
     kParamIndexDelayRequest = kParamIndexDelay | C2Param::CoreIndex::IS_REQUEST_FLAG,
 
@@ -1113,6 +1117,36 @@ constexpr char C2_PARAMKEY_OUT_OF_MEMORY[] = "algo.oom";
 typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexMaxBufferSize> C2StreamMaxBufferSizeInfo;
 constexpr char C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE[] = "input.buffers.max-size";
 constexpr char C2_PARAMKEY_OUTPUT_MAX_BUFFER_SIZE[] = "output.buffers.max-size";
+
+/**
+ * Large frame struct
+ *
+ * This structure describes the size limits for large frames (frames with multiple
+ * access units.)
+ */
+struct C2LargeFrameStruct {
+    uint32_t maxSize;         ///< maximum size of the buffer in bytes
+    uint32_t thresholdSize;   ///< size threshold for the buffer in bytes. The buffer is considered
+                              ///< full as soon as its size reaches or surpasses this limit.
+    C2LargeFrameStruct()
+        : maxSize(0),
+          thresholdSize(0) {}
+
+    C2LargeFrameStruct(uint32_t maxSize_, uint32_t thresholdSize_)
+        : maxSize(maxSize_), thresholdSize(thresholdSize_) {}
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(LargeFrame)
+    C2FIELD(maxSize, "max-size")
+    C2FIELD(thresholdSize, "threshold-size")
+};
+
+/**
+ * This tuning controls the size limits for large output frames for the component.
+ * The default value for this tuning is platform specific.
+ */
+typedef C2StreamParam<C2Tuning, C2LargeFrameStruct, kParamIndexLargeFrame>
+        C2LargeFrame;
+constexpr char C2_PARAMKEY_OUTPUT_LARGE_FRAME[] = "output.large-frame";
 
 /* ---------------------------------------- misc. state ---------------------------------------- */
 
@@ -2145,6 +2179,49 @@ constexpr char C2_PARAMKEY_DRC_OUTPUT_LOUDNESS[] = "output.drc.output-loudness";
 typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexAudioFrameSize>
         C2StreamAudioFrameSizeInfo;
 constexpr char C2_PARAMKEY_AUDIO_FRAME_SIZE[] = "raw.audio-frame-size";
+
+/**
+ * Information for an access unit in a large frame (containing multiple access units)
+ */
+struct C2AccessUnitInfosStruct {
+
+    inline C2AccessUnitInfosStruct() {
+        memset(this, 0, sizeof(*this));
+    }
+
+    inline C2AccessUnitInfosStruct(
+            uint32_t flags_,
+            uint32_t size_,
+            int64_t timestamp_)
+        : flags(flags_),
+          size(size_),
+          timestamp(timestamp_) { }
+
+    uint32_t flags; ///<flags for the access-unit
+    uint32_t size; ///<size of access-unit
+    int64_t timestamp; ///<timestamp in us for the access-unit
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(AccessUnitInfos)
+    C2FIELD(flags, "flags")
+    C2FIELD(size, "size")
+    C2FIELD(timestamp, "timestamp")
+};
+
+/**
+ * Multiple access unit support (e.g large audio frames)
+ *
+ * If supported by a component, multiple access units may be contained
+ * in a single work item. For now this is only defined for linear buffers.
+ * The metadata indicates the access-unit boundaries in a single buffer.
+ * The boundary of each access-units are marked by its size, immediately
+ * followed by the next access-unit.
+ */
+typedef C2StreamParam<C2Info, C2SimpleArrayStruct<C2AccessUnitInfosStruct>,
+                kParamIndexAccessUnitInfos>
+        C2AccessUnitInfos;
+
+constexpr char C2_PARAMKEY_INPUT_ACCESS_UNIT_INFOS[] = "input.access-unit-infos";
+constexpr char C2_PARAMKEY_OUTPUT_ACCESS_UNIT_INFOS[] = "output.access-unit-infos";
 
 /* --------------------------------------- AAC components --------------------------------------- */
 

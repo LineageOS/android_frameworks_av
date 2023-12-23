@@ -57,6 +57,17 @@ class EglSurfaceTexture {
   // Returns EGL texture id of the texture.
   GLuint updateTexture();
 
+  // Returns EGL texture id of the underlying texture.
+  GLuint getTextureId() const;
+
+  // Returns 4x4 transformation matrix in column-major order,
+  // which should be applied to EGL texture coordinates
+  // before sampling from the texture backed by android native buffer,
+  // so the corresponding region of the underlying buffer is sampled.
+  //
+  // See SurfaceTexture.getTransformMatrix for more details.
+  std::array<float, 16> getTransformMatrix();
+
  private:
   sp<IGraphicBufferProducer> mBufferProducer;
   sp<IGraphicBufferConsumer> mBufferConsumer;
