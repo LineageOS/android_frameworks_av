@@ -22,6 +22,30 @@
       },
       "revId": "3183f380b0d2541dd340e7dd6b6c2bcdaf192ff0",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e0d30a95_0a9dac94",
+        "filename": "media/libstagefright/wifi-display/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2023-12-24T11:09:46Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "09a2b44e_7211eb59",
+      "range": {
+        "startLine": 21,
+        "startChar": 29,
+        "endLine": 21,
+        "endChar": 43
+      },
+      "revId": "3183f380b0d2541dd340e7dd6b6c2bcdaf192ff0",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
