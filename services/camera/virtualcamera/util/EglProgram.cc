@@ -305,7 +305,7 @@ bool EglTextureProgram::draw(GLuint textureId,
   }
 
   // Pass transformation matrix for the texture coordinates.
-  glUniformMatrix4fv(mTextureCoordHandle, 1, /*transpose=*/GL_FALSE,
+  glUniformMatrix4fv(mTransformMatrixHandle, 1, /*transpose=*/GL_FALSE,
                      transformMatrix.data());
 
   // Configure texture for the shader.
