@@ -145,8 +145,30 @@ status_t Hal2AidlMapper::createOrUpdatePatch(
             std::vector<int32_t>* ids, std::set<int32_t>* portIds) -> status_t {
         for (const auto& s : configs) {
             AudioPortConfig portConfig;
-            RETURN_STATUS_IF_ERROR(setPortConfig(
-                            s, destinationPortIds, &portConfig, cleanups));
+            if (status_t status = setPortConfig(
+                            s, destinationPortIds, &portConfig, cleanups); status != OK) {
+                if (s.ext.getTag() == AudioPortExt::mix) {
+                    // See b/315528763. Despite that the framework knows the actual format of
+                    // the mix port, it still uses the original format. Luckily, there is
+                    // the I/O handle which can be used to find the mix port.
+                    ALOGI("fillPortConfigs: retrying to find a mix port config with default "
+                            "configuration");
+                    if (auto it = findPortConfig(std::nullopt, s.flags,
+                                    s.ext.get<AudioPortExt::mix>().handle);
+                            it != mPortConfigs.end()) {
+                        portConfig = it->second;
+                    } else {
+                        const std::string flags = s.flags.has_value() ?
+                                s.flags->toString() : "<unspecified>";
+                        ALOGE("fillPortConfigs: existing port config for flags %s, handle %d "
+                                "not found in module %s", flags.c_str(),
+                                s.ext.get<AudioPortExt::mix>().handle, mInstance.c_str());
+                        return BAD_VALUE;
+                    }
+                } else {
+                    return status;
+                }
+            }
             LOG_ALWAYS_FATAL_IF(portConfig.id == 0,
                     "fillPortConfigs: initial config: %s, port config: %s",
                     s.toString().c_str(), portConfig.toString().c_str());
@@ -683,7 +705,6 @@ status_t Hal2AidlMapper::prepareToOpenStream(
             flags.toString().c_str(), toString(source).c_str(),
             config->toString().c_str(), mixPortConfig->toString().c_str());
     resetUnusedPatchesAndPortConfigs();
-    const bool isInput = flags.getTag() == AudioIoFlags::Tag::input;
     const AudioConfig initialConfig = *config;
     // Find / create AudioPortConfigs for the device port and the mix port,
     // then find / create a patch between them, and open a stream on the mix port.
@@ -695,8 +716,38 @@ status_t Hal2AidlMapper::prepareToOpenStream(
     if (created) {
         cleanups->add(&Hal2AidlMapper::resetPortConfig, devicePortConfig.id);
     }
+    status_t status = prepareToOpenStreamHelper(ioHandle, devicePortConfig.portId,
+            devicePortConfig.id, flags, source, initialConfig, cleanups, config,
+            mixPortConfig, patch);
+    if (status != OK) {
+        // If using the client-provided config did not work out for establishing a mix port config
+        // or patching, try with the device port config. Note that in general device port config and
+        // mix port config are not required to be the same, however they must match if the HAL
+        // module can't perform audio stream conversions.
+        AudioConfig deviceConfig = initialConfig;
+        if (setConfigFromPortConfig(&deviceConfig, devicePortConfig)->base != initialConfig.base) {
+            ALOGD("%s: retrying with device port config: %s", __func__,
+                    devicePortConfig.toString().c_str());
+            status = prepareToOpenStreamHelper(ioHandle, devicePortConfig.portId,
+                    devicePortConfig.id, flags, source, initialConfig, cleanups,
+                    &deviceConfig, mixPortConfig, patch);
+            if (status == OK) {
+                *config = deviceConfig;
+            }
+        }
+    }
+    return status;
+}
+
+status_t Hal2AidlMapper::prepareToOpenStreamHelper(
+        int32_t ioHandle, int32_t devicePortId, int32_t devicePortConfigId,
+        const AudioIoFlags& flags, AudioSource source, const AudioConfig& initialConfig,
+        Cleanups* cleanups, AudioConfig* config, AudioPortConfig* mixPortConfig,
+        AudioPatch* patch) {
+    const bool isInput = flags.getTag() == AudioIoFlags::Tag::input;
+    bool created = false;
     RETURN_STATUS_IF_ERROR(findOrCreateMixPortConfig(*config, flags, ioHandle, source,
-                    std::set<int32_t>{devicePortConfig.portId}, mixPortConfig, &created));
+                    std::set<int32_t>{devicePortId}, mixPortConfig, &created));
     if (created) {
         cleanups->add(&Hal2AidlMapper::resetPortConfig, mixPortConfig->id);
     }
@@ -723,7 +774,7 @@ status_t Hal2AidlMapper::prepareToOpenStream(
         ALOGD("%s: retrying to find/create a mix port config using config %s", __func__,
                 config->toString().c_str());
         RETURN_STATUS_IF_ERROR(findOrCreateMixPortConfig(*config, flags, ioHandle, source,
-                        std::set<int32_t>{devicePortConfig.portId}, mixPortConfig, &created));
+                        std::set<int32_t>{devicePortId}, mixPortConfig, &created));
         if (created) {
             cleanups->add(&Hal2AidlMapper::resetPortConfig, mixPortConfig->id);
         }
@@ -736,10 +787,10 @@ status_t Hal2AidlMapper::prepareToOpenStream(
     }
     if (isInput) {
         RETURN_STATUS_IF_ERROR(findOrCreatePatch(
-                        {devicePortConfig.id}, {mixPortConfig->id}, patch, &created));
+                        {devicePortConfigId}, {mixPortConfig->id}, patch, &created));
     } else {
         RETURN_STATUS_IF_ERROR(findOrCreatePatch(
-                        {mixPortConfig->id}, {devicePortConfig.id}, patch, &created));
+                        {mixPortConfig->id}, {devicePortConfigId}, patch, &created));
     }
     if (created) {
         cleanups->add(&Hal2AidlMapper::resetPatch, patch->id);
