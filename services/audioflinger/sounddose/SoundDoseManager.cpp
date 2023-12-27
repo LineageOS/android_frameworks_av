@@ -53,7 +53,7 @@ sp<audio_utils::MelProcessor> SoundDoseManager::getOrCreateProcessorForDevice(
         size_t channelCount, audio_format_t format) {
     const std::lock_guard _l(mLock);
 
-    if (mHalSoundDose.size() > 0 && mEnabledCsd) {
+    if (!mUseFrameworkMel && mHalSoundDose.size() > 0 && mEnabledCsd) {
         ALOGD("%s: using HAL MEL computation, no MelProcessor needed.", __func__);
         return nullptr;
     }
@@ -143,7 +143,7 @@ void SoundDoseManager::setOutputRs2UpperBound(float rs2Value) {
     ALOGV("%s", __func__);
     const std::lock_guard _l(mLock);
 
-    if (mHalSoundDose.size() > 0) {
+    if (!mUseFrameworkMel && mHalSoundDose.size() > 0) {
         bool success = true;
         for (auto& halSoundDose : mHalSoundDose) {
             // using the HAL sound dose interface
@@ -549,9 +549,6 @@ bool SoundDoseManager::shouldComputeCsdForDeviceWithAddress(const audio_devices_
 }
 
 void SoundDoseManager::setUseFrameworkMel(bool useFrameworkMel) {
-    // invalidate any HAL sound dose interface used
-    resetHalSoundDoseInterfaces();
-
     const std::lock_guard _l(mLock);
     mUseFrameworkMel = useFrameworkMel;
 }
@@ -582,7 +579,7 @@ bool SoundDoseManager::isSoundDoseHalSupported() const {
 
 bool SoundDoseManager::useHalSoundDose() const {
     const std::lock_guard _l(mLock);
-    return mHalSoundDose.size() > 0;
+    return !mUseFrameworkMel && mHalSoundDose.size() > 0;
 }
 
 void SoundDoseManager::resetSoundDose() {
