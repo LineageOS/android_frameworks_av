@@ -127,7 +127,7 @@ private:
     // as defined in audio_effects.conf
     class EffectDesc {
     public:
-        EffectDesc(const char *name,
+        EffectDesc(std::string_view name,
                    const effect_uuid_t& typeUuid,
                    const String16& opPackageName,
                    const effect_uuid_t& uuid,
@@ -140,7 +140,7 @@ private:
                         mPriority(priority),
                         mId(id) { }
         // Modern EffectDesc usage:
-        EffectDesc(const char *name, const effect_uuid_t& uuid) :
+        EffectDesc(std::string_view name, const effect_uuid_t& uuid) :
                         EffectDesc(name,
                                    *EFFECT_UUID_NULL,
                                    String16(""),
@@ -186,7 +186,7 @@ private:
     class DeviceEffects {
     public:
         DeviceEffects(std::unique_ptr<EffectDescVector> effectDescriptors,
-                               audio_devices_t device, const std::string& address) :
+                               audio_devices_t device, std::string_view address) :
             mEffectDescriptors(std::move(effectDescriptors)),
             mDeviceType(device), mDeviceAddress(address) {}
 
