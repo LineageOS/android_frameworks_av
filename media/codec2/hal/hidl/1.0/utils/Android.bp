@@ -52,7 +52,6 @@ cc_library {
     ],
 }
 
-
 // DO NOT DEPEND ON THIS DIRECTLY
 // use libcodec2-hidl-defaults instead
 cc_library {
