@@ -35,6 +35,7 @@ namespace virtualcamera {
 namespace {
 
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
 using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
@@ -147,7 +148,8 @@ INSTANTIATE_TEST_SUITE_P(
                         .pixelFormat = Format::YUV_420_888,
                         .maxFps = kMaxFps}},
                     .virtualCameraCallback = nullptr,
-                    .sensorOrientation = SensorOrientation::ORIENTATION_0},
+                    .sensorOrientation = SensorOrientation::ORIENTATION_0,
+                    .lensFacing = LensFacing::FRONT},
             .expectedAvailableStreamConfigs =
                 {AvailableStreamConfiguration{
                      .width = kVgaWidth,
@@ -183,7 +185,8 @@ INSTANTIATE_TEST_SUITE_P(
                              .pixelFormat = Format::YUV_420_888,
                              .maxFps = kMaxFps}},
                     .virtualCameraCallback = nullptr,
-                    .sensorOrientation = SensorOrientation::ORIENTATION_0},
+                    .sensorOrientation = SensorOrientation::ORIENTATION_0,
+                    .lensFacing = LensFacing::BACK},
             .expectedAvailableStreamConfigs = {
                 AvailableStreamConfiguration{
                     .width = kVgaWidth,

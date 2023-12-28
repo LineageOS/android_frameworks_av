@@ -45,6 +45,7 @@ namespace virtualcamera {
 
 using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::companion::virtualcamera::IVirtualCameraCallback;
+using ::aidl::android::companion::virtualcamera::LensFacing;
 using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
@@ -132,7 +133,7 @@ std::map<Resolution, int> getResolutionToMaxFpsMap(
 // TODO(b/301023410) - Populate camera characteristics according to camera configuration.
 std::optional<CameraMetadata> initCameraCharacteristics(
     const std::vector<SupportedStreamConfiguration>& supportedInputConfig,
-    const SensorOrientation sensorOrientation) {
+    const SensorOrientation sensorOrientation, const LensFacing lensFacing) {
   if (!std::all_of(supportedInputConfig.begin(), supportedInputConfig.end(),
                    [](const SupportedStreamConfiguration& config) {
                      return isFormatSupportedForInput(
@@ -148,7 +149,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setSupportedHardwareLevel(
               ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL)
           .setFlashAvailable(false)
-          .setLensFacing(ANDROID_LENS_FACING_EXTERNAL)
+          .setLensFacing(
+              static_cast<camera_metadata_enum_android_lens_facing>(lensFacing))
           .setSensorOrientation(static_cast<int32_t>(sensorOrientation))
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
@@ -222,7 +224,8 @@ VirtualCameraDevice::VirtualCameraDevice(
       mVirtualCameraClientCallback(configuration.virtualCameraCallback),
       mSupportedInputConfigurations(configuration.supportedStreamConfigs) {
   std::optional<CameraMetadata> metadata = initCameraCharacteristics(
-      mSupportedInputConfigurations, configuration.sensorOrientation);
+      mSupportedInputConfigurations, configuration.sensorOrientation,
+      configuration.lensFacing);
   if (metadata.has_value()) {
     mCameraCharacteristics = *metadata;
   } else {

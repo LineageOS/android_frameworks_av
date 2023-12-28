@@ -45,6 +45,7 @@ constexpr int kCameraId = 42;
 
 using ::aidl::android::companion::virtualcamera::BnVirtualCameraCallback;
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
 using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
@@ -115,7 +116,8 @@ class VirtualCameraSessionTest : public ::testing::Test {
                            .pixelFormat = Format::YUV_420_888,
                            .maxFps = kMaxFps}},
                        .virtualCameraCallback = nullptr,
-                       .sensorOrientation = SensorOrientation::ORIENTATION_0});
+                       .sensorOrientation = SensorOrientation::ORIENTATION_0,
+                       .lensFacing = LensFacing::FRONT});
     mVirtualCameraSession = ndk::SharedRefBase::make<VirtualCameraSession>(
         mVirtualCameraDevice, mMockCameraDeviceCallback,
         mMockVirtualCameraClientCallback);

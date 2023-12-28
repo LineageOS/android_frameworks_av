@@ -33,6 +33,7 @@ namespace virtualcamera {
 namespace {
 
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
 using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
@@ -89,7 +90,8 @@ class VirtualCameraProviderTest : public ::testing::Test {
           .pixelFormat = Format::YUV_420_888,
           .maxFps = kMaxFps}},
       .virtualCameraCallback = nullptr,
-      .sensorOrientation = SensorOrientation::ORIENTATION_0};
+      .sensorOrientation = SensorOrientation::ORIENTATION_0,
+      .lensFacing = LensFacing::FRONT};
 };
 
 TEST_F(VirtualCameraProviderTest, SetNullCameraCallbackFails) {

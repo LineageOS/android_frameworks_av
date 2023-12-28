@@ -41,6 +41,7 @@ namespace companion {
 namespace virtualcamera {
 
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
 using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
@@ -83,6 +84,13 @@ ndk::ScopedAStatus validateConfiguration(
       configuration.sensorOrientation != SensorOrientation::ORIENTATION_90 &&
       configuration.sensorOrientation != SensorOrientation::ORIENTATION_180 &&
       configuration.sensorOrientation != SensorOrientation::ORIENTATION_270) {
+    return ndk::ScopedAStatus::fromServiceSpecificError(
+        Status::EX_ILLEGAL_ARGUMENT);
+  }
+
+  if (configuration.lensFacing != LensFacing::FRONT &&
+      configuration.lensFacing != LensFacing::BACK &&
+      configuration.lensFacing != LensFacing::EXTERNAL) {
     return ndk::ScopedAStatus::fromServiceSpecificError(
         Status::EX_ILLEGAL_ARGUMENT);
   }
@@ -254,6 +262,7 @@ void VirtualCameraService::enableTestCameraCmd(const int out, const int err) {
                                                   .height = kVgaHeight,
                                                   Format::YUV_420_888,
                                                   .maxFps = kMaxFps});
+  configuration.lensFacing = LensFacing::EXTERNAL;
   registerCamera(mTestCameraToken, configuration, &ret);
   if (ret) {
     dprintf(out, "Successfully registered test camera %s",

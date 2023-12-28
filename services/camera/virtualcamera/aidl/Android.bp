@@ -8,6 +8,7 @@ aidl_interface {
     unstable: true,
     srcs: [
         "android/companion/virtualcamera/Format.aidl",
+        "android/companion/virtualcamera/LensFacing.aidl",
         "android/companion/virtualcamera/IVirtualCameraCallback.aidl",
         "android/companion/virtualcamera/IVirtualCameraService.aidl",
         "android/companion/virtualcamera/VirtualCameraConfiguration.aidl",
