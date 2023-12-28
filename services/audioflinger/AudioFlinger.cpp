@@ -286,9 +286,6 @@ AudioFlinger::AudioFlinger()
     BatteryNotifier::getInstance().noteResetAudio();
 
     mMediaLogNotifier->run("MediaLogNotifier");
-    std::vector<pid_t> halPids;
-    mDevicesFactoryHal->getHalPids(&halPids);
-    mediautils::TimeCheck::setAudioHalPids(halPids);
 
     // Notify that we have started (also called when audioserver service restarts)
     mediametrics::LogItem(mMetricsId)
