@@ -166,6 +166,14 @@ class Hal2AidlMapper {
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle);
     bool isPortBeingHeld(int32_t portId);
+    status_t prepareToOpenStreamHelper(
+        int32_t ioHandle, int32_t devicePortId, int32_t devicePortConfigId,
+        const ::aidl::android::media::audio::common::AudioIoFlags& flags,
+        ::aidl::android::media::audio::common::AudioSource source,
+        const ::aidl::android::media::audio::common::AudioConfig& initialConfig,
+        Cleanups* cleanups, ::aidl::android::media::audio::common::AudioConfig* config,
+        ::aidl::android::media::audio::common::AudioPortConfig* mixPortConfig,
+        ::aidl::android::hardware::audio::core::AudioPatch* patch);
     bool portConfigBelongsToPort(int32_t portConfigId, int32_t portId) {
         auto it = mPortConfigs.find(portConfigId);
         return it != mPortConfigs.end() && it->second.portId == portId;
