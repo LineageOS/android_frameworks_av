@@ -35,8 +35,6 @@ class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
     // necessary to release references to the returned object.
     status_t openDevice(const char *name, sp<DeviceHalInterface> *device) override;
 
-    status_t getHalPids(std::vector<pid_t> *pids) override;
-
     status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback) override;
 
     android::detail::AudioHalVersionInfo getHalVersion() const override;

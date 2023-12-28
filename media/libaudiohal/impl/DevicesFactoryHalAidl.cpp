@@ -114,15 +114,6 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
     return OK;
 }
 
-status_t DevicesFactoryHalAidl::getHalPids(std::vector<pid_t> *pids) {
-    if (pids == nullptr) {
-        return BAD_VALUE;
-    }
-    // Retrieval of HAL pids requires "list services" permission which is not granted
-    // to the audio server. This job is performed by AudioService (in Java) instead.
-    return PERMISSION_DENIED;
-}
-
 status_t DevicesFactoryHalAidl::setCallbackOnce(sp<DevicesFactoryHalCallback> callback) {
     // Dynamic registration of module instances is not supported. The functionality
     // in the audio server which is related to this callback can be removed together
