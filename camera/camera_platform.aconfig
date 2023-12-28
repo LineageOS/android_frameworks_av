@@ -76,3 +76,10 @@ flag {
      description: "Enable creating MultiResolutionImageReader with usage flag configuration"
      bug: "301588215"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "use_ro_board_api_level_for_vndk_version"
+     description: "Enable using ro.board.api_level instead of ro.vndk.version to get VNDK version"
+     bug: "312315580"
+}
