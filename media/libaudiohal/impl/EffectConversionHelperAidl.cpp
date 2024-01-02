@@ -180,18 +180,6 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
 
     State state;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
-    // in case of buffer/ioHandle re-configure for an opened effect, close it and re-open
-    if (state != State::INIT && mCommon != common) {
-        ALOGI("%s at state %s, common parameter change from %s to %s, closing effect", __func__,
-              android::internal::ToString(state).c_str(), mCommon.toString().c_str(),
-              common.toString().c_str());
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->close()));
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
-        mStatusQ.reset();
-        mInputQ.reset();
-        mOutputQ.reset();
-    }
-
     if (state == State::INIT) {
         ALOGI("%s at state %s, opening effect with input %s output %s", __func__,
               android::internal::ToString(state).c_str(), common.input.toString().c_str(),
