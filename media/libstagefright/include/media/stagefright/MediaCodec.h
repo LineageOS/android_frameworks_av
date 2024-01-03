@@ -213,8 +213,7 @@ struct MediaCodec : public AHandler {
     status_t queueBuffer(
             size_t index,
             const std::shared_ptr<C2Buffer> &buffer,
-            int64_t presentationTimeUs,
-            uint32_t flags,
+            const sp<BufferInfosWrapper> &bufferInfos,
             const sp<AMessage> &tunings,
             AString *errorDetailMsg = NULL);
 
@@ -228,8 +227,7 @@ struct MediaCodec : public AHandler {
             const uint8_t iv[16],
             CryptoPlugin::Mode mode,
             const CryptoPlugin::Pattern &pattern,
-            int64_t presentationTimeUs,
-            uint32_t flags,
+            const sp<BufferInfosWrapper> &bufferInfos,
             const sp<AMessage> &tunings,
             AString *errorDetailMsg = NULL);
 
