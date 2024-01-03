@@ -663,7 +663,7 @@ private:
             virtual void notifyDeviceStateChange(int64_t /*newState*/) {}
             virtual status_t createDefaultRequest(
                     camera3::camera_request_template_t /*templateId*/,
-                    camera_metadata_t** /*metadata*/) {
+                    CameraMetadata* /*metadata*/) {
                 return INVALID_OPERATION;
             }
 

@@ -27,6 +27,7 @@
 #include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
 #include "device3/Camera3OutputStream.h"
+#include "device3/ZoomRatioMapper.h"
 #include "system/graphics-base-v1.1.h"
 #include <camera/StringUtils.h>
 #include <ui/PublicFormat.h>
@@ -686,7 +687,8 @@ convertToHALStreamCombination(
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
         bool overrideForPerfClass, metadata_vendor_id_t vendorTagId,
-        bool checkSessionParams, bool *earlyExit) {
+        bool checkSessionParams, const std::vector<int32_t>& additionalKeys,
+        bool *earlyExit) {
     using SensorPixelMode = aidl::android::hardware::camera::metadata::SensorPixelMode;
     auto operatingMode = sessionConfiguration.getOperatingMode();
     binder::Status res = checkOperatingMode(operatingMode, deviceInfo,
@@ -912,7 +914,7 @@ convertToHALStreamCombination(
         CameraMetadata filteredParams;
 
         filterParameters(sessionConfiguration.getSessionParameters(), deviceInfo,
-                vendorTagId, filteredParams);
+                additionalKeys, vendorTagId, filteredParams);
 
         camera_metadata_t* metadata = const_cast<camera_metadata_t*>(filteredParams.getAndLock());
         uint8_t *metadataP = reinterpret_cast<uint8_t*>(metadata);
@@ -1176,7 +1178,8 @@ status_t mapRequestTemplateToAidl(camera_request_template_t templateId,
 }
 
 void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
-        metadata_vendor_id_t vendorTagId, CameraMetadata& dst) {
+        const std::vector<int32_t>& additionalTags, metadata_vendor_id_t vendorTagId,
+        CameraMetadata& dst) {
     const CameraMetadata params(src);
     camera_metadata_ro_entry_t availableSessionKeys = deviceInfo.find(
             ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
@@ -1185,14 +1188,40 @@ void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInf
             filteredParams.getAndLock());
     set_camera_metadata_vendor_id(meta, vendorTagId);
     filteredParams.unlock(meta);
-    for (size_t i = 0; i < availableSessionKeys.count; i++) {
-        camera_metadata_ro_entry entry = params.find(
-                availableSessionKeys.data.i32[i]);
+
+    std::unordered_set<int32_t> filteredTags(availableSessionKeys.data.i32,
+            availableSessionKeys.data.i32 + availableSessionKeys.count);
+    filteredTags.insert(additionalTags.begin(), additionalTags.end());
+    for (int32_t tag : filteredTags) {
+        camera_metadata_ro_entry entry = params.find(tag);
         if (entry.count > 0) {
             filteredParams.update(entry);
         }
     }
     dst = std::move(filteredParams);
+}
+
+status_t overrideDefaultRequestKeys(CameraMetadata *request) {
+    // Override the template request with ZoomRatioMapper
+    status_t res = ZoomRatioMapper::initZoomRatioInTemplate(request);
+    if (res != OK) {
+        ALOGE("Failed to update zoom ratio: %s (%d)", strerror(-res), res);
+        return res;
+    }
+
+    // Fill in JPEG_QUALITY if not available
+    if (!request->exists(ANDROID_JPEG_QUALITY)) {
+        static const uint8_t kDefaultJpegQuality = 95;
+        request->update(ANDROID_JPEG_QUALITY, &kDefaultJpegQuality, 1);
+    }
+
+    // Fill in AUTOFRAMING if not available
+    if (!request->exists(ANDROID_CONTROL_AUTOFRAMING)) {
+        static const uint8_t kDefaultAutoframingMode = ANDROID_CONTROL_AUTOFRAMING_OFF;
+        request->update(ANDROID_CONTROL_AUTOFRAMING, &kDefaultAutoframingMode, 1);
+    }
+
+    return OK;
 }
 
 } // namespace SessionConfigurationUtils

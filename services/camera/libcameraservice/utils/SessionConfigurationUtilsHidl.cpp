@@ -113,7 +113,7 @@ convertToHALStreamCombination(
     auto ret = convertToHALStreamCombination(sessionConfiguration, logicalCameraId, deviceInfo,
             false /*isCompositeJpegRDisabled*/, getMetadata, physicalCameraIds,
             aidlStreamConfiguration, overrideForPerfClass, vendorTagId,
-            /*checkSessionParams*/false, earlyExit);
+            /*checkSessionParams*/false, /*additionalKeys*/{}, earlyExit);
     if (!ret.isOk()) {
         return ret;
     }

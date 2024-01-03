@@ -156,7 +156,8 @@ convertToHALStreamCombination(
     const std::vector<std::string> &physicalCameraIds,
     aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
     bool overrideForPerfClass, metadata_vendor_id_t vendorTagId,
-    bool checkSessionParams, bool *earlyExit);
+    bool checkSessionParams, const std::vector<int32_t>& additionalKeys,
+    bool *earlyExit);
 
 StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
 
@@ -177,7 +178,10 @@ status_t mapRequestTemplateToAidl(camera_request_template_t templateId,
         aidl::android::hardware::camera::device::RequestTemplate* tempId /*out*/);
 
 void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
-        metadata_vendor_id_t vendorTagId, CameraMetadata& dst);
+        const std::vector<int32_t>& additionalKeys, metadata_vendor_id_t vendorTagId,
+        CameraMetadata& dst);
+
+status_t overrideDefaultRequestKeys(CameraMetadata *request);
 
 template <typename T> bool contains(std::set<T> container, T value) {
     return container.find(value) != container.end();
