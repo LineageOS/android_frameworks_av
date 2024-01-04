@@ -283,7 +283,7 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWa
     float attenuation = soundDoseManager->getAttenuationForDeviceId(id);
     ALOGV("%s: attenuating received momentary exposure with %f dB", __func__, attenuation);
     // TODO: remove attenuation when enforcing HAL MELs to always be attenuated
-    soundDoseManager->onMomentaryExposure(in_currentDbA + attenuation, id);
+    soundDoseManager->onMomentaryExposure(in_currentDbA - attenuation, id);
 
     return ndk::ScopedAStatus::ok();
 }
@@ -656,9 +656,9 @@ void SoundDoseManager::onNewMelValues(const std::vector<float>& mels, size_t off
             size_t start = offset;
             size_t stop = offset;
             for (; stop < mels.size() && stop < offset + length; ++stop) {
-                if (mels[stop] + attenuation < kDefaultRs2LowerBound) {
+                if (mels[stop] - attenuation < kDefaultRs2LowerBound) {
                     if (start < stop) {
-                        std::vector<float> attMel(stop-start, attenuation);
+                        std::vector<float> attMel(stop-start, -attenuation);
                         // attMel[i] = mels[i] + attenuation, i in [start, stop)
                         std::transform(mels.begin() + start, mels.begin() + stop, attMel.begin(),
                                        attMel.begin(), std::plus<float>());
@@ -674,7 +674,7 @@ void SoundDoseManager::onNewMelValues(const std::vector<float>& mels, size_t off
                 }
             }
             if (start < stop) {
-                std::vector<float> attMel(stop-start, attenuation);
+                std::vector<float> attMel(stop-start, -attenuation);
                 // attMel[i] = mels[i] + attenuation, i in [start, stop)
                 std::transform(mels.begin() + start, mels.begin() + stop, attMel.begin(),
                                attMel.begin(), std::plus<float>());
