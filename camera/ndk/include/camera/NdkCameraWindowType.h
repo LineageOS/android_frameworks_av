@@ -41,14 +41,11 @@
  * camera2 NDK. This enables us to share the api definition headers and avoid
  * code duplication (since the VNDK variant doesn't use ANativeWindow unlike the
  * NDK variant).
+ * @deprecated No longer needed. Both NDK and VNDK use ANativeWindow now.
+ *             Use ANativeWindow directly.
  */
-#ifdef __ANDROID_VNDK__
-#include <cutils/native_handle.h>
-typedef const native_handle_t ACameraWindowType;
-#else
 #include <android/native_window.h>
 typedef ANativeWindow ACameraWindowType;
-#endif
 
 /** @} */
 

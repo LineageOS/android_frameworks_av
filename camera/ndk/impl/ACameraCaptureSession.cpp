@@ -146,7 +146,7 @@ camera_status_t ACameraCaptureSession::updateOutputConfiguration(ACaptureSession
     return ret;
 }
 
-camera_status_t ACameraCaptureSession::prepare(ACameraWindowType* window) {
+camera_status_t ACameraCaptureSession::prepare(ANativeWindow* window) {
 #ifdef __ANDROID_VNDK__
     std::shared_ptr<acam::CameraDevice> dev = getDevicePtr();
 #else

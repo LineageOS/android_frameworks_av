@@ -341,7 +341,7 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
     return ACAMERA_OK;
 }
 
-camera_status_t CameraDevice::prepareLocked(ACameraWindowType *window) {
+camera_status_t CameraDevice::prepareLocked(ANativeWindow *window) {
     camera_status_t ret = checkCameraClosedOrErrorLocked();
     if (ret != ACAMERA_OK) {
         return ret;
@@ -1097,7 +1097,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                     if (onWindowPrepared == nullptr) {
                         return;
                     }
-                    ACameraWindowType* anw;
+                    ANativeWindow* anw;
                     found = msg->findPointer(kAnwKey, (void**) &anw);
                     if (!found) {
                         ALOGE("%s: Cannot find ANativeWindow: %d!", __FUNCTION__, __LINE__);
@@ -1823,7 +1823,7 @@ CameraDevice::ServiceCallback::onPrepared(int streamId) {
         return ret;
     }
     // We've found the window corresponding to the surface id.
-    ACameraWindowType *window = it->second.first;
+    ANativeWindow *window = it->second.first;
     sp<AMessage> msg = new AMessage(kWhatPreparedCb, dev->mHandler);
     msg->setPointer(kContextKey, session->mPreparedCb.context);
     msg->setPointer(kAnwKey, window);
