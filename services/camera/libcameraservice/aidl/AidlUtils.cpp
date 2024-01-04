@@ -310,8 +310,8 @@ bool areBindersEqual(const ndk::SpAIBinder& b1, const ndk::SpAIBinder& b2) {
 
 status_t filterVndkKeys(int vndkVersion, CameraMetadata &metadata, bool isStatic) {
     if (vndkVersion == __ANDROID_API_FUTURE__) {
-        // VNDK version in ro.vndk.version is a version code-name that
-        // corresponds to the current version.
+        // VNDK version derived from ro.board.api_level is a version code-name that
+        // corresponds to the current SDK version.
         return OK;
     }
     const auto &apiLevelToKeys =
