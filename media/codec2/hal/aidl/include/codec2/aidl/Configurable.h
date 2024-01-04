@@ -111,7 +111,7 @@ struct CachedConfigurable : public BnConfigurable {
     virtual ::ndk::ScopedAStatus query(
             const std::vector<int32_t>& indices,
             bool mayBlock,
-            Params* params) override;
+            QueryResult* result) override;
 
     virtual ::ndk::ScopedAStatus config(
             const ::aidl::android::hardware::media::c2::Params& params,
@@ -126,7 +126,7 @@ struct CachedConfigurable : public BnConfigurable {
     virtual ::ndk::ScopedAStatus querySupportedValues(
             const std::vector<FieldSupportedValuesQuery>& fields,
             bool mayBlock,
-            std::vector<FieldSupportedValuesQueryResult>* result) override;
+            QuerySupportedValuesResult* result) override;
 
 protected:
     // Common Codec2.0 interface wrapper
