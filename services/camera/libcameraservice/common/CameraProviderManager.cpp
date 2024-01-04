@@ -147,7 +147,7 @@ CameraProviderManager::AidlServiceInteractionProxyImpl::getAidlService(
     if (flags::lazy_aidl_wait_for_service()) {
         binder = AServiceManager_waitForService(serviceName.c_str());
     } else {
-        binder = AServiceManager_getService(serviceName.c_str());
+        binder = AServiceManager_checkService(serviceName.c_str());
     }
 
     if (binder == nullptr) {
