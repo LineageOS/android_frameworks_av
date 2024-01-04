@@ -61,7 +61,7 @@ ScopedAStatus CachedConfigurable::getName(std::string* name) {
 ScopedAStatus CachedConfigurable::query(
         const std::vector<int32_t>& indices,
         bool mayBlock,
-        Params* params) {
+        QueryResult *queryResult) {
     typedef C2Param::Index Index;
     std::vector<Index> c2heapParamIndices(
             (Index*)indices.data(),
@@ -72,13 +72,11 @@ ScopedAStatus CachedConfigurable::query(
             mayBlock ? C2_MAY_BLOCK : C2_DONT_BLOCK,
             &c2heapParams);
 
-    if (!CreateParamsBlob(params, c2heapParams)) {
+    if (!CreateParamsBlob(&(queryResult->params), c2heapParams)) {
         LOG(WARNING) << "query -- invalid output params.";
     }
-    if (c2res == C2_OK) {
-        return ScopedAStatus::ok();
-    }
-    return ScopedAStatus::fromServiceSpecificError(c2res);
+    queryResult->status.status = c2res;
+    return ScopedAStatus::ok();
 }
 
 ScopedAStatus CachedConfigurable::config(
@@ -115,10 +113,8 @@ ScopedAStatus CachedConfigurable::config(
     if (!CreateParamsBlob(&result->params, c2params)) {
         LOG(DEBUG) << "config -- invalid output params.";
     }
-    if (c2res == C2_OK) {
-        return ScopedAStatus::ok();
-    }
-    return ScopedAStatus::fromServiceSpecificError(c2res);
+    result->status.status = c2res;
+    return ScopedAStatus::ok();
 }
 
 ScopedAStatus CachedConfigurable::querySupportedParams(
@@ -153,7 +149,7 @@ ScopedAStatus CachedConfigurable::querySupportedParams(
 ScopedAStatus CachedConfigurable::querySupportedValues(
         const std::vector<FieldSupportedValuesQuery>& fields,
         bool mayBlock,
-        std::vector<FieldSupportedValuesQueryResult>* result) {
+        QuerySupportedValuesResult *queryValues) {
     std::vector<C2FieldSupportedValuesQuery> c2fields;
     {
         // C2FieldSupportedValuesQuery objects are restricted in that some
@@ -173,22 +169,20 @@ ScopedAStatus CachedConfigurable::querySupportedValues(
     c2_status_t c2res = mIntf->querySupportedValues(
             c2fields,
             mayBlock ? C2_MAY_BLOCK : C2_DONT_BLOCK);
-    result->resize(fields.size());
+    queryValues->values.resize(fields.size());
     size_t dstIx = 0;
     for (const C2FieldSupportedValuesQuery &res : c2fields) {
-        if (ToAidl(&(*result)[dstIx], res)) {
+        if (ToAidl(&(queryValues->values[dstIx]), res)) {
             ++dstIx;
         } else {
-            result->resize(dstIx);
+            queryValues->values.resize(dstIx);
             c2res = C2_CORRUPTED;
             LOG(WARNING) << "querySupportedValues -- invalid output params.";
             break;
         }
     }
-    if (c2res == C2_OK) {
-        return ScopedAStatus::ok();
-    }
-    return ScopedAStatus::fromServiceSpecificError(c2res);
+    queryValues->status.status = c2res;
+    return ScopedAStatus::ok();
 }
 
 }  // namespace utils
