@@ -648,6 +648,24 @@ void C2SoftDav1dDec::process(const std::unique_ptr<C2Work>& work,
             if (res == 0) {
                 ALOGV("dav1d found a sequenceHeader (%dx%d) for in_frameIndex=%ld.", seq.max_width,
                       seq.max_height, (long)in_frameIndex);
+                if (seq.max_width != mWidth || seq.max_height != mHeight) {
+                    drainInternal(DRAIN_COMPONENT_NO_EOS, pool, work);
+                    mWidth = seq.max_width;
+                    mHeight = seq.max_height;
+
+                    C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
+                    std::vector<std::unique_ptr<C2SettingResult>> failures;
+                    c2_status_t err = mIntf->config({&size}, C2_MAY_BLOCK, &failures);
+                    if (err == C2_OK) {
+                        work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(size));
+                    } else {
+                        ALOGE("Config update size failed");
+                        mSignalledError = true;
+                        work->result = C2_CORRUPTED;
+                        work->workletsProcessed = 1u;
+                        return;
+                    }
+                }
             }
 
             // insert OBU TD if it is not present.
@@ -919,26 +937,6 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     } else if (res != 0) {
         ALOGE("The AV1 decoder failed to get a picture (res=%s).", strerror(DAV1D_ERR(res)));
         return false;
-    }
-
-    const int width = img.p.w;
-    const int height = img.p.h;
-    if (width != mWidth || height != mHeight) {
-        mWidth = width;
-        mHeight = height;
-
-        C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
-        std::vector<std::unique_ptr<C2SettingResult>> failures;
-        c2_status_t err = mIntf->config({&size}, C2_MAY_BLOCK, &failures);
-        if (err == C2_OK) {
-            work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(size));
-        } else {
-            ALOGE("Config update size failed");
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
-            work->workletsProcessed = 1u;
-            return false;
-        }
     }
 
     getVuiParams(&img);
