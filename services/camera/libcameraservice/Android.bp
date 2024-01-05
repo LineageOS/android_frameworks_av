@@ -195,6 +195,7 @@ cc_library {
         "utils/SessionStatsBuilder.cpp",
         "utils/TagMonitor.cpp",
         "utils/LatencyHistogram.cpp",
+        "utils/Utils.cpp",
     ],
 
     header_libs: [

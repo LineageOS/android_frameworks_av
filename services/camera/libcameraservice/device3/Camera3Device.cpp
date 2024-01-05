@@ -69,6 +69,7 @@
 #include "utils/SchedulingPolicyUtils.h"
 #include "utils/SessionConfigurationUtils.h"
 #include "utils/TraceHFR.h"
+#include "utils/Utils.h"
 
 #include <algorithm>
 #include <optional>
@@ -3061,7 +3062,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mOverrideToPortrait(overrideToPortrait),
         mSupportSettingsOverride(supportSettingsOverride) {
     mStatusId = statusTracker->addComponent("RequestThread");
-    mVndkVersion = property_get_int32("ro.vndk.version", __ANDROID_API_FUTURE__);
+    mVndkVersion = getVNDKVersionFromProp(__ANDROID_API_FUTURE__);
 }
 
 Camera3Device::RequestThread::~RequestThread() {}

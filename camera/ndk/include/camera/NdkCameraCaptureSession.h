@@ -124,7 +124,7 @@ typedef struct ACameraCaptureSession_stateCallbacks {
  */
 typedef void (*ACameraCaptureSession_prepareCallback)(
         void *context,
-        ACameraWindowType *window,
+        ANativeWindow *window,
         ACameraCaptureSession *session);
 
 /// Enum for describing error reason in {@link ACameraCaptureFailure}
@@ -276,7 +276,7 @@ typedef void (*ACameraCaptureSession_captureCallback_sequenceAbort)(
  */
 typedef void (*ACameraCaptureSession_captureCallback_bufferLost)(
         void* context, ACameraCaptureSession* session,
-        ACaptureRequest* request, ACameraWindowType* window, int64_t frameNumber);
+        ACaptureRequest* request, ANativeWindow* window, int64_t frameNumber);
 
 /**
  * ACaptureCaptureSession_captureCallbacks structure used in
@@ -1088,7 +1088,7 @@ camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
  * and no pre-allocation is done.</p>
  *
  * @param session the {@link ACameraCaptureSession} that needs to prepare output buffers.
- * @param window the {@link ACameraWindowType} for which the output buffers need to be prepared.
+ * @param window the {@link ANativeWindow} for which the output buffers need to be prepared.
  *
  * @return <ul><li>
  *             {@link ACAMERA_OK} if the method succeeds</li>
@@ -1102,7 +1102,7 @@ camera_status_t ACameraCaptureSession_setWindowPreparedCallback(
  */
 camera_status_t ACameraCaptureSession_prepareWindow(
     ACameraCaptureSession* session,
-    ACameraWindowType *window) __INTRODUCED_IN(34);
+    ANativeWindow *window) __INTRODUCED_IN(34);
 __END_DECLS
 
 #endif /* _NDK_CAMERA_CAPTURE_SESSION_H */
