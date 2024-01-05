@@ -198,7 +198,9 @@ void CharacterEncodingDetector::detectAndConvert() {
             ALOGV("@@@ checking %s", name);
             const char *s = mValues.getEntry(i);
             int32_t inputLength = strlen(s);
-            const char *enc;
+            // Use encoding determined from the combination of artist/album/title etc.
+            // as default if there is no better match found.
+            const char *enc = combinedenc;
 
             if (!allprintable && (!strcmp(name, "artist") ||
                     !strcmp(name, "albumartist") ||
@@ -216,13 +218,12 @@ void CharacterEncodingDetector::detectAndConvert() {
                     const UCharsetMatch** ucma = ucsdet_detectAll(csd, &matches, &status);
                     const UCharsetMatch* bestSingleMatch = getPreferred(s, inputLength,
                             ucma, matches, &goodmatchSingle, &highestSingle);
-                    if (goodmatchSingle || highestSingle > highest)
-                        enc = ucsdet_getName(bestSingleMatch, &status);
-                    else
-                        enc = combinedenc;
-                } else {
-                    // use encoding determined from the combination of artist/album/title etc.
-                    enc = combinedenc;
+                    // getPreferred could return a null. Check for null before calling
+                    // ucsdet_getName.
+                    if (bestSingleMatch != NULL) {
+                        if (goodmatchSingle || highestSingle > highest)
+                            enc = ucsdet_getName(bestSingleMatch, &status);
+                    }
                 }
             } else {
                 if (isPrintableAscii(s, inputLength)) {
