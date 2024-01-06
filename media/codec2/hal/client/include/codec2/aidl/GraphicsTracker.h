@@ -27,6 +27,7 @@
 #include <mutex>
 #include <set>
 #include <thread>
+#include <optional>
 
 #include <C2Buffer.h>
 
@@ -234,12 +235,14 @@ private:
     std::map<uint64_t, std::shared_ptr<BufferItem>> mDequeued;
     std::set<uint64_t> mDeallocating;
 
+    // These member variables are read and modified accessed as follows.
+    // 1. mConfigLock being held
+    //    Set mInConfig true with mLock in the beginning
+    //    Clear mInConfig with mLock in the end
+    // 2. mLock is held and mInConfig is false.
     int mMaxDequeue;
-    int mMaxDequeueRequested;
     int mMaxDequeueCommitted;
-
-    uint32_t mMaxDequeueRequestedSeqId;
-    uint32_t mMaxDequeueCommittedSeqId;
+    std::optional<int> mMaxDequeueRequested;
 
     int mDequeueable;
 
@@ -271,13 +274,6 @@ private:
     ::android::base::unique_fd mWritePipeFd;  // The writing end file descriptor
 
     std::atomic<bool> mStopped;
-    std::thread mEventQueueThread; // Thread to handle interrupted
-                                   // writes to the writing end.
-    std::mutex mEventLock;
-    std::condition_variable mEventCv;
-
-    bool mStopEventThread;
-    int mIncDequeueable; // pending # of write to increase dequeueable eventfd
 
 private:
     explicit GraphicsTracker(int maxDequeueCount);
@@ -289,6 +285,9 @@ private:
     bool adjustDequeueConfLocked(bool *updateDequeueConf);
 
     void updateDequeueConf();
+    void clearCacheIfNecessaryLocked(
+            const std::shared_ptr<BufferCache> &cache,
+            int maxDequeueCommitted);
 
     c2_status_t requestAllocate(std::shared_ptr<BufferCache> *cache);
     c2_status_t requestDeallocate(uint64_t bid, const sp<Fence> &fence,
@@ -305,7 +304,9 @@ private:
                         bool cached, int slotId, const sp<Fence> &fence,
                         std::shared_ptr<BufferItem> *buffer,
                         bool *updateDequeue);
-    void commitDeallocate(std::shared_ptr<BufferCache> &cache, int slotId, uint64_t bid);
+    void commitDeallocate(std::shared_ptr<BufferCache> &cache,
+                          int slotId, uint64_t bid,
+                          bool *updateDequeue);
     void commitRender(const std::shared_ptr<BufferCache> &cache,
                       const std::shared_ptr<BufferItem> &buffer,
                       const std::shared_ptr<BufferItem> &oldBuffer,
@@ -318,8 +319,8 @@ private:
             bool *cached, int *rSlotId, sp<Fence> *rFence,
             std::shared_ptr<BufferItem> *buffer);
 
-    void writeIncDequeueable(int inc);
-    void processEvent();
+    void writeIncDequeueableLocked(int inc);
+    void drainDequeueableLocked(int dec);
 };
 
 } // namespace aidl::android::hardware::media::c2::implementation
