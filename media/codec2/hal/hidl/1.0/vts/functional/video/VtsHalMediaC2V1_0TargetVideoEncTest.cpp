@@ -19,6 +19,7 @@
 
 #include <android-base/logging.h>
 #include <android/binder_process.h>
+#include <codec2/common/HalSelection.h>
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
@@ -71,7 +72,9 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
         std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
         CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &mGraphicAllocator),
                  C2_OK);
-        mGraphicPool = std::make_shared<C2PooledBlockPool>(mGraphicAllocator, mBlockPoolId++);
+        C2PooledBlockPool::BufferPoolVer ver = ::android::IsCodec2AidlHalSelected() ?
+                C2PooledBlockPool::VER_AIDL2 : C2PooledBlockPool::VER_HIDL;
+        mGraphicPool = std::make_shared<C2PooledBlockPool>(mGraphicAllocator, mBlockPoolId++, ver);
         ASSERT_NE(mGraphicPool, nullptr);
 
         std::vector<std::unique_ptr<C2Param>> queried;
