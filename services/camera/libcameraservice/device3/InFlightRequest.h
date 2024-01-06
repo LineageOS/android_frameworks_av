@@ -35,6 +35,7 @@ typedef struct camera_stream_configuration {
     uint32_t operation_mode;
     bool input_is_multi_resolution;
     bool use_hal_buf_manager = false;
+    std::set<int32_t> hal_buffer_managed_streams;
 } camera_stream_configuration_t;
 
 typedef struct camera_capture_request {
