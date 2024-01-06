@@ -649,8 +649,8 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
         return C2_CORRUPTED;
     }
     size_t i = 0;
-    for (auto it = paramPointers.begin();
-            it != paramPointers.end(); ) {
+    size_t numUpdatedStackParams = 0;
+    for (auto it = paramPointers.begin(); it != paramPointers.end(); ) {
         C2Param* paramPointer = *it;
         if (numStackIndices > 0) {
             --numStackIndices;
@@ -677,7 +677,9 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
                 status = C2_BAD_INDEX;
                 continue;
             }
-            if (!stackParams[i++]->updateFrom(*paramPointer)) {
+            if (stackParams[i++]->updateFrom(*paramPointer)) {
+                ++numUpdatedStackParams;
+            } else {
                 LOG(WARNING) << "query -- param update failed: "
                                 "index = "
                              << paramPointer->index() << ".";
@@ -696,6 +698,13 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
             }
         }
         ++it;
+    }
+    size_t numQueried = numUpdatedStackParams;
+    if (heapParams) {
+        numQueried += heapParams->size();
+    }
+    if (status == C2_OK && indices.size() != numQueried) {
+        status = C2_BAD_INDEX;
     }
     return status;
 }
