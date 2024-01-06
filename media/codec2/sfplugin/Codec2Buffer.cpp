@@ -1049,7 +1049,11 @@ public:
         // Unwrap raw buffer handle from the C2Handle
         native_handle_t *nh = UnwrapNativeCodec2GrallocHandle(handle);
         if (!nh) {
-            return;
+            nh = UnwrapNativeCodec2AhwbHandle(handle);
+            if (!nh) {
+                ALOGE("handle is not compatible to neither C2HandleGralloc nor C2HandleAhwb");
+                return;
+            }
         }
         // Import the raw handle so IMapper can use the buffer. The imported
         // handle must be freed when the client is done with the buffer.

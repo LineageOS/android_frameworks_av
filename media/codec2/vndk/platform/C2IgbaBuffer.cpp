@@ -193,7 +193,7 @@ c2_status_t C2IgbaBlockPool::fetchGraphicBlock(
             width, height, format, usage, kBlockingFetchTimeoutNs, &origId, block, &fence);
 
     if (res == C2_BLOCKING) {
-        return C2_TIMED_OUT;
+        return C2_BLOCKING;
     }
     if (res != C2_OK) {
         return res;
