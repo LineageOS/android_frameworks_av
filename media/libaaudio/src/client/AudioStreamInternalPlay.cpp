@@ -100,6 +100,10 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush_l() {
 }
 
 void AudioStreamInternalPlay::prepareBuffersForStart() {
+    // Reset volume ramps to avoid a starting noise.
+    // This was called here instead of AudioStreamInternal so that
+    // it will be easier to backport.
+    mFlowGraph.reset();
     // Prevent stale data from being played.
     mAudioEndpoint->eraseDataMemory();
 }

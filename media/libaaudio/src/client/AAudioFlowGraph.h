@@ -72,6 +72,12 @@ public:
      */
     int32_t pull(void *destination, int32_t targetFramesToRead);
 
+    // Reset the entire graph so that volume ramps start at their
+    // target value and sample rate converters start with no phase offset.
+    void reset() {
+        mSink->pullReset();
+    }
+
     /**
      * Set numFramesToWrite frames from the source into the flowgraph.
      * Then, attempt to read targetFramesToRead from the flowgraph.
