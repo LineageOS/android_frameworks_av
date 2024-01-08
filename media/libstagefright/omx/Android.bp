@@ -184,6 +184,9 @@ cc_library_shared {
 
 cc_defaults {
     name: "libstagefright_softomx-defaults",
+    // TODO (b/316432618) Software OMX codecs are no longer used, disable building them till
+    // this code is removed completely.
+    enabled: false,
     vendor_available: true,
 
     cflags: [
