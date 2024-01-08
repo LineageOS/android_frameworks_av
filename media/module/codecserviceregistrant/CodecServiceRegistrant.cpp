@@ -817,6 +817,7 @@ extern "C" void RegisterCodecServices() {
         }
     }
 
+    bool registered = false;
     if (platformVersion >= __ANDROID_API_V__) {
         if (!aidlStore) {
             aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
@@ -826,23 +827,27 @@ extern "C" void RegisterCodecServices() {
             std::string(c2_aidl::IComponentStore::descriptor) + "/software";
         binder_exception_t ex = AServiceManager_addService(
                 aidlStore->asBinder().get(), serviceName.c_str());
-        if (ex != EX_NONE) {
+        if (ex == EX_NONE) {
+            registered = true;
+        } else {
             LOG(ERROR) << "Cannot register software Codec2 AIDL service.";
-            return;
         }
     }
 
     if (!hidlStore) {
-        hidlStore = ::android::sp<V1_0::utils::ComponentStore>::make(
+        hidlStore = ::android::sp<V1_2::utils::ComponentStore>::make(
                 std::make_shared<H2C2ComponentStore>(nullptr));
-        hidlVer = "1.0";
+        hidlVer = "1.2";
     }
-    if (hidlStore->registerAsService("software") != android::OK) {
+    if (hidlStore->registerAsService("software") == android::OK) {
+        registered = true;
+    } else {
         LOG(ERROR) << "Cannot register software Codec2 v" << hidlVer << " service.";
-        return;
     }
 
-    LOG(INFO) << "Software Codec2 service created and registered.";
+    if (registered) {
+        LOG(INFO) << "Software Codec2 service created and registered.";
+    }
 
     ABinderProcess_joinThreadPool();
     ::android::hardware::joinRpcThreadpool();
