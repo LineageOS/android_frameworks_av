@@ -48,9 +48,9 @@ class ExtendedAccumulator {
 
   public:
     enum class Wrap {
-        NORMAL = 0,
-        UNDERFLOW = 1,
-        OVERFLOW = 2,
+        Normal = 0,
+        Underflow = 1,
+        Overflow = 2,
     };
 
     using UnsignedInt = Integral;
@@ -63,11 +63,11 @@ class ExtendedAccumulator {
     std::pair<SignedInt, Wrap> poll(UnsignedInt value) {
         auto acc = mAccumulated.load(std::memory_order_relaxed);
         const auto bottom_bits = static_cast<UnsignedInt>(acc);
-        std::pair<SignedInt, Wrap> res = {0, Wrap::NORMAL};
+        std::pair<SignedInt, Wrap> res = {0, Wrap::Normal};
         const bool overflow = __builtin_sub_overflow(value, bottom_bits, &res.first);
 
         if (overflow) {
-            res.second = (res.first > 0) ? Wrap::OVERFLOW : Wrap::UNDERFLOW;
+            res.second = (res.first > 0) ? Wrap::Overflow : Wrap::Underflow;
         }
 
         const bool acc_overflow = __builtin_add_overflow(acc, res.first, &acc);
