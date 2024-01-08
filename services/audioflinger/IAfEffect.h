@@ -175,8 +175,12 @@ public:
 
     static bool isHapticGenerator(const effect_uuid_t* type);
     virtual bool isHapticGenerator() const = 0;
+    static bool isSpatializer(const effect_uuid_t* type);
+    virtual bool isSpatializer() const = 0;
+
     virtual status_t setHapticIntensity(int id, os::HapticScale intensity) = 0;
     virtual status_t setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo) = 0;
+    virtual status_t sendMetadata(const std::vector<playback_track_metadata_v7_t>& metadata) = 0;
 
 private:
     virtual void process() = 0;
@@ -308,6 +312,10 @@ public:
 
     virtual size_t numberOfEffects() const = 0;
     virtual sp<IAfEffectModule> getEffectModule(size_t index) const = 0;
+
+    // sendMetadata_l() must be called with thread->mLock held
+    virtual void sendMetadata_l(const std::vector<playback_track_metadata_v7_t>& allMetadata,
+        const std::optional<const std::vector<playback_track_metadata_v7_t>> spatializedMetadata);
 
     virtual void dump(int fd, const Vector<String16>& args) const = 0;
 };

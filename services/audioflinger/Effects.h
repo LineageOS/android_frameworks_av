@@ -224,9 +224,11 @@ public:
     sp<IAfEffectModule> asEffectModule() final { return this; }
 
     bool isHapticGenerator() const final;
+    bool isSpatializer() const final;
 
     status_t setHapticIntensity(int id, os::HapticScale intensity) final;
     status_t setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo) final;
+    status_t sendMetadata(const std::vector<playback_track_metadata_v7_t>& metadata) final;
 
     status_t getConfigs(audio_config_base_t* inputCfg,
                                 audio_config_base_t* outputCfg,
@@ -512,6 +514,10 @@ public:
     sp<IAfEffectModule> getEffectModule(size_t index) const final {
         return mEffects[index];
     }
+
+    void sendMetadata_l(const std::vector<playback_track_metadata_v7_t>& allMetadata,
+        const std::optional<const std::vector<playback_track_metadata_v7_t>> spatializedMetadata)
+            final REQUIRES(audio_utils::ThreadBase_Mutex);
 
     void setThread(const sp<IAfThreadBase>& thread) final;
 

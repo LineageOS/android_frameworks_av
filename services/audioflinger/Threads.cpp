@@ -47,6 +47,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/PersistableBundle.h>
+#include <com_android_media_audio.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <fastpath/AutoPark.h>
@@ -1483,7 +1484,7 @@ status_t PlaybackThread::checkEffectCompatibility_l(
         return BAD_VALUE;
     }
 
-    if (memcmp(&desc->type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0
+    if (IAfEffectModule::isSpatializer(&desc->type)
             && mType != SPATIALIZER) {
         ALOGW("%s: attempt to create a spatializer effect on a thread of type %d",
                 __func__, mType);
@@ -1571,7 +1572,7 @@ status_t PlaybackThread::checkEffectCompatibility_l(
             return BAD_VALUE;
         } else if (sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
             // only post processing , downmixer or spatializer effects on output stage session
-            if (memcmp(&desc->type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0
+            if (IAfEffectModule::isSpatializer(&desc->type)
                     || memcmp(&desc->type, EFFECT_UIID_DOWNMIX, sizeof(effect_uuid_t)) == 0) {
                 break;
             }
@@ -3318,10 +3319,44 @@ ThreadBase::MetadataUpdate PlaybackThread::updateMetadata_l()
         return {}; // nothing to do
     }
     StreamOutHalInterface::SourceMetadata metadata;
-    auto backInserter = std::back_inserter(metadata.tracks);
-    for (const sp<IAfTrack>& track : mActiveTracks) {
-        // No track is invalid as this is called after prepareTrack_l in the same critical section
-        track->copyMetadataTo(backInserter);
+    if (com_android_media_audio_stereo_spatialization()) {
+        std::map<audio_session_t, std::vector<playback_track_metadata_v7_t> >allSessionsMetadata;
+        for (const sp<IAfTrack>& track : mActiveTracks) {
+            std::vector<playback_track_metadata_v7_t>& sessionMetadata =
+                    allSessionsMetadata[track->sessionId()];
+            auto backInserter = std::back_inserter(sessionMetadata);
+            // No track is invalid as this is called after prepareTrack_l in the same
+            // critical section
+            track->copyMetadataTo(backInserter);
+        }
+        std::vector<playback_track_metadata_v7_t> spatializedTracksMetaData;
+        for (const auto& [session, sessionTrackMetadata] : allSessionsMetadata) {
+            metadata.tracks.insert(metadata.tracks.end(),
+                    sessionTrackMetadata.begin(), sessionTrackMetadata.end());
+            if (auto chain = getEffectChain_l(session) ; chain != nullptr) {
+                chain->sendMetadata_l(sessionTrackMetadata, {});
+            }
+            if ((hasAudioSession_l(session) & IAfThreadBase::SPATIALIZED_SESSION) != 0) {
+                spatializedTracksMetaData.insert(spatializedTracksMetaData.end(),
+                        sessionTrackMetadata.begin(), sessionTrackMetadata.end());
+            }
+        }
+        if (auto chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX); chain != nullptr) {
+            chain->sendMetadata_l(metadata.tracks, {});
+        }
+        if (auto chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE); chain != nullptr) {
+            chain->sendMetadata_l(metadata.tracks, spatializedTracksMetaData);
+        }
+        if (auto chain = getEffectChain_l(AUDIO_SESSION_DEVICE); chain != nullptr) {
+            chain->sendMetadata_l(metadata.tracks, {});
+        }
+    } else {
+        auto backInserter = std::back_inserter(metadata.tracks);
+        for (const sp<IAfTrack>& track : mActiveTracks) {
+            // No track is invalid as this is called after prepareTrack_l in the same
+            // critical section
+            track->copyMetadataTo(backInserter);
+        }
     }
     sendMetadataToBackend_l(metadata);
     MetadataUpdate change;
