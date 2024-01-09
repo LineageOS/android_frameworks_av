@@ -1528,6 +1528,15 @@ bool EffectModule::isHapticGenerator() const {
     return IAfEffectModule::isHapticGenerator(&mDescriptor.type);
 }
 
+/*static*/
+bool IAfEffectModule::isSpatializer(const effect_uuid_t *type) {
+    return memcmp(type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0;
+}
+
+bool EffectModule::isSpatializer() const {
+    return IAfEffectModule::isSpatializer(&mDescriptor.type);
+}
+
 status_t EffectModule::setHapticIntensity(int id, os::HapticScale intensity)
 {
     if (mStatus != NO_ERROR) {
@@ -1598,6 +1607,35 @@ status_t EffectModule::getConfigs(
     outputCfg->format = static_cast<audio_format_t>(mConfig.outputCfg.format);
     *isOutput = mIsOutput;
     return NO_ERROR;
+}
+
+status_t EffectModule::sendMetadata(const std::vector<playback_track_metadata_v7_t>& metadata) {
+    if (mStatus != NO_ERROR) {
+        return mStatus;
+    }
+    // TODO b/307368176: send all metadata to effects if requested by the implementation.
+    // For now only send channel mask to Spatializer.
+    if (!isSpatializer()) {
+        return INVALID_OPERATION;
+    }
+
+    std::vector<uint8_t> request(
+            sizeof(effect_param_t) + sizeof(int32_t) + metadata.size() * sizeof(uint32_t));
+    effect_param_t *param = (effect_param_t*) request.data();
+    param->psize = sizeof(int32_t);
+    param->vsize = metadata.size() * sizeof(uint32_t);
+    *(int32_t*)param->data = SPATIALIZER_PARAM_INPUT_CHANNEL_MASK;
+    uint32_t* channelMasks = reinterpret_cast<uint32_t*>(param->data + sizeof(int32_t));
+    for (auto m : metadata) {
+        *channelMasks++ = m.channel_mask;
+    }
+    std::vector<uint8_t> response;
+    status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
+    if (status == NO_ERROR) {
+        LOG_ALWAYS_FATAL_IF(response.size() != sizeof(status_t));
+        status = *reinterpret_cast<const status_t*>(response.data());
+    }
+    return status;
 }
 
 static std::string dumpInOutBuffer(bool isInput, const sp<EffectBufferHalInterface> &buffer) {
@@ -2387,7 +2425,7 @@ ssize_t EffectChain::getInsertIndex(const effect_descriptor_t& desc) {
     // already present
     // Spatializer or Downmixer effects are inserted in first position because
     // they adapt the channel count for all other effects in the chain
-    if ((memcmp(&desc.type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0)
+    if (IAfEffectModule::isSpatializer(&desc.type)
             || (memcmp(&desc.type, EFFECT_UIID_DOWNMIX, sizeof(effect_uuid_t)) == 0)) {
         return 0;
     }
@@ -2981,6 +3019,20 @@ bool EffectChain::isCompatibleWithThread_l(const sp<IAfThreadBase>& thread) cons
         }
     }
     return true;
+}
+
+// sendMetadata_l() must be called with thread->mutex() held
+void EffectChain::sendMetadata_l(const std::vector<playback_track_metadata_v7_t>& allMetadata,
+        const std::optional<const std::vector<playback_track_metadata_v7_t>> spatializedMetadata) {
+    audio_utils::lock_guard _l(mutex());
+    for (const auto& effect : mEffects) {
+        if (spatializedMetadata.has_value()
+                && IAfEffectModule::isSpatializer(&effect->desc().type)) {
+            effect->sendMetadata(spatializedMetadata.value());
+        } else {
+            effect->sendMetadata(allMetadata);
+        }
+    }
 }
 
 // EffectCallbackInterface implementation
