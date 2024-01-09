@@ -219,7 +219,7 @@ status_t WAVExtractor::init() {
 
             mNumChannels = U16_LE_AT(&formatSpec[2]);
 
-            if (mNumChannels < 1 || mNumChannels > FCC_8) {
+            if (mNumChannels < 1 || mNumChannels > FCC_12) {
                 ALOGE("Unsupported number of channels (%d)", mNumChannels);
                 return AMEDIA_ERROR_UNSUPPORTED;
             }
