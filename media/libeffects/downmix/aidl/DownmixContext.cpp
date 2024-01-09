@@ -111,11 +111,12 @@ void DownmixContext::reset() {
 }
 
 IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int samples) {
-    LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
+    LOG(VERBOSE) << __func__ << " in " << in << " out " << out << " sample " << samples;
     IEffect::Status status = {EX_ILLEGAL_ARGUMENT, 0, 0};
 
     if (in == nullptr || out == nullptr ||
         getCommon().input.frameCount != getCommon().output.frameCount || getInputFrameSize() == 0) {
+        LOG(ERROR) << __func__ << " either in/out buffer invalid or framecount mismatch";
         return status;
     }
 
@@ -128,7 +129,7 @@ IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int sample
         return status;
     }
 
-    LOG(DEBUG) << __func__ << " start processing";
+    LOG(VERBOSE) << __func__ << " start processing";
     bool accumulate = false;
     int frames = samples * sizeof(float) / getInputFrameSize();
     if (mType == Downmix::Type::STRIP) {
@@ -153,8 +154,9 @@ IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int sample
             return status;
         }
     }
-    LOG(DEBUG) << __func__ << " done processing";
-    return {STATUS_OK, samples, samples};
+    int producedSamples = samples * getOutputFrameSize() / getInputFrameSize();
+    LOG(VERBOSE) << __func__ << " done processing generated samples " << producedSamples;
+    return {STATUS_OK, samples, producedSamples};
 }
 
 void DownmixContext::init_params(const Parameter::Common& common) {
