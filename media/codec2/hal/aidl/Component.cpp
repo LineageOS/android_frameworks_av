@@ -403,6 +403,22 @@ ScopedAStatus Component::configureVideoTunnel(
     return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
 }
 
+ScopedAStatus Component::connectToInputSurface(
+        const std::shared_ptr<IInputSurface>& inputSurface,
+        std::shared_ptr<IInputSurfaceConnection> *connection) {
+    // TODO
+    (void)inputSurface;
+    (void)connection;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
+}
+
+ScopedAStatus Component::asInputSink(
+        std::shared_ptr<IInputSink> *sink) {
+    // TODO
+    (void)sink;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
+}
+
 void Component::initListener(const std::shared_ptr<Component>& self) {
     if (__builtin_available(android __ANDROID_API_T__, *)) {
         std::shared_ptr<C2Component::Listener> c2listener =
