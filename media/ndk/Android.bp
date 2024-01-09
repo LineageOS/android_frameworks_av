@@ -217,10 +217,12 @@ cc_test {
         "libmediautils",
         "libnativewindow",
         "libgui",
+        "libhidlbase",
         "libutils",
         "libui",
         "libcutils",
         "android.hardware.graphics.bufferqueue@1.0",
+        "android.hidl.token@1.0",
     ],
 
     header_libs: [

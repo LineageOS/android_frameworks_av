@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <android/hidl/token/1.0/ITokenManager.h>
+#include <android/hidl/manager/1.2/IServiceManager.h>
 #include <gtest/gtest.h>
+#include <hidl/ServiceManagement.h>
 #include <media/NdkImageReader.h>
 #include <media/NdkImage.h>
 #include <mediautils/AImageReaderUtils.h>
@@ -30,6 +33,8 @@ namespace android {
 using HGraphicBufferProducer = hardware::graphics::bufferqueue::V1_0::
         IGraphicBufferProducer;
 using hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
+using hidl::manager::V1_2::IServiceManager;
+using hidl::token::V1_0::ITokenManager;
 using aimg::AImageReader_getHGBPFromHandle;
 
 typedef IGraphicBufferProducer::QueueBufferInput QueueBufferInput;
@@ -133,7 +138,15 @@ TEST_F(AImageReaderWindowHandleTest, CreateWindowNativeHandle) {
     // Check that we can create a native_handle_t corresponding to the
     // AImageReader.
     native_handle_t *nh = nullptr;
-    AImageReader_getWindowNativeHandle(imageReader_, &nh);
+    media_status_t status = AImageReader_getWindowNativeHandle(imageReader_, &nh);
+
+    // On newer devices without the HIDL TokenManager service this API is
+    // deprecated and will return an error.
+    if (IServiceManager::Transport::EMPTY ==
+        hardware::defaultServiceManager1_2()->getTransport(ITokenManager::descriptor, "default")) {
+      EXPECT_EQ(status, AMEDIA_ERROR_UNKNOWN);
+      return;
+    }
     ASSERT_NE(nh, nullptr);
 
     // Check that there are only ints in the handle.
