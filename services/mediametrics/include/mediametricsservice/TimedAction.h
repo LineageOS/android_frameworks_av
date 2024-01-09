@@ -30,7 +30,7 @@ class TimedAction {
 
     // Define granularity of wakeup to prevent delayed events if
     // device is suspended.
-    static constexpr auto kWakeupInterval = std::chrono::minutes(15);
+    static constexpr auto kWakeupInterval = std::chrono::minutes(3);
 public:
     TimedAction() : mThread{[this](){threadLoop();}} {}
 
