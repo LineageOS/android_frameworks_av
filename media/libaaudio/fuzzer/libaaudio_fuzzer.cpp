@@ -19,6 +19,8 @@
 #include "aaudio/AAudioTesting.h"
 #include <fuzzer/FuzzedDataProvider.h>
 
+#include <functional>
+
 constexpr int32_t kRandomStringLength = 256;
 constexpr int32_t kMaxRuns = 100;
 constexpr int64_t kNanosPerMillisecond = 1000 * 1000;
