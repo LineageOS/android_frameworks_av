@@ -273,6 +273,13 @@ ScopedAStatus ComponentStore::listComponents(
     return ScopedAStatus::ok();
 }
 
+ScopedAStatus ComponentStore::createInputSurface(
+        std::shared_ptr<IInputSurface> *inputSurface) {
+    // TODO
+    (void)inputSurface;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
+}
+
 void ComponentStore::onInterfaceLoaded(const std::shared_ptr<C2ComponentInterface> &intf) {
     // invalidate unsupported struct descriptors if a new interface is loaded as it may have
     // exposed new descriptors
