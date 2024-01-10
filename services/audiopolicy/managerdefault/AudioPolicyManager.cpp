@@ -3281,7 +3281,8 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         ALOGD("%s: no group matching with %s", __FUNCTION__, toString(attributes).c_str());
         return BAD_VALUE;
     }
-    ALOGV("%s: group %d matching with %s", __FUNCTION__, group, toString(attributes).c_str());
+    ALOGV("%s: group %d matching with %s index %d",
+            __FUNCTION__, group, toString(attributes).c_str(), index);
     status_t status = NO_ERROR;
     IVolumeCurves &curves = getVolumeCurves(attributes);
     VolumeSource vs = toVolumeSource(group);
@@ -3398,6 +3399,21 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
             status = volStatus;
         }
     }
+
+    // update voice volume if the an active call route exists
+    if (mCallRxSourceClient != nullptr && mCallRxSourceClient->isConnected()
+            && (curSrcDevices.find(
+                Volume::getDeviceForVolume({mCallRxSourceClient->sinkDevice()->type()}))
+                != curSrcDevices.end())) {
+        bool isVoiceVolSrc;
+        bool isBtScoVolSrc;
+        if (isVolumeConsistentForCalls(vs, {mCallRxSourceClient->sinkDevice()->type()},
+                isVoiceVolSrc, isBtScoVolSrc, __func__)
+                && (isVoiceVolSrc || isBtScoVolSrc)) {
+            setVoiceVolume(index, curves, isVoiceVolSrc, 0);
+        }
+    }
+
     mpClientInterface->onAudioVolumeGroupChanged(group, 0 /*flags*/);
     return status;
 }
@@ -7902,26 +7918,16 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
                outputDesc->getMuteCount(volumeSource), outputDesc->isActive(volumeSource));
         return NO_ERROR;
     }
-    VolumeSource callVolSrc = toVolumeSource(AUDIO_STREAM_VOICE_CALL, false);
-    VolumeSource btScoVolSrc = toVolumeSource(AUDIO_STREAM_BLUETOOTH_SCO, false);
-    bool isVoiceVolSrc = (volumeSource != VOLUME_SOURCE_NONE) && (callVolSrc == volumeSource);
-    bool isBtScoVolSrc = (volumeSource != VOLUME_SOURCE_NONE) && (btScoVolSrc == volumeSource);
 
-    bool isScoRequested = isScoRequestedForComm();
-    bool isHAUsed = isHearingAidUsedForComm();
-
-    // do not change in call volume if bluetooth is connected and vice versa
-    // if sco and call follow same curves, bypass forceUseForComm
-    if ((callVolSrc != btScoVolSrc) &&
-            ((isVoiceVolSrc && isScoRequested) ||
-             (isBtScoVolSrc && !(isScoRequested || isHAUsed))) &&
-            !isSingleDeviceType(deviceTypes, AUDIO_DEVICE_OUT_TELEPHONY_TX)) {
-        ALOGV("%s cannot set volume group %d volume when is%srequested for comm", __func__,
-             volumeSource, isScoRequested ? " " : " not ");
+    bool isVoiceVolSrc;
+    bool isBtScoVolSrc;
+    if (!isVolumeConsistentForCalls(
+            volumeSource, deviceTypes, isVoiceVolSrc, isBtScoVolSrc, __func__)) {
         // Do not return an error here as AudioService will always set both voice call
-        // and bluetooth SCO volumes due to stream aliasing.
+        // and Bluetooth SCO volumes due to stream aliasing.
         return NO_ERROR;
     }
+
     if (deviceTypes.empty()) {
         deviceTypes = outputDesc->devices().types();
         index = curves.getVolumeIndex(deviceTypes);
@@ -7946,19 +7952,49 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
             deviceTypes, delayMs, force, isVoiceVolSrc);
 
     if (outputDesc == mPrimaryOutput && (isVoiceVolSrc || isBtScoVolSrc)) {
-        float voiceVolume;
-        // Force voice volume to max or mute for Bluetooth SCO as other attenuations are managed by the headset
-        if (isVoiceVolSrc) {
-            voiceVolume = (float)index/(float)curves.getVolumeIndexMax();
-        } else {
-            voiceVolume = index == 0 ? 0.0 : 1.0;
-        }
-        if (voiceVolume != mLastVoiceVolume) {
-            mpClientInterface->setVoiceVolume(voiceVolume, delayMs);
-            mLastVoiceVolume = voiceVolume;
-        }
+        setVoiceVolume(index, curves, isVoiceVolSrc, delayMs);
     }
     return NO_ERROR;
+}
+
+void AudioPolicyManager::setVoiceVolume(
+        int index, IVolumeCurves &curves, bool isVoiceVolSrc, int delayMs) {
+    float voiceVolume;
+    // Force voice volume to max or mute for Bluetooth SCO as other attenuations are managed
+    // by the headset
+    if (isVoiceVolSrc) {
+        voiceVolume = (float)index/(float)curves.getVolumeIndexMax();
+    } else {
+        voiceVolume = index == 0 ? 0.0 : 1.0;
+    }
+    if (voiceVolume != mLastVoiceVolume) {
+        mpClientInterface->setVoiceVolume(voiceVolume, delayMs);
+        mLastVoiceVolume = voiceVolume;
+    }
+}
+
+bool AudioPolicyManager::isVolumeConsistentForCalls(VolumeSource volumeSource,
+                                                   const DeviceTypeSet& deviceTypes,
+                                                   bool& isVoiceVolSrc,
+                                                   bool& isBtScoVolSrc,
+                                                   const char* caller) {
+    const VolumeSource callVolSrc = toVolumeSource(AUDIO_STREAM_VOICE_CALL, false);
+    const VolumeSource btScoVolSrc = toVolumeSource(AUDIO_STREAM_BLUETOOTH_SCO, false);
+    const bool isScoRequested = isScoRequestedForComm();
+    const bool isHAUsed = isHearingAidUsedForComm();
+
+    isVoiceVolSrc = (volumeSource != VOLUME_SOURCE_NONE) && (callVolSrc == volumeSource);
+    isBtScoVolSrc = (volumeSource != VOLUME_SOURCE_NONE) && (btScoVolSrc == volumeSource);
+
+    if ((callVolSrc != btScoVolSrc) &&
+            ((isVoiceVolSrc && isScoRequested) ||
+             (isBtScoVolSrc && !(isScoRequested || isHAUsed))) &&
+            !isSingleDeviceType(deviceTypes, AUDIO_DEVICE_OUT_TELEPHONY_TX)) {
+        ALOGV("%s cannot set volume group %d volume when is%srequested for comm", caller,
+             volumeSource, isScoRequested ? " " : " not ");
+        return false;
+    }
+    return true;
 }
 
 void AudioPolicyManager::applyStreamVolumes(const sp<AudioOutputDescriptor>& outputDesc,
