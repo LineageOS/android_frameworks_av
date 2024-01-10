@@ -208,9 +208,9 @@ cc_library {
 }
 
 cc_test {
-    name: "AImageReaderWindowHandleTest",
+    name: "AImageReaderWindowTest",
     test_suites: ["device-tests"],
-    srcs: ["tests/AImageReaderWindowHandleTest.cpp"],
+    srcs: ["tests/AImageReaderWindowTest.cpp"],
     shared_libs: [
         "libbinder",
         "libmediandk",
