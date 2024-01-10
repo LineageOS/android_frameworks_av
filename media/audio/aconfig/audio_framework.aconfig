@@ -21,6 +21,15 @@ flag {
     bug: "302323921"
 }
 
+flag {
+    name: "focus_exclusive_with_recording"
+    namespace: "media_audio"
+    description:
+        "Audio focus GAIN_TRANSIENT_EXCLUSIVE only mutes"
+        "notifications when the focus owner is also recording"
+    bug: "316414750"
+}
+
 # TODO remove
 flag {
     name: "focus_freeze_test_api"

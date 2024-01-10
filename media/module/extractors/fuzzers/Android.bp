@@ -189,6 +189,8 @@ cc_fuzz {
     ],
 
     dictionary: "mkv_extractor_fuzzer.dict",
+
+    corpus: ["corpus/*"],
 }
 
 cc_fuzz {

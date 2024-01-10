@@ -383,7 +383,7 @@ c2_status_t Gralloc4Mapper_lock(native_handle_t *handle, uint64_t usage, const R
     }
 
     uint8_t *pointer = nullptr;
-    err = mapper.lock(handle, usage, bounds, (void **)&pointer, nullptr, nullptr);
+    err = mapper.lock(handle, usage, bounds, (void **)&pointer);
     if (err != NO_ERROR || pointer == nullptr) {
         return C2_CORRUPTED;
     }

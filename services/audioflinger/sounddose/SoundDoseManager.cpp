@@ -21,10 +21,12 @@
 #include "SoundDoseManager.h"
 
 #include "android/media/SoundDoseRecord.h"
+#include <algorithm>
 #include <android-base/stringprintf.h>
-#include <media/AidlConversionCppNdk.h>
 #include <cinttypes>
 #include <ctime>
+#include <functional>
+#include <media/AidlConversionCppNdk.h>
 #include <utils/Log.h>
 
 namespace android {
@@ -45,6 +47,8 @@ int64_t getMonotonicSecond() {
     }
     return now_ts.tv_sec;
 }
+
+constexpr float kDefaultRs2LowerBound = 80.f;  // dBA
 
 }  // namespace
 
@@ -187,6 +191,21 @@ void SoundDoseManager::removeStreamProcessor(audio_io_handle_t streamHandle) {
     }
 }
 
+float SoundDoseManager::getAttenuationForDeviceId(audio_port_handle_t id) const {
+    float attenuation = 0.f;
+
+    const std::lock_guard _l(mLock);
+    const auto deviceTypeIt = mActiveDeviceTypes.find(id);
+    if (deviceTypeIt != mActiveDeviceTypes.end()) {
+        auto attenuationIt = mMelAttenuationDB.find(deviceTypeIt->second);
+        if (attenuationIt != mMelAttenuationDB.end()) {
+            attenuation = attenuationIt->second;
+        }
+    }
+
+    return attenuation;
+}
+
 audio_port_handle_t SoundDoseManager::getIdForAudioDevice(const AudioDevice& audioDevice) const {
     if (isComputeCsdForcedOnAllDevices()) {
         // If CSD is forced on all devices return random port id. Used only in testing.
@@ -260,7 +279,11 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWa
                 in_audioDevice.address.toString().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
     }
-    soundDoseManager->onMomentaryExposure(in_currentDbA, id);
+
+    float attenuation = soundDoseManager->getAttenuationForDeviceId(id);
+    ALOGV("%s: attenuating received momentary exposure with %f dB", __func__, attenuation);
+    // TODO: remove attenuation when enforcing HAL MELs to always be attenuated
+    soundDoseManager->onMomentaryExposure(in_currentDbA - attenuation, id);
 
     return ndk::ScopedAStatus::ok();
 }
@@ -289,9 +312,10 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onNewMelValues(
                 in_audioDevice.address.toString().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
     }
+
     // TODO: introduce timestamp in onNewMelValues callback
-    soundDoseManager->onNewMelValues(in_melRecord.melValues, 0,
-                                     in_melRecord.melValues.size(), id);
+    soundDoseManager->onNewMelValues(in_melRecord.melValues, 0, in_melRecord.melValues.size(),
+                                     id, /*attenuated=*/false);
 
     return ndk::ScopedAStatus::ok();
 }
@@ -601,26 +625,68 @@ void SoundDoseManager::resetCsd(float currentCsd,
 }
 
 void SoundDoseManager::onNewMelValues(const std::vector<float>& mels, size_t offset, size_t length,
-                                      audio_port_handle_t deviceId) const {
+                                      audio_port_handle_t deviceId, bool attenuated) const {
     ALOGV("%s", __func__);
-
 
     sp<media::ISoundDoseCallback> soundDoseCallback;
     std::vector<audio_utils::CsdRecord> records;
     float currentCsd;
+
+    // TODO: delete this case when enforcing HAL MELs to always be attenuated
+    float attenuation = attenuated ? 0.0f : getAttenuationForDeviceId(deviceId);
+
     {
         const std::lock_guard _l(mLock);
         if (!mEnabledCsd) {
             return;
         }
 
-
         const int64_t timestampSec = getMonotonicSecond();
 
-        // only for internal callbacks
-        records = mMelAggregator->aggregateAndAddNewMelRecord(audio_utils::MelRecord(
-                deviceId, std::vector<float>(mels.begin() + offset, mels.begin() + offset + length),
-                timestampSec - length));
+        if (attenuated) {
+            records = mMelAggregator->aggregateAndAddNewMelRecord(audio_utils::MelRecord(
+                    deviceId,
+                    std::vector<float>(mels.begin() + offset, mels.begin() + offset + length),
+                    timestampSec - length));
+        } else {
+            ALOGV("%s: attenuating received values with %f dB", __func__, attenuation);
+
+            // Extracting all intervals that contain values >= RS2 low limit (80dBA) after the
+            // attenuation is applied
+            size_t start = offset;
+            size_t stop = offset;
+            for (; stop < mels.size() && stop < offset + length; ++stop) {
+                if (mels[stop] - attenuation < kDefaultRs2LowerBound) {
+                    if (start < stop) {
+                        std::vector<float> attMel(stop-start, -attenuation);
+                        // attMel[i] = mels[i] + attenuation, i in [start, stop)
+                        std::transform(mels.begin() + start, mels.begin() + stop, attMel.begin(),
+                                       attMel.begin(), std::plus<float>());
+                        std::vector<audio_utils::CsdRecord> newRec =
+                                mMelAggregator->aggregateAndAddNewMelRecord(
+                                        audio_utils::MelRecord(deviceId,
+                                                               attMel,
+                                                               timestampSec - length + start -
+                                                               offset));
+                        std::copy(newRec.begin(), newRec.end(), std::back_inserter(records));
+                    }
+                    start = stop+1;
+                }
+            }
+            if (start < stop) {
+                std::vector<float> attMel(stop-start, -attenuation);
+                // attMel[i] = mels[i] + attenuation, i in [start, stop)
+                std::transform(mels.begin() + start, mels.begin() + stop, attMel.begin(),
+                               attMel.begin(), std::plus<float>());
+                std::vector<audio_utils::CsdRecord> newRec =
+                        mMelAggregator->aggregateAndAddNewMelRecord(
+                                audio_utils::MelRecord(deviceId,
+                                                       attMel,
+                                                       timestampSec - length + start -
+                                                       offset));
+                std::copy(newRec.begin(), newRec.end(), std::back_inserter(records));
+            }
+        }
 
         currentCsd = mMelAggregator->getCsd();
     }
@@ -653,6 +719,10 @@ void SoundDoseManager::onMomentaryExposure(float currentMel, audio_port_handle_t
     {
         const std::lock_guard _l(mLock);
         if (!mEnabledCsd) {
+            return;
+        }
+
+        if (currentMel < mRs2UpperBound) {
             return;
         }
     }
