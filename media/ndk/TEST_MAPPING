@@ -1,7 +1,7 @@
 // mappings for frameworks/av/media/ndk
 {
   "presubmit": [
-    { "name": "AImageReaderWindowHandleTest" },
+    { "name": "AImageReaderWindowTest" },
     { "name": "libmediandk_test" }
   ]
 }

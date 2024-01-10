@@ -58,7 +58,7 @@ static const sp<Fence> kQueueBufferInputFence = Fence::NO_FENCE;
 
 static constexpr int kOnImageAvailableWaitUs = 100 * 1000;
 
-class AImageReaderWindowHandleTest : public ::testing::Test {
+class AImageReaderWindowTest : public ::testing::Test {
    public:
     void SetUp() override {
         AImageReader_newWithUsage(kImageWidth, kImageHeight, kImageFormat,
@@ -105,8 +105,8 @@ class AImageReaderWindowHandleTest : public ::testing::Test {
 
     static void onImageAvailable(void *context, AImageReader *reader) {
         (void)reader;
-        AImageReaderWindowHandleTest *thisContext =
-            reinterpret_cast<AImageReaderWindowHandleTest *>(context);
+        AImageReaderWindowTest *thisContext =
+            reinterpret_cast<AImageReaderWindowTest *>(context);
         thisContext->HandleImageAvailable();
     }
 
@@ -178,7 +178,7 @@ class AImageReaderWindowHandleTest : public ::testing::Test {
 };
 
 
-TEST_F(AImageReaderWindowHandleTest, CreateWindowNativeHandle) {
+TEST_F(AImageReaderWindowTest, CreateWindowNativeHandle) {
     // Check that we can create a native_handle_t corresponding to the
     // AImageReader.
     native_handle_t *nh = nullptr;
@@ -205,7 +205,7 @@ TEST_F(AImageReaderWindowHandleTest, CreateWindowNativeHandle) {
     validateIGBP(igbp);
 }
 
-TEST_F(AImageReaderWindowHandleTest, CreateWindow) {
+TEST_F(AImageReaderWindowTest, CreateWindow) {
     ANativeWindow* window = nullptr;
     media_status_t status = AImageReader_getWindow(imageReader_, &window);
 
