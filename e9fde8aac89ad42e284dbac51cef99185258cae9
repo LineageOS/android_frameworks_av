@@ -16,6 +16,24 @@
       "message": "Shouldn\u0027t this be guarded and left in place?",
       "revId": "e9fde8aac89ad42e284dbac51cef99185258cae9",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d5f95796_f03bb83c",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 470,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2024-01-10T19:53:57Z",
+      "side": 0,
+      "message": "Done",
+      "parentUuid": "9b931c54_a77cd6e6",
+      "revId": "e9fde8aac89ad42e284dbac51cef99185258cae9",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
