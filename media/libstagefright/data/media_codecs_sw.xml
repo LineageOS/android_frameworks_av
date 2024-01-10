@@ -330,6 +330,7 @@
             <!-- Video Quality control -->
                     <!-- supports QP bounding with standard keys -->
             <Feature name="qp-bounds" />
+            <Feature name="bitrate-modes" value="VBR,CBR" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.vp8.encoder" type="video/x-vnd.on2.vp8" variant="slow-cpu,!slow-cpu">
