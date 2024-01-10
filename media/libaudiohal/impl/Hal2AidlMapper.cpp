@@ -247,6 +247,7 @@ void Hal2AidlMapper::eraseConnectedPort(int32_t portId) {
         ALOGD("%s: disconnected port replacement: %s", __func__, port.toString().c_str());
         mDisconnectedPortReplacement = std::pair<int32_t, AudioPort>();
     }
+    updateDynamicMixPorts();
 }
 
 status_t Hal2AidlMapper::findOrCreatePatch(
@@ -1002,6 +1003,9 @@ status_t Hal2AidlMapper::updateAudioPort(int32_t portId, AudioPort* port) {
     if (status == OK) {
         auto portIt = mPorts.find(portId);
         if (portIt != mPorts.end()) {
+            if (port->ext.getTag() == AudioPortExt::Tag::mix && portIt->second != *port) {
+                mDynamicMixPortIds.insert(portId);
+            }
             portIt->second = *port;
         } else {
             ALOGW("%s, port(%d) returned successfully from the HAL but not it is not cached",
@@ -1048,6 +1052,17 @@ status_t Hal2AidlMapper::updateRoutes() {
         }
     }
     return OK;
+}
+
+void Hal2AidlMapper::updateDynamicMixPorts() {
+    for (int32_t portId : mDynamicMixPortIds) {
+        if (auto it = mPorts.find(portId); it != mPorts.end()) {
+            updateAudioPort(portId, &it->second);
+        } else {
+            // This must not happen
+            ALOGE("%s, cannot find port for id=%d", __func__, portId);
+        }
+    }
 }
 
 } // namespace android
