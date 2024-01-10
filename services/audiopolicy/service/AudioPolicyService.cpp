@@ -312,9 +312,16 @@ void AudioPolicyService::onFirstRef()
         }
     }
     AudioSystem::audioPolicyReady();
-    // AudioFlinger will handle effect creation and register these effects on audio_policy
-    // service. Hence, audio_policy service must be ready.
-    audioPolicyEffects->setDefaultDeviceEffects();
+}
+
+void AudioPolicyService::onAudioSystemReady() {
+    sp<AudioPolicyEffects> audioPolicyEffects;
+    {
+        audio_utils::lock_guard _l(mMutex);
+
+        audioPolicyEffects = mAudioPolicyEffects;
+    }
+    audioPolicyEffects->initDefaultDeviceEffects();
 }
 
 void AudioPolicyService::unloadAudioPolicyManager()
