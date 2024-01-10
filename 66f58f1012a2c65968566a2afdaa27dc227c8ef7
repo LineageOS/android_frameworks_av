@@ -24,6 +24,30 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "df6696cb_7a9a5517",
+        "filename": "services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 204,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2024-01-10T19:53:44Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "97984eb9_b02cb117",
+      "range": {
+        "startLine": 203,
+        "startChar": 0,
+        "endLine": 204,
+        "endChar": 86
+      },
+      "revId": "66f58f1012a2c65968566a2afdaa27dc227c8ef7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "fd725f33_f568b95a",
@@ -37,6 +61,30 @@
       "writtenOn": "2024-01-09T18:17:26Z",
       "side": 1,
       "message": "Wrong indentation",
+      "range": {
+        "startLine": 226,
+        "startChar": 0,
+        "endLine": 227,
+        "endChar": 29
+      },
+      "revId": "66f58f1012a2c65968566a2afdaa27dc227c8ef7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "77cee020_b0b3a538",
+        "filename": "services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 227,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2024-01-10T19:53:44Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "fd725f33_f568b95a",
       "range": {
         "startLine": 226,
         "startChar": 0,
