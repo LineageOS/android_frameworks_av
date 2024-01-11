@@ -19,6 +19,9 @@
 #define LOG_TAG "ResourceManagerServiceUtils"
 #include <utils/Log.h>
 
+#include <binder/IServiceManager.h>
+
+#include "IMediaResourceMonitor.h"
 #include "ResourceManagerService.h"
 #include "ResourceManagerServiceUtils.h"
 
@@ -200,6 +203,32 @@ std::shared_ptr<DeathNotifier> DeathNotifier::Create(
     }
 
     return deathNotifier;
+}
+
+void notifyResourceGranted(int pid, const std::vector<MediaResourceParcel>& resources) {
+    static const char* const kServiceName = "media_resource_monitor";
+    sp<IBinder> binder = defaultServiceManager()->checkService(String16(kServiceName));
+    if (binder != NULL) {
+        sp<IMediaResourceMonitor> service = interface_cast<IMediaResourceMonitor>(binder);
+        for (size_t i = 0; i < resources.size(); ++i) {
+            switch (resources[i].subType) {
+                case MediaResource::SubType::kHwAudioCodec:
+                case MediaResource::SubType::kSwAudioCodec:
+                    service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_AUDIO_CODEC);
+                    break;
+                case MediaResource::SubType::kHwVideoCodec:
+                case MediaResource::SubType::kSwVideoCodec:
+                    service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_VIDEO_CODEC);
+                    break;
+                case MediaResource::SubType::kHwImageCodec:
+                case MediaResource::SubType::kSwImageCodec:
+                    service->notifyResourceGranted(pid, IMediaResourceMonitor::TYPE_IMAGE_CODEC);
+                    break;
+                case MediaResource::SubType::kUnspecifiedSubType:
+                    break;
+            }
+        }
+    }
 }
 
 } // namespace android
