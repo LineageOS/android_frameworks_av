@@ -18,6 +18,8 @@
 #include <media/NdkMediaCrypto.h>
 #include <functional>
 
+#include <functional>
+
 constexpr size_t kMaxString = 256;
 constexpr size_t kMinBytes = 0;
 constexpr size_t kMaxBytes = 1000;

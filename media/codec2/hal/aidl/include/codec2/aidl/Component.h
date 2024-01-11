@@ -27,6 +27,9 @@
 #include <aidl/android/hardware/media/c2/IComponentInterface.h>
 #include <aidl/android/hardware/media/c2/IComponentListener.h>
 #include <aidl/android/hardware/media/c2/IComponentStore.h>
+#include <aidl/android/hardware/media/c2/IInputSink.h>
+#include <aidl/android/hardware/media/c2/IInputSurface.h>
+#include <aidl/android/hardware/media/c2/IInputSurfaceConnection.h>
 
 #include <C2Component.h>
 #include <C2Buffer.h>
@@ -71,6 +74,11 @@ struct Component : public BnComponent {
     ::ndk::ScopedAStatus configureVideoTunnel(
             int32_t avSyncHwId,
             common::NativeHandle* handle) override;
+    ::ndk::ScopedAStatus connectToInputSurface(
+            const std::shared_ptr<IInputSurface>& inputSurface,
+            std::shared_ptr<IInputSurfaceConnection> *connection) override;
+    ::ndk::ScopedAStatus asInputSink(
+            std::shared_ptr<IInputSink> *sink) override;
 
 protected:
     c2_status_t mInit;
