@@ -278,3 +278,9 @@ void AudioEndpoint::eraseDataMemory() {
         mDataQueue->eraseMemory();
     }
 }
+
+void AudioEndpoint::eraseEmptyDataMemory(int32_t numFrames) {
+    if (mDataQueue != nullptr) {
+        mDataQueue->eraseEmptyMemory(numFrames);
+    }
+}

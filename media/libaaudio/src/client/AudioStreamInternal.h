@@ -123,6 +123,8 @@ protected:
 
     virtual void prepareBuffersForStart() {}
 
+    virtual void prepareBuffersForStop() {}
+
     virtual void advanceClientToMatchServerPosition(int32_t serverMargin) = 0;
 
     virtual void onFlushFromServer() {}
