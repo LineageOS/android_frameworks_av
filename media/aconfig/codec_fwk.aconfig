@@ -17,3 +17,10 @@ flag {
   description: "Feature flag for HLG editing support"
   bug: "316397061"
 }
+
+flag {
+  name: "null_output_surface"
+  namespace: "codec_fwk"
+  description: "Feature flag for null output Surface support"
+  bug: "297920102"
+}
