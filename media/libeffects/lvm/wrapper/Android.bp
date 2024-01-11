@@ -118,10 +118,15 @@ cc_library_shared {
         "libhardware_headers",
     ],
     shared_libs: [
+        "libaudio_aidl_conversion_common_ndk",
+        "libaudioutils",
+        "libbinder",
         "liblog",
+        "libstagefright_foundation",
     ],
     cflags: [
         "-Wthread-safety",
+        "-DBACKEND_NDK",
     ],
     relative_install_path: "soundfx",
     visibility: [
