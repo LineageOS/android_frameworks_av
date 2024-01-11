@@ -10,3 +10,10 @@ flag {
   description: "Feature flag for dynamic color aspect support"
   bug: "297914560"
 }
+
+flag {
+  name: "hlg_editing"
+  namespace: "codec_fwk"
+  description: "Feature flag for HLG editing support"
+  bug: "316397061"
+}
