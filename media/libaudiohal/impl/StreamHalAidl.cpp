@@ -808,6 +808,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
                         mOffloadMetadata.channelMask = VALUE_OR_RETURN_STATUS(
                                 ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
                                         channel_mask, false /*isInput*/));
+                        return OK;
                     }
                     return BAD_VALUE;
                 }))) {
