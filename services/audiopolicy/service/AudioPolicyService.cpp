@@ -280,9 +280,9 @@ void AudioPolicyService::onFirstRef()
 
     // load audio processing modules
     const sp<EffectsFactoryHalInterface> effectsFactoryHal = EffectsFactoryHalInterface::create();
-    sp<AudioPolicyEffects> audioPolicyEffects = new AudioPolicyEffects(effectsFactoryHal);
-    sp<UidPolicy> uidPolicy = new UidPolicy(this);
-    sp<SensorPrivacyPolicy> sensorPrivacyPolicy = new SensorPrivacyPolicy(this);
+    auto audioPolicyEffects = sp<AudioPolicyEffects>::make(effectsFactoryHal);
+    auto uidPolicy = sp<UidPolicy>::make(this);
+    auto sensorPrivacyPolicy = sp<SensorPrivacyPolicy>::make(this);
     {
         audio_utils::lock_guard _l(mMutex);
         mAudioPolicyEffects = audioPolicyEffects;
