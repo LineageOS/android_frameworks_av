@@ -77,26 +77,21 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
                                     AUDIO_SOURCE_VOICE_RECOGNITION : inputSource;
 
     audio_utils::lock_guard _l(mMutex);
-    ssize_t index = mInputSources.indexOfKey(aliasSource);
-    if (index < 0) {
+    auto sourceIt = mInputSources.find(aliasSource);
+    if (sourceIt == mInputSources.end()) {
         ALOGV("addInputEffects(): no processing needs to be attached to this source");
         return status;
     }
-    ssize_t idx = mInputSessions.indexOfKey(audioSession);
-    std::shared_ptr<EffectVector> sessionDesc;
-    if (idx < 0) {
+    std::shared_ptr<EffectVector>& sessionDesc = mInputSessions[audioSession];
+    if (sessionDesc == nullptr) {
         sessionDesc = std::make_shared<EffectVector>(audioSession);
-        mInputSessions.add(audioSession, sessionDesc);
-    } else {
-        // EffectVector is existing and we just need to increase ref count
-        sessionDesc = mInputSessions.valueAt(idx);
     }
     sessionDesc->mRefCount++;
 
     ALOGV("addInputEffects(): input: %d, refCount: %d", input, sessionDesc->mRefCount);
     if (sessionDesc->mRefCount == 1) {
         int64_t token = IPCThreadState::self()->clearCallingIdentity();
-        const std::shared_ptr<EffectDescVector>& effects = mInputSources.valueAt(index);
+        const std::shared_ptr<EffectDescVector>& effects = sourceIt->second;
         for (const std::shared_ptr<EffectDesc>& effect : *effects) {
             AttributionSourceState attributionSource;
             attributionSource.packageName = "android";
@@ -132,16 +127,16 @@ status_t AudioPolicyEffects::releaseInputEffects(audio_io_handle_t input,
     status_t status = NO_ERROR;
 
     audio_utils::lock_guard _l(mMutex);
-    ssize_t index = mInputSessions.indexOfKey(audioSession);
-    if (index < 0) {
+    auto it = mInputSessions.find(audioSession);
+    if (it == mInputSessions.end()) {
         return status;
     }
-    std::shared_ptr<EffectVector> sessionDesc = mInputSessions.valueAt(index);
+    std::shared_ptr<EffectVector> sessionDesc = it->second;
     sessionDesc->mRefCount--;
     ALOGV("releaseInputEffects(): input: %d, refCount: %d", input, sessionDesc->mRefCount);
     if (sessionDesc->mRefCount == 0) {
         sessionDesc->setProcessorEnabled(false);
-        mInputSessions.removeItemsAt(index);
+        mInputSessions.erase(it);
         ALOGV("releaseInputEffects(): all effects released");
     }
     return status;
@@ -154,23 +149,15 @@ status_t AudioPolicyEffects::queryDefaultInputEffects(audio_session_t audioSessi
     status_t status = NO_ERROR;
 
     audio_utils::lock_guard _l(mMutex);
-    size_t index;
-    for (index = 0; index < mInputSessions.size(); index++) {
-        if (mInputSessions.valueAt(index)->mSessionId == audioSession) {
-            break;
-        }
-    }
-    if (index == mInputSessions.size()) {
+    auto it = mInputSessions.find(audioSession);
+    if (it == mInputSessions.end()) {
         *count = 0;
         return BAD_VALUE;
     }
-    const std::vector<sp<AudioEffect>>& effects = mInputSessions.valueAt(index)->mEffects;
-
-    for (size_t i = 0; i < effects.size(); i++) {
-        effect_descriptor_t desc = effects[i]->descriptor();
-        if (i < *count) {
-            descriptors[i] = desc;
-        }
+    const std::vector<sp<AudioEffect>>& effects = it->second->mEffects;
+    const size_t copysize = std::min(effects.size(), (size_t)*count);
+    for (size_t i = 0; i < copysize; i++) {
+        descriptors[i] = effects[i]->descriptor();
     }
     if (effects.size() > *count) {
         status = NO_MEMORY;
@@ -187,23 +174,15 @@ status_t AudioPolicyEffects::queryDefaultOutputSessionEffects(audio_session_t au
     status_t status = NO_ERROR;
 
     audio_utils::lock_guard _l(mMutex);
-    size_t index;
-    for (index = 0; index < mOutputSessions.size(); index++) {
-        if (mOutputSessions.valueAt(index)->mSessionId == audioSession) {
-            break;
-        }
-    }
-    if (index == mOutputSessions.size()) {
+    auto it = mOutputSessions.find(audioSession);
+    if (it == mOutputSessions.end()) {
         *count = 0;
         return BAD_VALUE;
     }
-    const std::vector<sp<AudioEffect>>& effects = mOutputSessions.valueAt(index)->mEffects;
-
-    for (size_t i = 0; i < effects.size(); i++) {
-        effect_descriptor_t desc = effects[i]->descriptor();
-        if (i < *count) {
-            descriptors[i] = desc;
-        }
+    const std::vector<sp<AudioEffect>>& effects = it->second->mEffects;
+    const size_t copysize = std::min(effects.size(), (size_t)*count);
+    for (size_t i = 0; i < copysize; i++) {
+        descriptors[i] = effects[i]->descriptor();
     }
     if (effects.size() > *count) {
         status = NO_MEMORY;
@@ -226,20 +205,15 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
     if (stream >= AUDIO_STREAM_PUBLIC_CNT) {
         stream = AUDIO_STREAM_MUSIC;
     }
-    ssize_t index = mOutputStreams.indexOfKey(stream);
-    if (index < 0) {
+    auto it = mOutputStreams.find(stream);
+    if (it == mOutputStreams.end()) {
         ALOGV("addOutputSessionEffects(): no output processing needed for this stream");
         return NO_ERROR;
     }
 
-    ssize_t idx = mOutputSessions.indexOfKey(audioSession);
-    std::shared_ptr<EffectVector> procDesc;
-    if (idx < 0) {
+    std::shared_ptr<EffectVector>& procDesc = mOutputSessions[audioSession];
+    if (procDesc == nullptr) {
         procDesc = std::make_shared<EffectVector>(audioSession);
-        mOutputSessions.add(audioSession, procDesc);
-    } else {
-        // EffectVector is existing and we just need to increase ref count
-        procDesc = mOutputSessions.valueAt(idx);
     }
     procDesc->mRefCount++;
 
@@ -248,7 +222,7 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
     if (procDesc->mRefCount == 1) {
         // make sure effects are associated to audio server even if we are executing a binder call
         int64_t token = IPCThreadState::self()->clearCallingIdentity();
-        const std::shared_ptr<EffectDescVector>& effects = mOutputStreams.valueAt(index);
+        const std::shared_ptr<EffectDescVector>& effects = it->second;
         for (const std::shared_ptr<EffectDesc>& effect : *effects) {
             AttributionSourceState attributionSource;
             attributionSource.packageName = "android";
@@ -278,29 +252,28 @@ status_t AudioPolicyEffects::releaseOutputSessionEffects(audio_io_handle_t outpu
                          audio_stream_type_t stream,
                          audio_session_t audioSession)
 {
-    status_t status = NO_ERROR;
     (void) output; // argument not used for now
     (void) stream; // argument not used for now
 
     audio_utils::lock_guard _l(mMutex);
-    ssize_t index = mOutputSessions.indexOfKey(audioSession);
-    if (index < 0) {
+    auto it = mOutputSessions.find(audioSession);
+    if (it == mOutputSessions.end()) {
         ALOGV("releaseOutputSessionEffects: no output processing was attached to this stream");
         return NO_ERROR;
     }
 
-    std::shared_ptr<EffectVector> procDesc = mOutputSessions.valueAt(index);
+    std::shared_ptr<EffectVector> procDesc = it->second;
     procDesc->mRefCount--;
     ALOGV("releaseOutputSessionEffects(): session: %d, refCount: %d",
           audioSession, procDesc->mRefCount);
     if (procDesc->mRefCount == 0) {
         procDesc->setProcessorEnabled(false);
         procDesc->mEffects.clear();
-        mOutputSessions.removeItemsAt(index);
+        mOutputSessions.erase(it);
         ALOGV("releaseOutputSessionEffects(): output processing released from session: %d",
               audioSession);
     }
-    return status;
+    return NO_ERROR;
 }
 
 status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
@@ -345,14 +318,9 @@ status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
     audio_utils::lock_guard _l(mMutex);
 
     // Find the EffectDescVector for the given source type, or create a new one if necessary.
-    ssize_t index = mInputSources.indexOfKey(source);
-    std::shared_ptr<EffectDescVector> desc;
-    if (index < 0) {
-        // No effects for this source type yet.
+    std::shared_ptr<EffectDescVector>& desc = mInputSources[source];
+    if (desc == nullptr) {
         desc = std::make_shared<EffectDescVector>();
-        mInputSources.add(source, desc);
-    } else {
-        desc = mInputSources.valueAt(index);
     }
 
     // Create a new effect and add it to the vector.
@@ -410,14 +378,10 @@ status_t AudioPolicyEffects::addStreamDefaultEffect(const effect_uuid_t *type,
     audio_utils::lock_guard _l(mMutex);
 
     // Find the EffectDescVector for the given stream type, or create a new one if necessary.
-    ssize_t index = mOutputStreams.indexOfKey(stream);
-    std::shared_ptr<EffectDescVector> desc;
-    if (index < 0) {
+    std::shared_ptr<EffectDescVector>& desc = mOutputStreams[stream];
+    if (desc == nullptr) {
         // No effects for this stream type yet.
         desc = std::make_shared<EffectDescVector>();
-        mOutputStreams.add(stream, desc);
-    } else {
-        desc = mOutputStreams.valueAt(index);
     }
 
     // Create a new effect and add it to the vector.
@@ -450,10 +414,8 @@ status_t AudioPolicyEffects::removeSourceDefaultEffect(audio_unique_id_t id)
     audio_utils::lock_guard _l(mMutex);
 
     // Check each source type.
-    size_t numSources = mInputSources.size();
-    for (size_t i = 0; i < numSources; ++i) {
+    for (auto& [source, descVector] : mInputSources) {
         // Check each effect for each source.
-        auto descVector = mInputSources[i];
         for (auto desc = descVector->begin(); desc != descVector->end(); ++desc) {
             if ((*desc)->mId == id) {
                 // Found it!
@@ -481,10 +443,8 @@ status_t AudioPolicyEffects::removeStreamDefaultEffect(audio_unique_id_t id)
     audio_utils::lock_guard _l(mMutex);
 
     // Check each stream type.
-    size_t numStreams = mOutputStreams.size();
-    for (size_t i = 0; i < numStreams; ++i) {
+    for (auto& [stream, descVector] : mOutputStreams) {
         // Check each effect for each stream.
-        auto descVector = mOutputStreams[i];
         for (auto desc = descVector->begin(); desc != descVector->end(); ++desc) {
             if ((*desc)->mId == id) {
                 // Found it!
@@ -502,8 +462,8 @@ status_t AudioPolicyEffects::removeStreamDefaultEffect(audio_unique_id_t id)
 
 void AudioPolicyEffects::EffectVector::setProcessorEnabled(bool enabled)
 {
-    for (size_t i = 0; i < mEffects.size(); i++) {
-        mEffects[i]->setEnabled(enabled);
+    for (const auto& effect : mEffects) {
+        effect->setEnabled(enabled);
     }
 }
 
@@ -818,7 +778,7 @@ status_t AudioPolicyEffects::loadInputEffectConfigurations_l(cnode* root,
             node = node->next;
             continue;
         }
-        mInputSources.add(source, desc);
+        mInputSources[source] = std::move(desc);
         node = node->next;
     }
     return NO_ERROR;
@@ -845,7 +805,7 @@ status_t AudioPolicyEffects::loadStreamEffectConfigurations_l(cnode* root,
             node = node->next;
             continue;
         }
-        mOutputStreams.add(stream, desc);
+        mOutputStreams[stream] = std::move(desc);
         node = node->next;
     }
     return NO_ERROR;
@@ -910,7 +870,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig_ll(
                 effectDescs->push_back(
                         std::make_shared<EffectDesc>(effect->name, effect->uuid));
             }
-            streams.add(stream.type, std::move(effectDescs));
+            streams[stream.type] = std::move(effectDescs);
         }
     };
 
