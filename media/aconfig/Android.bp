@@ -24,3 +24,26 @@ cc_aconfig_library {
     ],
     aconfig_declarations: "aconfig_mediacodec_flags",
 }
+
+aconfig_declarations {
+    name: "aconfig_codec_fwk_flags",
+    package: "android.media.codec",
+    srcs: ["codec_fwk.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.media.codec-aconfig-java",
+    aconfig_declarations: "aconfig_codec_fwk_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "android.media.codec-aconfig-cc",
+    min_sdk_version: "30",
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+    aconfig_declarations: "aconfig_codec_fwk_flags",
+}
