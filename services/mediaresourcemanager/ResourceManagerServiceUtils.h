@@ -18,6 +18,8 @@
 #ifndef ANDROID_MEDIA_RESOURCEMANAGERSERVICEUTILS_H_
 #define ANDROID_MEDIA_RESOURCEMANAGERSERVICEUTILS_H_
 
+#include <map>
+#include <memory>
 #include <vector>
 
 #include <aidl/android/media/BnResourceManagerService.h>
@@ -123,6 +125,16 @@ struct ResourceInfo {
 };
 
 /*
+ * Resource Reclaim request info that encapsulates
+ *  - the calling/requesting process pid.
+ *  - the list of resources requesting (to be reclaimed from others)
+ */
+struct ReclaimRequestInfo {
+    int mCallingPid = -1;
+    const std::vector<::aidl::android::media::MediaResourceParcel>& mResources;
+};
+
+/*
  * Resource request info that encapsulates
  *  - the calling/requesting process pid.
  *  - the resource requesting (to be reclaimed from others)
@@ -170,7 +182,7 @@ String8 getString(const std::vector<T>& items) {
 
 //Check whether a given resource (of type and subtype) is found in given resource parcel.
 bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
-                     const MediaResourceParcel& resource);
+                     const ::aidl::android::media::MediaResourceParcel& resource);
 
 //Check whether a given resource (of type and subtype) is found in given resource list.
 bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
@@ -193,7 +205,13 @@ ResourceInfo& getResourceInfoForEdit(
         ResourceInfos& infos);
 
 // Merge resources from r2 into r1.
-void mergeResources(MediaResourceParcel& r1, const MediaResourceParcel& r2);
+void mergeResources(::aidl::android::media::MediaResourceParcel& r1,
+                    const ::aidl::android::media::MediaResourceParcel& r2);
+
+// To notify the media_resource_monitor about the resource being granted.
+void notifyResourceGranted(
+        int pid,
+        const std::vector<::aidl::android::media::MediaResourceParcel>& resources);
 
 } // namespace android
 

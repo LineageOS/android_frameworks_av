@@ -77,8 +77,20 @@ private:
     }
 
 public:
-    ResourceManagerServiceTest() : ResourceManagerServiceTestBase() {}
+    ResourceManagerServiceTest(bool newRM = false) : ResourceManagerServiceTestBase(newRM) {}
 
+    void updateConfig(bool bSupportsMultipleSecureCodecs, bool bSupportsSecureWithNonSecureCodec) {
+        std::vector<MediaResourcePolicyParcel> policies;
+        policies.push_back(
+                MediaResourcePolicy(
+                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs,
+                        bSupportsMultipleSecureCodecs ? "true" : "false"));
+        policies.push_back(
+                MediaResourcePolicy(
+                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec,
+                        bSupportsSecureWithNonSecureCodec ? "true" : "false"));
+        mService->config(policies);
+    }
 
     // test set up
     // ---------------------------------------------------------------------------------
@@ -129,7 +141,7 @@ public:
         resources3.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 100));
         mService->addResource(client3Info, mTestClient3, resources3);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(2u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -159,7 +171,7 @@ public:
         // Expected result:
         // 1) the client should have been added;
         // 2) both resource entries should have been rejected, resource list should be empty.
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(1u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -213,29 +225,11 @@ public:
         EXPECT_TRUE(mService->mSupportsMultipleSecureCodecs);
         EXPECT_TRUE(mService->mSupportsSecureWithNonSecureCodec);
 
-        std::vector<MediaResourcePolicyParcel> policies1;
-        policies1.push_back(
-                MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs,
-                        "true"));
-        policies1.push_back(
-                MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec,
-                        "false"));
-        mService->config(policies1);
+        updateConfig(true, false);
         EXPECT_TRUE(mService->mSupportsMultipleSecureCodecs);
         EXPECT_FALSE(mService->mSupportsSecureWithNonSecureCodec);
 
-        std::vector<MediaResourcePolicyParcel> policies2;
-        policies2.push_back(
-                MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs,
-                        "false"));
-        policies2.push_back(
-                MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec,
-                        "true"));
-        mService->config(policies2);
+        updateConfig(false, true);
         EXPECT_FALSE(mService->mSupportsMultipleSecureCodecs);
         EXPECT_TRUE(mService->mSupportsSecureWithNonSecureCodec);
     }
@@ -254,7 +248,7 @@ public:
         resources11.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
         mService->addResource(client1Info, mTestClient1, resources11);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(1u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -299,7 +293,7 @@ public:
         resources11.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
         mService->addResource(client1Info, mTestClient1, resources11);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(1u, map.size());
         const auto& mapIndex1 = map.find(kTestPid1);
         EXPECT_TRUE(mapIndex1 != map.end());
@@ -339,8 +333,7 @@ public:
         // ### secure codec can't coexist and secure codec can coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsMultipleSecureCodecs = false;
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(false, true);
 
             // priority too low to reclaim resource
             ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(kLowPriorityPid),
@@ -374,7 +367,7 @@ public:
                                      .name = "none"};
         {
             addResource();
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(true, true);
 
             std::vector<MediaResourceParcel> resources;
             resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
@@ -402,7 +395,7 @@ public:
 
         {
             addResource();
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(true, true);
 
             std::vector<MediaResourceParcel> resources;
             resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
@@ -428,7 +421,7 @@ public:
 
         {
             addResource();
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(true, true);
 
             mService->markClientForPendingRemoval(client2Info);
 
@@ -466,7 +459,7 @@ public:
                                      .name = "none"};
         mService->removeClient(client2Info);
 
-        const PidResourceInfosMap &map = mService->mMap;
+        const PidResourceInfosMap &map = mService->getResourceMap();
         EXPECT_EQ(2u, map.size());
         const ResourceInfos &infos1 = map.at(kTestPid1);
         const ResourceInfos &infos2 = map.at(kTestPid2);
@@ -520,8 +513,7 @@ public:
         // ### secure codec can't coexist and secure codec can coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsMultipleSecureCodecs = false;
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(false, true);
 
             // priority too low
             CHECK_STATUS_FALSE(mService->reclaimResource(lowPriorityClient, resources, &result));
@@ -546,8 +538,7 @@ public:
         // ### secure codecs can't coexist and secure codec can't coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsMultipleSecureCodecs = false;
-            mService->mSupportsSecureWithNonSecureCodec = false;
+            updateConfig(false, false);
 
             // priority too low
             CHECK_STATUS_FALSE(mService->reclaimResource(lowPriorityClient, resources, &result));
@@ -567,8 +558,7 @@ public:
         // ### secure codecs can coexist but secure codec can't coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsMultipleSecureCodecs = true;
-            mService->mSupportsSecureWithNonSecureCodec = false;
+            updateConfig(true, false);
 
             // priority too low
             CHECK_STATUS_FALSE(mService->reclaimResource(lowPriorityClient, resources, &result));
@@ -599,8 +589,7 @@ public:
         // ### secure codecs can coexist and secure codec can coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsMultipleSecureCodecs = true;
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(true, true);
 
             // priority too low
             CHECK_STATUS_FALSE(mService->reclaimResource(lowPriorityClient, resources, &result));
@@ -630,8 +619,7 @@ public:
         // ### secure codecs can coexist and secure codec can coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsMultipleSecureCodecs = true;
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(true, true);
 
             std::vector<MediaResourceParcel> resources;
             resources.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
@@ -677,7 +665,7 @@ public:
         // ### secure codec can't coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsSecureWithNonSecureCodec = false;
+            updateConfig(true, false);
 
             // priority too low
             CHECK_STATUS_FALSE(mService->reclaimResource(lowPriorityClient, resources, &result));
@@ -703,7 +691,7 @@ public:
         // ### secure codec can coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(true, true);
 
             // priority too low
             CHECK_STATUS_FALSE(mService->reclaimResource(lowPriorityClient, resources, &result));
@@ -733,7 +721,7 @@ public:
         // ### secure codec can coexist with non-secure codec ###
         {
             addResource();
-            mService->mSupportsSecureWithNonSecureCodec = true;
+            updateConfig(true, true);
 
             std::vector<MediaResourceParcel> resources;
             resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
@@ -1512,6 +1500,11 @@ public:
     }
 };
 
+class ResourceManagerServiceNewTest : public ResourceManagerServiceTest {
+public:
+    ResourceManagerServiceNewTest(bool newRM = true) : ResourceManagerServiceTest(newRM) {}
+};
+
 TEST_F(ResourceManagerServiceTest, config) {
     testConfig();
 }
@@ -1595,6 +1588,93 @@ TEST_F(ResourceManagerServiceTest,
 }
 
 TEST_F(ResourceManagerServiceTest, concurrentCodecs) {
+    testConcurrentCodecs();
+}
+
+/////// test cases for ResourceManagerServiceNew ////
+TEST_F(ResourceManagerServiceNewTest, config) {
+    testConfig();
+}
+
+TEST_F(ResourceManagerServiceNewTest, addResource) {
+    addResource();
+}
+
+TEST_F(ResourceManagerServiceNewTest, combineResource) {
+    testCombineResource();
+}
+
+TEST_F(ResourceManagerServiceNewTest, combineResourceNegative) {
+    testCombineResourceWithNegativeValues();
+}
+
+TEST_F(ResourceManagerServiceNewTest, removeResource) {
+    testRemoveResource();
+}
+
+TEST_F(ResourceManagerServiceNewTest, removeClient) {
+    testRemoveClient();
+}
+
+TEST_F(ResourceManagerServiceNewTest, reclaimResource) {
+    testReclaimResourceSecure();
+    testReclaimResourceNonSecure();
+}
+
+TEST_F(ResourceManagerServiceNewTest, getAllClients_l) {
+    testGetAllClients();
+}
+
+TEST_F(ResourceManagerServiceNewTest, getLowestPriorityBiggestClient_l) {
+    testGetLowestPriorityBiggestClient();
+}
+
+TEST_F(ResourceManagerServiceNewTest, getLowestPriorityPid_l) {
+    testGetLowestPriorityPid();
+}
+
+TEST_F(ResourceManagerServiceNewTest, isCallingPriorityHigher_l) {
+    testIsCallingPriorityHigher();
+}
+
+TEST_F(ResourceManagerServiceNewTest, batteryStats) {
+    testBatteryStats();
+}
+
+TEST_F(ResourceManagerServiceNewTest, cpusetBoost) {
+    testCpusetBoost();
+}
+
+TEST_F(ResourceManagerServiceNewTest, overridePid) {
+    testOverridePid();
+}
+
+TEST_F(ResourceManagerServiceNewTest, markClientForPendingRemoval) {
+    testMarkClientForPendingRemoval();
+}
+
+TEST_F(ResourceManagerServiceNewTest, reclaimResources_withVideoCodec_reclaimsOnlyVideoCodec) {
+    testReclaimResources_withVideoCodec_reclaimsOnlyVideoCodec();
+}
+
+TEST_F(ResourceManagerServiceNewTest, reclaimResources_withAudioCodec_reclaimsOnlyAudioCodec) {
+    testReclaimResources_withAudioCodec_reclaimsOnlyAudioCodec();
+}
+
+TEST_F(ResourceManagerServiceNewTest, reclaimResources_withImageCodec_reclaimsOnlyImageCodec) {
+    testReclaimResources_withImageCodec_reclaimsOnlyImageCodec();
+}
+
+TEST_F(ResourceManagerServiceNewTest, reclaimResources_whenPartialResourceMatch_reclaims) {
+    testReclaimResources_whenPartialResourceMatch_reclaims();
+}
+
+TEST_F(ResourceManagerServiceNewTest,
+        reclaimResourcesFromMarkedClients_removesBiggestMarkedClientForSomeResources) {
+    testReclaimResourcesFromMarkedClients_removesBiggestMarkedClientForSomeResources();
+}
+
+TEST_F(ResourceManagerServiceNewTest, concurrentCodecs) {
     testConcurrentCodecs();
 }
 

@@ -238,6 +238,29 @@ status_t Hal2AidlMapper::createOrUpdatePortConfig(
     return OK;
 }
 
+status_t Hal2AidlMapper::createOrUpdatePortConfigRetry(
+        const AudioPortConfig& requestedPortConfig, AudioPortConfig* result, bool* created) {
+    AudioPortConfig suggestedOrAppliedPortConfig;
+    RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig,
+                    &suggestedOrAppliedPortConfig, created));
+    if (suggestedOrAppliedPortConfig.id == 0) {
+        // Try again with the suggested config
+        suggestedOrAppliedPortConfig.id = requestedPortConfig.id;
+        AudioPortConfig appliedPortConfig;
+        RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(suggestedOrAppliedPortConfig,
+                        &appliedPortConfig, created));
+        if (appliedPortConfig.id == 0) {
+            ALOGE("%s: module %s did not apply suggested config %s", __func__,
+                    mInstance.c_str(), suggestedOrAppliedPortConfig.toString().c_str());
+            return NO_INIT;
+        }
+        *result = appliedPortConfig;
+    } else {
+        *result = suggestedOrAppliedPortConfig;
+    }
+    return OK;
+}
+
 void Hal2AidlMapper::eraseConnectedPort(int32_t portId) {
     mPorts.erase(portId);
     mConnectedPorts.erase(portId);
@@ -295,27 +318,19 @@ status_t Hal2AidlMapper::findOrCreateDevicePortConfig(
         if (config != nullptr) {
             setPortConfigFromConfig(&requestedPortConfig, *config);
         }
-        AudioPortConfig suggestedOrAppliedPortConfig;
-        RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig,
-                        &suggestedOrAppliedPortConfig, created));
-        if (suggestedOrAppliedPortConfig.id == 0) {
-            // Try again with the suggested config
-            suggestedOrAppliedPortConfig.id = requestedPortConfig.id;
-            AudioPortConfig appliedPortConfig;
-            RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(suggestedOrAppliedPortConfig,
-                            &appliedPortConfig, created));
-            if (appliedPortConfig.id == 0) {
-                ALOGE("%s: module %s did not apply suggested config %s", __func__,
-                        mInstance.c_str(), suggestedOrAppliedPortConfig.toString().c_str());
-                return NO_INIT;
-            }
-            *portConfig = appliedPortConfig;
-        } else {
-            *portConfig = suggestedOrAppliedPortConfig;
-        }
+        return createOrUpdatePortConfigRetry(requestedPortConfig, portConfig, created);
     } else {
-        *portConfig = portConfigIt->second;
-        *created = false;
+        AudioPortConfig requestedPortConfig = portConfigIt->second;
+        if (config != nullptr) {
+            setPortConfigFromConfig(&requestedPortConfig, *config);
+        }
+
+        if (requestedPortConfig != portConfigIt->second) {
+            return createOrUpdatePortConfigRetry(requestedPortConfig, portConfig, created);
+        } else {
+            *portConfig = portConfigIt->second;
+            *created = false;
+        }
     }
     return OK;
 }
@@ -371,12 +386,12 @@ status_t Hal2AidlMapper::findOrCreateMixPortConfig(
         return BAD_VALUE;
     } else {
         AudioPortConfig requestedPortConfig = portConfigIt->second;
-        if (requestedPortConfig.ext.getTag() == AudioPortExt::Tag::mix) {
-            AudioPortMixExt& mixExt = requestedPortConfig.ext.get<AudioPortExt::Tag::mix>();
-            if (mixExt.usecase.getTag() == AudioPortMixExtUseCase::Tag::source &&
-                    source != AudioSource::SYS_RESERVED_INVALID) {
-                mixExt.usecase.get<AudioPortMixExtUseCase::Tag::source>() = source;
-            }
+        setPortConfigFromConfig(&requestedPortConfig, config);
+
+        AudioPortMixExt& mixExt = requestedPortConfig.ext.get<AudioPortExt::Tag::mix>();
+        if (mixExt.usecase.getTag() == AudioPortMixExtUseCase::Tag::source &&
+                source != AudioSource::SYS_RESERVED_INVALID) {
+            mixExt.usecase.get<AudioPortMixExtUseCase::Tag::source>() = source;
         }
 
         if (requestedPortConfig != portConfigIt->second) {
@@ -411,9 +426,19 @@ status_t Hal2AidlMapper::findOrCreatePortConfig(
                 requestedPortConfig.ext.get<Tag::mix>().handle, source, destinationPortIds,
                 portConfig, created);
     } else if (requestedPortConfig.ext.getTag() == Tag::device) {
-        return findOrCreateDevicePortConfig(
-                requestedPortConfig.ext.get<Tag::device>().device, nullptr /*config*/,
-                portConfig, created);
+        if (const auto& p = requestedPortConfig;
+                p.sampleRate.has_value() && p.channelMask.has_value() &&
+                p.format.has_value()) {
+            AudioConfig config;
+            setConfigFromPortConfig(&config, requestedPortConfig);
+            return findOrCreateDevicePortConfig(
+                    requestedPortConfig.ext.get<Tag::device>().device, &config,
+                    portConfig, created);
+        } else {
+            return findOrCreateDevicePortConfig(
+                    requestedPortConfig.ext.get<Tag::device>().device, nullptr /*config*/,
+                    portConfig, created);
+        }
     }
     ALOGW("%s: unsupported audio port config: %s",
             __func__, requestedPortConfig.toString().c_str());
