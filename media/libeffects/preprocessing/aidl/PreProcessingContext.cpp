@@ -141,6 +141,9 @@ RetCode PreProcessingContext::disable() {
 }
 
 RetCode PreProcessingContext::setCommon(const Parameter::Common& common) {
+    if(auto ret = updateIOFrameSize(common); ret != RetCode::SUCCESS) {
+        return ret;
+    }
     mCommon = common;
     updateConfigs(common);
     return RetCode::SUCCESS;

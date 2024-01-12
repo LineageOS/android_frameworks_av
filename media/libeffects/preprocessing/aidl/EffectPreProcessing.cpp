@@ -412,10 +412,6 @@ std::shared_ptr<EffectContext> EffectPreProcessing::createContext(const Paramete
     return mContext;
 }
 
-std::shared_ptr<EffectContext> EffectPreProcessing::getContext() {
-    return mContext;
-}
-
 RetCode EffectPreProcessing::releaseContext() {
     if (mContext) {
         PreProcessingSession::getPreProcessingSession().releaseSession(mType,
