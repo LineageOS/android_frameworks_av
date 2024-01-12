@@ -41,11 +41,19 @@
         }
       ]
     }
-  ]
+  ],
+  "postsubmit": [
   // TODO(b/302036943): Enable once we make it pass with AIDL HAL on CF.
-  // "postsubmit": [
   //   {
   //      "name": "audioeffect_analysis"
-  //   }
-  // ]
+  //   },
+    {
+      "name": "CtsVirtualDevicesTestCases",
+      "options" : [
+        {
+          "include-filter": "android.virtualdevice.cts.VirtualAudioTest"
+        }
+      ]
+    }
+  ]
 }
