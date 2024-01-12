@@ -16,6 +16,7 @@
 
 #include <fuzzer/FuzzedDataProvider.h>
 #include <media/NdkMediaCrypto.h>
+#include <functional>
 
 #include <functional>
 
