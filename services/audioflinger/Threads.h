@@ -436,7 +436,8 @@ public:
                 // ThreadBase mutex before processing the mixer and effects. This guarantees the
                 // integrity of the chains during the process.
                 // Also sets the parameter 'effectChains' to current value of mEffectChains.
-    void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains) final REQUIRES(mutex());
+    void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains) final
+            REQUIRES(mutex()) EXCLUDES_EffectChain_Mutex;
                 // unlock effect chains after process
     void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains) final;
                 // get a copy of mEffectChains vector

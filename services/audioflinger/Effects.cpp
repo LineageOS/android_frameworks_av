@@ -1356,8 +1356,7 @@ void EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
     }
 }
 
-status_t EffectModule::setVolume(uint32_t *left, uint32_t *right, bool controller)
-{
+status_t EffectModule::setVolume(uint32_t* left, uint32_t* right, bool controller) {
     AutoLockReentrant _l(mutex(), mSetVolumeReentrantTid);
     if (mStatus != NO_ERROR) {
         return mStatus;
@@ -2574,9 +2573,14 @@ bool EffectChain::hasVolumeControlEnabled_l() const {
     return false;
 }
 
-// setVolume_l() must be called with IAfThreadBase::mutex() or EffectChain::mutex() held
-bool EffectChain::setVolume_l(uint32_t *left, uint32_t *right, bool force)
-{
+// setVolume() must be called without EffectChain::mutex()
+bool EffectChain::setVolume(uint32_t* left, uint32_t* right, bool force) {
+    audio_utils::lock_guard _l(mutex());
+    return setVolume_l(left, right, force);
+}
+
+// setVolume_l() must be called with EffectChain::mutex() held
+bool EffectChain::setVolume_l(uint32_t* left, uint32_t* right, bool force) {
     uint32_t newLeft = *left;
     uint32_t newRight = *right;
     const size_t size = mEffects.size();
@@ -2651,7 +2655,7 @@ bool EffectChain::setVolume_l(uint32_t *left, uint32_t *right, bool force)
     return volumeControlIndex.has_value();
 }
 
-// resetVolume_l() must be called with IAfThreadBase::mutex() or EffectChain::mutex() held
+// resetVolume_l() must be called with EffectChain::mutex() held
 void EffectChain::resetVolume_l()
 {
     if ((mLeftVolume != UINT_MAX) && (mRightVolume != UINT_MAX)) {
@@ -3293,7 +3297,7 @@ bool EffectChain::EffectCallback::disconnectEffectHandle(IAfEffectHandle *handle
     return true;
 }
 
-void EffectChain::EffectCallback::resetVolume() {
+void EffectChain::EffectCallback::resetVolume() NO_THREAD_SAFETY_ANALYSIS {
     sp<IAfEffectChain> c = chain().promote();
     if (c == nullptr) {
         return;

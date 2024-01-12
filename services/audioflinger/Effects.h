@@ -401,9 +401,11 @@ class EffectChain : public IAfEffectChain {
 public:
     EffectChain(const sp<IAfThreadBase>& thread, audio_session_t sessionId);
 
-    void process_l() final;
+    void process_l() final REQUIRES(audio_utils::EffectChain_Mutex);
 
-    audio_utils::mutex& mutex() const final { return mMutex; }
+    audio_utils::mutex& mutex() const final RETURN_CAPABILITY(audio_utils::EffectChain_Mutex) {
+        return mMutex;
+    }
 
     status_t createEffect_l(sp<IAfEffectModule>& effect,
                             effect_descriptor_t *desc,
@@ -423,8 +425,9 @@ public:
     std::vector<int> getEffectIds() const final;
     // FIXME use float to improve the dynamic range
 
-    bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false) final;
-    void resetVolume_l() final;
+    bool setVolume(uint32_t* left, uint32_t* right,
+                   bool force = false) final EXCLUDES_EffectChain_Mutex;
+    void resetVolume_l() final REQUIRES(audio_utils::EffectChain_Mutex);
     void setDevices_l(const AudioDeviceTypeAddrVector &devices) final;
     void setInputDevice_l(const AudioDeviceTypeAddr &device) final;
     void setMode_l(audio_mode_t mode) final;
@@ -521,7 +524,9 @@ public:
 
     void setThread(const sp<IAfThreadBase>& thread) final;
 
-private:
+  private:
+    bool setVolume_l(uint32_t* left, uint32_t* right, bool force = false)
+            REQUIRES(audio_utils::EffectChain_Mutex);
 
     // For transaction consistency, please consider holding the EffectChain lock before
     // calling the EffectChain::EffectCallback methods, excepting

@@ -222,7 +222,8 @@ public:
 
     virtual void process_l() = 0;
 
-    virtual audio_utils::mutex& mutex() const = 0;
+    virtual audio_utils::mutex& mutex() const
+            RETURN_CAPABILITY(android::audio_utils::EffectChain_Mutex) = 0;
 
     virtual status_t createEffect_l(sp<IAfEffectModule>& effect,
                             effect_descriptor_t *desc,
@@ -241,8 +242,9 @@ public:
     virtual sp<IAfEffectModule> getEffectFromId_l(int id) const = 0;
     virtual sp<IAfEffectModule> getEffectFromType_l(const effect_uuid_t *type) const = 0;
     virtual std::vector<int> getEffectIds() const = 0;
-    virtual bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false) = 0;
-    virtual void resetVolume_l() = 0;
+    virtual bool setVolume(uint32_t* left, uint32_t* right,
+                           bool force = false) EXCLUDES_EffectChain_Mutex = 0;
+    virtual void resetVolume_l() REQUIRES(audio_utils::EffectChain_Mutex) = 0;
     virtual void setDevices_l(const AudioDeviceTypeAddrVector &devices) = 0;
     virtual void setInputDevice_l(const AudioDeviceTypeAddr &device) = 0;
     virtual void setMode_l(audio_mode_t mode) = 0;
