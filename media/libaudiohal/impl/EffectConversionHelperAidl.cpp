@@ -187,16 +187,7 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
         IEffect::OpenEffectReturn openReturn;
         RETURN_STATUS_IF_ERROR(
                 statusTFromBinderStatus(mEffect->open(common, std::nullopt, &openReturn)));
-
-        if (mIsProxyEffect) {
-            mStatusQ = std::static_pointer_cast<EffectProxy>(mEffect)->getStatusMQ();
-            mInputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getInputMQ();
-            mOutputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getOutputMQ();
-        } else {
-            mStatusQ = std::make_shared<StatusMQ>(openReturn.statusMQ);
-            mInputQ = std::make_shared<DataMQ>(openReturn.inputDataMQ);
-            mOutputQ = std::make_shared<DataMQ>(openReturn.outputDataMQ);
-        }
+        updateMqs(openReturn);
 
         if (status_t status = updateEventFlags(); status != OK) {
             ALOGV("%s closing at status %d", __func__, status);
@@ -211,6 +202,18 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
     mCommon = common;
 
     return *static_cast<int32_t*>(pReplyData) = OK;
+}
+
+void EffectConversionHelperAidl::updateMqs(const IEffect::OpenEffectReturn& ret) {
+    if (mIsProxyEffect) {
+        mStatusQ = std::static_pointer_cast<EffectProxy>(mEffect)->getStatusMQ();
+        mInputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getInputMQ();
+        mOutputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getOutputMQ();
+    } else {
+        mStatusQ = std::make_shared<StatusMQ>(ret.statusMQ);
+        mInputQ = std::make_shared<DataMQ>(ret.inputDataMQ);
+        mOutputQ = std::make_shared<DataMQ>(ret.outputDataMQ);
+    }
 }
 
 status_t EffectConversionHelperAidl::handleGetConfig(uint32_t cmdSize __unused,
@@ -503,6 +506,14 @@ Descriptor EffectConversionHelperAidl::getDescriptor() const {
         return mDesc;
     }
     return desc;
+}
+
+status_t EffectConversionHelperAidl::reopen() {
+    IEffect::OpenEffectReturn openReturn;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->reopen(&openReturn)));
+
+    updateMqs(openReturn);
+    return OK;
 }
 
 }  // namespace effect

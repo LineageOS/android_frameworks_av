@@ -358,10 +358,6 @@ std::shared_ptr<EffectContext> EffectReverb::createContext(const Parameter::Comm
     return mContext;
 }
 
-std::shared_ptr<EffectContext> EffectReverb::getContext() {
-    return mContext;
-}
-
 RetCode EffectReverb::releaseContext() {
     if (mContext) {
         mContext.reset();
