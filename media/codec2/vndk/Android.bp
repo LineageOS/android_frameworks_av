@@ -84,7 +84,7 @@ cc_library {
         "libbase",
         "libdmabufheap",
         "android.hardware.media.bufferpool@2.0",
-        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.bufferpool2-V2-ndk",
     ],
 
     local_include_dirs: [
@@ -102,7 +102,7 @@ cc_library {
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
         "android.hardware.media.bufferpool@2.0",
-        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.bufferpool2-V2-ndk",
         "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",
@@ -162,11 +162,12 @@ cc_defaults {
         "android.hardware.graphics.bufferqueue@2.0",
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
-        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.bufferpool2-V2-ndk",
         "android.hardware.media.c2-V1-ndk",
     ],
 
     shared_libs: [
+        "libbinder",
         "libbinder_ndk",
         "libui",
         "libdl",
