@@ -83,3 +83,10 @@ flag {
      description: "Enable using ro.board.api_level instead of ro.vndk.version to get VNDK version"
      bug: "312315580"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "delay_lazy_hal_instantiation"
+     description: "Only trigger lazy HAL instantiation when the HAL is needed for an operation."
+     bug: "319735068"
+}
