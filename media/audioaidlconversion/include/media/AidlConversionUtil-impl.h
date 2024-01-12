@@ -25,6 +25,7 @@
 #define AUDIO_AIDL_CONVERSION_AIDL_CONVERSION_UTIL_CPP
 #endif  // BACKEND_NDK_IMPL
 
+#include <functional>
 #include <limits>
 #include <type_traits>
 #include <utility>
