@@ -5497,6 +5497,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
     if (masterMute) {
         masterVolume = 0;
     }
+
     // Delegate master volume control to effect in output mix effect chain if needed
     sp<IAfEffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
     if (chain != 0) {
@@ -5836,7 +5837,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
 
             mixedTracks++;
 
-            // track->mainBuffer() != mSinkBuffer or mMixerBuffer means
+            // track->mainBuffer() != mSinkBuffer and mMixerBuffer means
             // there is an effect chain connected to the track
             chain.clear();
             if (track->mainBuffer() != mSinkBuffer &&
