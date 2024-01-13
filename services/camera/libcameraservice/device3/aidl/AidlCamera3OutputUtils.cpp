@@ -67,7 +67,8 @@ void processOneCaptureResultLocked(
 }
 
 void notify(CaptureOutputStates& states,
-        const aidl::android::hardware::camera::device::NotifyMsg& msg) {
+            const aidl::android::hardware::camera::device::NotifyMsg& msg,
+            bool hasReadoutTimestamp) {
 
     using ErrorCode = aidl::android::hardware::camera::device::ErrorCode;
     using Tag = aidl::android::hardware::camera::device::NotifyMsg::Tag;
@@ -110,8 +111,9 @@ void notify(CaptureOutputStates& states,
             m.type = CAMERA_MSG_SHUTTER;
             m.message.shutter.frame_number = msg.get<Tag::shutter>().frameNumber;
             m.message.shutter.timestamp = msg.get<Tag::shutter>().timestamp;
-            m.message.shutter.readout_timestamp_valid = true;
-            m.message.shutter.readout_timestamp = msg.get<Tag::shutter>().readoutTimestamp;
+            m.message.shutter.readout_timestamp_valid = hasReadoutTimestamp;
+            m.message.shutter.readout_timestamp =
+                    hasReadoutTimestamp ? msg.get<Tag::shutter>().readoutTimestamp : 0LL;
             break;
     }
     notify(states, &m);
