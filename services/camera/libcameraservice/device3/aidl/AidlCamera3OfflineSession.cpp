@@ -177,7 +177,7 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         /*overrideToPortrait*/false, activePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
-        camera3::notify(states, msg);
+        camera3::notify(states, msg, mSensorReadoutTimestampSupported);
     }
     return ::ndk::ScopedAStatus::ok();
 }

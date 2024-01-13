@@ -339,6 +339,16 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
 
     mBatchSizeLimitEnabled = (deviceVersion >= CAMERA_DEVICE_API_VERSION_1_2);
 
+    camera_metadata_entry readoutSupported = mDeviceInfo.find(ANDROID_SENSOR_READOUT_TIMESTAMP);
+    if (readoutSupported.count == 0) {
+        ALOGW("%s: Could not find value corresponding to ANDROID_SENSOR_READOUT_TIMESTAMP. "
+              "Assuming true.", __FUNCTION__);
+        mSensorReadoutTimestampSupported = true;
+    } else {
+        mSensorReadoutTimestampSupported =
+                readoutSupported.data.u8[0] == ANDROID_SENSOR_READOUT_TIMESTAMP_HARDWARE;
+    }
+
     return initializeCommonLocked();
 }
 
@@ -452,7 +462,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mOverrideToPortrait, mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
-        camera3::notify(states, msg);
+        camera3::notify(states, msg, mSensorReadoutTimestampSupported);
     }
     return ::ndk::ScopedAStatus::ok();
 
@@ -623,7 +633,8 @@ status_t AidlCamera3Device::switchToOffline(
             mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers);
 
     *session = new AidlCamera3OfflineSession(mId, inputStream, offlineStreamSet,
-            std::move(bufferRecords), offlineReqs, offlineStates, offlineSession);
+                                             std::move(bufferRecords), offlineReqs, offlineStates,
+                                             offlineSession, mSensorReadoutTimestampSupported);
 
     // Delete all streams that has been transferred to offline session
     Mutex::Autolock l(mLock);
