@@ -43,7 +43,7 @@ cc_library {
         "android.hardware.media.c2@1.0",
         "android.hardware.media.c2@1.1",
         "android.hardware.media.c2@1.2",
-        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.bufferpool2-V2-ndk",
         "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder",
