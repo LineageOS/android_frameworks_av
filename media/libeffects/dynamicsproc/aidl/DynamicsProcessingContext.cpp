@@ -63,6 +63,9 @@ void DynamicsProcessingContext::reset() {
 }
 
 RetCode DynamicsProcessingContext::setCommon(const Parameter::Common& common) {
+    if(auto ret = updateIOFrameSize(common); ret != RetCode::SUCCESS) {
+        return ret;
+    }
     mCommon = common;
     init();
     LOG(INFO) << __func__ << common.toString();
@@ -312,7 +315,9 @@ IEffect::Status DynamicsProcessingContext::dpeProcess(float* in, float* out, int
 
 void DynamicsProcessingContext::init() {
     std::lock_guard lg(mMutex);
-    mState = DYNAMICS_PROCESSING_STATE_INITIALIZED;
+    if (mState == DYNAMICS_PROCESSING_STATE_UNINITIALIZED) {
+        mState = DYNAMICS_PROCESSING_STATE_INITIALIZED;
+    }
     mChannelCount = static_cast<int>(::aidl::android::hardware::audio::common::getChannelCount(
             mCommon.input.base.channelMask));
 }

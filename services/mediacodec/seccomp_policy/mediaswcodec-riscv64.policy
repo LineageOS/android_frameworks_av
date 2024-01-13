@@ -52,6 +52,9 @@ ftruncate: 1
 getdents64: 1
 ppoll: 1
 
+clock_gettime: 1
+pipe2: 1
+
 # Required by AddressSanitizer
 gettid: 1
 sched_yield: 1
