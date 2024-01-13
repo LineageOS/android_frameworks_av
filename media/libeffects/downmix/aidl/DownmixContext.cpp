@@ -111,7 +111,6 @@ void DownmixContext::reset() {
 }
 
 IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int samples) {
-    LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
     IEffect::Status status = {EX_ILLEGAL_ARGUMENT, 0, 0};
 
     if (in == nullptr || out == nullptr ||
@@ -132,7 +131,6 @@ IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int sample
     bool accumulate = false;
     int frames = samples * sizeof(float) / getInputFrameSize();
     if (mType == Downmix::Type::STRIP) {
-        int inputChannelCount = getChannelCount(mChMask);
         while (frames) {
             if (accumulate) {
                 out[0] = std::clamp(out[0] + in[0], -1.f, 1.f);
@@ -141,7 +139,7 @@ IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int sample
                 out[0] = in[0];
                 out[1] = in[1];
             }
-            in += inputChannelCount;
+            in += mInputChannelCount;
             out += 2;
             frames--;
         }
@@ -153,8 +151,11 @@ IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int sample
             return status;
         }
     }
-    LOG(DEBUG) << __func__ << " done processing";
-    return {STATUS_OK, samples, samples};
+    int producedSamples = (samples / mInputChannelCount) << 1;
+    LOG(DEBUG) << __func__ << " done processing " << samples << " samples, generated "
+               << producedSamples << " frameSize: " << getInputFrameSize() << " - "
+               << getOutputFrameSize();
+    return {STATUS_OK, samples, producedSamples};
 }
 
 void DownmixContext::init_params(const Parameter::Common& common) {
