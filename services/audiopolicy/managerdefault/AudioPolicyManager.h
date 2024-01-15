@@ -339,7 +339,8 @@ public:
         virtual status_t startAudioSource(const struct audio_port_config *source,
                                           const audio_attributes_t *attributes,
                                           audio_port_handle_t *portId,
-                                          uid_t uid);
+                                          uid_t uid,
+                                          bool internal = false);
         virtual status_t stopAudioSource(audio_port_handle_t portId);
 
         virtual status_t setMasterMono(bool mono);
@@ -1055,9 +1056,6 @@ protected:
         bool isMsdPatch(const audio_patch_handle_t &handle) const;
 
 private:
-        sp<SourceClientDescriptor> startAudioSourceInternal(
-                const struct audio_port_config *source, const audio_attributes_t *attributes,
-                uid_t uid);
 
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
