@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "VirtualCameraSession.h"
 #include "aidl/android/companion/virtualcamera/BnVirtualCameraCallback.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
+#include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BnCameraDeviceCallback.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
@@ -38,12 +39,16 @@ namespace {
 
 constexpr int kWidth = 640;
 constexpr int kHeight = 480;
+constexpr int kMaxFps = 30;
 constexpr int kStreamId = 0;
 constexpr int kCameraId = 42;
 
 using ::aidl::android::companion::virtualcamera::BnVirtualCameraCallback;
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
+using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BnCameraDeviceCallback;
 using ::aidl::android::hardware::camera::device::BufferRequest;
@@ -104,12 +109,15 @@ class VirtualCameraSessionTest : public ::testing::Test {
     mMockVirtualCameraClientCallback =
         ndk::SharedRefBase::make<MockVirtualCameraCallback>();
     mVirtualCameraDevice = ndk::SharedRefBase::make<VirtualCameraDevice>(
-        kCameraId,
-        std::vector<SupportedStreamConfiguration>{
-            SupportedStreamConfiguration{.width = kWidth,
-                                         .height = kHeight,
-                                         .pixelFormat = Format::YUV_420_888}},
-        mMockVirtualCameraClientCallback);
+        kCameraId, VirtualCameraConfiguration{
+                       .supportedStreamConfigs = {SupportedStreamConfiguration{
+                           .width = kWidth,
+                           .height = kHeight,
+                           .pixelFormat = Format::YUV_420_888,
+                           .maxFps = kMaxFps}},
+                       .virtualCameraCallback = nullptr,
+                       .sensorOrientation = SensorOrientation::ORIENTATION_0,
+                       .lensFacing = LensFacing::FRONT});
     mVirtualCameraSession = ndk::SharedRefBase::make<VirtualCameraSession>(
         mVirtualCameraDevice, mMockCameraDeviceCallback,
         mMockVirtualCameraClientCallback);

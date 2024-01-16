@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 The Android Open Source Project
+ * Copyright 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,14 @@
 
 package android.companion.virtualcamera;
 
-import android.companion.virtualcamera.Format;
-
 /**
- * Configuration supported by virtual camera owner.
+ * Direction that the virtual camera faces relative to the device's screen.
  *
  * @hide
  */
-parcelable SupportedStreamConfiguration {
-    int width;
-    int height;
-    Format pixelFormat = Format.UNKNOWN;
-    int maxFps;
+@Backing(type="int")
+enum LensFacing {
+    FRONT = 0,
+    BACK = 1,
+    EXTERNAL = 2,
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,10 @@ namespace virtualcamera {
 namespace {
 
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
+using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 using ::aidl::android::hardware::camera::common::CameraDeviceStatus;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::common::TorchModeStatus;
@@ -49,6 +52,7 @@ using ::testing::Return;
 
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
+constexpr int kMaxFps = 30;
 constexpr char kVirtualCameraNameRegex[] =
     "device@[0-9]+\\.[0-9]+/virtual/[0-9]+";
 
@@ -79,10 +83,15 @@ class VirtualCameraProviderTest : public ::testing::Test {
   std::shared_ptr<VirtualCameraProvider> mCameraProvider;
   std::shared_ptr<MockCameraProviderCallback> mMockCameraProviderCallback =
       ndk::SharedRefBase::make<MockCameraProviderCallback>();
-  std::vector<SupportedStreamConfiguration> mInputConfigs = {
-      SupportedStreamConfiguration{.width = kVgaWidth,
-                                   .height = kVgaHeight,
-                                   .pixelFormat = Format::YUV_420_888}};
+  VirtualCameraConfiguration mInputConfig = VirtualCameraConfiguration{
+      .supportedStreamConfigs = {SupportedStreamConfiguration{
+          .width = kVgaWidth,
+          .height = kVgaHeight,
+          .pixelFormat = Format::YUV_420_888,
+          .maxFps = kMaxFps}},
+      .virtualCameraCallback = nullptr,
+      .sensorOrientation = SensorOrientation::ORIENTATION_0,
+      .lensFacing = LensFacing::FRONT};
 };
 
 TEST_F(VirtualCameraProviderTest, SetNullCameraCallbackFails) {
@@ -109,7 +118,7 @@ TEST_F(VirtualCameraProviderTest, CreateCamera) {
 
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfigs);
+      mCameraProvider->createCamera(mInputConfig);
   EXPECT_THAT(camera, Not(IsNull()));
   EXPECT_THAT(camera->getCameraName(), MatchesRegex(kVirtualCameraNameRegex));
 
@@ -127,7 +136,7 @@ TEST_F(VirtualCameraProviderTest, CreateCameraBeforeCallbackIsSet) {
       .WillOnce(Return(ndk::ScopedAStatus::ok()));
 
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfigs);
+      mCameraProvider->createCamera(mInputConfig);
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
 
   // Created camera should be in the list of cameras.
@@ -139,7 +148,7 @@ TEST_F(VirtualCameraProviderTest, CreateCameraBeforeCallbackIsSet) {
 TEST_F(VirtualCameraProviderTest, RemoveCamera) {
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfigs);
+      mCameraProvider->createCamera(mInputConfig);
 
   EXPECT_CALL(*mMockCameraProviderCallback,
               cameraDeviceStatusChange(Eq(camera->getCameraName()),
@@ -156,7 +165,7 @@ TEST_F(VirtualCameraProviderTest, RemoveCamera) {
 TEST_F(VirtualCameraProviderTest, RemoveNonExistingCamera) {
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfigs);
+      mCameraProvider->createCamera(mInputConfig);
 
   // Removing non-existing camera should fail.
   const std::string cameraName = "DefinitelyNoTCamera";

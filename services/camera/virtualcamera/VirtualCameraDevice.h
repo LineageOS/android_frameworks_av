@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 
 #include "aidl/android/companion/virtualcamera/IVirtualCameraCallback.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
+#include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/device/BnCameraDevice.h"
 
 namespace android {
@@ -35,12 +36,8 @@ class VirtualCameraDevice
  public:
   explicit VirtualCameraDevice(
       uint32_t cameraId,
-      const std::vector<
-          aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
-          supportedInputConfig,
-      std::shared_ptr<
-          ::aidl::android::companion::virtualcamera::IVirtualCameraCallback>
-          virtualCameraClientCallback = nullptr);
+      const aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
+          configuration);
 
   virtual ~VirtualCameraDevice() override = default;
 

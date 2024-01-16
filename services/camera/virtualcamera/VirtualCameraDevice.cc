@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@
 
 #include "VirtualCameraSession.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
+#include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
@@ -44,7 +45,10 @@ namespace virtualcamera {
 
 using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::companion::virtualcamera::IVirtualCameraCallback;
+using ::aidl::android::companion::virtualcamera::LensFacing;
+using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 using ::aidl::android::hardware::camera::common::CameraResourceCost;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
@@ -64,10 +68,14 @@ using namespace std::chrono_literals;
 // Prefix of camera name - "device@1.1/virtual/{numerical_id}"
 const char* kDevicePathPrefix = "device@1.1/virtual/";
 
-constexpr std::chrono::nanoseconds kMinFrameDuration30Fps = 1s / 30;
 constexpr int32_t kMaxJpegSize = 3 * 1024 * 1024 /*3MiB*/;
 
 constexpr MetadataBuilder::ControlRegion kDefaultEmptyControlRegion{};
+
+const std::array<int32_t, 3> kOutputFormats{
+    ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
+    ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888,
+    ANDROID_SCALER_AVAILABLE_FORMATS_BLOB};
 
 struct Resolution {
   Resolution(const int w, const int h) : width(w), height(h) {
@@ -103,24 +111,34 @@ std::optional<Resolution> getMaxResolution(
   return Resolution(itMax->width, itMax->height);
 }
 
-std::set<Resolution> getUniqueResolutions(
+// Returns a map of unique resolution to maximum maxFps for all streams with
+// that resolution.
+std::map<Resolution, int> getResolutionToMaxFpsMap(
     const std::vector<SupportedStreamConfiguration>& configs) {
-  std::set<Resolution> uniqueResolutions;
-  std::transform(configs.begin(), configs.end(),
-                 std::inserter(uniqueResolutions, uniqueResolutions.begin()),
-                 [](const SupportedStreamConfiguration& config) {
-                   return Resolution(config.width, config.height);
-                 });
-  return uniqueResolutions;
+  std::map<Resolution, int> resolutionToMaxFpsMap;
+
+  for (const SupportedStreamConfiguration& config : configs) {
+    Resolution resolution(config.width, config.height);
+    if (resolutionToMaxFpsMap.find(resolution) == resolutionToMaxFpsMap.end()) {
+      resolutionToMaxFpsMap[resolution] = config.maxFps;
+    } else {
+      int currentMaxFps = resolutionToMaxFpsMap[resolution];
+      resolutionToMaxFpsMap[resolution] = std::max(currentMaxFps, config.maxFps);
+    }
+  }
+
+  return resolutionToMaxFpsMap;
 }
 
 // TODO(b/301023410) - Populate camera characteristics according to camera configuration.
 std::optional<CameraMetadata> initCameraCharacteristics(
-    const std::vector<SupportedStreamConfiguration>& supportedInputConfig) {
+    const std::vector<SupportedStreamConfiguration>& supportedInputConfig,
+    const SensorOrientation sensorOrientation, const LensFacing lensFacing) {
   if (!std::all_of(supportedInputConfig.begin(), supportedInputConfig.end(),
                    [](const SupportedStreamConfiguration& config) {
                      return isFormatSupportedForInput(
-                         config.width, config.height, config.pixelFormat);
+                         config.width, config.height, config.pixelFormat,
+                         config.maxFps);
                    })) {
     ALOGE("%s: input configuration contains unsupported format", __func__);
     return std::nullopt;
@@ -131,8 +149,9 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setSupportedHardwareLevel(
               ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL)
           .setFlashAvailable(false)
-          .setLensFacing(ANDROID_LENS_FACING_EXTERNAL)
-          .setSensorOrientation(0)
+          .setLensFacing(
+              static_cast<camera_metadata_enum_android_lens_facing>(lensFacing))
+          .setSensorOrientation(static_cast<int32_t>(sensorOrientation))
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
           .setControlAvailableModes({ANDROID_CONTROL_MODE_AUTO})
@@ -166,45 +185,24 @@ std::optional<CameraMetadata> initCameraCharacteristics(
   // TODO(b/301023410) Add also all "standard" resolutions we can rescale the
   // streams to (all standard resolutions with same aspect ratio).
 
-  // Add IMPLEMENTATION_DEFINED format for all supported input resolutions.
-  std::set<Resolution> uniqueResolutions =
-      getUniqueResolutions(supportedInputConfig);
-  std::transform(
-      uniqueResolutions.begin(), uniqueResolutions.end(),
-      std::back_inserter(outputConfigurations),
-      [](const Resolution& resolution) {
-        return MetadataBuilder::StreamConfiguration{
-            .width = resolution.width,
-            .height = resolution.height,
-            .format = ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
-            .minFrameDuration = kMinFrameDuration30Fps,
-            .minStallDuration = 0s};
-      });
+  std::map<Resolution, int> resolutionToMaxFpsMap =
+      getResolutionToMaxFpsMap(supportedInputConfig);
 
-  // Add all supported configuration with explicit pixel format.
-  std::transform(supportedInputConfig.begin(), supportedInputConfig.end(),
-                 std::back_inserter(outputConfigurations),
-                 [](const SupportedStreamConfiguration& config) {
-                   return MetadataBuilder::StreamConfiguration{
-                       .width = config.width,
-                       .height = config.height,
-                       .format = static_cast<int>(config.pixelFormat),
-                       .minFrameDuration = kMinFrameDuration30Fps,
-                       .minStallDuration = 0s};
-                 });
-
-  // TODO(b/301023410) We currently don't support rescaling for still capture,
-  // so only announce BLOB support for formats exactly matching the input.
-  std::transform(uniqueResolutions.begin(), uniqueResolutions.end(),
-                 std::back_inserter(outputConfigurations),
-                 [](const Resolution& resolution) {
-                   return MetadataBuilder::StreamConfiguration{
-                       .width = resolution.width,
-                       .height = resolution.height,
-                       .format = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB,
-                       .minFrameDuration = kMinFrameDuration30Fps,
-                       .minStallDuration = 0s};
-                 });
+  // Add configurations for all unique input resolutions and output formats.
+  for (int32_t format : kOutputFormats) {
+    std::transform(
+        resolutionToMaxFpsMap.begin(), resolutionToMaxFpsMap.end(),
+        std::back_inserter(outputConfigurations), [format](const auto& entry) {
+          Resolution resolution = entry.first;
+          int maxFps = entry.second;
+          return MetadataBuilder::StreamConfiguration{
+              .width = resolution.width,
+              .height = resolution.height,
+              .format = format,
+              .minFrameDuration = std::chrono::nanoseconds(1s) / maxFps,
+              .minStallDuration = 0s};
+        });
+  }
 
   ALOGV("Adding %zu output configurations", outputConfigurations.size());
   builder.setAvailableOutputStreamConfigurations(outputConfigurations);
@@ -221,14 +219,13 @@ std::optional<CameraMetadata> initCameraCharacteristics(
 }  // namespace
 
 VirtualCameraDevice::VirtualCameraDevice(
-    const uint32_t cameraId,
-    const std::vector<SupportedStreamConfiguration>& supportedInputConfig,
-    std::shared_ptr<IVirtualCameraCallback> virtualCameraClientCallback)
+    const uint32_t cameraId, const VirtualCameraConfiguration& configuration)
     : mCameraId(cameraId),
-      mVirtualCameraClientCallback(virtualCameraClientCallback),
-      mSupportedInputConfigurations(supportedInputConfig) {
-  std::optional<CameraMetadata> metadata =
-      initCameraCharacteristics(mSupportedInputConfigurations);
+      mVirtualCameraClientCallback(configuration.virtualCameraCallback),
+      mSupportedInputConfigurations(configuration.supportedStreamConfigs) {
+  std::optional<CameraMetadata> metadata = initCameraCharacteristics(
+      mSupportedInputConfigurations, configuration.sensorOrientation,
+      configuration.lensFacing);
   if (metadata.has_value()) {
     mCameraCharacteristics = *metadata;
   } else {
