@@ -1628,7 +1628,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
 
     *isSpatialized = false;
     if (mSpatializerOutput != nullptr
-            && canBeSpatializedInt(attr, config, devices.toTypeAddrVector())) {
+            && canBeSpatializedInt(attr, config, devices.toTypeAddrVector())
+            && prefMixerConfigInfo == nullptr) {
         *isSpatialized = true;
         return mSpatializerOutput->mIoHandle;
     }
