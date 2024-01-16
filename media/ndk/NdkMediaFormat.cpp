@@ -449,6 +449,10 @@ EXPORT const char* AMEDIAFORMAT_KEY_MAX_B_FRAMES = "max-bframes";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER = "max-fps-to-encoder";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_HEIGHT = "max-height";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_INPUT_SIZE = "max-input-size";
+EXPORT const char* AMEDIAFORMAT_KEY_BUFFER_BATCH_MAX_OUTPUT_SIZE =
+        "buffer-batch-max-output-size";
+EXPORT const char* AMEDIAFORMAT_KEY_BUFFER_BATCH_THRESHOLD_OUTPUT_SIZE =
+        "buffer-batch-threshold-output-size";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_PTS_GAP_TO_ENCODER = "max-pts-gap-to-encoder";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_WIDTH = "max-width";
 EXPORT const char* AMEDIAFORMAT_KEY_MIME = "mime";
