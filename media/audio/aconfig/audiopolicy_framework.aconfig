@@ -18,3 +18,10 @@ flag {
     description: "Enable Fade Manager Configuration support to determine fade properties"
     bug: "307354764"
 }
+
+flag {
+    name: "multi_zone_audio"
+    namespace: "media_audio"
+    description: "Enable multi-zone audio support in audio product strategies."
+    bug: "316643994"
+}
