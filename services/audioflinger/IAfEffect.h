@@ -241,10 +241,7 @@ public:
     virtual sp<IAfEffectModule> getEffectFromId_l(int id) const = 0;
     virtual sp<IAfEffectModule> getEffectFromType_l(const effect_uuid_t *type) const = 0;
     virtual std::vector<int> getEffectIds() const = 0;
-    virtual bool setVolume_l(uint32_t* left, uint32_t* right, bool force = false)
-            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
-    virtual bool setVolume_ll(uint32_t* left, uint32_t* right, bool force = false)
-            REQUIRES(audio_utils::ThreadBase_Mutex, audio_utils::EffectChain_Mutex) = 0;
+    virtual bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false) = 0;
     virtual void resetVolume_l() = 0;
     virtual void setDevices_l(const AudioDeviceTypeAddrVector &devices) = 0;
     virtual void setInputDevice_l(const AudioDeviceTypeAddr &device) = 0;

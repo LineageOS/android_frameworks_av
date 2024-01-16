@@ -401,7 +401,7 @@ class EffectChain : public IAfEffectChain {
 public:
     EffectChain(const sp<IAfThreadBase>& thread, audio_session_t sessionId);
 
-    void process_l() final REQUIRES(audio_utils::ThreadBase_Mutex);
+    void process_l() final;
 
     audio_utils::mutex& mutex() const final { return mMutex; }
 
@@ -423,11 +423,8 @@ public:
     std::vector<int> getEffectIds() const final;
     // FIXME use float to improve the dynamic range
 
-    bool setVolume_l(uint32_t* left, uint32_t* right, bool force = false) final
-            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex;
-    bool setVolume_ll(uint32_t* left, uint32_t* right, bool force = false) final
-            REQUIRES(audio_utils::ThreadBase_Mutex, mutex());
-    void resetVolume_l() final REQUIRES(audio_utils::ThreadBase_Mutex);
+    bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false) final;
+    void resetVolume_l() final;
     void setDevices_l(const AudioDeviceTypeAddrVector &devices) final;
     void setInputDevice_l(const AudioDeviceTypeAddr &device) final;
     void setMode_l(audio_mode_t mode) final;
@@ -573,7 +570,7 @@ private:
         // check if effects should be suspended/restored when a given effect is enable/disabled
         void checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect,
                               bool enabled, bool threadLocked) override;
-        void resetVolume() override REQUIRES(audio_utils::ThreadBase_Mutex);
+        void resetVolume() override;
         product_strategy_t strategy() const override;
         int32_t activeTrackCnt() const override;
         void onEffectEnable(const sp<IAfEffectBase>& effect) override;
@@ -748,7 +745,7 @@ private:
 
         void checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect __unused,
                               bool enabled __unused, bool threadLocked __unused) override {}
-        void resetVolume() override REQUIRES(audio_utils::ThreadBase_Mutex) {}
+        void resetVolume() override {}
         product_strategy_t strategy() const override  { return static_cast<product_strategy_t>(0); }
         int32_t activeTrackCnt() const override { return 0; }
         void onEffectEnable(const sp<IAfEffectBase>& effect __unused) override;
