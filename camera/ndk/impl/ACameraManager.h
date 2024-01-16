@@ -87,23 +87,24 @@ class CameraManagerGlobal final : public RefBase {
     class CameraServiceListener final : public hardware::BnCameraServiceListener {
       public:
         explicit CameraServiceListener(CameraManagerGlobal* cm) : mCameraManager(cm) {}
-        virtual binder::Status onStatusChanged(int32_t status, const std::string& cameraId);
+        virtual binder::Status onStatusChanged(int32_t status, const std::string& cameraId,
+                int32_t deviceId);
         virtual binder::Status onPhysicalCameraStatusChanged(int32_t status,
-                const std::string& cameraId, const std::string& physicalCameraId);
+                const std::string& cameraId, const std::string& physicalCameraId, int32_t deviceId);
 
         // Torch API not implemented yet
-        virtual binder::Status onTorchStatusChanged(int32_t, const std::string&) {
+        virtual binder::Status onTorchStatusChanged(int32_t, const std::string&, int32_t) {
             return binder::Status::ok();
         }
-        virtual binder::Status onTorchStrengthLevelChanged(const std::string&, int32_t) {
+        virtual binder::Status onTorchStrengthLevelChanged(const std::string&, int32_t, int32_t) {
             return binder::Status::ok();
         }
 
         virtual binder::Status onCameraAccessPrioritiesChanged();
-        virtual binder::Status onCameraOpened(const std::string&, const std::string&) {
+        virtual binder::Status onCameraOpened(const std::string&, const std::string&, int32_t) {
             return binder::Status::ok();
         }
-        virtual binder::Status onCameraClosed(const std::string&) {
+        virtual binder::Status onCameraClosed(const std::string&, int32_t) {
             return binder::Status::ok();
         }
 

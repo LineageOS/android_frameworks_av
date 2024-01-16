@@ -67,6 +67,11 @@ MetadataBuilder& MetadataBuilder::setSupportedHardwareLevel(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setDeviceId(int32_t deviceId) {
+  mEntryMap[ANDROID_INFO_DEVICE_ID] = std::vector<int32_t>({deviceId});
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setFlashAvailable(bool flashAvailable) {
   const uint8_t metadataVal = flashAvailable
                                   ? ANDROID_FLASH_INFO_AVAILABLE_TRUE

@@ -62,6 +62,7 @@ namespace {
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kMaxFps = 60;
+constexpr int kDefaultDeviceId = 0;
 constexpr char kEnableTestCameraCmd[] = "enable_test_camera";
 constexpr char kDisableTestCameraCmd[] = "disable_test_camera";
 constexpr char kHelp[] = "help";
@@ -186,14 +187,15 @@ VirtualCameraService::VirtualCameraService(
 
 ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
-    const VirtualCameraConfiguration& configuration, bool* _aidl_return) {
-  return registerCamera(token, configuration, sNextId++, _aidl_return);
+    const VirtualCameraConfiguration& configuration, const int32_t deviceId,
+    bool* _aidl_return) {
+  return registerCamera(token, configuration, sNextId++, deviceId, _aidl_return);
 }
 
 ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
     const VirtualCameraConfiguration& configuration, const int cameraId,
-    bool* _aidl_return) {
+    const int32_t deviceId, bool* _aidl_return) {
   if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
     ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
           getpid(), getuid(), kCreateVirtualDevicePermission);
@@ -225,7 +227,7 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
   }
 
   std::shared_ptr<VirtualCameraDevice> camera =
-      mVirtualCameraProvider->createCamera(configuration, cameraId);
+      mVirtualCameraProvider->createCamera(configuration, cameraId, deviceId);
   if (camera == nullptr) {
     ALOGE("Failed to create camera for binder token 0x%" PRIxPTR,
           reinterpret_cast<uintptr_t>(token.get()));
@@ -389,7 +391,7 @@ binder_status_t VirtualCameraService::enableTestCameraCmd(
                                                   .maxFps = kMaxFps});
   configuration.lensFacing = lensFacing.value_or(LensFacing::EXTERNAL);
   registerCamera(mTestCameraToken, configuration, cameraId.value_or(sNextId++),
-                 &ret);
+                 kDefaultDeviceId, &ret);
   if (ret) {
     dprintf(out, "Successfully registered test camera %s\n",
             getCamera(mTestCameraToken)->getCameraName().c_str());

@@ -51,14 +51,20 @@ interface ICameraServiceListener
     // Use to initialize variables only
     const int STATUS_UNKNOWN          = -1;
 
-    oneway void onStatusChanged(int status, @utf8InCpp String cameraId);
+    // We pass deviceId associated with a camera in the callbacks, which is the id of the virtual
+    // device owning the camera (for virtual cameras), or kDefaultDeviceId (for real
+    // cameras). The deviceId is being passed so that the API layer (CameraManagerGlobal) can filter
+    // out the cameras that don't correspond to the context associated with the caller who
+    // registers a callback.
+
+    oneway void onStatusChanged(int status, @utf8InCpp String cameraId, int deviceId);
 
     /**
      * Notify registered client about status changes for a physical camera backing
      * a logical camera.
      */
     oneway void onPhysicalCameraStatusChanged(int status, @utf8InCpp String cameraId,
-            @utf8InCpp String physicalCameraId);
+            @utf8InCpp String physicalCameraId, int deviceId);
 
     /**
      * The torch mode status of a camera.
@@ -82,9 +88,9 @@ interface ICameraServiceListener
     // Use to initialize variables only
     const int TORCH_STATUS_UNKNOWN = -1;
 
-    oneway void onTorchStatusChanged(int status, @utf8InCpp String cameraId);
+    oneway void onTorchStatusChanged(int status, @utf8InCpp String cameraId, int deviceId);
 
-    oneway void onTorchStrengthLevelChanged(@utf8InCpp String cameraId, int newTorchStrength);
+    oneway void onTorchStrengthLevelChanged(@utf8InCpp String cameraId, int newTorchStrength, int deviceId);
 
     /**
      * Notify registered clients about camera access priority changes.
@@ -98,6 +104,6 @@ interface ICameraServiceListener
      * Only clients with android.permission.CAMERA_OPEN_CLOSE_LISTENER permission
      * will receive such callbacks.
      */
-    oneway void onCameraOpened(@utf8InCpp String cameraId, @utf8InCpp String clientPackageId);
-    oneway void onCameraClosed(@utf8InCpp String cameraId);
+    oneway void onCameraOpened(@utf8InCpp String cameraId, @utf8InCpp String clientPackageId, int deviceId);
+    oneway void onCameraClosed(@utf8InCpp String cameraId, int deviceId);
 }

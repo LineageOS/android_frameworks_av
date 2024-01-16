@@ -69,6 +69,7 @@ constexpr int kMaxFps = 30;
 constexpr SensorOrientation kSensorOrientation =
     SensorOrientation::ORIENTATION_0;
 constexpr LensFacing kLensFacing = LensFacing::FRONT;
+constexpr int kDefaultDeviceId = 0;
 constexpr char kCreateVirtualDevicePermissions[] =
     "android.permission.CREATE_VIRTUAL_DEVICE";
 
@@ -131,8 +132,8 @@ class VirtualCameraServiceTest : public ::testing::Test {
     bool aidlRet;
 
     ASSERT_TRUE(mCameraService
-                    ->registerCamera(mNdkOwnerToken,
-                                     mVgaYUV420OnlyConfiguration, &aidlRet)
+                    ->registerCamera(mNdkOwnerToken, mVgaYUV420OnlyConfiguration,
+                                     kDefaultDeviceId, &aidlRet)
                     .isOk());
     ASSERT_TRUE(aidlRet);
   }
@@ -196,10 +197,10 @@ TEST_F(VirtualCameraServiceTest, RegisterCameraWithYuvInputSucceeds) {
   ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
   bool aidlRet;
 
-  ASSERT_TRUE(
-      mCameraService
-          ->registerCamera(ndkToken, mVgaYUV420OnlyConfiguration, &aidlRet)
-          .isOk());
+  ASSERT_TRUE(mCameraService
+                  ->registerCamera(ndkToken, mVgaYUV420OnlyConfiguration,
+                                   kDefaultDeviceId, &aidlRet)
+                  .isOk());
 
   EXPECT_TRUE(aidlRet);
   EXPECT_THAT(getCameraIds(), SizeIs(1));
@@ -213,7 +214,9 @@ TEST_F(VirtualCameraServiceTest, RegisterCameraWithRgbaInputSucceeds) {
   VirtualCameraConfiguration config =
       createConfiguration(kVgaWidth, kVgaHeight, Format::RGBA_8888, kMaxFps);
 
-  ASSERT_TRUE(mCameraService->registerCamera(ndkToken, config, &aidlRet).isOk());
+  ASSERT_TRUE(mCameraService
+                  ->registerCamera(ndkToken, config, kDefaultDeviceId, &aidlRet)
+                  .isOk());
 
   EXPECT_TRUE(aidlRet);
   EXPECT_THAT(getCameraIds(), SizeIs(1));
@@ -225,7 +228,7 @@ TEST_F(VirtualCameraServiceTest, RegisterCameraTwiceSecondReturnsFalse) {
 
   ASSERT_TRUE(mCameraService
                   ->registerCamera(mNdkOwnerToken, mVgaYUV420OnlyConfiguration,
-                                   &aidlRet)
+                                   kDefaultDeviceId, &aidlRet)
                   .isOk());
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), SizeIs(1));
@@ -236,7 +239,8 @@ TEST_F(VirtualCameraServiceTest, EmptyConfigurationFails) {
 
   ASSERT_FALSE(mCameraService
                    ->registerCamera(mNdkOwnerToken,
-                                    kEmptyVirtualCameraConfiguration, &aidlRet)
+                                    kEmptyVirtualCameraConfiguration,
+                                    kDefaultDeviceId, &aidlRet)
                    .isOk());
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), IsEmpty());
@@ -249,7 +253,9 @@ TEST_F(VirtualCameraServiceTest, ConfigurationWithUnsupportedPixelFormatFails) {
       createConfiguration(kVgaWidth, kVgaHeight, Format::UNKNOWN, kMaxFps);
 
   ASSERT_FALSE(
-      mCameraService->registerCamera(mNdkOwnerToken, config, &aidlRet).isOk());
+      mCameraService
+          ->registerCamera(mNdkOwnerToken, config, kDefaultDeviceId, &aidlRet)
+          .isOk());
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), IsEmpty());
 }
@@ -260,7 +266,9 @@ TEST_F(VirtualCameraServiceTest, ConfigurationWithTooHighResFails) {
       createConfiguration(1000000, 1000000, Format::YUV_420_888, kMaxFps);
 
   ASSERT_FALSE(
-      mCameraService->registerCamera(mNdkOwnerToken, config, &aidlRet).isOk());
+      mCameraService
+          ->registerCamera(mNdkOwnerToken, config, kDefaultDeviceId, &aidlRet)
+          .isOk());
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), IsEmpty());
 }
@@ -271,7 +279,9 @@ TEST_F(VirtualCameraServiceTest, ConfigurationWithNegativeResolutionFails) {
       createConfiguration(-1, kVgaHeight, Format::YUV_420_888, kMaxFps);
 
   ASSERT_FALSE(
-      mCameraService->registerCamera(mNdkOwnerToken, config, &aidlRet).isOk());
+      mCameraService
+          ->registerCamera(mNdkOwnerToken, config, kDefaultDeviceId, &aidlRet)
+          .isOk());
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), IsEmpty());
 }
@@ -282,7 +292,9 @@ TEST_F(VirtualCameraServiceTest, ConfigurationWithTooLowMaxFpsFails) {
       createConfiguration(kVgaWidth, kVgaHeight, Format::YUV_420_888, 0);
 
   ASSERT_FALSE(
-      mCameraService->registerCamera(mNdkOwnerToken, config, &aidlRet).isOk());
+      mCameraService
+          ->registerCamera(mNdkOwnerToken, config, kDefaultDeviceId, &aidlRet)
+          .isOk());
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), IsEmpty());
 }
@@ -293,7 +305,9 @@ TEST_F(VirtualCameraServiceTest, ConfigurationWithTooHighMaxFpsFails) {
       createConfiguration(kVgaWidth, kVgaHeight, Format::YUV_420_888, 90);
 
   ASSERT_FALSE(
-      mCameraService->registerCamera(mNdkOwnerToken, config, &aidlRet).isOk());
+      mCameraService
+          ->registerCamera(mNdkOwnerToken, config, kDefaultDeviceId, &aidlRet)
+          .isOk());
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), IsEmpty());
 }
@@ -327,7 +341,7 @@ TEST_F(VirtualCameraServiceTest, RegisterCameraWithoutPermissionFails) {
 
   EXPECT_THAT(mCameraService
                   ->registerCamera(mNdkOwnerToken, mVgaYUV420OnlyConfiguration,
-                                   &aidlRet)
+                                   kDefaultDeviceId, &aidlRet)
                   .getExceptionCode(),
               Eq(EX_SECURITY));
 }

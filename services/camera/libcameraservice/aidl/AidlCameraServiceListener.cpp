@@ -18,6 +18,7 @@
 #include <aidl/AidlUtils.h>
 #include <aidl/android/frameworks/cameraservice/common/Status.h>
 #include <aidl/android/frameworks/cameraservice/service/CameraStatusAndId.h>
+#include <camera/CameraUtils.h>
 #include <camera/StringUtils.h>
 
 namespace android::frameworks::cameraservice::service::implementation {
@@ -28,7 +29,10 @@ using SCameraStatusAndId = ::aidl::android::frameworks::cameraservice::service::
 using SStatus = ::aidl::android::frameworks::cameraservice::common::Status;
 
 binder::Status AidlCameraServiceListener::onStatusChanged(
-        int32_t status, const std::string& cameraId) {
+        int32_t status, const std::string& cameraId, int32_t deviceId) {
+    if (deviceId != kDefaultDeviceId) {
+        return binder::Status::ok();
+    }
     SCameraDeviceStatus sStatus = convertCameraStatusToAidl(status);
     auto ret = mBase->onStatusChanged(sStatus, cameraId);
     LOG_STATUS_ERROR_IF_NOT_OK(ret, "onStatusChanged")
@@ -37,7 +41,10 @@ binder::Status AidlCameraServiceListener::onStatusChanged(
 
 binder::Status AidlCameraServiceListener::onPhysicalCameraStatusChanged(
         int32_t status, const std::string& cameraId,
-        const std::string& physicalCameraId) {
+        const std::string& physicalCameraId, int32_t deviceId) {
+    if (deviceId != kDefaultDeviceId) {
+        return binder::Status::ok();
+    }
     SCameraDeviceStatus sStatus = convertCameraStatusToAidl(status);
 
     auto ret = mBase->onPhysicalCameraStatusChanged(sStatus, cameraId, physicalCameraId);
@@ -46,20 +53,22 @@ binder::Status AidlCameraServiceListener::onPhysicalCameraStatusChanged(
 }
 
 ::android::binder::Status AidlCameraServiceListener::onTorchStatusChanged(
-    int32_t, const std::string&) {
+    [[maybe_unused]] int32_t, [[maybe_unused]] const std::string&, int32_t) {
   // We don't implement onTorchStatusChanged
   return binder::Status::ok();
 }
 
 ::android::binder::Status AidlCameraServiceListener::onTorchStrengthLevelChanged(
-    const std::string&, int32_t) {
+    [[maybe_unused]] const std::string&, [[maybe_unused]] int32_t, [[maybe_unused]] int32_t) {
     // We don't implement onTorchStrengthLevelChanged
     return binder::Status::ok();
 }
+
 status_t AidlCameraServiceListener::linkToDeath(const sp<DeathRecipient>& recipient, void* cookie,
                                                 uint32_t flags) {
     return mDeathPipe.linkToDeath(recipient, cookie, flags);
 }
+
 status_t AidlCameraServiceListener::unlinkToDeath(const wp<DeathRecipient>& recipient, void* cookie,
                                                   uint32_t flags,
                                                   wp<DeathRecipient>* outRecipient) {

@@ -112,7 +112,8 @@ void CameraUtilsFuzzer::invokeCameraBase() {
             }
             string clientPackage = mFDP->ConsumeRandomLengthString(kMaxBytes);
 
-            cameraStatus = new CameraStatus(id, status, unavailSubIds, clientPackage);
+            cameraStatus = new CameraStatus(id, status, unavailSubIds, clientPackage,
+                                            kDefaultDeviceId);
         }
 
         if (mFDP->ConsumeBool()) {

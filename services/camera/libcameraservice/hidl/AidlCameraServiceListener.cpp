@@ -16,6 +16,7 @@
 
 #include <hidl/AidlCameraServiceListener.h>
 #include <hidl/Utils.h>
+#include <camera/CameraUtils.h>
 #include <camera/StringUtils.h>
 
 namespace android {
@@ -29,7 +30,10 @@ using hardware::cameraservice::utils::conversion::convertToHidlCameraDeviceStatu
 typedef frameworks::cameraservice::service::V2_1::ICameraServiceListener HCameraServiceListener2_1;
 
 binder::Status H2BCameraServiceListener::onStatusChanged(
-    int32_t status, const std::string& cameraId) {
+    int32_t status, const std::string& cameraId, int32_t deviceId) {
+  if (deviceId != kDefaultDeviceId) {
+      return binder::Status::ok();
+  }
   HCameraDeviceStatus hCameraDeviceStatus = convertToHidlCameraDeviceStatus(status);
   CameraStatusAndId cameraStatusAndId;
   cameraStatusAndId.deviceStatus = hCameraDeviceStatus;
@@ -44,7 +48,10 @@ binder::Status H2BCameraServiceListener::onStatusChanged(
 
 binder::Status H2BCameraServiceListener::onPhysicalCameraStatusChanged(
     int32_t status, const std::string& cameraId,
-    const std::string& physicalCameraId) {
+    const std::string& physicalCameraId, int32_t deviceId) {
+  if (deviceId != kDefaultDeviceId) {
+      return binder::Status::ok();
+  }
   auto cast2_1 = HCameraServiceListener2_1::castFrom(mBase);
   sp<HCameraServiceListener2_1> interface2_1 = nullptr;
   if (cast2_1.isOk()) {
@@ -66,13 +73,13 @@ binder::Status H2BCameraServiceListener::onPhysicalCameraStatusChanged(
 }
 
 ::android::binder::Status H2BCameraServiceListener::onTorchStatusChanged(
-    int32_t, const std::string&) {
+    [[maybe_unused]] int32_t, [[maybe_unused]] const std::string&, [[maybe_unused]] int32_t) {
   // We don't implement onTorchStatusChanged
   return binder::Status::ok();
 }
 
 ::android::binder::Status H2BCameraServiceListener::onTorchStrengthLevelChanged(
-    const std::string&, int32_t) {
+    [[maybe_unused]] const std::string&, [[maybe_unused]] int32_t, [[maybe_unused]] int32_t) {
   return binder::Status::ok();
 }
 

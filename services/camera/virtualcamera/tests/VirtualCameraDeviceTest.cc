@@ -64,6 +64,7 @@ constexpr int kVgaHeight = 480;
 constexpr int kHdWidth = 1280;
 constexpr int kHdHeight = 720;
 constexpr int kMaxFps = 30;
+constexpr int kDefaultDeviceId = 0;
 
 const Stream kVgaYUV420Stream = Stream{
     .streamType = StreamType::OUTPUT,
@@ -137,8 +138,8 @@ TEST_P(VirtualCameraDeviceCharacterisicsTest,
        cameraCharacteristicsForInputFormat) {
   const VirtualCameraConfigTestParam& param = GetParam();
   std::shared_ptr<VirtualCameraDevice> camera =
-      ndk::SharedRefBase::make<VirtualCameraDevice>(kCameraId,
-                                                    param.inputConfig);
+      ndk::SharedRefBase::make<VirtualCameraDevice>(
+          kCameraId, param.inputConfig, kDefaultDeviceId);
 
   CameraMetadata metadata;
   ASSERT_TRUE(camera->getCameraCharacteristics(&metadata).isOk());
@@ -293,15 +294,17 @@ class VirtualCameraDeviceTest : public ::testing::Test {
  public:
   void SetUp() override {
     mCamera = ndk::SharedRefBase::make<VirtualCameraDevice>(
-        kCameraId, VirtualCameraConfiguration{
-                       .supportedStreamConfigs = {SupportedStreamConfiguration{
-                           .width = kVgaWidth,
-                           .height = kVgaHeight,
-                           .pixelFormat = Format::YUV_420_888,
-                           .maxFps = kMaxFps}},
-                       .virtualCameraCallback = nullptr,
-                       .sensorOrientation = SensorOrientation::ORIENTATION_0,
-                       .lensFacing = LensFacing::FRONT});
+        kCameraId,
+        VirtualCameraConfiguration{
+            .supportedStreamConfigs = {SupportedStreamConfiguration{
+                .width = kVgaWidth,
+                .height = kVgaHeight,
+                .pixelFormat = Format::YUV_420_888,
+                .maxFps = kMaxFps}},
+            .virtualCameraCallback = nullptr,
+            .sensorOrientation = SensorOrientation::ORIENTATION_0,
+            .lensFacing = LensFacing::FRONT},
+        kDefaultDeviceId);
   }
 
  protected:
