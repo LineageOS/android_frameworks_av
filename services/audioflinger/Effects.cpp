@@ -2574,8 +2574,13 @@ bool EffectChain::hasVolumeControlEnabled_l() const {
     return false;
 }
 
-// setVolume_l() must be called with IAfThreadBase::mutex() or EffectChain::mutex() held
-bool EffectChain::setVolume_l(uint32_t *left, uint32_t *right, bool force)
+bool EffectChain::setVolume_l(uint32_t* left, uint32_t* right, bool force) {
+    audio_utils::lock_guard _l(mutex());
+    return setVolume_ll(left, right, force);
+}
+
+// setVolume_l() must be called with IAfThreadBase::mutex() and EffectChain::mutex() held
+bool EffectChain::setVolume_ll(uint32_t *left, uint32_t *right, bool force)
 {
     uint32_t newLeft = *left;
     uint32_t newRight = *right;
