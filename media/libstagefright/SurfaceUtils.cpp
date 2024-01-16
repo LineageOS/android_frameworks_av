@@ -298,6 +298,11 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
             ALOGE("error pushing blank frames: lock failed: %s (%d)", strerror(-err), -err);
             break;
         }
+        if (img == nullptr) {
+            (void)buf->unlock(); // Since lock() was successful.
+            ALOGE("error pushing blank frames: lock succeeded: buf mapping is nullptr");
+            break;
+        }
 
         *img = 0;
 
