@@ -122,15 +122,18 @@ struct ResourceInfo {
     std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
     ResourceList resources;
     bool pendingRemoval{false};
+    uint32_t importance = 0;
 };
 
 /*
  * Resource Reclaim request info that encapsulates
  *  - the calling/requesting process pid.
+ *  - the calling/requesting client's importance.
  *  - the list of resources requesting (to be reclaimed from others)
  */
 struct ReclaimRequestInfo {
     int mCallingPid = -1;
+    uint32_t mCallingClientImportance = 0;
     const std::vector<::aidl::android::media::MediaResourceParcel>& mResources;
 };
 

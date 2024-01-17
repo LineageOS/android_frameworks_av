@@ -67,6 +67,9 @@ public:
                      const std::shared_ptr<::aidl::android::media::IResourceManagerClient>& client,
                      const std::vector<::aidl::android::media::MediaResourceParcel>& resources);
 
+    // Update the resource info, if there is any changes.
+    bool updateResource(const aidl::android::media::ClientInfoParcel& clientInfo);
+
     // Remove a set of resources from the given client.
     // returns true on success, false otherwise.
     bool removeResource(const aidl::android::media::ClientInfoParcel& clientInfo,
@@ -158,6 +161,17 @@ public:
             const std::vector<ClientInfo>& clients,
             ClientInfo& clientInfo,
             MediaResource::SubType primarySubType = MediaResource::SubType::kUnspecifiedSubType);
+
+    // Find the biggest client from the process pid, that has the least importance
+    // (than given importance) among the given list of clients.
+    // If applicable, match the primary type too.
+    // returns true on success, false otherwise.
+    bool getLeastImportantBiggestClient(int targetPid, int32_t importance,
+                                        MediaResource::Type type,
+                                        MediaResource::SubType subType,
+                                        MediaResource::SubType primarySubType,
+                                        const std::vector<ClientInfo>& clients,
+                                        ClientInfo& clientInfo);
 
     // Find the client that belongs to given process(pid) and with the given clientId.
     // A nullptr is returned upon failure to find the client.
