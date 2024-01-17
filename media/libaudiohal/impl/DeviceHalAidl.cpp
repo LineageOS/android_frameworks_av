@@ -985,7 +985,7 @@ status_t DeviceHalAidl::setSimulateDeviceConnections(bool enabled) {
     if (mModule == nullptr) return NO_INIT;
     {
         std::lock_guard l(mLock);
-        mMapper.resetUnusedPatchesAndPortConfigs();
+        mMapper.resetUnusedPatchesPortConfigsAndPorts();
     }
     ModuleDebug debug{ .simulateDeviceConnections = enabled };
     status_t status = statusTFromBinderStatus(mModule->setModuleDebug(debug));

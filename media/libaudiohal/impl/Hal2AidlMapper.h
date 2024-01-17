@@ -91,7 +91,7 @@ class Hal2AidlMapper {
         ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
         Cleanups* cleanups = nullptr);
     status_t releaseAudioPatch(int32_t patchId);
-    void resetUnusedPatchesAndPortConfigs();
+    void resetUnusedPatchesPortConfigsAndPorts();
     status_t setDevicePortConnectedState(
             const ::aidl::android::media::audio::common::AudioPort& devicePort, bool connected);
 
@@ -184,7 +184,7 @@ class Hal2AidlMapper {
     status_t releaseAudioPatches(const std::set<int32_t>& patchIds);
     void resetPatch(int32_t patchId) { (void)releaseAudioPatch(patchId); }
     void resetPortConfig(int32_t portConfigId);
-    void resetUnusedPortConfigs();
+    void resetUnusedPortConfigsAndPorts();
     status_t updateAudioPort(
             int32_t portId, ::aidl::android::media::audio::common::AudioPort* port);
     status_t updateRoutes();
