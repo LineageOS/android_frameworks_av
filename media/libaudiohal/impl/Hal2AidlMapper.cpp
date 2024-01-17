@@ -730,7 +730,7 @@ status_t Hal2AidlMapper::prepareToOpenStream(
             this, __func__, ioHandle, device.toString().c_str(),
             flags.toString().c_str(), toString(source).c_str(),
             config->toString().c_str(), mixPortConfig->toString().c_str());
-    resetUnusedPatchesAndPortConfigs();
+    resetUnusedPatchesPortConfigsAndPorts();
     const AudioConfig initialConfig = *config;
     // Find / create AudioPortConfigs for the device port and the mix port,
     // then find / create a patch between them, and open a stream on the mix port.
@@ -858,7 +858,7 @@ status_t Hal2AidlMapper::releaseAudioPatches(const std::set<int32_t>& patchIds) 
             result = BAD_VALUE;
         }
     }
-    resetUnusedPortConfigs();
+    resetUnusedPortConfigsAndPorts();
     return result;
 }
 
@@ -875,7 +875,7 @@ void Hal2AidlMapper::resetPortConfig(int32_t portConfigId) {
     ALOGE("%s: port config id %d not found", __func__, portConfigId);
 }
 
-void Hal2AidlMapper::resetUnusedPatchesAndPortConfigs() {
+void Hal2AidlMapper::resetUnusedPatchesPortConfigsAndPorts() {
     // Since patches can be created independently of streams via 'createOrUpdatePatch',
     // here we only clean up patches for released streams.
     std::set<int32_t> patchesToRelease;
@@ -889,11 +889,11 @@ void Hal2AidlMapper::resetUnusedPatchesAndPortConfigs() {
             it = mStreams.erase(it);
         }
     }
-    // 'releaseAudioPatches' also resets unused port configs.
+    // 'releaseAudioPatches' also resets unused port configs and ports.
     releaseAudioPatches(patchesToRelease);
 }
 
-void Hal2AidlMapper::resetUnusedPortConfigs() {
+void Hal2AidlMapper::resetUnusedPortConfigsAndPorts() {
     // The assumption is that port configs are used to create patches
     // (or to open streams, but that involves creation of patches, too). Thus,
     // orphaned port configs can and should be reset.
@@ -934,6 +934,7 @@ void Hal2AidlMapper::resetUnusedPortConfigs() {
 }
 
 status_t Hal2AidlMapper::setDevicePortConnectedState(const AudioPort& devicePort, bool connected) {
+    resetUnusedPatchesPortConfigsAndPorts();
     if (connected) {
         AudioDevice matchDevice = devicePort.ext.get<AudioPortExt::device>().device;
         std::optional<AudioPort> templatePort;
@@ -968,7 +969,6 @@ status_t Hal2AidlMapper::setDevicePortConnectedState(const AudioPort& devicePort
             }
             templatePort = portsIt->second;
         }
-        resetUnusedPatchesAndPortConfigs();
 
         // Use the ID of the "template" port, use all the information from the provided port.
         AudioPort connectedPort = devicePort;
@@ -995,7 +995,6 @@ status_t Hal2AidlMapper::setDevicePortConnectedState(const AudioPort& devicePort
             ALOGD("%s: device port for device %s found in the module %s",
                     __func__, matchDevice.toString().c_str(), mInstance.c_str());
         }
-        resetUnusedPatchesAndPortConfigs();
 
         // Disconnection of remote submix out with address "0" is a special case. We need to replace
         // the connected port entry with the "augmented template".
