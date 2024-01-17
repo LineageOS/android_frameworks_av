@@ -248,3 +248,30 @@ cc_binary {
     srcs: ["test_idle_disconnected_shared_stream.cpp"],
     shared_libs: ["libaaudio"],
 }
+
+cc_test {
+    name: "test_multiple_close_simultaneously",
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+        "libaaudio_tests_defaults",
+    ],
+    srcs: ["test_multiple_close_simultaneously.cpp"],
+    shared_libs: [
+        "aaudio-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libaaudio",
+        "libbinder",
+        "liblog",
+        "libutils",
+    ],
+    // This test will run 1 minute to ensure there is no crash happen.
+    // In that case, set the timeout as 2 minutes to allow the test to complete.
+    test_options: {
+        test_runner_options: [
+            {
+                name: "native-test-timeout",
+                value: "2m",
+            }
+        ],
+    },
+}
