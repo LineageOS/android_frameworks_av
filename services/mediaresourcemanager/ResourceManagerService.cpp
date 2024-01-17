@@ -492,9 +492,10 @@ void ResourceManagerService::getClientForResource_l(
 }
 
 bool ResourceManagerService::getTargetClients(
-        int32_t callingPid,
+        const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources,
         std::vector<ClientInfo>& targetClients) {
+    int32_t callingPid = clientInfo.pid;
     std::scoped_lock lock{mLock};
     if (!mProcessInfo->isPidTrusted(callingPid)) {
         pid_t actualCallingPid = IPCThreadState::self()->getCallingPid();
@@ -598,10 +599,9 @@ bool ResourceManagerService::getTargetClients(
 
 Status ResourceManagerService::reclaimResource(const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources, bool* _aidl_return) {
-    int32_t callingPid = clientInfo.pid;
     std::string clientName = clientInfo.name;
     String8 log = String8::format("reclaimResource(callingPid %d, uid %d resources %s)",
-            callingPid, clientInfo.uid, getString(resources).c_str());
+            clientInfo.pid, clientInfo.uid, getString(resources).c_str());
     mServiceLog->add(log);
     *_aidl_return = false;
 
@@ -611,7 +611,7 @@ Status ResourceManagerService::reclaimResource(const ClientInfoParcel& clientInf
     }
 
     std::vector<ClientInfo> targetClients;
-    if (!getTargetClients(callingPid, resources, targetClients)) {
+    if (!getTargetClients(clientInfo, resources, targetClients)) {
         // Nothing to reclaim from.
         ALOGI("%s: There aren't any clients to reclaim from", __func__);
         return Status::ok();

@@ -320,6 +320,9 @@ private:
     status_t reclaim(bool force = false);
     friend struct ResourceManagerClient;
 
+    // to create the metrics associated with this codec.
+    mediametrics_handle_t createMediaMetrics(const sp<AMessage>& format, uint32_t flags);
+
 private:
     enum State {
         UNINITIALIZED,
@@ -462,6 +465,7 @@ private:
     void resetMetricsFields();
     void updateEphemeralMediametrics(mediametrics_handle_t item);
     void updateLowLatency(const sp<AMessage> &msg);
+    void updateCodecImportance(const sp<AMessage>& msg);
     void onGetMetrics(const sp<AMessage>& msg);
     constexpr const char *asString(TunnelPeekState state, const char *default_string="?");
     void updateTunnelPeek(const sp<AMessage> &msg);
