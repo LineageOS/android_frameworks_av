@@ -76,21 +76,21 @@ aconfig_declarations {
     name: "android.media.audio-aconfig",
     package: "android.media.audio",
     srcs: ["audio_framework.aconfig"],
-    visibility: ["//visibility:private"],
+    visibility: ["//frameworks/base/api"],
 }
 
 aconfig_declarations {
     name: "android.media.audiopolicy-aconfig",
     package: "android.media.audiopolicy",
     srcs: ["audiopolicy_framework.aconfig"],
-    visibility: ["//visibility:private"],
+    visibility: ["//frameworks/base/api"],
 }
 
 aconfig_declarations {
     name: "android.media.midi-aconfig",
     package: "android.media.midi",
     srcs: ["midi_flags.aconfig"],
-    visibility: ["//visibility:private"],
+    visibility: ["//frameworks/base/api"],
 }
 
 java_aconfig_library {
