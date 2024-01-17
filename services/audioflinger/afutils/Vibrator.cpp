@@ -44,6 +44,10 @@ static sp<os::IExternalVibratorService> getExternalVibratorService() {
 }
 
 os::HapticScale onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration) {
+    if (externalVibration->getAudioAttributes().flags & AUDIO_FLAG_MUTE_HAPTIC) {
+        ALOGD("%s, mute haptic according to audio attributes flag", __func__);
+        return os::HapticScale::MUTE;
+    }
     const sp<os::IExternalVibratorService> evs = getExternalVibratorService();
     if (evs != nullptr) {
         int32_t ret;
