@@ -130,7 +130,7 @@ cc_library_shared {
     ],
     relative_install_path: "soundfx",
     visibility: [
-        "//hardware/interfaces/audio/aidl/default",
+        "//hardware/interfaces/audio/aidl/default:__subpackages__",
     ],
 }
 
@@ -161,6 +161,6 @@ cc_library_shared {
     ],
     relative_install_path: "soundfx",
     visibility: [
-        "//hardware/interfaces/audio/aidl/default",
+        "//hardware/interfaces/audio/aidl/default:__subpackages__",
     ],
 }
