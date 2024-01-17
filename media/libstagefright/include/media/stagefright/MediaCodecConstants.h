@@ -794,6 +794,7 @@ inline constexpr char KEY_HDR_STATIC_INFO[] = "hdr-static-info";
 inline constexpr char KEY_HDR10_PLUS_INFO[] = "hdr10-plus-info";
 inline constexpr char KEY_HEIGHT[] = "height";
 inline constexpr char KEY_I_FRAME_INTERVAL[] = "i-frame-interval";
+inline constexpr char KEY_IMPORTANCE[] = "importance";
 inline constexpr char KEY_INTRA_REFRESH_PERIOD[] = "intra-refresh-period";
 inline constexpr char KEY_IS_ADTS[] = "is-adts";
 inline constexpr char KEY_IS_AUTOSELECT[] = "is-autoselect";
