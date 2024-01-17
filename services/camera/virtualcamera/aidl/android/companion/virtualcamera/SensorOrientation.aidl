@@ -16,16 +16,15 @@
 
 package android.companion.virtualcamera;
 
-import android.companion.virtualcamera.Format;
-
 /**
- * Configuration supported by virtual camera owner.
+ * Sensor orientation of a virtual camera.
  *
  * @hide
  */
-parcelable SupportedStreamConfiguration {
-    int width;
-    int height;
-    Format pixelFormat = Format.UNKNOWN;
-    int maxFps;
+@Backing(type="int")
+enum SensorOrientation {
+    ORIENTATION_0 = 0,
+    ORIENTATION_90 = 90,
+    ORIENTATION_180 = 180,
+    ORIENTATION_270 = 270,
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,8 @@ oneway interface IVirtualCameraCallback {
      * @param height - height of the surface.
      * @param pixelFormat - pixel format of the surface.
      */
-    void onStreamConfigured(int streamId, in Surface surface, int width, int height, in Format pixelFormat);
+    void onStreamConfigured(int streamId, in Surface surface, int width, int height,
+            in Format pixelFormat);
 
     /**
      * Called when framework requests capture. This can be used by the client as a hint

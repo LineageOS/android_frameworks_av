@@ -35,6 +35,7 @@ using ::aidl::android::hardware::common::NativeHandle;
 // TODO(b/301023410) - Query actual max texture size.
 constexpr int kMaxTextureSize = 2048;
 constexpr int kLibJpegDctSize = DCTSIZE;
+constexpr int kMaxFpsUpperLimit = 60;
 
 constexpr std::array<Format, 2> kSupportedFormats{Format::YUV_420_888,
                                                   Format::RGBA_8888};
@@ -54,7 +55,7 @@ bool isPixelFormatSupportedForInput(const Format format) {
 
 // Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(const int width, const int height,
-                               const Format format) {
+                               const Format format, const int maxFps) {
   if (!isPixelFormatSupportedForInput(format)) {
     return false;
   }
@@ -68,6 +69,10 @@ bool isFormatSupportedForInput(const int width, const int height,
     // Input dimension needs to be multiple of libjpeg DCT size.
     // TODO(b/301023410) This restriction can be removed once we add support for
     // unaligned jpeg compression.
+    return false;
+  }
+
+  if (maxFps <= 0 || maxFps > kMaxFpsUpperLimit) {
     return false;
   }
 

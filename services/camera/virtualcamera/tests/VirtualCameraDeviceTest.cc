@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 #include "VirtualCameraDevice.h"
 #include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
+#include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
 #include "android/binder_interface_utils.h"
@@ -34,7 +35,10 @@ namespace virtualcamera {
 namespace {
 
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
+using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
 using ::aidl::android::hardware::camera::device::Stream;
 using ::aidl::android::hardware::camera::device::StreamConfiguration;
@@ -49,6 +53,7 @@ constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kHdWidth = 1280;
 constexpr int kHdHeight = 720;
+constexpr int kMaxFps = 30;
 
 struct AvailableStreamConfiguration {
   const int width;
@@ -96,7 +101,7 @@ std::vector<AvailableStreamConfiguration> getAvailableStreamConfigurations(
 }
 
 struct VirtualCameraConfigTestParam {
-  std::vector<SupportedStreamConfiguration> inputConfig;
+  VirtualCameraConfiguration inputConfig;
   std::vector<AvailableStreamConfiguration> expectedAvailableStreamConfigs;
 };
 
@@ -106,8 +111,8 @@ class VirtualCameraDeviceTest
 TEST_P(VirtualCameraDeviceTest, cameraCharacteristicsForInputFormat) {
   const VirtualCameraConfigTestParam& param = GetParam();
   std::shared_ptr<VirtualCameraDevice> camera =
-      ndk::SharedRefBase::make<VirtualCameraDevice>(
-          kCameraId, param.inputConfig, /*virtualCameraClientCallback=*/nullptr);
+      ndk::SharedRefBase::make<VirtualCameraDevice>(kCameraId,
+                                                    param.inputConfig);
 
   CameraMetadata metadata;
   ASSERT_TRUE(camera->getCameraCharacteristics(&metadata).isOk());
@@ -135,10 +140,16 @@ INSTANTIATE_TEST_SUITE_P(
     cameraCharacteristicsForInputFormat, VirtualCameraDeviceTest,
     testing::Values(
         VirtualCameraConfigTestParam{
-            .inputConfig = {SupportedStreamConfiguration{
-                .width = kVgaWidth,
-                .height = kVgaHeight,
-                .pixelFormat = Format::YUV_420_888}},
+            .inputConfig =
+                VirtualCameraConfiguration{
+                    .supportedStreamConfigs = {SupportedStreamConfiguration{
+                        .width = kVgaWidth,
+                        .height = kVgaHeight,
+                        .pixelFormat = Format::YUV_420_888,
+                        .maxFps = kMaxFps}},
+                    .virtualCameraCallback = nullptr,
+                    .sensorOrientation = SensorOrientation::ORIENTATION_0,
+                    .lensFacing = LensFacing::FRONT},
             .expectedAvailableStreamConfigs =
                 {AvailableStreamConfiguration{
                      .width = kVgaWidth,
@@ -160,14 +171,22 @@ INSTANTIATE_TEST_SUITE_P(
                      .streamConfiguration =
                          ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT}}},
         VirtualCameraConfigTestParam{
-            .inputConfig = {SupportedStreamConfiguration{
-                                .width = kVgaWidth,
-                                .height = kVgaHeight,
-                                .pixelFormat = Format::YUV_420_888},
-                            SupportedStreamConfiguration{
-                                .width = kHdWidth,
-                                .height = kHdHeight,
-                                .pixelFormat = Format::YUV_420_888}},
+            .inputConfig =
+                VirtualCameraConfiguration{
+                    .supportedStreamConfigs =
+                        {SupportedStreamConfiguration{
+                             .width = kVgaWidth,
+                             .height = kVgaHeight,
+                             .pixelFormat = Format::YUV_420_888,
+                             .maxFps = kMaxFps},
+                         SupportedStreamConfiguration{
+                             .width = kHdWidth,
+                             .height = kHdHeight,
+                             .pixelFormat = Format::YUV_420_888,
+                             .maxFps = kMaxFps}},
+                    .virtualCameraCallback = nullptr,
+                    .sensorOrientation = SensorOrientation::ORIENTATION_0,
+                    .lensFacing = LensFacing::BACK},
             .expectedAvailableStreamConfigs = {
                 AvailableStreamConfiguration{
                     .width = kVgaWidth,
