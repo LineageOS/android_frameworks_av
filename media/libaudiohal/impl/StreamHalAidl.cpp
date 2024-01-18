@@ -234,7 +234,9 @@ status_t StreamHalAidl::dump(int fd, const Vector<String16>& args) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return mStream->dump(fd, Args(args).args(), args.size());
+    status_t status = mStream->dump(fd, Args(args).args(), args.size());
+    mStreamPowerLog.dump(fd);
+    return status;
 }
 
 status_t StreamHalAidl::start() {
