@@ -22,6 +22,8 @@
 #include <utils/String16.h>
 #include <camera/StringUtils.h>
 
+#include <functional>
+
 using namespace std;
 using namespace android;
 
