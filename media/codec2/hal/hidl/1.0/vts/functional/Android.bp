@@ -44,6 +44,7 @@ filegroup {
         "res/bbb_opus_stereo_128kbps_48000hz.info",
         "res/bbb_opus_stereo_128kbps_48000hz.opus",
         "res/bbb_raw_1ch_8khz_s32le.info",
+        "res/bbb_raw_1ch_8khz_s32le_largeframe.info",
         "res/bbb_raw_1ch_8khz_s32le.raw",
         "res/bbb_vorbis_stereo_128kbps_48000hz.info",
         "res/bbb_vorbis_stereo_128kbps_48000hz.vorbis",

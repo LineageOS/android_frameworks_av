@@ -235,12 +235,13 @@ int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameIn
     uint32_t flags = 0;
     uint32_t vtsFlags = 0;
     uint32_t timestamp = 0;
+    uint32_t nLargeFrames = 0;
     while (1) {
         if (!(eleInfo >> bytesCount)) break;
         eleInfo >> flags;
         vtsFlags = mapInfoFlagstoVtsFlags(flags);
         if (vtsFlags == 0xFF) {
-            ALOGE("unrecognized flag entry in info file %s", info.c_str());
+            ALOGE("unrecognized flag(0x%x) entry in info file %s", flags, info.c_str());
             return -1;
         }
         eleInfo >> timestamp;
@@ -250,7 +251,18 @@ int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameIn
         if (timestampDevTest && !codecConfig && !nonDisplayFrame) {
             timestampUslist->push_back(timestamp);
         }
-        frameInfo->push_back({bytesCount, vtsFlags, timestamp});
+        frameInfo->push_back({bytesCount, vtsFlags, timestamp, {}});
+        if (vtsFlags & (1 << VTS_BIT_FLAG_LARGE_AUDIO_FRAME)) {
+            eleInfo >> nLargeFrames;
+            while(nLargeFrames-- > 0) {
+                eleInfo >> bytesCount;
+                eleInfo >> flags;
+                eleInfo >> timestamp;
+                vtsFlags = mapInfoFlagstoVtsFlags(flags);
+                frameInfo->editItemAt(frameInfo->size() - 1).largeFrameInfo.push_back(
+                        {vtsFlags, static_cast<uint32_t>(bytesCount), timestamp});
+            }
+        }
     }
     ALOGV("numCsds : %d", numCsds);
     eleInfo.close();
@@ -285,5 +297,6 @@ int mapInfoFlagstoVtsFlags(int infoFlags) {
     else if (infoFlags == 0x1) return (1 << VTS_BIT_FLAG_SYNC_FRAME);
     else if (infoFlags == 0x10) return (1 << VTS_BIT_FLAG_NO_SHOW_FRAME);
     else if (infoFlags == 0x20) return (1 << VTS_BIT_FLAG_CSD_FRAME);
+    else if (infoFlags == 0x40) return (1 << VTS_BIT_FLAG_LARGE_AUDIO_FRAME);
     return 0xFF;
 }

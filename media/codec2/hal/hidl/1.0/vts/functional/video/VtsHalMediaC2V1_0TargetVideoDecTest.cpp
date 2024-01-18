@@ -739,7 +739,7 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
             ASSERT_NE(vtsFlags, 0xFF) << "unrecognized flag entry in info file: " << mInfoFile;
             eleInfo >> timestamp;
             timestamp += timestampOffset;
-            Info.push_back({bytesCount, vtsFlags, timestamp});
+            Info.push_back({bytesCount, vtsFlags, timestamp, {}});
             bool codecConfig = (vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME)) != 0;
             bool nonDisplayFrame = (vtsFlags & (1 << VTS_BIT_FLAG_NO_SHOW_FRAME)) != 0;
 
@@ -978,7 +978,7 @@ TEST_P(Codec2VideoDecHidlTest, DecodeTestEmptyBuffersInserted) {
             eleInfo >> timestamp;
             codecConfig = (vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME)) != 0;
         }
-        Info.push_back({bytesCount, vtsFlags, timestamp});
+        Info.push_back({bytesCount, vtsFlags, timestamp, {}});
         frameId++;
     }
     eleInfo.close();
