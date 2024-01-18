@@ -289,30 +289,22 @@ ScopedAStatus Component::createBlockPool(
         const IComponent::BlockPoolAllocator &allocator,
         IComponent::BlockPool *blockPool) {
     std::shared_ptr<C2BlockPool> c2BlockPool;
-    static constexpr IComponent::BlockPoolAllocator::Tag ALLOCATOR_ID =
-        IComponent::BlockPoolAllocator::allocatorId;
-    static constexpr IComponent::BlockPoolAllocator::Tag IGBA =
-        IComponent::BlockPoolAllocator::allocator;
     c2_status_t status = C2_OK;
     ::android::C2PlatformAllocatorDesc allocatorParam;
-    switch (allocator.getTag()) {
-        case ALLOCATOR_ID: {
-            allocatorParam.allocatorId =
-                    allocator.get<IComponent::BlockPoolAllocator::allocatorId>();
-        }
-        break;
-        case IGBA: {
-            allocatorParam.allocatorId = ::android::C2PlatformAllocatorStore::IGBA;
-            allocatorParam.igba =
-                    allocator.get<IComponent::BlockPoolAllocator::allocator>().igba;
+    allocatorParam.allocatorId = allocator.allocatorId;
+    switch (allocator.allocatorId) {
+        case ::android::C2PlatformAllocatorStore::IGBA: {
+            allocatorParam.igba = allocator.gbAllocator->igba;
             allocatorParam.waitableFd.reset(
-                    allocator.get<IComponent::BlockPoolAllocator::allocator>()
-                    .waitableFd.dup().release());
+                    allocator.gbAllocator->waitableFd.dup().release());
         }
         break;
-        default:
-            return ScopedAStatus::fromServiceSpecificError(C2_CORRUPTED);
+        default: {
+            // no-op
+        }
+        break;
     }
+
 #ifdef __ANDROID_APEX__
     status = ::android::CreateCodec2BlockPool(
             allocatorParam,
