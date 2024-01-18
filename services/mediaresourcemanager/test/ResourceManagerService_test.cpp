@@ -209,7 +209,6 @@ public:
 
         resources1.clear();
         resources1.push_back(MediaResource(MediaResource::Type::kDrmSession, INT64_MIN));
-        expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, INT64_MIN));
         mService->addResource(client1Info, mTestClient1, resources1);
 
         // Expected result:
