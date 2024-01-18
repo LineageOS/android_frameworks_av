@@ -39,12 +39,12 @@ static bool hasResourceType(MediaResource::Type type, MediaResource::SubType sub
     bool foundResource = false;
     bool matchedPrimary =
         (primarySubType == MediaResource::SubType::kUnspecifiedSubType) ?  true : false;
-    for (auto it = resources.begin(); it != resources.end(); it++) {
-        if (hasResourceType(type, subType, it->second)) {
+    for (const MediaResourceParcel& res : resources.getResources()) {
+        if (hasResourceType(type, subType, res)) {
             foundResource = true;
-        } else if (it->second.subType == primarySubType) {
+        } else if (res.subType == primarySubType) {
             matchedPrimary = true;
-        } else if (isHwCodec(it->second.subType) == isHwCodec(primarySubType)) {
+        } else if (isHwCodec(res.subType) == isHwCodec(primarySubType)) {
             matchedPrimary = true;
         }
         if (matchedPrimary && foundResource) {
@@ -111,31 +111,20 @@ bool ResourceTracker::addResource(const ClientInfoParcel& clientInfo,
     ResourceList resourceAdded;
 
     for (const MediaResourceParcel& res : resources) {
-        const auto resType = std::tuple(res.type, res.subType, res.id);
-
         if (res.value < 0 && res.type != MediaResource::Type::kDrmSession) {
             ALOGV("%s: Ignoring request to remove negative value of non-drm resource", __func__);
             continue;
         }
-        if (info.resources.find(resType) == info.resources.end()) {
-            if (res.value <= 0) {
-                // We can't init a new entry with negative value, although it's allowed
-                // to merge in negative values after the initial add.
-                ALOGV("%s: Ignoring request to add new resource entry with value <= 0", __func__);
-                continue;
-            }
+        bool isNewEntry = false;
+        if (!info.resources.add(res, &isNewEntry)) {
+            continue;
+        }
+        if (isNewEntry) {
             onFirstAdded(res, info.uid);
-            info.resources[resType] = res;
-        } else {
-            mergeResources(info.resources[resType], res);
         }
+
         // Add it to the list of added resources for observers.
-        auto it = resourceAdded.find(resType);
-        if (it == resourceAdded.end()) {
-            resourceAdded[resType] = res;
-        } else {
-            mergeResources(it->second, res);
-        }
+        resourceAdded.add(res);
     }
     if (info.deathNotifier == nullptr && client != nullptr) {
         info.deathNotifier = DeathNotifier::Create(client, mService, clientInfo);
@@ -186,31 +175,21 @@ bool ResourceTracker::removeResource(const ClientInfoParcel& clientInfo,
     ResourceInfo& info = foundClient->second;
     ResourceList resourceRemoved;
     for (const MediaResourceParcel& res : resources) {
-        const auto resType = std::tuple(res.type, res.subType, res.id);
-
         if (res.value < 0) {
             ALOGV("%s: Ignoring request to remove negative value of resource", __func__);
             continue;
         }
-        // ignore if we don't have it
-        if (info.resources.find(resType) != info.resources.end()) {
-            MediaResourceParcel& resource = info.resources[resType];
+
+        long removedEntryValue = -1;
+        if (info.resources.remove(res, &removedEntryValue)) {
             MediaResourceParcel actualRemoved = res;
-            if (resource.value > res.value) {
-                resource.value -= res.value;
-            } else {
+            if (removedEntryValue != -1) {
                 onLastRemoved(res, info.uid);
-                actualRemoved.value = resource.value;
-                info.resources.erase(resType);
+                actualRemoved.value = removedEntryValue;
             }
 
             // Add it to the list of removed resources for observers.
-            auto it = resourceRemoved.find(resType);
-            if (it == resourceRemoved.end()) {
-                resourceRemoved[resType] = actualRemoved;
-            } else {
-                mergeResources(it->second, actualRemoved);
-            }
+            resourceRemoved.add(actualRemoved);
         }
     }
     if (mObserverService != nullptr && !resourceRemoved.empty()) {
@@ -243,8 +222,8 @@ bool ResourceTracker::removeResource(const ClientInfoParcel& clientInfo, bool va
     }
 
     const ResourceInfo& info = foundClient->second;
-    for (auto& [resType, resParcel] : info.resources) {
-        onLastRemoved(resParcel, info.uid);
+    for (const MediaResourceParcel& res : info.resources.getResources()) {
+        onLastRemoved(res, info.uid);
     }
 
     if (mObserverService != nullptr && !info.resources.empty()) {
@@ -523,8 +502,7 @@ bool ResourceTracker::getBiggestClientPendingRemoval(int pid, MediaResource::Typ
         if (!info.pendingRemoval) {
             continue;
         }
-        for (auto it = resources.begin(); it != resources.end(); it++) {
-            const MediaResourceParcel& resource = it->second;
+        for (const MediaResourceParcel& resource : resources.getResources()) {
             if (hasResourceType(type, subType, resource)) {
                 if (resource.value > largestValue) {
                     largestValue = resource.value;
@@ -567,19 +545,20 @@ bool ResourceTracker::getBiggestClient(int targetPid,
         const ResourceList& resources = info->resources;
         bool matchedPrimary =
             (primarySubType == MediaResource::SubType::kUnspecifiedSubType) ?  true : false;
-        for (auto it = resources.begin(); !matchedPrimary && it != resources.end(); it++) {
-            if (it->second.subType == primarySubType) {
+        for (const MediaResourceParcel& resource : resources.getResources()) {
+            if (resource.subType == primarySubType) {
                 matchedPrimary = true;
-            } else if (isHwCodec(it->second.subType) == isHwCodec(primarySubType)) {
+                break;
+            } else if (isHwCodec(resource.subType) == isHwCodec(primarySubType)) {
                 matchedPrimary = true;
+                break;
             }
         }
         // Primary type doesn't match, skip the client
         if (!matchedPrimary) {
             continue;
         }
-        for (auto it = resources.begin(); it != resources.end(); it++) {
-            const MediaResourceParcel& resource = it->second;
+        for (const MediaResourceParcel& resource : resources.getResources()) {
             if (hasResourceType(type, subType, resource)) {
                 if (resource.value > largestValue) {
                     largestValue = resource.value;
@@ -629,10 +608,10 @@ bool ResourceTracker::getLeastImportantBiggestClient(int targetPid, int32_t impo
         const ResourceList& resources = info->resources;
         bool matchedPrimary =
             (primarySubType == MediaResource::SubType::kUnspecifiedSubType) ?  true : false;
-        for (auto it = resources.begin(); !matchedPrimary && it != resources.end(); it++) {
-            if (it->second.subType == primarySubType) {
+        for (const MediaResourceParcel& resource : resources.getResources()) {
+            if (resource.subType == primarySubType) {
                 matchedPrimary = true;
-            } else if (isHwCodec(it->second.subType) == isHwCodec(primarySubType)) {
+            } else if (isHwCodec(resource.subType) == isHwCodec(primarySubType)) {
                 matchedPrimary = true;
             }
         }
@@ -640,8 +619,7 @@ bool ResourceTracker::getLeastImportantBiggestClient(int targetPid, int32_t impo
         if (!matchedPrimary) {
             continue;
         }
-        for (auto it = resources.begin(); it != resources.end(); it++) {
-            const MediaResourceParcel& resource = it->second;
+        for (const MediaResourceParcel& resource : resources.getResources()) {
             if (hasResourceType(type, subType, resource)) {
                 if (resource.value > largestValue) {
                     largestValue = resource.value;
@@ -690,10 +668,7 @@ void ResourceTracker::dump(std::string& resourceLogs) {
 
             const ResourceList& resources = info.resources;
             resourceLogs.append("        Resources:\n");
-            for (auto it = resources.begin(); it != resources.end(); it++) {
-                snprintf(buffer, SIZE, "          %s\n", toString(it->second).c_str());
-                resourceLogs.append(buffer);
-            }
+            resourceLogs.append(resources.toString());
         }
     }
     resourceLogs.append("  Process Pid override:\n");

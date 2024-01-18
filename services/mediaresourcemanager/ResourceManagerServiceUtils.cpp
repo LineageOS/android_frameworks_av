@@ -27,6 +27,93 @@
 
 namespace android {
 
+bool ResourceList::add(const MediaResourceParcel& res, bool* isNewEntry) {
+    // See if it's an existing entry, if so, merge it.
+    for (MediaResourceParcel& item : mResourceList) {
+        if (item.type == res.type && item.subType == res.subType && item.id == res.id) {
+            // We already have an item. Merge them and return
+            mergeResources(item, res);
+            return true;
+        }
+    }
+
+    // Since we have't found this resource yet, it is a new entry.
+    // We can't init a new entry with negative value, although it's allowed
+    // to merge in negative values after the initial add.
+    if (res.value <= 0) {
+        ALOGW("Ignoring request to add new resource entry with value <= 0");
+        return false;
+    }
+    if (isNewEntry) {
+        *isNewEntry = true;
+    }
+    mResourceList.push_back(res);
+    return true;
+}
+
+void ResourceList::addOrUpdate(const MediaResourceParcel& res) {
+    // See if it's an existing entry, just update the value.
+    for (MediaResourceParcel& item : mResourceList) {
+        if (item.type == res.type && item.subType == res.subType && item.id == res.id) {
+            item.value = res.value;
+            return;
+        }
+    }
+
+    // Add the new entry.
+    mResourceList.push_back(res);
+}
+
+bool ResourceList::remove(const MediaResourceParcel& res, long* removedEntryValue) {
+    // Make sure we have an entry for this resource.
+    for (std::vector<MediaResourceParcel>::iterator it = mResourceList.begin();
+         it != mResourceList.end(); it++) {
+        if (it->type == res.type && it->subType == res.subType && it->id == res.id) {
+            if (it->value > res.value) {
+                // Subtract the resource value by given value.
+                it->value -= res.value;
+            } else {
+                // This entry will be removed.
+                if (removedEntryValue) {
+                    *removedEntryValue = it->value;
+                }
+                mResourceList.erase(it);
+            }
+            return true;
+        }
+    }
+
+    // No such entry.
+    return false;
+}
+
+std::string ResourceList::toString() const {
+    std::string str;
+    for (const ::aidl::android::media::MediaResourceParcel& res : mResourceList) {
+        str.append(android::toString(res).c_str());
+        str.append("\n");
+    }
+
+    return std::move(str);
+}
+
+bool ResourceList::operator==(const ResourceList& rhs) const {
+    // Make sure the size is the same.
+    if (mResourceList.size() != rhs.mResourceList.size()) {
+        return false;
+    }
+
+    // Create a set from this object and check for the items from the rhs.
+    std::set<::aidl::android::media::MediaResourceParcel> lhs(
+            mResourceList.begin(), mResourceList.end());
+    for (const ::aidl::android::media::MediaResourceParcel& res : rhs.mResourceList) {
+        if (lhs.find(res) == lhs.end()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Bunch of utility functions that looks for a specific Resource.
 // Check whether a given resource (of type and subtype) is found in given resource parcel.
 bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
@@ -53,8 +140,8 @@ bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
 // Check whether a given resource (of type and subtype) is found in given resource list.
 bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
                      const ResourceList& resources) {
-    for (auto it = resources.begin(); it != resources.end(); it++) {
-        if (hasResourceType(type, subType, it->second)) {
+    for (const MediaResourceParcel& res : resources.getResources()) {
+        if (hasResourceType(type, subType, res)) {
             return true;
         }
     }

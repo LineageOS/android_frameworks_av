@@ -245,9 +245,7 @@ protected:
         // convert resource1 to ResourceList
         ResourceList r1;
         for (size_t i = 0; i < resources1.size(); ++i) {
-            const auto &res = resources1[i];
-            const auto resType = std::tuple(res.type, res.subType, res.id);
-            r1[resType] = res;
+            r1.addOrUpdate(resources1[i]);
         }
         return r1 == resources2;
     }

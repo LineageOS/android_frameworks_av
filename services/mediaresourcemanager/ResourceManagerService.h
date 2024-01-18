@@ -210,11 +210,11 @@ private:
     virtual void removeProcessInfoOverride(int pid);
 
     // Get the client for given pid and the clientId from the map
-    virtual std::shared_ptr<IResourceManagerClient> getClient(
+    virtual std::shared_ptr<IResourceManagerClient> getClient_l(
         int pid, const int64_t& clientId) const;
 
     // Remove the client for given pid and the clientId from the map
-    virtual bool removeClient(int pid, const int64_t& clientId);
+    virtual bool removeClient_l(int pid, const int64_t& clientId);
 
     // Get all the resource status for dump
     virtual void getResourceDump(std::string& resourceLog) const;

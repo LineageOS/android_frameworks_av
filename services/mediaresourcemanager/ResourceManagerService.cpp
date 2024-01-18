@@ -74,10 +74,7 @@ void ResourceManagerService::getResourceDump(std::string& resourceLog) const {
 
             const ResourceList& resources = info.resources;
             resourceLog.append("        Resources:\n");
-            for (auto it = resources.begin(); it != resources.end(); it++) {
-                snprintf(buffer, SIZE, "          %s\n", toString(it->second).c_str());
-                resourceLog.append(buffer);
-            }
+            resourceLog.append(resources.toString());
         }
     }
 
@@ -315,31 +312,21 @@ Status ResourceManagerService::addResource(const ClientInfoParcel& clientInfo,
 
     for (size_t i = 0; i < resources.size(); ++i) {
         const auto &res = resources[i];
-        const auto resType = std::tuple(res.type, res.subType, res.id);
 
         if (res.value < 0 && res.type != MediaResource::Type::kDrmSession) {
             ALOGW("Ignoring request to remove negative value of non-drm resource");
             continue;
         }
-        if (info.resources.find(resType) == info.resources.end()) {
-            if (res.value <= 0) {
-                // We can't init a new entry with negative value, although it's allowed
-                // to merge in negative values after the initial add.
-                ALOGW("Ignoring request to add new resource entry with value <= 0");
-                continue;
-            }
+        bool isNewEntry = false;
+        if (!info.resources.add(res, &isNewEntry)) {
+            continue;
+        }
+        if (isNewEntry) {
             onFirstAdded(res, info.uid);
-            info.resources[resType] = res;
-        } else {
-            mergeResources(info.resources[resType], res);
         }
+
         // Add it to the list of added resources for observers.
-        auto it = resourceAdded.find(resType);
-        if (it == resourceAdded.end()) {
-            resourceAdded[resType] = res;
-        } else {
-            mergeResources(it->second, res);
-        }
+        resourceAdded.add(res);
     }
     if (info.deathNotifier == nullptr && client != nullptr) {
         info.deathNotifier = DeathNotifier::Create(
@@ -386,31 +373,22 @@ Status ResourceManagerService::removeResource(const ClientInfoParcel& clientInfo
     ResourceList resourceRemoved;
     for (size_t i = 0; i < resources.size(); ++i) {
         const auto &res = resources[i];
-        const auto resType = std::tuple(res.type, res.subType, res.id);
 
         if (res.value < 0) {
             ALOGW("Ignoring request to remove negative value of resource");
             continue;
         }
-        // ignore if we don't have it
-        if (info.resources.find(resType) != info.resources.end()) {
-            MediaResourceParcel &resource = info.resources[resType];
+
+        long removedEntryValue = -1;
+        if (info.resources.remove(res, &removedEntryValue)) {
             MediaResourceParcel actualRemoved = res;
-            if (resource.value > res.value) {
-                resource.value -= res.value;
-            } else {
+            if (removedEntryValue != -1) {
                 onLastRemoved(res, info.uid);
-                actualRemoved.value = resource.value;
-                info.resources.erase(resType);
+                actualRemoved.value = removedEntryValue;
             }
 
             // Add it to the list of removed resources for observers.
-            auto it = resourceRemoved.find(resType);
-            if (it == resourceRemoved.end()) {
-                resourceRemoved[resType] = actualRemoved;
-            } else {
-                mergeResources(it->second, actualRemoved);
-            }
+            resourceRemoved.add(actualRemoved);
         }
     }
     if (mObserverService != nullptr && !resourceRemoved.empty()) {
@@ -453,8 +431,8 @@ Status ResourceManagerService::removeResource(const ClientInfoParcel& clientInfo
     }
 
     const ResourceInfo& info = foundClient->second;
-    for (auto it = info.resources.begin(); it != info.resources.end(); it++) {
-        onLastRemoved(it->second, info.uid);
+    for (const MediaResourceParcel& res : info.resources.getResources()) {
+        onLastRemoved(res, info.uid);
     }
 
     // Since this client has been removed, update the metrics collector.
@@ -642,7 +620,7 @@ void ResourceManagerService::pushReclaimAtom(const ClientInfoParcel& clientInfo,
     mResourceManagerMetrics->pushReclaimAtom(clientInfo, priorities, targetClients, reclaimed);
 }
 
-std::shared_ptr<IResourceManagerClient> ResourceManagerService::getClient(
+std::shared_ptr<IResourceManagerClient> ResourceManagerService::getClient_l(
         int pid, const int64_t& clientId) const {
     std::map<int, ResourceInfos>::const_iterator found = mMap.find(pid);
     if (found == mMap.end()) {
@@ -660,7 +638,7 @@ std::shared_ptr<IResourceManagerClient> ResourceManagerService::getClient(
     return foundClient->second.client;
 }
 
-bool ResourceManagerService::removeClient(int pid, const int64_t& clientId) {
+bool ResourceManagerService::removeClient_l(int pid, const int64_t& clientId) {
     std::map<int, ResourceInfos>::iterator found = mMap.find(pid);
     if (found == mMap.end()) {
         ALOGV("%s: didn't find pid %d for clientId %lld", __func__, pid, (long long) clientId);
@@ -687,8 +665,11 @@ bool ResourceManagerService::reclaimUnconditionallyFrom(
     int64_t failedClientId = -1;
     int32_t failedClientPid = -1;
     for (const ClientInfo& targetClient : targetClients) {
-        std::shared_ptr<IResourceManagerClient> client = getClient(
-            targetClient.mPid, targetClient.mClientId);
+        std::shared_ptr<IResourceManagerClient> client = nullptr;
+        {
+            std::scoped_lock lock{mLock};
+            client = getClient_l(targetClient.mPid, targetClient.mClientId);
+        }
         if (client == nullptr) {
             // skip already released clients.
             continue;
@@ -710,7 +691,7 @@ bool ResourceManagerService::reclaimUnconditionallyFrom(
 
     {
         std::scoped_lock lock{mLock};
-        bool found = removeClient(failedClientPid, failedClientId);
+        bool found = removeClient_l(failedClientPid, failedClientId);
         if (found) {
             ALOGW("Failed to reclaim resources from client with pid %d", failedClientPid);
         } else {
@@ -1056,8 +1037,7 @@ bool ResourceManagerService::getBiggestClient_l(int pid, MediaResource::Type typ
         if (pendingRemovalOnly && !info.pendingRemoval) {
             continue;
         }
-        for (auto it = resources.begin(); it != resources.end(); it++) {
-            const MediaResourceParcel &resource = it->second;
+        for (const MediaResourceParcel& resource : resources.getResources()) {
             if (hasResourceType(type, subType, resource)) {
                 if (resource.value > largestValue) {
                     largestValue = resource.value;

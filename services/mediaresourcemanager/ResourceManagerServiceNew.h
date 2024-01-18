@@ -124,11 +124,11 @@ private:
     bool getPriority_l(int pid, int* priority) const override;
 
     // Get the client for given pid and the clientId from the map
-    std::shared_ptr<IResourceManagerClient> getClient(
+    std::shared_ptr<IResourceManagerClient> getClient_l(
         int pid, const int64_t& clientId) const override;
 
     // Remove the client for given pid and the clientId from the map
-    bool removeClient(int pid, const int64_t& clientId) override;
+    bool removeClient_l(int pid, const int64_t& clientId) override;
 
     // Get all the resource status for dump
     void getResourceDump(std::string& resourceLog) const override;

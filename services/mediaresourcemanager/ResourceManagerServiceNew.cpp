@@ -356,12 +356,12 @@ bool ResourceManagerServiceNew::getAllClients_l(
     return true;
 }
 
-std::shared_ptr<IResourceManagerClient> ResourceManagerServiceNew::getClient(
+std::shared_ptr<IResourceManagerClient> ResourceManagerServiceNew::getClient_l(
         int pid, const int64_t& clientId) const {
     return mResourceTracker->getClient(pid, clientId);
 }
 
-bool ResourceManagerServiceNew::removeClient(int pid, const int64_t& clientId) {
+bool ResourceManagerServiceNew::removeClient_l(int pid, const int64_t& clientId) {
     return mResourceTracker->removeClient(pid, clientId);
 }
 
