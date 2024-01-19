@@ -174,7 +174,7 @@ private:
     // Gets the list of all the clients who own the list of specified resource type
     // and satisfy the resource model and the reclaim policy.
     virtual bool getTargetClients(
-        int32_t callingPid,
+        const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources,
         std::vector<ClientInfo>& targetClients);
 
@@ -210,11 +210,11 @@ private:
     virtual void removeProcessInfoOverride(int pid);
 
     // Get the client for given pid and the clientId from the map
-    virtual std::shared_ptr<IResourceManagerClient> getClient(
+    virtual std::shared_ptr<IResourceManagerClient> getClient_l(
         int pid, const int64_t& clientId) const;
 
     // Remove the client for given pid and the clientId from the map
-    virtual bool removeClient(int pid, const int64_t& clientId);
+    virtual bool removeClient_l(int pid, const int64_t& clientId);
 
     // Get all the resource status for dump
     virtual void getResourceDump(std::string& resourceLog) const;
@@ -232,6 +232,12 @@ private:
     // Returns a unmodifiable reference to the internal resource state as a map
     virtual const std::map<int, ResourceInfos>& getResourceMap() const {
         return mMap;
+    }
+    // enable/disable process priority based reclaim and client importance based reclaim
+    virtual void setReclaimPolicy(bool processPriority, bool clientImportance) {
+        // Implemented by the refactored/new RMService
+        (void)processPriority;
+        (void)clientImportance;
     }
     // END: TEST only functions
 

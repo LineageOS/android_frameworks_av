@@ -209,7 +209,6 @@ public:
 
         resources1.clear();
         resources1.push_back(MediaResource(MediaResource::Type::kDrmSession, INT64_MIN));
-        expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, INT64_MIN));
         mService->addResource(client1Info, mTestClient1, resources1);
 
         // Expected result:
@@ -1498,6 +1497,264 @@ public:
              client3Config.width * client3Config.height));
         EXPECT_TRUE(currentPixelCountP2 == 0);
     }
+
+    void addNonSecureVideoCodecResource(std::shared_ptr<IResourceManagerClient>& client,
+                                        std::vector<ClientInfoParcel>& infos) {
+        std::vector<MediaResourceParcel> resources;
+        resources.push_back(createNonSecureVideoCodecResource(1));
+
+        TestClient* testClient = toTestClient(client);
+        ClientInfoParcel clientInfo {.pid = static_cast<int32_t>(testClient->pid()),
+                                     .uid = static_cast<int32_t>(testClient->uid()),
+                                     .id = getId(client),
+                                     .name = "none",
+                                     .importance = testClient->clientImportance()};
+        mService->addResource(clientInfo, client, resources);
+        infos.push_back(clientInfo);
+    }
+
+    bool doReclaimResource(const ClientInfoParcel& clientInfo) {
+        bool result = false;
+        std::vector<MediaResourceParcel> reclaimResources;
+        reclaimResources.push_back(createNonSecureVideoCodecResource(1));
+        bool success = mService->reclaimResource(clientInfo, reclaimResources, &result).isOk();
+        return success && result;
+    }
+
+    // Verifies the resource reclaim policies
+    // - this verifies the reclaim policies based on:
+    //   - process priority (oom score)
+    //   - client priority
+    void testReclaimPolicies() {
+        // Create 3 clients with codec importance high, mid and low for a low
+        // priority pid.
+        std::vector<std::shared_ptr<IResourceManagerClient>> lowPriPidClients;
+        lowPriPidClients.push_back(
+            createTestClient(kLowPriorityPid, kTestUid1, kHighestCodecImportance));
+        lowPriPidClients.push_back(
+            createTestClient(kLowPriorityPid, kTestUid1, kMidCodecImportance));
+        lowPriPidClients.push_back(
+            createTestClient(kLowPriorityPid, kTestUid1, kLowestCodecImportance));
+
+        // Create 3 clients with codec importance high, mid and low for a high
+        // priority pid.
+        std::vector<std::shared_ptr<IResourceManagerClient>> highPriPidClients;
+        highPriPidClients.push_back(
+            createTestClient(kHighPriorityPid, kTestUid2, kHighestCodecImportance));
+        highPriPidClients.push_back(
+            createTestClient(kHighPriorityPid, kTestUid2, kMidCodecImportance));
+        highPriPidClients.push_back(
+            createTestClient(kHighPriorityPid, kTestUid2, kLowestCodecImportance));
+
+        // Add non secure video codec resources for all the 3 clients of low priority pid.
+        std::vector<ClientInfoParcel> lowPriPidClientInfos;
+        for (auto& client : lowPriPidClients) {
+            addNonSecureVideoCodecResource(client, lowPriPidClientInfos);
+        }
+        // Add non secure video codec resources for all the 3 clients of high priority pid.
+        std::vector<ClientInfoParcel> highPriPidClientInfos;
+        for (auto& client : highPriPidClients) {
+            addNonSecureVideoCodecResource(client, highPriPidClientInfos);
+        }
+
+        // 1. Set reclaim policy as "Process Priority".
+        // - A process should be reclaiming from:
+        //    - a lower priority process if there is any
+        //    - else fail.
+        mService->setReclaimPolicy(true /*process priority*/, false /*codec importance*/);
+
+        // 1.A:
+        // - high priority process should be able to reclaim successfully.
+        // - A process should be reclaiming from the low priority process.
+        EXPECT_TRUE(doReclaimResource(highPriPidClientInfos[0]));
+        // Verify that the high priority pid's clients are untouched.
+        bool success = true;
+        for (auto& client : highPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = false;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+        // Verify that the one of the client from the low priority pid has been reclaimed.
+        success = false;
+        for (auto& client : lowPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+
+        // 1.B:
+        // - low priority process should fail to reclaim.
+        EXPECT_FALSE(doReclaimResource(lowPriPidClientInfos[0]));
+
+        // 2. Set reclaim policy as "Client Importance".
+        // - A process should be reclaiming from:
+        //    - a lower priority client from the same process if any
+        //    - else fail.
+        mService->setReclaimPolicy(false /*process priority*/, true /*codec importance*/);
+
+        // 2.A:
+        // - high priority process should be able to reclaim successfully.
+        // - Process should be reclaiming from a lower priority client from the
+        // same process.
+        EXPECT_TRUE(doReclaimResource(highPriPidClientInfos[0]));
+        // Verify that the low priority pid's clients are untouched.
+        success = true;
+        for (auto& client : lowPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = false;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+        // Verify that the one of the low priority client from the high priority
+        // pid has been reclaimed.
+        success = false;
+        for (auto& client : highPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+
+        // 2.B:
+        // - high priority process should be able to reclaim successfully.
+        // - Process should be reclaiming from a lower priority client from the
+        // same process.
+        EXPECT_TRUE(doReclaimResource(lowPriPidClientInfos[0]));
+        // Verify that the high priority pid's clients are untouched.
+        success = true;
+        for (auto& client : highPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = false;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+        // Verify that the one of the low priority client from the low priority
+        // pid has been reclaimed.
+        success = false;
+        for (auto& client : lowPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+
+        // 2.C:
+        // - lowest priority client from high priority process should fail to reclaim.
+        EXPECT_FALSE(doReclaimResource(highPriPidClientInfos[2]));
+
+        // 2.D:
+        // - lowest priority client from low priority process should fail to reclaim.
+        EXPECT_FALSE(doReclaimResource(lowPriPidClientInfos[2]));
+
+        // 3. Set reclaim policy as "Process Priority and Client Importance".
+        // - A process should be reclaiming from:
+        //    - a lower priority process if there is any
+        //    - else a lower priority client from the same process if any
+        //    - else fail.
+        mService->setReclaimPolicy(true /*process priority*/, true /*codec importance*/);
+
+        // Remove all clients from the low priority process so that we have
+        // only one process (with high priority) with all the resources.
+        for (const auto& clientInfo : lowPriPidClientInfos) {
+            mService->removeClient(clientInfo);
+        }
+        lowPriPidClientInfos.clear();
+        lowPriPidClients.clear();
+        // 3.A:
+        // - high priority process should be able to reclaim successfully.
+        EXPECT_TRUE(doReclaimResource(highPriPidClientInfos[0]));
+        // Verify that the one of the client from the high priority pid has been reclaimed.
+        success = false;
+        for (auto& client : highPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+
+        // 3.B, set the policy back to ReclaimPolicyProcessPriority
+        mService->setReclaimPolicy(true /*process priority*/, false /*codec importance*/);
+
+        // Since there is only one process, the reclaim should fail.
+        EXPECT_FALSE(doReclaimResource(highPriPidClientInfos[0]));
+
+        // 4. Set reclaim policy as "Process Priority and Client Importance".
+        // - A process should be reclaiming from:
+        //    - from a lower priority process if there are any
+        //    - else from a lower priority client from the same process if there are any
+        //    - else fail.
+        mService->setReclaimPolicy(true /*process priority*/, true /*codec importance*/);
+
+        // Remove all clients from the high priority process so that we can
+        // start a new/fresh resource allocation.
+        for (const auto& clientInfo : highPriPidClientInfos) {
+            mService->removeClient(clientInfo);
+        }
+        highPriPidClientInfos.clear();
+        highPriPidClients.clear();
+
+        // Create 3 clients with codec importance high for a low priority pid.
+        lowPriPidClients.push_back(
+            createTestClient(kLowPriorityPid, kTestUid1, kHighestCodecImportance));
+        lowPriPidClients.push_back(
+            createTestClient(kLowPriorityPid, kTestUid1, kHighestCodecImportance));
+        lowPriPidClients.push_back(
+            createTestClient(kLowPriorityPid, kTestUid1, kHighestCodecImportance));
+
+        // Create 3 clients with codec importance low for a high priority pid.
+        highPriPidClients.push_back(
+            createTestClient(kHighPriorityPid, kTestUid2, kLowestCodecImportance));
+        highPriPidClients.push_back(
+            createTestClient(kHighPriorityPid, kTestUid2, kLowestCodecImportance));
+        highPriPidClients.push_back(
+            createTestClient(kHighPriorityPid, kTestUid2, kLowestCodecImportance));
+
+        // Add non secure video codec resources for all the 3 clients of low priority pid.
+        for (auto& client : lowPriPidClients) {
+            addNonSecureVideoCodecResource(client, lowPriPidClientInfos);
+        }
+        // Add non secure video codec resources for all the 3 clients of high priority pid.
+        for (auto& client : highPriPidClients) {
+            addNonSecureVideoCodecResource(client, highPriPidClientInfos);
+        }
+
+        // 4.A:
+        // - high priority process should be able to reclaim successfully.
+        EXPECT_TRUE(doReclaimResource(highPriPidClientInfos[0]));
+        // Since all clients are of same priority with in high priority process,
+        // none of the clients should be reclaimed.
+        success = true;
+        for (auto& client : highPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = false;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+        // Verify that the one of the client from the low priority pid has been reclaimed.
+        success = false;
+        for (auto& client : lowPriPidClients) {
+            if (toTestClient(client)->checkIfReclaimedAndReset()) {
+                success = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(success);
+
+        // 4.B, set the policy back to ReclaimPolicyProcessPriority
+        // If low priority process tries to reclaim, it should fail as there
+        // aren't any lower priority clients or lower priority processes.
+        EXPECT_FALSE(doReclaimResource(lowPriPidClientInfos[0]));
+    }
 };
 
 class ResourceManagerServiceNewTest : public ResourceManagerServiceTest {
@@ -1676,6 +1933,10 @@ TEST_F(ResourceManagerServiceNewTest,
 
 TEST_F(ResourceManagerServiceNewTest, concurrentCodecs) {
     testConcurrentCodecs();
+}
+
+TEST_F(ResourceManagerServiceNewTest, reclaimPolicies) {
+    testReclaimPolicies();
 }
 
 } // namespace android

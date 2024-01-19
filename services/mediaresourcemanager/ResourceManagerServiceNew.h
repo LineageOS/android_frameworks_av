@@ -106,26 +106,12 @@ private:
     // Returns false if any client belongs to a process with higher priority than the
     // calling process. The clients will remain unchanged if returns false.
     bool getTargetClients(
-        int32_t callingPid,
+        const ClientInfoParcel& clientInfo,
         const std::vector<MediaResourceParcel>& resources,
         std::vector<ClientInfo>& targetClients) override;
 
     // Removes the pid from the override map.
     void removeProcessInfoOverride(int pid) override;
-
-    // Gets the list of all the clients who own the specified resource type.
-    // Returns false if any client belongs to a process with higher priority than the
-    // calling process. The clients will remain unchanged if returns false.
-    bool getAllClients_l(const ResourceRequestInfo& resourceRequestInfo,
-                         std::vector<ClientInfo>& clientsInfo) override;
-
-    // Gets the client who owns specified resource type from lowest possible priority process.
-    // Returns false if the calling process priority is not higher than the lowest process
-    // priority. The client will remain unchanged if returns false.
-    // This function is used only by the unit test.
-    bool getLowestPriorityBiggestClient_l(
-        const ResourceRequestInfo& resourceRequestInfo,
-        ClientInfo& clientInfo) override;
 
     // override the pid of given process
     bool overridePid_l(int32_t originalPid, int32_t newPid) override;
@@ -137,17 +123,12 @@ private:
     // Get priority from process's pid
     bool getPriority_l(int pid, int* priority) const override;
 
-    // Gets lowest priority process that has the specified resource type.
-    // Returns false if failed. The output parameters will remain unchanged if failed.
-    bool getLowestPriorityPid_l(MediaResource::Type type, MediaResource::SubType subType,
-                                int* lowestPriorityPid, int* lowestPriority) override;
-
     // Get the client for given pid and the clientId from the map
-    std::shared_ptr<IResourceManagerClient> getClient(
+    std::shared_ptr<IResourceManagerClient> getClient_l(
         int pid, const int64_t& clientId) const override;
 
     // Remove the client for given pid and the clientId from the map
-    bool removeClient(int pid, const int64_t& clientId) override;
+    bool removeClient_l(int pid, const int64_t& clientId) override;
 
     // Get all the resource status for dump
     void getResourceDump(std::string& resourceLog) const override;
@@ -156,6 +137,30 @@ private:
     const std::map<int, ResourceInfos>& getResourceMap() const override;
 
     Status removeResource(const ClientInfoParcel& clientInfo, bool checkValid) override;
+
+    // The following utility functions are used only for testing by ResourceManagerServiceTest
+    // START: TEST only functions
+    // Gets the list of all the clients who own the specified resource type.
+    // Returns false if any client belongs to a process with higher priority than the
+    // calling process. The clients will remain unchanged if returns false.
+    bool getAllClients_l(const ResourceRequestInfo& resourceRequestInfo,
+                         std::vector<ClientInfo>& clientsInfo) override;
+
+    // Gets the client who owns specified resource type from lowest possible priority process.
+    // Returns false if the calling process priority is not higher than the lowest process
+    // priority. The client will remain unchanged if returns false.
+    bool getLowestPriorityBiggestClient_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        ClientInfo& clientInfo) override;
+
+    // Gets lowest priority process that has the specified resource type.
+    // Returns false if failed. The output parameters will remain unchanged if failed.
+    bool getLowestPriorityPid_l(MediaResource::Type type, MediaResource::SubType subType,
+                                int* lowestPriorityPid, int* lowestPriority) override;
+
+    // enable/disable process priority based reclaim and client importance based reclaim
+    void setReclaimPolicy(bool processPriority, bool clientImportance) override;
+    // END: TEST only functions
 
 private:
     std::shared_ptr<ResourceTracker> mResourceTracker;

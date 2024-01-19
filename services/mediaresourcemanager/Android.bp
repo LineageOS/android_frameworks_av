@@ -74,6 +74,7 @@ cc_library {
     name: "libresourcemanagerservice",
 
     srcs: [
+        "ClientImportanceReclaimPolicy.cpp",
         "DefaultResourceModel.cpp",
         "ProcessPriorityReclaimPolicy.cpp",
         "ResourceManagerMetrics.cpp",
