@@ -18,6 +18,7 @@
 #define LOG_TAG "VirtualCameraSession"
 #include "VirtualCameraSession.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -150,6 +151,13 @@ HalStream getHalStream(const Stream& stream) {
   return halStream;
 }
 
+Stream getHighestResolutionStream(const std::vector<Stream>& streams) {
+  return *(std::max_element(streams.begin(), streams.end(),
+                            [](const Stream& a, const Stream& b) {
+                              return a.width * a.height < b.width * b.height;
+                            }));
+}
+
 }  // namespace
 
 VirtualCameraSession::VirtualCameraSession(
@@ -233,8 +241,9 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       }
     }
 
-    inputWidth = streams[0].width;
-    inputHeight = streams[0].height;
+    Stream maxResStream = getHighestResolutionStream(streams);
+    inputWidth = maxResStream.width;
+    inputHeight = maxResStream.height;
     if (mRenderThread == nullptr) {
       // If there's no client callback, start camera in test mode.
       const bool testMode = mVirtualCameraClientCallback == nullptr;
