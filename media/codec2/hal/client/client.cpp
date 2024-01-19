@@ -2072,6 +2072,8 @@ c2_status_t Codec2Client::Component::createBlockPool(
         id = id == C2PlatformAllocatorStore::BUFFERQUEUE ?
                 C2PlatformAllocatorStore::IGBA : id;
 
+        c2_aidl::IComponent::BlockPoolAllocator allocator;
+        allocator.allocatorId = id;
         if (id == C2PlatformAllocatorStore::IGBA)  {
             std::shared_ptr<AidlGraphicBufferAllocator> gba =
                     mGraphicBufferAllocators->create();
@@ -2081,12 +2083,11 @@ c2_status_t Codec2Client::Component::createBlockPool(
             if (status != C2_OK) {
                 return status;
             }
-            c2_aidl::IComponent::BlockPoolAllocator allocator;
-            allocator.set<c2_aidl::IComponent::BlockPoolAllocator::allocator>();
-            allocator.get<c2_aidl::IComponent::BlockPoolAllocator::allocator>().igba =
+            c2_aidl::IComponent::GbAllocator gbAllocator;
+            gbAllocator.waitableFd = std::move(waitableFd);
+            gbAllocator.igba =
                     c2_aidl::IGraphicBufferAllocator::fromBinder(gba->asBinder());
-            allocator.get<c2_aidl::IComponent::BlockPoolAllocator::allocator>().waitableFd =
-                    std::move(waitableFd);
+            allocator.gbAllocator = std::move(gbAllocator);
             ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(
                     allocator, &aidlBlockPool);
             status = GetC2Status(transStatus, "createBlockPool");
@@ -2096,7 +2097,7 @@ c2_status_t Codec2Client::Component::createBlockPool(
             mGraphicBufferAllocators->setCurrentId(aidlBlockPool.blockPoolId);
         } else {
             ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(
-                    static_cast<int32_t>(id), &aidlBlockPool);
+                    allocator, &aidlBlockPool);
             status = GetC2Status(transStatus, "createBlockPool");
             if (status != C2_OK) {
                 return status;
