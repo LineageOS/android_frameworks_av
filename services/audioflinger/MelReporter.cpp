@@ -307,6 +307,22 @@ void MelReporter::stopMelComputationForDeviceId(audio_port_handle_t deviceId) {
 
 }
 
+void MelReporter::applyAllAudioPatches() {
+    ALOGV("%s", __func__);
+
+    std::vector<IAfPatchPanel::Patch> patchesCopy;
+    {
+        audio_utils::lock_guard _laf(mAfMelReporterCallback->mutex());
+        for (const auto& patch : mAfPatchPanel->patches_l()) {
+            patchesCopy.emplace_back(patch.second);
+        }
+    }
+
+    for (const auto& patch : patchesCopy) {
+        onCreateAudioPatch(patch.mHalHandle, patch);
+    }
+}
+
 std::optional<audio_patch_handle_t> MelReporter::activePatchStreamHandle_l(
         audio_io_handle_t streamHandle) {
     for(const auto& patchIt : mActiveMelPatches) {
