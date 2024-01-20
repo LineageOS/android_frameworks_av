@@ -4483,7 +4483,7 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
             if (effect->state() == IAfEffectModule::ACTIVE ||
                     effect->state() == IAfEffectModule::STOPPING) {
                 ++started;
-                effect->start();
+                effect->start_l();
             }
         }
         dstChain->mutex().unlock();
@@ -4586,7 +4586,7 @@ Exit:
         // removeEffect_l() has stopped the effect if it was active so it must be restarted
         if (effect->state() == IAfEffectModule::ACTIVE ||
             effect->state() == IAfEffectModule::STOPPING) {
-            effect->start();
+            effect->start_l();
         }
     }
 

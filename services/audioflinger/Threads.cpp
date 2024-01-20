@@ -1691,7 +1691,7 @@ sp<IAfEffectHandle> ThreadBase::createEffect_l(
                     std::move(mAfThreadCallback->getDefaultVibratorInfo_l());
             if (defaultVibratorInfo) {
                 // Only set the vibrator info when it is a valid one.
-                effect->setVibratorInfo(*defaultVibratorInfo);
+                effect->setVibratorInfo_l(*defaultVibratorInfo);
             }
         }
         // create effect handle and connect it to effect module
@@ -1793,7 +1793,7 @@ sp<IAfEffectModule> ThreadBase::getEffect_l(audio_session_t sessionId,
 std::vector<int> ThreadBase::getEffectIds_l(audio_session_t sessionId) const
 {
     sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
-    return chain != nullptr ? chain->getEffectIds() : std::vector<int>{};
+    return chain != nullptr ? chain->getEffectIds_l() : std::vector<int>{};
 }
 
 // PlaybackThread::addEffect_ll() must be called with AudioFlinger::mutex() and
@@ -1825,7 +1825,7 @@ status_t ThreadBase::addEffect_ll(const sp<IAfEffectModule>& effect)
         return BAD_VALUE;
     }
 
-    effect->setOffloaded(mType == OFFLOAD, mId);
+    effect->setOffloaded_l(mType == OFFLOAD, mId);
 
     status_t status = chain->addEffect_l(effect);
     if (status != NO_ERROR) {
@@ -9746,7 +9746,7 @@ status_t RecordThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
 
     // make sure enabled pre processing effects state is communicated to the HAL as we
     // just moved them to a new input stream.
-    chain->syncHalEffectsState();
+    chain->syncHalEffectsState_l();
 
     mEffectChains.add(chain);
 
@@ -10731,7 +10731,7 @@ status_t MmapThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
     chain->setThread(this);
     chain->setInBuffer(nullptr);
     chain->setOutBuffer(nullptr);
-    chain->syncHalEffectsState();
+    chain->syncHalEffectsState_l();
 
     mEffectChains.add(chain);
     checkSuspendOnAddEffectChain_l(chain);

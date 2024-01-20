@@ -437,9 +437,10 @@ public:
                 // integrity of the chains during the process.
                 // Also sets the parameter 'effectChains' to current value of mEffectChains.
     void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains) final
-            REQUIRES(mutex()) EXCLUDES_EffectChain_Mutex;
+            REQUIRES(audio_utils::ThreadBase_Mutex) ACQUIRE(audio_utils::EffectChain_Mutex);
                 // unlock effect chains after process
-    void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains) final;
+    void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains) final
+            RELEASE(audio_utils::EffectChain_Mutex);
                 // get a copy of mEffectChains vector
     Vector<sp<IAfEffectChain>> getEffectChains_l() const final REQUIRES(mutex()) {
         return mEffectChains;
