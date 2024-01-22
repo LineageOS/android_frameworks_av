@@ -68,6 +68,12 @@ java_aconfig_library {
     aconfig_declarations: "com.android.media.audio-aconfig",
 }
 
+// For CTS usage
+java_aconfig_library {
+    name: "com.android.media.audioserver-aconfig-java",
+    aconfig_declarations: "com.android.media.audioserver-aconfig",
+}
+
 // Framework available flags to follow
 // Care must be taken to avoid namespace conflicts.
 // These flags are accessible outside of the platform! Limit usage to @FlaggedApi wherever possible
