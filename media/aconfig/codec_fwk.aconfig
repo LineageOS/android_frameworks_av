@@ -1,0 +1,26 @@
+# Codec framework feature flags.
+#
+# !!! Please add flags in alphabetical order. !!!
+
+package: "android.media.codec"
+
+flag {
+  name: "dynamic_color_aspects"
+  namespace: "codec_fwk"
+  description: "Feature flag for dynamic color aspect support"
+  bug: "297914560"
+}
+
+flag {
+  name: "hlg_editing"
+  namespace: "codec_fwk"
+  description: "Feature flag for HLG editing support"
+  bug: "316397061"
+}
+
+flag {
+  name: "null_output_surface"
+  namespace: "codec_fwk"
+  description: "Feature flag for null output Surface support"
+  bug: "297920102"
+}
