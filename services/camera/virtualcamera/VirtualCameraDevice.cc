@@ -283,6 +283,11 @@ ndk::ScopedAStatus VirtualCameraDevice::isStreamCombinationSupported(
 
 bool VirtualCameraDevice::isStreamCombinationSupported(
     const StreamConfiguration& streamConfiguration) const {
+  if (streamConfiguration.streams.empty()) {
+    ALOGE("%s: Querying empty configuration", __func__);
+    return false;
+  }
+
   for (const Stream& stream : streamConfiguration.streams) {
     ALOGV("%s: Configuration queried: %s", __func__, stream.toString().c_str());
 
