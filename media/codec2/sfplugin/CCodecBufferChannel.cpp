@@ -1604,8 +1604,14 @@ status_t CCodecBufferChannel::start(
                     padding = 0;
                 }
                 if (delay || padding) {
-                    // We need write access to the buffers, and we're already in
-                    // array mode.
+                    // We need write access to the buffers, so turn them into array mode.
+                    // TODO: b/321930152 - define SkipCutOutputBuffers that takes output from
+                    // component, runs it through SkipCutBuffer and allocate local buffer to be
+                    // used by fwk. Make initSkipCutBuffer() return OutputBuffers similar to
+                    // toArrayMode().
+                    if (!output->buffers->isArrayMode()) {
+                        output->buffers = output->buffers->toArrayMode(numOutputSlots);
+                    }
                     output->buffers->initSkipCutBuffer(delay, padding, sampleRate, channelCount);
                 }
             }
