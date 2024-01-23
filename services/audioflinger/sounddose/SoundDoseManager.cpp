@@ -590,8 +590,19 @@ bool SoundDoseManager::isFrameworkMelForced() const {
 }
 
 void SoundDoseManager::setComputeCsdOnAllDevices(bool computeCsdOnAllDevices) {
-    const std::lock_guard _l(mLock);
-    mComputeCsdOnAllDevices = computeCsdOnAllDevices;
+    bool changed = false;
+    {
+        const std::lock_guard _l(mLock);
+        if (mHalSoundDose.size() != 0) {
+            // when using the HAL path we cannot enforce to deliver values for all devices
+            changed = mUseFrameworkMel != computeCsdOnAllDevices;
+            mUseFrameworkMel = computeCsdOnAllDevices;
+        }
+        mComputeCsdOnAllDevices = computeCsdOnAllDevices;
+    }
+    if (changed && computeCsdOnAllDevices) {
+        mMelReporterCallback->applyAllAudioPatches();
+    }
 }
 
 bool SoundDoseManager::isComputeCsdForcedOnAllDevices() const {

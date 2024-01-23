@@ -39,6 +39,8 @@ public:
 
     virtual void stopMelComputationForDeviceId(audio_port_handle_t deviceId) = 0;
     virtual void startMelComputationForDeviceId(audio_port_handle_t deviceId) = 0;
+
+    virtual void applyAllAudioPatches() = 0;
 };
 
 class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {

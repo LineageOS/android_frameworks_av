@@ -44,6 +44,7 @@ class MelReporterCallback : public IMelReporterCallback {
 public:
     MOCK_METHOD(void, startMelComputationForDeviceId, (audio_port_handle_t), (override));
     MOCK_METHOD(void, stopMelComputationForDeviceId, (audio_port_handle_t), (override));
+    MOCK_METHOD(void, applyAllAudioPatches, (), (override));
 };
 
 class MelAggregatorMock : public audio_utils::MelAggregator {
