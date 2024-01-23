@@ -18,7 +18,7 @@
 #define LOG_TAG "APM_AudioPolicyManager"
 
 // Need to keep the log statements even in production builds
-// to enable VERBOSE logging dynamicstartAudioSourceally.
+// to enable VERBOSE logging dynamically.
 // You can enable VERBOSE logging as follows:
 // adb shell setprop log.tag.APM_AudioPolicyManager V
 #define LOG_NDEBUG 0
