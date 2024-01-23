@@ -18,7 +18,7 @@
 #define LOG_TAG "APM_AudioPolicyManager"
 
 // Need to keep the log statements even in production builds
-// to enable VERBOSE logging dynamically.
+// to enable VERBOSE logging dynamicstartAudioSourceally.
 // You can enable VERBOSE logging as follows:
 // adb shell setprop log.tag.APM_AudioPolicyManager V
 #define LOG_NDEBUG 0
@@ -782,7 +782,11 @@ void AudioPolicyManager::connectTelephonyRxAudioSource()
         .ext.device.type = AUDIO_DEVICE_IN_TELEPHONY_RX, .ext.device.address = ""
     };
     const auto aa = mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL);
-    mCallRxSourceClient = startAudioSourceInternal(&source, &aa, 0/*uid*/);
+
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    status_t status = startAudioSource(&source, &aa, &portId, 0 /*uid*/, true /*internal*/);
+    ALOGE_IF(status != OK, "%s: failed to start audio source (%d)", __func__, status);
+    mCallRxSourceClient = mAudioSources.valueFor(portId);
     ALOGE_IF(mCallRxSourceClient == nullptr,
              "%s failed to start Telephony Rx AudioSource", __func__);
 }
@@ -815,9 +819,11 @@ void AudioPolicyManager::connectTelephonyTxAudioSource(
 
     struct audio_port_config source = {};
     srcDevice->toAudioPortConfig(&source);
-    mCallTxSourceClient = new InternalSourceClientDescriptor(
-                callTxSourceClientPortId, mUidCached, aa, source, srcDevice, sinkDevice,
-                mCommunnicationStrategy, toVolumeSource(aa));
+    mCallTxSourceClient = new SourceClientDescriptor(
+                callTxSourceClientPortId, mUidCached, aa, source, srcDevice, AUDIO_STREAM_PATCH,
+                mCommunnicationStrategy, toVolumeSource(aa), true);
+    mCallTxSourceClient->setPreferredDeviceId(sinkDevice->getId());
+
     audio_patch_handle_t patchHandle = AUDIO_PATCH_HANDLE_NONE;
     status_t status = connectAudioSourceToSink(
                 mCallTxSourceClient, sinkDevice, patchBuilder.patch(), patchHandle, mUidCached,
@@ -4874,9 +4880,11 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
     audio_attributes_t attributes = attributes_initializer(AUDIO_USAGE_MEDIA);
     const struct audio_port_config *source = &patch->sources[0];
     sp<SourceClientDescriptor> sourceDesc =
-            new InternalSourceClientDescriptor(
-                portId, uid, attributes, *source, srcDevice, sinkDevice,
-                mEngine->getProductStrategyForAttributes(attributes), toVolumeSource(attributes));
+            new SourceClientDescriptor(
+                portId, uid, attributes, *source, srcDevice, AUDIO_STREAM_PATCH,
+                mEngine->getProductStrategyForAttributes(attributes), toVolumeSource(attributes),
+                true);
+    sourceDesc->setPreferredDeviceId(sinkDevice->getId());
 
     status_t status =
             connectAudioSourceToSink(sourceDesc, sinkDevice, patch, *handle, uid, 0 /* delayMs */);
@@ -5543,7 +5551,7 @@ status_t AudioPolicyManager::acquireSoundTriggerSession(audio_session_t *session
 status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *source,
                                               const audio_attributes_t *attributes,
                                               audio_port_handle_t *portId,
-                                              uid_t uid)
+                                              uid_t uid, bool internal)
 {
     ALOGV("%s", __FUNCTION__);
     *portId = AUDIO_PORT_HANDLE_NONE;
@@ -5576,7 +5584,7 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
         new SourceClientDescriptor(*portId, uid, *attributes, *source, srcDevice,
                                    mEngine->getStreamTypeForAttributes(*attributes),
                                    mEngine->getProductStrategyForAttributes(*attributes),
-                                   toVolumeSource(*attributes));
+                                   toVolumeSource(*attributes), internal);
 
     status_t status = connectAudioSource(sourceDesc);
     if (status == NO_ERROR) {
@@ -5584,18 +5592,6 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
     }
     return status;
 }
-
-sp<SourceClientDescriptor> AudioPolicyManager::startAudioSourceInternal(
-        const struct audio_port_config *source, const audio_attributes_t *attributes, uid_t uid)
-{
-    ALOGV("%s", __FUNCTION__);
-    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
-
-    status_t status = startAudioSource(source, attributes, &portId, uid);
-    ALOGE_IF(status != OK, "%s: failed to start audio source (%d)", __func__, status);
-    return mAudioSources.valueFor(portId);
-}
-
 
 status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
 {

@@ -1,5 +1,10 @@
 package: "com.android.media.codec.flags"
 
+# ******************************************************************
+#            !!! DO NOT ADD FURTHER FLAGS TO THIS FILE !!!
+#            !!!     USE codec_fwk.aconfig INSTEAD     !!!
+# ******************************************************************
+
 flag {
   name: "large_audio_frame"
   namespace: "codec_fwk"
