@@ -120,7 +120,6 @@ cc_library_shared {
     shared_libs: [
         "libaudio_aidl_conversion_common_ndk",
         "libaudioutils",
-        "libbinder",
         "liblog",
         "libstagefright_foundation",
     ],
