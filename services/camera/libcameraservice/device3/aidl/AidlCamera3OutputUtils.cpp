@@ -319,10 +319,15 @@ void requestStreamBuffers(RequestBufferStates& states,
                 sb.acquire_fence = -1;
                 sb.status = CAMERA_BUFFER_STATUS_ERROR;
             }
-            returnOutputBuffers(states.useHalBufManager,states.halBufManagedStreamIds, nullptr,
-                    streamBuffers.data(), numAllocatedBuffers, 0,
-                    0, false,
-                    0, states.sessionStatsBuilder);
+            std::vector<BufferToReturn> returnableBuffers{};
+            collectReturnableOutputBuffers(states.useHalBufManager, states.halBufManagedStreamIds,
+                    /*listener*/ nullptr,
+                    streamBuffers.data(), numAllocatedBuffers, /*timestamp*/ 0,
+                    /*readoutTimestamp*/ 0, /*requested*/ false,
+                    /*requestTimeNs*/ 0, states.sessionStatsBuilder,
+                    /*out*/ &returnableBuffers);
+            finishReturningOutputBuffers(returnableBuffers, /*listener*/ nullptr,
+                    states.sessionStatsBuilder);
             for (auto buf : newBuffers) {
                 states.bufferRecordsIntf.removeOneBufferCache(streamId, buf);
             }
