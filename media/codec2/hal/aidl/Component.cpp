@@ -51,8 +51,10 @@ using ::ndk::ScopedAStatus;
 struct Component::Listener : public C2Component::Listener {
 
     Listener(const std::shared_ptr<Component>& component) :
-        mComponent(component),
-        mListener(component->mListener) {
+            mComponent(component),
+            mListener(component->mListener) {
+        CHECK(component);
+        CHECK(component->mListener);
     }
 
     virtual void onError_nb(
@@ -420,6 +422,8 @@ void Component::initListener(const std::shared_ptr<Component>& self) {
             mInit = res;
         }
 
+        // b/321902635, mListener should not be null.
+        CHECK(mListener);
         mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
                 AIBinder_DeathRecipient_new(OnBinderDied));
         mDeathContext = new DeathContext{ref<Component>()};
