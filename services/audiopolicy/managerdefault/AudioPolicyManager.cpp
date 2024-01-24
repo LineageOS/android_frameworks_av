@@ -3265,6 +3265,7 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
     // requested device or one of the devices selected by the engine for this stream
     // - For default requested device (AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME), apply volume only if
     // no specific device volume value exists for currently selected device.
+    // - Only apply the volume if the requested device is the desired device for volume control.
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         DeviceTypeSet curDevices = desc->devices().types();
@@ -3284,7 +3285,8 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
             curSrcDevices.insert(device);
             applyVolume = (curSrcDevices.find(
-                    Volume::getDeviceForVolume(curDevices)) != curSrcDevices.end());
+                    Volume::getDeviceForVolume(curDevices)) != curSrcDevices.end())
+                    && Volume::getDeviceForVolume(curSrcDevices) == device;
         } else {
             applyVolume = !curves.hasVolumeIndexForDevice(curSrcDevice);
         }
