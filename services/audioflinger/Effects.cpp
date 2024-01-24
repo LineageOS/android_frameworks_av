@@ -570,10 +570,10 @@ EffectModule::EffectModule(const sp<EffectCallbackInterface>& callback,
     : EffectBase(callback, desc, id, sessionId, pinned),
       // clear mConfig to ensure consistent initial value of buffer framecount
       // in case buffers are associated by setInBuffer() or setOutBuffer()
-      // prior to configure().
+      // prior to configure_l().
       mConfig{{}, {}},
       mStatus(NO_INIT),
-      mMaxDisableWaitCnt(1), // set by configure(), should be >= 1
+      mMaxDisableWaitCnt(1), // set by configure_l(), should be >= 1
       mDisableWaitCnt(0),    // set by process() and updateState()
       mOffloaded(false),
       mIsOutput(false)
@@ -588,13 +588,13 @@ EffectModule::EffectModule(const sp<EffectCallbackInterface>& callback,
     if (mStatus != NO_ERROR) {
         return;
     }
-    lStatus = init();
+    lStatus = init_l();
     if (lStatus < 0) {
         mStatus = lStatus;
         goto Error;
     }
 
-    setOffloaded(callback->isOffload(), callback->io());
+    setOffloaded_l(callback->isOffload(), callback->io());
     ALOGV("Constructor success name %s, Interface %p", mDescriptor.name, mEffectInterface.get());
 
     return;
@@ -616,7 +616,7 @@ EffectModule::~EffectModule()
 
 }
 
-bool EffectModule::updateState() {
+bool EffectModule::updateState_l() {
     audio_utils::lock_guard _l(mutex());
 
     bool started = false;
@@ -632,7 +632,7 @@ bool EffectModule::updateState() {
                    0,
                    mConfig.inputCfg.buffer.frameCount*sizeof(int32_t));
         }
-        if (start_l() == NO_ERROR) {
+        if (start_ll() == NO_ERROR) {
             mState = ACTIVE;
             started = true;
         } else {
@@ -641,8 +641,8 @@ bool EffectModule::updateState() {
         break;
     case STOPPING:
         // volume control for offload and direct threads must take effect immediately.
-        if (stop_l() == NO_ERROR
-            && !(isVolumeControl() && isOffloadedOrDirect())) {
+        if (stop_ll() == NO_ERROR
+            && !(isVolumeControl() && isOffloadedOrDirect_l())) {
             mDisableWaitCnt = mMaxDisableWaitCnt;
         } else {
             mDisableWaitCnt = 1; // will cause immediate transition to IDLE
@@ -836,9 +836,9 @@ void EffectModule::reset_l()
     mEffectInterface->command(EFFECT_CMD_RESET, 0, NULL, &replySize, &reply);
 }
 
-status_t EffectModule::configure()
+status_t EffectModule::configure_l()
 {
-    ALOGVV("configure() started");
+    ALOGVV("%s started", __func__);
     status_t status;
     uint32_t size;
     audio_channel_mask_t channelMask;
@@ -879,7 +879,7 @@ status_t EffectModule::configure()
     mConfig.outputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
 
     // Don't use sample rate for thread if effect isn't offloadable.
-    if (callback->isOffloadOrDirect() && !isOffloaded()) {
+    if (callback->isOffloadOrDirect() && !isOffloaded_l()) {
         mConfig.inputCfg.samplingRate = DEFAULT_OUTPUT_SAMPLE_RATE;
         ALOGV("Overriding effect input as 48kHz");
     } else {
@@ -909,9 +909,9 @@ status_t EffectModule::configure()
     mConfig.outputCfg.buffer.frameCount = mConfig.inputCfg.buffer.frameCount;
     mIsOutput = callback->isOutput();
 
-    ALOGV("configure() %p chain %p buffer %p framecount %zu",
-          this, callback->chain().promote().get(),
-          mConfig.inputCfg.buffer.raw, mConfig.inputCfg.buffer.frameCount);
+    ALOGV("%s %p chain %p buffer %p framecount %zu", __func__, this,
+          callback->chain().promote().get(), mConfig.inputCfg.buffer.raw,
+          mConfig.inputCfg.buffer.frameCount);
 
     status_t cmdStatus;
     size = sizeof(int);
@@ -1012,11 +1012,11 @@ status_t EffectModule::configure()
 exit:
     // TODO: consider clearing mConfig on error.
     mStatus = status;
-    ALOGVV("configure ended");
+    ALOGVV("%s ended", __func__);
     return status;
 }
 
-status_t EffectModule::init()
+status_t EffectModule::init_l()
 {
     audio_utils::lock_guard _l(mutex());
     if (mEffectInterface == 0) {
@@ -1048,21 +1048,21 @@ void EffectModule::addEffectToHal_l()
     }
 }
 
-// start() must be called with PlaybackThread::mutex() or EffectChain::mutex() held
-status_t EffectModule::start()
+// start_l() must be called with EffectChain::mutex() held
+status_t EffectModule::start_l()
 {
     status_t status;
     {
         audio_utils::lock_guard _l(mutex());
-        status = start_l();
+        status = start_ll();
     }
     if (status == NO_ERROR) {
-        getCallback()->resetVolume();
+        getCallback()->resetVolume_l();
     }
     return status;
 }
 
-status_t EffectModule::start_l()
+status_t EffectModule::start_ll()
 {
     if (mEffectInterface == 0) {
         return NO_INIT;
@@ -1086,13 +1086,13 @@ status_t EffectModule::start_l()
     return status;
 }
 
-status_t EffectModule::stop()
+status_t EffectModule::stop_l()
 {
     audio_utils::lock_guard _l(mutex());
-    return stop_l();
+    return stop_ll();
 }
 
-status_t EffectModule::stop_l()
+status_t EffectModule::stop_ll()
 {
     if (mEffectInterface == 0) {
         return NO_INIT;
@@ -1103,11 +1103,11 @@ status_t EffectModule::stop_l()
     status_t cmdStatus = NO_ERROR;
     uint32_t size = sizeof(status_t);
 
-    if (isVolumeControl() && isOffloadedOrDirect()) {
+    if (isVolumeControl() && isOffloadedOrDirect_l()) {
         // We have the EffectChain and EffectModule lock, permit a reentrant call to setVolume:
         // resetVolume_l --> setVolume_l --> EffectModule::setVolume
         mSetVolumeReentrantTid = gettid();
-        getCallback()->resetVolume();
+        getCallback()->resetVolume_l();
         mSetVolumeReentrantTid = INVALID_PID;
     }
 
@@ -1162,7 +1162,7 @@ status_t EffectModule::command(int32_t cmdCode,
                      std::vector<uint8_t>* reply)
 {
     audio_utils::lock_guard _l(mutex());
-    ALOGVV("command(), cmdCode: %d, mEffectInterface: %p", cmdCode, mEffectInterface.get());
+    ALOGVV("%s, cmdCode: %d, mEffectInterface: %p", __func__, cmdCode, mEffectInterface.get());
 
     if (mState == DESTROYED || mEffectInterface == 0) {
         return NO_INIT;
@@ -1258,20 +1258,20 @@ bool EffectModule::isProcessEnabled() const
     }
 }
 
-bool EffectModule::isOffloadedOrDirect() const
+bool EffectModule::isOffloadedOrDirect_l() const
 {
     return getCallback()->isOffloadOrDirect();
 }
 
-bool EffectModule::isVolumeControlEnabled() const
+bool EffectModule::isVolumeControlEnabled_l() const
 {
-    return (isVolumeControl() && (isOffloadedOrDirect() ? isEnabled() : isProcessEnabled()));
+    return (isVolumeControl() && (isOffloadedOrDirect_l() ? isEnabled() : isProcessEnabled()));
 }
 
 void EffectModule::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
     ALOGVV("setInBuffer %p",(&buffer));
 
-    // mConfig.inputCfg.buffer.frameCount may be zero if configure() is not called yet.
+    // mConfig.inputCfg.buffer.frameCount may be zero if configure_l() is not called yet.
     if (buffer != 0) {
         mConfig.inputCfg.buffer.raw = buffer->audioBuffer()->raw;
         buffer->setFrameCount(mConfig.inputCfg.buffer.frameCount);
@@ -1317,7 +1317,7 @@ void EffectModule::setInBuffer(const sp<EffectBufferHalInterface>& buffer) {
 void EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
     ALOGVV("setOutBuffer %p",(&buffer));
 
-    // mConfig.outputCfg.buffer.frameCount may be zero if configure() is not called yet.
+    // mConfig.outputCfg.buffer.frameCount may be zero if configure_l() is not called yet.
     if (buffer != 0) {
         mConfig.outputCfg.buffer.raw = buffer->audioBuffer()->raw;
         buffer->setFrameCount(mConfig.outputCfg.buffer.frameCount);
@@ -1356,8 +1356,7 @@ void EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
     }
 }
 
-status_t EffectModule::setVolume(uint32_t *left, uint32_t *right, bool controller)
-{
+status_t EffectModule::setVolume(uint32_t* left, uint32_t* right, bool controller) {
     AutoLockReentrant _l(mutex(), mSetVolumeReentrantTid);
     if (mStatus != NO_ERROR) {
         return mStatus;
@@ -1480,7 +1479,7 @@ status_t EffectModule::setAudioSource(audio_source_t source)
     return status;
 }
 
-status_t EffectModule::setOffloaded(bool offloaded, audio_io_handle_t io)
+status_t EffectModule::setOffloaded_l(bool offloaded, audio_io_handle_t io)
 {
     audio_utils::lock_guard _l(mutex());
     if (mStatus != NO_ERROR) {
@@ -1509,11 +1508,11 @@ status_t EffectModule::setOffloaded(bool offloaded, audio_io_handle_t io)
         }
         mOffloaded = false;
     }
-    ALOGV("setOffloaded() offloaded %d io %d status %d", offloaded, io, status);
+    ALOGV("%s offloaded %d io %d status %d", __func__, offloaded, io, status);
     return status;
 }
 
-bool EffectModule::isOffloaded() const
+bool EffectModule::isOffloaded_l() const
 {
     audio_utils::lock_guard _l(mutex());
     return mOffloaded;
@@ -1537,8 +1536,7 @@ bool EffectModule::isSpatializer() const {
     return IAfEffectModule::isSpatializer(&mDescriptor.type);
 }
 
-status_t EffectModule::setHapticIntensity(int id, os::HapticScale intensity)
-{
+status_t EffectModule::setHapticIntensity_l(int id, os::HapticScale intensity) {
     if (mStatus != NO_ERROR) {
         return mStatus;
     }
@@ -1563,8 +1561,7 @@ status_t EffectModule::setHapticIntensity(int id, os::HapticScale intensity)
     return status;
 }
 
-status_t EffectModule::setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo)
-{
+status_t EffectModule::setVibratorInfo_l(const media::AudioVibratorInfo& vibratorInfo) {
     if (mStatus != NO_ERROR) {
         return mStatus;
     }
@@ -1593,8 +1590,8 @@ status_t EffectModule::setVibratorInfo(const media::AudioVibratorInfo& vibratorI
     return status;
 }
 
-status_t EffectModule::getConfigs(
-        audio_config_base_t* inputCfg, audio_config_base_t* outputCfg, bool* isOutput) const {
+status_t EffectModule::getConfigs_l(audio_config_base_t* inputCfg, audio_config_base_t* outputCfg,
+                                    bool* isOutput) const {
     audio_utils::lock_guard _l(mutex());
     if (mConfig.inputCfg.mask == 0 || mConfig.outputCfg.mask == 0) {
         return NO_INIT;
@@ -1609,7 +1606,7 @@ status_t EffectModule::getConfigs(
     return NO_ERROR;
 }
 
-status_t EffectModule::sendMetadata(const std::vector<playback_track_metadata_v7_t>& metadata) {
+status_t EffectModule::sendMetadata_ll(const std::vector<playback_track_metadata_v7_t>& metadata) {
     if (mStatus != NO_ERROR) {
         return mStatus;
     }
@@ -1948,7 +1945,7 @@ Status EffectHandle::getConfig(
     audio_config_base_t inputCfg = AUDIO_CONFIG_BASE_INITIALIZER;
     audio_config_base_t outputCfg = AUDIO_CONFIG_BASE_INITIALIZER;
     bool isOutput;
-    status_t status = effectModule->getConfigs(&inputCfg, &outputCfg, &isOutput);
+    status_t status = effectModule->getConfigs_l(&inputCfg, &outputCfg, &isOutput);
     if (status == NO_ERROR) {
         constexpr bool isInput = false; // effects always use 'OUT' channel masks.
         _config->inputCfg = VALUE_OR_RETURN_STATUS_AS_OUT(
@@ -2214,7 +2211,7 @@ sp<IAfEffectModule> EffectChain::getEffectFromType_l(
     return 0;
 }
 
-std::vector<int> EffectChain::getEffectIds() const
+std::vector<int> EffectChain::getEffectIds_l() const
 {
     std::vector<int> ids;
     audio_utils::lock_guard _l(mutex());
@@ -2244,8 +2241,7 @@ void EffectChain::clearInputBuffer_l()
 }
 
 // Must be called with EffectChain::mutex() locked
-void EffectChain::process_l()
-{
+void EffectChain::process_l() {
     // never process effects when:
     // - on an OFFLOAD thread
     // - no more tracks are on the session and the effect tail has been rendered
@@ -2288,7 +2284,7 @@ void EffectChain::process_l()
     }
     bool doResetVolume = false;
     for (size_t i = 0; i < size; i++) {
-        doResetVolume = mEffects[i]->updateState() || doResetVolume;
+        doResetVolume = mEffects[i]->updateState_l() || doResetVolume;
     }
     if (doResetVolume) {
         resetVolume_l();
@@ -2342,14 +2338,14 @@ status_t EffectChain::addEffect_ll(const sp<IAfEffectModule>& effect)
                 numSamples * sizeof(float), &halBuffer);
         if (result != OK) return result;
 
-        effect->configure();
+        effect->configure_l();
 
         effect->setInBuffer(halBuffer);
         // auxiliary effects output samples to chain input buffer for further processing
         // by insert effects
         effect->setOutBuffer(mInBuffer);
     } else {
-        ssize_t idx_insert = getInsertIndex(desc);
+        ssize_t idx_insert = getInsertIndex_ll(desc);
         if (idx_insert < 0) {
             return INVALID_OPERATION;
         }
@@ -2357,7 +2353,7 @@ status_t EffectChain::addEffect_ll(const sp<IAfEffectModule>& effect)
         size_t previousSize = mEffects.size();
         mEffects.insertAt(effect, idx_insert);
 
-        effect->configure();
+        effect->configure_l();
 
         // - By default:
         //   All effects read samples from chain input buffer.
@@ -2372,9 +2368,9 @@ status_t EffectChain::addEffect_ll(const sp<IAfEffectModule>& effect)
             effect->setOutBuffer(mOutBuffer);
             if (idx_insert == 0) {
                 if (previousSize != 0) {
-                    mEffects[1]->configure();
+                    mEffects[1]->configure_l();
                     mEffects[1]->setInBuffer(mOutBuffer);
-                    mEffects[1]->updateAccessMode();      // reconfig if neeeded.
+                    mEffects[1]->updateAccessMode_l();  // reconfig if needed.
                 }
                 effect->setInBuffer(mInBuffer);
             } else {
@@ -2384,9 +2380,9 @@ status_t EffectChain::addEffect_ll(const sp<IAfEffectModule>& effect)
             effect->setInBuffer(mInBuffer);
             if (idx_insert == static_cast<ssize_t>(previousSize)) {
                 if (idx_insert != 0) {
-                    mEffects[idx_insert-1]->configure();
+                    mEffects[idx_insert-1]->configure_l();
                     mEffects[idx_insert-1]->setOutBuffer(mInBuffer);
-                    mEffects[idx_insert - 1]->updateAccessMode();      // reconfig if neeeded.
+                    mEffects[idx_insert - 1]->updateAccessMode_l();  // reconfig if needed.
                 }
                 effect->setOutBuffer(mOutBuffer);
             } else {
@@ -2396,21 +2392,21 @@ status_t EffectChain::addEffect_ll(const sp<IAfEffectModule>& effect)
         ALOGV("%s effect %p, added in chain %p at rank %zu",
                 __func__, effect.get(), this, idx_insert);
     }
-    effect->configure();
+    effect->configure_l();
 
     return NO_ERROR;
 }
 
 std::optional<size_t> EffectChain::findVolumeControl_l(size_t from, size_t to) const {
     for (size_t i = std::min(to, mEffects.size()); i > from; i--) {
-        if (mEffects[i - 1]->isVolumeControlEnabled()) {
+        if (mEffects[i - 1]->isVolumeControlEnabled_l()) {
             return i - 1;
         }
     }
     return std::nullopt;
 }
 
-ssize_t EffectChain::getInsertIndex(const effect_descriptor_t& desc) {
+ssize_t EffectChain::getInsertIndex_ll(const effect_descriptor_t& desc) {
     // Insert effects are inserted at the end of mEffects vector as they are processed
     //  after track and auxiliary effects.
     // Insert effect order as a function of indicated preference:
@@ -2498,7 +2494,7 @@ size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
             // the middle of a read from audio HAL
             if (mEffects[i]->state() == EffectModule::ACTIVE ||
                     mEffects[i]->state() == EffectModule::STOPPING) {
-                mEffects[i]->stop();
+                mEffects[i]->stop_l();
             }
             if (release) {
                 mEffects[i]->release_l();
@@ -2506,9 +2502,9 @@ size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
 
             if (type != EFFECT_FLAG_TYPE_AUXILIARY) {
                 if (i == size - 1 && i != 0) {
-                    mEffects[i - 1]->configure();
+                    mEffects[i - 1]->configure_l();
                     mEffects[i - 1]->setOutBuffer(mOutBuffer);
-                    mEffects[i - 1]->updateAccessMode();      // reconfig if neeeded.
+                    mEffects[i - 1]->updateAccessMode_l();      // reconfig if needed.
                 }
             }
             mEffects.removeAt(i);
@@ -2517,9 +2513,9 @@ size_t EffectChain::removeEffect_l(const sp<IAfEffectModule>& effect,
             // is updated if needed (can switch from HAL channel mask to mixer channel mask)
             if (type != EFFECT_FLAG_TYPE_AUXILIARY // TODO(b/284522658) breaks for aux FX, why?
                     && i == 0 && size > 1) {
-                mEffects[0]->configure();
+                mEffects[0]->configure_l();
                 mEffects[0]->setInBuffer(mInBuffer);
-                mEffects[0]->updateAccessMode();      // reconfig if neeeded.
+                mEffects[0]->updateAccessMode_l();      // reconfig if needed.
             }
 
             ALOGV("removeEffect_l() effect %p, removed from chain %p at rank %zu", effect.get(),
@@ -2569,14 +2565,19 @@ void EffectChain::setAudioSource_l(audio_source_t source)
 
 bool EffectChain::hasVolumeControlEnabled_l() const {
     for (const auto &effect : mEffects) {
-        if (effect->isVolumeControlEnabled()) return true;
+        if (effect->isVolumeControlEnabled_l()) return true;
     }
     return false;
 }
 
-// setVolume_l() must be called with IAfThreadBase::mutex() or EffectChain::mutex() held
-bool EffectChain::setVolume_l(uint32_t *left, uint32_t *right, bool force)
-{
+// setVolume() must be called without EffectChain::mutex()
+bool EffectChain::setVolume(uint32_t* left, uint32_t* right, bool force) {
+    audio_utils::lock_guard _l(mutex());
+    return setVolume_l(left, right, force);
+}
+
+// setVolume_l() must be called with EffectChain::mutex() held
+bool EffectChain::setVolume_l(uint32_t* left, uint32_t* right, bool force) {
     uint32_t newLeft = *left;
     uint32_t newRight = *right;
     const size_t size = mEffects.size();
@@ -2651,7 +2652,7 @@ bool EffectChain::setVolume_l(uint32_t *left, uint32_t *right, bool force)
     return volumeControlIndex.has_value();
 }
 
-// resetVolume_l() must be called with IAfThreadBase::mutex() or EffectChain::mutex() held
+// resetVolume_l() must be called with EffectChain::mutex() held
 void EffectChain::resetVolume_l()
 {
     if ((mLeftVolume != UINT_MAX) && (mRightVolume != UINT_MAX)) {
@@ -2677,11 +2678,11 @@ void EffectChain::setHapticIntensity_l(int id, os::HapticScale intensity)
 {
     audio_utils::lock_guard _l(mutex());
     for (size_t i = 0; i < mEffects.size(); ++i) {
-        mEffects[i]->setHapticIntensity(id, intensity);
+        mEffects[i]->setHapticIntensity_l(id, intensity);
     }
 }
 
-void EffectChain::syncHalEffectsState()
+void EffectChain::syncHalEffectsState_l()
 {
     audio_utils::lock_guard _l(mutex());
     for (size_t i = 0; i < mEffects.size(); i++) {
@@ -2750,7 +2751,7 @@ void EffectChain::setEffectSuspended_l(
         }
 
         if (desc->mRefCount++ == 0) {
-            sp<IAfEffectModule> effect = getEffectIfEnabled(type);
+            sp<IAfEffectModule> effect = getEffectIfEnabled_l(type);
             if (effect != 0) {
                 desc->mEffect = effect;
                 effect->setSuspended(true);
@@ -2803,7 +2804,7 @@ void EffectChain::setEffectSuspendedAll_l(bool suspend)
         }
         if (desc->mRefCount++ == 0) {
             Vector< sp<IAfEffectModule> > effects;
-            getSuspendEligibleEffects(effects);
+            getSuspendEligibleEffects_l(effects);
             for (size_t i = 0; i < effects.size(); i++) {
                 setEffectSuspended_l(&effects[i]->desc().type, true);
             }
@@ -2844,8 +2845,7 @@ const effect_uuid_t * const SL_IID_VOLUME = &SL_IID_VOLUME_;
 #endif //OPENSL_ES_H_
 
 /* static */
-bool EffectChain::isEffectEligibleForBtNrecSuspend(const effect_uuid_t *type)
-{
+bool EffectChain::isEffectEligibleForBtNrecSuspend_l(const effect_uuid_t* type) {
     // Only NS and AEC are suspended when BtNRec is off
     if ((memcmp(type, FX_IID_AEC, sizeof(effect_uuid_t)) == 0) ||
         (memcmp(type, FX_IID_NS, sizeof(effect_uuid_t)) == 0)) {
@@ -2854,7 +2854,7 @@ bool EffectChain::isEffectEligibleForBtNrecSuspend(const effect_uuid_t *type)
     return false;
 }
 
-bool EffectChain::isEffectEligibleForSuspend(const effect_descriptor_t& desc)
+bool EffectChain::isEffectEligibleForSuspend_l(const effect_descriptor_t& desc)
 {
     // auxiliary effects and visualizer are never suspended on output mix
     if ((mSessionId == AUDIO_SESSION_OUTPUT_MIX) &&
@@ -2867,26 +2867,24 @@ bool EffectChain::isEffectEligibleForSuspend(const effect_descriptor_t& desc)
     return true;
 }
 
-void EffectChain::getSuspendEligibleEffects(
+void EffectChain::getSuspendEligibleEffects_l(
         Vector< sp<IAfEffectModule> > &effects)
 {
     effects.clear();
     for (size_t i = 0; i < mEffects.size(); i++) {
-        if (isEffectEligibleForSuspend(mEffects[i]->desc())) {
+        if (isEffectEligibleForSuspend_l(mEffects[i]->desc())) {
             effects.add(mEffects[i]);
         }
     }
 }
 
-sp<IAfEffectModule> EffectChain::getEffectIfEnabled(const effect_uuid_t *type)
+sp<IAfEffectModule> EffectChain::getEffectIfEnabled_l(const effect_uuid_t *type)
 {
     sp<IAfEffectModule> effect = getEffectFromType_l(type);
     return effect != 0 && effect->isEnabled() ? effect : 0;
 }
 
-void EffectChain::checkSuspendOnEffectEnabled(const sp<IAfEffectModule>& effect,
-                                                            bool enabled)
-{
+void EffectChain::checkSuspendOnEffectEnabled_l(const sp<IAfEffectModule>& effect, bool enabled) {
     ssize_t index = mSuspendedEffects.indexOfKey(effect->desc().type.timeLow);
     if (enabled) {
         if (index < 0) {
@@ -2895,18 +2893,17 @@ void EffectChain::checkSuspendOnEffectEnabled(const sp<IAfEffectModule>& effect,
             if (index < 0) {
                 return;
             }
-            if (!isEffectEligibleForSuspend(effect->desc())) {
+            if (!isEffectEligibleForSuspend_l(effect->desc())) {
                 return;
             }
             setEffectSuspended_l(&effect->desc().type, enabled);
             index = mSuspendedEffects.indexOfKey(effect->desc().type.timeLow);
             if (index < 0) {
-                ALOGW("checkSuspendOnEffectEnabled() Fx should be suspended here!");
+                ALOGW("%s Fx should be suspended here!", __func__);
                 return;
             }
         }
-        ALOGV("checkSuspendOnEffectEnabled() enable suspending fx %08x",
-            effect->desc().type.timeLow);
+        ALOGV("%s enable suspending fx %08x", __func__, effect->desc().type.timeLow);
         sp<SuspendedEffectDesc> desc = mSuspendedEffects.valueAt(index);
         // if effect is requested to suspended but was not yet enabled, suspend it now.
         if (desc->mEffect == 0) {
@@ -2918,8 +2915,7 @@ void EffectChain::checkSuspendOnEffectEnabled(const sp<IAfEffectModule>& effect,
         if (index < 0) {
             return;
         }
-        ALOGV("checkSuspendOnEffectEnabled() disable restoring fx %08x",
-            effect->desc().type.timeLow);
+        ALOGV("%s disable restoring fx %08x", __func__, effect->desc().type.timeLow);
         sp<SuspendedEffectDesc> desc = mSuspendedEffects.valueAt(index);
         desc->mEffect.clear();
         effect->setSuspended(false);
@@ -3028,9 +3024,9 @@ void EffectChain::sendMetadata_l(const std::vector<playback_track_metadata_v7_t>
     for (const auto& effect : mEffects) {
         if (spatializedMetadata.has_value()
                 && IAfEffectModule::isSpatializer(&effect->desc().type)) {
-            effect->sendMetadata(spatializedMetadata.value());
+            effect->sendMetadata_ll(spatializedMetadata.value());
         } else {
-            effect->sendMetadata(allMetadata);
+            effect->sendMetadata_ll(allMetadata);
         }
     }
 }
@@ -3248,8 +3244,9 @@ NO_THREAD_SAFETY_ANALYSIS  // setVolumeForOutput_l() access
     t->setVolumeForOutput_l(left, right);
 }
 
-void EffectChain::EffectCallback::checkSuspendOnEffectEnabled(
-        const sp<IAfEffectBase>& effect, bool enabled, bool threadLocked) {
+void EffectChain::EffectCallback::checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect,
+                                                              bool enabled, bool threadLocked)
+        NO_THREAD_SAFETY_ANALYSIS {
     const sp<IAfThreadBase> t = thread().promote();
     if (t == nullptr) {
         return;
@@ -3261,7 +3258,7 @@ void EffectChain::EffectCallback::checkSuspendOnEffectEnabled(
         return;
     }
     // in EffectChain context, an EffectBase is always from an EffectModule so static cast is safe
-    c->checkSuspendOnEffectEnabled(effect->asEffectModule(), enabled);
+    c->checkSuspendOnEffectEnabled_l(effect->asEffectModule(), enabled);
 }
 
 void EffectChain::EffectCallback::onEffectEnable(const sp<IAfEffectBase>& effect) {
@@ -3293,7 +3290,7 @@ bool EffectChain::EffectCallback::disconnectEffectHandle(IAfEffectHandle *handle
     return true;
 }
 
-void EffectChain::EffectCallback::resetVolume() {
+void EffectChain::EffectCallback::resetVolume_l() {
     sp<IAfEffectChain> c = chain().promote();
     if (c == nullptr) {
         return;
@@ -3354,7 +3351,7 @@ status_t DeviceEffectProxy::setEnabled(bool enabled, bool fromHandle)
     return status;
 }
 
-status_t DeviceEffectProxy::init(
+status_t DeviceEffectProxy::init_l(
         const std::map <audio_patch_handle_t, IAfPatchPanel::Patch>& patches) {
 //For all audio patches
 //If src or sink device match
@@ -3458,7 +3455,7 @@ NO_THREAD_SAFETY_ANALYSIS
             } else {
                 mHalEffect->setDevices({mDevice});
             }
-            mHalEffect->configure();
+            mHalEffect->configure_l();
         }
         *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/,
                                    mNotifyFramesProcessed);
@@ -3747,7 +3744,7 @@ void DeviceEffectProxy::ProxyCallback::onEffectEnable(
     if (effect == nullptr) {
         return;
     }
-    effect->start();
+    effect->start_l();
 }
 
 void DeviceEffectProxy::ProxyCallback::onEffectDisable(
@@ -3756,7 +3753,7 @@ void DeviceEffectProxy::ProxyCallback::onEffectDisable(
     if (effect == nullptr) {
         return;
     }
-    effect->stop();
+    effect->stop_l();
 }
 
 } // namespace android
