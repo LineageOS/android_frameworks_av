@@ -210,6 +210,8 @@ ScopedAStatus ComponentStore::createComponent(
     c2_status_t status =
             mStore->createComponent(name, &c2component);
 
+    ALOGD("createComponent(): listener(%d)", bool(listener));
+
     if (status == C2_OK) {
 #ifndef __ANDROID_APEX__
         c2component = GetFilterWrapper()->maybeWrapComponent(c2component);
@@ -218,7 +220,8 @@ ScopedAStatus ComponentStore::createComponent(
         std::shared_ptr<Component> comp =
             SharedRefBase::make<Component>(c2component, listener, ref<ComponentStore>(), pool);
         *component = comp;
-        if (!component) {
+        if (!component || !comp) {
+            ALOGE("createComponent(): component cannot be returned");
             status = C2_CORRUPTED;
         } else {
             reportComponentBirth(comp.get());

@@ -360,7 +360,7 @@ protected:
         EXIT_STANDBY,
     };
     AAudioThread            mCommandThread;
-    std::atomic<bool>       mThreadEnabled{false};
+    std::atomic_bool        mThreadEnabled{false};
     AAudioCommandQueue      mCommandQueue;
 
     int32_t                 mFramesPerBurst = 0;
@@ -399,6 +399,8 @@ private:
                                 std::shared_ptr<AAudioCommandParam> param = nullptr,
                                 bool waitForReply = false,
                                 int64_t timeoutNanos = 0);
+
+    void stopCommandThread();
 
     aaudio_result_t closeAndClear();
 

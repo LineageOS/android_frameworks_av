@@ -1691,7 +1691,7 @@ sp<IAfEffectHandle> ThreadBase::createEffect_l(
                     std::move(mAfThreadCallback->getDefaultVibratorInfo_l());
             if (defaultVibratorInfo) {
                 // Only set the vibrator info when it is a valid one.
-                effect->setVibratorInfo(*defaultVibratorInfo);
+                effect->setVibratorInfo_l(*defaultVibratorInfo);
             }
         }
         // create effect handle and connect it to effect module
@@ -1793,7 +1793,7 @@ sp<IAfEffectModule> ThreadBase::getEffect_l(audio_session_t sessionId,
 std::vector<int> ThreadBase::getEffectIds_l(audio_session_t sessionId) const
 {
     sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
-    return chain != nullptr ? chain->getEffectIds() : std::vector<int>{};
+    return chain != nullptr ? chain->getEffectIds_l() : std::vector<int>{};
 }
 
 // PlaybackThread::addEffect_ll() must be called with AudioFlinger::mutex() and
@@ -1825,7 +1825,7 @@ status_t ThreadBase::addEffect_ll(const sp<IAfEffectModule>& effect)
         return BAD_VALUE;
     }
 
-    effect->setOffloaded(mType == OFFLOAD, mId);
+    effect->setOffloaded_l(mType == OFFLOAD, mId);
 
     status_t status = chain->addEffect_l(effect);
     if (status != NO_ERROR) {
@@ -1862,22 +1862,20 @@ void ThreadBase::removeEffect_l(const sp<IAfEffectModule>& effect, bool release)
     }
 }
 
-void ThreadBase::lockEffectChains_l(
-        Vector<sp<IAfEffectChain>>& effectChains)
-NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::lock()
+void ThreadBase::lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains)
+        NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::lock()
 {
     effectChains = mEffectChains;
-    for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->mutex().lock();
+    for (const auto& effectChain : effectChains) {
+        effectChain->mutex().lock();
     }
 }
 
-void ThreadBase::unlockEffectChains(
-        const Vector<sp<IAfEffectChain>>& effectChains)
-NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
+void ThreadBase::unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains)
+        NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
 {
-    for (size_t i = 0; i < effectChains.size(); i++) {
-        effectChains[i]->mutex().unlock();
+    for (const auto& effectChain : effectChains) {
+        effectChain->mutex().unlock();
     }
 }
 
@@ -5501,7 +5499,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
     sp<IAfEffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
     if (chain != 0) {
         uint32_t v = (uint32_t)(masterVolume * (1 << 24));
-        chain->setVolume_l(&v, &v);
+        chain->setVolume(&v, &v);
         masterVolume = (float)((v + (1 << 23)) >> 24);
         chain.clear();
     }
@@ -5836,7 +5834,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
 
             mixedTracks++;
 
-            // track->mainBuffer() != mSinkBuffer or mMixerBuffer means
+            // track->mainBuffer() != mSinkBuffer and mMixerBuffer means
             // there is an effect chain connected to the track
             chain.clear();
             if (track->mainBuffer() != mSinkBuffer &&
@@ -5940,7 +5938,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
             track->setFinalVolume(vrf, vlf);
 
             // Delegate volume control to effect in track effect chain if needed
-            if (chain != 0 && chain->setVolume_l(&vl, &vr)) {
+            if (chain != 0 && chain->setVolume(&vl, &vr)) {
                 // Do not ramp volume if volume is controlled by effect
                 param = AudioMixer::VOLUME;
                 // Update remaining floating point volume levels
@@ -6680,8 +6678,8 @@ void DirectOutputThread::processVolume_l(IAfTrack* track, bool lastTrack)
                 // Convert volumes from float to 8.24
                 uint32_t vl = (uint32_t)(left * (1 << 24));
                 uint32_t vr = (uint32_t)(right * (1 << 24));
-                // Direct/Offload effect chains set output volume in setVolume_l().
-                (void)mEffectChains[0]->setVolume_l(&vl, &vr);
+                // Direct/Offload effect chains set output volume in setVolume().
+                (void)mEffectChains[0]->setVolume(&vl, &vr);
             } else {
                 // otherwise we directly set the volume.
                 setVolumeForOutput_l(left, right);
@@ -9748,7 +9746,7 @@ status_t RecordThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
 
     // make sure enabled pre processing effects state is communicated to the HAL as we
     // just moved them to a new input stream.
-    chain->syncHalEffectsState();
+    chain->syncHalEffectsState_l();
 
     mEffectChains.add(chain);
 
@@ -10733,7 +10731,7 @@ status_t MmapThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
     chain->setThread(this);
     chain->setInBuffer(nullptr);
     chain->setOutBuffer(nullptr);
-    chain->syncHalEffectsState();
+    chain->syncHalEffectsState_l();
 
     mEffectChains.add(chain);
     checkSuspendOnAddEffectChain_l(chain);
@@ -11026,7 +11024,7 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent_l
         // only one effect chain can be present on DirectOutputThread, so if
         // there is one, the track is connected to it
         if (!mEffectChains.isEmpty()) {
-            mEffectChains[0]->setVolume_l(&vol, &vol);
+            mEffectChains[0]->setVolume(&vol, &vol);
             volume = (float)vol / (1 << 24);
         }
         // Try to use HW volume control and fall back to SW control if not implemented
