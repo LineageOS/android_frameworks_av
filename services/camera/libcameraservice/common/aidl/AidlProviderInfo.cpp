@@ -297,9 +297,10 @@ const std::shared_ptr<ICameraProvider> AidlProviderInfo::startProviderInterface(
     }
 
     ALOGV("Camera provider actually needs restart, calling getService(%s)", mProviderName.c_str());
-    interface = mManager->mAidlServiceProxy->getAidlService(mProviderName.c_str());
+    interface = mManager->mAidlServiceProxy->getService(mProviderName);
+
     if (interface == nullptr) {
-        ALOGD("%s: %s service not started", __FUNCTION__, mProviderName.c_str());
+        ALOGE("%s: %s service not started", __FUNCTION__, mProviderName.c_str());
         return nullptr;
     }
 

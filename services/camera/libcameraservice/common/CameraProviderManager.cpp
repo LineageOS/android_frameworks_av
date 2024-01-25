@@ -139,7 +139,7 @@ status_t CameraProviderManager::tryToInitAndAddHidlProvidersLocked(
 }
 
 std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
-CameraProviderManager::AidlServiceInteractionProxyImpl::getAidlService(
+CameraProviderManager::AidlServiceInteractionProxyImpl::getService(
         const std::string& serviceName) {
     using aidl::android::hardware::camera::provider::ICameraProvider;
 
@@ -151,15 +151,31 @@ CameraProviderManager::AidlServiceInteractionProxyImpl::getAidlService(
     }
 
     if (binder == nullptr) {
-        ALOGD("%s: AIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
-              serviceName.c_str());
+        ALOGE("%s: AIDL Camera provider HAL '%s' is not actually available, despite waiting "
+              "indefinitely?", __FUNCTION__, serviceName.c_str());
         return nullptr;
     }
     std::shared_ptr<ICameraProvider> interface =
             ICameraProvider::fromBinder(ndk::SpAIBinder(binder));
 
     return interface;
-};
+}
+
+std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+CameraProviderManager::AidlServiceInteractionProxyImpl::tryGetService(
+        const std::string& serviceName) {
+    using aidl::android::hardware::camera::provider::ICameraProvider;
+
+    std::shared_ptr<ICameraProvider> interface = ICameraProvider::fromBinder(
+                    ndk::SpAIBinder(AServiceManager_checkService(serviceName.c_str())));
+    if (interface == nullptr) {
+        ALOGD("%s: AIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
+              serviceName.c_str());
+        return nullptr;
+    }
+
+    return interface;
+}
 
 static std::string getFullAidlProviderName(const std::string instance) {
     std::string aidlHalServiceDescriptor =
@@ -2096,8 +2112,14 @@ status_t CameraProviderManager::tryToInitializeAidlProviderLocked(
         const std::string& providerName, const sp<ProviderInfo>& providerInfo) {
     using aidl::android::hardware::camera::provider::ICameraProvider;
 
-    std::shared_ptr<ICameraProvider> interface =
-            mAidlServiceProxy->getAidlService(providerName.c_str());
+    std::shared_ptr<ICameraProvider> interface;
+    if (flags::delay_lazy_hal_instantiation()) {
+        // Only get remote instance if already running. Lazy Providers will be
+        // woken up later.
+        interface = mAidlServiceProxy->tryGetService(providerName);
+    } else {
+        interface = mAidlServiceProxy->getService(providerName);
+    }
 
     if (interface == nullptr) {
         ALOGW("%s: AIDL Camera provider HAL '%s' is not actually available", __FUNCTION__,
