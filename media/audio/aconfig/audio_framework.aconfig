@@ -53,3 +53,12 @@ support."
     bug: "298463873"
 }
 
+flag {
+    name: "sco_managed_by_audio"
+    namespace: "media_audio"
+    description: "\
+Enable new implementation of headset profile device connection and\
+SCO audio activation."
+    bug: "265057196"
+}
+
