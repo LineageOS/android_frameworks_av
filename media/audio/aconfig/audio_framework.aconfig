@@ -62,3 +62,9 @@ SCO audio activation."
     bug: "265057196"
 }
 
+flag {
+    name: "supported_device_types_api"
+    namespace: "media_audio"
+    description: "Surface new API method AudioManager.getSupportedDeviceTypes()"
+    bug: "307537538"
+}
