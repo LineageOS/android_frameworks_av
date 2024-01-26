@@ -15,6 +15,8 @@
  *
  */
 
+#include <MediaExtractorService.h>
+#include <MediaPlayerService.h>
 #include <StagefrightMetadataRetriever.h>
 #include <binder/ProcessState.h>
 #include <datasource/FileSource.h>
@@ -54,58 +56,96 @@ const char *kMimeTypes[] = {MEDIA_MIMETYPE_IMAGE_JPEG,         MEDIA_MIMETYPE_IM
                             MEDIA_MIMETYPE_CONTAINER_MPEG2PS,  MEDIA_MIMETYPE_CONTAINER_HEIF,
                             MEDIA_MIMETYPE_TEXT_3GPP,          MEDIA_MIMETYPE_TEXT_SUBRIP,
                             MEDIA_MIMETYPE_TEXT_VTT,           MEDIA_MIMETYPE_TEXT_CEA_608,
-                            MEDIA_MIMETYPE_TEXT_CEA_708,       MEDIA_MIMETYPE_DATA_TIMED_ID3};
+                            MEDIA_MIMETYPE_TEXT_CEA_708,       MEDIA_MIMETYPE_DATA_TIMED_ID3,
+                            MEDIA_MIMETYPE_IMAGE_AVIF,         MEDIA_MIMETYPE_AUDIO_MPEGH_MHA1,
+                            MEDIA_MIMETYPE_AUDIO_MPEGH_MHM1,   MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L3,
+                            MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L4,  MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L3,
+                            MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L4,  MEDIA_MIMETYPE_AUDIO_DTS,
+                            MEDIA_MIMETYPE_AUDIO_DTS_HD,       MEDIA_MIMETYPE_AUDIO_DTS_HD_MA,
+                            MEDIA_MIMETYPE_AUDIO_DTS_UHD,      MEDIA_MIMETYPE_AUDIO_DTS_UHD_P1,
+                            MEDIA_MIMETYPE_AUDIO_DTS_UHD_P2,   MEDIA_MIMETYPE_AUDIO_EVRC,
+                            MEDIA_MIMETYPE_AUDIO_EVRCB,        MEDIA_MIMETYPE_AUDIO_EVRCWB,
+                            MEDIA_MIMETYPE_AUDIO_EVRCNW,       MEDIA_MIMETYPE_AUDIO_AMR_WB_PLUS,
+                            MEDIA_MIMETYPE_AUDIO_APTX,         MEDIA_MIMETYPE_AUDIO_DRA,
+                            MEDIA_MIMETYPE_AUDIO_DOLBY_MAT,    MEDIA_MIMETYPE_AUDIO_DOLBY_TRUEHD,
+                            MEDIA_MIMETYPE_AUDIO_DOLBY_MAT_1_0,MEDIA_MIMETYPE_AUDIO_AAC_MP4,
+                            MEDIA_MIMETYPE_AUDIO_DOLBY_MAT_2_0,MEDIA_MIMETYPE_AUDIO_DOLBY_MAT_2_1,
+                            MEDIA_MIMETYPE_AUDIO_AAC_MAIN,     MEDIA_MIMETYPE_AUDIO_AAC_LC,
+                            MEDIA_MIMETYPE_AUDIO_AAC_SSR,      MEDIA_MIMETYPE_AUDIO_AAC_LTP,
+                            MEDIA_MIMETYPE_AUDIO_AAC_HE_V1,    MEDIA_MIMETYPE_AUDIO_AAC_SCALABLE,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ERLC,     MEDIA_MIMETYPE_AUDIO_AAC_ADTS_MAIN,
+                            MEDIA_MIMETYPE_AUDIO_AAC_HE_V2,    MEDIA_MIMETYPE_AUDIO_AAC_ADTS_HE_V1,
+                            MEDIA_MIMETYPE_AUDIO_AAC_XHE,      MEDIA_MIMETYPE_AUDIO_AAC_ADTS_HE_V2,
+                            MEDIA_MIMETYPE_AUDIO_AAC_LD,       MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LC,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ADTS_SSR, MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LTP,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ADIF,     MEDIA_MIMETYPE_AUDIO_IEC60958,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ADTS_ERLC,MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LD,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ELD,      MEDIA_MIMETYPE_AUDIO_AAC_LATM_HE_V1,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ADTS_XHE, MEDIA_MIMETYPE_AUDIO_AAC_LATM_LC,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ADTS_ELD, MEDIA_MIMETYPE_AUDIO_AAC_LATM_HE_V2,
+                            MEDIA_MIMETYPE_AUDIO_IEC61937,
+                            MEDIA_MIMETYPE_AUDIO_AAC_ADTS_SCALABLE,};
+
+constexpr size_t kMaxSize = 100;
 
 class MetadataRetrieverFuzzer {
    public:
     MetadataRetrieverFuzzer(const uint8_t *data, size_t size)
-        : mFdp(data, size),
-          mMdRetriever(new StagefrightMetadataRetriever()),
-          mDataSourceFd(memfd_create("InputFile", MFD_ALLOW_SEALING)) {}
-    ~MetadataRetrieverFuzzer() { close(mDataSourceFd); }
+        : mFdp(data, size), mMdRetriever(new StagefrightMetadataRetriever()) {}
     bool setDataSource(const uint8_t *data, size_t size);
     void getData();
 
    private:
     FuzzedDataProvider mFdp;
     sp<StagefrightMetadataRetriever> mMdRetriever = nullptr;
-    const int32_t mDataSourceFd;
+    int32_t mDataSourceFd;
 };
 
 void MetadataRetrieverFuzzer::getData() {
-    int64_t timeUs = mFdp.ConsumeIntegral<int64_t>();
-    int32_t option = mFdp.ConsumeIntegral<int32_t>();
-    int32_t colorFormat = mFdp.ConsumeIntegral<int32_t>();
-    bool metaOnly = mFdp.ConsumeBool();
-    mMdRetriever->getFrameAtTime(timeUs, option, colorFormat, metaOnly);
-
-    int32_t index = mFdp.ConsumeIntegral<int32_t>();
-    colorFormat = mFdp.ConsumeIntegral<int32_t>();
-    metaOnly = mFdp.ConsumeBool();
-    bool thumbnail = mFdp.ConsumeBool();
-    mMdRetriever->getImageAtIndex(index, colorFormat, metaOnly, thumbnail);
-
-    index = mFdp.ConsumeIntegral<int32_t>();
-    colorFormat = mFdp.ConsumeIntegral<int32_t>();
-    int32_t left = mFdp.ConsumeIntegral<int32_t>();
-    int32_t top = mFdp.ConsumeIntegral<int32_t>();
-    int32_t right = mFdp.ConsumeIntegral<int32_t>();
-    int32_t bottom = mFdp.ConsumeIntegral<int32_t>();
-    mMdRetriever->getImageRectAtIndex(index, colorFormat, left, top, right, bottom);
-
-    index = mFdp.ConsumeIntegral<int32_t>();
-    colorFormat = mFdp.ConsumeIntegral<int32_t>();
-    metaOnly = mFdp.ConsumeBool();
-    mMdRetriever->getFrameAtIndex(index, colorFormat, metaOnly);
-
-    mMdRetriever->extractAlbumArt();
-
-    int32_t keyCode = mFdp.ConsumeIntegral<int32_t>();
-    mMdRetriever->extractMetadata(keyCode);
+    while (mFdp.remaining_bytes()) {
+        auto invokeMediaApi = mFdp.PickValueInArray<const std::function<void()>>({
+                [&]() {
+                    mMdRetriever->getFrameAtTime(mFdp.ConsumeIntegral<int64_t>() /* timeUs */,
+                                                 mFdp.ConsumeIntegral<int32_t>() /* option */,
+                                                 mFdp.ConsumeIntegral<int32_t>() /* colorFormat */,
+                                                 mFdp.ConsumeBool() /* metaOnly */);
+                },
+                [&]() {
+                    mMdRetriever->getImageAtIndex(mFdp.ConsumeIntegral<int32_t>() /* index */,
+                                                  mFdp.ConsumeIntegral<int32_t>() /* colorFormat */,
+                                                  mFdp.ConsumeBool() /* metaOnly */,
+                                                  mFdp.ConsumeBool() /* thumbnail */);
+                },
+                [&]() {
+                    mMdRetriever->getImageRectAtIndex(
+                            mFdp.ConsumeIntegral<int32_t>() /* index */,
+                            mFdp.ConsumeIntegral<int32_t>() /* colorFormat */,
+                            mFdp.ConsumeIntegral<int32_t>() /* left */,
+                            mFdp.ConsumeIntegral<int32_t>() /* top */,
+                            mFdp.ConsumeIntegral<int32_t>() /* right */,
+                            mFdp.ConsumeIntegral<int32_t>() /* bottom */);
+                },
+                [&]() {
+                    mMdRetriever->getFrameAtIndex(mFdp.ConsumeIntegral<int32_t>() /* index */,
+                                                  mFdp.ConsumeIntegral<int32_t>() /* colorFormat */,
+                                                  mFdp.ConsumeBool() /* metaOnly */);
+                },
+                [&]() { mMdRetriever->extractAlbumArt(); },
+                [&]() {
+                    mMdRetriever->extractMetadata(mFdp.ConsumeIntegral<int32_t>() /* keyCode */);
+                },
+        });
+        invokeMediaApi();
+    }
 }
 
 bool MetadataRetrieverFuzzer::setDataSource(const uint8_t *data, size_t size) {
     status_t status = -1;
+    std::unique_ptr<std::FILE, decltype(&fclose)> fp(tmpfile(), &fclose);
+    mDataSourceFd = fileno(fp.get());
+    if (mDataSourceFd < 0) {
+        return false;
+    }
 
     enum DataSourceChoice {FromHttp, FromFd, FromFileSource, kMaxValue = FromFileSource};
     switch (mFdp.ConsumeEnum<DataSourceChoice>()) {
@@ -114,7 +154,7 @@ bool MetadataRetrieverFuzzer::setDataSource(const uint8_t *data, size_t size) {
             mHeaders.add(String8(mFdp.ConsumeRandomLengthString().c_str()),
                          String8(mFdp.ConsumeRandomLengthString().c_str()));
 
-            uint32_t dataBlobSize = mFdp.ConsumeIntegralInRange<uint16_t>(0, size);
+            uint32_t dataBlobSize = mFdp.ConsumeIntegralInRange<uint16_t>(0, min(kMaxSize,size));
             vector<uint8_t> uriSuffix = mFdp.ConsumeBytes<uint8_t>(dataBlobSize);
 
             string uri("data:");
@@ -144,6 +184,12 @@ bool MetadataRetrieverFuzzer::setDataSource(const uint8_t *data, size_t size) {
         return false;
     }
     return true;
+}
+
+extern "C" int LLVMFuzzerInitialize(int* /* argc */, char*** /* argv */) {
+    MediaPlayerService::instantiate();
+    MediaExtractorService::instantiate();
+    return 0;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {

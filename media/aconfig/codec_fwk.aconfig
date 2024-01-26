@@ -5,6 +5,13 @@
 package: "android.media.codec"
 
 flag {
+  name: "aidl_hal_input_surface"
+  namespace: "codec_fwk"
+  description: "Feature flags for enabling AIDL HAL InputSurface handling"
+  bug: "201479783"
+}
+
+flag {
   name: "dynamic_color_aspects"
   namespace: "codec_fwk"
   description: "Feature flag for dynamic color aspect support"
