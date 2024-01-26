@@ -722,8 +722,9 @@ NO_THREAD_SAFETY_ANALYSIS  // condition variable
     {
         audio_utils::unique_lock _l(event->mutex());
         while (event->mWaitStatus) {
-            if (event->mCondition.wait_for(_l, std::chrono::nanoseconds(kConfigEventTimeoutNs))
-                        == std::cv_status::timeout) {
+            if (event->mCondition.wait_for(
+                    _l, std::chrono::nanoseconds(kConfigEventTimeoutNs), getTid())
+                            == std::cv_status::timeout) {
                 event->mStatus = TIMED_OUT;
                 event->mWaitStatus = false;
             }
