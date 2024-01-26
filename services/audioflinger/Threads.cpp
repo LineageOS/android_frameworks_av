@@ -4160,6 +4160,30 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
             metadataUpdate = updateMetadata_l();
 
+            // Acquire a local copy of active tracks with lock (release w/o lock).
+            //
+            // Control methods on the track acquire the ThreadBase lock (e.g. start()
+            // stop(), pause(), etc.), but the threadLoop is entitled to call audio
+            // data / buffer methods on tracks from activeTracks without the ThreadBase lock.
+            activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
+
+            setHalLatencyMode_l();
+
+            // updateTeePatches_l will acquire the ThreadBase_Mutex of other threads,
+            // so this is done before we lock our effect chains.
+            for (const auto& track : mActiveTracks) {
+                track->updateTeePatches_l();
+            }
+
+            // signal actual start of output stream when the render position reported by
+            // the kernel starts moving.
+            if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
+                    && (mKernelPositionOnStandby
+                            != mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL])))) {
+                mHalStarted = true;
+                mWaitHalStartCV.notify_all();
+            }
+
             // prevent any changes in effect chain list and in each effect chain
             // during mixing and effect process as the audio buffers could be deleted
             // or modified if an effect is created or deleted
@@ -4186,28 +4210,6 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                                 mType == SPATIALIZER && track->isSpatialized();
                     }
                 }
-            }
-
-            // Acquire a local copy of active tracks with lock (release w/o lock).
-            //
-            // Control methods on the track acquire the ThreadBase lock (e.g. start()
-            // stop(), pause(), etc.), but the threadLoop is entitled to call audio
-            // data / buffer methods on tracks from activeTracks without the ThreadBase lock.
-            activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
-
-            setHalLatencyMode_l();
-
-            for (const auto &track : mActiveTracks ) {
-                track->updateTeePatches_l();
-            }
-
-            // signal actual start of output stream when the render position reported by the kernel
-            // starts moving.
-            if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
-                    && (mKernelPositionOnStandby
-                            != mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL])))) {
-                mHalStarted = true;
-                mWaitHalStartCV.notify_all();
             }
         } // mutex() scope ends
 

@@ -18,6 +18,7 @@
 
 #include <android/media/BnAudioRecord.h>
 #include <android/media/BnAudioTrack.h>
+#include <audio_utils/mutex.h>
 #include <audiomanager/IAudioManager.h>
 #include <binder/IMemory.h>
 #include <fastpath/FastMixerDumpState.h>
@@ -351,7 +352,8 @@ public:
     virtual sp<os::ExternalVibration> getExternalVibration() const = 0;
 
     // This function should be called with holding thread lock.
-    virtual void updateTeePatches_l() = 0;
+    virtual void updateTeePatches_l() REQUIRES(audio_utils::ThreadBase_Mutex)
+            EXCLUDES_BELOW_ThreadBase_Mutex = 0;
 
     // Argument teePatchesToUpdate is by value, use std::move to optimize.
     virtual void setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate) = 0;
