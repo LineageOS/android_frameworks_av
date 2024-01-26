@@ -2481,7 +2481,7 @@ status_t AudioPolicyService::AudioCommandThread::sendCommand(sp<AudioCommand>& c
     while (command->mWaitStatus) {
         nsecs_t timeOutNs = kAudioCommandTimeoutNs + milliseconds(delayMs);
         if (command->mCond.wait_for(
-                    ul, std::chrono::nanoseconds(timeOutNs)) == std::cv_status::timeout) {
+                ul, std::chrono::nanoseconds(timeOutNs), getTid()) == std::cv_status::timeout) {
             command->mStatus = TIMED_OUT;
             command->mWaitStatus = false;
         }
