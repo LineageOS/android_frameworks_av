@@ -45,10 +45,7 @@ class DevicesFactoryHalAidl : public DevicesFactoryHalInterface
 
   private:
     const std::shared_ptr<::aidl::android::hardware::audio::core::IConfig> mConfig;
-    std::optional<std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension>>
-            mVendorExt;
-
-    std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension> getVendorExtension();
+    const std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension> mVendorExt;
 
     ~DevicesFactoryHalAidl() = default;
 };
