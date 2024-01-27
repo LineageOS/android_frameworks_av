@@ -194,7 +194,8 @@ public:
     sp<os::ExternalVibration> getExternalVibration() const final { return mExternalVibration; }
 
             // This function should be called with holding thread lock.
-    void updateTeePatches_l() final;
+    void updateTeePatches_l() final REQUIRES(audio_utils::ThreadBase_Mutex)
+            EXCLUDES_BELOW_ThreadBase_Mutex;
     void setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate) final;
 
     void tallyUnderrunFrames(size_t frames) final {
