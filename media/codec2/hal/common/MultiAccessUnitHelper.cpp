@@ -277,9 +277,11 @@ c2_status_t MultiAccessUnitHelper::scatter(
                     std::static_pointer_cast<const C2AccessUnitInfos::input>(
                     w->input.buffers.front()->getInfo(C2AccessUnitInfos::input::PARAM_TYPE));
             uint32_t offset = 0; uint32_t multiAUSize = multiAU.front().size();
+            bool sendEos = false;
             for (int idx = 0; idx < auInfo->flexCount(); ++idx) {
                 std::vector<C2ConstLinearBlock> au;
                 const C2AccessUnitInfosStruct &info = auInfo->m.values[idx];
+                sendEos |= (info.flags & C2FrameData::FLAG_END_OF_STREAM);
                 std::unique_ptr<C2Work> newWork = cloneInputWork(w, info.flags);
                 frameSet.insert(newFrameIdx);
                 newFrameIdx = mFrameIndex++;
@@ -301,6 +303,17 @@ c2_status_t MultiAccessUnitHelper::scatter(
                 sliceWork.push_back(std::move(newWork));
                 processedWork->push_back(std::move(sliceWork));
                 offset += info.size;
+            }
+            if (!sendEos && (w->input.flags & C2FrameData::FLAG_END_OF_STREAM)) {
+                if (!processedWork->empty()) {
+                    std::list<std::unique_ptr<C2Work>> &sliceWork = processedWork->back();
+                    if (!sliceWork.empty()) {
+                        std::unique_ptr<C2Work> &work = sliceWork.back();
+                        if (work) {
+                            work->input.flags = C2FrameData::FLAG_END_OF_STREAM;
+                        }
+                    }
+                }
             }
         }
         if (!processedWork->empty()) {
