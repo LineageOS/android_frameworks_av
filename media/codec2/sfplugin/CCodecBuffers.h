@@ -20,6 +20,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <C2Config.h>
 #include <DataConverter.h>
@@ -33,6 +34,8 @@ namespace android {
 struct ICrypto;
 class MemoryDealer;
 class SkipCutBuffer;
+class MultiAccessUnitSkipCutBuffer;
+struct AccessUnitInfo;
 
 constexpr size_t kLinearBufferSize = 1048576;
 // This can fit an 8K frame.
@@ -382,12 +385,16 @@ public:
             sp<MediaCodecBuffer>* outBuffer);
 
 protected:
-    sp<SkipCutBuffer> mSkipCutBuffer;
+
+    sp<MultiAccessUnitSkipCutBuffer> mSkipCutBuffer;
 
     /**
      * Update the SkipCutBuffer object. No-op if it's never initialized.
      */
     void updateSkipCutBuffer(int32_t sampleRate, int32_t channelCount);
+
+    bool submit(const sp<MediaCodecBuffer> &buffer, int32_t sampleRate,
+            int32_t channelCount, std::shared_ptr<const C2AccessUnitInfos::output> &infos);
 
     /**
      * Submit buffer to SkipCutBuffer object, if initialized.

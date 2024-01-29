@@ -59,6 +59,12 @@ class SkipCutBuffer: public RefBase {
     int32_t mReadHead;
     int32_t mCapacity;
     char* mCutBuffer;
+
+    /*
+     * Added to use Access unit skip cut in Codec2 framework
+     */
+    friend class MultiAccessUnitSkipCutBuffer;
+
     DISALLOW_EVIL_CONSTRUCTORS(SkipCutBuffer);
 };
 
