@@ -273,6 +273,36 @@ static bool kEmitHistogram = false;
 
 typedef WrapperObject<std::vector<AccessUnitInfo>> BufferInfosWrapper;
 
+// Multi access unit helpers
+static status_t generateFlagsFromAccessUnitInfo(
+        sp<AMessage> &msg, const sp<BufferInfosWrapper> &bufferInfos) {
+    msg->setInt64("timeUs", bufferInfos->value[0].mTimestamp);
+    msg->setInt32("flags", bufferInfos->value[0].mFlags);
+    // will prevent any access-unit info copy.
+    if (bufferInfos->value.size() > 1) {
+        uint32_t bufferFlags = 0;
+        uint32_t flagsInAllAU = BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_CODEC_CONFIG;
+        uint32_t andFlags = flagsInAllAU;
+        int infoIdx = 0;
+        bool foundEndOfStream = false;
+        for ( ; infoIdx < bufferInfos->value.size() && !foundEndOfStream; ++infoIdx) {
+            bufferFlags |= bufferInfos->value[infoIdx].mFlags;
+            andFlags &= bufferInfos->value[infoIdx].mFlags;
+            if (bufferFlags & BUFFER_FLAG_END_OF_STREAM) {
+                foundEndOfStream = true;
+            }
+        }
+        bufferFlags = bufferFlags & (andFlags | (~flagsInAllAU));
+        if (infoIdx != bufferInfos->value.size()) {
+            ALOGE("Error: incorrect access-units");
+            return -EINVAL;
+        }
+        msg->setInt32("flags", bufferFlags);
+        msg->setObject("accessUnitInfo", bufferInfos);
+    }
+    return OK;
+}
+
 static int64_t getId(IResourceManagerClient const * client) {
     return (int64_t) client;
 }
@@ -3262,28 +3292,30 @@ status_t MediaCodec::queueSecureInputBuffer(
 status_t MediaCodec::queueBuffer(
         size_t index,
         const std::shared_ptr<C2Buffer> &buffer,
-        int64_t presentationTimeUs,
-        uint32_t flags,
+        const sp<BufferInfosWrapper> &bufferInfos,
         const sp<AMessage> &tunings,
         AString *errorDetailMsg) {
     if (errorDetailMsg != NULL) {
         errorDetailMsg->clear();
     }
-
+    if (bufferInfos == nullptr || bufferInfos->value.empty()) {
+        return BAD_VALUE;
+    }
+    status_t err = OK;
     sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
     msg->setSize("index", index);
     sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
         new WrapperObject<std::shared_ptr<C2Buffer>>{buffer}};
     msg->setObject("c2buffer", obj);
-    msg->setInt64("timeUs", presentationTimeUs);
-    msg->setInt32("flags", flags);
+    if (OK != (err = generateFlagsFromAccessUnitInfo(msg, bufferInfos))) {
+        return err;
+    }
     if (tunings && tunings->countEntries() > 0) {
         msg->setMessage("tunings", tunings);
     }
     msg->setPointer("errorDetailMsg", errorDetailMsg);
-
     sp<AMessage> response;
-    status_t err = PostAndAwaitResponse(msg, &response);
+    err = PostAndAwaitResponse(msg, &response);
 
     return err;
 }
@@ -3298,14 +3330,16 @@ status_t MediaCodec::queueEncryptedBuffer(
         const uint8_t iv[16],
         CryptoPlugin::Mode mode,
         const CryptoPlugin::Pattern &pattern,
-        int64_t presentationTimeUs,
-        uint32_t flags,
+        const sp<BufferInfosWrapper> &bufferInfos,
         const sp<AMessage> &tunings,
         AString *errorDetailMsg) {
     if (errorDetailMsg != NULL) {
         errorDetailMsg->clear();
     }
-
+    if (bufferInfos == nullptr || bufferInfos->value.empty()) {
+        return BAD_VALUE;
+    }
+    status_t err = OK;
     sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
     msg->setSize("index", index);
     sp<WrapperObject<sp<hardware::HidlMemory>>> memory{
@@ -3319,15 +3353,16 @@ status_t MediaCodec::queueEncryptedBuffer(
     msg->setInt32("mode", mode);
     msg->setInt32("encryptBlocks", pattern.mEncryptBlocks);
     msg->setInt32("skipBlocks", pattern.mSkipBlocks);
-    msg->setInt64("timeUs", presentationTimeUs);
-    msg->setInt32("flags", flags);
+    if (OK != (err = generateFlagsFromAccessUnitInfo(msg, bufferInfos))) {
+        return err;
+    }
     if (tunings && tunings->countEntries() > 0) {
         msg->setMessage("tunings", tunings);
     }
     msg->setPointer("errorDetailMsg", errorDetailMsg);
 
     sp<AMessage> response;
-    status_t err = PostAndAwaitResponse(msg, &response);
+    err = PostAndAwaitResponse(msg, &response);
 
     return err;
 }
