@@ -11,6 +11,7 @@ cc_library {
 
     srcs: [
         "BufferTypes.cpp",
+        "MultiAccessUnitHelper.cpp",
     ],
 
     export_include_dirs: ["include/"],
@@ -26,7 +27,10 @@ cc_library {
         "libcodec2_vndk",
         "liblog",
         "libstagefright_foundation",
+        "server_configurable_flags",
     ],
+
+    static_libs: ["aconfig_mediacodec_flags_c_lib"],
 }
 
 cc_library_static {
