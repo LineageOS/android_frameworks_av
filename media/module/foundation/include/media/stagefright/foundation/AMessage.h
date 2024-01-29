@@ -356,6 +356,16 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(AMessage);
 };
 
+/*
+ * Helper struct for wrapping any object with RefBase.
+ */
+template <typename T>
+struct WrapperObject : public RefBase {
+    WrapperObject(const T& v) : value(v) {}
+    WrapperObject(T&& v) : value(std::move(v)) {}
+    T value;
+};
+
 }  // namespace android
 
 #endif  // A_MESSAGE_H_

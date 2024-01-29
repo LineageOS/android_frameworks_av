@@ -28,6 +28,7 @@
 #include <media/MediaMetrics.h>
 #include <media/MediaProfiles.h>
 #include <media/stagefright/foundation/AHandler.h>
+#include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/CodecErrorLog.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <media/stagefright/MediaHistogram.h>
@@ -56,6 +57,7 @@ struct AReplyToken;
 struct AString;
 struct BatteryChecker;
 class BufferChannelBase;
+struct AccessUnitInfo;
 struct CodecBase;
 struct CodecParameterDescriptor;
 class IBatteryStats;
@@ -77,6 +79,8 @@ struct IDescrambler;
 using hardware::cas::native::V1_0::IDescrambler;
 using aidl::android::media::MediaResourceParcel;
 using aidl::android::media::ClientConfigParcel;
+
+typedef WrapperObject<std::vector<AccessUnitInfo>> BufferInfosWrapper;
 
 struct MediaCodec : public AHandler {
     enum Domain {
@@ -115,6 +119,7 @@ struct MediaCodec : public AHandler {
         CB_OUTPUT_FORMAT_CHANGED = 4,
         CB_RESOURCE_RECLAIMED = 5,
         CB_CRYPTO_ERROR = 6,
+        CB_LARGE_FRAME_OUTPUT_AVAILABLE = 7,
     };
 
     static const pid_t kNoPid = -1;
@@ -183,6 +188,13 @@ struct MediaCodec : public AHandler {
             size_t size,
             int64_t presentationTimeUs,
             uint32_t flags,
+            AString *errorDetailMsg = NULL);
+
+    status_t queueInputBuffers(
+            size_t index,
+            size_t offset,
+            size_t size,
+            const sp<BufferInfosWrapper> &accessUnitInfo,
             AString *errorDetailMsg = NULL);
 
     status_t queueSecureInputBuffer(
