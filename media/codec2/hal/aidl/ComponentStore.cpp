@@ -206,11 +206,18 @@ ScopedAStatus ComponentStore::createComponent(
         const std::shared_ptr<IClientManager>& pool,
         std::shared_ptr<IComponent> *component) {
 
+    if (!listener) {
+        ALOGE("createComponent(): listener is null");
+        return ScopedAStatus::fromServiceSpecificError(Status::BAD_VALUE);
+    }
+    if (!pool) {
+        ALOGE("createComponent(): pool is null");
+        return ScopedAStatus::fromServiceSpecificError(Status::BAD_VALUE);
+    }
+
     std::shared_ptr<C2Component> c2component;
     c2_status_t status =
             mStore->createComponent(name, &c2component);
-
-    ALOGD("createComponent(): listener(%d)", bool(listener));
 
     if (status == C2_OK) {
 #ifndef __ANDROID_APEX__
