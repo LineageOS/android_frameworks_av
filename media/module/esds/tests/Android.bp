@@ -25,6 +25,7 @@ package {
 cc_test {
     name: "ESDSTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
         "ESDSTest.cpp",

@@ -1,9 +1,5 @@
-// frameworks/av/media/libstagefright/mpeg2ts
 {
-  // tests which require dynamic content
-  // invoke with: atest -- --enable-module-dynamic-download=true
-  // TODO(b/148094059): unit tests not allowed to download content
-  "dynamic-presubmit": [
+  "postsubmit": [
     { "name": "Mpeg2tsUnitTest" }
   ]
 }
