@@ -1,8 +1,5 @@
 {
-  // tests which require dynamic content
-  // invoke with: atest -- --enable-module-dynamic-download=true
-  // TODO(b/148094059): unit tests not allowed to download content
-  "dynamic-presubmit": [
+  "postsubmit": [
     // writerTest fails about 5 out of 66
     // { "name": "writerTest" },
 
