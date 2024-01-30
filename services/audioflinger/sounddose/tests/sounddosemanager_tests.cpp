@@ -262,11 +262,11 @@ TEST_F(SoundDoseManagerTest, GetUnmappedIdReturnsHandleNone) {
 }
 
 TEST_F(SoundDoseManagerTest, GetDefaultForceComputeCsdOnAllDevices) {
-    EXPECT_FALSE(mSoundDoseManager->forceComputeCsdOnAllDevices());
+    EXPECT_FALSE(mSoundDoseManager->isComputeCsdForcedOnAllDevices());
 }
 
 TEST_F(SoundDoseManagerTest, GetDefaultForceUseFrameworkMel) {
-    EXPECT_FALSE(mSoundDoseManager->forceUseFrameworkMel());
+    EXPECT_FALSE(mSoundDoseManager->isFrameworkMelForced());
 }
 
 TEST_F(SoundDoseManagerTest, SetAudioDeviceCategoryStopsNonHeadphone) {

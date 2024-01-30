@@ -172,7 +172,7 @@ public:
         return createThread_l(periodNanoseconds, threadProc, threadArg);
     }
 
-    aaudio_result_t joinThread(void **returnArg);
+    aaudio_result_t joinThread(void **returnArg) EXCLUDES(mStreamLock);
 
     virtual aaudio_result_t registerThread() {
         return AAUDIO_OK;
@@ -204,8 +204,16 @@ public:
         return mBufferCapacity;
     }
 
+    virtual int32_t getDeviceBufferCapacity() const {
+        return mDeviceBufferCapacity;
+    }
+
     virtual int32_t getFramesPerBurst() const {
         return mFramesPerBurst;
+    }
+
+    virtual int32_t getDeviceFramesPerBurst() const {
+        return mDeviceFramesPerBurst;
     }
 
     virtual int32_t getXRunCount() const {
@@ -224,6 +232,10 @@ public:
         return mSampleRate;
     }
 
+    aaudio_result_t getDeviceSampleRate() const {
+        return mDeviceSampleRate;
+    }
+
     aaudio_result_t getHardwareSampleRate() const {
         return mHardwareSampleRate;
     }
@@ -238,6 +250,10 @@ public:
 
     aaudio_result_t getSamplesPerFrame() const {
         return mSamplesPerFrame;
+    }
+
+    aaudio_result_t getDeviceSamplesPerFrame() const {
+        return mDeviceSamplesPerFrame;
     }
 
     aaudio_result_t getHardwareSamplesPerFrame() const {
@@ -322,10 +338,10 @@ public:
     }
 
     /**
-     * This is only valid after setChannelMask() and setDeviceFormat() have been called.
+     * This is only valid after setDeviceSamplesPerFrame() and setDeviceFormat() have been called.
      */
     int32_t getBytesPerDeviceFrame() const {
-        return getSamplesPerFrame() * audio_bytes_per_sample(getDeviceFormat());
+        return getDeviceSamplesPerFrame() * audio_bytes_per_sample(getDeviceFormat());
     }
 
     virtual int64_t getFramesWritten() = 0;
@@ -365,6 +381,11 @@ public:
         mSamplesPerFrame = AAudioConvert_channelMaskToCount(channelMask);
     }
 
+    void setDeviceSamplesPerFrame(int32_t deviceSamplesPerFrame) {
+        mDeviceSamplesPerFrame = deviceSamplesPerFrame;
+    }
+
+
     /**
      * @return true if data callback has been specified
      */
@@ -403,7 +424,7 @@ public:
     }
 
     // This is used by the AudioManager to duck and mute the stream when changing audio focus.
-    void setDuckAndMuteVolume(float duckAndMuteVolume);
+    void setDuckAndMuteVolume(float duckAndMuteVolume) EXCLUDES(mStreamLock);
 
     float getDuckAndMuteVolume() const {
         return mDuckAndMuteVolume;
@@ -438,11 +459,11 @@ public:
         mPlayerBase->unregisterWithAudioManager();
     }
 
-    aaudio_result_t systemStart();
+    aaudio_result_t systemStart() EXCLUDES(mStreamLock);
 
-    aaudio_result_t systemPause();
+    aaudio_result_t systemPause() EXCLUDES(mStreamLock);
 
-    aaudio_result_t safeFlush();
+    aaudio_result_t safeFlush() EXCLUDES(mStreamLock);
 
     /**
      * This is called when an app calls AAudioStream_requestStop();
@@ -453,14 +474,14 @@ public:
     /**
      * This is called internally when an app callback returns AAUDIO_CALLBACK_RESULT_STOP.
      */
-    aaudio_result_t systemStopInternal();
+    aaudio_result_t systemStopInternal() EXCLUDES(mStreamLock);
 
     /**
      * Safely RELEASE a stream after taking mStreamLock and checking
      * to make sure we are not being called from a callback.
      * @return AAUDIO_OK or a negative error
      */
-    aaudio_result_t safeRelease();
+    aaudio_result_t safeRelease() EXCLUDES(mStreamLock);
 
     /**
      * Safely RELEASE and CLOSE a stream after taking mStreamLock and checking
@@ -469,7 +490,7 @@ public:
      */
     aaudio_result_t safeReleaseClose();
 
-    aaudio_result_t safeReleaseCloseInternal();
+    aaudio_result_t safeReleaseCloseInternal() EXCLUDES(mStreamLock);
 
 protected:
 
@@ -542,6 +563,11 @@ protected:
     }
 
     // This should not be called after the open() call.
+    void setDeviceSampleRate(int32_t deviceSampleRate) {
+        mDeviceSampleRate = deviceSampleRate;
+    }
+
+    // This should not be called after the open() call.
     void setHardwareSampleRate(int32_t hardwareSampleRate) {
         mHardwareSampleRate = hardwareSampleRate;
     }
@@ -552,8 +578,18 @@ protected:
     }
 
     // This should not be called after the open() call.
+    void setDeviceFramesPerBurst(int32_t deviceFramesPerBurst) {
+        mDeviceFramesPerBurst = deviceFramesPerBurst;
+    }
+
+    // This should not be called after the open() call.
     void setBufferCapacity(int32_t bufferCapacity) {
         mBufferCapacity = bufferCapacity;
+    }
+
+    // This should not be called after the open() call.
+    void setDeviceBufferCapacity(int32_t deviceBufferCapacity) {
+        mDeviceBufferCapacity = deviceBufferCapacity;
     }
 
     // This should not be called after the open() call.
@@ -721,9 +757,11 @@ private:
 
     // These do not change after open().
     int32_t                     mSamplesPerFrame = AAUDIO_UNSPECIFIED;
+    int32_t                     mDeviceSamplesPerFrame = AAUDIO_UNSPECIFIED;
     int32_t                     mHardwareSamplesPerFrame = AAUDIO_UNSPECIFIED;
     aaudio_channel_mask_t       mChannelMask = AAUDIO_UNSPECIFIED;
     int32_t                     mSampleRate = AAUDIO_UNSPECIFIED;
+    int32_t                     mDeviceSampleRate = AAUDIO_UNSPECIFIED;
     int32_t                     mHardwareSampleRate = AAUDIO_UNSPECIFIED;
     int32_t                     mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
@@ -732,7 +770,9 @@ private:
     audio_format_t              mHardwareFormat = AUDIO_FORMAT_DEFAULT;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
     int32_t                     mFramesPerBurst = 0;
+    int32_t                     mDeviceFramesPerBurst = 0;
     int32_t                     mBufferCapacity = 0;
+    int32_t                     mDeviceBufferCapacity = 0;
 
     aaudio_usage_t              mUsage           = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;

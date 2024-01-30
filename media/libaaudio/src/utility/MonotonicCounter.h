@@ -104,7 +104,7 @@ public:
      */
     void roundUp64(int32_t period) {
         if (period > 0) {
-            int64_t numPeriods = (mCounter64 + period - 1) / period;
+            const int64_t numPeriods = (mCounter64 + period - 1) / period;
             mCounter64 = numPeriods * period;
         }
     }

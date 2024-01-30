@@ -120,6 +120,8 @@ public:
     status_t injectCamera(const std::string& injectedCamId,
             sp<CameraProviderManager> manager) override;
     status_t stopInjection() override;
+    status_t injectSessionParams(
+        const hardware::camera2::impl::CameraMetadataNative& sessionParams) override;
 
 private:
     mutable Mutex mBinderSerializationLock;

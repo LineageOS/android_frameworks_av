@@ -115,7 +115,7 @@ static inline bool device_distinguishes_on_address(audio_devices_t device)
  */
 static inline bool device_has_encoding_capability(audio_devices_t device)
 {
-    return audio_is_a2dp_out_device(device);
+    return audio_is_a2dp_out_device(device) || audio_is_ble_out_device(device);
 }
 
 /**

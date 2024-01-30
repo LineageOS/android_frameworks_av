@@ -812,7 +812,7 @@ status_t AudioTrack::start()
     (void) updateAndGetPosition_l();
 
     // save start timestamp
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         if (getTimestamp_l(mStartTs) != OK) {
             mStartTs.mPosition = 0;
         }
@@ -833,7 +833,7 @@ status_t AudioTrack::start()
         mTimestampStaleTimeReported = false;
         mPreviousLocation = ExtendedTimestamp::LOCATION_INVALID;
 
-        if (!isOffloadedOrDirect_l()
+        if (!isAfTrackOffloadedOrDirect_l()
                 && mStartEts.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] > 0) {
             // Server side has consumed something, but is it finished consuming?
             // It is possible since flush and stop are asynchronous that the server
@@ -1916,6 +1916,7 @@ status_t AudioTrack::createTrack_l()
     mAfChannelCount = audio_channel_count_from_out_mask(output.afChannelMask);
     mAfFormat = output.afFormat;
     mAfLatency = output.afLatencyMs;
+    mAfTrackFlags = output.afTrackFlags;
 
     mLatency = mAfLatency + (1000LL * mFrameCount) / mSampleRate;
 
@@ -3181,7 +3182,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
     // To avoid a race, read the presented frames first.  This ensures that presented <= consumed.
 
     status_t status;
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         // use Binder to get timestamp
         media::AudioTimestampInternal ts;
         mAudioTrack->getTimestamp(&ts, &status);
@@ -3293,7 +3294,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
         ALOGV_IF(status != WOULD_BLOCK, "%s(%d): getTimestamp error:%#x", __func__, mPortId, status);
         return status;
     }
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         if (isOffloaded_l() && (mState == STATE_PAUSED || mState == STATE_PAUSED_STOPPING)) {
             // use cached paused position in case another offloaded track is running.
             timestamp.mPosition = mPausedPosition;
@@ -3739,7 +3740,7 @@ bool AudioTrack::hasStarted()
     // This is conservatively figured - if we encounter an unexpected error
     // then we will not wait.
     bool wait = false;
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         AudioTimestamp ts;
         status_t status = getTimestamp_l(ts);
         if (status == WOULD_BLOCK) {

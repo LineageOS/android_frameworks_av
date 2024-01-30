@@ -112,7 +112,8 @@ public:
             return mMutex;
         }
         const int mType; // event type e.g. CFG_EVENT_IO
-        mutable audio_utils::mutex mMutex; // mutex associated with mCondition
+        // mutex associated with mCondition
+        mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kConfigEvent_Mutex};
         audio_utils::condition_variable mCondition; // condition for status return
 
         // NO_THREAD_SAFETY_ANALYSIS Can we add GUARDED_BY?
@@ -537,7 +538,7 @@ public:
     audio_utils::mutex& mutex() const final RETURN_CAPABILITY(audio_utils::ThreadBase_Mutex) {
         return mMutex;
     }
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kThreadBase_Mutex};
 
     void onEffectEnable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
     void onEffectDisable() final EXCLUDES_ThreadBase_Mutex;
@@ -983,7 +984,8 @@ public:
                                 audio_port_handle_t portId,
                                 const sp<media::IAudioTrackCallback>& callback,
                                 bool isSpatialized,
-                                bool isBitPerfect) final
+                                bool isBitPerfect,
+                                audio_output_flags_t* afTrackFlags) final
             REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     bool isTrackActive(const sp<IAfTrack>& track) const final {
@@ -1453,7 +1455,8 @@ protected:
     sp<AsyncCallbackThread>         mCallbackThread;
 
     audio_utils::mutex& audioTrackCbMutex() const { return mAudioTrackCbMutex; }
-    mutable audio_utils::mutex mAudioTrackCbMutex;
+    mutable audio_utils::mutex mAudioTrackCbMutex{
+            audio_utils::MutexOrder::kPlaybackThread_AudioTrackCbMutex};
     // Record of IAudioTrackCallback
     std::map<sp<IAfTrack>, sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
@@ -1808,7 +1811,7 @@ private:
     // to indicate that the callback has been received via resetDraining()
     uint32_t                   mDrainSequence;
     audio_utils::condition_variable mWaitWorkCV;
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAsyncCallbackThread_Mutex};
     bool                       mAsyncError;
 
     audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::AsyncCallbackThread_Mutex) {
@@ -1846,6 +1849,7 @@ protected:
     void threadLoop_sleepTime() final REQUIRES(ThreadBase_ThreadLoop);
     ssize_t threadLoop_write() final REQUIRES(ThreadBase_ThreadLoop);
     void threadLoop_standby() final REQUIRES(ThreadBase_ThreadLoop);
+    void threadLoop_exit() final REQUIRES(ThreadBase_ThreadLoop);
     void cacheParameters_l() final REQUIRES(mutex(), ThreadBase_ThreadLoop);
 
 private:
@@ -1896,6 +1900,8 @@ protected:
     void checkOutputStageEffects() final
             REQUIRES(ThreadBase_ThreadLoop) EXCLUDES_ThreadBase_Mutex;
     void setHalLatencyMode_l() final REQUIRES(mutex());
+
+    void threadLoop_exit() final REQUIRES(ThreadBase_ThreadLoop);
 
 private:
             // Do not request a specific mode by default

@@ -42,6 +42,7 @@
 #include "fifo/FifoBuffer.h"
 #include "utility/AudioClock.h"
 #include <media/AidlConversion.h>
+#include <com_android_media_aaudio.h>
 
 #include "AudioStreamInternal.h"
 
@@ -62,6 +63,9 @@ using namespace aaudio;
 #define MIN_TIMEOUT_OPERATIONS    4
 
 #define LOG_TIMESTAMPS            0
+
+// Minimum number of bursts to use when sample rate conversion is used.
+#define MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS    3
 
 AudioStreamInternal::AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService)
         : AudioStream()
@@ -132,12 +136,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
 
-    request.getConfiguration().setHardwareSamplesPerFrame(builder.getHardwareSamplesPerFrame());
-    request.getConfiguration().setHardwareSampleRate(builder.getHardwareSampleRate());
-    request.getConfiguration().setHardwareFormat(builder.getHardwareFormat());
-
-    mDeviceChannelCount = getSamplesPerFrame(); // Assume it will be the same. Update if not.
-
     mServiceStreamHandleInfo = mServiceInterface.openStream(request, configurationOutput);
     if (getServiceHandle() < 0
             && (request.getConfiguration().getSamplesPerFrame() == 1
@@ -181,9 +179,6 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         setChannelMask(configurationOutput.getChannelMask());
     }
 
-    mDeviceChannelCount = configurationOutput.getSamplesPerFrame();
-
-    setSampleRate(configurationOutput.getSampleRate());
     setDeviceId(configurationOutput.getDeviceId());
     setSessionId(configurationOutput.getSessionId());
     setSharingMode(configurationOutput.getSharingMode());
@@ -194,8 +189,23 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     setIsContentSpatialized(configurationOutput.isContentSpatialized());
     setInputPreset(configurationOutput.getInputPreset());
 
+    setDeviceSampleRate(configurationOutput.getSampleRate());
+
+    if (getSampleRate() == AAUDIO_UNSPECIFIED) {
+        setSampleRate(configurationOutput.getSampleRate());
+    }
+
+    if (!com::android::media::aaudio::sample_rate_conversion()) {
+        if (getSampleRate() != getDeviceSampleRate()) {
+            ALOGD("%s - skipping sample rate converter. SR = %d, Device SR = %d", __func__,
+                    getSampleRate(), getDeviceSampleRate());
+            goto error;
+        }
+    }
+
     // Save device format so we can do format conversion and volume scaling together.
     setDeviceFormat(configurationOutput.getFormat());
+    setDeviceSamplesPerFrame(configurationOutput.getSamplesPerFrame());
 
     setHardwareSamplesPerFrame(configurationOutput.getHardwareSamplesPerFrame());
     setHardwareSampleRate(configurationOutput.getHardwareSampleRate());
@@ -233,39 +243,50 @@ error:
 }
 
 aaudio_result_t AudioStreamInternal::configureDataInformation(int32_t callbackFrames) {
-    int32_t framesPerHardwareBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
+    int32_t originalFramesPerBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
+    int32_t deviceFramesPerBurst = originalFramesPerBurst;
 
     // Scale up the burst size to meet the minimum equivalent in microseconds.
     // This is to avoid waking the CPU too often when the HW burst is very small
-    // or at high sample rates.
-    int32_t framesPerBurst = framesPerHardwareBurst;
+    // or at high sample rates. The actual number of frames that we call back to
+    // the app with will be 0 < N <= framesPerBurst so round up the division.
     int32_t burstMicros = 0;
     const int32_t burstMinMicros = android::AudioSystem::getAAudioHardwareBurstMinUsec();
     do {
         if (burstMicros > 0) {  // skip first loop
-            framesPerBurst *= 2;
+            deviceFramesPerBurst *= 2;
         }
-        burstMicros = framesPerBurst * static_cast<int64_t>(1000000) / getSampleRate();
+        burstMicros = deviceFramesPerBurst * static_cast<int64_t>(1000000) / getDeviceSampleRate();
     } while (burstMicros < burstMinMicros);
     ALOGD("%s() original HW burst = %d, minMicros = %d => SW burst = %d\n",
-          __func__, framesPerHardwareBurst, burstMinMicros, framesPerBurst);
+          __func__, originalFramesPerBurst, burstMinMicros, deviceFramesPerBurst);
 
     // Validate final burst size.
-    if (framesPerBurst < MIN_FRAMES_PER_BURST || framesPerBurst > MAX_FRAMES_PER_BURST) {
-        ALOGE("%s - framesPerBurst out of range = %d", __func__, framesPerBurst);
+    if (deviceFramesPerBurst < MIN_FRAMES_PER_BURST
+            || deviceFramesPerBurst > MAX_FRAMES_PER_BURST) {
+        ALOGE("%s - deviceFramesPerBurst out of range = %d", __func__, deviceFramesPerBurst);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
+
+    // Calculate the application framesPerBurst from the deviceFramesPerBurst
+    int32_t framesPerBurst = (static_cast<int64_t>(deviceFramesPerBurst) * getSampleRate() +
+             getDeviceSampleRate() - 1) / getDeviceSampleRate();
+
+    setDeviceFramesPerBurst(deviceFramesPerBurst);
     setFramesPerBurst(framesPerBurst); // only save good value
 
-    mBufferCapacityInFrames = mEndpointDescriptor.dataQueueDescriptor.capacityInFrames;
+    mDeviceBufferCapacityInFrames = mEndpointDescriptor.dataQueueDescriptor.capacityInFrames;
+
+    mBufferCapacityInFrames = static_cast<int64_t>(mDeviceBufferCapacityInFrames)
+            * getSampleRate() / getDeviceSampleRate();
     if (mBufferCapacityInFrames < getFramesPerBurst()
             || mBufferCapacityInFrames > MAX_BUFFER_CAPACITY_IN_FRAMES) {
         ALOGE("%s - bufferCapacity out of range = %d", __func__, mBufferCapacityInFrames);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
-    mClockModel.setSampleRate(getSampleRate());
-    mClockModel.setFramesPerBurst(framesPerHardwareBurst);
+    mClockModel.setSampleRate(getDeviceSampleRate());
+    mClockModel.setFramesPerBurst(deviceFramesPerBurst);
 
     if (isDataCallbackSet()) {
         mCallbackFrames = callbackFrames;
@@ -315,7 +336,8 @@ aaudio_result_t AudioStreamInternal::configureDataInformation(int32_t callbackFr
         mTimeOffsetNanos = offsetMicros * AAUDIO_NANOS_PER_MICROSECOND;
     }
 
-    setBufferSize(mBufferCapacityInFrames / 2); // Default buffer size to match Q
+    // Default buffer size to match Q
+    setBufferSize(mBufferCapacityInFrames / 2);
     return AAUDIO_OK;
 }
 
@@ -374,9 +396,15 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     // Cache the buffer size which may be from client.
     const int32_t previousBufferSize = mBufferSizeInFrames;
     // Copy all available data from current data queue.
-    uint8_t buffer[getBufferCapacity() * getBytesPerFrame()];
-    android::fifo_frames_t fullFramesAvailable =
-            mAudioEndpoint->read(buffer, getBufferCapacity());
+    uint8_t buffer[getDeviceBufferCapacity() * getBytesPerFrame()];
+    android::fifo_frames_t fullFramesAvailable = mAudioEndpoint->read(buffer,
+            getDeviceBufferCapacity());
+    // Before releasing the data queue, update the frames read and written.
+    getFramesRead();
+    getFramesWritten();
+    // Call freeDataQueue() here because the following call to
+    // closeDataFileDescriptor() will invalidate the pointers used by the data queue.
+    mAudioEndpoint->freeDataQueue();
     mEndPointParcelable.closeDataFileDescriptor();
     aaudio_result_t result = mServiceInterface.exitStandby(
             mServiceStreamHandleInfo, endpointParcelable);
@@ -408,7 +436,7 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
         goto exit;
     }
     // Write data from previous data buffer to new endpoint.
-    if (android::fifo_frames_t framesWritten =
+    if (const android::fifo_frames_t framesWritten =
                 mAudioEndpoint->write(buffer, fullFramesAvailable);
             framesWritten != fullFramesAvailable) {
         ALOGW("Some data lost after exiting standby, frames written: %d, "
@@ -448,7 +476,7 @@ aaudio_result_t AudioStreamInternal::requestStart_l()
         ALOGD("requestStart() but DISCONNECTED");
         return AAUDIO_ERROR_DISCONNECTED;
     }
-    aaudio_stream_state_t originalState = getState();
+    const aaudio_stream_state_t originalState = getState();
     setState(AAUDIO_STREAM_STATE_STARTING);
 
     // Clear any stale timestamps from the previous run.
@@ -605,7 +633,11 @@ aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t /*clockId*/,
     // Generated in server and passed to client. Return latest.
     if (mAtomicInternalTimestamp.isValid()) {
         Timestamp timestamp = mAtomicInternalTimestamp.read();
-        int64_t position = timestamp.getPosition() + mFramesOffsetFromService;
+        // This should not overflow as timestamp.getPosition() should be a position in a buffer and
+        // not the actual timestamp. timestamp.getNanoseconds() below uses the actual timestamp.
+        // At 48000 Hz we can run for over 100 years before overflowing the int64_t.
+        int64_t position = (timestamp.getPosition() + mFramesOffsetFromService) * getSampleRate() /
+                getDeviceSampleRate();
         if (position >= 0) {
             *framePosition = position;
             *timeNanoseconds = timestamp.getNanoseconds();
@@ -876,44 +908,47 @@ void AudioStreamInternal::processTimestamp(uint64_t position, int64_t time) {
 }
 
 aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
-    int32_t adjustedFrames = requestedFrames;
     const int32_t maximumSize = getBufferCapacity() - getFramesPerBurst();
-    // Minimum size should be a multiple number of bursts.
-    const int32_t minimumSize = 1 * getFramesPerBurst();
+    int32_t adjustedFrames = std::min(requestedFrames, maximumSize);
+    // Buffer sizes should always be a multiple of framesPerBurst.
+    int32_t numBursts = (static_cast<int64_t>(adjustedFrames) + getFramesPerBurst() - 1) /
+        getFramesPerBurst();
 
-    // Clip to minimum size so that rounding up will work better.
-    adjustedFrames = std::max(minimumSize, adjustedFrames);
+    // Use at least one burst
+    if (numBursts == 0) {
+        numBursts = 1;
+    }
 
-    // Prevent arithmetic overflow by clipping before we round.
-    if (adjustedFrames >= maximumSize) {
-        adjustedFrames = maximumSize;
-    } else {
-        // Round to the next highest burst size.
-        int32_t numBursts = (adjustedFrames + getFramesPerBurst() - 1) / getFramesPerBurst();
-        adjustedFrames = numBursts * getFramesPerBurst();
-        // Clip just in case maximumSize is not a multiple of getFramesPerBurst().
-        adjustedFrames = std::min(maximumSize, adjustedFrames);
+    // Set a minimum number of bursts if sample rate conversion is used.
+    if ((getSampleRate() != getDeviceSampleRate()) &&
+            (numBursts < MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS)) {
+        numBursts = MIN_SAMPLE_RATE_CONVERSION_NUM_BURSTS;
     }
 
     if (mAudioEndpoint) {
         // Clip against the actual size from the endpoint.
-        int32_t actualFrames = 0;
+        int32_t actualFramesDevice = 0;
+        int32_t maximumFramesDevice = getDeviceBufferCapacity() - getDeviceFramesPerBurst();
         // Set to maximum size so we can write extra data when ready in order to reduce glitches.
         // The amount we keep in the buffer is controlled by mBufferSizeInFrames.
-        mAudioEndpoint->setBufferSizeInFrames(maximumSize, &actualFrames);
-        // actualFrames should be <= actual maximum size of endpoint
-        adjustedFrames = std::min(actualFrames, adjustedFrames);
+        mAudioEndpoint->setBufferSizeInFrames(maximumFramesDevice, &actualFramesDevice);
+        int32_t actualNumBursts = actualFramesDevice / getDeviceFramesPerBurst();
+        numBursts = std::min(numBursts, actualNumBursts);
     }
 
-    if (adjustedFrames != mBufferSizeInFrames) {
+    const int32_t bufferSizeInFrames = numBursts * getFramesPerBurst();
+    const int32_t deviceBufferSizeInFrames = numBursts * getDeviceFramesPerBurst();
+
+    if (deviceBufferSizeInFrames != mDeviceBufferSizeInFrames) {
         android::mediametrics::LogItem(mMetricsId)
                 .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETBUFFERSIZE)
-                .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, adjustedFrames)
+                .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, deviceBufferSizeInFrames)
                 .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getXRunCount())
                 .record();
     }
 
-    mBufferSizeInFrames = adjustedFrames;
+    mBufferSizeInFrames = bufferSizeInFrames;
+    mDeviceBufferSizeInFrames = deviceBufferSizeInFrames;
     ALOGV("%s(%d) returns %d", __func__, requestedFrames, adjustedFrames);
     return (aaudio_result_t) adjustedFrames;
 }
@@ -922,8 +957,16 @@ int32_t AudioStreamInternal::getBufferSize() const {
     return mBufferSizeInFrames;
 }
 
+int32_t AudioStreamInternal::getDeviceBufferSize() const {
+    return mDeviceBufferSizeInFrames;
+}
+
 int32_t AudioStreamInternal::getBufferCapacity() const {
     return mBufferCapacityInFrames;
+}
+
+int32_t AudioStreamInternal::getDeviceBufferCapacity() const {
+    return mDeviceBufferCapacityInFrames;
 }
 
 bool AudioStreamInternal::isClockModelInControl() const {

@@ -38,6 +38,7 @@ public:
     enum {
         CREATE_AUDIO_PATCH,
         RELEASE_AUDIO_PATCH,
+        UPDATE_AUDIO_PATCH,
     };
 
     class PatchCommandListener : public virtual RefBase {
@@ -45,6 +46,9 @@ public:
         virtual void onCreateAudioPatch(audio_patch_handle_t handle,
                                         const IAfPatchPanel::Patch& patch) = 0;
         virtual void onReleaseAudioPatch(audio_patch_handle_t handle) = 0;
+        virtual void onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+                                        audio_patch_handle_t newHandle,
+                                        const IAfPatchPanel::Patch& patch) = 0;
     };
 
     PatchCommandThread() : Thread(false /* canCallJava */) {}
@@ -56,6 +60,8 @@ public:
     void createAudioPatch(audio_patch_handle_t handle, const IAfPatchPanel::Patch& patch)
             EXCLUDES_PatchCommandThread_Mutex;
     void releaseAudioPatch(audio_patch_handle_t handle) EXCLUDES_PatchCommandThread_Mutex;
+    void updateAudioPatch(audio_patch_handle_t oldHandle, audio_patch_handle_t newHandle,
+            const IAfPatchPanel::Patch& patch) EXCLUDES_PatchCommandThread_Mutex;
 
     // Thread virtuals
     void onFirstRef() override;
@@ -66,6 +72,9 @@ public:
     void createAudioPatchCommand(audio_patch_handle_t handle,
             const IAfPatchPanel::Patch& patch) EXCLUDES_PatchCommandThread_Mutex;
     void releaseAudioPatchCommand(audio_patch_handle_t handle) EXCLUDES_PatchCommandThread_Mutex;
+    void updateAudioPatchCommand(audio_patch_handle_t oldHandle, audio_patch_handle_t newHandle,
+            const IAfPatchPanel::Patch& patch) EXCLUDES_PatchCommandThread_Mutex;
+
 private:
     class CommandData;
 
@@ -99,6 +108,18 @@ private:
         audio_patch_handle_t mHandle;
     };
 
+    class UpdateAudioPatchData : public CommandData {
+    public:
+        UpdateAudioPatchData(audio_patch_handle_t oldHandle,
+                             audio_patch_handle_t newHandle,
+                             const IAfPatchPanel::Patch& patch)
+            :   mOldHandle(oldHandle), mNewHandle(newHandle), mPatch(patch) {}
+
+        const audio_patch_handle_t mOldHandle;
+        const audio_patch_handle_t mNewHandle;
+        const IAfPatchPanel::Patch mPatch;
+    };
+
     void sendCommand(const sp<Command>& command) EXCLUDES_PatchCommandThread_Mutex;
 
     audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::PatchCommandThread_Mutex) {
@@ -109,11 +130,12 @@ private:
         return mListenerMutex;
     }
 
-    mutable audio_utils::mutex mMutex;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kPatchCommandThread_Mutex};
     audio_utils::condition_variable mWaitWorkCV;
     std::deque<sp<Command>> mCommands GUARDED_BY(mutex()); // list of pending commands
 
-    mutable audio_utils::mutex mListenerMutex;
+    mutable audio_utils::mutex mListenerMutex{
+            audio_utils::MutexOrder::kPatchCommandThread_ListenerMutex};
     std::vector<wp<PatchCommandListener>> mListeners GUARDED_BY(listenerMutex());
 };
 

@@ -18,6 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERA2CLIENT_BASE_H
 
 #include "common/CameraDeviceBase.h"
+#include "camera/CameraMetadata.h"
 #include "camera/CaptureResult.h"
 #include "utils/CameraServiceProxyWrapper.h"
 #include "CameraServiceWatchdog.h"
@@ -97,7 +98,8 @@ public:
     void                  notifyIdleWithUserTag(int64_t requestCount, int64_t resultErrorCount,
                                      bool deviceError,
                                      const std::vector<hardware::CameraStreamStats>& streamStats,
-                                     const std::string& userTag, int videoStabilizationMode);
+                                     const std::string& userTag, int videoStabilizationMode,
+                                     bool usedUltraWide, bool usedZoomOverride);
 
     int                   getCameraId() const;
     const sp<CameraDeviceBase>&
@@ -135,10 +137,9 @@ public:
                                sp<CameraProviderManager> manager) override;
     status_t      stopInjection() override;
 
-protected:
+    status_t      injectSessionParams(const CameraMetadata& sessionParams) override;
 
-    // Used for watchdog timeout to monitor disconnect
-    static const nsecs_t kBufferTimeDisconnectNs = 3000000000; // 3 sec.
+protected:
 
     // The PID provided in the constructor call
     pid_t mInitialClientPid;
@@ -185,9 +186,6 @@ private:
     status_t              initializeImpl(TProviderPtr providerPtr, const std::string& monitorTags);
 
     binder::Status disconnectImpl();
-
-    // Watchdog thread
-    sp<CameraServiceWatchdog> mCameraServiceWatchdog;
 
 };
 

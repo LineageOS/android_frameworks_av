@@ -89,7 +89,38 @@ private:
             const struct audio_patch *patch)
             REQUIRES(audio_utils::AudioFlinger_Mutex);
     void removeSoftwarePatchFromInsertedModules(audio_patch_handle_t handle);
-    void erasePatch(audio_patch_handle_t handle);
+    /**
+     * erase the patch referred by its handle.
+     * @param handle of the patch to be erased
+     * @param reuseExistingHalPatch if set, do not trig the callback of listeners, listener
+     * would receive instead a onUpdateAudioPatch when the patch will be recreated.
+     * It prevents for example DeviceEffectManager to spuriously remove / add a device on an already
+     * opened input / output mix.
+     */
+    void erasePatch(audio_patch_handle_t handle, bool reuseExistingHalPatch = false);
+
+    /**
+     * Returns true if the old and new patches passed as arguments describe the same
+     * connections between the first sink and the first source
+     * @param oldPatch previous patch
+     * @param newPatch new patch
+     * @return true if the route is unchanged between the old and new patch, false otherwise
+     */
+    inline bool patchesHaveSameRoute(
+            const struct audio_patch &newPatch, const struct audio_patch &oldPatch) const {
+        return (newPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                oldPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                newPatch.sources[0].id == oldPatch.sources[0].id &&
+                newPatch.sinks[0].type == AUDIO_PORT_TYPE_MIX &&
+                oldPatch.sinks[0].type == AUDIO_PORT_TYPE_MIX &&
+                newPatch.sinks[0].ext.mix.handle == oldPatch.sinks[0].ext.mix.handle) ||
+                (newPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                oldPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                newPatch.sinks[0].id == oldPatch.sinks[0].id &&
+                newPatch.sources[0].type == AUDIO_PORT_TYPE_MIX &&
+                oldPatch.sources[0].type == AUDIO_PORT_TYPE_MIX &&
+                newPatch.sources[0].ext.mix.handle == oldPatch.sources[0].ext.mix.handle);
+    }
 
     const sp<IAfPatchPanelCallback> mAfPatchPanelCallback;
     std::map<audio_patch_handle_t, Patch> mPatches;

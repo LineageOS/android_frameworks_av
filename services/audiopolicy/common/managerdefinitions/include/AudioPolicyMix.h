@@ -59,7 +59,9 @@ public:
 
     status_t unregisterMix(const AudioMix& mix);
 
-    void closeOutput(sp<SwAudioOutputDescriptor> &desc);
+    status_t updateMix(const AudioMix& mix, const std::vector<AudioMixMatchCriterion>& newCriteria);
+
+    void closeOutput(sp<SwAudioOutputDescriptor> &desc, const SwAudioOutputCollection& allOutputs);
 
     /**
      * Tries to find the best matching audio policy mix

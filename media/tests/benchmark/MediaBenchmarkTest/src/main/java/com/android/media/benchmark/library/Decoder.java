@@ -43,6 +43,7 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
     private boolean mRender = false;
     private ArrayList<BufferInfo> mInputBufferInfo;
     private Stats mStats;
+    private String mMime;
 
     private boolean mSawInputEOS;
     private boolean mSawOutputEOS;
@@ -107,14 +108,14 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
     }
 
     private MediaCodec createCodec(String codecName, MediaFormat format) throws IOException {
-        String mime = format.getString(MediaFormat.KEY_MIME);
+        mMime = format.getString(MediaFormat.KEY_MIME);
         try {
             MediaCodec codec;
             if (codecName.isEmpty()) {
-                Log.i(TAG, "File mime type: " + mime);
-                if (mime != null) {
-                    codec = MediaCodec.createDecoderByType(mime);
-                    Log.i(TAG, "Decoder created for mime type " + mime);
+                Log.i(TAG, "File mime type: " + mMime);
+                if (mMime != null) {
+                    codec = MediaCodec.createDecoderByType(mMime);
+                    Log.i(TAG, "Decoder created for mime type " + mMime);
                     return codec;
                 } else {
                     Log.e(TAG, "Mime type is null, please specify a mime type to create decoder");
@@ -122,12 +123,12 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
                 }
             } else {
                 codec = MediaCodec.createByCodecName(codecName);
-                Log.i(TAG, "Decoder created with codec name: " + codecName + " mime: " + mime);
+                Log.i(TAG, "Decoder created with codec name: " + codecName + " mime: " + mMime);
                 return codec;
             }
         } catch (IllegalArgumentException ex) {
             ex.printStackTrace();
-            Log.e(TAG, "Failed to create decoder for " + codecName + " mime:" + mime);
+            Log.e(TAG, "Failed to create decoder for " + codecName + " mime:" + mMime);
             return null;
         }
     }
@@ -167,6 +168,7 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
         }
         if (mFrameReleaseQueue != null) {
             mFrameReleaseQueue.setMediaCodec(mCodec);
+            mFrameReleaseQueue.setMime(mMime);
         }
         if (asyncMode) {
             mCodec.setCallback(new MediaCodec.Callback() {
@@ -322,7 +324,7 @@ public class Decoder implements IBufferXfer.IReceiveBuffer {
             ByteBuffer inputCodecBuffer = mediaCodec.getInputBuffer(inputBufferId);
             BufferInfo bufInfo;
             if (mNumInFramesProvided >= mNumInFramesRequired) {
-                Log.i(TAG, "Input frame limit reached");
+                Log.i(TAG, "Input frame limit reached provided: " + mNumInFramesProvided);
                 mIndex = mInputBufferInfo.size() - 1;
                 bufInfo = mInputBufferInfo.get(mIndex);
                 if ((bufInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) == 0) {

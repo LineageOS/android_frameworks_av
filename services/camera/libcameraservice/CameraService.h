@@ -17,6 +17,7 @@
 #ifndef ANDROID_SERVERS_CAMERA_CAMERASERVICE_H
 #define ANDROID_SERVERS_CAMERA_CAMERASERVICE_H
 
+#include <android/content/AttributionSourceState.h>
 #include <android/hardware/BnCameraService.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
@@ -102,6 +103,9 @@ public:
 
     // Event log ID
     static const int SN_EVENT_LOG_ID = 0x534e4554;
+
+    // Keep this in sync with frameworks/base/core/java/android/os/UserHandle.java
+    static const userid_t USER_SYSTEM = 0;
 
     // Register camera service
     static void instantiate();
@@ -228,7 +232,21 @@ public:
             const hardware::CameraExtensionSessionStats& stats, std::string* sessionKey /*out*/);
 
     virtual binder::Status remapCameraIds(const hardware::CameraIdRemapping&
-        cameraIdRemapping);
+            cameraIdRemapping);
+
+    virtual binder::Status injectSessionParams(
+            const std::string& cameraId,
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams);
+
+    virtual binder::Status createDefaultRequest(const std::string& cameraId, int templateId,
+            /*out*/
+            hardware::camera2::impl::CameraMetadataNative* request);
+
+    virtual binder::Status isSessionConfigurationWithParametersSupported(
+            const std::string& cameraId,
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/
+            bool* supported);
 
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
@@ -397,6 +415,10 @@ public:
 
         // Stop the injection camera and restore to internal camera session.
         virtual status_t stopInjection() = 0;
+
+        // Inject session parameters into an existing session.
+        virtual status_t injectSessionParams(
+                const hardware::camera2::impl::CameraMetadataNative& sessionParams) = 0;
 
     protected:
         BasicClient(const sp<CameraService>& cameraService,
@@ -617,6 +639,13 @@ public:
     int32_t updateAudioRestrictionLocked();
 
 private:
+    /**
+     * Returns true if the device is an automotive device and cameraId is system
+     * only camera which has characteristic AUTOMOTIVE_LOCATION value as either
+     * AUTOMOTIVE_LOCATION_EXTERIOR_LEFT,AUTOMOTIVE_LOCATION_EXTERIOR_RIGHT,
+     * AUTOMOTIVE_LOCATION_EXTERIOR_FRONT or AUTOMOTIVE_LOCATION_EXTERIOR_REAR.
+     */
+    bool isAutomotiveExteriorSystemCamera(const std::string& cameraId) const;
 
     // TODO: b/263304156 update this to make use of a death callback for more
     // robust/fault tolerant logging
@@ -633,6 +662,26 @@ private:
     }
 
     /**
+     * Pre-grants the permission if the attribution source uid is for an automotive
+     * privileged client. Otherwise uses system service permission checker to check
+     * for the appropriate permission. If this function is called for accessing a specific
+     * camera,then the cameraID must not be empty. CameraId is used only in case of automotive
+     * privileged client so that permission is pre-granted only to access system camera device
+     * which is located outside of the vehicle body frame because camera located inside the vehicle
+     * cabin would need user permission.
+     */
+    bool checkPermission(const std::string& cameraId, const std::string& permission,
+            const content::AttributionSourceState& attributionSource, const std::string& message,
+            int32_t attributedOpCode) const;
+
+    bool hasPermissionsForSystemCamera(const std::string& cameraId, int callingPid, int callingUid)
+            const;
+
+    bool hasPermissionsForCameraHeadlessSystemUser(const std::string& cameraId, int callingPid,
+            int callingUid) const;
+
+    bool hasCameraPermissions() const;
+   /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
      * layer values.
      */
@@ -894,7 +943,7 @@ private:
     // Should a device status update be skipped for a particular camera device ? (this can happen
     // under various conditions. For example if a camera device is advertised as
     // system only or hidden secure camera, amongst possible others.
-    static bool shouldSkipStatusUpdates(SystemCameraKind systemCameraKind, bool isVendorListener,
+    bool shouldSkipStatusUpdates(SystemCameraKind systemCameraKind, bool isVendorListener,
             int clientPid, int clientUid);
 
     // Gets the kind of camera device (i.e public, hidden secure or system only)
@@ -1423,11 +1472,11 @@ private:
      */
     static std::string getFormattedCurrentTime();
 
-    static binder::Status makeClient(
-            const sp<CameraService>& cameraService, const sp<IInterface>& cameraCb,
-            const std::string& packageName, bool systemNativeClient,
-            const std::optional<std::string>& featureId, const std::string& cameraId, int api1CameraId,
-            int facing, int sensorOrientation, int clientPid, uid_t clientUid, int servicePid,
+    static binder::Status makeClient(const sp<CameraService>& cameraService,
+            const sp<IInterface>& cameraCb, const std::string& packageName,
+            bool systemNativeClient, const std::optional<std::string>& featureId,
+            const std::string& cameraId, int api1CameraId, int facing, int sensorOrientation,
+            int clientPid, uid_t clientUid, int servicePid,
             std::pair<int, IPCTransport> deviceVersionAndIPCTransport, apiLevel effectiveApiLevel,
             bool overrideForPerfClass, bool overrideToPortrait, bool forceSlowJpegMode,
             const std::string& originalCameraId,

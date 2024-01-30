@@ -145,6 +145,7 @@ cc_test {
     srcs: ["test_flowgraph.cpp"],
     shared_libs: [
         "libaaudio_internal",
+        "libaudioutils",
         "libbinder",
         "libcutils",
         "libutils",
@@ -181,7 +182,10 @@ cc_test {
     name: "test_full_queue",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_full_queue.cpp"],
-    shared_libs: ["libaaudio"],
+    shared_libs: [
+		"libaaudio",
+		"liblog"
+	],
 }
 
 cc_test {
@@ -236,4 +240,11 @@ cc_test {
     shared_libs: [
         "libaaudio_internal",
     ],
+}
+
+cc_binary {
+    name: "test_idle_disconnected_shared_stream",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_idle_disconnected_shared_stream.cpp"],
+    shared_libs: ["libaaudio"],
 }

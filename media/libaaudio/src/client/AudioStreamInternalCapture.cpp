@@ -47,6 +47,27 @@ AudioStreamInternalCapture::AudioStreamInternalCapture(AAudioServiceInterface  &
 
 }
 
+aaudio_result_t AudioStreamInternalCapture::open(const AudioStreamBuilder &builder) {
+    aaudio_result_t result = AudioStreamInternal::open(builder);
+    if (result == AAUDIO_OK) {
+        result = mFlowGraph.configure(getDeviceFormat(),
+                             getDeviceSamplesPerFrame(),
+                             getDeviceSampleRate(),
+                             getFormat(),
+                             getSamplesPerFrame(),
+                             getSampleRate(),
+                             getRequireMonoBlend(),
+                             false /* useVolumeRamps */,
+                             getAudioBalance(),
+                             aaudio::resampler::MultiChannelResampler::Quality::Medium);
+
+        if (result != AAUDIO_OK) {
+            safeReleaseClose();
+        }
+    }
+    return result;
+}
+
 void AudioStreamInternalCapture::advanceClientToMatchServerPosition(int32_t serverMargin) {
     int64_t readCounter = mAudioEndpoint->getDataReadCounter();
     int64_t writeCounter = mAudioEndpoint->getDataWriteCounter() + serverMargin;
@@ -149,7 +170,8 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
                 // Calculate frame position based off of the readCounter because
                 // the writeCounter might have just advanced in the background,
                 // causing us to sleep until a later burst.
-                int64_t nextPosition = mAudioEndpoint->getDataReadCounter() + getFramesPerBurst();
+                const int64_t nextPosition = mAudioEndpoint->getDataReadCounter() +
+                        getDeviceFramesPerBurst();
                 wakeTime = mClockModel.convertPositionToLatestTime(nextPosition);
             }
                 break;
@@ -166,42 +188,75 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
 
 aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
                                                                 int32_t numFrames) {
-    // ALOGD("readNowWithConversion(%p, %d)",
-    //              buffer, numFrames);
     WrappingBuffer wrappingBuffer;
-    uint8_t *destination = (uint8_t *) buffer;
-    int32_t framesLeft = numFrames;
+    uint8_t *byteBuffer = (uint8_t *) buffer;
+    int32_t framesLeftInByteBuffer = numFrames;
+
+    if (framesLeftInByteBuffer > 0) {
+        // Pull data from the flowgraph in case there is residual data.
+        const int32_t framesActuallyWrittenToByteBuffer = mFlowGraph.pull(
+                (void *)byteBuffer,
+                framesLeftInByteBuffer);
+
+        const int32_t numBytesActuallyWrittenToByteBuffer =
+                framesActuallyWrittenToByteBuffer * getBytesPerFrame();
+        byteBuffer += numBytesActuallyWrittenToByteBuffer;
+        framesLeftInByteBuffer -= framesActuallyWrittenToByteBuffer;
+    }
 
     mAudioEndpoint->getFullFramesAvailable(&wrappingBuffer);
 
-    // Read data in one or two parts.
-    for (int partIndex = 0; framesLeft > 0 && partIndex < WrappingBuffer::SIZE; partIndex++) {
-        int32_t framesToProcess = framesLeft;
-        const int32_t framesAvailable = wrappingBuffer.numFrames[partIndex];
-        if (framesAvailable <= 0) break;
+    // Write data in one or two parts.
+    int partIndex = 0;
+    int framesReadFromAudioEndpoint = 0;
+    while (framesLeftInByteBuffer > 0 && partIndex < WrappingBuffer::SIZE) {
+        const int32_t totalFramesInWrappingBuffer = wrappingBuffer.numFrames[partIndex];
+        int32_t framesAvailableInWrappingBuffer = totalFramesInWrappingBuffer;
+        uint8_t *currentWrappingBuffer = (uint8_t *) wrappingBuffer.data[partIndex];
 
-        if (framesToProcess > framesAvailable) {
-            framesToProcess = framesAvailable;
+        if (framesAvailableInWrappingBuffer <= 0) break;
+
+        // Put data from the wrapping buffer into the flowgraph 8 frames at a time.
+        // Continuously pull as much data as possible from the flowgraph into the byte buffer.
+        // The return value of mFlowGraph.process is the number of frames actually pulled.
+        while (framesAvailableInWrappingBuffer > 0 && framesLeftInByteBuffer > 0) {
+            const int32_t framesToReadFromWrappingBuffer = std::min(flowgraph::kDefaultBufferSize,
+                    framesAvailableInWrappingBuffer);
+
+            const int32_t numBytesToReadFromWrappingBuffer = getBytesPerDeviceFrame() *
+                    framesToReadFromWrappingBuffer;
+
+            // If framesActuallyWrittenToByteBuffer < framesLeftInByteBuffer, it is guaranteed
+            // that all the data is pulled. If there is no more space in the byteBuffer, the
+            // remaining data will be pulled in the following readNowWithConversion().
+            const int32_t framesActuallyWrittenToByteBuffer = mFlowGraph.process(
+                    (void *)currentWrappingBuffer,
+                    framesToReadFromWrappingBuffer,
+                    (void *)byteBuffer,
+                    framesLeftInByteBuffer);
+
+            const int32_t numBytesActuallyWrittenToByteBuffer =
+                    framesActuallyWrittenToByteBuffer * getBytesPerFrame();
+            byteBuffer += numBytesActuallyWrittenToByteBuffer;
+            framesLeftInByteBuffer -= framesActuallyWrittenToByteBuffer;
+            currentWrappingBuffer += numBytesToReadFromWrappingBuffer;
+            framesAvailableInWrappingBuffer -= framesToReadFromWrappingBuffer;
+
+            //ALOGD("%s() numBytesActuallyWrittenToByteBuffer %d, framesLeftInByteBuffer %d"
+            //      "framesAvailableInWrappingBuffer %d, framesReadFromAudioEndpoint %d"
+            //      , __func__, numBytesActuallyWrittenToByteBuffer, framesLeftInByteBuffer,
+            //      framesAvailableInWrappingBuffer, framesReadFromAudioEndpoint);
         }
-
-        const int32_t numBytes = getBytesPerFrame() * framesToProcess;
-        const int32_t numSamples = framesToProcess * getSamplesPerFrame();
-
-        const audio_format_t sourceFormat = getDeviceFormat();
-        const audio_format_t destinationFormat = getFormat();
-
-        memcpy_by_audio_format(destination, destinationFormat,
-                wrappingBuffer.data[partIndex], sourceFormat, numSamples);
-
-        destination += numBytes;
-        framesLeft -= framesToProcess;
+        framesReadFromAudioEndpoint += totalFramesInWrappingBuffer -
+                framesAvailableInWrappingBuffer;
+        partIndex++;
     }
 
-    int32_t framesProcessed = numFrames - framesLeft;
-    mAudioEndpoint->advanceReadIndex(framesProcessed);
+    // The audio endpoint should reference the number of frames written to the wrapping buffer.
+    mAudioEndpoint->advanceReadIndex(framesReadFromAudioEndpoint);
 
-    //ALOGD("readNowWithConversion() returns %d", framesProcessed);
-    return framesProcessed;
+    // The internal code should use the number of frames read from the app.
+    return numFrames - framesLeftInByteBuffer;
 }
 
 int64_t AudioStreamInternalCapture::getFramesWritten() {
@@ -218,7 +273,8 @@ int64_t AudioStreamInternalCapture::getFramesWritten() {
 
 int64_t AudioStreamInternalCapture::getFramesRead() {
     if (mAudioEndpoint) {
-        mLastFramesRead = mAudioEndpoint->getDataReadCounter() + mFramesOffsetFromService;
+        mLastFramesRead = std::max(mLastFramesRead,
+                                   mAudioEndpoint->getDataReadCounter() + mFramesOffsetFromService);
     }
     return mLastFramesRead;
 }
@@ -240,8 +296,10 @@ void *AudioStreamInternalCapture::callbackLoop() {
         if ((result != mCallbackFrames)) {
             ALOGE("callbackLoop: read() returned %d", result);
             if (result >= 0) {
-                // Only read some of the frames requested. Must have timed out.
-                result = AAUDIO_ERROR_TIMEOUT;
+                // Only read some of the frames requested. The stream can be disconnected
+                // or timed out.
+                processCommands();
+                result = isDisconnected() ? AAUDIO_ERROR_DISCONNECTED : AAUDIO_ERROR_TIMEOUT;
             }
             maybeCallErrorCallback(result);
             break;

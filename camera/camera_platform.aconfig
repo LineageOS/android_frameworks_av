@@ -1,0 +1,78 @@
+package: "com.android.internal.camera.flags"
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_hsum_permission"
+     description: "Camera access by headless system user"
+     bug: "273539631"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "concert_mode"
+     description: "Introduces a new concert mode camera extension type"
+     bug: "297083874"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "feature_combination_query"
+     description: "Query feature combination support and session specific characteristics"
+     bug: "309627704"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "log_ultrawide_usage"
+     description: "Enable measuring how much usage there is for ultrawide-angle cameras"
+     bug: "300515796"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_manual_flash_strength_control"
+     description: "Flash brightness level control in manual flash mode"
+     bug: "238348881"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "lazy_aidl_wait_for_service"
+     description: "Use waitForService instead of getService with lazy AIDL HALs"
+     bug: "285546208"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "log_zoom_override_usage"
+     description: "Enable measuring how much usage there is for zoom settings overrde"
+     bug: "307409002"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "session_hal_buf_manager"
+     description: "Enable or disable HAL buffer manager as requested by the camera HAL"
+     bug: "311263114"
+}
+
+flag {
+    namespace: "camera_platform"
+    name: "inject_session_params"
+    description: "Enable session parameter injection via reconfiguration"
+    bug: "308984721"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_ae_mode_low_light_boost"
+     description: "An AE mode that enables increased brightening in low light scenes"
+     bug: "312803148"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "multiresolution_imagereader_usage_config"
+     description: "Enable creating MultiResolutionImageReader with usage flag configuration"
+     bug: "301588215"
+}

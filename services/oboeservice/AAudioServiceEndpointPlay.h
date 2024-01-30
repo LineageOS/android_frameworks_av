@@ -19,7 +19,6 @@
 
 #include <atomic>
 #include <functional>
-#include <mutex>
 #include <vector>
 
 #include "client/AudioStreamInternal.h"

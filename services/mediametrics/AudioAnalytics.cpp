@@ -242,6 +242,7 @@ static constexpr const char * const AAudioStreamFields[] {
     "channel_count_hardware",
     "sample_rate_hardware",
     "uid",
+    "sample_rate_client",
 };
 
 static constexpr const char * HeadTrackerDeviceEnabledFields[] {
@@ -1379,6 +1380,10 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
 
     const auto uid = item->getUid();
 
+    int32_t sampleRateClient = 0;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SAMPLERATECLIENT, &sampleRateClient);
+
     LOG(LOG_LEVEL) << "key:" << key
             << " path:" << path
             << " direction:" << direction << "(" << directionStr << ")"
@@ -1402,7 +1407,8 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
             << " format_hardware:" << formatHardware << "(" << formatHardwareStr << ")"
             << " channel_count_hardware:" << channelCountHardware
             << " sample_rate_hardware: " << sampleRateHardware
-            << " uid: " << uid;
+            << " uid: " << uid
+            << " sample_rate_client: " << sampleRateClient;
 
     if (mAudioAnalytics.mDeliverStatistics) {
         const stats::media_metrics::BytesField bf_serialized(
@@ -1431,6 +1437,7 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , channelCountHardware
                 , sampleRateHardware
                 , uid
+                , sampleRateClient
                 );
         std::stringstream ss;
         ss << "result:" << result;
@@ -1458,6 +1465,7 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , channelCountHardware
                 , sampleRateHardware
                 , uid
+                , sampleRateClient
                 );
         ss << " " << fieldsStr;
         std::string str = ss.str();

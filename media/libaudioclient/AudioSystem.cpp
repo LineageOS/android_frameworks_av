@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <android/media/IAudioPolicyService.h>
+#include <android/media/AudioMixUpdate.h>
 #include <android/media/BnCaptureStateListener.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
@@ -132,12 +133,10 @@ const sp<IAudioFlinger> AudioSystem::getAudioFlingerImpl(bool canStartThreadPool
                 binder = gAudioFlingerBinder;
             } else {
                 sp<IServiceManager> sm = defaultServiceManager();
-                do {
-                    binder = sm->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
-                    if (binder != nullptr) break;
-                    ALOGW("AudioFlinger not published, waiting...");
-                    usleep(500000); // 0.5 s
-                } while (true);
+                binder = sm->waitForService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
+                if (binder == nullptr) {
+                    return nullptr;
+                }
             }
             binder->linkToDeath(gAudioFlingerClient);
             const auto afs = interface_cast<media::IAudioFlingerService>(binder);
@@ -880,14 +879,10 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service() {
         Mutex::Autolock _l(gLockAPS);
         if (gAudioPolicyService == 0) {
             sp<IServiceManager> sm = defaultServiceManager();
-            sp<IBinder> binder;
-            do {
-                binder = sm->getService(String16("media.audio_policy"));
-                if (binder != 0)
-                    break;
-                ALOGW("AudioPolicyService not published, waiting...");
-                usleep(500000); // 0.5 s
-            } while (true);
+            sp<IBinder> binder = sm->waitForService(String16("media.audio_policy"));
+            if (binder == nullptr) {
+                return nullptr;
+            }
             if (gAudioPolicyServiceClient == NULL) {
                 gAudioPolicyServiceClient = new AudioPolicyServiceClient();
             }
@@ -1848,6 +1843,27 @@ status_t AudioSystem::registerPolicyMixes(const Vector<AudioMix>& mixes, bool re
     return statusTFromBinderStatus(aps->registerPolicyMixes(mixesAidl, registration));
 }
 
+status_t AudioSystem::updatePolicyMixes(
+        const std::vector<std::pair<AudioMix, std::vector<AudioMixMatchCriterion>>>&
+                mixesWithUpdates) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    std::vector<media::AudioMixUpdate> updatesAidl;
+    updatesAidl.reserve(mixesWithUpdates.size());
+
+    for (const auto& update : mixesWithUpdates) {
+        media::AudioMixUpdate updateAidl;
+        updateAidl.audioMix = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioMix(update.first));
+        RETURN_STATUS_IF_ERROR(convertRange(update.second.begin(), update.second.end(),
+                                            std::back_inserter(updateAidl.newCriteria),
+                                            legacy2aidl_AudioMixMatchCriterion));
+        updatesAidl.emplace_back(updateAidl);
+    }
+
+    return statusTFromBinderStatus(aps->updatePolicyMixes(updatesAidl));
+}
+
 status_t AudioSystem::setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
@@ -2103,8 +2119,7 @@ status_t AudioSystem::getHwOffloadFormatsSupportedForBluetoothMedia(
         return BAD_VALUE;
     }
 
-    const sp<IAudioPolicyService>
-            & aps = AudioSystem::get_audio_policy_service();
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
     std::vector<AudioFormatDescription> formatsAidl;

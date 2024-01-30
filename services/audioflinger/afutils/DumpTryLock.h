@@ -19,7 +19,6 @@
 
 #include <audio_utils/mutex.h>
 #include <utils/Mutex.h>
-#include <utils/Timers.h>
 
 namespace android::afutils {
 
@@ -36,13 +35,7 @@ inline bool dumpTryLock(Mutex& mutex)
 inline bool dumpTryLock(audio_utils::mutex& mutex) TRY_ACQUIRE(true, mutex)
 {
     static constexpr int64_t kDumpLockTimeoutNs = 1'000'000'000;
-
-    const int64_t timeoutNs = kDumpLockTimeoutNs + systemTime(SYSTEM_TIME_REALTIME);
-    const struct timespec ts = {
-        .tv_sec = static_cast<time_t>(timeoutNs / 1000000000),
-        .tv_nsec = static_cast<long>(timeoutNs % 1000000000),
-    };
-    return pthread_mutex_timedlock(mutex.native_handle(), &ts) == 0;
+    return mutex.try_lock(kDumpLockTimeoutNs);
 }
 
 }  // android::afutils
