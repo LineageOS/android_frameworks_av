@@ -45,7 +45,7 @@ struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
             sp<hardware::camera::provider::V2_4::ICameraProvider>& interface,
             int64_t currentDeviceState);
 
-    IPCTransport getIPCTransport() override {return IPCTransport::HIDL;}
+    IPCTransport getIPCTransport() const override {return IPCTransport::HIDL;}
 
     const sp<hardware::camera::provider::V2_4::ICameraProvider> startProviderInterface();
 
@@ -105,8 +105,9 @@ struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
 
         virtual status_t isSessionConfigurationSupported(
                 const SessionConfiguration &/*configuration*/,
-                bool overrideForPerfClass, camera3::metadataGetter getMetadata,
+                bool overrideForPerfClass, bool checkSessionParams,
                 bool *status/*status*/);
+
         sp<hardware::camera::device::V3_2::ICameraDevice> startDeviceInterface();
     };
 

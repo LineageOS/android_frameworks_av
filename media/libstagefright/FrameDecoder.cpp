@@ -86,6 +86,22 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         displayWidth = width;
         displayHeight = height;
     }
+    int32_t displayLeft = 0;
+    int32_t displayTop = 0;
+    int32_t displayRight;
+    int32_t displayBottom;
+    if (trackMeta->findRect(kKeyCropRect, &displayLeft, &displayTop, &displayRight,
+                            &displayBottom)) {
+        if (displayLeft >= 0 && displayTop >= 0 && displayRight < width && displayBottom < height &&
+            displayLeft <= displayRight && displayTop <= displayBottom) {
+            displayWidth = displayRight - displayLeft + 1;
+            displayHeight = displayBottom - displayTop + 1;
+        } else {
+            // Crop rectangle is invalid, use the whole frame.
+            displayLeft = 0;
+            displayTop = 0;
+        }
+    }
 
     if (allocRotated) {
         if (rotationAngle == 90 || rotationAngle == 270) {
@@ -108,8 +124,8 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         }
     }
 
-    VideoFrame frame(width, height, displayWidth, displayHeight,
-            tileWidth, tileHeight, rotationAngle, dstBpp, bitDepth, !metaOnly, iccSize);
+    VideoFrame frame(width, height, displayWidth, displayHeight, displayLeft, displayTop, tileWidth,
+                     tileHeight, rotationAngle, dstBpp, bitDepth, !metaOnly, iccSize);
 
     size_t size = frame.getFlattenedSize();
     sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");

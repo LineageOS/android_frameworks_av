@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <media/NdkMediaFormat.h>
+#include <media/stagefright/foundation/AMessage.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <utils/Log.h>
@@ -176,11 +177,13 @@ constexpr size_t kMinBytes = 0;
 constexpr size_t kMaxBytes = 1000;
 constexpr size_t kMinChoice = 0;
 constexpr size_t kMaxChoice = 9;
+const size_t kMaxIteration = android::AMessage::maxAllowedEntries();
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     FuzzedDataProvider fdp(data, size);
     AMediaFormat* mediaFormat = AMediaFormat_new();
-    while (fdp.remaining_bytes()) {
+    std::vector<std::string> nameCollection;
+    while (fdp.remaining_bytes() && nameCollection.size() < kMaxIteration) {
         const char* name = nullptr;
         std::string nameString;
         if (fdp.ConsumeBool()) {
@@ -190,6 +193,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                             : fdp.ConsumeRandomLengthString(
                                       fdp.ConsumeIntegralInRange<size_t>(kMinBytes, kMaxBytes));
             name = nameString.c_str();
+            std::vector<std::string>::iterator it =
+                    find(nameCollection.begin(), nameCollection.end(), name);
+            if (it == nameCollection.end()) {
+                nameCollection.push_back(name);
+            }
         }
         switch (fdp.ConsumeIntegralInRange<int32_t>(kMinChoice, kMaxChoice)) {
             case 0: {

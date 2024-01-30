@@ -134,7 +134,8 @@ void AudioStream::logOpenActual() {
             .set(AMEDIAMETRICS_PROP_ENCODINGHARDWARE,
                     android::toString(getHardwareFormat()).c_str())
             .set(AMEDIAMETRICS_PROP_CHANNELCOUNTHARDWARE, (int32_t)getHardwareSamplesPerFrame())
-            .set(AMEDIAMETRICS_PROP_SAMPLERATEHARDWARE, (int32_t)getHardwareSampleRate());
+            .set(AMEDIAMETRICS_PROP_SAMPLERATEHARDWARE, (int32_t)getHardwareSampleRate())
+            .set(AMEDIAMETRICS_PROP_SAMPLERATECLIENT, (int32_t)getSampleRate());
 
         if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
             item.set(AMEDIAMETRICS_PROP_PLAYERIID, mPlayerBase->getPlayerIId());

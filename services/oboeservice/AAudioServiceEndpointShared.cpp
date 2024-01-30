@@ -219,9 +219,13 @@ aaudio_result_t AAudioServiceEndpointShared::getTimestamp(int64_t *positionFrame
 
 void AAudioServiceEndpointShared::handleDisconnectRegisteredStreamsAsync() {
     android::sp<AAudioServiceEndpointShared> holdEndpoint(this);
+    // When there is a routing changed, mmap stream should be disconnected. Set `mConnected`
+    // as false here so that there won't be a new stream connect to this endpoint.
+    mConnected.store(false);
     std::thread asyncTask([holdEndpoint]() {
-        // We do not need the returned vector.
-        holdEndpoint->disconnectRegisteredStreams();
+        // When handling disconnection, the service side has disconnected. In that case,
+        // it should be safe to release all registered streams.
+        holdEndpoint->releaseRegisteredStreams();
     });
     asyncTask.detach();
 }

@@ -18,6 +18,7 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <com_android_internal_camera_flags.h>
 #include <cutils/properties.h>
 #include <utils/CameraThreadState.h>
 #include <utils/Log.h>
@@ -54,6 +55,8 @@ namespace android {
 using namespace camera2;
 using namespace camera3;
 using camera3::camera_stream_rotation_t::CAMERA_STREAM_ROTATION_0;
+
+namespace flags = com::android::internal::camera::flags;
 
 CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<CameraService>& cameraService,
@@ -439,7 +442,7 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         CameraDeviceBase::PhysicalCameraSettingsList physicalSettingsList;
         for (const auto& it : request.mPhysicalCameraSettings) {
-            std::string resolvedId = (mOriginalCameraId == it.id) ? mDevice->getId() : it.id;
+            const std::string resolvedId = (mOriginalCameraId == it.id) ? mDevice->getId() : it.id;
             if (it.settings.isEmpty()) {
                 ALOGE("%s: Camera %s: Sent empty metadata packet. Rejecting request.",
                         __FUNCTION__, mCameraIdStr.c_str());
@@ -465,18 +468,19 @@ binder::Status CameraDeviceClient::submitRequestList(
                 }
             }
 
+            const std::string &physicalId = resolvedId;
             bool hasTestPatternModePhysicalKey = std::find(mSupportedPhysicalRequestKeys.begin(),
                     mSupportedPhysicalRequestKeys.end(), ANDROID_SENSOR_TEST_PATTERN_MODE) !=
                     mSupportedPhysicalRequestKeys.end();
             bool hasTestPatternDataPhysicalKey = std::find(mSupportedPhysicalRequestKeys.begin(),
                     mSupportedPhysicalRequestKeys.end(), ANDROID_SENSOR_TEST_PATTERN_DATA) !=
                     mSupportedPhysicalRequestKeys.end();
-            if (resolvedId != mDevice->getId()) {
+            if (physicalId != mDevice->getId()) {
                 auto found = std::find(requestedPhysicalIds.begin(), requestedPhysicalIds.end(),
                         resolvedId);
                 if (found == requestedPhysicalIds.end()) {
                     ALOGE("%s: Camera %s: Physical camera id: %s not part of attached outputs.",
-                            __FUNCTION__, mCameraIdStr.c_str(), resolvedId.c_str());
+                            __FUNCTION__, mCameraIdStr.c_str(), physicalId.c_str());
                     return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                             "Invalid physical camera id");
                 }
@@ -537,6 +541,21 @@ binder::Status CameraDeviceClient::submitRequestList(
                         ANDROID_CONTROL_VIDEO_STABILIZATION_MODE);
         if (entry.count == 1) {
             mVideoStabilizationMode = entry.data.u8[0];
+        }
+        if (flags::log_ultrawide_usage()) {
+            entry = physicalSettingsList.begin()->metadata.find(
+                    ANDROID_CONTROL_ZOOM_RATIO);
+            if (entry.count == 1 && entry.data.f[0] < 1.0f ) {
+                mUsedUltraWide = true;
+            }
+        }
+        if (!mUsedSettingsOverrideZoom && flags::log_zoom_override_usage()) {
+            entry = physicalSettingsList.begin()->metadata.find(
+                    ANDROID_CONTROL_SETTINGS_OVERRIDE);
+            if (entry.count == 1 && entry.data.i32[0] ==
+                    ANDROID_CONTROL_SETTINGS_OVERRIDE_ZOOM) {
+                mUsedSettingsOverrideZoom = true;
+            }
         }
     }
     mRequestIdCounter++;
@@ -723,13 +742,6 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
 
-    auto operatingMode = sessionConfiguration.getOperatingMode();
-    res = SessionConfigurationUtils::checkOperatingMode(operatingMode, mDevice->info(),
-            mCameraIdStr);
-    if (!res.isOk()) {
-        return res;
-    }
-
     if (status == nullptr) {
         std::string msg = fmt::sprintf( "Camera %s: Invalid status!", mCameraIdStr.c_str());
         ALOGE("%s: %s", __FUNCTION__, msg.c_str());
@@ -737,11 +749,9 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
     }
 
     *status = false;
-    camera3::metadataGetter getMetadata = [this](const std::string &id,
-            bool /*overrideForPerfClass*/) {
-          return mDevice->infoPhysical(id);};
     ret = mProviderManager->isSessionConfigurationSupported(mCameraIdStr.c_str(),
-            sessionConfiguration, mOverrideForPerfClass, getMetadata, status);
+            sessionConfiguration, mOverrideForPerfClass, /*checkSessionParams*/false,
+            status);
     switch (ret) {
         case OK:
             // Expected, do nothing.
@@ -749,6 +759,60 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
         case INVALID_OPERATION: {
                 std::string msg = fmt::sprintf(
                         "Camera %s: Session configuration query not supported!",
+                        mCameraIdStr.c_str());
+                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
+                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
+            }
+
+            break;
+        default: {
+                std::string msg = fmt::sprintf( "Camera %s: Error: %s (%d)", mCameraIdStr.c_str(),
+                        strerror(-ret), ret);
+                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+                res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                        msg.c_str());
+            }
+    }
+
+    return res;
+}
+
+binder::Status CameraDeviceClient::getSessionCharacteristics(
+        const SessionConfiguration& sessionConfiguration,
+        /*out*/
+        hardware::camera2::impl::CameraMetadataNative* sessionCharacteristics) {
+    ATRACE_CALL();
+    binder::Status res;
+    status_t ret = OK;
+    if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
+
+    Mutex::Autolock icl(mBinderSerializationLock);
+
+    if (!mDevice.get()) {
+        return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
+    }
+
+    auto operatingMode = sessionConfiguration.getOperatingMode();
+    res = SessionConfigurationUtils::checkOperatingMode(operatingMode, mDevice->info(),
+            mCameraIdStr);
+    if (!res.isOk()) {
+        return res;
+    }
+
+    camera3::metadataGetter getMetadata = [this](const std::string &id,
+            bool /*overrideForPerfClass*/) {
+          return mDevice->infoPhysical(id);};
+    ret = mProviderManager->getSessionCharacteristics(mCameraIdStr.c_str(),
+            sessionConfiguration, mOverrideForPerfClass, getMetadata,
+            sessionCharacteristics);
+
+    switch (ret) {
+        case OK:
+            // Expected, do nothing.
+            break;
+        case INVALID_OPERATION: {
+                std::string msg = fmt::sprintf(
+                        "Camera %s: Session characteristics query not supported!",
                         mCameraIdStr.c_str());
                 ALOGD("%s: %s", __FUNCTION__, msg.c_str());
                 res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
@@ -1378,7 +1442,9 @@ binder::Status CameraDeviceClient::createDefaultRequest(int templateId,
 
     status_t err;
     camera_request_template_t tempId = camera_request_template_t::CAMERA_TEMPLATE_COUNT;
-    if (!(res = mapRequestTemplate(templateId, &tempId)).isOk()) return res;
+    res = SessionConfigurationUtils::mapRequestTemplateFromClient(
+            mCameraIdStr, templateId, &tempId);
+    if (!res.isOk()) return res;
 
     CameraMetadata metadata;
     if ( (err = mDevice->createDefaultRequest(tempId, &metadata) ) == OK &&
@@ -2051,7 +2117,8 @@ void CameraDeviceClient::notifyIdle(
         }
     }
     Camera2ClientBase::notifyIdleWithUserTag(requestCount, resultErrorCount, deviceError,
-            fullStreamStats, mUserTag, mVideoStabilizationMode);
+            fullStreamStats, mUserTag, mVideoStabilizationMode, mUsedUltraWide,
+            mUsedSettingsOverrideZoom);
 }
 
 void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
@@ -2224,44 +2291,6 @@ status_t CameraDeviceClient::getRotationTransformLocked(int mirrorMode,
 
     const CameraMetadata& staticInfo = mDevice->info();
     return CameraUtils::getRotationTransform(staticInfo, mirrorMode, transform);
-}
-
-binder::Status CameraDeviceClient::mapRequestTemplate(int templateId,
-        camera_request_template_t* tempId /*out*/) {
-    binder::Status ret = binder::Status::ok();
-
-    if (tempId == nullptr) {
-        ret = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "Camera %s: Invalid template argument", mCameraIdStr.c_str());
-        return ret;
-    }
-    switch(templateId) {
-        case ICameraDeviceUser::TEMPLATE_PREVIEW:
-            *tempId = camera_request_template_t::CAMERA_TEMPLATE_PREVIEW;
-            break;
-        case ICameraDeviceUser::TEMPLATE_RECORD:
-            *tempId = camera_request_template_t::CAMERA_TEMPLATE_VIDEO_RECORD;
-            break;
-        case ICameraDeviceUser::TEMPLATE_STILL_CAPTURE:
-            *tempId = camera_request_template_t::CAMERA_TEMPLATE_STILL_CAPTURE;
-            break;
-        case ICameraDeviceUser::TEMPLATE_VIDEO_SNAPSHOT:
-            *tempId = camera_request_template_t::CAMERA_TEMPLATE_VIDEO_SNAPSHOT;
-            break;
-        case ICameraDeviceUser::TEMPLATE_ZERO_SHUTTER_LAG:
-            *tempId = camera_request_template_t::CAMERA_TEMPLATE_ZERO_SHUTTER_LAG;
-            break;
-        case ICameraDeviceUser::TEMPLATE_MANUAL:
-            *tempId = camera_request_template_t::CAMERA_TEMPLATE_MANUAL;
-            break;
-        default:
-            ret = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                    "Camera %s: Template ID %d is invalid or not supported",
-                    mCameraIdStr.c_str(), templateId);
-            return ret;
-    }
-
-    return ret;
 }
 
 const CameraMetadata &CameraDeviceClient::getStaticInfo(const std::string &cameraId) {

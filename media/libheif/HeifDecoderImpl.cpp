@@ -41,8 +41,8 @@ HeifDecoder* createHeifDecoder() {
 namespace android {
 
 void initFrameInfo(HeifFrameInfo *info, const VideoFrame *videoFrame) {
-    info->mWidth = videoFrame->mWidth;
-    info->mHeight = videoFrame->mHeight;
+    info->mWidth = videoFrame->mDisplayWidth;
+    info->mHeight = videoFrame->mDisplayHeight;
     info->mRotationAngle = videoFrame->mRotationAngle;
     info->mBytesPerPixel = videoFrame->mBytesPerPixel;
     info->mDurationUs = videoFrame->mDurationUs;
@@ -476,35 +476,37 @@ bool HeifDecoderImpl::getEncodedColor(HeifEncodedColor* /*outColor*/) const {
 }
 
 bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
-    if (heifColor == (HeifColorFormat)mOutputColor) {
-        return true;
-    }
-
+    android_pixel_format_t outputColor;
     switch(heifColor) {
         case kHeifColorFormat_RGB565:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_RGB_565;
+            outputColor = HAL_PIXEL_FORMAT_RGB_565;
             break;
         }
         case kHeifColorFormat_RGBA_8888:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_RGBA_8888;
+            outputColor = HAL_PIXEL_FORMAT_RGBA_8888;
             break;
         }
         case kHeifColorFormat_BGRA_8888:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_BGRA_8888;
+            outputColor = HAL_PIXEL_FORMAT_BGRA_8888;
             break;
         }
         case kHeifColorFormat_RGBA_1010102:
         {
-            mOutputColor = HAL_PIXEL_FORMAT_RGBA_1010102;
+            outputColor = HAL_PIXEL_FORMAT_RGBA_1010102;
             break;
         }
         default:
             ALOGE("Unsupported output color format %d", heifColor);
             return false;
     }
+    if (outputColor == mOutputColor) {
+        return true;
+    }
+
+    mOutputColor = outputColor;
 
     if (mFrameDecoded) {
         return reinit(nullptr);
@@ -740,8 +742,11 @@ bool HeifDecoderImpl::getScanlineInner(uint8_t* dst) {
     //       Either document why it is safe in this case or address the
     //       issue (e.g. by copying).
     VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
-    uint8_t* src = videoFrame->getFlattenedData() + videoFrame->mRowBytes * mCurScanline++;
-    memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mWidth);
+    uint8_t* src = videoFrame->getFlattenedData() +
+                   (videoFrame->mRowBytes * (mCurScanline + videoFrame->mDisplayTop)) +
+                   (videoFrame->mBytesPerPixel * videoFrame->mDisplayLeft);
+    mCurScanline++;
+    memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mDisplayWidth);
     return true;
 }
 

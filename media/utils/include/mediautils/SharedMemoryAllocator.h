@@ -138,7 +138,7 @@ class ScopedAllocation : public BnMemory {
 template <typename Allocator>
 class ScopedAllocator {
   public:
-    static constexpr size_t alignment() { return Allocator::alignment(); }
+    static size_t alignment() { return Allocator::alignment(); }
 
     explicit ScopedAllocator(const std::shared_ptr<Allocator>& allocator) : mAllocator(allocator) {}
 
@@ -218,7 +218,7 @@ class SizePolicy {
 template <typename Allocator, typename Policy>
 class PolicyAllocator {
   public:
-    static constexpr size_t alignment() { return Allocator::alignment(); }
+    static size_t alignment() { return Allocator::alignment(); }
 
     PolicyAllocator(Allocator allocator, Policy policy)
         : mAllocator(allocator), mPolicy(std::move(policy)) {}
@@ -277,7 +277,7 @@ class SnoopingAllocator {
         std::string name;
         size_t allocation_number;
     };
-    static constexpr size_t alignment() { return Allocator::alignment(); }
+    static size_t alignment() { return Allocator::alignment(); }
 
     SnoopingAllocator(Allocator allocator, std::string_view name)
         : mName(name), mAllocator(std::move(allocator)) {}
@@ -362,16 +362,19 @@ class SnoopingAllocator {
 template <class PrimaryAllocator, class SecondaryAllocator>
 class FallbackAllocator {
   public:
-    static_assert(PrimaryAllocator::alignment() == SecondaryAllocator::alignment());
     static_assert(shared_allocator_impl::has_owns<PrimaryAllocator>);
 
-    static constexpr size_t alignment() { return PrimaryAllocator::alignment(); }
+    static size_t alignment() { return PrimaryAllocator::alignment(); }
 
     FallbackAllocator(const PrimaryAllocator& primary, const SecondaryAllocator& secondary)
-        : mPrimary(primary), mSecondary(secondary) {}
+        : mPrimary(primary), mSecondary(secondary) {
+      verify_alignment();
+    }
 
     // Default construct primary and secondary allocator
-    FallbackAllocator() = default;
+    FallbackAllocator() {
+      verify_alignment();
+    }
 
     template <typename T>
     AllocationType allocate(T&& request) {
@@ -414,6 +417,10 @@ class FallbackAllocator {
     }
 
   private:
+    void verify_alignment() {
+      LOG_ALWAYS_FATAL_IF(PrimaryAllocator::alignment() != SecondaryAllocator::alignment(),
+                          "PrimaryAllocator::alignment() != SecondaryAllocator::alignment()");
+    }
     [[no_unique_address]] PrimaryAllocator mPrimary;
     [[no_unique_address]] SecondaryAllocator mSecondary;
 };
@@ -423,7 +430,7 @@ class FallbackAllocator {
 template <typename Allocator>
 class IndirectAllocator {
   public:
-    static constexpr size_t alignment() { return Allocator::alignment(); }
+    static size_t alignment() { return Allocator::alignment(); }
 
     explicit IndirectAllocator(const std::shared_ptr<Allocator>& allocator)
         : mAllocator(allocator) {}
@@ -449,7 +456,7 @@ class IndirectAllocator {
 // a shared memory mapped anonymous file) as allocations.
 class MemoryHeapBaseAllocator {
   public:
-    static constexpr size_t alignment() { return 4096; /* PAGE_SIZE */ }
+    static size_t alignment() { return kPageSize; }
     static constexpr unsigned FLAGS = 0;  // default flags
 
     template <typename T>
@@ -475,5 +482,7 @@ class MemoryHeapBaseAllocator {
         // allocated by us, the underlying IMemoryHeap was a MemoryHeapBase
         static_cast<MemoryHeapBase&>(*heap).dispose();
     }
+  private:
+    static inline const size_t kPageSize = getpagesize();
 };
 }  // namespace android::mediautils

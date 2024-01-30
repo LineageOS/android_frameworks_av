@@ -30,6 +30,7 @@ cc_library {
 
     srcs: [
         "AC4Parser.cpp",
+        "HeifCleanAperture.cpp",
         "ItemTable.cpp",
         "MPEG4Extractor.cpp",
         "SampleIterator.cpp",

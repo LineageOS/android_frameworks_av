@@ -462,6 +462,10 @@ public:
 
     static status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
+    static status_t updatePolicyMixes(
+        const std::vector<
+                std::pair<AudioMix, std::vector<AudioMixMatchCriterion>>>& mixesWithUpdates);
+
     static status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices);
 
     static status_t removeUidDeviceAffinities(uid_t uid);

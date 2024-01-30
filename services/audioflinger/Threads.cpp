@@ -2378,7 +2378,8 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
         audio_port_handle_t portId,
         const sp<media::IAudioTrackCallback>& callback,
         bool isSpatialized,
-        bool isBitPerfect)
+        bool isBitPerfect,
+        audio_output_flags_t *afTrackFlags)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -2697,6 +2698,7 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
         if (mType == DIRECT) {
             trackFlags = static_cast<audio_output_flags_t>(trackFlags | AUDIO_OUTPUT_FLAG_DIRECT);
         }
+        *afTrackFlags = trackFlags;
 
         track = IAfTrack::create(this, client, streamType, attr, sampleRate, format,
                           channelMask, frameCount,
@@ -7606,6 +7608,23 @@ void DuplicatingThread::threadLoop_standby()
     }
 }
 
+void DuplicatingThread::threadLoop_exit()
+{
+    // Prevent calling the OutputTrack dtor in the DuplicatingThread dtor
+    // where other mutexes (i.e. AudioPolicyService_Mutex) may be held.
+    // Do so here in the threadLoop_exit().
+
+    SortedVector <sp<IAfOutputTrack>> localTracks;
+    {
+        audio_utils::lock_guard l(mutex());
+        localTracks = std::move(mOutputTracks);
+        mOutputTracks.clear();
+    }
+    localTracks.clear();
+    outputTracks.clear();
+    PlaybackThread::threadLoop_exit();
+}
+
 void DuplicatingThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     MixerThread::dumpInternals_l(fd, args);
@@ -7745,7 +7764,8 @@ void DuplicatingThread::sendMetadataToBackend_l(
 
 uint32_t DuplicatingThread::activeSleepTimeUs() const
 {
-    return (mWaitTimeMs * 1000) / 2;
+    // return half the wait time in microseconds.
+    return std::min(mWaitTimeMs * 500ULL, (unsigned long long)UINT32_MAX);  // prevent overflow.
 }
 
 void DuplicatingThread::cacheParameters_l()
@@ -7876,6 +7896,15 @@ NO_THREAD_SAFETY_ANALYSIS
         audio_utils::lock_guard _l(mutex());
         mFinalDownMixer = finalDownMixer;
     }
+}
+
+void SpatializerThread::threadLoop_exit()
+{
+    // The Spatializer EffectHandle must be released on the PlaybackThread
+    // threadLoop() to prevent lock inversion in the SpatializerThread dtor.
+    mFinalDownMixer.clear();
+
+    PlaybackThread::threadLoop_exit();
 }
 
 // ----------------------------------------------------------------------------
@@ -8180,6 +8209,12 @@ reacquire_wakelock:
                 case IAfTrackBase::PAUSING:
                     mActiveTracks.remove(activeTrack);
                     activeTrack->setState(IAfTrackBase::PAUSED);
+                    if (activeTrack->isFastTrack()) {
+                        ALOGV("%s fast track is paused, thus removed from active list", __func__);
+                        // Keep a ref on fast track to wait for FastCapture thread to get updated
+                        // state before potential track removal
+                        fastTrackToRemove = activeTrack;
+                    }
                     doBroadcast = true;
                     size--;
                     continue;
@@ -10305,7 +10340,7 @@ status_t MmapThread::standby()
 NO_THREAD_SAFETY_ANALYSIS  // clang bug
 {
     ALOGV("%s", __FUNCTION__);
-    audio_utils::lock_guard(mutex());
+    audio_utils::lock_guard l_{mutex()};
 
     if (mHalStream == 0) {
         return NO_INIT;

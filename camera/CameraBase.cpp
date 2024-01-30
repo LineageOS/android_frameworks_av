@@ -104,7 +104,6 @@ status_t CameraStatus::readFromParcel(const android::Parcel* parcel) {
 
 namespace {
     sp<::android::hardware::ICameraService> gCameraService;
-    const int                 kCameraServicePollDelay = 500000; // 0.5s
     const char*               kCameraServiceName      = "media.camera";
 
     Mutex                     gLock;
@@ -142,14 +141,10 @@ const sp<::android::hardware::ICameraService> CameraBase<TCam, TCamTraits>::getC
 
         sp<IServiceManager> sm = defaultServiceManager();
         sp<IBinder> binder;
-        do {
-            binder = sm->getService(toString16(kCameraServiceName));
-            if (binder != 0) {
-                break;
-            }
-            ALOGW("CameraService not published, waiting...");
-            usleep(kCameraServicePollDelay);
-        } while(true);
+        binder = sm->waitForService(toString16(kCameraServiceName));
+        if (binder == nullptr) {
+            return nullptr;
+        }
         if (gDeathNotifier == NULL) {
             gDeathNotifier = new DeathNotifier();
         }

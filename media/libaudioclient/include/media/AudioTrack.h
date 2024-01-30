@@ -1238,6 +1238,11 @@ public:
             bool     isDirect_l() const
                 { return (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0; }
 
+            bool     isAfTrackOffloadedOrDirect_l() const
+                { return isOffloadedOrDirect_l() ||
+                        (mAfTrackFlags & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD|
+                                AUDIO_OUTPUT_FLAG_DIRECT)) != 0; }
+
             // pure pcm data is mixable (which excludes HW_AV_SYNC, with embedded timing)
             bool     isPurePcmData_l() const
                 { return audio_is_linear_pcm(mFormat)
@@ -1295,6 +1300,7 @@ public:
     uint32_t                mAfSampleRate;          // AudioFlinger sample rate
     uint32_t                mAfChannelCount;        // AudioFlinger channel count
     audio_format_t          mAfFormat;              // AudioFlinger format
+    audio_output_flags_t    mAfTrackFlags;          // AudioFlinger track flags
 
     // constant after constructor or set()
     audio_format_t          mFormat;                // as requested by client, not forced to 16-bit

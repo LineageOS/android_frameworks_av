@@ -51,6 +51,8 @@ public:
 
     virtual ~Camera3SharedOutputStream();
 
+    void setHalBufferManager(bool enabled) override;
+
     virtual status_t notifyBufferReleased(ANativeWindowBuffer *buffer);
 
     virtual bool isConsumerConfigurationDeferred(size_t surface_id) const;
@@ -85,7 +87,7 @@ private:
 
     // Whether HAL is in control for buffer management. Surface sharing behavior
     // depends on this flag.
-    const bool mUseHalBufManager;
+    bool mUseHalBufManager;
 
     // Pair of an output Surface and its unique ID
     typedef std::pair<sp<Surface>, size_t> SurfaceUniqueId;

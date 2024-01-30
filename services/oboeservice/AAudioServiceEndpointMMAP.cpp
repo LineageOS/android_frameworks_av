@@ -45,6 +45,8 @@
 #define OUTPUT_ESTIMATED_HARDWARE_OFFSET_NANOS  (3 * AAUDIO_NANOS_PER_MILLISECOND)
 #define INPUT_ESTIMATED_HARDWARE_OFFSET_NANOS   (-1 * AAUDIO_NANOS_PER_MILLISECOND)
 
+#define AAUDIO_MAX_OPEN_ATTEMPTS    10
+
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
@@ -74,16 +76,26 @@ namespace {
 const static std::map<audio_format_t, audio_format_t> NEXT_FORMAT_TO_TRY = {
         {AUDIO_FORMAT_PCM_FLOAT,         AUDIO_FORMAT_PCM_32_BIT},
         {AUDIO_FORMAT_PCM_32_BIT,        AUDIO_FORMAT_PCM_24_BIT_PACKED},
-        {AUDIO_FORMAT_PCM_24_BIT_PACKED, AUDIO_FORMAT_PCM_16_BIT}
+        {AUDIO_FORMAT_PCM_24_BIT_PACKED, AUDIO_FORMAT_PCM_8_24_BIT},
+        {AUDIO_FORMAT_PCM_8_24_BIT,      AUDIO_FORMAT_PCM_16_BIT}
 };
 
-audio_format_t getNextFormatToTry(audio_format_t curFormat, audio_format_t returnedFromAPM) {
-    if (returnedFromAPM != AUDIO_FORMAT_DEFAULT) {
-        return returnedFromAPM;
-    }
+audio_format_t getNextFormatToTry(audio_format_t curFormat) {
     const auto it = NEXT_FORMAT_TO_TRY.find(curFormat);
-    return it != NEXT_FORMAT_TO_TRY.end() ? it->second : AUDIO_FORMAT_DEFAULT;
+    return it != NEXT_FORMAT_TO_TRY.end() ? it->second : curFormat;
 }
+
+struct configComp {
+    bool operator() (const audio_config_base_t& lhs, const audio_config_base_t& rhs) const {
+        if (lhs.sample_rate != rhs.sample_rate) {
+            return lhs.sample_rate < rhs.sample_rate;
+        } else if (lhs.channel_mask != rhs.channel_mask) {
+            return lhs.channel_mask < rhs.channel_mask;
+        } else {
+            return lhs.format < rhs.format;
+        }
+    }
+};
 
 } // namespace
 
@@ -101,59 +113,65 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
         legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
 
     audio_format_t audioFormat = getFormat();
-    std::set<audio_format_t> formatsTried;
-    while (true) {
-        if (formatsTried.find(audioFormat) != formatsTried.end()) {
+    int32_t sampleRate = getSampleRate();
+    if (sampleRate == AAUDIO_UNSPECIFIED) {
+        sampleRate = AAUDIO_SAMPLE_RATE_DEFAULT;
+    }
+
+    const aaudio_direction_t direction = getDirection();
+    audio_config_base_t config;
+    config.format = audioFormat;
+    config.sample_rate = sampleRate;
+    config.channel_mask = AAudio_getChannelMaskForOpen(
+            getChannelMask(), getSamplesPerFrame(), direction == AAUDIO_DIRECTION_INPUT);
+
+    std::set<audio_config_base_t, configComp> configsTried;
+    int32_t numberOfAttempts = 0;
+    while (numberOfAttempts < AAUDIO_MAX_OPEN_ATTEMPTS) {
+        if (configsTried.find(config) != configsTried.end()) {
             // APM returning something that has already tried.
-            ALOGW("Have already tried to open with format=%#x, but failed before", audioFormat);
+            ALOGW("Have already tried to open with format=%#x and sr=%d, but failed before",
+                  config.format, config.sample_rate);
             break;
         }
-        formatsTried.insert(audioFormat);
+        configsTried.insert(config);
 
-        audio_format_t nextFormatToTry = AUDIO_FORMAT_DEFAULT;
-        result = openWithFormat(audioFormat, &nextFormatToTry);
+        audio_config_base_t previousConfig = config;
+        result = openWithConfig(&config);
         if (result != AAUDIO_ERROR_UNAVAILABLE) {
             // Return if it is successful or there is an error that is not
             // AAUDIO_ERROR_UNAVAILABLE happens.
-            ALOGI("Opened format=%#x with result=%d", audioFormat, result);
+            ALOGI("Opened format=%#x sr=%d, with result=%d", previousConfig.format,
+                    previousConfig.sample_rate, result);
             break;
         }
 
-        nextFormatToTry = getNextFormatToTry(audioFormat, nextFormatToTry);
-        ALOGD("%s() %#x failed, perhaps due to format. Try again with %#x",
-              __func__, audioFormat, nextFormatToTry);
-        audioFormat = nextFormatToTry;
-        if (audioFormat == AUDIO_FORMAT_DEFAULT) {
-            // Nothing else to try
-            break;
+        // Try other formats if the config from APM is the same as our current config.
+        // Some HALs may report its format support incorrectly.
+        if ((previousConfig.format == config.format) &&
+                (previousConfig.sample_rate == config.sample_rate)) {
+            config.format = getNextFormatToTry(config.format);
         }
+
+        ALOGD("%s() %#x %d failed, perhaps due to format or sample rate. Try again with %#x %d",
+                __func__, previousConfig.format, previousConfig.sample_rate, config.format,
+                config.sample_rate);
+        numberOfAttempts++;
     }
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
-        audio_format_t audioFormat, audio_format_t* nextFormatToTry) {
+aaudio_result_t AAudioServiceEndpointMMAP::openWithConfig(
+        audio_config_base_t* config) {
     aaudio_result_t result = AAUDIO_OK;
-    audio_config_base_t config;
+    audio_config_base_t currentConfig = *config;
     audio_port_handle_t deviceId;
 
     const audio_attributes_t attributes = getAudioAttributesFrom(this);
 
     deviceId = mRequestedDeviceId;
 
-    // Fill in config
-    config.format = audioFormat;
-
-    int32_t aaudioSampleRate = getSampleRate();
-    if (aaudioSampleRate == AAUDIO_UNSPECIFIED) {
-        aaudioSampleRate = AAUDIO_SAMPLE_RATE_DEFAULT;
-    }
-    config.sample_rate = aaudioSampleRate;
-
     const aaudio_direction_t direction = getDirection();
-
-    config.channel_mask = AAudio_getChannelMaskForOpen(
-            getChannelMask(), getSamplesPerFrame(), direction == AAUDIO_DIRECTION_INPUT);
 
     if (direction == AAUDIO_DIRECTION_OUTPUT) {
         mHardwareTimeOffsetNanos = OUTPUT_ESTIMATED_HARDWARE_OFFSET_NANOS; // frames at DAC later
@@ -177,11 +195,11 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
     // Open HAL stream. Set mMmapStream
     ALOGD("%s trying to open MMAP stream with format=%#x, "
           "sample_rate=%u, channel_mask=%#x, device=%d",
-          __func__, config.format, config.sample_rate,
-          config.channel_mask, deviceId);
+          __func__, config->format, config->sample_rate,
+          config->channel_mask, deviceId);
     const status_t status = MmapStreamInterface::openMmapStream(streamDirection,
                                                                 &attributes,
-                                                                &config,
+                                                                config,
                                                                 mMmapClient,
                                                                 &deviceId,
                                                                 &sessionId,
@@ -195,9 +213,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
         // not match the hardware.
         ALOGD("%s() - openMmapStream() returned status=%d, suggested format=%#x, sample_rate=%u, "
               "channel_mask=%#x",
-              __func__, status, config.format, config.sample_rate, config.channel_mask);
-        *nextFormatToTry = config.format != audioFormat ? config.format
-                                                        : *nextFormatToTry;
+              __func__, status, config->format, config->sample_rate, config->channel_mask);
+        // Keep the channel mask of the current config
+        config->channel_mask = currentConfig.channel_mask;
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
@@ -217,7 +235,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
     setSessionId(actualSessionId);
 
     ALOGD("%s(format = 0x%X) deviceId = %d, sessionId = %d",
-          __func__, audioFormat, getDeviceId(), getSessionId());
+          __func__, config->format, getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
     result = createMmapBuffer();
@@ -227,11 +245,11 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(
 
     // Get information about the stream and pass it back to the caller.
     setChannelMask(AAudioConvert_androidToAAudioChannelMask(
-            config.channel_mask, getDirection() == AAUDIO_DIRECTION_INPUT,
-            AAudio_isChannelIndexMask(config.channel_mask)));
+            config->channel_mask, getDirection() == AAUDIO_DIRECTION_INPUT,
+            AAudio_isChannelIndexMask(config->channel_mask)));
 
-    setFormat(config.format);
-    setSampleRate(config.sample_rate);
+    setFormat(config->format);
+    setSampleRate(config->sample_rate);
     setHardwareSampleRate(getSampleRate());
     setHardwareFormat(getFormat());
     setHardwareSamplesPerFrame(AAudioConvert_channelMaskToCount(getChannelMask()));
@@ -404,10 +422,17 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle)
     ALOGD("%s() called with dev %d, old = %d", __func__, deviceId, getDeviceId());
     if (getDeviceId() != deviceId) {
         if (getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
+            // When there is a routing changed, mmap stream should be disconnected. Set `mConnected`
+            // as false here so that there won't be a new stream connect to this endpoint.
+            mConnected.store(false);
             const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
             std::thread asyncTask([holdEndpoint, deviceId]() {
                 ALOGD("onRoutingChanged() asyncTask launched");
-                holdEndpoint->disconnectRegisteredStreams();
+                // When routing changed, the stream is disconnected and cannot be used except for
+                // closing. In that case, it should be safe to release all registered streams.
+                // This can help release service side resource in case the client doesn't close
+                // the stream after receiving disconnect event.
+                holdEndpoint->releaseRegisteredStreams();
                 holdEndpoint->setDeviceId(deviceId);
             });
             asyncTask.detach();

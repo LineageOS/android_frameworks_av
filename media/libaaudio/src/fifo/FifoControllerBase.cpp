@@ -21,7 +21,8 @@
 #include <stdint.h>
 #include "FifoControllerBase.h"
 
-using namespace android;  // TODO just import names needed
+using android::FifoControllerBase;
+using android::fifo_frames_t;
 
 FifoControllerBase::FifoControllerBase(fifo_frames_t capacity, fifo_frames_t threshold)
         : mCapacity(capacity)

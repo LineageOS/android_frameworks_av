@@ -84,6 +84,7 @@ cc_library {
         "libprocessinfoservice_aidl",
     ],
     shared_libs: [
+        "com.android.media.audio-aconfig-cc",
         "libaudioclient_aidl_conversion",
         "libaudioutils", // for clock.h, Statistics.h
         "libbase",
@@ -178,4 +179,9 @@ cc_library {
 
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
+}
+
+cc_library_headers {
+    name: "mediautils_headers",
+    export_include_dirs: ["include", "."],
 }

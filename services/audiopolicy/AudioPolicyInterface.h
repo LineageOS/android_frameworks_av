@@ -270,6 +270,10 @@ public:
     virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes) = 0;
     virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes) = 0;
 
+    virtual status_t updatePolicyMix(
+        const AudioMix& mix,
+        const std::vector<AudioMixMatchCriterion>& updatedCriteria) = 0;
+
     virtual status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices)
             = 0;
     virtual status_t removeUidDeviceAffinities(uid_t uid) = 0;

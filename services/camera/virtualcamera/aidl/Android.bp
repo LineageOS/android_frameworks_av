@@ -1,0 +1,36 @@
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+aidl_interface {
+    name: "virtual_camera_service_aidl",
+    unstable: true,
+    srcs: [
+        "android/companion/virtualcamera/Format.aidl",
+        "android/companion/virtualcamera/IVirtualCameraCallback.aidl",
+        "android/companion/virtualcamera/IVirtualCameraService.aidl",
+        "android/companion/virtualcamera/VirtualCameraConfiguration.aidl",
+        "android/companion/virtualcamera/SupportedStreamConfiguration.aidl",
+    ],
+    local_include_dir: ".",
+    include_dirs: [
+        "frameworks/native/aidl/gui",
+    ],
+    backend: {
+        cpp: {
+            enabled: false,
+        },
+        ndk: {
+            enabled: true,
+            additional_shared_libraries: [
+                "libnativewindow",
+            ],
+            min_sdk_version: "34",
+        },
+        java: {
+            enabled: true,
+            platform_apis: true,
+        }
+    },
+}
