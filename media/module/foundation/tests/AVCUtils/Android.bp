@@ -28,6 +28,7 @@ package {
 cc_test {
     name: "AVCUtilsUnitTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
         "AVCUtilsUnitTest.cpp",
