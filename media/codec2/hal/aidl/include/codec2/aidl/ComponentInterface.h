@@ -22,11 +22,14 @@
 
 #include <aidl/android/hardware/media/c2/BnComponentInterface.h>
 
+#include <codec2/common/MultiAccessUnitHelper.h>
+
 #include <C2Component.h>
 #include <C2Buffer.h>
 #include <C2.h>
 
 #include <memory>
+#include <set>
 
 namespace aidl {
 namespace android {
@@ -35,12 +38,16 @@ namespace media {
 namespace c2 {
 namespace utils {
 
-struct ComponentStore;
+using ::android::MultiAccessUnitInterface;
 
 struct ComponentInterface : public BnComponentInterface {
     ComponentInterface(
             const std::shared_ptr<C2ComponentInterface>& interface,
             const std::shared_ptr<ParameterCache>& cache);
+    ComponentInterface(
+        const std::shared_ptr<C2ComponentInterface>& interface,
+        const std::shared_ptr<MultiAccessUnitInterface>& largeBufferIntf,
+        const std::shared_ptr<ParameterCache>& cache);
     c2_status_t status() const;
     ::ndk::ScopedAStatus getConfigurable(
             std::shared_ptr<IConfigurable> *intf) override;
@@ -50,7 +57,6 @@ protected:
     std::shared_ptr<CachedConfigurable> mConfigurable;
     c2_status_t mInit;
 };
-
 
 }  // namespace utils
 }  // namespace c2

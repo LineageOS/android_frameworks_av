@@ -1632,10 +1632,13 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         *flags = (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_ULTRASOUND);
     }
 
+    // Use the spatializer output if the content can be spatialized, no preferred mixer
+    // was specified and offload or direct playback is not explicitly requested.
     *isSpatialized = false;
     if (mSpatializerOutput != nullptr
             && canBeSpatializedInt(attr, config, devices.toTypeAddrVector())
-            && prefMixerConfigInfo == nullptr) {
+            && prefMixerConfigInfo == nullptr
+            && ((*flags & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT)) == 0)) {
         *isSpatialized = true;
         return mSpatializerOutput->mIoHandle;
     }
@@ -6001,7 +6004,8 @@ bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
     // The caller can have the audio config criteria ignored by either passing a null ptr or
     // the AUDIO_CONFIG_INITIALIZER value.
     // If an audio config is specified, current policy is to only allow spatialization for
-    // some positional channel masks and PCM format
+    // some positional channel masks and PCM format and for stereo if low latency performance
+    // mode is not requested.
 
     if (config != nullptr && *config != AUDIO_CONFIG_INITIALIZER) {
         const bool channel_mask_spatialized =
@@ -6012,6 +6016,10 @@ bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
             return false;
         }
         if (!audio_is_linear_pcm(config->format)) {
+            return false;
+        }
+        if (config->channel_mask == AUDIO_CHANNEL_OUT_STEREO
+                && ((attr->flags & AUDIO_FLAG_LOW_LATENCY) != 0)) {
             return false;
         }
     }
