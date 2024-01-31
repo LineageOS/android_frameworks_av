@@ -1015,6 +1015,7 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
     ssize_t idx;
 
     std::vector<BufferToReturn> returnableBuffers{};
+    CaptureResultExtras pendingNotificationResultExtras{};
 
     // Set timestamp for the request in the in-flight tracking
     // and get the request ID to send upstream
@@ -1082,9 +1083,13 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                             states.lastCompletedReprocessFrameNumber;
                     r.resultExtras.lastCompletedZslFrameNumber =
                             states.lastCompletedZslFrameNumber;
-                    states.listener->notifyShutter(r.resultExtras, msg.timestamp);
+                    if (flags::return_buffers_outside_locks()) {
+                        pendingNotificationResultExtras = r.resultExtras;
+                    } else {
+                        states.listener->notifyShutter(r.resultExtras, msg.timestamp);
+                    }
                 }
-                // send pending result and buffers
+                // send pending result and buffers; this queues them up for delivery later
                 const auto& cameraIdsWithZoom = getCameraIdsWithZoomLocked(
                         inflightMap, r.pendingMetadata, r.cameraIdsWithZoom);
                 sendCaptureResult(states,
@@ -1110,6 +1115,11 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
         SET_ERR("Shutter notification for non-existent frame number %d",
                 msg.frame_number);
     }
+    // Call notifyShutter outside of in-flight mutex
+    if (flags::return_buffers_outside_locks() && pendingNotificationResultExtras.isValid()) {
+        states.listener->notifyShutter(pendingNotificationResultExtras, msg.timestamp);
+    }
+
     // With no locks held, finish returning buffers to streams, which may take a while since
     // binder calls are involved
     if (flags::return_buffers_outside_locks()) {
