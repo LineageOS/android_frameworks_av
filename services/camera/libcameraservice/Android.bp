@@ -112,6 +112,7 @@ cc_defaults {
         "libcameraservice_device_independent",
         "libdynamic_depth",
         "libprocessinfoservice_aidl",
+        "libvirtualdevicebuildflags",
         "media_permission-aidl-cpp",
     ],
 }

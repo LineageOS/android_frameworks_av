@@ -33,6 +33,7 @@
 #include <future>
 #include <inttypes.h>
 #include <android_companion_virtualdevice_flags.h>
+#include <android_companion_virtualdevice_build_flags.h>
 #include <android/binder_manager.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
@@ -3266,7 +3267,8 @@ void CameraProviderManager::filterLogicalCameraIdsLocked(
 }
 
 bool CameraProviderManager::isVirtualCameraHalEnabled() {
-    return vd_flags::virtual_camera_service_discovery();
+    return vd_flags::virtual_camera_service_discovery() &&
+           vd_flags::virtual_camera_service_build_flag();
 }
 
 } // namespace android
