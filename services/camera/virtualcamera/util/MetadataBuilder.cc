@@ -103,6 +103,22 @@ MetadataBuilder& MetadataBuilder::setControlAvailableModes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setControlAvailableSceneModes(
+    const std::vector<camera_metadata_enum_android_control_scene_mode>&
+        availableSceneModes) {
+  mEntryMap[ANDROID_CONTROL_AVAILABLE_SCENE_MODES] =
+      convertTo<uint8_t>(availableSceneModes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAvailableEffects(
+    const std::vector<camera_metadata_enum_android_control_effect_mode>&
+        availableEffects) {
+  mEntryMap[ANDROID_CONTROL_AVAILABLE_EFFECTS] =
+      convertTo<uint8_t>(availableEffects);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setControlAfAvailableModes(
     const std::vector<camera_metadata_enum_android_control_af_mode_t>&
         availableModes) {
@@ -130,6 +146,32 @@ MetadataBuilder& MetadataBuilder::setControlMaxRegions(int32_t maxAeRegions,
                                                        int32_t maxAfRegions) {
   mEntryMap[ANDROID_CONTROL_MAX_REGIONS] =
       std::vector<int32_t>({maxAeRegions, maxAwbRegions, maxAfRegions});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAvailableAwbModes(
+    const std::vector<camera_metadata_enum_android_control_awb_mode>& awbModes) {
+  mEntryMap[ANDROID_CONTROL_AWB_AVAILABLE_MODES] = convertTo<uint8_t>(awbModes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAwbLockAvailable(
+    const bool awbLockAvailable) {
+  const uint8_t lockAvailable = awbLockAvailable
+                                    ? ANDROID_CONTROL_AWB_LOCK_AVAILABLE_TRUE
+                                    : ANDROID_CONTROL_AWB_LOCK_AVAILABLE_FALSE;
+  mEntryMap[ANDROID_CONTROL_AWB_LOCK_AVAILABLE] =
+      std::vector<uint8_t>({lockAvailable});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAeLockAvailable(
+    const bool aeLockAvailable) {
+  const uint8_t lockAvailable = aeLockAvailable
+                                    ? ANDROID_CONTROL_AE_LOCK_AVAILABLE_TRUE
+                                    : ANDROID_CONTROL_AE_LOCK_AVAILABLE_FALSE;
+  mEntryMap[ANDROID_CONTROL_AE_LOCK_AVAILABLE] =
+      std::vector<uint8_t>({lockAvailable});
   return *this;
 }
 
@@ -190,6 +232,21 @@ MetadataBuilder& MetadataBuilder::setMaxJpegSize(const int32_t size) {
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setSyncMaxLatency(
+    camera_metadata_enum_android_sync_max_latency latency) {
+  mEntryMap[ANDROID_SYNC_MAX_LATENCY] =
+      std::vector<int32_t>({static_cast<int32_t>(latency)});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setAvailableRequestCapabilities(
+    const std::vector<camera_metadata_enum_android_request_available_capabilities_t>&
+        requestCapabilities) {
+  mEntryMap[ANDROID_REQUEST_AVAILABLE_CAPABILITIES] =
+      convertTo<uint8_t>(requestCapabilities);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setAvailableOutputStreamConfigurations(
     const std::vector<StreamConfiguration>& streamConfigurations) {
   std::vector<int32_t> metadataStreamConfigs;
@@ -228,7 +285,7 @@ MetadataBuilder& MetadataBuilder::setAvailableOutputStreamConfigurations(
 
 MetadataBuilder& MetadataBuilder::setAvailableMaxDigitalZoom(const float maxZoom) {
   mEntryMap[ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM] =
-      std::vector<float>(maxZoom);
+      std::vector<float>({maxZoom});
   return *this;
 }
 
