@@ -29,6 +29,12 @@
 #define INT32_MAX   2147483647
 #endif
 
+/* Quantization param values defined by the spec */
+#define VPX_QP_MIN 0
+#define VPX_QP_MAX 63
+#define VPX_QP_DEFAULT_MIN VPX_QP_MIN
+#define VPX_QP_DEFAULT_MAX VPX_QP_MAX
+
 namespace android {
 
 C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
@@ -197,6 +203,20 @@ C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helpe
             })
             .withSetter(CodedColorAspectsSetter, mColorAspects)
             .build());
+
+    addParameter(
+            DefineParam(mPictureQuantization, C2_PARAMKEY_PICTURE_QUANTIZATION)
+            .withDefault(C2StreamPictureQuantizationTuning::output::AllocShared(
+                    0 /* flexCount */, 0u /* stream */))
+            .withFields({C2F(mPictureQuantization, m.values[0].type_).oneOf(
+                            {C2Config::I_FRAME, C2Config::P_FRAME}),
+                         C2F(mPictureQuantization, m.values[0].min).inRange(
+                            VPX_QP_DEFAULT_MIN, VPX_QP_DEFAULT_MAX),
+                         C2F(mPictureQuantization, m.values[0].max).inRange(
+                            VPX_QP_DEFAULT_MIN, VPX_QP_DEFAULT_MAX)})
+            .withSetter(PictureQuantizationSetter)
+            .build());
+
 }
 
 C2R C2SoftVpxEnc::IntfImpl::BitrateSetter(bool mayBlock, C2P<C2StreamBitrateInfo::output> &me) {
@@ -330,6 +350,58 @@ uint32_t C2SoftVpxEnc::IntfImpl::getSyncFramePeriod() const {
     double period = mSyncFramePeriod->value / 1e6 * mFrameRate->value;
     return (uint32_t)c2_max(c2_min(period + 0.5, double(UINT32_MAX)), 1.);
 }
+
+C2R C2SoftVpxEnc::IntfImpl::PictureQuantizationSetter(bool mayBlock,
+                                                     C2P<C2StreamPictureQuantizationTuning::output>
+                                                     &me) {
+    (void)mayBlock;
+    // these are the ones we're going to set, so want them to default
+    // to the DEFAULT values for the codec
+    int32_t iMin = VPX_QP_DEFAULT_MIN, pMin = VPX_QP_DEFAULT_MIN;
+    int32_t iMax = VPX_QP_DEFAULT_MAX, pMax = VPX_QP_DEFAULT_MAX;
+    for (size_t i = 0; i < me.v.flexCount(); ++i) {
+        const C2PictureQuantizationStruct &layer = me.v.m.values[i];
+        // layerMin is clamped to [VPX_QP_MIN, layerMax] to avoid error
+        // cases where layer.min > layer.max
+        int32_t layerMax = std::clamp(layer.max, VPX_QP_MIN, VPX_QP_MAX);
+        int32_t layerMin = std::clamp(layer.min, VPX_QP_MIN, layerMax);
+        if (layer.type_ == C2Config::picture_type_t(I_FRAME)) {
+            iMax = layerMax;
+            iMin = layerMin;
+            ALOGV("iMin %d iMax %d", iMin, iMax);
+        } else if (layer.type_ == C2Config::picture_type_t(P_FRAME)) {
+            pMax = layerMax;
+            pMin = layerMin;
+            ALOGV("pMin %d pMax %d", pMin, pMax);
+        }
+    }
+    ALOGV("PictureQuantizationSetter(entry): i %d-%d p %d-%d",
+          iMin, iMax, pMin, pMax);
+
+    // vpx library takes same range for I/P picture type
+    int32_t maxFrameQP = std::min({iMax, pMax});
+    int32_t minFrameQP = std::max({iMin, pMin});
+    if (minFrameQP > maxFrameQP) {
+        minFrameQP = maxFrameQP;
+    }
+    // put them back into the structure
+    for (size_t i = 0; i < me.v.flexCount(); ++i) {
+        const C2PictureQuantizationStruct &layer = me.v.m.values[i];
+
+        if (layer.type_ == C2Config::picture_type_t(I_FRAME)) {
+            me.set().m.values[i].max = maxFrameQP;
+            me.set().m.values[i].min = minFrameQP;
+        }
+        else if (layer.type_ == C2Config::picture_type_t(P_FRAME)) {
+            me.set().m.values[i].max = maxFrameQP;
+            me.set().m.values[i].min = minFrameQP;
+        }
+    }
+    ALOGV("PictureQuantizationSetter(exit): minFrameQP = %d maxFrameQP = %d",
+          minFrameQP, maxFrameQP);
+    return C2R::Ok();
+}
+
 C2R C2SoftVpxEnc::IntfImpl::ColorAspectsSetter(bool mayBlock,
                                                C2P<C2StreamColorAspectsInfo::input>& me) {
     (void)mayBlock;
@@ -453,6 +525,7 @@ status_t C2SoftVpxEnc::initEncoder() {
         mRequestSync = mIntf->getRequestSync_l();
         mLayering = mIntf->getTemporalLayers_l();
         mTemporalLayers = mLayering->m.layerCount;
+        mQpBounds = mIntf->getPictureQuantization_l();
     }
 
     switch (mBitrateMode->value) {
@@ -464,6 +537,18 @@ status_t C2SoftVpxEnc::initEncoder() {
         default:
             mBitrateControlMode = VPX_VBR;
             break;
+    }
+
+    if (mQpBounds->flexCount() > 0) {
+        // read min max qp for sequence
+        for (size_t i = 0; i < mQpBounds->flexCount(); ++i) {
+            const C2PictureQuantizationStruct &layer = mQpBounds->m.values[i];
+            if (layer.type_ == C2Config::picture_type_t(I_FRAME)) {
+                mMaxQuantizer = layer.max;
+                mMinQuantizer = layer.min;
+                break;
+            }
+        }
     }
 
     setCodecSpecificInterface();
