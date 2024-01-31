@@ -1,0 +1,33 @@
+soong_config_module_type {
+    name: "virtual_device_build_flags_cc_defaults",
+    module_type: "cc_defaults",
+    config_namespace: "vdm",
+    bool_variables: [
+        "virtual_camera_service_enabled",
+    ],
+    properties: [
+        "cflags",
+    ],
+}
+
+soong_config_bool_variable {
+    name: "virtual_camera_service_enabled",
+}
+
+virtual_device_build_flags_cc_defaults {
+    name: "virtual_device_build_flags_defaults",
+    soong_config_variables: {
+        virtual_camera_service_enabled: {
+            cflags: ["-DVIRTUAL_CAMERA_SERVICE_ENABLED=1"],
+        },
+    },
+}
+
+cc_library_static {
+    name: "libvirtualdevicebuildflags",
+    srcs: [
+        "android_companion_virtualdevice_build_flags.cc",
+    ],
+    export_include_dirs: ["."],
+    defaults: ["virtual_device_build_flags_defaults"],
+}

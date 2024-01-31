@@ -345,10 +345,15 @@ void returnStreamBuffersT(ReturnBufferStates& states,
             continue;
         }
         streamBuffer.stream = stream->asHalStream();
-        returnOutputBuffers(states.useHalBufManager, states.halBufManagedStreamIds,
+        std::vector<BufferToReturn> returnableBuffers{};
+        collectReturnableOutputBuffers(states.useHalBufManager, states.halBufManagedStreamIds,
                 /*listener*/nullptr, &streamBuffer, /*size*/1, /*timestamp*/ 0,
                 /*readoutTimestamp*/0, /*requested*/false, /*requestTimeNs*/0,
+                states.sessionStatsBuilder,
+                /*out*/&returnableBuffers);
+        finishReturningOutputBuffers(returnableBuffers, /*listener*/ nullptr,
                 states.sessionStatsBuilder);
+
     }
 }
 
