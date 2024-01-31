@@ -248,7 +248,7 @@ bool ResourceManagerServiceNew::getTargetClients(
     // Use the Resource Model to get a list of all the clients that hold the
     // needed/requested resources.
     uint32_t callingImportance = std::max(0, clientInfo.importance);
-    ReclaimRequestInfo reclaimRequestInfo{callingPid, callingImportance, resources};
+    ReclaimRequestInfo reclaimRequestInfo{callingPid, clientInfo.id, callingImportance, resources};
     std::vector<ClientInfo> clients;
     if (!mDefaultResourceModel->getAllClients(reclaimRequestInfo, clients)) {
         if (clients.empty()) {
@@ -300,7 +300,10 @@ bool ResourceManagerServiceNew::getLowestPriorityBiggestClient_l(
 
     // Use the DefaultResourceModel to get all the clients with the resources requested.
     std::vector<MediaResourceParcel> resources{*resourceRequestInfo.mResource};
-    ReclaimRequestInfo reclaimRequestInfo{resourceRequestInfo.mCallingPid, 0, resources};
+    ReclaimRequestInfo reclaimRequestInfo{resourceRequestInfo.mCallingPid,
+                                          resourceRequestInfo.mClientId,
+                                          0, // default importance
+                                          resources};
     std::vector<ClientInfo> clients;
     mDefaultResourceModel->getAllClients(reclaimRequestInfo, clients);
 
