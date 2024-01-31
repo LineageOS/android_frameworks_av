@@ -17,6 +17,7 @@
 // Root soong_namespace for common components
 
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -30,10 +31,12 @@ prebuilt_etc {
     vendor: true,
     src: ":audio_policy_engine_criteria",
 }
+
 filegroup {
     name: "audio_policy_engine_criterion_types_template",
     srcs: ["example/common/audio_policy_engine_criterion_types.xml.in"],
 }
+
 filegroup {
     name: "audio_policy_engine_criteria",
     srcs: ["example/common/audio_policy_engine_criteria.xml"],

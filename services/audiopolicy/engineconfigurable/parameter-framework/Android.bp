@@ -17,6 +17,7 @@
 // Root soong_namespace for common components
 
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -31,18 +32,21 @@ prebuilt_etc {
     src: ":PolicyClass",
     sub_dir: "parameter-framework/Structure/Policy",
 }
+
 prebuilt_etc {
     name: "PolicySubsystem.xml",
     vendor: true,
     src: ":PolicySubsystem",
     sub_dir: "parameter-framework/Structure/Policy",
 }
+
 prebuilt_etc {
     name: "PolicySubsystem-CommonTypes.xml",
     vendor: true,
     src: ":buildcommontypesstructure_gen",
     sub_dir: "parameter-framework/Structure/Policy",
 }
+
 genrule {
     name: "buildcommontypesstructure_gen",
     defaults: ["buildcommontypesstructurerule"],
@@ -52,34 +56,42 @@ filegroup {
     name: "product_strategies_structure_template",
     srcs: ["examples/common/Structure/ProductStrategies.xml.in"],
 }
+
 filegroup {
     name: "PolicySubsystem",
     srcs: ["examples/common/Structure/PolicySubsystem.xml"],
 }
+
 filegroup {
     name: "PolicySubsystem-no-strategy",
     srcs: ["examples/common/Structure/PolicySubsystem-no-strategy.xml"],
 }
+
 filegroup {
     name: "common_types_structure_template",
     srcs: ["examples/common/Structure/PolicySubsystem-CommonTypes.xml.in"],
 }
+
 filegroup {
     name: "PolicyClass",
     srcs: ["examples/common/Structure/PolicyClass.xml"],
 }
+
 filegroup {
     name: "volumes.pfw",
     srcs: ["examples/Settings/volumes.pfw"],
 }
+
 filegroup {
     name: "device_for_input_source.pfw",
     srcs: ["examples/Settings/device_for_input_source.pfw"],
 }
+
 filegroup {
     name: "ParameterFrameworkConfigurationPolicy.userdebug.xml",
     srcs: ["examples/ParameterFrameworkConfigurationPolicy.userdebug.xml"],
 }
+
 filegroup {
     name: "ParameterFrameworkConfigurationPolicy.user.xml",
     srcs: ["examples/ParameterFrameworkConfigurationPolicy.user.xml"],
