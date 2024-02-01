@@ -100,7 +100,7 @@ class ReverbContext final : public EffectContext {
     }
     bool getReflectionsLevel() const { return mReflectionsLevelMb; }
 
-    IEffect::Status lvmProcess(float* in, float* out, int samples);
+    IEffect::Status process(float* in, float* out, int samples);
 
   private:
     static constexpr inline float kUnitVolume = 1;
