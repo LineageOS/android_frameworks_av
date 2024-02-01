@@ -33,6 +33,6 @@ aidl_interface {
         java: {
             enabled: true,
             platform_apis: true,
-        }
+        },
     },
 }

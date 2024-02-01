@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  *****************************************************************************/
- package {
+package {
     // See: http://go/android-license-faq
     default_applicable_licenses: ["Android-Apache-2.0"],
 }

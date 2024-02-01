@@ -54,7 +54,7 @@ cc_library_static {
         "util/EglProgram.cc",
         "util/EglSurfaceTexture.cc",
         "util/EglUtil.cc",
-        "util/Permissions.cc"
+        "util/Permissions.cc",
     ],
     defaults: [
         "libvirtualcamera_defaults",
