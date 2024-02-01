@@ -715,6 +715,11 @@ bool ResourceTracker::getNonConflictingClients(const ResourceRequestInfo& resour
     MediaResource::SubType subType = resourceRequestInfo.mResource->subType;
     for (auto& [pid, /* ResourceInfos */ infos] : mMap) {
         for (const auto& [id, /* ResourceInfo */ info] : infos) {
+            if (pid == resourceRequestInfo.mCallingPid && id == resourceRequestInfo.mClientId) {
+                ALOGI("%s: Skip the client[%jd] for which the resource request is made",
+                      __func__, id);
+                continue;
+            }
             if (hasResourceType(type, subType, info.resources)) {
                 if (!isCallingPriorityHigher(resourceRequestInfo.mCallingPid, pid)) {
                     // some higher/equal priority process owns the resource,
