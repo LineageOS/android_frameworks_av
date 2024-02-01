@@ -788,7 +788,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
     if (VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
                 parameters, String8(AudioParameter::keyOffloadCodecAverageBitRate),
                 [&](int value) {
-                    return value > 0 ?
+                    return value >= 0 ?
                             mOffloadMetadata.averageBitRatePerSecond = value, OK : BAD_VALUE;
                 }))) {
         updateMetadata = true;
