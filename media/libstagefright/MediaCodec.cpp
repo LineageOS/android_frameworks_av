@@ -300,7 +300,6 @@ static status_t generateFlagsFromAccessUnitInfo(
             return -EINVAL;
         }
         msg->setInt32("flags", bufferFlags);
-        msg->setObject("accessUnitInfo", bufferInfos);
     }
     return OK;
 }
@@ -3299,6 +3298,58 @@ status_t MediaCodec::queueSecureInputBuffer(
     return err;
 }
 
+status_t MediaCodec::queueSecureInputBuffers(
+        size_t index,
+        size_t offset,
+        size_t size,
+        const sp<BufferInfosWrapper> &auInfo,
+        const sp<CryptoInfosWrapper> &cryptoInfos,
+        AString *errorDetailMsg) {
+    if (errorDetailMsg != NULL) {
+        errorDetailMsg->clear();
+    }
+    sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
+    uint32_t bufferFlags = 0;
+    uint32_t flagsinAllAU = BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_CODECCONFIG;
+    uint32_t andFlags = flagsinAllAU;
+    if (auInfo == nullptr
+            || auInfo->value.empty()
+            || cryptoInfos == nullptr
+            || cryptoInfos->value.empty()) {
+        ALOGE("ERROR: Large Audio frame with no BufferInfo/CryptoInfo");
+        return BAD_VALUE;
+    }
+    int infoIdx = 0;
+    std::vector<AccessUnitInfo> &accessUnitInfo = auInfo->value;
+    int64_t minTimeUs = accessUnitInfo.front().mTimestamp;
+    bool foundEndOfStream = false;
+    for ( ; infoIdx < accessUnitInfo.size() && !foundEndOfStream; ++infoIdx) {
+        bufferFlags |= accessUnitInfo[infoIdx].mFlags;
+        andFlags &= accessUnitInfo[infoIdx].mFlags;
+        if (bufferFlags & BUFFER_FLAG_END_OF_STREAM) {
+            foundEndOfStream = true;
+        }
+    }
+    bufferFlags = bufferFlags & (andFlags | (~flagsinAllAU));
+    if (infoIdx != accessUnitInfo.size()) {
+        ALOGE("queueInputBuffers has incorrect access-units");
+        return -EINVAL;
+    }
+    msg->setSize("index", index);
+    msg->setSize("offset", offset);
+    msg->setSize("ssize", size);
+    msg->setInt64("timeUs", minTimeUs);
+    msg->setInt32("flags", bufferFlags);
+    msg->setObject("accessUnitInfo", auInfo);
+    msg->setObject("cryptoInfos", cryptoInfos);
+    msg->setPointer("errorDetailMsg", errorDetailMsg);
+
+    sp<AMessage> response;
+    status_t err = PostAndAwaitResponse(msg, &response);
+
+    return err;
+}
+
 status_t MediaCodec::queueBuffer(
         size_t index,
         const std::shared_ptr<C2Buffer> &buffer,
@@ -3320,6 +3371,7 @@ status_t MediaCodec::queueBuffer(
     if (OK != (err = generateFlagsFromAccessUnitInfo(msg, bufferInfos))) {
         return err;
     }
+    msg->setObject("accessUnitInfo", bufferInfos);
     if (tunings && tunings->countEntries() > 0) {
         msg->setMessage("tunings", tunings);
     }
@@ -3334,19 +3386,18 @@ status_t MediaCodec::queueEncryptedBuffer(
         size_t index,
         const sp<hardware::HidlMemory> &buffer,
         size_t offset,
-        const CryptoPlugin::SubSample *subSamples,
-        size_t numSubSamples,
-        const uint8_t key[16],
-        const uint8_t iv[16],
-        CryptoPlugin::Mode mode,
-        const CryptoPlugin::Pattern &pattern,
+        size_t size,
         const sp<BufferInfosWrapper> &bufferInfos,
+        const sp<CryptoInfosWrapper> &cryptoInfos,
         const sp<AMessage> &tunings,
         AString *errorDetailMsg) {
     if (errorDetailMsg != NULL) {
         errorDetailMsg->clear();
     }
     if (bufferInfos == nullptr || bufferInfos->value.empty()) {
+        return BAD_VALUE;
+    }
+    if (cryptoInfos == nullptr || cryptoInfos->value.empty()) {
         return BAD_VALUE;
     }
     status_t err = OK;
@@ -3356,13 +3407,9 @@ status_t MediaCodec::queueEncryptedBuffer(
         new WrapperObject<sp<hardware::HidlMemory>>{buffer}};
     msg->setObject("memory", memory);
     msg->setSize("offset", offset);
-    msg->setPointer("subSamples", (void *)subSamples);
-    msg->setSize("numSubSamples", numSubSamples);
-    msg->setPointer("key", (void *)key);
-    msg->setPointer("iv", (void *)iv);
-    msg->setInt32("mode", mode);
-    msg->setInt32("encryptBlocks", pattern.mEncryptBlocks);
-    msg->setInt32("skipBlocks", pattern.mSkipBlocks);
+    msg->setSize("ssize", size);
+    msg->setObject("cryptoInfos", cryptoInfos);
+    msg->setObject("accessUnitInfo", bufferInfos);
     if (OK != (err = generateFlagsFromAccessUnitInfo(msg, bufferInfos))) {
         return err;
     }
@@ -6072,22 +6119,26 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             mErrorLog.log(LOG_TAG, "queuing secure buffer without mCrypto or mDescrambler!");
             return -EINVAL;
         }
-        CHECK(msg->findPointer("subSamples", (void **)&subSamples));
-        CHECK(msg->findSize("numSubSamples", &numSubSamples));
-        CHECK(msg->findPointer("key", (void **)&key));
-        CHECK(msg->findPointer("iv", (void **)&iv));
-        CHECK(msg->findInt32("encryptBlocks", (int32_t *)&pattern.mEncryptBlocks));
-        CHECK(msg->findInt32("skipBlocks", (int32_t *)&pattern.mSkipBlocks));
+        sp<RefBase> obj;
+        if (msg->findObject("cryptoInfos", &obj)) {
+            CHECK(msg->findSize("ssize", &size));
+        } else {
+            CHECK(msg->findPointer("subSamples", (void **)&subSamples));
+            CHECK(msg->findSize("numSubSamples", &numSubSamples));
+            CHECK(msg->findPointer("key", (void **)&key));
+            CHECK(msg->findPointer("iv", (void **)&iv));
+            CHECK(msg->findInt32("encryptBlocks", (int32_t *)&pattern.mEncryptBlocks));
+            CHECK(msg->findInt32("skipBlocks", (int32_t *)&pattern.mSkipBlocks));
 
-        int32_t tmp;
-        CHECK(msg->findInt32("mode", &tmp));
+            int32_t tmp;
+            CHECK(msg->findInt32("mode", &tmp));
 
-        mode = (CryptoPlugin::Mode)tmp;
-
-        size = 0;
-        for (size_t i = 0; i < numSubSamples; ++i) {
-            size += subSamples[i].mNumBytesOfClearData;
-            size += subSamples[i].mNumBytesOfEncryptedData;
+            mode = (CryptoPlugin::Mode)tmp;
+            size = 0;
+            for (size_t i = 0; i < numSubSamples; ++i) {
+                size += subSamples[i].mNumBytesOfClearData;
+                size += subSamples[i].mNumBytesOfEncryptedData;
+            }
         }
     }
 
@@ -6114,7 +6165,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         status_t err = OK;
         sp<RefBase> obj;
         if (msg->findObject("accessUnitInfo", &obj)) {
-                buffer->meta()->setObject("accessUnitInfo", obj);
+            buffer->meta()->setObject("accessUnitInfo", obj);
         }
         buffer->meta()->setInt64("timeUs", timeUs);
         if (flags & BUFFER_FLAG_EOS) {
@@ -6152,35 +6203,48 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
      return err;
     };
     auto buildCryptoInfoAMessage = [&](const sp<AMessage> & cryptoInfo, int32_t action) {
-        size_t key_len = (key != nullptr)? 16 : 0;
-        size_t iv_len = (iv != nullptr)? 16 : 0;
-        sp<ABuffer> shared_key;
-        sp<ABuffer> shared_iv;
-        if (key_len > 0) {
-            shared_key = ABuffer::CreateAsCopy((void*)key, key_len);
-        }
-        if (iv_len > 0) {
-            shared_iv = ABuffer::CreateAsCopy((void*)iv, iv_len);
-        }
-        sp<ABuffer> subSamples_buffer =
-            new ABuffer(sizeof(CryptoPlugin::SubSample) * numSubSamples);
-        CryptoPlugin::SubSample * samples =
-           (CryptoPlugin::SubSample *)(subSamples_buffer.get()->data());
-        for (int s = 0 ; s < numSubSamples ; s++) {
-            samples[s].mNumBytesOfClearData = subSamples[s].mNumBytesOfClearData;
-            samples[s].mNumBytesOfEncryptedData = subSamples[s].mNumBytesOfEncryptedData;
-        }
         // set decrypt Action
         cryptoInfo->setInt32("action", action);
         cryptoInfo->setObject("buffer", buffer);
         cryptoInfo->setInt32("secure", mFlags & kFlagIsSecure);
-        cryptoInfo->setBuffer("key", shared_key);
-        cryptoInfo->setBuffer("iv", shared_iv);
-        cryptoInfo->setInt32("mode", (int)mode);
-        cryptoInfo->setInt32("encryptBlocks", pattern.mEncryptBlocks);
-        cryptoInfo->setInt32("skipBlocks", pattern.mSkipBlocks);
-        cryptoInfo->setBuffer("subSamples", subSamples_buffer);
-        cryptoInfo->setSize("numSubSamples", numSubSamples);
+        sp<RefBase> obj;
+        if (msg->findObject("cryptoInfos", &obj)) {
+            sp<CryptoInfosWrapper> infos{(CryptoInfosWrapper*)obj.get()};
+            sp<CryptoInfosWrapper> asyncInfos{
+                    new CryptoInfosWrapper(std::vector<std::unique_ptr<CodecCryptoInfo>>())};
+            for (std::unique_ptr<CodecCryptoInfo> &info : infos->value) {
+                if (info) {
+                    asyncInfos->value.emplace_back(new CryptoAsync::CryptoAsyncInfo(info));
+                }
+            }
+            buffer->meta()->setObject("cryptoInfos", asyncInfos);
+        } else {
+            size_t key_len = (key != nullptr)? 16 : 0;
+            size_t iv_len = (iv != nullptr)? 16 : 0;
+            sp<ABuffer> shared_key;
+            sp<ABuffer> shared_iv;
+            if (key_len > 0) {
+                shared_key = ABuffer::CreateAsCopy((void*)key, key_len);
+            }
+            if (iv_len > 0) {
+                shared_iv = ABuffer::CreateAsCopy((void*)iv, iv_len);
+            }
+            sp<ABuffer> subSamples_buffer =
+                new ABuffer(sizeof(CryptoPlugin::SubSample) * numSubSamples);
+            CryptoPlugin::SubSample * samples =
+               (CryptoPlugin::SubSample *)(subSamples_buffer.get()->data());
+            for (int s = 0 ; s < numSubSamples ; s++) {
+                samples[s].mNumBytesOfClearData = subSamples[s].mNumBytesOfClearData;
+                samples[s].mNumBytesOfEncryptedData = subSamples[s].mNumBytesOfEncryptedData;
+            }
+            cryptoInfo->setBuffer("key", shared_key);
+            cryptoInfo->setBuffer("iv", shared_iv);
+            cryptoInfo->setInt32("mode", (int)mode);
+            cryptoInfo->setInt32("encryptBlocks", pattern.mEncryptBlocks);
+            cryptoInfo->setInt32("skipBlocks", pattern.mSkipBlocks);
+            cryptoInfo->setBuffer("subSamples", subSamples_buffer);
+            cryptoInfo->setSize("numSubSamples", numSubSamples);
+        }
     };
     if (c2Buffer || memory) {
         sp<AMessage> tunings = NULL;
@@ -6190,15 +6254,37 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         status_t err = OK;
         if (c2Buffer) {
             err = mBufferChannel->attachBuffer(c2Buffer, buffer);
+            // to prevent unnecessary copy for single info case.
+            if (msg->findObject("accessUnitInfo", &obj)) {
+                sp<BufferInfosWrapper> infos{(BufferInfosWrapper*)(obj.get())};
+                if (infos->value.size() == 1) {
+                   msg->removeEntryByName("accessUnitInfo");
+                }
+            }
         } else if (memory) {
             AString errorDetailMsg;
-            err = mBufferChannel->attachEncryptedBuffer(
-                    memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
-                    offset, subSamples, numSubSamples, buffer, &errorDetailMsg);
+            if (msg->findObject("cryptoInfos", &obj)) {
+                buffer->meta()->setSize("ssize", size);
+                buffer->meta()->setObject("cryptoInfos", obj);
+                if (msg->findObject("accessUnitInfo", &obj)) {
+                    // the reference will be same here and
+                    // setBufferParams
+                    buffer->meta()->setObject("accessUnitInfo", obj);
+                }
+                err = mBufferChannel->attachEncryptedBuffers(
+                    memory,
+                    offset,
+                    buffer,
+                    (mFlags & kFlagIsSecure),
+                    &errorDetailMsg);
+            } else {
+                err = mBufferChannel->attachEncryptedBuffer(
+                        memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
+                        offset, subSamples, numSubSamples, buffer, &errorDetailMsg);
+            }
             if (err != OK && hasCryptoOrDescrambler()
                     && (mFlags & kFlagUseCryptoAsync)) {
                 // create error detail
-                AString errorDetailMsg;
                 sp<AMessage> cryptoErrorInfo = new AMessage();
                 buildCryptoInfoAMessage(cryptoErrorInfo, CryptoAsync::kActionDecrypt);
                 cryptoErrorInfo->setInt32("err", err);
@@ -6270,10 +6356,17 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             }
         }
         if (mCryptoAsync) {
+            // TODO b/316565675 - enable async path for audio
             // prepare a message and enqueue
             sp<AMessage> cryptoInfo = new AMessage();
             buildCryptoInfoAMessage(cryptoInfo, CryptoAsync::kActionDecrypt);
             mCryptoAsync->decrypt(cryptoInfo);
+        } else if (msg->findObject("cryptoInfos", &obj)) {
+                buffer->meta()->setObject("cryptoInfos", obj);
+                err = mBufferChannel->queueSecureInputBuffers(
+                        buffer,
+                        (mFlags & kFlagIsSecure),
+                        errorDetailMsg);
         } else {
             err = mBufferChannel->queueSecureInputBuffer(
                 buffer,
@@ -6647,7 +6740,7 @@ void MediaCodec::onOutputBufferAvailable() {
         if (accessUnitInfoObj) {
             outputCallbackID = CB_LARGE_FRAME_OUTPUT_AVAILABLE;
             msg->setObject("accessUnitInfo", accessUnitInfoObj);
-             sp<BufferInfosWrapper> auInfo(
+            sp<BufferInfosWrapper> auInfo(
                     (decltype(auInfo.get()))accessUnitInfoObj.get());
              auInfo->value.back().mFlags |= flags & BUFFER_FLAG_END_OF_STREAM;
         }
