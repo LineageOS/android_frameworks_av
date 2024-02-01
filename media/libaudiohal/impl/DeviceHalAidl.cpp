@@ -1024,11 +1024,15 @@ status_t DeviceHalAidl::filterAndUpdateBtA2dpParameters(AudioParameter &paramete
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
                     parameters, String8(AudioParameter::keyReconfigA2dp),
                     [&](const String8& value) -> status_t {
-                        std::vector<VendorParameter> result;
-                        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                                mVendorExt->parseBluetoothA2dpReconfigureOffload(
-                                        std::string(value.c_str()), &result)));
-                        reconfigureOffload = std::move(result);
+                        if (mVendorExt != nullptr) {
+                            std::vector<VendorParameter> result;
+                            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                                    mVendorExt->parseBluetoothA2dpReconfigureOffload(
+                                            std::string(value.c_str()), &result)));
+                            reconfigureOffload = std::move(result);
+                        } else {
+                            reconfigureOffload = std::vector<VendorParameter>();
+                        }
                         return OK;
                     }));
     if (mBluetoothA2dp != nullptr && a2dpEnabled.has_value()) {
