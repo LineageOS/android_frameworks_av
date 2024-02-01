@@ -3318,7 +3318,11 @@ ThreadBase::MetadataUpdate PlaybackThread::updateMetadata_l()
         return {}; // nothing to do
     }
     StreamOutHalInterface::SourceMetadata metadata;
-    if (com_android_media_audio_stereo_spatialization()) {
+    static const bool stereo_spatialization_property =
+            property_get_bool("ro.audio.stereo_spatialization_enabled", false);
+    const bool stereo_spatialization_enabled =
+            stereo_spatialization_property && com_android_media_audio_stereo_spatialization();
+    if (stereo_spatialization_enabled) {
         std::map<audio_session_t, std::vector<playback_track_metadata_v7_t> >allSessionsMetadata;
         for (const sp<IAfTrack>& track : mActiveTracks) {
             std::vector<playback_track_metadata_v7_t>& sessionMetadata =
