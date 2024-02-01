@@ -74,6 +74,14 @@ MetadataBuilder& MetadataBuilder::setLensFacing(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setSensorReadoutTimestamp(
+    const camera_metadata_enum_android_sensor_readout_timestamp_t
+        sensorReadoutTimestamp) {
+  mEntryMap[ANDROID_SENSOR_READOUT_TIMESTAMP] =
+      std::vector<uint8_t>({static_cast<uint8_t>(sensorReadoutTimestamp)});
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setSensorOrientation(int32_t sensorOrientation) {
   mEntryMap[ANDROID_SENSOR_ORIENTATION] =
       std::vector<int32_t>({sensorOrientation});

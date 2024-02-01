@@ -73,6 +73,11 @@ class MetadataBuilder {
   MetadataBuilder& setLensFacing(
       camera_metadata_enum_android_lens_facing lensFacing);
 
+  // See ANDROID_SENSOR_READOUT_TIMESTAMP in CameraMetadataTag.aidl.
+  MetadataBuilder& setSensorReadoutTimestamp(
+      camera_metadata_enum_android_sensor_readout_timestamp_t
+          sensorReadoutTimestamp);
+
   // See ANDROID_SENSOR_ORIENTATION in CameraMetadataTag.aidl.
   MetadataBuilder& setSensorOrientation(int32_t sensorOrientation);
 

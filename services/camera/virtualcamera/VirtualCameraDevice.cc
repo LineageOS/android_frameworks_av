@@ -152,6 +152,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setLensFacing(
               static_cast<camera_metadata_enum_android_lens_facing>(lensFacing))
           .setSensorOrientation(static_cast<int32_t>(sensorOrientation))
+          .setSensorReadoutTimestamp(
+              ANDROID_SENSOR_READOUT_TIMESTAMP_NOT_SUPPORTED)
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
           .setControlAvailableModes({ANDROID_CONTROL_MODE_AUTO})
