@@ -173,6 +173,14 @@ class MetadataBuilder {
   // See ANDROID_JPEG_SIZE in CameraMetadataTag.aidl.
   MetadataBuilder& setMaxJpegSize(int32_t size);
 
+  // The maximum numbers of different types of output streams
+  // that can be configured and used simultaneously by a camera device.
+  //
+  // See ANDROID_REQUEST_MAX_NUM_OUTPUT_STREAMS in CameraMetadataTag.aidl.
+  MetadataBuilder& setMaxNumberOutputStreams(int32_t maxRawStreams,
+                                             int32_t maxProcessedStreams,
+                                             int32_t maxStallStreams);
+
   // See ANDROID_SYNC_MAX_LATENCY in CameraMetadataTag.aidl.
   MetadataBuilder& setSyncMaxLatency(
       camera_metadata_enum_android_sync_max_latency setSyncMaxLatency);

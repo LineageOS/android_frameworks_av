@@ -240,6 +240,14 @@ MetadataBuilder& MetadataBuilder::setMaxJpegSize(const int32_t size) {
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setMaxNumberOutputStreams(
+    const int32_t maxRawStreams, const int32_t maxProcessedStreams,
+    const int32_t maxStallStreams) {
+  mEntryMap[ANDROID_REQUEST_MAX_NUM_OUTPUT_STREAMS] = std::vector<int32_t>(
+      {maxRawStreams, maxProcessedStreams, maxStallStreams});
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setSyncMaxLatency(
     camera_metadata_enum_android_sync_max_latency latency) {
   mEntryMap[ANDROID_SYNC_MAX_LATENCY] =

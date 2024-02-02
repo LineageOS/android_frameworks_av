@@ -72,10 +72,9 @@ constexpr int32_t kMaxJpegSize = 3 * 1024 * 1024 /*3MiB*/;
 
 constexpr MetadataBuilder::ControlRegion kDefaultEmptyControlRegion{};
 
-const std::array<int32_t, 3> kOutputFormats{
-    ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
-    ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888,
-    ANDROID_SCALER_AVAILABLE_FORMATS_BLOB};
+const std::array<PixelFormat, 3> kOutputFormats{
+    PixelFormat::IMPLEMENTATION_DEFINED, PixelFormat::YCBCR_420_888,
+    PixelFormat::BLOB};
 
 struct Resolution {
   Resolution(const int w, const int h) : width(w), height(h) {
@@ -92,6 +91,11 @@ struct Resolution {
   const int width;
   const int height;
 };
+
+bool isSupportedOutputFormat(const PixelFormat pixelFormat) {
+  return std::find(kOutputFormats.begin(), kOutputFormats.end(), pixelFormat) !=
+         kOutputFormats.end();
+}
 
 std::optional<Resolution> getMaxResolution(
     const std::vector<SupportedStreamConfiguration>& configs) {
@@ -172,6 +176,10 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setControlAvailableAwbModes({ANDROID_CONTROL_AWB_MODE_AUTO})
           .setControlZoomRatioRange(/*min=*/1.0, /*max=*/1.0)
           .setMaxJpegSize(kMaxJpegSize)
+          .setMaxNumberOutputStreams(
+              VirtualCameraDevice::kMaxNumberOfRawStreams,
+              VirtualCameraDevice::kMaxNumberOfProcessedStreams,
+              VirtualCameraDevice::kMaxNumberOfStallStreams)
           .setSyncMaxLatency(ANDROID_SYNC_MAX_LATENCY_UNKNOWN)
           .setAvailableRequestKeys({})
           .setAvailableRequestKeys({ANDROID_CONTROL_AF_MODE})
@@ -198,7 +206,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
       getResolutionToMaxFpsMap(supportedInputConfig);
 
   // Add configurations for all unique input resolutions and output formats.
-  for (int32_t format : kOutputFormats) {
+  for (const PixelFormat format : kOutputFormats) {
     std::transform(
         resolutionToMaxFpsMap.begin(), resolutionToMaxFpsMap.end(),
         std::back_inserter(outputConfigurations), [format](const auto& entry) {
@@ -207,7 +215,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           return MetadataBuilder::StreamConfiguration{
               .width = resolution.width,
               .height = resolution.height,
-              .format = format,
+              .format = static_cast<int32_t>(format),
               .minFrameDuration = std::chrono::nanoseconds(1s) / maxFps,
               .minStallDuration = 0s};
         });
@@ -297,6 +305,8 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
     return false;
   }
 
+  int numberOfProcessedStreams = 0;
+  int numberOfStallStreams = 0;
   for (const Stream& stream : streamConfiguration.streams) {
     ALOGV("%s: Configuration queried: %s", __func__, stream.toString().c_str());
 
@@ -305,13 +315,16 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
       return false;
     }
 
-    // TODO(b/301023410) remove hardcoded format checks, verify against configuration.
     if (stream.rotation != StreamRotation::ROTATION_0 ||
-        (stream.format != PixelFormat::IMPLEMENTATION_DEFINED &&
-         stream.format != PixelFormat::YCBCR_420_888 &&
-         stream.format != PixelFormat::BLOB)) {
+        !isSupportedOutputFormat(stream.format)) {
       ALOGV("Unsupported output stream type");
       return false;
+    }
+
+    if (stream.format == PixelFormat::BLOB) {
+      numberOfStallStreams++;
+    } else {
+      numberOfProcessedStreams++;
     }
 
     auto matchesSupportedInputConfig =
@@ -325,6 +338,19 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
       return false;
     }
   }
+
+  if (numberOfProcessedStreams > kMaxNumberOfProcessedStreams) {
+    ALOGE("%s: %d processed streams exceeds the supported maximum of %d",
+          __func__, numberOfProcessedStreams, kMaxNumberOfProcessedStreams);
+    return false;
+  }
+
+  if (numberOfStallStreams > kMaxNumberOfStallStreams) {
+    ALOGE("%s: %d stall streams exceeds the supported maximum of %d", __func__,
+          numberOfStallStreams, kMaxNumberOfStallStreams);
+    return false;
+  }
+
   return true;
 }
 
