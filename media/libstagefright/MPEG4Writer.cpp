@@ -2454,6 +2454,11 @@ bool MPEG4Writer::Track::isTimestampValid(int64_t timeUs) {
         return true;
     }
 
+    // Make sure abs(timeUs) does not overflow
+    if (timeUs == INT64_MIN) {
+       return false;
+    }
+
     // Ensure that the timeUs value does not have extremely low or high values
     // that would cause an underflow or overflow, like in the calculation -
     // mdhdDuration = (trakDurationUs * mTimeScale + 5E5) / 1E6
