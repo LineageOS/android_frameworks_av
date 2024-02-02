@@ -4839,30 +4839,32 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
                 }
             }
-            int32_t largeFrameParam;
-            if (format->findInt32(KEY_BUFFER_BATCH_MAX_OUTPUT_SIZE, &largeFrameParam) ||
+            int32_t largeFrameParamMax = 0, largeFrameParamThreshold = 0;
+            if (format->findInt32(KEY_BUFFER_BATCH_MAX_OUTPUT_SIZE, &largeFrameParamMax) ||
                     format->findInt32(KEY_BUFFER_BATCH_THRESHOLD_OUTPUT_SIZE,
-                    &largeFrameParam)) {
-                if(mComponentName.startsWith("OMX")) {
-                    mErrorLog.log(LOG_TAG,
-                            "Large Frame params are not supported on OMX codecs."
-                            "Currently only supported on C2 audio codec.");
-                    PostReplyWithError(replyID, INVALID_OPERATION);
-                    break;
-                }
-                AString mime;
-                CHECK(format->findString("mime", &mime));
-                if (!mime.startsWith("audio")) {
-                    mErrorLog.log(LOG_TAG,
-                            "Large Frame params only works with audio codec");
-                    PostReplyWithError(replyID, INVALID_OPERATION);
-                    break;
-                }
-                if (!(mFlags & kFlagIsAsync)) {
-                        mErrorLog.log(LOG_TAG, "Large Frame audio" \
-                                "config works only with async mode");
-                    PostReplyWithError(replyID, INVALID_OPERATION);
-                    break;
+                    &largeFrameParamThreshold)) {
+                if (largeFrameParamMax > 0 || largeFrameParamThreshold > 0) {
+                    if(mComponentName.startsWith("OMX")) {
+                        mErrorLog.log(LOG_TAG,
+                                "Large Frame params are not supported on OMX codecs."
+                                "Currently only supported on C2 audio codec.");
+                        PostReplyWithError(replyID, INVALID_OPERATION);
+                        break;
+                    }
+                    AString mime;
+                    CHECK(format->findString("mime", &mime));
+                    if (!mime.startsWith("audio")) {
+                        mErrorLog.log(LOG_TAG,
+                                "Large Frame params only works with audio codec");
+                        PostReplyWithError(replyID, INVALID_OPERATION);
+                        break;
+                    }
+                    if (!(mFlags & kFlagIsAsync)) {
+                            mErrorLog.log(LOG_TAG, "Large Frame audio" \
+                                    "config works only with async mode");
+                        PostReplyWithError(replyID, INVALID_OPERATION);
+                        break;
+                    }
                 }
             }
 
