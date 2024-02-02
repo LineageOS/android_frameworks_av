@@ -474,6 +474,7 @@ bool ResourceManagerService::getTargetClients(
         const std::vector<MediaResourceParcel>& resources,
         std::vector<ClientInfo>& targetClients) {
     int32_t callingPid = clientInfo.pid;
+    int64_t clientId = clientInfo.id;
     std::scoped_lock lock{mLock};
     if (!mProcessInfo->isPidTrusted(callingPid)) {
         pid_t actualCallingPid = IPCThreadState::self()->getCallingPid();
@@ -508,7 +509,7 @@ bool ResourceManagerService::getTargetClients(
     if (secureCodec != NULL) {
         MediaResourceParcel mediaResource{.type = MediaResource::Type::kSecureCodec,
                                           .subType = secureCodec->subType};
-        ResourceRequestInfo resourceRequestInfo{callingPid, &mediaResource};
+        ResourceRequestInfo resourceRequestInfo{callingPid, clientId, &mediaResource};
         if (!mSupportsMultipleSecureCodecs) {
             if (!getAllClients_l(resourceRequestInfo, targetClients)) {
                 return false;
@@ -525,7 +526,7 @@ bool ResourceManagerService::getTargetClients(
         if (!mSupportsSecureWithNonSecureCodec) {
             MediaResourceParcel mediaResource{.type = MediaResource::Type::kSecureCodec,
                                               .subType = nonSecureCodec->subType};
-            ResourceRequestInfo resourceRequestInfo{callingPid, &mediaResource};
+            ResourceRequestInfo resourceRequestInfo{callingPid, clientId, &mediaResource};
             if (!getAllClients_l(resourceRequestInfo, targetClients)) {
                 return false;
             }
@@ -533,7 +534,7 @@ bool ResourceManagerService::getTargetClients(
     }
 
     if (drmSession != NULL) {
-        ResourceRequestInfo resourceRequestInfo{callingPid, drmSession};
+        ResourceRequestInfo resourceRequestInfo{callingPid, clientId, drmSession};
         getClientForResource_l(resourceRequestInfo, targetClients);
         if (targetClients.size() == 0) {
             return false;
@@ -542,18 +543,18 @@ bool ResourceManagerService::getTargetClients(
 
     if (targetClients.size() == 0 && graphicMemory != nullptr) {
         // if no secure/non-secure codec conflict, run second pass to handle other resources.
-        ResourceRequestInfo resourceRequestInfo{callingPid, graphicMemory};
+        ResourceRequestInfo resourceRequestInfo{callingPid, clientId, graphicMemory};
         getClientForResource_l(resourceRequestInfo, targetClients);
     }
 
     if (targetClients.size() == 0) {
         // if we are here, run the third pass to free one codec with the same type.
         if (secureCodec != nullptr) {
-            ResourceRequestInfo resourceRequestInfo{callingPid, secureCodec};
+            ResourceRequestInfo resourceRequestInfo{callingPid, clientId, secureCodec};
             getClientForResource_l(resourceRequestInfo, targetClients);
         }
         if (nonSecureCodec != nullptr) {
-            ResourceRequestInfo resourceRequestInfo{callingPid, nonSecureCodec};
+            ResourceRequestInfo resourceRequestInfo{callingPid, clientId, nonSecureCodec};
             getClientForResource_l(resourceRequestInfo, targetClients);
         }
     }
@@ -562,12 +563,12 @@ bool ResourceManagerService::getTargetClients(
         // if we are here, run the fourth pass to free one codec with the different type.
         if (secureCodec != nullptr) {
             MediaResource temp(MediaResource::Type::kNonSecureCodec, secureCodec->subType, 1);
-            ResourceRequestInfo resourceRequestInfo{callingPid, &temp};
+            ResourceRequestInfo resourceRequestInfo{callingPid, clientId, &temp};
             getClientForResource_l(resourceRequestInfo, targetClients);
         }
         if (nonSecureCodec != nullptr) {
             MediaResource temp(MediaResource::Type::kSecureCodec, nonSecureCodec->subType, 1);
-            ResourceRequestInfo resourceRequestInfo{callingPid, &temp};
+            ResourceRequestInfo resourceRequestInfo{callingPid, clientId, &temp};
             getClientForResource_l(resourceRequestInfo, targetClients);
         }
     }
@@ -914,6 +915,11 @@ bool ResourceManagerService::getAllClients_l(
 
     for (auto& [pid, infos] : mMap) {
         for (const auto& [id, info] : infos) {
+            if (pid == resourceRequestInfo.mCallingPid && id == resourceRequestInfo.mClientId) {
+                ALOGI("%s: Skip the client[%jd] for which the resource request is made",
+                      __func__, id);
+                continue;
+            }
             if (hasResourceType(type, subType, info.resources)) {
                 if (!isCallingPriorityHigher_l(resourceRequestInfo.mCallingPid, pid)) {
                     // some higher/equal priority process owns the resource,

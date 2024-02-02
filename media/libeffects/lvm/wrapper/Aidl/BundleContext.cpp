@@ -854,21 +854,34 @@ IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
             LOG(DEBUG) << "Effect_process() processing last frame";
         }
         mNumberEffectsCalled = 0;
-        float* outTmp = (accumulate ? getWorkBuffer() : out);
-        /* Process the samples */
-        LVM_ReturnStatus_en lvmStatus;
-        {
-            std::lock_guard lg(mMutex);
-
-            lvmStatus = LVM_Process(mInstance, in, outTmp, inputFrameCount, 0);
-            if (lvmStatus != LVM_SUCCESS) {
-                LOG(ERROR) << __func__ << lvmStatus;
-                return {EX_UNSUPPORTED_OPERATION, 0, 0};
-            }
-            if (accumulate) {
-                for (int i = 0; i < samples; i++) {
-                    out[i] += outTmp[i];
+        int frames = samples * sizeof(float) / frameSize;
+        int bufferIndex = 0;
+        // LVM library supports max of int16_t frames at a time and should be multiple of
+        // kBlockSizeMultiple.
+        constexpr int kBlockSizeMultiple = 4;
+        constexpr int kMaxBlockFrames =
+                (std::numeric_limits<int16_t>::max() / kBlockSizeMultiple) * kBlockSizeMultiple;
+        while (frames > 0) {
+            float* outTmp = (accumulate ? getWorkBuffer() : out);
+            /* Process the samples */
+            LVM_ReturnStatus_en lvmStatus;
+            {
+                std::lock_guard lg(mMutex);
+                int processFrames = std::min(frames, kMaxBlockFrames);
+                lvmStatus = LVM_Process(mInstance, in + bufferIndex, outTmp + bufferIndex,
+                                        processFrames, 0);
+                if (lvmStatus != LVM_SUCCESS) {
+                    LOG(ERROR) << "LVM lib failed with error: " << lvmStatus;
+                    return {EX_UNSUPPORTED_OPERATION, 0, 0};
                 }
+                if (accumulate) {
+                    for (int i = 0; i < samples; i++) {
+                        out[i] += outTmp[i];
+                    }
+                }
+                frames -= processFrames;
+                int processedSize = processFrames * frameSize / sizeof(float);
+                bufferIndex += processedSize;
             }
         }
     } else {

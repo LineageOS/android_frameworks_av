@@ -165,6 +165,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(TestClient);
 };
 
+// [pid, uid] used by the test.
 static const int kTestPid1 = 30;
 static const int kTestUid1 = 1010;
 
@@ -175,6 +176,12 @@ static const int kLowPriorityPid = 40;
 static const int kMidPriorityPid = 25;
 static const int kHighPriorityPid = 10;
 
+// Client Ids used by the test.
+static const int kLowPriorityClientId = 1111;
+static const int kMidPriorityClientId = 2222;
+static const int kHighPriorityClientId = 3333;
+
+// Client importance used by the test.
 static const int32_t kHighestCodecImportance = 0;
 static const int32_t kLowestCodecImportance = 100;
 static const int32_t kMidCodecImportance = 50;

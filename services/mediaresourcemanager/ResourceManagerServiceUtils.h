@@ -166,11 +166,13 @@ struct ResourceInfo {
 /*
  * Resource Reclaim request info that encapsulates
  *  - the calling/requesting process pid.
+ *  - id of the client that made reclaim request.
  *  - the calling/requesting client's importance.
  *  - the list of resources requesting (to be reclaimed from others)
  */
 struct ReclaimRequestInfo {
     int mCallingPid = -1;
+    int64_t mClientId = 0;
     uint32_t mCallingClientImportance = 0;
     const std::vector<::aidl::android::media::MediaResourceParcel>& mResources;
 };
@@ -178,11 +180,14 @@ struct ReclaimRequestInfo {
 /*
  * Resource request info that encapsulates
  *  - the calling/requesting process pid.
+ *  - the calling/requesting client's id.
  *  - the resource requesting (to be reclaimed from others)
  */
 struct ResourceRequestInfo {
     // pid of the calling/requesting process.
     int mCallingPid = -1;
+    // id of the calling/requesting client.
+    int64_t mClientId = 0;
     // resources requested.
     const ::aidl::android::media::MediaResourceParcel* mResource;
 };

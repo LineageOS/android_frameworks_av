@@ -44,7 +44,9 @@ bool DefaultResourceModel::getAllClients(
     clients.clear();
     MediaResourceParcel mediaResource{.type = reclimRequestInfo.mResources[0].type,
                                       .subType = reclimRequestInfo.mResources[0].subType};
-    ResourceRequestInfo resourceRequestInfo{reclimRequestInfo.mCallingPid, &mediaResource};
+    ResourceRequestInfo resourceRequestInfo{reclimRequestInfo.mCallingPid,
+                                            reclimRequestInfo.mClientId,
+                                            &mediaResource};
 
     // Resolve the secure-unsecure codec conflicts if there is any.
     switch (reclimRequestInfo.mResources[0].type) {
@@ -116,7 +118,9 @@ bool DefaultResourceModel::getCodecClients(
         const ReclaimRequestInfo& reclimRequestInfo,
         std::vector<ClientInfo>& clients) {
     MediaResourceParcel mediaResource;
-    ResourceRequestInfo resourceRequestInfo{reclimRequestInfo.mCallingPid, &mediaResource};
+    ResourceRequestInfo resourceRequestInfo{reclimRequestInfo.mCallingPid,
+                                            reclimRequestInfo.mClientId,
+                                            &mediaResource};
 
     // 1. Look to find the client(s) with the other resources, for the given
     // primary type.
