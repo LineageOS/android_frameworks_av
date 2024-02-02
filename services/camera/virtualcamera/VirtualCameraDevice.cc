@@ -151,9 +151,11 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setFlashAvailable(false)
           .setLensFacing(
               static_cast<camera_metadata_enum_android_lens_facing>(lensFacing))
+          .setFocalLength(43.0)
           .setSensorOrientation(static_cast<int32_t>(sensorOrientation))
           .setSensorReadoutTimestamp(
               ANDROID_SENSOR_READOUT_TIMESTAMP_NOT_SUPPORTED)
+          .setSensorPhysicalSize(36.0, 24.0)
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
           .setControlAvailableModes({ANDROID_CONTROL_MODE_AUTO})
@@ -188,6 +190,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
   }
   builder.setSensorActiveArraySize(0, 0, maxResolution->width,
                                    maxResolution->height);
+  builder.setSensorPixelArraySize(maxResolution->width, maxResolution->height);
 
   std::vector<MetadataBuilder::StreamConfiguration> outputConfigurations;
 

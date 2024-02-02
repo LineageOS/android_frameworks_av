@@ -78,6 +78,10 @@ class MetadataBuilder {
       camera_metadata_enum_android_sensor_readout_timestamp_t
           sensorReadoutTimestamp);
 
+  // See ANDROID_LENS_FOCAL_LENGTH and ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS
+  // in CameraMetadataTag.aidl.
+  MetadataBuilder& setFocalLength(float focalLength);
+
   // See ANDROID_SENSOR_ORIENTATION in CameraMetadataTag.aidl.
   MetadataBuilder& setSensorOrientation(int32_t sensorOrientation);
 
@@ -89,6 +93,12 @@ class MetadataBuilder {
 
   // See ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE in CameraMetadataTag.aidl.
   MetadataBuilder& setSensorActiveArraySize(int x0, int y0, int x1, int y1);
+
+  // See ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE in CameraMetadataTag.aidl.
+  MetadataBuilder& setSensorPixelArraySize(int width, int height);
+
+  // See ANDROID_SENSOR_INFO_PHYSICAL_SIZE in CameraMetadataTag.aidl.
+  MetadataBuilder& setSensorPhysicalSize(float width, float height);
 
   // See ANDROID_STATISTICS_FACE_DETECT_MODE in CameraMetadataTag.aidl.
   MetadataBuilder& setAvailableFaceDetectModes(
