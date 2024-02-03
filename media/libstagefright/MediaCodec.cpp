@@ -2254,7 +2254,10 @@ static const char enableMediaFormatShapingProperty[] = "debug.stagefright.enable
 static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
                       bool reverse);
 
-mediametrics_handle_t MediaCodec::createMediaMetrics(const sp<AMessage>& format, uint32_t flags) {
+mediametrics_handle_t MediaCodec::createMediaMetrics(const sp<AMessage>& format,
+                                                     uint32_t flags,
+                                                     status_t* err) {
+    *err = OK;
     mediametrics_handle_t nextMetricsHandle = mediametrics_create(kCodecKeyName);
     bool isEncoder = (flags & CONFIGURE_FLAG_ENCODE);
 
@@ -2334,7 +2337,9 @@ mediametrics_handle_t MediaCodec::createMediaMetrics(const sp<AMessage>& format,
             mErrorLog.log(LOG_TAG, base::StringPrintf(
                     "Invalid size(s), width=%d, height=%d", mWidth, mHeight));
             mediametrics_delete(nextMetricsHandle);
-            return BAD_VALUE;
+            // Set the error code and return null handle.
+            *err = BAD_VALUE;
+            return 0;
         }
 
     } else {
@@ -2417,7 +2422,11 @@ status_t MediaCodec::configure(
     updateCodecImportance(format);
 
     // Create and set up metrics for this codec.
-    mediametrics_handle_t nextMetricsHandle = createMediaMetrics(format, flags);
+    status_t err = OK;
+    mediametrics_handle_t nextMetricsHandle = createMediaMetrics(format, flags, &err);
+    if (err != OK) {
+        return err;
+    }
 
     sp<AMessage> msg = new AMessage(kWhatConfigure, this);
     msg->setMessage("format", format);
@@ -2452,7 +2461,6 @@ status_t MediaCodec::configure(
 
     sp<AMessage> callback = mCallback;
 
-    status_t err;
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(mFlags & kFlagIsSecure,
             toMediaResourceSubType(mIsHardware, mDomain)));

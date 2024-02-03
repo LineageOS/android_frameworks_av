@@ -331,7 +331,10 @@ private:
     friend struct ResourceManagerClient;
 
     // to create the metrics associated with this codec.
-    mediametrics_handle_t createMediaMetrics(const sp<AMessage>& format, uint32_t flags);
+    // Any error in this function will be captured by the output argument err.
+    mediametrics_handle_t createMediaMetrics(const sp<AMessage>& format,
+                                             uint32_t flags,
+                                             status_t* err);
 
 private:
     enum State {
