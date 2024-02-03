@@ -215,6 +215,10 @@ ndk::ScopedAStatus DynamicsProcessingImpl::open(const Parameter::Common& common,
     RETURN_OK_IF(mState != State::INIT);
     mImplContext = createContext(common);
     RETURN_IF(!mContext || !mImplContext, EX_NULL_POINTER, "createContextFailed");
+    int version = 0;
+    RETURN_IF(!getInterfaceVersion(&version).isOk(), EX_UNSUPPORTED_OPERATION,
+              "FailedToGetInterfaceVersion");
+    mImplContext->setVersion(version);
     mEventFlag = mImplContext->getStatusEventFlag();
 
     if (specific.has_value()) {
