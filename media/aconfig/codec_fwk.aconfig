@@ -32,3 +32,10 @@ flag {
   description: "Feature flag for null output Surface support"
   bug: "297920102"
 }
+
+flag {
+  name: "region_of_interest"
+  namespace: "codec_fwk"
+  description: "Feature flag for region of interest support"
+  bug: "299191092"
+}
