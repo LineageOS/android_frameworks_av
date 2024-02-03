@@ -86,6 +86,13 @@ flag {
 
 flag {
      namespace: "camera_platform"
+     name: "camera_extensions_characteristics_get"
+     description: "Enable get extension specific camera characteristics API"
+     bug: "280649914"
+}
+
+flag {
+     namespace: "camera_platform"
      name: "delay_lazy_hal_instantiation"
      description: "Only trigger lazy HAL instantiation when the HAL is needed for an operation."
      bug: "319735068"

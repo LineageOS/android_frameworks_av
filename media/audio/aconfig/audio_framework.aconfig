@@ -30,6 +30,15 @@ flag {
     bug: "316414750"
 }
 
+flag {
+    name: "foreground_audio_control"
+    namespace: "media_audio"
+    description:
+        "Audio focus gain requires FGS or delegation to "
+	"take effect"
+    bug: "296232417"
+}
+
 # TODO remove
 flag {
     name: "focus_freeze_test_api"

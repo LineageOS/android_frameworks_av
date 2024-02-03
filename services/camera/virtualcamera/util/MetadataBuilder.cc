@@ -82,6 +82,13 @@ MetadataBuilder& MetadataBuilder::setSensorReadoutTimestamp(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setFocalLength(float focalLength) {
+  std::vector<float> focalLengths({focalLength});
+  mEntryMap[ANDROID_LENS_FOCAL_LENGTH] = focalLengths;
+  mEntryMap[ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS] = focalLengths;
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setSensorOrientation(int32_t sensorOrientation) {
   mEntryMap[ANDROID_SENSOR_ORIENTATION] =
       std::vector<int32_t>({sensorOrientation});
@@ -240,6 +247,14 @@ MetadataBuilder& MetadataBuilder::setMaxJpegSize(const int32_t size) {
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setMaxNumberOutputStreams(
+    const int32_t maxRawStreams, const int32_t maxProcessedStreams,
+    const int32_t maxStallStreams) {
+  mEntryMap[ANDROID_REQUEST_MAX_NUM_OUTPUT_STREAMS] = std::vector<int32_t>(
+      {maxRawStreams, maxProcessedStreams, maxStallStreams});
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setSyncMaxLatency(
     camera_metadata_enum_android_sync_max_latency latency) {
   mEntryMap[ANDROID_SYNC_MAX_LATENCY] =
@@ -307,6 +322,20 @@ MetadataBuilder& MetadataBuilder::setSensorActiveArraySize(int x0, int y0,
                                                            int x1, int y1) {
   mEntryMap[ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE] =
       std::vector<int32_t>({x0, y0, x1, y1});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setSensorPixelArraySize(int width,
+                                                          int height) {
+  mEntryMap[ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE] =
+      std::vector<int32_t>({width, height});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setSensorPhysicalSize(float width,
+                                                        float height) {
+  mEntryMap[ANDROID_SENSOR_INFO_PHYSICAL_SIZE] =
+      std::vector<float>({width, height});
   return *this;
 }
 
