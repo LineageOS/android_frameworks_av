@@ -13,6 +13,7 @@
 // limitations under the License.
 
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -36,13 +37,13 @@ genrule_defaults {
     name: "buildpolicycriteriontypesrule",
     tools: ["buildPolicyCriterionTypes"],
     cmd: "cp $(locations :audio_policy_configuration_files) $(genDir)/. && " +
-         "cp $(location :audio_policy_configuration_top_file) $(genDir)/audio_policy_configuration.xml && " +
-         "$(location buildPolicyCriterionTypes) " +
-         " --androidaudiobaseheader $(location :libaudio_system_audio_base) " +
-         " --androidaudiocommonbaseheader $(location :libaudio_system_audio_common_base) " +
-         "--audiopolicyconfigurationfile $(genDir)/audio_policy_configuration.xml " +
-         "--criteriontypes $(location :audio_policy_engine_criterion_types_template) " +
-         "--outputfile $(out)",
+        "cp $(location :audio_policy_configuration_top_file) $(genDir)/audio_policy_configuration.xml && " +
+        "$(location buildPolicyCriterionTypes) " +
+        " --androidaudiobaseheader $(location :libaudio_system_audio_base) " +
+        " --androidaudiocommonbaseheader $(location :libaudio_system_audio_common_base) " +
+        "--audiopolicyconfigurationfile $(genDir)/audio_policy_configuration.xml " +
+        "--criteriontypes $(location :audio_policy_engine_criterion_types_template) " +
+        "--outputfile $(out)",
     srcs: [
         // The commented inputs must be provided to use this genrule_defaults
         // @todo uncomment if 1428659 is merged":android_audio_base_header_file",
@@ -81,17 +82,17 @@ genrule_defaults {
         "domainGeneratorConnector",
     ],
     cmd: "mkdir -p $(genDir)/Structure/Policy && " +
-         "cp $(locations :audio_policy_pfw_structure_files) $(genDir)/Structure/Policy && " +
-         "cp $(location :audio_policy_pfw_toplevel) $(genDir)/top_level && " +
-         "$(location domainGeneratorPolicy) " +
-         "--validate " +
-         "--domain-generator-tool $(location domainGeneratorConnector) " +
-         "--toplevel-config $(genDir)/top_level " +
-         "--criteria $(location :audio_policy_engine_criteria) " +
-         "--criteriontypes $(location :audio_policy_engine_criterion_types) " +
-         "--add-edds $(locations :edd_files) " +
-         "--schemas-dir external/parameter-framework/upstream/schemas " +
-         " > $(out)",
+        "cp $(locations :audio_policy_pfw_structure_files) $(genDir)/Structure/Policy && " +
+        "cp $(location :audio_policy_pfw_toplevel) $(genDir)/top_level && " +
+        "$(location domainGeneratorPolicy) " +
+        "--validate " +
+        "--domain-generator-tool $(location domainGeneratorConnector) " +
+        "--toplevel-config $(genDir)/top_level " +
+        "--criteria $(location :audio_policy_engine_criteria) " +
+        "--criteriontypes $(location :audio_policy_engine_criterion_types) " +
+        "--add-edds $(locations :edd_files) " +
+        "--schemas-dir external/parameter-framework/upstream/schemas " +
+        " > $(out)",
     srcs: [
         // The commented inputs must be provided to use this genrule_defaults
         // ":audio_policy_pfw_toplevel",
@@ -118,11 +119,11 @@ python_binary_host {
 genrule_defaults {
     name: "buildstrategiesstructurerule",
     tools: ["buildStrategiesStructureFile"],
-    cmd: "cp $(locations :audio_policy_engine_configuration_files) $(genDir) && ls -l $(genDir) &&"+
-         "$(location buildStrategiesStructureFile) " +
-         "--audiopolicyengineconfigurationfile $(genDir)/audio_policy_engine_configuration.xml "+
-         "--productstrategiesstructurefile $(location :product_strategies_structure_template) " +
-         "--outputfile $(out)",
+    cmd: "cp $(locations :audio_policy_engine_configuration_files) $(genDir) && ls -l $(genDir) &&" +
+        "$(location buildStrategiesStructureFile) " +
+        "--audiopolicyengineconfigurationfile $(genDir)/audio_policy_engine_configuration.xml " +
+        "--productstrategiesstructurefile $(location :product_strategies_structure_template) " +
+        "--outputfile $(out)",
     srcs: [
         // The commented inputs must be provided to use this genrule_defaults
         // ":audio_policy_engine_configuration_files",
@@ -146,9 +147,9 @@ genrule_defaults {
     name: "buildcommontypesstructurerule",
     tools: ["buildCommonTypesStructureFile"],
     cmd: "$(location buildCommonTypesStructureFile) " +
-         "--androidaudiobaseheader $(location :libaudio_system_audio_base) " +
-         "--commontypesstructure $(location :common_types_structure_template) " +
-         "--outputfile $(out)",
+        "--androidaudiobaseheader $(location :libaudio_system_audio_base) " +
+        "--commontypesstructure $(location :common_types_structure_template) " +
+        "--outputfile $(out)",
     srcs: [
         ":common_types_structure_template",
         ":libaudio_system_audio_base",

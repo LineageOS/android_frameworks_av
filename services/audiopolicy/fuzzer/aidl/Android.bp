@@ -16,6 +16,10 @@
  *
  ******************************************************************************/
 
+package {
+    default_team: "trendy_team_android_media_audio_framework",
+}
+
 cc_defaults {
     name: "audiopolicy_aidl_fuzzer_defaults",
     shared_libs: [
