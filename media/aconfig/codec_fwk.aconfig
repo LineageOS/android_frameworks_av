@@ -3,6 +3,7 @@
 # !!! Please add flags in alphabetical order. !!!
 
 package: "android.media.codec"
+container: "system"
 
 flag {
   name: "aidl_hal_input_surface"
