@@ -18,6 +18,7 @@ soong_namespace {
 }
 
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -31,41 +32,49 @@ prebuilt_etc {
     vendor: true,
     src: ":a2dp_in_audio_policy_configuration",
 }
+
 prebuilt_etc {
     name: "a2dp_audio_policy_configuration.xml",
     vendor: true,
     src: ":a2dp_audio_policy_configuration",
 }
+
 prebuilt_etc {
     name: "audio_policy_configuration.xml",
     vendor: true,
     src: ":audio_policy_configuration_generic",
 }
+
 prebuilt_etc {
     name: "r_submix_audio_policy_configuration.xml",
     vendor: true,
     src: ":r_submix_audio_policy_configuration",
 }
+
 prebuilt_etc {
     name: "audio_policy_volumes.xml",
     vendor: true,
     src: ":audio_policy_volumes",
 }
+
 prebuilt_etc {
     name: "default_volume_tables.xml",
     vendor: true,
     src: ":default_volume_tables",
 }
+
 prebuilt_etc {
     name: "surround_sound_configuration_5_0.xml",
     vendor: true,
     src: ":surround_sound_configuration_5_0",
 }
+
 prebuilt_etc {
     name: "usb_audio_policy_configuration.xml",
     vendor: true,
     src: ":usb_audio_policy_configuration",
 }
+
 prebuilt_etc {
     name: "primary_audio_policy_configuration.xml",
     src: ":primary_audio_policy_configuration",
@@ -76,50 +85,62 @@ filegroup {
     name: "a2dp_in_audio_policy_configuration",
     srcs: ["a2dp_in_audio_policy_configuration.xml"],
 }
+
 filegroup {
     name: "a2dp_audio_policy_configuration",
     srcs: ["a2dp_audio_policy_configuration.xml"],
 }
+
 filegroup {
     name: "primary_audio_policy_configuration",
     srcs: ["primary_audio_policy_configuration.xml"],
 }
+
 filegroup {
     name: "surround_sound_configuration_5_0",
     srcs: ["surround_sound_configuration_5_0.xml"],
 }
+
 filegroup {
     name: "default_volume_tables",
     srcs: ["default_volume_tables.xml"],
 }
+
 filegroup {
     name: "audio_policy_volumes",
     srcs: ["audio_policy_volumes.xml"],
 }
+
 filegroup {
     name: "audio_policy_configuration_generic",
     srcs: ["audio_policy_configuration_generic.xml"],
 }
+
 filegroup {
     name: "audio_policy_configuration_generic_configurable",
     srcs: ["audio_policy_configuration_generic_configurable.xml"],
 }
+
 filegroup {
     name: "usb_audio_policy_configuration",
     srcs: ["usb_audio_policy_configuration.xml"],
 }
+
 filegroup {
     name: "r_submix_audio_policy_configuration",
     srcs: ["r_submix_audio_policy_configuration.xml"],
 }
+
 filegroup {
     name: "bluetooth_audio_policy_configuration_7_0",
     srcs: ["bluetooth_audio_policy_configuration_7_0.xml"],
 }
+
 filegroup {
     name: "bluetooth_with_le_audio_policy_configuration_7_0",
     srcs: ["bluetooth_with_le_audio_policy_configuration_7_0.xml"],
 }
+
 filegroup {
     name: "hearing_aid_audio_policy_configuration_7_0",
     srcs: ["hearing_aid_audio_policy_configuration_7_0.xml"],

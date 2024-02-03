@@ -24,6 +24,7 @@ soong_namespace {
 }
 
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -43,11 +44,13 @@ prebuilt_etc {
         ":audio_policy_engine_volumes.xml",
     ],
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_product_strategies.xml",
     vendor: true,
     src: "audio_policy_engine_product_strategies.xml",
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_criterion_types.xml",
     vendor: true,
@@ -65,6 +68,7 @@ genrule {
         ":audio_policy_configuration_files",
     ],
 }
+
 filegroup {
     name: "audio_policy_configuration_files",
     srcs: [
@@ -75,10 +79,12 @@ filegroup {
         ":primary_audio_policy_configuration",
     ],
 }
+
 filegroup {
-    name : "audio_policy_configuration_top_file",
+    name: "audio_policy_configuration_top_file",
     srcs: [":audio_policy_configuration_generic"],
 }
+
 filegroup {
     name: "audio_policy_engine_configuration_files",
     srcs: [

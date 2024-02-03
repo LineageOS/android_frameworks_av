@@ -28,6 +28,7 @@ soong_namespace {
 // Generate Audio Policy Parameter Framework Product Strategies Structure file from template
 //
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -43,6 +44,7 @@ prebuilt_etc {
     sub_dir: "parameter-framework/Structure/Policy",
     required: ["libpolicy-subsystem"],
 }
+
 genrule {
     name: "buildstrategiesstructure_gen",
     defaults: ["buildstrategiesstructurerule"],
@@ -68,6 +70,7 @@ prebuilt_etc {
         "PolicySubsystem-CommonTypes.xml",
     ],
 }
+
 genrule {
     name: "domaingeneratorpolicyrule_gen",
     enabled: false, // TODO: This module fails to build
@@ -79,6 +82,7 @@ genrule {
         ":edd_files",
     ],
 }
+
 filegroup {
     name: "edd_files",
     srcs: [
@@ -87,11 +91,13 @@ filegroup {
         "Settings/device_for_product_strategies.pfw",
     ],
 }
+
 // This is for Settings generation, must use socket port, so userdebug version is required
 filegroup {
     name: "audio_policy_pfw_toplevel",
     srcs: [":ParameterFrameworkConfigurationPolicy.userdebug.xml"],
 }
+
 filegroup {
     name: "audio_policy_pfw_structure_files",
     srcs: [

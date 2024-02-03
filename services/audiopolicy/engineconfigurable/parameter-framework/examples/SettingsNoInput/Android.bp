@@ -24,6 +24,7 @@ soong_namespace {
 }
 
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -57,10 +58,12 @@ genrule {
         ":edd_files",
     ],
 }
+
 filegroup {
     name: "audio_policy_pfw_toplevel",
     srcs: [":ParameterFrameworkConfigurationPolicy.userdebug.xml"],
 }
+
 filegroup {
     name: "audio_policy_pfw_structure_files",
     srcs: [
@@ -69,6 +72,7 @@ filegroup {
         ":buildcommontypesstructure_gen",
     ],
 }
+
 filegroup {
     name: "edd_files",
     srcs: [
@@ -76,6 +80,7 @@ filegroup {
         ":volumes.pfw",
     ],
 }
+
 prebuilt_etc {
     name: "PolicySubsystem.xml",
     vendor: true,
