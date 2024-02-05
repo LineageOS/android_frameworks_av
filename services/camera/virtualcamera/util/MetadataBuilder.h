@@ -26,6 +26,7 @@
 
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "system/camera_metadata.h"
+#include "util/Util.h"
 
 namespace android {
 namespace companion {
@@ -90,6 +91,10 @@ class MetadataBuilder {
   //
   // See ANDROID_SENSOR_TIMESTAMP in CameraMetadataTag.aidl.
   MetadataBuilder& setSensorTimestamp(std::chrono::nanoseconds timestamp);
+
+  // See SENSOR_INFO_TIMESTAMP_SOURCE in CameraCharacteristic.java.
+  MetadataBuilder& setSensorTimestampSource(
+      camera_metadata_enum_android_sensor_info_timestamp_source_t timestampSource);
 
   // See ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE in CameraMetadataTag.aidl.
   MetadataBuilder& setSensorActiveArraySize(int x0, int y0, int x1, int y1);
@@ -183,6 +188,10 @@ class MetadataBuilder {
   // See ANDROID_JPEG_SIZE in CameraMetadataTag.aidl.
   MetadataBuilder& setMaxJpegSize(int32_t size);
 
+  // See JPEG_AVAILABLE_THUMBNAIL_SIZES in CameraCharacteristic.java.
+  MetadataBuilder& setJpegAvailableThumbnailSizes(
+      const std::vector<Resolution>& thumbnailSizes);
+
   // The maximum numbers of different types of output streams
   // that can be configured and used simultaneously by a camera device.
   //
@@ -232,14 +241,14 @@ class MetadataBuilder {
       const std::vector<camera_metadata_tag_t>& keys);
 
   // Extends metadata with ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS
-  // containing all previously set tags.
+  // containing all set tags.
   MetadataBuilder& setAvailableCharacteristicKeys();
 
   // Build CameraMetadata instance.
   //
   // Returns nullptr in case something went wrong.
   std::unique_ptr<::aidl::android::hardware::camera::device::CameraMetadata>
-  build() const;
+  build();
 
  private:
   // Maps metadata tags to vectors of values for the given tag.
@@ -248,6 +257,8 @@ class MetadataBuilder {
                         std::vector<uint8_t>, std::vector<float>,
                         std::vector<camera_metadata_rational_t>>>
       mEntryMap;
+  // Extend metadata with ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS.
+  bool mExtendWithAvailableCharacteristicsKeys = false;
 };
 
 }  // namespace virtualcamera

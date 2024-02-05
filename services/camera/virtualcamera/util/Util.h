@@ -52,6 +52,27 @@ bool isFormatSupportedForInput(
     int width, int height,
     ::aidl::android::companion::virtualcamera::Format format, int maxFps);
 
+// Representation of resolution / size.
+struct Resolution {
+  Resolution(const int w, const int h) : width(w), height(h) {
+  }
+
+  // Order by increasing pixel count, and by width for same pixel count.
+  bool operator<(const Resolution& other) const {
+    const int pixCount = width * height;
+    const int otherPixCount = other.width * other.height;
+    return pixCount == otherPixCount ? width < other.width
+                                     : pixCount < otherPixCount;
+  }
+
+  bool operator==(const Resolution& other) const {
+    return width == other.width && height == other.height;
+  }
+
+  const int width;
+  const int height;
+};
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android
