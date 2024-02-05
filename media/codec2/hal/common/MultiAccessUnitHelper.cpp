@@ -134,7 +134,7 @@ MultiAccessUnitHelper::~MultiAccessUnitHelper() {
 bool MultiAccessUnitHelper::isEnabledOnPlatform() {
     bool result = com::android::media::codec::flags::provider_->large_audio_frame();
     if (!result) {
-        false;
+        return false;
     }
     //TODO: remove this before launch
     result = ::android::base::GetBoolProperty("debug.media.c2.large.audio.frame", true);
