@@ -65,7 +65,7 @@ RetCode LoudnessEnhancerContext::setLeGain(int gainMb) {
     return RetCode::SUCCESS;
 }
 
-IEffect::Status LoudnessEnhancerContext::lvmProcess(float* in, float* out, int samples) {
+IEffect::Status LoudnessEnhancerContext::process(float* in, float* out, int samples) {
     LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
 
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};

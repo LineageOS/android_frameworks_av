@@ -747,7 +747,7 @@ std::vector<Virtualizer::ChannelAngle> BundleContext::getSpeakerAngles(
     return angles;
 }
 
-IEffect::Status BundleContext::lvmProcess(float* in, float* out, int samples) {
+IEffect::Status BundleContext::process(float* in, float* out, int samples) {
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!in, status, "nullInput");
     RETURN_VALUE_IF(!out, status, "nullOutput");
