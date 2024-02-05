@@ -76,22 +76,6 @@ const std::array<PixelFormat, 3> kOutputFormats{
     PixelFormat::IMPLEMENTATION_DEFINED, PixelFormat::YCBCR_420_888,
     PixelFormat::BLOB};
 
-struct Resolution {
-  Resolution(const int w, const int h) : width(w), height(h) {
-  }
-
-  bool operator<(const Resolution& other) const {
-    return width * height < other.width * other.height;
-  }
-
-  bool operator==(const Resolution& other) const {
-    return width == other.width && height == other.height;
-  }
-
-  const int width;
-  const int height;
-};
-
 bool isSupportedOutputFormat(const PixelFormat pixelFormat) {
   return std::find(kOutputFormats.begin(), kOutputFormats.end(), pixelFormat) !=
          kOutputFormats.end();
@@ -159,6 +143,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setSensorOrientation(static_cast<int32_t>(sensorOrientation))
           .setSensorReadoutTimestamp(
               ANDROID_SENSOR_READOUT_TIMESTAMP_NOT_SUPPORTED)
+          .setSensorTimestampSource(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN)
           .setSensorPhysicalSize(36.0, 24.0)
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
@@ -177,6 +162,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setControlAeLockAvailable(false)
           .setControlAvailableAwbModes({ANDROID_CONTROL_AWB_MODE_AUTO})
           .setControlZoomRatioRange(/*min=*/1.0, /*max=*/1.0)
+          // TODO(b/301023410) Add JPEG Exif + thumbnail support.
+          .setJpegAvailableThumbnailSizes({Resolution(0, 0)})
           .setMaxJpegSize(kMaxJpegSize)
           .setMaxNumberOutputStreams(
               VirtualCameraDevice::kMaxNumberOfRawStreams,
@@ -187,8 +174,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setAvailableRequestKeys({ANDROID_CONTROL_AF_MODE})
           .setAvailableResultKeys({ANDROID_CONTROL_AF_MODE})
           .setAvailableCapabilities(
-              {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE})
-          .setAvailableCharacteristicKeys();
+              {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE});
 
   // Active array size must correspond to largest supported input resolution.
   std::optional<Resolution> maxResolution =
@@ -227,7 +213,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
   ALOGV("Adding %zu output configurations", outputConfigurations.size());
   builder.setAvailableOutputStreamConfigurations(outputConfigurations);
 
-  auto metadata = builder.build();
+  auto metadata = builder.setAvailableCharacteristicKeys().build();
   if (metadata == nullptr) {
     ALOGE("Failed to build metadata!");
     return CameraMetadata();

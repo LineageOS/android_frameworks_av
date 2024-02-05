@@ -31,6 +31,7 @@
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "log/log.h"
 #include "system/camera_metadata.h"
+#include "util/Util.h"
 #include "utils/Errors.h"
 
 namespace android {
@@ -92,6 +93,14 @@ MetadataBuilder& MetadataBuilder::setFocalLength(float focalLength) {
 MetadataBuilder& MetadataBuilder::setSensorOrientation(int32_t sensorOrientation) {
   mEntryMap[ANDROID_SENSOR_ORIENTATION] =
       std::vector<int32_t>({sensorOrientation});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setSensorTimestampSource(
+    const camera_metadata_enum_android_sensor_info_timestamp_source_t
+        timestampSource) {
+  mEntryMap[ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE] =
+      std::vector<uint8_t>({static_cast<uint8_t>(timestampSource)});
   return *this;
 }
 
@@ -247,6 +256,18 @@ MetadataBuilder& MetadataBuilder::setMaxJpegSize(const int32_t size) {
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setJpegAvailableThumbnailSizes(
+    const std::vector<Resolution>& thumbnailSizes) {
+  std::vector<int32_t> sizes;
+  sizes.reserve(thumbnailSizes.size() * 2);
+  for (const Resolution& resolution : thumbnailSizes) {
+    sizes.push_back(resolution.width);
+    sizes.push_back(resolution.height);
+  }
+  mEntryMap[ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES] = sizes;
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setMaxNumberOutputStreams(
     const int32_t maxRawStreams, const int32_t maxProcessedStreams,
     const int32_t maxStallStreams) {
@@ -381,19 +402,23 @@ MetadataBuilder& MetadataBuilder::setAvailableCharacteristicKeys(
 }
 
 MetadataBuilder& MetadataBuilder::setAvailableCharacteristicKeys() {
-  std::vector<camera_metadata_tag_t> availableKeys;
-  availableKeys.reserve(mEntryMap.size());
-  for (const auto& [key, _] : mEntryMap) {
-    if (key != ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS) {
-      availableKeys.push_back(key);
-    }
-  }
-  setAvailableCharacteristicKeys(availableKeys);
+  mExtendWithAvailableCharacteristicsKeys = true;
   return *this;
 }
 
 std::unique_ptr<aidl::android::hardware::camera::device::CameraMetadata>
-MetadataBuilder::build() const {
+MetadataBuilder::build() {
+  if (mExtendWithAvailableCharacteristicsKeys) {
+    std::vector<camera_metadata_tag_t> availableKeys;
+    availableKeys.reserve(mEntryMap.size());
+    for (const auto& [key, _] : mEntryMap) {
+      if (key != ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS) {
+        availableKeys.push_back(key);
+      }
+    }
+    setAvailableCharacteristicKeys(availableKeys);
+  }
+
   CameraMetadata metadataHelper;
   for (const auto& entry : mEntryMap) {
     status_t ret = std::visit(
