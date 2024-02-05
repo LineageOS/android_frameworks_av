@@ -28,7 +28,12 @@
 namespace android {
 
 bool IsCodec2AidlHalSelected() {
-    if (!com::android::media::codec::flags::provider_->aidl_hal()) {
+    // For new devices with vendor software targeting 202404, we always want to
+    // use AIDL if it exists
+    constexpr int kAndroidApi202404 = 202404;
+    int vendorVersion = ::android::base::GetIntProperty("ro.vendor.api_level", -1);
+    if (!com::android::media::codec::flags::provider_->aidl_hal() &&
+        vendorVersion < kAndroidApi202404) {
         // Cannot select AIDL if not enabled
         return false;
     }
