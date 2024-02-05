@@ -174,15 +174,15 @@ public:
     void setHapticPlaybackEnabled(bool hapticPlaybackEnabled) final {
                 mHapticPlaybackEnabled = hapticPlaybackEnabled;
             }
-            /** Return at what intensity to play haptics, used in mixer. */
-    os::HapticScale getHapticIntensity() const final { return mHapticIntensity; }
+            /** Return the haptics scale, used in mixer. */
+    os::HapticScale getHapticScale() const final { return mHapticScale; }
             /** Return the maximum amplitude allowed for haptics data, used in mixer. */
     float getHapticMaxAmplitude() const final { return mHapticMaxAmplitude; }
             /** Set intensity of haptic playback, should be set after querying vibrator service. */
-    void setHapticIntensity(os::HapticScale hapticIntensity) final {
-                if (os::isValidHapticScale(hapticIntensity)) {
-                    mHapticIntensity = hapticIntensity;
-                    setHapticPlaybackEnabled(mHapticIntensity != os::HapticScale::MUTE);
+    void setHapticScale(os::HapticScale hapticScale) final {
+                if (os::isValidHapticScale(hapticScale)) {
+                    mHapticScale = hapticScale;
+                    setHapticPlaybackEnabled(!mHapticScale.isScaleMute());
                 }
             }
             /** Set maximum amplitude allowed for haptic data, should be set after querying
@@ -329,8 +329,8 @@ protected:
     sp<OpPlayAudioMonitor>  mOpPlayAudioMonitor;
 
     bool                mHapticPlaybackEnabled = false; // indicates haptic playback enabled or not
-    // intensity to play haptic data
-    os::HapticScale mHapticIntensity = os::HapticScale::MUTE;
+    // scale to play haptic data
+    os::HapticScale mHapticScale = os::HapticScale::mute();
     // max amplitude allowed for haptic data
     float mHapticMaxAmplitude = NAN;
     class AudioVibrationController : public os::BnExternalVibrationController {
