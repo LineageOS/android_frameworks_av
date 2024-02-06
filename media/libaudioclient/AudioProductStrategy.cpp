@@ -60,9 +60,13 @@ aidl2legacy_AudioProductStrategy(const media::AudioProductStrategy& aidl) {
 }
 
 // Keep in sync with android/media/audiopolicy/AudioProductStrategy#attributeMatches
-int AudioProductStrategy::attributesMatchesScore(const audio_attributes_t refAttributes,
-                                                 const audio_attributes_t clientAttritubes)
+int AudioProductStrategy::attributesMatchesScore(audio_attributes_t refAttributes,
+                                                 audio_attributes_t clientAttritubes)
 {
+    refAttributes.flags = static_cast<audio_flags_mask_t>(
+            refAttributes.flags & AUDIO_FLAGS_AFFECT_STRATEGY_SELECTION);
+    clientAttritubes.flags = static_cast<audio_flags_mask_t>(
+            clientAttritubes.flags & AUDIO_FLAGS_AFFECT_STRATEGY_SELECTION);
     if (refAttributes == clientAttritubes) {
         return MATCH_EQUALS;
     }
