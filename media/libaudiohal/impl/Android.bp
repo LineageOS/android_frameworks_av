@@ -257,7 +257,7 @@ cc_defaults {
     shared_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
-        "av-audio-types-aidl-ndk",
+        "av-audio-types-aidl-V1-ndk",
         "libaudio_aidl_conversion_common_cpp",
         "libaudio_aidl_conversion_common_ndk",
         "libaudio_aidl_conversion_common_ndk_cpp",
