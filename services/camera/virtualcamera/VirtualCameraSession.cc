@@ -27,6 +27,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <numeric>
 #include <optional>
 #include <tuple>
 #include <unordered_set>
@@ -44,6 +45,7 @@
 #include "aidl/android/hardware/camera/device/CaptureRequest.h"
 #include "aidl/android/hardware/camera/device/HalStream.h"
 #include "aidl/android/hardware/camera/device/NotifyMsg.h"
+#include "aidl/android/hardware/camera/device/RequestTemplate.h"
 #include "aidl/android/hardware/camera/device/ShutterMsg.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
@@ -69,6 +71,7 @@ namespace virtualcamera {
 
 using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::companion::virtualcamera::IVirtualCameraCallback;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BufferCache;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
@@ -102,31 +105,59 @@ static constexpr size_t kMetadataMsgQueueSize = 0;
 // Maximum number of buffers to use per single stream.
 static constexpr size_t kMaxStreamBuffers = 2;
 
-CameraMetadata createDefaultRequestSettings(RequestTemplate type) {
-  hardware::camera::common::V1_0::helper::CameraMetadata metadataHelper;
-
-  camera_metadata_enum_android_control_capture_intent_t intent =
-      ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
+camera_metadata_enum_android_control_capture_intent_t requestTemplateToIntent(
+    const RequestTemplate type) {
   switch (type) {
     case RequestTemplate::PREVIEW:
-      intent = ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
-      break;
+      return ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
     case RequestTemplate::STILL_CAPTURE:
-      intent = ANDROID_CONTROL_CAPTURE_INTENT_STILL_CAPTURE;
-      break;
+      return ANDROID_CONTROL_CAPTURE_INTENT_STILL_CAPTURE;
     case RequestTemplate::VIDEO_RECORD:
-      intent = ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_RECORD;
-      break;
+      return ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_RECORD;
     case RequestTemplate::VIDEO_SNAPSHOT:
-      intent = ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_SNAPSHOT;
-      break;
+      return ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_SNAPSHOT;
     default:
-      // Leave default.
-      break;
+      // Return PREVIEW by default
+      return ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
   }
+}
 
-  auto metadata = MetadataBuilder().setControlCaptureIntent(intent).build();
-  return (metadata != nullptr) ? std::move(*metadata) : CameraMetadata();
+int getMaxFps(const std::vector<SupportedStreamConfiguration>& configs) {
+  return std::transform_reduce(
+      configs.begin(), configs.end(), 0,
+      [](const int a, const int b) { return std::max(a, b); },
+      [](const SupportedStreamConfiguration& config) { return config.maxFps; });
+}
+
+CameraMetadata createDefaultRequestSettings(
+    const RequestTemplate type,
+    const std::vector<SupportedStreamConfiguration>& inputConfigs) {
+  int maxFps = getMaxFps(inputConfigs);
+  auto metadata =
+      MetadataBuilder()
+          .setControlCaptureIntent(requestTemplateToIntent(type))
+          .setControlMode(ANDROID_CONTROL_MODE_AUTO)
+          .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
+          .setControlAeExposureCompensation(0)
+          .setControlAeTargetFpsRange(maxFps, maxFps)
+          .setControlAeAntibandingMode(ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO)
+          .setControlAePrecaptureTrigger(
+              ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
+          .setControlAfTrigger(ANDROID_CONTROL_AF_TRIGGER_IDLE)
+          .setControlAfMode(ANDROID_CONTROL_AF_MODE_AUTO)
+          .setControlAwbMode(ANDROID_CONTROL_AWB_MODE_AUTO)
+          .setFaceDetectMode(ANDROID_STATISTICS_FACE_DETECT_MODE_OFF)
+          .setFlashMode(ANDROID_FLASH_MODE_OFF)
+          .build();
+  if (metadata == nullptr) {
+    ALOGE("%s: Failed to construct metadata for default request type %s",
+          __func__, toString(type).c_str());
+    return CameraMetadata();
+  } else {
+    ALOGV("%s: Successfully created metadata for request type %s", __func__,
+          toString(type).c_str());
+  }
+  return *metadata;
 }
 
 HalStream getHalStream(const Stream& stream) {
@@ -272,12 +303,22 @@ ndk::ScopedAStatus VirtualCameraSession::constructDefaultRequestSettings(
     RequestTemplate in_type, CameraMetadata* _aidl_return) {
   ALOGV("%s: type %d", __func__, static_cast<int32_t>(in_type));
 
+  std::shared_ptr<VirtualCameraDevice> camera = mCameraDevice.lock();
+  if (camera == nullptr) {
+    ALOGW(
+        "%s: constructDefaultRequestSettings called on already unregistered "
+        "camera",
+        __func__);
+    return cameraStatus(Status::CAMERA_DISCONNECTED);
+  }
+
   switch (in_type) {
     case RequestTemplate::PREVIEW:
     case RequestTemplate::STILL_CAPTURE:
     case RequestTemplate::VIDEO_RECORD:
     case RequestTemplate::VIDEO_SNAPSHOT: {
-      *_aidl_return = createDefaultRequestSettings(in_type);
+      *_aidl_return =
+          createDefaultRequestSettings(in_type, camera->getInputConfigs());
       return ndk::ScopedAStatus::ok();
     }
     case RequestTemplate::MANUAL:
