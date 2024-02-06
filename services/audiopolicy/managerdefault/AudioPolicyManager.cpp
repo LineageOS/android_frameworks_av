@@ -6010,8 +6010,10 @@ bool AudioPolicyManager::canBeSpatializedInt(const audio_attributes_t *attr,
     // mode is not requested.
 
     if (config != nullptr && *config != AUDIO_CONFIG_INITIALIZER) {
+        static const bool stereo_spatialization_enabled =
+                property_get_bool("ro.audio.stereo_spatialization_enabled", false);
         const bool channel_mask_spatialized =
-                com_android_media_audio_stereo_spatialization()
+                (stereo_spatialization_enabled && com_android_media_audio_stereo_spatialization())
                 ? audio_channel_mask_contains_stereo(config->channel_mask)
                 : audio_is_channel_mask_spatialized(config->channel_mask);
         if (!channel_mask_spatialized) {

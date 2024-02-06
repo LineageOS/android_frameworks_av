@@ -31,6 +31,7 @@
 #include <audio_utils/fixedfft.h>
 #include <com_android_media_audio.h>
 #include <cutils/bitops.h>
+#include <cutils/properties.h>
 #include <hardware/sensors.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -394,8 +395,10 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
         return status;
     }
     for (const auto channelMask : channelMasks) {
+        static const bool stereo_spatialization_enabled =
+                property_get_bool("ro.audio.stereo_spatialization_enabled", false);
         const bool channel_mask_spatialized =
-                com_android_media_audio_stereo_spatialization()
+                (stereo_spatialization_enabled && com_android_media_audio_stereo_spatialization())
                 ? audio_channel_mask_contains_stereo(channelMask)
                 : audio_is_channel_mask_spatialized(channelMask);
         if (!channel_mask_spatialized) {
