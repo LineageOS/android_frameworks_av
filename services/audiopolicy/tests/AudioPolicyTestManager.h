@@ -31,6 +31,7 @@ class AudioPolicyTestManager : public AudioPolicyManager {
     using AudioPolicyManager::getConfig;
     using AudioPolicyManager::initialize;
     using AudioPolicyManager::getOutputs;
+    using AudioPolicyManager::getInputs;
     using AudioPolicyManager::getAvailableOutputDevices;
     using AudioPolicyManager::getAvailableInputDevices;
     using AudioPolicyManager::setSurroundFormatEnabled;
