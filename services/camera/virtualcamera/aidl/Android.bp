@@ -21,6 +21,9 @@ aidl_interface {
         cpp: {
             enabled: false,
         },
+        rust: {
+            enabled: false,
+        },
         ndk: {
             enabled: true,
             additional_shared_libraries: [
