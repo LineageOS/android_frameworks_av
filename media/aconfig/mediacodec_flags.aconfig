@@ -1,4 +1,5 @@
 package: "com.android.media.codec.flags"
+container: "system"
 
 # ******************************************************************
 #            !!! DO NOT ADD FURTHER FLAGS TO THIS FILE !!!
