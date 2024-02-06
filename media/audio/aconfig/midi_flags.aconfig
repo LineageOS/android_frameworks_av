@@ -4,6 +4,7 @@
 # Please add flags in alphabetical order.
 
 package: "android.media.midi"
+container: "system"
 
 flag {
     name: "virtual_ump"

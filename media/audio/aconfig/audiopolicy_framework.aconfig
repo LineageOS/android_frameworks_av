@@ -4,6 +4,7 @@
 # Please add flags in alphabetical order.
 
 package: "android.media.audiopolicy"
+container: "system"
 
 flag {
     name: "audio_policy_update_mixing_rules_api"
