@@ -57,20 +57,22 @@ using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::IEffect;
 using ::aidl::android::hardware::audio::effect::IFactory;
 using ::aidl::android::hardware::audio::effect::kEventFlagDataMqUpdate;
+using ::aidl::android::hardware::audio::effect::kReopenSupportedVersion;
 using ::aidl::android::hardware::audio::effect::State;
 
 namespace android {
 namespace effect {
 
 EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
-                             const std::shared_ptr<IEffect>& effect,
-                             int32_t sessionId, int32_t ioId, const Descriptor& desc,
-                             bool isProxyEffect)
+                             const std::shared_ptr<IEffect>& effect, int32_t sessionId,
+                             int32_t ioId, const Descriptor& desc, bool isProxyEffect)
     : mFactory(factory),
       mEffect(effect),
       mSessionId(sessionId),
       mIoId(ioId),
       mIsProxyEffect(isProxyEffect) {
+    assert(mFactory != nullptr);
+    assert(mEffect != nullptr);
     createAidlConversion(effect, sessionId, ioId, desc);
 }
 
@@ -184,10 +186,18 @@ status_t EffectHalAidl::process() {
         return INVALID_OPERATION;
     }
 
-    if (uint32_t efState = 0;
-        ::android::OK == efGroup->wait(kEventFlagDataMqUpdate, &efState, 1 /* ns */,
-                                       true /* retry */)) {
-        ALOGI("%s %s receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str());
+    // use IFactory HAL version because IEffect can be an EffectProxy instance
+    static const int halVersion = [&]() {
+        int version = 0;
+        return mFactory->getInterfaceVersion(&version).isOk() ? version : 0;
+    }();
+
+    if (uint32_t efState = 0; halVersion >= kReopenSupportedVersion &&
+                              ::android::OK == efGroup->wait(kEventFlagDataMqUpdate, &efState,
+                                                             1 /* ns */, true /* retry */) &&
+                              efState & kEventFlagDataMqUpdate) {
+        ALOGI("%s %s V%d receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str(),
+              halVersion);
         mConversion->reopen();
     }
     auto statusQ = mConversion->getStatusMQ();
