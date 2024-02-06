@@ -61,8 +61,8 @@ const std::vector<Range::VisualizerRange> VisualizerImpl::kRanges = {
         MAKE_RANGE(Visualizer, latencyMs, 0, VisualizerContext::kMaxLatencyMs),
         MAKE_RANGE(Visualizer, captureSamples, 0, VisualizerContext::kMaxCaptureBufSize),
         /* get only parameters, set invalid range (min > max) to indicate not support set */
-        MAKE_RANGE(Visualizer, measurement, Visualizer::Measurement({.peak = 1, .rms = 1}),
-                   Visualizer::Measurement({.peak = 0, .rms = 0})),
+        MAKE_RANGE(Visualizer, measurement, Visualizer::Measurement({.rms = 1, .peak = 1}),
+                   Visualizer::Measurement({.rms = 0, .peak = 0})),
         MAKE_RANGE(Visualizer, captureSampleBuffer, std::vector<uint8_t>({1}),
                    std::vector<uint8_t>({0}))};
 const Capability VisualizerImpl::kCapability = {
