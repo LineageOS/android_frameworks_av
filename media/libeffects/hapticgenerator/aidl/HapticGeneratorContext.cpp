@@ -118,7 +118,7 @@ RetCode HapticGeneratorContext::setHgVibratorInformation(
     return RetCode::SUCCESS;
 }
 
-IEffect::Status HapticGeneratorContext::lvmProcess(float* in, float* out, int samples) {
+IEffect::Status HapticGeneratorContext::process(float* in, float* out, int samples) {
     LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
 
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
