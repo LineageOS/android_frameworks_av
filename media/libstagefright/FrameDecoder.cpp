@@ -102,13 +102,6 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
             displayTop = 0;
         }
     }
-    if (displayWidth > width) {
-        displayWidth = width;
-    }
-    if (displayHeight > height) {
-        displayHeight = height;
-    }
-
 
     if (allocRotated) {
         if (rotationAngle == 90 || rotationAngle == 270) {

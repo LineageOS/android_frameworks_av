@@ -60,6 +60,7 @@ flag {
 Enable the API for providing loudness metadata and CTA-2075 \
 support."
     bug: "298463873"
+    is_exported: true
 }
 
 flag {
