@@ -43,6 +43,28 @@ using stats::media_metrics::\
     MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_NO_CLIENTS;
 using stats::media_metrics::\
     MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_RECLAIM_RESOURCES;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_UNSPECIFIED;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_AUDIO;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_VIDEO;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_IMAGE;
+
+// Map MediaResourceSubType to stats::media_metrics::CodecType
+inline int32_t getMetricsCodecType(MediaResourceSubType codecType) {
+    switch (codecType) {
+        case MediaResourceSubType::kHwAudioCodec:
+        case MediaResourceSubType::kSwAudioCodec:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_AUDIO;
+        case MediaResourceSubType::kHwVideoCodec:
+        case MediaResourceSubType::kSwVideoCodec:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_VIDEO;
+        case MediaResourceSubType::kHwImageCodec:
+        case MediaResourceSubType::kSwImageCodec:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_IMAGE;
+        case MediaResourceSubType::kUnspecifiedSubType:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_UNSPECIFIED;
+    }
+    return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_UNSPECIFIED;
+}
 
 inline const char* getCodecType(MediaResourceSubType codecType) {
     switch (codecType) {
@@ -229,7 +251,7 @@ void ResourceManagerMetrics::notifyClientStarted(const ClientConfigParcel& clien
          clientConfig.clientInfo.uid,
          clientConfig.id,
          clientConfig.clientInfo.name.c_str(),
-         static_cast<int32_t>(clientConfig.codecType),
+         getMetricsCodecType(clientConfig.codecType),
          clientConfig.isEncoder,
          isHardwareCodec(clientConfig.codecType),
          clientConfig.width, clientConfig.height,
@@ -311,7 +333,7 @@ void ResourceManagerMetrics::notifyClientStopped(const ClientConfigParcel& clien
          clientConfig.clientInfo.uid,
          clientConfig.id,
          clientConfig.clientInfo.name.c_str(),
-         static_cast<int32_t>(clientConfig.codecType),
+         getMetricsCodecType(clientConfig.codecType),
          clientConfig.isEncoder,
          isHardwareCodec(clientConfig.codecType),
          clientConfig.width, clientConfig.height,
