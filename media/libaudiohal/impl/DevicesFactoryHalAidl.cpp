@@ -26,6 +26,7 @@
 #include <aidl/android/hardware/audio/core/IModule.h>
 #include <aidl/android/media/audio/BnHalAdapterVendorExtension.h>
 #include <android/binder_manager.h>
+#include <cutils/properties.h>
 #include <media/AidlConversionNdkCpp.h>
 #include <media/AidlConversionUtil.h>
 #include <utils/Log.h>
@@ -121,8 +122,8 @@ class HalAdapterVendorExtensionWrapper :
     std::shared_ptr<IHalAdapterVendorExtension> getService(bool reset = false) {
         std::lock_guard l(mLock);
         if (reset || !mVendorExt.has_value()) {
-            auto serviceName = std::string(IHalAdapterVendorExtension::descriptor) + "/default";
-            if (AServiceManager_isDeclared(serviceName.c_str())) {
+            if (property_get_bool("ro.audio.ihaladaptervendorextension_enabled", false)) {
+                auto serviceName = std::string(IHalAdapterVendorExtension::descriptor) + "/default";
                 mVendorExt = std::shared_ptr<IHalAdapterVendorExtension>(
                         IHalAdapterVendorExtension::fromBinder(ndk::SpAIBinder(
                                         AServiceManager_waitForService(serviceName.c_str()))));

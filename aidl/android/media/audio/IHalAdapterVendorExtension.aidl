@@ -23,6 +23,8 @@ import android.hardware.audio.core.VendorParameter;
  * is optional. Vendors may provide an implementation on the system_ext
  * partition. The default instance of this interface, if provided, must be
  * registered prior to the moment when the audio server connects to HAL modules.
+ * Vendors need to set the system property `ro.audio.ihaladaptervendorextension_enabled`
+ * to `true` for the framework to bind to this service.
  *
  * {@hide}
  */
