@@ -77,3 +77,10 @@ flag {
     description: "Surface new API method AudioManager.getSupportedDeviceTypes()"
     bug: "307537538"
 }
+
+flag {
+    name: "volume_ringer_api_hardening"
+    namespace: "media_audio"
+    description: "Limit access to volume and ringer SDK APIs in AudioManager"
+    bug: "296232417"
+}
