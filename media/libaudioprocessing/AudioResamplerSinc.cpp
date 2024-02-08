@@ -17,7 +17,6 @@
 #define LOG_TAG "AudioResamplerSinc"
 //#define LOG_NDEBUG 0
 
-#define __STDC_CONSTANT_MACROS
 #include <malloc.h>
 #include <pthread.h>
 #include <string.h>
