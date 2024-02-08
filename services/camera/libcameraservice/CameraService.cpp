@@ -2556,39 +2556,65 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
         // Enable/disable camera service watchdog
         client->setCameraServiceWatchdog(mCameraServiceWatchdogEnabled);
 
-        // Set rotate-and-crop override behavior
-        if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
-            client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
-        } else if (overrideToPortrait && portraitRotation != 0) {
-            uint8_t rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
-            switch (portraitRotation) {
-                case 90:
-                    rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
-                    break;
-                case 180:
-                    rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_180;
-                    break;
-                case 270:
-                    rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_270;
-                    break;
-                default:
-                    ALOGE("Unexpected portrait rotation: %d", portraitRotation);
-                    break;
+        CameraMetadata chars;
+        bool rotateAndCropSupported = true;
+        err = mCameraProviderManager->getCameraCharacteristics(cameraId, overrideForPerfClass,
+                &chars, overrideToPortrait);
+        if (err == OK) {
+            auto availableRotateCropEntry = chars.find(
+                    ANDROID_SCALER_AVAILABLE_ROTATE_AND_CROP_MODES);
+            if (availableRotateCropEntry.count <= 1) {
+                rotateAndCropSupported = false;
             }
-            client->setRotateAndCropOverride(rotateAndCropMode);
         } else {
-            client->setRotateAndCropOverride(
-                mCameraServiceProxyWrapper->getRotateAndCropOverride(
-                    clientPackageName, facing, multiuser_get_user_id(clientUid)));
+            ALOGE("%s: Unable to query static metadata for camera %s: %s (%d)", __FUNCTION__,
+                    cameraId.c_str(), strerror(-err), err);
         }
 
-        // Set autoframing override behaviour
-        if (mOverrideAutoframingMode != ANDROID_CONTROL_AUTOFRAMING_AUTO) {
-            client->setAutoframingOverride(mOverrideAutoframingMode);
-        } else {
-            client->setAutoframingOverride(
-                mCameraServiceProxyWrapper->getAutoframingOverride(
-                    clientPackageName));
+        if (rotateAndCropSupported) {
+            // Set rotate-and-crop override behavior
+            if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
+                client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
+            } else if (overrideToPortrait && portraitRotation != 0) {
+                uint8_t rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
+                switch (portraitRotation) {
+                    case 90:
+                        rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
+                        break;
+                    case 180:
+                        rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_180;
+                        break;
+                    case 270:
+                        rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_270;
+                        break;
+                    default:
+                        ALOGE("Unexpected portrait rotation: %d", portraitRotation);
+                        break;
+                }
+                client->setRotateAndCropOverride(rotateAndCropMode);
+            } else {
+                client->setRotateAndCropOverride(
+                    mCameraServiceProxyWrapper->getRotateAndCropOverride(
+                        clientPackageName, facing, multiuser_get_user_id(clientUid)));
+            }
+        }
+
+        bool autoframingSupported = true;
+        auto availableAutoframingEntry = chars.find(ANDROID_CONTROL_AUTOFRAMING_AVAILABLE);
+        if ((availableAutoframingEntry.count == 1) && (availableAutoframingEntry.data.u8[0] ==
+                    ANDROID_CONTROL_AUTOFRAMING_AVAILABLE_FALSE)) {
+            autoframingSupported = false;
+        }
+
+        if (autoframingSupported) {
+            // Set autoframing override behaviour
+            if (mOverrideAutoframingMode != ANDROID_CONTROL_AUTOFRAMING_AUTO) {
+                client->setAutoframingOverride(mOverrideAutoframingMode);
+            } else {
+                client->setAutoframingOverride(
+                    mCameraServiceProxyWrapper->getAutoframingOverride(
+                        clientPackageName));
+            }
         }
 
         // Automotive privileged client AID_AUTOMOTIVE_EVS using exterior system camera for use
