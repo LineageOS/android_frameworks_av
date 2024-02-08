@@ -984,6 +984,61 @@ Status CameraService::isSessionConfigurationWithParametersSupported(
     return res;
 }
 
+Status CameraService::getSessionCharacteristics(const std::string& unresolvedCameraId,
+                                                int targetSdkVersion, bool overrideToPortrait,
+                                                const SessionConfiguration& sessionConfiguration,
+                                                /*out*/ CameraMetadata* outMetadata) {
+    ATRACE_CALL();
+
+    if (!mInitialized) {
+        ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        logServiceError("Camera subsystem is not available", ERROR_DISCONNECTED);
+        return STATUS_ERROR(ERROR_DISCONNECTED, "Camera subsystem is not available");
+    }
+
+    const std::string cameraId =
+            resolveCameraId(unresolvedCameraId, CameraThreadState::getCallingUid());
+
+    if (outMetadata == nullptr) {
+        std::string msg =
+                fmt::sprintf("Camera %s: Invalid 'outMetadata' input!", unresolvedCameraId.c_str());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+
+    bool overrideForPerfClass = SessionConfigurationUtils::targetPerfClassPrimaryCamera(
+            mPerfClassPrimaryCameraIds, cameraId, targetSdkVersion);
+
+    status_t ret = mCameraProviderManager->getSessionCharacteristics(
+            cameraId, sessionConfiguration, overrideForPerfClass, overrideToPortrait, outMetadata);
+
+    // TODO(b/303645857): Remove fingerprintable metadata if the caller process does not have
+    //                    camera access permission.
+
+    Status res = Status::ok();
+    switch (ret) {
+        case OK:
+            // Expected, no handling needed.
+            break;
+        case INVALID_OPERATION: {
+                std::string msg = fmt::sprintf(
+                        "Camera %s: Session characteristics query not supported!",
+                        cameraId.c_str());
+                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
+                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
+            }
+            break;
+        default: {
+                std::string msg = fmt::sprintf("Camera %s: Error: %s (%d)", cameraId.c_str(),
+                                               strerror(-ret), ret);
+                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+                res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+            }
+    }
+
+    return res;
+}
+
 Status CameraService::parseCameraIdRemapping(
         const hardware::CameraIdRemapping& cameraIdRemapping,
         /* out */ TCameraIdRemapping* cameraIdRemappingMap) {

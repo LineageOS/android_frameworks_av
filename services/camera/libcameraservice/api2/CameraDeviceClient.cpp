@@ -777,60 +777,6 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
     return res;
 }
 
-binder::Status CameraDeviceClient::getSessionCharacteristics(
-        const SessionConfiguration& sessionConfiguration,
-        /*out*/
-        hardware::camera2::impl::CameraMetadataNative* sessionCharacteristics) {
-    ATRACE_CALL();
-    binder::Status res;
-    status_t ret = OK;
-    if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
-
-    Mutex::Autolock icl(mBinderSerializationLock);
-
-    if (!mDevice.get()) {
-        return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
-    }
-
-    auto operatingMode = sessionConfiguration.getOperatingMode();
-    res = SessionConfigurationUtils::checkOperatingMode(operatingMode, mDevice->info(),
-            mCameraIdStr);
-    if (!res.isOk()) {
-        return res;
-    }
-
-    camera3::metadataGetter getMetadata = [this](const std::string &id,
-            bool /*overrideForPerfClass*/) {
-          return mDevice->infoPhysical(id);};
-    ret = mProviderManager->getSessionCharacteristics(mCameraIdStr.c_str(),
-            sessionConfiguration, mOverrideForPerfClass, getMetadata,
-            sessionCharacteristics);
-
-    switch (ret) {
-        case OK:
-            // Expected, do nothing.
-            break;
-        case INVALID_OPERATION: {
-                std::string msg = fmt::sprintf(
-                        "Camera %s: Session characteristics query not supported!",
-                        mCameraIdStr.c_str());
-                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
-            }
-
-            break;
-        default: {
-                std::string msg = fmt::sprintf( "Camera %s: Error: %s (%d)", mCameraIdStr.c_str(),
-                        strerror(-ret), ret);
-                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                        msg.c_str());
-            }
-    }
-
-    return res;
-}
-
 binder::Status CameraDeviceClient::deleteStream(int streamId) {
     ATRACE_CALL();
     ALOGV("%s (streamId = 0x%x)", __FUNCTION__, streamId);

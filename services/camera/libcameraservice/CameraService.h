@@ -248,6 +248,11 @@ public:
             /*out*/
             bool* supported);
 
+    virtual binder::Status getSessionCharacteristics(
+            const std::string& cameraId, int targetSdkVersion, bool overrideToPortrait,
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/ CameraMetadata* outMetadata);
+
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
                                    Parcel* reply, uint32_t flags);
