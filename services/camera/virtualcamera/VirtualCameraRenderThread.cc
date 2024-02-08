@@ -26,6 +26,7 @@
 #include <thread>
 
 #include "GLES/gl.h"
+#include "VirtualCameraDevice.h"
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
@@ -81,6 +82,7 @@ CameraMetadata createCaptureResultMetadata(
           .setControlAfMode(ANDROID_CONTROL_AF_MODE_AUTO)
           .setControlAwbMode(ANDROID_CONTROL_AWB_MODE_AUTO)
           .setFlashState(ANDROID_FLASH_STATE_UNAVAILABLE)
+          .setFocalLength(VirtualCameraDevice::kFocalLength)
           .setSensorTimestamp(timestamp)
           .build();
   if (metadata == nullptr) {

@@ -99,10 +99,14 @@ MetadataBuilder& MetadataBuilder::setSensorReadoutTimestamp(
   return *this;
 }
 
-MetadataBuilder& MetadataBuilder::setFocalLength(float focalLength) {
-  std::vector<float> focalLengths({focalLength});
-  mEntryMap[ANDROID_LENS_FOCAL_LENGTH] = focalLengths;
+MetadataBuilder& MetadataBuilder::setAvailableFocalLengths(
+    const std::vector<float>& focalLengths) {
   mEntryMap[ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS] = focalLengths;
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setFocalLength(float focalLength) {
+  mEntryMap[ANDROID_LENS_FOCAL_LENGTH] = asVectorOf<float>(focalLength);
   return *this;
 }
 
