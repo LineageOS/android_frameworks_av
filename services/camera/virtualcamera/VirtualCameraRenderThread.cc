@@ -74,7 +74,15 @@ static constexpr std::chrono::milliseconds kAcquireFenceTimeout = 500ms;
 CameraMetadata createCaptureResultMetadata(
     const std::chrono::nanoseconds timestamp) {
   std::unique_ptr<CameraMetadata> metadata =
-      MetadataBuilder().setSensorTimestamp(timestamp).build();
+      MetadataBuilder()
+          .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
+          .setControlAePrecaptureTrigger(
+              ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
+          .setControlAfMode(ANDROID_CONTROL_AF_MODE_AUTO)
+          .setControlAwbMode(ANDROID_CONTROL_AWB_MODE_AUTO)
+          .setFlashState(ANDROID_FLASH_STATE_UNAVAILABLE)
+          .setSensorTimestamp(timestamp)
+          .build();
   if (metadata == nullptr) {
     ALOGE("%s: Failed to build capture result metadata", __func__);
     return CameraMetadata();
