@@ -96,8 +96,10 @@ class MetadataBuilder {
       camera_metadata_enum_android_sensor_readout_timestamp_t
           sensorReadoutTimestamp);
 
-  // See ANDROID_LENS_FOCAL_LENGTH and ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS
-  // in CameraMetadataTag.aidl.
+  // See ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS in CameraMetadataTag.aidl.
+  MetadataBuilder& setAvailableFocalLengths(const std::vector<float>& focalLengths);
+
+  // See ANDROID_LENS_FOCAL_LENGTH in CameraMetadataTag.aidl.
   MetadataBuilder& setFocalLength(float focalLength);
 
   // See ANDROID_SENSOR_ORIENTATION in CameraMetadataTag.aidl.

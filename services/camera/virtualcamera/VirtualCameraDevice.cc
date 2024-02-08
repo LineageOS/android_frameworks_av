@@ -152,7 +152,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setFlashAvailable(false)
           .setLensFacing(
               static_cast<camera_metadata_enum_android_lens_facing>(lensFacing))
-          .setFocalLength(43.0)
+          .setAvailableFocalLengths({VirtualCameraDevice::kFocalLength})
           .setSensorOrientation(static_cast<int32_t>(sensorOrientation))
           .setSensorReadoutTimestamp(
               ANDROID_SENSOR_READOUT_TIMESTAMP_NOT_SUPPORTED)
@@ -198,7 +198,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setAvailableResultKeys(
               {ANDROID_CONTROL_AE_MODE, ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER,
                ANDROID_CONTROL_AF_MODE, ANDROID_CONTROL_AWB_MODE,
-               ANDROID_FLASH_STATE, ANDROID_SENSOR_TIMESTAMP})
+               ANDROID_FLASH_STATE, ANDROID_SENSOR_TIMESTAMP,
+               ANDROID_LENS_FOCAL_LENGTH})
           .setAvailableCapabilities(
               {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE});
 

@@ -111,6 +111,9 @@ class VirtualCameraDevice
   // load.
   static const int32_t kMaxNumberOfStallStreams = 1;
 
+  // Focal length for full frame sensor.
+  constexpr static const float kFocalLength = 43.0;
+
  private:
   std::shared_ptr<VirtualCameraDevice> sharedFromThis();
 
