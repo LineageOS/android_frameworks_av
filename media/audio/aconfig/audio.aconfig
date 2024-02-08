@@ -57,3 +57,10 @@ flag {
     description: "Enable stereo channel mask for spatialization."
     bug: "303920722"
 }
+
+flag {
+    name: "volume_refactoring"
+    namespace: "media_audio"
+    description: "Refactor the audio volume internal architecture logic"
+    bug: "324152869"
+}
