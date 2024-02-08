@@ -161,7 +161,7 @@ class ReverbContext final : public EffectContext {
     std::mutex mMutex;
     const lvm::ReverbEffectType mType;
     bool mEnabled = false;
-    LVREV_Handle_t mInstance GUARDED_BY(mMutex);
+    LVREV_Handle_t mInstance GUARDED_BY(mMutex) = LVM_NULL;
 
     int mRoomLevel = 0;
     int mRoomHfLevel = 0;
