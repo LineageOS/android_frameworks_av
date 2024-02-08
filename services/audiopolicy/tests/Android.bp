@@ -34,11 +34,14 @@ cc_test {
         "libutils",
         "libcutils",
         "libxml2",
+        "server_configurable_flags",
     ],
 
     static_libs: [
+        "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "libaudiopolicycomponents",
+        "libflagtest",
         "libgmock",
     ],
 

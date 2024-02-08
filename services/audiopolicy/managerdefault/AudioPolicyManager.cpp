@@ -42,6 +42,7 @@
 #include <Serializer.h>
 #include <android/media/audio/common/AudioPort.h>
 #include <com_android_media_audio.h>
+#include <android_media_audiopolicy.h>
 #include <com_android_media_audioserver.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
@@ -57,6 +58,9 @@
 #include "TypeConverter.h"
 
 namespace android {
+
+
+namespace audio_flags = android::media::audiopolicy;
 
 using android::media::audio::common::AudioDevice;
 using android::media::audio::common::AudioDeviceAddress;
@@ -3863,6 +3867,24 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
         updateCallAndOutputRouting();
     }
     return res;
+}
+
+status_t AudioPolicyManager::getRegisteredPolicyMixes(std::vector<AudioMix>& _aidl_return) {
+    if (!audio_flags::audio_mix_test_api()) {
+        return INVALID_OPERATION;
+    }
+
+    _aidl_return.clear();
+    _aidl_return.reserve(mPolicyMixes.size());
+    for (const auto &policyMix: mPolicyMixes) {
+        _aidl_return.emplace_back(policyMix->mCriteria, policyMix->mMixType,
+                             policyMix->mFormat, policyMix->mRouteFlags, policyMix->mDeviceAddress,
+                             policyMix->mCbFlags);
+        _aidl_return.back().mDeviceType = policyMix->mDeviceType;
+    }
+
+    ALOGVV("%s() returning %zu registered mixes", __func__, _aidl_return->size());
+    return OK;
 }
 
 status_t AudioPolicyManager::updatePolicyMix(
