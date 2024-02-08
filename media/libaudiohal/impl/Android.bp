@@ -83,32 +83,6 @@ cc_defaults {
 }
 
 cc_library_shared {
-    name: "libaudiohal@4.0",
-    defaults: [
-        "libaudiohal_default",
-        "libaudiohal_hidl_default"
-    ],
-    srcs: [
-        ":audio_core_hal_client_sources",
-        ":audio_effect_hidl_hal_client_sources",
-        "EffectsFactoryHalEntry.cpp",
-    ],
-    shared_libs: [
-        "android.hardware.audio.common@4.0",
-        "android.hardware.audio.common@4.0-util",
-        "android.hardware.audio.effect@4.0",
-        "android.hardware.audio.effect@4.0-util",
-        "android.hardware.audio@4.0",
-        "android.hardware.audio@4.0-util",
-    ],
-    cflags: [
-        "-DMAJOR_VERSION=4",
-        "-DMINOR_VERSION=0",
-        "-include common/all-versions/VersionMacro.h",
-    ]
-}
-
-cc_library_shared {
     name: "libaudiohal@5.0",
     defaults: [
         "libaudiohal_default",
