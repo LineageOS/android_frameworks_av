@@ -317,7 +317,7 @@ int HapticGenerator_SetParameter(struct HapticGeneratorContext *context,
         }
         int id = *(int *) value;
         os::HapticScale hapticIntensity = static_cast<os::HapticScale>(*((int *) value + 1));
-        ALOGD("Setting haptic intensity as %d", hapticIntensity);
+        ALOGD("Setting haptic intensity as %d", static_cast<int>(hapticIntensity));
         if (hapticIntensity == os::HapticScale::MUTE) {
             context->param.id2Intensity.erase(id);
         } else {
