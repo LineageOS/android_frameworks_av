@@ -51,12 +51,17 @@ std::vector<To> convertTo(const std::vector<From>& from) {
   return to;
 }
 
+template <typename To, typename From>
+std::vector<To> asVectorOf(const From from) {
+  return std::vector<To>({static_cast<To>(from)});
+}
+
 }  // namespace
 
 MetadataBuilder& MetadataBuilder::setSupportedHardwareLevel(
     camera_metadata_enum_android_info_supported_hardware_level_t hwLevel) {
   mEntryMap[ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL] =
-      std::vector<uint8_t>({static_cast<uint8_t>(hwLevel)});
+      asVectorOf<uint8_t>(hwLevel);
   return *this;
 }
 
@@ -64,14 +69,25 @@ MetadataBuilder& MetadataBuilder::setFlashAvailable(bool flashAvailable) {
   const uint8_t metadataVal = flashAvailable
                                   ? ANDROID_FLASH_INFO_AVAILABLE_TRUE
                                   : ANDROID_FLASH_INFO_AVAILABLE_FALSE;
-  mEntryMap[ANDROID_FLASH_INFO_AVAILABLE] = std::vector<uint8_t>({metadataVal});
+  mEntryMap[ANDROID_FLASH_INFO_AVAILABLE] = asVectorOf<uint8_t>(metadataVal);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setFlashState(
+    const camera_metadata_enum_android_flash_state_t flashState) {
+  mEntryMap[ANDROID_FLASH_STATE] = asVectorOf<uint8_t>(flashState);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setFlashMode(
+    const camera_metadata_enum_android_flash_mode_t flashMode) {
+  mEntryMap[ANDROID_FLASH_MODE] = asVectorOf<uint8_t>(flashMode);
   return *this;
 }
 
 MetadataBuilder& MetadataBuilder::setLensFacing(
     camera_metadata_enum_android_lens_facing lensFacing) {
-  mEntryMap[ANDROID_LENS_FACING] =
-      std::vector<uint8_t>({static_cast<uint8_t>(lensFacing)});
+  mEntryMap[ANDROID_LENS_FACING] = asVectorOf<uint8_t>(lensFacing);
   return *this;
 }
 
@@ -79,20 +95,23 @@ MetadataBuilder& MetadataBuilder::setSensorReadoutTimestamp(
     const camera_metadata_enum_android_sensor_readout_timestamp_t
         sensorReadoutTimestamp) {
   mEntryMap[ANDROID_SENSOR_READOUT_TIMESTAMP] =
-      std::vector<uint8_t>({static_cast<uint8_t>(sensorReadoutTimestamp)});
+      asVectorOf<uint8_t>(sensorReadoutTimestamp);
   return *this;
 }
 
-MetadataBuilder& MetadataBuilder::setFocalLength(float focalLength) {
-  std::vector<float> focalLengths({focalLength});
-  mEntryMap[ANDROID_LENS_FOCAL_LENGTH] = focalLengths;
+MetadataBuilder& MetadataBuilder::setAvailableFocalLengths(
+    const std::vector<float>& focalLengths) {
   mEntryMap[ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS] = focalLengths;
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setFocalLength(float focalLength) {
+  mEntryMap[ANDROID_LENS_FOCAL_LENGTH] = asVectorOf<float>(focalLength);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setSensorOrientation(int32_t sensorOrientation) {
-  mEntryMap[ANDROID_SENSOR_ORIENTATION] =
-      std::vector<int32_t>({sensorOrientation});
+  mEntryMap[ANDROID_SENSOR_ORIENTATION] = asVectorOf<int32_t>(sensorOrientation);
   return *this;
 }
 
@@ -100,14 +119,13 @@ MetadataBuilder& MetadataBuilder::setSensorTimestampSource(
     const camera_metadata_enum_android_sensor_info_timestamp_source_t
         timestampSource) {
   mEntryMap[ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE] =
-      std::vector<uint8_t>({static_cast<uint8_t>(timestampSource)});
+      asVectorOf<uint8_t>(timestampSource);
   return *this;
 }
 
 MetadataBuilder& MetadataBuilder::setSensorTimestamp(
     std::chrono::nanoseconds timestamp) {
-  mEntryMap[ANDROID_SENSOR_TIMESTAMP] =
-      std::vector<int64_t>({timestamp.count()});
+  mEntryMap[ANDROID_SENSOR_TIMESTAMP] = asVectorOf<int64_t>(timestamp.count());
   return *this;
 }
 
@@ -119,11 +137,25 @@ MetadataBuilder& MetadataBuilder::setAvailableFaceDetectModes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setFaceDetectMode(
+    const camera_metadata_enum_android_statistics_face_detect_mode_t
+        faceDetectMode) {
+  mEntryMap[ANDROID_STATISTICS_FACE_DETECT_MODE] =
+      asVectorOf<uint8_t>(faceDetectMode);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setControlAvailableModes(
     const std::vector<camera_metadata_enum_android_control_mode_t>&
         availableModes) {
   mEntryMap[ANDROID_CONTROL_AVAILABLE_MODES] =
       convertTo<uint8_t>(availableModes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlMode(
+    const camera_metadata_enum_android_control_mode_t mode) {
+  mEntryMap[ANDROID_CONTROL_MODE] = asVectorOf<uint8_t>(mode);
   return *this;
 }
 
@@ -153,15 +185,52 @@ MetadataBuilder& MetadataBuilder::setControlAfAvailableModes(
 
 MetadataBuilder& MetadataBuilder::setControlAfMode(
     const camera_metadata_enum_android_control_af_mode_t mode) {
-  mEntryMap[ANDROID_CONTROL_AF_MODE] =
-      std::vector<uint8_t>({static_cast<uint8_t>(mode)});
+  mEntryMap[ANDROID_CONTROL_AF_MODE] = asVectorOf<uint8_t>(mode);
   return *this;
 }
 
-MetadataBuilder& MetadataBuilder::setControlAeAvailableFpsRange(
+// See ANDROID_CONTROL_AF_TRIGGER_MODE in CameraMetadataTag.aidl.
+MetadataBuilder& MetadataBuilder::setControlAfTrigger(
+    const camera_metadata_enum_android_control_af_trigger_t trigger) {
+  mEntryMap[ANDROID_CONTROL_AF_TRIGGER] = asVectorOf<uint8_t>(trigger);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAeAvailableFpsRanges(
+    const std::vector<FpsRange>& fpsRanges) {
+  std::vector<int32_t> ranges;
+  ranges.resize(2 * fpsRanges.size());
+  for (const FpsRange fpsRange : fpsRanges) {
+    ranges.push_back(fpsRange.minFps);
+    ranges.push_back(fpsRange.maxFps);
+  }
+  mEntryMap[ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES] = std::move(ranges);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAeTargetFpsRange(
     const int32_t minFps, const int32_t maxFps) {
-  mEntryMap[ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES] =
+  mEntryMap[ANDROID_CONTROL_AE_TARGET_FPS_RANGE] =
       std::vector<int32_t>({minFps, maxFps});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAeMode(
+    camera_metadata_enum_android_control_ae_mode_t mode) {
+  mEntryMap[ANDROID_CONTROL_AE_MODE] = asVectorOf<uint8_t>(mode);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAeAvailableModes(
+    const std::vector<camera_metadata_enum_android_control_ae_mode_t>& modes) {
+  mEntryMap[ANDROID_CONTROL_AE_AVAILABLE_MODES] = convertTo<uint8_t>(modes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAePrecaptureTrigger(
+    const camera_metadata_enum_android_control_ae_precapture_trigger_t trigger) {
+  mEntryMap[ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER] =
+      asVectorOf<uint8_t>(trigger);
   return *this;
 }
 
@@ -179,6 +248,12 @@ MetadataBuilder& MetadataBuilder::setControlAvailableAwbModes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setControlAwbMode(
+    const camera_metadata_enum_android_control_awb_mode awbMode) {
+  mEntryMap[ANDROID_CONTROL_AWB_MODE] = asVectorOf<uint8_t>(awbMode);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setControlAwbLockAvailable(
     const bool awbLockAvailable) {
   const uint8_t lockAvailable = awbLockAvailable
@@ -189,13 +264,29 @@ MetadataBuilder& MetadataBuilder::setControlAwbLockAvailable(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setControlAeAvailableAntibandingModes(
+    const std::vector<camera_metadata_enum_android_control_ae_antibanding_mode_t>&
+        antibandingModes) {
+  mEntryMap[ANDROID_CONTROL_AE_AVAILABLE_ANTIBANDING_MODES] =
+      convertTo<uint8_t>(antibandingModes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAeAntibandingMode(
+    const camera_metadata_enum_android_control_ae_antibanding_mode_t
+        antibandingMode) {
+  mEntryMap[ANDROID_CONTROL_AE_ANTIBANDING_MODE] =
+      asVectorOf<uint8_t>(antibandingMode);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setControlAeLockAvailable(
     const bool aeLockAvailable) {
   const uint8_t lockAvailable = aeLockAvailable
                                     ? ANDROID_CONTROL_AE_LOCK_AVAILABLE_TRUE
                                     : ANDROID_CONTROL_AE_LOCK_AVAILABLE_FALSE;
   mEntryMap[ANDROID_CONTROL_AE_LOCK_AVAILABLE] =
-      std::vector<uint8_t>({lockAvailable});
+      asVectorOf<uint8_t>(lockAvailable);
   return *this;
 }
 
@@ -246,13 +337,12 @@ MetadataBuilder& MetadataBuilder::setControlAwbRegions(
 
 MetadataBuilder& MetadataBuilder::setControlCaptureIntent(
     const camera_metadata_enum_android_control_capture_intent_t intent) {
-  mEntryMap[ANDROID_CONTROL_CAPTURE_INTENT] =
-      std::vector<uint8_t>({static_cast<uint8_t>(intent)});
+  mEntryMap[ANDROID_CONTROL_CAPTURE_INTENT] = asVectorOf<uint8_t>(intent);
   return *this;
 }
 
 MetadataBuilder& MetadataBuilder::setMaxJpegSize(const int32_t size) {
-  mEntryMap[ANDROID_JPEG_MAX_SIZE] = std::vector<int32_t>({size});
+  mEntryMap[ANDROID_JPEG_MAX_SIZE] = asVectorOf<int32_t>(size);
   return *this;
 }
 
@@ -264,7 +354,7 @@ MetadataBuilder& MetadataBuilder::setJpegAvailableThumbnailSizes(
     sizes.push_back(resolution.width);
     sizes.push_back(resolution.height);
   }
-  mEntryMap[ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES] = sizes;
+  mEntryMap[ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES] = std::move(sizes);
   return *this;
 }
 
@@ -278,8 +368,7 @@ MetadataBuilder& MetadataBuilder::setMaxNumberOutputStreams(
 
 MetadataBuilder& MetadataBuilder::setSyncMaxLatency(
     camera_metadata_enum_android_sync_max_latency latency) {
-  mEntryMap[ANDROID_SYNC_MAX_LATENCY] =
-      std::vector<int32_t>({static_cast<int32_t>(latency)});
+  mEntryMap[ANDROID_SYNC_MAX_LATENCY] = asVectorOf<int32_t>(latency);
   return *this;
 }
 
@@ -319,17 +408,18 @@ MetadataBuilder& MetadataBuilder::setAvailableOutputStreamConfigurations(
   }
 
   mEntryMap[ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS] =
-      metadataStreamConfigs;
+      std::move(metadataStreamConfigs);
   mEntryMap[ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS] =
-      metadataMinFrameDurations;
-  mEntryMap[ANDROID_SCALER_AVAILABLE_STALL_DURATIONS] = metadataStallDurations;
+      std::move(metadataMinFrameDurations);
+  mEntryMap[ANDROID_SCALER_AVAILABLE_STALL_DURATIONS] =
+      std::move(metadataStallDurations);
 
   return *this;
 }
 
 MetadataBuilder& MetadataBuilder::setAvailableMaxDigitalZoom(const float maxZoom) {
   mEntryMap[ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM] =
-      std::vector<float>({maxZoom});
+      asVectorOf<float>(maxZoom);
   return *this;
 }
 
@@ -370,7 +460,14 @@ MetadataBuilder& MetadataBuilder::setControlAeCompensationRange(int32_t min,
 MetadataBuilder& MetadataBuilder::setControlAeCompensationStep(
     const camera_metadata_rational step) {
   mEntryMap[ANDROID_CONTROL_AE_COMPENSATION_STEP] =
-      std::vector<camera_metadata_rational>({step});
+      asVectorOf<camera_metadata_rational>(step);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAeExposureCompensation(
+    const int32_t exposureCompensation) {
+  mEntryMap[ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION] =
+      asVectorOf<int32_t>(exposureCompensation);
   return *this;
 }
 

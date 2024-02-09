@@ -23,7 +23,6 @@ cc_library_shared {
     ],
 
     required: [
-        "libaudiohal@4.0",
         "libaudiohal@5.0",
         "libaudiohal@6.0",
         "libaudiohal@7.0",

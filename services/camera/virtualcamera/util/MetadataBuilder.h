@@ -59,6 +59,15 @@ class MetadataBuilder {
     int32_t weight = 0;
   };
 
+  struct FpsRange {
+    int32_t minFps;
+    int32_t maxFps;
+
+    bool operator<(const FpsRange& other) const {
+      return std::tuple(minFps, maxFps) < std::tuple(other.minFps, other.maxFps);
+    }
+  };
+
   MetadataBuilder() = default;
   ~MetadataBuilder() = default;
 
@@ -70,6 +79,14 @@ class MetadataBuilder {
   // See ANDROID_FLASH_INFO_AVAILABLE in CameraMetadataTag.aidl.
   MetadataBuilder& setFlashAvailable(bool flashAvailable);
 
+  // See FLASH_STATE in CaptureResult.java.
+  MetadataBuilder& setFlashState(
+      camera_metadata_enum_android_flash_state_t flashState);
+
+  // See FLASH_MODE in CaptureRequest.java.
+  MetadataBuilder& setFlashMode(
+      camera_metadata_enum_android_flash_mode_t flashMode);
+
   // See ANDROID_LENS_FACING in CameraMetadataTag.aidl.
   MetadataBuilder& setLensFacing(
       camera_metadata_enum_android_lens_facing lensFacing);
@@ -79,8 +96,10 @@ class MetadataBuilder {
       camera_metadata_enum_android_sensor_readout_timestamp_t
           sensorReadoutTimestamp);
 
-  // See ANDROID_LENS_FOCAL_LENGTH and ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS
-  // in CameraMetadataTag.aidl.
+  // See ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS in CameraMetadataTag.aidl.
+  MetadataBuilder& setAvailableFocalLengths(const std::vector<float>& focalLengths);
+
+  // See ANDROID_LENS_FOCAL_LENGTH in CameraMetadataTag.aidl.
   MetadataBuilder& setFocalLength(float focalLength);
 
   // See ANDROID_SENSOR_ORIENTATION in CameraMetadataTag.aidl.
@@ -110,6 +129,10 @@ class MetadataBuilder {
       const std::vector<camera_metadata_enum_android_statistics_face_detect_mode_t>&
           faceDetectMode);
 
+  // See ANDROID_STATISTICS_FACE_DETECT_MODE in CaptureRequest.java.
+  MetadataBuilder& setFaceDetectMode(
+      camera_metadata_enum_android_statistics_face_detect_mode_t faceDetectMode);
+
   // Sets available stream configurations along with corresponding minimal frame
   // durations (corresponding to max fps) and stall durations.
   //
@@ -124,6 +147,10 @@ class MetadataBuilder {
       const std::vector<camera_metadata_enum_android_control_mode_t>&
           availableModes);
 
+  // See ANDROID_CONTROL_MODE in CaptureRequest.java.
+  MetadataBuilder& setControlMode(
+      camera_metadata_enum_android_control_mode_t mode);
+
   // See ANDROID_CONTROL_AVAILABLE_SCENE_MODES in CameraMetadataTag.aidl.
   MetadataBuilder& setControlAvailableSceneModes(
       const std::vector<camera_metadata_enum_android_control_scene_mode>&
@@ -134,11 +161,35 @@ class MetadataBuilder {
       const std::vector<camera_metadata_enum_android_control_effect_mode>&
           availableEffects);
 
+  // See CONTROL_AE_AVAILABLE_ANTIBANDING_MODES in CameraCharacteristics.java.
+  MetadataBuilder& setControlAeAvailableAntibandingModes(
+      const std::vector<camera_metadata_enum_android_control_ae_antibanding_mode_t>&
+          antibandingModes);
+
+  // See CONTROL_AE_ANTIBANDING_MODE in CaptureRequest.java.
+  MetadataBuilder& setControlAeAntibandingMode(
+      camera_metadata_enum_android_control_ae_antibanding_mode_t antibandingMode);
+
   // See ANDROID_CONTROL_AE_COMPENSATION_RANGE in CameraMetadataTag.aidl.
   MetadataBuilder& setControlAeCompensationRange(int32_t min, int32_t max);
 
   // See ANDROID_CONTROL_AE_COMPENSATION_STEP in CameraMetadataTag.aidl.
   MetadataBuilder& setControlAeCompensationStep(camera_metadata_rational step);
+
+  // See ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION in CameraMetadataTag.aidl.
+  MetadataBuilder& setControlAeExposureCompensation(int32_t exposureCompensation);
+
+  // See ANDROID_CONTROL_AE_AVAILABLE_MODES in CameraCharacteristics.java.
+  MetadataBuilder& setControlAeAvailableModes(
+      const std::vector<camera_metadata_enum_android_control_ae_mode_t>& modes);
+
+  // See ANDROID_CONTROL_AE_MODE in CaptureRequest.java.
+  MetadataBuilder& setControlAeMode(
+      camera_metadata_enum_android_control_ae_mode_t step);
+
+  // See ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER in CaptureRequest.java.
+  MetadataBuilder& setControlAePrecaptureTrigger(
+      camera_metadata_enum_android_control_ae_precapture_trigger_t trigger);
 
   // See ANDROID_CONTROL_AF_AVAILABLE_MODES in CameraMetadataTag.aidl.
   MetadataBuilder& setControlAfAvailableModes(
@@ -149,8 +200,16 @@ class MetadataBuilder {
   MetadataBuilder& setControlAfMode(
       const camera_metadata_enum_android_control_af_mode_t mode);
 
+  // See ANDROID_CONTROL_AF_TRIGGER_MODE in CameraMetadataTag.aidl.
+  MetadataBuilder& setControlAfTrigger(
+      const camera_metadata_enum_android_control_af_trigger_t trigger);
+
   // See ANDROID_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES in CameraMetadataTag.aidl.
-  MetadataBuilder& setControlAeAvailableFpsRange(int32_t min, int32_t max);
+  MetadataBuilder& setControlAeAvailableFpsRanges(
+      const std::vector<FpsRange>& fpsRanges);
+
+  // See ANDROID_CONTROL_AE_TARGET_FPS_RANGE in CaptureRequest.java.
+  MetadataBuilder& setControlAeTargetFpsRange(int32_t min, int32_t max);
 
   // See ANDROID_CONTROL_CAPTURE_INTENT in CameraMetadataTag.aidl.
   MetadataBuilder& setControlCaptureIntent(
@@ -164,6 +223,10 @@ class MetadataBuilder {
   // See ANDROID_CONTROL_AWB_AVAILABLE_MODES in CameraMetadataTag.aidl.
   MetadataBuilder& setControlAvailableAwbModes(
       const std::vector<camera_metadata_enum_android_control_awb_mode>& awbModes);
+
+  // See ANDROID_CONTROL_AWB_AVAILABLE_MODE in CaptureRequest.java.
+  MetadataBuilder& setControlAwbMode(
+      camera_metadata_enum_android_control_awb_mode awb);
 
   // See CONTROL_AWB_LOCK_AVAILABLE in CameraMetadataTag.aidl.
   MetadataBuilder& setControlAwbLockAvailable(bool awbLockAvailable);

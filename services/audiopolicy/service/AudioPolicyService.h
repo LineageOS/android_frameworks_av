@@ -311,6 +311,8 @@ public:
     binder::Status clearPreferredMixerAttributes(const media::audio::common::AudioAttributes& attr,
                                                  int32_t portId,
                                                  int32_t uid) override;
+    binder::Status getRegisteredPolicyMixes(
+            std::vector <::android::media::AudioMix>* mixes) override;
 
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 

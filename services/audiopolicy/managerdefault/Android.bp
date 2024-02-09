@@ -45,6 +45,7 @@ cc_library_shared {
         "libaudioclient_aidl_conversion",
         "audioclient-types-aidl-cpp",
         // Flag support
+        "android.media.audiopolicy-aconfig-cc",
         "com.android.media.audioserver-aconfig-cc",
     ],
 

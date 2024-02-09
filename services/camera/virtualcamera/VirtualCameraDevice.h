@@ -94,6 +94,10 @@ class VirtualCameraDevice
 
   uint32_t getCameraId() const { return mCameraId; }
 
+  const std::vector<
+      aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
+  getInputConfigs() const;
+
   // Maximal number of RAW streams - virtual camera doesn't support RAW streams.
   static const int32_t kMaxNumberOfRawStreams = 0;
 
@@ -106,6 +110,9 @@ class VirtualCameraDevice
   // streams. Can be increaed at the cost of potential cost of more GPU/CPU
   // load.
   static const int32_t kMaxNumberOfStallStreams = 1;
+
+  // Focal length for full frame sensor.
+  constexpr static const float kFocalLength = 43.0;
 
  private:
   std::shared_ptr<VirtualCameraDevice> sharedFromThis();

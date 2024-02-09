@@ -22,6 +22,13 @@ flag {
 }
 
 flag {
+    name: "feature_spatial_audio_headtracking_low_latency"
+    namespace: "media_audio"
+    description: "Define feature for low latency headtracking for SA"
+    bug: "324291076"
+}
+
+flag {
     name: "focus_exclusive_with_recording"
     namespace: "media_audio"
     description:
@@ -77,4 +84,11 @@ flag {
     namespace: "media_audio"
     description: "Surface new API method AudioManager.getSupportedDeviceTypes()"
     bug: "307537538"
+}
+
+flag {
+    name: "volume_ringer_api_hardening"
+    namespace: "media_audio"
+    description: "Limit access to volume and ringer SDK APIs in AudioManager"
+    bug: "296232417"
 }
