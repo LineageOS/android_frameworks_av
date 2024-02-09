@@ -41,7 +41,7 @@ cc_defaults {
     ],
     header_libs: [
         "android.hardware.audio.common.util@all-versions",
-    ]
+    ],
 }
 
 cc_defaults {
@@ -71,7 +71,7 @@ cc_defaults {
     ],
     header_libs: [
         "libaudioclient_headers",
-        "libaudiohal_headers"
+        "libaudiohal_headers",
     ],
     defaults: [
         "latest_android_media_audio_common_types_cpp_export_shared",
@@ -86,7 +86,7 @@ cc_library_shared {
     name: "libaudiohal@5.0",
     defaults: [
         "libaudiohal_default",
-        "libaudiohal_hidl_default"
+        "libaudiohal_hidl_default",
     ],
     srcs: [
         ":audio_core_hal_client_sources",
@@ -105,14 +105,14 @@ cc_library_shared {
         "-DMAJOR_VERSION=5",
         "-DMINOR_VERSION=0",
         "-include common/all-versions/VersionMacro.h",
-    ]
+    ],
 }
 
 cc_library_shared {
     name: "libaudiohal@6.0",
     defaults: [
         "libaudiohal_default",
-        "libaudiohal_hidl_default"
+        "libaudiohal_hidl_default",
     ],
     srcs: [
         ":audio_core_hal_client_sources",
@@ -131,14 +131,14 @@ cc_library_shared {
         "-DMAJOR_VERSION=6",
         "-DMINOR_VERSION=0",
         "-include common/all-versions/VersionMacro.h",
-    ]
+    ],
 }
 
 cc_library_static {
     name: "libaudiohal.effect@7.0",
     defaults: [
         "libaudiohal_default",
-        "libaudiohal_hidl_default"
+        "libaudiohal_hidl_default",
     ],
     srcs: [
         ":audio_effect_hidl_hal_client_sources",
@@ -153,14 +153,14 @@ cc_library_static {
         "-DMAJOR_VERSION=7",
         "-DMINOR_VERSION=0",
         "-include common/all-versions/VersionMacro.h",
-    ]
+    ],
 }
 
 cc_library_shared {
     name: "libaudiohal@7.0",
     defaults: [
         "libaudiohal_default",
-        "libaudiohal_hidl_default"
+        "libaudiohal_hidl_default",
     ],
     srcs: [
         ":audio_core_hal_client_sources",
@@ -180,7 +180,7 @@ cc_library_shared {
         "-DMAJOR_VERSION=7",
         "-DMINOR_VERSION=0",
         "-include common/all-versions/VersionMacro.h",
-    ]
+    ],
 }
 
 cc_library_shared {
@@ -189,7 +189,7 @@ cc_library_shared {
         "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "latest_android_hardware_audio_sounddose_ndk_shared",
         "libaudiohal_default",
-        "libaudiohal_hidl_default"
+        "libaudiohal_hidl_default",
     ],
     srcs: [
         ":audio_core_hal_client_sources",
@@ -216,7 +216,7 @@ cc_library_shared {
         "-DCOMMON_TYPES_MINOR_VERSION=0",
         "-DCORE_TYPES_MINOR_VERSION=0",
         "-include common/all-versions/VersionMacro.h",
-    ]
+    ],
 }
 
 cc_defaults {
@@ -261,9 +261,30 @@ cc_library_shared {
     ],
     srcs: [
         "DevicesFactoryHalEntry.cpp",
+        "EffectsFactoryHalEntry.cpp",
+        ":audio_effect_hal_aidl_src_files",
+        ":core_audio_hal_aidl_src_files",
+    ],
+}
+
+filegroup {
+    name: "core_audio_hal_aidl_src_files",
+    srcs: [
+        "ConversionHelperAidl.cpp",
+        "DeviceHalAidl.cpp",
+        "DevicesFactoryHalAidl.cpp",
+        "Hal2AidlMapper.cpp",
+        "StreamHalAidl.cpp",
+    ],
+}
+
+filegroup {
+    name: "audio_effect_hal_aidl_src_files",
+    srcs: [
         "EffectConversionHelperAidl.cpp",
         "EffectBufferHalAidl.cpp",
         "EffectHalAidl.cpp",
+        "EffectsFactoryHalAidl.cpp",
         "effectsAidlConversion/AidlConversionAec.cpp",
         "effectsAidlConversion/AidlConversionAgc1.cpp",
         "effectsAidlConversion/AidlConversionAgc2.cpp",
@@ -280,21 +301,7 @@ cc_library_shared {
         "effectsAidlConversion/AidlConversionVendorExtension.cpp",
         "effectsAidlConversion/AidlConversionVirtualizer.cpp",
         "effectsAidlConversion/AidlConversionVisualizer.cpp",
-        "EffectsFactoryHalAidl.cpp",
-        "EffectsFactoryHalEntry.cpp",
         ":audio_effectproxy_src_files",
-        ":core_audio_hal_aidl_src_files",
-    ],
-}
-
-filegroup {
-    name: "core_audio_hal_aidl_src_files",
-    srcs: [
-        "ConversionHelperAidl.cpp",
-        "DeviceHalAidl.cpp",
-        "DevicesFactoryHalAidl.cpp",
-        "Hal2AidlMapper.cpp",
-        "StreamHalAidl.cpp",
     ],
 }
 
