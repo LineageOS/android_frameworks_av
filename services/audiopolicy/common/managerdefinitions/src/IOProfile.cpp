@@ -156,9 +156,9 @@ void IOProfile::toSupportedMixerAttributes(
         for (const auto sampleRate : profile->getSampleRates()) {
             for (const auto channelMask : profile->getChannels()) {
                 const audio_config_base_t config = {
-                        .format = profile->getFormat(),
                         .sample_rate = sampleRate,
-                        .channel_mask = channelMask
+                        .channel_mask = channelMask,
+                        .format = profile->getFormat(),
                 };
                 for (const auto mixerBehavior : mMixerBehaviors) {
                     mixerAttributes->push_back({
