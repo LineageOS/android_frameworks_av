@@ -6,6 +6,22 @@
 package: "android.media.audiopolicy"
 
 flag {
+    name: "audio_mix_ownership"
+    namespace: "media_audio"
+    description: "Improves ownership model of AudioMixes and the relationship between AudioPolicy and AudioMix."
+    bug: "309080867"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "audio_mix_policy_ordering"
+    namespace: "media_audio"
+    description: "Orders AudioMixes per registered AudioPolicy."
+    bug: "309080867"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "audio_mix_test_api"
     namespace: "media_audio"
     description: "Enable new Test APIs that provide access to registered AudioMixes on system server and native side."
@@ -32,4 +48,12 @@ flag {
     namespace: "media_audio"
     description: "Enable multi-zone audio support in audio product strategies."
     bug: "316643994"
+}
+
+flag {
+    name: "record_audio_device_aware_permission"
+    namespace: "media_audio"
+    description: "Enable device-aware permission handling for RECORD_AUDIO permission"
+    bug: "291737188"
+    is_fixed_read_only: true
 }
