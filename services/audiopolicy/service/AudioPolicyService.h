@@ -542,10 +542,6 @@ private:
             binder::Status onSensorPrivacyChanged(int toggleType, int sensor,
                                                   bool enabled);
 
-            binder::Status onSensorPrivacyStateChanged(int, int, int) {
-                return binder::Status::ok();
-            }
-
         private:
             wp<AudioPolicyService> mService;
             std::atomic_bool mSensorPrivacyEnabled = false;
