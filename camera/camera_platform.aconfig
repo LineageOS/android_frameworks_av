@@ -97,10 +97,3 @@ flag {
      description: "Enable returning graphics buffers to buffer queues without holding the in-flight mutex"
      bug: "315526878"
 }
-
-flag {
-     namespace: "camera_platform"
-     name: "privacy_allowlist"
-     description: "Allowlisting to exempt safety-relevant cameras from privacy control for automotive devices"
-     bug: "282814430"
-}
