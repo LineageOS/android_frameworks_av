@@ -137,6 +137,14 @@ MetadataBuilder& MetadataBuilder::setAvailableFaceDetectModes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setAvailableTestPatternModes(
+    const std::vector<camera_metadata_enum_android_sensor_test_pattern_mode>&
+        testPatternModes) {
+  mEntryMap[ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES] =
+      convertTo<int32_t>(testPatternModes);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setFaceDetectMode(
     const camera_metadata_enum_android_statistics_face_detect_mode_t
         faceDetectMode) {
@@ -175,6 +183,21 @@ MetadataBuilder& MetadataBuilder::setControlAvailableEffects(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setControlEffectMode(
+    const camera_metadata_enum_android_control_effect_mode_t effectMode) {
+  mEntryMap[ANDROID_CONTROL_EFFECT_MODE] = asVectorOf<uint8_t>(effectMode);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setControlAvailableVideoStabilizationModes(
+    const std::vector<
+        camera_metadata_enum_android_control_video_stabilization_mode_t>&
+        videoStabilizationModes) {
+  mEntryMap[ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES] =
+      convertTo<uint8_t>(videoStabilizationModes);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setControlAfAvailableModes(
     const std::vector<camera_metadata_enum_android_control_af_mode_t>&
         availableModes) {
@@ -199,7 +222,7 @@ MetadataBuilder& MetadataBuilder::setControlAfTrigger(
 MetadataBuilder& MetadataBuilder::setControlAeAvailableFpsRanges(
     const std::vector<FpsRange>& fpsRanges) {
   std::vector<int32_t> ranges;
-  ranges.resize(2 * fpsRanges.size());
+  ranges.reserve(2 * fpsRanges.size());
   for (const FpsRange fpsRange : fpsRanges) {
     ranges.push_back(fpsRange.minFps);
     ranges.push_back(fpsRange.maxFps);
@@ -341,8 +364,23 @@ MetadataBuilder& MetadataBuilder::setControlCaptureIntent(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setCropRegion(const int32_t x, const int32_t y,
+                                                const int32_t width,
+                                                const int32_t height) {
+  mEntryMap[ANDROID_SCALER_CROP_REGION] =
+      std::vector<int32_t>({x, y, width, height});
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setMaxJpegSize(const int32_t size) {
   mEntryMap[ANDROID_JPEG_MAX_SIZE] = asVectorOf<int32_t>(size);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setMaxFrameDuration(
+    const std::chrono::nanoseconds duration) {
+  mEntryMap[ANDROID_SENSOR_INFO_MAX_FRAME_DURATION] =
+      asVectorOf<int64_t>(duration.count());
   return *this;
 }
 
@@ -369,6 +407,16 @@ MetadataBuilder& MetadataBuilder::setMaxNumberOutputStreams(
 MetadataBuilder& MetadataBuilder::setSyncMaxLatency(
     camera_metadata_enum_android_sync_max_latency latency) {
   mEntryMap[ANDROID_SYNC_MAX_LATENCY] = asVectorOf<int32_t>(latency);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setPipelineMaxDepth(const uint8_t maxDepth) {
+  mEntryMap[ANDROID_REQUEST_PIPELINE_MAX_DEPTH] = asVectorOf<uint8_t>(maxDepth);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setPipelineDepth(const uint8_t depth) {
+  mEntryMap[ANDROID_REQUEST_PIPELINE_DEPTH] = asVectorOf<uint8_t>(depth);
   return *this;
 }
 

@@ -144,10 +144,12 @@ CameraMetadata createDefaultRequestSettings(
           .setControlAePrecaptureTrigger(
               ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
           .setControlAfTrigger(ANDROID_CONTROL_AF_TRIGGER_IDLE)
-          .setControlAfMode(ANDROID_CONTROL_AF_MODE_AUTO)
+          .setControlAfMode(ANDROID_CONTROL_AF_MODE_OFF)
           .setControlAwbMode(ANDROID_CONTROL_AWB_MODE_AUTO)
+          .setControlEffectMode(ANDROID_CONTROL_EFFECT_MODE_OFF)
           .setFaceDetectMode(ANDROID_STATISTICS_FACE_DETECT_MODE_OFF)
           .setFlashMode(ANDROID_FLASH_MODE_OFF)
+          .setFlashState(ANDROID_FLASH_STATE_UNAVAILABLE)
           .build();
   if (metadata == nullptr) {
     ALOGE("%s: Failed to construct metadata for default request type %s",
@@ -279,7 +281,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       // If there's no client callback, start camera in test mode.
       const bool testMode = mVirtualCameraClientCallback == nullptr;
       mRenderThread = std::make_unique<VirtualCameraRenderThread>(
-          mSessionContext, inputWidth, inputHeight, mCameraDeviceCallback,
+          mSessionContext, Resolution(inputWidth, inputHeight),
+          virtualCamera->getMaxInputResolution(), mCameraDeviceCallback,
           testMode);
       mRenderThread->start();
       inputSurface = mRenderThread->getInputSurface();
