@@ -643,7 +643,7 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
     int32_t count = mUpMessageQueue->getFifoBuffer()->write(command, 1);
     if (count != 1) {
         ALOGW("%s(): Queue full. Did client stop? Suspending stream. what = %u, %s",
-              __func__, command->what, getTypeText());
+              __func__, static_cast<unsigned>(command->what), getTypeText());
         setSuspended(true);
         return AAUDIO_ERROR_WOULD_BLOCK;
     } else {
