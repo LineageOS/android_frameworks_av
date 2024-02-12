@@ -256,7 +256,7 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onMomentaryExposureWa
     auto id = soundDoseManager->getIdForAudioDevice(in_audioDevice);
     if (id == AUDIO_PORT_HANDLE_NONE) {
         ALOGI("%s: no mapped id for audio device with type %d and address %s",
-                __func__, in_audioDevice.type.type,
+                __func__, static_cast<int>(in_audioDevice.type.type),
                 in_audioDevice.address.toString().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
     }
@@ -285,7 +285,7 @@ ndk::ScopedAStatus SoundDoseManager::HalSoundDoseCallback::onNewMelValues(
     auto id = soundDoseManager->getIdForAudioDevice(in_audioDevice);
     if (id == AUDIO_PORT_HANDLE_NONE) {
         ALOGI("%s: no mapped id for audio device with type %d and address %s",
-                __func__, in_audioDevice.type.type,
+                __func__, static_cast<int>(in_audioDevice.type.type),
                 in_audioDevice.address.toString().c_str());
         return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
     }

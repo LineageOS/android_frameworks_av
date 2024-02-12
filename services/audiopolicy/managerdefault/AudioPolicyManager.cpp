@@ -123,7 +123,8 @@ void AudioPolicyManager::broadcastDeviceConnectionState(const sp<DeviceDescripto
     device->toAudioPort(&devicePort);
     if (status_t status = mpClientInterface->setDeviceConnectedState(&devicePort, state);
             status != OK) {
-        ALOGE("Error %d while setting connected state for device %s", state,
+        ALOGE("Error %d while setting connected state for device %s",
+                static_cast<int>(state),
                 device->getDeviceTypeAddr().toString(false).c_str());
     }
 }
