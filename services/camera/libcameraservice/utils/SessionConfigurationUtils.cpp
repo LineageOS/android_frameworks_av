@@ -432,7 +432,7 @@ binder::Status createSurfaceFromGbp(
         const std::string &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed, int64_t dynamicRangeProfile,
         int64_t streamUseCase, int timestampBase, int mirrorMode,
-        int32_t colorSpace) {
+        int32_t colorSpace, bool respectSurfaceSize) {
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         std::string msg = fmt::sprintf("Camera %s: Surface is NULL", logicalCameraId.c_str());
@@ -529,8 +529,10 @@ binder::Status createSurfaceFromGbp(
         // we can use the default stream configuration map
         foundInMaxRes = true;
     }
-    // Round dimensions to the nearest dimensions available for this format
-    if (flexibleConsumer && isPublicFormat(format) &&
+    // Round dimensions to the nearest dimensions available for this format.
+    // Only do the rounding if the client doesn't ask to respect the surface
+    // size.
+    if (flexibleConsumer && isPublicFormat(format) && !respectSurfaceSize &&
             !SessionConfigurationUtils::roundBufferDimensionNearest(width, height,
             format, dataSpace, physicalCameraMetadata, foundInMaxRes, /*out*/&width,
             /*out*/&height)) {
@@ -753,6 +755,7 @@ convertToHALStreamCombination(
         const std::vector<sp<IGraphicBufferProducer>>& bufferProducers =
             it.getGraphicBufferProducers();
         bool deferredConsumer = it.isDeferred();
+        bool isConfigurationComplete = it.isComplete();
         const std::string &physicalCameraId = it.getPhysicalCameraId();
 
         int64_t dynamicRangeProfile = it.getDynamicRangeProfile();
@@ -768,7 +771,8 @@ convertToHALStreamCombination(
         int32_t groupId = it.isMultiResolution() ? it.getSurfaceSetID() : -1;
         OutputStreamInfo streamInfo;
 
-        res = checkSurfaceType(numBufferProducers, deferredConsumer, it.getSurfaceType());
+        res = checkSurfaceType(numBufferProducers, deferredConsumer, it.getSurfaceType(),
+                               isConfigurationComplete);
         if (!res.isOk()) {
             return res;
         }
@@ -781,15 +785,38 @@ convertToHALStreamCombination(
         int64_t streamUseCase = it.getStreamUseCase();
         int timestampBase = it.getTimestampBase();
         int mirrorMode = it.getMirrorMode();
-        if (deferredConsumer) {
+        // If the configuration is a deferred consumer, or a not yet completed
+        // configuration with no buffer producers attached.
+        if (deferredConsumer || (!isConfigurationComplete && numBufferProducers == 0)) {
             streamInfo.width = it.getWidth();
             streamInfo.height = it.getHeight();
-            streamInfo.format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
-            streamInfo.dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
             auto surfaceType = it.getSurfaceType();
-            streamInfo.consumerUsage = GraphicBuffer::USAGE_HW_TEXTURE;
-            if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
-                streamInfo.consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
+            switch (surfaceType) {
+                case OutputConfiguration::SURFACE_TYPE_SURFACE_TEXTURE:
+                    streamInfo.consumerUsage = GraphicBuffer::USAGE_HW_TEXTURE;
+                    streamInfo.format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+                    streamInfo.dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
+                    break;
+                case OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW:
+                    streamInfo.consumerUsage = GraphicBuffer::USAGE_HW_TEXTURE
+                            | GraphicBuffer::USAGE_HW_COMPOSER;
+                    streamInfo.format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+                    streamInfo.dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
+                    break;
+                case OutputConfiguration::SURFACE_TYPE_MEDIA_RECORDER:
+                case OutputConfiguration::SURFACE_TYPE_MEDIA_CODEC:
+                    streamInfo.consumerUsage = GraphicBuffer::USAGE_HW_VIDEO_ENCODER;
+                    streamInfo.format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+                    streamInfo.dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
+                    break;
+                case OutputConfiguration::SURFACE_TYPE_IMAGE_READER:
+                    streamInfo.consumerUsage = it.getUsage();
+                    streamInfo.format = it.getFormat();
+                    streamInfo.dataSpace = (android_dataspace)it.getDataspace();
+                    break;
+                default:
+                    return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                                        "Invalid surface type.");
             }
             streamInfo.dynamicRangeProfile = it.getDynamicRangeProfile();
             if (checkAndOverrideSensorPixelModesUsed(sensorPixelModesUsed,
@@ -815,7 +842,8 @@ convertToHALStreamCombination(
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
                     logicalCameraId, metadataChosen, sensorPixelModesUsed, dynamicRangeProfile,
-                    streamUseCase, timestampBase, mirrorMode, colorSpace);
+                    streamUseCase, timestampBase, mirrorMode, colorSpace,
+                    /*respectSurfaceSize*/true);
 
             if (!res.isOk())
                 return res;
@@ -912,22 +940,37 @@ binder::Status checkPhysicalCameraId(
 }
 
 binder::Status checkSurfaceType(size_t numBufferProducers,
-        bool deferredConsumer, int surfaceType)  {
+        bool deferredConsumer, int surfaceType, bool isConfigurationComplete)  {
     if (numBufferProducers > MAX_SURFACES_PER_STREAM) {
         ALOGE("%s: GraphicBufferProducer count %zu for stream exceeds limit of %d",
                 __FUNCTION__, numBufferProducers, MAX_SURFACES_PER_STREAM);
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Surface count is too high");
-    } else if ((numBufferProducers == 0) && (!deferredConsumer)) {
+    } else if ((numBufferProducers == 0) && (!deferredConsumer) && isConfigurationComplete) {
         ALOGE("%s: Number of consumers cannot be smaller than 1", __FUNCTION__);
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "No valid consumers.");
     }
 
-    bool validSurfaceType = ((surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) ||
-            (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_TEXTURE));
-
-    if (deferredConsumer && !validSurfaceType) {
-        ALOGE("%s: Target surface has invalid surfaceType = %d.", __FUNCTION__, surfaceType);
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, "Target Surface is invalid");
+    if (deferredConsumer) {
+        bool validSurfaceType = (
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) ||
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_TEXTURE));
+        if (!validSurfaceType) {
+            std::string msg = fmt::sprintf("Deferred target surface has invalid "
+                    "surfaceType = %d.", surfaceType);
+            ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+        }
+    } else if (!isConfigurationComplete && numBufferProducers == 0) {
+        bool validSurfaceType = (
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_MEDIA_RECORDER) ||
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_MEDIA_CODEC) ||
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_IMAGE_READER));
+        if (!validSurfaceType) {
+            std::string msg = fmt::sprintf("OutputConfiguration target surface has invalid "
+                    "surfaceType = %d.", surfaceType);
+            ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+        }
     }
 
     return binder::Status::ok();
