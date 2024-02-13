@@ -4705,18 +4705,21 @@ typedef enum acamera_metadata_tag {
      * </ul>
      * <p>should be interpreted in the effective after raw crop field-of-view coordinate system.
      * In this coordinate system,
-     * {preCorrectionActiveArraySize.left, preCorrectionActiveArraySize.top} corresponds to the
+     * {ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.left,
+     *  ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.top} corresponds to the
      * the top left corner of the cropped RAW frame and
-     * {preCorrectionActiveArraySize.right, preCorrectionActiveArraySize.bottom} corresponds to
+     * {ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.right,
+     *  ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.bottom} corresponds to
      * the bottom right corner. Client applications must use the values of the keys
      * in the CaptureResult metadata if present.</p>
-     * <p>Crop regions (android.scaler.CropRegion), AE/AWB/AF regions and face coordinates still
+     * <p>Crop regions ACAMERA_SCALER_CROP_REGION, AE/AWB/AF regions and face coordinates still
      * use the ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE coordinate system as usual.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
+     * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_STATISTICS_HOT_PIXEL_MAP
