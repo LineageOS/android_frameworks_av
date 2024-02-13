@@ -51,6 +51,7 @@ cc_fuzz {
         "aaudio-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "com.android.media.aaudio-aconfig-cc",
     ],
     static_libs: [
         "libaaudioservice",

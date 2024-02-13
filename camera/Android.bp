@@ -46,6 +46,7 @@ license {
 aconfig_declarations {
     name: "camera_platform_flags",
     package: "com.android.internal.camera.flags",
+    container: "system",
     srcs: ["camera_platform.aconfig"],
 }
 
