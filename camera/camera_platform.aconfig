@@ -1,4 +1,5 @@
 package: "com.android.internal.camera.flags"
+container: "system"
 
 flag {
      namespace: "camera_platform"
