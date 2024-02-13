@@ -906,13 +906,6 @@ Status CameraService::createDefaultRequest(const std::string& unresolvedCameraId
                 "request for system only device %s: ", cameraId.c_str());
     }
 
-    // Check for camera permissions
-    if (!hasCameraPermissions()) {
-        return STATUS_ERROR(ERROR_PERMISSION_DENIED,
-                "android.permission.CAMERA needed to call"
-                "createDefaultRequest");
-    }
-
     CameraMetadata metadata;
     status_t err = mCameraProviderManager->createDefaultRequest(cameraId, tempId, &metadata);
     if (err == OK) {
@@ -959,13 +952,6 @@ Status CameraService::isSessionConfigurationWithParametersSupported(
         return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to query "
                 "session configuration with parameters support for system only device %s: ",
                 cameraId.c_str());
-    }
-
-    // Check for camera permissions
-    if (!hasCameraPermissions()) {
-        return STATUS_ERROR(ERROR_PERMISSION_DENIED,
-                "android.permission.CAMERA needed to call"
-                "isSessionConfigurationWithParametersSupported");
     }
 
     *supported = false;

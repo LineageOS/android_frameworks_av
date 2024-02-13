@@ -105,3 +105,10 @@ flag {
      description: "Enable returning graphics buffers to buffer queues without holding the in-flight mutex"
      bug: "315526878"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_device_setup"
+     description: "Create an intermediate Camera Device class for limited CameraDevice access."
+     bug: "320741775"
+}
