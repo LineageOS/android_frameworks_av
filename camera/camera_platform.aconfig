@@ -112,3 +112,10 @@ flag {
      description: "Create an intermediate Camera Device class for limited CameraDevice access."
      bug: "320741775"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_privacy_allowlist"
+     description: "Allowlisting to exempt safety-relevant cameras from privacy control for automotive devices"
+     bug: "282814430"
+}
