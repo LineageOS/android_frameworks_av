@@ -926,7 +926,7 @@ public:  // AsyncCallbackThread
 protected:
     // StreamHalInterfaceCodecFormatCallback implementation
                 void        onCodecFormatChanged(
-            const std::basic_string<uint8_t>& metadataBs) final;
+            const std::vector<uint8_t>& metadataBs) final;
 
     // ThreadBase virtuals
     void preExit() final EXCLUDES_ThreadBase_Mutex;
