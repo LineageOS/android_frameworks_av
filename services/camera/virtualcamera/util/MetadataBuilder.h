@@ -64,7 +64,8 @@ class MetadataBuilder {
     int32_t maxFps;
 
     bool operator<(const FpsRange& other) const {
-      return std::tuple(minFps, maxFps) < std::tuple(other.minFps, other.maxFps);
+      return maxFps == other.maxFps ? minFps < other.minFps
+                                    : maxFps < other.maxFps;
     }
   };
 
@@ -129,6 +130,11 @@ class MetadataBuilder {
       const std::vector<camera_metadata_enum_android_statistics_face_detect_mode_t>&
           faceDetectMode);
 
+  // See SENSOR_AVAILABLE_TEST_PATTERN_MODES in CameraCharacteristics.java.
+  MetadataBuilder& setAvailableTestPatternModes(
+      const std::vector<camera_metadata_enum_android_sensor_test_pattern_mode>&
+          testPatternModes);
+
   // See ANDROID_STATISTICS_FACE_DETECT_MODE in CaptureRequest.java.
   MetadataBuilder& setFaceDetectMode(
       camera_metadata_enum_android_statistics_face_detect_mode_t faceDetectMode);
@@ -160,6 +166,16 @@ class MetadataBuilder {
   MetadataBuilder& setControlAvailableEffects(
       const std::vector<camera_metadata_enum_android_control_effect_mode>&
           availableEffects);
+
+  // See CONTROL_EFFECT_MODE in CaptureRequest.java.
+  MetadataBuilder& setControlEffectMode(
+      camera_metadata_enum_android_control_effect_mode_t effectMode);
+
+  // See ANDROID_CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES
+  MetadataBuilder& setControlAvailableVideoStabilizationModes(
+      const std::vector<
+          camera_metadata_enum_android_control_video_stabilization_mode_t>&
+          videoStabilizationModes);
 
   // See CONTROL_AE_AVAILABLE_ANTIBANDING_MODES in CameraCharacteristics.java.
   MetadataBuilder& setControlAeAvailableAntibandingModes(
@@ -242,6 +258,10 @@ class MetadataBuilder {
   MetadataBuilder& setControlAwbRegions(
       const std::vector<ControlRegion>& awbRegions);
 
+  // See ANDROID_SCALER_CROP_REGION in CaptureRequest.java.
+  MetadataBuilder& setCropRegion(int32_t x, int32_t y, int32_t width,
+                                 int32_t height);
+
   // See ANDROID_CONTROL_AF_REGIONS in CameraMetadataTag.aidl.
   MetadataBuilder& setControlAfRegions(
       const std::vector<ControlRegion>& afRegions);
@@ -250,6 +270,9 @@ class MetadataBuilder {
   //
   // See ANDROID_JPEG_SIZE in CameraMetadataTag.aidl.
   MetadataBuilder& setMaxJpegSize(int32_t size);
+
+  // See SENSOR_INFO_MAX_FRAME_DURATION in CameraCharacteristic.java.
+  MetadataBuilder& setMaxFrameDuration(std::chrono::nanoseconds duration);
 
   // See JPEG_AVAILABLE_THUMBNAIL_SIZES in CameraCharacteristic.java.
   MetadataBuilder& setJpegAvailableThumbnailSizes(
@@ -266,6 +289,12 @@ class MetadataBuilder {
   // See ANDROID_SYNC_MAX_LATENCY in CameraMetadataTag.aidl.
   MetadataBuilder& setSyncMaxLatency(
       camera_metadata_enum_android_sync_max_latency setSyncMaxLatency);
+
+  // See REQUEST_PIPELINE_MAX_DEPTH in CameraCharacteristic.java.
+  MetadataBuilder& setPipelineMaxDepth(uint8_t maxDepth);
+
+  // See REQUEST_PIPELINE_DEPTH in CaptureResult.java.
+  MetadataBuilder& setPipelineDepth(uint8_t depth);
 
   // See ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM in CameraMetadataTag.aidl.
   MetadataBuilder& setAvailableMaxDigitalZoom(const float maxZoom);

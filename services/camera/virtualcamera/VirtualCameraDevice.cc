@@ -72,6 +72,13 @@ const char* kDevicePathPrefix = "device@1.1/virtual/";
 
 constexpr int32_t kMaxJpegSize = 3 * 1024 * 1024 /*3MiB*/;
 
+constexpr int32_t kMinFps = 15;
+
+constexpr std::chrono::nanoseconds kMaxFrameDuration =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(1e9ns / kMinFps);
+
+constexpr uint8_t kPipelineMaxDepth = 2;
+
 constexpr MetadataBuilder::ControlRegion kDefaultEmptyControlRegion{};
 
 const std::array<PixelFormat, 3> kOutputFormats{
@@ -86,8 +93,18 @@ bool isSupportedOutputFormat(const PixelFormat pixelFormat) {
 std::vector<MetadataBuilder::FpsRange> fpsRangesForInputConfig(
     const std::vector<SupportedStreamConfiguration>& configs) {
   std::set<MetadataBuilder::FpsRange> availableRanges;
+
   for (const SupportedStreamConfiguration& config : configs) {
+    availableRanges.insert({.minFps = kMinFps, .maxFps = config.maxFps});
     availableRanges.insert({.minFps = config.maxFps, .maxFps = config.maxFps});
+  }
+
+  if (std::any_of(configs.begin(), configs.end(),
+                  [](const SupportedStreamConfiguration& config) {
+                    return config.maxFps >= 30;
+                  })) {
+    availableRanges.insert({.minFps = kMinFps, .maxFps = 30});
+    availableRanges.insert({.minFps = 30, .maxFps = 30});
   }
 
   return std::vector<MetadataBuilder::FpsRange>(availableRanges.begin(),
@@ -159,11 +176,14 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setSensorTimestampSource(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN)
           .setSensorPhysicalSize(36.0, 24.0)
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
+          .setAvailableTestPatternModes({ANDROID_SENSOR_TEST_PATTERN_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
           .setControlAvailableModes({ANDROID_CONTROL_MODE_AUTO})
           .setControlAfAvailableModes({ANDROID_CONTROL_AF_MODE_OFF})
           .setControlAvailableSceneModes({ANDROID_CONTROL_SCENE_MODE_DISABLED})
           .setControlAvailableEffects({ANDROID_CONTROL_EFFECT_MODE_OFF})
+          .setControlAvailableVideoStabilizationModes(
+              {ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF})
           .setControlAeAvailableModes({ANDROID_CONTROL_AE_MODE_ON})
           .setControlAeAvailableAntibandingModes(
               {ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO})
@@ -182,10 +202,12 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           // TODO(b/301023410) Add JPEG Exif + thumbnail support.
           .setJpegAvailableThumbnailSizes({Resolution(0, 0)})
           .setMaxJpegSize(kMaxJpegSize)
+          .setMaxFrameDuration(kMaxFrameDuration)
           .setMaxNumberOutputStreams(
               VirtualCameraDevice::kMaxNumberOfRawStreams,
               VirtualCameraDevice::kMaxNumberOfProcessedStreams,
               VirtualCameraDevice::kMaxNumberOfStallStreams)
+          .setPipelineMaxDepth(kPipelineMaxDepth)
           .setSyncMaxLatency(ANDROID_SYNC_MAX_LATENCY_UNKNOWN)
           .setAvailableRequestKeys(
               {ANDROID_CONTROL_CAPTURE_INTENT, ANDROID_CONTROL_AE_MODE,
@@ -194,12 +216,17 @@ std::optional<CameraMetadata> initCameraCharacteristics(
                ANDROID_CONTROL_AE_ANTIBANDING_MODE,
                ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, ANDROID_CONTROL_AF_TRIGGER,
                ANDROID_CONTROL_AF_MODE, ANDROID_CONTROL_AWB_MODE,
-               ANDROID_STATISTICS_FACE_DETECT_MODE, ANDROID_FLASH_MODE})
+               ANDROID_SCALER_CROP_REGION, ANDROID_CONTROL_EFFECT_MODE,
+               ANDROID_CONTROL_MODE, ANDROID_CONTROL_SCENE_MODE,
+               ANDROID_CONTROL_VIDEO_STABILIZATION_MODE,
+               ANDROID_CONTROL_ZOOM_RATIO, ANDROID_STATISTICS_FACE_DETECT_MODE,
+               ANDROID_FLASH_MODE})
           .setAvailableResultKeys(
               {ANDROID_CONTROL_AE_MODE, ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER,
                ANDROID_CONTROL_AF_MODE, ANDROID_CONTROL_AWB_MODE,
-               ANDROID_FLASH_STATE, ANDROID_SENSOR_TIMESTAMP,
-               ANDROID_LENS_FOCAL_LENGTH})
+               ANDROID_CONTROL_EFFECT_MODE, ANDROID_CONTROL_MODE,
+               ANDROID_FLASH_MODE, ANDROID_FLASH_STATE,
+               ANDROID_SENSOR_TIMESTAMP, ANDROID_LENS_FOCAL_LENGTH})
           .setAvailableCapabilities(
               {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE});
 
@@ -424,6 +451,19 @@ std::string VirtualCameraDevice::getCameraName() const {
 const std::vector<SupportedStreamConfiguration>&
 VirtualCameraDevice::getInputConfigs() const {
   return mSupportedInputConfigurations;
+}
+
+Resolution VirtualCameraDevice::getMaxInputResolution() const {
+  std::optional<Resolution> maxResolution =
+      getMaxResolution(mSupportedInputConfigurations);
+  if (!maxResolution.has_value()) {
+    ALOGE(
+        "%s: Cannot determine sensor size for virtual camera - input "
+        "configurations empty?",
+        __func__);
+    return Resolution(0, 0);
+  }
+  return maxResolution.value();
 }
 
 std::shared_ptr<VirtualCameraDevice> VirtualCameraDevice::sharedFromThis() {
