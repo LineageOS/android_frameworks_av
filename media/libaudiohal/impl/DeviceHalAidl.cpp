@@ -401,8 +401,7 @@ class OutputStreamEventCallbackAidl :
                       *static_cast<StreamCallbackBase*>(this)),
               StreamCallbackBaseHelper<StreamOutHalInterfaceLatencyModeCallback>(
                       *static_cast<StreamCallbackBase*>(this)) {}
-    ndk::ScopedAStatus onCodecFormatChanged(const std::vector<uint8_t>& in_audioMetadata) override {
-        std::basic_string<uint8_t> halMetadata(in_audioMetadata.begin(), in_audioMetadata.end());
+    ndk::ScopedAStatus onCodecFormatChanged(const std::vector<uint8_t>& halMetadata) override {
         return StreamCallbackBaseHelper<StreamOutHalInterfaceEventCallback>::runCb(
                 [&halMetadata](auto cb) { cb->onCodecFormatChanged(halMetadata); });
     }

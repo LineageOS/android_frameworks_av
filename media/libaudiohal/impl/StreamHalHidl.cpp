@@ -840,7 +840,7 @@ struct StreamOutEventCallback : public IStreamOutEventCallback {
             const android::hardware::hidl_vec<uint8_t>& audioMetadata)  override {
         sp<StreamOutHalHidl> stream = mStream.promote();
         if (stream != nullptr) {
-            std::basic_string<uint8_t> metadataBs(audioMetadata.begin(), audioMetadata.end());
+            std::vector<uint8_t> metadataBs(audioMetadata.begin(), audioMetadata.end());
             stream->onCodecFormatChanged(metadataBs);
         }
         return Void();
@@ -967,7 +967,7 @@ void StreamOutHalHidl::onError() {
     callback->onError();
 }
 
-void StreamOutHalHidl::onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs) {
+void StreamOutHalHidl::onCodecFormatChanged(const std::vector<uint8_t>& metadataBs) {
     sp<StreamOutHalInterfaceEventCallback> callback = mEventCallback.load().promote();
     if (callback == nullptr) return;
     ALOGV("asyncCodecFormatCallback %s", __func__);

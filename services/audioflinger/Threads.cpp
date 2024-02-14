@@ -3057,7 +3057,7 @@ void PlaybackThread::onError()
 }
 
 void PlaybackThread::onCodecFormatChanged(
-        const std::basic_string<uint8_t>& metadataBs)
+        const std::vector<uint8_t>& metadataBs)
 {
     const auto weakPointerThis = wp<PlaybackThread>::fromExisting(this);
     std::thread([this, metadataBs, weakPointerThis]() {
