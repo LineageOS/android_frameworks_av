@@ -24,6 +24,7 @@
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/device/BnCameraDevice.h"
+#include "util/Util.h"
 
 namespace android {
 namespace companion {
@@ -97,6 +98,9 @@ class VirtualCameraDevice
   const std::vector<
       aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
   getInputConfigs() const;
+
+  // Returns largest supported input resolution.
+  Resolution getMaxInputResolution() const;
 
   // Maximal number of RAW streams - virtual camera doesn't support RAW streams.
   static const int32_t kMaxNumberOfRawStreams = 0;

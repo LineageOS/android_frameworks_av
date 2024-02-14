@@ -18,7 +18,6 @@
 #include "VirtualCameraRenderThread.h"
 
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <future>
 #include <memory>
@@ -72,17 +71,29 @@ using namespace std::chrono_literals;
 
 static constexpr std::chrono::milliseconds kAcquireFenceTimeout = 500ms;
 
+// See REQUEST_PIPELINE_DEPTH in CaptureResult.java.
+// This roughly corresponds to frame latency, we set to
+// documented minimum of 2.
+static constexpr uint8_t kPipelineDepth = 2;
+
 CameraMetadata createCaptureResultMetadata(
-    const std::chrono::nanoseconds timestamp) {
+    const std::chrono::nanoseconds timestamp,
+    const Resolution reportedSensorSize) {
   std::unique_ptr<CameraMetadata> metadata =
       MetadataBuilder()
           .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
           .setControlAePrecaptureTrigger(
               ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
-          .setControlAfMode(ANDROID_CONTROL_AF_MODE_AUTO)
+          .setControlAfMode(ANDROID_CONTROL_AF_MODE_OFF)
           .setControlAwbMode(ANDROID_CONTROL_AWB_MODE_AUTO)
+          .setControlEffectMode(ANDROID_CONTROL_EFFECT_MODE_OFF)
+          .setControlMode(ANDROID_CONTROL_MODE_AUTO)
+          .setCropRegion(0, 0, reportedSensorSize.width,
+                         reportedSensorSize.height)
+          .setFaceDetectMode(ANDROID_STATISTICS_FACE_DETECT_MODE_OFF)
           .setFlashState(ANDROID_FLASH_STATE_UNAVAILABLE)
           .setFocalLength(VirtualCameraDevice::kFocalLength)
+          .setPipelineDepth(kPipelineDepth)
           .setSensorTimestamp(timestamp)
           .build();
   if (metadata == nullptr) {
@@ -180,12 +191,12 @@ sp<Fence> CaptureRequestBuffer::getFence() const {
 }
 
 VirtualCameraRenderThread::VirtualCameraRenderThread(
-    VirtualCameraSessionContext& sessionContext, const int mWidth,
-    const int mHeight,
+    VirtualCameraSessionContext& sessionContext,
+    const Resolution inputSurfaceSize, const Resolution reportedSensorSize,
     std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback, bool testMode)
     : mCameraDeviceCallback(cameraDeviceCallback),
-      mInputSurfaceWidth(mWidth),
-      mInputSurfaceHeight(mHeight),
+      mInputSurfaceSize(inputSurfaceSize),
+      mReportedSensorSize(reportedSensorSize),
       mTestMode(testMode),
       mSessionContext(sessionContext) {
 }
@@ -273,8 +284,8 @@ void VirtualCameraRenderThread::threadLoop() {
       std::make_unique<EglTextureProgram>(EglTextureProgram::TextureFormat::YUV);
   mEglTextureRgbProgram = std::make_unique<EglTextureProgram>(
       EglTextureProgram::TextureFormat::RGBA);
-  mEglSurfaceTexture = std::make_unique<EglSurfaceTexture>(mInputSurfaceWidth,
-                                                           mInputSurfaceHeight);
+  mEglSurfaceTexture = std::make_unique<EglSurfaceTexture>(
+      mInputSurfaceSize.width, mInputSurfaceSize.height);
   mInputSurfacePromise.set_value(mEglSurfaceTexture->getSurface());
 
   while (std::unique_ptr<ProcessCaptureRequestTask> task = dequeueTask()) {
@@ -297,7 +308,8 @@ void VirtualCameraRenderThread::processCaptureRequest(
   captureResult.partialResult = 1;
   captureResult.inputBuffer.streamId = -1;
   captureResult.physicalCameraMetadata.resize(0);
-  captureResult.result = createCaptureResultMetadata(timestamp);
+  captureResult.result =
+      createCaptureResultMetadata(timestamp, mReportedSensorSize);
 
   const std::vector<CaptureRequestBuffer>& buffers = request.getBuffers();
   captureResult.outputBuffers.resize(buffers.size());
