@@ -73,6 +73,10 @@ public:
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
             AString *errorDetailMsg) override;
+    status_t queueSecureInputBuffers(
+            const sp<MediaCodecBuffer> &buffer,
+            bool secure,
+            AString *errorDetailMsg) override;
     status_t attachBuffer(
             const std::shared_ptr<C2Buffer> &c2Buffer,
             const sp<MediaCodecBuffer> &buffer) override;
@@ -87,6 +91,12 @@ public:
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
             const sp<MediaCodecBuffer> &buffer,
+            AString* errorDetailMsg) override;
+    status_t attachEncryptedBuffers(
+            const sp<hardware::HidlMemory> &memory,
+            size_t offset,
+            const sp<MediaCodecBuffer> &buffer,
+            bool secure,
             AString* errorDetailMsg) override;
     status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
