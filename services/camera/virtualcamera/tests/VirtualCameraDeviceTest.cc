@@ -30,6 +30,8 @@
 #include "gtest/gtest.h"
 #include "log/log_main.h"
 #include "system/camera_metadata.h"
+#include "util/MetadataUtil.h"
+#include "util/Util.h"
 #include "utils/Errors.h"
 
 namespace android {
@@ -47,6 +49,7 @@ using ::aidl::android::hardware::camera::device::Stream;
 using ::aidl::android::hardware::camera::device::StreamConfiguration;
 using ::aidl::android::hardware::camera::device::StreamType;
 using ::aidl::android::hardware::graphics::common::PixelFormat;
+using ::testing::ElementsAre;
 using ::testing::UnorderedElementsAreArray;
 using metadata_stream_t =
     camera_metadata_enum_android_scaler_available_stream_configurations_t;
@@ -304,6 +307,16 @@ TEST_F(VirtualCameraDeviceTest, configureTooManyStallStreamsFails) {
   bool aidl_ret;
   ASSERT_TRUE(mCamera->isStreamCombinationSupported(config, &aidl_ret).isOk());
   EXPECT_FALSE(aidl_ret);
+}
+
+TEST_F(VirtualCameraDeviceTest, thumbnailSizeWithCompatibleAspectRatio) {
+  CameraMetadata metadata;
+  ASSERT_TRUE(mCamera->getCameraCharacteristics(&metadata).isOk());
+
+  // Camera is configured with VGA input, we expect 240 x 180 thumbnail size in
+  // characteristics, since it has same aspect ratio.
+  EXPECT_THAT(getJpegAvailableThumbnailSizes(metadata),
+              ElementsAre(Resolution(0, 0), Resolution(240, 180)));
 }
 
 }  // namespace

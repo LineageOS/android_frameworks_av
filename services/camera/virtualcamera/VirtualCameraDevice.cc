@@ -38,7 +38,7 @@
 #include "android/binder_status.h"
 #include "log/log.h"
 #include "system/camera_metadata.h"
-#include "util/MetadataBuilder.h"
+#include "util/MetadataUtil.h"
 #include "util/Util.h"
 
 namespace android {
@@ -81,9 +81,44 @@ constexpr uint8_t kPipelineMaxDepth = 2;
 
 constexpr MetadataBuilder::ControlRegion kDefaultEmptyControlRegion{};
 
+constexpr float kAspectRatioEpsilon = 0.05;
+
+const std::array<Resolution, 5> kStandardJpegThumbnailSizes{
+    Resolution(176, 144), Resolution(240, 144), Resolution(256, 144),
+    Resolution(240, 160), Resolution(240, 180)};
+
 const std::array<PixelFormat, 3> kOutputFormats{
     PixelFormat::IMPLEMENTATION_DEFINED, PixelFormat::YCBCR_420_888,
     PixelFormat::BLOB};
+
+bool isApproximatellySameAspectRatio(const Resolution r1, const Resolution r2) {
+  float aspectRatio1 =
+      static_cast<float>(r1.width) / static_cast<float>(r1.height);
+  float aspectRatio2 =
+      static_cast<float>(r2.width) / static_cast<float>(r2.height);
+
+  return abs(aspectRatio1 - aspectRatio2) < kAspectRatioEpsilon;
+}
+
+std::vector<Resolution> getSupportedJpegThumbnailSizes(
+    const std::vector<SupportedStreamConfiguration>& configs) {
+  auto isSupportedByAnyInputConfig =
+      [&configs](const Resolution thumbnailResolution) {
+        return std::any_of(
+            configs.begin(), configs.end(),
+            [thumbnailResolution](const SupportedStreamConfiguration& config) {
+              return isApproximatellySameAspectRatio(
+                  thumbnailResolution, Resolution(config.width, config.height));
+            });
+      };
+
+  std::vector<Resolution> supportedThumbnailSizes({Resolution(0, 0)});
+  std::copy_if(kStandardJpegThumbnailSizes.begin(),
+               kStandardJpegThumbnailSizes.end(),
+               std::back_insert_iterator(supportedThumbnailSizes),
+               isSupportedByAnyInputConfig);
+  return supportedThumbnailSizes;
+}
 
 bool isSupportedOutputFormat(const PixelFormat pixelFormat) {
   return std::find(kOutputFormats.begin(), kOutputFormats.end(), pixelFormat) !=
@@ -199,8 +234,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setControlAeLockAvailable(false)
           .setControlAvailableAwbModes({ANDROID_CONTROL_AWB_MODE_AUTO})
           .setControlZoomRatioRange(/*min=*/1.0, /*max=*/1.0)
-          // TODO(b/301023410) Add JPEG Exif + thumbnail support.
-          .setJpegAvailableThumbnailSizes({Resolution(0, 0)})
+          .setJpegAvailableThumbnailSizes(
+              getSupportedJpegThumbnailSizes(supportedInputConfig))
           .setMaxJpegSize(kMaxJpegSize)
           .setMaxFrameDuration(kMaxFrameDuration)
           .setMaxNumberOutputStreams(
@@ -209,24 +244,34 @@ std::optional<CameraMetadata> initCameraCharacteristics(
               VirtualCameraDevice::kMaxNumberOfStallStreams)
           .setPipelineMaxDepth(kPipelineMaxDepth)
           .setSyncMaxLatency(ANDROID_SYNC_MAX_LATENCY_UNKNOWN)
-          .setAvailableRequestKeys(
-              {ANDROID_CONTROL_CAPTURE_INTENT, ANDROID_CONTROL_AE_MODE,
-               ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION,
-               ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
-               ANDROID_CONTROL_AE_ANTIBANDING_MODE,
-               ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, ANDROID_CONTROL_AF_TRIGGER,
-               ANDROID_CONTROL_AF_MODE, ANDROID_CONTROL_AWB_MODE,
-               ANDROID_SCALER_CROP_REGION, ANDROID_CONTROL_EFFECT_MODE,
-               ANDROID_CONTROL_MODE, ANDROID_CONTROL_SCENE_MODE,
-               ANDROID_CONTROL_VIDEO_STABILIZATION_MODE,
-               ANDROID_CONTROL_ZOOM_RATIO, ANDROID_STATISTICS_FACE_DETECT_MODE,
-               ANDROID_FLASH_MODE})
+          .setAvailableRequestKeys({ANDROID_CONTROL_CAPTURE_INTENT,
+                                    ANDROID_CONTROL_AE_MODE,
+                                    ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION,
+                                    ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
+                                    ANDROID_CONTROL_AE_ANTIBANDING_MODE,
+                                    ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER,
+                                    ANDROID_CONTROL_AF_TRIGGER,
+                                    ANDROID_CONTROL_AF_MODE,
+                                    ANDROID_CONTROL_AWB_MODE,
+                                    ANDROID_SCALER_CROP_REGION,
+                                    ANDROID_CONTROL_EFFECT_MODE,
+                                    ANDROID_CONTROL_MODE,
+                                    ANDROID_CONTROL_SCENE_MODE,
+                                    ANDROID_CONTROL_VIDEO_STABILIZATION_MODE,
+                                    ANDROID_CONTROL_ZOOM_RATIO,
+                                    ANDROID_STATISTICS_FACE_DETECT_MODE,
+                                    ANDROID_FLASH_MODE,
+                                    ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES,
+                                    ANDROID_JPEG_QUALITY,
+                                    ANDROID_JPEG_THUMBNAIL_QUALITY})
           .setAvailableResultKeys(
               {ANDROID_CONTROL_AE_MODE, ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER,
                ANDROID_CONTROL_AF_MODE, ANDROID_CONTROL_AWB_MODE,
                ANDROID_CONTROL_EFFECT_MODE, ANDROID_CONTROL_MODE,
                ANDROID_FLASH_MODE, ANDROID_FLASH_STATE,
-               ANDROID_SENSOR_TIMESTAMP, ANDROID_LENS_FOCAL_LENGTH})
+               ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES, ANDROID_JPEG_QUALITY,
+               ANDROID_JPEG_THUMBNAIL_QUALITY, ANDROID_SENSOR_TIMESTAMP,
+               ANDROID_LENS_FOCAL_LENGTH})
           .setAvailableCapabilities(
               {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE});
 

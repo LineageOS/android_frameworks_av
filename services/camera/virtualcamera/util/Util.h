@@ -54,6 +54,7 @@ bool isFormatSupportedForInput(
 
 // Representation of resolution / size.
 struct Resolution {
+  Resolution() = default;
   Resolution(const int w, const int h) : width(w), height(h) {
   }
 
@@ -69,9 +70,11 @@ struct Resolution {
     return width == other.width && height == other.height;
   }
 
-  const int width;
-  const int height;
+  int width = 0;
+  int height = 0;
 };
+
+std::ostream& operator<<(std::ostream& os, const Resolution& resolution);
 
 }  // namespace virtualcamera
 }  // namespace companion

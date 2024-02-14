@@ -30,7 +30,7 @@
 #include "android/binder_interface_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "util/MetadataBuilder.h"
+#include "util/MetadataUtil.h"
 
 namespace android {
 namespace companion {
