@@ -939,7 +939,7 @@ uint32_t ExtractFormatFromCodec2GrallocHandle(const C2Handle *const handle) {
     return 0;
 }
 
-bool EXtractMetadataFromCodec2GrallocHandle(
+bool ExtractMetadataFromCodec2GrallocHandle(
         const C2Handle *const handle,
         uint32_t *width, uint32_t *height, uint32_t *format, uint64_t *usage, uint32_t *stride) {
     if (handle == nullptr) {
@@ -959,7 +959,7 @@ bool EXtractMetadataFromCodec2GrallocHandle(
         (void)C2HandleAhwb::Import(handle, width, height, format, usage, stride, &origId);
         return true;
     }
-    ALOGE("EXtractMetadata from non compatible handle");
+    ALOGE("ExtractMetadata from non compatible handle");
     return false;
 }
 
