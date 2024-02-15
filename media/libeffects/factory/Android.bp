@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -20,10 +21,10 @@ cc_library_shared {
     name: "libeffects",
     vendor: true,
     srcs: [
-         "EffectsFactory.c",
-         "EffectsConfigLoader.c",
-         "EffectsFactoryState.c",
-         "EffectsXmlConfigLoader.cpp",
+        "EffectsFactory.c",
+        "EffectsConfigLoader.c",
+        "EffectsFactoryState.c",
+        "EffectsXmlConfigLoader.cpp",
     ],
 
     shared_libs: [
@@ -34,7 +35,7 @@ cc_library_shared {
     ],
     cflags: ["-fvisibility=hidden"],
 
-    local_include_dirs:["include/media"],
+    local_include_dirs: ["include/media"],
 
     header_libs: [
         "libaudioeffects",
@@ -61,5 +62,8 @@ cc_binary {
         "libeffectsconfig",
         "libeffects",
     ],
-    local_include_dirs:[".", "include"],
+    local_include_dirs: [
+        ".",
+        "include",
+    ],
 }

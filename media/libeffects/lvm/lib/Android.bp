@@ -1,5 +1,6 @@
 // Music bundle
 package {
+    default_team: "trendy_team_media_framework_audio",
     default_applicable_licenses: [
         "frameworks_av_media_libeffects_lvm_lib_license",
     ],

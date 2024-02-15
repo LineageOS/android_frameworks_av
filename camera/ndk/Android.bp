@@ -17,6 +17,7 @@
 // frameworks/av/include.
 
 package {
+    default_team: "trendy_team_camera_framework",
     default_applicable_licenses: ["frameworks_av_camera_ndk_license"],
 }
 
