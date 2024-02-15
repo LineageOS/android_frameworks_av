@@ -85,6 +85,18 @@ public:
         kActionDecrypt                 = (1 <<  0),
         kActionAttachEncryptedBuffer   = (1 <<  1)
     };
+
+    // This struct is meant to copy the mapped contents from the original info.
+    struct CryptoAsyncInfo : public CodecCryptoInfo {
+        public:
+            explicit CryptoAsyncInfo(const std::unique_ptr<CodecCryptoInfo> &info);
+            virtual ~CryptoAsyncInfo() = default;
+        protected:
+            // all backup buffers for the base object.
+            sp<ABuffer> mKeyBuffer;
+            sp<ABuffer> mIvBuffer;
+            sp<ABuffer> mSubSamplesBuffer;
+    };
 protected:
 
     // Message types for the looper

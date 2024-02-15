@@ -483,6 +483,130 @@ int32_t CCodecBufferChannel::getHeapSeqNum(const sp<HidlMemory> &memory) {
     return heapSeqNum;
 }
 
+typedef WrapperObject<std::vector<AccessUnitInfo>> BufferInfosWrapper;
+typedef WrapperObject<std::vector<std::unique_ptr<CodecCryptoInfo>>> CryptoInfosWrapper;
+status_t CCodecBufferChannel::attachEncryptedBuffers(
+        const sp<hardware::HidlMemory> &memory,
+        size_t offset,
+        const sp<MediaCodecBuffer> &buffer,
+        bool secure,
+        AString* errorDetailMsg) {
+    static const C2MemoryUsage kDefaultReadWriteUsage{
+        C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+    if (!hasCryptoOrDescrambler()) {
+        ALOGE("attachEncryptedBuffers requires Crypto/descrambler object");
+        return -ENOSYS;
+    }
+    size_t size = 0;
+    CHECK(buffer->meta()->findSize("ssize", &size));
+    if (size == 0) {
+        buffer->setRange(0, 0);
+        return OK;
+    }
+    sp<RefBase> obj;
+    CHECK(buffer->meta()->findObject("cryptoInfos", &obj));
+    sp<CryptoInfosWrapper> cryptoInfos{(CryptoInfosWrapper *)obj.get()};
+    CHECK(buffer->meta()->findObject("accessUnitInfo", &obj));
+    sp<BufferInfosWrapper> bufferInfos{(BufferInfosWrapper *)obj.get()};
+    if (secure || (mCrypto == nullptr)) {
+        if (cryptoInfos->value.size() != 1) {
+            ALOGE("Cannot decrypt multiple access units");
+            return -ENOSYS;
+        }
+        // we are dealing with just one cryptoInfo or descrambler.
+        std::unique_ptr<CodecCryptoInfo> info = std::move(cryptoInfos->value[0]);
+        if (info == nullptr) {
+            ALOGE("Cannot decrypt, CryptoInfos are null.");
+            return -ENOSYS;
+        }
+        return attachEncryptedBuffer(
+                memory,
+                secure,
+                info->mKey,
+                info->mIv,
+                info->mMode,
+                info->mPattern,
+                offset,
+                info->mSubSamples,
+                info->mNumSubSamples,
+                buffer,
+                errorDetailMsg);
+    }
+    std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
+    std::shared_ptr<C2LinearBlock> block;
+    c2_status_t err = pool->fetchLinearBlock(
+            size,
+            kDefaultReadWriteUsage,
+            &block);
+    if (err != C2_OK) {
+        ALOGI("[%s] attachEncryptedBuffers: fetchLinearBlock failed: size = %zu (%s) err = %d",
+              mName, size, secure ? "secure" : "non-secure", err);
+        return NO_MEMORY;
+    }
+    ensureDecryptDestination(size);
+    C2WriteView wView = block->map().get();
+    if (wView.error() != C2_OK) {
+        ALOGI("[%s] attachEncryptedBuffers: block map error: %d (non-secure)",
+              mName, wView.error());
+        return UNKNOWN_ERROR;
+    }
+
+    ssize_t result = -1;
+    ssize_t codecDataOffset = 0;
+    size_t inBufferOffset = 0;
+    size_t outBufferSize = 0;
+    uint32_t cryptoInfoIdx = 0;
+    int32_t heapSeqNum = getHeapSeqNum(memory);
+    hardware::drm::V1_0::SharedBuffer src{(uint32_t)heapSeqNum, offset, size};
+    hardware::drm::V1_0::DestinationBuffer dst;
+    dst.type = DrmBufferType::SHARED_MEMORY;
+    IMemoryToSharedBuffer(
+            mDecryptDestination, mHeapSeqNum, &dst.nonsecureMemory);
+    for (int i = 0; i < bufferInfos->value.size(); i++) {
+        if (bufferInfos->value[i].mSize > 0) {
+            std::unique_ptr<CodecCryptoInfo> info = std::move(cryptoInfos->value[cryptoInfoIdx++]);
+            result = mCrypto->decrypt(
+                    (uint8_t*)info->mKey,
+                    (uint8_t*)info->mIv,
+                    info->mMode,
+                    info->mPattern,
+                    src,
+                    inBufferOffset,
+                    info->mSubSamples,
+                    info->mNumSubSamples,
+                    dst,
+                    errorDetailMsg);
+            inBufferOffset += bufferInfos->value[i].mSize;
+            if (result < 0) {
+                ALOGI("[%s] attachEncryptedBuffers: decrypt failed: result = %zd",
+                        mName, result);
+                return result;
+            }
+            if (wView.error() == C2_OK) {
+                if (wView.size() < result) {
+                    ALOGI("[%s] attachEncryptedBuffers: block size too small:"
+                            "size=%u result=%zd (non-secure)", mName, wView.size(), result);
+                    return UNKNOWN_ERROR;
+                }
+                memcpy(wView.data(), mDecryptDestination->unsecurePointer(), result);
+                bufferInfos->value[i].mSize = result;
+                wView.setOffset(wView.offset() + result);
+            }
+            outBufferSize += result;
+        }
+    }
+    if (wView.error() == C2_OK) {
+        wView.setOffset(0);
+    }
+    std::shared_ptr<C2Buffer> c2Buffer{C2Buffer::CreateLinearBuffer(
+            block->share(codecDataOffset, outBufferSize - codecDataOffset, C2Fence{}))};
+    if (!buffer->copy(c2Buffer)) {
+        ALOGI("[%s] attachEncryptedBuffers: buffer copy failed", mName);
+        return -ENOSYS;
+    }
+    return OK;
+}
+
 status_t CCodecBufferChannel::attachEncryptedBuffer(
         const sp<hardware::HidlMemory> &memory,
         bool secure,
@@ -774,6 +898,138 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
 
     buffer->setRange(codecDataOffset, result - codecDataOffset);
 
+    return queueInputBufferInternal(buffer, block, bufferSize);
+}
+
+status_t CCodecBufferChannel::queueSecureInputBuffers(
+        const sp<MediaCodecBuffer> &buffer,
+        bool secure,
+        AString *errorDetailMsg) {
+    QueueGuard guard(mSync);
+    if (!guard.isRunning()) {
+        ALOGD("[%s] No more buffers should be queued at current state.", mName);
+        return -ENOSYS;
+    }
+
+    if (!hasCryptoOrDescrambler()) {
+        ALOGE("queueSecureInputBuffers requires a Crypto/descrambler Object");
+        return -ENOSYS;
+    }
+    sp<RefBase> obj;
+    CHECK(buffer->meta()->findObject("cryptoInfos", &obj));
+    sp<CryptoInfosWrapper> cryptoInfos{(CryptoInfosWrapper *)obj.get()};
+    CHECK(buffer->meta()->findObject("accessUnitInfo", &obj));
+    sp<BufferInfosWrapper> bufferInfos{(BufferInfosWrapper *)obj.get()};
+    if (secure || mCrypto == nullptr) {
+        if (cryptoInfos->value.size() != 1) {
+            ALOGE("Cannot decrypt multiple access units on native handles");
+            return -ENOSYS;
+        }
+        std::unique_ptr<CodecCryptoInfo> info = std::move(cryptoInfos->value[0]);
+        if (info == nullptr) {
+            ALOGE("Cannot decrypt, CryptoInfos are null");
+            return -ENOSYS;
+        }
+        return queueSecureInputBuffer(
+                buffer,
+                secure,
+                info->mKey,
+                info->mIv,
+                info->mMode,
+                info->mPattern,
+                info->mSubSamples,
+                info->mNumSubSamples,
+                errorDetailMsg);
+    }
+    sp<EncryptedLinearBlockBuffer> encryptedBuffer((EncryptedLinearBlockBuffer *)buffer.get());
+
+    std::shared_ptr<C2LinearBlock> block;
+    size_t allocSize = buffer->size();
+    size_t bufferSize = 0;
+    c2_status_t blockRes = C2_OK;
+    bool copied = false;
+    ScopedTrace trace(ATRACE_TAG, android::base::StringPrintf(
+            "CCodecBufferChannel::decrypt(%s)", mName).c_str());
+    if (mSendEncryptedInfoBuffer) {
+        static const C2MemoryUsage kDefaultReadWriteUsage{
+            C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+        constexpr int kAllocGranule0 = 1024 * 64;
+        constexpr int kAllocGranule1 = 1024 * 1024;
+        std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
+        // round up encrypted sizes to limit fragmentation and encourage buffer reuse
+        if (allocSize <= kAllocGranule1) {
+            bufferSize = align(allocSize, kAllocGranule0);
+        } else {
+            bufferSize = align(allocSize, kAllocGranule1);
+        }
+        blockRes = pool->fetchLinearBlock(
+                bufferSize, kDefaultReadWriteUsage, &block);
+
+        if (blockRes == C2_OK) {
+            C2WriteView view = block->map().get();
+            if (view.error() == C2_OK && view.size() == bufferSize) {
+                copied = true;
+                // TODO: only copy clear sections
+                memcpy(view.data(), buffer->data(), allocSize);
+            }
+        }
+    }
+
+    if (!copied) {
+        block.reset();
+    }
+    // size of cryptoInfo and accessUnitInfo should be the same?
+    ssize_t result = -1;
+    ssize_t codecDataOffset = 0;
+    size_t inBufferOffset = 0;
+    size_t outBufferSize = 0;
+    uint32_t cryptoInfoIdx = 0;
+    {
+        // scoped this block to enable destruction of mappedBlock
+        std::unique_ptr<EncryptedLinearBlockBuffer::MappedBlock> mappedBlock = nullptr;
+        hardware::drm::V1_0::DestinationBuffer destination;
+        destination.type = DrmBufferType::SHARED_MEMORY;
+        IMemoryToSharedBuffer(
+                mDecryptDestination, mHeapSeqNum, &destination.nonsecureMemory);
+        encryptedBuffer->getMappedBlock(&mappedBlock);
+        hardware::drm::V1_0::SharedBuffer source;
+        encryptedBuffer->fillSourceBuffer(&source);
+        for (int i = 0 ; i < bufferInfos->value.size(); i++) {
+            if (bufferInfos->value[i].mSize > 0) {
+                std::unique_ptr<CodecCryptoInfo> info =
+                        std::move(cryptoInfos->value[cryptoInfoIdx++]);
+                if (info->mNumSubSamples == 1
+                        && info->mSubSamples[0].mNumBytesOfClearData == 0
+                        && info->mSubSamples[0].mNumBytesOfEncryptedData == 0) {
+                    // no data so we only populate the bufferInfo
+                    result = 0;
+                } else {
+                    result = mCrypto->decrypt(
+                            (uint8_t*)info->mKey,
+                            (uint8_t*)info->mIv,
+                            info->mMode,
+                            info->mPattern,
+                            source,
+                            inBufferOffset,
+                            info->mSubSamples,
+                            info->mNumSubSamples,
+                            destination,
+                            errorDetailMsg);
+                    inBufferOffset += bufferInfos->value[i].mSize;
+                    if (result < 0) {
+                        ALOGI("[%s] decrypt failed: result=%zd", mName, result);
+                        return result;
+                    }
+                    if (destination.type == DrmBufferType::SHARED_MEMORY && mappedBlock) {
+                        mappedBlock->copyDecryptedContent(mDecryptDestination, result);
+                    }
+                    bufferInfos->value[i].mSize = result;
+                    outBufferSize += result;
+                }
+            }
+        }
+        buffer->setRange(codecDataOffset, outBufferSize - codecDataOffset);
+    }
     return queueInputBufferInternal(buffer, block, bufferSize);
 }
 

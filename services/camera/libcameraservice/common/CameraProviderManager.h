@@ -330,7 +330,8 @@ public:
      */
      status_t getSessionCharacteristics(const std::string& id,
             const SessionConfiguration &configuration,
-            bool overrideForPerfClass, camera3::metadataGetter getMetadata,
+            bool overrideForPerfClass,
+            bool overrideToPortrait,
             CameraMetadata* sessionCharacteristics /*out*/) const;
 
     /**
