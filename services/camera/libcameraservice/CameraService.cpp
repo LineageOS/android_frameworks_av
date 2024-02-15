@@ -4288,8 +4288,15 @@ status_t CameraService::BasicClient::startCameraOps() {
     if (mAppOpsManager != nullptr) {
         // Notify app ops that the camera is not available
         mOpsCallback = new OpsCallback(this);
-        mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
+
+        if (flags::watch_foreground_changes()) {
+            mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
+                toString16(mClientPackageName),
+                AppOpsManager::WATCH_FOREGROUND_CHANGES, mOpsCallback);
+        } else {
+            mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
                 toString16(mClientPackageName), mOpsCallback);
+        }
 
         // Just check for camera acccess here on open - delay startOp until
         // camera frames start streaming in startCameraStreamingOps
@@ -4450,6 +4457,11 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
     } else if (res == AppOpsManager::MODE_IGNORED) {
         bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid, mClientPackageName);
 
+        // Uid may be active, but not visible to the user (e.g. PROCESS_STATE_FOREGROUND_SERVICE).
+        // If not visible, but still active, then we want to block instead of muting the camera.
+        int32_t procState = sCameraService->mUidPolicy->getProcState(mClientUid);
+        bool isUidVisible = (procState <= ActivityManager::PROCESS_STATE_BOUND_TOP);
+
         bool isCameraPrivacyEnabled;
         if (flags::camera_privacy_allowlist()) {
             isCameraPrivacyEnabled = sCameraService->isCameraPrivacyEnabled(
@@ -4460,17 +4472,26 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
         }
 
         ALOGI("Camera %s: Access for \"%s\" has been restricted, isUidTrusted %d, isUidActive %d"
-                " isCameraPrivacyEnabled %d", mCameraIdStr.c_str(), mClientPackageName.c_str(),
-                mUidIsTrusted, isUidActive, isCameraPrivacyEnabled);
-        // If the calling Uid is trusted (a native service), or the client Uid is active (WAR for
-        // b/175320666), the AppOpsManager could return MODE_IGNORED. Do not treat such cases as
-        // error.
+                " isUidVisible %d, isCameraPrivacyEnabled %d", mCameraIdStr.c_str(),
+                mClientPackageName.c_str(), mUidIsTrusted, isUidActive, isUidVisible,
+                isCameraPrivacyEnabled);
+        // If the calling Uid is trusted (a native service), or the client Uid is active / visible
+        // (WAR for b/175320666)the AppOpsManager could return MODE_IGNORED. Do not treat such
+        // cases as error.
         if (!mUidIsTrusted) {
-            if (isUidActive && isCameraPrivacyEnabled && supportsCameraMute()) {
-                setCameraMute(true);
-            } else if (!isUidActive
-                || (isCameraPrivacyEnabled && !supportsCameraMute())) {
-                block();
+            if (flags::watch_foreground_changes()) {
+                if (isUidVisible && isCameraPrivacyEnabled && supportsCameraMute()) {
+                    setCameraMute(true);
+                } else {
+                    block();
+                }
+            } else {
+                if (isUidActive && isCameraPrivacyEnabled && supportsCameraMute()) {
+                    setCameraMute(true);
+                } else if (!isUidActive
+                    || (isCameraPrivacyEnabled && !supportsCameraMute())) {
+                    block();
+                }
             }
         }
     } else if (res == AppOpsManager::MODE_ALLOWED) {
