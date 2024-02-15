@@ -57,7 +57,6 @@ cc_binary {
     relative_install_path: "hw",
 
     init_rc: ["android.hardware.audio.parameter_parser.example_service.rc"],
-    vintf_fragments: ["android.hardware.audio.parameter_parser.example_service.xml"],
 
     defaults: [
         "android.hardware.audio.parameter_parser.example_defaults",
