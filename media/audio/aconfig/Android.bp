@@ -134,11 +134,11 @@ cc_aconfig_library {
     defaults: ["audio-aconfig-cc-defaults"],
 }
 
-filegroup {
+aconfig_declarations_group {
     name: "audio-framework-aconfig",
-    srcs: [
-        ":android.media.audio-aconfig-java{.generated_srcjars}",
-        ":android.media.audiopolicy-aconfig-java{.generated_srcjars}",
-        ":android.media.midi-aconfig-java{.generated_srcjars}",
+    java_aconfig_libraries: [
+        "android.media.audio-aconfig-java",
+        "android.media.audiopolicy-aconfig-java",
+        "android.media.midi-aconfig-java",
     ],
 }
