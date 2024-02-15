@@ -160,6 +160,12 @@ public:
         SkipCutBuffer(skip, cut, num16BitChannels),
         mFrontPaddingDelay(0), mSize(0) {
     }
+    void clearAll() {
+        mInfos.clear();
+        mFrontPaddingDelay = 0;
+        mSize = 0;
+        SkipCutBuffer::clear();
+    }
 
     virtual ~MultiAccessUnitSkipCutBuffer() {
 
@@ -1378,7 +1384,7 @@ void OutputBuffersArray::flush(const std::list<std::unique_ptr<C2Work>> &flushed
     (void)flushedWork;
     mImpl.flush();
     if (mSkipCutBuffer != nullptr) {
-        mSkipCutBuffer->clear();
+        mSkipCutBuffer->clearAll();
     }
 }
 
@@ -1536,7 +1542,7 @@ uint32_t FlexOutputBuffers::getPixelFormatIfApplicable() { return mPixelFormat; 
 void LinearOutputBuffers::flush(
         const std::list<std::unique_ptr<C2Work>> &flushedWork) {
     if (mSkipCutBuffer != nullptr) {
-        mSkipCutBuffer->clear();
+        mSkipCutBuffer->clearAll();
     }
     FlexOutputBuffers::flush(flushedWork);
 }
