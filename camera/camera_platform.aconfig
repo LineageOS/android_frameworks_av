@@ -119,3 +119,10 @@ flag {
      description: "Allowlisting to exempt safety-relevant cameras from privacy control for automotive devices"
      bug: "282814430"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "extension_10_bit"
+     description: "Enables 10-bit support in the camera extensions."
+     bug: "316375635"
+}
