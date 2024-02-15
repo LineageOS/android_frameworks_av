@@ -78,6 +78,7 @@
 using namespace android::camera3;
 using namespace android::camera3::SessionConfigurationUtils;
 using namespace android::hardware::camera;
+using namespace android::hardware::cameraservice::utils::conversion::aidl;
 
 namespace flags = com::android::internal::camera::flags;
 namespace android {
@@ -253,6 +254,8 @@ status_t Camera3Device::initializeCommonLocked() {
                 strerror(-res), res);
         return res;
     }
+
+    mSupportsExtensionKeys = areExtensionKeysSupported(mDeviceInfo);
 
     return OK;
 }
@@ -3887,12 +3890,21 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
 
                     for (it = captureRequest->mSettingsList.begin();
                             it != captureRequest->mSettingsList.end(); it++) {
-                        res = hardware::cameraservice::utils::conversion::aidl::filterVndkKeys(
-                                mVndkVersion, it->metadata, false /*isStatic*/);
+                        res = filterVndkKeys(mVndkVersion, it->metadata, false /*isStatic*/);
                         if (res != OK) {
                             SET_ERR("RequestThread: Failed during VNDK filter of capture requests "
                                     "%d: %s (%d)", halRequest->frame_number, strerror(-res), res);
                             return INVALID_OPERATION;
+                        }
+
+                        if (!parent->mSupportsExtensionKeys) {
+                            res = filterExtensionKeys(&it->metadata);
+                            if (res != OK) {
+                                SET_ERR("RequestThread: Failed during extension filter of capture "
+                                        "requests %d: %s (%d)", halRequest->frame_number,
+                                        strerror(-res), res);
+                                return INVALID_OPERATION;
+                            }
                         }
                     }
                 }
