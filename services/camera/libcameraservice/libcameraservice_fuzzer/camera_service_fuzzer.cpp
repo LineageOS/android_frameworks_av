@@ -40,6 +40,9 @@ using namespace android;
 using namespace hardware;
 using namespace std;
 
+using ICameraService::ROTATION_OVERRIDE_NONE;
+using ICameraService::ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT;
+
 const int32_t kPreviewThreshold = 8;
 const int32_t kNumRequestsTested = 8;
 const nsecs_t kPreviewTimeout = 5000000000;  // .5 [s.]
@@ -236,12 +239,12 @@ void CameraFuzzer::getCameraInformation(int32_t cameraId) {
     mCameraService->getCameraVendorTagCache(&cache);
 
     CameraInfo cameraInfo;
-    mCameraService->getCameraInfo(cameraId, /*overrideToPortrait*/false, kDefaultDeviceId,
+    mCameraService->getCameraInfo(cameraId, ROTATION_OVERRIDE_NONE, kDefaultDeviceId,
             /*devicePolicy*/0, &cameraInfo);
 
     CameraMetadata metadata;
     mCameraService->getCameraCharacteristics(cameraIdStr,
-            /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
+            /*targetSdkVersion*/__ANDROID_API_FUTURE__, ROTATION_OVERRIDE_NONE,
             kDefaultDeviceId, /*devicePolicy*/0, &metadata);
 }
 
@@ -350,7 +353,8 @@ void CameraFuzzer::invokeCameraAPIs() {
                                  android::CameraService::USE_CALLING_UID,
                                  android::CameraService::USE_CALLING_PID,
                                  /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
-                                 /*overrideToPortrait*/true, /*forceSlowJpegMode*/false,
+                                 ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT,
+                                 /*forceSlowJpegMode*/false,
                                  kDefaultDeviceId, /*devicePolicy*/0, &cameraDevice);
     if (!rc.isOk()) {
         // camera not connected
@@ -588,7 +592,8 @@ void Camera2Fuzzer::process() {
         sp<hardware::camera2::ICameraDeviceUser> device;
         mCameraService->connectDevice(callbacks, s.cameraId, std::string(), {},
                 android::CameraService::USE_CALLING_UID, 0/*oomScoreDiff*/,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/true,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__,
+                ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT,
                 kDefaultDeviceId, /*devicePolicy*/0, &device);
         if (device == nullptr) {
             continue;

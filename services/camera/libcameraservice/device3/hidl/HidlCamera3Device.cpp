@@ -166,7 +166,7 @@ status_t HidlCamera3Device::initialize(sp<CameraProviderManager> manager,
     }
 
     res = manager->getCameraCharacteristics(mId, mOverrideForPerfClass, &mDeviceInfo,
-            /*overrideToPortrait*/false);
+            hardware::ICameraService::ROTATION_OVERRIDE_NONE);
     if (res != OK) {
         SET_ERR_L("Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
@@ -181,7 +181,7 @@ status_t HidlCamera3Device::initialize(sp<CameraProviderManager> manager,
             // Do not override characteristics for physical cameras
             res = manager->getCameraCharacteristics(
                     physicalId, /*overrideForPerfClass*/false, &mPhysicalDeviceInfoMap[physicalId],
-                    /*overrideToPortrait*/false);
+                    hardware::ICameraService::ROTATION_OVERRIDE_NONE);
             if (res != OK) {
                 SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
                         physicalId.c_str(), strerror(-res), res);
@@ -370,7 +370,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult_3_4(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mOverrideToPortrait,
+        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mRotationOverride,
         mActivePhysicalId}, mResultMetadataQueue
     };
 
@@ -433,7 +433,7 @@ hardware::Return<void> HidlCamera3Device::processCaptureResult(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mOverrideToPortrait,
+        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mRotationOverride,
         mActivePhysicalId}, mResultMetadataQueue
     };
 
@@ -481,7 +481,7 @@ hardware::Return<void> HidlCamera3Device::notifyHelper(
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
-        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mOverrideToPortrait,
+        *mInterface, mLegacyClient, mMinExpectedDuration, mIsFixedFps, mRotationOverride,
         mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
@@ -717,10 +717,10 @@ sp<Camera3Device::RequestThread> HidlCamera3Device::createNewRequestThread(
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait,
+                int rotationOverride,
                 bool supportSettingsOverride) {
         return new HidlRequestThread(parent, statusTracker, interface, sessionParamKeys,
-                useHalBufManager, supportCameraMute, overrideToPortrait,
+                useHalBufManager, supportCameraMute, rotationOverride,
                 supportSettingsOverride);
 };
 
@@ -1721,10 +1721,10 @@ HidlCamera3Device::HidlRequestThread::HidlRequestThread(wp<Camera3Device> parent
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait,
+                int rotationOverride,
                 bool supportSettingsOverride) :
           RequestThread(parent, statusTracker, interface, sessionParamKeys, useHalBufManager,
-                  supportCameraMute, overrideToPortrait, supportSettingsOverride) {}
+                  supportCameraMute, rotationOverride, supportSettingsOverride) {}
 
 status_t HidlCamera3Device::HidlRequestThread::switchToOffline(
         const std::vector<int32_t>& streamsToKeep,
