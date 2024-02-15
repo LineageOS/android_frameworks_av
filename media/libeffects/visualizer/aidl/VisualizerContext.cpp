@@ -93,7 +93,7 @@ RetCode VisualizerContext::setCaptureSamples(int samples) {
     mCaptureSamples = samples;
     return RetCode::SUCCESS;
 }
-int VisualizerContext::getCaptureSamples() {
+int32_t VisualizerContext::getCaptureSamples() {
     std::lock_guard lg(mMutex);
     return mCaptureSamples;
 }
