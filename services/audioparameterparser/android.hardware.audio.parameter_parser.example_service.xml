@@ -1,7 +1,0 @@
-<manifest version="1.0" type="framework">
-  <hal format="aidl">
-    <name>android.media.audio</name>
-    <version>1</version>
-    <fqname>IHalAdapterVendorExtension/default</fqname>
-  </hal>
-</manifest>
