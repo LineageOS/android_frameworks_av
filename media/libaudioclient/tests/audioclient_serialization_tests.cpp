@@ -15,18 +15,23 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "AudioClientSerializationUnitTests"
+#define LOG_TAG "AudioClientSerializationTests"
 
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
-
-#include <gtest/gtest.h>
+#include <vector>
 
 #include <android_audio_policy_configuration_V7_0-enums.h>
+#include <gtest/gtest.h>
+#include <media/AudioPolicy.h>
+#include <media/AudioProductStrategy.h>
+#include <media/AudioVolumeGroup.h>
+#include <media/VolumeGroupAttributes.h>
+#include <system/audio.h>
 #include <xsdc/XsdcSupport.h>
 
-#include "audio_test_utils.h"
+#include "test_execution_tracer.h"
 
 using namespace android;
 namespace xsd {
@@ -310,3 +315,9 @@ TEST_P(AudioAttributesParameterizedTest, AudioAttributesBinderization) {
 // audioStream
 INSTANTIATE_TEST_SUITE_P(SerializationParameterizedTests, AudioAttributesParameterizedTest,
                          ::testing::Combine(testing::ValuesIn(kStreamtypes)));
+
+int main(int argc, char** argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
+}
