@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -8,23 +9,23 @@ package {
 }
 
 cc_fuzz {
-  name: "libaudioprocessing_resampler_fuzzer",
-  srcs: [
-    "libaudioprocessing_resampler_fuzzer.cpp",
-  ],
-  defaults: ["libaudioprocessing_test_defaults"],
-  static_libs: [
-    "libsndfile",
-  ],
+    name: "libaudioprocessing_resampler_fuzzer",
+    srcs: [
+        "libaudioprocessing_resampler_fuzzer.cpp",
+    ],
+    defaults: ["libaudioprocessing_test_defaults"],
+    static_libs: [
+        "libsndfile",
+    ],
 }
 
 cc_fuzz {
-  name: "libaudioprocessing_record_buffer_converter_fuzzer",
-  srcs: [
-    "libaudioprocessing_record_buffer_converter_fuzzer.cpp",
-  ],
-  defaults: ["libaudioprocessing_test_defaults"],
-  static_libs: [
-    "libsndfile",
-  ],
+    name: "libaudioprocessing_record_buffer_converter_fuzzer",
+    srcs: [
+        "libaudioprocessing_record_buffer_converter_fuzzer.cpp",
+    ],
+    defaults: ["libaudioprocessing_test_defaults"],
+    static_libs: [
+        "libsndfile",
+    ],
 }
