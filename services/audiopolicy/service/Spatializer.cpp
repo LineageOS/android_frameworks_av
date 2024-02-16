@@ -49,12 +49,12 @@ using aidl_utils::binderStatusFromStatusT;
 using aidl_utils::statusTFromBinderStatus;
 using android::content::AttributionSourceState;
 using binder::Status;
+using internal::ToString;
 using media::HeadTrackingMode;
 using media::Pose3f;
 using media::SensorPoseProvider;
 using media::audio::common::HeadTracking;
 using media::audio::common::Spatialization;
-using ::android::internal::ToString;
 
 using namespace std::chrono_literals;
 
@@ -348,7 +348,8 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     bool activeLevelFound = false;
     for (const auto spatializationLevel : spatializationLevels) {
         if (!aidl_utils::isValidEnum(spatializationLevel)) {
-            ALOGW("%s: ignoring spatializationLevel:%d", __func__, (int)spatializationLevel);
+            ALOGW("%s: ignoring spatializationLevel:%s", __func__,
+                  ToString(spatializationLevel).c_str());
             continue;
         }
         if (spatializationLevel == Spatialization::Level::NONE) {
@@ -375,7 +376,8 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
 
     for (const auto spatializationMode : spatializationModes) {
         if (!aidl_utils::isValidEnum(spatializationMode)) {
-            ALOGW("%s: ignoring spatializationMode:%d", __func__, (int)spatializationMode);
+            ALOGW("%s: ignoring spatializationMode:%s", __func__,
+                  ToString(spatializationMode).c_str());
             continue;
         }
         // we don't detect duplicates.
@@ -406,27 +408,26 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
         return BAD_VALUE;
     }
 
-    //TODO b/273373363: use AIDL enum when available
     if (com::android::media::audio::dsa_over_bt_le_audio()
             && mSupportsHeadTracking) {
-        mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED;
-        std::vector<uint8_t> headtrackingConnectionModes;
+        mHeadtrackingConnectionMode = HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED;
+        std::vector<HeadTracking::ConnectionMode> headtrackingConnectionModes;
         status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_HEADTRACKING_CONNECTION,
                 &headtrackingConnectionModes);
         if (status == NO_ERROR) {
             for (const auto htConnectionMode : headtrackingConnectionModes) {
-                if (htConnectionMode < HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED ||
-                        htConnectionMode > HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_TUNNEL) {
-                    ALOGW("%s: ignoring HT connection mode:%d", __func__, (int)htConnectionMode);
+                if (htConnectionMode < HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED ||
+                    htConnectionMode > HeadTracking::ConnectionMode::DIRECT_TO_SENSOR_TUNNEL) {
+                    ALOGW("%s: ignoring HT connection mode:%s", __func__,
+                          ToString(htConnectionMode).c_str());
                     continue;
                 }
-                mSupportedHeadtrackingConnectionModes.insert(
-                        static_cast<headtracking_connection_t> (htConnectionMode));
+                mSupportedHeadtrackingConnectionModes.insert(htConnectionMode);
             }
             ALOGW_IF(mSupportedHeadtrackingConnectionModes.find(
-                    HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED)
-                        == mSupportedHeadtrackingConnectionModes.end(),
-                    "%s: HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED not reported", __func__);
+                    HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED) ==
+                        mSupportedHeadtrackingConnectionModes.end(),
+                    "%s: Headtracking FRAMEWORK_PROCESSED not reported", __func__);
         }
     }
 
@@ -553,12 +554,12 @@ Status Spatializer::getLevel(Spatialization::Level *level) {
     }
     audio_utils::lock_guard lock(mMutex);
     *level = mLevel;
-    ALOGV("%s level %d", __func__, (int)*level);
+    ALOGV("%s level %s", __func__, ToString(*level).c_str());
     return Status::ok();
 }
 
 Status Spatializer::isHeadTrackingSupported(bool *supports) {
-    ALOGV("%s mSupportsHeadTracking %d", __func__, mSupportsHeadTracking);
+    ALOGV("%s mSupportsHeadTracking %s", __func__, ToString(mSupportsHeadTracking).c_str());
     if (supports == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
@@ -853,7 +854,7 @@ void Spatializer::onHeadToStagePoseMsg(const std::vector<float>& headToStage) {
 }
 
 void Spatializer::onActualModeChange(HeadTrackingMode mode) {
-    std::string modeStr = media::toString(mode);
+    std::string modeStr = ToString(mode);
     ALOGV("%s(%s)", __func__, modeStr.c_str());
     sp<AMessage> msg = new AMessage(EngineCallbackHandler::kWhatOnActualModeChange, mHandler);
     msg->setInt32(EngineCallbackHandler::kModeKey, static_cast<int>(mode));
@@ -861,7 +862,7 @@ void Spatializer::onActualModeChange(HeadTrackingMode mode) {
 }
 
 void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
-    ALOGV("%s(%d)", __func__, (int) mode);
+    ALOGV("%s(%s)", __func__, ToString(mode).c_str());
     sp<media::ISpatializerHeadTrackingCallback> callback;
     HeadTracking::Mode spatializerMode;
     {
@@ -880,7 +881,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
                     spatializerMode = HeadTracking::Mode::RELATIVE_SCREEN;
                     break;
                 default:
-                    LOG_ALWAYS_FATAL("Unknown mode: %d", static_cast<int>(mode));
+                    LOG_ALWAYS_FATAL("Unknown mode: %s", ToString(mode).c_str());
             }
         }
         mActualHeadTrackingMode = spatializerMode;
@@ -894,7 +895,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
             }
         }
         callback = mHeadTrackingCallback;
-        mLocalLog.log("%s: updating mode to %s", __func__, media::toString(mode).c_str());
+        mLocalLog.log("%s: updating mode to %s", __func__, ToString(mode).c_str());
     }
     if (callback != nullptr) {
         callback->onHeadTrackingModeChanged(spatializerMode);
@@ -1052,24 +1053,23 @@ void Spatializer::updateActiveTracks(size_t numActiveTracks) {
     }
 }
 
-//TODO b/273373363: use AIDL enum when available
 audio_latency_mode_t Spatializer::selectHeadtrackingConnectionMode_l() {
     if (!com::android::media::audio::dsa_over_bt_le_audio()) {
         return AUDIO_LATENCY_MODE_LOW;
     }
     // mSupportedLatencyModes is ordered according to system preferences loaded in
     // mOrderedLowLatencyModes
-    mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED;
+    mHeadtrackingConnectionMode = HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED;
     audio_latency_mode_t requestedLatencyMode = mSupportedLatencyModes[0];
     if (requestedLatencyMode == AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_HARDWARE) {
         if (mSupportedHeadtrackingConnectionModes.find(
-                HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_TUNNEL)
+                HeadTracking::ConnectionMode::DIRECT_TO_SENSOR_TUNNEL)
                     != mSupportedHeadtrackingConnectionModes.end()) {
-            mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_TUNNEL;
+            mHeadtrackingConnectionMode = HeadTracking::ConnectionMode::DIRECT_TO_SENSOR_TUNNEL;
         } else if (mSupportedHeadtrackingConnectionModes.find(
-                HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_SW)
+                HeadTracking::ConnectionMode::DIRECT_TO_SENSOR_SW)
                     != mSupportedHeadtrackingConnectionModes.end()) {
-            mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_SW;
+            mHeadtrackingConnectionMode = HeadTracking::ConnectionMode::DIRECT_TO_SENSOR_SW;
         } else {
             // if the engine does not support direct reading of IMU data, do not allow
             // DYNAMIC_SPATIAL_AUDIO_HARDWARE mode and fallback to next mode
@@ -1213,7 +1213,7 @@ std::string Spatializer::toString(unsigned level) const {
         base::StringAppendF(&ss, " %s", ToString(mode).c_str());
     }
     base::StringAppendF(&ss, "], Desired: %s, Actual %s\n",
-                        media::toString(mDesiredHeadTrackingMode).c_str(),
+                        ToString(mDesiredHeadTrackingMode).c_str(),
                         ToString(mActualHeadTrackingMode).c_str());
 
     base::StringAppendF(&ss, "%smSpatializationModes: [", prefixSpace.c_str());
