@@ -1956,7 +1956,7 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     mHardwareStatus = AUDIO_HW_IDLE;
 
     // Change parameters of the configuration each iteration until we find a
-    // configuration that the device will support.
+    // configuration that the device will support, or HAL suggests what it supports.
     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
     for (auto testChannelMask : channelMasks) {
         config.channel_mask = testChannelMask;
@@ -1966,11 +1966,16 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
                 config.sample_rate = testSampleRate;
 
                 size_t bytes = 0;
+                audio_config_t loopConfig = config;
                 status_t result = dev->getInputBufferSize(&config, &bytes);
+                if (result == BAD_VALUE) {
+                    // Retry with the config suggested by the HAL.
+                    result = dev->getInputBufferSize(&config, &bytes);
+                }
                 if (result != OK || bytes == 0) {
+                    config = loopConfig;
                     continue;
                 }
-
                 if (config.sample_rate != sampleRate || config.channel_mask != channelMask ||
                     config.format != format) {
                     uint32_t dstChannelCount = audio_channel_count_from_in_mask(channelMask);
