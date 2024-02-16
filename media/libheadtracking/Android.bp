@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -11,18 +12,18 @@ cc_library {
     name: "libheadtracking",
     host_supported: true,
     srcs: [
-      "HeadTrackingProcessor.cpp",
-      "ModeSelector.cpp",
-      "Pose.cpp",
-      "PoseBias.cpp",
-      "PoseDriftCompensator.cpp",
-      "PosePredictor.cpp",
-      "PoseRateLimiter.cpp",
-      "QuaternionUtil.cpp",
-      "ScreenHeadFusion.cpp",
-      "StillnessDetector.cpp",
-      "Twist.cpp",
-      "VectorRecorder.cpp",
+        "HeadTrackingProcessor.cpp",
+        "ModeSelector.cpp",
+        "Pose.cpp",
+        "PoseBias.cpp",
+        "PoseDriftCompensator.cpp",
+        "PosePredictor.cpp",
+        "PoseRateLimiter.cpp",
+        "QuaternionUtil.cpp",
+        "ScreenHeadFusion.cpp",
+        "StillnessDetector.cpp",
+        "Twist.cpp",
+        "VectorRecorder.cpp",
     ],
     shared_libs: [
         "libaudioutils",
@@ -51,7 +52,7 @@ cc_library {
 cc_library {
     name: "libheadtracking-binding",
     srcs: [
-      "SensorPoseProvider.cpp",
+        "SensorPoseProvider.cpp",
     ],
     shared_libs: [
         "libbase",

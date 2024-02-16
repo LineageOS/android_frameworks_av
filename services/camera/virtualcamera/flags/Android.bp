@@ -1,3 +1,7 @@
+package {
+    default_team: "trendy_team_xr_framework",
+}
+
 soong_config_module_type {
     name: "virtual_device_build_flags_cc_defaults",
     module_type: "cc_defaults",
