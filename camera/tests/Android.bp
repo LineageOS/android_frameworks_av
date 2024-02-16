@@ -13,6 +13,7 @@
 // limitations under the License.
 
 package {
+    default_team: "trendy_team_camera_framework",
     // See: http://go/android-license-faq
     default_applicable_licenses: [
         "frameworks_av_camera_license",

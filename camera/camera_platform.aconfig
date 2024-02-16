@@ -24,6 +24,13 @@ flag {
 
 flag {
      namespace: "camera_platform"
+     name: "watch_foreground_changes"
+     description: "Request AppOps to notify changes in the foreground status of the client"
+     bug: "290086710"
+}
+
+flag {
+     namespace: "camera_platform"
      name: "log_ultrawide_usage"
      description: "Enable measuring how much usage there is for ultrawide-angle cameras"
      bug: "300515796"
@@ -118,4 +125,11 @@ flag {
      name: "camera_privacy_allowlist"
      description: "Allowlisting to exempt safety-relevant cameras from privacy control for automotive devices"
      bug: "282814430"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "extension_10_bit"
+     description: "Enables 10-bit support in the camera extensions."
+     bug: "316375635"
 }
