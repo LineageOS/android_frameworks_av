@@ -510,12 +510,10 @@ std::vector<uint8_t> VirtualCameraRenderThread::createThumbnail(
     return {};
   }
 
-  android_ycbcr ycbcr;
-  status_t status =
-      gBuffer->lockYCbCr(AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, &ycbcr);
-  if (status != NO_ERROR) {
+  YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
+  if (yCbCrLock.getStatus() != NO_ERROR) {
     ALOGE("%s: Failed to lock graphic buffer while generating thumbnail: %d",
-          __func__, status);
+          __func__, yCbCrLock.getStatus());
     return {};
   }
 
@@ -523,9 +521,9 @@ std::vector<uint8_t> VirtualCameraRenderThread::createThumbnail(
   compressedThumbnail.resize(kJpegThumbnailBufferSize);
   ALOGE("%s: Compressing thumbnail %d x %d", __func__, gBuffer->getWidth(),
         gBuffer->getHeight());
-  std::optional<size_t> compressedSize =
-      compressJpeg(gBuffer->getWidth(), gBuffer->getHeight(), quality, ycbcr,
-                   {}, compressedThumbnail.size(), compressedThumbnail.data());
+  std::optional<size_t> compressedSize = compressJpeg(
+      gBuffer->getWidth(), gBuffer->getHeight(), quality, *yCbCrLock, {},
+      compressedThumbnail.size(), compressedThumbnail.data());
   if (!compressedSize.has_value()) {
     ALOGE("%s: Failed to compress jpeg thumbnail", __func__);
     return {};
@@ -570,14 +568,9 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     return status;
   }
 
-  AHardwareBuffer_Planes planes_info;
-
-  int32_t rawFence = fence != nullptr ? fence->get() : -1;
-  int result = AHardwareBuffer_lockPlanes(hwBuffer.get(),
-                                          AHARDWAREBUFFER_USAGE_CPU_READ_RARELY,
-                                          rawFence, nullptr, &planes_info);
-  if (result != OK) {
-    ALOGE("%s: Failed to lock planes for BLOB buffer: %d", __func__, result);
+  PlanesLockGuard planesLock(hwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_RARELY,
+                             fence);
+  if (planesLock.getStatus() != OK) {
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
@@ -586,22 +579,16 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
 
   std::optional<size_t> compressedSize;
   if (gBuffer != nullptr) {
-    android_ycbcr ycbcr;
     if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
       // This should never happen since we're allocating the temporary buffer
       // with YUV420 layout above.
       ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
             gBuffer->getPixelFormat());
-      AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
       return cameraStatus(Status::INTERNAL_ERROR);
     }
 
-    status_t status =
-        gBuffer->lockYCbCr(AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, &ycbcr);
-    ALOGV("Locked buffers");
-    if (status != NO_ERROR) {
-      AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
-      ALOGE("%s: Failed to lock graphic buffer: %d", __func__, status);
+    YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
+    if (yCbCrLock.getStatus() != OK) {
       return cameraStatus(Status::INTERNAL_ERROR);
     }
 
@@ -611,24 +598,18 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
                                    requestSettings.thumbnailJpegQuality));
     compressedSize = compressJpeg(
         gBuffer->getWidth(), gBuffer->getHeight(), requestSettings.jpegQuality,
-        ycbcr, app1ExifData, stream->bufferSize - sizeof(CameraBlob),
-        planes_info.planes[0].data);
-
-    status_t res = gBuffer->unlock();
-    if (res != NO_ERROR) {
-      ALOGE("Failed to unlock graphic buffer: %d", res);
-    }
+        *yCbCrLock, app1ExifData, stream->bufferSize - sizeof(CameraBlob),
+        (*planesLock).planes[0].data);
   } else {
     std::vector<uint8_t> app1ExifData =
         createExif(Resolution(stream->width, stream->height));
     compressedSize = compressBlackJpeg(
         stream->width, stream->height, requestSettings.jpegQuality, app1ExifData,
-        stream->bufferSize - sizeof(CameraBlob), planes_info.planes[0].data);
+        stream->bufferSize - sizeof(CameraBlob), (*planesLock).planes[0].data);
   }
 
   if (!compressedSize.has_value()) {
     ALOGE("%s: Failed to compress JPEG image", __func__);
-    AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
@@ -636,11 +617,9 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
       .blobId = CameraBlobId::JPEG,
       .blobSizeBytes = static_cast<int32_t>(compressedSize.value())};
 
-  memcpy(reinterpret_cast<uint8_t*>(planes_info.planes[0].data) +
+  memcpy(reinterpret_cast<uint8_t*>((*planesLock).planes[0].data) +
              (stream->bufferSize - sizeof(cameraBlob)),
          &cameraBlob, sizeof(cameraBlob));
-
-  AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
 
   ALOGV("%s: Successfully compressed JPEG image, resulting size %zu B",
         __func__, compressedSize.value());
