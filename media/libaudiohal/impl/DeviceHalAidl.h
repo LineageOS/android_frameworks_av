@@ -113,7 +113,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t getParameters(const String8& keys, String8 *values) override;
 
     // Returns audio input buffer size according to parameters passed.
-    status_t getInputBufferSize(const struct audio_config* config, size_t* size) override;
+    status_t getInputBufferSize(struct audio_config* config, size_t* size) override;
 
     // Creates and opens the audio hardware output stream. The stream is closed
     // by releasing all references to the returned object.

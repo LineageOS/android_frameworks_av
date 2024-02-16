@@ -274,15 +274,16 @@ status_t DeviceHalAidl::getParameters(const String8& keys, String8 *values) {
     return parseAndGetVendorParameters(mVendorExt, mModule, parameterKeys, values);
 }
 
-status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, size_t* size) {
+status_t DeviceHalAidl::getInputBufferSize(struct audio_config* config, size_t* size) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (mModule == nullptr) return NO_INIT;
     if (config == nullptr || size == nullptr) {
         return BAD_VALUE;
     }
+    constexpr bool isInput = true;
     AudioConfig aidlConfig = VALUE_OR_RETURN_STATUS(
-            ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, true /*isInput*/));
+            ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, isInput));
     AudioDevice aidlDevice;
     aidlDevice.type.type = AudioDeviceType::IN_DEFAULT;
     AudioSource aidlSource = AudioSource::DEFAULT;
@@ -296,6 +297,9 @@ status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, si
                         0 /*handle*/, aidlDevice, aidlFlags, aidlSource,
                         &cleanups, &aidlConfig, &mixPortConfig, &aidlPatch));
     }
+    *config = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_AudioConfig_audio_config_t(aidlConfig, isInput));
+    if (mixPortConfig.id == 0) return BAD_VALUE;  // HAL suggests a different config.
     *size = aidlConfig.frameCount *
             getFrameSizeInBytes(aidlConfig.base.format, aidlConfig.base.channelMask);
     // Do not disarm cleanups to release temporary port configs.
