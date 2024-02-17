@@ -65,36 +65,37 @@ using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
 using media::audio::common::Int;
 
-// client singleton for AudioFlinger binder interface
-Mutex AudioSystem::gLock;
-Mutex AudioSystem::gLockErrorCallbacks;
-Mutex AudioSystem::gLockAPS;
+std::mutex AudioSystem::gMutex;
 sp<IAudioFlinger> AudioSystem::gAudioFlinger;
+sp<IBinder> AudioSystem::gAudioFlingerBinder;
+sp<IAudioFlinger> AudioSystem::gLocalAudioFlinger;
 sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
-std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 routing_callback AudioSystem::gRoutingCallback = NULL;
 vol_range_init_req_callback AudioSystem::gVolRangeInitReqCallback = NULL;
 
-// Required to be held while calling into gSoundTriggerCaptureStateListener.
-class CaptureStateListenerImpl;
+std::mutex AudioSystem::gErrorCallbacksMutex;
+std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 
-Mutex gSoundTriggerCaptureStateListenerLock;
-sp<CaptureStateListenerImpl> gSoundTriggerCaptureStateListener = nullptr;
+std::mutex AudioSystem::gSoundTriggerMutex;
+sp<CaptureStateListenerImpl> AudioSystem::gSoundTriggerCaptureStateListener;
 
-// Binder for the AudioFlinger service that's passed to this client process from the system server.
+std::mutex AudioSystem::gAPSMutex;
+sp<IAudioPolicyService> AudioSystem::gAudioPolicyService;
+sp<AudioSystem::AudioPolicyServiceClient> AudioSystem::gAudioPolicyServiceClient;
+
+// Sets the Binder for the AudioFlinger service, passed to this client process
+// from the system server.
 // This allows specific isolated processes to access the audio system. Currently used only for the
 // HotwordDetectionService.
-static sp<IBinder> gAudioFlingerBinder = nullptr;
-
 void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
     if (audioFlinger->getInterfaceDescriptor() != media::IAudioFlingerService::descriptor) {
         ALOGE("setAudioFlingerBinder: received a binder of type %s",
               String8(audioFlinger->getInterfaceDescriptor()).c_str());
         return;
     }
-    Mutex::Autolock _l(gLock);
+    std::lock_guard _l(gMutex);
     if (gAudioFlinger != nullptr) {
         ALOGW("setAudioFlingerBinder: ignoring; AudioFlinger connection already established.");
         return;
@@ -102,10 +103,8 @@ void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
     gAudioFlingerBinder = audioFlinger;
 }
 
-static sp<IAudioFlinger> gLocalAudioFlinger; // set if we are local.
-
 status_t AudioSystem::setLocalAudioFlinger(const sp<IAudioFlinger>& af) {
-    Mutex::Autolock _l(gLock);
+    std::lock_guard _l(gMutex);
     if (gAudioFlinger != nullptr) return INVALID_OPERATION;
     gLocalAudioFlinger = af;
     return OK;
@@ -117,7 +116,7 @@ const sp<IAudioFlinger> AudioSystem::getAudioFlingerImpl(bool canStartThreadPool
     sp<AudioFlingerClient> afc;
     bool reportNoError = false;
     {
-        Mutex::Autolock _l(gLock);
+        std::lock_guard _l(gMutex);
         if (gAudioFlinger != nullptr) {
             return gAudioFlinger;
         }
@@ -172,7 +171,7 @@ const sp<AudioSystem::AudioFlingerClient> AudioSystem::getAudioFlingerClient() {
     // calling get_audio_flinger() will initialize gAudioFlingerClient if needed
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return 0;
-    Mutex::Autolock _l(gLock);
+    std::lock_guard _l(gMutex);
     return gAudioFlingerClient;
 }
 
@@ -308,23 +307,23 @@ String8 AudioSystem::getParameters(const String8& keys) {
 // convert volume steps to natural log scale
 
 // change this value to change volume scaling
-static const float dBPerStep = 0.5f;
+constexpr float kdbPerStep = 0.5f;
 // shouldn't need to touch these
-static const float dBConvert = -dBPerStep * 2.302585093f / 20.0f;
-static const float dBConvertInverse = 1.0f / dBConvert;
+constexpr float kdBConvert = -kdbPerStep * 2.302585093f / 20.0f;
+constexpr float kdBConvertInverse = 1.0f / kdBConvert;
 
 float AudioSystem::linearToLog(int volume) {
-    // float v = volume ? exp(float(100 - volume) * dBConvert) : 0;
+    // float v = volume ? exp(float(100 - volume) * kdBConvert) : 0;
     // ALOGD("linearToLog(%d)=%f", volume, v);
     // return v;
-    return volume ? exp(float(100 - volume) * dBConvert) : 0;
+    return volume ? exp(float(100 - volume) * kdBConvert) : 0;
 }
 
 int AudioSystem::logToLinear(float volume) {
-    // int v = volume ? 100 - int(dBConvertInverse * log(volume) + 0.5) : 0;
+    // int v = volume ? 100 - int(kdBConvertInverse * log(volume) + 0.5) : 0;
     // ALOGD("logTolinear(%d)=%f", v, volume);
     // return v;
-    return volume ? 100 - int(dBConvertInverse * log(volume) + 0.5) : 0;
+    return volume ? 100 - int(kdBConvertInverse * log(volume) + 0.5) : 0;
 }
 
 /* static */ size_t AudioSystem::calculateMinFrameCount(
@@ -549,7 +548,7 @@ status_t AudioSystem::getFrameCountHAL(audio_io_handle_t ioHandle,
 
 
 void AudioSystem::AudioFlingerClient::clearIoCache() {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     mIoDescriptors.clear();
     mInBuffSize = 0;
     mInSamplingRate = 0;
@@ -559,7 +558,7 @@ void AudioSystem::AudioFlingerClient::clearIoCache() {
 
 void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who __unused) {
     {
-        Mutex::Autolock _l(AudioSystem::gLock);
+        std::lock_guard _l(AudioSystem::gMutex);
         AudioSystem::gAudioFlinger.clear();
     }
 
@@ -587,7 +586,7 @@ Status AudioSystem::AudioFlingerClient::ioConfigChanged(
     audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
     std::vector<sp<AudioDeviceCallback>> callbacksToCall;
     {
-        Mutex::Autolock _l(mLock);
+        std::lock_guard _l(mMutex);
         auto callbacks = std::map<audio_port_handle_t, wp<AudioDeviceCallback>>();
 
         switch (event) {
@@ -692,8 +691,8 @@ Status AudioSystem::AudioFlingerClient::ioConfigChanged(
         }
     }
 
-    // Callbacks must be called without mLock held. May lead to dead lock if calling for
-    // example getRoutedDevice that updates the device and tries to acquire mLock.
+    // Callbacks must be called without mMutex held. May lead to dead lock if calling for
+    // example getRoutedDevice that updates the device and tries to acquire mMutex.
     for (auto cb  : callbacksToCall) {
         // If callbacksToCall is not empty, it implies ioDesc->getIoHandle() and deviceId are valid
         cb->onAudioDeviceUpdate(ioDesc->getIoHandle(), deviceId);
@@ -712,7 +711,7 @@ Status AudioSystem::AudioFlingerClient::onSupportedLatencyModesChanged(
 
     std::vector<sp<SupportedLatencyModesCallback>> callbacks;
     {
-        Mutex::Autolock _l(mLock);
+        std::lock_guard _l(mMutex);
         for (auto callback : mSupportedLatencyModesCallbacks) {
             if (auto ref = callback.promote(); ref != nullptr) {
                 callbacks.push_back(ref);
@@ -733,7 +732,7 @@ status_t AudioSystem::AudioFlingerClient::getInputBufferSize(
     if (af == 0) {
         return PERMISSION_DENIED;
     }
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     // Do we have a stale mInBuffSize or are we requesting the input buffer size for new values
     if ((mInBuffSize == 0) || (sampleRate != mInSamplingRate) || (format != mInFormat)
         || (channelMask != mInChannelMask)) {
@@ -768,7 +767,7 @@ AudioSystem::AudioFlingerClient::getIoDescriptor_l(audio_io_handle_t ioHandle) {
 }
 
 sp<AudioIoDescriptor> AudioSystem::AudioFlingerClient::getIoDescriptor(audio_io_handle_t ioHandle) {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     return getIoDescriptor_l(ioHandle);
 }
 
@@ -776,7 +775,7 @@ status_t AudioSystem::AudioFlingerClient::addAudioDeviceCallback(
         const wp<AudioDeviceCallback>& callback, audio_io_handle_t audioIo,
         audio_port_handle_t portId) {
     ALOGV("%s audioIo %d portId %d", __func__, audioIo, portId);
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     auto& callbacks = mAudioDeviceCallbacks.emplace(
             audioIo,
             std::map<audio_port_handle_t, wp<AudioDeviceCallback>>()).first->second;
@@ -791,7 +790,7 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
         const wp<AudioDeviceCallback>& callback __unused, audio_io_handle_t audioIo,
         audio_port_handle_t portId) {
     ALOGV("%s audioIo %d portId %d", __func__, audioIo, portId);
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     auto it = mAudioDeviceCallbacks.find(audioIo);
     if (it == mAudioDeviceCallbacks.end()) {
         return INVALID_OPERATION;
@@ -807,7 +806,7 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
 
 status_t AudioSystem::AudioFlingerClient::addSupportedLatencyModesCallback(
         const sp<SupportedLatencyModesCallback>& callback) {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     if (std::find(mSupportedLatencyModesCallbacks.begin(),
                   mSupportedLatencyModesCallbacks.end(),
                   callback) != mSupportedLatencyModesCallbacks.end()) {
@@ -819,7 +818,7 @@ status_t AudioSystem::AudioFlingerClient::addSupportedLatencyModesCallback(
 
 status_t AudioSystem::AudioFlingerClient::removeSupportedLatencyModesCallback(
         const sp<SupportedLatencyModesCallback>& callback) {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     auto it = std::find(mSupportedLatencyModesCallbacks.begin(),
                                  mSupportedLatencyModesCallbacks.end(),
                                  callback);
@@ -831,55 +830,49 @@ status_t AudioSystem::AudioFlingerClient::removeSupportedLatencyModesCallback(
 }
 
 /* static */ uintptr_t AudioSystem::addErrorCallback(audio_error_callback cb) {
-    Mutex::Autolock _l(gLockErrorCallbacks);
+    std::lock_guard _l(gErrorCallbacksMutex);
     gAudioErrorCallbacks.insert(cb);
     return reinterpret_cast<uintptr_t>(cb);
 }
 
 /* static */ void AudioSystem::removeErrorCallback(uintptr_t cb) {
-    Mutex::Autolock _l(gLockErrorCallbacks);
+    std::lock_guard _l(gErrorCallbacksMutex);
     gAudioErrorCallbacks.erase(reinterpret_cast<audio_error_callback>(cb));
 }
 
 /* static */ void AudioSystem::reportError(status_t err) {
-    Mutex::Autolock _l(gLockErrorCallbacks);
+    std::lock_guard _l(gErrorCallbacksMutex);
     for (auto callback : gAudioErrorCallbacks) {
         callback(err);
     }
 }
 
 /*static*/ void AudioSystem::setDynPolicyCallback(dynamic_policy_callback cb) {
-    Mutex::Autolock _l(gLock);
+    std::lock_guard _l(gMutex);
     gDynPolicyCallback = cb;
 }
 
 /*static*/ void AudioSystem::setRecordConfigCallback(record_config_callback cb) {
-    Mutex::Autolock _l(gLock);
+    std::lock_guard _l(gMutex);
     gRecordConfigCallback = cb;
 }
 
 /*static*/ void AudioSystem::setRoutingCallback(routing_callback cb) {
-    Mutex::Autolock _l(gLock);
+    std::lock_guard _l(gMutex);
     gRoutingCallback = cb;
 }
 
 /*static*/ void AudioSystem::setVolInitReqCallback(vol_range_init_req_callback cb) {
-    Mutex::Autolock _l(gLock);
+    std::lock_guard _l(gMutex);
     gVolRangeInitReqCallback = cb;
 }
-
-// client singleton for AudioPolicyService binder interface
-// protected by gLockAPS
-sp<IAudioPolicyService> AudioSystem::gAudioPolicyService;
-sp<AudioSystem::AudioPolicyServiceClient> AudioSystem::gAudioPolicyServiceClient;
-
 
 // establish binder interface to AudioPolicy service
 const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service() {
     sp<IAudioPolicyService> ap;
     sp<AudioPolicyServiceClient> apc;
     {
-        Mutex::Autolock _l(gLockAPS);
+        std::lock_guard _l(gAPSMutex);
         if (gAudioPolicyService == 0) {
             sp<IServiceManager> sm = defaultServiceManager();
             sp<IBinder> binder = sm->waitForService(String16("media.audio_policy"));
@@ -910,7 +903,7 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service() {
 }
 
 void AudioSystem::clearAudioPolicyService() {
-    Mutex::Autolock _l(gLockAPS);
+    std::lock_guard _l(gAPSMutex);
     gAudioPolicyService.clear();
 }
 
@@ -1513,7 +1506,7 @@ void AudioSystem::clearAudioConfigCache() {
     // called by restoreTrack_l(), which needs new IAudioFlinger and IAudioPolicyService instances
     ALOGV("clearAudioConfigCache()");
     {
-        Mutex::Autolock _l(gLock);
+        std::lock_guard _l(gMutex);
         if (gAudioFlingerClient != 0) {
             gAudioFlingerClient->clearIoCache();
         }
@@ -1682,7 +1675,7 @@ status_t AudioSystem::addAudioPortCallback(const sp<AudioPortCallback>& callback
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    Mutex::Autolock _l(gLockAPS);
+    std::lock_guard _l(gAPSMutex);
     if (gAudioPolicyServiceClient == 0) {
         return NO_INIT;
     }
@@ -1698,7 +1691,7 @@ status_t AudioSystem::removeAudioPortCallback(const sp<AudioPortCallback>& callb
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    Mutex::Autolock _l(gLockAPS);
+    std::lock_guard _l(gAPSMutex);
     if (gAudioPolicyServiceClient == 0) {
         return NO_INIT;
     }
@@ -1713,7 +1706,7 @@ status_t AudioSystem::addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallb
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    Mutex::Autolock _l(gLockAPS);
+    std::lock_guard _l(gAPSMutex);
     if (gAudioPolicyServiceClient == 0) {
         return NO_INIT;
     }
@@ -1728,7 +1721,7 @@ status_t AudioSystem::removeAudioVolumeGroupCallback(const sp<AudioVolumeGroupCa
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    Mutex::Autolock _l(gLockAPS);
+    std::lock_guard _l(gAPSMutex);
     if (gAudioPolicyServiceClient == 0) {
         return NO_INIT;
     }
@@ -2605,15 +2598,15 @@ public:
     }
 
     binder::Status setCaptureState(bool active) override {
-        Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+        std::lock_guard _l(AudioSystem::gSoundTriggerMutex);
         mListener->onStateChanged(active);
         return binder::Status::ok();
     }
 
     void binderDied(const wp<IBinder>&) override {
-        Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+        std::lock_guard _l(AudioSystem::gSoundTriggerMutex);
         mListener->onServiceDied();
-        gSoundTriggerCaptureStateListener = nullptr;
+        AudioSystem::gSoundTriggerCaptureStateListener = nullptr;
     }
 
 private:
@@ -2632,7 +2625,7 @@ status_t AudioSystem::registerSoundTriggerCaptureStateListener(
         return PERMISSION_DENIED;
     }
 
-    Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+    std::lock_guard _l(AudioSystem::gSoundTriggerMutex);
     gSoundTriggerCaptureStateListener = new CaptureStateListenerImpl(aps, listener);
     gSoundTriggerCaptureStateListener->init();
 
@@ -2755,7 +2748,7 @@ status_t AudioSystem::clearPreferredMixerAttributes(const audio_attributes_t *at
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(
         const sp<AudioPortCallback>& callback) {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     for (size_t i = 0; i < mAudioPortCallbacks.size(); i++) {
         if (mAudioPortCallbacks[i] == callback) {
             return -1;
@@ -2767,7 +2760,7 @@ int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(
 
 int AudioSystem::AudioPolicyServiceClient::removeAudioPortCallback(
         const sp<AudioPortCallback>& callback) {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     size_t i;
     for (i = 0; i < mAudioPortCallbacks.size(); i++) {
         if (mAudioPortCallbacks[i] == callback) {
@@ -2783,7 +2776,7 @@ int AudioSystem::AudioPolicyServiceClient::removeAudioPortCallback(
 
 
 Status AudioSystem::AudioPolicyServiceClient::onAudioPortListUpdate() {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     for (size_t i = 0; i < mAudioPortCallbacks.size(); i++) {
         mAudioPortCallbacks[i]->onAudioPortListUpdate();
     }
@@ -2791,7 +2784,7 @@ Status AudioSystem::AudioPolicyServiceClient::onAudioPortListUpdate() {
 }
 
 Status AudioSystem::AudioPolicyServiceClient::onAudioPatchListUpdate() {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     for (size_t i = 0; i < mAudioPortCallbacks.size(); i++) {
         mAudioPortCallbacks[i]->onAudioPatchListUpdate();
     }
@@ -2801,7 +2794,7 @@ Status AudioSystem::AudioPolicyServiceClient::onAudioPatchListUpdate() {
 // ----------------------------------------------------------------------------
 int AudioSystem::AudioPolicyServiceClient::addAudioVolumeGroupCallback(
         const sp<AudioVolumeGroupCallback>& callback) {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     for (size_t i = 0; i < mAudioVolumeGroupCallback.size(); i++) {
         if (mAudioVolumeGroupCallback[i] == callback) {
             return -1;
@@ -2813,7 +2806,7 @@ int AudioSystem::AudioPolicyServiceClient::addAudioVolumeGroupCallback(
 
 int AudioSystem::AudioPolicyServiceClient::removeAudioVolumeGroupCallback(
         const sp<AudioVolumeGroupCallback>& callback) {
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     size_t i;
     for (i = 0; i < mAudioVolumeGroupCallback.size(); i++) {
         if (mAudioVolumeGroupCallback[i] == callback) {
@@ -2833,7 +2826,7 @@ Status AudioSystem::AudioPolicyServiceClient::onAudioVolumeGroupChanged(int32_t 
             aidl2legacy_int32_t_volume_group_t(group));
     int flagsLegacy = VALUE_OR_RETURN_BINDER_STATUS(convertReinterpret<int>(flags));
 
-    Mutex::Autolock _l(mLock);
+    std::lock_guard _l(mMutex);
     for (size_t i = 0; i < mAudioVolumeGroupCallback.size(); i++) {
         mAudioVolumeGroupCallback[i]->onAudioVolumeGroupChanged(groupLegacy, flagsLegacy);
     }
@@ -2849,7 +2842,7 @@ Status AudioSystem::AudioPolicyServiceClient::onDynamicPolicyMixStateUpdate(
     int stateLegacy = VALUE_OR_RETURN_BINDER_STATUS(convertReinterpret<int>(state));
     dynamic_policy_callback cb = NULL;
     {
-        Mutex::Autolock _l(AudioSystem::gLock);
+        std::lock_guard _l(AudioSystem::gMutex);
         cb = gDynPolicyCallback;
     }
 
@@ -2870,7 +2863,7 @@ Status AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
         AudioSource source) {
     record_config_callback cb = NULL;
     {
-        Mutex::Autolock _l(AudioSystem::gLock);
+        std::lock_guard _l(AudioSystem::gMutex);
         cb = gRecordConfigCallback;
     }
 
@@ -2903,7 +2896,7 @@ Status AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
 Status AudioSystem::AudioPolicyServiceClient::onRoutingUpdated() {
     routing_callback cb = NULL;
     {
-        Mutex::Autolock _l(AudioSystem::gLock);
+        std::lock_guard _l(AudioSystem::gMutex);
         cb = gRoutingCallback;
     }
 
@@ -2916,7 +2909,7 @@ Status AudioSystem::AudioPolicyServiceClient::onRoutingUpdated() {
 Status AudioSystem::AudioPolicyServiceClient::onVolumeRangeInitRequest() {
     vol_range_init_req_callback cb = NULL;
     {
-        Mutex::Autolock _l(AudioSystem::gLock);
+        std::lock_guard _l(AudioSystem::gMutex);
         cb = gVolRangeInitReqCallback;
     }
 
@@ -2928,7 +2921,7 @@ Status AudioSystem::AudioPolicyServiceClient::onVolumeRangeInitRequest() {
 
 void AudioSystem::AudioPolicyServiceClient::binderDied(const wp<IBinder>& who __unused) {
     {
-        Mutex::Autolock _l(mLock);
+        std::lock_guard _l(mMutex);
         for (size_t i = 0; i < mAudioPortCallbacks.size(); i++) {
             mAudioPortCallbacks[i]->onServiceDied();
         }
