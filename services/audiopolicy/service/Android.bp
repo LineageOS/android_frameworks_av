@@ -52,7 +52,7 @@ cc_defaults {
     static_libs: [
         "libeffectsconfig",
         "libaudiopolicycomponents",
-    ]
+    ],
 }
 
 cc_library {
@@ -75,9 +75,8 @@ cc_library {
     ],
 
     include_dirs: [
-        "frameworks/av/services/audioflinger"
+        "frameworks/av/services/audioflinger",
     ],
-
 
     static_libs: [
         "framework-permission-aidl-cpp",
