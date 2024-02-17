@@ -15,8 +15,9 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "AudioEffectUnitTests"
+#define LOG_TAG "AudioEffectTests"
 
+#include <binder/ProcessState.h>
 #include <gtest/gtest.h>
 #include <media/AudioEffect.h>
 #include <system/audio_effects/effect_hapticgenerator.h>
@@ -24,6 +25,7 @@
 #include <system/audio_effects/effect_visualizer.h>
 
 #include "audio_test_utils.h"
+#include "test_execution_tracer.h"
 
 using namespace android;
 
@@ -562,4 +564,11 @@ TEST(AudioEffectTest, TestHapticEffect) {
     playback.clear();
     EXPECT_TRUE(cb->receivedFramesProcessed)
             << "AudioEffect frames processed callback not received";
+}
+
+int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
 }

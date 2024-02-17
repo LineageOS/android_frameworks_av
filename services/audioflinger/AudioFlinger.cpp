@@ -1957,7 +1957,7 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     mHardwareStatus = AUDIO_HW_IDLE;
 
     // Change parameters of the configuration each iteration until we find a
-    // configuration that the device will support.
+    // configuration that the device will support, or HAL suggests what it supports.
     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
     for (auto testChannelMask : channelMasks) {
         config.channel_mask = testChannelMask;
@@ -1967,11 +1967,16 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
                 config.sample_rate = testSampleRate;
 
                 size_t bytes = 0;
+                audio_config_t loopConfig = config;
                 status_t result = dev->getInputBufferSize(&config, &bytes);
+                if (result == BAD_VALUE) {
+                    // Retry with the config suggested by the HAL.
+                    result = dev->getInputBufferSize(&config, &bytes);
+                }
                 if (result != OK || bytes == 0) {
+                    config = loopConfig;
                     continue;
                 }
-
                 if (config.sample_rate != sampleRate || config.channel_mask != channelMask ||
                     config.format != format) {
                     uint32_t dstChannelCount = audio_channel_count_from_in_mask(channelMask);
@@ -2171,30 +2176,24 @@ sp<IAfThreadBase> AudioFlinger::getEffectThread_l(audio_session_t sessionId,
     sp<IAfThreadBase> thread;
 
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        if (mPlaybackThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mPlaybackThreads.valueAt(i);
+        thread = mPlaybackThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
-    }
-    if (thread != nullptr) {
-        return thread;
     }
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        if (mRecordThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mRecordThreads.valueAt(i);
+        thread = mRecordThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
-    }
-    if (thread != nullptr) {
-        return thread;
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
-        if (mMmapThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mMmapThreads.valueAt(i);
+        thread = mMmapThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
     }
-    return thread;
+    return nullptr;
 }
 
 // ----------------------------------------------------------------------------
@@ -4387,11 +4386,12 @@ void AudioFlinger::setEffectSuspended(int effectId,
 
     sp<IAfThreadBase> thread = getEffectThread_l(sessionId, effectId);
     if (thread == nullptr) {
-      return;
+        return;
     }
     audio_utils::lock_guard _sl(thread->mutex());
-    sp<IAfEffectModule> effect = thread->getEffect_l(sessionId, effectId);
-    thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
+    if (const auto& effect = thread->getEffect_l(sessionId, effectId)) {
+        thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
+    }
 }
 
 

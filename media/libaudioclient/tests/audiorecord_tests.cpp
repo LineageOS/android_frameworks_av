@@ -24,6 +24,7 @@
 #include <gtest/gtest.h>
 
 #include "audio_test_utils.h"
+#include "test_execution_tracer.h"
 
 using namespace android;
 
@@ -260,26 +261,6 @@ INSTANTIATE_TEST_SUITE_P(AudioRecordMiscInput, AudioRecordCreateTest,
                                                               AUDIO_SOURCE_VOICE_COMMUNICATION,
                                                               AUDIO_SOURCE_UNPROCESSED)),
                          GetRecordTestName);
-
-namespace {
-
-class TestExecutionTracer : public ::testing::EmptyTestEventListener {
-  public:
-    void OnTestStart(const ::testing::TestInfo& test_info) override {
-        TraceTestState("Started", test_info);
-    }
-    void OnTestEnd(const ::testing::TestInfo& test_info) override {
-        TraceTestState("Finished", test_info);
-    }
-    void OnTestPartResult(const ::testing::TestPartResult& result) override { LOG(INFO) << result; }
-
-  private:
-    static void TraceTestState(const std::string& state, const ::testing::TestInfo& test_info) {
-        LOG(INFO) << state << " " << test_info.test_suite_name() << "::" << test_info.name();
-    }
-};
-
-}  // namespace
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

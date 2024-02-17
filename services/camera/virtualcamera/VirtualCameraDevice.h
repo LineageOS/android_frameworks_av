@@ -103,20 +103,23 @@ class VirtualCameraDevice
   Resolution getMaxInputResolution() const;
 
   // Maximal number of RAW streams - virtual camera doesn't support RAW streams.
-  static const int32_t kMaxNumberOfRawStreams = 0;
+  static constexpr int32_t kMaxNumberOfRawStreams = 0;
 
   // Maximal number of non-jpeg streams configured concurrently in single
   // session. This should be at least 3 and can be increased at the potential
   // cost of more CPU/GPU load if there are many concurrent streams.
-  static const int32_t kMaxNumberOfProcessedStreams = 3;
+  static constexpr int32_t kMaxNumberOfProcessedStreams = 3;
 
   // Maximal number of stalling (in case of virtual camera only jpeg for now)
   // streams. Can be increaed at the cost of potential cost of more GPU/CPU
   // load.
-  static const int32_t kMaxNumberOfStallStreams = 1;
+  static constexpr int32_t kMaxNumberOfStallStreams = 1;
 
   // Focal length for full frame sensor.
-  constexpr static const float kFocalLength = 43.0;
+  static constexpr float kFocalLength = 43.0;
+
+  // Default JPEG compression quality.
+  static constexpr uint8_t kDefaultJpegQuality = 80;
 
  private:
   std::shared_ptr<VirtualCameraDevice> sharedFromThis();

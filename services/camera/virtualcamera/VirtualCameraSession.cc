@@ -42,6 +42,7 @@
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferCache.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
+#include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureRequest.h"
 #include "aidl/android/hardware/camera/device/HalStream.h"
 #include "aidl/android/hardware/camera/device/NotifyMsg.h"
@@ -61,7 +62,7 @@
 #include "util/EglFramebuffer.h"
 #include "util/EglProgram.h"
 #include "util/JpegUtil.h"
-#include "util/MetadataBuilder.h"
+#include "util/MetadataUtil.h"
 #include "util/TestPatternHelper.h"
 #include "util/Util.h"
 
@@ -100,10 +101,16 @@ using namespace std::chrono_literals;
 
 // Size of request/result metadata fast message queue.
 // Setting to 0 to always disables FMQ.
-static constexpr size_t kMetadataMsgQueueSize = 0;
+constexpr size_t kMetadataMsgQueueSize = 0;
 
 // Maximum number of buffers to use per single stream.
-static constexpr size_t kMaxStreamBuffers = 2;
+constexpr size_t kMaxStreamBuffers = 2;
+
+constexpr int32_t kDefaultJpegQuality = 80;
+constexpr int32_t kDefaultJpegThumbnailQuality = 70;
+
+// Thumbnail size (0,0) correspods to disabling thumbnail.
+const Resolution kDefaultJpegThumbnailSize(0, 0);
 
 camera_metadata_enum_android_control_capture_intent_t requestTemplateToIntent(
     const RequestTemplate type) {
@@ -150,6 +157,9 @@ CameraMetadata createDefaultRequestSettings(
           .setFaceDetectMode(ANDROID_STATISTICS_FACE_DETECT_MODE_OFF)
           .setFlashMode(ANDROID_FLASH_MODE_OFF)
           .setFlashState(ANDROID_FLASH_STATE_UNAVAILABLE)
+          .setJpegQuality(VirtualCameraDevice::kDefaultJpegQuality)
+          .setJpegThumbnailQuality(VirtualCameraDevice::kDefaultJpegQuality)
+          .setJpegThumbnailSize(0, 0)
           .build();
   if (metadata == nullptr) {
     ALOGE("%s: Failed to construct metadata for default request type %s",
@@ -189,6 +199,16 @@ Stream getHighestResolutionStream(const std::vector<Stream>& streams) {
                             [](const Stream& a, const Stream& b) {
                               return a.width * a.height < b.width * b.height;
                             }));
+}
+
+RequestSettings createSettingsFromMetadata(const CameraMetadata& metadata) {
+  return RequestSettings{
+      .jpegQuality = getJpegQuality(metadata).value_or(
+          VirtualCameraDevice::kDefaultJpegQuality),
+      .thumbnailResolution =
+          getJpegThumbnailSize(metadata).value_or(Resolution(0, 0)),
+      .thumbnailJpegQuality = getJpegThumbnailQuality(metadata).value_or(
+          VirtualCameraDevice::kDefaultJpegQuality)};
 }
 
 }  // namespace
@@ -298,7 +318,6 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
         inputWidth, inputHeight, Format::YUV_420_888);
   }
 
-  mFirstRequest.store(true);
   return ndk::ScopedAStatus::ok();
 }
 
@@ -440,13 +459,25 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
     const CaptureRequest& request) {
   ALOGD("%s: request: %s", __func__, request.toString().c_str());
 
-  if (mFirstRequest.exchange(false) && request.settings.metadata.empty()) {
-    return cameraStatus(Status::ILLEGAL_ARGUMENT);
-  }
-
   std::shared_ptr<ICameraDeviceCallback> cameraCallback = nullptr;
+  RequestSettings requestSettings;
   {
     std::lock_guard<std::mutex> lock(mLock);
+
+    // If metadata it empty, last received metadata applies, if  it's non-empty
+    // update it.
+    if (!request.settings.metadata.empty()) {
+      mCurrentRequestMetadata = request.settings;
+    }
+
+    // We don't have any metadata for this request - this means we received none
+    // in first request, this is an error state.
+    if (mCurrentRequestMetadata.metadata.empty()) {
+      return cameraStatus(Status::ILLEGAL_ARGUMENT);
+    }
+
+    requestSettings = createSettingsFromMetadata(mCurrentRequestMetadata);
+
     cameraCallback = mCameraDeviceCallback;
   }
 
@@ -480,7 +511,7 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
       return cameraStatus(Status::INTERNAL_ERROR);
     }
     mRenderThread->enqueueTask(std::make_unique<ProcessCaptureRequestTask>(
-        request.frameNumber, taskBuffers));
+        request.frameNumber, taskBuffers, requestSettings));
   }
 
   if (mVirtualCameraClientCallback != nullptr) {

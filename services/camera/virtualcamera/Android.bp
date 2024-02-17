@@ -12,6 +12,7 @@ cc_defaults {
         "libbinder",
         "libbinder_ndk",
         "libcamera_metadata",
+        "libexif",
         "liblog",
         "libfmq",
         "libgui",
@@ -47,7 +48,7 @@ cc_library_static {
     name: "libvirtualcamera_utils",
     srcs: [
         "util/JpegUtil.cc",
-        "util/MetadataBuilder.cc",
+        "util/MetadataUtil.cc",
         "util/Util.cc",
         "util/TestPatternHelper.cc",
         "util/EglDisplayContext.cc",
