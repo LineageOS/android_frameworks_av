@@ -4918,6 +4918,22 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
             break;
     }
 
+    // make sure the following transactions require MODIFY_AUDIO_ROUTING permission
+    switch (code) {
+        case TransactionCode::SET_APP_VOLUME:
+        case TransactionCode::SET_APP_MUTE: {
+            if (!modifyAudioRoutingAllowed()) {
+                ALOGW("%s: transaction %d received from PID %d UID %d does not have "
+                      "MODIFY_AUDIO_ROUTING permission",
+                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      IPCThreadState::self()->getCallingUid());
+                return INVALID_OPERATION;
+            }
+        } break;
+        default:
+            break;
+    }
+
     // List of relevant events that trigger log merging.
     // Log merging should activate during audio activity of any kind. This are considered the
     // most relevant events.
