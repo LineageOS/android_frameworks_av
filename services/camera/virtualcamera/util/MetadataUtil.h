@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_COMPANION_VIRTUALCAMERA_METADATABUILDER_H
-#define ANDROID_COMPANION_VIRTUALCAMERA_METADATABUILDER_H
+#ifndef ANDROID_COMPANION_VIRTUALCAMERA_METADATAUTIL_H
+#define ANDROID_COMPANION_VIRTUALCAMERA_METADATAUTIL_H
 
 #include <chrono>
 #include <cstdint>
@@ -98,7 +98,8 @@ class MetadataBuilder {
           sensorReadoutTimestamp);
 
   // See ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS in CameraMetadataTag.aidl.
-  MetadataBuilder& setAvailableFocalLengths(const std::vector<float>& focalLengths);
+  MetadataBuilder& setAvailableFocalLengths(
+      const std::vector<float>& focalLengths);
 
   // See ANDROID_LENS_FOCAL_LENGTH in CameraMetadataTag.aidl.
   MetadataBuilder& setFocalLength(float focalLength);
@@ -278,6 +279,15 @@ class MetadataBuilder {
   MetadataBuilder& setJpegAvailableThumbnailSizes(
       const std::vector<Resolution>& thumbnailSizes);
 
+  // See JPEG_QUALITY in CaptureRequest.java.
+  MetadataBuilder& setJpegQuality(uint8_t quality);
+
+  // See JPEG_THUMBNAIL_SIZE in CaptureRequest.java.
+  MetadataBuilder& setJpegThumbnailSize(int width, int height);
+
+  // See JPEG_THUMBNAIL_QUALITY in CaptureRequest.java.
+  MetadataBuilder& setJpegThumbnailQuality(uint8_t quality);
+
   // The maximum numbers of different types of output streams
   // that can be configured and used simultaneously by a camera device.
   //
@@ -353,8 +363,25 @@ class MetadataBuilder {
   bool mExtendWithAvailableCharacteristicsKeys = false;
 };
 
+// Returns JPEG_QUALITY from metadata, or nullopt if the key is not present.
+std::optional<int32_t> getJpegQuality(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
+// Returns JPEG_THUMBNAIL_SIZE from metadata, or nullopt if the key is not present.
+std::optional<Resolution> getJpegThumbnailSize(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
+// Returns JPEG_THUMBNAIL_QUALITY from metadata, or nullopt if the key is not present.
+std::optional<int32_t> getJpegThumbnailQuality(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
+// Returns JPEG_AVAILABLE_THUMBNAIL_SIZES from metadata, or nullopt if the key
+// is not present.
+std::vector<Resolution> getJpegAvailableThumbnailSizes(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android
 
-#endif  // ANDROID_COMPANION_VIRTUALCAMERA_METADATABUILDER_H
+#endif  // ANDROID_COMPANION_VIRTUALCAMERA_METADATAUTIL_H

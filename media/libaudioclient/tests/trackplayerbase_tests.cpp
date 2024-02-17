@@ -16,9 +16,11 @@
 
 #define LOG_TAG "TrackPlayerBaseTest"
 
+#include <binder/ProcessState.h>
 #include <gtest/gtest.h>
-
 #include <media/TrackPlayerBase.h>
+
+#include "test_execution_tracer.h"
 
 using namespace android;
 using namespace android::media;
@@ -159,3 +161,10 @@ TEST_P(PauseTestParam, PauseTest) {
 
 INSTANTIATE_TEST_SUITE_P(TrackPlayerTest, PauseTestParam,
                          ::testing::Values(std::make_tuple(1.0, 75.0, 2, 24000)));
+
+int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
+}

@@ -79,6 +79,10 @@ bool isFormatSupportedForInput(const int width, const int height,
   return true;
 }
 
+std::ostream& operator<<(std::ostream& os, const Resolution& resolution) {
+  return os << resolution.width << "x" << resolution.height;
+}
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android

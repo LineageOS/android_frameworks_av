@@ -15,9 +15,9 @@
  */
 
 // #define LOG_NDEBUG 0
-#define LOG_TAG "MetadataBuilder"
+#define LOG_TAG "MetadataUtil"
 
-#include "MetadataBuilder.h"
+#include "MetadataUtil.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -396,6 +396,22 @@ MetadataBuilder& MetadataBuilder::setJpegAvailableThumbnailSizes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setJpegQuality(const uint8_t quality) {
+  mEntryMap[ANDROID_JPEG_QUALITY] = asVectorOf<uint8_t>(quality);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setJpegThumbnailSize(const int width,
+                                                       const int height) {
+  mEntryMap[ANDROID_JPEG_THUMBNAIL_SIZE] = std::vector<int32_t>({width, height});
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setJpegThumbnailQuality(const uint8_t quality) {
+  mEntryMap[ANDROID_JPEG_THUMBNAIL_QUALITY] = asVectorOf<uint8_t>(quality);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setMaxNumberOutputStreams(
     const int32_t maxRawStreams, const int32_t maxProcessedStreams,
     const int32_t maxStallStreams) {
@@ -595,6 +611,67 @@ MetadataBuilder::build() {
   metadataHelper.unlock(metadata);
 
   return aidlMetadata;
+}
+
+std::optional<int32_t> getJpegQuality(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_JPEG_QUALITY, &entry) !=
+      OK) {
+    return std::nullopt;
+  }
+
+  return *entry.data.i32;
+}
+
+std::optional<Resolution> getJpegThumbnailSize(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_JPEG_THUMBNAIL_SIZE,
+                                    &entry) != OK) {
+    return std::nullopt;
+  }
+
+  return Resolution(entry.data.i32[0], entry.data.i32[1]);
+}
+
+std::optional<int32_t> getJpegThumbnailQuality(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_JPEG_THUMBNAIL_QUALITY,
+                                    &entry) != OK) {
+    return std::nullopt;
+  }
+
+  return *entry.data.i32;
+}
+
+std::vector<Resolution> getJpegAvailableThumbnailSizes(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(
+          metadata, ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES, &entry) != OK) {
+    return {};
+  }
+
+  std::vector<Resolution> thumbnailSizes;
+  thumbnailSizes.reserve(entry.count / 2);
+  for (int i = 0; i < entry.count; i += 2) {
+    thumbnailSizes.emplace_back(entry.data.i32[i], entry.data.i32[i + 1]);
+  }
+  return thumbnailSizes;
 }
 
 }  // namespace virtualcamera

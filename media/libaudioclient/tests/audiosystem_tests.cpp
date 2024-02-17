@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AudioSystemTest"
-
 #include <string.h>
 
 #include <set>
+
+#define LOG_TAG "AudioSystemTest"
 
 #include <gtest/gtest.h>
 #include <log/log.h>
@@ -26,6 +26,7 @@
 #include <media/IAudioFlinger.h>
 
 #include "audio_test_utils.h"
+#include "test_execution_tracer.h"
 
 using android::media::audio::common::AudioDeviceAddress;
 using android::media::audio::common::AudioDeviceDescription;
@@ -705,21 +706,6 @@ TEST_F(AudioSystemTest, SetDeviceConnectedState) {
         EXPECT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, deviceState);
     }
 }
-
-class TestExecutionTracer : public ::testing::EmptyTestEventListener {
-  public:
-    void OnTestStart(const ::testing::TestInfo& test_info) override {
-        TraceTestState("Started", test_info);
-    }
-    void OnTestEnd(const ::testing::TestInfo& test_info) override {
-        TraceTestState("Completed", test_info);
-    }
-
-  private:
-    static void TraceTestState(const std::string& state, const ::testing::TestInfo& test_info) {
-        ALOGI("%s %s::%s", state.c_str(), test_info.test_suite_name(), test_info.name());
-    }
-};
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
