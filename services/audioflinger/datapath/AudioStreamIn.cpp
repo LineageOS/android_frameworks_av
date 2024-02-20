@@ -56,15 +56,15 @@ status_t AudioStreamIn::getCapturePosition(int64_t* frames, int64_t* time)
         return status;
     }
 
-    // Adjust for standby using HAL rate frames.
-    // Only apply this correction if the HAL is getting PCM frames.
-    if (mHalFormatHasProportionalFrames) {
+    if (mHalFormatHasProportionalFrames &&
+            (flags & AUDIO_INPUT_FLAG_DIRECT) == AUDIO_INPUT_FLAG_DIRECT) {
+        // For DirectRecord reset timestamp to 0 on standby.
         const uint64_t adjustedPosition = (halPosition <= mFramesReadAtStandby) ?
                 0 : (halPosition - mFramesReadAtStandby);
         // Scale from HAL sample rate to application rate.
         *frames = adjustedPosition / mRateMultiplier;
     } else {
-        // For compressed formats.
+        // For compressed formats and linear PCM.
         *frames = halPosition;
     }
 
