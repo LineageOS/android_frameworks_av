@@ -1523,6 +1523,9 @@ class Camera3Device :
     // AE_TARGET_FPS_RANGE
     bool mIsFixedFps = false;
 
+    // Flag to indicate that we shouldn't forward extension related metadata
+    bool mSupportsExtensionKeys = false;
+
     // Injection camera related methods.
     class Camera3DeviceInjectionMethods : public virtual RefBase {
       public:
