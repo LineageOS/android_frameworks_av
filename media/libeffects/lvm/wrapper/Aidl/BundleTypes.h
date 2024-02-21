@@ -129,8 +129,7 @@ static const Descriptor kVirtualizerDesc = {
                    .implementor = "NXP Software Ltd."},
         .capability = kVirtualizerCap};
 
-static const std::vector<Range::VolumeRange> kVolumeRanges = {
-        MAKE_RANGE(Volume, levelDb, -9600, 0)};
+static const std::vector<Range::VolumeRange> kVolumeRanges = {MAKE_RANGE(Volume, levelDb, -96, 0)};
 static const Capability kVolumeCap = {.range = kVolumeRanges};
 static const std::string kVolumeEffectName = "Volume";
 static const Descriptor kVolumeDesc = {
