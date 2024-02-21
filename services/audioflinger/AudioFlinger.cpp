@@ -2541,6 +2541,7 @@ AudioHwDevice* AudioFlinger::loadHwModule_ll(const char *name)
         bool mm;
         if (OK == dev->getMasterMute(&mm)) {
             mMasterMute = mm;
+            ALOGI_IF(mMasterMute, "%s: applying mute from HAL %s", __func__, name);
         }
     }
 
