@@ -1674,7 +1674,7 @@ void Track::processMuteEvent_l(const sp<
 
     if (result == OK) {
         ALOGI("%s(%d): processed mute state for port ID %d from %d to %d", __func__, id(), mPortId,
-              int(muteState), int(mMuteState));
+                static_cast<int>(mMuteState), static_cast<int>(muteState));
         mMuteState = muteState;
     } else {
         ALOGW("%s(%d): cannot process mute state for port ID %d, status error %d", __func__, id(),
@@ -3554,6 +3554,8 @@ void MmapTrack::processMuteEvent_l(const sp<IAudioManager>& audioManager, mute_s
     }
 
     if (result == OK) {
+        ALOGI("%s(%d): processed mute state for port ID %d from %d to %d", __func__, id(), mPortId,
+                static_cast<int>(mMuteState), static_cast<int>(muteState));
         mMuteState = muteState;
     } else {
         ALOGW("%s(%d): cannot process mute state for port ID %d, status error %d",
