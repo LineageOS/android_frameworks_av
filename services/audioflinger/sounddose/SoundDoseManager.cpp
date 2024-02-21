@@ -231,10 +231,12 @@ audio_port_handle_t SoundDoseManager::getIdForAudioDevice(const AudioDevice& aud
         ALOGI("%s: could not find port id for device %s", __func__, adt.toString().c_str());
         return AUDIO_PORT_HANDLE_NONE;
     }
-    const auto btDeviceIt = mBluetoothDevicesWithCsd.find(std::make_pair(address, type));
-    if (btDeviceIt != mBluetoothDevicesWithCsd.end()) {
-        if (!btDeviceIt->second) {
-            ALOGI("%s: bt device %s does not support sound dose", __func__, adt.toString().c_str());
+
+    if (audio_is_ble_out_device(type) || audio_is_a2dp_device(type)) {
+        const auto btDeviceIt = mBluetoothDevicesWithCsd.find(std::make_pair(address, type));
+        if (btDeviceIt == mBluetoothDevicesWithCsd.end() || !btDeviceIt->second) {
+            ALOGI("%s: bt device %s does not support sound dose", __func__,
+                  adt.toString().c_str());
             return AUDIO_PORT_HANDLE_NONE;
         }
     }
