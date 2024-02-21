@@ -284,15 +284,15 @@ RetCode BundleContext::limitLevel() {
 
         // roundoff
         int maxLevelRound = (int)(totalEnergyEstimation + 0.99);
-        if (maxLevelRound + mVolume > 0) {
-            gainCorrection = maxLevelRound + mVolume;
+        if (maxLevelRound + mVolumedB > 0) {
+            gainCorrection = maxLevelRound + mVolumedB;
         }
 
-        params.VC_EffectLevel = mVolume - gainCorrection;
+        params.VC_EffectLevel = mVolumedB - gainCorrection;
         if (params.VC_EffectLevel < -96) {
             params.VC_EffectLevel = -96;
         }
-        LOG(INFO) << "\tVol: " << mVolume << ", GainCorrection: " << gainCorrection
+        LOG(INFO) << "\tVol: " << mVolumedB << ", GainCorrection: " << gainCorrection
                   << ", Actual vol: " << params.VC_EffectLevel;
 
         /* Activate the initial settings */
@@ -576,25 +576,25 @@ RetCode BundleContext::setBassBoostStrength(int strength) {
 
 RetCode BundleContext::setVolumeLevel(float level) {
     if (mMuteEnabled) {
-        mLevelSaved = level;
+        mLevelSaveddB = level;
     } else {
-        mVolume = level;
+        mVolumedB = level;
     }
     LOG(INFO) << __func__ << " success with level " << level;
     return limitLevel();
 }
 
 float BundleContext::getVolumeLevel() const {
-    return (mMuteEnabled ? mLevelSaved : mVolume);
+    return (mMuteEnabled ? mLevelSaveddB : mVolumedB);
 }
 
 RetCode BundleContext::setVolumeMute(bool mute) {
     mMuteEnabled = mute;
     if (mMuteEnabled) {
-        mLevelSaved = mVolume;
-        mVolume = -96;
+        mLevelSaveddB = mVolumedB;
+        mVolumedB = -96;
     } else {
-        mVolume = mLevelSaved;
+        mVolumedB = mLevelSaveddB;
     }
     return limitLevel();
 }
