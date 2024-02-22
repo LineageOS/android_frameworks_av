@@ -913,7 +913,6 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
     std::set<int> activeStreams;
     camera::device::StreamConfiguration requestedConfiguration;
     requestedConfiguration.streams.resize(config->num_streams);
-    config->use_hal_buf_manager = mUseHalBufManager;
     for (size_t i = 0; i < config->num_streams; i++) {
         camera::device::Stream &dst = requestedConfiguration.streams[i];
         camera3::camera_stream_t *src = config->streams[i];
