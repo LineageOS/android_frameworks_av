@@ -411,6 +411,11 @@ public:
     // and output configuration cache (gOutputs)
     static void clearAudioConfigCache();
 
+    // Sets a local AudioPolicyService interface to be used by AudioSystem.
+    // This is used by audioserver main() to allow client object initialization
+    // before exposing any interfaces to ServiceManager.
+    static status_t setLocalAudioPolicyService(const sp<media::IAudioPolicyService>& aps);
+
     static sp<media::IAudioPolicyService> get_audio_policy_service();
     static void clearAudioPolicyService();
 
@@ -907,6 +912,7 @@ public:
     static routing_callback gRoutingCallback GUARDED_BY(gMutex);
     static vol_range_init_req_callback gVolRangeInitReqCallback GUARDED_BY(gMutex);
 
+    [[clang::no_destroy]] static std::mutex gApsCallbackMutex;
     [[clang::no_destroy]] static std::mutex gErrorCallbacksMutex;
     [[clang::no_destroy]] static std::set<audio_error_callback> gAudioErrorCallbacks
             GUARDED_BY(gErrorCallbacksMutex);
@@ -914,12 +920,6 @@ public:
     [[clang::no_destroy]] static std::mutex gSoundTriggerMutex;
     [[clang::no_destroy]] static sp<CaptureStateListenerImpl> gSoundTriggerCaptureStateListener
             GUARDED_BY(gSoundTriggerMutex);
-
-    [[clang::no_destroy]] static std::mutex gAPSMutex;
-    [[clang::no_destroy]] static sp<media::IAudioPolicyService> gAudioPolicyService
-            GUARDED_BY(gAPSMutex);
-    [[clang::no_destroy]] static sp<AudioPolicyServiceClient> gAudioPolicyServiceClient
-            GUARDED_BY(gAPSMutex);
 };
 
 }  // namespace android
