@@ -1640,6 +1640,11 @@ off64_t MPEG4Writer::addSample_l(
     ALOGV("buffer->range_length:%lld", (long long)buffer->range_length());
     if (buffer->meta_data().findInt64(kKeySampleFileOffset, &offset)) {
         ALOGV("offset:%lld, old_offset:%lld", (long long)offset, (long long)old_offset);
+        if (mMaxOffsetAppend > offset) {
+            // This has already been appended, skip updating mOffset value.
+            *bytesWritten = buffer->range_length();
+            return offset;
+        }
         if (old_offset == offset) {
             mOffset += buffer->range_length();
         } else {
