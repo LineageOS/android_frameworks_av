@@ -18,16 +18,79 @@
 #define ANDROID_COMPANION_VIRTUALCAMERA_UTIL_H
 
 #include <cstdint>
+#include <memory>
 
 #include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "android/binder_auto_utils.h"
+#include "android/hardware_buffer.h"
+#include "system/graphics.h"
 #include "ui/Fence.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
+
+// RAII utility class to safely lock AHardwareBuffer and obtain android_ycbcr
+// structure describing YUV plane layout.
+//
+// Access to the buffer is locked immediatelly afer construction.
+class YCbCrLockGuard {
+ public:
+  YCbCrLockGuard(std::shared_ptr<AHardwareBuffer> hwBuffer, uint32_t usageFlags);
+  YCbCrLockGuard(YCbCrLockGuard&& other) = default;
+  ~YCbCrLockGuard();
+
+  // Returns OK if the buffer is successfully locked.
+  status_t getStatus() const;
+
+  // Dereferencing instance of this guard returns android_ycbcr structure
+  // describing the layout.
+  // Caller needs to check whether the buffer was successfully locked
+  // before dereferencing.
+  const android_ycbcr& operator*() const;
+
+  // Disable copy.
+  YCbCrLockGuard(const YCbCrLockGuard&) = delete;
+  YCbCrLockGuard& operator=(const YCbCrLockGuard&) = delete;
+
+ private:
+  std::shared_ptr<AHardwareBuffer> mHwBuffer;
+  android_ycbcr mYCbCr = {};
+  status_t mLockStatus = DEAD_OBJECT;
+};
+
+// RAII utility class to safely lock AHardwareBuffer and obtain
+// AHardwareBuffer_Planes (Suitable for interacting with RGBA / BLOB buffers.
+//
+// Access to the buffer is locked immediatelly afer construction.
+class PlanesLockGuard {
+ public:
+  PlanesLockGuard(std::shared_ptr<AHardwareBuffer> hwBuffer,
+                  uint64_t usageFlags, sp<Fence> fence = nullptr);
+  PlanesLockGuard(PlanesLockGuard&& other) = default;
+  ~PlanesLockGuard();
+
+  // Returns OK if the buffer is successfully locked.
+  status_t getStatus() const;
+
+  // Dereferencing instance of this guard returns AHardwareBuffer_Planes
+  // structure describing the layout.
+  //
+  // Caller needs to check whether the buffer was successfully locked
+  // before dereferencing.
+  const AHardwareBuffer_Planes& operator*() const;
+
+  // Disable copy.
+  PlanesLockGuard(const PlanesLockGuard&) = delete;
+  PlanesLockGuard& operator=(const YCbCrLockGuard&) = delete;
+
+ private:
+  std::shared_ptr<AHardwareBuffer> mHwBuffer;
+  AHardwareBuffer_Planes mPlanes;
+  status_t mLockStatus = DEAD_OBJECT;
+};
 
 // Converts camera AIDL status to ndk::ScopedAStatus
 inline ndk::ScopedAStatus cameraStatus(
