@@ -75,6 +75,9 @@ struct ComponentStore : public BnComponentStore {
 
     static std::shared_ptr<::android::FilterWrapper> GetFilterWrapper();
 
+    std::shared_ptr<MultiAccessUnitInterface> tryCreateMultiAccessUnitInterface(
+            const std::shared_ptr<C2ComponentInterface> &c2interface);
+
     // Methods from ::aidl::android::hardware::media::c2::IComponentStore.
     virtual ::ndk::ScopedAStatus createComponent(
             const std::string& name,
