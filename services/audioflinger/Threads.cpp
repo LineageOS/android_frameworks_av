@@ -10663,6 +10663,16 @@ NO_THREAD_SAFETY_ANALYSIS  // elease and re-acquire mutex()
         }
     }
 
+    // For mmap streams, once the routing has changed, they will be disconnected. It should be
+    // okay to notify the client earlier before the new patch creation.
+    if (mDeviceId != deviceId) {
+        if (const sp<MmapStreamCallback> callback = mCallback.promote()) {
+            // The aaudioservice handle the routing changed event asynchronously. In that case,
+            // it is safe to hold the lock here.
+            callback->onRoutingChanged(deviceId);
+        }
+    }
+
     if (mAudioHwDev->supportsAudioPatches()) {
         status = mHalDevice->createAudioPatch(patch->num_sources, patch->sources, patch->num_sinks,
                                               patch->sinks, handle);
@@ -10687,12 +10697,6 @@ NO_THREAD_SAFETY_ANALYSIS  // elease and re-acquire mutex()
         } else {
             sendIoConfigEvent_l(AUDIO_INPUT_CONFIG_CHANGED);
             mInDeviceTypeAddr = sourceDeviceTypeAddr;
-        }
-        sp<MmapStreamCallback> callback = mCallback.promote();
-        if (mDeviceId != deviceId && callback != 0) {
-            mutex().unlock();
-            callback->onRoutingChanged(deviceId);
-            mutex().lock();
         }
         mPatch = *patch;
         mDeviceId = deviceId;
@@ -10845,21 +10849,18 @@ status_t MmapThread::checkEffectCompatibility_l(
 
 void MmapThread::checkInvalidTracks_l()
 {
-    sp<MmapStreamCallback> callback;
     for (const sp<IAfMmapTrack>& track : mActiveTracks) {
         if (track->isInvalid()) {
-            callback = mCallback.promote();
-            if (callback == nullptr &&  mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
+            if (const sp<MmapStreamCallback> callback = mCallback.promote()) {
+                // The aaudioservice handle the routing changed event asynchronously. In that case,
+                // it is safe to hold the lock here.
+                callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
+            } else if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
                 ALOGW("Could not notify MMAP stream tear down: no onRoutingChanged callback!");
                 mNoCallbackWarningCount++;
             }
             break;
         }
-    }
-    if (callback != 0) {
-        mutex().unlock();
-        callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
-        mutex().lock();
     }
 }
 
