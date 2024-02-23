@@ -24,6 +24,8 @@
 #include <media/TranscodingResourcePolicy.h>
 #include <utils/Log.h>
 
+#include <map>
+
 namespace android {
 
 using Status = ::ndk::ScopedAStatus;
@@ -66,11 +68,31 @@ struct TranscodingResourcePolicy::ResourceObserver : public BnResourceObserver {
     TranscodingResourcePolicy* mOwner;
 };
 
+// cookie used for death recipients. The TranscodingResourcePolicy
+// that this cookie is associated with must outlive this cookie. It is
+// either deleted by binderDied, or in unregisterSelf which is also called
+// in the destructor of TranscodingResourcePolicy
+class TranscodingResourcePolicyCookie {
+public:
+    TranscodingResourcePolicyCookie(TranscodingResourcePolicy* policy) : mPolicy(policy) {}
+    TranscodingResourcePolicyCookie() = delete;
+    TranscodingResourcePolicy* mPolicy;
+};
+
+static std::map<uintptr_t, std::unique_ptr<TranscodingResourcePolicyCookie>> sCookies;
+static uintptr_t sCookieKeyCounter;
+static std::mutex sCookiesMutex;
+
 // static
 void TranscodingResourcePolicy::BinderDiedCallback(void* cookie) {
-    TranscodingResourcePolicy* owner = reinterpret_cast<TranscodingResourcePolicy*>(cookie);
-    if (owner != nullptr) {
-        owner->unregisterSelf();
+    std::lock_guard<std::mutex> guard(sCookiesMutex);
+    if (auto it = sCookies.find(reinterpret_cast<uintptr_t>(cookie)); it != sCookies.end()) {
+        ALOGI("BinderDiedCallback unregistering TranscodingResourcePolicy");
+        auto policy = reinterpret_cast<TranscodingResourcePolicy*>(it->second->mPolicy);
+        if (policy) {
+            policy->unregisterSelf();
+        }
+        sCookies.erase(it);
     }
     // TODO(chz): retry to connecting to IResourceObserverService after failure.
     // Also need to have back-up logic if IResourceObserverService is offline for
@@ -88,6 +110,24 @@ TranscodingResourcePolicy::TranscodingResourcePolicy()
 }
 
 TranscodingResourcePolicy::~TranscodingResourcePolicy() {
+    {
+        std::lock_guard<std::mutex> guard(sCookiesMutex);
+
+        // delete all of the cookies associated with this TranscodingResourcePolicy
+        // instance since they are holding pointers to this object that will no
+        // longer be valid.
+        for (auto it = sCookies.begin(); it != sCookies.end();) {
+            const uintptr_t key = it->first;
+            std::lock_guard guard(mCookieKeysLock);
+            if (mCookieKeys.find(key) != mCookieKeys.end()) {
+                // No longer need to track this cookie
+                mCookieKeys.erase(key);
+                it = sCookies.erase(it);
+            } else {
+                it++;
+            }
+        }
+    }
     unregisterSelf();
 }
 
@@ -123,7 +163,16 @@ void TranscodingResourcePolicy::registerSelf() {
         return;
     }
 
-    AIBinder_linkToDeath(binder.get(), mDeathRecipient.get(), reinterpret_cast<void*>(this));
+    std::unique_ptr<TranscodingResourcePolicyCookie> cookie =
+            std::make_unique<TranscodingResourcePolicyCookie>(this);
+    uintptr_t cookieKey = sCookieKeyCounter++;
+    sCookies.emplace(cookieKey, std::move(cookie));
+    {
+        std::lock_guard guard(mCookieKeysLock);
+        mCookieKeys.insert(cookieKey);
+    }
+
+    AIBinder_linkToDeath(binder.get(), mDeathRecipient.get(), reinterpret_cast<void*>(cookieKey));
 
     ALOGD("@@@ registered observer");
     mRegistered = true;
@@ -141,7 +190,6 @@ void TranscodingResourcePolicy::unregisterSelf() {
     ::ndk::SpAIBinder binder = mService->asBinder();
     if (binder.get() != nullptr) {
         Status status = mService->unregisterObserver(mObserver);
-        AIBinder_unlinkToDeath(binder.get(), mDeathRecipient.get(), reinterpret_cast<void*>(this));
     }
 
     mService = nullptr;
