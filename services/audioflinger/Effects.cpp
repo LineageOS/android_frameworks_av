@@ -1536,7 +1536,7 @@ bool EffectModule::isSpatializer() const {
     return IAfEffectModule::isSpatializer(&mDescriptor.type);
 }
 
-status_t EffectModule::setHapticIntensity_l(int id, os::HapticScale intensity) {
+status_t EffectModule::setHapticScale_l(int id, os::HapticScale hapticScale) {
     if (mStatus != NO_ERROR) {
         return mStatus;
     }
@@ -1551,7 +1551,7 @@ status_t EffectModule::setHapticIntensity_l(int id, os::HapticScale intensity) {
     param->vsize = sizeof(int32_t) * 2;
     *(int32_t*)param->data = HG_PARAM_HAPTIC_INTENSITY;
     *((int32_t*)param->data + 1) = id;
-    *((int32_t*)param->data + 2) = static_cast<int32_t>(intensity);
+    *((int32_t*)param->data + 2) = static_cast<int32_t>(hapticScale.getLevel());
     std::vector<uint8_t> response;
     status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
     if (status == NO_ERROR) {
@@ -2674,11 +2674,11 @@ bool EffectChain::containsHapticGeneratingEffect_l()
     return false;
 }
 
-void EffectChain::setHapticIntensity_l(int id, os::HapticScale intensity)
+void EffectChain::setHapticScale_l(int id, os::HapticScale hapticScale)
 {
     audio_utils::lock_guard _l(mutex());
     for (size_t i = 0; i < mEffects.size(); ++i) {
-        mEffects[i]->setHapticIntensity_l(id, intensity);
+        mEffects[i]->setHapticScale_l(id, hapticScale);
     }
 }
 
