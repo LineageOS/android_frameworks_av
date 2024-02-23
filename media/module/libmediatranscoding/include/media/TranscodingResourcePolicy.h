@@ -22,6 +22,7 @@
 #include <utils/Condition.h>
 
 #include <mutex>
+#include <set>
 namespace aidl {
 namespace android {
 namespace media {
@@ -48,6 +49,8 @@ private:
     bool mRegistered GUARDED_BY(mRegisteredLock);
     std::shared_ptr<IResourceObserverService> mService GUARDED_BY(mRegisteredLock);
     std::shared_ptr<ResourceObserver> mObserver;
+    mutable std::mutex mCookieKeysLock;
+    std::set<uintptr_t> mCookieKeys;
 
     mutable std::mutex mCallbackLock;
     std::weak_ptr<ResourcePolicyCallbackInterface> mResourcePolicyCallback
@@ -59,6 +62,7 @@ private:
     static void BinderDiedCallback(void* cookie);
 
     void registerSelf();
+    // must delete the associated TranscodingResourcePolicyCookie any time this is called
     void unregisterSelf();
     void onResourceAvailable(pid_t pid);
 };  // class TranscodingUidPolicy
