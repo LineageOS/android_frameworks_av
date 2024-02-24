@@ -49,7 +49,7 @@ public:
         DOWNMIX_TYPE    = 0x4004,
         // for haptic
         HAPTIC_ENABLED  = 0x4007, // Set haptic data from this track should be played or not.
-        HAPTIC_INTENSITY = 0x4008, // Set the intensity to play haptic data.
+        HAPTIC_SCALE = 0x4008, // Set the scale to play haptic data.
         HAPTIC_MAX_AMPLITUDE = 0x4009, // Set the max amplitude allowed for haptic data.
         // for target TIMESTRETCH
         PLAYBACK_RATE   = 0x4300, // Configure timestretch on this track name;
@@ -141,7 +141,7 @@ private:
 
         // Haptic
         bool                 mHapticPlaybackEnabled;
-        os::HapticScale      mHapticIntensity;
+        os::HapticScale      mHapticScale;
         float                mHapticMaxAmplitude;
         audio_channel_mask_t mHapticChannelMask;
         uint32_t             mHapticChannelCount;

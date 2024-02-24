@@ -180,7 +180,7 @@ public:
     static bool isSpatializer(const effect_uuid_t* type);
     virtual bool isSpatializer() const = 0;
 
-    virtual status_t setHapticIntensity_l(int id, os::HapticScale intensity)
+    virtual status_t setHapticScale_l(int id, os::HapticScale hapticScale)
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectBase_Mutex = 0;
     virtual status_t setVibratorInfo_l(const media::AudioVibratorInfo& vibratorInfo)
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectBase_Mutex = 0;
@@ -319,7 +319,7 @@ public:
 
     virtual bool containsHapticGeneratingEffect_l() = 0;
 
-    virtual void setHapticIntensity_l(int id, os::HapticScale intensity)
+    virtual void setHapticScale_l(int id, os::HapticScale hapticScale)
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
 
     virtual sp<EffectCallbackInterface> effectCallback() const = 0;

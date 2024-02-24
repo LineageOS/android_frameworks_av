@@ -233,7 +233,7 @@ public:
     bool isHapticGenerator() const final;
     bool isSpatializer() const final;
 
-    status_t setHapticIntensity_l(int id, os::HapticScale intensity) final
+    status_t setHapticScale_l(int id, os::HapticScale hapticScale) final
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectBase_Mutex;
     status_t setVibratorInfo_l(const media::AudioVibratorInfo& vibratorInfo) final
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectBase_Mutex;
@@ -520,7 +520,7 @@ public:
     // Requires either IAfThreadBase::mutex() or EffectChain::mutex() held
     bool containsHapticGeneratingEffect_l() final;
 
-    void setHapticIntensity_l(int id, os::HapticScale intensity) final
+    void setHapticScale_l(int id, os::HapticScale hapticScale) final
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex;
 
     sp<EffectCallbackInterface> effectCallback() const final { return mEffectCallback; }

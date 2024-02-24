@@ -339,12 +339,12 @@ public:
     /** Set haptic playback of the track is enabled or not, should be
      * set after query or get callback from vibrator service */
     virtual void setHapticPlaybackEnabled(bool hapticPlaybackEnabled) = 0;
-    /** Return at what intensity to play haptics, used in mixer. */
-    virtual os::HapticScale getHapticIntensity() const = 0;
+    /** Return the haptics scale, used in mixer. */
+    virtual os::HapticScale getHapticScale() const = 0;
     /** Return the maximum amplitude allowed for haptics data, used in mixer. */
     virtual float getHapticMaxAmplitude() const = 0;
-    /** Set intensity of haptic playback, should be set after querying vibrator service. */
-    virtual void setHapticIntensity(os::HapticScale hapticIntensity) = 0;
+    /** Set scale for haptic playback, should be set after querying vibrator service. */
+    virtual void setHapticScale(os::HapticScale hapticScale) = 0;
     /** Set maximum amplitude allowed for haptic data, should be set after querying
      *  vibrator service.
      */
