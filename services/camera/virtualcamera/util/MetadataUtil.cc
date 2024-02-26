@@ -481,6 +481,41 @@ MetadataBuilder& MetadataBuilder::setAvailableOutputStreamConfigurations(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setAvailableAberrationCorrectionModes(
+    const std::vector<camera_metadata_enum_android_color_correction_aberration_mode>&
+        aberrationCorectionModes) {
+  mEntryMap[ANDROID_COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES] =
+      convertTo<uint8_t>(aberrationCorectionModes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setAvailableNoiseReductionModes(
+    const std::vector<camera_metadata_enum_android_noise_reduction_mode>&
+        noiseReductionModes) {
+  mEntryMap[ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES] =
+      convertTo<uint8_t>(noiseReductionModes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setRequestPartialResultCount(
+    const int partialResultCount) {
+  mEntryMap[ANDROID_REQUEST_PARTIAL_RESULT_COUNT] =
+      asVectorOf<int32_t>(partialResultCount);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setCroppingType(
+    const camera_metadata_enum_android_scaler_cropping_type croppingType) {
+  mEntryMap[ANDROID_SCALER_CROPPING_TYPE] = asVectorOf<uint8_t>(croppingType);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setMaxFaceCount(const int maxFaceCount) {
+  mEntryMap[ANDROID_STATISTICS_INFO_MAX_FACE_COUNT] =
+      asVectorOf<int32_t>(maxFaceCount);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setAvailableMaxDigitalZoom(const float maxZoom) {
   mEntryMap[ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM] =
       asVectorOf<float>(maxZoom);
