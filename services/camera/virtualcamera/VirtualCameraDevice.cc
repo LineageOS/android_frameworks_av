@@ -250,7 +250,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setRequestPartialResultCount(1)
           .setPipelineMaxDepth(kPipelineMaxDepth)
           .setSyncMaxLatency(ANDROID_SYNC_MAX_LATENCY_UNKNOWN)
-          .setAvailableRequestKeys({ANDROID_CONTROL_CAPTURE_INTENT,
+          .setAvailableRequestKeys({ANDROID_COLOR_CORRECTION_ABERRATION_MODE,
+                                    ANDROID_CONTROL_CAPTURE_INTENT,
                                     ANDROID_CONTROL_AE_MODE,
                                     ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION,
                                     ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
@@ -265,19 +266,20 @@ std::optional<CameraMetadata> initCameraCharacteristics(
                                     ANDROID_CONTROL_SCENE_MODE,
                                     ANDROID_CONTROL_VIDEO_STABILIZATION_MODE,
                                     ANDROID_CONTROL_ZOOM_RATIO,
-                                    ANDROID_STATISTICS_FACE_DETECT_MODE,
                                     ANDROID_FLASH_MODE,
                                     ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES,
                                     ANDROID_JPEG_QUALITY,
-                                    ANDROID_JPEG_THUMBNAIL_QUALITY})
+                                    ANDROID_JPEG_THUMBNAIL_QUALITY,
+                                    ANDROID_NOISE_REDUCTION_MODE,
+                                    ANDROID_STATISTICS_FACE_DETECT_MODE})
           .setAvailableResultKeys(
-              {ANDROID_CONTROL_AE_MODE, ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER,
-               ANDROID_CONTROL_AF_MODE, ANDROID_CONTROL_AWB_MODE,
-               ANDROID_CONTROL_EFFECT_MODE, ANDROID_CONTROL_MODE,
-               ANDROID_FLASH_MODE, ANDROID_FLASH_STATE,
+              {ANDROID_COLOR_CORRECTION_ABERRATION_MODE, ANDROID_CONTROL_AE_MODE,
+               ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, ANDROID_CONTROL_AF_MODE,
+               ANDROID_CONTROL_AWB_MODE, ANDROID_CONTROL_EFFECT_MODE,
+               ANDROID_CONTROL_MODE, ANDROID_FLASH_MODE, ANDROID_FLASH_STATE,
                ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES, ANDROID_JPEG_QUALITY,
-               ANDROID_JPEG_THUMBNAIL_QUALITY, ANDROID_SENSOR_TIMESTAMP,
-               ANDROID_LENS_FOCAL_LENGTH})
+               ANDROID_JPEG_THUMBNAIL_QUALITY, ANDROID_LENS_FOCAL_LENGTH,
+               ANDROID_SENSOR_TIMESTAMP, ANDROID_NOISE_REDUCTION_MODE})
           .setAvailableCapabilities(
               {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE});
 

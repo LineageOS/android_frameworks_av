@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "system/camera_metadata.h"
 #define LOG_TAG "VirtualCameraRenderThread"
 #include "VirtualCameraRenderThread.h"
 
@@ -93,6 +94,8 @@ CameraMetadata createCaptureResultMetadata(
     const Resolution reportedSensorSize) {
   std::unique_ptr<CameraMetadata> metadata =
       MetadataBuilder()
+          .setAberrationCorrectionMode(
+              ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF)
           .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
           .setControlAePrecaptureTrigger(
               ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
@@ -109,6 +112,7 @@ CameraMetadata createCaptureResultMetadata(
           .setJpegThumbnailSize(requestSettings.thumbnailResolution.width,
                                 requestSettings.thumbnailResolution.height)
           .setJpegThumbnailQuality(requestSettings.thumbnailJpegQuality)
+          .setNoiseReductionMode(ANDROID_NOISE_REDUCTION_MODE_OFF)
           .setPipelineDepth(kPipelineDepth)
           .setSensorTimestamp(timestamp)
           .build();
