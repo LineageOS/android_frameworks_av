@@ -182,8 +182,8 @@ public:
     static status_t setLocalAudioFlinger(const sp<IAudioFlinger>& af);
 
     // helper function to obtain AudioFlinger service handle
-    static const sp<IAudioFlinger> get_audio_flinger();
-    static const sp<IAudioFlinger> get_audio_flinger_for_fuzzer();
+    static sp<IAudioFlinger> get_audio_flinger();
+    static sp<IAudioFlinger> get_audio_flinger_for_fuzzer();
 
     static float linearToLog(int volume);
     static int logToLinear(float volume);
@@ -407,7 +407,7 @@ public:
     // and output configuration cache (gOutputs)
     static void clearAudioConfigCache();
 
-    static const sp<media::IAudioPolicyService> get_audio_policy_service();
+    static sp<media::IAudioPolicyService> get_audio_policy_service();
     static void clearAudioPolicyService();
 
     // helpers for android.media.AudioManager.getProperty(), see description there for meaning
