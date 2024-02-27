@@ -13,6 +13,13 @@ flag {
 }
 
 flag {
+    name: "as_device_connection_failure"
+    namespace: "media_audio"
+    description: "AudioService handles device connection failures."
+    bug: "326597760"
+}
+
+flag {
     name: "bluetooth_mac_address_anonymization"
     namespace: "media_audio"
     description:
