@@ -2414,12 +2414,8 @@ bool CameraService::isCameraPrivacyEnabled(const String16& packageName, const st
         return true;
     } else if (mSensorPrivacyPolicy->getCameraPrivacyState() == SensorPrivacyManager::DISABLED) {
         return false;
-    } else if ((mSensorPrivacyPolicy->getCameraPrivacyState()
-            == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_HELPFUL_APPS) ||
-            (mSensorPrivacyPolicy->getCameraPrivacyState()
-            == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_REQUIRED_APPS) ||
-            (mSensorPrivacyPolicy->getCameraPrivacyState() ==
-            SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_APPS)) {
+    } else if (mSensorPrivacyPolicy->getCameraPrivacyState()
+            == SensorPrivacyManager::ENABLED_EXCEPT_ALLOWLISTED_APPS) {
         if (hasPermissionsForCameraPrivacyAllowlist(callingPid, callingUid)) {
             return false;
         } else {
@@ -4978,9 +4974,7 @@ binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyStateChanged(
     // if sensor privacy is enabled then block all clients from accessing the camera
     if (state == SensorPrivacyManager::ENABLED) {
         service->blockAllClients();
-    } else if ((state == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_APPS)
-            || (state == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_HELPFUL_APPS)
-            || (state == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_REQUIRED_APPS)) {
+    } else if (state == SensorPrivacyManager::ENABLED_EXCEPT_ALLOWLISTED_APPS) {
         service->blockPrivacyEnabledClients();
     }
     return binder::Status::ok();
