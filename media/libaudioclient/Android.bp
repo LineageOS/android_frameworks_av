@@ -188,6 +188,7 @@ cc_library {
         "-Wall",
         "-Werror",
         "-Wno-error=deprecated-declarations",
+        "-Wthread-safety",
     ],
     sanitize: {
         misc_undefined: [
