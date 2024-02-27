@@ -210,6 +210,9 @@ std::optional<CameraMetadata> initCameraCharacteristics(
               ANDROID_SENSOR_READOUT_TIMESTAMP_NOT_SUPPORTED)
           .setSensorTimestampSource(ANDROID_SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN)
           .setSensorPhysicalSize(36.0, 24.0)
+          .setAvailableAberrationCorrectionModes(
+              {ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF})
+          .setAvailableNoiseReductionModes({ANDROID_NOISE_REDUCTION_MODE_OFF})
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
           .setAvailableTestPatternModes({ANDROID_SENSOR_TEST_PATTERN_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
@@ -234,14 +237,17 @@ std::optional<CameraMetadata> initCameraCharacteristics(
           .setControlAeLockAvailable(false)
           .setControlAvailableAwbModes({ANDROID_CONTROL_AWB_MODE_AUTO})
           .setControlZoomRatioRange(/*min=*/1.0, /*max=*/1.0)
+          .setCroppingType(ANDROID_SCALER_CROPPING_TYPE_CENTER_ONLY)
           .setJpegAvailableThumbnailSizes(
               getSupportedJpegThumbnailSizes(supportedInputConfig))
           .setMaxJpegSize(kMaxJpegSize)
+          .setMaxFaceCount(0)
           .setMaxFrameDuration(kMaxFrameDuration)
           .setMaxNumberOutputStreams(
               VirtualCameraDevice::kMaxNumberOfRawStreams,
               VirtualCameraDevice::kMaxNumberOfProcessedStreams,
               VirtualCameraDevice::kMaxNumberOfStallStreams)
+          .setRequestPartialResultCount(1)
           .setPipelineMaxDepth(kPipelineMaxDepth)
           .setSyncMaxLatency(ANDROID_SYNC_MAX_LATENCY_UNKNOWN)
           .setAvailableRequestKeys({ANDROID_CONTROL_CAPTURE_INTENT,

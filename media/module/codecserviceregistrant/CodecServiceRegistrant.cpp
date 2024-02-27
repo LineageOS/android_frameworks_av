@@ -819,19 +819,21 @@ extern "C" void RegisterCodecServices() {
     }
 
     bool registered = false;
-    if (platformVersion >= __ANDROID_API_V__) {
-        if (!aidlStore) {
-            aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
-                    std::make_shared<H2C2ComponentStore>(nullptr));
-        }
-        const std::string serviceName =
-            std::string(c2_aidl::IComponentStore::descriptor) + "/software";
-        binder_exception_t ex = AServiceManager_addService(
-                aidlStore->asBinder().get(), serviceName.c_str());
-        if (ex == EX_NONE) {
-            registered = true;
-        } else {
-            LOG(ERROR) << "Cannot register software Codec2 AIDL service.";
+    const std::string aidlServiceName =
+        std::string(c2_aidl::IComponentStore::descriptor) + "/software";
+    if (__builtin_available(android __ANDROID_API_S__, *)) {
+        if (AServiceManager_isDeclared(aidlServiceName.c_str())) {
+            if (!aidlStore) {
+                aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
+                        std::make_shared<H2C2ComponentStore>(nullptr));
+            }
+            binder_exception_t ex = AServiceManager_addService(
+                    aidlStore->asBinder().get(), aidlServiceName.c_str());
+            if (ex == EX_NONE) {
+                registered = true;
+            } else {
+                LOG(WARNING) << "Cannot register software Codec2 AIDL service. Exception: " << ex;
+            }
         }
     }
 
