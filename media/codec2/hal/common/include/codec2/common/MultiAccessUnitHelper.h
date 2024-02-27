@@ -153,6 +153,11 @@ protected:
          */
         std::unique_ptr<C2Work> mLargeWork;
 
+        /*
+         * For holding a reference to the incoming buffer
+         */
+        std::vector<std::shared_ptr<C2Buffer>> mInputC2Ref;
+
         MultiAccessUnitInfo(C2WorkOrdinalStruct ordinal):inOrdinal(ordinal) {
 
         }
