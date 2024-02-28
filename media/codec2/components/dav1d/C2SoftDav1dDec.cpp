@@ -243,10 +243,17 @@ class C2SoftDav1dDec::IntfImpl : public SimpleInterface<void>::BaseParams {
                              .build());
 
         addParameter(
+                DefineParam(mLowLatencyMode, C2_PARAMKEY_LOW_LATENCY_MODE)
+                .withDefault(new C2GlobalLowLatencyModeTuning(0))
+                .withFields({C2F(mLowLatencyMode, value).oneOf({0,1})})
+                .withSetter(Setter<decltype(*mLowLatencyMode)>::StrictValueWithNoDeps)
+                .build());
+
+        addParameter(
                 DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
                 .withDefault(new C2PortActualDelayTuning::output(kOutputDelay))
                 .withFields({C2F(mActualOutputDelay, value).inRange(0, kOutputDelay)})
-                .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
+                .withSetter(ActualOutputDelaySetter, mLowLatencyMode)
                 .build());
     }
 
@@ -365,6 +372,10 @@ class C2SoftDav1dDec::IntfImpl : public SimpleInterface<void>::BaseParams {
         return mPixelFormat;
     }
 
+    std::shared_ptr<C2PortActualDelayTuning::output> getActualOutputDelay_l() const {
+        return mActualOutputDelay;
+    }
+
     static C2R HdrStaticInfoSetter(bool mayBlock, C2P<C2StreamHdrStaticInfo::output>& me) {
         (void)mayBlock;
         if (me.v.mastering.red.x > 1) {
@@ -406,6 +417,13 @@ class C2SoftDav1dDec::IntfImpl : public SimpleInterface<void>::BaseParams {
         return C2R::Ok();
     }
 
+    static C2R ActualOutputDelaySetter(bool mayBlock, C2P<C2PortActualDelayTuning::output>& me,
+                                  const C2P<C2GlobalLowLatencyModeTuning>& lowLatencyMode) {
+        (void)mayBlock;
+        me.set().value = lowLatencyMode.v.value ? 1 : kOutputDelay;
+        return C2R::Ok();
+    }
+
   private:
     std::shared_ptr<C2StreamProfileLevelInfo::input> mProfileLevel;
     std::shared_ptr<C2StreamPictureSizeInfo::output> mSize;
@@ -419,6 +437,7 @@ class C2SoftDav1dDec::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamHdr10PlusInfo::input> mHdr10PlusInfoInput;
     std::shared_ptr<C2StreamHdr10PlusInfo::output> mHdr10PlusInfoOutput;
     std::shared_ptr<C2StreamHdrStaticInfo::output> mHdrStaticInfo;
+    std::shared_ptr<C2GlobalLowLatencyModeTuning> mLowLatencyMode;
 };
 
 C2SoftDav1dDec::C2SoftDav1dDec(const char* name, c2_node_id_t id,
@@ -516,6 +535,7 @@ bool C2SoftDav1dDec::initDecoder() {
     {
         IntfImpl::Lock lock = mIntf->lock();
         mPixelFormatInfo = mIntf->getPixelFormat_l();
+        mActualOutputDelayInfo = mIntf->getActualOutputDelay_l();
     }
 
     const char* version = dav1d_version();
@@ -529,7 +549,7 @@ bool C2SoftDav1dDec::initDecoder() {
             android::base::GetIntProperty(NUM_THREADS_DAV1D_PROPERTY, NUM_THREADS_DAV1D_DEFAULT);
     if (numThreads > 0) lib_settings.n_threads = numThreads;
 
-    lib_settings.max_frame_delay = kOutputDelay;
+    lib_settings.max_frame_delay = mActualOutputDelayInfo->value;
 
     int res = 0;
     if ((res = dav1d_open(&mDav1dCtx, &lib_settings))) {
