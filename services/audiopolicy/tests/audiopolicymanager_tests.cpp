@@ -1330,6 +1330,10 @@ protected:
             std::string mixAddress, const audio_config_t& audioConfig,
             const std::vector<AudioMixMatchCriterion>& matchCriteria);
 
+    status_t addPolicyMix(const AudioMix& mix);
+
+    status_t removePolicyMixes(const Vector<AudioMix>& mixes);
+
     std::vector<AudioMix> getRegisteredPolicyMixes();
     void clearPolicyMix();
     void addPolicyMixAndStartInputForLoopback(
@@ -1367,11 +1371,20 @@ status_t AudioPolicyManagerTestDynamicPolicy::addPolicyMix(int mixType, int mixF
     myAudioMix.mDeviceType = deviceType;
     // Clear mAudioMix before add new one to make sure we don't add already exist mixes.
     mAudioMixes.clear();
-    mAudioMixes.add(myAudioMix);
+    return addPolicyMix(myAudioMix);
+}
+
+status_t AudioPolicyManagerTestDynamicPolicy::addPolicyMix(const AudioMix& mix) {
+    mAudioMixes.add(mix);
 
     // As the policy mixes registration may fail at some case,
     // caller need to check the returned status.
     status_t ret = mManager->registerPolicyMixes(mAudioMixes);
+    return ret;
+}
+
+status_t AudioPolicyManagerTestDynamicPolicy::removePolicyMixes(const Vector<AudioMix>& mixes) {
+    status_t ret = mManager->unregisterPolicyMixes(mixes);
     return ret;
 }
 
@@ -1535,6 +1548,98 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, RegisterPolicyWithInconsistentMixFai
                                 AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig,
                                 mixMatchCriteria);
     ASSERT_EQ(INVALID_OPERATION, ret);
+}
+
+TEST_F_WITH_FLAGS(
+        AudioPolicyManagerTestDynamicPolicy,
+        RegisterInvalidMixesDoesNotImpactPriorMixes,
+        REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::media::audiopolicy, audio_mix_test_api),
+                               ACONFIG_FLAG(android::media::audiopolicy, audio_mix_ownership))
+) {
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+
+    std::vector<AudioMixMatchCriterion> validMixMatchCriteria = {
+            createUidCriterion(/*uid=*/42),
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/true)};
+    AudioMix validAudioMix(validMixMatchCriteria, MIX_TYPE_PLAYERS, audioConfig,
+                           MIX_ROUTE_FLAG_LOOP_BACK, String8(mMixAddress.c_str()), 0);
+    validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
+
+    mAudioMixes.clear();
+    mAudioMixes.add(validAudioMix);
+    status_t ret = mManager->registerPolicyMixes(mAudioMixes);
+
+    ASSERT_EQ(NO_ERROR, ret);
+
+    std::vector<AudioMix> registeredMixes = getRegisteredPolicyMixes();
+    ASSERT_EQ(1, registeredMixes.size());
+
+    std::vector<AudioMixMatchCriterion> invalidMixMatchCriteria = {
+            createUidCriterion(/*uid=*/42),
+            createUidCriterion(/*uid=*/1235, /*exclude=*/true),
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/true)};
+
+    AudioMix invalidAudioMix(invalidMixMatchCriteria, MIX_TYPE_PLAYERS, audioConfig,
+                             MIX_ROUTE_FLAG_LOOP_BACK, String8(mMixAddress.c_str()), 0);
+    validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
+
+    mAudioMixes.add(invalidAudioMix);
+    ret = mManager->registerPolicyMixes(mAudioMixes);
+
+    ASSERT_EQ(INVALID_OPERATION, ret);
+
+    std::vector<AudioMix> remainingMixes = getRegisteredPolicyMixes();
+    ASSERT_EQ(registeredMixes.size(), remainingMixes.size());
+}
+
+TEST_F_WITH_FLAGS(
+        AudioPolicyManagerTestDynamicPolicy,
+        UnregisterInvalidMixesReturnsError,
+        REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::media::audiopolicy, audio_mix_test_api),
+                               ACONFIG_FLAG(android::media::audiopolicy, audio_mix_ownership))
+) {
+    audio_config_t audioConfig = AUDIO_CONFIG_INITIALIZER;
+    audioConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    audioConfig.format = AUDIO_FORMAT_PCM_16_BIT;
+    audioConfig.sample_rate = k48000SamplingRate;
+
+    std::vector<AudioMixMatchCriterion> validMixMatchCriteria = {
+            createUidCriterion(/*uid=*/42),
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/true)};
+    AudioMix validAudioMix(validMixMatchCriteria, MIX_TYPE_PLAYERS, audioConfig,
+                           MIX_ROUTE_FLAG_LOOP_BACK, String8(mMixAddress.c_str()), 0);
+    validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
+
+    mAudioMixes.clear();
+    mAudioMixes.add(validAudioMix);
+    status_t ret = mManager->registerPolicyMixes(mAudioMixes);
+
+    ASSERT_EQ(NO_ERROR, ret);
+
+    std::vector<AudioMix> registeredMixes = getRegisteredPolicyMixes();
+    ASSERT_EQ(1, registeredMixes.size());
+
+    std::vector<AudioMixMatchCriterion> invalidMixMatchCriteria = {
+            createUidCriterion(/*uid=*/42),
+            createUidCriterion(/*uid=*/1235, /*exclude=*/true),
+            createUsageCriterion(AUDIO_USAGE_MEDIA, /*exclude=*/true)};
+
+    AudioMix invalidAudioMix(invalidMixMatchCriteria, MIX_TYPE_PLAYERS, audioConfig,
+                             MIX_ROUTE_FLAG_LOOP_BACK, String8(mMixAddress.c_str()), 0);
+    validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
+
+    Vector<AudioMix> mixes;
+    mixes.add(invalidAudioMix);
+    mixes.add(validAudioMix);
+    ret = removePolicyMixes(mixes);
+
+    ASSERT_EQ(INVALID_OPERATION, ret);
+
+    std::vector<AudioMix> remainingMixes = getRegisteredPolicyMixes();
+    EXPECT_THAT(remainingMixes, IsEmpty());
 }
 
 TEST_F_WITH_FLAGS(
