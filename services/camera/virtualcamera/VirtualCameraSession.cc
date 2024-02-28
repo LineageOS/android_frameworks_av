@@ -142,6 +142,8 @@ CameraMetadata createDefaultRequestSettings(
   int maxFps = getMaxFps(inputConfigs);
   auto metadata =
       MetadataBuilder()
+          .setAberrationCorrectionMode(
+              ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF)
           .setControlCaptureIntent(requestTemplateToIntent(type))
           .setControlMode(ANDROID_CONTROL_MODE_AUTO)
           .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
@@ -160,6 +162,7 @@ CameraMetadata createDefaultRequestSettings(
           .setJpegQuality(VirtualCameraDevice::kDefaultJpegQuality)
           .setJpegThumbnailQuality(VirtualCameraDevice::kDefaultJpegQuality)
           .setJpegThumbnailSize(0, 0)
+          .setNoiseReductionMode(ANDROID_NOISE_REDUCTION_MODE_OFF)
           .build();
   if (metadata == nullptr) {
     ALOGE("%s: Failed to construct metadata for default request type %s",
