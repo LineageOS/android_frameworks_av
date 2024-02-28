@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -39,6 +40,7 @@
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraRenderThread.h"
 #include "VirtualCameraStream.h"
+#include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferCache.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
@@ -48,6 +50,7 @@
 #include "aidl/android/hardware/camera/device/NotifyMsg.h"
 #include "aidl/android/hardware/camera/device/RequestTemplate.h"
 #include "aidl/android/hardware/camera/device/ShutterMsg.h"
+#include "aidl/android/hardware/camera/device/Stream.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
 #include "aidl/android/hardware/camera/device/StreamRotation.h"
@@ -105,9 +108,6 @@ constexpr size_t kMetadataMsgQueueSize = 0;
 
 // Maximum number of buffers to use per single stream.
 constexpr size_t kMaxStreamBuffers = 2;
-
-constexpr int32_t kDefaultJpegQuality = 80;
-constexpr int32_t kDefaultJpegThumbnailQuality = 70;
 
 // Thumbnail size (0,0) correspods to disabling thumbnail.
 const Resolution kDefaultJpegThumbnailSize(0, 0);
@@ -204,6 +204,55 @@ Stream getHighestResolutionStream(const std::vector<Stream>& streams) {
                             }));
 }
 
+Resolution resolutionFromStream(const Stream& stream) {
+  return Resolution(stream.width, stream.height);
+}
+
+Resolution resolutionFromInputConfig(
+    const SupportedStreamConfiguration& inputConfig) {
+  return Resolution(inputConfig.width, inputConfig.height);
+}
+
+std::optional<SupportedStreamConfiguration> pickInputConfigurationForStreams(
+    const std::vector<Stream>& requestedStreams,
+    const std::vector<SupportedStreamConfiguration>& supportedInputConfigs) {
+  Stream maxResolutionStream = getHighestResolutionStream(requestedStreams);
+  Resolution maxResolution = resolutionFromStream(maxResolutionStream);
+
+  // Find best fitting stream to satisfy all requested streams:
+  // Best fitting => same or higher resolution as input with lowest pixel count
+  // difference and same aspect ratio.
+  auto isBetterInputConfig = [maxResolution](
+                                 const SupportedStreamConfiguration& configA,
+                                 const SupportedStreamConfiguration& configB) {
+    int maxResPixelCount = maxResolution.width * maxResolution.height;
+    int pixelCountDiffA =
+        std::abs((configA.width * configA.height) - maxResPixelCount);
+    int pixelCountDiffB =
+        std::abs((configB.width * configB.height) - maxResPixelCount);
+
+    return pixelCountDiffA < pixelCountDiffB;
+  };
+
+  std::optional<SupportedStreamConfiguration> bestConfig;
+  for (const SupportedStreamConfiguration& inputConfig : supportedInputConfigs) {
+    Resolution inputConfigResolution = resolutionFromInputConfig(inputConfig);
+    if (inputConfigResolution < maxResolution ||
+        !isApproximatellySameAspectRatio(inputConfigResolution, maxResolution)) {
+      // We don't want to upscale from lower resolution, or use different aspect
+      // ratio, skip.
+      continue;
+    }
+
+    if (!bestConfig.has_value() ||
+        isBetterInputConfig(inputConfig, bestConfig.value())) {
+      bestConfig = inputConfig;
+    }
+  }
+
+  return bestConfig;
+}
+
 RequestSettings createSettingsFromMetadata(const CameraMetadata& metadata) {
   return RequestSettings{
       .jpegQuality = getJpegQuality(metadata).value_or(
@@ -279,15 +328,13 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
   halStreams.clear();
   halStreams.resize(in_requestedConfiguration.streams.size());
 
-  sp<Surface> inputSurface = nullptr;
-  int inputWidth;
-  int inputHeight;
-
   if (!virtualCamera->isStreamCombinationSupported(in_requestedConfiguration)) {
     ALOGE("%s: Requested stream configuration is not supported", __func__);
     return cameraStatus(Status::ILLEGAL_ARGUMENT);
   }
 
+  sp<Surface> inputSurface = nullptr;
+  std::optional<SupportedStreamConfiguration> inputConfig;
   {
     std::lock_guard<std::mutex> lock(mLock);
     for (int i = 0; i < in_requestedConfiguration.streams.size(); ++i) {
@@ -297,14 +344,20 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       }
     }
 
-    Stream maxResStream = getHighestResolutionStream(streams);
-    inputWidth = maxResStream.width;
-    inputHeight = maxResStream.height;
+    inputConfig = pickInputConfigurationForStreams(
+        streams, virtualCamera->getInputConfigs());
+    if (!inputConfig.has_value()) {
+      ALOGE(
+          "%s: Failed to pick any input configuration for stream configuration "
+          "request: %s",
+          __func__, in_requestedConfiguration.toString().c_str());
+      return cameraStatus(Status::ILLEGAL_ARGUMENT);
+    }
     if (mRenderThread == nullptr) {
       // If there's no client callback, start camera in test mode.
       const bool testMode = mVirtualCameraClientCallback == nullptr;
       mRenderThread = std::make_unique<VirtualCameraRenderThread>(
-          mSessionContext, Resolution(inputWidth, inputHeight),
+          mSessionContext, resolutionFromInputConfig(*inputConfig),
           virtualCamera->getMaxInputResolution(), mCameraDeviceCallback,
           testMode);
       mRenderThread->start();
@@ -318,7 +371,7 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
     // create single texture.
     mVirtualCameraClientCallback->onStreamConfigured(
         /*streamId=*/0, aidl::android::view::Surface(inputSurface.get()),
-        inputWidth, inputHeight, Format::YUV_420_888);
+        inputConfig->width, inputConfig->height, inputConfig->pixelFormat);
   }
 
   return ndk::ScopedAStatus::ok();

@@ -17,6 +17,7 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_UTIL_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_UTIL_H
 
+#include <cmath>
 #include <cstdint>
 #include <memory>
 
@@ -129,6 +130,10 @@ struct Resolution {
                                      : pixCount < otherPixCount;
   }
 
+  bool operator<=(const Resolution& other) const {
+    return *this == other || *this < other;
+  }
+
   bool operator==(const Resolution& other) const {
     return width == other.width && height == other.height;
   }
@@ -136,6 +141,17 @@ struct Resolution {
   int width = 0;
   int height = 0;
 };
+
+inline bool isApproximatellySameAspectRatio(const Resolution r1,
+                                            const Resolution r2) {
+  static constexpr float kAspectRatioEpsilon = 0.05;
+  float aspectRatio1 =
+      static_cast<float>(r1.width) / static_cast<float>(r1.height);
+  float aspectRatio2 =
+      static_cast<float>(r2.width) / static_cast<float>(r2.height);
+
+  return std::abs(aspectRatio1 - aspectRatio2) < kAspectRatioEpsilon;
+}
 
 std::ostream& operator<<(std::ostream& os, const Resolution& resolution);
 
