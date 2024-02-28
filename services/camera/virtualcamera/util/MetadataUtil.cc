@@ -489,11 +489,26 @@ MetadataBuilder& MetadataBuilder::setAvailableAberrationCorrectionModes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setAberrationCorrectionMode(
+    const camera_metadata_enum_android_color_correction_aberration_mode
+        aberrationCorrectionMode) {
+  mEntryMap[ANDROID_COLOR_CORRECTION_ABERRATION_MODE] =
+      asVectorOf<uint8_t>(aberrationCorrectionMode);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setAvailableNoiseReductionModes(
     const std::vector<camera_metadata_enum_android_noise_reduction_mode>&
         noiseReductionModes) {
   mEntryMap[ANDROID_NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES] =
       convertTo<uint8_t>(noiseReductionModes);
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setNoiseReductionMode(
+    camera_metadata_enum_android_noise_reduction_mode noiseReductionMode) {
+  mEntryMap[ANDROID_NOISE_REDUCTION_MODE] =
+      asVectorOf<uint8_t>(noiseReductionMode);
   return *this;
 }
 

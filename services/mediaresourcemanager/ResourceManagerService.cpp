@@ -586,17 +586,20 @@ Status ResourceManagerService::reclaimResource(const ClientInfoParcel& clientInf
 
     // Check if there are any resources to be reclaimed before processing.
     if (resources.empty()) {
+        // Invalid reclaim request. So no need to log.
         return Status::ok();
     }
 
     std::vector<ClientInfo> targetClients;
-    if (!getTargetClients(clientInfo, resources, targetClients)) {
-        // Nothing to reclaim from.
+    if (getTargetClients(clientInfo, resources, targetClients)) {
+        // Reclaim all the target clients.
+        *_aidl_return = reclaimUnconditionallyFrom(targetClients);
+    } else {
+        // No clients to reclaim from.
         ALOGI("%s: There aren't any clients to reclaim from", __func__);
-        return Status::ok();
+        // We need to log this failed reclaim as "no clients to reclaim from".
+        targetClients.clear();
     }
-
-    *_aidl_return = reclaimUnconditionallyFrom(targetClients);
 
     // Log Reclaim Pushed Atom to statsd
     pushReclaimAtom(clientInfo, targetClients, *_aidl_return);
