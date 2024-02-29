@@ -130,9 +130,35 @@ struct CompIntf : public ConfigurableC2Intf {
     virtual c2_status_t querySupportedValues(
             std::vector<C2FieldSupportedValuesQuery>& fields,
             c2_blocking_t mayBlock) const override {
-        c2_status_t err = mIntf->querySupportedValues_vb(fields, mayBlock);
-        if (mMultiAccessUnitIntf != nullptr) {
-            err = mMultiAccessUnitIntf->querySupportedValues(fields, mayBlock);
+        if (mMultiAccessUnitIntf == nullptr) {
+           return  mIntf->querySupportedValues_vb(fields, mayBlock);
+        }
+        std::vector<C2FieldSupportedValuesQuery> dup = fields;
+        std::vector<C2FieldSupportedValuesQuery> queryArray[2];
+        std::map<C2ParamField, std::pair<uint32_t, size_t>> queryMap;
+        c2_status_t err = C2_OK;
+        for (int i = 0 ; i < fields.size(); i++) {
+            const C2ParamField &field = fields[i].field();
+            uint32_t queryArrayIdx = 1;
+            if (mMultiAccessUnitIntf->isValidField(field)) {
+                queryArrayIdx = 0;
+            }
+            queryMap[field] = std::make_pair(
+                    queryArrayIdx, queryArray[queryArrayIdx].size());
+            queryArray[queryArrayIdx].push_back(fields[i]);
+        }
+        if (queryArray[0].size() > 0) {
+            err = mMultiAccessUnitIntf->querySupportedValues(queryArray[0], mayBlock);
+        }
+        if (queryArray[1].size() > 0) {
+             err = mIntf->querySupportedValues_vb(queryArray[1], mayBlock);
+        }
+        for (int i = 0 ; i < dup.size(); i++) {
+            auto it = queryMap.find(dup[i].field());
+            if (it != queryMap.end()) {
+                std::pair<uint32_t, size_t> queryid = it->second;
+                fields[i] = queryArray[queryid.first][queryid.second];
+            }
         }
         return err;
     }
