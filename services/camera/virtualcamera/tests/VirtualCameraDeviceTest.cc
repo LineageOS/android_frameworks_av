@@ -55,6 +55,10 @@ using metadata_stream_t =
     camera_metadata_enum_android_scaler_available_stream_configurations_t;
 
 constexpr int kCameraId = 42;
+constexpr int kQvgaWidth = 320;
+constexpr int kQvgaHeight = 240;
+constexpr int k360pWidth = 640;
+constexpr int k360pHeight = 360;
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kHdWidth = 1280;
@@ -79,7 +83,8 @@ struct AvailableStreamConfiguration {
   const int width;
   const int height;
   const int pixelFormat;
-  const metadata_stream_t streamConfiguration;
+  const metadata_stream_t streamConfiguration =
+      ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT;
 };
 
 bool operator==(const AvailableStreamConfiguration& a,
@@ -173,24 +178,33 @@ INSTANTIATE_TEST_SUITE_P(
                     .lensFacing = LensFacing::FRONT},
             .expectedAvailableStreamConfigs =
                 {AvailableStreamConfiguration{
-                     .width = kVgaWidth,
-                     .height = kVgaHeight,
-                     .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888,
-                     .streamConfiguration =
-                         ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT},
+                     .width = kQvgaWidth,
+                     .height = kQvgaHeight,
+                     .pixelFormat =
+                         ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888},
+                 AvailableStreamConfiguration{
+                     .width = kQvgaWidth,
+                     .height = kQvgaHeight,
+                     .pixelFormat =
+                         ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED},
+                 AvailableStreamConfiguration{
+                     .width = kQvgaWidth,
+                     .height = kQvgaHeight,
+                     .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB},
                  AvailableStreamConfiguration{
                      .width = kVgaWidth,
                      .height = kVgaHeight,
                      .pixelFormat =
-                         ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
-                     .streamConfiguration =
-                         ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT},
+                         ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888},
                  AvailableStreamConfiguration{
                      .width = kVgaWidth,
                      .height = kVgaHeight,
-                     .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB,
-                     .streamConfiguration =
-                         ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT}}},
+                     .pixelFormat =
+                         ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED},
+                 AvailableStreamConfiguration{
+                     .width = kVgaWidth,
+                     .height = kVgaHeight,
+                     .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB}}},
         VirtualCameraConfigTestParam{
             .inputConfig =
                 VirtualCameraConfiguration{
@@ -210,43 +224,70 @@ INSTANTIATE_TEST_SUITE_P(
                     .lensFacing = LensFacing::BACK},
             .expectedAvailableStreamConfigs = {
                 AvailableStreamConfiguration{
+                    .width = kQvgaWidth,
+                    .height = kQvgaHeight,
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888},
+                AvailableStreamConfiguration{
+                    .width = kQvgaWidth,
+                    .height = kQvgaHeight,
+                    .pixelFormat =
+                        ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED},
+                AvailableStreamConfiguration{
+                    .width = kQvgaWidth,
+                    .height = kQvgaHeight,
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB},
+                AvailableStreamConfiguration{
+                    .width = 640,
+                    .height = 360,
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888},
+                AvailableStreamConfiguration{
+                    .width = 640,
+                    .height = 360,
+                    .pixelFormat =
+                        ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED},
+                AvailableStreamConfiguration{
+                    .width = 640,
+                    .height = 360,
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB},
+                AvailableStreamConfiguration{
                     .width = kVgaWidth,
                     .height = kVgaHeight,
-                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888,
-                    .streamConfiguration =
-                        ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT},
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888},
                 AvailableStreamConfiguration{
                     .width = kVgaWidth,
                     .height = kVgaHeight,
                     .pixelFormat =
-                        ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
-                    .streamConfiguration =
-                        ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT},
+                        ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED},
                 AvailableStreamConfiguration{
                     .width = kVgaWidth,
                     .height = kVgaHeight,
-                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB,
-                    .streamConfiguration =
-                        ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT},
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB},
+                AvailableStreamConfiguration{
+                    .width = 1024,
+                    .height = 576,
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888},
+                AvailableStreamConfiguration{
+                    .width = 1024,
+                    .height = 576,
+                    .pixelFormat =
+                        ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED},
+                AvailableStreamConfiguration{
+                    .width = 1024,
+                    .height = 576,
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB},
                 AvailableStreamConfiguration{
                     .width = kHdWidth,
                     .height = kHdHeight,
-                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888,
-                    .streamConfiguration =
-                        ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT},
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_YCbCr_420_888},
                 AvailableStreamConfiguration{
                     .width = kHdWidth,
                     .height = kHdHeight,
                     .pixelFormat =
-                        ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED,
-                    .streamConfiguration =
-                        ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT},
+                        ANDROID_SCALER_AVAILABLE_FORMATS_IMPLEMENTATION_DEFINED},
                 AvailableStreamConfiguration{
                     .width = kHdWidth,
                     .height = kHdHeight,
-                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB,
-                    .streamConfiguration =
-                        ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT}}}));
+                    .pixelFormat = ANDROID_SCALER_AVAILABLE_FORMATS_BLOB}}}));
 
 class VirtualCameraDeviceTest : public ::testing::Test {
  public:

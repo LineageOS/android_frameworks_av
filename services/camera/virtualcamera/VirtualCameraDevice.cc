@@ -81,8 +81,6 @@ constexpr uint8_t kPipelineMaxDepth = 2;
 
 constexpr MetadataBuilder::ControlRegion kDefaultEmptyControlRegion{};
 
-constexpr float kAspectRatioEpsilon = 0.05;
-
 const std::array<Resolution, 5> kStandardJpegThumbnailSizes{
     Resolution(176, 144), Resolution(240, 144), Resolution(256, 144),
     Resolution(240, 160), Resolution(240, 180)};
@@ -91,14 +89,15 @@ const std::array<PixelFormat, 3> kOutputFormats{
     PixelFormat::IMPLEMENTATION_DEFINED, PixelFormat::YCBCR_420_888,
     PixelFormat::BLOB};
 
-bool isApproximatellySameAspectRatio(const Resolution r1, const Resolution r2) {
-  float aspectRatio1 =
-      static_cast<float>(r1.width) / static_cast<float>(r1.height);
-  float aspectRatio2 =
-      static_cast<float>(r2.width) / static_cast<float>(r2.height);
-
-  return abs(aspectRatio1 - aspectRatio2) < kAspectRatioEpsilon;
-}
+// The resolutions below will used to extend the set of supported output formats.
+// All resolutions with lower pixel count and same aspect ratio as some supported
+// input resolution will be added to the set of supported output resolutions.
+const std::array<Resolution, 10> kOutputResolutions{
+    Resolution(320, 240),   Resolution(640, 360),  Resolution(640, 480),
+    Resolution(720, 480),   Resolution(720, 576),  Resolution(800, 600),
+    Resolution(1024, 576),  Resolution(1280, 720), Resolution(1280, 960),
+    Resolution(1280, 1080),
+};
 
 std::vector<Resolution> getSupportedJpegThumbnailSizes(
     const std::vector<SupportedStreamConfiguration>& configs) {
@@ -179,6 +178,36 @@ std::map<Resolution, int> getResolutionToMaxFpsMap(
       resolutionToMaxFpsMap[resolution] = std::max(currentMaxFps, config.maxFps);
     }
   }
+
+  std::map<Resolution, int> additionalResolutionToMaxFpsMap;
+  // Add additional resolutions we can support by downscaling input streams with
+  // same aspect ratio.
+  for (const Resolution& outputResolution : kOutputResolutions) {
+    for (const auto& [resolution, maxFps] : resolutionToMaxFpsMap) {
+      if (resolutionToMaxFpsMap.find(outputResolution) !=
+          resolutionToMaxFpsMap.end()) {
+        // Resolution is already in the map, skip it.
+        continue;
+      }
+
+      if (outputResolution < resolution &&
+          isApproximatellySameAspectRatio(outputResolution, resolution)) {
+        // Lower resolution with same aspect ratio, we can achieve this by
+        // downscaling, let's add it to the map.
+        ALOGD(
+            "Extending set of output resolutions with %dx%d which has same "
+            "aspect ratio as supported input %dx%d.",
+            outputResolution.width, outputResolution.height, resolution.width,
+            resolution.height);
+        additionalResolutionToMaxFpsMap[outputResolution] = maxFps;
+        break;
+      }
+    }
+  }
+
+  // Add all resolution we can achieve by downscaling to the map.
+  resolutionToMaxFpsMap.insert(additionalResolutionToMaxFpsMap.begin(),
+                               additionalResolutionToMaxFpsMap.end());
 
   return resolutionToMaxFpsMap;
 }
@@ -401,6 +430,22 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
     return false;
   }
 
+  const std::vector<Stream>& streams = streamConfiguration.streams;
+
+  Resolution firstStreamResolution(streams[0].width, streams[0].height);
+  auto isSameAspectRatioAsFirst = [firstStreamResolution](const Stream& stream) {
+    return isApproximatellySameAspectRatio(
+        firstStreamResolution, Resolution(stream.width, stream.height));
+  };
+  if (!std::all_of(streams.begin(), streams.end(), isSameAspectRatioAsFirst)) {
+    ALOGW(
+        "%s: Requested streams do not have same aspect ratio. Different aspect "
+        "ratios are currently "
+        "not supported by virtual camera. Stream configuration: %s",
+        __func__, streamConfiguration.toString().c_str());
+    return false;
+  }
+
   int numberOfProcessedStreams = 0;
   int numberOfStallStreams = 0;
   for (const Stream& stream : streamConfiguration.streams) {
@@ -423,9 +468,13 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
       numberOfProcessedStreams++;
     }
 
+    Resolution requestedResolution(stream.width, stream.height);
     auto matchesSupportedInputConfig =
-        [&stream](const SupportedStreamConfiguration& config) {
-          return stream.width == config.width && stream.height == config.height;
+        [requestedResolution](const SupportedStreamConfiguration& config) {
+          Resolution supportedInputResolution(config.width, config.height);
+          return requestedResolution <= supportedInputResolution &&
+                 isApproximatellySameAspectRatio(requestedResolution,
+                                                 supportedInputResolution);
         };
     if (std::none_of(mSupportedInputConfigurations.begin(),
                      mSupportedInputConfigurations.end(),
