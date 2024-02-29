@@ -199,6 +199,36 @@ std::shared_ptr<FilterWrapper> ComponentStore::GetFilterWrapper() {
 }
 #endif
 
+std::shared_ptr<MultiAccessUnitInterface> ComponentStore::tryCreateMultiAccessUnitInterface(
+        const std::shared_ptr<C2ComponentInterface> &c2interface) {
+    std::shared_ptr<MultiAccessUnitInterface> multiAccessUnitIntf = nullptr;
+    if (c2interface == nullptr) {
+        return nullptr;
+    }
+    if (MultiAccessUnitHelper::isEnabledOnPlatform()) {
+        c2_status_t err = C2_OK;
+        C2ComponentDomainSetting domain;
+        std::vector<std::unique_ptr<C2Param>> heapParams;
+        err = c2interface->query_vb({&domain}, {}, C2_MAY_BLOCK, &heapParams);
+        if (err == C2_OK && (domain.value == C2Component::DOMAIN_AUDIO)) {
+            std::vector<std::shared_ptr<C2ParamDescriptor>> params;
+            bool isComponentSupportsLargeAudioFrame = false;
+            c2interface->querySupportedParams_nb(&params);
+            for (const auto &paramDesc : params) {
+                if (paramDesc->name().compare(C2_PARAMKEY_OUTPUT_LARGE_FRAME) == 0) {
+                    isComponentSupportsLargeAudioFrame = true;
+                    break;
+                }
+            }
+            if (!isComponentSupportsLargeAudioFrame) {
+                multiAccessUnitIntf = std::make_shared<MultiAccessUnitInterface>(
+                        c2interface, std::static_pointer_cast<C2ReflectorHelper>(mParamReflector));
+            }
+        }
+    }
+    return multiAccessUnitIntf;
+}
+
 // Methods from ::aidl::android::hardware::media::c2::IComponentStore
 ScopedAStatus ComponentStore::createComponent(
         const std::string& name,
@@ -258,7 +288,10 @@ ScopedAStatus ComponentStore::createInterface(
         c2interface = GetFilterWrapper()->maybeWrapInterface(c2interface);
 #endif
         onInterfaceLoaded(c2interface);
-        *intf = SharedRefBase::make<ComponentInterface>(c2interface, mParameterCache);
+        std::shared_ptr<MultiAccessUnitInterface> multiAccessUnitIntf =
+                tryCreateMultiAccessUnitInterface(c2interface);
+        *intf = SharedRefBase::make<ComponentInterface>(
+                c2interface, multiAccessUnitIntf, mParameterCache);
         return ScopedAStatus::ok();
     }
     return ScopedAStatus::fromServiceSpecificError(res);

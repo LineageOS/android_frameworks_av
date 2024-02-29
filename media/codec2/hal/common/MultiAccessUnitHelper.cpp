@@ -73,12 +73,17 @@ MultiAccessUnitInterface::MultiAccessUnitInterface(
     for (std::shared_ptr<C2ParamDescriptor> &desc : supportedParams) {
         mSupportedParamIndexSet.insert(desc->index());
     }
+    mParamFields.emplace_back(mLargeFrameParams.get(), &(mLargeFrameParams.get()->maxSize));
+    mParamFields.emplace_back(mLargeFrameParams.get(), &(mLargeFrameParams.get()->thresholdSize));
 
     if (mC2ComponentIntf) {
         c2_status_t err = mC2ComponentIntf->query_vb({&mKind}, {}, C2_MAY_BLOCK, nullptr);
     }
 }
 
+bool MultiAccessUnitInterface::isValidField(const C2ParamField &field) const {
+    return (std::find(mParamFields.begin(), mParamFields.end(), field) != mParamFields.end());
+}
 bool MultiAccessUnitInterface::isParamSupported(C2Param::Index index) {
     return (mSupportedParamIndexSet.count(index) != 0);
 }
