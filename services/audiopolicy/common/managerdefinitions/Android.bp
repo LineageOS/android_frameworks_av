@@ -36,6 +36,7 @@ cc_library {
         "src/TypeConverter.cpp",
     ],
     shared_libs: [
+        "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "audiopolicy-types-aidl-cpp",
         "libaudioclient_aidl_conversion",

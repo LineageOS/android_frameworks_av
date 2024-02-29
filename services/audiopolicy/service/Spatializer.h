@@ -486,11 +486,13 @@ private:
     bool mSupportsHeadTracking;
     /** List of supported headtracking connection modes reported by the spatializer.
      * If the list is empty, the spatializer does not support any optional connection
-     * mode and mode HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED is assumed.
+     * mode and mode HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED is assumed.
      */
-    std::unordered_set<headtracking_connection_t> mSupportedHeadtrackingConnectionModes;
+    std::unordered_set<media::audio::common::HeadTracking::ConnectionMode>
+            mSupportedHeadtrackingConnectionModes;
     /** Selected HT connection mode when several modes are supported by the spatializer */
-    headtracking_connection_t mHeadtrackingConnectionMode;
+    media::audio::common::HeadTracking::ConnectionMode mHeadtrackingConnectionMode =
+            media::audio::common::HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED;
 
     // Looper thread for mEngine callbacks
     class EngineCallbackHandler;

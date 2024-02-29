@@ -649,7 +649,7 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
         return C2_CORRUPTED;
     }
     size_t i = 0;
-    size_t numUpdatedStackParams = 0;
+    size_t numQueried = 0;
     for (auto it = paramPointers.begin(); it != paramPointers.end(); ) {
         C2Param* paramPointer = *it;
         if (numStackIndices > 0) {
@@ -678,7 +678,7 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
                 continue;
             }
             if (stackParams[i++]->updateFrom(*paramPointer)) {
-                ++numUpdatedStackParams;
+                ++numQueried;
             } else {
                 LOG(WARNING) << "query -- param update failed: "
                                 "index = "
@@ -695,13 +695,10 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
                                 "unexpected extra stack param.";
             } else {
                 heapParams->emplace_back(C2Param::Copy(*paramPointer));
+                ++numQueried;
             }
         }
         ++it;
-    }
-    size_t numQueried = numUpdatedStackParams;
-    if (heapParams) {
-        numQueried += heapParams->size();
     }
     if (status == C2_OK && indices.size() != numQueried) {
         status = C2_BAD_INDEX;
