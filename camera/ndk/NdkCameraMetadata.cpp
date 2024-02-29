@@ -121,6 +121,18 @@ camera_status_t ACameraMetadata_getAllTags(
 }
 
 EXPORT
+camera_status_t ACameraMetadata_getTagFromName(
+        const ACameraMetadata* acm, const char* name, uint32_t* tag) {
+    ATRACE_CALL();
+    if (acm == nullptr || name == nullptr || tag == nullptr) {
+        ALOGE("%s: invalid argument! metadata %p, name %p, tag %p",
+               __FUNCTION__, acm, name, tag);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return acm->getTagFromName(name, tag);
+}
+
+EXPORT
 ACameraMetadata* ACameraMetadata_copy(const ACameraMetadata* src) {
     ATRACE_CALL();
     if (src == nullptr) {
