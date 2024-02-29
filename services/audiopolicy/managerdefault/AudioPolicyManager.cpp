@@ -3678,6 +3678,7 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
     status_t res = NO_ERROR;
     bool checkOutputs = false;
     sp<HwModule> rSubmixModule;
+    Vector<AudioMix> registeredMixes;
     // examine each mix's route type
     for (size_t i = 0; i < mixes.size(); i++) {
         AudioMix mix = mixes[i];
@@ -3801,11 +3802,19 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
                 break;
             } else {
                 checkOutputs = true;
+                registeredMixes.add(mix);
             }
         }
     }
     if (res != NO_ERROR) {
-        unregisterPolicyMixes(mixes);
+        if (audio_flags::audio_mix_ownership()) {
+            // Only unregister mixes that were actually registered to not accidentally unregister
+            // mixes that already existed previously.
+            unregisterPolicyMixes(registeredMixes);
+            registeredMixes.clear();
+        } else {
+            unregisterPolicyMixes(mixes);
+        }
     } else if (checkOutputs) {
         checkForDeviceAndOutputChanges();
         updateCallAndOutputRouting();
@@ -3816,6 +3825,7 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
 status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
 {
     ALOGV("unregisterPolicyMixes() num mixes %zu", mixes.size());
+    status_t endResult = NO_ERROR;
     status_t res = NO_ERROR;
     bool checkOutputs = false;
     sp<HwModule> rSubmixModule;
@@ -3828,6 +3838,7 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
                         AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX);
                 if (rSubmixModule == 0) {
                     res = INVALID_OPERATION;
+                    endResult = INVALID_OPERATION;
                     continue;
                 }
             }
@@ -3836,6 +3847,7 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
 
             if (mPolicyMixes.unregisterMix(mix) != NO_ERROR) {
                 res = INVALID_OPERATION;
+                endResult = INVALID_OPERATION;
                 continue;
             }
 
@@ -3848,6 +3860,7 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
                     if (res != OK) {
                         ALOGE("Error making RemoteSubmix device unavailable for mix "
                               "with type %d, address %s", device, address.c_str());
+                        endResult = INVALID_OPERATION;
                     }
                 }
             }
@@ -3857,15 +3870,24 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
         } else if ((mix.mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
             if (mPolicyMixes.unregisterMix(mix) != NO_ERROR) {
                 res = INVALID_OPERATION;
+                endResult = INVALID_OPERATION;
                 continue;
             } else {
                 checkOutputs = true;
             }
         }
     }
-    if (res == NO_ERROR && checkOutputs) {
-        checkForDeviceAndOutputChanges();
-        updateCallAndOutputRouting();
+    if (audio_flags::audio_mix_ownership()) {
+        res = endResult;
+        if (res == NO_ERROR && checkOutputs) {
+            checkForDeviceAndOutputChanges();
+            updateCallAndOutputRouting();
+        }
+    } else {
+        if (res == NO_ERROR && checkOutputs) {
+            checkForDeviceAndOutputChanges();
+            updateCallAndOutputRouting();
+        }
     }
     return res;
 }
@@ -3882,6 +3904,7 @@ status_t AudioPolicyManager::getRegisteredPolicyMixes(std::vector<AudioMix>& _ai
                              policyMix->mFormat, policyMix->mRouteFlags, policyMix->mDeviceAddress,
                              policyMix->mCbFlags);
         _aidl_return.back().mDeviceType = policyMix->mDeviceType;
+        _aidl_return.back().mToken = policyMix->mToken;
     }
 
     ALOGVV("%s() returning %zu registered mixes", __func__, _aidl_return->size());

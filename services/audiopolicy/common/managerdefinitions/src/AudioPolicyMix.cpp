@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "APM_AudioPolicyMix"
-// #define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 
 #include <algorithm>
 #include <iterator>
@@ -28,6 +28,9 @@
 #include "PolicyAudioPort.h"
 #include "IOProfile.h"
 #include <AudioOutputDescriptor.h>
+#include <android_media_audiopolicy.h>
+
+namespace audio_flags = android::media::audiopolicy;
 
 namespace android {
 namespace {
@@ -190,6 +193,12 @@ status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
                     mix.mDeviceType, mix.mDeviceAddress.c_str());
             return BAD_VALUE;
         }
+        if (audio_flags::audio_mix_ownership()) {
+            if (mix.mToken == registeredMix->mToken) {
+                ALOGE("registerMix(): same mix already registered - skipping");
+                return BAD_VALUE;
+            }
+        }
     }
     if (!areMixCriteriaConsistent(mix.mCriteria)) {
         ALOGE("registerMix(): Mix contains inconsistent criteria "
@@ -212,12 +221,21 @@ status_t AudioPolicyMixCollection::unregisterMix(const AudioMix& mix)
 {
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioPolicyMix>& registeredMix = itemAt(i);
-        if (mix.mDeviceType == registeredMix->mDeviceType
+        if (audio_flags::audio_mix_ownership()) {
+            if (mix.mToken == registeredMix->mToken) {
+                ALOGD("unregisterMix(): removing mix for dev=0x%x addr=%s",
+                      mix.mDeviceType, mix.mDeviceAddress.c_str());
+                removeAt(i);
+                return NO_ERROR;
+            }
+        } else {
+            if (mix.mDeviceType == registeredMix->mDeviceType
                 && mix.mDeviceAddress.compare(registeredMix->mDeviceAddress) == 0) {
-            ALOGD("unregisterMix(): removing mix for dev=0x%x addr=%s",
-                    mix.mDeviceType, mix.mDeviceAddress.c_str());
-            removeAt(i);
-            return NO_ERROR;
+                ALOGD("unregisterMix(): removing mix for dev=0x%x addr=%s",
+                      mix.mDeviceType, mix.mDeviceAddress.c_str());
+                removeAt(i);
+                return NO_ERROR;
+            }
         }
     }
 

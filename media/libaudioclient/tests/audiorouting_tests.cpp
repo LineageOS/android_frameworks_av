@@ -17,6 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "AudioRoutingTest"
 
+#include <string.h>
+
+#include <binder/Binder.h>
 #include <binder/ProcessState.h>
 #include <cutils/properties.h>
 #include <gtest/gtest.h>
@@ -149,6 +152,7 @@ class AudioRoutingTest : public ::testing::Test {
         config.sample_rate = 48000;
         AudioMix mix(criteria, mixType, config, mixFlag, String8{mAddress.c_str()}, 0);
         mix.mDeviceType = deviceType;
+        mix.mToken = sp<BBinder>::make();
         mMixes.push(mix);
         if (OK == AudioSystem::registerPolicyMixes(mMixes, true)) {
             mPolicyMixRegistered = true;
