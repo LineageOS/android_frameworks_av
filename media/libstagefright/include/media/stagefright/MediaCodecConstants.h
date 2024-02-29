@@ -697,6 +697,7 @@ inline static const char *asString_ColorFormat(int32_t i, const char *def = "??"
 inline constexpr char FEATURE_AdaptivePlayback[]       = "adaptive-playback";
 inline constexpr char FEATURE_EncodingStatistics[]     = "encoding-statistics";
 inline constexpr char FEATURE_IntraRefresh[] = "intra-refresh";
+inline constexpr char FEATURE_MultipleFrames[] = "multiple-frames";
 inline constexpr char FEATURE_PartialFrame[] = "partial-frame";
 inline constexpr char FEATURE_QpBounds[] = "qp-bounds";
 inline constexpr char FEATURE_SecurePlayback[]         = "secure-playback";
