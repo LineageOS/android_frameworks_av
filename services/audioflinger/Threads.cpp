@@ -2927,7 +2927,6 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
 
             // Set haptic intensity for effect
             if (chain != nullptr) {
-                // TODO(b/324559333): Add adaptive haptics scaling support for the HapticGenerator.
                 chain->setHapticScale_l(track->id(), hapticScale);
             }
         }

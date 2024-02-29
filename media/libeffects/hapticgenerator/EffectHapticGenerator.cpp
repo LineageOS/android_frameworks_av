@@ -114,10 +114,11 @@ std::string hapticSettingToString(const struct HapticGeneratorParam& param) {
     std::stringstream ss;
     ss << "\t\tHaptic setting:\n";
     ss << "\t\t- tracks intensity map:\n";
-    for (const auto&[id, intensity] : param.id2Intensity) {
-        ss << "\t\t\t- id=" << id << ", intensity=" << (int) intensity;
+    for (const auto&[id, hapticScale] : param.id2HapticScale) {
+        ss << "\t\t\t- id=" << id << ", hapticLevel=" << (int) hapticScale.getLevel()
+           << ", adaptiveScaleFactor=" << hapticScale.getAdaptiveScaleFactor();
     }
-    ss << "\t\t- max intensity: " << (int) param.maxHapticIntensity << '\n';
+    ss << "\t\t- max scale level: " << (int) param.maxHapticScale.getLevel() << '\n';
     ss << "\t\t- max haptic amplitude: " << param.maxHapticAmplitude << '\n';
     return ss.str();
 }
@@ -145,7 +146,7 @@ int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     memset(context->param.hapticChannelSource, 0, sizeof(context->param.hapticChannelSource));
     context->param.hapticChannelCount = 0;
     context->param.audioChannelCount = 0;
-    context->param.maxHapticIntensity = os::HapticLevel::MUTE;
+    context->param.maxHapticScale = os::HapticScale::mute();
 
     context->param.resonantFrequency = DEFAULT_RESONANT_FREQUENCY;
     context->param.bpfQ = 1.0f;
@@ -312,22 +313,25 @@ int HapticGenerator_SetParameter(struct HapticGeneratorContext *context,
                                  void *value) {
     switch (param) {
     case HG_PARAM_HAPTIC_INTENSITY: {
-        if (value == nullptr || size != (uint32_t) (2 * sizeof(int))) {
+        if (value == nullptr || size != (uint32_t) (2 * sizeof(int) + sizeof(float))) {
             return -EINVAL;
         }
-        int id = *(int *) value;
-        os::HapticLevel hapticIntensity =
-                static_cast<os::HapticLevel>(*((int *) value + 1));
-        ALOGD("Setting haptic intensity as %d", static_cast<int>(hapticIntensity));
-        if (hapticIntensity == os::HapticLevel::MUTE) {
-            context->param.id2Intensity.erase(id);
+        const int id = *(int *) value;
+        const os::HapticLevel hapticLevel = static_cast<os::HapticLevel>(*((int *) value + 1));
+        const float adaptiveScaleFactor = (*((float *) value + 2));
+        const os::HapticScale hapticScale = {hapticLevel, adaptiveScaleFactor};
+        ALOGD("Updating haptic scale, hapticLevel=%d, adaptiveScaleFactor=%f",
+              static_cast<int>(hapticLevel), adaptiveScaleFactor);
+        if (hapticScale.isScaleMute()) {
+            context->param.id2HapticScale.erase(id);
         } else {
-            context->param.id2Intensity.emplace(id, hapticIntensity);
+            context->param.id2HapticScale.emplace(id, hapticScale);
         }
-        context->param.maxHapticIntensity = hapticIntensity;
-        for (const auto&[id, intensity] : context->param.id2Intensity) {
-            context->param.maxHapticIntensity = std::max(
-                    context->param.maxHapticIntensity, intensity);
+        context->param.maxHapticScale = hapticScale;
+        for (const auto&[id, scale] : context->param.id2HapticScale) {
+            if (scale.getLevel() > context->param.maxHapticScale.getLevel()) {
+                context->param.maxHapticScale = scale;
+            }
         }
         break;
     }
@@ -479,7 +483,7 @@ int32_t HapticGenerator_Process(effect_handle_t self,
         return -ENODATA;
     }
 
-    if (context->param.maxHapticIntensity == os::HapticLevel::MUTE) {
+    if (context->param.maxHapticScale.isScaleMute()) {
         // Haptic channels are muted, not need to generate haptic data.
         return 0;
     }
@@ -506,7 +510,7 @@ int32_t HapticGenerator_Process(effect_handle_t self,
             context->processingChain, context->inputBuffer.data(),
             context->outputBuffer.data(), inBuffer->frameCount);
         os::scaleHapticData(hapticOutBuffer, hapticSampleCount,
-                            { /*level=*/context->param.maxHapticIntensity},
+                            context->param.maxHapticScale,
                             context->param.maxHapticAmplitude);
 
     // For haptic data, the haptic playback thread will copy the data from effect input buffer,
