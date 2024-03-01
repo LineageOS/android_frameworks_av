@@ -259,30 +259,7 @@ Component::Component(
         mBufferPoolSender{clientPoolManager} {
     // Retrieve supported parameters from store
     // TODO: We could cache this per component/interface type
-    if (MultiAccessUnitHelper::isEnabledOnPlatform()) {
-        c2_status_t err = C2_OK;
-        C2ComponentDomainSetting domain;
-        std::vector<std::unique_ptr<C2Param>> heapParams;
-        err = component->intf()->query_vb({&domain}, {}, C2_MAY_BLOCK, &heapParams);
-        if (err == C2_OK && (domain.value == C2Component::DOMAIN_AUDIO)) {
-            std::vector<std::shared_ptr<C2ParamDescriptor>> params;
-            bool isComponentSupportsLargeAudioFrame = false;
-            component->intf()->querySupportedParams_nb(&params);
-            for (const auto &paramDesc : params) {
-                if (paramDesc->name().compare(C2_PARAMKEY_OUTPUT_LARGE_FRAME) == 0) {
-                    isComponentSupportsLargeAudioFrame = true;
-                    LOG(VERBOSE) << "Underlying component supports large frame audio";
-                    break;
-                }
-            }
-            if (!isComponentSupportsLargeAudioFrame) {
-                mMultiAccessUnitIntf = std::make_shared<MultiAccessUnitInterface>(
-                        component->intf(),
-                        std::static_pointer_cast<C2ReflectorHelper>(
-                                GetCodec2PlatformComponentStore()->getParamReflector()));
-            }
-        }
-    }
+    mMultiAccessUnitIntf = store->tryCreateMultiAccessUnitInterface(component->intf());
     mInterface = new ComponentInterface(
             component->intf(), mMultiAccessUnitIntf, store->getParameterCache());
     mInit = mInterface->status();

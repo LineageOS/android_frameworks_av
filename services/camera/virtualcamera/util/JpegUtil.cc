@@ -153,18 +153,6 @@ class LibJpegContext {
     return compress(yLines, cbLines, crLines);
   }
 
-  std::optional<size_t> compressBlackImage() {
-    // We only really need to prepare one scanline for Y and one shared scanline
-    // for Cb & Cr.
-    std::vector<uint8_t> yLine(mWidth, 0);
-    std::vector<uint8_t> chromaLine(mWidth / 2, 0xff / 2);
-
-    std::vector<JSAMPROW> yLines(mHeight, yLine.data());
-    std::vector<JSAMPROW> cLines(mHeight / 2, chromaLine.data());
-
-    return compress(yLines, cLines, cLines);
-  }
-
  private:
   void setSuccess(const boolean success) {
     mSuccess = success;
@@ -277,17 +265,6 @@ std::optional<size_t> compressJpeg(const int width, const int height,
     context.setApp1Data(app1ExifData.data(), app1ExifData.size());
   }
   return context.compress(ycbcr);
-}
-
-std::optional<size_t> compressBlackJpeg(const int width, const int height,
-                                        const int quality,
-                                        const std::vector<uint8_t>& app1ExifData,
-                                        size_t outBufferSize, void* outBuffer) {
-  LibJpegContext context(width, height, quality, outBufferSize, outBuffer);
-  if (!app1ExifData.empty()) {
-    context.setApp1Data(app1ExifData.data(), app1ExifData.size());
-  }
-  return context.compressBlackImage();
 }
 
 }  // namespace virtualcamera
