@@ -61,11 +61,6 @@ AudioPolicyEffects::AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& eff
     }
 }
 
-void AudioPolicyEffects::setDefaultDeviceEffects() {
-    mDefaultDeviceEffectFuture = std::async(
-                std::launch::async, &AudioPolicyEffects::initDefaultDeviceEffects, this);
-}
-
 status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
                              audio_source_t inputSource,
                              audio_session_t audioSession)
