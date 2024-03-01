@@ -79,6 +79,9 @@ struct ComponentStore : public IComponentStore {
 
     static std::shared_ptr<FilterWrapper> GetFilterWrapper();
 
+    std::shared_ptr<MultiAccessUnitInterface> tryCreateMultiAccessUnitInterface(
+            const std::shared_ptr<C2ComponentInterface> &c2interface);
+
     // Methods from ::android::hardware::media::c2::V1_0::IComponentStore.
     virtual Return<void> createComponent(
             const hidl_string& name,

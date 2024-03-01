@@ -58,25 +58,14 @@ EffectBufferHalAidl::EffectBufferHalAidl(size_t size)
 }
 
 EffectBufferHalAidl::~EffectBufferHalAidl() {
+    if (mAudioBuffer.raw) free(mAudioBuffer.raw);
 }
 
 status_t EffectBufferHalAidl::init() {
-    int fd = ashmem_create_region("audioEffectAidl", mBufferSize);
-    if (fd < 0) {
-        ALOGE("%s create ashmem failed %d", __func__, fd);
-        return fd;
+    if (0 != posix_memalign(&mAudioBuffer.raw, 32, mBufferSize)) {
+        return NO_MEMORY;
     }
 
-    ScopedFileDescriptor tempFd(fd);
-    mAudioBuffer.raw = mmap(nullptr /* address */, mBufferSize /* length */, PROT_READ | PROT_WRITE,
-                            MAP_SHARED, fd, 0 /* offset */);
-    if (mAudioBuffer.raw == MAP_FAILED) {
-        ALOGE("mmap failed for fd %d", fd);
-        mAudioBuffer.raw = nullptr;
-        return INVALID_OPERATION;
-    }
-
-    mMemory = {std::move(tempFd), static_cast<int64_t>(mBufferSize)};
     return OK;
 }
 

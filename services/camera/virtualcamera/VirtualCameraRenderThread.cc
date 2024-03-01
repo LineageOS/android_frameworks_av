@@ -581,36 +581,35 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
   std::shared_ptr<AHardwareBuffer> inHwBuffer = framebuffer->getHardwareBuffer();
   GraphicBuffer* gBuffer = GraphicBuffer::fromAHardwareBuffer(inHwBuffer.get());
 
-  std::optional<size_t> compressedSize;
-  if (gBuffer != nullptr) {
-    if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
-      // This should never happen since we're allocating the temporary buffer
-      // with YUV420 layout above.
-      ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
-            gBuffer->getPixelFormat());
-      return cameraStatus(Status::INTERNAL_ERROR);
-    }
-
-    YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
-    if (yCbCrLock.getStatus() != OK) {
-      return cameraStatus(Status::INTERNAL_ERROR);
-    }
-
-    std::vector<uint8_t> app1ExifData =
-        createExif(Resolution(stream->width, stream->height),
-                   createThumbnail(requestSettings.thumbnailResolution,
-                                   requestSettings.thumbnailJpegQuality));
-    compressedSize = compressJpeg(
-        gBuffer->getWidth(), gBuffer->getHeight(), requestSettings.jpegQuality,
-        *yCbCrLock, app1ExifData, stream->bufferSize - sizeof(CameraBlob),
-        (*planesLock).planes[0].data);
-  } else {
-    std::vector<uint8_t> app1ExifData =
-        createExif(Resolution(stream->width, stream->height));
-    compressedSize = compressBlackJpeg(
-        stream->width, stream->height, requestSettings.jpegQuality, app1ExifData,
-        stream->bufferSize - sizeof(CameraBlob), (*planesLock).planes[0].data);
+  if (gBuffer == nullptr) {
+    ALOGE(
+        "%s: Encountered invalid temporary buffer while rendering JPEG "
+        "into BLOB stream",
+        __func__);
+    return cameraStatus(Status::INTERNAL_ERROR);
   }
+
+  if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+    // This should never happen since we're allocating the temporary buffer
+    // with YUV420 layout above.
+    ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
+          gBuffer->getPixelFormat());
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
+  if (yCbCrLock.getStatus() != OK) {
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  std::vector<uint8_t> app1ExifData =
+      createExif(Resolution(stream->width, stream->height),
+                 createThumbnail(requestSettings.thumbnailResolution,
+                                 requestSettings.thumbnailJpegQuality));
+  std::optional<size_t> compressedSize = compressJpeg(
+      gBuffer->getWidth(), gBuffer->getHeight(), requestSettings.jpegQuality,
+      *yCbCrLock, app1ExifData, stream->bufferSize - sizeof(CameraBlob),
+      (*planesLock).planes[0].data);
 
   if (!compressedSize.has_value()) {
     ALOGE("%s: Failed to compress JPEG image", __func__);
