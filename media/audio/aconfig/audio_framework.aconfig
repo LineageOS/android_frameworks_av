@@ -23,6 +23,7 @@ flag {
 
 flag {
     name: "feature_spatial_audio_headtracking_low_latency"
+    is_exported: true
     namespace: "media_audio"
     description: "Define feature for low latency headtracking for SA"
     bug: "324291076"
@@ -30,6 +31,7 @@ flag {
 
 flag {
     name: "focus_exclusive_with_recording"
+    is_exported: true
     namespace: "media_audio"
     description:
         "Audio focus GAIN_TRANSIENT_EXCLUSIVE only mutes"
@@ -39,6 +41,7 @@ flag {
 
 flag {
     name: "foreground_audio_control"
+    is_exported: true
     namespace: "media_audio"
     description:
         "Audio focus gain requires FGS or delegation to "
@@ -49,6 +52,7 @@ flag {
 # TODO remove
 flag {
     name: "focus_freeze_test_api"
+    is_exported: true
     namespace: "media_audio"
     description: "\
  AudioManager audio focus test APIs:\
@@ -62,6 +66,7 @@ flag {
 
 flag {
     name: "loudness_configurator_api"
+    is_exported: true
     namespace: "media_audio"
     description: "\
 Enable the API for providing loudness metadata and CTA-2075 \
@@ -79,6 +84,7 @@ flag {
 
 flag {
     name: "sco_managed_by_audio"
+    is_exported: true
     namespace: "media_audio"
     description: "\
 Enable new implementation of headset profile device connection and\
@@ -88,6 +94,7 @@ SCO audio activation."
 
 flag {
     name: "supported_device_types_api"
+    is_exported: true
     namespace: "media_audio"
     description: "Surface new API method AudioManager.getSupportedDeviceTypes()"
     bug: "307537538"
