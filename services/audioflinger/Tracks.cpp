@@ -1233,7 +1233,7 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
                 && (state == IDLE || state == STOPPED || state == FLUSHED)) {
             mFrameMap.reset();
 
-            if (!isFastTrack() && (isDirect() || isOffloaded())) {
+            if (!isFastTrack()) {
                 // Start point of track -> sink frame map. If the HAL returns a
                 // frame position smaller than the first written frame in
                 // updateTrackFrameInfo, the timestamp can be interpolated
