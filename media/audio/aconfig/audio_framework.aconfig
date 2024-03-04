@@ -1,0 +1,15 @@
+# Top level framework (android.media) flags
+# Only add flags here which must be included in framework.jar
+#
+# Please add flags in alphabetical order.
+
+package: "android.media.audio"
+
+flag {
+    name: "sco_managed_by_audio"
+    namespace: "media_audio"
+    description: "\
+Enable new implementation of headset profile device connection and\
+SCO audio activation."
+    bug: "265057196"
+}

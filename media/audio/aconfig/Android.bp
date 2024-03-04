@@ -1,0 +1,37 @@
+// media_audio namespace flags
+
+cc_defaults {
+    name: "audio-aconfig-cc-defaults",
+    host_supported: true,
+}
+
+// Framework available flags to follow
+// Care must be taken to avoid namespace conflicts.
+// These flags are accessible outside of the platform! Limit usage to @FlaggedApi wherever possible
+
+aconfig_declarations {
+    name: "android.media.audio-aconfig",
+    package: "android.media.audio",
+    container: "system",
+    srcs: ["audio_framework.aconfig"],
+    visibility: ["//frameworks/base/api"],
+}
+
+java_aconfig_library {
+    name: "android.media.audio-aconfig-java",
+    aconfig_declarations: "android.media.audio-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "android.media.audio-aconfig-cc",
+    aconfig_declarations: "android.media.audio-aconfig",
+    defaults: ["audio-aconfig-cc-defaults"],
+}
+
+aconfig_declarations_group {
+    name: "audio-framework-aconfig",
+    java_aconfig_libraries: [
+        "android.media.audio-aconfig-java",
+    ],
+}
