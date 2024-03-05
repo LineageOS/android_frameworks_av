@@ -20,6 +20,7 @@
 
 #include <strings.h>
 
+#include <com_android_media_codec_flags.h>
 #include <android_media_codec.h>
 
 #include <C2Component.h>
@@ -755,7 +756,8 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 addSupportedColorFormats(
                         intf, caps.get(), trait, mediaType, it->second);
 
-                if (android::media::codec::provider_->large_audio_frame_finish()) {
+                if (com::android::media::codec::flags::provider_->large_audio_frame()
+                        && android::media::codec::provider_->large_audio_frame_finish()) {
                     // Adding feature-multiple-frames when C2LargeFrame param is present
                     if (trait.domain == C2Component::DOMAIN_AUDIO) {
                         std::vector<std::shared_ptr<C2ParamDescriptor>> params;
