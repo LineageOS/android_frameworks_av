@@ -1922,9 +1922,10 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     if (mPrimaryHardwareDev == nullptr) {
         return 0;
     }
+    if (mInputBufferSizeOrderedDevs.empty()) {
+        return 0;
+    }
     mHardwareStatus = AUDIO_HW_GET_INPUT_BUFFER_SIZE;
-
-    sp<DeviceHalInterface> dev = mPrimaryHardwareDev.load()->hwDevice();
 
     std::vector<audio_channel_mask_t> channelMasks = {channelMask};
     if (channelMask != AUDIO_CHANNEL_IN_MONO) {
@@ -1955,6 +1956,22 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
 
     mHardwareStatus = AUDIO_HW_IDLE;
 
+    auto getInputBufferSize = [](const sp<DeviceHalInterface>& dev, audio_config_t config,
+                                 size_t* bytes) -> status_t {
+        if (!dev) {
+            return BAD_VALUE;
+        }
+        status_t result = dev->getInputBufferSize(&config, bytes);
+        if (result == BAD_VALUE) {
+            // Retry with the config suggested by the HAL.
+            result = dev->getInputBufferSize(&config, bytes);
+        }
+        if (result != OK || *bytes == 0) {
+            return BAD_VALUE;
+        }
+        return result;
+    };
+
     // Change parameters of the configuration each iteration until we find a
     // configuration that the device will support, or HAL suggests what it supports.
     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
@@ -1966,16 +1983,15 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
                 config.sample_rate = testSampleRate;
 
                 size_t bytes = 0;
-                audio_config_t loopConfig = config;
-                status_t result = dev->getInputBufferSize(&config, &bytes);
-                if (result == BAD_VALUE) {
-                    // Retry with the config suggested by the HAL.
-                    result = dev->getInputBufferSize(&config, &bytes);
+                ret = BAD_VALUE;
+                for (const AudioHwDevice* dev : mInputBufferSizeOrderedDevs) {
+                    ret = getInputBufferSize(dev->hwDevice(), config, &bytes);
+                    if (ret == OK) {
+                        break;
+                    }
                 }
-                if (result != OK || bytes == 0) {
-                    config = loopConfig;
-                    continue;
-                }
+                if (ret == BAD_VALUE) continue;
+
                 if (config.sample_rate != sampleRate || config.channel_mask != channelMask ||
                     config.format != format) {
                     uint32_t dstChannelCount = audio_channel_count_from_in_mask(channelMask);
@@ -2603,10 +2619,41 @@ AudioHwDevice* AudioFlinger::loadHwModule_ll(const char *name)
     }
 
     mAudioHwDevs.add(handle, audioDevice);
+    if (strcmp(name, AUDIO_HARDWARE_MODULE_ID_STUB) != 0) {
+        mInputBufferSizeOrderedDevs.insert(audioDevice);
+    }
 
     ALOGI("loadHwModule() Loaded %s audio interface, handle %d", name, handle);
 
     return audioDevice;
+}
+
+// Sort AudioHwDevice to be traversed in the getInputBufferSize call in the following order:
+// Primary, Usb, Bluetooth, A2DP, other modules, remote submix.
+/* static */
+bool AudioFlinger::inputBufferSizeDevsCmp(const AudioHwDevice* lhs, const AudioHwDevice* rhs) {
+    static const std::map<std::string_view, int> kPriorities = {
+        { AUDIO_HARDWARE_MODULE_ID_PRIMARY, 0 }, { AUDIO_HARDWARE_MODULE_ID_USB, 1 },
+        { AUDIO_HARDWARE_MODULE_ID_BLUETOOTH, 2 }, { AUDIO_HARDWARE_MODULE_ID_A2DP, 3 },
+        { AUDIO_HARDWARE_MODULE_ID_REMOTE_SUBMIX, std::numeric_limits<int>::max() }
+    };
+
+    const std::string_view lhsName = lhs->moduleName();
+    const std::string_view rhsName = rhs->moduleName();
+
+    auto lhsPriority = std::numeric_limits<int>::max() - 1;
+    if (const auto lhsIt = kPriorities.find(lhsName); lhsIt != kPriorities.end()) {
+        lhsPriority = lhsIt->second;
+    }
+    auto rhsPriority = std::numeric_limits<int>::max() - 1;
+    if (const auto rhsIt = kPriorities.find(rhsName); rhsIt != kPriorities.end()) {
+        rhsPriority = rhsIt->second;
+    }
+
+    if (lhsPriority != rhsPriority) {
+        return lhsPriority < rhsPriority;
+    }
+    return lhsName < rhsName;
 }
 
 // ----------------------------------------------------------------------------

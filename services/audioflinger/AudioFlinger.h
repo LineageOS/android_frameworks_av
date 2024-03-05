@@ -629,6 +629,10 @@ private:
     DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*> mAudioHwDevs
             GUARDED_BY(hardwareMutex()) {nullptr /* defValue */};
 
+    static bool inputBufferSizeDevsCmp(const AudioHwDevice* lhs, const AudioHwDevice* rhs);
+    std::set<AudioHwDevice*, decltype(&inputBufferSizeDevsCmp)>
+            mInputBufferSizeOrderedDevs GUARDED_BY(hardwareMutex()) {inputBufferSizeDevsCmp};
+
      const sp<DevicesFactoryHalInterface> mDevicesFactoryHal =
              DevicesFactoryHalInterface::create();
      /* const */ sp<DevicesFactoryHalCallback> mDevicesFactoryHalCallback;  // set onFirstRef().
