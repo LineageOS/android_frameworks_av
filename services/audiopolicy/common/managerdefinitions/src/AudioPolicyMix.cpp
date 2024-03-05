@@ -30,7 +30,7 @@
 #include <AudioOutputDescriptor.h>
 #include <android_media_audiopolicy.h>
 
-namespace audio_flags = android::media::audiopolicy;
+namespace audiopolicy_flags = android::media::audiopolicy;
 
 namespace android {
 namespace {
@@ -193,7 +193,7 @@ status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
                     mix.mDeviceType, mix.mDeviceAddress.c_str());
             return BAD_VALUE;
         }
-        if (audio_flags::audio_mix_ownership()) {
+        if (audiopolicy_flags::audio_mix_ownership()) {
             if (mix.mToken == registeredMix->mToken) {
                 ALOGE("registerMix(): same mix already registered - skipping");
                 return BAD_VALUE;
@@ -221,7 +221,7 @@ status_t AudioPolicyMixCollection::unregisterMix(const AudioMix& mix)
 {
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioPolicyMix>& registeredMix = itemAt(i);
-        if (audio_flags::audio_mix_ownership()) {
+        if (audiopolicy_flags::audio_mix_ownership()) {
             if (mix.mToken == registeredMix->mToken) {
                 ALOGD("unregisterMix(): removing mix for dev=0x%x addr=%s",
                       mix.mDeviceType, mix.mDeviceAddress.c_str());
