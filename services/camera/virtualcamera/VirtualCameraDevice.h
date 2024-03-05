@@ -24,6 +24,7 @@
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/device/BnCameraDevice.h"
+#include "system/camera_metadata.h"
 #include "util/Util.h"
 
 namespace android {
@@ -120,6 +121,9 @@ class VirtualCameraDevice
 
   // Default JPEG compression quality.
   static constexpr uint8_t kDefaultJpegQuality = 80;
+
+  static constexpr camera_metadata_enum_android_control_capture_intent_t
+      kDefaultCaptureIntent = ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW;
 
  private:
   std::shared_ptr<VirtualCameraDevice> sharedFromThis();

@@ -148,7 +148,7 @@ CameraMetadata createDefaultRequestSettings(
           .setControlMode(ANDROID_CONTROL_MODE_AUTO)
           .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
           .setControlAeExposureCompensation(0)
-          .setControlAeTargetFpsRange(maxFps, maxFps)
+          .setControlAeTargetFpsRange(FpsRange{maxFps, maxFps})
           .setControlAeAntibandingMode(ANDROID_CONTROL_AE_ANTIBANDING_MODE_AUTO)
           .setControlAePrecaptureTrigger(
               ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
@@ -260,7 +260,10 @@ RequestSettings createSettingsFromMetadata(const CameraMetadata& metadata) {
       .thumbnailResolution =
           getJpegThumbnailSize(metadata).value_or(Resolution(0, 0)),
       .thumbnailJpegQuality = getJpegThumbnailQuality(metadata).value_or(
-          VirtualCameraDevice::kDefaultJpegQuality)};
+          VirtualCameraDevice::kDefaultJpegQuality),
+      .fpsRange = getFpsRange(metadata),
+      .captureIntent = getCaptureIntent(metadata).value_or(
+          ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW)};
 }
 
 }  // namespace

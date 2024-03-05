@@ -124,9 +124,9 @@ bool isSupportedOutputFormat(const PixelFormat pixelFormat) {
          kOutputFormats.end();
 }
 
-std::vector<MetadataBuilder::FpsRange> fpsRangesForInputConfig(
+std::vector<FpsRange> fpsRangesForInputConfig(
     const std::vector<SupportedStreamConfiguration>& configs) {
-  std::set<MetadataBuilder::FpsRange> availableRanges;
+  std::set<FpsRange> availableRanges;
 
   for (const SupportedStreamConfiguration& config : configs) {
     availableRanges.insert({.minFps = kMinFps, .maxFps = config.maxFps});
@@ -141,8 +141,7 @@ std::vector<MetadataBuilder::FpsRange> fpsRangesForInputConfig(
     availableRanges.insert({.minFps = 30, .maxFps = 30});
   }
 
-  return std::vector<MetadataBuilder::FpsRange>(availableRanges.begin(),
-                                                availableRanges.end());
+  return std::vector<FpsRange>(availableRanges.begin(), availableRanges.end());
 }
 
 std::optional<Resolution> getMaxResolution(
@@ -301,14 +300,41 @@ std::optional<CameraMetadata> initCameraCharacteristics(
                                     ANDROID_JPEG_THUMBNAIL_QUALITY,
                                     ANDROID_NOISE_REDUCTION_MODE,
                                     ANDROID_STATISTICS_FACE_DETECT_MODE})
-          .setAvailableResultKeys(
-              {ANDROID_COLOR_CORRECTION_ABERRATION_MODE, ANDROID_CONTROL_AE_MODE,
-               ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER, ANDROID_CONTROL_AF_MODE,
-               ANDROID_CONTROL_AWB_MODE, ANDROID_CONTROL_EFFECT_MODE,
-               ANDROID_CONTROL_MODE, ANDROID_FLASH_MODE, ANDROID_FLASH_STATE,
-               ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES, ANDROID_JPEG_QUALITY,
-               ANDROID_JPEG_THUMBNAIL_QUALITY, ANDROID_LENS_FOCAL_LENGTH,
-               ANDROID_SENSOR_TIMESTAMP, ANDROID_NOISE_REDUCTION_MODE})
+          .setAvailableResultKeys({
+              ANDROID_COLOR_CORRECTION_ABERRATION_MODE,
+              ANDROID_CONTROL_AE_ANTIBANDING_MODE,
+              ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION,
+              ANDROID_CONTROL_AE_LOCK,
+              ANDROID_CONTROL_AE_MODE,
+              ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER,
+              ANDROID_CONTROL_AE_STATE,
+              ANDROID_CONTROL_AE_TARGET_FPS_RANGE,
+              ANDROID_CONTROL_AF_MODE,
+              ANDROID_CONTROL_AF_STATE,
+              ANDROID_CONTROL_AF_TRIGGER,
+              ANDROID_CONTROL_AWB_LOCK,
+              ANDROID_CONTROL_AWB_MODE,
+              ANDROID_CONTROL_AWB_STATE,
+              ANDROID_CONTROL_CAPTURE_INTENT,
+              ANDROID_CONTROL_EFFECT_MODE,
+              ANDROID_CONTROL_MODE,
+              ANDROID_CONTROL_SCENE_MODE,
+              ANDROID_CONTROL_VIDEO_STABILIZATION_MODE,
+              ANDROID_STATISTICS_FACE_DETECT_MODE,
+              ANDROID_FLASH_MODE,
+              ANDROID_FLASH_STATE,
+              ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES,
+              ANDROID_JPEG_QUALITY,
+              ANDROID_JPEG_THUMBNAIL_QUALITY,
+              ANDROID_LENS_FOCAL_LENGTH,
+              ANDROID_LENS_OPTICAL_STABILIZATION_MODE,
+              ANDROID_NOISE_REDUCTION_MODE,
+              ANDROID_REQUEST_PIPELINE_DEPTH,
+              ANDROID_SENSOR_TIMESTAMP,
+              ANDROID_STATISTICS_HOT_PIXEL_MAP_MODE,
+              ANDROID_STATISTICS_LENS_SHADING_MAP_MODE,
+              ANDROID_STATISTICS_SCENE_FLICKER,
+          })
           .setAvailableCapabilities(
               {ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE});
 
