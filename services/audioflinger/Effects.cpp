@@ -31,6 +31,7 @@
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioEffect.h>
+#include <media/EffectClientAsyncProxy.h>
 #include <media/ShmemCompat.h>
 #include <media/TypeConverter.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -1726,7 +1727,8 @@ EffectHandle::EffectHandle(const sp<IAfEffectBase>& effect,
                                          const sp<media::IEffectClient>& effectClient,
                                          int32_t priority, bool notifyFramesProcessed)
     : BnEffect(),
-    mEffect(effect), mEffectClient(effectClient), mClient(client), mCblk(NULL),
+    mEffect(effect), mEffectClient(media::EffectClientAsyncProxy::makeIfNeeded(effectClient)),
+    mClient(client), mCblk(nullptr),
     mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false),
     mNotifyFramesProcessed(notifyFramesProcessed)
 {
