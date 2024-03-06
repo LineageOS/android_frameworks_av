@@ -32,6 +32,7 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <system/audio_effects/effect_spatializer.h>
 #include <string>
+#include <unordered_set>
 
 #include "SpatializerPoseController.h"
 
@@ -281,6 +282,33 @@ private:
     }
 
     /**
+     * Set a parameter to spatializer engine by calling setParameter on mEngine AudioEffect object.
+     * The variant is for compound parameters with two values of different base types
+     */
+    template<typename P1, typename P2>
+    status_t setEffectParameter_l(uint32_t type, const P1 val1, const P2 val2) REQUIRES(mLock) {
+        static_assert(sizeof(P1) <= sizeof(uint32_t), "The size of P1 must less than 32 bits");
+        static_assert(sizeof(P2) <= sizeof(uint32_t), "The size of P2 must less than 32 bits");
+
+        uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 3];
+        effect_param_t *p = (effect_param_t *)cmd;
+        p->psize = sizeof(uint32_t);
+        p->vsize = 2 * sizeof(uint32_t);
+        *(uint32_t *)p->data = type;
+        *((uint32_t *)p->data + 1) = static_cast<uint32_t>(val1);
+        *((uint32_t *)p->data + 2) = static_cast<uint32_t>(val2);
+
+        status_t status = mEngine->setParameter(p);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        if (p->status != NO_ERROR) {
+            return p->status;
+        }
+        return NO_ERROR;
+    }
+
+    /**
      * Get a parameter from spatializer engine by calling getParameter on AudioEffect object.
      * It is possible to read more than one value of type T according to the parameter type
      * by specifying values vector size.
@@ -312,6 +340,34 @@ private:
         return NO_ERROR;
     }
 
+    /**
+     * Get a parameter from spatializer engine by calling getParameter on AudioEffect object.
+     * The variant is for compound parameters with two values of different base types
+     */
+    template<typename P1, typename P2>
+    status_t getEffectParameter_l(uint32_t type, P1 *val1, P2 *val2) REQUIRES(mLock) {
+        static_assert(sizeof(P1) <= sizeof(uint32_t), "The size of P1 must less than 32 bits");
+        static_assert(sizeof(P2) <= sizeof(uint32_t), "The size of P2 must less than 32 bits");
+
+        uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 3];
+        effect_param_t *p = (effect_param_t *)cmd;
+        p->psize = sizeof(uint32_t);
+        p->vsize = 2 * sizeof(uint32_t);
+        *(uint32_t *)p->data = type;
+
+        status_t status = mEngine->getParameter(p);
+
+        if (status != NO_ERROR) {
+            return status;
+        }
+        if (p->status != NO_ERROR) {
+            return p->status;
+        }
+        *val1 = static_cast<P1>(*((uint32_t *)p->data + 1));
+        *val2 = static_cast<P2>(*((uint32_t *)p->data + 2));
+        return NO_ERROR;
+    }
+
     virtual void onFramesProcessed(int32_t framesProcessed) override;
 
     /**
@@ -338,6 +394,35 @@ private:
      * is disabled.
      */
     void resetEngineHeadPose_l() REQUIRES(mLock);
+
+    /** Read bluetooth.core.le.dsa_transport_preference property and populate the ordered list of
+     * preferred low latency modes in mOrderedLowLatencyModes.
+     */
+    void loadOrderedLowLatencyModes();
+
+    /**
+     * Sort mSupportedLatencyModes list according to the preference order stored in
+     * mOrderedLowLatencyModes.
+     * Note: Because MODE_FREE is not in mOrderedLowLatencyModes, it will always be at
+     * the end of the list.
+     */
+    void sortSupportedLatencyModes_l() REQUIRES(mLock);
+
+    /**
+     * Called after enabling head tracking in the spatializer engine to indicate which
+     * connection mode should be used among those supported. The selection depends on
+     * currently supported latency modes reported by the audio HAL.
+     * When the connection mode is direct to the sensor, the sensor ID is also communicated
+     * to the spatializer engine.
+     */
+    void setEngineHeadtrackingConnectionMode_l() REQUIRES(mLock);
+
+    /**
+     * Select the desired head tracking connection mode for the spatializer engine among the list
+     * stored in mSupportedHeadtrackingConnectionModes at init time.
+     * Also returns the desired low latency mode according to selected connection mode.
+     */
+    audio_latency_mode_t selectHeadtrackingConnectionMode_l() REQUIRES(mLock);
 
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
@@ -398,6 +483,13 @@ private:
     std::vector<media::audio::common::Spatialization::Mode> mSpatializationModes;
     std::vector<audio_channel_mask_t> mChannelMasks;
     bool mSupportsHeadTracking;
+    /** List of supported headtracking connection modes reported by the spatializer.
+     * If the list is empty, the spatializer does not support any optional connection
+     * mode and mode HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED is assumed.
+     */
+    std::unordered_set<headtracking_connection_t> mSupportedHeadtrackingConnectionModes;
+    /** Selected HT connection mode when several modes are supported by the spatializer */
+    headtracking_connection_t mHeadtrackingConnectionMode;
 
     // Looper thread for mEngine callbacks
     class EngineCallbackHandler;
@@ -407,7 +499,10 @@ private:
 
     size_t mNumActiveTracks GUARDED_BY(mLock) = 0;
     std::vector<audio_latency_mode_t> mSupportedLatencyModes GUARDED_BY(mLock);
-
+    /** preference order for low latency modes according to persist.bluetooth.hid.transport */
+    std::vector<audio_latency_mode_t> mOrderedLowLatencyModes;
+    /** string to latency mode map used to parse bluetooth.core.le.dsa_transport_preference */
+    static const std::map<std::string, audio_latency_mode_t> sStringToLatencyModeMap;
     static const std::vector<const char*> sHeadPoseKeys;
 
     // Local log for command messages.

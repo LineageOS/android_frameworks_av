@@ -138,7 +138,53 @@ cc_defaults {
     ],
 }
 
-cc_library_shared {
+cc_defaults {
+    name: "libaudioflinger_dependencies",
+
+    shared_libs: [
+        "audioflinger-aidl-cpp",
+        "audioclient-types-aidl-cpp",
+        "av-types-aidl-cpp",
+        "effect-aidl-cpp",
+        "libaudioclient_aidl_conversion",
+        "libactivitymanager_aidl",
+        "libaudioflinger_datapath",
+        "libaudioflinger_fastpath",
+        "libaudioflinger_timing",
+        "libaudioflinger_utils",
+        "libaudiofoundation",
+        "libaudiohal",
+        "libaudioprocessing",
+        "libaudioutils",
+        "libcutils",
+        "libutils",
+        "liblog",
+        "libbinder",
+        "libbinder_ndk",
+        "libaudioclient",
+        "libaudiomanager",
+        "libmediametrics",
+        "libmediautils",
+        "libnbaio",
+        "libnblog",
+        "libpermission",
+        "libpowermanager",
+        "libmemunreachable",
+        "libmedia_helper",
+        "libshmemcompat",
+        "libsounddose",
+        "libvibrator",
+        "packagemanager_aidl-cpp",
+    ],
+
+    static_libs: [
+        "libmedialogservice",
+        "libaudiospdif",
+    ],
+}
+
+
+cc_library {
     name: "libaudioflinger",
 
     defaults: [
@@ -146,6 +192,7 @@ cc_library_shared {
         "latest_android_hardware_audio_core_sounddose_ndk_export_shared_lib_header",
         "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "latest_android_media_audio_common_types_cpp_shared",
+        "libaudioflinger_dependencies",
     ],
 
     srcs: [
@@ -163,44 +210,6 @@ cc_library_shared {
     include_dirs: [
         "frameworks/av/services/audiopolicy",
         "frameworks/av/services/medialog",
-    ],
-
-    shared_libs: [
-        "audioflinger-aidl-cpp",
-        "audioclient-types-aidl-cpp",
-        "av-types-aidl-cpp",
-        "effect-aidl-cpp",
-        "libaudioclient_aidl_conversion",
-        "libactivitymanager_aidl",
-        "libaudioflinger_datapath",
-        "libaudioflinger_fastpath",
-        "libaudioflinger_timing",
-        "libaudioflinger_utils",
-        "libaudiofoundation",
-        "libaudiohal",
-        "libaudioprocessing",
-        "libaudiospdif",
-        "libaudioutils",
-        "libcutils",
-        "libutils",
-        "liblog",
-        "libbinder",
-        "libbinder_ndk",
-        "libaudioclient",
-        "libaudiomanager",
-        "libmedialogservice",
-        "libmediametrics",
-        "libmediautils",
-        "libnbaio",
-        "libnblog",
-        "libpermission",
-        "libpowermanager",
-        "libmemunreachable",
-        "libmedia_helper",
-        "libshmemcompat",
-        "libsounddose",
-        "libvibrator",
-        "packagemanager_aidl-cpp",
     ],
 
     static_libs: [

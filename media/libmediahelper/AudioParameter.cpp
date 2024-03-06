@@ -75,6 +75,8 @@ const char * const AudioParameter::keyBtA2dpSuspended = AUDIO_PARAMETER_KEY_BT_A
 const char * const AudioParameter::keyReconfigA2dp = AUDIO_PARAMETER_RECONFIG_A2DP;
 const char * const AudioParameter::keyReconfigA2dpSupported = AUDIO_PARAMETER_A2DP_RECONFIG_SUPPORTED;
 const char * const AudioParameter::keyBtLeSuspended = AUDIO_PARAMETER_KEY_BT_LE_SUSPENDED;
+const char * const AudioParameter::keyReconfigLe = AUDIO_PARAMETER_RECONFIG_LE;
+const char * const AudioParameter::keyReconfigLeSupported = AUDIO_PARAMETER_LE_RECONFIG_SUPPORTED;
 // const char * const AudioParameter::keyDeviceSupportedEncapsulationModes =
 //        AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_MODES;
 // const char * const AudioParameter::keyDeviceSupportedEncapsulationMetadataTypes =

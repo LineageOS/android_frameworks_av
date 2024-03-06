@@ -19,21 +19,25 @@
 #include <gtest/gtest.h>
 #include <mediautils/SharedMemoryAllocator.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <utils/Log.h>
 
 using namespace android;
 using namespace android::mediautils;
 
 namespace {
+const size_t kPageSize = getpagesize();
+constexpr size_t kMaxPageSize = 65536;  // arm64 supports 4k, 16k and 64k pages
+
 void validate_block(const AllocationType& block) {
     ASSERT_TRUE(block != nullptr);
-    memset(block->unsecurePointer(), 10, 4096);
+    memset(block->unsecurePointer(), 10, kPageSize);
     EXPECT_EQ(*(static_cast<char*>(block->unsecurePointer()) + 100), static_cast<char>(10));
 }
 
 template <size_t N = 0, bool FatalOwn = true>
 struct ValidateForwarding {
-    static constexpr size_t alignment() { return 1337; }
+    static size_t alignment() { return 1337; }
 
     bool owns(const AllocationType& allocation) const {
         if (allocation == owned) return true;
@@ -48,9 +52,9 @@ struct ValidateForwarding {
 
     static inline size_t deallocate_all_count = 0;
     static inline const AllocationType owned =
-            MemoryHeapBaseAllocator().allocate(BasicAllocRequest{4096});
+            MemoryHeapBaseAllocator().allocate(BasicAllocRequest{kMaxPageSize});
     static inline const AllocationType not_owned =
-            MemoryHeapBaseAllocator().allocate(BasicAllocRequest{4096});
+            MemoryHeapBaseAllocator().allocate(BasicAllocRequest{kMaxPageSize});
     static inline const std::string dump_string = std::to_string(N) + "Test Dump Forwarding";
 };
 
@@ -64,17 +68,14 @@ static_assert(
         shared_allocator_impl::has_deallocate_all<SnoopingAllocator<MemoryHeapBaseAllocator>> ==
         true);
 static_assert(
-        shared_allocator_impl::has_owns<
-                PolicyAllocator<SnoopingAllocator<MemoryHeapBaseAllocator>, SizePolicy<4096>>> ==
-        true);
+        shared_allocator_impl::has_owns<PolicyAllocator<SnoopingAllocator<MemoryHeapBaseAllocator>,
+                                                        SizePolicy<kMaxPageSize>>> == true);
 static_assert(
-        shared_allocator_impl::has_dump<
-                PolicyAllocator<SnoopingAllocator<MemoryHeapBaseAllocator>, SizePolicy<4096>>> ==
-        true);
-static_assert(
-        shared_allocator_impl::has_deallocate_all<
-                PolicyAllocator<SnoopingAllocator<MemoryHeapBaseAllocator>, SizePolicy<4096>>> ==
-        true);
+        shared_allocator_impl::has_dump<PolicyAllocator<SnoopingAllocator<MemoryHeapBaseAllocator>,
+                                                        SizePolicy<kMaxPageSize>>> == true);
+static_assert(shared_allocator_impl::has_deallocate_all<PolicyAllocator<
+                      SnoopingAllocator<MemoryHeapBaseAllocator>, SizePolicy<kMaxPageSize>>> ==
+              true);
 static_assert(shared_allocator_impl::has_owns<
                       FallbackAllocator<SnoopingAllocator<MemoryHeapBaseAllocator>,
                                         SnoopingAllocator<MemoryHeapBaseAllocator>>> == true);
@@ -93,7 +94,7 @@ TEST(shared_memory_allocator_tests, mheapbase_allocator) {
     const auto memory = allocator.allocate(BasicAllocRequest{500});
     ASSERT_TRUE(memory != nullptr);
     const auto fd = dup(memory->getMemory()->getHeapID());
-    EXPECT_EQ(memory->size(), static_cast<unsigned>(4096));
+    EXPECT_EQ(memory->size(), static_cast<unsigned>(kPageSize));
     EXPECT_EQ(memory->size(), memory->getMemory()->getSize());
     validate_block(memory);
     allocator.deallocate(memory);
@@ -108,7 +109,7 @@ TEST(shared_memory_allocator_tests, mheapbase_allocator) {
 }
 
 TEST(shared_memory_allocator_tests, mheapbase_allocator_independence) {
-    static_assert(MemoryHeapBaseAllocator::alignment() == 4096);
+    ASSERT_EQ(MemoryHeapBaseAllocator::alignment(), kPageSize);
     MemoryHeapBaseAllocator allocator;
     const auto first_memory = allocator.allocate(BasicAllocRequest{500});
     const auto second_memory = allocator.allocate(BasicAllocRequest{500});
@@ -120,8 +121,8 @@ TEST(shared_memory_allocator_tests, mheapbase_allocator_independence) {
 }
 
 TEST(shared_memory_allocator_tests, snooping_allocator) {
-    static_assert(SnoopingAllocator<ValidateForwarding<0>>::alignment() ==
-                  ValidateForwarding<0>::alignment());
+    ASSERT_EQ(SnoopingAllocator<ValidateForwarding<0>>::alignment(),
+              ValidateForwarding<0>::alignment());
 
     SnoopingAllocator<MemoryHeapBaseAllocator> allocator{"allocator"};
     const auto first_memory = allocator.allocate(NamedAllocRequest{{500}, "allocate_1"});
@@ -165,29 +166,29 @@ TEST(shared_memory_allocator_tests, snooping_allocator) {
 // TODO generic policy test
 TEST(shared_memory_allocator_tests, size_policy_allocator_enforcement) {
     PolicyAllocator allocator{MemoryHeapBaseAllocator{},
-                              SizePolicy<4096 * 7, 4096 * 2, 4096 * 4>{}};
+                              SizePolicy<kMaxPageSize * 7, kMaxPageSize * 2, kMaxPageSize * 4>{}};
     // Violate max size
-    EXPECT_TRUE(allocator.allocate(BasicAllocRequest{4096 * 5}) == nullptr);
+    EXPECT_TRUE(allocator.allocate(BasicAllocRequest{kMaxPageSize * 5}) == nullptr);
     // Violate min alloc size
-    EXPECT_TRUE(allocator.allocate(BasicAllocRequest{4096}) == nullptr);
-    const auto first_memory = allocator.allocate(BasicAllocRequest{4096 * 4});
+    EXPECT_TRUE(allocator.allocate(BasicAllocRequest{kMaxPageSize}) == nullptr);
+    const auto first_memory = allocator.allocate(BasicAllocRequest{kMaxPageSize * 4});
     validate_block(first_memory);
     // Violate pool size
-    EXPECT_TRUE(allocator.allocate(BasicAllocRequest{4096 * 4}) == nullptr);
-    const auto second_memory = allocator.allocate(BasicAllocRequest{4096 * 3});
+    EXPECT_TRUE(allocator.allocate(BasicAllocRequest{kMaxPageSize * 4}) == nullptr);
+    const auto second_memory = allocator.allocate(BasicAllocRequest{kMaxPageSize * 3});
     validate_block(second_memory);
     allocator.deallocate(second_memory);
     // Check pool size update after deallocation
-    const auto new_second_memory = allocator.allocate(BasicAllocRequest{4096 * 2});
+    const auto new_second_memory = allocator.allocate(BasicAllocRequest{kMaxPageSize * 2});
     validate_block(new_second_memory);
 }
 
 TEST(shared_memory_allocator_tests, indirect_allocator) {
-    static_assert(IndirectAllocator<ValidateForwarding<0>>::alignment() ==
-                  ValidateForwarding<0>::alignment());
+    ASSERT_EQ(IndirectAllocator<ValidateForwarding<0>>::alignment(),
+              ValidateForwarding<0>::alignment());
     const auto allocator_handle = std::make_shared<SnoopingAllocator<MemoryHeapBaseAllocator>>();
     IndirectAllocator allocator{allocator_handle};
-    const auto memory = allocator.allocate(NamedAllocRequest{{4096}, "allocation"});
+    const auto memory = allocator.allocate(NamedAllocRequest{{kPageSize}, "allocation"});
     EXPECT_TRUE(allocator_handle->owns(memory));
     EXPECT_TRUE(allocator_handle->getAllocations().size() == 1);
     allocator.deallocate(memory);
@@ -199,35 +200,37 @@ TEST(shared_memory_allocator_tests, policy_allocator_forwarding) {
     // Test appropriate forwarding of allocator, deallocate
     const auto primary_allocator =
             std::make_shared<SnoopingAllocator<MemoryHeapBaseAllocator>>("allocator");
-    PolicyAllocator allocator{IndirectAllocator(primary_allocator), SizePolicy<4096>{}};
-    const auto memory = allocator.allocate(NamedAllocRequest{{4096}, "allocation"});
+    PolicyAllocator allocator{IndirectAllocator(primary_allocator), SizePolicy<kMaxPageSize>{}};
+    const auto memory = allocator.allocate(NamedAllocRequest{{kPageSize}, "allocation"});
     EXPECT_TRUE(primary_allocator->owns(memory));
     const auto& allocations = primary_allocator->getAllocations();
     EXPECT_TRUE(allocations.size() == 1);
     allocator.deallocate(memory);
     EXPECT_TRUE(allocations.size() == 0);
-    const auto memory2 = allocator.allocate(NamedAllocRequest{{4096}, "allocation_2"});
+    const auto memory2 = allocator.allocate(NamedAllocRequest{{kPageSize}, "allocation_2"});
     EXPECT_TRUE(allocations.size() == 1);
     EXPECT_TRUE(primary_allocator->owns(memory2));
     allocator.deallocate(memory2);
     EXPECT_FALSE(primary_allocator->owns(memory2));
     EXPECT_TRUE(allocations.size() == 0);
     // Test appropriate forwarding of own, dump, alignment, deallocate_all
-    PolicyAllocator allocator2{ValidateForwarding<0>{}, SizePolicy<4096>{}};
+    PolicyAllocator allocator2{ValidateForwarding<0>{}, SizePolicy<kMaxPageSize>{}};
     EXPECT_TRUE(allocator2.owns(ValidateForwarding<0>::owned));
     EXPECT_FALSE(allocator2.owns(ValidateForwarding<0>::not_owned));
     EXPECT_TRUE(allocator2.dump().find(ValidateForwarding<0>::dump_string) != std::string::npos);
-    static_assert(decltype(allocator2)::alignment() == ValidateForwarding<0>::alignment());
+    ASSERT_EQ(decltype(allocator2)::alignment(), ValidateForwarding<0>::alignment());
     size_t prev = ValidateForwarding<0>::deallocate_all_count;
     allocator2.deallocate_all();
     EXPECT_EQ(ValidateForwarding<0>::deallocate_all_count, prev + 1);
 }
 
 TEST(shared_memory_allocator_tests, snooping_allocator_nullptr) {
-    SnoopingAllocator allocator{PolicyAllocator{MemoryHeapBaseAllocator{}, SizePolicy<4096 * 2>{}}};
-    const auto memory = allocator.allocate(NamedAllocRequest{{3000}, "allocation_1"});
+    SnoopingAllocator allocator{
+            PolicyAllocator{MemoryHeapBaseAllocator{}, SizePolicy<kMaxPageSize * 2>{}}};
+    const auto memory = allocator.allocate(NamedAllocRequest{{kMaxPageSize}, "allocation_1"});
     validate_block(memory);
-    ASSERT_TRUE(allocator.allocate(NamedAllocRequest{{5000}, "allocation_2"}) == nullptr);
+    ASSERT_TRUE(allocator.allocate(NamedAllocRequest{{kMaxPageSize * 3}, "allocation_2"}) ==
+                nullptr);
     const auto& allocations = allocator.getAllocations();
     EXPECT_EQ(allocations.size(), 1ul);
     for (const auto& [key, val] : allocations) {
@@ -240,23 +243,26 @@ TEST(shared_memory_allocator_tests, snooping_allocator_nullptr) {
 TEST(shared_memory_allocator_tests, fallback_allocator) {
     // Construct Fallback Allocator
     const auto primary_allocator = std::make_shared<
-            SnoopingAllocator<PolicyAllocator<MemoryHeapBaseAllocator, SizePolicy<4096>>>>(
-            PolicyAllocator<MemoryHeapBaseAllocator, SizePolicy<4096>>{}, "primary_allocator");
+            SnoopingAllocator<PolicyAllocator<MemoryHeapBaseAllocator, SizePolicy<kMaxPageSize>>>>(
+            PolicyAllocator<MemoryHeapBaseAllocator, SizePolicy<kMaxPageSize>>{},
+            "primary_allocator");
     const auto secondary_allocator =
             std::make_shared<SnoopingAllocator<MemoryHeapBaseAllocator>>("secondary_allocator");
 
     FallbackAllocator fallback_allocator{SnoopingAllocator{IndirectAllocator{primary_allocator}},
                                          SnoopingAllocator{IndirectAllocator{secondary_allocator}}};
-    static_assert(decltype(fallback_allocator)::alignment() == 4096);
+    ASSERT_EQ(decltype(fallback_allocator)::alignment(), kPageSize);
     // Basic Allocation Test
-    const auto memory = fallback_allocator.allocate(NamedAllocRequest{{3000}, "allocation_1"});
+    const auto memory =
+            fallback_allocator.allocate(NamedAllocRequest{{kMaxPageSize}, "allocation_1"});
     validate_block(memory);
     // Correct allocator selected
     EXPECT_TRUE(fallback_allocator.owns(memory));
     EXPECT_TRUE(primary_allocator->owns(memory));
     EXPECT_FALSE(secondary_allocator->owns(memory));
     // Test fallback allocation
-    const auto memory2 = fallback_allocator.allocate(NamedAllocRequest{{3000}, "allocation_2"});
+    const auto memory2 =
+            fallback_allocator.allocate(NamedAllocRequest{{kMaxPageSize}, "allocation_2"});
     validate_block(memory2);
     // Correct allocator selected
     EXPECT_TRUE(fallback_allocator.owns(memory2));
@@ -276,7 +282,8 @@ TEST(shared_memory_allocator_tests, fallback_allocator) {
     EXPECT_TRUE(primary_allocator->getAllocations().size() == 0ul);
     EXPECT_TRUE(secondary_allocator->getAllocations().size() == 1ul);
     // Appropriate fallback after deallocation
-    const auto memory3 = fallback_allocator.allocate(NamedAllocRequest{{3000}, "allocation_3"});
+    const auto memory3 =
+            fallback_allocator.allocate(NamedAllocRequest{{kMaxPageSize}, "allocation_3"});
     EXPECT_TRUE(fallback_allocator.owns(memory3));
     EXPECT_TRUE(primary_allocator->owns(memory3));
     EXPECT_FALSE(secondary_allocator->owns(memory3));
@@ -285,7 +292,8 @@ TEST(shared_memory_allocator_tests, fallback_allocator) {
     EXPECT_TRUE(secondary_allocator->getAllocations().size() == 1ul);
     fallback_allocator.deallocate(memory2);
     EXPECT_TRUE(secondary_allocator->getAllocations().size() == 0ul);
-    const auto memory4 = fallback_allocator.allocate(NamedAllocRequest{{3000}, "allocation_4"});
+    const auto memory4 =
+            fallback_allocator.allocate(NamedAllocRequest{{kMaxPageSize}, "allocation_4"});
     EXPECT_TRUE(fallback_allocator.owns(memory4));
     EXPECT_FALSE(primary_allocator->owns(memory4));
     EXPECT_TRUE(secondary_allocator->owns(memory4));
@@ -311,7 +319,7 @@ TEST(shared_memory_allocator_tests, fallback_allocator_forwarding) {
     EXPECT_FALSE(forward_test.owns(Alloc1::not_owned));
     EXPECT_FALSE(forward_test.owns(Alloc2::not_owned));
     // Test alignment forwarding
-    static_assert(FallbackAllocator<Alloc1, Alloc2>::alignment() == Alloc1::alignment());
+    ASSERT_EQ(decltype(forward_test)::alignment(), Alloc1::alignment());
     // Test deallocate_all forwarding
     size_t prev1 = Alloc1::deallocate_all_count;
     size_t prev2 = Alloc2::deallocate_all_count;
@@ -343,8 +351,8 @@ TEST(shared_memory_allocator_tests, scoped_allocator) {
     }
     EXPECT_EQ(allocations.size(), 0ul);
     // Test forwarding
-    static_assert(ScopedAllocator<ValidateForwarding<0>>::alignment() ==
-                  ValidateForwarding<0>::alignment());
+    ASSERT_EQ(ScopedAllocator<ValidateForwarding<0>>::alignment(),
+              ValidateForwarding<0>::alignment());
     ScopedAllocator<ValidateForwarding<0>> forwarding{};
     EXPECT_EQ(forwarding.dump(), ValidateForwarding<0>::dump_string);
 }

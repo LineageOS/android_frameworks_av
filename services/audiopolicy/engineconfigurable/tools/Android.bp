@@ -99,6 +99,7 @@ genrule_defaults {
         ":audio_policy_engine_criteria",
         // ":audio_policy_engine_criterion_types",
         // ":edd_files",
+        ":parameter_frameworks_configuration_schemas",
     ],
     out: ["PolicyConfigurableDomains.xml"],
 }

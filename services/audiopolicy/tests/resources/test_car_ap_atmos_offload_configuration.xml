@@ -30,6 +30,7 @@
                 <item>bus5_alarm_out</item>
                 <item>bus6_notification_out</item>
                 <item>bus7_system_sound_out</item>
+                <item>bus8_mmap_out</item>
                 <!-- names with _audio_zone_# are used for defined an emulator rear seat audio zone
                     where each number # is the zone id number -->
                 <item>bus100_audio_zone_1</item>
@@ -95,6 +96,11 @@
                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                              samplingRates="48000"
                              channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+                </mixPort>
+                <mixPort name="mixport_bus8_mmap_out" role="source"
+                         flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_MMAP_NOIRQ">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
                 </mixPort>
                 <mixPort name="mixport_bus100_audio_zone_1" role="source">
                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
@@ -213,6 +219,16 @@
                                 stepValueMB="100"/>
                     </gains>
                 </devicePort>
+                <devicePort tagName="bus8_mmap_out" role="sink" type="AUDIO_DEVICE_OUT_BUS"
+                    address="bus8_mmap_out">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                        samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+                    <gains>
+                        <gain name="" mode="AUDIO_GAIN_MODE_JOINT"
+                            minValueMB="-3200" maxValueMB="600" defaultValueMB="0"
+                            stepValueMB="100"/>
+                    </gains>
+                </devicePort>
                 <devicePort tagName="bus100_audio_zone_1" role="sink" type="AUDIO_DEVICE_OUT_BUS"
                         address="bus100_audio_zone_1">
                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
@@ -295,6 +311,8 @@
                         sources="mixport_bus6_notification_out"/>
                 <route type="mix" sink="bus7_system_sound_out"
                         sources="mixport_bus7_system_sound_out"/>
+                <route type="mix" sink="bus8_mmap_out"
+                        sources="mixport_bus8_mmap_out"/>
                 <route type="mix" sink="bus100_audio_zone_1" sources="mixport_bus100_audio_zone_1"/>
                 <route type="mix" sink="bus200_audio_zone_2" sources="mixport_bus200_audio_zone_2"/>
                 <route type="mix" sink="primary input"

@@ -27,7 +27,9 @@
 #include <sys/types.h>
 
 #include <android/content/AttributionSourceState.h>
+#include <android/sysprop/BluetoothProperties.sysprop.h>
 #include <audio_utils/fixedfft.h>
+#include <com_android_media_audio.h>
 #include <cutils/bitops.h>
 #include <hardware/sensors.h>
 #include <media/stagefright/foundation/AHandler.h>
@@ -213,6 +215,38 @@ const std::vector<const char *> Spatializer::sHeadPoseKeys = {
     Spatializer::EngineCallbackHandler::kRotation2Key,
 };
 
+// Mapping table between strings read form property bluetooth.core.le.dsa_transport_preference
+// and low latency modes emums.
+//TODO b/273373363: use AIDL enum when available
+const std::map<std::string, audio_latency_mode_t> Spatializer::sStringToLatencyModeMap = {
+    {"le-acl", AUDIO_LATENCY_MODE_LOW},
+    {"iso-sw", AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_SOFTWARE},
+    {"iso-hw", AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_HARDWARE},
+};
+
+void Spatializer::loadOrderedLowLatencyModes() {
+    if (!com::android::media::audio::dsa_over_bt_le_audio()) {
+        return;
+    }
+    auto latencyModesStrs = android::sysprop::BluetoothProperties::dsa_transport_preference();
+    std::lock_guard lock(mLock);
+    // First load preferred low latency modes ordered from the property
+    for (auto str : latencyModesStrs) {
+        if (!str.has_value()) continue;
+        if (auto it = sStringToLatencyModeMap.find(str.value());
+                it != sStringToLatencyModeMap.end()) {
+            mOrderedLowLatencyModes.push_back(it->second);
+        }
+    }
+    // Then add unlisted latency modes at the end of the ordered list
+    for (auto it : sStringToLatencyModeMap) {
+        if (std::find(mOrderedLowLatencyModes.begin(), mOrderedLowLatencyModes.end(), it.second)
+                == mOrderedLowLatencyModes.end()) {
+             mOrderedLowLatencyModes.push_back(it.second);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 sp<Spatializer> Spatializer::create(SpatializerPolicyCallback* callback,
                                     const sp<EffectsFactoryHalInterface>& effectsFactoryHal) {
@@ -244,6 +278,7 @@ sp<Spatializer> Spatializer::create(SpatializerPolicyCallback* callback,
             spatializer.clear();
             ALOGW("%s loadEngine error: %d  effect %p", __func__, status, effect.get());
         } else {
+            spatializer->loadOrderedLowLatencyModes();
             spatializer->mLocalLog.log("%s with effect Id %p", __func__, effect.get());
         }
     }
@@ -369,6 +404,30 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
     if (mChannelMasks.empty()) {
         ALOGW("%s: SPATIALIZER_PARAM_SUPPORTED_CHANNEL_MASKS reports empty", __func__);
         return BAD_VALUE;
+    }
+
+    //TODO b/273373363: use AIDL enum when available
+    if (com::android::media::audio::dsa_over_bt_le_audio()
+            && mSupportsHeadTracking) {
+        mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED;
+        std::vector<uint8_t> headtrackingConnectionModes;
+        status = getHalParameter<true>(effect, SPATIALIZER_PARAM_SUPPORTED_HEADTRACKING_CONNECTION,
+                &headtrackingConnectionModes);
+        if (status == NO_ERROR) {
+            for (const auto htConnectionMode : headtrackingConnectionModes) {
+                if (htConnectionMode < HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED ||
+                        htConnectionMode > HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_TUNNEL) {
+                    ALOGW("%s: ignoring HT connection mode:%d", __func__, (int)htConnectionMode);
+                    continue;
+                }
+                mSupportedHeadtrackingConnectionModes.insert(
+                        static_cast<headtracking_connection_t> (htConnectionMode));
+            }
+            ALOGW_IF(mSupportedHeadtrackingConnectionModes.find(
+                    HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED)
+                        == mSupportedHeadtrackingConnectionModes.end(),
+                    "%s: HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED not reported", __func__);
+        }
     }
 
     // Currently we expose only RELATIVE_WORLD.
@@ -831,6 +890,7 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
             } else {
                 setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
                                      std::vector<HeadTracking::Mode>{spatializerMode});
+                setEngineHeadtrackingConnectionMode_l();
             }
         }
         callback = mHeadTrackingCallback;
@@ -839,6 +899,32 @@ void Spatializer::onActualModeChangeMsg(HeadTrackingMode mode) {
     if (callback != nullptr) {
         callback->onHeadTrackingModeChanged(spatializerMode);
     }
+}
+
+void Spatializer::setEngineHeadtrackingConnectionMode_l() {
+    if (!com::android::media::audio::dsa_over_bt_le_audio()) {
+        return;
+    }
+    if (mActualHeadTrackingMode != HeadTracking::Mode::DISABLED
+            && !mSupportedHeadtrackingConnectionModes.empty()) {
+        setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_CONNECTION,
+                static_cast<uint8_t>(mHeadtrackingConnectionMode),
+                static_cast<uint32_t>(mHeadSensor));
+    }
+}
+
+void Spatializer::sortSupportedLatencyModes_l() {
+    if (!com::android::media::audio::dsa_over_bt_le_audio()) {
+        return;
+    }
+    std::sort(mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
+            [this](audio_latency_mode_t x, audio_latency_mode_t y) {
+                auto itX = std::find(mOrderedLowLatencyModes.begin(),
+                    mOrderedLowLatencyModes.end(), x);
+                auto itY = std::find(mOrderedLowLatencyModes.begin(),
+                    mOrderedLowLatencyModes.end(), y);
+                return itX < itY;
+            });
 }
 
 status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTracks) {
@@ -881,6 +967,7 @@ status_t Spatializer::attachOutput(audio_io_handle_t output, size_t numActiveTra
         status = AudioSystem::getSupportedLatencyModes(mOutput, &latencyModes);
         if (status == OK) {
             mSupportedLatencyModes = latencyModes;
+            sortSupportedLatencyModes_l();
         }
 
         checkEngineState_l();
@@ -950,6 +1037,7 @@ void Spatializer::onSupportedLatencyModesChangedMsg(
             __func__, (int)output, (int)mOutput, modes.size());
     if (output == mOutput) {
         mSupportedLatencyModes = std::move(modes);
+        sortSupportedLatencyModes_l();
         checkSensorsState_l();
     }
 }
@@ -964,26 +1052,75 @@ void Spatializer::updateActiveTracks(size_t numActiveTracks) {
     }
 }
 
+//TODO b/273373363: use AIDL enum when available
+audio_latency_mode_t Spatializer::selectHeadtrackingConnectionMode_l() {
+    if (!com::android::media::audio::dsa_over_bt_le_audio()) {
+        return AUDIO_LATENCY_MODE_LOW;
+    }
+    // mSupportedLatencyModes is ordered according to system preferences loaded in
+    // mOrderedLowLatencyModes
+    mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED;
+    audio_latency_mode_t requestedLatencyMode = mSupportedLatencyModes[0];
+    if (requestedLatencyMode == AUDIO_LATENCY_MODE_DYNAMIC_SPATIAL_AUDIO_HARDWARE) {
+        if (mSupportedHeadtrackingConnectionModes.find(
+                HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_TUNNEL)
+                    != mSupportedHeadtrackingConnectionModes.end()) {
+            mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_TUNNEL;
+        } else if (mSupportedHeadtrackingConnectionModes.find(
+                HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_SW)
+                    != mSupportedHeadtrackingConnectionModes.end()) {
+            mHeadtrackingConnectionMode = HEADTRACKING_CONNECTION_DIRECT_TO_SENSOR_SW;
+        } else {
+            // if the engine does not support direct reading of IMU data, do not allow
+            // DYNAMIC_SPATIAL_AUDIO_HARDWARE mode and fallback to next mode
+            if (mSupportedLatencyModes.size() > 1) {
+                requestedLatencyMode = mSupportedLatencyModes[1];
+            } else {
+                // If only DYNAMIC_SPATIAL_AUDIO_HARDWARE mode is reported by the
+                // HAL and the engine does not support it, assert as this is a
+                // product configuration error
+                LOG_ALWAYS_FATAL("%s: the audio HAL reported only low latency with"
+                        "HW HID tunneling but the spatializer does not support it",
+                        __func__);
+            }
+        }
+    }
+    return requestedLatencyMode;
+}
+
 void Spatializer::checkSensorsState_l() {
     audio_latency_mode_t requestedLatencyMode = AUDIO_LATENCY_MODE_FREE;
     const bool supportsSetLatencyMode = !mSupportedLatencyModes.empty();
-    const bool supportsLowLatencyMode = supportsSetLatencyMode && std::find(
+    bool supportsLowLatencyMode;
+    if (com::android::media::audio::dsa_over_bt_le_audio()) {
+        // mSupportedLatencyModes is ordered with MODE_FREE always at the end:
+        // the first entry is never MODE_FREE if at least one low ltency mode is supported.
+        supportsLowLatencyMode = supportsSetLatencyMode
+                && mSupportedLatencyModes[0] != AUDIO_LATENCY_MODE_FREE;
+    } else {
+        supportsLowLatencyMode = supportsSetLatencyMode && std::find(
             mSupportedLatencyModes.begin(), mSupportedLatencyModes.end(),
             AUDIO_LATENCY_MODE_LOW) != mSupportedLatencyModes.end();
+    }
     if (mSupportsHeadTracking) {
         if (mPoseController != nullptr) {
             // TODO(b/253297301, b/255433067) reenable low latency condition check
             // for Head Tracking after Bluetooth HAL supports it correctly.
             if (mNumActiveTracks > 0 && mLevel != Spatialization::Level::NONE
-                && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
-                && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
+                    && mDesiredHeadTrackingMode != HeadTrackingMode::STATIC
+                    && mHeadSensor != SpatializerPoseController::INVALID_SENSOR) {
+                if (supportsLowLatencyMode) {
+                    requestedLatencyMode = selectHeadtrackingConnectionMode_l();
+                }
                 if (mEngine != nullptr) {
                     setEffectParameter_l(SPATIALIZER_PARAM_HEADTRACKING_MODE,
                             std::vector<HeadTracking::Mode>{mActualHeadTrackingMode});
+                    setEngineHeadtrackingConnectionMode_l();
                 }
+                // TODO: b/307588546: configure mPoseController according to selected
+                // mHeadtrackingConnectionMode
                 mPoseController->setHeadSensor(mHeadSensor);
                 mPoseController->setScreenSensor(mScreenSensor);
-                if (supportsLowLatencyMode) requestedLatencyMode = AUDIO_LATENCY_MODE_LOW;
             } else {
                 mPoseController->setHeadSensor(SpatializerPoseController::INVALID_SENSOR);
                 mPoseController->setScreenSensor(SpatializerPoseController::INVALID_SENSOR);

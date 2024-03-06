@@ -75,7 +75,9 @@ aaudio_result_t AAudioThread::start(Runnable *runnable) {
 
 aaudio_result_t AAudioThread::stop() {
     if (!mHasThread) {
-        ALOGE("stop() but no thread running");
+        // There can be cases that the thread is just created but not started.
+        // Logging as warning to attract attention but not too serious.
+        ALOGW("stop() but no thread running");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 

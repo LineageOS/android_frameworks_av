@@ -154,6 +154,184 @@ Input
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
 
+/* The below code is borrowed from ./test/mp3reader.cpp */
+static bool parseHeader(
+        uint32_t header, size_t *frame_size,
+        uint32_t *out_sampling_rate = NULL, uint32_t *out_channels = NULL ,
+        uint32_t *out_bitrate = NULL, uint32_t *out_num_samples = NULL) {
+    *frame_size = 0;
+
+    if (out_sampling_rate) {
+        *out_sampling_rate = 0;
+    }
+
+    if (out_channels) {
+        *out_channels = 0;
+    }
+
+    if (out_bitrate) {
+        *out_bitrate = 0;
+    }
+
+    if (out_num_samples) {
+        *out_num_samples = 1152;
+    }
+
+    if ((header & 0xffe00000) != 0xffe00000) {
+        return false;
+    }
+
+    unsigned version = (header >> 19) & 3;
+
+    if (version == 0x01) {
+        return false;
+    }
+
+    unsigned layer = (header >> 17) & 3;
+
+    if (layer == 0x00) {
+        return false;
+    }
+
+    unsigned bitrate_index = (header >> 12) & 0x0f;
+
+    if (bitrate_index == 0 || bitrate_index == 0x0f) {
+        // Disallow "free" bitrate.
+        return false;
+    }
+
+    unsigned sampling_rate_index = (header >> 10) & 3;
+
+    if (sampling_rate_index == 3) {
+        return false;
+    }
+
+    static const int kSamplingRateV1[] = { 44100, 48000, 32000 };
+    int sampling_rate = kSamplingRateV1[sampling_rate_index];
+    if (version == 2 /* V2 */) {
+        sampling_rate /= 2;
+    } else if (version == 0 /* V2.5 */) {
+        sampling_rate /= 4;
+    }
+
+    unsigned padding = (header >> 9) & 1;
+
+    if (layer == 3) {
+        // layer I
+
+        static const int kBitrateV1[] = {
+            32, 64, 96, 128, 160, 192, 224, 256,
+            288, 320, 352, 384, 416, 448
+        };
+
+        static const int kBitrateV2[] = {
+            32, 48, 56, 64, 80, 96, 112, 128,
+            144, 160, 176, 192, 224, 256
+        };
+
+        int bitrate =
+            (version == 3 /* V1 */)
+                ? kBitrateV1[bitrate_index - 1]
+                : kBitrateV2[bitrate_index - 1];
+
+        if (out_bitrate) {
+            *out_bitrate = bitrate;
+        }
+
+        *frame_size = (12000 * bitrate / sampling_rate + padding) * 4;
+
+        if (out_num_samples) {
+            *out_num_samples = 384;
+        }
+    } else {
+        // layer II or III
+
+        static const int kBitrateV1L2[] = {
+            32, 48, 56, 64, 80, 96, 112, 128,
+            160, 192, 224, 256, 320, 384
+        };
+
+        static const int kBitrateV1L3[] = {
+            32, 40, 48, 56, 64, 80, 96, 112,
+            128, 160, 192, 224, 256, 320
+        };
+
+        static const int kBitrateV2[] = {
+            8, 16, 24, 32, 40, 48, 56, 64,
+            80, 96, 112, 128, 144, 160
+        };
+
+        int bitrate;
+        if (version == 3 /* V1 */) {
+            bitrate = (layer == 2 /* L2 */)
+                ? kBitrateV1L2[bitrate_index - 1]
+                : kBitrateV1L3[bitrate_index - 1];
+
+            if (out_num_samples) {
+                *out_num_samples = 1152;
+            }
+        } else {
+            // V2 (or 2.5)
+
+            bitrate = kBitrateV2[bitrate_index - 1];
+            if (out_num_samples) {
+                *out_num_samples = (layer == 1 /* L3 */) ? 576 : 1152;
+            }
+        }
+
+        if (out_bitrate) {
+            *out_bitrate = bitrate;
+        }
+
+        if (version == 3 /* V1 */) {
+            *frame_size = 144000 * bitrate / sampling_rate + padding;
+        } else {
+            // V2 or V2.5
+            size_t tmp = (layer == 1 /* L3 */) ? 72000 : 144000;
+            *frame_size = tmp * bitrate / sampling_rate + padding;
+        }
+    }
+
+    if (out_sampling_rate) {
+        *out_sampling_rate = sampling_rate;
+    }
+
+    if (out_channels) {
+        int channel_mode = (header >> 6) & 3;
+
+        *out_channels = (channel_mode == 3) ? 1 : 2;
+    }
+
+    return true;
+}
+
+static uint32_t U32_AT(const uint8_t *ptr) {
+    return ptr[0] << 24 | ptr[1] << 16 | ptr[2] << 8 | ptr[3];
+}
+
+// Check if the input is valid by checking if it contains a sync word
+static bool isInputValid(uint8 *buf, uint32 inSize)
+{
+    // Buffer needs to contain at least 4 bytes which is the size of
+    // the header
+    if (inSize < 4) return false;
+
+    size_t totalInSize = 0;
+    size_t frameSize = 0;
+    while (totalInSize <= (inSize - 4)) {
+        if (!parseHeader(U32_AT(buf + totalInSize), &frameSize)) {
+            return false;
+        }
+        // Buffer needs to be large enough to include complete frame
+        if ((frameSize > inSize) || (totalInSize > (inSize - frameSize))) {
+            return false;
+        }
+        totalInSize += frameSize;
+    }
+
+    return true;
+}
+
 ERROR_CODE pvmp3_framedecoder(tPVMP3DecoderExternal *pExt,
                               void              *pMem)
 {
@@ -169,6 +347,12 @@ ERROR_CODE pvmp3_framedecoder(tPVMP3DecoderExternal *pExt,
 
     mp3Header info_data;
     mp3Header *info = &info_data;
+
+    if (!isInputValid(pExt->pInputBuffer, pExt->inputBufferCurrentLength))
+    {
+        pExt->outputFrameSize = 0;
+        return SYNCH_LOST_ERROR;
+    }
 
     pVars->inputStream.pBuffer  = pExt->pInputBuffer;
 

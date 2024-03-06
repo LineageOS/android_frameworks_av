@@ -157,16 +157,6 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         return res;
     }
 
-    /** Start watchdog thread */
-    mCameraServiceWatchdog = new CameraServiceWatchdog(TClientBase::mCameraIdStr,
-            mCameraServiceProxyWrapper);
-    res = mCameraServiceWatchdog->run("Camera2ClientBaseWatchdog");
-    if (res != OK) {
-        ALOGE("%s: Unable to start camera service watchdog thread: %s (%d)",
-                __FUNCTION__, strerror(-res), res);
-        return res;
-    }
-
     return OK;
 }
 
@@ -177,11 +167,6 @@ Camera2ClientBase<TClientBase>::~Camera2ClientBase() {
     TClientBase::mDestructionStarted = true;
 
     disconnect();
-
-    if (mCameraServiceWatchdog != NULL) {
-        mCameraServiceWatchdog->requestExit();
-        mCameraServiceWatchdog.clear();
-    }
 
     ALOGI("%s: Client object's dtor for Camera Id %s completed. Client was: %s (PID %d, UID %u)",
             __FUNCTION__, TClientBase::mCameraIdStr.c_str(),
@@ -268,17 +253,7 @@ status_t Camera2ClientBase<TClientBase>::dumpDevice(
 
 template <typename TClientBase>
 binder::Status Camera2ClientBase<TClientBase>::disconnect() {
-    if (mCameraServiceWatchdog != nullptr && mDevice != nullptr) {
-        // Timer for the disconnect call should be greater than getExpectedInFlightDuration
-        // since this duration is used to error handle methods in the disconnect sequence
-        // thus allowing existing error handling methods to execute first
-        uint64_t maxExpectedDuration =
-                ns2ms(mDevice->getExpectedInFlightDuration() + kBufferTimeDisconnectNs);
 
-        // Initialization from hal succeeded, time disconnect.
-        return mCameraServiceWatchdog->WATCH_CUSTOM_TIMER(disconnectImpl(),
-                maxExpectedDuration / kCycleLengthMs, kCycleLengthMs);
-    }
     return disconnectImpl();
 }
 
@@ -403,7 +378,8 @@ template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::vector<hardware::CameraStreamStats>& streamStats,
-        const std::string& userTag, int videoStabilizationMode) {
+        const std::string& userTag, int videoStabilizationMode, bool usedUltraWide,
+        bool usedZoomOverride) {
     if (mDeviceActive) {
         status_t res = TClientBase::finishCameraStreamingOps();
         if (res != OK) {
@@ -412,7 +388,7 @@ void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         }
         mCameraServiceProxyWrapper->logIdle(TClientBase::mCameraIdStr,
                 requestCount, resultErrorCount, deviceError, userTag, videoStabilizationMode,
-                streamStats);
+                usedUltraWide, usedZoomOverride, streamStats);
     }
     mDeviceActive = false;
 
@@ -531,6 +507,12 @@ status_t Camera2ClientBase<TClientBase>::injectCamera(const std::string& injecte
 template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::stopInjection() {
     return mDevice->stopInjection();
+}
+
+template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::injectSessionParams(
+    const CameraMetadata& sessionParams) {
+    return mDevice->injectSessionParams(sessionParams);
 }
 
 template class Camera2ClientBase<CameraService::Client>;

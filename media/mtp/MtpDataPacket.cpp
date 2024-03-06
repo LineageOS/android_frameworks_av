@@ -73,14 +73,14 @@ void MtpDataPacket::setTransactionID(MtpTransactionID id) {
 }
 
 bool MtpDataPacket::getUInt8(uint8_t& value) {
-    if (mPacketSize - mOffset < sizeof(value))
+    if ((mPacketSize - mOffset < sizeof(value)) || (mOffset >= mBufferSize))
         return false;
     value = mBuffer[mOffset++];
     return true;
 }
 
 bool MtpDataPacket::getUInt16(uint16_t& value) {
-    if (mPacketSize - mOffset < sizeof(value))
+    if ((mPacketSize - mOffset < sizeof(value)) || ((mOffset+1) >= mBufferSize))
         return false;
     int offset = mOffset;
     value = (uint16_t)mBuffer[offset] | ((uint16_t)mBuffer[offset + 1] << 8);
@@ -89,7 +89,7 @@ bool MtpDataPacket::getUInt16(uint16_t& value) {
 }
 
 bool MtpDataPacket::getUInt32(uint32_t& value) {
-    if (mPacketSize - mOffset < sizeof(value))
+    if ((mPacketSize - mOffset < sizeof(value)) || ((mOffset+3) >= mBufferSize))
         return false;
     int offset = mOffset;
     value = (uint32_t)mBuffer[offset] | ((uint32_t)mBuffer[offset + 1] << 8) |
@@ -99,7 +99,7 @@ bool MtpDataPacket::getUInt32(uint32_t& value) {
 }
 
 bool MtpDataPacket::getUInt64(uint64_t& value) {
-    if (mPacketSize - mOffset < sizeof(value))
+    if ((mPacketSize - mOffset < sizeof(value)) || ((mOffset+7) >= mBufferSize))
         return false;
     int offset = mOffset;
     value = (uint64_t)mBuffer[offset] | ((uint64_t)mBuffer[offset + 1] << 8) |
@@ -420,11 +420,16 @@ void MtpDataPacket::putString(const MtpStringBuffer& string) {
 }
 
 void MtpDataPacket::putString(const char* s) {
-    MtpStringBuffer string(s);
-    string.writeToPacket(this);
+    if (s != NULL) {
+        MtpStringBuffer string(s);
+        string.writeToPacket(this);
+    }
 }
 
 void MtpDataPacket::putString(const uint16_t* string) {
+    if (string == NULL) {
+        return;
+    }
     int count = 0;
     for (int i = 0; i <= MTP_STRING_MAX_CHARACTER_NUMBER; i++) {
         if (string[i])

@@ -60,18 +60,37 @@ void DeviceEffectManager::onCreateAudioPatch(audio_patch_handle_t handle,
             __func__, handle, patch.mHalHandle,
             patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
     audio_utils::lock_guard _l(mutex());
-    for (auto& effect : mDeviceEffects) {
-        status_t status = effect.second->onCreatePatch(handle, patch);
-        ALOGV("%s Effect onCreatePatch status %d", __func__, status);
-        ALOGW_IF(status == BAD_VALUE, "%s onCreatePatch error %d", __func__, status);
+    for (auto& effectProxies : mDeviceEffects) {
+        for (auto& effect : effectProxies.second) {
+            const status_t status = effect->onCreatePatch(handle, patch);
+            ALOGV("%s Effect onCreatePatch status %d", __func__, status);
+            ALOGW_IF(status == BAD_VALUE, "%s onCreatePatch error %d", __func__, status);
+        }
     }
 }
 
 void DeviceEffectManager::onReleaseAudioPatch(audio_patch_handle_t handle) {
     ALOGV("%s", __func__);
     audio_utils::lock_guard _l(mutex());
-    for (auto& effect : mDeviceEffects) {
-        effect.second->onReleasePatch(handle);
+    for (auto& effectProxies : mDeviceEffects) {
+        for (auto& effect : effectProxies.second) {
+            effect->onReleasePatch(handle);
+        }
+    }
+}
+
+void DeviceEffectManager::onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+        audio_patch_handle_t newHandle, const IAfPatchPanel::Patch& patch) {
+    ALOGV("%s oldhandle %d newHandle %d mHalHandle %d device sink %08x",
+            __func__, oldHandle, newHandle, patch.mHalHandle,
+            patch.mAudioPatch.num_sinks > 0 ? patch.mAudioPatch.sinks[0].ext.device.type : 0);
+    audio_utils::lock_guard _l(mutex());
+    for (auto& effectProxies : mDeviceEffects) {
+        for (auto& effect : effectProxies.second) {
+            const status_t status = effect->onUpdatePatch(oldHandle, newHandle, patch);
+            ALOGV("%s Effect onUpdatePatch status %d", __func__, status);
+            ALOGW_IF(status != NO_ERROR, "%s onUpdatePatch error %d", __func__, status);
+        }
     }
 }
 
@@ -87,6 +106,7 @@ sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
         bool probe,
         bool notifyFramesProcessed) {
     sp<IAfDeviceEffectProxy> effect;
+    std::vector<sp<IAfDeviceEffectProxy>> effectsForDevice = {};
     sp<IAfEffectHandle> handle;
     status_t lStatus;
 
@@ -100,12 +120,21 @@ sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
         audio_utils::lock_guard _l(mutex());
         auto iter = mDeviceEffects.find(device);
         if (iter != mDeviceEffects.end()) {
-            effect = iter->second;
-        } else {
+            effectsForDevice = iter->second;
+            for (const auto& iterEffect : effectsForDevice) {
+                if (memcmp(&iterEffect->desc().uuid, &descriptor->uuid, sizeof(effect_uuid_t)) ==
+                    0) {
+                    effect = iterEffect;
+                    break;
+                }
+            }
+        }
+        if (effect == nullptr) {
             effect = IAfDeviceEffectProxy::create(device, mMyCallback,
                     descriptor,
                     mAfDeviceEffectManagerCallback->nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT),
                     notifyFramesProcessed);
+            effectsForDevice.push_back(effect);
         }
         // create effect handle and connect it to effect module
         handle = IAfEffectHandle::create(
@@ -119,7 +148,8 @@ sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
                     lStatus = NO_ERROR;
                 }
                 if (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS) {
-                    mDeviceEffects.emplace(device, effect);
+                    mDeviceEffects.erase(device);
+                    mDeviceEffects.emplace(device, effectsForDevice);
                 }
             }
         }
@@ -187,8 +217,10 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
         String8 outStr;
         outStr.appendFormat("%*sEffect for device %s address %s:\n", 2, "",
                 ::android::toString(iter.first.mType).c_str(), iter.first.getAddress());
-        write(fd, outStr.c_str(), outStr.size());
-        iter.second->dump2(fd, 4);
+        for (const auto& effect : iter.second) {
+            write(fd, outStr.c_str(), outStr.size());
+            effect->dump2(fd, 4);
+        }
     }
 
     if (locked) {
@@ -199,7 +231,20 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
 size_t DeviceEffectManager::removeEffect(const sp<IAfDeviceEffectProxy>& effect)
 {
     audio_utils::lock_guard _l(mutex());
-    mDeviceEffects.erase(effect->device());
+    const auto& iter = mDeviceEffects.find(effect->device());
+    if (iter != mDeviceEffects.end()) {
+        const auto& iterEffect = std::find_if(
+                iter->second.begin(), iter->second.end(), [&effect](const auto& effectProxy) {
+                    return memcmp(&effectProxy->desc().uuid, &effect->desc().uuid,
+                            sizeof(effect_uuid_t)) == 0;
+                });
+        if (iterEffect != iter->second.end()) {
+            iter->second.erase(iterEffect);
+            if (iter->second.empty()) {
+                mDeviceEffects.erase(effect->device());
+            }
+        }
+    }
     return mDeviceEffects.size();
 }
 

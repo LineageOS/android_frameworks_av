@@ -184,6 +184,11 @@ status_t Camera3StreamSplitter::addOutput(size_t surfaceId, const sp<Surface>& o
     return res;
 }
 
+void Camera3StreamSplitter::setHalBufferManager(bool enabled) {
+    Mutex::Autolock lock(mMutex);
+    mUseHalBufManager = enabled;
+}
+
 status_t Camera3StreamSplitter::addOutputLocked(size_t surfaceId, const sp<Surface>& outputQueue) {
     ATRACE_CALL();
     if (outputQueue == nullptr) {

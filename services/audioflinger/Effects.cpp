@@ -514,11 +514,12 @@ NO_THREAD_SAFETY_ANALYSIS // conditional try lock
     if (!locked) {
         result.append("\t\tCould not lock Fx mutex:\n");
     }
-
-    result.append("\t\tSession State Registered Enabled Suspended:\n");
-    result.appendFormat("\t\t%05d   %03d   %s          %s       %s\n",
-            mSessionId, mState, mPolicyRegistered ? "y" : "n",
-            mPolicyEnabled ? "y" : "n", mSuspended ? "y" : "n");
+    bool isInternal = isInternal_l();
+    result.append("\t\tSession State Registered Internal Enabled Suspended:\n");
+    result.appendFormat("\t\t%05d   %03d   %s          %s        %s       %s\n",
+            mSessionId, mState, mPolicyRegistered ? "y" : "n", isInternal ? "y" : "n",
+            ((isInternal && isEnabled()) || (!isInternal && mPolicyEnabled)) ? "y" : "n",
+            mSuspended ? "y" : "n");
 
     result.append("\t\tDescriptor:\n");
     char uuidStr[64];
@@ -1004,8 +1005,9 @@ status_t EffectModule::configure()
     // mConfig.outputCfg.buffer.frameCount cannot be zero.
     mMaxDisableWaitCnt = (uint32_t)std::max(
             (uint64_t)1, // mMaxDisableWaitCnt must be greater than zero.
-            (uint64_t)MAX_DISABLE_TIME_MS * mConfig.outputCfg.samplingRate
-                / ((uint64_t)1000 * mConfig.outputCfg.buffer.frameCount));
+            (uint64_t)mConfig.outputCfg.buffer.frameCount == 0 ? 1
+                : (MAX_DISABLE_TIME_MS * mConfig.outputCfg.samplingRate
+                / ((uint64_t)1000 * mConfig.outputCfg.buffer.frameCount)));
 
 exit:
     // TODO: consider clearing mConfig on error.
@@ -3323,6 +3325,23 @@ status_t DeviceEffectProxy::init(
     return status;
 }
 
+status_t DeviceEffectProxy::onUpdatePatch(audio_patch_handle_t oldPatchHandle,
+        audio_patch_handle_t newPatchHandle,
+        const IAfPatchPanel::Patch& /* patch */) {
+    status_t status = NAME_NOT_FOUND;
+    ALOGV("%s", __func__);
+    audio_utils::lock_guard _l(proxyMutex());
+    if (mEffectHandles.find(oldPatchHandle) != mEffectHandles.end()) {
+        ALOGV("%s replacing effect from handle %d to handle %d", __func__, oldPatchHandle,
+                newPatchHandle);
+        sp<IAfEffectHandle> effect = mEffectHandles.at(oldPatchHandle);
+        mEffectHandles.erase(oldPatchHandle);
+        mEffectHandles.emplace(newPatchHandle, effect);
+        status = NO_ERROR;
+    }
+    return status;
+}
+
 status_t DeviceEffectProxy::onCreatePatch(
         audio_patch_handle_t patchHandle, const IAfPatchPanel::Patch& patch) {
     status_t status = NAME_NOT_FOUND;
@@ -3336,6 +3355,9 @@ status_t DeviceEffectProxy::onCreatePatch(
     }
     if (status == NO_ERROR || status == ALREADY_EXISTS) {
         audio_utils::lock_guard _l(proxyMutex());
+        size_t erasedHandle = mEffectHandles.erase(patchHandle);
+        ALOGV("%s %s effecthandle %p for patch %d",
+                __func__, (erasedHandle == 0 ? "adding" : "replacing"), handle.get(), patchHandle);
         mEffectHandles.emplace(patchHandle, handle);
     }
     ALOGW_IF(status == BAD_VALUE,
@@ -3371,18 +3393,21 @@ NO_THREAD_SAFETY_ANALYSIS
 
     if (mDescriptor.flags & EFFECT_FLAG_HW_ACC_TUNNEL) {
         audio_utils::lock_guard _l(proxyMutex());
-        mDevicePort = *port;
-        mHalEffect = new EffectModule(mMyCallback,
+        if (mHalEffect != nullptr && mDevicePort.id == port->id) {
+            ALOGV("%s reusing HAL effect", __func__);
+        } else {
+            mDevicePort = *port;
+            mHalEffect = new EffectModule(mMyCallback,
                                       const_cast<effect_descriptor_t *>(&mDescriptor),
                                       mMyCallback->newEffectId(), AUDIO_SESSION_DEVICE,
                                       false /* pinned */, port->id);
-        if (audio_is_input_device(mDevice.mType)) {
-            mHalEffect->setInputDevice(mDevice);
-        } else {
-            mHalEffect->setDevices({mDevice});
+            if (audio_is_input_device(mDevice.mType)) {
+                mHalEffect->setInputDevice(mDevice);
+            } else {
+                mHalEffect->setDevices({mDevice});
+            }
+            mHalEffect->configure();
         }
-        mHalEffect->configure();
-
         *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/,
                                    mNotifyFramesProcessed);
         status = (*handle)->initCheck();
@@ -3468,6 +3493,23 @@ status_t DeviceEffectProxy::removeEffectFromHal(
         return NO_INIT;
     }
     return mManagerCallback->removeEffectFromHal(&mDevicePort, effect);
+}
+
+status_t DeviceEffectProxy::command(
+        int32_t cmdCode, const std::vector<uint8_t>& cmdData, int32_t maxReplySize,
+        std::vector<uint8_t>* reply) {
+    audio_utils::lock_guard _l(proxyMutex());
+    status_t status = EffectBase::command(cmdCode, cmdData, maxReplySize, reply);
+    if (status == NO_ERROR) {
+        for (auto& handle : mEffectHandles) {
+            sp<IAfEffectBase> effect = handle.second->effect().promote();
+            if (effect != nullptr) {
+                status = effect->command(cmdCode, cmdData, maxReplySize, reply);
+            }
+        }
+    }
+    ALOGV("%s status %d", __func__, status);
+    return status;
 }
 
 bool DeviceEffectProxy::isOutput() const {

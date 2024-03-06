@@ -203,12 +203,12 @@ public:
 
 private:
     android::Mutex                          mServiceLock;
-    std::shared_ptr<AAudioServiceInterface> mAdapter;
+    std::shared_ptr<AAudioServiceInterface> mAdapter PT_GUARDED_BY(mServiceLock);
     android::sp<AAudioClient>               mAAudioClient;
 
-    std::shared_ptr<AAudioServiceInterface> getAAudioService();
+    std::shared_ptr<AAudioServiceInterface> getAAudioService() EXCLUDES(mServiceLock);
 
-    void dropAAudioService();
+    void dropAAudioService() EXCLUDES(mServiceLock);
 
 };
 

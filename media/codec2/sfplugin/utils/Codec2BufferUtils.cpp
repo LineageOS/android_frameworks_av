@@ -621,8 +621,8 @@ status_t ConvertRGBToPlanarYUV(
     uint8_t maxLvlChroma =  colorRange == C2Color::RANGE_FULL ? 255 : 240;
 
 #define CLIP3(min,v,max) (((v) < (min)) ? (min) : (((max) > (v)) ? (v) : (max)))
-    for (size_t y = 0; y < src.height(); ++y) {
-        for (size_t x = 0; x < src.width(); ++x) {
+    for (size_t y = 0; y < src.crop().height; ++y) {
+        for (size_t x = 0; x < src.crop().width; ++x) {
             uint8_t r = *pRed;
             uint8_t g = *pGreen;
             uint8_t b = *pBlue;

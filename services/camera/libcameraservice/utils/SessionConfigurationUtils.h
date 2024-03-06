@@ -48,6 +48,17 @@
 namespace android {
 namespace camera3 {
 
+typedef enum camera_request_template {
+    CAMERA_TEMPLATE_PREVIEW = 1,
+    CAMERA_TEMPLATE_STILL_CAPTURE = 2,
+    CAMERA_TEMPLATE_VIDEO_RECORD = 3,
+    CAMERA_TEMPLATE_VIDEO_SNAPSHOT = 4,
+    CAMERA_TEMPLATE_ZERO_SHUTTER_LAG = 5,
+    CAMERA_TEMPLATE_MANUAL = 6,
+    CAMERA_TEMPLATE_COUNT,
+    CAMERA_VENDOR_TEMPLATE_START = 0x40000000
+} camera_request_template_t;
+
 typedef std::function<CameraMetadata (const std::string &, bool overrideForPerfClass)>
         metadataGetter;
 
@@ -144,7 +155,8 @@ convertToHALStreamCombination(
     bool isCompositeJpegRDisabled, metadataGetter getMetadata,
     const std::vector<std::string> &physicalCameraIds,
     aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
-    bool overrideForPerfClass, bool *earlyExit);
+    bool overrideForPerfClass, metadata_vendor_id_t vendorTagId,
+    bool checkSessionParams, bool *earlyExit);
 
 StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
 
@@ -156,6 +168,16 @@ status_t checkAndOverrideSensorPixelModesUsed(
 bool targetPerfClassPrimaryCamera(
         const std::set<std::string>& perfClassPrimaryCameraIds, const std::string& cameraId,
         int32_t targetSdkVersion);
+
+// Utility method that maps AIDL request templates.
+binder::Status mapRequestTemplateFromClient(const std::string& cameraId, int templateId,
+        camera_request_template_t* tempId /*out*/);
+
+status_t mapRequestTemplateToAidl(camera_request_template_t templateId,
+        aidl::android::hardware::camera::device::RequestTemplate* tempId /*out*/);
+
+void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
+        int vendorTagId, CameraMetadata& dst);
 
 constexpr int32_t MAX_SURFACES_PER_STREAM = 4;
 

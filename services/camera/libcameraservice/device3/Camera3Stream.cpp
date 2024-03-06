@@ -772,7 +772,8 @@ status_t Camera3Stream::returnBuffer(const camera_stream_buffer &buffer,
 
     // Buffer status may be changed, so make a copy of the stream_buffer struct.
     camera_stream_buffer b = buffer;
-    if (timestampIncreasing && timestamp != 0 && timestamp <= mLastTimestamp) {
+    if (timestampIncreasing && timestamp != 0 && timestamp <= mLastTimestamp
+            && b.status != CAMERA_BUFFER_STATUS_ERROR) {
         ALOGE("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
                 __FUNCTION__, mId, timestamp, mLastTimestamp);
         b.status = CAMERA_BUFFER_STATUS_ERROR;

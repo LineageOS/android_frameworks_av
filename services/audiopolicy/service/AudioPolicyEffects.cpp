@@ -44,10 +44,7 @@ using content::AttributionSourceState;
 AudioPolicyEffects::AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& effectsFactoryHal) {
     // load xml config with effectsFactoryHal
     status_t loadResult = loadAudioEffectConfig(effectsFactoryHal);
-    if (loadResult == NO_ERROR) {
-        mDefaultDeviceEffectFuture =
-                std::async(std::launch::async, &AudioPolicyEffects::initDefaultDeviceEffects, this);
-    } else if (loadResult < 0) {
+    if (loadResult < 0) {
         ALOGW("Failed to query effect configuration, fallback to load .conf");
         // load automatic audio effect modules
         if (access(AUDIO_EFFECT_VENDOR_CONFIG_FILE, R_OK) == 0) {
@@ -58,6 +55,11 @@ AudioPolicyEffects::AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& eff
     } else if (loadResult > 0) {
         ALOGE("Effect config is partially invalid, skipped %d elements", loadResult);
     }
+}
+
+void AudioPolicyEffects::setDefaultDeviceEffects() {
+    mDefaultDeviceEffectFuture = std::async(
+                std::launch::async, &AudioPolicyEffects::initDefaultDeviceEffects, this);
 }
 
 AudioPolicyEffects::~AudioPolicyEffects()

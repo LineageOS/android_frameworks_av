@@ -30,7 +30,7 @@ namespace android {
 
 bool MelReporter::activateHalSoundDoseComputation(const std::string& module,
         const sp<DeviceHalInterface>& device) {
-    if (mSoundDoseManager->forceUseFrameworkMel()) {
+    if (mSoundDoseManager->isFrameworkMelForced()) {
         ALOGD("%s: Forcing use of internal MEL computation.", __func__);
         activateInternalSoundDoseComputation();
         return false;
@@ -233,7 +233,17 @@ void MelReporter::onReleaseAudioPatch(audio_patch_handle_t handle) {
 
     audio_utils::lock_guard _afl(mAfMelReporterCallback->mutex());  // AudioFlinger_Mutex
     audio_utils::lock_guard _l(mutex());
-    stopMelComputationForPatch_l(melPatch);
+    if (melPatch.csdActive) {
+        // only need to stop if patch was active
+        melPatch.csdActive = false;
+        stopMelComputationForPatch_l(melPatch);
+    }
+}
+
+void MelReporter::onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+        audio_patch_handle_t newHandle, const IAfPatchPanel::Patch& patch) {
+    onReleaseAudioPatch(oldHandle);
+    onCreateAudioPatch(newHandle, patch);
 }
 
 sp<media::ISoundDose> MelReporter::getSoundDoseInterface(
@@ -308,7 +318,7 @@ std::optional<audio_patch_handle_t> MelReporter::activePatchStreamHandle_l(
 }
 
 bool MelReporter::useHalSoundDoseInterface_l() {
-    return !mSoundDoseManager->forceUseFrameworkMel() & mUseHalSoundDoseInterface;
+    return !mSoundDoseManager->isFrameworkMelForced() & mUseHalSoundDoseInterface;
 }
 
 std::string MelReporter::dump() {

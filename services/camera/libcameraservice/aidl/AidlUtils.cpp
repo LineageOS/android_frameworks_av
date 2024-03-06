@@ -73,24 +73,49 @@ int32_t convertFromAidl(SStreamConfigurationMode streamConfigurationMode) {
 
 UOutputConfiguration convertFromAidl(const SOutputConfiguration &src) {
     std::vector<sp<IGraphicBufferProducer>> iGBPs;
-    auto &windowHandles = src.windowHandles;
-    iGBPs.reserve(windowHandles.size());
+    if (!src.surfaces.empty()) {
+        auto& surfaces = src.surfaces;
+        iGBPs.reserve(surfaces.size());
 
-    for (auto &handle : windowHandles) {
-        native_handle_t* nh = makeFromAidl(handle);
-        auto igbp = AImageReader_getHGBPFromHandle(nh);
-        if (igbp == nullptr) {
-            ALOGE("%s: Could not get HGBP from NativeHandle: %s. Skipping.",
-                    __FUNCTION__, handle.toString().c_str());
-            continue;
+        for (auto& sSurface : surfaces) {
+            sp<IGraphicBufferProducer> igbp =
+                    Surface::getIGraphicBufferProducer(sSurface.get());
+            if (igbp == nullptr) {
+                ALOGE("%s: ANativeWindow (%p) not backed by a Surface.",
+                      __FUNCTION__, sSurface.get());
+                continue;
+            }
+            iGBPs.push_back(igbp);
         }
-        iGBPs.push_back(new H2BGraphicBufferProducer(igbp));
-        native_handle_delete(nh);
+    } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        // HIDL token manager (and consequently 'windowHandles') is deprecated and will be removed
+        // in the future. However, cameraservice must still support old NativeHandle pathway until
+        // all vendors have moved away from using NativeHandles
+        auto &windowHandles = src.windowHandles;
+#pragma clang diagnostic pop
+
+        iGBPs.reserve(windowHandles.size());
+
+        for (auto &handle : windowHandles) {
+            native_handle_t* nh = makeFromAidl(handle);
+            auto igbp = AImageReader_getHGBPFromHandle(nh);
+            if (igbp == nullptr) {
+                ALOGE("%s: Could not get HGBP from NativeHandle: %s. Skipping.",
+                        __FUNCTION__, handle.toString().c_str());
+                continue;
+            }
+
+            iGBPs.push_back(new H2BGraphicBufferProducer(igbp));
+            native_handle_delete(nh);
+        }
     }
+
     UOutputConfiguration outputConfiguration(
         iGBPs, convertFromAidl(src.rotation), src.physicalCameraId,
         src.windowGroupId, OutputConfiguration::SURFACE_TYPE_UNKNOWN, 0, 0,
-        (windowHandles.size() > 1));
+        (iGBPs.size() > 1));
     return outputConfiguration;
 }
 

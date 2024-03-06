@@ -175,34 +175,37 @@ void Engine::filterOutputDevicesForStrategy(legacy_strategy strategy,
         //   - cannot route from voice call RX OR
         //   - audio HAL version is < 3.0 and TX device is on the primary HW module
         if (getPhoneState() == AUDIO_MODE_IN_CALL) {
-            audio_devices_t txDevice = AUDIO_DEVICE_NONE;
-            sp<DeviceDescriptor> txDeviceDesc =
-                    getDeviceForInputSource(AUDIO_SOURCE_VOICE_COMMUNICATION);
-            if (txDeviceDesc != nullptr) {
-                txDevice = txDeviceDesc->type();
-            }
             sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
-            LOG_ALWAYS_FATAL_IF(primaryOutput == nullptr, "Primary output not found");
-            DeviceVector availPrimaryInputDevices =
-                    availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle());
+            if (primaryOutput != nullptr) {
+                audio_devices_t txDevice = AUDIO_DEVICE_NONE;
+                sp<DeviceDescriptor> txDeviceDesc =
+                        getDeviceForInputSource(AUDIO_SOURCE_VOICE_COMMUNICATION);
+                if (txDeviceDesc != nullptr) {
+                    txDevice = txDeviceDesc->type();
+                }
+                DeviceVector availPrimaryInputDevices =
+                        availableInputDevices.getDevicesFromHwModule(
+                            primaryOutput->getModuleHandle());
 
-            // TODO: getPrimaryOutput return only devices from first module in
-            // audio_policy_configuration.xml, hearing aid is not there, but it's
-            // a primary device
-            // FIXME: this is not the right way of solving this problem
-            DeviceVector availPrimaryOutputDevices = availableOutputDevices.getDevicesFromTypes(
-                    primaryOutput->supportedDevices().types());
-            availPrimaryOutputDevices.add(
-                    availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID));
+                // TODO: getPrimaryOutput return only devices from first module in
+                // audio_policy_configuration.xml, hearing aid is not there, but it's
+                // a primary device
+                // FIXME: this is not the right way of solving this problem
+                DeviceVector availPrimaryOutputDevices = availableOutputDevices.getDevicesFromTypes(
+                        primaryOutput->supportedDevices().types());
+                availPrimaryOutputDevices.add(
+                        availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID));
 
-            if ((availableInputDevices.getDevice(AUDIO_DEVICE_IN_TELEPHONY_RX,
-                                                 String8(""), AUDIO_FORMAT_DEFAULT) == nullptr) ||
-                ((availPrimaryInputDevices.getDevice(
-                        txDevice, String8(""), AUDIO_FORMAT_DEFAULT) != nullptr) &&
-                 (primaryOutput->getPolicyAudioPort()->getModuleVersionMajor() < 3))) {
-                availableOutputDevices = availPrimaryOutputDevices;
+                if ((availableInputDevices.getDevice(AUDIO_DEVICE_IN_TELEPHONY_RX,
+                                                     String8(""), AUDIO_FORMAT_DEFAULT) == nullptr)
+                    || ((availPrimaryInputDevices.getDevice(
+                            txDevice, String8(""), AUDIO_FORMAT_DEFAULT) != nullptr) &&
+                     (primaryOutput->getPolicyAudioPort()->getModuleVersionMajor() < 3))) {
+                    availableOutputDevices = availPrimaryOutputDevices;
+                }
+            } else {
+                ALOGE("%s, STRATEGY_PHONE: Primary output not found", __func__);
             }
-
         }
         // Do not use A2DP devices when in call but use them when not in call
         // (e.g for voice mail playback)
@@ -597,8 +600,11 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         if ((getPhoneState() == AUDIO_MODE_IN_CALL) &&
                 (availableOutputDevices.getDevice(AUDIO_DEVICE_OUT_TELEPHONY_TX,
                         String8(""), AUDIO_FORMAT_DEFAULT)) == nullptr) {
-            LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
-            availableDevices = availablePrimaryDevices;
+            if (!availablePrimaryDevices.isEmpty()) {
+                availableDevices = availablePrimaryDevices;
+            } else {
+                ALOGE("%s, AUDIO_SOURCE_VOICE_COMMUNICATION: Primary devices not found", __func__);
+            }
         }
 
         if (audio_is_bluetooth_out_sco_device(commDeviceType)) {
@@ -652,8 +658,11 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     case AUDIO_SOURCE_HOTWORD:
         // We should not use primary output criteria for Hotword but rather limit
         // to devices attached to the same HW module as the build in mic
-        LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
-        availableDevices = availablePrimaryDevices;
+        if (!availablePrimaryDevices.isEmpty()) {
+            availableDevices = availablePrimaryDevices;
+        } else {
+            ALOGE("%s, AUDIO_SOURCE_HOTWORD: Primary devices not found", __func__);
+        }
         if (audio_is_bluetooth_out_sco_device(commDeviceType)) {
             device = availableDevices.getDevice(
                     AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
