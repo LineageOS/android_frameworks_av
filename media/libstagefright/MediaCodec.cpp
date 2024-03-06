@@ -3395,9 +3395,6 @@ status_t MediaCodec::queueEncryptedBuffer(
     if (bufferInfos == nullptr || bufferInfos->value.empty()) {
         return BAD_VALUE;
     }
-    if (cryptoInfos == nullptr || cryptoInfos->value.empty()) {
-        return BAD_VALUE;
-    }
     status_t err = OK;
     sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
     msg->setSize("index", index);
@@ -3405,8 +3402,12 @@ status_t MediaCodec::queueEncryptedBuffer(
         new WrapperObject<sp<hardware::HidlMemory>>{buffer}};
     msg->setObject("memory", memory);
     msg->setSize("offset", offset);
-    msg->setSize("ssize", size);
-    msg->setObject("cryptoInfos", cryptoInfos);
+    if (cryptoInfos != nullptr) {
+        msg->setSize("ssize", size);
+        msg->setObject("cryptoInfos", cryptoInfos);
+    } else {
+        msg->setSize("size", size);
+    }
     msg->setObject("accessUnitInfo", bufferInfos);
     if (OK != (err = generateFlagsFromAccessUnitInfo(msg, bufferInfos))) {
         return err;
