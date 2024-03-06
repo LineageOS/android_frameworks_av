@@ -98,7 +98,7 @@ C2Component::kind_t MultiAccessUnitInterface::kind() const {
 
 bool MultiAccessUnitInterface::getDecoderSampleRateAndChannelCount(
         uint32_t * const sampleRate_, uint32_t * const channelCount_) const {
-    if (sampleRate_ == nullptr || sampleRate_ == nullptr) {
+    if (sampleRate_ == nullptr || channelCount_ == nullptr) {
         return false;
     }
     if (mC2ComponentIntf) {
