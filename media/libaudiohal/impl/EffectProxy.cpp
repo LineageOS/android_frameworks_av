@@ -208,6 +208,10 @@ Descriptor::Common EffectProxy::buildDescriptorCommon(
         if (desc.common.flags.volume == Flags::Volume::NONE) {
             common.flags.volume = Flags::Volume::NONE;
         }
+        // set to AUXILIARY if any sub-effect is of AUXILIARY type
+        if (desc.common.flags.type == Flags::Type::AUXILIARY) {
+            common.flags.type = Flags::Type::AUXILIARY;
+        }
     }
 
     // copy type UUID from any of sub-effects, all sub-effects should have same type
