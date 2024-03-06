@@ -1,13 +1,4 @@
 {
-  "postsubmit": [
-    // writerTest fails about 5 out of 66
-    // { "name": "writerTest" },
-
-    { "name": "HEVCUtilsUnitTest" },
-    { "name": "ExtractorFactoryTest" }
-
-  ],
-
   "presubmit-large": [
     {
       "name": "CtsMediaMiscTestCases",
@@ -92,8 +83,16 @@
     }
   ],
   "postsubmit": [
+    // writerTest fails about 5 out of 66
+    // { "name": "writerTest" },
     {
        "name": "BatteryChecker_test"
+    },
+    {
+        "name": "ExtractorFactoryTest"
+    },
+    {
+        "name": "HEVCUtilsUnitTest"
     }
   ]
 }
