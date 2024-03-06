@@ -3509,7 +3509,7 @@ void PlaybackThread::checkSilentMode_l()
             char *endptr;
             unsigned long ul = strtoul(value, &endptr, 0);
             if (*endptr == '\0' && ul != 0) {
-                ALOGD("Silence is golden");
+                ALOGW("%s: mute from ro.audio.silent. Silence is golden", __func__);
                 // The setprop command will not allow a property to be changed after
                 // the first time it is set, so we don't have to worry about un-muting.
                 setMasterMute_l(true);
