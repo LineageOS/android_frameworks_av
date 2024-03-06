@@ -7895,6 +7895,11 @@ void SpatializerThread::setHalLatencyMode_l() {
     if (mSupportedLatencyModes.empty()) {
         return;
     }
+    // Do not update the HAL latency mode if no track is active
+    if (mActiveTracks.isEmpty()) {
+        return;
+    }
+
     audio_latency_mode_t latencyMode = AUDIO_LATENCY_MODE_FREE;
     if (mSupportedLatencyModes.size() == 1) {
         // If the HAL only support one latency mode currently, confirm the choice
