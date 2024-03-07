@@ -1137,7 +1137,7 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
 
         std::optional<Smpte2086> smpte2086;
         status_t status = mapper.getSmpte2086(buffer.get(), &smpte2086);
-        if (status != OK) {
+        if (status != OK || !smpte2086) {
             err = C2_CORRUPTED;
         } else {
             if (smpte2086) {
@@ -1157,7 +1157,7 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
 
         std::optional<Cta861_3> cta861_3;
         status = mapper.getCta861_3(buffer.get(), &cta861_3);
-        if (status != OK) {
+        if (status != OK || !cta861_3) {
             err = C2_CORRUPTED;
         } else {
             if (cta861_3) {
@@ -1176,7 +1176,7 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
         dynamicInfo->reset();
         std::optional<std::vector<uint8_t>> vec;
         status_t status = mapper.getSmpte2094_40(buffer.get(), &vec);
-        if (status != OK) {
+        if (status != OK || !vec) {
             dynamicInfo->reset();
             err = C2_CORRUPTED;
         } else {
