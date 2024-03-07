@@ -626,6 +626,10 @@ status_t OMXNodeInstance::sendCommand(
             // ACodec is waiting for all buffers to be returned, do NOT
             // submit any more buffers to the codec.
             bufferSource->onOmxIdle();
+        } else if (param == OMX_StateExecuting) {
+            // Initiating transition from Idle -> Executing
+            // Start submitting buffers to codec.
+            bufferSource->onOmxExecuting();
         } else if (param == OMX_StateLoaded) {
             // Initiating transition from Idle/Executing -> Loaded
             // Buffers are about to be freed.
@@ -2403,13 +2407,6 @@ void OMXNodeInstance::onEvent(
     CLOGI_(level, onEvent, "%s(%x), %s(%x), %s(%x)",
             asString(event), event, arg1String, arg1, arg2String, arg2);
     const sp<IOMXBufferSource> bufferSource(getBufferSource());
-
-    if (bufferSource != NULL
-            && event == OMX_EventCmdComplete
-            && arg1 == OMX_CommandStateSet
-            && arg2 == OMX_StateExecuting) {
-        bufferSource->onOmxExecuting();
-    }
 
     // allow configuration if we return to the loaded state
     if (event == OMX_EventCmdComplete

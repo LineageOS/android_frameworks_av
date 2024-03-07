@@ -552,8 +552,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffers(
     }
 
     ssize_t result = -1;
-    ssize_t codecDataOffset = 0;
-    size_t inBufferOffset = 0;
+    size_t srcOffset = offset;
     size_t outBufferSize = 0;
     uint32_t cryptoInfoIdx = 0;
     int32_t heapSeqNum = getHeapSeqNum(memory);
@@ -565,18 +564,20 @@ status_t CCodecBufferChannel::attachEncryptedBuffers(
     for (int i = 0; i < bufferInfos->value.size(); i++) {
         if (bufferInfos->value[i].mSize > 0) {
             std::unique_ptr<CodecCryptoInfo> info = std::move(cryptoInfos->value[cryptoInfoIdx++]);
+            src.offset = srcOffset;
+            src.size = bufferInfos->value[i].mSize;
             result = mCrypto->decrypt(
                     (uint8_t*)info->mKey,
                     (uint8_t*)info->mIv,
                     info->mMode,
                     info->mPattern,
                     src,
-                    inBufferOffset,
+                    0,
                     info->mSubSamples,
                     info->mNumSubSamples,
                     dst,
                     errorDetailMsg);
-            inBufferOffset += bufferInfos->value[i].mSize;
+            srcOffset += bufferInfos->value[i].mSize;
             if (result < 0) {
                 ALOGI("[%s] attachEncryptedBuffers: decrypt failed: result = %zd",
                         mName, result);
@@ -599,7 +600,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffers(
         wView.setOffset(0);
     }
     std::shared_ptr<C2Buffer> c2Buffer{C2Buffer::CreateLinearBuffer(
-            block->share(codecDataOffset, outBufferSize - codecDataOffset, C2Fence{}))};
+            block->share(0, outBufferSize, C2Fence{}))};
     if (!buffer->copy(c2Buffer)) {
         ALOGI("[%s] attachEncryptedBuffers: buffer copy failed", mName);
         return -ENOSYS;
@@ -980,8 +981,7 @@ status_t CCodecBufferChannel::queueSecureInputBuffers(
     }
     // size of cryptoInfo and accessUnitInfo should be the same?
     ssize_t result = -1;
-    ssize_t codecDataOffset = 0;
-    size_t inBufferOffset = 0;
+    size_t srcOffset = 0;
     size_t outBufferSize = 0;
     uint32_t cryptoInfoIdx = 0;
     {
@@ -994,6 +994,7 @@ status_t CCodecBufferChannel::queueSecureInputBuffers(
         encryptedBuffer->getMappedBlock(&mappedBlock);
         hardware::drm::V1_0::SharedBuffer source;
         encryptedBuffer->fillSourceBuffer(&source);
+        srcOffset = source.offset;
         for (int i = 0 ; i < bufferInfos->value.size(); i++) {
             if (bufferInfos->value[i].mSize > 0) {
                 std::unique_ptr<CodecCryptoInfo> info =
@@ -1004,18 +1005,20 @@ status_t CCodecBufferChannel::queueSecureInputBuffers(
                     // no data so we only populate the bufferInfo
                     result = 0;
                 } else {
+                    source.offset = srcOffset;
+                    source.size = bufferInfos->value[i].mSize;
                     result = mCrypto->decrypt(
                             (uint8_t*)info->mKey,
                             (uint8_t*)info->mIv,
                             info->mMode,
                             info->mPattern,
                             source,
-                            inBufferOffset,
+                            buffer->offset(),
                             info->mSubSamples,
                             info->mNumSubSamples,
                             destination,
                             errorDetailMsg);
-                    inBufferOffset += bufferInfos->value[i].mSize;
+                    srcOffset += bufferInfos->value[i].mSize;
                     if (result < 0) {
                         ALOGI("[%s] decrypt failed: result=%zd", mName, result);
                         return result;
@@ -1028,7 +1031,7 @@ status_t CCodecBufferChannel::queueSecureInputBuffers(
                 }
             }
         }
-        buffer->setRange(codecDataOffset, outBufferSize - codecDataOffset);
+        buffer->setRange(0, outBufferSize);
     }
     return queueInputBufferInternal(buffer, block, bufferSize);
 }

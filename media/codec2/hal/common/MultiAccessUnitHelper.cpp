@@ -98,7 +98,7 @@ C2Component::kind_t MultiAccessUnitInterface::kind() const {
 
 bool MultiAccessUnitInterface::getDecoderSampleRateAndChannelCount(
         uint32_t * const sampleRate_, uint32_t * const channelCount_) const {
-    if (sampleRate_ == nullptr || sampleRate_ == nullptr) {
+    if (sampleRate_ == nullptr || channelCount_ == nullptr) {
         return false;
     }
     if (mC2ComponentIntf) {
@@ -169,6 +169,7 @@ c2_status_t MultiAccessUnitHelper::error(
         std::list<std::unique_ptr<C2Work>> * const worklist) {
     if (worklist == nullptr) {
         LOG(ERROR) << "Provided null worklist for error()";
+        mFrameHolder.clear();
         return C2_OK;
     }
     std::unique_lock<std::mutex> l(mLock);
@@ -277,6 +278,7 @@ c2_status_t MultiAccessUnitHelper::scatter(
                 LOG(ERROR) << "ERROR: Work has Large frame info but has no linear blocks.";
                 return C2_CORRUPTED;
             }
+            frameInfo.mInputC2Ref = inBuffers;
             const std::vector<C2ConstLinearBlock>& multiAU =
                     inBuffers.front()->data().linearBlocks();
             std::shared_ptr<const C2AccessUnitInfos::input> auInfo =

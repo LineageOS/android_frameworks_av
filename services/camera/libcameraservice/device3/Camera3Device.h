@@ -1060,7 +1060,7 @@ class Camera3Device :
         static const nsecs_t kRequestTimeout = 50e6; // 50 ms
 
         // TODO: does this need to be adjusted for long exposure requests?
-        static const nsecs_t kRequestSubmitTimeout = 200e6; // 200 ms
+        static const nsecs_t kRequestSubmitTimeout = 500e6; // 500 ms
 
         // Used to prepare a batch of requests.
         struct NextRequest {
