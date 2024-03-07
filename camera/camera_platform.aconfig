@@ -133,3 +133,13 @@ flag {
      description: "Enables 10-bit support in the camera extensions."
      bug: "316375635"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "surface_leak_fix"
+     description: "Address Surface release leaks in CaptureRequest"
+     bug: "324071855"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
