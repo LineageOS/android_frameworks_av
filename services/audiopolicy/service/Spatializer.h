@@ -27,6 +27,7 @@
 #include <audio_utils/SimpleLog.h>
 #include <math.h>
 #include <media/AudioEffect.h>
+#include <media/MediaMetricsItem.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/VectorRecorder.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -153,6 +154,34 @@ class Spatializer : public media::BnSpatializer,
         return mLevel;
     }
 
+    /** For test only */
+    std::unordered_set<media::audio::common::HeadTracking::ConnectionMode>
+            getSupportedHeadtrackingConnectionModes() const {
+        return mSupportedHeadtrackingConnectionModes;
+    }
+
+    /** For test only */
+    media::audio::common::HeadTracking::ConnectionMode getHeadtrackingConnectionMode() const {
+        return mHeadtrackingConnectionMode;
+    }
+
+    /** For test only */
+    std::vector<audio_latency_mode_t> getSupportedLatencyModes() const {
+        audio_utils::lock_guard lock(mMutex);
+        return mSupportedLatencyModes;
+    }
+
+    /** For test only */
+    std::vector<audio_latency_mode_t> getOrderedLowLatencyModes() const {
+        return mOrderedLowLatencyModes;
+    }
+
+    /** For test only */
+    audio_latency_mode_t getRequestedLatencyMode() const {
+        audio_utils::lock_guard lock(mMutex);
+        return mRequestedLatencyMode;
+    }
+
     /** Called by audio policy service when the special output mixer dedicated to spatialization
      * is opened and the spatializer engine must be created.
      */
@@ -163,6 +192,12 @@ class Spatializer : public media::BnSpatializer,
     audio_io_handle_t detachOutput();
     /** Returns the output stream the spatializer is attached to. */
     audio_io_handle_t getOutput() const { audio_utils::lock_guard lock(mMutex); return mOutput; }
+
+    /** For test only */
+    void setOutput(audio_io_handle_t output) {
+        audio_utils::lock_guard lock(mMutex);
+        mOutput = output;
+    }
 
     void updateActiveTracks(size_t numActiveTracks);
 
@@ -188,6 +223,10 @@ class Spatializer : public media::BnSpatializer,
     // NO_INIT: Spatializer creation failed.
     static void sendEmptyCreateSpatializerMetricWithStatus(status_t status);
 
+    /** Made public for test only */
+    void onSupportedLatencyModesChangedMsg(
+            audio_io_handle_t output, std::vector<audio_latency_mode_t>&& modes);
+
 private:
     Spatializer(effect_descriptor_t engineDescriptor,
                      SpatializerPolicyCallback *callback);
@@ -200,8 +239,6 @@ private:
 
     void onHeadToStagePoseMsg(const std::vector<float>& headToStage);
     void onActualModeChangeMsg(media::HeadTrackingMode mode);
-    void onSupportedLatencyModesChangedMsg(
-            audio_io_handle_t output, std::vector<audio_latency_mode_t>&& modes);
 
     static constexpr int kMaxEffectParamValues = 10;
     /**
@@ -484,9 +521,11 @@ private:
     std::vector<media::audio::common::Spatialization::Mode> mSpatializationModes;
     std::vector<audio_channel_mask_t> mChannelMasks;
     bool mSupportsHeadTracking;
-    /** List of supported headtracking connection modes reported by the spatializer.
+
+    /** List of supported head tracking connection modes reported by the spatializer.
      * If the list is empty, the spatializer does not support any optional connection
      * mode and mode HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED is assumed.
+     * This is set in the factory constructor and can be accessed without mutex.
      */
     std::unordered_set<media::audio::common::HeadTracking::ConnectionMode>
             mSupportedHeadtrackingConnectionModes;
@@ -504,6 +543,9 @@ private:
     std::vector<audio_latency_mode_t> mSupportedLatencyModes GUARDED_BY(mMutex);
     /** preference order for low latency modes according to persist.bluetooth.hid.transport */
     std::vector<audio_latency_mode_t> mOrderedLowLatencyModes;
+
+    audio_latency_mode_t mRequestedLatencyMode GUARDED_BY(mMutex) = AUDIO_LATENCY_MODE_FREE;
+
     /** string to latency mode map used to parse bluetooth.core.le.dsa_transport_preference */
     static const std::map<std::string, audio_latency_mode_t> sStringToLatencyModeMap;
     static const std::vector<const char*> sHeadPoseKeys;
