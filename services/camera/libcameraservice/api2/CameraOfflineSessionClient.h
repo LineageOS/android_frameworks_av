@@ -47,7 +47,6 @@ public:
             sp<CameraOfflineSessionBase> session,
             const KeyedVector<sp<IBinder>, sp<CompositeStream>>& offlineCompositeStreamMap,
             const sp<ICameraDeviceCallbacks>& remoteCallback,
-            std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
             const std::string& clientPackageName,
             const std::optional<std::string>& clientFeatureId,
             const std::string& cameraIdStr, int cameraFacing, int sensorOrientation,
@@ -55,7 +54,6 @@ public:
             CameraService::BasicClient(
                     cameraService,
                     IInterface::asBinder(remoteCallback),
-                    attributionAndPermissionUtils,
                     // (v)ndk doesn't have offline session support
                     clientPackageName, /*overridePackageName*/false, clientFeatureId,
                     cameraIdStr, cameraFacing, sensorOrientation, clientPid, clientUid, servicePid,
