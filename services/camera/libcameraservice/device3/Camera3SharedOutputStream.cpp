@@ -106,6 +106,13 @@ status_t Camera3SharedOutputStream::attachBufferToSplitterLocked(
     return res;
 }
 
+void Camera3SharedOutputStream::setHalBufferManager(bool enabled) {
+    Mutex::Autolock l(mLock);
+    mUseHalBufManager = enabled;
+    if (mStreamSplitter != nullptr) {
+        mStreamSplitter->setHalBufferManager(enabled);
+    }
+}
 
 status_t Camera3SharedOutputStream::notifyBufferReleased(ANativeWindowBuffer *anwBuffer) {
     Mutex::Autolock l(mLock);

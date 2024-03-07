@@ -112,3 +112,15 @@ filegroup {
     name: "r_submix_audio_policy_configuration",
     srcs: ["r_submix_audio_policy_configuration.xml"],
 }
+filegroup {
+    name: "bluetooth_audio_policy_configuration_7_0",
+    srcs: ["bluetooth_audio_policy_configuration_7_0.xml"],
+}
+filegroup {
+    name: "bluetooth_with_le_audio_policy_configuration_7_0",
+    srcs: ["bluetooth_with_le_audio_policy_configuration_7_0.xml"],
+}
+filegroup {
+    name: "hearing_aid_audio_policy_configuration_7_0",
+    srcs: ["hearing_aid_audio_policy_configuration_7_0.xml"],
+}

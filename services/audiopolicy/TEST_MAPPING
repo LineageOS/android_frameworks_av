@@ -34,5 +34,18 @@
     {
        "name": "audiopolicy_tests"
     }
+  ],
+  "postsubmit": [
+    {
+      "name": "GtsGmscoreHostTestCases",
+      "options" : [
+        {
+          "include-filter": "com.google.android.gts.audio.AudioHostTest"
+        },
+        {
+          "include-filter": "com.google.android.gts.audio.AudioPolicyHostTest"
+        }
+      ]
+    }
   ]
 }

@@ -136,8 +136,8 @@ public:
 
     // used for testing only
     size_t getCachedMelRecordsSize() const;
-    bool forceUseFrameworkMel() const;
-    bool forceComputeCsdOnAllDevices() const;
+    bool isFrameworkMelForced() const;
+    bool isComputeCsdForcedOnAllDevices() const;
 
     /** Method for converting from audio_utils::CsdRecord to media::SoundDoseRecord. */
     static media::SoundDoseRecord csdRecordToSoundDoseRecord(const audio_utils::CsdRecord& legacy);

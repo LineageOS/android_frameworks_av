@@ -48,14 +48,18 @@ constexpr int kRampMSec = 10; // time to apply a change in volume
 
 aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder) {
     aaudio_result_t result = AudioStreamInternal::open(builder);
+    const bool useVolumeRamps = (getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE);
     if (result == AAUDIO_OK) {
         result = mFlowGraph.configure(getFormat(),
                              getSamplesPerFrame(),
+                             getSampleRate(),
                              getDeviceFormat(),
-                             getDeviceChannelCount(),
+                             getDeviceSamplesPerFrame(),
+                             getDeviceSampleRate(),
                              getRequireMonoBlend(),
+                             useVolumeRamps,
                              getAudioBalance(),
-                             (getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE));
+                             aaudio::resampler::MultiChannelResampler::Quality::Medium);
 
         if (result != AAUDIO_OK) {
             safeReleaseClose();
@@ -186,7 +190,7 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     // Sleep if there is too much data in the buffer.
     // Calculate an ideal time to wake up.
     if (wakeTimePtr != nullptr
-            && (mAudioEndpoint->getFullFramesAvailable() >= getBufferSize())) {
+            && (mAudioEndpoint->getFullFramesAvailable() >= getDeviceBufferSize())) {
         // By default wake up a few milliseconds from now.  // TODO review
         int64_t wakeTime = currentNanoTime + (1 * AAUDIO_NANOS_PER_MILLISECOND);
         aaudio_stream_state_t state = getState();
@@ -206,12 +210,12 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
                 // If the appBufferSize is smaller than the endpointBufferSize then
                 // we will have room to write data beyond the appBufferSize.
                 // That is a technique used to reduce glitches without adding latency.
-                const int32_t appBufferSize = getBufferSize();
+                const int64_t appBufferSize = getDeviceBufferSize();
                 // The endpoint buffer size is set to the maximum that can be written.
                 // If we use it then we must carve out some room to write data when we wake up.
-                const int32_t endBufferSize = mAudioEndpoint->getBufferSizeInFrames()
-                        - getFramesPerBurst();
-                const int32_t bestBufferSize = std::min(appBufferSize, endBufferSize);
+                const int64_t endBufferSize = mAudioEndpoint->getBufferSizeInFrames()
+                        - getDeviceFramesPerBurst();
+                const int64_t bestBufferSize = std::min(appBufferSize, endBufferSize);
                 int64_t targetReadPosition = mAudioEndpoint->getDataWriteCounter() - bestBufferSize;
                 wakeTime = mClockModel.convertPositionToTime(targetReadPosition);
             }
@@ -232,37 +236,84 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
                                                             int32_t numFrames) {
     WrappingBuffer wrappingBuffer;
     uint8_t *byteBuffer = (uint8_t *) buffer;
-    int32_t framesLeft = numFrames;
+    int32_t framesLeftInByteBuffer = numFrames;
 
     mAudioEndpoint->getEmptyFramesAvailable(&wrappingBuffer);
 
     // Write data in one or two parts.
     int partIndex = 0;
-    while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
-        int32_t framesToWrite = framesLeft;
-        int32_t framesAvailable = wrappingBuffer.numFrames[partIndex];
-        if (framesAvailable > 0) {
-            if (framesToWrite > framesAvailable) {
-                framesToWrite = framesAvailable;
-            }
+    int framesWrittenToAudioEndpoint = 0;
+    while (framesLeftInByteBuffer > 0 && partIndex < WrappingBuffer::SIZE) {
+        int32_t framesAvailableInWrappingBuffer = wrappingBuffer.numFrames[partIndex];
+        uint8_t *currentWrappingBuffer = (uint8_t *) wrappingBuffer.data[partIndex];
 
-            int32_t numBytes = getBytesPerFrame() * framesToWrite;
+        if (framesAvailableInWrappingBuffer > 0) {
+            // Pull data from the flowgraph in case there is residual data.
+            const int32_t framesActuallyWrittenToWrappingBuffer = mFlowGraph.pull(
+                (void*) currentWrappingBuffer,
+                framesAvailableInWrappingBuffer);
 
-            mFlowGraph.process((void *)byteBuffer,
-                               wrappingBuffer.data[partIndex],
-                               framesToWrite);
-
-            byteBuffer += numBytes;
-            framesLeft -= framesToWrite;
+            const int32_t numBytesActuallyWrittenToWrappingBuffer =
+                framesActuallyWrittenToWrappingBuffer * getBytesPerDeviceFrame();
+            currentWrappingBuffer += numBytesActuallyWrittenToWrappingBuffer;
+            framesAvailableInWrappingBuffer -= framesActuallyWrittenToWrappingBuffer;
+            framesWrittenToAudioEndpoint += framesActuallyWrittenToWrappingBuffer;
         } else {
             break;
         }
+
+        // Put data from byteBuffer into the flowgraph one buffer (8 frames) at a time.
+        // Continuously pull as much data as possible from the flowgraph into the wrapping buffer.
+        // The return value of mFlowGraph.process is the number of frames actually pulled.
+        while (framesAvailableInWrappingBuffer > 0 && framesLeftInByteBuffer > 0) {
+            int32_t framesToWriteFromByteBuffer = std::min(flowgraph::kDefaultBufferSize,
+                    framesLeftInByteBuffer);
+            // If the wrapping buffer is running low, write one frame at a time.
+            if (framesAvailableInWrappingBuffer < flowgraph::kDefaultBufferSize) {
+                framesToWriteFromByteBuffer = 1;
+            }
+
+            const int32_t numBytesToWriteFromByteBuffer = getBytesPerFrame() *
+                    framesToWriteFromByteBuffer;
+
+            //ALOGD("%s() framesLeftInByteBuffer %d, framesAvailableInWrappingBuffer %d"
+            //      "framesToWriteFromByteBuffer %d, numBytesToWriteFromByteBuffer %d"
+            //      , __func__, framesLeftInByteBuffer, framesAvailableInWrappingBuffer,
+            //      framesToWriteFromByteBuffer, numBytesToWriteFromByteBuffer);
+
+            const int32_t framesActuallyWrittenToWrappingBuffer = mFlowGraph.process(
+                    (void *)byteBuffer,
+                    framesToWriteFromByteBuffer,
+                    (void *)currentWrappingBuffer,
+                    framesAvailableInWrappingBuffer);
+
+            byteBuffer += numBytesToWriteFromByteBuffer;
+            framesLeftInByteBuffer -= framesToWriteFromByteBuffer;
+            const int32_t numBytesActuallyWrittenToWrappingBuffer =
+                    framesActuallyWrittenToWrappingBuffer * getBytesPerDeviceFrame();
+            currentWrappingBuffer += numBytesActuallyWrittenToWrappingBuffer;
+            framesAvailableInWrappingBuffer -= framesActuallyWrittenToWrappingBuffer;
+            framesWrittenToAudioEndpoint += framesActuallyWrittenToWrappingBuffer;
+
+            //ALOGD("%s() numBytesActuallyWrittenToWrappingBuffer %d, framesLeftInByteBuffer %d"
+            //      "framesActuallyWrittenToWrappingBuffer %d, numBytesToWriteFromByteBuffer %d"
+            //      "framesWrittenToAudioEndpoint %d"
+            //      , __func__, numBytesActuallyWrittenToWrappingBuffer, framesLeftInByteBuffer,
+            //      framesActuallyWrittenToWrappingBuffer, numBytesToWriteFromByteBuffer,
+            //      framesWrittenToAudioEndpoint);
+        }
         partIndex++;
     }
-    int32_t framesWritten = numFrames - framesLeft;
-    mAudioEndpoint->advanceWriteIndex(framesWritten);
+    //ALOGD("%s() framesWrittenToAudioEndpoint %d, numFrames %d"
+    //              "framesLeftInByteBuffer %d"
+    //              , __func__, framesWrittenToAudioEndpoint, numFrames,
+    //              framesLeftInByteBuffer);
 
-    return framesWritten;
+    // The audio endpoint should reference the number of frames written to the wrapping buffer.
+    mAudioEndpoint->advanceWriteIndex(framesWrittenToAudioEndpoint);
+
+    // The internal code should use the number of frames read from the app.
+    return numFrames - framesLeftInByteBuffer;
 }
 
 int64_t AudioStreamInternalPlay::getFramesRead() {
@@ -278,12 +329,12 @@ int64_t AudioStreamInternalPlay::getFramesRead() {
 
 int64_t AudioStreamInternalPlay::getFramesWritten() {
     if (mAudioEndpoint) {
-        mLastFramesWritten = mAudioEndpoint->getDataWriteCounter()
-                             + mFramesOffsetFromService;
+        mLastFramesWritten = std::max(
+                mLastFramesWritten,
+                mAudioEndpoint->getDataWriteCounter() + mFramesOffsetFromService);
     }
     return mLastFramesWritten;
 }
-
 
 // Render audio in the application callback and then write the data to the stream.
 void *AudioStreamInternalPlay::callbackLoop() {
@@ -303,8 +354,10 @@ void *AudioStreamInternalPlay::callbackLoop() {
             result = write(mCallbackBuffer.get(), mCallbackFrames, timeoutNanos);
             if ((result != mCallbackFrames)) {
                 if (result >= 0) {
-                    // Only wrote some of the frames requested. Must have timed out.
-                    result = AAUDIO_ERROR_TIMEOUT;
+                    // Only wrote some of the frames requested. The stream can be disconnected
+                    // or timed out.
+                    processCommands();
+                    result = isDisconnected() ? AAUDIO_ERROR_DISCONNECTED : AAUDIO_ERROR_TIMEOUT;
                 }
                 maybeCallErrorCallback(result);
                 break;

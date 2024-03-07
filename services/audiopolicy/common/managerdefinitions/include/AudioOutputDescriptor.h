@@ -328,6 +328,13 @@ public:
     wp<AudioPolicyMix> mPolicyMix;  // non NULL when used by a dynamic policy
 
     virtual uint32_t getRecommendedMuteDurationMs() const { return 0; }
+    virtual std::string info() const {
+        std::string result;
+        result.append("[portId:" );
+        result.append(android::internal::ToString(getId()));
+        result.append("]");
+        return result;
+    }
 
 protected:
     const sp<PolicyAudioPort> mPolicyAudioPort;
@@ -470,6 +477,8 @@ public:
     bool isConfigurationMatched(const audio_config_base_t& config, audio_output_flags_t flags);
 
     PortHandleVector getClientsForStream(audio_stream_type_t streamType) const;
+
+    virtual std::string info() const override;
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
     audio_io_handle_t mIoHandle;           // output handle

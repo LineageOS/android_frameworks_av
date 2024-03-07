@@ -647,6 +647,10 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
         setSuspended(true);
         return AAUDIO_ERROR_WOULD_BLOCK;
     } else {
+        if (isSuspended()) {
+            ALOGW("%s(): Queue no longer full. Un-suspending the stream.", __func__);
+            setSuspended(false);
+        }
         return AAUDIO_OK;
     }
 }

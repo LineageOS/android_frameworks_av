@@ -47,6 +47,9 @@ public:
             const std::shared_ptr<C2BlockPool> &pool) override;
 
 private:
+    static constexpr size_t kMaxChannelCount = 6;
+    static constexpr size_t kRemainderBufSize = kMaxChannelCount * sizeof(int16_t);
+
     std::shared_ptr<IntfImpl> mIntf;
 
     HANDLE_AACENCODER mAACEncoder;
@@ -63,7 +66,7 @@ private:
     std::atomic_uint64_t mOutIndex;
 
     // We support max 6 channels
-    uint8_t mRemainder[6 * sizeof(int16_t)];
+    uint8_t mRemainder[kRemainderBufSize];
     size_t mRemainderLen;
 
     status_t initEncoder();

@@ -55,7 +55,7 @@ tidy_errors = [
     "modernize-use-emplace",
     "modernize-use-equals-default",
     "modernize-use-equals-delete",
-    // "modernize-use-nodiscard", // Maybe add this in the future
+    "modernize-use-nodiscard",
     "modernize-use-noexcept",
     "modernize-use-nullptr",
     "modernize-use-override",
@@ -78,12 +78,38 @@ tidy_errors = [
 
 ]
 
+cc_defaults {
+    name: "libaaudioservice_dependencies",
 
-cc_library {
+    shared_libs: [
+        "libaaudio_internal",
+        "libaudioclient",
+        "libaudioutils",
+        "libmedia_helper",
+        "libmediametrics",
+        "libmediautils",
+        "libbase",
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libutils",
+        "aaudio-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libaudioclient_aidl_conversion",
+        "packagemanager_aidl-cpp",
+    ],
+
+    static_libs: [
+        "libaudioflinger",
+    ]
+}
+
+cc_library_static {
 
     name: "libaaudioservice",
 
     defaults: [
+        "libaaudioservice_dependencies",
         "latest_android_media_audio_common_types_cpp_shared",
     ],
 
@@ -114,25 +140,6 @@ cc_library {
         "-Wno-unused-parameter",
         "-Wall",
         "-Werror",
-    ],
-
-    shared_libs: [
-        "libaaudio_internal",
-        "libaudioclient",
-        "libaudioflinger",
-        "libaudioutils",
-        "libmedia_helper",
-        "libmediametrics",
-        "libmediautils",
-        "libbase",
-        "libbinder",
-        "libcutils",
-        "liblog",
-        "libutils",
-        "aaudio-aidl-cpp",
-        "framework-permission-aidl-cpp",
-        "libaudioclient_aidl_conversion",
-        "packagemanager_aidl-cpp",
     ],
 
     export_shared_lib_headers: [

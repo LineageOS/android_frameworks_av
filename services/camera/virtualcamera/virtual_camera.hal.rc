@@ -1,0 +1,11 @@
+service virtual_camera /system/bin/virtual_camera
+    class core
+    user system
+    group system
+    capabilities SYS_NICE
+    rlimit rtprio 10 10
+    task_profiles CameraServiceCapacity CameraServicePerformance
+    interface aidl virtual_camera
+    interface aidl android.hardware.camera.provider.ICameraProvider/virtual/0
+    oneshot
+    disabled

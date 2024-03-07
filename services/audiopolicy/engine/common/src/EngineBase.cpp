@@ -24,6 +24,7 @@
 #include "EngineBase.h"
 #include "EngineDefaultConfig.h"
 #include <TypeConverter.h>
+#include <com_android_media_audio.h>
 
 namespace android {
 namespace audio_policy {
@@ -177,6 +178,24 @@ engineConfig::ParsingResult EngineBase::processParsingResult(
             if (!DeviceCategoryConverter::fromString(configCurve.deviceCategory, deviceCat)) {
                 ALOGE("%s: Invalid %s", __FUNCTION__, configCurve.deviceCategory.c_str());
                 continue;
+            }
+            if (!com::android::media::audio::alarm_min_volume_zero()) {
+                /*
+                 * This special handling is done because the audio_policy_volumes.xml
+                 * is updated but if the flag is disabled, the min alarm volume can
+                 * still be zero because the audio_policy_volumes.xml is the source of
+                 * truth. So the index value is modified here to match the flag setting
+                 */
+                if (volumeConfig.name.compare(audio_stream_type_to_string(AUDIO_STREAM_ALARM)) == 0
+                      && deviceCat == DEVICE_CATEGORY_SPEAKER) {
+                    for (auto &point : configCurve.curvePoints) {
+                        if (point.index == 1) {
+                            ALOGD("Mute alarm disabled: Found point with index 1. setting it to 0");
+                            point.index = 0;
+                            break;
+                        }
+                    }
+                }
             }
             sp<VolumeCurve> curve = new VolumeCurve(deviceCat);
             for (auto &point : configCurve.curvePoints) {

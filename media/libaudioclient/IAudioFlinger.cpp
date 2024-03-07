@@ -116,6 +116,8 @@ IAudioFlinger::CreateTrackOutput::toAidl() const {
             legacy2aidl_audio_channel_mask_t_AudioChannelLayout(afChannelMask, false /*isInput*/));
     aidl.afFormat = VALUE_OR_RETURN(
             legacy2aidl_audio_format_t_AudioFormatDescription(afFormat));
+    aidl.afTrackFlags = VALUE_OR_RETURN(
+            legacy2aidl_audio_output_flags_t_int32_t_mask(afTrackFlags));
     aidl.outputId = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(outputId));
     aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(portId));
     aidl.audioTrack = audioTrack;
@@ -144,6 +146,8 @@ IAudioFlinger::CreateTrackOutput::fromAidl(
                                                                 false /*isInput*/));
     legacy.afFormat = VALUE_OR_RETURN(
             aidl2legacy_AudioFormatDescription_audio_format_t(aidl.afFormat));
+    legacy.afTrackFlags = VALUE_OR_RETURN(
+            aidl2legacy_int32_t_audio_output_flags_t_mask(aidl.afTrackFlags));
     legacy.outputId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_io_handle_t(aidl.outputId));
     legacy.portId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
     legacy.audioTrack = aidl.audioTrack;

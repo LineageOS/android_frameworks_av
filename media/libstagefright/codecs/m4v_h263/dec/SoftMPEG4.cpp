@@ -286,9 +286,11 @@ void SoftMPEG4::onQueueFilled(OMX_U32 /* portIndex */) {
             return;
         }
 
-        // decoder deals in ms, OMX in us.
-        outHeader->nTimeStamp = mPvToOmxTimeMap.valueFor(timestamp);
-        mPvToOmxTimeMap.removeItem(timestamp);
+        if (mPvToOmxTimeMap.indexOfKey(timestamp) >= 0) {
+            // decoder deals in ms, OMX in us.
+            outHeader->nTimeStamp = mPvToOmxTimeMap.valueFor(timestamp);
+            mPvToOmxTimeMap.removeItem(timestamp);
+        }
 
         inHeader->nOffset += bufferSize;
         inHeader->nFilledLen = 0;
@@ -312,8 +314,11 @@ void SoftMPEG4::onQueueFilled(OMX_U32 /* portIndex */) {
         outHeader->nFilledLen = frameSize;
 
         List<BufferInfo *>::iterator it = outQueue.begin();
-        while ((*it)->mHeader != outHeader) {
-            ++it;
+        while (it != outQueue.end() && (*it)->mHeader != outHeader) {
+             ++it;
+        }
+        if (it == outQueue.end()) {
+            return;
         }
 
         BufferInfo *outInfo = *it;

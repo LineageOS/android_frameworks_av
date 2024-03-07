@@ -41,6 +41,7 @@ cc_fuzz {
         "libaudioclient_aidl_conversion",
         "libaudio_aidl_conversion_common_cpp",
         "libutils",
+        "com.android.media.aaudio-aconfig-cc",
     ],
     static_libs: [
         "liblog",

@@ -1003,6 +1003,18 @@ PortHandleVector SwAudioOutputDescriptor::getClientsForStream(
     return clientsForStream;
 }
 
+std::string SwAudioOutputDescriptor::info() const {
+    std::string result;
+    result.append("[" );
+    result.append(AudioOutputDescriptor::info());
+    result.append("[io:" );
+    result.append(android::internal::ToString(mIoHandle));
+    result.append(", " );
+    result.append(isDuplicated() ? "duplicating" : mProfile->getTagName());
+    result.append("]]");
+    return result;
+}
+
 void SwAudioOutputCollection::dump(String8 *dst) const
 {
     dst->appendFormat("\n Outputs (%zu):\n", size());

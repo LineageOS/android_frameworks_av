@@ -25,7 +25,6 @@
 #include <sys/time.h>
 #include <dlfcn.h>
 
-#include <android/content/pm/IPackageManagerNative.h>
 #include <audio_utils/clock.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
@@ -35,6 +34,7 @@
 #include <binder/IResultReceiver.h>
 #include <utils/String16.h>
 #include <utils/threads.h>
+#include "AudioRecordClient.h"
 #include "AudioPolicyService.h"
 #include <hardware_legacy/power.h>
 #include <media/AidlConversion.h>
@@ -121,6 +121,7 @@ BINDER_METHOD_ENTRY(acquireSoundTriggerSession) \
 BINDER_METHOD_ENTRY(releaseSoundTriggerSession) \
 BINDER_METHOD_ENTRY(getPhoneState) \
 BINDER_METHOD_ENTRY(registerPolicyMixes) \
+BINDER_METHOD_ENTRY(updatePolicyMixes) \
 BINDER_METHOD_ENTRY(setUidDeviceAffinities) \
 BINDER_METHOD_ENTRY(removeUidDeviceAffinities) \
 BINDER_METHOD_ENTRY(setUserIdDeviceAffinities) \
@@ -217,27 +218,6 @@ static void destroyAudioPolicyManager(AudioPolicyInterface *interface)
 {
     delete interface;
 }
-
-namespace {
-int getTargetSdkForPackageName(std::string_view packageName) {
-    const auto binder = defaultServiceManager()->checkService(String16{"package_native"});
-    int targetSdk = -1;
-    if (binder != nullptr) {
-        const auto pm = interface_cast<content::pm::IPackageManagerNative>(binder);
-        if (pm != nullptr) {
-            const auto status = pm->getTargetSdkVersionForPackage(
-                    String16{packageName.data(), packageName.size()}, &targetSdk);
-            ALOGI("Capy check package %s, sdk %d", packageName.data(), targetSdk);
-            return status.isOk() ? targetSdk : -1;
-        }
-    }
-    return targetSdk;
-}
-
-bool doesPackageTargetAtLeastU(std::string_view packageName) {
-    return getTargetSdkForPackageName(packageName) >= __ANDROID_API_U__;
-}
-} // anonymous
 // ----------------------------------------------------------------------------
 
 AudioPolicyService::AudioPolicyService()
@@ -319,7 +299,11 @@ void AudioPolicyService::onFirstRef()
         AudioDeviceTypeAddrVector devices;
         bool hasSpatializer = mAudioPolicyManager->canBeSpatialized(&attr, nullptr, devices);
         if (hasSpatializer) {
+            // Unlock as Spatializer::create() will use the callback and acquire the
+            // AudioPolicyService_Mutex.
+            mLock.unlock();
             mSpatializer = Spatializer::create(this, effectsFactoryHal);
+            mLock.lock();
         }
         if (mSpatializer == nullptr) {
             // No spatializer created, signal the reason: NO_INIT a failure, OK means intended.
@@ -328,6 +312,9 @@ void AudioPolicyService::onFirstRef()
         }
     }
     AudioSystem::audioPolicyReady();
+    // AudioFlinger will handle effect creation and register these effects on audio_policy
+    // service. Hence, audio_policy service must be ready.
+    audioPolicyEffects->setDefaultDeviceEffects();
 }
 
 void AudioPolicyService::unloadAudioPolicyManager()
@@ -985,7 +972,8 @@ void AudioPolicyService::updateUidStates_l()
                 }
             }
         }
-        if (current->attributes.source != AUDIO_SOURCE_HOTWORD) {
+        if (current->attributes.source != AUDIO_SOURCE_HOTWORD &&
+                !isVirtualSource(current->attributes.source)) {
             onlyHotwordActive = false;
         }
         if (currentUid == mPhoneStateOwnerUid &&
@@ -1187,20 +1175,6 @@ bool AudioPolicyService::isVirtualSource(audio_source_t source)
     return false;
 }
 
-/* static */
-bool AudioPolicyService::isAppOpSource(audio_source_t source)
-{
-    switch (source) {
-        case AUDIO_SOURCE_FM_TUNER:
-        case AUDIO_SOURCE_ECHO_REFERENCE:
-        case AUDIO_SOURCE_REMOTE_SUBMIX:
-            return false;
-        default:
-            break;
-    }
-    return true;
-}
-
 void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t state)
 {
     AutoCallerClear acc;
@@ -1340,6 +1314,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_isStreamActiveRemotely:
         case TRANSACTION_isSourceActive:
         case TRANSACTION_registerPolicyMixes:
+        case TRANSACTION_updatePolicyMixes:
         case TRANSACTION_setMasterMono:
         case TRANSACTION_getSurroundFormats:
         case TRANSACTION_getReportedSurroundFormats:
@@ -1900,113 +1875,6 @@ binder::Status AudioPolicyService::SensorPrivacyPolicy::onSensorPrivacyChanged(
     }
     return binder::Status::ok();
 }
-
-// -----------  AudioPolicyService::OpRecordAudioMonitor implementation ----------
-
-// static
-sp<AudioPolicyService::OpRecordAudioMonitor>
-AudioPolicyService::OpRecordAudioMonitor::createIfNeeded(
-            const AttributionSourceState& attributionSource, const audio_attributes_t& attr,
-            wp<AudioCommandThread> commandThread)
-{
-    if (isAudioServerOrRootUid(attributionSource.uid)) {
-        ALOGV("not silencing record for audio or root source %s",
-                attributionSource.toString().c_str());
-        return nullptr;
-    }
-
-    if (!AudioPolicyService::isAppOpSource(attr.source)) {
-        ALOGD("not monitoring app op for uid %d and source %d",
-                attributionSource.uid, attr.source);
-        return nullptr;
-    }
-
-    if (!attributionSource.packageName.has_value()
-            || attributionSource.packageName.value().size() == 0) {
-        return nullptr;
-    }
-    return new OpRecordAudioMonitor(attributionSource, getOpForSource(attr.source), commandThread);
-}
-
-AudioPolicyService::OpRecordAudioMonitor::OpRecordAudioMonitor(
-        const AttributionSourceState& attributionSource, int32_t appOp,
-        wp<AudioCommandThread> commandThread) :
-            mHasOp(true), mAttributionSource(attributionSource), mAppOp(appOp),
-            mCommandThread(commandThread)
-{
-}
-
-AudioPolicyService::OpRecordAudioMonitor::~OpRecordAudioMonitor()
-{
-    if (mOpCallback != 0) {
-        mAppOpsManager.stopWatchingMode(mOpCallback);
-    }
-    mOpCallback.clear();
-}
-
-void AudioPolicyService::OpRecordAudioMonitor::onFirstRef()
-{
-    checkOp();
-    mOpCallback = new RecordAudioOpCallback(this);
-    ALOGV("start watching op %d for %s", mAppOp, mAttributionSource.toString().c_str());
-    int flags = doesPackageTargetAtLeastU(
-            mAttributionSource.packageName.value_or("")) ?
-            AppOpsManager::WATCH_FOREGROUND_CHANGES : 0;
-    // TODO: We need to always watch AppOpsManager::OP_RECORD_AUDIO too
-    // since it controls the mic permission for legacy apps.
-    mAppOpsManager.startWatchingMode(mAppOp, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
-        mAttributionSource.packageName.value_or(""))),
-        flags,
-        mOpCallback);
-}
-
-bool AudioPolicyService::OpRecordAudioMonitor::hasOp() const {
-    return mHasOp.load();
-}
-
-// Called by RecordAudioOpCallback when the app op corresponding to this OpRecordAudioMonitor
-// is updated in AppOp callback and in onFirstRef()
-// Note this method is never called (and never to be) for audio server / root track
-// due to the UID in createIfNeeded(). As a result for those record track, it's:
-// - not called from constructor,
-// - not called from RecordAudioOpCallback because the callback is not installed in this case
-void AudioPolicyService::OpRecordAudioMonitor::checkOp(bool updateUidStates)
-{
-    // TODO: We need to always check AppOpsManager::OP_RECORD_AUDIO too
-    // since it controls the mic permission for legacy apps.
-    const int32_t mode = mAppOpsManager.checkOp(mAppOp,
-            mAttributionSource.uid, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
-                mAttributionSource.packageName.value_or(""))));
-    const bool hasIt = (mode == AppOpsManager::MODE_ALLOWED);
-    // verbose logging only log when appOp changed
-    ALOGI_IF(hasIt != mHasOp.load(),
-            "App op %d missing, %ssilencing record %s",
-            mAppOp, hasIt ? "un" : "", mAttributionSource.toString().c_str());
-    mHasOp.store(hasIt);
-
-    if (updateUidStates) {
-          sp<AudioCommandThread> commandThread = mCommandThread.promote();
-          if (commandThread != nullptr) {
-              commandThread->updateUidStatesCommand();
-          }
-    }
-}
-
-AudioPolicyService::OpRecordAudioMonitor::RecordAudioOpCallback::RecordAudioOpCallback(
-        const wp<OpRecordAudioMonitor>& monitor) : mMonitor(monitor)
-{ }
-
-void AudioPolicyService::OpRecordAudioMonitor::RecordAudioOpCallback::opChanged(int32_t op,
-            const String16& packageName __unused) {
-    sp<OpRecordAudioMonitor> monitor = mMonitor.promote();
-    if (monitor != NULL) {
-        if (op != monitor->getOp()) {
-            return;
-        }
-        monitor->checkOp(true);
-    }
-}
-
 
 // -----------  AudioPolicyService::AudioCommandThread implementation ----------
 

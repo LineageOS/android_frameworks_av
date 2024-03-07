@@ -8,6 +8,7 @@
 + [ndk_drm_fuzzer](#NdkDrm)
 + [ndk_mediamuxer_fuzzer](#NdkMediaMuxer)
 + [ndk_sync_codec_fuzzer](#NdkSyncCodec)
++ [ndk_async_codec_fuzzer](#NdkAsyncCodec)
 
 # <a name="NdkCrypto"></a> Fuzzer for NdkCrypto
 
@@ -155,4 +156,17 @@ NdkMediaMuxer supports the following parameters:
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/ndk_sync_codec_fuzzer/ndk_sync_codec_fuzzer
+```
+
+# <a name="NdkAsyncCodec"></a>Fuzzer for NdkAsyncCodec
+
+#### Steps to run
+1. Build the fuzzer
+```
+  $ mm -j$(nproc) ndk_async_codec_fuzzer
+```
+2. Run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/ndk_async_codec_fuzzer/ndk_sync_codec_fuzzer
 ```
