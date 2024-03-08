@@ -81,3 +81,10 @@ flag {
   description: "Feature flag for region of interest support"
   bug: "325549730"
 }
+
+flag {
+  name: "teamfood"
+  namespace: "codec_fwk"
+  description: "Feature flag to track teamfood population"
+  bug: "328770262"
+}
