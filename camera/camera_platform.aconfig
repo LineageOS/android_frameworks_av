@@ -143,3 +143,11 @@ flag {
        purpose: PURPOSE_BUGFIX
      }
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "concert_mode_api"
+     description: "Covers the eyes free videography public facing API"
+     bug: "297083874"
+}
+
