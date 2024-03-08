@@ -101,7 +101,7 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
     audio_source_t aliasSource = (inputSource == AUDIO_SOURCE_HOTWORD) ?
                                     AUDIO_SOURCE_VOICE_RECOGNITION : inputSource;
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
     ssize_t index = mInputSources.indexOfKey(aliasSource);
     if (index < 0) {
         ALOGV("addInputEffects(): no processing needs to be attached to this source");
@@ -156,7 +156,7 @@ status_t AudioPolicyEffects::releaseInputEffects(audio_io_handle_t input,
 {
     status_t status = NO_ERROR;
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
     ssize_t index = mInputSessions.indexOfKey(audioSession);
     if (index < 0) {
         return status;
@@ -179,7 +179,7 @@ status_t AudioPolicyEffects::queryDefaultInputEffects(audio_session_t audioSessi
 {
     status_t status = NO_ERROR;
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
     size_t index;
     for (index = 0; index < mInputSessions.size(); index++) {
         if (mInputSessions.valueAt(index)->mSessionId == audioSession) {
@@ -212,7 +212,7 @@ status_t AudioPolicyEffects::queryDefaultOutputSessionEffects(audio_session_t au
 {
     status_t status = NO_ERROR;
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
     size_t index;
     for (index = 0; index < mOutputSessions.size(); index++) {
         if (mOutputSessions.valueAt(index)->mSessionId == audioSession) {
@@ -245,7 +245,7 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
 {
     status_t status = NO_ERROR;
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
     // create audio processors according to stream
     // FIXME: should we have specific post processing settings for internal streams?
     // default to media for now.
@@ -309,7 +309,7 @@ status_t AudioPolicyEffects::releaseOutputSessionEffects(audio_io_handle_t outpu
     (void) output; // argument not used for now
     (void) stream; // argument not used for now
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
     ssize_t index = mOutputSessions.indexOfKey(audioSession);
     if (index < 0) {
         ALOGV("releaseOutputSessionEffects: no output processing was attached to this stream");
@@ -370,7 +370,7 @@ status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
         return BAD_VALUE;
     }
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
 
     // Find the EffectDescVector for the given source type, or create a new one if necessary.
     ssize_t index = mInputSources.indexOfKey(source);
@@ -435,7 +435,7 @@ status_t AudioPolicyEffects::addStreamDefaultEffect(const effect_uuid_t *type,
         return BAD_VALUE;
     }
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
 
     // Find the EffectDescVector for the given stream type, or create a new one if necessary.
     ssize_t index = mOutputStreams.indexOfKey(stream);
@@ -475,7 +475,7 @@ status_t AudioPolicyEffects::removeSourceDefaultEffect(audio_unique_id_t id)
         return BAD_VALUE;
     }
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
 
     // Check each source type.
     size_t numSources = mInputSources.size();
@@ -506,7 +506,7 @@ status_t AudioPolicyEffects::removeStreamDefaultEffect(audio_unique_id_t id)
         return BAD_VALUE;
     }
 
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
 
     // Check each stream type.
     size_t numStreams = mOutputStreams.size();
@@ -948,7 +948,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
     loadProcessingChain(processings->postprocess, mOutputStreams);
 
     {
-        Mutex::Autolock _l(mLock);
+        audio_utils::lock_guard _l(mMutex);
         loadDeviceProcessingChain(processings->deviceprocess, mDeviceEffects);
     }
 
@@ -985,7 +985,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfigLegacy(const char *path)
 
 void AudioPolicyEffects::initDefaultDeviceEffects()
 {
-    Mutex::Autolock _l(mLock);
+    audio_utils::lock_guard _l(mMutex);
     for (const auto& deviceEffectsIter : mDeviceEffects) {
         const auto& deviceEffects =  deviceEffectsIter.second;
         for (const auto& effectDesc : deviceEffects->mEffectDescriptors->mEffects) {
