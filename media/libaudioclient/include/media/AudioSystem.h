@@ -821,8 +821,7 @@ private:
 
     private:
         mutable std::mutex mMutex;
-        DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor>>
-                mIoDescriptors GUARDED_BY(mMutex);
+        std::map<audio_io_handle_t, sp<AudioIoDescriptor>> mIoDescriptors GUARDED_BY(mMutex);
 
         std::map<audio_io_handle_t, std::map<audio_port_handle_t, wp<AudioDeviceCallback>>>
                 mAudioDeviceCallbacks GUARDED_BY(mMutex);
@@ -850,7 +849,7 @@ private:
 
         bool isAudioPortCbEnabled() const EXCLUDES(mMutex) {
             std::lock_guard _l(mMutex);
-            return (mAudioPortCallbacks.size() != 0);
+            return !mAudioPortCallbacks.empty();
         }
 
         int addAudioVolumeGroupCallback(
@@ -861,7 +860,7 @@ private:
 
         bool isAudioVolumeGroupCbEnabled() const EXCLUDES(mMutex) {
             std::lock_guard _l(mMutex);
-            return (mAudioVolumeGroupCallback.size() != 0);
+            return !mAudioVolumeGroupCallbacks.empty();
         }
 
         // DeathRecipient
@@ -887,8 +886,8 @@ private:
 
     private:
         mutable std::mutex mMutex;
-        Vector<sp<AudioPortCallback>> mAudioPortCallbacks GUARDED_BY(mMutex);
-        Vector<sp<AudioVolumeGroupCallback>> mAudioVolumeGroupCallback GUARDED_BY(mMutex);
+        std::set<sp<AudioPortCallback>> mAudioPortCallbacks GUARDED_BY(mMutex);
+        std::set<sp<AudioVolumeGroupCallback>> mAudioVolumeGroupCallbacks GUARDED_BY(mMutex);
     };
 
     static audio_io_handle_t getOutput(audio_stream_type_t stream);
