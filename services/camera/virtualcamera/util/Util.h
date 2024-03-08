@@ -142,6 +142,16 @@ struct Resolution {
   int height = 0;
 };
 
+struct FpsRange {
+  int32_t minFps;
+  int32_t maxFps;
+
+  bool operator<(const FpsRange& other) const {
+    return maxFps == other.maxFps ? minFps < other.minFps
+                                  : maxFps < other.maxFps;
+  }
+};
+
 inline bool isApproximatellySameAspectRatio(const Resolution r1,
                                             const Resolution r2) {
   static constexpr float kAspectRatioEpsilon = 0.05;

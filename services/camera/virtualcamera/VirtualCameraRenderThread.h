@@ -33,6 +33,7 @@
 #include "util/EglFramebuffer.h"
 #include "util/EglProgram.h"
 #include "util/EglSurfaceTexture.h"
+#include "util/MetadataUtil.h"
 #include "util/Util.h"
 
 namespace android {
@@ -58,6 +59,9 @@ struct RequestSettings {
   int jpegQuality = VirtualCameraDevice::kDefaultJpegQuality;
   Resolution thumbnailResolution = Resolution(0, 0);
   int thumbnailJpegQuality = VirtualCameraDevice::kDefaultJpegQuality;
+  std::optional<FpsRange> fpsRange = {};
+  camera_metadata_enum_android_control_capture_intent_t captureIntent =
+      VirtualCameraDevice::kDefaultCaptureIntent;
 };
 
 // Represents single capture request to fill set of buffers.
