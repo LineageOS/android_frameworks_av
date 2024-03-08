@@ -58,7 +58,8 @@ protected:
 struct MultiAccessUnitHelper {
 public:
     MultiAccessUnitHelper(
-            const std::shared_ptr<MultiAccessUnitInterface>& intf);
+            const std::shared_ptr<MultiAccessUnitInterface>& intf,
+            std::shared_ptr<C2BlockPool> &linearPool);
 
     virtual ~MultiAccessUnitHelper();
 
@@ -202,8 +203,6 @@ protected:
     C2BlockPool::local_id_t mBlockPoolId;
     // C2Blockpool for output buffer allocation
     std::shared_ptr<C2BlockPool> mLinearPool;
-    // Allocator for output buffer allocation
-    std::shared_ptr<C2Allocator> mLinearAllocator;
     // FrameIndex for the current outgoing work
     std::atomic_uint64_t mFrameIndex;
     // Mutex to protect mFrameHolder
