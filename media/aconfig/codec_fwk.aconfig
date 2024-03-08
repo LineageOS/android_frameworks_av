@@ -48,6 +48,13 @@ flag {
 }
 
 flag {
+  name: "native_capabilites"
+  namespace: "codec_fwk"
+  description: "Feature flag for native codec capabilities"
+  bug: "306023029"
+}
+
+flag {
   name: "null_output_surface"
   namespace: "codec_fwk"
   description: "Feature flag for null output Surface API"
