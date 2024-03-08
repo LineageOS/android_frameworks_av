@@ -33,10 +33,11 @@ class HidlCamera3Device :
 
     explicit HidlCamera3Device(
         std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
         bool legacyClient = false) :
-        Camera3Device(cameraServiceProxyWrapper, id, overrideForPerfClass, overrideToPortrait,
-                legacyClient) { }
+        Camera3Device(cameraServiceProxyWrapper, attributionAndPermissionUtils, id,
+                overrideForPerfClass, overrideToPortrait, legacyClient) { }
 
     virtual ~HidlCamera3Device() {}
 

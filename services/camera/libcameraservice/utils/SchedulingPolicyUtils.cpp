@@ -20,7 +20,6 @@
 #include <pthread.h>
 #include <sched.h>
 
-#include "CameraThreadState.h"
 #include <private/android_filesystem_config.h>
 #include <processgroup/processgroup.h>
 #include <processgroup/sched_policy.h>

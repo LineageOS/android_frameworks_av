@@ -65,7 +65,6 @@
 #include "device3/Camera3InputStream.h"
 #include "device3/Camera3OutputStream.h"
 #include "device3/Camera3SharedOutputStream.h"
-#include "utils/CameraThreadState.h"
 #include "utils/CameraTraces.h"
 #include "utils/SchedulingPolicyUtils.h"
 #include "utils/SessionConfigurationUtils.h"
@@ -85,8 +84,10 @@ namespace flags = com::android::internal::camera::flags;
 namespace android {
 
 Camera3Device::Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string &id, bool overrideForPerfClass, bool overrideToPortrait,
         bool legacyClient):
+        AttributionAndPermissionUtilsEncapsulator(attributionAndPermissionUtils),
         mCameraServiceProxyWrapper(cameraServiceProxyWrapper),
         mId(id),
         mLegacyClient(legacyClient),
@@ -1433,7 +1434,7 @@ status_t Camera3Device::createDefaultRequest(camera_request_template_t templateI
 
     if (templateId <= 0 || templateId >= CAMERA_TEMPLATE_COUNT) {
         android_errorWriteWithInfoLog(CameraService::SN_EVENT_LOG_ID, "26866110",
-                CameraThreadState::getCallingUid(), nullptr, 0);
+                getCallingUid(), nullptr, 0);
         return BAD_VALUE;
     }
 

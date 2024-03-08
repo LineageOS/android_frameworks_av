@@ -47,6 +47,7 @@
 #include "device3/Camera3OutputInterface.h"
 #include "device3/Camera3OfflineSession.h"
 #include "device3/Camera3StreamInterface.h"
+#include "utils/AttributionAndPermissionUtils.h"
 #include "utils/TagMonitor.h"
 #include "utils/IPCTransport.h"
 #include "utils/LatencyHistogram.h"
@@ -79,12 +80,14 @@ class Camera3Device :
             public camera3::SetErrorInterface,
             public camera3::InflightRequestUpdateInterface,
             public camera3::RequestBufferInterface,
-            public camera3::FlushBufferInterface {
+            public camera3::FlushBufferInterface,
+            public AttributionAndPermissionUtilsEncapsulator {
   friend class HidlCamera3Device;
   friend class AidlCamera3Device;
   public:
 
     explicit Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+            std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
             const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
             bool legacyClient = false);
 

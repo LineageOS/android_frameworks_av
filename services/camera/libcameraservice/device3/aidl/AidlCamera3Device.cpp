@@ -68,7 +68,6 @@
 #include "device3/aidl/AidlCamera3OutputUtils.h"
 #include "device3/aidl/AidlCamera3OfflineSession.h"
 #include "CameraService.h"
-#include "utils/CameraThreadState.h"
 #include "utils/SessionConfigurationUtils.h"
 #include "utils/TraceHFR.h"
 #include "utils/CameraServiceProxyWrapper.h"
@@ -173,10 +172,11 @@ uint64_t AidlCamera3Device::mapProducerToFrameworkUsage(
 
 AidlCamera3Device::AidlCamera3Device(
         std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
         bool legacyClient) :
-        Camera3Device(cameraServiceProxyWrapper, id, overrideForPerfClass, overrideToPortrait,
-        legacyClient) {
+        Camera3Device(cameraServiceProxyWrapper, attributionAndPermissionUtils, id,
+                overrideForPerfClass, overrideToPortrait, legacyClient) {
     mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
 }
 
