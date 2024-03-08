@@ -68,15 +68,12 @@ record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 routing_callback AudioSystem::gRoutingCallback = NULL;
 vol_range_init_req_callback AudioSystem::gVolRangeInitReqCallback = NULL;
 
+std::mutex AudioSystem::gApsCallbackMutex;
 std::mutex AudioSystem::gErrorCallbacksMutex;
 std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 
 std::mutex AudioSystem::gSoundTriggerMutex;
 sp<CaptureStateListenerImpl> AudioSystem::gSoundTriggerCaptureStateListener;
-
-std::mutex AudioSystem::gAPSMutex;
-sp<IAudioPolicyService> AudioSystem::gAudioPolicyService;
-sp<AudioSystem::AudioPolicyServiceClient> AudioSystem::gAudioPolicyServiceClient;
 
 // Sets the Binder for the AudioFlinger service, passed to this client process
 // from the system server.
@@ -926,44 +923,35 @@ status_t AudioSystem::AudioFlingerClient::removeSupportedLatencyModesCallback(
     gVolRangeInitReqCallback = cb;
 }
 
-// establish binder interface to AudioPolicy service
-sp<IAudioPolicyService> AudioSystem::get_audio_policy_service() {
-    sp<IAudioPolicyService> ap;
-    sp<AudioPolicyServiceClient> apc;
-    {
-        std::lock_guard _l(gAPSMutex);
-        if (gAudioPolicyService == 0) {
-            sp<IServiceManager> sm = defaultServiceManager();
-            sp<IBinder> binder = sm->waitForService(String16("media.audio_policy"));
-            if (binder == nullptr) {
-                return nullptr;
-            }
-            if (gAudioPolicyServiceClient == NULL) {
-                gAudioPolicyServiceClient = new AudioPolicyServiceClient();
-            }
-            binder->linkToDeath(gAudioPolicyServiceClient);
-            gAudioPolicyService = interface_cast<IAudioPolicyService>(binder);
-            LOG_ALWAYS_FATAL_IF(gAudioPolicyService == 0);
-            apc = gAudioPolicyServiceClient;
-            // Make sure callbacks can be received by gAudioPolicyServiceClient
-            ProcessState::self()->startThreadPool();
-        }
-        ap = gAudioPolicyService;
-    }
-    if (apc != 0) {
-        int64_t token = IPCThreadState::self()->clearCallingIdentity();
+struct AudioPolicyTraits {
+    static void onServiceCreate(const sp<IAudioPolicyService>& ap,
+            const sp<AudioSystem::AudioPolicyServiceClient>& apc) {
+        const int64_t token = IPCThreadState::self()->clearCallingIdentity();
         ap->registerClient(apc);
         ap->setAudioPortCallbacksEnabled(apc->isAudioPortCbEnabled());
         ap->setAudioVolumeGroupCallbacksEnabled(apc->isAudioVolumeGroupCbEnabled());
         IPCThreadState::self()->restoreCallingIdentity(token);
     }
 
-    return ap;
+    static void onClearService(const sp<AudioSystem::AudioPolicyServiceClient>&) {}
+
+    static constexpr const char *SERVICE_NAME = "media.audio_policy";
+};
+
+[[clang::no_destroy]] static constinit ServiceHandler<IAudioPolicyService,
+        AudioSystem::AudioPolicyServiceClient, IAudioPolicyService,
+        AudioPolicyTraits> gAudioPolicyServiceHandler;
+
+status_t AudioSystem::setLocalAudioPolicyService(const sp<IAudioPolicyService>& aps) {
+    return gAudioPolicyServiceHandler.setLocalService(aps);
+}
+
+sp<IAudioPolicyService> AudioSystem::get_audio_policy_service() {
+    return gAudioPolicyServiceHandler.getService();
 }
 
 void AudioSystem::clearAudioPolicyService() {
-    std::lock_guard _l(gAPSMutex);
-    gAudioPolicyService.clear();
+    gAudioPolicyServiceHandler.clearService();
 }
 
 // ---------------------------------------------------------------------------
@@ -1727,12 +1715,11 @@ status_t AudioSystem::setAudioPortConfig(const struct audio_port_config* config)
 status_t AudioSystem::addAudioPortCallback(const sp<AudioPortCallback>& callback) {
     const sp<IAudioPolicyService> aps = get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
+    const auto apc = gAudioPolicyServiceHandler.getClient();
+    if (apc == nullptr) return NO_INIT;
 
-    std::lock_guard _l(gAPSMutex);
-    if (gAudioPolicyServiceClient == 0) {
-        return NO_INIT;
-    }
-    int ret = gAudioPolicyServiceClient->addAudioPortCallback(callback);
+    std::lock_guard _l(gApsCallbackMutex);
+    const int ret = apc->addAudioPortCallback(callback);
     if (ret == 1) {
         aps->setAudioPortCallbacksEnabled(true);
     }
@@ -1743,12 +1730,11 @@ status_t AudioSystem::addAudioPortCallback(const sp<AudioPortCallback>& callback
 status_t AudioSystem::removeAudioPortCallback(const sp<AudioPortCallback>& callback) {
     const sp<IAudioPolicyService> aps = get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
+    const auto apc = gAudioPolicyServiceHandler.getClient();
+    if (apc == nullptr) return NO_INIT;
 
-    std::lock_guard _l(gAPSMutex);
-    if (gAudioPolicyServiceClient == 0) {
-        return NO_INIT;
-    }
-    int ret = gAudioPolicyServiceClient->removeAudioPortCallback(callback);
+    std::lock_guard _l(gApsCallbackMutex);
+    const int ret = apc->removeAudioPortCallback(callback);
     if (ret == 0) {
         aps->setAudioPortCallbacksEnabled(false);
     }
@@ -1758,12 +1744,11 @@ status_t AudioSystem::removeAudioPortCallback(const sp<AudioPortCallback>& callb
 status_t AudioSystem::addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback) {
     const sp<IAudioPolicyService> aps = get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
+    const auto apc = gAudioPolicyServiceHandler.getClient();
+    if (apc == nullptr) return NO_INIT;
 
-    std::lock_guard _l(gAPSMutex);
-    if (gAudioPolicyServiceClient == 0) {
-        return NO_INIT;
-    }
-    int ret = gAudioPolicyServiceClient->addAudioVolumeGroupCallback(callback);
+    std::lock_guard _l(gApsCallbackMutex);
+    const int ret = apc->addAudioVolumeGroupCallback(callback);
     if (ret == 1) {
         aps->setAudioVolumeGroupCallbacksEnabled(true);
     }
@@ -1773,12 +1758,11 @@ status_t AudioSystem::addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallb
 status_t AudioSystem::removeAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback) {
     const sp<IAudioPolicyService> aps = get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
+    const auto apc = gAudioPolicyServiceHandler.getClient();
+    if (apc == nullptr) return NO_INIT;
 
-    std::lock_guard _l(gAPSMutex);
-    if (gAudioPolicyServiceClient == 0) {
-        return NO_INIT;
-    }
-    int ret = gAudioPolicyServiceClient->removeAudioVolumeGroupCallback(callback);
+    std::lock_guard _l(gApsCallbackMutex);
+    const int ret = apc->removeAudioVolumeGroupCallback(callback);
     if (ret == 0) {
         aps->setAudioVolumeGroupCallbacksEnabled(false);
     }
