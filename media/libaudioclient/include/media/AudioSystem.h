@@ -100,6 +100,10 @@ class AudioSystem
     friend class AudioFlingerClient;
     friend class AudioPolicyServiceClient;
     friend class CaptureStateListenerImpl;
+    template <typename ServiceInterface, typename Client, typename AidlInterface,
+            typename ServiceTraits>
+    friend class ServiceHandler;
+
 public:
 
     // FIXME Declare in binder opcode order, similarly to IAudioFlinger.h and IAudioFlinger.cpp
@@ -779,8 +783,6 @@ public:
 
     static int32_t getAAudioHardwareBurstMinUsec();
 
-private:
-
     class AudioFlingerClient: public IBinder::DeathRecipient, public media::BnAudioFlingerClient
     {
     public:
@@ -821,8 +823,7 @@ private:
 
     private:
         mutable std::mutex mMutex;
-        DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor>>
-                mIoDescriptors GUARDED_BY(mMutex);
+        std::map<audio_io_handle_t, sp<AudioIoDescriptor>> mIoDescriptors GUARDED_BY(mMutex);
 
         std::map<audio_io_handle_t, std::map<audio_port_handle_t, wp<AudioDeviceCallback>>>
                 mAudioDeviceCallbacks GUARDED_BY(mMutex);
@@ -850,7 +851,7 @@ private:
 
         bool isAudioPortCbEnabled() const EXCLUDES(mMutex) {
             std::lock_guard _l(mMutex);
-            return (mAudioPortCallbacks.size() != 0);
+            return !mAudioPortCallbacks.empty();
         }
 
         int addAudioVolumeGroupCallback(
@@ -861,7 +862,7 @@ private:
 
         bool isAudioVolumeGroupCbEnabled() const EXCLUDES(mMutex) {
             std::lock_guard _l(mMutex);
-            return (mAudioVolumeGroupCallback.size() != 0);
+            return !mAudioVolumeGroupCallbacks.empty();
         }
 
         // DeathRecipient
@@ -887,23 +888,20 @@ private:
 
     private:
         mutable std::mutex mMutex;
-        Vector<sp<AudioPortCallback>> mAudioPortCallbacks GUARDED_BY(mMutex);
-        Vector<sp<AudioVolumeGroupCallback>> mAudioVolumeGroupCallback GUARDED_BY(mMutex);
+        std::set<sp<AudioPortCallback>> mAudioPortCallbacks GUARDED_BY(mMutex);
+        std::set<sp<AudioVolumeGroupCallback>> mAudioVolumeGroupCallbacks GUARDED_BY(mMutex);
     };
 
+    private:
+
     static audio_io_handle_t getOutput(audio_stream_type_t stream);
-    static const sp<AudioFlingerClient> getAudioFlingerClient();
+    static sp<AudioFlingerClient> getAudioFlingerClient();
     static sp<AudioIoDescriptor> getIoDescriptor(audio_io_handle_t ioHandle);
-    static const sp<IAudioFlinger> getAudioFlingerImpl(bool canStartThreadPool);
 
     // Invokes all registered error callbacks with the given error code.
     static void reportError(status_t err);
 
     [[clang::no_destroy]] static std::mutex gMutex;
-    [[clang::no_destroy]] static sp<IAudioFlinger> gAudioFlinger GUARDED_BY(gMutex);
-    [[clang::no_destroy]] static sp<IBinder> gAudioFlingerBinder GUARDED_BY(gMutex);
-    [[clang::no_destroy]] static sp<IAudioFlinger> gLocalAudioFlinger GUARDED_BY(gMutex);
-    [[clang::no_destroy]] static sp<AudioFlingerClient> gAudioFlingerClient GUARDED_BY(gMutex);
     static dynamic_policy_callback gDynPolicyCallback GUARDED_BY(gMutex);
     static record_config_callback gRecordConfigCallback GUARDED_BY(gMutex);
     static routing_callback gRoutingCallback GUARDED_BY(gMutex);
