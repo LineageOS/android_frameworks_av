@@ -487,7 +487,19 @@ void Component::initListener(const std::shared_ptr<Component>& self) {
     if (__builtin_available(android __ANDROID_API_T__, *)) {
         std::shared_ptr<C2Component::Listener> c2listener;
         if (mMultiAccessUnitIntf) {
-            mMultiAccessUnitHelper = std::make_shared<MultiAccessUnitHelper>(mMultiAccessUnitIntf);
+            std::shared_ptr<C2Allocator> allocator;
+            std::shared_ptr<C2BlockPool> linearPool;
+            std::shared_ptr<C2AllocatorStore> store = ::android::GetCodec2PlatformAllocatorStore();
+            if(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator) == C2_OK) {
+                ::android::C2PlatformAllocatorDesc desc;
+                desc.allocatorId = allocator->getId();
+                if (C2_OK == CreateCodec2BlockPool(desc, mComponent, &linearPool)) {
+                    if (linearPool) {
+                        mMultiAccessUnitHelper = std::make_shared<MultiAccessUnitHelper>(
+                                mMultiAccessUnitIntf, linearPool);
+                    }
+                }
+            }
         }
         c2listener = mMultiAccessUnitHelper ?
                 std::make_shared<MultiAccessUnitListener>(self, mMultiAccessUnitHelper) :
