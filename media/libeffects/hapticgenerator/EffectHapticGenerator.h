@@ -48,9 +48,9 @@ struct HapticGeneratorParam {
     uint32_t audioChannelCount;
     uint32_t hapticChannelCount;
 
-    // A map from track id to haptic intensity.
-    std::map<int, os::HapticLevel> id2Intensity;
-    os::HapticLevel maxHapticIntensity; // max intensity will be used to scale haptic data.
+    // A map from track id to haptic scale.
+    std::map<int, os::HapticScale> id2HapticScale;
+    os::HapticScale maxHapticScale; // max haptic scale will be used to scale haptic data.
     float maxHapticAmplitude; // max amplitude will be used to limit haptic data absolute values.
 
     float resonantFrequency;
