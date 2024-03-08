@@ -15,16 +15,20 @@
 ** limitations under the License.
 */
 
-#include <android/content/AttributionSourceState.h>
+#pragma once
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#include "TrackBase.h"
+
+#include <android/content/AttributionSourceState.h>
+#include <audio_utils/mutex.h>
+#include <datapath/AudioStreamIn.h> // struct Source
+
+namespace android {
 
 // record track
-class RecordTrack : public TrackBase {
+class RecordTrack : public TrackBase, public virtual IAfRecordTrack {
 public:
-                        RecordTrack(RecordThread *thread,
+    RecordTrack(IAfRecordThread* thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& attr,
                                 uint32_t sampleRate,
@@ -40,66 +44,69 @@ public:
                                 track_type type,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 int32_t startFrames = -1);
-    virtual             ~RecordTrack();
-    virtual status_t    initCheck() const;
+    ~RecordTrack() override;
+    status_t initCheck() const final;
 
-    virtual status_t    start(AudioSystem::sync_event_t event, audio_session_t triggerSession);
-    virtual void        stop();
+    status_t start(AudioSystem::sync_event_t event, audio_session_t triggerSession) final;
+    void stop() final;
+    void destroy() final;
+    void invalidate() final;
 
-            void        destroy();
-
-    virtual void        invalidate();
             // clear the buffer overflow flag
-            void        clearOverflow() { mOverflow = false; }
+    void clearOverflow() final { mOverflow = false; }
             // set the buffer overflow flag and return previous value
-            bool        setOverflow() { bool tmp = mOverflow; mOverflow = true;
+    bool setOverflow() final { bool tmp = mOverflow; mOverflow = true;
                                                 return tmp; }
 
-            void        appendDumpHeader(String8& result);
-            void        appendDump(String8& result, bool active);
+    void appendDumpHeader(String8& result) const final;
+    void appendDump(String8& result, bool active) const final;
 
-            void        handleSyncStartEvent(const sp<SyncEvent>& event);
-            void        clearSyncStartEvent();
+    void handleSyncStartEvent(const sp<audioflinger::SyncEvent>& event) final;
+    void clearSyncStartEvent() final;
 
-            void        updateTrackFrameInfo(int64_t trackFramesReleased,
+    void updateTrackFrameInfo(int64_t trackFramesReleased,
                                              int64_t sourceFramesRead,
                                              uint32_t halSampleRate,
-                                             const ExtendedTimestamp &timestamp);
+                                             const ExtendedTimestamp &timestamp) final;
 
-    virtual bool        isFastTrack() const { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
-            bool        isDirect() const override
+    bool isFastTrack() const final { return (mFlags & AUDIO_INPUT_FLAG_FAST) != 0; }
+    bool isDirect() const final
                                 { return (mFlags & AUDIO_INPUT_FLAG_DIRECT) != 0; }
 
-            void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
-            bool        isSilenced() const { return mSilenced; }
+    void setSilenced(bool silenced) final { if (!isPatchTrack()) mSilenced = silenced; }
+    bool isSilenced() const final { return mSilenced; }
 
-            status_t    getActiveMicrophones(
-                    std::vector<media::MicrophoneInfoFw>* activeMicrophones);
+    status_t getActiveMicrophones(
+            std::vector<media::MicrophoneInfoFw>* activeMicrophones) const final;
 
-            status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
-            status_t    setPreferredMicrophoneFieldDimension(float zoom);
-            status_t    shareAudioHistory(const std::string& sharedAudioPackageName,
-                                          int64_t sharedAudioStartMs);
-            int32_t     startFrames() { return mStartFrames; }
+    status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction) final;
+    status_t setPreferredMicrophoneFieldDimension(float zoom) final;
+    status_t shareAudioHistory(const std::string& sharedAudioPackageName,
+            int64_t sharedAudioStartMs) final;
+    int32_t startFrames() const final { return mStartFrames; }
 
-    static  bool        checkServerLatencySupported(
-                                audio_format_t format, audio_input_flags_t flags) {
-                            return audio_is_linear_pcm(format)
-                                    && (flags & AUDIO_INPUT_FLAG_HW_AV_SYNC) == 0;
-                        }
+    using SinkMetadatas = std::vector<record_track_metadata_v7_t>;
+    using MetadataInserter = std::back_insert_iterator<SinkMetadatas>;
+    void copyMetadataTo(MetadataInserter& backInserter) const final;
 
-            using SinkMetadatas = std::vector<record_track_metadata_v7_t>;
-            using MetadataInserter = std::back_insert_iterator<SinkMetadatas>;
-            virtual void    copyMetadataTo(MetadataInserter& backInserter) const;
+    AudioBufferProvider::Buffer& sinkBuffer() final { return mSink; }
+    audioflinger::SynchronizedRecordState& synchronizedRecordState() final {
+        return mSynchronizedRecordState;
+    }
+    RecordBufferConverter* recordBufferConverter() const final { return mRecordBufferConverter; }
+    ResamplerBufferProvider* resamplerBufferProvider() const final {
+        return mResamplerBufferProvider;
+    }
 
 private:
-    friend class AudioFlinger;  // for mState
-
     DISALLOW_COPY_AND_ASSIGN(RecordTrack);
 
+protected:
     // AudioBufferProvider interface
-    virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
     // releaseBuffer() not overridden
+
+private:
 
     bool                mOverflow;  // overflow on most recent attempt to fill client buffer
 
@@ -107,15 +114,13 @@ private:
 
             // sync event triggering actual audio capture. Frames read before this event will
             // be dropped and therefore not read by the application.
-            sp<SyncEvent>                       mSyncStartEvent;
+            sp<audioflinger::SyncEvent>        mSyncStartEvent;
 
-            // number of captured frames to drop after the start sync event has been received.
-            // when < 0, maximum frames to drop before starting capture even if sync event is
-            // not received
-            ssize_t                             mFramesToDrop;
+            audioflinger::SynchronizedRecordState
+                    mSynchronizedRecordState{mSampleRate}; // sampleRate defined in base
 
             // used by resampler to find source frames
-            ResamplerBufferProvider            *mResamplerBufferProvider;
+            ResamplerBufferProvider* mResamplerBufferProvider;
 
             // used by the record thread to convert frames to proper destination format
             RecordBufferConverter              *mRecordBufferConverter;
@@ -128,10 +133,9 @@ private:
 };
 
 // playback track, used by PatchPanel
-class PatchRecord : public RecordTrack, public PatchTrackBase {
+class PatchRecord : public RecordTrack, public PatchTrackBase, public IAfPatchRecord {
 public:
-
-    PatchRecord(RecordThread *recordThread,
+    PatchRecord(IAfRecordThread* recordThread,
                 uint32_t sampleRate,
                 audio_channel_mask_t channelMask,
                 audio_format_t format,
@@ -141,20 +145,20 @@ public:
                 audio_input_flags_t flags,
                 const Timeout& timeout = {},
                 audio_source_t source = AUDIO_SOURCE_DEFAULT);
-    virtual             ~PatchRecord();
+    ~PatchRecord() override;
 
-    virtual Source* getSource() { return nullptr; }
+    Source* getSource() override { return nullptr; }
 
     // AudioBufferProvider interface
-    virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
-    virtual void releaseBuffer(AudioBufferProvider::Buffer* buffer);
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
 
     // PatchProxyBufferProvider interface
-    virtual status_t    obtainBuffer(Proxy::Buffer *buffer,
-                                     const struct timespec *timeOut = NULL);
-    virtual void        releaseBuffer(Proxy::Buffer *buffer);
+    status_t obtainBuffer(Proxy::Buffer* buffer,
+                                     const struct timespec* timeOut = nullptr) override;
+    void releaseBuffer(Proxy::Buffer* buffer) override;
 
-    size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) {
+    size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) final {
         return writeFrames(this, src, frameCount, frameSize);
     }
 
@@ -167,7 +171,7 @@ protected:
 
 class PassthruPatchRecord : public PatchRecord, public Source {
 public:
-    PassthruPatchRecord(RecordThread *recordThread,
+    PassthruPatchRecord(IAfRecordThread* recordThread,
                         uint32_t sampleRate,
                         audio_channel_mask_t channelMask,
                         audio_format_t format,
@@ -175,25 +179,25 @@ public:
                         audio_input_flags_t flags,
                         audio_source_t source = AUDIO_SOURCE_DEFAULT);
 
-    Source* getSource() override { return static_cast<Source*>(this); }
+    Source* getSource() final { return static_cast<Source*>(this); }
 
     // Source interface
-    status_t read(void *buffer, size_t bytes, size_t *read) override;
-    status_t getCapturePosition(int64_t *frames, int64_t *time) override;
-    status_t standby() override;
+    status_t read(void* buffer, size_t bytes, size_t* read) final;
+    status_t getCapturePosition(int64_t* frames, int64_t* time) final;
+    status_t standby() final;
 
     // AudioBufferProvider interface
     // This interface is used by RecordThread to pass the data obtained
     // from HAL or other source to the client. PassthruPatchRecord receives
     // the data in 'obtainBuffer' so these calls are stubbed out.
-    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
-    void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) final;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) final;
 
     // PatchProxyBufferProvider interface
     // This interface is used from DirectOutputThread to acquire data from HAL.
-    bool producesBufferOnDemand() const override { return true; }
-    status_t obtainBuffer(Proxy::Buffer *buffer, const struct timespec *timeOut = nullptr) override;
-    void releaseBuffer(Proxy::Buffer *buffer) override;
+    bool producesBufferOnDemand() const final { return true; }
+    status_t obtainBuffer(Proxy::Buffer* buffer, const struct timespec* timeOut = nullptr) final;
+    void releaseBuffer(Proxy::Buffer* buffer) final;
 
 private:
     // This is to use with PatchRecord::writeFrames
@@ -210,15 +214,19 @@ private:
         PassthruPatchRecord& mPassthru;
     };
 
-    sp<StreamInHalInterface> obtainStream(sp<ThreadBase>* thread);
+    sp<StreamInHalInterface> obtainStream(sp<IAfThreadBase>* thread);
+    audio_utils::mutex& readMutex() const { return mReadMutex; }
 
     PatchRecordAudioBufferProvider mPatchRecordAudioBufferProvider;
     std::unique_ptr<void, decltype(free)*> mSinkBuffer;  // frame size aligned continuous buffer
     std::unique_ptr<void, decltype(free)*> mStubBuffer;  // buffer used for AudioBufferProvider
     size_t mUnconsumedFrames = 0;
-    std::mutex mReadLock;
-    std::condition_variable mReadCV;
-    size_t mReadBytes = 0; // GUARDED_BY(mReadLock)
-    status_t mReadError = NO_ERROR; // GUARDED_BY(mReadLock)
+    mutable audio_utils::mutex mReadMutex{
+            audio_utils::MutexOrder::kPassthruPatchRecord_ReadMutex};
+    audio_utils::condition_variable mReadCV;
+    size_t mReadBytes = 0; // GUARDED_BY(readMutex())
+    status_t mReadError = NO_ERROR; // GUARDED_BY(readMutex())
     int64_t mLastReadFrames = 0;  // accessed on RecordThread only
 };
+
+} // namespace android

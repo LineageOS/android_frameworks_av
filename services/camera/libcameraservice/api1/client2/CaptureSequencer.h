@@ -113,7 +113,7 @@ class CaptureSequencer:
     static const nsecs_t kWaitDuration = 100000000; // 100 ms
     static const nsecs_t kIdleWaitDuration = 10000000; // 10 ms
     static const int kMaxTimeoutsForPrecaptureStart = 10; // 1 sec
-    static const int kMaxTimeoutsForPrecaptureEnd = 20;  // 2 sec
+    static const int kMaxTimeoutsForPrecaptureEnd = 40;  // 4 sec
     static const int kMaxTimeoutsForCaptureEnd    = 40;  // 4 sec
     static const int kMaxRetryCount = 3; // 3 retries in case of buffer drop
 

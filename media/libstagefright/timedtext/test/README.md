@@ -22,16 +22,16 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/TimedTextUnitTest/TimedTextUnitTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/timedtext/test/TimedTextUnitTest.zip).
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/libstagefright/timedtext/test/TimedTextUnitTest-1.0.zip).
 Download, unzip and push these files into device for testing.
 
 ```
-adb push TimedTextUnitTestRes/. /data/local/tmp/
+adb push TimedTextUnitTestRes-1.0 /data/local/tmp/
 ```
 
 usage: TimedTextUnitTest -P \<path_to_folder\>
 ```
-adb shell /data/local/tmp/TimedTextUnitTest -P /data/local/tmp/TimedTextUnitTestRes/
+adb shell /data/local/tmp/TimedTextUnitTest -P /data/local/tmp/TimedTextUnitTestRes-1.0/
 ```
 Alternatively, the test can also be run using atest command.
 

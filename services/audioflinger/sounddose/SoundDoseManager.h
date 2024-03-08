@@ -136,8 +136,8 @@ public:
 
     // used for testing only
     size_t getCachedMelRecordsSize() const;
-    bool forceUseFrameworkMel() const;
-    bool forceComputeCsdOnAllDevices() const;
+    bool isFrameworkMelForced() const;
+    bool isComputeCsdForcedOnAllDevices() const;
 
     /** Method for converting from audio_utils::CsdRecord to media::SoundDoseRecord. */
     static media::SoundDoseRecord csdRecordToSoundDoseRecord(const audio_utils::CsdRecord& legacy);
@@ -157,7 +157,7 @@ private:
               mSoundDoseCallback(callback) {}
 
         /** IBinder::DeathRecipient. Listen to the death of ISoundDoseCallback. */
-        virtual void binderDied(const wp<IBinder>& who);
+        void binderDied(const wp<IBinder>& who) override;
 
         /** BnSoundDose override */
         binder::Status setOutputRs2UpperBound(float value) override;

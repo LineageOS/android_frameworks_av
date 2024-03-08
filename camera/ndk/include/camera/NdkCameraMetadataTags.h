@@ -2244,6 +2244,39 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_CONTROL_AUTOFRAMING_STATE =                         // byte (acamera_metadata_enum_android_control_autoframing_state_t)
             ACAMERA_CONTROL_START + 54,
+    /**
+     * <p>The operating luminance range of low light boost measured in lux (lx).</p>
+     *
+     * <p>Type: float[2]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     */
+    ACAMERA_CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE =      // float[2]
+            ACAMERA_CONTROL_START + 55,
+    /**
+     * <p>Current state of the low light boost AE mode.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_control_low_light_boost_state_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>When low light boost is enabled by setting the AE mode to
+     * 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY', it can dynamically apply a low light
+     * boost when the light level threshold is exceeded.</p>
+     * <p>This state indicates when low light boost is 'ACTIVE' and applied. Similarly, it can
+     * indicate when it is not being applied by returning 'INACTIVE'.</p>
+     * <p>This key will be absent from the CaptureResult if AE mode is not set to
+     * 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY.</p>
+     */
+    ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE =                     // byte (acamera_metadata_enum_android_control_low_light_boost_state_t)
+            ACAMERA_CONTROL_START + 56,
     ACAMERA_CONTROL_END,
 
     /**
@@ -2364,6 +2397,125 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_FLASH_STATE =                                       // byte (acamera_metadata_enum_android_flash_state_t)
             ACAMERA_FLASH_START + 5,
+    /**
+     * <p>Flash strength level to be used when manual flash control is active.</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>Flash strength level to use in capture mode i.e. when the applications control
+     * flash with either SINGLE or TORCH mode.</p>
+     * <p>Use android.flash.info.singleStrengthMaxLevel and
+     * android.flash.info.torchStrengthMaxLevel to check whether the device supports
+     * flash strength control or not.
+     * If the values of android.flash.info.singleStrengthMaxLevel and
+     * android.flash.info.torchStrengthMaxLevel are greater than 1,
+     * then the device supports manual flash strength control.</p>
+     * <p>If the ACAMERA_FLASH_MODE <code>==</code> TORCH the value must be &gt;= 1
+     * and &lt;= android.flash.info.torchStrengthMaxLevel.
+     * If the application doesn't set the key and
+     * android.flash.info.torchStrengthMaxLevel &gt; 1,
+     * then the flash will be fired at the default level set by HAL in
+     * android.flash.info.torchStrengthDefaultLevel.
+     * If the ACAMERA_FLASH_MODE <code>==</code> SINGLE, then the value must be &gt;= 1
+     * and &lt;= android.flash.info.singleStrengthMaxLevel.
+     * If the application does not set this key and
+     * android.flash.info.singleStrengthMaxLevel &gt; 1,
+     * then the flash will be fired at the default level set by HAL
+     * in android.flash.info.singleStrengthDefaultLevel.
+     * If ACAMERA_CONTROL_AE_MODE is set to any of ON_AUTO_FLASH, ON_ALWAYS_FLASH,
+     * ON_AUTO_FLASH_REDEYE, ON_EXTERNAL_FLASH values, then the strengthLevel will be ignored.</p>
+     *
+     * @see ACAMERA_CONTROL_AE_MODE
+     * @see ACAMERA_FLASH_MODE
+     */
+    ACAMERA_FLASH_STRENGTH_LEVEL =                              // int32
+            ACAMERA_FLASH_START + 6,
+    /**
+     * <p>Maximum flash brightness level for manual flash control in SINGLE mode.</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Maximum flash brightness level in camera capture mode and
+     * ACAMERA_FLASH_MODE set to SINGLE.
+     * Value will be &gt; 1 if the manual flash strength control feature is supported,
+     * otherwise the value will be equal to 1.
+     * Note that this level is just a number of supported levels (the granularity of control).
+     * There is no actual physical power units tied to this level.</p>
+     *
+     * @see ACAMERA_FLASH_MODE
+     */
+    ACAMERA_FLASH_SINGLE_STRENGTH_MAX_LEVEL =                   // int32
+            ACAMERA_FLASH_START + 7,
+    /**
+     * <p>Default flash brightness level for manual flash control in SINGLE mode.</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>If flash unit is available this will be greater than or equal to 1 and less
+     * or equal to <code>android.flash.info.singleStrengthMaxLevel</code>.
+     * Note for devices that do not support the manual flash strength control
+     * feature, this level will always be equal to 1.</p>
+     */
+    ACAMERA_FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL =               // int32
+            ACAMERA_FLASH_START + 8,
+    /**
+     * <p>Maximum flash brightness level for manual flash control in TORCH mode</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Maximum flash brightness level in camera capture mode and
+     * ACAMERA_FLASH_MODE set to TORCH.
+     * Value will be &gt; 1 if the manual flash strength control feature is supported,
+     * otherwise the value will be equal to 1.</p>
+     * <p>Note that this level is just a number of supported levels(the granularity of control).
+     * There is no actual physical power units tied to this level.
+     * There is no relation between android.flash.info.torchStrengthMaxLevel and
+     * android.flash.info.singleStrengthMaxLevel i.e. the ratio of
+     * android.flash.info.torchStrengthMaxLevel:android.flash.info.singleStrengthMaxLevel
+     * is not guaranteed to be the ratio of actual brightness.</p>
+     *
+     * @see ACAMERA_FLASH_MODE
+     */
+    ACAMERA_FLASH_TORCH_STRENGTH_MAX_LEVEL =                    // int32
+            ACAMERA_FLASH_START + 9,
+    /**
+     * <p>Default flash brightness level for manual flash control in TORCH mode</p>
+     *
+     * <p>Type: int32</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>If flash unit is available this will be greater than or equal to 1 and less
+     * or equal to android.flash.info.torchStrengthMaxLevel.
+     * Note for the devices that do not support the manual flash strength control feature,
+     * this level will always be equal to 1.</p>
+     */
+    ACAMERA_FLASH_TORCH_STRENGTH_DEFAULT_LEVEL =                // int32
+            ACAMERA_FLASH_START + 10,
     ACAMERA_FLASH_END,
 
     /**
@@ -4506,8 +4658,8 @@ typedef enum acamera_metadata_tag {
      * <p>The guaranteed stream combinations related to stream use case for a camera device with
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE">CameraCharacteristics#REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE</a>
      * capability is documented in the camera device
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#stream-use-case-capability-additional-guaranteed-configurations">guideline</a>. The application is strongly recommended to use one of the guaranteed stream
-     * combinations.
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#stream-use-case-capability-additional-guaranteed-configurations">guideline</a>.
+     * The application is strongly recommended to use one of the guaranteed stream combinations.
      * If the application creates a session with a stream combination not in the guaranteed
      * list, or with mixed DEFAULT and non-DEFAULT use cases within the same session,
      * the camera device may ignore some stream use cases due to hardware constraints
@@ -4597,8 +4749,8 @@ typedef enum acamera_metadata_tag {
     ACAMERA_SENSOR_EXPOSURE_TIME =                              // int64
             ACAMERA_SENSOR_START,
     /**
-     * <p>Duration from start of frame exposure to
-     * start of next frame exposure.</p>
+     * <p>Duration from start of frame readout to
+     * start of next frame readout.</p>
      *
      * <p>Type: int64</p>
      *
@@ -4668,6 +4820,10 @@ typedef enum acamera_metadata_tag {
      * <p>For more details about stalling, see {@link ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS }.</p>
      * <p>This control is only effective if ACAMERA_CONTROL_AE_MODE or ACAMERA_CONTROL_MODE is set to
      * OFF; otherwise the auto-exposure algorithm will override this value.</p>
+     * <p><em>Note:</em> Prior to Android 13, this field was described as measuring the duration from
+     * start of frame exposure to start of next frame exposure, which doesn't reflect the
+     * definition from sensor manufacturer. A mobile sensor defines the frame duration as
+     * intervals between sensor readouts.</p>
      *
      * @see ACAMERA_CONTROL_AE_MODE
      * @see ACAMERA_CONTROL_MODE
@@ -6371,6 +6527,40 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_STATISTICS_OIS_Y_SHIFTS =                           // float[n]
             ACAMERA_STATISTICS_START + 20,
+    /**
+     * <p>An array of timestamps of lens intrinsics samples, in nanoseconds.</p>
+     *
+     * <p>Type: int64[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The array contains the timestamps of lens intrinsics samples. The timestamps are in the
+     * same timebase as and comparable to ACAMERA_SENSOR_TIMESTAMP.</p>
+     *
+     * @see ACAMERA_SENSOR_TIMESTAMP
+     */
+    ACAMERA_STATISTICS_LENS_INTRINSIC_TIMESTAMPS =              // int64[n]
+            ACAMERA_STATISTICS_START + 21,
+    /**
+     * <p>An array of intra-frame lens intrinsics.</p>
+     *
+     * <p>Type: float[5*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The data layout and contents of individual array entries matches with
+     * ACAMERA_LENS_INTRINSIC_CALIBRATION.</p>
+     *
+     * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
+     */
+    ACAMERA_STATISTICS_LENS_INTRINSIC_SAMPLES =                 // float[5*n]
+            ACAMERA_STATISTICS_START + 22,
     ACAMERA_STATISTICS_END,
 
     /**
@@ -7345,6 +7535,54 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID =           // byte
             ACAMERA_LOGICAL_MULTI_CAMERA_START + 2,
+    /**
+     * <p>The current region of the active physical sensor that will be read out for this
+     * capture.</p>
+     *
+     * <p>Type: int32[4]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>This capture result matches with ACAMERA_SCALER_CROP_REGION on non-logical single
+     * camera sensor devices. In case of logical cameras that can switch between several
+     * physical devices in response to ACAMERA_CONTROL_ZOOM_RATIO, this capture result will
+     * not behave like ACAMERA_SCALER_CROP_REGION and ACAMERA_CONTROL_ZOOM_RATIO, where the
+     * combination of both reflects the effective zoom and crop of the logical camera output.
+     * Instead, this capture result value will describe the zoom and crop of the active physical
+     * device. Some examples of when the value of this capture result will change include
+     * switches between different physical lenses, switches between regular and maximum
+     * resolution pixel mode and going through the device digital or optical range.
+     * This capture result is similar to ACAMERA_SCALER_CROP_REGION with respect to distortion
+     * correction. When the distortion correction mode is OFF, the coordinate system follows
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, with (0, 0) being the top-left pixel
+     * of the pre-correction active array. When the distortion correction mode is not OFF,
+     * the coordinate system follows ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with (0, 0) being
+     * the top-left pixel of the active array.</p>
+     * <p>For camera devices with the
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR">CameraMetadata#REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR</a>
+     * capability or devices where <a href="https://developer.android.com/reference/CameraCharacteristics.html#getAvailableCaptureRequestKeys">CameraCharacteristics#getAvailableCaptureRequestKeys</a>
+     * lists <a href="https://developer.android.com/reference/CaptureRequest.html#SENSOR_PIXEL_MODE">ACAMERA_SENSOR_PIXEL_MODE</a>
+     * , the current active physical device
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION /
+     * ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION must be used as the
+     * coordinate system for requests where ACAMERA_SENSOR_PIXEL_MODE is set to
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION">CameraMetadata#SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION</a>.</p>
+     * <p>The data representation is int[4], which maps to (left, top, width, height).</p>
+     *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
+     * @see ACAMERA_SCALER_CROP_REGION
+     * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
+     * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION
+     * @see ACAMERA_SENSOR_PIXEL_MODE
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_SENSOR_CROP_REGION = 
+                                                                // int32[4]
+            ACAMERA_LOGICAL_MULTI_CAMERA_START + 3,
     ACAMERA_LOGICAL_MULTI_CAMERA_END,
 
     /**
@@ -8008,6 +8246,44 @@ typedef enum acamera_metadata_enum_acamera_control_ae_mode {
      * @see ACAMERA_CONTROL_AE_STATE
      */
     ACAMERA_CONTROL_AE_MODE_ON_EXTERNAL_FLASH                        = 5,
+
+    /**
+     * <p>Like 'ON' but applies additional brightness boost in low light scenes.</p>
+     * <p>When the scene lighting conditions are within the range defined by
+     * ACAMERA_CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE this mode will apply additional
+     * brightness boost.</p>
+     * <p>This mode will automatically adjust the intensity of low light boost applied
+     * according to the scene lighting conditions. A darker scene will receive more boost
+     * while a brighter scene will receive less boost.</p>
+     * <p>This mode can ignore the set target frame rate to allow more light to be captured
+     * which can result in choppier motion. The frame rate can extend to lower than the
+     * ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES but will not go below 10 FPS. This mode
+     * can also increase the sensor sensitivity gain which can result in increased luma
+     * and chroma noise. The sensor sensitivity gain can extend to higher values beyond
+     * ACAMERA_SENSOR_INFO_SENSITIVITY_RANGE. This mode may also apply additional
+     * processing to recover details in dark and bright areas of the image,and noise
+     * reduction at high sensitivity gain settings to manage the trade-off between light
+     * sensitivity and capture noise.</p>
+     * <p>This mode is restricted to two output surfaces. One output surface type can either
+     * be SurfaceView or TextureView. Another output surface type can either be MediaCodec
+     * or MediaRecorder. This mode cannot be used with a target FPS range higher than 30
+     * FPS.</p>
+     * <p>If the session configuration is not supported, the AE mode reported in the
+     * CaptureResult will be 'ON' instead of 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY'.</p>
+     * <p>The application can observe the CapturerResult field
+     * ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE to determine when low light boost is 'ACTIVE' or
+     * 'INACTIVE'.</p>
+     * <p>The low light boost is 'ACTIVE' once the scene lighting condition is less than the
+     * upper bound lux value defined by ACAMERA_CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE.
+     * This mode will be 'INACTIVE' once the scene lighting condition is greater than the
+     * upper bound lux value defined by ACAMERA_CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE.</p>
+     *
+     * @see ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES
+     * @see ACAMERA_CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE
+     * @see ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE
+     * @see ACAMERA_SENSOR_INFO_SENSITIVITY_RANGE
+     */
+    ACAMERA_CONTROL_AE_MODE_ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY   = 6,
 
 } acamera_metadata_enum_android_control_ae_mode_t;
 
@@ -9010,6 +9286,20 @@ typedef enum acamera_metadata_enum_acamera_control_autoframing_state {
 
 } acamera_metadata_enum_android_control_autoframing_state_t;
 
+// ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE
+typedef enum acamera_metadata_enum_acamera_control_low_light_boost_state {
+    /**
+     * <p>The AE mode 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY' is enabled but not applied.</p>
+     */
+    ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE_INACTIVE                   = 0,
+
+    /**
+     * <p>The AE mode 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY' is enabled and applied.</p>
+     */
+    ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE_ACTIVE                     = 1,
+
+} acamera_metadata_enum_android_control_low_light_boost_state_t;
+
 
 
 // ACAMERA_EDGE_MODE
@@ -9885,8 +10175,8 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * </ul>
      * <p><a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#SCALER_AVAILABLE_STREAM_USE_CASES">CameraCharacteristics#SCALER_AVAILABLE_STREAM_USE_CASES</a>
      * lists all of the supported stream use cases.</p>
-     * <p>Refer to
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#stream-use-case-capability-additional-guaranteed-configurations">CameraDevice#stream-use-case-capability-additional-guaranteed-configurations</a>
+     * <p>Refer to the
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#stream-use-case-capability-additional-guaranteed-configurations">guideline</a>
      * for the mandatory stream combinations involving stream use cases, which can also be
      * queried via <a href="https://developer.android.com/reference/android/hardware/camera2/params/MandatoryStreamCombination.html">MandatoryStreamCombination</a>.</p>
      */
@@ -10747,9 +11037,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
     /**
      * <p>This camera device does not have enough capabilities to qualify as a <code>FULL</code> device or
      * better.</p>
-     * <p>Only the stream configurations listed in the <code>LEGACY</code> and <code>LIMITED</code> tables in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are guaranteed to be supported.</p>
+     * <p>Only the stream configurations listed in the <code>LEGACY</code> and <code>LIMITED</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#limited-level-additional-guaranteed-configurations">tables</a>
+     * in the documentation are guaranteed to be supported.</p>
      * <p>All <code>LIMITED</code> devices support the <code>BACKWARDS_COMPATIBLE</code> capability, indicating basic
      * support for color image capture. The only exception is that the device may
      * alternatively support only the <code>DEPTH_OUTPUT</code> capability, if it can only output depth
@@ -10774,9 +11064,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
 
     /**
      * <p>This camera device is capable of supporting advanced imaging applications.</p>
-     * <p>The stream configurations listed in the <code>FULL</code>, <code>LEGACY</code> and <code>LIMITED</code> tables in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are guaranteed to be supported.</p>
+     * <p>The stream configurations listed in the <code>FULL</code>, <code>LEGACY</code> and <code>LIMITED</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#full-level-additional-guaranteed-configurations">tables</a>
+     * in the documentation are guaranteed to be supported.</p>
      * <p>A <code>FULL</code> device will support below capabilities:</p>
      * <ul>
      * <li><code>BURST_CAPTURE</code> capability (ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains
@@ -10803,9 +11093,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
 
     /**
      * <p>This camera device is running in backward compatibility mode.</p>
-     * <p>Only the stream configurations listed in the <code>LEGACY</code> table in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are supported.</p>
+     * <p>Only the stream configurations listed in the <code>LEGACY</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#legacy-level-guaranteed-configurations">table</a>
+     * in the documentation are supported.</p>
      * <p>A <code>LEGACY</code> device does not support per-frame control, manual sensor control, manual
      * post-processing, arbitrary cropping regions, and has relaxed performance constraints.
      * No additional capabilities beyond <code>BACKWARD_COMPATIBLE</code> will ever be listed by a
@@ -10827,9 +11117,9 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
      * <p>This camera device is capable of YUV reprocessing and RAW data capture, in addition to
      * FULL-level capabilities.</p>
      * <p>The stream configurations listed in the <code>LEVEL_3</code>, <code>RAW</code>, <code>FULL</code>, <code>LEGACY</code> and
-     * <code>LIMITED</code> tables in the
-     * {@link ACameraDevice_createCaptureSession }
-     * documentation are guaranteed to be supported.</p>
+     * <code>LIMITED</code>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice#level-3-additional-guaranteed-configurations">tables</a>
+     * in the documentation are guaranteed to be supported.</p>
      * <p>The following additional capabilities are guaranteed to be supported:</p>
      * <ul>
      * <li><code>YUV_REPROCESSING</code> capability (ACAMERA_REQUEST_AVAILABLE_CAPABILITIES contains

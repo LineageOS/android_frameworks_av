@@ -43,7 +43,7 @@ public:
     HwModule(const char *name, uint32_t halVersion = 0);
     ~HwModule();
 
-    const char *getName() const { return mName.string(); }
+    const char *getName() const { return mName.c_str(); }
 
     const DeviceVector &getDeclaredDevices() const { return mDeclaredDevices; }
     void setDeclaredDevices(const DeviceVector &devices);

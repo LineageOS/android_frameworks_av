@@ -86,7 +86,7 @@ ScopedAStatus AidlCameraService::getCameraCharacteristics(const std::string& in_
     if (_aidl_return == nullptr) { return fromSStatus(SStatus::ILLEGAL_ARGUMENT); }
 
     ::android::CameraMetadata cameraMetadata;
-    UStatus ret = mCameraService->getCameraCharacteristics(String16(in_cameraId.c_str()),
+    UStatus ret = mCameraService->getCameraCharacteristics(in_cameraId,
                                                            mVndkVersion,
                                                            /* overrideToPortrait= */ false,
                                                            &cameraMetadata);
@@ -103,7 +103,7 @@ ScopedAStatus AidlCameraService::getCameraCharacteristics(const std::string& in_
                 return fromSStatus(SStatus::ILLEGAL_ARGUMENT);
             default:
                 ALOGE("Get camera characteristics from camera service failed: %s",
-                      ret.toString8().string());
+                      ret.toString8().c_str());
                 return fromUStatus(ret);
         }
     }
@@ -140,8 +140,8 @@ ndk::ScopedAStatus AidlCameraService::connectDevice(
     sp<hardware::camera2::ICameraDeviceCallbacks> callbacks = hybridCallbacks;
     binder::Status serviceRet = mCameraService->connectDevice(
             callbacks,
-            String16(in_cameraId.c_str()),
-            String16(""),
+            in_cameraId,
+            std::string(),
             /* clientFeatureId= */{},
             hardware::ICameraService::USE_CALLING_UID,
             /* scoreOffset= */ 0,
@@ -249,7 +249,7 @@ SStatus AidlCameraService::addListenerInternal(
             [this](const hardware::CameraStatus& s) {
                 bool supportsHAL3 = false;
                 binder::Status sRet =
-                            mCameraService->supportsCameraApi(String16(s.cameraId),
+                            mCameraService->supportsCameraApi(s.cameraId,
                                     UICameraService::API_VERSION_2, &supportsHAL3);
                 return !sRet.isOk() || !supportsHAL3;
             }), cameraStatusAndIds->end());
@@ -313,7 +313,7 @@ ndk::ScopedAStatus AidlCameraService::getCameraVendorTagSections(
         }
         vendorTagSections.resize(numSections);
         for (size_t s = 0; s < numSections; s++) {
-            vendorTagSections[s].sectionName = (*sectionNames)[s].string();
+            vendorTagSections[s].sectionName = (*sectionNames)[s].c_str();
             vendorTagSections[s].tags = tagsBySection[s];
         }
         SProviderIdAndVendorTagSections & prvdrIdAndVendorTagSection =

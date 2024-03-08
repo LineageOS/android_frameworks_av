@@ -594,18 +594,13 @@ status_t AudioTrack::set(
     channelCount = audio_channel_count_from_out_mask(channelMask);
     mChannelCount = channelCount;
 
-    if (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
-        if (audio_has_proportional_frames(format)) {
-            mFrameSize = channelCount * audio_bytes_per_sample(format);
-        } else {
-            mFrameSize = sizeof(uint8_t);
-        }
-    } else {
-        ALOG_ASSERT(audio_has_proportional_frames(format));
-        mFrameSize = channelCount * audio_bytes_per_sample(format);
+    if (!(mFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
         // createTrack will return an error if PCM format is not supported by server,
         // so no need to check for specific PCM formats here
+        ALOGW_IF(!audio_has_proportional_frames(format), "%s(): no direct flag for format 0x%x",
+            __func__, format);
     }
+    mFrameSize = audio_bytes_per_frame(channelCount, format);
 
     // sampling rate must be specified for direct outputs
     if (sampleRate == 0 && (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
@@ -817,7 +812,7 @@ status_t AudioTrack::start()
     (void) updateAndGetPosition_l();
 
     // save start timestamp
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         if (getTimestamp_l(mStartTs) != OK) {
             mStartTs.mPosition = 0;
         }
@@ -838,7 +833,7 @@ status_t AudioTrack::start()
         mTimestampStaleTimeReported = false;
         mPreviousLocation = ExtendedTimestamp::LOCATION_INVALID;
 
-        if (!isOffloadedOrDirect_l()
+        if (!isAfTrackOffloadedOrDirect_l()
                 && mStartEts.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] > 0) {
             // Server side has consumed something, but is it finished consuming?
             // It is possible since flush and stop are asynchronous that the server
@@ -1917,6 +1912,7 @@ status_t AudioTrack::createTrack_l()
     mAfChannelCount = audio_channel_count_from_out_mask(output.afChannelMask);
     mAfFormat = output.afFormat;
     mAfLatency = output.afLatencyMs;
+    mAfTrackFlags = output.afTrackFlags;
 
     mLatency = mAfLatency + (1000LL * mFrameCount) / mSampleRate;
 
@@ -3035,7 +3031,7 @@ status_t AudioTrack::selectPresentation(int presentationId, int programId)
     param.addInt(String8(AudioParameter::keyPresentationId), presentationId);
     param.addInt(String8(AudioParameter::keyProgramId), programId);
     ALOGV("%s(%d): PresentationId/ProgramId[%s]",
-            __func__, mPortId, param.toString().string());
+            __func__, mPortId, param.toString().c_str());
 
     status_t status;
     mAudioTrack->setParameters(param.toString().c_str(), &status);
@@ -3182,7 +3178,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
     // To avoid a race, read the presented frames first.  This ensures that presented <= consumed.
 
     status_t status;
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         // use Binder to get timestamp
         media::AudioTimestampInternal ts;
         mAudioTrack->getTimestamp(&ts, &status);
@@ -3294,7 +3290,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
         ALOGV_IF(status != WOULD_BLOCK, "%s(%d): getTimestamp error:%#x", __func__, mPortId, status);
         return status;
     }
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         if (isOffloaded_l() && (mState == STATE_PAUSED || mState == STATE_PAUSED_STOPPING)) {
             // use cached paused position in case another offloaded track is running.
             timestamp.mPosition = mPausedPosition;
@@ -3478,7 +3474,7 @@ String8 AudioTrack::getParameters(const String8& keys)
     if (output != AUDIO_IO_HANDLE_NONE) {
         return AudioSystem::getParameters(output, keys);
     } else {
-        return String8::empty();
+        return String8();
     }
 }
 
@@ -3524,7 +3520,7 @@ status_t AudioTrack::dump(int fd, const Vector<String16>& args __unused) const
                         mLatency, mSelectedDeviceId, mRoutedDeviceId);
     result.appendFormat("  output(%d) AF latency (%u) AF frame count(%zu) AF SampleRate(%u)\n",
                         mOutput, mAfLatency, mAfFrameCount, mAfSampleRate);
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
     return NO_ERROR;
 }
 
@@ -3740,7 +3736,7 @@ bool AudioTrack::hasStarted()
     // This is conservatively figured - if we encounter an unexpected error
     // then we will not wait.
     bool wait = false;
-    if (isOffloadedOrDirect_l()) {
+    if (isAfTrackOffloadedOrDirect_l()) {
         AudioTimestamp ts;
         status_t status = getTimestamp_l(ts);
         if (status == WOULD_BLOCK) {

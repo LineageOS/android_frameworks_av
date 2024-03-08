@@ -40,9 +40,5 @@ int main(int argc __unused, char** argv)
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
     strcpy(argv[0], "media.swcodec");
 
-    ::android::hardware::configureRpcThreadpool(64, false);
-
     RegisterCodecServices();
-
-    ::android::hardware::joinRpcThreadpool();
 }

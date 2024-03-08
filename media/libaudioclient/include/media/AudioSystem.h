@@ -178,6 +178,7 @@ public:
 
     // helper function to obtain AudioFlinger service handle
     static const sp<IAudioFlinger> get_audio_flinger();
+    static const sp<IAudioFlinger> get_audio_flinger_for_fuzzer();
 
     static float linearToLog(int volume);
     static int logToLinear(float volume);
@@ -460,6 +461,10 @@ public:
     static audio_mode_t getPhoneState();
 
     static status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
+
+    static status_t updatePolicyMixes(
+        const std::vector<
+                std::pair<AudioMix, std::vector<AudioMixMatchCriterion>>>& mixesWithUpdates);
 
     static status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices);
 
@@ -876,6 +881,7 @@ private:
     static audio_io_handle_t getOutput(audio_stream_type_t stream);
     static const sp<AudioFlingerClient> getAudioFlingerClient();
     static sp<AudioIoDescriptor> getIoDescriptor(audio_io_handle_t ioHandle);
+    static const sp<IAudioFlinger> getAudioFlingerImpl(bool canStartThreadPool);
 
     // Invokes all registered error callbacks with the given error code.
     static void reportError(status_t err);

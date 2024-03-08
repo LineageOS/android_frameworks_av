@@ -17,6 +17,8 @@
 #ifndef ANDROID_HARDWARE_CAMERA_SERVICE_SESSION_STATS_H
 #define ANDROID_HARDWARE_CAMERA_SERVICE_SESSION_STATS_H
 
+#include <string>
+
 #include <binder/Parcelable.h>
 
 #include <camera/CameraMetadata.h>
@@ -121,10 +123,10 @@ public:
     static const int CAMERA_API_LEVEL_1;
     static const int CAMERA_API_LEVEL_2;
 
-    String16 mCameraId;
+    std::string mCameraId;
     int mFacing;
     int mNewCameraState;
-    String16 mClientName;
+    std::string mClientName;
     int mApiLevel;
     bool mIsNdk;
     // latency in ms for camera open, close, or session creation.
@@ -157,16 +159,18 @@ public:
     // Whether the device runs into an error state
     bool mDeviceError;
     std::vector<CameraStreamStats> mStreamStats;
-    String16 mUserTag;
+    std::string mUserTag;
     int mVideoStabilizationMode;
+    bool mUsedUltraWide;
+    bool mUsedZoomOverride;
     int mSessionIndex;
 
     CameraExtensionSessionStats mCameraExtensionSessionStats;
 
     // Constructors
     CameraSessionStats();
-    CameraSessionStats(const String16& cameraId, int facing, int newCameraState,
-                       const String16& clientName, int apiLevel, bool isNdk, int32_t latencyMs,
+    CameraSessionStats(const std::string& cameraId, int facing, int newCameraState,
+                       const std::string& clientName, int apiLevel, bool isNdk, int32_t latencyMs,
                        int64_t logId);
 
     virtual status_t readFromParcel(const android::Parcel* parcel) override;

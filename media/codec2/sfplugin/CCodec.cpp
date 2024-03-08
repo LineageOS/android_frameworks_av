@@ -867,6 +867,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
         sp<Surface> surface;
         if (msg->findObject("native-window", &obj)) {
             surface = static_cast<Surface *>(obj.get());
+            int32_t generation;
+            (void)msg->findInt32("native-window-generation", &generation);
             // setup tunneled playback
             if (surface != nullptr) {
                 Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -901,7 +903,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     }
                 }
             }
-            setSurface(surface);
+            setSurface(surface, (uint32_t)generation);
         }
 
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -1923,8 +1925,16 @@ void CCodec::stop(bool pushBlankBuffer) {
         }
         comp = state->comp;
     }
-    status_t err = comp->stop();
+
+    // Note: Logically mChannel->stopUseOutputSurface() should be after comp->stop().
+    // But in the case some HAL implementations hang forever on comp->stop().
+    // (HAL is waiting for C2Fence until fetchGraphicBlock unblocks and not
+    // completing stop()).
+    // So we reverse their order for stopUseOutputSurface() to notify C2Fence waiters
+    // prior to comp->stop().
+    // See also b/300350761.
     mChannel->stopUseOutputSurface(pushBlankBuffer);
+    status_t err = comp->stop();
     if (err != C2_OK) {
         // TODO: convert err into status_t
         mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
@@ -2012,8 +2022,15 @@ void CCodec::release(bool sendCallback, bool pushBlankBuffer) {
         }
         comp = state->comp;
     }
-    comp->release();
+    // Note: Logically mChannel->stopUseOutputSurface() should be after comp->release().
+    // But in the case some HAL implementations hang forever on comp->release().
+    // (HAL is waiting for C2Fence until fetchGraphicBlock unblocks and not
+    // completing release()).
+    // So we reverse their order for stopUseOutputSurface() to notify C2Fence waiters
+    // prior to comp->release().
+    // See also b/300350761.
     mChannel->stopUseOutputSurface(pushBlankBuffer);
+    comp->release();
 
     {
         Mutexed<State>::Locked state(mState);
@@ -2026,7 +2043,7 @@ void CCodec::release(bool sendCallback, bool pushBlankBuffer) {
     }
 }
 
-status_t CCodec::setSurface(const sp<Surface> &surface) {
+status_t CCodec::setSurface(const sp<Surface> &surface, uint32_t generation) {
     bool pushBlankBuffer = false;
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -2055,7 +2072,7 @@ status_t CCodec::setSurface(const sp<Surface> &surface) {
         }
         pushBlankBuffer = config->mPushBlankBuffersOnStop;
     }
-    return mChannel->setSurface(surface, pushBlankBuffer);
+    return mChannel->setSurface(surface, generation, pushBlankBuffer);
 }
 
 void CCodec::signalFlush() {
@@ -2318,9 +2335,12 @@ status_t CCodec::unsubscribeFromParameters(const std::vector<std::string> &names
 void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
     if (!workItems.empty()) {
         Mutexed<std::list<std::unique_ptr<C2Work>>>::Locked queue(mWorkDoneQueue);
+        bool shouldPost = queue->empty();
         queue->splice(queue->end(), workItems);
+        if (shouldPost) {
+            (new AMessage(kWhatWorkDone, this))->post();
+        }
     }
-    (new AMessage(kWhatWorkDone, this))->post();
 }
 
 void CCodec::onInputBufferDone(uint64_t frameIndex, size_t arrayIndex) {

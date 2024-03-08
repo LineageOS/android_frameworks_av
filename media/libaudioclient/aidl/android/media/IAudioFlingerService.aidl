@@ -288,6 +288,11 @@ interface IAudioFlingerService {
      */
     AudioPolicyConfig getAudioPolicyConfig();
 
+    /**
+     * Get the attributes of the mix port when connecting to the given device port.
+     */
+    AudioPortFw getAudioMixPort(in AudioPortFw devicePort, in AudioPortFw mixPort);
+
     // When adding a new method, please review and update
     // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode
     // AudioFlinger.cpp AudioFlinger::onTransactWrapper()

@@ -21,8 +21,10 @@
 #include <android/hardware_buffer.h>
 #include <cutils/properties.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/AUtils.h>
 
 #include <inttypes.h>
+#include <libyuv.h>
 
 #include <C2Config.h>
 #include <C2Debug.h>
@@ -32,6 +34,15 @@
 #include <SimpleC2Component.h>
 
 namespace android {
+
+// libyuv version required for I410ToAB30Matrix and I210ToAB30Matrix.
+#if LIBYUV_VERSION >= 1780
+#include <algorithm>
+#define HAVE_LIBYUV_I410_I210_TO_AB30 1
+#else
+#define HAVE_LIBYUV_I410_I210_TO_AB30 0
+#endif
+
 constexpr uint8_t kNeutralUVBitDepth8 = 128;
 constexpr uint16_t kNeutralUVBitDepth10 = 512;
 
@@ -506,6 +517,120 @@ void convertRGBA1010102ToYUV420Planar16(uint16_t* dstY, uint16_t* dstU, uint16_t
     }
 }
 
+void convertPlanar16ToY410OrRGBA1010102(uint8_t* dst, const uint16_t* srcY, const uint16_t* srcU,
+                                        const uint16_t* srcV, size_t srcYStride, size_t srcUStride,
+                                        size_t srcVStride, size_t dstStride, size_t width,
+                                        size_t height,
+                                        std::shared_ptr<const C2ColorAspectsStruct> aspects,
+                                        CONV_FORMAT_T format) {
+    bool processed = false;
+#if HAVE_LIBYUV_I410_I210_TO_AB30
+    if (format == CONV_FORMAT_I444) {
+        libyuv::I410ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dst,
+                                 dstStride, &libyuv::kYuvV2020Constants, width, height);
+        processed = true;
+    } else if (format == CONV_FORMAT_I422) {
+        libyuv::I210ToAB30Matrix(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dst,
+                                 dstStride, &libyuv::kYuvV2020Constants, width, height);
+        processed = true;
+    }
+#endif  // HAVE_LIBYUV_I410_I210_TO_AB30
+    if (!processed) {
+        convertYUV420Planar16ToY410OrRGBA1010102(
+                (uint32_t*)dst, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                dstStride / sizeof(uint32_t), width, height,
+                std::static_pointer_cast<const C2ColorAspectsStruct>(aspects));
+    }
+}
+
+void convertPlanar16ToP010(uint16_t* dstY, uint16_t* dstUV, const uint16_t* srcY,
+                           const uint16_t* srcU, const uint16_t* srcV, size_t srcYStride,
+                           size_t srcUStride, size_t srcVStride, size_t dstYStride,
+                           size_t dstUStride, size_t dstVStride, size_t width, size_t height,
+                           bool isMonochrome, CONV_FORMAT_T format, uint16_t* tmpFrameBuffer,
+                           size_t tmpFrameBufferSize) {
+#if LIBYUV_VERSION >= 1779
+    if ((format == CONV_FORMAT_I444) || (format == CONV_FORMAT_I422)) {
+        // TODO(https://crbug.com/libyuv/952): replace this block with libyuv::I410ToP010
+        // and libyuv::I210ToP010 when they are available. Note it may be safe to alias dstY
+        // in I010ToP010, but the libyuv API doesn't make any guarantees.
+        const size_t tmpSize = dstYStride * height + dstUStride * align(height, 2);
+        CHECK(tmpSize <= tmpFrameBufferSize);
+
+        uint16_t* const tmpY = tmpFrameBuffer;
+        uint16_t* const tmpU = tmpY + dstYStride * height;
+        uint16_t* const tmpV = tmpU + dstUStride * align(height, 2) / 2;
+        if (format == CONV_FORMAT_I444) {
+            libyuv::I410ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
+                               dstYStride, tmpU, dstUStride, tmpV, dstUStride, width, height);
+        } else {
+            libyuv::I210ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY,
+                               dstYStride, tmpU, dstUStride, tmpV, dstUStride, width, height);
+        }
+        libyuv::I010ToP010(tmpY, dstYStride, tmpU, dstUStride, tmpV, dstVStride, dstY, dstYStride,
+                           dstUV, dstUStride, width, height);
+    } else {
+        convertYUV420Planar16ToP010(dstY, dstUV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                    srcVStride, dstYStride, dstUStride, width, height,
+                                    isMonochrome);
+    }
+#else   // LIBYUV_VERSION < 1779
+    convertYUV420Planar16ToP010(dstY, dstUV, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                                dstYStride, dstUStride, width, height, isMonochrome);
+#endif  // LIBYUV_VERSION >= 1779
+}
+
+void convertPlanar16ToYV12(uint8_t* dstY, uint8_t* dstU, uint8_t* dstV, const uint16_t* srcY,
+                           const uint16_t* srcU, const uint16_t* srcV, size_t srcYStride,
+                           size_t srcUStride, size_t srcVStride, size_t dstYStride,
+                           size_t dstUStride, size_t dstVStride, size_t width, size_t height,
+                           bool isMonochrome, CONV_FORMAT_T format, uint16_t* tmpFrameBuffer,
+                           size_t tmpFrameBufferSize) {
+#if LIBYUV_VERSION >= 1779
+    if (format == CONV_FORMAT_I444) {
+        // TODO(https://crbug.com/libyuv/950): replace this block with libyuv::I410ToI420
+        // when it's available.
+        const size_t tmpSize = dstYStride * height + dstUStride * align(height, 2);
+        CHECK(tmpSize <= tmpFrameBufferSize);
+
+        uint16_t* const tmpY = tmpFrameBuffer;
+        uint16_t* const tmpU = tmpY + dstYStride * height;
+        uint16_t* const tmpV = tmpU + dstUStride * align(height, 2) / 2;
+        libyuv::I410ToI010(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, tmpY, dstYStride,
+                           tmpU, dstUStride, tmpV, dstVStride, width, height);
+        libyuv::I010ToI420(tmpY, dstYStride, tmpU, dstUStride, tmpV, dstUStride, dstY, dstYStride,
+                           dstU, dstUStride, dstV, dstVStride, width, height);
+    } else if (format == CONV_FORMAT_I422) {
+        libyuv::I210ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY, dstYStride,
+                           dstU, dstUStride, dstV, dstVStride, width, height);
+    } else {
+        convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                    srcVStride, dstYStride, dstUStride, width, height,
+                                    isMonochrome);
+    }
+#else   // LIBYUV_VERSION < 1779
+    convertYUV420Planar16ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                srcVStride, dstYStride, dstUStride, width, height, isMonochrome);
+#endif  // LIBYUV_VERSION >= 1779
+}
+
+void convertPlanar8ToYV12(uint8_t* dstY, uint8_t* dstU, uint8_t* dstV, const uint8_t* srcY,
+                          const uint8_t* srcU, const uint8_t* srcV, size_t srcYStride,
+                          size_t srcUStride, size_t srcVStride, size_t dstYStride,
+                          size_t dstUStride, size_t dstVStride, uint32_t width, uint32_t height,
+                          bool isMonochrome, CONV_FORMAT_T format) {
+    if (format == CONV_FORMAT_I444) {
+        libyuv::I444ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY, dstYStride,
+                           dstU, dstUStride, dstV, dstVStride, width, height);
+    } else if (format == CONV_FORMAT_I422) {
+        libyuv::I422ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride, dstY, dstYStride,
+                           dstU, dstUStride, dstV, dstVStride, width, height);
+    } else {
+        convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                   srcVStride, dstYStride, dstUStride, dstVStride, width, height,
+                                   isMonochrome);
+    }
+}
 std::unique_ptr<C2Work> SimpleC2Component::WorkQueue::pop_front() {
     std::unique_ptr<C2Work> work = std::move(mQueue.front().work);
     mQueue.pop_front();

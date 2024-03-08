@@ -69,7 +69,7 @@ android::status_t InitDataParser::parse(const Vector<uint8_t>& initData,
     String8 requestJson = generateRequest(keyIds);
     licenseRequest->clear();
     licenseRequest->appendArray(
-            reinterpret_cast<const uint8_t*>(requestJson.string()),
+            reinterpret_cast<const uint8_t*>(requestJson.c_str()),
             requestJson.size());
     return android::OK;
 }

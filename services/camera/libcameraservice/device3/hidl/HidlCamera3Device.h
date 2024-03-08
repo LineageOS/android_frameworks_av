@@ -31,8 +31,9 @@ class HidlCamera3Device :
             public Camera3Device {
   public:
 
-   explicit HidlCamera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
-        const String8& id, bool overrideForPerfClass, bool overrideToPortrait,
+    explicit HidlCamera3Device(
+        std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+        const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
         bool legacyClient = false) :
         Camera3Device(cameraServiceProxyWrapper, id, overrideForPerfClass, overrideToPortrait,
                 legacyClient) { }
@@ -59,7 +60,7 @@ class HidlCamera3Device :
     static uint64_t mapProducerToFrameworkUsage(
             hardware::camera::device::V3_2::BufferUsageFlags usage);
 
-    status_t initialize(sp<CameraProviderManager> manager, const String8& monitorTags) override;
+    status_t initialize(sp<CameraProviderManager> manager, const std::string& monitorTags) override;
 
     /**
      * Implementation of android::hardware::camera::device::V3_5::ICameraDeviceCallback
@@ -191,7 +192,7 @@ class HidlCamera3Device :
      public:
         // Initialize the injection camera and generate an hal interface.
         status_t injectionInitialize(
-                const String8& injectedCamId, sp<CameraProviderManager> manager,
+                const std::string& injectedCamId, sp<CameraProviderManager> manager,
                 const sp<
                     android::hardware::camera::device::V3_2 ::ICameraDeviceCallback>&
                     callback);
@@ -217,7 +218,11 @@ class HidlCamera3Device :
     hardware::Return<void> notifyHelper(
             const hardware::hidl_vec<NotifyMsgType>& msgs);
 
-    virtual status_t injectionCameraInitialize(const String8 &injectCamId,
+    virtual void applyMaxBatchSizeLocked(
+            RequestList* requestList,
+            const sp<camera3::Camera3OutputStreamInterface>& stream) override;
+
+    virtual status_t injectionCameraInitialize(const std::string &injectCamId,
             sp<CameraProviderManager> manager) override;
 
     virtual sp<RequestThread> createNewRequestThread(wp<Camera3Device> parent,

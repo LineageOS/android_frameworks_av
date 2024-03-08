@@ -18,14 +18,21 @@
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
         <option name="push" value="ID3Test->/data/local/tmp/ID3Test" />
-        <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/id3/test/ID3Test-1.2.zip?unzip=true"
-            value="/data/local/tmp/ID3TestRes/" />
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="target" value="host" />
+        <option name="config-filename" value="ID3Test" />
+        <option name="version" value="1.0"/>
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.MediaPreparer">
+        <option name="push-all" value="true" />
+        <option name="media-folder-name" value="ID3TestRes-1.3" />
+        <option name="dynamic-config-module" value="ID3Test" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="ID3Test" />
-        <option name="native-test-flag" value="-P /data/local/tmp/ID3TestRes/" />
+        <option name="native-test-flag" value="-P /sdcard/test/ID3TestRes-1.3/" />
     </test>
 </configuration>

@@ -69,11 +69,6 @@ public:
     static const char * const keyBtHfpSamplingRate;
     static const char * const keyBtHfpVolume;
 
-#ifndef __ANDROID_VNDK__
-    // These static fields are not used by vendor code, they were added to make
-    // the framework code consistent. There is no plan to expose them to vendors
-    // because they were used by HIDL get/setParameters interface which does not
-    // exist in the AIDL HAL interface.
     static const char * const keyTtyMode;
     static const char * const valueTtyModeOff;
     static const char * const valueTtyModeFull;
@@ -83,7 +78,6 @@ public:
     static const char * const keyHacSetting;
     static const char * const valueHacOff;
     static const char * const valueHacOn;
-#endif  // __ANDROID_VNDK__
 
     //  keyHwAvSync: get HW synchronization source identifier from a device
     //  keyMonoOutput: Enable mono audio playback
@@ -127,10 +121,14 @@ public:
     // keyReconfigA2dp: Ask HwModule to reconfigure A2DP offloaded codec
     // keyReconfigA2dpSupported: Query if HwModule supports A2DP offload codec config
     // keyBtLeSuspended: 'true' or 'false'
+    // keyReconfigLe: Ask HwModule to reconfigure LE offloaded codec
+    // keyReconfigLeSupported: Query if HwModule supports LE offload codec config
     static const char * const keyBtA2dpSuspended;
     static const char * const keyReconfigA2dp;
     static const char * const keyReconfigA2dpSupported;
     static const char * const keyBtLeSuspended;
+    static const char * const keyReconfigLe;
+    static const char * const keyReconfigLeSupported;
 
     // For querying device supported encapsulation capabilities. All returned values are integer,
     // which are bit fields composed from using encapsulation capability values as position bits.

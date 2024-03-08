@@ -31,7 +31,6 @@
 #include <utils/Log.h>
 
 #include <functional>
-#include <fcntl.h>
 
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -564,6 +563,11 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     mResetStatus = OK;
     mPreAllocFirstTime = true;
     mPrevAllTracksTotalMetaDataSizeEstimate = 0;
+    mIsFirstChunk = false;
+    mDone = false;
+    mThread = 0;
+    mDriftTimeUs = 0;
+    mHasDolbyVision = false;
 
     // Following variables only need to be set for the first recording session.
     // And they will stay the same for all the recording sessions.
@@ -609,7 +613,7 @@ status_t MPEG4Writer::dump(
     result.append(buffer);
     snprintf(buffer, SIZE, "     mStarted: %s\n", mStarted? "true": "false");
     result.append(buffer);
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
     for (List<Track *>::iterator it = mTracks.begin();
          it != mTracks.end(); ++it) {
         (*it)->dump(fd, args);
@@ -631,7 +635,7 @@ status_t MPEG4Writer::Track::dump(
     result.append(buffer);
     snprintf(buffer, SIZE, "       duration encoded : %" PRId64 " us\n", mTrackDurationUs);
     result.append(buffer);
-    ::write(fd, result.string(), result.size());
+    ::write(fd, result.c_str(), result.size());
     return OK;
 }
 
@@ -711,6 +715,7 @@ status_t MPEG4Writer::addSource(const sp<MediaSource> &source) {
         // So we let the creation of the new track now and
         // assign FourCC codes later using getDoviFourCC()
         ALOGV("Add source mime '%s'", mime);
+        mHasDolbyVision = true;
     } else if (Track::getFourCCForMime(mime) == NULL) {
         ALOGE("Unsupported mime '%s'", mime);
         return ERROR_UNSUPPORTED;
@@ -1572,6 +1577,13 @@ void MPEG4Writer::writeFtypBox(MetaData *param) {
                 writeFourcc("av01");
                 break;
             }
+        }
+        // The brand ‘dby1’ should be used in the compatible_brands field to indicate that the file
+        // is compliant with all Dolby Extensions. For details, refer to
+        // https://professional.dolby.com/siteassets/content-creation/dolby-vision-for-content-creators/dolby_vision_bitstreams_within_the_iso_base_media_file_format_dec2017.pdf
+        // Chapter 7, Dolby Vision Files.
+        if (fileType == OUTPUT_FORMAT_MPEG_4 && mHasDolbyVision) {
+            writeFourcc("dby1");
         }
     }
 

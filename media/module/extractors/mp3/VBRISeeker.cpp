@@ -84,7 +84,7 @@ VBRISeeker *VBRISeeker::CreateFromSource(
          scale,
          entrySize);
 
-    if (entrySize > 4) {
+    if (entrySize < 1 || entrySize > 4) {
         ALOGE("invalid VBRI entry size: %zu", entrySize);
         return NULL;
     }
@@ -122,16 +122,13 @@ VBRISeeker *VBRISeeker::CreateFromSource(
 
     off64_t offset = post_id3_pos;
     for (size_t i = 0; i < numEntries; ++i) {
-        uint32_t numBytes;
+        uint32_t numBytes = 0;
+        // entrySize is known to be [1..4]
         switch (entrySize) {
             case 1: numBytes = buffer[i]; break;
             case 2: numBytes = U16_AT(buffer + 2 * i); break;
             case 3: numBytes = U24_AT(buffer + 3 * i); break;
-            default:
-            {
-                CHECK_EQ(entrySize, 4u);
-                numBytes = U32_AT(buffer + 4 * i); break;
-            }
+            case 4: numBytes = U32_AT(buffer + 4 * i); break;
         }
 
         numBytes *= scale;

@@ -84,9 +84,21 @@ struct IComponent;
 struct IComponentStore;
 }  // namespace android::hardware::media::c2::V1_2
 
+namespace aidl::android::hardware::media::c2 {
+class IComponent;
+class IComponentInterface;
+class IComponentStore;
+class IConfigurable;
+}  // namespace aidl::android::hardware::media::c2
+
 namespace android::hardware::media::bufferpool::V2_0 {
 struct IClientManager;
 }  // namespace android::hardware::media::bufferpool::V2_0
+
+namespace aidl::android::hardware::media::bufferpool2 {
+class IClientManager;
+}  // namespace aidl::android::hardware::media::c2
+
 
 namespace android::hardware::graphics::bufferqueue::V1_0 {
 struct IGraphicBufferProducer;
@@ -106,7 +118,36 @@ namespace android {
 // declaration of an inner class is not possible.
 struct Codec2ConfigurableClient {
 
-    typedef ::android::hardware::media::c2::V1_0::IConfigurable Base;
+    typedef ::android::hardware::media::c2::V1_0::IConfigurable HidlBase;
+    typedef ::aidl::android::hardware::media::c2::IConfigurable AidlBase;
+
+    struct ImplBase {
+        virtual ~ImplBase() = default;
+
+        virtual const C2String& getName() const = 0;
+
+        virtual c2_status_t query(
+                const std::vector<C2Param*>& stackParams,
+                const std::vector<C2Param::Index> &heapParamIndices,
+                c2_blocking_t mayBlock,
+                std::vector<std::unique_ptr<C2Param>>* const heapParams) const = 0;
+
+        virtual c2_status_t config(
+                const std::vector<C2Param*> &params,
+                c2_blocking_t mayBlock,
+                std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
+
+        virtual c2_status_t querySupportedParams(
+                std::vector<std::shared_ptr<C2ParamDescriptor>>* const params
+                ) const = 0;
+
+        virtual c2_status_t querySupportedValues(
+                std::vector<C2FieldSupportedValuesQuery>& fields,
+                c2_blocking_t mayBlock) const = 0;
+    };
+
+    explicit Codec2ConfigurableClient(const sp<HidlBase> &hidlBase);
+    explicit Codec2ConfigurableClient(const std::shared_ptr<AidlBase> &aidlBase);
 
     const C2String& getName() const;
 
@@ -128,25 +169,21 @@ struct Codec2ConfigurableClient {
     c2_status_t querySupportedValues(
             std::vector<C2FieldSupportedValuesQuery>& fields,
             c2_blocking_t mayBlock) const;
+private:
+    struct HidlImpl;
+    struct AidlImpl;
 
-    // base cannot be null.
-    Codec2ConfigurableClient(const sp<Base>& base);
-
-protected:
-    sp<Base> mBase;
-    C2String mName;
-
-    friend struct Codec2Client;
+    const std::unique_ptr<ImplBase> mImpl;
 };
 
 struct Codec2Client : public Codec2ConfigurableClient {
 
-    typedef ::android::hardware::media::c2::V1_0::IComponentStore Base1_0;
-    typedef ::android::hardware::media::c2::V1_1::IComponentStore Base1_1;
-    typedef ::android::hardware::media::c2::V1_2::IComponentStore Base1_2;
-    typedef Base1_0 Base;
+    typedef ::android::hardware::media::c2::V1_0::IComponentStore HidlBase1_0;
+    typedef ::android::hardware::media::c2::V1_1::IComponentStore HidlBase1_1;
+    typedef ::android::hardware::media::c2::V1_2::IComponentStore HidlBase1_2;
+    typedef HidlBase1_0 HidlBase;
 
-    typedef ::android::hardware::media::c2::V1_0::IConfigurable IConfigurable;
+    typedef ::aidl::android::hardware::media::c2::IComponentStore AidlBase;
 
     struct Listener;
 
@@ -162,10 +199,11 @@ struct Codec2Client : public Codec2ConfigurableClient {
 
     typedef Codec2Client Store;
 
-    sp<Base> const& getBase() const;
-    sp<Base1_0> const& getBase1_0() const;
-    sp<Base1_1> const& getBase1_1() const;
-    sp<Base1_2> const& getBase1_2() const;
+    sp<HidlBase> const& getHidlBase() const;
+    sp<HidlBase1_0> const& getHidlBase1_0() const;
+    sp<HidlBase1_1> const& getHidlBase1_1() const;
+    sp<HidlBase1_2> const& getHidlBase1_2() const;
+    ::ndk::SpAIBinder getAidlBase() const;
 
     std::string const& getServiceName() const;
 
@@ -234,14 +272,19 @@ struct Codec2Client : public Codec2ConfigurableClient {
 
     // base and/or configurable cannot be null.
     Codec2Client(
-            sp<Base> const& base,
-            sp<IConfigurable> const& configurable,
+            sp<HidlBase> const& base,
+            sp<Codec2ConfigurableClient::HidlBase> const& configurable,
+            size_t serviceIndex);
+    Codec2Client(
+            std::shared_ptr<AidlBase> const& base,
+            std::shared_ptr<Codec2ConfigurableClient::AidlBase> const& configurable,
             size_t serviceIndex);
 
 protected:
-    sp<Base1_0> mBase1_0;
-    sp<Base1_1> mBase1_1;
-    sp<Base1_2> mBase1_2;
+    sp<HidlBase1_0> mHidlBase1_0;
+    sp<HidlBase1_1> mHidlBase1_1;
+    sp<HidlBase1_2> mHidlBase1_2;
+    std::shared_ptr<AidlBase> mAidlBase;
 
     // Finds the first store where the predicate returns C2_OK and returns the
     // last predicate result. The predicate will be tried on all stores. The
@@ -269,8 +312,11 @@ protected:
     mutable std::vector<C2Component::Traits> mTraitsList;
 
     sp<::android::hardware::media::bufferpool::V2_0::IClientManager>
-            mHostPoolManager;
+            mHidlHostPoolManager;
+    std::shared_ptr<::aidl::android::hardware::media::bufferpool2::IClientManager>
+            mAidlHostPoolManager;
 
+    static std::vector<std::string> CacheServiceNames();
     static std::shared_ptr<Codec2Client> _CreateFromIndex(size_t index);
 
     std::vector<C2Component::Traits> _listComponents(bool* success) const;
@@ -280,12 +326,15 @@ protected:
 
 struct Codec2Client::Interface : public Codec2Client::Configurable {
 
-    typedef ::android::hardware::media::c2::V1_0::IComponentInterface Base;
+    typedef ::android::hardware::media::c2::V1_0::IComponentInterface HidlBase;
+    typedef ::aidl::android::hardware::media::c2::IComponentInterface AidlBase;
 
-    Interface(const sp<Base>& base);
+    Interface(const sp<HidlBase>& base);
+    Interface(const std::shared_ptr<AidlBase>& base);
 
 protected:
-    sp<Base> mBase;
+    sp<HidlBase> mHidlBase;
+    std::shared_ptr<AidlBase> mAidlBase;
 };
 
 struct Codec2Client::Listener {
@@ -324,16 +373,17 @@ struct Codec2Client::Listener {
             int32_t slotId,
             int64_t timestampNs) = 0;
 
-    virtual ~Listener();
-
+    virtual ~Listener() = default;
 };
 
 struct Codec2Client::Component : public Codec2Client::Configurable {
 
-    typedef ::android::hardware::media::c2::V1_0::IComponent Base1_0;
-    typedef ::android::hardware::media::c2::V1_1::IComponent Base1_1;
-    typedef ::android::hardware::media::c2::V1_2::IComponent Base1_2;
-    typedef Base1_0 Base;
+    typedef ::android::hardware::media::c2::V1_0::IComponent HidlBase1_0;
+    typedef ::android::hardware::media::c2::V1_1::IComponent HidlBase1_1;
+    typedef ::android::hardware::media::c2::V1_2::IComponent HidlBase1_2;
+    typedef HidlBase1_0 HidlBase;
+
+    typedef ::aidl::android::hardware::media::c2::IComponent AidlBase;
 
     c2_status_t createBlockPool(
             C2Allocator::id_t id,
@@ -424,6 +474,18 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     void stopUsingOutputSurface(
             C2BlockPool::local_id_t blockPoolId);
 
+    // Notify a buffer is released from output surface.
+    void onBufferReleasedFromOutputSurface(
+            uint32_t generation);
+
+    // When the client received \p workList and the blocks inside
+    // \p workList are IGBA based graphic blocks, specify the owner
+    // as the current IGBA for the future operations.
+    // Future operations could be rendering the blocks to the surface
+    // or deallocating blocks to the surface.
+    void holdIgbaBlocks(
+            const std::list<std::unique_ptr<C2Work>>& workList);
+
     // Connect to a given InputSurface.
     c2_status_t connectToInputSurface(
             const std::shared_ptr<InputSurface>& inputSurface,
@@ -437,19 +499,23 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     c2_status_t disconnectFromInputSurface();
 
     // base cannot be null.
-    Component(const sp<Base>& base);
-    Component(const sp<Base1_1>& base);
-    Component(const sp<Base1_2>& base);
+    Component(const sp<HidlBase>& base);
+    Component(const sp<HidlBase1_1>& base);
+    Component(const sp<HidlBase1_2>& base);
+    Component(const std::shared_ptr<AidlBase>& base);
 
     ~Component();
 
 protected:
-    sp<Base1_0> mBase1_0;
-    sp<Base1_1> mBase1_1;
-    sp<Base1_2> mBase1_2;
+    sp<HidlBase1_0> mHidlBase1_0;
+    sp<HidlBase1_1> mHidlBase1_1;
+    sp<HidlBase1_2> mHidlBase1_2;
+    std::shared_ptr<AidlBase> mAidlBase;
 
-    struct BufferPoolSender;
-    std::unique_ptr<BufferPoolSender> mBufferPoolSender;
+    struct HidlBufferPoolSender;
+    struct AidlBufferPoolSender;
+    std::unique_ptr<HidlBufferPoolSender> mHidlBufferPoolSender;
+    std::unique_ptr<AidlBufferPoolSender> mAidlBufferPoolSender;
 
     struct OutputBufferQueue;
     std::unique_ptr<OutputBufferQueue> mOutputBufferQueue;
@@ -459,6 +525,13 @@ protected:
     // In order to prevent the race condition mutex is added.
     std::mutex mOutputMutex;
 
+    struct GraphicBufferAllocators;
+    std::unique_ptr<GraphicBufferAllocators> mGraphicBufferAllocators;
+
+    class AidlDeathManager;
+    static AidlDeathManager *GetAidlDeathManager();
+    std::optional<size_t> mAidlDeathSeq;
+
     static c2_status_t setDeathListener(
             const std::shared_ptr<Component>& component,
             const std::shared_ptr<Listener>& listener);
@@ -467,16 +540,15 @@ protected:
     friend struct Codec2Client;
 
     struct HidlListener;
+    struct AidlListener;
     void handleOnWorkDone(const std::list<std::unique_ptr<C2Work>> &workItems);
-
 };
 
 struct Codec2Client::InputSurface : public Codec2Client::Configurable {
 public:
     typedef ::android::hardware::media::c2::V1_0::IInputSurface Base;
 
-    typedef ::android::hardware::media::c2::V1_0::IInputSurfaceConnection
-            ConnectionBase;
+    typedef ::android::hardware::media::c2::V1_0::IInputSurfaceConnection ConnectionBase;
 
     typedef Codec2Client::InputSurfaceConnection Connection;
 

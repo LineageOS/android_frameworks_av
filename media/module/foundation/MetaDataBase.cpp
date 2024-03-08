@@ -443,7 +443,7 @@ String8 MetaDataBase::toString() const {
         char cc[5];
         MakeFourCCString(key, cc);
         const typed_data &item = mInternalData->mItems.valueAt(i);
-        s.appendFormat("%s: %s", cc, item.asString(false).string());
+        s.appendFormat("%s: %s", cc, item.asString(false).c_str());
         if (i != 0) {
             s.append(", ");
         }
@@ -458,7 +458,7 @@ void MetaDataBase::dumpToLog() const {
         char cc[5];
         MakeFourCCString(key, cc);
         const typed_data &item = mInternalData->mItems.valueAt(i);
-        ALOGI("%s: %s", cc, item.asString(true /* verbose */).string());
+        ALOGI("%s: %s", cc, item.asString(true /* verbose */).c_str());
     }
 }
 

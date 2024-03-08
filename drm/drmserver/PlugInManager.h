@@ -25,6 +25,8 @@
 #include <utils/Vector.h>
 #include <utils/KeyedVector.h>
 
+#include <filesystem>
+
 namespace android {
 
 const char* const PLUGIN_MANAGER_CREATE = "create";
@@ -137,7 +139,7 @@ public:
 
         PlugInContainer* pPlugInContainer = new PlugInContainer();
 
-        pPlugInContainer->hHandle = dlopen(rsPlugInPath.string(), RTLD_LAZY);
+        pPlugInContainer->hHandle = dlopen(rsPlugInPath.c_str(), RTLD_LAZY);
 
         if (NULL == pPlugInContainer->hHandle) {
             delete pPlugInContainer;
@@ -201,7 +203,7 @@ private:
      */
     Vector<String8> getPlugInPathList(const String8& rsDirPath) {
         Vector<String8> fileList;
-        DIR* pDir = opendir(rsDirPath.string());
+        DIR* pDir = opendir(rsDirPath.c_str());
         struct dirent* pEntry;
 
         while (NULL != pDir && NULL != (pEntry = readdir(pDir))) {
@@ -227,10 +229,9 @@ private:
      * True if the input name denotes plug-in
      */
     bool isPlugIn(const struct dirent* pEntry) const {
-        String8 sName(pEntry->d_name);
-        String8 extension(sName.getPathExtension());
+        const auto extension = std::filesystem::path(pEntry->d_name).extension();
         // Note that the plug-in extension must exactly match case
-        return extension == String8(PLUGIN_EXTENSION);
+        return extension.string() == PLUGIN_EXTENSION;
     }
 
     /**

@@ -270,6 +270,10 @@ public:
     virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes) = 0;
     virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes) = 0;
 
+    virtual status_t updatePolicyMix(
+        const AudioMix& mix,
+        const std::vector<AudioMixMatchCriterion>& updatedCriteria) = 0;
+
     virtual status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices)
             = 0;
     virtual status_t removeUidDeviceAffinities(uid_t uid) = 0;
@@ -574,6 +578,10 @@ public:
                                              media::DeviceConnectedState state) = 0;
 
     virtual status_t invalidateTracks(const std::vector<audio_port_handle_t>& portIds) = 0;
+
+    // Get the attributes of the mix port when connecting to the given device port.
+    virtual status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                     struct audio_port_v7 *mixPort) = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager

@@ -50,7 +50,7 @@ sp<Session> SessionLibrary::createSession() {
     mNextSessionId += 1;
     Vector<uint8_t> sessionId;
     sessionId.appendArray(
-            reinterpret_cast<const uint8_t*>(sessionIdString.string()),
+            reinterpret_cast<const uint8_t*>(sessionIdString.c_str()),
             sessionIdString.size());
 
     mSessions.add(sessionId, new Session(sessionId));

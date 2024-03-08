@@ -41,10 +41,10 @@ tidy_errors = [
     "modernize-use-emplace",
     "modernize-use-equals-default",
     "modernize-use-equals-delete",
-    // "modernize-use-nodiscard", // found in aidl generated files
+    "modernize-use-nodiscard",
     "modernize-use-noexcept",
     "modernize-use-nullptr",
-    // "modernize-use-override", // found in aidl generated files
+    "modernize-use-override",
     // "modernize-use-trailing-return-type", // not necessarily more readable
     "modernize-use-transparent-functors",
     "modernize-use-uncaught-exceptions",
@@ -173,6 +173,7 @@ cc_library {
         "aaudio-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
+        "com.android.media.aaudio-aconfig-cc",
     ],
 
     cflags: [
@@ -224,10 +225,12 @@ cc_library {
         "flowgraph/SinkI16.cpp",
         "flowgraph/SinkI24.cpp",
         "flowgraph/SinkI32.cpp",
+        "flowgraph/SinkI8_24.cpp",
         "flowgraph/SourceFloat.cpp",
         "flowgraph/SourceI16.cpp",
         "flowgraph/SourceI24.cpp",
         "flowgraph/SourceI32.cpp",
+        "flowgraph/SourceI8_24.cpp",
         "flowgraph/resampler/IntegerRatio.cpp",
         "flowgraph/resampler/LinearResampler.cpp",
         "flowgraph/resampler/MultiChannelResampler.cpp",
@@ -254,6 +257,9 @@ aidl_interface {
     name: "aaudio-aidl",
     unstable: true,
     local_include_dir: "binding/aidl",
+    defaults: [
+        "latest_android_media_audio_common_types_import_interface",
+    ],
     srcs: [
         "binding/aidl/aaudio/Endpoint.aidl",
         "binding/aidl/aaudio/RingBuffer.aidl",
@@ -264,7 +270,6 @@ aidl_interface {
         "binding/aidl/aaudio/IAAudioService.aidl",
     ],
     imports: [
-        "android.media.audio.common.types-V2",
         "audioclient-types-aidl",
         "shared-file-region-aidl",
         "framework-permission-aidl",

@@ -609,6 +609,8 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
     size_t bufferSize = 0;
     c2_status_t blockRes = C2_OK;
     bool copied = false;
+    ScopedTrace trace(ATRACE_TAG, android::base::StringPrintf(
+            "CCodecBufferChannel::decrypt(%s)", mName).c_str());
     if (mSendEncryptedInfoBuffer) {
         static const C2MemoryUsage kDefaultReadWriteUsage{
             C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
@@ -1188,6 +1190,17 @@ void CCodecBufferChannel::pollForRenderedBuffers() {
     processRenderedFrames(delta);
 }
 
+void CCodecBufferChannel::onBufferReleasedFromOutputSurface(uint32_t generation) {
+    // Note: Since this is called asynchronously from IProducerListener not
+    // knowing the internal state of CCodec/CCodecBufferChannel,
+    // prevent mComponent from being destroyed by holding the shared reference
+    // during this interface being executed.
+    std::shared_ptr<Codec2Client::Component> comp = mComponent;
+    if (comp) {
+        comp->onBufferReleasedFromOutputSurface(generation);
+    }
+}
+
 status_t CCodecBufferChannel::discardBuffer(const sp<MediaCodecBuffer> &buffer) {
     ALOGV("[%s] discardBuffer: %p", mName, buffer.get());
     bool released = false;
@@ -1673,7 +1686,8 @@ status_t CCodecBufferChannel::start(
         watcher->inputDelay(inputDelayValue)
                 .pipelineDelay(pipelineDelayValue)
                 .outputDelay(outputDelayValue)
-                .smoothnessFactor(kSmoothnessFactor);
+                .smoothnessFactor(kSmoothnessFactor)
+                .tunneled(mTunneled);
         watcher->flush();
     }
 
@@ -2102,6 +2116,7 @@ bool CCodecBufferChannel::handleWork(
             newInputDelay.value_or(input->inputDelay) +
             newPipelineDelay.value_or(input->pipelineDelay) +
             kSmoothnessFactor;
+        input->inputDelay = newInputDelay.value_or(input->inputDelay);
         if (input->buffers->isArrayMode()) {
             if (input->numSlots >= newNumSlots) {
                 input->numExtraSlots = 0;
@@ -2240,8 +2255,15 @@ bool CCodecBufferChannel::handleWork(
 
     if (notifyClient && !buffer && !flags) {
         if (mTunneled && drop && outputFormat) {
-            ALOGV("[%s] onWorkDone: Keep tunneled, drop frame with format change (%lld)",
-                  mName, work->input.ordinal.frameIndex.peekull());
+            if (mOutputFormat != outputFormat) {
+                ALOGV("[%s] onWorkDone: Keep tunneled, drop frame with format change (%lld)",
+                      mName, work->input.ordinal.frameIndex.peekull());
+                mOutputFormat = outputFormat;
+            } else {
+                ALOGV("[%s] onWorkDone: Not reporting output buffer without format change (%lld)",
+                      mName, work->input.ordinal.frameIndex.peekull());
+                notifyClient = false;
+            }
         } else {
             ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
                   mName, work->input.ordinal.frameIndex.peekull());
@@ -2343,12 +2365,8 @@ void CCodecBufferChannel::sendOutputBuffers() {
     }
 }
 
-status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface, bool pushBlankBuffer) {
-    static std::atomic_uint32_t surfaceGeneration{0};
-    uint32_t generation = (getpid() << 10) |
-            ((surfaceGeneration.fetch_add(1, std::memory_order_relaxed) + 1)
-                & ((1 << 10) - 1));
-
+status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface,
+                                         uint32_t generation, bool pushBlankBuffer) {
     sp<IGraphicBufferProducer> producer;
     int maxDequeueCount;
     sp<Surface> oldSurface;
@@ -2362,7 +2380,6 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface, bool pus
         newSurface->setDequeueTimeout(kDequeueTimeoutNs);
         newSurface->setMaxDequeuedBufferCount(maxDequeueCount);
         producer = newSurface->getIGraphicBufferProducer();
-        producer->setGenerationNumber(generation);
     } else {
         ALOGE("[%s] setting output surface to null", mName);
         return INVALID_OPERATION;

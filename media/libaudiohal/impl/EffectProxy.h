@@ -98,6 +98,7 @@ class EffectProxy final : public ::aidl::android::hardware::audio::effect::BnEff
     }
 
     bool isBypassing() const;
+    bool isTunnel() const;
 
     // call dump for all sub-effects
     binder_status_t dump(int fd, const char** args, uint32_t numArgs) override;

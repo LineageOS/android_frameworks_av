@@ -20,7 +20,6 @@
 #include <memory>
 #include <mutex>
 
-#include <utils/String8.h>
 #include <utils/String16.h>
 
 #include <android/hardware/camera/device/3.6/ICameraOfflineSession.h>
@@ -53,7 +52,7 @@ class HidlCamera3OfflineSession :
   public:
 
     // initialize by Camera3Device.
-    explicit HidlCamera3OfflineSession(const String8& id,
+    explicit HidlCamera3OfflineSession(const std::string& id,
             const sp<camera3::Camera3Stream>& inputStream,
             const camera3::StreamSet& offlineStreamSet,
             camera3::BufferRecords&& bufferRecords,

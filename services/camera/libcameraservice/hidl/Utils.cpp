@@ -18,6 +18,7 @@
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <cutils/native_handle.h>
 #include <mediautils/AImageReaderUtils.h>
+#include <camera/StringUtils.h>
 
 namespace android {
 namespace hardware {
@@ -87,11 +88,17 @@ hardware::camera2::params::OutputConfiguration convertFromHidl(
     auto &windowHandles = hOutputConfiguration.windowHandles;
     iGBPs.reserve(windowHandles.size());
     for (auto &handle : windowHandles) {
-        iGBPs.push_back(new H2BGraphicBufferProducer(AImageReader_getHGBPFromHandle(handle)));
+        auto igbp = AImageReader_getHGBPFromHandle(handle);
+        if (igbp == nullptr) {
+            ALOGE("%s: Could not get HGBP from native_handle: %p. Skipping.",
+                    __FUNCTION__, handle.getNativeHandle());
+            continue;
+        }
+        iGBPs.push_back(new H2BGraphicBufferProducer(igbp));
     }
-    String16 physicalCameraId16(hOutputConfiguration.physicalCameraId.c_str());
     hardware::camera2::params::OutputConfiguration outputConfiguration(
-        iGBPs, convertFromHidl(hOutputConfiguration.rotation), physicalCameraId16,
+        iGBPs, convertFromHidl(hOutputConfiguration.rotation),
+        hOutputConfiguration.physicalCameraId,
         hOutputConfiguration.windowGroupId, OutputConfiguration::SURFACE_TYPE_UNKNOWN, 0, 0,
         (windowHandles.size() > 1));
     return outputConfiguration;
@@ -157,8 +164,8 @@ HCaptureResultExtras convertToHidl(const CaptureResultExtras &captureResultExtra
     hCaptureResultExtras.frameNumber = captureResultExtras.frameNumber;
     hCaptureResultExtras.partialResultCount = captureResultExtras.partialResultCount;
     hCaptureResultExtras.errorStreamId = captureResultExtras.errorStreamId;
-    hCaptureResultExtras.errorPhysicalCameraId = hidl_string(String8(
-            captureResultExtras.errorPhysicalCameraId).string());
+    hCaptureResultExtras.errorPhysicalCameraId = hidl_string(
+            captureResultExtras.errorPhysicalCameraId.c_str());
     return hCaptureResultExtras;
 }
 
@@ -191,7 +198,7 @@ void convertToHidl(const std::vector<hardware::CameraStatus> &src,
     size_t i = 0;
     for (auto &statusAndId : src) {
         auto &a = (*dst)[i++];
-        a.cameraId = statusAndId.cameraId.c_str();
+        a.cameraId = statusAndId.cameraId;
         a.deviceStatus = convertToHidlCameraDeviceStatus(statusAndId.status);
     }
     return;
@@ -203,12 +210,12 @@ void convertToHidl(const std::vector<hardware::CameraStatus> &src,
     size_t i = 0;
     for (const auto &statusAndId : src) {
         auto &a = (*dst)[i++];
-        a.v2_0.cameraId = statusAndId.cameraId.c_str();
+        a.v2_0.cameraId = statusAndId.cameraId;
         a.v2_0.deviceStatus = convertToHidlCameraDeviceStatus(statusAndId.status);
         size_t numUnvailPhysicalCameras = statusAndId.unavailablePhysicalIds.size();
         a.unavailPhysicalCameraIds.resize(numUnvailPhysicalCameras);
         for (size_t j = 0; j < numUnvailPhysicalCameras; j++) {
-            a.unavailPhysicalCameraIds[j] = statusAndId.unavailablePhysicalIds[j].c_str();
+            a.unavailPhysicalCameraIds[j] = statusAndId.unavailablePhysicalIds[j];
         }
     }
     return;
@@ -265,7 +272,7 @@ HPhysicalCaptureResultInfo convertToHidl(
     std::shared_ptr<CaptureResultMetadataQueue> &captureResultMetadataQueue) {
     HPhysicalCaptureResultInfo hPhysicalCaptureResultInfo;
     hPhysicalCaptureResultInfo.physicalCameraId =
-        String8(physicalCaptureResultInfo.mPhysicalCameraId).string();
+        toString8(physicalCaptureResultInfo.mPhysicalCameraId);
     const camera_metadata_t *rawMetadata =
         physicalCaptureResultInfo.mPhysicalCameraMetadata.getAndLock();
     // Try using fmq at first.

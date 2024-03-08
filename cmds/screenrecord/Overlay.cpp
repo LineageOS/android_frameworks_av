@@ -90,9 +90,12 @@ status_t Overlay::start(const sp<IGraphicBufferProducer>& outputSurface,
 
 status_t Overlay::stop() {
     ALOGV("Overlay::stop");
-    Mutex::Autolock _l(mMutex);
-    mState = STOPPING;
-    mEventCond.signal();
+    {
+        Mutex::Autolock _l(mMutex);
+        mState = STOPPING;
+        mEventCond.signal();
+    }
+    join();
     return NO_ERROR;
 }
 

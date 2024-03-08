@@ -131,7 +131,7 @@ static String8 sessionIdToString(const std::vector<uint8_t> &array) {
     for (size_t i = 0; i < array.size(); i++) {
         result.appendFormat("%02x ", array[i]);
     }
-    if (result.isEmpty()) {
+    if (result.empty()) {
         result.append("(null)");
     }
     return result;
@@ -157,7 +157,7 @@ status_t ClearKeyCasPlugin::openSession(uint32_t intent, uint32_t mode,
 }
 
 status_t ClearKeyCasPlugin::closeSession(const CasSessionId &sessionId) {
-    ALOGV("closeSession: sessionId=%s", sessionIdToString(sessionId).string());
+    ALOGV("closeSession: sessionId=%s", sessionIdToString(sessionId).c_str());
     std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
     if (session.get() == nullptr) {
@@ -171,7 +171,7 @@ status_t ClearKeyCasPlugin::closeSession(const CasSessionId &sessionId) {
 status_t ClearKeyCasPlugin::setSessionPrivateData(
         const CasSessionId &sessionId, const CasData & /*data*/) {
     ALOGV("setSessionPrivateData: sessionId=%s",
-            sessionIdToString(sessionId).string());
+            sessionIdToString(sessionId).c_str());
     std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
     if (session.get() == nullptr) {
@@ -182,7 +182,7 @@ status_t ClearKeyCasPlugin::setSessionPrivateData(
 
 status_t ClearKeyCasPlugin::processEcm(
         const CasSessionId &sessionId, const CasEcm& ecm) {
-    ALOGV("processEcm: sessionId=%s", sessionIdToString(sessionId).string());
+    ALOGV("processEcm: sessionId=%s", sessionIdToString(sessionId).c_str());
     std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
     if (session.get() == nullptr) {
@@ -220,7 +220,7 @@ status_t ClearKeyCasPlugin::sendSessionEvent(
         const CasSessionId &sessionId, int32_t event,
         int arg, const CasData &eventData) {
     ALOGV("sendSessionEvent: sessionId=%s, event=%d, arg=%d",
-          sessionIdToString(sessionId).string(), event, arg);
+          sessionIdToString(sessionId).c_str(), event, arg);
     // Echo the received event to the callback.
     // Clear key plugin doesn't use any event, echo'ing for testing only.
     if (mCallbackExt != NULL) {
@@ -232,12 +232,12 @@ status_t ClearKeyCasPlugin::sendSessionEvent(
 }
 
 status_t ClearKeyCasPlugin::provision(const String8 &str) {
-    ALOGV("provision: provisionString=%s", str.string());
+    ALOGV("provision: provisionString=%s", str.c_str());
     Mutex::Autolock lock(mKeyFetcherLock);
 
     std::unique_ptr<ClearKeyLicenseFetcher> license_fetcher;
     license_fetcher.reset(new ClearKeyLicenseFetcher());
-    status_t err = license_fetcher->Init(str.string());
+    status_t err = license_fetcher->Init(str.c_str());
     if (err != OK) {
         ALOGE("provision: failed to init ClearKeyLicenseFetcher (err=%d)", err);
         return err;
@@ -475,7 +475,7 @@ bool ClearKeyDescramblerPlugin::requiresSecureDecoderComponent(
 
 status_t ClearKeyDescramblerPlugin::setMediaCasSession(
         const CasSessionId &sessionId) {
-    ALOGV("setMediaCasSession: sessionId=%s", sessionIdToString(sessionId).string());
+    ALOGV("setMediaCasSession: sessionId=%s", sessionIdToString(sessionId).c_str());
 
     std::shared_ptr<ClearKeyCasSession> session =
             ClearKeySessionLibrary::get()->findSession(sessionId);
@@ -503,7 +503,7 @@ ssize_t ClearKeyDescramblerPlugin::descramble(
     ALOGV("descramble: secure=%d, sctrl=%d, subSamples=%s, "
             "srcPtr=%p, dstPtr=%p, srcOffset=%d, dstOffset=%d",
           (int)secure, (int)scramblingControl,
-          subSamplesToString(subSamples, numSubSamples).string(),
+          subSamplesToString(subSamples, numSubSamples).c_str(),
           srcPtr, dstPtr, srcOffset, dstOffset);
 
     std::shared_ptr<ClearKeyCasSession> session = std::atomic_load(&mCASSession);

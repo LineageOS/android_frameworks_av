@@ -144,7 +144,7 @@ TEST(AudioTrackTest, TestAudioCbNotifier) {
     EXPECT_EQ(cb->mDeviceId, ap->getAudioTrackHandle()->getRoutedDeviceId());
     String8 keys;
     keys = ap->getAudioTrackHandle()->getParameters(keys);
-    if (!keys.isEmpty()) {
+    if (!keys.empty()) {
         std::cerr << "track parameters :: " << keys << std::endl;
     }
     EXPECT_TRUE(checkPatchPlayback(cb->mAudioIo, cb->mDeviceId));

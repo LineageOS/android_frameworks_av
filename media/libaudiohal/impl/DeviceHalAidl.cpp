@@ -18,7 +18,6 @@
 // #define LOG_NDEBUG 0
 
 #include <algorithm>
-#include <forward_list>
 
 #include <aidl/android/hardware/audio/core/BnStreamCallback.h>
 #include <aidl/android/hardware/audio/core/BnStreamOutEventCallback.h>
@@ -28,6 +27,7 @@
 #include <media/AidlConversionNdkCpp.h>
 #include <media/AidlConversionUtil.h>
 #include <mediautils/TimeCheck.h>
+#include <system/audio.h>
 #include <Utils.h>
 #include <utils/Log.h>
 
@@ -37,14 +37,9 @@
 
 using aidl::android::aidl_utils::statusTFromBinderStatus;
 using aidl::android::media::audio::common::Boolean;
-using aidl::android::media::audio::common::AudioChannelLayout;
 using aidl::android::media::audio::common::AudioConfig;
 using aidl::android::media::audio::common::AudioDevice;
-using aidl::android::media::audio::common::AudioDeviceAddress;
 using aidl::android::media::audio::common::AudioDeviceType;
-using aidl::android::media::audio::common::AudioFormatDescription;
-using aidl::android::media::audio::common::AudioFormatType;
-using aidl::android::media::audio::common::AudioInputFlags;
 using aidl::android::media::audio::common::AudioIoFlags;
 using aidl::android::media::audio::common::AudioLatencyMode;
 using aidl::android::media::audio::common::AudioMMapPolicy;
@@ -54,11 +49,7 @@ using aidl::android::media::audio::common::AudioMode;
 using aidl::android::media::audio::common::AudioOutputFlags;
 using aidl::android::media::audio::common::AudioPort;
 using aidl::android::media::audio::common::AudioPortConfig;
-using aidl::android::media::audio::common::AudioPortDeviceExt;
 using aidl::android::media::audio::common::AudioPortExt;
-using aidl::android::media::audio::common::AudioPortMixExt;
-using aidl::android::media::audio::common::AudioPortMixExtUseCase;
-using aidl::android::media::audio::common::AudioProfile;
 using aidl::android::media::audio::common::AudioSource;
 using aidl::android::media::audio::common::Float;
 using aidl::android::media::audio::common::Int;
@@ -67,9 +58,8 @@ using aidl::android::media::audio::common::MicrophoneInfo;
 using aidl::android::media::audio::IHalAdapterVendorExtension;
 using aidl::android::hardware::audio::common::getFrameSizeInBytes;
 using aidl::android::hardware::audio::common::isBitPositionFlagSet;
-using aidl::android::hardware::audio::common::isDefaultAudioFormat;
-using aidl::android::hardware::audio::common::makeBitPositionFlagMask;
 using aidl::android::hardware::audio::common::RecordTrackMetadata;
+using aidl::android::hardware::audio::core::sounddose::ISoundDose;
 using aidl::android::hardware::audio::core::AudioPatch;
 using aidl::android::hardware::audio::core::AudioRoute;
 using aidl::android::hardware::audio::core::IBluetooth;
@@ -78,36 +68,11 @@ using aidl::android::hardware::audio::core::IBluetoothLe;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::ITelephony;
 using aidl::android::hardware::audio::core::ModuleDebug;
-using aidl::android::hardware::audio::core::StreamDescriptor;
 using aidl::android::hardware::audio::core::VendorParameter;
 
 namespace android {
 
 namespace {
-
-bool isConfigEqualToPortConfig(const AudioConfig& config, const AudioPortConfig& portConfig) {
-    return portConfig.sampleRate.value().value == config.base.sampleRate &&
-            portConfig.channelMask.value() == config.base.channelMask &&
-            portConfig.format.value() == config.base.format;
-}
-
-void setConfigFromPortConfig(AudioConfig* config, const AudioPortConfig& portConfig) {
-    config->base.sampleRate = portConfig.sampleRate.value().value;
-    config->base.channelMask = portConfig.channelMask.value();
-    config->base.format = portConfig.format.value();
-}
-
-void setPortConfigFromConfig(AudioPortConfig* portConfig, const AudioConfig& config) {
-    if (config.base.sampleRate != 0) {
-        portConfig->sampleRate = Int{ .value = config.base.sampleRate };
-    }
-    if (config.base.channelMask != AudioChannelLayout{}) {
-        portConfig->channelMask = config.base.channelMask;
-    }
-    if (config.base.format != AudioFormatDescription{}) {
-        portConfig->format = config.base.format;
-    }
-}
 
 // Note: these converters are for types defined in different AIDL files. Although these
 // AIDL files are copies of each other, however formally these are different types
@@ -142,28 +107,29 @@ DeviceHalAidl::DeviceHalAidl(const std::string& instance, const std::shared_ptr<
           mTelephony(retrieveSubInterface<ITelephony>(module, &IModule::getTelephony)),
           mBluetooth(retrieveSubInterface<IBluetooth>(module, &IModule::getBluetooth)),
           mBluetoothA2dp(retrieveSubInterface<IBluetoothA2dp>(module, &IModule::getBluetoothA2dp)),
-          mBluetoothLe(retrieveSubInterface<IBluetoothLe>(module, &IModule::getBluetoothLe)) {
+          mBluetoothLe(retrieveSubInterface<IBluetoothLe>(module, &IModule::getBluetoothLe)),
+          mSoundDose(retrieveSubInterface<ISoundDose>(module, &IModule::getSoundDose)),
+          mMapper(instance, module), mMapperAccessor(mMapper, mLock) {
 }
 
 status_t DeviceHalAidl::getAudioPorts(std::vector<media::audio::common::AudioPort> *ports) {
-    return ::aidl::android::convertContainer(mPorts, ports,
-            [](const Ports::value_type& pair) { return ndk2cpp_AudioPort(pair.second); });
+    std::lock_guard l(mLock);
+    return mMapper.getAudioPorts(ports, ndk2cpp_AudioPort);
 }
 
 status_t DeviceHalAidl::getAudioRoutes(std::vector<media::AudioRoute> *routes) {
-    *routes = VALUE_OR_RETURN_STATUS(
-            ::aidl::android::convertContainer<std::vector<media::AudioRoute>>(
-                    mRoutes, ndk2cpp_AudioRoute));
-    return OK;
+    std::lock_guard l(mLock);
+    return mMapper.getAudioRoutes(routes, ndk2cpp_AudioRoute);
 }
 
 status_t DeviceHalAidl::getSupportedModes(std::vector<media::audio::common::AudioMode> *modes) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
+    if (mTelephony == nullptr) return INVALID_OPERATION;
     if (modes == nullptr) {
         return BAD_VALUE;
     }
-    if (mModule == nullptr) return NO_INIT;
-    if (mTelephony == nullptr) return INVALID_OPERATION;
     std::vector<AudioMode> aidlModes;
     RETURN_STATUS_IF_ERROR(
             statusTFromBinderStatus(mTelephony->getSupportedAudioModes(&aidlModes)));
@@ -179,51 +145,17 @@ status_t DeviceHalAidl::getSupportedDevices(uint32_t*) {
 }
 
 status_t DeviceHalAidl::initCheck() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (mModule == nullptr) return NO_INIT;
-    std::vector<AudioPort> ports;
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->getAudioPorts(&ports)));
-    ALOGW_IF(ports.empty(), "%s: module %s returned an empty list of audio ports",
-            __func__, mInstance.c_str());
-    std::transform(ports.begin(), ports.end(), std::inserter(mPorts, mPorts.end()),
-            [](const auto& p) { return std::make_pair(p.id, p); });
-    mDefaultInputPortId = mDefaultOutputPortId = -1;
-    const int defaultDeviceFlag = 1 << AudioPortDeviceExt::FLAG_INDEX_DEFAULT_DEVICE;
-    for (const auto& pair : mPorts) {
-        const auto& p = pair.second;
-        if (p.ext.getTag() == AudioPortExt::Tag::device &&
-                (p.ext.get<AudioPortExt::Tag::device>().flags & defaultDeviceFlag) != 0) {
-            if (p.flags.getTag() == AudioIoFlags::Tag::input) {
-                mDefaultInputPortId = p.id;
-            } else if (p.flags.getTag() == AudioIoFlags::Tag::output) {
-                mDefaultOutputPortId = p.id;
-            }
-        }
-    }
-    ALOGI("%s: module %s default port ids: input %d, output %d",
-            __func__, mInstance.c_str(), mDefaultInputPortId, mDefaultOutputPortId);
-    RETURN_STATUS_IF_ERROR(updateRoutes());
-    std::vector<AudioPortConfig> portConfigs;
-    RETURN_STATUS_IF_ERROR(
-            statusTFromBinderStatus(mModule->getAudioPortConfigs(&portConfigs)));  // OK if empty
-    std::transform(portConfigs.begin(), portConfigs.end(),
-            std::inserter(mPortConfigs, mPortConfigs.end()),
-            [](const auto& p) { return std::make_pair(p.id, p); });
-    std::transform(mPortConfigs.begin(), mPortConfigs.end(),
-            std::inserter(mInitialPortConfigIds, mInitialPortConfigIds.end()),
-            [](const auto& pcPair) { return pcPair.first; });
-    std::vector<AudioPatch> patches;
-    RETURN_STATUS_IF_ERROR(
-            statusTFromBinderStatus(mModule->getAudioPatches(&patches)));  // OK if empty
-    std::transform(patches.begin(), patches.end(),
-            std::inserter(mPatches, mPatches.end()),
-            [](const auto& p) { return std::make_pair(p.id, p); });
-    return OK;
+    std::lock_guard l(mLock);
+    return mMapper.initialize();
 }
 
 status_t DeviceHalAidl::setVoiceVolume(float volume) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     if (mTelephony == nullptr) return INVALID_OPERATION;
     ITelephony::TelecomConfig inConfig{ .voiceVolume = Float{volume} }, outConfig;
     RETURN_STATUS_IF_ERROR(
@@ -235,20 +167,26 @@ status_t DeviceHalAidl::setVoiceVolume(float volume) {
 }
 
 status_t DeviceHalAidl::setMasterVolume(float volume) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     return statusTFromBinderStatus(mModule->setMasterVolume(volume));
 }
 
 status_t DeviceHalAidl::getMasterVolume(float *volume) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
+    if (volume == nullptr) {
+        return BAD_VALUE;
+    }
     return statusTFromBinderStatus(mModule->getMasterVolume(volume));
 }
 
 status_t DeviceHalAidl::setMode(audio_mode_t mode) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     AudioMode audioMode = VALUE_OR_FATAL(::aidl::android::legacy2aidl_audio_mode_t_AudioMode(mode));
     if (mTelephony != nullptr) {
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mTelephony->switchAudioMode(audioMode)));
@@ -257,31 +195,43 @@ status_t DeviceHalAidl::setMode(audio_mode_t mode) {
 }
 
 status_t DeviceHalAidl::setMicMute(bool state) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     return statusTFromBinderStatus(mModule->setMicMute(state));
 }
 
 status_t DeviceHalAidl::getMicMute(bool *state) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
+    if (state == nullptr) {
+        return BAD_VALUE;
+    }
     return statusTFromBinderStatus(mModule->getMicMute(state));
 }
 
 status_t DeviceHalAidl::setMasterMute(bool state) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     return statusTFromBinderStatus(mModule->setMasterMute(state));
 }
 
 status_t DeviceHalAidl::getMasterMute(bool *state) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
+    if (state == nullptr) {
+        return BAD_VALUE;
+    }
     return statusTFromBinderStatus(mModule->getMasterMute(state));
 }
 
 status_t DeviceHalAidl::setParameters(const String8& kvPairs) {
-    if (!mModule) return NO_INIT;
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
     AudioParameter parameters(kvPairs);
     ALOGD("%s: parameters: \"%s\"", __func__, parameters.toString().c_str());
 
@@ -307,8 +257,9 @@ status_t DeviceHalAidl::setParameters(const String8& kvPairs) {
 }
 
 status_t DeviceHalAidl::getParameters(const String8& keys, String8 *values) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     if (values == nullptr) {
         return BAD_VALUE;
     }
@@ -316,48 +267,20 @@ status_t DeviceHalAidl::getParameters(const String8& keys, String8 *values) {
     if (status_t status = filterAndRetrieveBtA2dpParameters(parameterKeys, &result); status != OK) {
         ALOGW("%s: filtering or retrieving BT A2DP parameters failed: %d", __func__, status);
     }
+    if (status_t status = filterAndRetrieveBtLeParameters(parameterKeys, &result); status != OK) {
+        ALOGW("%s: filtering or retrieving BT LE parameters failed: %d", __func__, status);
+    }
     *values = result.toString();
     return parseAndGetVendorParameters(mVendorExt, mModule, parameterKeys, values);
 }
 
-namespace {
-
-class Cleanup {
-  public:
-    typedef void (DeviceHalAidl::*Cleaner)(int32_t);
-
-    Cleanup(DeviceHalAidl* device, Cleaner cleaner, int32_t id) :
-            mDevice(device), mCleaner(cleaner), mId(id) {}
-    ~Cleanup() { clean(); }
-    void clean() {
-        if (mDevice != nullptr) (mDevice->*mCleaner)(mId);
-        disarm();
-    }
-    void disarm() { mDevice = nullptr; }
-
-  private:
-    DeviceHalAidl* mDevice;
-    const Cleaner mCleaner;
-    const int32_t mId;
-};
-
-}  // namespace
-
-// Since the order of container elements destruction is unspecified,
-// ensure that cleanups are performed from the most recent one and upwards.
-// This is the same as if there were individual Cleanup instances on the stack,
-// however the bonus is that we can disarm all of them with just one statement.
-class DeviceHalAidl::Cleanups : public std::forward_list<Cleanup> {
-  public:
-    ~Cleanups() { for (auto& c : *this) c.clean(); }
-    void disarmAll() { for (auto& c : *this) c.disarm(); }
-};
-
 status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, size_t* size) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
-    if (size == nullptr) return BAD_VALUE;
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
+    if (config == nullptr || size == nullptr) {
+        return BAD_VALUE;
+    }
     AudioConfig aidlConfig = VALUE_OR_RETURN_STATUS(
             ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, true /*isInput*/));
     AudioDevice aidlDevice;
@@ -365,58 +288,17 @@ status_t DeviceHalAidl::getInputBufferSize(const struct audio_config* config, si
     AudioSource aidlSource = AudioSource::DEFAULT;
     AudioIoFlags aidlFlags = AudioIoFlags::make<AudioIoFlags::Tag::input>(0);
     AudioPortConfig mixPortConfig;
-    Cleanups cleanups;
-    audio_config writableConfig = *config;
+    Hal2AidlMapper::Cleanups cleanups(mMapperAccessor);
     AudioPatch aidlPatch;
-    RETURN_STATUS_IF_ERROR(prepareToOpenStream(0 /*handle*/, aidlDevice, aidlFlags, aidlSource,
-                    &writableConfig, &cleanups, &aidlConfig, &mixPortConfig, &aidlPatch));
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.prepareToOpenStream(
+                        0 /*handle*/, aidlDevice, aidlFlags, aidlSource,
+                        &cleanups, &aidlConfig, &mixPortConfig, &aidlPatch));
+    }
     *size = aidlConfig.frameCount *
             getFrameSizeInBytes(aidlConfig.base.format, aidlConfig.base.channelMask);
     // Do not disarm cleanups to release temporary port configs.
-    return OK;
-}
-
-status_t DeviceHalAidl::prepareToOpenStream(
-        int32_t aidlHandle, const AudioDevice& aidlDevice, const AudioIoFlags& aidlFlags,
-        AudioSource aidlSource, struct audio_config* config,
-        Cleanups* cleanups, AudioConfig* aidlConfig, AudioPortConfig* mixPortConfig,
-        AudioPatch* aidlPatch) {
-    ALOGD("%p %s::%s: handle %d, device %s, flags %s, source %s, config %s, mix port config %s",
-            this, getClassName().c_str(), __func__, aidlHandle, aidlDevice.toString().c_str(),
-            aidlFlags.toString().c_str(), toString(aidlSource).c_str(),
-            aidlConfig->toString().c_str(), mixPortConfig->toString().c_str());
-    resetUnusedPatchesAndPortConfigs();
-    const bool isInput = aidlFlags.getTag() == AudioIoFlags::Tag::input;
-    // Find / create AudioPortConfigs for the device port and the mix port,
-    // then find / create a patch between them, and open a stream on the mix port.
-    AudioPortConfig devicePortConfig;
-    bool created = false;
-    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(aidlDevice, aidlConfig,
-                                                  &devicePortConfig, &created));
-    if (created) {
-        cleanups->emplace_front(this, &DeviceHalAidl::resetPortConfig, devicePortConfig.id);
-    }
-    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(*aidlConfig, aidlFlags, aidlHandle, aidlSource,
-                    std::set<int32_t>{devicePortConfig.portId}, mixPortConfig, &created));
-    if (created) {
-        cleanups->emplace_front(this, &DeviceHalAidl::resetPortConfig, mixPortConfig->id);
-    }
-    setConfigFromPortConfig(aidlConfig, *mixPortConfig);
-    if (isInput) {
-        RETURN_STATUS_IF_ERROR(findOrCreatePatch(
-                        {devicePortConfig.id}, {mixPortConfig->id}, aidlPatch, &created));
-    } else {
-        RETURN_STATUS_IF_ERROR(findOrCreatePatch(
-                        {mixPortConfig->id}, {devicePortConfig.id}, aidlPatch, &created));
-    }
-    if (created) {
-        cleanups->emplace_front(this, &DeviceHalAidl::resetPatch, aidlPatch->id);
-    }
-    if (aidlConfig->frameCount <= 0) {
-        aidlConfig->frameCount = aidlPatch->minimumStreamBufferSizeFrames;
-    }
-    *config = VALUE_OR_RETURN_STATUS(
-            ::aidl::android::aidl2legacy_AudioConfig_audio_config_t(*aidlConfig, isInput));
     return OK;
 }
 
@@ -543,26 +425,33 @@ status_t DeviceHalAidl::openOutputStream(
         const char* address,
         sp<StreamOutHalInterface>* outStream) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
-    if (!outStream || !config) {
+    TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
+    if (outStream == nullptr || config == nullptr) {
         return BAD_VALUE;
     }
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    constexpr bool isInput = false;
     int32_t aidlHandle = VALUE_OR_RETURN_STATUS(
             ::aidl::android::legacy2aidl_audio_io_handle_t_int32_t(handle));
     AudioConfig aidlConfig = VALUE_OR_RETURN_STATUS(
-            ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, false /*isInput*/));
+            ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, isInput));
     AudioDevice aidlDevice = VALUE_OR_RETURN_STATUS(
             ::aidl::android::legacy2aidl_audio_device_AudioDevice(devices, address));
     int32_t aidlOutputFlags = VALUE_OR_RETURN_STATUS(
             ::aidl::android::legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
     AudioIoFlags aidlFlags = AudioIoFlags::make<AudioIoFlags::Tag::output>(aidlOutputFlags);
     AudioPortConfig mixPortConfig;
-    Cleanups cleanups;
     AudioPatch aidlPatch;
-    RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags,
-                    AudioSource::SYS_RESERVED_INVALID /*only needed for input*/,
-                    config, &cleanups, &aidlConfig, &mixPortConfig, &aidlPatch));
+    Hal2AidlMapper::Cleanups cleanups(mMapperAccessor);
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags,
+                        AudioSource::SYS_RESERVED_INVALID /*only needed for input*/,
+                        &cleanups, &aidlConfig, &mixPortConfig, &aidlPatch));
+    }
+    *config = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_AudioConfig_audio_config_t(aidlConfig, isInput));
+    if (mixPortConfig.id == 0) return BAD_VALUE;  // HAL suggests a different config.
     ::aidl::android::hardware::audio::core::IModule::OpenOutputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     const bool isOffload = isBitPositionFlagSet(
@@ -588,11 +477,11 @@ status_t DeviceHalAidl::openOutputStream(
     }
     *outStream = sp<StreamOutHalAidl>::make(*config, std::move(context), aidlPatch.latenciesMs[0],
             std::move(ret.stream), mVendorExt, this /*callbackBroker*/);
-    mStreams.insert(std::pair(*outStream, aidlPatch.id));
     void* cbCookie = (*outStream).get();
     {
         std::lock_guard l(mLock);
         mCallbacks.emplace(cbCookie, Callbacks{});
+        mMapper.addStream(*outStream, mixPortConfig.id, aidlPatch.id);
     }
     if (streamCb) streamCb->setCookie(cbCookie);
     eventCb->setCookie(cbCookie);
@@ -607,15 +496,16 @@ status_t DeviceHalAidl::openInputStream(
         audio_devices_t outputDevice, const char* outputDeviceAddress,
         sp<StreamInHalInterface>* inStream) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
-    if (!inStream || !config) {
+    TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
+    if (inStream == nullptr || config == nullptr) {
         return BAD_VALUE;
     }
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    constexpr bool isInput = true;
     int32_t aidlHandle = VALUE_OR_RETURN_STATUS(
             ::aidl::android::legacy2aidl_audio_io_handle_t_int32_t(handle));
     AudioConfig aidlConfig = VALUE_OR_RETURN_STATUS(
-            ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, true /*isInput*/));
+            ::aidl::android::legacy2aidl_audio_config_t_AudioConfig(*config, isInput));
     AudioDevice aidlDevice = VALUE_OR_RETURN_STATUS(
             ::aidl::android::legacy2aidl_audio_device_AudioDevice(devices, address));
     int32_t aidlInputFlags = VALUE_OR_RETURN_STATUS(
@@ -624,10 +514,17 @@ status_t DeviceHalAidl::openInputStream(
     AudioSource aidlSource = VALUE_OR_RETURN_STATUS(
             ::aidl::android::legacy2aidl_audio_source_t_AudioSource(source));
     AudioPortConfig mixPortConfig;
-    Cleanups cleanups;
     AudioPatch aidlPatch;
-    RETURN_STATUS_IF_ERROR(prepareToOpenStream(aidlHandle, aidlDevice, aidlFlags, aidlSource,
-                    config, &cleanups, &aidlConfig, &mixPortConfig, &aidlPatch));
+    Hal2AidlMapper::Cleanups cleanups(mMapperAccessor);
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.prepareToOpenStream(
+                        aidlHandle, aidlDevice, aidlFlags, aidlSource,
+                        &cleanups, &aidlConfig, &mixPortConfig, &aidlPatch));
+    }
+    *config = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::aidl2legacy_AudioConfig_audio_config_t(aidlConfig, isInput));
+    if (mixPortConfig.id == 0) return BAD_VALUE;  // HAL suggests a different config.
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
     RecordTrackMetadata aidlTrackMetadata{
@@ -649,12 +546,18 @@ status_t DeviceHalAidl::openInputStream(
     }
     *inStream = sp<StreamInHalAidl>::make(*config, std::move(context), aidlPatch.latenciesMs[0],
             std::move(ret.stream), mVendorExt, this /*micInfoProvider*/);
-    mStreams.insert(std::pair(*inStream, aidlPatch.id));
+    {
+        std::lock_guard l(mLock);
+        mMapper.addStream(*inStream, mixPortConfig.id, aidlPatch.id);
+    }
     cleanups.disarmAll();
     return OK;
 }
 
 status_t DeviceHalAidl::supportsAudioPatches(bool* supportsPatches) {
+    if (supportsPatches == nullptr) {
+        return BAD_VALUE;
+    }
     *supportsPatches = true;
     return OK;
 }
@@ -666,7 +569,7 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
                                          audio_patch_handle_t* patch) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     if (num_sinks > AUDIO_PATCH_PORTS_MAX || num_sources > AUDIO_PATCH_PORTS_MAX ||
         sources == nullptr || sinks == nullptr || patch == nullptr) {
         return BAD_VALUE;
@@ -683,7 +586,7 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
     // that the HAL module uses `int32_t` for patch IDs. The following assert ensures
     // that both the framework and the HAL use the same value for "no ID":
     static_assert(AUDIO_PATCH_HANDLE_NONE == 0);
-    int32_t halPatchId = static_cast<int32_t>(*patch);
+    int32_t aidlPatchId = static_cast<int32_t>(*patch);
 
     // Upon conversion, mix port configs contain audio configuration, while
     // device port configs contain device address. This data is used to find
@@ -705,68 +608,13 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
                         ::aidl::android::legacy2aidl_audio_port_config_AudioPortConfig(
                                 sinks[i], isInput, 0)));
     }
-    Cleanups cleanups;
-    auto existingPatchIt = halPatchId != 0 ? mPatches.find(halPatchId): mPatches.end();
-    AudioPatch aidlPatch;
-    if (existingPatchIt != mPatches.end()) {
-        aidlPatch = existingPatchIt->second;
-        aidlPatch.sourcePortConfigIds.clear();
-        aidlPatch.sinkPortConfigIds.clear();
+    Hal2AidlMapper::Cleanups cleanups(mMapperAccessor);
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.createOrUpdatePatch(
+                        aidlSources, aidlSinks, &aidlPatchId, &cleanups));
     }
-    // The IDs will be found by 'fillPortConfigs', however the original 'aidlSources' and
-    // 'aidlSinks' will not be updated because 'setAudioPatch' only needs IDs. Here we log
-    // the source arguments, where only the audio configuration and device specifications
-    // are relevant.
-    ALOGD("%s: [disregard IDs] sources: %s, sinks: %s",
-            __func__, ::android::internal::ToString(aidlSources).c_str(),
-            ::android::internal::ToString(aidlSinks).c_str());
-    auto fillPortConfigs = [&](
-            const std::vector<AudioPortConfig>& configs,
-            const std::set<int32_t>& destinationPortIds,
-            std::vector<int32_t>* ids, std::set<int32_t>* portIds) -> status_t {
-        for (const auto& s : configs) {
-            AudioPortConfig portConfig;
-            bool created = false;
-            RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(
-                            s, destinationPortIds, &portConfig, &created));
-            if (created) {
-                cleanups.emplace_front(this, &DeviceHalAidl::resetPortConfig, portConfig.id);
-            }
-            ids->push_back(portConfig.id);
-            if (portIds != nullptr) {
-                portIds->insert(portConfig.portId);
-            }
-        }
-        return OK;
-    };
-    // When looking up port configs, the destinationPortId is only used for mix ports.
-    // Thus, we process device port configs first, and look up the destination port ID from them.
-    bool sourceIsDevice = std::any_of(aidlSources.begin(), aidlSources.end(),
-            [](const auto& config) { return config.ext.getTag() == AudioPortExt::device; });
-    const std::vector<AudioPortConfig>& devicePortConfigs =
-            sourceIsDevice ? aidlSources : aidlSinks;
-    std::vector<int32_t>* devicePortConfigIds =
-            sourceIsDevice ? &aidlPatch.sourcePortConfigIds : &aidlPatch.sinkPortConfigIds;
-    const std::vector<AudioPortConfig>& mixPortConfigs =
-            sourceIsDevice ? aidlSinks : aidlSources;
-    std::vector<int32_t>* mixPortConfigIds =
-            sourceIsDevice ? &aidlPatch.sinkPortConfigIds : &aidlPatch.sourcePortConfigIds;
-    std::set<int32_t> devicePortIds;
-    RETURN_STATUS_IF_ERROR(fillPortConfigs(
-                    devicePortConfigs, std::set<int32_t>(), devicePortConfigIds, &devicePortIds));
-    RETURN_STATUS_IF_ERROR(fillPortConfigs(
-                    mixPortConfigs, devicePortIds, mixPortConfigIds, nullptr));
-    if (existingPatchIt != mPatches.end()) {
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                        mModule->setAudioPatch(aidlPatch, &aidlPatch)));
-        existingPatchIt->second = aidlPatch;
-    } else {
-        bool created = false;
-        RETURN_STATUS_IF_ERROR(findOrCreatePatch(aidlPatch, &aidlPatch, &created));
-        // Since no cleanup of the patch is needed, 'created' is ignored.
-        halPatchId = aidlPatch.id;
-        *patch = static_cast<audio_patch_handle_t>(halPatchId);
-    }
+    *patch = static_cast<audio_patch_handle_t>(aidlPatchId);
     cleanups.disarmAll();
     return OK;
 }
@@ -774,26 +622,17 @@ status_t DeviceHalAidl::createAudioPatch(unsigned int num_sources,
 status_t DeviceHalAidl::releaseAudioPatch(audio_patch_handle_t patch) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     static_assert(AUDIO_PATCH_HANDLE_NONE == 0);
     if (patch == AUDIO_PATCH_HANDLE_NONE) {
         return BAD_VALUE;
     }
-    int32_t halPatchId = static_cast<int32_t>(patch);
-    auto patchIt = mPatches.find(halPatchId);
-    if (patchIt == mPatches.end()) {
-        ALOGE("%s: patch with id %d not found", __func__, halPatchId);
-        return BAD_VALUE;
-    }
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->resetAudioPatch(halPatchId)));
-    mPatches.erase(patchIt);
+    std::lock_guard l(mLock);
+    RETURN_STATUS_IF_ERROR(mMapper.releaseAudioPatch(static_cast<int32_t>(patch)));
     return OK;
 }
 
 status_t DeviceHalAidl::getAudioPort(struct audio_port* port) {
-    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
     if (port == nullptr) {
         return BAD_VALUE;
     }
@@ -806,7 +645,7 @@ status_t DeviceHalAidl::getAudioPort(struct audio_port* port) {
 status_t DeviceHalAidl::getAudioPort(struct audio_port_v7 *port) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     if (port == nullptr) {
         return BAD_VALUE;
     }
@@ -822,24 +661,44 @@ status_t DeviceHalAidl::getAudioPort(struct audio_port_v7 *port) {
     const auto& matchDevice = aidlPort.ext.get<AudioPortExt::device>().device;
     // It seems that we don't have to call HAL since all valid ports have been added either
     // during initialization, or while handling connection of an external device.
-    auto portsIt = findPort(matchDevice);
-    if (portsIt == mPorts.end()) {
-        ALOGE("%s: device port for device %s is not found in the module %s",
-                __func__, matchDevice.toString().c_str(), mInstance.c_str());
-        return BAD_VALUE;
-    }
     const int32_t fwkId = aidlPort.id;
-    aidlPort = portsIt->second;
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.getAudioPortCached(matchDevice, &aidlPort));
+    }
     aidlPort.id = fwkId;
     *port = VALUE_OR_RETURN_STATUS(::aidl::android::aidl2legacy_AudioPort_audio_port_v7(
                     aidlPort, isInput));
     return OK;
 }
 
+status_t DeviceHalAidl::getAudioMixPort(const struct audio_port_v7 *devicePort,
+                                        struct audio_port_v7 *mixPort) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
+    if (devicePort == nullptr || mixPort == nullptr ||
+            devicePort->type != AUDIO_PORT_TYPE_DEVICE || mixPort->type != AUDIO_PORT_TYPE_MIX) {
+        return BAD_VALUE;
+    }
+    const int32_t aidlHandle = VALUE_OR_RETURN_STATUS(
+            ::aidl::android::legacy2aidl_audio_io_handle_t_int32_t(mixPort->ext.mix.handle));
+    AudioPort port;
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.getAudioMixPort(aidlHandle, &port));
+    }
+    const bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(
+            mixPort->role, mixPort->type)) == ::aidl::android::AudioPortDirection::INPUT;
+    *mixPort = VALUE_OR_RETURN_STATUS(::aidl::android::aidl2legacy_AudioPort_audio_port_v7(
+            port, isInput));
+    return OK;
+}
+
 status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* config) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     if (config == nullptr) {
         return BAD_VALUE;
     }
@@ -849,13 +708,15 @@ status_t DeviceHalAidl::setAudioPortConfig(const struct audio_port_config* confi
             ::aidl::android::legacy2aidl_audio_port_config_AudioPortConfig(
                     *config, isInput, 0 /*portId*/));
     AudioPortConfig portConfig;
-    bool created = false;
-    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(
-                    requestedPortConfig, std::set<int32_t>(), &portConfig, &created));
-    return OK;
+    std::lock_guard l(mLock);
+    return mMapper.setPortConfig(requestedPortConfig, std::set<int32_t>(), &portConfig);
 }
 
 MicrophoneInfoProvider::Info const* DeviceHalAidl::getMicrophoneInfo() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (!mModule) return {};
+    std::lock_guard l(mLock);
     if (mMicrophones.status == Microphones::Status::UNKNOWN) {
         TIME_CHECK();
         std::vector<MicrophoneInfo> aidlInfo;
@@ -878,11 +739,12 @@ MicrophoneInfoProvider::Info const* DeviceHalAidl::getMicrophoneInfo() {
 
 status_t DeviceHalAidl::getMicrophones(
         std::vector<audio_microphone_characteristic_t>* microphones) {
-    if (!microphones) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
+    if (microphones == nullptr) {
         return BAD_VALUE;
     }
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
     auto staticInfo = getMicrophoneInfo();
     if (!staticInfo) return INVALID_OPERATION;
     std::vector<MicrophoneDynamicInfo> emptyDynamicInfo;
@@ -899,9 +761,10 @@ status_t DeviceHalAidl::getMicrophones(
 
 status_t DeviceHalAidl::addDeviceEffect(
         const struct audio_port_config *device, sp<EffectHalInterface> effect) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
-    if (!effect) {
+    if (mModule == nullptr) return NO_INIT;
+    if (device == nullptr || effect == nullptr) {
         return BAD_VALUE;
     }
     bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(
@@ -915,12 +778,11 @@ status_t DeviceHalAidl::addDeviceEffect(
         return BAD_VALUE;
     }
     AudioPortConfig devicePortConfig;
-    bool created;
-    RETURN_STATUS_IF_ERROR(findOrCreatePortConfig(
-                    requestedPortConfig, {} /*destinationPortIds*/, &devicePortConfig, &created));
-    Cleanups cleanups;
-    if (created) {
-        cleanups.emplace_front(this, &DeviceHalAidl::resetPortConfig, devicePortConfig.id);
+    Hal2AidlMapper::Cleanups cleanups(mMapperAccessor);
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.setPortConfig(
+                    requestedPortConfig, {} /*destinationPortIds*/, &devicePortConfig, &cleanups));
     }
     auto aidlEffect = sp<effect::EffectHalAidl>::cast(effect);
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->addDeviceEffect(
@@ -930,9 +792,10 @@ status_t DeviceHalAidl::addDeviceEffect(
 }
 status_t DeviceHalAidl::removeDeviceEffect(
         const struct audio_port_config *device, sp<EffectHalInterface> effect) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
-    if (!effect) {
+    if (mModule == nullptr) return NO_INIT;
+    if (device == nullptr || effect == nullptr) {
         return BAD_VALUE;
     }
     bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(
@@ -945,22 +808,24 @@ status_t DeviceHalAidl::removeDeviceEffect(
                 __func__, requestedPortConfig.toString().c_str());
         return BAD_VALUE;
     }
-    auto existingPortConfigIt = findPortConfig(
-            requestedPortConfig.ext.get<AudioPortExt::Tag::device>().device);
-    if (existingPortConfigIt == mPortConfigs.end()) {
-        ALOGE("%s: could not find a configured device port for the config %s",
-                __func__, requestedPortConfig.toString().c_str());
-        return BAD_VALUE;
+    AudioPortConfig devicePortConfig;
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(mMapper.findPortConfig(
+                        requestedPortConfig.ext.get<AudioPortExt::Tag::device>().device,
+                        &devicePortConfig));
     }
     auto aidlEffect = sp<effect::EffectHalAidl>::cast(effect);
     return statusTFromBinderStatus(mModule->removeDeviceEffect(
-                    existingPortConfigIt->first, aidlEffect->getIEffect()));
+                    devicePortConfig.id, aidlEffect->getIEffect()));
 }
 
 status_t DeviceHalAidl::getMmapPolicyInfos(
         media::audio::common::AudioMMapPolicyType policyType,
         std::vector<media::audio::common::AudioMMapPolicyInfo>* policyInfos) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
     AudioMMapPolicyType mmapPolicyType = VALUE_OR_RETURN_STATUS(
             cpp2ndk_AudioMMapPolicyType(policyType));
 
@@ -978,7 +843,9 @@ status_t DeviceHalAidl::getMmapPolicyInfos(
 }
 
 int32_t DeviceHalAidl::getAAudioMixerBurstCount() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
     int32_t mixerBurstCount = 0;
     if (mModule->getAAudioMixerBurstCount(&mixerBurstCount).isOk()) {
         return mixerBurstCount;
@@ -987,7 +854,9 @@ int32_t DeviceHalAidl::getAAudioMixerBurstCount() {
 }
 
 int32_t DeviceHalAidl::getAAudioHardwareBurstMinUsec() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
+    if (mModule == nullptr) return NO_INIT;
     int32_t hardwareBurstMinUsec = 0;
     if (mModule->getAAudioHardwareBurstMinUsec(&hardwareBurstMinUsec).isOk()) {
         return hardwareBurstMinUsec;
@@ -996,8 +865,9 @@ int32_t DeviceHalAidl::getAAudioHardwareBurstMinUsec() {
 }
 
 error::Result<audio_hw_sync_t> DeviceHalAidl::getHwAvSync() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     int32_t aidlHwAvSync;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->generateHwAvSyncId(&aidlHwAvSync)));
     return VALUE_OR_RETURN_STATUS(
@@ -1006,13 +876,14 @@ error::Result<audio_hw_sync_t> DeviceHalAidl::getHwAvSync() {
 
 status_t DeviceHalAidl::dump(int fd, const Vector<String16>& args) {
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     return mModule->dump(fd, Args(args).args(), args.size());
 }
 
 status_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     if (supports == nullptr) {
         return BAD_VALUE;
     }
@@ -1021,21 +892,24 @@ status_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports) {
 
 status_t DeviceHalAidl::getSoundDoseInterface(const std::string& module,
                                               ::ndk::SpAIBinder* soundDoseBinder)  {
-    TIME_CHECK();
-    if (!mModule) return NO_INIT;
-    if (mSoundDose == nullptr) {
-        ndk::ScopedAStatus status = mModule->getSoundDose(&mSoundDose);
-        if (!status.isOk()) {
-            ALOGE("%s failed to return the sound dose interface for module %s: %s",
-                  __func__,
-                  module.c_str(),
-                  status.getDescription().c_str());
-            return BAD_VALUE;
-        }
+    if (soundDoseBinder == nullptr) {
+        return BAD_VALUE;
     }
+    if (mSoundDose == nullptr) {
+        ALOGE("%s failed to retrieve the sound dose interface for module %s",
+                __func__, module.c_str());
+        return BAD_VALUE;
+    }
+
+    if (mSoundDose == nullptr) {
+        ALOGE("%s failed to return the sound dose interface for module %s: not implemented",
+                  __func__,
+                  module.c_str());
+        return NO_INIT;
+    }
+
     *soundDoseBinder = mSoundDose->asBinder();
     ALOGI("%s using audio AIDL HAL sound dose interface", __func__);
-
     return OK;
 }
 
@@ -1043,28 +917,32 @@ status_t DeviceHalAidl::prepareToDisconnectExternalDevice(const struct audio_por
     // There is not AIDL API defined for `prepareToDisconnectExternalDevice`.
     // Call `setConnectedState` instead.
     // TODO(b/279824103): call prepareToDisconnectExternalDevice when it is added.
-    if (const status_t status = setConnectedState(port, false /*connected*/); status == NO_ERROR) {
-        mDeviceDisconnectionNotified.insert(port->id);
-    }
+    RETURN_STATUS_IF_ERROR(setConnectedState(port, false /*connected*/));
+    std::lock_guard l(mLock);
+    mDeviceDisconnectionNotified.insert(port->id);
     // Return that there was no error as otherwise the disconnection procedure will not be
-    // considered complete for upper layers, and 'setConnectedState' will not be called again.
-    return NO_ERROR;
+    // considered complete for upper layers, and 'setConnectedState' will not be called again
+    return OK;
 }
 
 status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool connected) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
+    if (mModule == nullptr) return NO_INIT;
     if (port == nullptr) {
         return BAD_VALUE;
     }
-    if (!connected && mDeviceDisconnectionNotified.erase(port->id) > 0) {
-        // For device disconnection, APM will first call `prepareToDisconnectExternalDevice`
-        // and then call `setConnectedState`. However, there is no API for
-        // `prepareToDisconnectExternalDevice` yet. In that case, `setConnectedState` will be
-        // called when calling `prepareToDisconnectExternalDevice`. Do not call to the HAL if
-        // previous call is successful. Also remove the cache here to avoid a large cache after
-        // a long run.
-        return NO_ERROR;
+    if (!connected) {
+        std::lock_guard l(mLock);
+        if (mDeviceDisconnectionNotified.erase(port->id) > 0) {
+            // For device disconnection, APM will first call `prepareToDisconnectExternalDevice`
+            // and then call `setConnectedState`. However, there is no API for
+            // `prepareToDisconnectExternalDevice` yet. In that case, `setConnectedState` will be
+            // called when calling `prepareToDisconnectExternalDevice`. Do not call to the HAL if
+            // previous call is successful. Also remove the cache here to avoid a large cache after
+            // a long run.
+            return OK;
+        }
     }
     bool isInput = VALUE_OR_RETURN_STATUS(::aidl::android::portDirection(port->role, port->type)) ==
             ::aidl::android::AudioPortDirection::INPUT;
@@ -1075,64 +953,17 @@ status_t DeviceHalAidl::setConnectedState(const struct audio_port_v7 *port, bool
                 __func__, mInstance.c_str(), aidlPort.toString().c_str());
         return BAD_VALUE;
     }
-    if (connected) {
-        AudioDevice matchDevice = aidlPort.ext.get<AudioPortExt::device>().device;
-        // Reset the device address to find the "template" port.
-        matchDevice.address = AudioDeviceAddress::make<AudioDeviceAddress::id>();
-        auto portsIt = findPort(matchDevice);
-        if (portsIt == mPorts.end()) {
-            // Since 'setConnectedState' is called for all modules, it is normal when the device
-            // port not found in every one of them.
-            return BAD_VALUE;
-        } else {
-            ALOGD("%s: device port for device %s found in the module %s",
-                    __func__, matchDevice.toString().c_str(), mInstance.c_str());
-        }
-        resetUnusedPatchesAndPortConfigs();
-        // Use the ID of the "template" port, use all the information from the provided port.
-        aidlPort.id = portsIt->first;
-        AudioPort connectedPort;
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->connectExternalDevice(
-                                aidlPort, &connectedPort)));
-        const auto [it, inserted] = mPorts.insert(std::make_pair(connectedPort.id, connectedPort));
-        LOG_ALWAYS_FATAL_IF(!inserted,
-                "%s: module %s, duplicate port ID received from HAL: %s, existing port: %s",
-                __func__, mInstance.c_str(), connectedPort.toString().c_str(),
-                it->second.toString().c_str());
-        mConnectedPorts[connectedPort.id] = false;
-    } else {  // !connected
-        AudioDevice matchDevice = aidlPort.ext.get<AudioPortExt::device>().device;
-        auto portsIt = findPort(matchDevice);
-        if (portsIt == mPorts.end()) {
-            // Since 'setConnectedState' is called for all modules, it is normal when the device
-            // port not found in every one of them.
-            return BAD_VALUE;
-        } else {
-            ALOGD("%s: device port for device %s found in the module %s",
-                    __func__, matchDevice.toString().c_str(), mInstance.c_str());
-        }
-        resetUnusedPatchesAndPortConfigs();
-        // Streams are closed by AudioFlinger independently from device disconnections.
-        // It is possible that the stream has not been closed yet.
-        const int32_t portId = portsIt->second.id;
-        if (!isPortHeldByAStream(portId)) {
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                            mModule->disconnectExternalDevice(portId)));
-            mPorts.erase(portsIt);
-            mConnectedPorts.erase(portId);
-        } else {
-            ALOGD("%s: since device port ID %d is used by a stream, "
-                    "external device disconnection postponed", __func__, portId);
-            mConnectedPorts[portId] = true;
-        }
-    }
-    return updateRoutes();
+    std::lock_guard l(mLock);
+    return mMapper.setDevicePortConnectedState(aidlPort, connected);
 }
 
 status_t DeviceHalAidl::setSimulateDeviceConnections(bool enabled) {
     TIME_CHECK();
-    if (!mModule) return NO_INIT;
-    resetUnusedPatchesAndPortConfigs();
+    if (mModule == nullptr) return NO_INIT;
+    {
+        std::lock_guard l(mLock);
+        mMapper.resetUnusedPatchesAndPortConfigs();
+    }
     ModuleDebug debug{ .simulateDeviceConnections = enabled };
     status_t status = statusTFromBinderStatus(mModule->setModuleDebug(debug));
     // This is important to log as it affects HAL behavior.
@@ -1144,66 +975,41 @@ status_t DeviceHalAidl::setSimulateDeviceConnections(bool enabled) {
     return status;
 }
 
-bool DeviceHalAidl::audioDeviceMatches(const AudioDevice& device, const AudioPort& p) {
-    if (p.ext.getTag() != AudioPortExt::Tag::device) return false;
-    return p.ext.get<AudioPortExt::Tag::device>().device == device;
-}
-
-bool DeviceHalAidl::audioDeviceMatches(const AudioDevice& device, const AudioPortConfig& p) {
-    if (p.ext.getTag() != AudioPortExt::Tag::device) return false;
-    if (device.type.type == AudioDeviceType::IN_DEFAULT) {
-        return p.portId == mDefaultInputPortId;
-    } else if (device.type.type == AudioDeviceType::OUT_DEFAULT) {
-        return p.portId == mDefaultOutputPortId;
-    }
-    return p.ext.get<AudioPortExt::Tag::device>().device == device;
-}
-
-status_t DeviceHalAidl::createOrUpdatePortConfig(
-        const AudioPortConfig& requestedPortConfig, PortConfigs::iterator* result, bool* created) {
-    TIME_CHECK();
-    AudioPortConfig appliedPortConfig;
-    bool applied = false;
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->setAudioPortConfig(
-                            requestedPortConfig, &appliedPortConfig, &applied)));
-    if (!applied) {
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->setAudioPortConfig(
-                                appliedPortConfig, &appliedPortConfig, &applied)));
-        if (!applied) {
-            ALOGE("%s: module %s did not apply suggested config %s",
-                    __func__, mInstance.c_str(), appliedPortConfig.toString().c_str());
-            return NO_INIT;
+status_t DeviceHalAidl::filterAndRetrieveBtA2dpParameters(
+        AudioParameter &keys, AudioParameter *result) {
+    if (String8 key = String8(AudioParameter::keyReconfigA2dpSupported); keys.containsKey(key)) {
+        keys.remove(key);
+        if (mBluetoothA2dp != nullptr) {
+            bool supports;
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                            mBluetoothA2dp->supportsOffloadReconfiguration(&supports)));
+            result->addInt(key, supports ? 1 : 0);
+        } else {
+            ALOGI("%s: no IBluetoothA2dp on %s", __func__, mInstance.c_str());
+            result->addInt(key, 0);
         }
     }
-
-    int32_t id = appliedPortConfig.id;
-    if (requestedPortConfig.id != 0 && requestedPortConfig.id != id) {
-        LOG_ALWAYS_FATAL("%s: requested port config id %d changed to %d", __func__,
-                requestedPortConfig.id, id);
-    }
-
-    auto [it, inserted] = mPortConfigs.insert_or_assign(std::move(id),
-            std::move(appliedPortConfig));
-    *result = it;
-    *created = inserted;
     return OK;
 }
 
-status_t DeviceHalAidl::filterAndRetrieveBtA2dpParameters(
+status_t DeviceHalAidl::filterAndRetrieveBtLeParameters(
         AudioParameter &keys, AudioParameter *result) {
-    TIME_CHECK();
-    if (String8 key = String8(AudioParameter::keyReconfigA2dpSupported); keys.containsKey(key)) {
+    if (String8 key = String8(AudioParameter::keyReconfigLeSupported); keys.containsKey(key)) {
         keys.remove(key);
-        bool supports;
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                        mBluetoothA2dp->supportsOffloadReconfiguration(&supports)));
-        result->addInt(key, supports ? 1 : 0);
+        if (mBluetoothLe != nullptr) {
+            bool supports;
+            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                            mBluetoothLe->supportsOffloadReconfiguration(&supports)));
+            result->addInt(key, supports ? 1 : 0);
+        } else {
+            ALOGI("%s: no mBluetoothLe on %s", __func__, mInstance.c_str());
+            result->addInt(key, 0);
+        }
     }
     return OK;
 }
 
 status_t DeviceHalAidl::filterAndUpdateBtA2dpParameters(AudioParameter &parameters) {
-    TIME_CHECK();
     std::optional<bool> a2dpEnabled;
     std::optional<std::vector<VendorParameter>> reconfigureOffload;
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
@@ -1245,7 +1051,6 @@ status_t DeviceHalAidl::filterAndUpdateBtA2dpParameters(AudioParameter &paramete
 }
 
 status_t DeviceHalAidl::filterAndUpdateBtHfpParameters(AudioParameter &parameters) {
-    TIME_CHECK();
     IBluetooth::HfpConfig hfpConfig;
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
                     parameters, String8(AudioParameter::keyBtHfpEnable),
@@ -1284,8 +1089,8 @@ status_t DeviceHalAidl::filterAndUpdateBtHfpParameters(AudioParameter &parameter
 }
 
 status_t DeviceHalAidl::filterAndUpdateBtLeParameters(AudioParameter &parameters) {
-    TIME_CHECK();
     std::optional<bool> leEnabled;
+    std::optional<std::vector<VendorParameter>> reconfigureOffload;
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
                     parameters, String8(AudioParameter::keyBtLeSuspended),
                     [&leEnabled](const String8& trueOrFalse) {
@@ -1300,14 +1105,31 @@ status_t DeviceHalAidl::filterAndUpdateBtLeParameters(AudioParameter &parameters
                                 AudioParameter::keyBtLeSuspended, trueOrFalse.c_str());
                         return BAD_VALUE;
                     }));
+    (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
+                    parameters, String8(AudioParameter::keyReconfigLe),
+                    [&](const String8& value) -> status_t {
+                        if (mVendorExt != nullptr) {
+                            std::vector<VendorParameter> result;
+                            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                                    mVendorExt->parseBluetoothLeReconfigureOffload(
+                                            std::string(value.c_str()), &result)));
+                            reconfigureOffload = std::move(result);
+                        } else {
+                            reconfigureOffload = std::vector<VendorParameter>();
+                        }
+                        return OK;
+                    }));
     if (mBluetoothLe != nullptr && leEnabled.has_value()) {
         return statusTFromBinderStatus(mBluetoothLe->setEnabled(leEnabled.value()));
+    }
+    if (mBluetoothLe != nullptr && reconfigureOffload.has_value()) {
+        return statusTFromBinderStatus(mBluetoothLe->reconfigureOffload(
+                        reconfigureOffload.value()));
     }
     return OK;
 }
 
 status_t DeviceHalAidl::filterAndUpdateBtScoParameters(AudioParameter &parameters) {
-    TIME_CHECK();
     IBluetooth::ScoConfig scoConfig;
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
                     parameters, String8(AudioParameter::keyBtSco),
@@ -1365,7 +1187,6 @@ status_t DeviceHalAidl::filterAndUpdateBtScoParameters(AudioParameter &parameter
 }
 
 status_t DeviceHalAidl::filterAndUpdateScreenParameters(AudioParameter &parameters) {
-    TIME_CHECK();
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
                     parameters, String8(AudioParameter::keyScreenState),
                     [&](const String8& onOrOff) -> status_t {
@@ -1403,7 +1224,6 @@ status_t DeviceHalAidl::filterAndUpdateScreenParameters(AudioParameter &paramete
 }
 
 status_t DeviceHalAidl::filterAndUpdateTelephonyParameters(AudioParameter &parameters) {
-    TIME_CHECK();
     using TtyMode = ITelephony::TelecomConfig::TtyMode;
     ITelephony::TelecomConfig telConfig;
     (void)VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<String8>(
@@ -1444,398 +1264,6 @@ status_t DeviceHalAidl::filterAndUpdateTelephonyParameters(AudioParameter &param
         ITelephony::TelecomConfig newTelConfig;
         return statusTFromBinderStatus(
                 mTelephony->setTelecomConfig(telConfig, &newTelConfig));
-    }
-    return OK;
-}
-
-status_t DeviceHalAidl::findOrCreatePatch(
-        const AudioPatch& requestedPatch, AudioPatch* patch, bool* created) {
-    std::set<int32_t> sourcePortConfigIds(requestedPatch.sourcePortConfigIds.begin(),
-            requestedPatch.sourcePortConfigIds.end());
-    std::set<int32_t> sinkPortConfigIds(requestedPatch.sinkPortConfigIds.begin(),
-            requestedPatch.sinkPortConfigIds.end());
-    return findOrCreatePatch(sourcePortConfigIds, sinkPortConfigIds, patch, created);
-}
-
-status_t DeviceHalAidl::findOrCreatePatch(
-        const std::set<int32_t>& sourcePortConfigIds, const std::set<int32_t>& sinkPortConfigIds,
-        AudioPatch* patch, bool* created) {
-    auto patchIt = findPatch(sourcePortConfigIds, sinkPortConfigIds);
-    if (patchIt == mPatches.end()) {
-        TIME_CHECK();
-        AudioPatch requestedPatch, appliedPatch;
-        requestedPatch.sourcePortConfigIds.insert(requestedPatch.sourcePortConfigIds.end(),
-                sourcePortConfigIds.begin(), sourcePortConfigIds.end());
-        requestedPatch.sinkPortConfigIds.insert(requestedPatch.sinkPortConfigIds.end(),
-                sinkPortConfigIds.begin(), sinkPortConfigIds.end());
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->setAudioPatch(
-                                requestedPatch, &appliedPatch)));
-        patchIt = mPatches.insert(mPatches.end(), std::make_pair(appliedPatch.id, appliedPatch));
-        *created = true;
-    } else {
-        *created = false;
-    }
-    *patch = patchIt->second;
-    return OK;
-}
-
-status_t DeviceHalAidl::findOrCreatePortConfig(const AudioDevice& device, const AudioConfig* config,
-        AudioPortConfig* portConfig, bool* created) {
-    auto portConfigIt = findPortConfig(device);
-    if (portConfigIt == mPortConfigs.end()) {
-        auto portsIt = findPort(device);
-        if (portsIt == mPorts.end()) {
-            ALOGE("%s: device port for device %s is not found in the module %s",
-                    __func__, device.toString().c_str(), mInstance.c_str());
-            return BAD_VALUE;
-        }
-        AudioPortConfig requestedPortConfig;
-        requestedPortConfig.portId = portsIt->first;
-        if (config != nullptr) {
-            setPortConfigFromConfig(&requestedPortConfig, *config);
-        }
-        RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
-                created));
-    } else {
-        *created = false;
-    }
-    *portConfig = portConfigIt->second;
-    return OK;
-}
-
-status_t DeviceHalAidl::findOrCreatePortConfig(
-        const AudioConfig& config, const std::optional<AudioIoFlags>& flags, int32_t ioHandle,
-        AudioSource source, const std::set<int32_t>& destinationPortIds,
-        AudioPortConfig* portConfig, bool* created) {
-    // These flags get removed one by one in this order when retrying port finding.
-    static const std::vector<AudioInputFlags> kOptionalInputFlags{
-        AudioInputFlags::FAST, AudioInputFlags::RAW };
-    auto portConfigIt = findPortConfig(config, flags, ioHandle);
-    if (portConfigIt == mPortConfigs.end() && flags.has_value()) {
-        auto optionalInputFlagsIt = kOptionalInputFlags.begin();
-        AudioIoFlags matchFlags = flags.value();
-        auto portsIt = findPort(config, matchFlags, destinationPortIds);
-        while (portsIt == mPorts.end() && matchFlags.getTag() == AudioIoFlags::Tag::input
-                && optionalInputFlagsIt != kOptionalInputFlags.end()) {
-            if (!isBitPositionFlagSet(
-                            matchFlags.get<AudioIoFlags::Tag::input>(), *optionalInputFlagsIt)) {
-                ++optionalInputFlagsIt;
-                continue;
-            }
-            matchFlags.set<AudioIoFlags::Tag::input>(matchFlags.get<AudioIoFlags::Tag::input>() &
-                    ~makeBitPositionFlagMask(*optionalInputFlagsIt++));
-            portsIt = findPort(config, matchFlags, destinationPortIds);
-            ALOGI("%s: mix port for config %s, flags %s was not found in the module %s, "
-                    "retried with flags %s", __func__, config.toString().c_str(),
-                    flags.value().toString().c_str(), mInstance.c_str(),
-                    matchFlags.toString().c_str());
-        }
-        if (portsIt == mPorts.end()) {
-            ALOGE("%s: mix port for config %s, flags %s is not found in the module %s",
-                    __func__, config.toString().c_str(), matchFlags.toString().c_str(),
-                    mInstance.c_str());
-            return BAD_VALUE;
-        }
-        AudioPortConfig requestedPortConfig;
-        requestedPortConfig.portId = portsIt->first;
-        setPortConfigFromConfig(&requestedPortConfig, config);
-        requestedPortConfig.ext = AudioPortMixExt{ .handle = ioHandle };
-        if (matchFlags.getTag() == AudioIoFlags::Tag::input
-                && source != AudioSource::SYS_RESERVED_INVALID) {
-            requestedPortConfig.ext.get<AudioPortExt::Tag::mix>().usecase =
-                    AudioPortMixExtUseCase::make<AudioPortMixExtUseCase::Tag::source>(source);
-        }
-        RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
-                created));
-    } else if (portConfigIt == mPortConfigs.end() && !flags.has_value()) {
-        ALOGW("%s: mix port config for %s, handle %d not found in the module %s, "
-                "and was not created as flags are not specified",
-                __func__, config.toString().c_str(), ioHandle, mInstance.c_str());
-        return BAD_VALUE;
-    } else {
-        AudioPortConfig requestedPortConfig = portConfigIt->second;
-        if (requestedPortConfig.ext.getTag() == AudioPortExt::Tag::mix) {
-            AudioPortMixExt& mixExt = requestedPortConfig.ext.get<AudioPortExt::Tag::mix>();
-            if (mixExt.usecase.getTag() == AudioPortMixExtUseCase::Tag::source &&
-                    source != AudioSource::SYS_RESERVED_INVALID) {
-                mixExt.usecase.get<AudioPortMixExtUseCase::Tag::source>() = source;
-            }
-        }
-
-        if (requestedPortConfig != portConfigIt->second) {
-            RETURN_STATUS_IF_ERROR(createOrUpdatePortConfig(requestedPortConfig, &portConfigIt,
-                    created));
-        } else {
-            *created = false;
-        }
-    }
-    *portConfig = portConfigIt->second;
-    return OK;
-}
-
-status_t DeviceHalAidl::findOrCreatePortConfig(
-        const AudioPortConfig& requestedPortConfig, const std::set<int32_t>& destinationPortIds,
-        AudioPortConfig* portConfig, bool* created) {
-    using Tag = AudioPortExt::Tag;
-    if (requestedPortConfig.ext.getTag() == Tag::mix) {
-        if (const auto& p = requestedPortConfig;
-                !p.sampleRate.has_value() || !p.channelMask.has_value() ||
-                !p.format.has_value()) {
-            ALOGW("%s: provided mix port config is not fully specified: %s",
-                    __func__, p.toString().c_str());
-            return BAD_VALUE;
-        }
-        AudioConfig config;
-        setConfigFromPortConfig(&config, requestedPortConfig);
-        AudioSource source = requestedPortConfig.ext.get<Tag::mix>().usecase.getTag() ==
-                AudioPortMixExtUseCase::Tag::source ?
-                requestedPortConfig.ext.get<Tag::mix>().usecase.
-                get<AudioPortMixExtUseCase::Tag::source>() : AudioSource::SYS_RESERVED_INVALID;
-        return findOrCreatePortConfig(config, requestedPortConfig.flags,
-                requestedPortConfig.ext.get<Tag::mix>().handle, source, destinationPortIds,
-                portConfig, created);
-    } else if (requestedPortConfig.ext.getTag() == Tag::device) {
-        return findOrCreatePortConfig(
-                requestedPortConfig.ext.get<Tag::device>().device, nullptr /*config*/,
-                portConfig, created);
-    }
-    ALOGW("%s: unsupported audio port config: %s",
-            __func__, requestedPortConfig.toString().c_str());
-    return BAD_VALUE;
-}
-
-DeviceHalAidl::Patches::iterator DeviceHalAidl::findPatch(
-        const std::set<int32_t>& sourcePortConfigIds, const std::set<int32_t>& sinkPortConfigIds) {
-    return std::find_if(mPatches.begin(), mPatches.end(),
-            [&](const auto& pair) {
-                const auto& p = pair.second;
-                std::set<int32_t> patchSrcs(
-                        p.sourcePortConfigIds.begin(), p.sourcePortConfigIds.end());
-                std::set<int32_t> patchSinks(
-                        p.sinkPortConfigIds.begin(), p.sinkPortConfigIds.end());
-                return sourcePortConfigIds == patchSrcs && sinkPortConfigIds == patchSinks; });
-}
-
-DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(const AudioDevice& device) {
-    if (device.type.type == AudioDeviceType::IN_DEFAULT) {
-        return mPorts.find(mDefaultInputPortId);
-    } else if (device.type.type == AudioDeviceType::OUT_DEFAULT) {
-        return mPorts.find(mDefaultOutputPortId);
-    }
-    if (device.address.getTag() != AudioDeviceAddress::id ||
-            !device.address.get<AudioDeviceAddress::id>().empty()) {
-        return std::find_if(mPorts.begin(), mPorts.end(),
-                [&](const auto& pair) { return audioDeviceMatches(device, pair.second); });
-    }
-    // For connection w/o an address, two ports can be found: the template port,
-    // and a connected port (if exists). Make sure we return the connected port.
-    DeviceHalAidl::Ports::iterator portIt = mPorts.end();
-    for (auto it = mPorts.begin(); it != mPorts.end(); ++it) {
-        if (audioDeviceMatches(device, it->second)) {
-            if (mConnectedPorts.find(it->first) != mConnectedPorts.end()) {
-                return it;
-            } else {
-                // Will return 'it' if there is no connected port.
-                portIt = it;
-            }
-        }
-    }
-    return portIt;
-}
-
-DeviceHalAidl::Ports::iterator DeviceHalAidl::findPort(
-            const AudioConfig& config, const AudioIoFlags& flags,
-            const std::set<int32_t>& destinationPortIds) {
-    auto belongsToProfile = [&config](const AudioProfile& prof) {
-        return (isDefaultAudioFormat(config.base.format) || prof.format == config.base.format) &&
-                (config.base.channelMask.getTag() == AudioChannelLayout::none ||
-                        std::find(prof.channelMasks.begin(), prof.channelMasks.end(),
-                                config.base.channelMask) != prof.channelMasks.end()) &&
-                (config.base.sampleRate == 0 ||
-                        std::find(prof.sampleRates.begin(), prof.sampleRates.end(),
-                                config.base.sampleRate) != prof.sampleRates.end());
-    };
-    static const std::vector<AudioOutputFlags> kOptionalOutputFlags{AudioOutputFlags::BIT_PERFECT};
-    int optionalFlags = 0;
-    auto flagMatches = [&flags, &optionalFlags](const AudioIoFlags& portFlags) {
-        // Ports should be able to match if the optional flags are not requested.
-        return portFlags == flags ||
-               (portFlags.getTag() == AudioIoFlags::Tag::output &&
-                        AudioIoFlags::make<AudioIoFlags::Tag::output>(
-                                portFlags.get<AudioIoFlags::Tag::output>() &
-                                        ~optionalFlags) == flags);
-    };
-    auto matcher = [&](const auto& pair) {
-        const auto& p = pair.second;
-        return p.ext.getTag() == AudioPortExt::Tag::mix &&
-                flagMatches(p.flags) &&
-                (destinationPortIds.empty() ||
-                        std::any_of(destinationPortIds.begin(), destinationPortIds.end(),
-                                [&](const int32_t destId) { return mRoutingMatrix.count(
-                                            std::make_pair(p.id, destId)) != 0; })) &&
-                (p.profiles.empty() ||
-                        std::find_if(p.profiles.begin(), p.profiles.end(), belongsToProfile) !=
-                        p.profiles.end()); };
-    auto result = std::find_if(mPorts.begin(), mPorts.end(), matcher);
-    if (result == mPorts.end() && flags.getTag() == AudioIoFlags::Tag::output) {
-        auto optionalOutputFlagsIt = kOptionalOutputFlags.begin();
-        while (result == mPorts.end() && optionalOutputFlagsIt != kOptionalOutputFlags.end()) {
-            if (isBitPositionFlagSet(
-                        flags.get<AudioIoFlags::Tag::output>(), *optionalOutputFlagsIt)) {
-                // If the flag is set by the request, it must be matched.
-                ++optionalOutputFlagsIt;
-                continue;
-            }
-            optionalFlags |= makeBitPositionFlagMask(*optionalOutputFlagsIt++);
-            result = std::find_if(mPorts.begin(), mPorts.end(), matcher);
-            ALOGI("%s: port for config %s, flags %s was not found in the module %s, "
-                  "retried with excluding optional flags %#x", __func__, config.toString().c_str(),
-                    flags.toString().c_str(), mInstance.c_str(), optionalFlags);
-        }
-    }
-    return result;
-}
-
-DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(const AudioDevice& device) {
-    return std::find_if(mPortConfigs.begin(), mPortConfigs.end(),
-            [&](const auto& pair) { return audioDeviceMatches(device, pair.second); });
-}
-
-DeviceHalAidl::PortConfigs::iterator DeviceHalAidl::findPortConfig(
-            const AudioConfig& config, const std::optional<AudioIoFlags>& flags, int32_t ioHandle) {
-    using Tag = AudioPortExt::Tag;
-    return std::find_if(mPortConfigs.begin(), mPortConfigs.end(),
-            [&](const auto& pair) {
-                const auto& p = pair.second;
-                LOG_ALWAYS_FATAL_IF(p.ext.getTag() == Tag::mix &&
-                        !p.sampleRate.has_value() || !p.channelMask.has_value() ||
-                        !p.format.has_value() || !p.flags.has_value(),
-                        "%s: stored mix port config is not fully specified: %s",
-                        __func__, p.toString().c_str());
-                return p.ext.getTag() == Tag::mix &&
-                        isConfigEqualToPortConfig(config, p) &&
-                        (!flags.has_value() || p.flags.value() == flags.value()) &&
-                        p.ext.template get<Tag::mix>().handle == ioHandle; });
-}
-
-bool DeviceHalAidl::isPortHeldByAStream(int32_t portId) {
-    // It is assumed that mStreams has already been cleaned up.
-    for (const auto& streamPair : mStreams) {
-        int32_t patchId = streamPair.second;
-        auto patchIt = mPatches.find(patchId);
-        if (patchIt == mPatches.end()) continue;
-        for (int32_t id : patchIt->second.sourcePortConfigIds) {
-            auto portConfigIt = mPortConfigs.find(id);
-            if (portConfigIt != mPortConfigs.end() && portConfigIt->second.portId == portId) {
-                return true;
-            }
-        }
-        for (int32_t id : patchIt->second.sinkPortConfigIds) {
-            auto portConfigIt = mPortConfigs.find(id);
-            if (portConfigIt != mPortConfigs.end() && portConfigIt->second.portId == portId) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-void DeviceHalAidl::resetPatch(int32_t patchId) {
-    if (auto it = mPatches.find(patchId); it != mPatches.end()) {
-        mPatches.erase(it);
-        TIME_CHECK();
-        if (ndk::ScopedAStatus status = mModule->resetAudioPatch(patchId); !status.isOk()) {
-            ALOGE("%s: error while resetting patch %d: %s",
-                    __func__, patchId, status.getDescription().c_str());
-        }
-        return;
-    }
-    ALOGE("%s: patch id %d not found", __func__, patchId);
-}
-
-void DeviceHalAidl::resetPortConfig(int32_t portConfigId) {
-    if (auto it = mPortConfigs.find(portConfigId); it != mPortConfigs.end()) {
-        mPortConfigs.erase(it);
-        TIME_CHECK();
-        if (ndk::ScopedAStatus status = mModule->resetAudioPortConfig(portConfigId);
-                !status.isOk()) {
-            ALOGE("%s: error while resetting port config %d: %s",
-                    __func__, portConfigId, status.getDescription().c_str());
-        }
-        return;
-    }
-    ALOGE("%s: port config id %d not found", __func__, portConfigId);
-}
-
-void DeviceHalAidl::resetUnusedPatches() {
-    // Since patches can be created independently of streams via 'createAudioPatch',
-    // here we only clean up patches for released streams.
-    for (auto it = mStreams.begin(); it != mStreams.end(); ) {
-        if (auto streamSp = it->first.promote(); streamSp) {
-            ++it;
-        } else {
-            resetPatch(it->second);
-            it = mStreams.erase(it);
-        }
-    }
-}
-
-void DeviceHalAidl::resetUnusedPatchesAndPortConfigs() {
-    resetUnusedPatches();
-    resetUnusedPortConfigs();
-}
-
-void DeviceHalAidl::resetUnusedPortConfigs() {
-    // The assumption is that port configs are used to create patches
-    // (or to open streams, but that involves creation of patches, too). Thus,
-    // orphaned port configs can and should be reset.
-    std::map<int32_t, int32_t /*portID*/> portConfigIds;
-    std::transform(mPortConfigs.begin(), mPortConfigs.end(),
-            std::inserter(portConfigIds, portConfigIds.end()),
-            [](const auto& pcPair) { return std::make_pair(pcPair.first, pcPair.second.portId); });
-    for (const auto& p : mPatches) {
-        for (int32_t id : p.second.sourcePortConfigIds) portConfigIds.erase(id);
-        for (int32_t id : p.second.sinkPortConfigIds) portConfigIds.erase(id);
-    }
-    for (int32_t id : mInitialPortConfigIds) {
-        portConfigIds.erase(id);
-    }
-    std::set<int32_t> retryDeviceDisconnection;
-    for (const auto& portConfigAndIdPair : portConfigIds) {
-        resetPortConfig(portConfigAndIdPair.first);
-        if (const auto it = mConnectedPorts.find(portConfigAndIdPair.second);
-                it != mConnectedPorts.end() && it->second) {
-            retryDeviceDisconnection.insert(portConfigAndIdPair.second);
-        }
-    }
-    for (int32_t portId : retryDeviceDisconnection) {
-        if (!isPortHeldByAStream(portId)) {
-            TIME_CHECK();
-            if (auto status = mModule->disconnectExternalDevice(portId); status.isOk()) {
-                mPorts.erase(portId);
-                mConnectedPorts.erase(portId);
-                ALOGD("%s: executed postponed external device disconnection for port ID %d",
-                        __func__, portId);
-            }
-        }
-    }
-    if (!retryDeviceDisconnection.empty()) {
-        updateRoutes();
-    }
-}
-
-status_t DeviceHalAidl::updateRoutes() {
-    TIME_CHECK();
-    RETURN_STATUS_IF_ERROR(
-            statusTFromBinderStatus(mModule->getAudioRoutes(&mRoutes)));
-    ALOGW_IF(mRoutes.empty(), "%s: module %s returned an empty list of audio routes",
-            __func__, mInstance.c_str());
-    mRoutingMatrix.clear();
-    for (const auto& r : mRoutes) {
-        for (auto portId : r.sourcePortIds) {
-            mRoutingMatrix.emplace(r.sinkPortId, portId);
-            mRoutingMatrix.emplace(portId, r.sinkPortId);
-        }
     }
     return OK;
 }

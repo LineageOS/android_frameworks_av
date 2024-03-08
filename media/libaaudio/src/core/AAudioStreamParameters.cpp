@@ -61,6 +61,7 @@ static aaudio_result_t isFormatValid(audio_format_t format) {
         case AUDIO_FORMAT_PCM_32_BIT:
         case AUDIO_FORMAT_PCM_FLOAT:
         case AUDIO_FORMAT_PCM_24_BIT_PACKED:
+        case AUDIO_FORMAT_PCM_8_24_BIT:
         case AUDIO_FORMAT_IEC61937:
             break; // valid
         default:
@@ -184,6 +185,8 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_INPUT_PRESET_VOICE_RECOGNITION:
         case AAUDIO_INPUT_PRESET_UNPROCESSED:
         case AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE:
+        case AAUDIO_INPUT_PRESET_SYSTEM_ECHO_REFERENCE:
+        case AAUDIO_INPUT_PRESET_SYSTEM_HOTWORD:
             break; // valid
         default:
             ALOGD("input preset not valid = %d", mInputPreset);

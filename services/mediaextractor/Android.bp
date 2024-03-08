@@ -89,3 +89,25 @@ prebuilt_etc {
         "code_coverage.policy",
     ],
 }
+
+cc_fuzz {
+    name: "mediaextractor_service_fuzzer",
+    shared_libs: [
+        "libmedia",
+        "libmediaextractorservice",
+        "libmediautils",
+        "liblog",
+        "libavservices_minijail",
+    ],
+    defaults: [
+        "service_fuzzer_defaults",
+        "fuzzer_disable_leaks",
+    ],
+    srcs: ["fuzzers/MediaExtractorServiceFuzzer.cpp"],
+    fuzz_config: {
+        cc: [
+            "android-media-playback+bugs@google.com",
+        ],
+        triage_assignee: "waghpawan@google.com",
+    },
+}

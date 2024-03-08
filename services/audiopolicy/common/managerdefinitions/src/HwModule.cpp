@@ -67,7 +67,7 @@ status_t HwModule::addOutputProfile(const std::string& name, const audio_config_
                                               config->sample_rate));
 
     sp<DeviceDescriptor> devDesc =
-            new DeviceDescriptor(device, getTagForDevice(device), address.string());
+            new DeviceDescriptor(device, getTagForDevice(device), address.c_str());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
@@ -135,7 +135,7 @@ status_t HwModule::addInputProfile(const std::string& name, const audio_config_t
                                               config->sample_rate));
 
     sp<DeviceDescriptor> devDesc =
-            new DeviceDescriptor(device, getTagForDevice(device), address.string());
+            new DeviceDescriptor(device, getTagForDevice(device), address.c_str());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
@@ -361,7 +361,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
         DeviceVector moduleDevices = hwModule->getAllDevices();
         auto moduleDevice = moduleDevices.getDevice(deviceType, devAddress, encodedFormat);
 
-        // Prevent overwritting moduleDevice address if connected device does not have the same
+        // Prevent overwriting moduleDevice address if connected device does not have the same
         // address (since getDevice with empty address ignores match on address), use dynamic device
         if (moduleDevice && allowToCreate &&
                 (!moduleDevice->address().empty() &&
@@ -375,7 +375,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
             if (allowToCreate) {
                 moduleDevice->attach(hwModule);
                 // Name may be overwritten, restored on detach.
-                moduleDevice->setAddress(devAddress.string());
+                moduleDevice->setAddress(devAddress.c_str());
                 // Name may be overwritten, restored on detach.
                 moduleDevice->setName(name);
             }
@@ -383,8 +383,8 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
         }
     }
     if (!allowToCreate) {
-        ALOGV("%s: could not find HW module for device %s %04x address %s", __FUNCTION__,
-              name, deviceType, address);
+        ALOGW("%s: could not find HW module for device %s (%s, %08x) address %s", __FUNCTION__,
+                name, audio_device_to_string(deviceType), deviceType, address);
         return nullptr;
     }
     return createDevice(deviceType, address, name, encodedFormat);
@@ -398,8 +398,14 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
     std::string tagName = {};
     sp<HwModule> hwModule = getModuleForDeviceType(type, encodedFormat, &tagName);
     if (hwModule == 0) {
-        ALOGE("%s: could not find HW module for device %04x address %s", __FUNCTION__, type,
-              address);
+        if (encodedFormat == AUDIO_FORMAT_DEFAULT) {
+            ALOGE("%s: could not find HW module for device type '%s' (%08x)",
+                    __FUNCTION__, audio_device_to_string(type), type);
+        } else {
+            ALOGE("%s: could not find HW module for device type '%s' (%08x), "
+                    "encoded format '%s'", __FUNCTION__, audio_device_to_string(type), type,
+                    audio_format_to_string(encodedFormat));
+        }
         return nullptr;
     }
 

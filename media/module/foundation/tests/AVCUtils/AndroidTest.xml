@@ -18,14 +18,22 @@
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="false" />
         <option name="push" value="AVCUtilsUnitTest->/data/local/tmp/AVCUtilsUnitTest" />
-        <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/foundation/tests/AVCUtils/AVCUtilsUnitTest.zip?unzip=true"
-            value="/data/local/tmp/AVCUtilsUnitTest/" />
+    </target_preparer>
+
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="target" value="host" />
+        <option name="config-filename" value="AVCUtilsUnitTest" />
+        <option name="version" value="1.0"/>
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.MediaPreparer">
+        <option name="push-all" value="true" />
+        <option name="media-folder-name" value="AVCUtilsUnitTest-1.0" />
+        <option name="dynamic-config-module" value="AVCUtilsUnitTest" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="AVCUtilsUnitTest" />
-        <option name="native-test-flag" value="-P /data/local/tmp/AVCUtilsUnitTest/" />
+        <option name="native-test-flag" value="-P /sdcard/test/AVCUtilsUnitTest-1.0/" />
     </test>
 </configuration>

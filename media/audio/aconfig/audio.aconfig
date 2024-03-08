@@ -1,0 +1,44 @@
+# Audio flags intended for general consumption (cross-cutting), but NOT included in framework.
+#
+# Please add flags in alphabetical order.
+
+package: "com.android.media.audio"
+
+flag {
+    name: "alarm_min_volume_zero"
+    namespace: "media_audio"
+    description: "Support configuring alarm min vol to zero"
+    bug: "296884402"
+}
+
+flag {
+    name: "bluetooth_mac_address_anonymization"
+    namespace: "media_audio"
+    description:
+        "Enable Bluetooth MAC address anonymization when reporting "
+        "audio device descriptors to non privileged apps."
+    bug: "285588444"
+}
+
+flag {
+    name: "disable_prescale_absolute_volume"
+    namespace: "media_audio"
+    description:
+        "Disable pre-scale absolute volume."
+    bug: "302553525"
+}
+
+flag {
+    name: "dsa_over_bt_le_audio"
+    namespace: "media_audio"
+    description:
+        "Enable dynamic spatial audio over Bluetooth LE Audio."
+    bug: "307588546"
+}
+
+flag {
+    name: "spatializer_offload"
+    namespace: "media_audio"
+    description: "Enable spatializer offload"
+    bug: "307842941"
+}

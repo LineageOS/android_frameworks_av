@@ -69,7 +69,7 @@ status_t parseAndGetVendorParameters(
         // Re-parse the vendor-provided string to ensure that it is correct.
         AudioParameter reparse(String8(vendorParameters.c_str()));
         if (reparse.size() != 0) {
-            if (!values->empty()) {
+            if (values->length() > 0) {
                 values->append(";");
             }
             values->append(reparse.toString().c_str());

@@ -19,6 +19,7 @@
 
 #include <unordered_set>
 
+#include <HeifCleanAperture.h>
 #include <ItemTable.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
@@ -47,7 +48,7 @@ struct ImageItem {
     ImageItem(uint32_t _type, uint32_t _id, bool _hidden) :
             type(_type), itemId(_id), hidden(_hidden),
             rows(0), columns(0), width(0), height(0), rotation(0),
-            offset(0), size(0), nextTileIndex(0) {}
+            offset(0), size(0), seenClap(false), nextTileIndex(0) {}
 
     bool isGrid() const {
         return type == FOURCC("grid");
@@ -77,6 +78,8 @@ struct ImageItem {
     sp<ABuffer> hvcc;
     sp<ABuffer> icc;
     sp<ABuffer> av1c;
+    bool seenClap;
+    CleanAperture clap;
 
     Vector<uint32_t> thumbnails;
     Vector<uint32_t> dimgRefs;
@@ -833,6 +836,47 @@ status_t IrotBox::parse(off64_t offset, size_t size) {
     return OK;
 }
 
+struct ClapBox : public Box, public ItemProperty {
+    ClapBox(DataSourceHelper *source) :
+        Box(source, FOURCC("clap")), mSeen(false) {}
+
+    status_t parse(off64_t offset, size_t size) override;
+
+    void attachTo(ImageItem &image) const override {
+        image.seenClap = mSeen;
+        if (!mSeen) return;
+        image.clap = mClap;
+    }
+
+private:
+    bool mSeen;
+    CleanAperture mClap;
+};
+
+status_t ClapBox::parse(off64_t offset, size_t size) {
+    ALOGV("%s: offset %lld, size %zu", __FUNCTION__, (long long)offset, size);
+
+    if (size < 32) {
+        return ERROR_MALFORMED;
+    }
+    mSeen = true;
+    uint32_t values[8];
+    for (int i = 0; i < 8; ++i, offset += 4) {
+        if (!source()->getUInt32(offset, &values[i])) {
+            return ERROR_IO;
+        }
+    }
+    mClap.width.n = values[0];
+    mClap.width.d = values[1];
+    mClap.height.n = values[2];
+    mClap.height.d = values[3];
+    mClap.horizOff.n = values[4];
+    mClap.horizOff.d = values[5];
+    mClap.vertOff.n = values[6];
+    mClap.vertOff.d = values[7];
+    return OK;
+}
+
 struct ColrBox : public Box, public ItemProperty {
     ColrBox(DataSourceHelper *source) :
         Box(source, FOURCC("colr")) {}
@@ -992,6 +1036,11 @@ status_t IpcoBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
             itemProperty = new IrotBox(source());
             break;
         }
+        case FOURCC("clap"):
+        {
+            itemProperty = new ClapBox(source());
+            break;
+        }
         case FOURCC("colr"):
         {
             itemProperty = new ColrBox(source());
@@ -1111,7 +1160,7 @@ bool InfeBox::parseNullTerminatedString(
         }
         buf.push_back(tmp);
         if (tmp == 0) {
-            out->setTo(buf.array());
+            *out = buf.array();
 
             *offset = newOffset;
             *size = stopOffset - newOffset;
@@ -1452,9 +1501,9 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
                     info.isExif(), (long long)offset, (long long)size);
             if ((info.isExif() && size > 4) || (info.isXmp() && size > 0)) {
                 ExternalMetaItem metaItem = {
-                        .isExif = info.isExif(),
                         .offset = offset,
                         .size = size,
+                        .isExif = info.isExif(),
                 };
                 mItemIdToMetaMap.add(info.itemId, metaItem);
             }
@@ -1598,6 +1647,12 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
     // we validated no overflow in IspeBox::parse()
     AMediaFormat_setInt32(meta,
             AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 3 / 2);
+
+    int32_t left, top, right, bottom;
+    if (image->seenClap && convertCleanApertureToRect(image->width, image->height, image->clap,
+                                                      &left, &top, &right, &bottom)) {
+        AMediaFormat_setRect(meta, AMEDIAFORMAT_KEY_DISPLAY_CROP, left, top, right - 1, bottom - 1);
+    }
 
     if (!image->thumbnails.empty()) {
         ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(image->thumbnails[0]);

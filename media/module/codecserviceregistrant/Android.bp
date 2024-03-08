@@ -6,34 +6,8 @@ package {
     //   SPDX-license-identifier-Apache-2.0
 }
 
-cc_library {
-    name: "libmedia_codecserviceregistrant",
-    vendor_available: true,
-    min_sdk_version: "29",
-    apex_available: [
-        "//apex_available:platform",
-        "com.android.media.swcodec",
-    ],
-
-    srcs: [
-        "CodecServiceRegistrant.cpp",
-    ],
-
-    header_libs: [
-        "libmedia_headers",
-    ],
-
-    defaults: [
-        "libcodec2-hidl-defaults",
-    ],
-    shared_libs: [
-        "libbase",
-        "libcodec2_hidl@1.0",
-        "libcodec2_vndk",
-        "libhidlbase",
-        "libutils",
-    ],
-
+cc_defaults {
+    name: "libcodec2-runtime-libs",
     // Codecs
     runtime_libs: [
         "libcodec2_soft_avcdec",
@@ -61,6 +35,7 @@ cc_library {
         "libcodec2_soft_vp9dec",
         // "libcodec2_soft_av1dec_aom",  // replaced by the gav1 implementation
         "libcodec2_soft_av1dec_gav1",
+        "libcodec2_soft_av1dec_dav1d",
         "libcodec2_soft_av1enc",
         "libcodec2_soft_vp8enc",
         "libcodec2_soft_vp9enc",
@@ -69,4 +44,36 @@ cc_library {
         "libcodec2_soft_flacenc",
         "libcodec2_soft_gsmdec",
     ],
+}
+
+cc_library {
+    name: "libmedia_codecserviceregistrant",
+    vendor_available: true,
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
+    srcs: [
+        "CodecServiceRegistrant.cpp",
+    ],
+
+    header_libs: [
+        "libmedia_headers",
+    ],
+
+    defaults: [
+        "libcodec2-aidl-defaults",
+        "libcodec2-hidl-defaults",
+        "libcodec2-runtime-libs",
+    ],
+    shared_libs: [
+        "libbase",
+        "libcodec2_hidl@1.0",
+        "libcodec2_vndk",
+        "libhidlbase",
+        "libutils",
+    ],
+
 }

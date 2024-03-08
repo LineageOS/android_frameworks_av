@@ -184,6 +184,7 @@
 #define AMEDIAMETRICS_PROP_PLAYERIID      "playerIId"      // int32 (-1 invalid/unset IID)
 #define AMEDIAMETRICS_PROP_ROUTEDDEVICEID "routedDeviceId" // int32
 #define AMEDIAMETRICS_PROP_SAMPLERATE     "sampleRate"     // int32
+#define AMEDIAMETRICS_PROP_SAMPLERATECLIENT "sampleRateClient" // int32
 #define AMEDIAMETRICS_PROP_SAMPLERATEHARDWARE "sampleRateHardware" // int32
 #define AMEDIAMETRICS_PROP_SELECTEDDEVICEID "selectedDeviceId" // int32
 #define AMEDIAMETRICS_PROP_SELECTEDMICDIRECTION "selectedMicDirection" // int32

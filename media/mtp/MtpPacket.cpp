@@ -97,7 +97,7 @@ uint16_t MtpPacket::getUInt16(int offset) const {
     }
     else {
         ALOGE("offset for buffer read is greater than buffer size!");
-        abort();
+        return 0;
     }
 }
 
@@ -108,7 +108,7 @@ uint32_t MtpPacket::getUInt32(int offset) const {
     }
     else {
         ALOGE("offset for buffer read is greater than buffer size!");
-        abort();
+        return 0;
     }
 }
 
@@ -177,6 +177,9 @@ void MtpPacket::setParameter(int index, uint32_t value) {
 
 #ifdef MTP_HOST
 int MtpPacket::transfer(struct usb_request* request) {
+    if (request->dev == NULL) {
+        return -1;
+    }
     int result = usb_device_bulk_transfer(request->dev,
                             request->endpoint,
                             request->buffer,

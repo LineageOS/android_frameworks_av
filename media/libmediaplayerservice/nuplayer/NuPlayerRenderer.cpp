@@ -132,6 +132,7 @@ NuPlayer::Renderer::Renderer(
       mMediaClock(mediaClock),
       mPlaybackSettings(AUDIO_PLAYBACK_RATE_DEFAULT),
       mAudioFirstAnchorTimeMediaUs(-1),
+      mAudioAnchorTimeMediaUs(-1),
       mAnchorTimeMediaUs(-1),
       mAnchorNumFramesWritten(-1),
       mVideoLateByUs(0LL),
@@ -157,7 +158,8 @@ NuPlayer::Renderer::Renderer(
       mTotalBuffersQueued(0),
       mLastAudioBufferDrained(0),
       mUseAudioCallback(false),
-      mWakeLock(new AWakeLock()) {
+      mWakeLock(new AWakeLock()),
+      mNeedVideoClearAnchor(false) {
     CHECK(mediaClock != NULL);
     mPlaybackRate = mPlaybackSettings.mSpeed;
     mMediaClock->setPlaybackRate(mPlaybackRate);
@@ -233,6 +235,10 @@ status_t NuPlayer::Renderer::onConfigPlayback(const AudioPlaybackRate &rate /* s
         if (err != OK) {
             return err;
         }
+    }
+
+    if (!mHasAudio && mHasVideo) {
+        mNeedVideoClearAnchor = true;
     }
     mPlaybackSettings = rate;
     mPlaybackRate = rate.mSpeed;
@@ -327,7 +333,6 @@ void NuPlayer::Renderer::flush(bool audio, bool notifyComplete) {
             mNextVideoTimeMediaUs = -1;
         }
 
-        mMediaClock->clearAnchor();
         mVideoLateByUs = 0;
         mSyncQueues = false;
     }
@@ -429,6 +434,7 @@ void NuPlayer::Renderer::setAudioFirstAnchorTimeIfNeeded_l(int64_t mediaUs) {
 // Called on renderer looper.
 void NuPlayer::Renderer::clearAnchorTime() {
     mMediaClock->clearAnchor();
+    mAudioAnchorTimeMediaUs = -1;
     mAnchorTimeMediaUs = -1;
     mAnchorNumFramesWritten = -1;
 }
@@ -1282,7 +1288,7 @@ void NuPlayer::Renderer::onNewAudioMediaTime(int64_t mediaTimeUs) {
     Mutex::Autolock autoLock(mLock);
     // TRICKY: vorbis decoder generates multiple frames with the same
     // timestamp, so only update on the first frame with a given timestamp
-    if (mediaTimeUs == mAnchorTimeMediaUs) {
+    if (mediaTimeUs == mAudioAnchorTimeMediaUs) {
         return;
     }
     setAudioFirstAnchorTimeIfNeeded_l(mediaTimeUs);
@@ -1320,6 +1326,7 @@ void NuPlayer::Renderer::onNewAudioMediaTime(int64_t mediaTimeUs) {
         }
     }
     mAnchorNumFramesWritten = mNumFramesWritten;
+    mAudioAnchorTimeMediaUs = mediaTimeUs;
     mAnchorTimeMediaUs = mediaTimeUs;
 }
 
@@ -1371,6 +1378,10 @@ void NuPlayer::Renderer::postDrainVideoQueue() {
 
     {
         Mutex::Autolock autoLock(mLock);
+        if (mNeedVideoClearAnchor && !mHasAudio) {
+            mNeedVideoClearAnchor = false;
+            clearAnchorTime();
+        }
         if (mAnchorTimeMediaUs < 0) {
             mMediaClock->updateAnchor(mediaTimeUs, nowUs, mediaTimeUs);
             mAnchorTimeMediaUs = mediaTimeUs;
@@ -1525,6 +1536,8 @@ void NuPlayer::Renderer::notifyEOS_l(bool audio, status_t finalResult, int64_t d
                         mNextVideoTimeMediaUs + kDefaultVideoFrameIntervalUs);
             }
         }
+    } else {
+        mHasVideo = false;
     }
 }
 
@@ -1686,6 +1699,7 @@ void NuPlayer::Renderer::onFlush(const sp<AMessage> &msg) {
         } else {
             notifyComplete = mNotifyCompleteVideo;
             mNotifyCompleteVideo = false;
+            mHasVideo = false;
         }
 
         // If we're currently syncing the queues, i.e. dropping audio while
@@ -1698,7 +1712,17 @@ void NuPlayer::Renderer::onFlush(const sp<AMessage> &msg) {
         // is flushed.
         syncQueuesDone_l();
     }
-    clearAnchorTime();
+
+    if (audio && mDrainVideoQueuePending) {
+        // Audio should not clear anchor(MediaClock) directly, because video
+        // postDrainVideoQueue sets msg kWhatDrainVideoQueue into MediaClock
+        // timer, clear anchor without update immediately may block msg posting.
+        // So, postpone clear action to video to ensure anchor can be updated
+        // immediately after clear
+        mNeedVideoClearAnchor = true;
+    } else {
+        clearAnchorTime();
+    }
 
     ALOGV("flushing %s", audio ? "audio" : "video");
     if (audio) {

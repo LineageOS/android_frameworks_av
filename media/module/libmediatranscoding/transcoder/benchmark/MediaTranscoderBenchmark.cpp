@@ -37,6 +37,8 @@
 
 #include <iostream>
 
+#include "BenchmarkCommon.h"
+
 using namespace android;
 
 const std::string PARAM_VIDEO_FRAME_RATE = "VideoFrameRate";
@@ -110,8 +112,6 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     static constexpr int kDstOpenFlags = O_WRONLY | O_CREAT;
     // User R+W permission.
     static constexpr int kDstFileMode = S_IRUSR | S_IWUSR;
-    // Asset directory
-    static const std::string kAssetDirectory = "/data/local/tmp/TranscodingBenchmark/";
 
     // Transcoding configuration params to be logged
     int64_t trackDurationUs = 0;
@@ -132,11 +132,11 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     media_status_t status = AMEDIA_OK;
 
     if ((srcFd = open(srcPath.c_str(), O_RDONLY)) < 0) {
-        state.SkipWithError("Unable to open source file");
+        state.SkipWithError("Unable to open source file: " + srcPath);
         goto exit;
     }
     if ((dstFd = open(dstPath.c_str(), kDstOpenFlags, kDstFileMode)) < 0) {
-        state.SkipWithError("Unable to open destination file");
+        state.SkipWithError("Unable to open destination file: " + dstPath);
         goto exit;
     }
 
@@ -615,7 +615,7 @@ void CustomCsvReporter::ReportRuns(const std::vector<Run>& reports) {
 }
 
 void CustomCsvReporter::PrintRunData(const Run& run) {
-    if (run.error_occurred) {
+    if (run.skipped) {
         return;
     }
     std::ostream& Out = GetOutputStream();

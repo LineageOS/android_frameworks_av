@@ -1,0 +1,46 @@
+# Top level framework (android.media) flags
+# Only add flags here which must be included in framework.jar
+#
+# Please add flags in alphabetical order.
+
+package: "android.media.audio"
+
+flag {
+    name: "auto_public_volume_api_hardening"
+    namespace: "media_audio"
+    description: "On AAOS, make volume and ringer SDK APIs in AudioManager no-ops."
+    bug: "302751899"
+}
+
+flag {
+    name: "automatic_bt_device_type"
+    namespace: "media_audio"
+    description:
+        "Enable the automatic Bluetooth audio device type "
+        "categorization based on BluetoothDevice class metadata."
+    bug: "302323921"
+}
+
+# TODO remove
+flag {
+    name: "focus_freeze_test_api"
+    namespace: "media_audio"
+    description: "\
+ AudioManager audio focus test APIs:\
+ AudioManager.enterAudioFocusFreezeForTest(java.util.List)\
+ AudioManager.exitAudioFocusFreezeForTest()\
+ AudioManager.getFocusDuckedUidsForTest()\
+ AudioManager.getFocusFadeOutDurationForTest()\
+ AudioManager.getFocusUnmuteDelayAfterFadeOutForTest()"
+    bug: "301713440"
+}
+
+flag {
+    name: "loudness_configurator_api"
+    namespace: "media_audio"
+    description: "\
+Enable the API for providing loudness metadata and CTA-2075 \
+support."
+    bug: "298463873"
+}
+

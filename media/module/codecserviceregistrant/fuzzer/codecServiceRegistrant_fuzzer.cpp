@@ -17,6 +17,7 @@
 #include "fuzzer/FuzzedDataProvider.h"
 #include <C2Config.h>
 #include <C2Param.h>
+#include <android/api-level.h>
 
 using namespace std;
 
@@ -59,14 +60,34 @@ void CodecServiceRegistrantFuzzer::initH2C2ComponentStore() {
   if (!store) {
     return;
   }
-  android::sp<V1_1::IComponentStore> storeV1_1 =
+
+  int32_t platformVersion = android_get_device_api_level();
+  if (platformVersion >= __ANDROID_API_S__) {
+    android::sp<V1_2::IComponentStore> storeV1_2 =
+      new V1_2::utils::ComponentStore(store);
+    if (storeV1_2->registerAsService(string(kServiceName)) != android::OK) {
+      return;
+    }
+  } else if (platformVersion == __ANDROID_API_R__) {
+    android::sp<V1_1::IComponentStore> storeV1_1 =
       new V1_1::utils::ComponentStore(store);
-  if (storeV1_1->registerAsService(string(kServiceName)) != android::OK) {
+    if (storeV1_1->registerAsService(string(kServiceName)) != android::OK) {
+      return;
+    }
+  } else if (platformVersion == __ANDROID_API_Q__) {
+    android::sp<V1_0::IComponentStore> storeV1_0 =
+      new V1_0::utils::ComponentStore(store);
+    if (storeV1_0->registerAsService(string(kServiceName)) != android::OK) {
+      return;
+    }
+  }
+  else {
     return;
   }
+
   string const preferredStoreName = string(kServiceName);
-  sp<IComponentStore> preferredStore =
-      IComponentStore::getService(preferredStoreName.c_str());
+  sp<V1_0::IComponentStore> preferredStore =
+      V1_0::IComponentStore::getService(preferredStoreName.c_str());
   mH2C2 = new H2C2ComponentStore(preferredStore);
 }
 

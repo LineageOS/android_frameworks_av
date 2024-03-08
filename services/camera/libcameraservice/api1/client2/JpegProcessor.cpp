@@ -83,7 +83,7 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
     }
 
     // Find out buffer size for JPEG
-    ssize_t maxJpegSize = device->getJpegBufferSize(device->infoPhysical(String8("")),
+    ssize_t maxJpegSize = device->getJpegBufferSize(device->infoPhysical(""),
             params.pictureWidth, params.pictureHeight);
     if (maxJpegSize <= 0) {
         ALOGE("%s: Camera %d: Jpeg buffer size (%zu) is invalid ",
@@ -157,7 +157,7 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
                 params.pictureWidth, params.pictureHeight,
                 HAL_PIXEL_FORMAT_BLOB, HAL_DATASPACE_V0_JFIF,
                 CAMERA_STREAM_ROTATION_0, &mCaptureStreamId,
-                String8(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
+                std::string(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for capture: "
                     "%s (%d)", __FUNCTION__, mId,

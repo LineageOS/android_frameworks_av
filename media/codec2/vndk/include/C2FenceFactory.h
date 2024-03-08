@@ -20,6 +20,18 @@
 
 #include <C2Buffer.h>
 
+#include <android-base/unique_fd.h>
+
+/*
+ * Create a list of fds from fence
+ *
+ * \param fence   C2Fence object from which associated
+ *                file descriptors need to be extracted
+ * \return a vector of fds otherwise return vector of size 0
+ */
+
+std::vector<int> ExtractFdsFromCodec2SyncFence(const C2Fence& fence);
+
 class C2SurfaceSyncMemory;
 
 /**
@@ -29,6 +41,7 @@ struct _C2FenceFactory {
 
     class SurfaceFenceImpl;
     class SyncFenceImpl;
+    class PipeFenceImpl;
 
     /*
      * Create C2Fence for BufferQueueBased blockpool.
@@ -47,6 +60,33 @@ struct _C2FenceFactory {
      *                          It will be owned and closed by the returned fence object.
      */
     static C2Fence CreateSyncFence(int fenceFd);
+
+    /*
+     * Create C2Fence from list of fence file fds.
+     *
+     * \param fenceFds          Vector of file descriptor for fence.
+     *                          It will be owned and closed by the returned fence object.
+     */
+    static C2Fence CreateMultipleFdSyncFence(const std::vector<int>& fenceFds);
+
+    /*
+     * Create C2Fence from an fd created by pipe()/pipe2() syscall.
+     * The ownership of \p fd is transterred to the returned C2Fence.
+     *
+     * \param fd                An fd representing the write end from a pair of
+     *                          file descriptors which are created by
+     *                          pipe()/pipe2() syscall.
+     */
+    static C2Fence CreatePipeFence(int fd);
+
+    /*
+     * Create C2Fence from a unique_fd created by pipe()/pipe2() syscall.
+     *
+     * \param ufd               A unique_fd representing the write end from a pair
+     *                          of file descriptors which are created by
+     *                          pipe()/pipe2() syscall.
+     */
+    static C2Fence CreatePipeFence(::android::base::unique_fd &&ufd);
 
     /**
      * Create a native handle from fence for marshalling

@@ -535,40 +535,40 @@ void ID3::Iterator::next() {
 }
 
 void ID3::Iterator::getID(String8 *id) const {
-    id->setTo("");
+    *id = "";
 
     if (mFrameData == NULL) {
         return;
     }
 
     if (mParent.mVersion == ID3_V2_2) {
-        id->setTo((const char *)&mParent.mData[mOffset], 3);
+        *id = String8((const char *)&mParent.mData[mOffset], 3);
     } else if (mParent.mVersion == ID3_V2_3 || mParent.mVersion == ID3_V2_4) {
-        id->setTo((const char *)&mParent.mData[mOffset], 4);
+        *id = String8((const char *)&mParent.mData[mOffset], 4);
     } else {
         CHECK(mParent.mVersion == ID3_V1 || mParent.mVersion == ID3_V1_1);
 
         switch (mOffset) {
             case 3:
-                id->setTo("TT2");
+                *id = "TT2";
                 break;
             case 33:
-                id->setTo("TP1");
+                *id = "TP1";
                 break;
             case 63:
-                id->setTo("TAL");
+                *id = "TAL";
                 break;
             case 93:
-                id->setTo("TYE");
+                *id = "TYE";
                 break;
             case 97:
-                id->setTo("COM");
+                *id = "COM";
                 break;
             case 126:
-                id->setTo("TRK");
+                *id = "TRK";
                 break;
             case 127:
-                id->setTo("TCO");
+                *id = "TCO";
                 break;
             default:
                 CHECK(!"should not be here.");
@@ -590,7 +590,7 @@ void ID3::Iterator::getString(String8 *id, String8 *comment) const {
 // followed by more data. The data following the \0 can be retrieved by setting
 // "otherdata" to true.
 void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
-    id->setTo("");
+    *id = "";
 
     const uint8_t *frameData = mFrameData;
     if (frameData == NULL) {
@@ -605,13 +605,13 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
             char tmp[16];
             snprintf(tmp, sizeof(tmp), "%d", (int)*frameData);
 
-            id->setTo(tmp);
+            *id = tmp;
             return;
         }
 
         // this is supposed to be ISO-8859-1, but pass it up as-is to the caller, who will figure
         // out the real encoding
-        id->setTo((const char*)frameData, mFrameSize);
+        *id = String8((const char*)frameData, mFrameSize);
         return;
     }
 
@@ -640,10 +640,10 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
 
     if (encoding == 0x00) {
         // supposedly ISO 8859-1
-        id->setTo((const char*)frameData + 1, n);
+        *id = String8((const char*)frameData + 1, n);
     } else if (encoding == 0x03) {
         // supposedly UTF-8
-        id->setTo((const char *)(frameData + 1), n);
+        *id = String8((const char *)(frameData + 1), n);
     } else if (encoding == 0x02) {
         // supposedly UTF-16 BE, no byte order mark.
         // API wants number of characters, not number of bytes...
@@ -662,7 +662,7 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
             framedata = framedatacopy;
         }
 #endif
-        id->setTo(framedata, len);
+        *id = String8(framedata, len);
         if (framedatacopy != NULL) {
             delete[] framedatacopy;
         }
@@ -715,13 +715,13 @@ void ID3::Iterator::getstring(String8 *id, bool otherdata) const {
                 for (int i = 0; i < len; i++) {
                     frame8[i] = framedata[i];
                 }
-                id->setTo(frame8, len);
+                *id = String8(frame8, len);
                 delete [] frame8;
             } else {
-                id->setTo(framedata, len);
+                *id = String8(framedata, len);
             }
         } else {
-            id->setTo(framedata, len);
+            *id = String8(framedata, len);
         }
 
         if (framedatacopy != NULL) {
@@ -948,7 +948,7 @@ static size_t StringSize(const uint8_t *start, size_t limit, uint8_t encoding) {
 const void *
 ID3::getAlbumArt(size_t *length, String8 *mime) const {
     *length = 0;
-    mime->setTo("");
+    *mime = "";
 
     Iterator it(
             *this,
@@ -971,7 +971,7 @@ ID3::getAlbumArt(size_t *length, String8 *mime) const {
                 ALOGW("bogus album art size: mime");
                 return NULL;
             }
-            mime->setTo((const char *)&data[consumed]);
+            *mime = (const char *)&data[consumed];
             consumed += mimeLen;
 
 #if 0
@@ -1008,11 +1008,11 @@ ID3::getAlbumArt(size_t *length, String8 *mime) const {
             }
 
             if (!memcmp(&data[1], "PNG", 3)) {
-                mime->setTo("image/png");
+                *mime = "image/png";
             } else if (!memcmp(&data[1], "JPG", 3)) {
-                mime->setTo("image/jpeg");
+                *mime = "image/jpeg";
             } else if (!memcmp(&data[1], "-->", 3)) {
-                mime->setTo("text/plain");
+                *mime = "text/plain";
             } else {
                 return NULL;
             }

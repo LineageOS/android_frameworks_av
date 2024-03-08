@@ -18,14 +18,22 @@
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
         <option name="push" value="FlacDecoderTest->/data/local/tmp/FlacDecoderTest/" />
-        <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/flac/dec/test/FlacDecoder.zip?unzip=true"
-            value="/data/local/tmp/FlacDecoderTestRes/" />
+    </target_preparer>
+
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="target" value="host" />
+        <option name="config-filename" value="FlacDecoderTest" />
+        <option name="version" value="1.0"/>
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.MediaPreparer">
+        <option name="push-all" value="true" />
+        <option name="media-folder-name" value="FlacDecoder-1.0" />
+        <option name="dynamic-config-module" value="FlacDecoderTest" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="FlacDecoderTest" />
-        <option name="native-test-flag" value="-P /data/local/tmp/FlacDecoderTestRes/" />
+        <option name="native-test-flag" value="-P /sdcard/test/FlacDecoder-1.0/" />
     </test>
 </configuration>

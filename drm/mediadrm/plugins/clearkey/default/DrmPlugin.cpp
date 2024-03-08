@@ -142,7 +142,7 @@ status_t DrmPlugin::getPropertyByteArray(
         const String8& name, Vector<uint8_t>& value) const {
     ssize_t index = mByteArrayProperties.indexOfKey(name);
     if (index < 0) {
-        ALOGE("App requested unknown property: %s", name.string());
+        ALOGE("App requested unknown property: %s", name.c_str());
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
     value = mByteArrayProperties.valueAt(index);
@@ -154,12 +154,12 @@ status_t DrmPlugin::setPropertyByteArray(
 {
     UNUSED(value);
     if (0 == name.compare(kDeviceIdKey)) {
-        ALOGD("Cannot set immutable property: %s", name.string());
+        ALOGD("Cannot set immutable property: %s", name.c_str());
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     // Setting of undefined properties is not supported
-    ALOGE("Failed to set property byte array, key=%s", name.string());
+    ALOGE("Failed to set property byte array, key=%s", name.c_str());
     return android::ERROR_DRM_CANNOT_HANDLE;
 }
 
@@ -167,7 +167,7 @@ status_t DrmPlugin::getPropertyString(
         const String8& name, String8& value) const {
     ssize_t index = mStringProperties.indexOfKey(name);
     if (index < 0) {
-        ALOGE("App requested unknown property: %s", name.string());
+        ALOGE("App requested unknown property: %s", name.c_str());
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
     value = mStringProperties.valueAt(index);
@@ -178,21 +178,21 @@ status_t DrmPlugin::setPropertyString(
         const String8& name, const String8& value) {
     String8 immutableKeys;
     immutableKeys.appendFormat("%s,%s,%s,%s",
-            kAlgorithmsKey.string(), kPluginDescriptionKey.string(),
-            kVendorKey.string(), kVersionKey.string());
-    if (immutableKeys.contains(name.string())) {
-        ALOGD("Cannot set immutable property: %s", name.string());
+            kAlgorithmsKey.c_str(), kPluginDescriptionKey.c_str(),
+            kVendorKey.c_str(), kVersionKey.c_str());
+    if (immutableKeys.contains(name.c_str())) {
+        ALOGD("Cannot set immutable property: %s", name.c_str());
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     ssize_t index = mStringProperties.indexOfKey(name);
     if (index < 0) {
-        ALOGE("Cannot set undefined property string, key=%s", name.string());
+        ALOGE("Cannot set undefined property string, key=%s", name.c_str());
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
     if (mStringProperties.add(name, value) < 0) {
-        ALOGE("Failed to set property string, key=%s", name.string());
+        ALOGE("Failed to set property string, key=%s", name.c_str());
         return android::ERROR_DRM_UNKNOWN;
     }
     return android::OK;

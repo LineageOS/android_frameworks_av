@@ -1,0 +1,2 @@
+per-file DataSource.h,ExtractorUtils.h,MediaExtractorPluginApi.h,MediaExtractorPluginHelper.h,MediaPlayerInterface.h,MediaTrack.h=set noparent
+per-file DataSource.h,ExtractorUtils.h,MediaExtractorPluginApi.h,MediaExtractorPluginHelper.h,MediaPlayerInterface.h,MediaTrack.h=file:platform/frameworks/av:/media/janitors/media_solutions_OWNERS

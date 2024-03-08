@@ -17,7 +17,9 @@
 #include <MtpDevHandle.h>
 #include <MtpPacket.h>
 #include <MtpPacketFuzzerUtils.h>
+#include <functional>
 #include <fuzzer/FuzzedDataProvider.h>
+#include <mtp.h>
 
 using namespace android;
 
@@ -35,7 +37,8 @@ class MtpPacketFuzzer : MtpPacketFuzzerUtils {
 };
 
 void MtpPacketFuzzer::process() {
-    MtpPacket mtpPacket(mFdp.ConsumeIntegralInRange<size_t>(kMinSize, kMaxSize)); /*bufferSize*/
+    MtpPacket mtpPacket(mFdp.ConsumeIntegralInRange<size_t>(MTP_CONTAINER_HEADER_SIZE,
+                                                            kMaxSize)); /*bufferSize*/
     while (mFdp.remaining_bytes() > 0) {
         auto mtpPacketAPI = mFdp.PickValueInArray<const std::function<void()>>({
                 [&]() {

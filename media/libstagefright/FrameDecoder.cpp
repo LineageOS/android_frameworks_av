@@ -16,7 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "FrameDecoder"
-
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include "include/FrameDecoder.h"
 #include "include/FrameCaptureLayer.h"
 #include "include/HevcUtils.h"
@@ -41,6 +41,7 @@
 #include <media/stagefright/Utils.h>
 #include <private/media/VideoFrame.h>
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 namespace android {
 
@@ -85,6 +86,22 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         displayWidth = width;
         displayHeight = height;
     }
+    int32_t displayLeft = 0;
+    int32_t displayTop = 0;
+    int32_t displayRight;
+    int32_t displayBottom;
+    if (trackMeta->findRect(kKeyCropRect, &displayLeft, &displayTop, &displayRight,
+                            &displayBottom)) {
+        if (displayLeft >= 0 && displayTop >= 0 && displayRight < width && displayBottom < height &&
+            displayLeft <= displayRight && displayTop <= displayBottom) {
+            displayWidth = displayRight - displayLeft + 1;
+            displayHeight = displayBottom - displayTop + 1;
+        } else {
+            // Crop rectangle is invalid, use the whole frame.
+            displayLeft = 0;
+            displayTop = 0;
+        }
+    }
 
     if (allocRotated) {
         if (rotationAngle == 90 || rotationAngle == 270) {
@@ -107,8 +124,8 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         }
     }
 
-    VideoFrame frame(width, height, displayWidth, displayHeight,
-            tileWidth, tileHeight, rotationAngle, dstBpp, bitDepth, !metaOnly, iccSize);
+    VideoFrame frame(width, height, displayWidth, displayHeight, displayLeft, displayTop, tileWidth,
+                     tileHeight, rotationAngle, dstBpp, bitDepth, !metaOnly, iccSize);
 
     size_t size = frame.getFlattenedSize();
     sp<MemoryHeapBase> heap = new MemoryHeapBase(size, 0, "MetadataRetrieverClient");
@@ -340,6 +357,7 @@ status_t FrameDecoder::init(
 }
 
 sp<IMemory> FrameDecoder::extractFrame(FrameRect *rect) {
+    ScopedTrace trace(ATRACE_TAG, "FrameDecoder::ExtractFrame");
     status_t err = onExtractRect(rect);
     if (err == OK) {
         err = extractInternal();
@@ -713,6 +731,7 @@ status_t VideoFrameDecoder::onOutputReceived(
     }
     converter.setSrcColorSpace(standard, range, transfer);
     if (converter.isValid()) {
+        ScopedTrace trace(ATRACE_TAG, "FrameDecoder::ColorConverter");
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
                 width, height, stride,

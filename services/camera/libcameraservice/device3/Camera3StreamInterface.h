@@ -62,7 +62,7 @@ typedef struct camera_stream {
     uint32_t max_buffers;
     android_dataspace_t data_space;
     camera_stream_rotation_t rotation;
-    const char* physical_camera_id;
+    std::string physical_camera_id;
 
     std::unordered_set<int32_t> sensor_pixel_modes_used;
     int64_t dynamic_range_profile;

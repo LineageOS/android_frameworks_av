@@ -22,15 +22,15 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/Mp3DecoderTest/Mp3DecoderTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/mp3dec/test/Mp3DecoderTest.zip). Download, unzip and push these files into device for testing.
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/module/codecs/mp3dec/test/Mp3DecoderTest-1.3.zip). Download, unzip and push these files into device for testing.
 
 ```
-adb push Mp3DecoderTestRes/. /data/local/tmp/
+adb push Mp3DecoderTest-1.3 /data/local/tmp/
 ```
 
 usage: Mp3DecoderTest -P \<path_to_folder\>
 ```
-adb shell /data/local/tmp/Mp3DecoderTest -P /data/local/tmp/Mp3DecoderTestRes/
+adb shell /data/local/tmp/Mp3DecoderTest -P /data/local/tmp/Mp3DecoderTest-1.3/
 ```
 Alternatively, the test can also be run using atest command.
 

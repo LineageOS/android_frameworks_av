@@ -207,10 +207,13 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
 
     status_t getLatency(uint32_t *latency);
 
+    // Always returns non-negative values.
     status_t getObservablePosition(int64_t *frames, int64_t *timestamp);
 
+    // Always returns non-negative values.
     status_t getHardwarePosition(int64_t *frames, int64_t *timestamp);
 
+    // Always returns non-negative values.
     status_t getXruns(int32_t *frames);
 
     status_t transfer(void *buffer, size_t bytes, size_t *transferred);

@@ -107,7 +107,7 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
 
     if (args.size() > 0) {
         const String8 arg0(args[0]);
-        if (!strcmp(arg0.string(), "-r")) {
+        if (!strcmp(arg0.c_str(), "-r")) {
             // needed because mReaders is protected by mLock
             bool locked = dumpTryLock(mLock);
 
@@ -115,9 +115,9 @@ status_t MediaLogService::dump(int fd, const Vector<String16>& args __unused)
             if (!locked) {
                 String8 result(kDeadlockedString);
                 if (fd >= 0) {
-                    write(fd, result.string(), result.size());
+                    write(fd, result.c_str(), result.size());
                 } else {
-                    ALOGW("%s:", result.string());
+                    ALOGW("%s:", result.c_str());
                 }
                 return NO_ERROR;
             }

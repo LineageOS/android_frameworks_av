@@ -53,7 +53,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
     sp<IGraphicBufferProducer> mProducer;
     Vector<BufferItem> mBuffersInFlight;
 
-    static const String8 FAKE_ID;
+    static const std::string FAKE_ID;
 
     /**
      * Camera3IOStreamBase

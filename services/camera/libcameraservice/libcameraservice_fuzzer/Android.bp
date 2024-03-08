@@ -29,11 +29,8 @@ package {
     ],
 }
 
-cc_fuzz {
-    name: "camera_service_fuzzer",
-    srcs: [
-        "camera_service_fuzzer.cpp",
-    ],
+cc_defaults {
+    name: "camera_service_fuzzer_defaults",
     header_libs: [
         "libmedia_headers",
     ],
@@ -52,7 +49,7 @@ cc_fuzz {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.provider-V2-ndk",
+        "android.hardware.camera.provider-V3-ndk",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.3",
@@ -63,14 +60,45 @@ cc_fuzz {
     ],
     fuzz_config: {
         cc: [
-            "android-media-fuzzing-reports@google.com",
             "android-camera-fwk-eng@google.com",
         ],
-        componentid: 155276,
+        componentid: 41727,
         libfuzzer_options: [
             //based on b/187360866
             "timeout=770",
         ],
+        hotlists: [
+            "4593311",
+        ],
+        description: "The fuzzer targets the APIs of libcameraservice",
+        vector: "local_no_privileges_required",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
+    },
+}
 
+cc_fuzz {
+    name: "camera_service_fuzzer",
+    srcs: [
+        "camera_service_fuzzer.cpp",
+    ],
+    defaults: [
+        "camera_service_fuzzer_defaults"
+    ],
+}
+
+cc_fuzz {
+    name: "camera_service_aidl_fuzzer",
+    srcs: [
+        "camera_service_aidl_fuzzer.cpp",
+    ],
+    defaults: [
+        "camera_service_fuzzer_defaults",
+        "service_fuzzer_defaults",
+        "fuzzer_disable_leaks",
+    ],
+    fuzz_config: {
+        triage_assignee: "waghpawan@google.com",
     },
 }

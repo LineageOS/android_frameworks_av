@@ -421,7 +421,7 @@ void TranscodingSessionController::dumpAllSessions(int fd, const Vector<String16
         dumpSession_l(session, result, true /*closedSession*/);
     }
 
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 }
 
 /*

@@ -74,10 +74,10 @@ EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
 }
 
 EffectHalAidl::~EffectHalAidl() {
-    if (mFactory && mEffect) {
+    if (mEffect) {
         if (mIsProxyEffect) {
             std::static_pointer_cast<EffectProxy>(mEffect)->destroy();
-        } else {
+        } else if (mFactory) {
             mFactory->destroyEffect(mEffect);
         }
     }

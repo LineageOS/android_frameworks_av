@@ -208,6 +208,12 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     setBufferCapacity(getBufferCapacityFromDevice());
     setFramesPerBurst(getFramesPerBurstFromDevice());
 
+    // Use the same values for device values.
+    setDeviceSamplesPerFrame(getSamplesPerFrame());
+    setDeviceSampleRate(mAudioRecord->getSampleRate());
+    setDeviceBufferCapacity(getBufferCapacityFromDevice());
+    setDeviceFramesPerBurst(getFramesPerBurstFromDevice());
+
     setHardwareSamplesPerFrame(mAudioRecord->getHalChannelCount());
     setHardwareSampleRate(mAudioRecord->getHalSampleRate());
     setHardwareFormat(mAudioRecord->getHalFormat());

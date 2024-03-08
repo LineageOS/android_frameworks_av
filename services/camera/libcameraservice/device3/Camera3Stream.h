@@ -19,7 +19,6 @@
 
 #include <gui/Surface.h>
 #include <utils/RefBase.h>
-#include <utils/String8.h>
 #include <utils/String16.h>
 #include <utils/List.h>
 
@@ -163,25 +162,25 @@ class Camera3Stream :
     /**
      * Get the stream's dimensions and format
      */
-    uint32_t          getWidth() const;
-    uint32_t          getHeight() const;
-    int               getFormat() const;
-    android_dataspace getDataSpace() const;
-    int32_t           getColorSpace() const;
-    uint64_t          getUsage() const;
-    void              setUsage(uint64_t usage);
-    void              setFormatOverride(bool formatOverriden);
-    bool              isFormatOverridden() const;
-    int               getOriginalFormat() const;
-    int64_t           getDynamicRangeProfile() const;
-    void              setDataSpaceOverride(bool dataSpaceOverriden);
-    bool              isDataSpaceOverridden() const;
-    android_dataspace getOriginalDataSpace() const;
-    int               getMaxHalBuffers() const;
-    const String8&    physicalCameraId() const;
-    int64_t           getStreamUseCase() const;
-    int               getTimestampBase() const;
-    bool              isDeviceTimeBaseRealtime() const;
+    uint32_t           getWidth() const;
+    uint32_t           getHeight() const;
+    int                getFormat() const;
+    android_dataspace  getDataSpace() const;
+    int32_t            getColorSpace() const;
+    uint64_t           getUsage() const;
+    void               setUsage(uint64_t usage);
+    void               setFormatOverride(bool formatOverridden);
+    bool               isFormatOverridden() const;
+    int                getOriginalFormat() const;
+    int64_t            getDynamicRangeProfile() const;
+    void               setDataSpaceOverride(bool dataSpaceOverridden);
+    bool               isDataSpaceOverridden() const;
+    android_dataspace  getOriginalDataSpace() const;
+    int                getMaxHalBuffers() const;
+    const std::string& physicalCameraId() const;
+    int64_t            getStreamUseCase() const;
+    int                getTimestampBase() const;
+    bool               isDeviceTimeBaseRealtime() const;
 
     void              setOfflineProcessingSupport(bool) override;
     bool              getOfflineProcessingSupport() const override;
@@ -415,6 +414,11 @@ class Camera3Stream :
     virtual status_t setStatusTracker(sp<StatusTracker> statusTracker);
 
     /**
+     * Toggle the state of hal buffer manager
+     */
+    virtual void setHalBufferManager(bool /*enabled*/) {/* No-op */ }
+
+    /**
      * Disconnect stream from its non-HAL endpoint. After this,
      * start/finishConfiguration must be called before the stream can be used
      * again. This cannot be called if the stream has outstanding dequeued
@@ -487,7 +491,7 @@ class Camera3Stream :
      */
     const int mSetId;
 
-    const String8 mName;
+    const std::string mName;
     // Zero for formats with fixed buffer size for given dimensions.
     const size_t mMaxSize;
 
@@ -507,7 +511,7 @@ class Camera3Stream :
     Camera3Stream(int id, camera_stream_type type,
             uint32_t width, uint32_t height, size_t maxSize, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
-            const String8& physicalCameraId,
+            const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
             int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
@@ -634,7 +638,7 @@ class Camera3Stream :
     bool mDataSpaceOverridden;
     const android_dataspace mOriginalDataSpace;
 
-    String8 mPhysicalCameraId;
+    std::string mPhysicalCameraId;
     nsecs_t mLastTimestamp;
 
     bool mIsMultiResolution = false;

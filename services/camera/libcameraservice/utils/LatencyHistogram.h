@@ -40,7 +40,7 @@ private:
     std::vector<int64_t> mBins;
     uint64_t mTotalCount;
 
-    void formatHistogramText(String8& lineBins, String8& lineBinCounts) const;
+    void formatHistogramText(std::string& lineBins, std::string& lineBinCounts) const;
 }; // class CameraLatencyHistogram
 
 }; // namespace android

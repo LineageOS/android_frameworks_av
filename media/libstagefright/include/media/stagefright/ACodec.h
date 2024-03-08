@@ -83,7 +83,7 @@ struct ACodec : public AHierarchicalStateMachine, public CodecBase {
             const char* mime, bool isEncoder,
             MediaCodecInfo::CapabilitiesWriter* caps);
 
-    virtual status_t setSurface(const sp<Surface> &surface);
+    virtual status_t setSurface(const sp<Surface> &surface, uint32_t /*generation*/);
 
     virtual void signalFlush();
     virtual void signalResume();
@@ -603,6 +603,7 @@ private:
             status_t internalError = UNKNOWN_ERROR);
 
     status_t requestIDRFrame();
+    status_t setSurfaceParameters(const sp<AMessage> &params);
     status_t setParameters(const sp<AMessage> &params);
 
     // set vendor extension parameters specified in params that are supported by the codec

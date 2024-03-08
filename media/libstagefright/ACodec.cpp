@@ -302,6 +302,8 @@ protected:
         }
     }
 
+    void setSurfaceParameters(const sp<AMessage> &msg);
+
 private:
     // Handles an OMX message. Returns true iff message was handled.
     bool onOMXMessage(const sp<AMessage> &msg);
@@ -668,7 +670,7 @@ void ACodec::initiateConfigureComponent(const sp<AMessage> &msg) {
     msg->post();
 }
 
-status_t ACodec::setSurface(const sp<Surface> &surface) {
+status_t ACodec::setSurface(const sp<Surface> &surface, uint32_t /*generation*/) {
     sp<AMessage> msg = new AMessage(kWhatSetSurface, this);
     msg->setObject("surface", surface);
 
@@ -6557,6 +6559,59 @@ void ACodec::BaseState::getMoreInputDataIfPossible() {
     postFillThisBuffer(eligible);
 }
 
+void ACodec::BaseState::setSurfaceParameters(const sp<AMessage> &msg) {
+    sp<AMessage> params;
+    CHECK(msg->findMessage("params", &params));
+
+    status_t err = mCodec->setSurfaceParameters(params);
+    if (err != OK) {
+        ALOGE("[%s] Unable to set input surface parameters (err %d)",
+                mCodec->mComponentName.c_str(),
+                err);
+        return;
+    }
+
+    int64_t timeOffsetUs;
+    if (params->findInt64(PARAMETER_KEY_OFFSET_TIME, &timeOffsetUs)) {
+        params->removeEntryAt(params->findEntryByName(PARAMETER_KEY_OFFSET_TIME));
+
+        if (params->countEntries() == 0) {
+            msg->removeEntryAt(msg->findEntryByName("params"));
+            return;
+        }
+    }
+
+    int64_t skipFramesBeforeUs;
+    if (params->findInt64("skip-frames-before", &skipFramesBeforeUs)) {
+        params->removeEntryAt(params->findEntryByName("skip-frames-before"));
+
+        if (params->countEntries() == 0) {
+            msg->removeEntryAt(msg->findEntryByName("params"));
+            return;
+        }
+    }
+
+    int32_t dropInputFrames;
+    if (params->findInt32(PARAMETER_KEY_SUSPEND, &dropInputFrames)) {
+        params->removeEntryAt(params->findEntryByName(PARAMETER_KEY_SUSPEND));
+
+        if (params->countEntries() == 0) {
+            msg->removeEntryAt(msg->findEntryByName("params"));
+            return;
+        }
+    }
+
+    int64_t stopTimeUs;
+    if (params->findInt64("stop-time-us", &stopTimeUs)) {
+        params->removeEntryAt(params->findEntryByName("stop-time-us"));
+
+        if (params->countEntries() == 0) {
+            msg->removeEntryAt(msg->findEntryByName("params"));
+            return;
+        }
+    }
+}
+
 bool ACodec::BaseState::onOMXFillBufferDone(
         IOMX::buffer_id bufferID,
         size_t rangeOffset, size_t rangeLength,
@@ -7453,6 +7508,13 @@ status_t ACodec::LoadedToIdleState::allocateBuffers() {
 bool ACodec::LoadedToIdleState::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatSetParameters:
+        {
+            BaseState::setSurfaceParameters(msg);
+            if (msg->countEntries() > 0) {
+                mCodec->deferMessage(msg);
+            }
+            return true;
+        }
         case kWhatShutdown:
         {
             mCodec->deferMessage(msg);
@@ -7529,6 +7591,13 @@ void ACodec::IdleToExecutingState::stateEntered() {
 bool ACodec::IdleToExecutingState::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatSetParameters:
+        {
+            BaseState::setSurfaceParameters(msg);
+            if (msg->countEntries() > 0) {
+                mCodec->deferMessage(msg);
+            }
+            return true;
+        }
         case kWhatShutdown:
         {
             mCodec->deferMessage(msg);
@@ -7815,27 +7884,7 @@ bool ACodec::ExecutingState::onMessageReceived(const sp<AMessage> &msg) {
     return handled;
 }
 
-status_t ACodec::setParameters(const sp<AMessage> &params) {
-    int32_t videoBitrate;
-    if (params->findInt32("video-bitrate", &videoBitrate)) {
-        OMX_VIDEO_CONFIG_BITRATETYPE configParams;
-        InitOMXParams(&configParams);
-        configParams.nPortIndex = kPortIndexOutput;
-        configParams.nEncodeBitrate = videoBitrate;
-
-        status_t err = mOMXNode->setConfig(
-                OMX_IndexConfigVideoBitrate,
-                &configParams,
-                sizeof(configParams));
-
-        if (err != OK) {
-            ALOGE("setConfig(OMX_IndexConfigVideoBitrate, %d) failed w/ err %d",
-                   videoBitrate, err);
-
-            return err;
-        }
-    }
-
+status_t ACodec::setSurfaceParameters(const sp<AMessage> &params) {
     int64_t timeOffsetUs;
     if (params->findInt64(PARAMETER_KEY_OFFSET_TIME, &timeOffsetUs)) {
         if (mGraphicBufferSource == NULL) {
@@ -7923,9 +7972,41 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         mInputFormat->setInt64("android._stop-time-offset-us", stopTimeOffsetUs);
     }
 
+    return OK;
+}
+
+status_t ACodec::setParameters(const sp<AMessage> &params) {
+    status_t err;
+
+    int32_t videoBitrate;
+    if (params->findInt32("video-bitrate", &videoBitrate)) {
+        OMX_VIDEO_CONFIG_BITRATETYPE configParams;
+        InitOMXParams(&configParams);
+        configParams.nPortIndex = kPortIndexOutput;
+        configParams.nEncodeBitrate = videoBitrate;
+
+        err = mOMXNode->setConfig(
+                OMX_IndexConfigVideoBitrate,
+                &configParams,
+                sizeof(configParams));
+
+        if (err != OK) {
+            ALOGE("setConfig(OMX_IndexConfigVideoBitrate, %d) failed w/ err %d",
+                   videoBitrate, err);
+
+            return err;
+        }
+    }
+
+    err = setSurfaceParameters(params);
+    if (err != OK) {
+        ALOGE("Failed to set input surface parameters (err %d)", err);
+        return err;
+    }
+
     int32_t tmp;
     if (params->findInt32("request-sync", &tmp)) {
-        status_t err = requestIDRFrame();
+        err = requestIDRFrame();
 
         if (err != OK) {
             ALOGE("Requesting a sync frame failed w/ err %d", err);
@@ -7940,7 +8021,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         rateFloat = (float) rateInt; // 16MHz (FLINTMAX) is OK for upper bound.
     }
     if (rateFloat > 0) {
-        status_t err = setOperatingRate(rateFloat, mIsVideo);
+        err = setOperatingRate(rateFloat, mIsVideo);
         if (err != OK) {
             ALOGI("Failed to set parameter 'operating-rate' (err %d)", err);
         }
@@ -7949,7 +8030,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
     int32_t intraRefreshPeriod = 0;
     if (params->findInt32("intra-refresh-period", &intraRefreshPeriod)
             && intraRefreshPeriod > 0) {
-        status_t err = setIntraRefreshPeriod(intraRefreshPeriod, false);
+        err = setIntraRefreshPeriod(intraRefreshPeriod, false);
         if (err != OK) {
             ALOGI("[%s] failed setIntraRefreshPeriod. Failure is fine since this key is optional",
                     mComponentName.c_str());
@@ -7959,7 +8040,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
 
     int32_t lowLatency = 0;
     if (params->findInt32("low-latency", &lowLatency)) {
-        status_t err = setLowLatency(lowLatency);
+        err = setLowLatency(lowLatency);
         if (err != OK) {
             return err;
         }
@@ -7967,7 +8048,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
 
     int32_t latency = 0;
     if (params->findInt32("latency", &latency) && latency > 0) {
-        status_t err = setLatency(latency);
+        err = setLatency(latency);
         if (err != OK) {
             ALOGI("[%s] failed setLatency. Failure is fine since this key is optional",
                     mComponentName.c_str());
@@ -7979,7 +8060,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
     if (params->findInt32("audio-presentation-presentation-id", &presentationId)) {
         int32_t programId = -1;
         params->findInt32("audio-presentation-program-id", &programId);
-        status_t err = setAudioPresentation(presentationId, programId);
+        err = setAudioPresentation(presentationId, programId);
         if (err != OK) {
             ALOGI("[%s] failed setAudioPresentation. Failure is fine since this key is optional",
                     mComponentName.c_str());
@@ -8052,7 +8133,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
     {
         int32_t tunnelPeek = 0;
         if (params->findInt32(TUNNEL_PEEK_KEY, &tunnelPeek)) {
-            status_t err = setTunnelPeek(tunnelPeek);
+            err = setTunnelPeek(tunnelPeek);
             if (err != OK) {
                 return err;
             }
@@ -8061,7 +8142,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
     {
         int32_t tunnelPeekSetLegacy = 0;
         if (params->findInt32(TUNNEL_PEEK_SET_LEGACY_KEY, &tunnelPeekSetLegacy)) {
-            status_t err = setTunnelPeekLegacy(tunnelPeekSetLegacy);
+            err = setTunnelPeekLegacy(tunnelPeekSetLegacy);
             if (err != OK) {
                 return err;
             }

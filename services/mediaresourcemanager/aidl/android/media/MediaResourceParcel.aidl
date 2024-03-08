@@ -25,18 +25,15 @@ import android.media.MediaResourceSubType;
  * {@hide}
  */
 parcelable MediaResourceParcel {
-    // TODO: default enum value is not supported yet.
-    // Set default enum value when b/142739329 is fixed.
-
     /**
      * Type of the media resource.
      */
-    MediaResourceType type;// = MediaResourceTypeEnum::kUnspecified;
+    MediaResourceType type = MediaResourceType.kUnspecified;
 
     /**
      * Sub-type of the media resource.
      */
-    MediaResourceSubType subType;// = MediaResourceSubTypeEnum::kUnspecifiedSubType;
+    MediaResourceSubType subType = MediaResourceSubType.kUnspecifiedSubType;
 
     /**
      * Identifier of the media resource (eg. Drm session id).

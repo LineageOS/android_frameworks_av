@@ -31,43 +31,28 @@
 
 namespace android {
 
-bool isAtLeastT() {
+
+static bool isAtLeast(int version, const char *codeName) {
     char deviceCodeName[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.codename", deviceCodeName);
-    return android_get_device_api_level() >= __ANDROID_API_T__ ||
-           !strcmp(deviceCodeName, "Tiramisu");
+    return android_get_device_api_level() >= version || !strcmp(deviceCodeName, codeName);
+}
+
+bool isAtLeastT() {
+    return isAtLeast(__ANDROID_API_T__, "Tiramisu");
+}
+
+bool isAtLeastU() {
+    return isAtLeast(__ANDROID_API_U__, "UpsideDownCake");
 }
 
 static bool isP010Allowed() {
-    // The first SDK the device shipped with.
-    static const int32_t kProductFirstApiLevel =
-        base::GetIntProperty<int32_t>("ro.product.first_api_level", 0);
+    // The Vendor API level which is min(ro.product.first_api_level, ro.board.[first_]api_level).
+    // This is the api level to which VSR requirement the device conform.
+    static const int32_t kVendorApiLevel =
+        base::GetIntProperty<int32_t>("ro.vendor.api_level", 0);
 
-    // GRF devices (introduced in Android 11) list the first and possibly the current api levels
-    // to signal which VSR requirements they conform to even if the first device SDK was higher.
-    static const int32_t kBoardFirstApiLevel =
-        base::GetIntProperty<int32_t>("ro.board.first_api_level", 0);
-
-    // Some devices that launched prior to Android S may not support P010 correctly, even
-    // though they may advertise it as supported.
-    if (kProductFirstApiLevel != 0 && kProductFirstApiLevel < __ANDROID_API_S__) {
-        return false;
-    }
-
-    if (kBoardFirstApiLevel != 0 && kBoardFirstApiLevel < __ANDROID_API_S__) {
-        return false;
-    }
-
-    static const int32_t kBoardApiLevel =
-        base::GetIntProperty<int32_t>("ro.board.api_level", 0);
-
-    // For non-GRF devices, use the first SDK version by the product.
-    static const int32_t kFirstApiLevel =
-        kBoardApiLevel != 0 ? kBoardApiLevel :
-        kBoardFirstApiLevel != 0 ? kBoardFirstApiLevel :
-        kProductFirstApiLevel;
-
-    return kFirstApiLevel >= __ANDROID_API_T__;
+    return kVendorApiLevel >= __ANDROID_API_T__;
 }
 
 bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
@@ -83,7 +68,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
     }
 
     // Default scenario --- the consumer is display or GPU
-    const AHardwareBuffer_Desc desc = {
+    const AHardwareBuffer_Desc consumableForDisplayOrGpu = {
             .width = 320,
             .height = 240,
             .format = format,
@@ -98,7 +83,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
     };
 
     // The consumer is a HW encoder
-    const AHardwareBuffer_Desc descHwEncoder = {
+    const AHardwareBuffer_Desc consumableForHwEncoder = {
             .width = 320,
             .height = 240,
             .format = format,
@@ -106,7 +91,6 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
             .usage = AHARDWAREBUFFER_USAGE_CPU_READ_RARELY |
                      AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
                      AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
-                     AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY |
                      AHARDWAREBUFFER_USAGE_VIDEO_ENCODE,
             .stride = 0,
             .rfu0 = 0,
@@ -114,7 +98,7 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
     };
 
     // The consumer is a SW encoder
-    const AHardwareBuffer_Desc descSwEncoder = {
+    const AHardwareBuffer_Desc consumableForSwEncoder = {
             .width = 320,
             .height = 240,
             .format = format,
@@ -127,10 +111,16 @@ bool isHalPixelFormatSupported(AHardwareBuffer_Format format) {
             .rfu0 = 0,
             .rfu1 = 0,
     };
-
-    return AHardwareBuffer_isSupported(&desc)
-            && AHardwareBuffer_isSupported(&descHwEncoder)
-            && AHardwareBuffer_isSupported(&descSwEncoder);
+    // Some devices running versions prior to Android U aren't guaranteed to advertise support
+    // for some color formats when the consumer is an encoder. Hence limit these checks to
+    // Android U and beyond.
+    if (isAtLeastU()) {
+        return AHardwareBuffer_isSupported(&consumableForDisplayOrGpu)
+                && AHardwareBuffer_isSupported(&consumableForHwEncoder)
+                && AHardwareBuffer_isSupported(&consumableForSwEncoder);
+    } else {
+        return AHardwareBuffer_isSupported(&consumableForDisplayOrGpu);
+    }
 }
 
 }  // namespace android

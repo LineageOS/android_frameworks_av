@@ -15,14 +15,18 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
+
+#include "TrackBase.h"
+
+#include <android/content/AttributionSourceState.h>
+
+namespace android {
 
 // playback track
-class MmapTrack : public TrackBase {
+class MmapTrack : public TrackBase, public IAfMmapTrack {
 public:
-                MmapTrack(ThreadBase *thread,
+    MmapTrack(IAfThreadBase* thread,
                             const audio_attributes_t& attr,
                             uint32_t sampleRate,
                             audio_format_t format,
@@ -32,26 +36,25 @@ public:
                             const android::content::AttributionSourceState& attributionSource,
                             pid_t creatorPid,
                             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
-    virtual             ~MmapTrack();
+    ~MmapTrack() override;
 
-                        // TrackBase virtual
-    virtual status_t    initCheck() const;
-    virtual status_t    start(AudioSystem::sync_event_t event,
-                              audio_session_t triggerSession);
-    virtual void        stop();
-    virtual bool        isFastTrack() const { return false; }
-            bool        isDirect() const override { return true; }
+    status_t initCheck() const final;
+    status_t start(
+            AudioSystem::sync_event_t event, audio_session_t triggerSession) final;
+    void stop() final;
+    bool isFastTrack() const final { return false; }
+    bool isDirect() const final { return true; }
 
-            void        appendDumpHeader(String8& result);
-            void        appendDump(String8& result, bool active);
+    void appendDumpHeader(String8& result) const final;
+    void appendDump(String8& result, bool active) const final;
 
                         // protected by MMapThread::mLock
-            void        setSilenced_l(bool silenced) { mSilenced = silenced;
+    void setSilenced_l(bool silenced) final { mSilenced = silenced;
                                                        mSilencedNotified = false;}
                         // protected by MMapThread::mLock
-            bool        isSilenced_l() const { return mSilenced; }
+    bool isSilenced_l() const final { return mSilenced; }
                         // protected by MMapThread::mLock
-            bool        getAndSetSilencedNotified_l() { bool silencedNotified = mSilencedNotified;
+    bool getAndSetSilencedNotified_l() final { bool silencedNotified = mSilencedNotified;
                                                         mSilencedNotified = true;
                                                         return silencedNotified; }
 
@@ -61,10 +64,8 @@ public:
      */
     void processMuteEvent_l(const sp<IAudioManager>& audioManager,
                             mute_state_t muteState)
-                            REQUIRES(AudioFlinger::MmapPlaybackThread::mLock);
+                            /* REQUIRES(MmapPlaybackThread::mLock) */ final;
 private:
-    friend class MmapThread;
-
     DISALLOW_COPY_AND_ASSIGN(MmapTrack);
 
     // AudioBufferProvider interface
@@ -72,19 +73,20 @@ private:
     // releaseBuffer() not overridden
 
     // ExtendedAudioBufferProvider interface
-    virtual size_t framesReady() const;
-    virtual int64_t framesReleased() const;
-    virtual void onTimestamp(const ExtendedTimestamp &timestamp);
+    size_t framesReady() const final;
+    int64_t framesReleased() const final;
+    void onTimestamp(const ExtendedTimestamp &timestamp) final;
 
-    pid_t mPid;
+    const pid_t mPid;
     bool  mSilenced;            // protected by MMapThread::mLock
     bool  mSilencedNotified;    // protected by MMapThread::mLock
 
     // TODO: replace PersistableBundle with own struct
     // access these two variables only when holding player thread lock.
     std::unique_ptr<os::PersistableBundle> mMuteEventExtras
-            GUARDED_BY(AudioFlinger::MmapPlaybackThread::mLock);
+            /* GUARDED_BY(MmapPlaybackThread::mLock) */;
     mute_state_t mMuteState
-            GUARDED_BY(AudioFlinger::MmapPlaybackThread::mLock);
+            /* GUARDED_BY(MmapPlaybackThread::mLock) */;
 };  // end of Track
 
+} // namespace android

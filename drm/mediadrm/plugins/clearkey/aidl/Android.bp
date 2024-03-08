@@ -8,21 +8,7 @@ package {
 }
 
 cc_defaults {
-    name: "aidl_clearkey_service_defaults",
-    vendor: true,
-
-    srcs: [
-        "CreatePluginFactories.cpp",
-        "CryptoPlugin.cpp",
-        "DrmFactory.cpp",
-        "DrmPlugin.cpp",
-    ],
-
-    relative_install_path: "hw",
-
-    cflags: ["-Wall", "-Werror", "-Wthread-safety"],
-
-    include_dirs: ["frameworks/av/include"],
+    name: "aidl_clearkey_service_defaults-use-shared-deps",
 
     shared_libs: [
         "libbase",
@@ -39,6 +25,46 @@ cc_defaults {
         "libclearkeybase",
         "libjsoncpp",
     ],
+}
+
+cc_defaults {
+    name: "aidl_clearkey_service_defaults-use-static-deps",
+
+    stl: "c++_static",
+
+    shared_libs: [
+        "libbinder_ndk",
+        "libcrypto",
+        "liblog",
+    ],
+
+    static_libs: [
+        "android.hardware.common-V2-ndk",
+        "android.hardware.drm-V1-ndk",
+        "libbase",
+        "libclearkeybase",
+        "libjsoncpp",
+        "libprotobuf-cpp-lite",
+        "libutils",
+    ],
+}
+
+cc_defaults {
+    name: "aidl_clearkey_service_defaults",
+    vendor: true,
+
+    srcs: [
+        "CreatePluginFactories.cpp",
+        "CryptoPlugin.cpp",
+        "DrmFactory.cpp",
+        "DrmPlugin.cpp",
+    ],
+
+    relative_install_path: "hw",
+
+    cflags: ["-Wall", "-Werror", "-Wthread-safety"],
+
+    include_dirs: ["frameworks/av/include"],
 
     local_include_dirs: ["include"],
 
@@ -49,7 +75,10 @@ cc_defaults {
 
 cc_binary {
     name: "android.hardware.drm-service.clearkey",
-    defaults: ["aidl_clearkey_service_defaults"],
+    defaults: [
+        "aidl_clearkey_service_defaults",
+        "aidl_clearkey_service_defaults-use-shared-deps",
+    ],
     srcs: ["Service.cpp"],
     init_rc: ["android.hardware.drm-service.clearkey.rc"],
     vintf_fragments: ["android.hardware.drm-service.clearkey.xml"],
@@ -57,17 +86,31 @@ cc_binary {
 
 cc_binary {
     name: "android.hardware.drm-service-lazy.clearkey",
-    defaults: ["aidl_clearkey_service_defaults"],
+    defaults: [
+        "aidl_clearkey_service_defaults",
+        "aidl_clearkey_service_defaults-use-shared-deps",
+    ],
     overrides: ["android.hardware.drm-service.clearkey"],
     srcs: ["ServiceLazy.cpp"],
     init_rc: ["android.hardware.drm-service-lazy.clearkey.rc"],
     vintf_fragments: ["android.hardware.drm-service.clearkey.xml"],
 }
 
+cc_binary {
+    name: "android.hardware.drm-service.clearkey.apex",
+    stem: "android.hardware.drm-service.clearkey",
+    defaults: [
+        "aidl_clearkey_service_defaults",
+        "aidl_clearkey_service_defaults-use-static-deps",
+    ],
+    srcs: ["Service.cpp"],
+    installable: false, // installed in APEX
+}
+
 phony {
     name: "android.hardware.drm@latest-service.clearkey",
     required: [
-        "android.hardware.drm-service.clearkey",
+        "com.android.hardware.drm.clearkey",
     ],
 }
 
@@ -122,4 +165,35 @@ cc_fuzz {
             "hamzeh@google.com",
         ],
     },
+}
+
+apex {
+    name: "com.android.hardware.drm.clearkey",
+    manifest: "manifest.json",
+    file_contexts: "file_contexts",
+    key: "com.android.hardware.key",
+    certificate: ":com.android.hardware.certificate",
+    vendor: true,
+    updatable: false,
+
+    binaries: [
+        "android.hardware.drm-service.clearkey.apex",
+    ],
+    prebuilts: [
+        "android.hardware.drm-service.clearkey.apex.rc",
+        "android.hardware.drm-service.clearkey.xml"
+    ],
+}
+
+prebuilt_etc {
+    name: "android.hardware.drm-service.clearkey.apex.rc",
+    src: "android.hardware.drm-service.clearkey.apex.rc",
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "android.hardware.drm-service.clearkey.xml",
+    src: "android.hardware.drm-service.clearkey.xml",
+    sub_dir: "vintf",
+    installable: false,
 }

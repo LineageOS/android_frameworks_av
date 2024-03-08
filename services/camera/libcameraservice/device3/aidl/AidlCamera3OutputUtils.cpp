@@ -145,7 +145,7 @@ void requestStreamBuffers(RequestBufferStates& states,
     outBuffers->clear();
     if (!states.useHalBufManager) {
         ALOGE("%s: Camera %s does not support HAL buffer management",
-                __FUNCTION__, states.cameraId.string());
+                __FUNCTION__, states.cameraId.c_str());
         *status = BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS;
         return;
     }

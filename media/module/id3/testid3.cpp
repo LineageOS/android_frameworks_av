@@ -90,9 +90,9 @@ void scanFile(const char *path) {
                 String8 text;
                 it.getString(&text);
 
-                printf("  found text frame '%s': %s\n", id.string(), text.string());
+                printf("  found text frame '%s': %s\n", id.c_str(), text.c_str());
             } else {
-                printf("  found frame '%s'.\n", id.string());
+                printf("  found frame '%s'.\n", id.c_str());
             }
 
             it.next();
@@ -104,7 +104,7 @@ void scanFile(const char *path) {
 
         if (data) {
             printf("found album art: size=%zu mime='%s'\n", dataSize,
-                   mime.string());
+                   mime.c_str());
 
             hexdump(data, dataSize > 128 ? 128 : dataSize);
         }

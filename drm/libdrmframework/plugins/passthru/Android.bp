@@ -39,10 +39,14 @@ cc_library_shared {
     srcs: ["src/DrmPassthruPlugIn.cpp"],
 
     shared_libs: [
+        "libbase",
         "libutils",
         "liblog",
         "libdl",
         "libdrmframeworkcommon",
+    ],
+    whole_static_libs: [
+        "libc++fs",
     ],
 
     local_include_dirs: ["include"],

@@ -52,6 +52,9 @@ cc_library {
         "com.android.media.swcodec",
     ],
 
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
 
     srcs: [
         "C2AllocatorBlob.cpp",
@@ -65,6 +68,7 @@ cc_library {
         "C2Store.cpp",
         "platform/C2BqBuffer.cpp",
         "platform/C2SurfaceSyncObj.cpp",
+        "platform/C2IgbaBuffer.cpp",
         "types.cpp",
         "util/C2Debug.cpp",
         "util/C2InterfaceHelper.cpp",
@@ -99,6 +103,7 @@ cc_library {
         "android.hardware.common.fmq-V1-ndk",
         "android.hardware.media.bufferpool@2.0",
         "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcutils",
@@ -127,6 +132,10 @@ cc_library {
 cc_defaults {
     name: "libcodec2-static-defaults",
 
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
+
     static_libs: [
         "liblog",
         "libion",
@@ -154,6 +163,7 @@ cc_defaults {
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
         "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.c2-V1-ndk",
     ],
 
     shared_libs: [
@@ -168,11 +178,17 @@ cc_defaults {
 // public dependency for implementing Codec 2 components
 cc_defaults {
     name: "libcodec2-impl-defaults",
+    cpp_std: "gnu++17",
+
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
 
     shared_libs: [
         "libbase", // for C2_LOG
         "liblog", // for ALOG
         "libcodec2",
+        "libcodec2_hal_common",
         "libcodec2_vndk",
         "libutils",
     ],

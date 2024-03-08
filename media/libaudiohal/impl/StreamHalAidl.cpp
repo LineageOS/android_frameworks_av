@@ -83,6 +83,7 @@ StreamHalAidl::StreamHalAidl(
           mContext(std::move(context)),
           mStream(stream),
           mVendorExt(vext) {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     {
         std::lock_guard l(mLock);
         mLastReply.latencyMs = nominalLatency;
@@ -97,6 +98,7 @@ StreamHalAidl::StreamHalAidl(
 }
 
 StreamHalAidl::~StreamHalAidl() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     if (mStream != nullptr) {
         ndk::ScopedAStatus status = mStream->close();
         ALOGE_IF(!status.isOk(), "%s: status %s", __func__, status.getDescription().c_str());
@@ -193,7 +195,7 @@ status_t StreamHalAidl::standby() {
     StreamDescriptor::Reply reply;
     switch (state) {
         case StreamDescriptor::State::ACTIVE:
-            if (status_t status = pause(&reply); status != OK) return status;
+            RETURN_STATUS_IF_ERROR(pause(&reply));
             if (reply.state != StreamDescriptor::State::PAUSED) {
                 ALOGE("%s: unexpected stream state: %s (expected PAUSED)",
                         __func__, toString(reply.state).c_str());
@@ -203,7 +205,7 @@ status_t StreamHalAidl::standby() {
         case StreamDescriptor::State::PAUSED:
         case StreamDescriptor::State::DRAIN_PAUSED:
             if (mIsInput) return flush();
-            if (status_t status = flush(&reply); status != OK) return status;
+            RETURN_STATUS_IF_ERROR(flush(&reply));
             if (reply.state != StreamDescriptor::State::IDLE) {
                 ALOGE("%s: unexpected stream state: %s (expected IDLE)",
                         __func__, toString(reply.state).c_str());
@@ -211,10 +213,8 @@ status_t StreamHalAidl::standby() {
             }
             FALLTHROUGH_INTENDED;
         case StreamDescriptor::State::IDLE:
-            if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::standby>(),
-                            &reply, true /*safeFromNonWorkerThread*/); status != OK) {
-                return status;
-            }
+            RETURN_STATUS_IF_ERROR(sendCommand(makeHalCommand<HalCommand::Tag::standby>(),
+                            &reply, true /*safeFromNonWorkerThread*/));
             if (reply.state != StreamDescriptor::State::STANDBY) {
                 ALOGE("%s: unexpected stream state: %s (expected STANDBY)",
                         __func__, toString(reply.state).c_str());
@@ -244,10 +244,7 @@ status_t StreamHalAidl::start() {
     const auto state = getState();
     StreamDescriptor::Reply reply;
     if (state == StreamDescriptor::State::STANDBY) {
-        if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply, true);
-                status != OK) {
-            return status;
-        }
+        RETURN_STATUS_IF_ERROR(sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply, true));
         return sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), &reply, true);
     }
 
@@ -264,10 +261,11 @@ status_t StreamHalAidl::getLatency(uint32_t *latency) {
     ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
     if (!mStream) return NO_INIT;
     StreamDescriptor::Reply reply;
-    if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
-        return status;
-    }
-    *latency = std::max<int32_t>(0, reply.latencyMs);
+    RETURN_STATUS_IF_ERROR(updateCountersIfNeeded(&reply));
+    *latency = std::clamp(std::max<int32_t>(0, reply.latencyMs), 1, 3000);
+    ALOGW_IF(reply.latencyMs != static_cast<int32_t>(*latency),
+             "Suspicious latency value reported by HAL: %d, clamped to %u", reply.latencyMs,
+             *latency);
     return OK;
 }
 
@@ -275,11 +273,9 @@ status_t StreamHalAidl::getObservablePosition(int64_t *frames, int64_t *timestam
     ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
     if (!mStream) return NO_INIT;
     StreamDescriptor::Reply reply;
-    if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
-        return status;
-    }
-    *frames = reply.observable.frames;
-    *timestamp = reply.observable.timeNs;
+    RETURN_STATUS_IF_ERROR(updateCountersIfNeeded(&reply));
+    *frames = std::max<int64_t>(0, reply.observable.frames);
+    *timestamp = std::max<int64_t>(0, reply.observable.timeNs);
     return OK;
 }
 
@@ -288,12 +284,9 @@ status_t StreamHalAidl::getHardwarePosition(int64_t *frames, int64_t *timestamp)
     if (!mStream) return NO_INIT;
     StreamDescriptor::Reply reply;
     // TODO: switch to updateCountersIfNeeded once we sort out mWorkerTid initialization
-    if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::getStatus>(), &reply, true);
-            status != OK) {
-        return status;
-    }
-    *frames = reply.hardware.frames;
-    *timestamp = reply.hardware.timeNs;
+    RETURN_STATUS_IF_ERROR(sendCommand(makeHalCommand<HalCommand::Tag::getStatus>(), &reply, true));
+    *frames = std::max<int64_t>(0, reply.hardware.frames);
+    *timestamp = std::max<int64_t>(0, reply.hardware.timeNs);
     return OK;
 }
 
@@ -301,10 +294,8 @@ status_t StreamHalAidl::getXruns(int32_t *frames) {
     ALOGV("%p %s::%s", this, getClassName().c_str(), __func__);
     if (!mStream) return NO_INIT;
     StreamDescriptor::Reply reply;
-    if (status_t status = updateCountersIfNeeded(&reply); status != OK) {
-        return status;
-    }
-    *frames = reply.xrunFrames;
+    RETURN_STATUS_IF_ERROR(updateCountersIfNeeded(&reply));
+    *frames = std::max<int32_t>(0, reply.xrunFrames);
     return OK;
 }
 
@@ -319,10 +310,7 @@ status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred
     // stream state), however this scenario wasn't supported by the HIDL HAL.
     if (getState() == StreamDescriptor::State::STANDBY) {
         StreamDescriptor::Reply reply;
-        if (status_t status = sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply);
-                status != OK) {
-            return status;
-        }
+        RETURN_STATUS_IF_ERROR(sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply));
         if (reply.state != StreamDescriptor::State::IDLE) {
             ALOGE("%s: failed to get the stream out of standby, actual state: %s",
                     __func__, toString(reply.state).c_str());
@@ -341,9 +329,7 @@ status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred
         }
     }
     StreamDescriptor::Reply reply;
-    if (status_t status = sendCommand(burst, &reply); status != OK) {
-        return status;
-    }
+    RETURN_STATUS_IF_ERROR(sendCommand(burst, &reply));
     *transferred = reply.fmqByteCount;
     if (mIsInput) {
         LOG_ALWAYS_FATAL_IF(*transferred > bytes,
@@ -381,11 +367,8 @@ status_t StreamHalAidl::resume(StreamDescriptor::Reply* reply) {
             if (state == StreamDescriptor::State::IDLE) {
                 StreamDescriptor::Reply localReply{};
                 StreamDescriptor::Reply* innerReply = reply ?: &localReply;
-                if (status_t status =
-                        sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), innerReply);
-                        status != OK) {
-                    return status;
-                }
+                RETURN_STATUS_IF_ERROR(
+                        sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), innerReply));
                 if (innerReply->state != StreamDescriptor::State::ACTIVE) {
                     ALOGE("%s: unexpected stream state: %s (expected ACTIVE)",
                             __func__, toString(innerReply->state).c_str());
@@ -448,10 +431,7 @@ status_t StreamHalAidl::getMmapPosition(struct audio_mmap_position *position) {
         return BAD_VALUE;
     }
     int64_t aidlPosition = 0, aidlTimestamp = 0;
-    if (status_t status = getHardwarePosition(&aidlPosition, &aidlTimestamp); status != OK) {
-        return status;
-    }
-
+    RETURN_STATUS_IF_ERROR(getHardwarePosition(&aidlPosition, &aidlTimestamp));
     position->time_nanoseconds = aidlTimestamp;
     position->position_frames = static_cast<int32_t>(aidlPosition);
     return OK;
@@ -499,6 +479,11 @@ status_t StreamHalAidl::sendCommand(
     }
     {
         std::lock_guard l(mLock);
+        // Not every command replies with 'latencyMs' field filled out, substitute the last
+        // returned value in that case.
+        if (reply->latencyMs <= 0) {
+            reply->latencyMs = mLastReply.latencyMs;
+        }
         mLastReply = *reply;
     }
     switch (reply->status) {
@@ -604,10 +589,8 @@ status_t StreamOutHalAidl::getRenderPosition(uint32_t *dspFrames) {
         return BAD_VALUE;
     }
     int64_t aidlFrames = 0, aidlTimestamp = 0;
-    if (status_t status = getObservablePosition(&aidlFrames, &aidlTimestamp); status != OK) {
-        return OK;
-    }
-    *dspFrames = std::clamp<int64_t>(aidlFrames, 0, UINT32_MAX);
+    RETURN_STATUS_IF_ERROR(getObservablePosition(&aidlFrames, &aidlTimestamp));
+    *dspFrames = static_cast<uint32_t>(aidlFrames);
     return OK;
 }
 
@@ -676,10 +659,8 @@ status_t StreamOutHalAidl::getPresentationPosition(uint64_t *frames, struct time
         return BAD_VALUE;
     }
     int64_t aidlFrames = 0, aidlTimestamp = 0;
-    if (status_t status = getObservablePosition(&aidlFrames, &aidlTimestamp); status != OK) {
-        return status;
-    }
-    *frames = std::max<int64_t>(0, aidlFrames);
+    RETURN_STATUS_IF_ERROR(getObservablePosition(&aidlFrames, &aidlTimestamp));
+    *frames = aidlFrames;
     timestamp->tv_sec = aidlTimestamp / NANOS_PER_SECOND;
     timestamp->tv_nsec = aidlTimestamp - timestamp->tv_sec * NANOS_PER_SECOND;
     return OK;
@@ -897,9 +878,7 @@ status_t StreamInHalAidl::getInputFramesLost(uint32_t *framesLost) {
         return BAD_VALUE;
     }
     int32_t aidlXruns = 0;
-    if (status_t status = getXruns(&aidlXruns); status != OK) {
-        return status;
-    }
+    RETURN_STATUS_IF_ERROR(getXruns(&aidlXruns));
     *framesLost = std::max<int32_t>(0, aidlXruns);
     return OK;
 }

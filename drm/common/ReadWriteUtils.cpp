@@ -34,7 +34,7 @@ using namespace android;
 
 String8 ReadWriteUtils::readBytes(const String8& filePath) {
     FILE* file = NULL;
-    file = fopen(filePath.string(), "r");
+    file = fopen(filePath.c_str(), "r");
 
     String8 string("");
     if (NULL != file) {
@@ -56,7 +56,7 @@ String8 ReadWriteUtils::readBytes(const String8& filePath) {
 
 int ReadWriteUtils::readBytes(const String8& filePath, char** buffer) {
     FILE* file = NULL;
-    file = fopen(filePath.string(), "r");
+    file = fopen(filePath.c_str(), "r");
     off64_t length = 0;
 
     if (NULL != file) {
@@ -77,15 +77,15 @@ int ReadWriteUtils::readBytes(const String8& filePath, char** buffer) {
 
 void ReadWriteUtils::writeToFile(const String8& filePath, const String8& data) {
     FILE* file = NULL;
-    file = fopen(filePath.string(), "w+");
+    file = fopen(filePath.c_str(), "w+");
 
     if (NULL != file) {
         int fd = fileno(file);
 
         int size = data.size();
         if (FAILURE != ftruncate(fd, size)) {
-            if (size != write(fd, data.string(), size)) {
-                ALOGE("Failed to write the data to: %s", filePath.string());
+            if (size != write(fd, data.c_str(), size)) {
+                ALOGE("Failed to write the data to: %s", filePath.c_str());
             }
         }
         fclose(file);
@@ -94,14 +94,14 @@ void ReadWriteUtils::writeToFile(const String8& filePath, const String8& data) {
 
 void ReadWriteUtils::appendToFile(const String8& filePath, const String8& data) {
     FILE* file = NULL;
-    file = fopen(filePath.string(), "a+");
+    file = fopen(filePath.c_str(), "a+");
 
     if (NULL != file) {
         int fd = fileno(file);
 
         int size = data.size();
-        if (size != write(fd, data.string(), size)) {
-            ALOGE("Failed to write the data to: %s", filePath.string());
+        if (size != write(fd, data.c_str(), size)) {
+            ALOGE("Failed to write the data to: %s", filePath.c_str());
         }
         fclose(file);
     }

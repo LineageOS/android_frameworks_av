@@ -16,8 +16,10 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2BqBuffer"
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <android/hardware_buffer.h>
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <ui/BufferQueueDefs.h>
 #include <ui/GraphicBuffer.h>
@@ -33,10 +35,12 @@
 #include <C2FenceFactory.h>
 #include <C2SurfaceSyncObj.h>
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <mutex>
 
+using ::android::ScopedTrace;
 using ::android::BufferQueueDefs::NUM_BUFFER_SLOTS;
 using ::android::C2AllocatorGralloc;
 using ::android::C2AndroidMemoryUsage;
@@ -392,6 +396,12 @@ private:
                     if (c2Fence) {
                         *c2Fence = _C2FenceFactory::CreateSurfaceFence(mSyncMem, waitId);
                     }
+                    if (mInvalidated) {
+                        if (c2Fence) {
+                            *c2Fence = C2Fence();
+                        }
+                        return C2_BAD_STATE;
+                    }
                     return C2_BLOCKING;
                 }
                 if (syncVar->getSyncStatusLocked() != C2SyncVariables::STATUS_ACTIVE) {
@@ -399,6 +409,12 @@ private:
                     syncVar->unlock();
                     if (c2Fence) {
                         *c2Fence = _C2FenceFactory::CreateSurfaceFence(mSyncMem, waitId);
+                    }
+                    if (mInvalidated) {
+                        if (c2Fence) {
+                            *c2Fence = C2Fence();
+                        }
+                        return C2_BAD_STATE;
                     }
                     return C2_BLOCKING;
                 }
@@ -686,7 +702,6 @@ public:
             }
         }
         int migrated = 0;
-        std::shared_ptr<C2SurfaceSyncMemory> oldMem;
         // poolDatas dtor should not be called during lock is held.
         std::shared_ptr<C2BufferQueueBlockPoolData>
                 poolDatas[NUM_BUFFER_SLOTS];
@@ -704,8 +719,22 @@ public:
                 mGeneration = 0;
                 ALOGD("configuring null producer: igbp_information(%d)", bqInformation);
             }
-            oldMem = mSyncMem; // preven destruction while locked.
-            mSyncMem = c2SyncMem;
+            if (mInvalidated) {
+                return;
+            }
+            {
+                std::unique_lock<std::mutex> memLock(mSyncMemMutex);
+                mOldMem = mSyncMem; // prevent destruction while locked.
+                                    // The waiters from the old memory will be
+                                    // woken up by the client after this
+                                    // configuration from HAL being finished.
+                                    // But we will keep this in case of the
+                                    // client being dead in between.
+                                    // In the case the death listener will wake
+                                    // up the wiators for the old memory using
+                                    // mOldMem here.
+                mSyncMem = c2SyncMem;
+            }
             C2SyncVariables *syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
             if (syncVar) {
                 syncVar->lock();
@@ -732,6 +761,9 @@ public:
                 // is no longer valid.
                 mIgbpValidityToken = std::make_shared<int>(0);
             }
+            if (mInvalidated) {
+                mIgbpValidityToken = std::make_shared<int>(0);
+            }
             for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
                 mBuffers[i] = buffers[i];
                 mPoolDatas[i] = poolDatas[i];
@@ -750,8 +782,33 @@ public:
     }
 
     void invalidate() {
-        std::scoped_lock<std::mutex> lock(mMutex);
-        mInvalidated = true;
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem;
+        std::shared_ptr<C2SurfaceSyncMemory> oldMem;
+        {
+            std::unique_lock<std::mutex> l(mSyncMemMutex);
+            bool old = mInvalidated.exchange(true);
+            if (old) {
+                return;
+            }
+            syncMem = mSyncMem;
+            oldMem = mOldMem;
+        }
+        mIgbpValidityToken.reset();
+        C2SyncVariables *syncVar = syncMem ? syncMem->mem(): nullptr;
+        if (syncVar) {
+            syncVar->invalidate();
+        }
+        C2SyncVariables *oldVar = oldMem ? oldMem->mem(): nullptr;
+        if (oldVar) {
+            oldVar->invalidate();
+        }
+        // invalidate pending lock from a dead process if any
+        if (syncVar) {
+            syncVar->clearLockIfNecessary();
+        }
+        if (oldVar) {
+            oldVar->clearLockIfNecessary();
+        }
     }
 
 private:
@@ -776,7 +833,9 @@ private:
     sp<GraphicBuffer> mBuffers[NUM_BUFFER_SLOTS];
     std::weak_ptr<C2BufferQueueBlockPoolData> mPoolDatas[NUM_BUFFER_SLOTS];
 
+    std::mutex mSyncMemMutex;
     std::shared_ptr<C2SurfaceSyncMemory> mSyncMem;
+    std::shared_ptr<C2SurfaceSyncMemory> mOldMem;
 
     // IGBP invalidation notification token.
     // The buffers(C2BufferQueueBlockPoolData) has the reference to the IGBP where
@@ -791,7 +850,7 @@ private:
     // if the token has been expired, the buffers will not call IGBP::cancelBuffer()
     // when they are no longer used.
     std::shared_ptr<int> mIgbpValidityToken;
-    bool mInvalidated{false};
+    std::atomic<bool> mInvalidated{false};
 };
 
 C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
@@ -1063,6 +1122,7 @@ c2_status_t C2BufferQueueBlockPool::fetchGraphicBlock(
         uint32_t format,
         C2MemoryUsage usage,
         std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
+    ScopedTrace trace(ATRACE_TAG,"C2BufferQueueBlockPool::fetchGraphicBlock");
     if (mImpl) {
         return mImpl->fetchGraphicBlock(width, height, format, usage, block, nullptr);
     }

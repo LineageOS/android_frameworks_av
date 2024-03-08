@@ -17,8 +17,10 @@
 #ifndef MEDIA_C2_HIDL_TEST_COMMON_H
 #define MEDIA_C2_HIDL_TEST_COMMON_H
 
+#include <C2BufferPriv.h>
 #include <C2Component.h>
 #include <C2Config.h>
+#include <C2PlatformSupport.h>
 
 #include <codec2/hidl/client.h>
 #include <getopt.h>
@@ -26,9 +28,6 @@
 #include <hidl/HidlSupport.h>
 #include <chrono>
 #include <fstream>
-
-#define FLAG_NON_DISPLAY_FRAME (1 << 4)
-#define FLAG_CONFIG_DATA (1 << 5)
 
 #define MAX_RETRY 20
 #define TIME_OUT 400ms
@@ -51,9 +50,15 @@ extern std::string sResourceDir;
 // Component name prefix
 extern std::string sComponentNamePrefix;
 
+enum c2_vts_flags_t {
+    VTS_BIT_FLAG_SYNC_FRAME = 1,
+    VTS_BIT_FLAG_NO_SHOW_FRAME = 2,
+    VTS_BIT_FLAG_CSD_FRAME = 3,
+};
+
 struct FrameInfo {
     int bytesCount;
-    uint32_t flags;
+    uint32_t vtsFlags;
     int64_t timestamp;
 };
 
@@ -126,6 +131,8 @@ struct CodecListener : public android::Codec2Client::Listener {
     std::function<void(std::list<std::unique_ptr<C2Work>>& workItems)> callBack;
 };
 
+C2PooledBlockPool::BufferPoolVer getBufferPoolVer();
+
 void parseArgs(int argc, char** argv);
 
 // Return all test parameters, a list of tuple of <instance, component>.
@@ -161,4 +168,7 @@ int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameIn
 void verifyFlushOutput(std::list<std::unique_ptr<C2Work>>& flushedWork,
                        std::list<std::unique_ptr<C2Work>>& workQueue,
                        std::list<uint64_t>& flushedIndices, std::mutex& queueLock);
+
+int mapInfoFlagstoVtsFlags(int infoFlags);
+
 #endif  // MEDIA_C2_HIDL_TEST_COMMON_H

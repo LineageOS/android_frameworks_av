@@ -1,0 +1,73 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_base_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_services_audioflinger_license"],
+}
+
+// TODO(b/275642749) Reenable these warnings
+audioflinger_utils_tidy_errors = audioflinger_base_tidy_errors + [
+    "-misc-non-private-member-variables-in-classes",
+]
+
+// Eventually use common tidy defaults
+cc_defaults {
+    name: "audioflinger_utils_flags_defaults",
+    // https://clang.llvm.org/docs/UsersManual.html#command-line-options
+    // https://clang.llvm.org/docs/DiagnosticsReference.html
+    cflags: audioflinger_base_cflags,
+    // https://clang.llvm.org/extra/clang-tidy/
+    tidy: true,
+    tidy_checks: audioflinger_utils_tidy_errors,
+    tidy_checks_as_errors: audioflinger_utils_tidy_errors,
+    tidy_flags: [
+      "-format-style=file",
+    ],
+}
+
+cc_library {
+    name: "libaudioflinger_utils",
+
+    defaults: [
+        "audioflinger_utils_flags_defaults",
+        "latest_android_media_audio_common_types_cpp_shared", // PropertyUtils.cpp
+    ],
+
+    srcs: [
+        "AudioWatchdog.cpp",
+        "BufLog.cpp",
+        "NBAIO_Tee.cpp",
+        "Permission.cpp",
+        "PropertyUtils.cpp",
+        "TypedLogger.cpp",
+        "Vibrator.cpp",
+    ],
+
+    shared_libs: [
+        "framework-permission-aidl-cpp",
+        "libaudioclient_aidl_conversion",
+        "libaudioutils",
+        "libbase",
+        "libbinder",
+        "libcutils", // property_get_int32
+        "liblog",
+        "libnbaio",
+        "libnblog",
+        "libutils",
+        "libvibrator",
+    ],
+
+    static_libs: [
+        "libsndfile",
+    ],
+
+    header_libs: [
+        "libaaudio_headers",  // PropertyUtils.cpp
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audioflinger",  // for configuration
+    ],
+}

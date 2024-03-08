@@ -213,12 +213,12 @@ ARTPAssembler::AssemblyStatus AHEVCAssembler::addNALUnit(
                     seqNum, mNextExpectedSeqNo,
                     baseJbTimeMs, dynamicJbTimeMs, tryJbTimeMs, JITTER_MULTIPLE);
         if (isSecondLineBroken) {
-            ALOGE("%s", info.string());
+            ALOGE("%s", info.c_str());
             printNowTimeMs(startTimeMs, nowTimeMs, playedTimeMs);
             printRTPTime(rtpTime, playedTimeRtp, expiredTimeRtp, isExpired);
 
         }  else {
-            ALOGW("%s", info.string());
+            ALOGW("%s", info.c_str());
         }
     }
 

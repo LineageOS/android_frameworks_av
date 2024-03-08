@@ -156,7 +156,7 @@ status_t MediaHTTP::reconnectAtOffset(off64_t offset) {
 
 String8 MediaHTTP::getUri() {
     if (mInitCheck != OK) {
-        return String8::empty();
+        return String8();
     }
 
     String8 uri;

@@ -355,6 +355,11 @@ TunerHidlFilter::~TunerHidlFilter() {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }
 
+    // Call to HAL to make sure the transport FD was able to be closed by binder.
+    // This is a tricky workaround for a problem in Binder.
+    // TODO:[b/192048842] When that problem is fixed we may be able to remove or change this code.
+    mFilter_1_1->getId([&](HidlResult /* r */, uint32_t /* filterId*/){});
+
     return ::ndk::ScopedAStatus::ok();
 }
 

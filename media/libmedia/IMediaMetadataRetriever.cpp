@@ -218,7 +218,7 @@ public:
             } else {
                 mMetadata.replaceValueFor(keyCode, value);
             }
-            return mMetadata.valueFor(keyCode).string();
+            return mMetadata.valueFor(keyCode).c_str();
         } else {
             return NULL;
         }

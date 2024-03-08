@@ -20,11 +20,10 @@
 #include <android/hardware/ICameraServiceProxy.h>
 
 #include <utils/Mutex.h>
-#include <utils/String8.h>
-#include <utils/String16.h>
 #include <utils/StrongPointer.h>
 #include <utils/Timers.h>
 #include <random>
+#include <string>
 
 #include <camera/CameraSessionStats.h>
 
@@ -49,8 +48,8 @@ private:
         void updateProxyDeviceState(sp<hardware::ICameraServiceProxy>& proxyBinder);
 
       public:
-        CameraSessionStatsWrapper(const String16& cameraId, int facing, int newCameraState,
-                                  const String16& clientName, int apiLevel, bool isNdk,
+        CameraSessionStatsWrapper(const std::string& cameraId, int facing, int newCameraState,
+                                  const std::string& clientName, int apiLevel, bool isNdk,
                                   int32_t latencyMs, int64_t logId)
             : mSessionStats(cameraId, facing, newCameraState, clientName, apiLevel, isNdk,
                             latencyMs, logId) {}
@@ -62,10 +61,11 @@ private:
         void onActive(sp<hardware::ICameraServiceProxy>& proxyBinder, float maxPreviewFps);
         void onIdle(sp<hardware::ICameraServiceProxy>& proxyBinder,
                 int64_t requestCount, int64_t resultErrorCount, bool deviceError,
-                const std::string& userTag, int32_t videoStabilizationMode,
-                const std::vector<hardware::CameraStreamStats>& streamStats);
+                const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
+                bool usedZoomOverride, const std::vector<hardware::CameraStreamStats>& streamStats);
 
-        String16 updateExtensionSessionStats(const hardware::CameraExtensionSessionStats& extStats);
+        std::string updateExtensionSessionStats(
+                const hardware::CameraExtensionSessionStats& extStats);
 
         // Returns the logId associated with this event.
         int64_t getLogId();
@@ -74,7 +74,7 @@ private:
     // Lock for camera session stats map
     Mutex mLock;
     // Map from camera id to the camera's session statistics
-    std::map<String8, std::shared_ptr<CameraSessionStatsWrapper>> mSessionStatsMap;
+    std::map<std::string, std::shared_ptr<CameraSessionStatsWrapper>> mSessionStatsMap;
 
     std::random_device mRandomDevice;  // pulls 32-bit random numbers from /dev/urandom
 
@@ -93,34 +93,34 @@ public:
     static sp<hardware::ICameraServiceProxy> getDefaultCameraServiceProxy();
 
     // Open
-    void logOpen(const String8& id, int facing,
-            const String16& clientPackageName, int apiLevel, bool isNdk,
+    void logOpen(const std::string& id, int facing,
+            const std::string& clientPackageName, int apiLevel, bool isNdk,
             int32_t latencyMs);
 
     // Close
-    void logClose(const String8& id, int32_t latencyMs, bool deviceError);
+    void logClose(const std::string& id, int32_t latencyMs, bool deviceError);
 
     // Stream configuration
-    void logStreamConfigured(const String8& id, int operatingMode, bool internalReconfig,
+    void logStreamConfigured(const std::string& id, int operatingMode, bool internalReconfig,
             int32_t latencyMs);
 
     // Session state becomes active
-    void logActive(const String8& id, float maxPreviewFps);
+    void logActive(const std::string& id, float maxPreviewFps);
 
     // Session state becomes idle
-    void logIdle(const String8& id,
+    void logIdle(const std::string& id,
             int64_t requestCount, int64_t resultErrorCount, bool deviceError,
-            const std::string& userTag, int32_t videoStabilizationMode,
-            const std::vector<hardware::CameraStreamStats>& streamStats);
+            const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
+            bool usedZoomOverride, const std::vector<hardware::CameraStreamStats>& streamStats);
 
     // Ping camera service proxy for user update
     void pingCameraServiceProxy();
 
     // Return the current top activity rotate and crop override.
-    int getRotateAndCropOverride(String16 packageName, int lensFacing, int userId);
+    int getRotateAndCropOverride(const std::string &packageName, int lensFacing, int userId);
 
     // Return the current top activity autoframing.
-    int getAutoframingOverride(const String16& packageName);
+    int getAutoframingOverride(const std::string& packageName);
 
     // Detect if the camera is disabled by device policy.
     bool isCameraDisabled(int userId);
@@ -128,10 +128,10 @@ public:
     // Returns the logId currently associated with the given cameraId. See 'mLogId' in
     // frameworks/av/camera/include/camera/CameraSessionStats.h for more details about this
     // identifier. Returns a non-0 value on success.
-    int64_t getCurrentLogIdForCamera(const String8& cameraId);
+    int64_t getCurrentLogIdForCamera(const std::string& cameraId);
 
     // Update the stored extension stats to the latest values
-    String16 updateExtensionStats(const hardware::CameraExtensionSessionStats& extStats);
+    std::string updateExtensionStats(const hardware::CameraExtensionSessionStats& extStats);
 };
 
 } // android

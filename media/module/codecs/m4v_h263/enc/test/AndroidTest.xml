@@ -18,14 +18,22 @@
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
         <option name="push" value="Mpeg4H263EncoderTest->/data/local/tmp/Mpeg4H263EncoderTest/" />
-        <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/enc/test/Mpeg4H263Encoder.zip?unzip=true"
-            value="/data/local/tmp/Mpeg4H263EncoderTestRes/" />
+    </target_preparer>
+
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.DynamicConfigPusher">
+        <option name="target" value="host" />
+        <option name="config-filename" value="Mpeg4H263EncoderTest" />
+        <option name="version" value="1.0"/>
+    </target_preparer>
+    <target_preparer class="com.android.compatibility.common.tradefed.targetprep.MediaPreparer">
+        <option name="push-all" value="true" />
+        <option name="media-folder-name" value="Mpeg4H263Encoder-1.1" />
+        <option name="dynamic-config-module" value="Mpeg4H263EncoderTest" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="Mpeg4H263EncoderTest" />
-        <option name="native-test-flag" value="-P /data/local/tmp/Mpeg4H263EncoderTestRes/" />
+        <option name="native-test-flag" value="-P /sdcard/test/Mpeg4H263Encoder-1.1/" />
     </test>
 </configuration>

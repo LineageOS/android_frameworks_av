@@ -37,10 +37,4 @@ cc_library_shared {
         ],
         cfi: true,
     },
-
-    product_variables: {
-        pdk: {
-            enabled: false,
-        },
-    },
 }

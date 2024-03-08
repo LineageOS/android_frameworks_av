@@ -136,6 +136,7 @@ PV_STATUS DecodeVOLHeader(VideoDecData *video, int layer)
                 case 0x05:
                 case 0x06:
                 case 0x08:
+                case 0x09:
                 case 0x10:
                 case 0x11:
                 case 0x12:

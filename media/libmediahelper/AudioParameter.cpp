@@ -43,7 +43,6 @@ const char * const AudioParameter::keyBtScoWb = AUDIO_PARAMETER_KEY_BT_SCO_WB;
 const char * const AudioParameter::keyBtHfpEnable = AUDIO_PARAMETER_KEY_HFP_ENABLE;
 const char * const AudioParameter::keyBtHfpSamplingRate = AUDIO_PARAMETER_KEY_HFP_SET_SAMPLING_RATE;
 const char * const AudioParameter::keyBtHfpVolume = AUDIO_PARAMETER_KEY_HFP_VOLUME;
-#ifndef __ANDROID_VNDK__
 const char * const AudioParameter::keyTtyMode = AUDIO_PARAMETER_KEY_TTY_MODE;
 const char * const AudioParameter::valueTtyModeOff = AUDIO_PARAMETER_VALUE_TTY_OFF;
 const char * const AudioParameter::valueTtyModeFull = AUDIO_PARAMETER_VALUE_TTY_FULL;
@@ -52,7 +51,6 @@ const char * const AudioParameter::valueTtyModeVco = AUDIO_PARAMETER_VALUE_TTY_V
 const char * const AudioParameter::keyHacSetting = AUDIO_PARAMETER_KEY_HAC;
 const char * const AudioParameter::valueHacOff = AUDIO_PARAMETER_VALUE_HAC_OFF;
 const char * const AudioParameter::valueHacOn = AUDIO_PARAMETER_VALUE_HAC_ON;
-#endif  // __ANDROID_VNDK__
 const char * const AudioParameter::keyHwAvSync = AUDIO_PARAMETER_HW_AV_SYNC;
 const char * const AudioParameter::keyPresentationId = AUDIO_PARAMETER_STREAM_PRESENTATION_ID;
 const char * const AudioParameter::keyProgramId = AUDIO_PARAMETER_STREAM_PROGRAM_ID;
@@ -77,6 +75,8 @@ const char * const AudioParameter::keyBtA2dpSuspended = AUDIO_PARAMETER_KEY_BT_A
 const char * const AudioParameter::keyReconfigA2dp = AUDIO_PARAMETER_RECONFIG_A2DP;
 const char * const AudioParameter::keyReconfigA2dpSupported = AUDIO_PARAMETER_A2DP_RECONFIG_SUPPORTED;
 const char * const AudioParameter::keyBtLeSuspended = AUDIO_PARAMETER_KEY_BT_LE_SUSPENDED;
+const char * const AudioParameter::keyReconfigLe = AUDIO_PARAMETER_RECONFIG_LE;
+const char * const AudioParameter::keyReconfigLeSupported = AUDIO_PARAMETER_LE_RECONFIG_SUPPORTED;
 // const char * const AudioParameter::keyDeviceSupportedEncapsulationModes =
 //        AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_MODES;
 // const char * const AudioParameter::keyDeviceSupportedEncapsulationMetadataTypes =
@@ -98,7 +98,7 @@ AudioParameter::AudioParameter(const String8& keyValuePairs)
     mKeyValuePairs = keyValuePairs;
     char *last;
 
-    strcpy(str, keyValuePairs.string());
+    strcpy(str, keyValuePairs.c_str());
     char *pair = strtok_r(str, ";", &last);
     while (pair != NULL) {
         if (strlen(pair) != 0) {
@@ -210,7 +210,7 @@ status_t AudioParameter::getInt(const String8& key, int& value) const
     value = 0;
     if (result == NO_ERROR) {
         int val;
-        if (sscanf(str8.string(), "%d", &val) == 1) {
+        if (sscanf(str8.c_str(), "%d", &val) == 1) {
             value = val;
         } else {
             result = INVALID_OPERATION;
@@ -226,7 +226,7 @@ status_t AudioParameter::getFloat(const String8& key, float& value) const
     value = 0;
     if (result == NO_ERROR) {
         float val;
-        if (sscanf(str8.string(), "%f", &val) == 1) {
+        if (sscanf(str8.c_str(), "%f", &val) == 1) {
             value = val;
         } else {
             result = INVALID_OPERATION;

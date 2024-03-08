@@ -69,7 +69,7 @@ status_t CoreConversionHelperHidl::keysFromHal(
             keepValueParam.add(key, value);
             key = keepValueParam.toString();
         }
-        (*hidlKeys)[i] = key.string();
+        (*hidlKeys)[i] = key.c_str();
     }
     return OK;
 }
@@ -84,8 +84,8 @@ status_t CoreConversionHelperHidl::parametersFromHal(
         String8 key, value;
         status_t status = params.getAt(i, key, value);
         if (status != OK) return status;
-        (*hidlParams)[i].key = key.string();
-        (*hidlParams)[i].value = value.string();
+        (*hidlParams)[i].key = key.c_str();
+        (*hidlParams)[i].value = value.c_str();
     }
     return OK;
 }
@@ -97,7 +97,7 @@ void CoreConversionHelperHidl::parametersToHal(
     for (size_t i = 0; i < parameters.size(); ++i) {
         params.add(String8(parameters[i].key.c_str()), String8(parameters[i].value.c_str()));
     }
-    values->setTo(params.toString());
+    *values = params.toString();
 }
 
 CoreConversionHelperHidl::CoreConversionHelperHidl(std::string_view className)

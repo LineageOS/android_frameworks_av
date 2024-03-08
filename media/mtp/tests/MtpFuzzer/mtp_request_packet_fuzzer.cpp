@@ -17,8 +17,9 @@
 #include <MtpDevHandle.h>
 #include <MtpPacketFuzzerUtils.h>
 #include <MtpRequestPacket.h>
-#include <fuzzer/FuzzedDataProvider.h>
 #include <fstream>
+#include <functional>
+#include <fuzzer/FuzzedDataProvider.h>
 
 using namespace android;
 

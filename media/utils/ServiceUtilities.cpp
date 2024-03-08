@@ -27,6 +27,7 @@
 #include <media/AidlConversionUtil.h>
 #include <android/content/AttributionSourceState.h>
 
+#include <com_android_media_audio.h>
 #include <iterator>
 #include <algorithm>
 #include <pwd.h>
@@ -387,6 +388,10 @@ status_t checkIMemory(const sp<IMemory>& iMemory)
  */
 bool mustAnonymizeBluetoothAddress(
         const AttributionSourceState& attributionSource, const String16& caller) {
+    if (!com::android::media::audio::bluetooth_mac_address_anonymization()) {
+        return false;
+    }
+
     uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
     if (isAudioServerOrSystemServerUid(uid)) {
         return false;
@@ -446,7 +451,7 @@ std::optional<bool> MediaPackageManager::doIsAllowed(uid_t uid) {
     PermissionController{}.getPackagesForUid(uid, str16PackageNames);
     std::vector<std::string> packageNames;
     for (const auto& str16PackageName : str16PackageNames) {
-        packageNames.emplace_back(String8(str16PackageName).string());
+        packageNames.emplace_back(String8(str16PackageName).c_str());
     }
     if (packageNames.empty()) {
         ALOGW("%s: Playback capture for uid %u is denied as no package name could be retrieved "

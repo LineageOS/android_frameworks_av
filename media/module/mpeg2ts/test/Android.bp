@@ -37,9 +37,8 @@ cc_test{
     shared_libs: [
         "android.hardware.cas@1.0",
         "android.hardware.cas.native@1.0",
-        "android.hidl.token@1.0-utils",
-        "android.hidl.allocator@1.0",
         "libcrypto",
+        "libcutils",
         "libhidlbase",
         "libhidlmemory",
         "liblog",

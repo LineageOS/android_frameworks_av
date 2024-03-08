@@ -34,10 +34,11 @@ namespace SessionConfigurationUtils {
 // isn't valid.
 binder::Status
 convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
-        const String8 &cameraId, const CameraMetadata &deviceInfo,
+        const std::string &cameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
-        bool overrideForPerfClass, bool *earlyExit);
+        bool overrideForPerfClass, metadata_vendor_id_t vendorTagId,
+        bool *earlyExit);
 
 // Utility function to convert a V3_7::StreamConfiguration to
 // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot

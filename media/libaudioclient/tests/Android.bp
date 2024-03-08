@@ -104,6 +104,7 @@ cc_defaults {
     shared_libs: [
         "capture_state_listener-aidl-cpp",
         "framework-permission-aidl-cpp",
+        "libaudioutils",
         "libbase",
         "libcgrouprc",
         "libdl",
@@ -114,7 +115,6 @@ cc_defaults {
         "libnblog",
         "libprocessgroup",
         "libshmemcompat",
-        "libxml2",
         "mediametricsservice-aidl-cpp",
         "packagemanager_aidl-cpp",
         "shared-file-region-aidl-cpp",
@@ -131,7 +131,6 @@ cc_defaults {
         "libaudiofoundation",
         "libaudiomanager",
         "libaudiopolicy",
-        "libaudioutils",
     ],
     data: ["bbb*.raw"],
     test_config_template: "audio_test_template.xml",

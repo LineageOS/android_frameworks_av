@@ -35,6 +35,7 @@ cc_defaults {
     shared_libs: [
         "framework-permission-aidl-cpp",
         "libbinder",
+        "libbinder_ndk",
         "libcutils",
         "libmedia",
         "libstagefright",
@@ -173,5 +174,29 @@ cc_fuzz {
         "libnetd_client",
         "libpowermanager",
         "libstagefright_httplive",
+        "libaudiohal@7.0",
     ],
+}
+
+cc_fuzz {
+    name: "media_player_service_fuzzer",
+    defaults: [
+        "service_fuzzer_defaults",
+        "libmediaplayerservice_defaults",
+        "fuzzer_disable_leaks",
+    ],
+    srcs: [
+        "media_player_service_fuzzer.cpp",
+    ],
+    fuzz_config: {
+        cc: [
+            "kyslov@google.com",
+            "ibaker@google.com",
+        ],
+        triage_assignee: "waghpawan@google.com",
+    },
+    cflags: [
+        "-DFUZZ_MODE_MEDIA_PLAYER_SERVICE",
+    ],
+    include_dirs: ["frameworks/av/media/libmediaplayerservice/"],
 }

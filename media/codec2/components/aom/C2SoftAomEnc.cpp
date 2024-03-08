@@ -107,7 +107,7 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
 
     addParameter(DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
                          .withDefault(new C2StreamProfileLevelInfo::output(0u, PROFILE_AV1_0,
-                                                                           LEVEL_AV1_4_1))
+                                                                           LEVEL_AV1_2))
                          .withFields({
                                  C2F(mProfileLevel, profile).equalTo(PROFILE_AV1_0),
                                  C2F(mProfileLevel, level)
@@ -116,7 +116,7 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
                                             LEVEL_AV1_3_2, LEVEL_AV1_3_3, LEVEL_AV1_4,
                                             LEVEL_AV1_4_1}),
                          })
-                         .withSetter(ProfileLevelSetter)
+                         .withSetter(ProfileLevelSetter, mSize, mFrameRate, mBitrate)
                          .build());
 
     std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
@@ -201,12 +201,69 @@ C2R C2SoftAomEnc::IntfImpl::SizeSetter(bool mayBlock,
 }
 
 C2R C2SoftAomEnc::IntfImpl::ProfileLevelSetter(bool mayBlock,
-                                               C2P<C2StreamProfileLevelInfo::output>& me) {
+                                               C2P<C2StreamProfileLevelInfo::output>& me,
+                                               const C2P<C2StreamPictureSizeInfo::input>& size,
+                                               const C2P<C2StreamFrameRateInfo::output>& frameRate,
+                                               const C2P<C2StreamBitrateInfo::output>& bitrate) {
     (void)mayBlock;
     if (!me.F(me.v.profile).supportsAtAll(me.v.profile)) {
         me.set().profile = PROFILE_AV1_0;
     }
+    struct LevelLimits {
+        C2Config::level_t level;
+        float samplesPerSec;
+        uint64_t samples;
+        uint32_t bitrate;
+        size_t maxHSize;
+        size_t maxVSize;
+    };
+    constexpr LevelLimits kLimits[] = {
+            {LEVEL_AV1_2, 4423680, 147456, 1500000, 2048, 1152},
+            {LEVEL_AV1_2_1, 8363520, 278784, 3000000, 2816, 1584},
+            {LEVEL_AV1_3, 19975680, 665856, 6000000, 4352, 2448},
+            {LEVEL_AV1_3_1, 37950720, 1065024, 10000000, 5504, 3096},
+            {LEVEL_AV1_4, 70778880, 2359296, 12000000, 6144, 3456},
+            {LEVEL_AV1_4_1, 141557760, 2359296, 20000000, 6144, 3456},
+    };
+
+    uint64_t samples = size.v.width * size.v.height;
+    float samplesPerSec = float(samples) * frameRate.v.value;
+
+    // Check if the supplied level meets the samples / bitrate requirements.
+    // If not, update the level with the lowest level meeting the requirements.
+    bool found = false;
+
+    // By default needsUpdate = false in case the supplied level does meet
+    // the requirements.
+    bool needsUpdate = false;
     if (!me.F(me.v.level).supportsAtAll(me.v.level)) {
+        needsUpdate = true;
+    }
+    for (const LevelLimits& limit : kLimits) {
+        if (samples <= limit.samples && samplesPerSec <= limit.samplesPerSec &&
+            bitrate.v.value <= limit.bitrate && size.v.width <= limit.maxHSize &&
+            size.v.height <= limit.maxVSize) {
+            // This is the lowest level that meets the requirements, and if
+            // we haven't seen the supplied level yet, that means we don't
+            // need the update.
+            if (needsUpdate) {
+                ALOGD("Given level %x does not cover current configuration: "
+                        "adjusting to %x",
+                        me.v.level, limit.level);
+                me.set().level = limit.level;
+            }
+            found = true;
+            break;
+        }
+        if (me.v.level == limit.level) {
+            // We break out of the loop when the lowest feasible level is
+            // found. The fact that we're here means that our level doesn't
+            // meet the requirement and needs to be updated.
+            needsUpdate = true;
+        }
+    }
+    if (!found) {
+        // We set to the highest supported level.
         me.set().level = LEVEL_AV1_4_1;
     }
     return C2R::Ok();
@@ -246,6 +303,10 @@ C2R C2SoftAomEnc::IntfImpl::CodedColorAspectsSetter(
     me.set().transfer = coded.v.transfer;
     me.set().matrix = coded.v.matrix;
     return C2R::Ok();
+}
+
+uint32_t C2SoftAomEnc::IntfImpl::getLevel_l() const {
+        return mProfileLevel->level - LEVEL_AV1_2;
 }
 
 C2SoftAomEnc::C2SoftAomEnc(const char* name, c2_node_id_t id,
@@ -323,6 +384,9 @@ static int MapC2ComplexityToAOMSpeed (int c2Complexity) {
 
 aom_codec_err_t C2SoftAomEnc::setupCodecParameters() {
     aom_codec_err_t codec_return = AOM_CODEC_OK;
+
+    codec_return = aom_codec_control(mCodecContext, AV1E_SET_TARGET_SEQ_LEVEL_IDX, mAV1EncLevel);
+    if (codec_return != AOM_CODEC_OK) goto BailOut;
 
     codec_return = aom_codec_control(mCodecContext, AOME_SET_CPUUSED,
                                      MapC2ComplexityToAOMSpeed(mComplexity->value));
@@ -478,6 +542,7 @@ status_t C2SoftAomEnc::initEncoder() {
         mColorAspects = mIntf->getCodedColorAspects_l();
         mQuality = mIntf->getQuality_l();
         mComplexity = mIntf->getComplexity_l();
+        mAV1EncLevel = mIntf->getLevel_l();
     }
 
 

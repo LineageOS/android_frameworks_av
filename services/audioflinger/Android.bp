@@ -19,7 +19,8 @@ license {
     ],
 }
 
-tidy_errors = [
+// base tidy_errors for this and all subprojects.
+audioflinger_base_tidy_errors = [
     // https://clang.llvm.org/extra/clang-tidy/checks/list.html
     // For many categories, the checks are too many to specify individually.
     // Feel free to disable as needed - as warnings are generally ignored,
@@ -71,8 +72,10 @@ tidy_errors = [
     "-bugprone-suspicious-string-compare",
     "-cert-oop54-cpp", // found in TransactionLog.h
     "-bugprone-narrowing-conversions", // b/182410845
+]
 
-    // TODO(b/275642749) Reenable these warnings
+// TODO(b/275642749) Reenable these warnings
+audioflinger_tidy_errors = audioflinger_base_tidy_errors + [
     "-bugprone-assignment-in-if-condition",
     "-bugprone-forward-declaration-namespace",
     "-bugprone-parent-virtual-call",
@@ -94,88 +97,49 @@ tidy_errors = [
     "-performance-no-int-to-ptr",
 ]
 
+audioflinger_base_cflags = [
+    "-Wall",
+    "-Wdeprecated",
+    "-Werror",
+    "-Werror=implicit-fallthrough",
+    "-Werror=sometimes-uninitialized",
+    "-Werror=conditional-uninitialized",
+    "-Wextra",
+
+    // suppress some warning chatter.
+    "-Wno-deprecated-copy-with-dtor",
+    "-Wno-deprecated-copy-with-user-provided-dtor",
+
+    "-Wredundant-decls",
+    "-Wshadow",
+    "-Wstrict-aliasing",
+    "-fstrict-aliasing",
+    "-Wthread-safety",
+    //"-Wthread-safety-negative", // experimental - looks broken in R.
+    "-Wunreachable-code",
+    "-Wunreachable-code-break",
+    "-Wunreachable-code-return",
+    "-Wunused",
+    "-Wused-but-marked-unused",
+]
+
 // Eventually use common tidy defaults
 cc_defaults {
     name: "audioflinger_flags_defaults",
     // https://clang.llvm.org/docs/UsersManual.html#command-line-options
     // https://clang.llvm.org/docs/DiagnosticsReference.html
-    cflags: [
-        "-Wall",
-        "-Wdeprecated",
-        "-Werror",
-        "-Werror=implicit-fallthrough",
-        "-Werror=sometimes-uninitialized",
-        "-Werror=conditional-uninitialized",
-        "-Wextra",
-
-        // suppress some warning chatter.
-        "-Wno-deprecated-copy-with-dtor",
-        "-Wno-deprecated-copy-with-user-provided-dtor",
-
-        "-Wredundant-decls",
-        "-Wshadow",
-        "-Wstrict-aliasing",
-        "-fstrict-aliasing",
-        "-Wthread-safety",
-        //"-Wthread-safety-negative", // experimental - looks broken in R.
-        "-Wunreachable-code",
-        "-Wunreachable-code-break",
-        "-Wunreachable-code-return",
-        "-Wunused",
-        "-Wused-but-marked-unused",
-        "-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS",
-    ],
+    cflags: audioflinger_base_cflags,
     // https://clang.llvm.org/extra/clang-tidy/
     tidy: true,
-    tidy_checks: tidy_errors,
-    tidy_checks_as_errors: tidy_errors,
+    tidy_checks: audioflinger_tidy_errors,
+    tidy_checks_as_errors: audioflinger_tidy_errors,
     tidy_flags: [
       "-format-style=file",
     ],
 }
 
-cc_library_shared {
-    name: "libaudioflinger",
-
-    defaults: [
-        "latest_android_media_audio_common_types_cpp_shared",
-        "latest_android_hardware_audio_core_sounddose_ndk_shared",
-        "audioflinger_flags_defaults",
-    ],
-
-    srcs: [
-        "AudioFlinger.cpp",
-        "AudioHwDevice.cpp",
-        "AudioStreamOut.cpp",
-        "AudioWatchdog.cpp",
-        "BufLog.cpp",
-        "DeviceEffectManager.cpp",
-        "Effects.cpp",
-        "FastCapture.cpp",
-        "FastCaptureDumpState.cpp",
-        "FastCaptureState.cpp",
-        "FastMixer.cpp",
-        "FastMixerDumpState.cpp",
-        "FastMixerState.cpp",
-        "FastThread.cpp",
-        "FastThreadDumpState.cpp",
-        "FastThreadState.cpp",
-        "MelReporter.cpp",
-        "NBAIO_Tee.cpp",
-        "PatchCommandThread.cpp",
-        "PatchPanel.cpp",
-        "PropertyUtils.cpp",
-        "SpdifStreamOut.cpp",
-        "StateQueue.cpp",
-        "Threads.cpp",
-        "Tracks.cpp",
-        "TypedLogger.cpp",
-    ],
-
-    include_dirs: [
-        "frameworks/av/services/audiopolicy",
-        "frameworks/av/services/medialog",
-    ],
+cc_defaults {
+    name: "libaudioflinger_dependencies",
 
     shared_libs: [
         "audioflinger-aidl-cpp",
@@ -184,11 +148,13 @@ cc_library_shared {
         "effect-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libactivitymanager_aidl",
+        "libaudioflinger_datapath",
+        "libaudioflinger_fastpath",
         "libaudioflinger_timing",
+        "libaudioflinger_utils",
         "libaudiofoundation",
         "libaudiohal",
         "libaudioprocessing",
-        "libaudiospdif",
         "libaudioutils",
         "libcutils",
         "libutils",
@@ -197,7 +163,6 @@ cc_library_shared {
         "libbinder_ndk",
         "libaudioclient",
         "libaudiomanager",
-        "libmedialogservice",
         "libmediametrics",
         "libmediautils",
         "libnbaio",
@@ -213,8 +178,42 @@ cc_library_shared {
     ],
 
     static_libs: [
+        "libmedialogservice",
+        "libaudiospdif",
+    ],
+}
+
+
+cc_library {
+    name: "libaudioflinger",
+
+    defaults: [
+        "audioflinger_flags_defaults",
+        "latest_android_hardware_audio_core_sounddose_ndk_export_shared_lib_header",
+        "latest_android_hardware_audio_core_sounddose_ndk_shared",
+        "latest_android_media_audio_common_types_cpp_shared",
+        "libaudioflinger_dependencies",
+    ],
+
+    srcs: [
+        "AudioFlinger.cpp",
+        "Client.cpp",
+        "DeviceEffectManager.cpp",
+        "Effects.cpp",
+        "MelReporter.cpp",
+        "PatchCommandThread.cpp",
+        "PatchPanel.cpp",
+        "Threads.cpp",
+        "Tracks.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audiopolicy",
+        "frameworks/av/services/medialog",
+    ],
+
+    static_libs: [
         "libcpustats",
-        "libsndfile",
         "libpermission",
     ],
 
@@ -228,11 +227,9 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libpermission",
-        "android.hardware.audio.core.sounddose-V1-ndk",
     ],
 
     cflags: [
-        "-DSTATE_QUEUE_INSTANTIATIONS=\"StateQueueInstantiations.cpp\"",
         "-fvisibility=hidden",
         "-Werror",
         "-Wall",

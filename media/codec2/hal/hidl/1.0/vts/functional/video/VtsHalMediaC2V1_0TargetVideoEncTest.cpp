@@ -18,6 +18,7 @@
 #define LOG_TAG "codec2_hidl_hal_video_enc_test"
 
 #include <android-base/logging.h>
+#include <android/binder_process.h>
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
@@ -500,7 +501,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     description("Encodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    bool signalEOS = std::get<3>(GetParam());
+    bool signalEOS = std::get<2>(GetParam());
     // Send an empty frame to receive CSD data from encoder.
     bool sendEmptyFirstFrame = std::get<3>(GetParam());
     mConfigBPictures = std::get<4>(GetParam());
@@ -930,5 +931,6 @@ int main(int argc, char** argv) {
     }
 
     ::testing::InitGoogleTest(&argc, argv);
+    ABinderProcess_startThreadPool();
     return RUN_ALL_TESTS();
 }

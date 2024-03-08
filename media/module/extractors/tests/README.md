@@ -22,15 +22,15 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/ExtractorUnitTest/ExtractorUnitTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/extractors/tests/extractor-1.4.zip). Download, unzip and push these files into device for testing.
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/module/extractors/tests/extractor-1.5.zip). Download, unzip and push these files into device for testing.
 
 ```
-adb push extractor /data/local/tmp/
+adb push extractor-1.5 /data/local/tmp/
 ```
 
 usage: ExtractorUnitTest -P \<path_to_folder\>
 ```
-adb shell /data/local/tmp/ExtractorUnitTest -P /data/local/tmp/extractor/
+adb shell /data/local/tmp/ExtractorUnitTest -P /data/local/tmp/extractor-1.5/
 ```
 Alternatively, the test can also be run using atest command.
 

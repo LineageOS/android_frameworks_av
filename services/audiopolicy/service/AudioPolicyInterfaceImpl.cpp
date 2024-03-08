@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include "AudioPolicyService.h"
+#include "AudioRecordClient.h"
 #include "TypeConverter.h"
 #include <media/AidlConversion.h>
 #include <media/AudioPolicy.h>
@@ -1809,6 +1810,22 @@ Status AudioPolicyService::registerPolicyMixes(const std::vector<media::AudioMix
     } else {
         return binderStatusFromStatusT(mAudioPolicyManager->unregisterPolicyMixes(mixes));
     }
+}
+
+Status AudioPolicyService::updatePolicyMixes(
+        const ::std::vector<::android::media::AudioMixUpdate>& updates) {
+    Mutex::Autolock _l(mLock);
+    for (const auto& update : updates) {
+        AudioMix mix = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_AudioMix(update.audioMix));
+        std::vector<AudioMixMatchCriterion> newCriteria =
+                VALUE_OR_RETURN_BINDER_STATUS(convertContainer<std::vector<AudioMixMatchCriterion>>(
+                        update.newCriteria, aidl2legacy_AudioMixMatchCriterion));
+        int status;
+        if((status = mAudioPolicyManager->updatePolicyMix(mix, newCriteria)) != NO_ERROR) {
+            return binderStatusFromStatusT(status);
+        }
+    }
+    return binderStatusFromStatusT(NO_ERROR);
 }
 
 Status AudioPolicyService::setUidDeviceAffinities(

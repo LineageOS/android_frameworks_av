@@ -70,7 +70,7 @@ AString::AString(const String8 &from)
     : mData(NULL),
       mSize(0),
       mAllocSize(1) {
-    setTo(from.string(), from.length());
+    setTo(from.c_str(), from.length());
 }
 
 AString::AString(const AString &from)

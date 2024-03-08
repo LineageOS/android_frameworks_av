@@ -49,7 +49,7 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
 
     static void binderDied(void *cookie);
 
-    virtual IPCTransport getIPCTransport() override {return IPCTransport::AIDL;}
+    virtual IPCTransport getIPCTransport() const override {return IPCTransport::AIDL;}
 
     const std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
     startProviderInterface();
@@ -107,8 +107,6 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
 
     struct AidlDeviceInfo3 : public CameraProviderManager::ProviderInfo::DeviceInfo3 {
 
-        //TODO: fix init
-        const hardware::hidl_version mVersion = hardware::hidl_version{3, 2};
         std::shared_ptr<aidl::android::hardware::camera::device::ICameraDevice>
                 mSavedInterface = nullptr;
 
@@ -129,8 +127,17 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
 
         virtual status_t isSessionConfigurationSupported(
                 const SessionConfiguration &/*configuration*/,
-                bool overrideForPerfClass, camera3::metadataGetter /*getMetadata*/,
+                bool overrideForPerfClass, bool checkSessionParams,
                 bool *status/*status*/);
+
+        virtual status_t createDefaultRequest(
+                    camera3::camera_request_template_t templateId,
+                    camera_metadata_t** metadata) override;
+
+        virtual status_t getSessionCharacteristics(
+                const SessionConfiguration &/*configuration*/,
+                bool overrideForPerfClass, camera3::metadataGetter /*getMetadata*/,
+                CameraMetadata *sessionCharacteristics /*sessionCharacteristics*/);
 
         std::shared_ptr<aidl::android::hardware::camera::device::ICameraDevice>
                 startDeviceInterface();

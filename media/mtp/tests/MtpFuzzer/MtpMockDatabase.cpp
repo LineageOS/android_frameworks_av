@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -40,7 +41,7 @@ MtpMockDatabase::~MtpMockDatabase() {
 }
 
 void MtpMockDatabase::addObject(MtpObjectInfo* info) {
-    assert(hasStorage(info->storageID));
+    assert(hasStorage(info->mStorageID));
 
     // we take ownership
     mObjects.push_back(info);

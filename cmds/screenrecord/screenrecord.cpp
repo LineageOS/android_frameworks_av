@@ -892,9 +892,9 @@ static status_t recordScreen(const char* fileName) {
         gPhysicalDisplayId ? displayState.layerStackSpaceRect : getMaxDisplaySize();
     if (gVerbose) {
         printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
-                layerStackSpaceRect.getWidth(), layerStackSpaceRect.getHeight(),
-                displayMode.refreshRate, toCString(displayState.orientation),
-                displayState.layerStack.id);
+               layerStackSpaceRect.getWidth(), layerStackSpaceRect.getHeight(),
+               displayMode.peakRefreshRate, toCString(displayState.orientation),
+               displayState.layerStack.id);
         fflush(stdout);
     }
 
@@ -911,7 +911,8 @@ static status_t recordScreen(const char* fileName) {
     sp<FrameOutput> frameOutput;
     sp<IGraphicBufferProducer> encoderInputSurface;
     if (gOutputFormat != FORMAT_FRAMES && gOutputFormat != FORMAT_RAW_FRAMES) {
-        err = prepareEncoder(displayMode.refreshRate, &recordingData.encoder, &encoderInputSurface);
+        err = prepareEncoder(displayMode.peakRefreshRate, &recordingData.encoder,
+                             &encoderInputSurface);
 
         if (err != NO_ERROR && !gSizeSpecified) {
             // fallback is defined for landscape; swap if we're in portrait
@@ -924,8 +925,8 @@ static status_t recordScreen(const char* fileName) {
                         gVideoWidth, gVideoHeight, newWidth, newHeight);
                 gVideoWidth = newWidth;
                 gVideoHeight = newHeight;
-                err = prepareEncoder(displayMode.refreshRate, &recordingData.encoder,
-                                      &encoderInputSurface);
+                err = prepareEncoder(displayMode.peakRefreshRate, &recordingData.encoder,
+                                     &encoderInputSurface);
             }
         }
         if (err != NO_ERROR) return err;
@@ -1096,7 +1097,7 @@ static status_t notifyMediaScanner(const char* fileName) {
             "-a",
             "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
             "-d",
-            fileUrl.string(),
+            fileUrl.c_str(),
             NULL
     };
     if (gVerbose) {

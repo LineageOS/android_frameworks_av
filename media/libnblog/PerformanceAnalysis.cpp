@@ -393,7 +393,7 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
             PerformanceAnalysis& curr = hash.second;
             // write performance data to console
             curr.reportPerformance(&body, thread.first, hash.first);
-            if (!body.isEmpty()) {
+            if (!body.empty()) {
                 dumpLine(fd, indent, body);
                 body.clear();
             }
@@ -409,7 +409,7 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
 
 // Writes a string into specified file descriptor
 void dumpLine(int fd, int indent, const String8 &body) {
-    dprintf(fd, "%.*s%s \n", indent, "", body.string());
+    dprintf(fd, "%.*s%s \n", indent, "", body.c_str());
 }
 
 } // namespace ReportPerformance

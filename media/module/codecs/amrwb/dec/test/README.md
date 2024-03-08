@@ -22,15 +22,15 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/AmrwbDecoderTest/AmrwbDecoderTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/amrwb/test/AmrwbDecoderTest.zip). Download, unzip and push these files into device for testing.
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/module/codecs/amrwb/dec/test/AmrwbDecoderTest-1.0.zip). Download, unzip and push these files into device for testing.
 
 ```
-adb push AmrwbDecoderTestRes/. /data/local/tmp/
+adb push AmrwbDecoderTest-1.0 /data/local/tmp/
 ```
 
 usage: AmrwbDecoderTest -P \<path_to_folder\>
 ```
-adb shell /data/local/tmp/AmrwbDecoderTest -P /data/local/tmp/AmrwbDecoderTestRes/
+adb shell /data/local/tmp/AmrwbDecoderTest -P /data/local/tmp/AmrwbDecoderTest-1.0/
 ```
 Alternatively, the test can also be run using atest command.
 

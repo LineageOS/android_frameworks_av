@@ -379,8 +379,8 @@ MP3Extractor::MP3Extractor(
             String8 commentdesc;
             String8 commentvalue;
             com->getString(&commentdesc, &commentvalue);
-            const char * desc = commentdesc.string();
-            const char * value = commentvalue.string();
+            const char * desc = commentdesc.c_str();
+            const char * value = commentvalue.c_str();
 
             // first 3 characters are the language, which we don't care about
             if(strlen(desc) > 3 && strcmp(desc + 3, "iTunSMPB") == 0) {
@@ -652,7 +652,7 @@ media_status_t MP3Extractor::getMetaData(AMediaFormat *meta) {
         it->getString(&s);
         delete it;
 
-        AMediaFormat_setString(meta, kMap[i].key, s.string());
+        AMediaFormat_setString(meta, kMap[i].key, s.c_str());
     }
 
     size_t dataSize;

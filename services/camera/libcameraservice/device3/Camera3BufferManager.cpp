@@ -18,10 +18,13 @@
 #define LOG_TAG "Camera3-BufferManager"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 
+#include <sstream>
+
 #include <gui/ISurfaceComposer.h>
 #include <private/gui/ComposerService.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
+#include <camera/StringUtils.h>
 #include "utils/CameraTraces.h"
 #include "Camera3BufferManager.h"
 
@@ -454,34 +457,36 @@ status_t Camera3BufferManager::onBuffersRemoved(int streamId, int streamSetId,
 void Camera3BufferManager::dump(int fd, [[maybe_unused]] const Vector<String16>& args) const {
     Mutex::Autolock l(mLock);
 
-    String8 lines;
-    lines.appendFormat("      Total stream sets: %zu\n", mStreamSetMap.size());
+    std::ostringstream lines;
+    lines << fmt::sprintf("      Total stream sets: %zu\n", mStreamSetMap.size());
     for (size_t i = 0; i < mStreamSetMap.size(); i++) {
-        lines.appendFormat("        Stream set %d(%d) has below streams:\n",
+        lines << fmt::sprintf("        Stream set %d(%d) has below streams:\n",
                 mStreamSetMap.keyAt(i).id, mStreamSetMap.keyAt(i).isMultiRes);
         for (size_t j = 0; j < mStreamSetMap[i].streamInfoMap.size(); j++) {
-            lines.appendFormat("          Stream %d\n", mStreamSetMap[i].streamInfoMap[j].streamId);
+            lines << fmt::sprintf("          Stream %d\n",
+                    mStreamSetMap[i].streamInfoMap[j].streamId);
         }
-        lines.appendFormat("          Stream set max allowed buffer count: %zu\n",
+        lines << fmt::sprintf("          Stream set max allowed buffer count: %zu\n",
                 mStreamSetMap[i].maxAllowedBufferCount);
-        lines.appendFormat("          Stream set buffer count water mark: %zu\n",
+        lines << fmt::sprintf("          Stream set buffer count water mark: %zu\n",
                 mStreamSetMap[i].allocatedBufferWaterMark);
-        lines.appendFormat("          Handout buffer counts:\n");
+        lines << "          Handout buffer counts:\n";
         for (size_t m = 0; m < mStreamSetMap[i].handoutBufferCountMap.size(); m++) {
             int streamId = mStreamSetMap[i].handoutBufferCountMap.keyAt(m);
             size_t bufferCount = mStreamSetMap[i].handoutBufferCountMap.valueAt(m);
-            lines.appendFormat("            stream id: %d, buffer count: %zu.\n",
+            lines << fmt::sprintf("            stream id: %d, buffer count: %zu.\n",
                     streamId, bufferCount);
         }
-        lines.appendFormat("          Attached buffer counts:\n");
+        lines << "          Attached buffer counts:\n";
         for (size_t m = 0; m < mStreamSetMap[i].attachedBufferCountMap.size(); m++) {
             int streamId = mStreamSetMap[i].attachedBufferCountMap.keyAt(m);
             size_t bufferCount = mStreamSetMap[i].attachedBufferCountMap.valueAt(m);
-            lines.appendFormat("            stream id: %d, attached buffer count: %zu.\n",
+            lines << fmt::sprintf("            stream id: %d, attached buffer count: %zu.\n",
                     streamId, bufferCount);
         }
     }
-    write(fd, lines.string(), lines.size());
+    std::string linesStr = std::move(lines.str());
+    write(fd, linesStr.c_str(), linesStr.size());
 }
 
 bool Camera3BufferManager::checkIfStreamRegisteredLocked(int streamId,

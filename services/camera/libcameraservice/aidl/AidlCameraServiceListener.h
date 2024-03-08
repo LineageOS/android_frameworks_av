@@ -45,25 +45,25 @@ class AidlCameraServiceListener : public UBnCameraServiceListener {
     ~AidlCameraServiceListener() = default;
 
     ::android::binder::Status onStatusChanged(int32_t status,
-            const ::android::String16& cameraId) override;
+            const std::string& cameraId) override;
     ::android::binder::Status onPhysicalCameraStatusChanged(int32_t status,
-            const ::android::String16& cameraId,
-            const ::android::String16& physicalCameraId) override;
+            const std::string& cameraId,
+            const std::string& physicalCameraId) override;
 
     ::android::binder::Status onTorchStatusChanged(
-            int32_t status, const ::android::String16& cameraId) override;
+            int32_t status, const std::string& cameraId) override;
     ::android::binder::Status onTorchStrengthLevelChanged(
-            const ::android::String16& cameraId, int32_t newStrengthLevel) override;
+            const std::string& cameraId, int32_t newStrengthLevel) override;
     binder::Status onCameraAccessPrioritiesChanged() override {
         // TODO: no implementation yet.
         return binder::Status::ok();
     }
-    binder::Status onCameraOpened(const ::android::String16& /*cameraId*/,
-            const ::android::String16& /*clientPackageId*/) override {
+    binder::Status onCameraOpened(const std::string& /*cameraId*/,
+            const std::string& /*clientPackageId*/) override {
         // empty implementation
         return binder::Status::ok();
     }
-    binder::Status onCameraClosed(const ::android::String16& /*cameraId*/) override {
+    binder::Status onCameraClosed(const std::string& /*cameraId*/) override {
         // empty implementation
         return binder::Status::ok();
     }

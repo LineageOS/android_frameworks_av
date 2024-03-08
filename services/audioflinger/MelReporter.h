@@ -15,15 +15,28 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
 
-#include <mutex>
+#include "IAfPatchPanel.h"
+#include "PatchCommandThread.h"
+
+#include <audio_utils/mutex.h>
 #include <sounddose/SoundDoseManager.h>
+
 #include <unordered_map>
 
+namespace android {
+
 constexpr static int kMaxTimestampDeltaInSec = 120;
+
+class IAfMelReporterCallback : public virtual RefBase {
+public:
+    virtual audio_utils::mutex& mutex() const
+            RETURN_CAPABILITY(audio_utils::AudioFlinger_Mutex) = 0;
+    virtual const sp<PatchCommandThread>& getPatchCommandThread() = 0;
+    virtual sp<IAfThreadBase> checkOutputThread_l(audio_io_handle_t ioHandle) const
+            REQUIRES(mutex()) = 0;
+};
 
 /**
  * Class for listening to new patches and starting the MEL computation. MelReporter is
@@ -32,8 +45,8 @@ constexpr static int kMaxTimestampDeltaInSec = 120;
 class MelReporter : public PatchCommandThread::PatchCommandListener,
                     public IMelReporterCallback {
 public:
-    explicit MelReporter(AudioFlinger& audioFlinger)
-        : mAudioFlinger(audioFlinger) {}
+    explicit MelReporter(const sp<IAfMelReporterCallback>& afMelReporterCallback)
+        : mAfMelReporterCallback(afMelReporterCallback) {}
 
     void onFirstRef() override;
 
@@ -51,7 +64,7 @@ public:
      * implementation, false otherwise.
      */
     bool activateHalSoundDoseComputation(const std::string& module,
-                                         const sp<DeviceHalInterface>& device);
+            const sp<DeviceHalInterface>& device) EXCLUDES_MelReporter_Mutex;
 
     /**
      * Activates the MEL reporting from internal framework values. These are used
@@ -59,20 +72,26 @@ public:
      * Note: the internal CSD computation does not guarantee a certification with
      * IEC62368-1 3rd edition or EN50332-3
      */
-    void activateInternalSoundDoseComputation();
+    void activateInternalSoundDoseComputation() EXCLUDES_MelReporter_Mutex;
 
     sp<media::ISoundDose> getSoundDoseInterface(const sp<media::ISoundDoseCallback>& callback);
 
     std::string dump();
 
     // IMelReporterCallback methods
-    void stopMelComputationForDeviceId(audio_port_handle_t deviceId) override;
-    void startMelComputationForDeviceId(audio_port_handle_t deviceId) override;
+    void stopMelComputationForDeviceId(audio_port_handle_t deviceId) final
+            EXCLUDES_MelReporter_Mutex;
+    void startMelComputationForDeviceId(audio_port_handle_t deviceId) final
+            EXCLUDES_MelReporter_Mutex;
 
     // PatchCommandListener methods
     void onCreateAudioPatch(audio_patch_handle_t handle,
-                            const PatchPanel::Patch& patch) override;
-    void onReleaseAudioPatch(audio_patch_handle_t handle) override;
+            const IAfPatchPanel::Patch& patch) final
+            EXCLUDES_AudioFlinger_Mutex;
+    void onReleaseAudioPatch(audio_patch_handle_t handle) final EXCLUDES_AudioFlinger_Mutex;
+    void onUpdateAudioPatch(audio_patch_handle_t oldHandle,
+                            audio_patch_handle_t newHandle,
+            const IAfPatchPanel::Patch& patch) final EXCLUDES_AudioFlinger_Mutex;
 
     /**
      * The new metadata can determine whether we should compute MEL for the given thread.
@@ -80,7 +99,9 @@ public:
      * Otherwise, this method will disable CSD.
      **/
     void updateMetadataForCsd(audio_io_handle_t streamHandle,
-                              const std::vector<playback_track_metadata_v7_t>& metadataVec);
+            const std::vector<playback_track_metadata_v7_t>& metadataVec)
+            EXCLUDES_AudioFlinger_Mutex;
+
 private:
     struct ActiveMelPatch {
         audio_io_handle_t streamHandle{AUDIO_IO_HANDLE_NONE};
@@ -94,30 +115,34 @@ private:
     };
 
     void stopInternalMelComputation();
+    audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::MelReporter_Mutex) {
+        return mMutex;
+    }
 
-    /** Should be called with the following order of locks: mAudioFlinger.mLock -> mLock. */
-    void stopMelComputationForPatch_l(const ActiveMelPatch& patch) REQUIRES(mLock);
+    /** Should be called with the following order of locks: mAudioFlinger.mutex() -> mutex(). */
+    void stopMelComputationForPatch_l(const ActiveMelPatch& patch) REQUIRES(mutex());
 
-    /** Should be called with the following order of locks: mAudioFlinger.mLock -> mLock. */
-    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch) REQUIRES(mLock);
+    /** Should be called with the following order of locks: mAudioFlinger.mutex() -> mutex(). */
+    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch) REQUIRES(mutex());
 
     std::optional<audio_patch_handle_t>
-    activePatchStreamHandle_l(audio_io_handle_t streamHandle) REQUIRES(mLock);
+    activePatchStreamHandle_l(audio_io_handle_t streamHandle) REQUIRES(mutex());
 
-    bool useHalSoundDoseInterface_l() REQUIRES(mLock);
+    bool useHalSoundDoseInterface_l() REQUIRES(mutex());
 
-    AudioFlinger& mAudioFlinger;  // does not own the object
+    const sp<IAfMelReporterCallback> mAfMelReporterCallback;
 
-    sp<SoundDoseManager> mSoundDoseManager;
+    /* const */ sp<SoundDoseManager> mSoundDoseManager;  // set onFirstRef
 
     /**
      * Lock for protecting the active mel patches. Do not mix with the AudioFlinger lock.
-     * Locking order AudioFlinger::mLock -> PatchCommandThread::mLock -> MelReporter::mLock.
+     * Locking order AudioFlinger::mutex() -> PatchCommandThread::mutex() -> MelReporter::mutex().
      */
-    std::mutex mLock;
-    std::unordered_map<audio_patch_handle_t, ActiveMelPatch>
-        mActiveMelPatches GUARDED_BY(AudioFlinger::MelReporter::mLock);
-    std::unordered_map<audio_port_handle_t, int>
-        mActiveDevices GUARDED_BY(AudioFlinger::MelReporter::mLock);
-    bool mUseHalSoundDoseInterface GUARDED_BY(AudioFlinger::MelReporter::mLock) = false;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kMelReporter_Mutex};
+    std::unordered_map<audio_patch_handle_t, ActiveMelPatch> mActiveMelPatches
+            GUARDED_BY(mutex());
+    std::unordered_map<audio_port_handle_t, int> mActiveDevices GUARDED_BY(mutex());
+    bool mUseHalSoundDoseInterface GUARDED_BY(mutex()) = false;
 };
+
+}  // namespace android

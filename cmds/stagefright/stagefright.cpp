@@ -106,6 +106,12 @@ static void displayDecodeHistogram(Vector<int64_t> *decodeTimesUs) {
     decodeTimesUs->sort(CompareIncreasing);
 
     size_t n = decodeTimesUs->size();
+
+    if (n == 0) {
+        printf("no decode histogram to display\n");
+        return;
+    }
+
     int64_t minUs = decodeTimesUs->itemAt(0);
     int64_t maxUs = decodeTimesUs->itemAt(n - 1);
 
@@ -149,7 +155,7 @@ static void displayAVCProfileLevelIfPossible(const sp<MetaData>& meta) {
 }
 
 static void dumpSource(const sp<MediaSource> &source, const String8 &filename) {
-    FILE *out = fopen(filename.string(), "wb");
+    FILE *out = fopen(filename.c_str(), "wb");
 
     CHECK_EQ((status_t)OK, source->start());
 
@@ -206,8 +212,8 @@ static void playSource(sp<MediaSource> &source) {
         }
         rawSource = SimpleDecodingSource::Create(
                 source, flags, gSurface,
-                gComponentNameOverride.isEmpty() ? nullptr : gComponentNameOverride.c_str(),
-                !gComponentNameOverride.isEmpty());
+                gComponentNameOverride.empty() ? nullptr : gComponentNameOverride.c_str(),
+                !gComponentNameOverride.empty());
         if (rawSource == NULL) {
             return;
         }
@@ -532,9 +538,9 @@ static void writeSourcesToMP4(
         Vector<sp<MediaSource> > &sources, bool syncInfoPresent) {
 #if 0
     sp<MPEG4Writer> writer =
-        new MPEG4Writer(gWriteMP4Filename.string());
+        new MPEG4Writer(gWriteMP4Filename.c_str());
 #else
-    int fd = open(gWriteMP4Filename.string(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    int fd = open(gWriteMP4Filename.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
     if (fd < 0) {
         fprintf(stderr, "couldn't open file");
         return;
@@ -749,7 +755,8 @@ static void dumpCodecDetails(bool queryDecoders) {
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP8)   ? asString_VP8Profile(pl.mProfile) :
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_HEVC)  ? asString_HEVCProfile(pl.mProfile) :
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP9)   ? asString_VP9Profile(pl.mProfile) :
-                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AV1)   ? asString_AV1Profile(pl.mProfile) :"??";
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AV1)   ? asString_AV1Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_DOLBY_VISION) ? asString_DolbyVisionProfile(pl.mProfile) :"??";
                     const char *niceLevel =
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG2) ? asString_MPEG2Level(pl.mLevel) :
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_H263)  ? asString_H263Level(pl.mLevel) :
@@ -759,6 +766,7 @@ static void dumpCodecDetails(bool queryDecoders) {
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_HEVC)  ? asString_HEVCTierLevel(pl.mLevel) :
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP9)   ? asString_VP9Level(pl.mLevel) :
                         mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AV1)   ? asString_AV1Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_DOLBY_VISION) ? asString_DolbyVisionLevel(pl.mLevel) :
                         "??";
 
                     list.add(AStringPrintf("% 5u/% 5u (%s/%s)",
@@ -826,7 +834,7 @@ int main(int argc, char **argv) {
             case 'd':
             {
                 dumpStream = true;
-                dumpStreamFilename.setTo(optarg);
+                dumpStreamFilename = optarg;
                 break;
             }
 
@@ -834,13 +842,13 @@ int main(int argc, char **argv) {
             {
                 dumpPCMStream = true;
                 audioOnly = true;
-                dumpStreamFilename.setTo(optarg);
+                dumpStreamFilename = optarg;
                 break;
             }
 
             case 'N':
             {
-                gComponentNameOverride.setTo(optarg);
+                gComponentNameOverride = optarg;
                 break;
             }
 
@@ -878,7 +886,7 @@ int main(int argc, char **argv) {
             case 'w':
             {
                 gWriteMP4 = true;
-                gWriteMP4Filename.setTo(optarg);
+                gWriteMP4Filename = optarg;
                 break;
             }
 

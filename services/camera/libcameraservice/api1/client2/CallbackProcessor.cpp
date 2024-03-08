@@ -158,7 +158,7 @@ status_t CallbackProcessor::updateStream(const Parameters &params) {
         res = device->createStream(mCallbackWindow,
                 params.previewWidth, params.previewHeight, callbackFormat,
                 HAL_DATASPACE_V0_JFIF, CAMERA_STREAM_ROTATION_0, &mCallbackStreamId,
-                String8(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
+                std::string(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for callbacks: "
                     "%s (%d)", __FUNCTION__, mId,

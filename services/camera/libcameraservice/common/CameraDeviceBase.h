@@ -20,7 +20,6 @@
 #include <list>
 
 #include <utils/RefBase.h>
-#include <utils/String8.h>
 #include <utils/String16.h>
 #include <utils/Vector.h>
 #include <utils/KeyedVector.h>
@@ -36,23 +35,13 @@
 #include "binder/Status.h"
 #include "FrameProducer.h"
 #include "utils/IPCTransport.h"
+#include "utils/SessionConfigurationUtils.h"
 
 #include "CameraOfflineSessionBase.h"
 
 namespace android {
 
 namespace camera3 {
-
-typedef enum camera_request_template {
-    CAMERA_TEMPLATE_PREVIEW = 1,
-    CAMERA_TEMPLATE_STILL_CAPTURE = 2,
-    CAMERA_TEMPLATE_VIDEO_RECORD = 3,
-    CAMERA_TEMPLATE_VIDEO_SNAPSHOT = 4,
-    CAMERA_TEMPLATE_ZERO_SHUTTER_LAG = 5,
-    CAMERA_TEMPLATE_MANUAL = 6,
-    CAMERA_TEMPLATE_COUNT,
-    CAMERA_VENDOR_TEMPLATE_START = 0x40000000
-} camera_request_template_t;
 
 typedef enum camera_stream_configuration_mode {
     CAMERA_STREAM_CONFIGURATION_NORMAL_MODE = 0,
@@ -99,11 +88,12 @@ class CameraDeviceBase : public virtual FrameProducer {
      */
     virtual metadata_vendor_id_t getVendorTagId() const = 0;
 
-    virtual status_t initialize(sp<CameraProviderManager> manager, const String8& monitorTags) = 0;
+    virtual status_t initialize(sp<CameraProviderManager> manager,
+            const std::string& monitorTags) = 0;
     virtual status_t disconnect() = 0;
 
     virtual status_t dump(int fd, const Vector<String16> &args) = 0;
-    virtual status_t startWatchingTags(const String8 &tags) = 0;
+    virtual status_t startWatchingTags(const std::string &tags) = 0;
     virtual status_t stopWatchingTags() = 0;
     virtual status_t dumpWatchedEventsToVector(std::vector<std::string> &out) = 0;
 
@@ -111,7 +101,7 @@ class CameraDeviceBase : public virtual FrameProducer {
      * The physical camera device's static characteristics metadata buffer, or
      * the logical camera's static characteristics if physical id is empty.
      */
-    virtual const CameraMetadata& infoPhysical(const String8& physicalId) const = 0;
+    virtual const CameraMetadata& infoPhysical(const std::string& physicalId) const = 0;
 
     virtual bool isCompositeJpegRDisabled() const { return false; };
 
@@ -188,7 +178,7 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
-            const String8& physicalCameraId,
+            const std::string& physicalCameraId,
             const std::unordered_set<int32_t>  &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
@@ -212,7 +202,7 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
-            const String8& physicalCameraId,
+            const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
@@ -511,13 +501,17 @@ class CameraDeviceBase : public virtual FrameProducer {
      * The injection camera session to replace the internal camera
      * session.
      */
-    virtual status_t injectCamera(const String8& injectedCamId,
+    virtual status_t injectCamera(const std::string& injectedCamId,
             sp<CameraProviderManager> manager) = 0;
 
     /**
      * Stop the injection camera and restore to internal camera session.
      */
     virtual status_t stopInjection() = 0;
+
+    // Inject session parameters into an existing client.
+    virtual status_t injectSessionParams(
+        const CameraMetadata& sessionParams) = 0;
 
     /**
      * Set whether camera client is privileged or not

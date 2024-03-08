@@ -18,7 +18,6 @@
 #define ANDROID_SERVERS_CAMERA_TRACES_H_
 
 #include <utils/Errors.h>
-#include <utils/String16.h>
 #include <utils/Vector.h>
 
 namespace android {

@@ -22,20 +22,18 @@
 #include <set>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include <aidl/android/media/BnResourceManagerService.h>
-#include <arpa/inet.h>
 #include <media/MediaResource.h>
 #include <utils/Errors.h>
-#include <utils/KeyedVector.h>
 #include <utils/String8.h>
 #include <utils/threads.h>
-#include <utils/Vector.h>
+
+#include "ResourceManagerServiceUtils.h"
 
 namespace android {
 
-class DeathNotifier;
-class ResourceManagerService;
 class ResourceObserverService;
 class ServiceLog;
 struct ProcessInfoInterface;
@@ -49,27 +47,6 @@ using ::aidl::android::media::MediaResourcePolicyParcel;
 using ::aidl::android::media::ClientInfoParcel;
 using ::aidl::android::media::ClientConfigParcel;
 
-typedef std::map<std::tuple<
-        MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>,
-        MediaResourceParcel> ResourceList;
-
-struct ResourceInfo {
-    uid_t uid;
-    int64_t clientId;
-    std::string name;
-    std::shared_ptr<IResourceManagerClient> client;
-    uintptr_t cookie{0};
-    ResourceList resources;
-    bool pendingRemoval{false};
-};
-
-// vector of <PID, UID>
-typedef std::vector<std::pair<int32_t, uid_t>> PidUidVector;
-
-// TODO: convert these to std::map
-typedef KeyedVector<int64_t, ResourceInfo> ResourceInfos;
-typedef KeyedVector<int, ResourceInfos> PidResourceInfosMap;
-
 class ResourceManagerService : public BnResourceManagerService {
 public:
     struct SystemCallbackInterface : public RefBase {
@@ -82,13 +59,20 @@ public:
     static char const *getServiceName() { return "media.resource_manager"; }
     static void instantiate();
 
-    virtual inline binder_status_t dump(
+        // Static creation methods.
+    static std::shared_ptr<ResourceManagerService> Create();
+    static std::shared_ptr<ResourceManagerService> Create(
+        const sp<ProcessInfoInterface>& processInfo,
+        const sp<SystemCallbackInterface>& systemResource);
+
+    virtual binder_status_t dump(
             int /*fd*/, const char** /*args*/, uint32_t /*numArgs*/);
 
     ResourceManagerService();
     explicit ResourceManagerService(const sp<ProcessInfoInterface> &processInfo,
             const sp<SystemCallbackInterface> &systemResource);
     virtual ~ResourceManagerService();
+
     void setObserverService(const std::shared_ptr<ResourceObserverService>& observerService);
 
     // IResourceManagerService interface
@@ -131,56 +115,50 @@ public:
 
 private:
     friend class ResourceManagerServiceTest;
+    friend class ResourceManagerServiceTestBase;
     friend class DeathNotifier;
     friend class OverrideProcessInfoDeathNotifier;
 
     // Reclaims resources from |clients|. Returns true if reclaim succeeded
     // for all clients.
-    bool reclaimUnconditionallyFrom(const Vector<std::shared_ptr<IResourceManagerClient>> &clients);
+    bool reclaimUnconditionallyFrom(
+        const std::vector<ClientInfo>& targetClients);
 
     // Gets the list of all the clients who own the specified resource type.
     // Returns false if any client belongs to a process with higher priority than the
     // calling process. The clients will remain unchanged if returns false.
-    bool getAllClients_l(int callingPid, MediaResource::Type type, MediaResource::SubType subType,
-            PidUidVector* idList,
-            Vector<std::shared_ptr<IResourceManagerClient>> *clients);
+    bool getAllClients_l(const ResourceRequestInfo& resourceRequestInfo,
+                         std::vector<ClientInfo>& clientsInfo);
 
     // Gets the client who owns specified resource type from lowest possible priority process.
     // Returns false if the calling process priority is not higher than the lowest process
     // priority. The client will remain unchanged if returns false.
-    bool getLowestPriorityBiggestClient_l(int callingPid, MediaResource::Type type,
-            MediaResource::SubType subType, PidUidVector* idList,
-            std::shared_ptr<IResourceManagerClient> *client);
-
-    // Gets lowest priority process that has the specified resource type.
-    // Returns false if failed. The output parameters will remain unchanged if failed.
-    bool getLowestPriorityPid_l(MediaResource::Type type, MediaResource::SubType subType, int *pid,
-                int *priority);
+    bool getLowestPriorityBiggestClient_l(
+        const ResourceRequestInfo& resourceRequestInfo,
+        ClientInfo& clientInfo);
 
     // Gets the client who owns biggest piece of specified resource type from pid.
-    // Returns false with no change to client if there are no clients holdiing resources of thisi
+    // Returns false with no change to client if there are no clients holding resources of this
     // type.
     bool getBiggestClient_l(int pid, MediaResource::Type type, MediaResource::SubType subType,
-            uid_t& uid, std::shared_ptr<IResourceManagerClient> *client,
-            bool pendingRemovalOnly = false);
+                            ClientInfo& clientsInfo,
+                            bool pendingRemovalOnly = false);
     // Same method as above, but with pendingRemovalOnly as true.
     bool getBiggestClientPendingRemoval_l(int pid, MediaResource::Type type,
-            MediaResource::SubType subType, uid_t& uid,
-            std::shared_ptr<IResourceManagerClient> *client);
+                                          MediaResource::SubType subType,
+                                          ClientInfo& clientsInfo);
 
+    // A helper function that returns true if the callingPid has higher priority than pid.
+    // Returns false otherwise.
     bool isCallingPriorityHigher_l(int callingPid, int pid);
 
-    // A helper function basically calls getLowestPriorityBiggestClient_l and add
+    // A helper function basically calls getLowestPriorityBiggestClient_l and adds
     // the result client to the given Vector.
-    void getClientForResource_l(int callingPid, const MediaResourceParcel *res,
-            PidUidVector* idList,
-            Vector<std::shared_ptr<IResourceManagerClient>> *clients);
+    void getClientForResource_l(const ResourceRequestInfo& resourceRequestInfo,
+                                std::vector<ClientInfo>& clientsInfo);
 
-    void onFirstAdded(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
-    void onLastRemoved(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
-
-    // Merge r2 into r1
-    void mergeResources(MediaResourceParcel& r1, const MediaResourceParcel& r2);
+    void onFirstAdded(const MediaResourceParcel& res, uid_t uid);
+    void onLastRemoved(const MediaResourceParcel& res, uid_t uid);
 
     // Get priority from process's pid
     bool getPriority_l(int pid, int* priority);
@@ -188,21 +166,28 @@ private:
     void removeProcessInfoOverride(int pid);
 
     void removeProcessInfoOverride_l(int pid);
-    uintptr_t addCookieAndLink_l(const std::shared_ptr<IResourceManagerClient>& client,
-                                 const sp<DeathNotifier>& notifier);
-    void removeCookieAndUnlink_l(const std::shared_ptr<IResourceManagerClient>& client,
-                                 uintptr_t cookie);
 
     void pushReclaimAtom(const ClientInfoParcel& clientInfo,
-                         const Vector<std::shared_ptr<IResourceManagerClient>>& clients,
-                         const PidUidVector& idList, bool reclaimed);
+                         const std::vector<ClientInfo>& targetClients,
+                         bool reclaimed);
 
+    // Get the client for given pid and the clientId from the map
+    std::shared_ptr<IResourceManagerClient> getClient(int pid, const int64_t& clientId) const;
+
+    // Remove the client for given pid and the clientId from the map
+    bool removeClient(int pid, const int64_t& clientId);
+
+    // The following utility functions are used only for testing by ResourceManagerServiceTest
+    // Gets lowest priority process that has the specified resource type.
+    // Returns false if failed. The output parameters will remain unchanged if failed.
+    bool getLowestPriorityPid_l(MediaResource::Type type, MediaResource::SubType subType,
+                                int* lowestPriorityPid, int* lowestPriority);
     // Get the peak concurrent pixel count (associated with the video codecs) for the process.
     long getPeakConcurrentPixelCount(int pid) const;
     // Get the current concurrent pixel count (associated with the video codecs) for the process.
     long getCurrentConcurrentPixelCount(int pid) const;
 
-    mutable Mutex mLock;
+    mutable std::mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
     sp<SystemCallbackInterface> mSystemCB;
     sp<ServiceLog> mServiceLog;
@@ -210,17 +195,12 @@ private:
     bool mSupportsMultipleSecureCodecs;
     bool mSupportsSecureWithNonSecureCodec;
     int32_t mCpuBoostCount;
-    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
     struct ProcessInfoOverride {
-        uintptr_t cookie;
+        std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
         std::shared_ptr<IResourceManagerClient> client;
     };
     std::map<int, int> mOverridePidMap;
     std::map<pid_t, ProcessInfoOverride> mProcessInfoOverrideMap;
-    static std::mutex sCookieLock;
-    static uintptr_t sCookieCounter GUARDED_BY(sCookieLock);
-    static std::map<uintptr_t, sp<DeathNotifier> > sCookieToDeathNotifierMap
-            GUARDED_BY(sCookieLock);
     std::shared_ptr<ResourceObserverService> mObserverService;
     std::unique_ptr<ResourceManagerMetrics> mResourceManagerMetrics;
 };

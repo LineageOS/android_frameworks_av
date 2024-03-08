@@ -122,7 +122,19 @@ public:
     // ------------------------------
 
     // Configure the buffer source to be used with a component with the default
-    // data space.
+    // data space. (32-bit consumerUsage flag, for vendor partition
+    // compatibility)
+    [[deprecated("use configure() with a 64-bit consumerUsage flag instead")]]
+    status_t configure(
+        const sp<ComponentWrapper> &component,
+        int32_t dataSpace,
+        int32_t bufferCount,
+        uint32_t frameWidth,
+        uint32_t frameHeight,
+        uint32_t consumerUsage);
+
+    // Configure the buffer source to be used with a component with the default
+    // data space. (64-bit consumerUsage flag)
     status_t configure(
         const sp<ComponentWrapper> &component,
         int32_t dataSpace,

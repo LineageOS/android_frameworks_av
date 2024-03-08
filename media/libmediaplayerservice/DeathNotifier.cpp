@@ -31,6 +31,10 @@ public:
     DeathRecipient(Notify const& notify): mNotify{notify} {
     }
 
+    void initNdk() {
+        mNdkRecipient.set(AIBinder_DeathRecipient_new(OnBinderDied));
+    }
+
     virtual void binderDied(wp<IBinder> const&) override {
         mNotify();
     }
@@ -39,8 +43,18 @@ public:
         mNotify();
     }
 
+    static void OnBinderDied(void *cookie) {
+        DeathRecipient *thiz = (DeathRecipient *)cookie;
+        thiz->mNotify();
+    }
+
+    AIBinder_DeathRecipient *getNdkRecipient() {
+        return mNdkRecipient.get();;
+    }
+
 private:
     Notify mNotify;
+    ::ndk::ScopedAIBinder_DeathRecipient mNdkRecipient;
 };
 
 DeathNotifier::DeathNotifier(sp<IBinder> const& service, Notify const& notify)
@@ -53,6 +67,14 @@ DeathNotifier::DeathNotifier(sp<HBase> const& service, Notify const& notify)
       : mService{std::in_place_index<2>, service},
         mDeathRecipient{new DeathRecipient(notify)} {
     service->linkToDeath(mDeathRecipient, 0);
+}
+
+DeathNotifier::DeathNotifier(::ndk::SpAIBinder const& service, Notify const& notify)
+      : mService{std::in_place_index<3>, service},
+        mDeathRecipient{new DeathRecipient(notify)} {
+    mDeathRecipient->initNdk();
+    AIBinder_linkToDeath(
+            service.get(), mDeathRecipient->getNdkRecipient(), mDeathRecipient.get());
 }
 
 DeathNotifier::DeathNotifier(DeathNotifier&& other)
@@ -70,6 +92,12 @@ DeathNotifier::~DeathNotifier() {
         break;
     case 2:
         std::get<2>(mService)->unlinkToDeath(mDeathRecipient);
+        break;
+    case 3:
+        AIBinder_unlinkToDeath(
+                std::get<3>(mService).get(),
+                mDeathRecipient->getNdkRecipient(),
+                mDeathRecipient.get());
         break;
     default:
         CHECK(false) << "Corrupted service type during destruction.";

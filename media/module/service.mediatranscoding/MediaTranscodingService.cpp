@@ -110,7 +110,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
                     "Permission Denial: "
                     "can't dump MediaTranscodingService from pid=%d, uid=%d\n",
                     AIBinder_getCallingPid(), AIBinder_getCallingUid());
-            write(fd, result.string(), result.size());
+            write(fd, result.c_str(), result.size());
             return PERMISSION_DENIED;
         }
     }
@@ -120,7 +120,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 
     snprintf(buffer, SIZE, "MediaTranscodingService: %p\n", this);
     result.append(buffer);
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
 
     Vector<String16> args;
     mClientManager->dumpAllClients(fd, args);

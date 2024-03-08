@@ -17,6 +17,7 @@
 #include <MtpDataPacket.h>
 #include <MtpDevHandle.h>
 #include <MtpPacketFuzzerUtils.h>
+#include <functional>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <utils/String16.h>
 
@@ -212,7 +213,7 @@ void MtpDataPacketFuzzer::process() {
                     if (mFdp.ConsumeBool()) {
                         std::string str = mFdp.ConsumeRandomLengthString(kMaxLength);
                         android::String16 s(str.c_str());
-                        char16_t* data = const_cast<char16_t*>(s.string());
+                        char16_t* data = const_cast<char16_t*>(s.c_str());
                         mtpDataPacket.putString(reinterpret_cast<uint16_t*>(data));
                     } else {
                         mtpDataPacket.putString(static_cast<uint16_t*>(nullptr));

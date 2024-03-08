@@ -17,7 +17,8 @@ license {
     ],
 }
 
-cc_library {
+filegroup {
+    name: "libmediaplayerservice_sources",
 
     srcs: [
         "ActivityManager.cpp",
@@ -32,6 +33,14 @@ cc_library {
         "StagefrightRecorder.cpp",
         "TestPlayerStub.cpp",
     ],
+}
+
+cc_defaults {
+    name: "libmediaplayerservice_defaults",
+
+    srcs: [
+        ":libmediaplayerservice_sources",
+    ],
 
     shared_libs: [
         "android.hardware.media.c2@1.0",
@@ -40,6 +49,7 @@ cc_library {
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libbase",
+        "libbinder_ndk",
         "libactivitymanager_aidl",
         "libandroid_net",
         "libaudioclient",
@@ -86,6 +96,24 @@ cc_library {
         "framework-permission-aidl-cpp",
     ],
 
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        cfi: true,
+    },
+}
+
+cc_library {
+    name: "libmediaplayerservice",
+
+    defaults: [
+        "libmediaplayerservice_defaults",
+    ],
+
     export_shared_lib_headers: [
         "libmedia",
         "framework-permission-aidl-cpp",
@@ -99,22 +127,9 @@ cc_library {
         "frameworks/av/media/libstagefright/wifi-display",
     ],
 
-    local_include_dirs: ["include"],
-
     export_include_dirs: [
         ".",
     ],
 
-    cflags: [
-        "-Werror",
-        "-Wno-error=deprecated-declarations",
-        "-Wall",
-    ],
-
-    name: "libmediaplayerservice",
-
-    sanitize: {
-        cfi: true,
-    },
-
+    local_include_dirs: ["include"],
 }

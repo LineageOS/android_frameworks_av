@@ -37,6 +37,8 @@
 #include "FwdLockGlue.h"
 #include "MimeTypeUtil.h"
 
+#include <filesystem>
+
 #undef LOG_TAG
 #define LOG_TAG "FwdLockEngine"
 
@@ -227,7 +229,7 @@ DrmSupportInfo* FwdLockEngine::onGetSupportInfo(int /* uniqueId */) {
 bool FwdLockEngine::onCanHandle(int /* uniqueId */, const String8& path) {
     bool result = false;
 
-    String8 extString = path.getPathExtension();
+    String8 extString(std::filesystem::path(path.c_str()).extension().c_str());
     return IsFileSuffixSupported(extString);
 }
 
@@ -544,7 +546,7 @@ status_t FwdLockEngine::onOpenDecryptSession(int uniqueId,
         String8 uriTag = String8(uri);
         uriTag.toLower();
 
-        if (0 == strncmp(uriTag.string(), fileTag, sizeof(fileTag) - 1)) {
+        if (0 == strncmp(uriTag.c_str(), fileTag, sizeof(fileTag) - 1)) {
             const char *filePath = strchr(uri + sizeof(fileTag) - 1, '/');
             if (NULL != filePath && onCanHandle(uniqueId, String8(filePath))) {
                 int fd = open(filePath, O_RDONLY);

@@ -15,11 +15,16 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
 
-#include <math.h>
+#include "TrackBase.h"
+
+#include <android/os/BnExternalVibrationController.h>
+#include <audio_utils/mutex.h>
+#include <audio_utils/LinearMap.h>
+#include <binder/AppOpsManager.h>
+
+namespace android {
 
 // Checks and monitors OP_PLAY_AUDIO
 class OpPlayAudioMonitor : public RefBase {
@@ -29,13 +34,13 @@ public:
     bool hasOpPlayAudio() const;
 
     static sp<OpPlayAudioMonitor> createIfNeeded(
-            AudioFlinger::ThreadBase* thread,
+            IAfThreadBase* thread,
             const AttributionSourceState& attributionSource,
             const audio_attributes_t& attr, int id,
             audio_stream_type_t streamType);
 
 private:
-    OpPlayAudioMonitor(AudioFlinger::ThreadBase* thread,
+    OpPlayAudioMonitor(IAfThreadBase* thread,
                        const AttributionSourceState& attributionSource,
                        audio_usage_t usage, int id, uid_t uid);
     void onFirstRef() override;
@@ -56,19 +61,19 @@ private:
     // called by PlayAudioOpCallback when OP_PLAY_AUDIO is updated in AppOp callback
     void checkPlayAudioForUsage(bool doBroadcast);
 
-    wp<AudioFlinger::ThreadBase> mThread;
+    wp<IAfThreadBase> mThread;
     std::atomic_bool mHasOpPlayAudio;
-    const AttributionSourceState mAttributionSource;
-    const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
+    const int32_t mUsage;  // on purpose not audio_usage_t because always checked in appOps as
+                           // int32_t
     const int mId; // for logging purposes only
     const uid_t mUid;
     const String16 mPackageName;
 };
 
 // playback track
-class Track : public TrackBase, public VolumeProvider {
+class Track : public TrackBase, public virtual IAfTrack, public VolumeProvider {
 public:
-                        Track(  PlaybackThread *thread,
+    Track(IAfPlaybackThread* thread,
                                 const sp<Client>& client,
                                 audio_stream_type_t streamType,
                                 const audio_attributes_t& attr,
@@ -91,72 +96,66 @@ public:
                                 float speed = 1.0f,
                                 bool isSpatialized = false,
                                 bool isBitPerfect = false);
-    virtual             ~Track();
-    virtual status_t    initCheck() const;
-
-            void        appendDumpHeader(String8& result);
-            void        appendDump(String8& result, bool active);
-    virtual status_t    start(AudioSystem::sync_event_t event = AudioSystem::SYNC_EVENT_NONE,
-                              audio_session_t triggerSession = AUDIO_SESSION_NONE);
-    virtual void        stop();
-            void        pause();
-
-            void        flush();
-            void        destroy();
-
-    virtual uint32_t    sampleRate() const;
-
-            audio_stream_type_t streamType() const {
+    ~Track() override;
+    status_t initCheck() const final;
+    void appendDumpHeader(String8& result) const final;
+    void appendDump(String8& result, bool active) const final;
+    status_t start(AudioSystem::sync_event_t event = AudioSystem::SYNC_EVENT_NONE,
+            audio_session_t triggerSession = AUDIO_SESSION_NONE) override;
+    void stop() override;
+    void pause() final;
+    void flush() final;
+    void destroy() final;
+    uint32_t sampleRate() const final;
+    audio_stream_type_t streamType() const final {
                 return mStreamType;
             }
-            bool        isOffloaded() const
+    bool isOffloaded() const final
                                 { return (mFlags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0; }
-            bool        isDirect() const override
+    bool isDirect() const final
                                 { return (mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0; }
-            bool        isOffloadedOrDirect() const { return (mFlags
+    bool isOffloadedOrDirect() const final { return (mFlags
                             & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
                                     | AUDIO_OUTPUT_FLAG_DIRECT)) != 0; }
-            bool        isStatic() const { return  mSharedBuffer.get() != nullptr; }
+    bool isStatic() const final { return  mSharedBuffer.get() != nullptr; }
 
-            status_t    setParameters(const String8& keyValuePairs);
-            status_t    selectPresentation(int presentationId, int programId);
-            status_t    attachAuxEffect(int EffectId);
-            void        setAuxBuffer(int EffectId, int32_t *buffer);
-            int32_t     *auxBuffer() const { return mAuxBuffer; }
-            void        setMainBuffer(effect_buffer_t *buffer) { mMainBuffer = buffer; }
-            effect_buffer_t *mainBuffer() const { return mMainBuffer; }
-            int         auxEffectId() const { return mAuxEffectId; }
-    virtual status_t    getTimestamp(AudioTimestamp& timestamp);
-            void        signal();
-            status_t    getDualMonoMode(audio_dual_mono_mode_t* mode);
-            status_t    setDualMonoMode(audio_dual_mono_mode_t mode);
-            status_t    getAudioDescriptionMixLevel(float* leveldB);
-            status_t    setAudioDescriptionMixLevel(float leveldB);
-            status_t    getPlaybackRateParameters(audio_playback_rate_t* playbackRate);
-            status_t    setPlaybackRateParameters(const audio_playback_rate_t& playbackRate);
+    status_t setParameters(const String8& keyValuePairs) final;
+    status_t selectPresentation(int presentationId, int programId) final;
+    status_t attachAuxEffect(int EffectId) final;
+    void setAuxBuffer(int EffectId, int32_t* buffer) final;
+    int32_t* auxBuffer() const final { return mAuxBuffer; }
+    void setMainBuffer(float* buffer) final { mMainBuffer = buffer; }
+    float* mainBuffer() const final { return mMainBuffer; }
+    int auxEffectId() const final { return mAuxEffectId; }
+    status_t getTimestamp(AudioTimestamp& timestamp) final;
+    void signal() final;
+    status_t getDualMonoMode(audio_dual_mono_mode_t* mode) const final;
+    status_t setDualMonoMode(audio_dual_mono_mode_t mode) final;
+    status_t getAudioDescriptionMixLevel(float* leveldB) const final;
+    status_t setAudioDescriptionMixLevel(float leveldB) final;
+    status_t getPlaybackRateParameters(audio_playback_rate_t* playbackRate) const final;
+    status_t setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) final;
 
-// implement FastMixerState::VolumeProvider interface
-    virtual gain_minifloat_packed_t getVolumeLR();
+    // implement FastMixerState::VolumeProvider interface
+    gain_minifloat_packed_t getVolumeLR() const final;
 
-    virtual status_t    setSyncEvent(const sp<SyncEvent>& event);
-
-    virtual bool        isFastTrack() const { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
-
-            double      bufferLatencyMs() const override {
+    status_t setSyncEvent(const sp<audioflinger::SyncEvent>& event) final;
+    bool isFastTrack() const final { return (mFlags & AUDIO_OUTPUT_FLAG_FAST) != 0; }
+    double bufferLatencyMs() const final {
                             return isStatic() ? 0. : TrackBase::bufferLatencyMs();
                         }
 
-// implement volume handling.
+    // implement volume handling.
     media::VolumeShaper::Status applyVolumeShaper(
                                 const sp<media::VolumeShaper::Configuration>& configuration,
                                 const sp<media::VolumeShaper::Operation>& operation);
-    sp<media::VolumeShaper::State> getVolumeShaperState(int id);
-    sp<media::VolumeHandler>   getVolumeHandler() { return mVolumeHandler; }
+    sp<media::VolumeShaper::State> getVolumeShaperState(int id) const final;
+    sp<media::VolumeHandler> getVolumeHandler() const final{ return mVolumeHandler; }
     /** Set the computed normalized final volume of the track.
      * !masterMute * masterVolume * streamVolume * averageLRVolume */
-    void                setFinalVolume(float volumeLeft, float volumeRight);
-    float               getFinalVolume() const { return mFinalVolume; }
-    void                getFinalVolume(float* left, float* right) const {
+    void setFinalVolume(float volumeLeft, float volumeRight) final;
+    float getFinalVolume() const final { return mFinalVolume; }
+    void getFinalVolume(float* left, float* right) const final {
                             *left = mFinalVolumeLeft;
                             *right = mFinalVolumeRight;
     }
@@ -164,21 +163,22 @@ public:
     using SourceMetadatas = std::vector<playback_track_metadata_v7_t>;
     using MetadataInserter = std::back_insert_iterator<SourceMetadatas>;
     /** Copy the track metadata in the provided iterator. Thread safe. */
-    virtual void    copyMetadataTo(MetadataInserter& backInserter) const;
+    void copyMetadataTo(MetadataInserter& backInserter) const override;
+
 
             /** Return haptic playback of the track is enabled or not, used in mixer. */
-            bool    getHapticPlaybackEnabled() const { return mHapticPlaybackEnabled; }
+    bool getHapticPlaybackEnabled() const final { return mHapticPlaybackEnabled; }
             /** Set haptic playback of the track is enabled or not, should be
              *  set after query or get callback from vibrator service */
-            void    setHapticPlaybackEnabled(bool hapticPlaybackEnabled) {
+    void setHapticPlaybackEnabled(bool hapticPlaybackEnabled) final {
                 mHapticPlaybackEnabled = hapticPlaybackEnabled;
             }
             /** Return at what intensity to play haptics, used in mixer. */
-            os::HapticScale getHapticIntensity() const { return mHapticIntensity; }
+    os::HapticScale getHapticIntensity() const final { return mHapticIntensity; }
             /** Return the maximum amplitude allowed for haptics data, used in mixer. */
-            float getHapticMaxAmplitude() const { return mHapticMaxAmplitude; }
+    float getHapticMaxAmplitude() const final { return mHapticMaxAmplitude; }
             /** Set intensity of haptic playback, should be set after querying vibrator service. */
-            void    setHapticIntensity(os::HapticScale hapticIntensity) {
+    void setHapticIntensity(os::HapticScale hapticIntensity) final {
                 if (os::isValidHapticScale(hapticIntensity)) {
                     mHapticIntensity = hapticIntensity;
                     setHapticPlaybackEnabled(mHapticIntensity != os::HapticScale::MUTE);
@@ -187,16 +187,16 @@ public:
             /** Set maximum amplitude allowed for haptic data, should be set after querying
              *  vibrator service.
              */
-            void    setHapticMaxAmplitude(float maxAmplitude) {
+    void setHapticMaxAmplitude(float maxAmplitude) final {
                 mHapticMaxAmplitude = maxAmplitude;
             }
-            sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
+    sp<os::ExternalVibration> getExternalVibration() const final { return mExternalVibration; }
 
             // This function should be called with holding thread lock.
-            void    updateTeePatches_l();
-            void    setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate);
+    void updateTeePatches_l() final;
+    void setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate) final;
 
-    void tallyUnderrunFrames(size_t frames) override {
+    void tallyUnderrunFrames(size_t frames) final {
        if (isOut()) { // we expect this from output tracks only
            mAudioTrackServerProxy->tallyUnderrunFrames(frames);
            // Fetch absolute numbers from AudioTrackShared as it counts
@@ -207,29 +207,18 @@ public:
        }
     }
 
-    static bool checkServerLatencySupported(
-            audio_format_t format, audio_output_flags_t flags) {
-        return audio_is_linear_pcm(format)
-                && (flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) == 0;
-    }
-
-    audio_output_flags_t getOutputFlags() const { return mFlags; }
-    float getSpeed() const { return mSpeed; }
-    bool isSpatialized() const override { return mIsSpatialized; }
-    bool isBitPerfect() const override { return mIsBitPerfect; }
+    audio_output_flags_t getOutputFlags() const final { return mFlags; }
+    float getSpeed() const final { return mSpeed; }
+    bool isSpatialized() const final { return mIsSpatialized; }
+    bool isBitPerfect() const final { return mIsBitPerfect; }
 
     /**
      * Updates the mute state and notifies the audio service. Call this only when holding player
      * thread lock.
      */
-    void processMuteEvent_l(const sp<IAudioManager>& audioManager, mute_state_t muteState);
+    void processMuteEvent_l(const sp<IAudioManager>& audioManager, mute_state_t muteState) final;
 
 protected:
-    // for numerous
-    friend class PlaybackThread;
-    friend class MixerThread;
-    friend class DirectOutputThread;
-    friend class OffloadThread;
 
     DISALLOW_COPY_AND_ASSIGN(Track);
 
@@ -238,38 +227,39 @@ protected:
     void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
 
     // ExtendedAudioBufferProvider interface
-    virtual size_t framesReady() const;
-    virtual int64_t framesReleased() const;
-    virtual void onTimestamp(const ExtendedTimestamp &timestamp);
+    size_t framesReady() const override;
+    int64_t framesReleased() const override;
+    void onTimestamp(const ExtendedTimestamp &timestamp) override;
 
-    bool isPausing() const { return mState == PAUSING; }
-    bool isPaused() const { return mState == PAUSED; }
-    bool isResuming() const { return mState == RESUMING; }
-    bool isReady() const;
-    void setPaused() { mState = PAUSED; }
-    void reset();
-    bool isFlushPending() const { return mFlushHwPending; }
-    void flushAck();
-    bool isResumePending();
-    void resumeAck();
+    // Used by thread
+    bool isPausing() const final { return mState == PAUSING; }
+    bool isPaused() const final { return mState == PAUSED; }
+    bool isResuming() const final { return mState == RESUMING; }
+    bool isReady() const final;
+    void setPaused() final { mState = PAUSED; }
+    void reset() final;
+    bool isFlushPending() const final { return mFlushHwPending; }
+    void flushAck() final;
+    bool isResumePending() const final;
+    void resumeAck() final;
     // For direct or offloaded tracks ensure that the pause state is acknowledged
     // by the playback thread in case of an immediate flush.
-    bool isPausePending() const { return mPauseHwPending; }
-    void pauseAck();
+    bool isPausePending() const final { return mPauseHwPending; }
+    void pauseAck() final;
     void updateTrackFrameInfo(int64_t trackFramesReleased, int64_t sinkFramesWritten,
-            uint32_t halSampleRate, const ExtendedTimestamp &timeStamp);
+            uint32_t halSampleRate, const ExtendedTimestamp& timeStamp) final;
 
-    sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
+    sp<IMemory> sharedBuffer() const final { return mSharedBuffer; }
 
     // presentationComplete checked by frames. (Mixed Tracks).
     // framesWritten is cumulative, never reset, and is shared all tracks
     // audioHalFrames is derived from output latency
-    bool presentationComplete(int64_t framesWritten, size_t audioHalFrames);
+    bool presentationComplete(int64_t framesWritten, size_t audioHalFrames) final;
 
     // presentationComplete checked by time. (Direct Tracks).
-    bool presentationComplete(uint32_t latencyMs);
+    bool presentationComplete(uint32_t latencyMs) final;
 
-    void resetPresentationComplete() {
+    void resetPresentationComplete() final {
         mPresentationCompleteFrames = 0;
         mPresentationCompleteTimeNs = 0;
     }
@@ -280,30 +270,48 @@ protected:
 
     void signalClientFlag(int32_t flag);
 
-public:
-    void triggerEvents(AudioSystem::sync_event_t type);
-    virtual void invalidate();
-    void disable();
-
-    int fastIndex() const { return mFastIndex; }
-
-    bool isPlaybackRestricted() const {
+    void triggerEvents(AudioSystem::sync_event_t type) final;
+    void invalidate() final;
+    void disable() final;
+    int& fastIndex() final { return mFastIndex; }
+    bool isPlaybackRestricted() const final {
         // The monitor is only created for tracks that can be silenced.
         return mOpPlayAudioMonitor ? !mOpPlayAudioMonitor->hasOpPlayAudio() : false; }
 
-protected:
+    const sp<AudioTrackServerProxy>& audioTrackServerProxy() const final {
+        return mAudioTrackServerProxy;
+    }
+    bool hasVolumeController() const final { return mHasVolumeController; }
+    void setHasVolumeController(bool hasVolumeController) final {
+        mHasVolumeController = hasVolumeController;
+    }
+    void setCachedVolume(float volume) final {
+        mCachedVolume = volume;
+    }
+    void setResetDone(bool resetDone) final {
+        mResetDone = resetDone;
+    }
+    ExtendedAudioBufferProvider* asExtendedAudioBufferProvider() final {
+        return this;
+    }
+    VolumeProvider* asVolumeProvider() final {
+        return this;
+    }
 
-    // FILLED state is used for suppressing volume ramp at begin of playing
-    enum {FS_INVALID, FS_FILLING, FS_FILLED, FS_ACTIVE};
-    mutable uint8_t     mFillingUpStatus;
+    FillingStatus& fillingStatus() final { return mFillingStatus; }
+    int8_t& retryCount() final { return mRetryCount; }
+    FastTrackUnderruns& fastTrackUnderruns() final { return mObservedUnderruns; }
+
+protected:
+    mutable FillingStatus mFillingStatus;
     int8_t              mRetryCount;
 
-    // see comment at AudioFlinger::PlaybackThread::Track::~Track for why this can't be const
+    // see comment at ~Track for why this can't be const
     sp<IMemory>         mSharedBuffer;
 
     bool                mResetDone;
     const audio_stream_type_t mStreamType;
-    effect_buffer_t     *mMainBuffer;
+    float     *mMainBuffer;
 
     int32_t             *mAuxBuffer;
     int                 mAuxEffectId;
@@ -377,7 +385,7 @@ private:
     bool                mFlushHwPending; // track requests for thread flush
     bool                mPauseHwPending = false; // direct/offload track request for thread pause
     audio_output_flags_t mFlags;
-    TeePatches  mTeePatches;
+    TeePatches mTeePatches;
     std::optional<TeePatches> mTeePatchesToUpdate;
     const float         mSpeed;
     const bool          mIsSpatialized;
@@ -391,7 +399,7 @@ private:
 
 
 // playback track, used by DuplicatingThread
-class OutputTrack : public Track {
+class OutputTrack : public Track, public IAfOutputTrack {
 public:
 
     class Buffer : public AudioBufferProvider::Buffer {
@@ -399,29 +407,28 @@ public:
         void *mBuffer;
     };
 
-                        OutputTrack(PlaybackThread *thread,
-                                DuplicatingThread *sourceThread,
+    OutputTrack(IAfPlaybackThread* thread,
+            IAfDuplicatingThread* sourceThread,
                                 uint32_t sampleRate,
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
                                 const AttributionSourceState& attributionSource);
-    virtual             ~OutputTrack();
+    ~OutputTrack() override;
 
-    virtual status_t    start(AudioSystem::sync_event_t event =
+    status_t start(AudioSystem::sync_event_t event =
                                     AudioSystem::SYNC_EVENT_NONE,
-                             audio_session_t triggerSession = AUDIO_SESSION_NONE);
-    virtual void        stop();
-            ssize_t     write(void* data, uint32_t frames);
-            bool        bufferQueueEmpty() const { return mBufferQueue.size() == 0; }
-            bool        isActive() const { return mActive; }
-    const wp<ThreadBase>& thread() const { return mThread; }
+                             audio_session_t triggerSession = AUDIO_SESSION_NONE) final;
+    void stop() final;
+    ssize_t write(void* data, uint32_t frames) final;
+    bool bufferQueueEmpty() const final { return mBufferQueue.size() == 0; }
+    bool isActive() const final { return mActive; }
 
-            void        copyMetadataTo(MetadataInserter& backInserter) const override;
+    void copyMetadataTo(MetadataInserter& backInserter) const final;
     /** Set the metadatas of the upstream tracks. Thread safe. */
-            void        setMetadatas(const SourceMetadatas& metadatas);
+    void setMetadatas(const SourceMetadatas& metadatas) final;
     /** returns client timestamp to the upstream duplicating thread. */
-    ExtendedTimestamp   getClientProxyTimestamp() const {
+    ExtendedTimestamp getClientProxyTimestamp() const final {
                             // server - kernel difference is not true latency when drained
                             // i.e. mServerProxy->isDrained().
                             ExtendedTimestamp timestamp;
@@ -432,7 +439,6 @@ public:
                             // (with mTimeNs[] filled with -1's) is returned.
                             return timestamp;
                         }
-
 private:
     status_t            obtainBuffer(AudioBufferProvider::Buffer* buffer,
                                      uint32_t waitTimeMs);
@@ -447,7 +453,7 @@ private:
     Vector < Buffer* >          mBufferQueue;
     AudioBufferProvider::Buffer mOutBuffer;
     bool                        mActive;
-    DuplicatingThread* const    mSourceThread; // for waitTimeMs() in write()
+    IAfDuplicatingThread* const mSourceThread; // for waitTimeMs() in write()
     sp<AudioTrackClientProxy>   mClientProxy;
 
     /** Attributes of the source tracks.
@@ -463,14 +469,15 @@ private:
      */
     SourceMetadatas mTrackMetadatas;
     /** Protects mTrackMetadatas against concurrent access. */
-    mutable std::mutex mTrackMetadatasMutex;
+    audio_utils::mutex& trackMetadataMutex() const { return mTrackMetadataMutex; }
+    mutable audio_utils::mutex mTrackMetadataMutex{
+            audio_utils::MutexOrder::kOutputTrack_TrackMetadataMutex};
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel
-class PatchTrack : public Track, public PatchTrackBase {
+class PatchTrack : public Track, public PatchTrackBase, public IAfPatchTrack {
 public:
-
-                        PatchTrack(PlaybackThread *playbackThread,
+    PatchTrack(IAfPlaybackThread* playbackThread,
                                    audio_stream_type_t streamType,
                                    uint32_t sampleRate,
                                    audio_channel_mask_t channelMask,
@@ -484,23 +491,24 @@ public:
                                                                     *  as soon as possible to have
                                                                     *  the lowest possible latency
                                                                     *  even if it might glitch. */);
-    virtual             ~PatchTrack();
+    ~PatchTrack() override;
 
-            size_t      framesReady() const override;
+    size_t framesReady() const final;
 
-    virtual status_t    start(AudioSystem::sync_event_t event =
+    status_t start(AudioSystem::sync_event_t event =
                                     AudioSystem::SYNC_EVENT_NONE,
-                             audio_session_t triggerSession = AUDIO_SESSION_NONE);
+                             audio_session_t triggerSession = AUDIO_SESSION_NONE) final;
 
     // AudioBufferProvider interface
-    virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
-    virtual void releaseBuffer(AudioBufferProvider::Buffer* buffer);
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) final;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) final;
 
     // PatchProxyBufferProvider interface
-    virtual status_t    obtainBuffer(Proxy::Buffer* buffer,
-                                     const struct timespec *timeOut = NULL);
-    virtual void        releaseBuffer(Proxy::Buffer* buffer);
+    status_t obtainBuffer(Proxy::Buffer* buffer, const struct timespec* timeOut = nullptr) final;
+    void releaseBuffer(Proxy::Buffer* buffer) final;
 
 private:
             void restartIfDisabled();
 };  // end of PatchTrack
+
+} // namespace android

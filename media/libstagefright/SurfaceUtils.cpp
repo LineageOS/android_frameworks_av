@@ -225,6 +225,13 @@ status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull *
         return err;
     };
 
+    // We need to set sidebandStream to nullptr before pushing blank buffers
+    err = native_window_set_sideband_stream(nativeWindow, nullptr);
+    if (err != NO_ERROR) {
+        ALOGE("error setting sidebandStream to nullptr: %s (%d)", strerror(-err), -err);
+        return err;
+    }
+
     // We need to reconnect to the ANativeWindow as a CPU client to ensure that
     // no frames get dropped by SurfaceFlinger assuming that these are video
     // frames.
@@ -317,6 +324,16 @@ status_t nativeWindowConnect(ANativeWindow *surface, const char *reason) {
 
     status_t err = native_window_api_connect(surface, NATIVE_WINDOW_API_MEDIA);
     ALOGE_IF(err != OK, "Failed to connect to surface %p, err %d", surface, err);
+
+    return err;
+}
+
+status_t surfaceConnectWithListener(
+        const sp<Surface> &surface, sp<IProducerListener> listener, const char *reason) {
+    ALOGD("connecting to surface %p, reason %s", surface.get(), reason);
+
+    status_t err = surface->connect(NATIVE_WINDOW_API_MEDIA, listener);
+    ALOGE_IF(err != OK, "Failed to connect from surface %p, err %d", surface.get(), err);
 
     return err;
 }

@@ -70,9 +70,9 @@ EffectsFactoryHalAidl::EffectsFactoryHalAidl(std::shared_ptr<IFactory> effectsFa
       }()),
       mProxyUuidDescriptorMap([this]() {
           std::map<AudioUuid, std::vector<Descriptor>> proxyUuidMap;
-          for (auto& desc : mHalDescList) {
+          for (const auto& desc : mHalDescList) {
               if (desc.common.id.proxy.has_value()) {
-                  auto& uuid = desc.common.id.proxy.value();
+                  const auto& uuid = desc.common.id.proxy.value();
                   if (proxyUuidMap.count(uuid) == 0) {
                       proxyUuidMap.insert({uuid, {desc}});
                   } else {
@@ -120,7 +120,7 @@ status_t EffectsFactoryHalAidl::queryNumberEffects(uint32_t *pNumEffects) {
     }
 
     *pNumEffects = mEffectCount;
-    ALOGD("%s %d non %zu proxyMap %zu proxyDesc %zu", __func__, *pNumEffects,
+    ALOGD("%s %u non %zu proxyMap %zu proxyDesc %zu", __func__, *pNumEffects,
           mNonProxyDescList.size(), mProxyUuidDescriptorMap.size(), mProxyDescList.size());
     return OK;
 }
@@ -243,7 +243,7 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithImplUuid(const AudioUuid& uu
                                 [&](const auto& desc) { return desc.common.id.uuid == uuid; });
     if (matchIt == list.end()) {
         ALOGE("%s UUID not found in HAL and proxy list %s", __func__, toString(uuid).c_str());
-        return BAD_VALUE;
+        return NAME_NOT_FOUND;
     }
     ALOGI("%s UUID impl found %s", __func__, toString(uuid).c_str());
 

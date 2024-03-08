@@ -32,6 +32,7 @@
 #include <media/stagefright/MetaData.h>
 #include <camera/Camera.h>
 #include <camera/CameraParameters.h>
+#include <camera/StringUtils.h>
 #include <gui/Surface.h>
 #include <utils/String8.h>
 #include <cutils/properties.h>
@@ -146,7 +147,7 @@ status_t CameraSource::initCheck() const {
 
 status_t CameraSource::isCameraAvailable(
     const sp<hardware::ICamera>& camera, const sp<ICameraRecordingProxy>& proxy,
-    int32_t cameraId, const String16& clientName, uid_t clientUid, pid_t clientPid) {
+    int32_t cameraId, const std::string& clientName, uid_t clientUid, pid_t clientPid) {
 
     if (camera == 0) {
         mCamera = Camera::connect(cameraId, clientName, clientUid, clientPid,
@@ -535,7 +536,7 @@ status_t CameraSource::initWithCameraAccess(
     status_t err = OK;
 
     if ((err = isCameraAvailable(camera, proxy, cameraId,
-            clientName, clientUid, clientPid)) != OK) {
+            toStdString(clientName), clientUid, clientPid)) != OK) {
         ALOGE("Camera connection could not be established.");
         return err;
     }

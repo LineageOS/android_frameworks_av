@@ -55,6 +55,16 @@
                            samplingRates="8000 16000 32000 48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
                 </mixPort>
                 <mixPort name="hifi_output" role="source" flags="AUDIO_OUTPUT_FLAG_BIT_PERFECT"/>
+                <mixPort name="mmap_no_irq_out" role="source"
+                         flags="AUDIO_OUTPUT_FLAG_DIRECT AUDIO_OUTPUT_FLAG_MMAP_NOIRQ">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+                </mixPort>
+                <mixPort name="mixport_bus_input" role="sink">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                        samplingRates="48000"
+                        channelMasks="AUDIO_CHANNEL_IN_STEREO"/>
+                </mixPort>
             </mixPorts>
             <devicePorts>
                 <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink">
@@ -79,6 +89,8 @@
                 </devicePort>
                 <devicePort tagName="USB Device In" type="AUDIO_DEVICE_IN_USB_DEVICE" role="source">
                 </devicePort>
+                <devicePort tagName="BUS Device In" type="AUDIO_DEVICE_IN_BUS" role="source" address="BUS00_MIC">
+                </devicePort>
             </devicePorts>
             <routes>
                 <route type="mix" sink="Speaker"
@@ -96,7 +108,9 @@
                 <route type="mix" sink="BT A2DP Out"
                        sources="primary output,hifi_output"/>
                 <route type="mix" sink="USB Device Out"
-                       sources="primary output,hifi_output"/>
+                       sources="primary output,hifi_output,mmap_no_irq_out"/>
+                <route type="mix" sink="mixport_bus_input"
+                    sources="BUS Device In"/>
             </routes>
         </module>
 

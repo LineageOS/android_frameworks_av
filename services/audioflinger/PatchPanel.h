@@ -15,228 +15,114 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
 
+#include "IAfPatchPanel.h"
 
-// PatchPanel is concealed within AudioFlinger, their lifetimes are the same.
-class PatchPanel {
+#include <map>  // avoid transitive dependency
+#include <set>  // avoid transitive dependency
+
+namespace android {
+
+class PatchPanel : public IAfPatchPanel {
 public:
-    class SoftwarePatch {
-      public:
-        SoftwarePatch(const PatchPanel &patchPanel, audio_patch_handle_t patchHandle,
-                audio_io_handle_t playbackThreadHandle, audio_io_handle_t recordThreadHandle)
-                : mPatchPanel(patchPanel), mPatchHandle(patchHandle),
-                  mPlaybackThreadHandle(playbackThreadHandle),
-                  mRecordThreadHandle(recordThreadHandle) {}
-        SoftwarePatch(const SoftwarePatch&) = default;
-
-        // Must be called under AudioFlinger::mLock
-        status_t getLatencyMs_l(double *latencyMs) const;
-        audio_patch_handle_t getPatchHandle() const { return mPatchHandle; };
-        audio_io_handle_t getPlaybackThreadHandle() const { return mPlaybackThreadHandle; };
-        audio_io_handle_t getRecordThreadHandle() const { return mRecordThreadHandle; };
-      private:
-        const PatchPanel &mPatchPanel;
-        const audio_patch_handle_t mPatchHandle;
-        const audio_io_handle_t mPlaybackThreadHandle;
-        const audio_io_handle_t mRecordThreadHandle;
-    };
-
-    explicit PatchPanel(AudioFlinger* audioFlinger) : mAudioFlinger(*audioFlinger) {}
+    explicit PatchPanel(const sp<IAfPatchPanelCallback>& afPatchPanelCallback)
+        : mAfPatchPanelCallback(afPatchPanelCallback) {}
 
     /* List connected audio ports and their attributes */
-    status_t listAudioPorts(unsigned int *num_ports,
-                                    struct audio_port *ports);
+    status_t listAudioPorts_l(unsigned int *num_ports,
+            struct audio_port* ports) final REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* Get supported attributes for a given audio port */
-    status_t getAudioPort(struct audio_port_v7 *port);
+    status_t getAudioPort_l(struct audio_port_v7* port) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* Create a patch between several source and sink ports */
-    status_t createAudioPatch(const struct audio_patch *patch,
+    status_t createAudioPatch_l(const struct audio_patch *patch,
                               audio_patch_handle_t *handle,
-                              bool endpointPatch = false);
+                              bool endpointPatch = false) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* Release a patch */
-    status_t releaseAudioPatch(audio_patch_handle_t handle);
+    status_t releaseAudioPatch_l(audio_patch_handle_t handle) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
     /* List connected audio devices and they attributes */
-    status_t listAudioPatches(unsigned int *num_patches,
-                                      struct audio_patch *patches);
+    status_t listAudioPatches_l(unsigned int *num_patches,
+            struct audio_patch* patches) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
-    // Retrieves all currently estrablished software patches for a stream
+    // Retrieves all currently established software patches for a stream
     // opened on an intermediate module.
     status_t getDownstreamSoftwarePatches(audio_io_handle_t stream,
-            std::vector<SoftwarePatch> *patches) const;
+            std::vector<SoftwarePatch>* patches) const final;
 
     // Notifies patch panel about all opened and closed streams.
     void notifyStreamOpened(AudioHwDevice *audioHwDevice, audio_io_handle_t stream,
-                            struct audio_patch *patch);
-    void notifyStreamClosed(audio_io_handle_t stream);
+                            struct audio_patch* patch) final;
+    void notifyStreamClosed(audio_io_handle_t stream) final;
 
-    void dump(int fd) const;
+    void dump(int fd) const final;
 
-    template<typename ThreadType, typename TrackType>
-    class Endpoint final {
-    public:
-        Endpoint() = default;
-        Endpoint(const Endpoint&) = delete;
-        Endpoint& operator=(const Endpoint& other) noexcept {
-            mThread = other.mThread;
-            mCloseThread = other.mCloseThread;
-            mHandle = other.mHandle;
-            mTrack = other.mTrack;
-            return *this;
-        }
-        Endpoint(Endpoint&& other) noexcept { swap(other); }
-        Endpoint& operator=(Endpoint&& other) noexcept {
-            swap(other);
-            return *this;
-        }
-        ~Endpoint() {
-            ALOGE_IF(mHandle != AUDIO_PATCH_HANDLE_NONE,
-                    "A non empty Patch Endpoint leaked, handle %d", mHandle);
-        }
+    const std::map<audio_patch_handle_t, Patch>& patches_l() const final
+            REQUIRES(audio_utils::AudioFlinger_Mutex) { return mPatches; }
 
-        status_t checkTrack(TrackType *trackOrNull) const {
-            if (trackOrNull == nullptr) return NO_MEMORY;
-            return trackOrNull->initCheck();
-        }
-        audio_patch_handle_t handle() const { return mHandle; }
-        sp<ThreadType> thread() const { return mThread; }
-        sp<TrackType> track() const { return mTrack; }
-        sp<const ThreadType> const_thread() const { return mThread; }
-        sp<const TrackType> const_track() const { return mTrack; }
+    status_t getLatencyMs_l(audio_patch_handle_t patchHandle, double* latencyMs) const final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
-        void closeConnections(PatchPanel *panel) {
-            if (mHandle != AUDIO_PATCH_HANDLE_NONE) {
-                panel->releaseAudioPatch(mHandle);
-                mHandle = AUDIO_PATCH_HANDLE_NONE;
-            }
-            if (mThread != 0) {
-                if (mTrack != 0) {
-                    mThread->deletePatchTrack(mTrack);
-                }
-                if (mCloseThread) {
-                    panel->mAudioFlinger.closeThreadInternal_l(mThread);
-                }
-            }
-        }
-        audio_patch_handle_t* handlePtr() { return &mHandle; }
-        void setThread(const sp<ThreadType>& thread, bool closeThread = true) {
-            mThread = thread;
-            mCloseThread = closeThread;
-        }
-        template <typename T>
-        void setTrackAndPeer(const sp<TrackType>& track, const sp<T> &peer, bool holdReference) {
-            mTrack = track;
-            mThread->addPatchTrack(mTrack);
-            mTrack->setPeerProxy(peer, holdReference);
-            mClearPeerProxy = holdReference;
-        }
-        void clearTrackPeer() { if (mClearPeerProxy && mTrack) mTrack->clearPeerProxy(); }
-        void stopTrack() { if (mTrack) mTrack->stop(); }
+    void closeThreadInternal_l(const sp<IAfThreadBase>& thread) const final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
-        void swap(Endpoint &other) noexcept {
-            using std::swap;
-            swap(mThread, other.mThread);
-            swap(mCloseThread, other.mCloseThread);
-            swap(mClearPeerProxy, other.mClearPeerProxy);
-            swap(mHandle, other.mHandle);
-            swap(mTrack, other.mTrack);
-        }
-
-        friend void swap(Endpoint &a, Endpoint &b) noexcept {
-            a.swap(b);
-        }
-
-    private:
-        sp<ThreadType> mThread;
-        bool mCloseThread = true;
-        bool mClearPeerProxy = true;
-        audio_patch_handle_t mHandle = AUDIO_PATCH_HANDLE_NONE;
-        sp<TrackType> mTrack;
-    };
-
-    class Patch final {
-    public:
-        Patch(const struct audio_patch &patch, bool endpointPatch) :
-            mAudioPatch(patch), mIsEndpointPatch(endpointPatch) {}
-        Patch() = default;
-        ~Patch();
-        Patch(const Patch& other) noexcept {
-            mAudioPatch = other.mAudioPatch;
-            mHalHandle = other.mHalHandle;
-            mPlayback = other.mPlayback;
-            mRecord = other.mRecord;
-            mThread = other.mThread;
-            mIsEndpointPatch = other.mIsEndpointPatch;
-        }
-        Patch(Patch&& other) noexcept { swap(other); }
-        Patch& operator=(Patch&& other) noexcept {
-            swap(other);
-            return *this;
-        }
-
-        void swap(Patch &other) noexcept {
-            using std::swap;
-            swap(mAudioPatch, other.mAudioPatch);
-            swap(mHalHandle, other.mHalHandle);
-            swap(mPlayback, other.mPlayback);
-            swap(mRecord, other.mRecord);
-            swap(mThread, other.mThread);
-            swap(mIsEndpointPatch, other.mIsEndpointPatch);
-        }
-
-        friend void swap(Patch &a, Patch &b) noexcept {
-            a.swap(b);
-        }
-
-        status_t createConnections(PatchPanel *panel);
-        void clearConnections(PatchPanel *panel);
-        bool isSoftware() const {
-            return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
-                    mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE; }
-
-        void setThread(const sp<ThreadBase>& thread) { mThread = thread; }
-        wp<ThreadBase> thread() const { return mThread; }
-
-        // returns the latency of the patch (from record to playback).
-        status_t getLatencyMs(double *latencyMs) const;
-
-        String8 dump(audio_patch_handle_t myHandle) const;
-
-        // Note that audio_patch::id is only unique within a HAL module
-        struct audio_patch              mAudioPatch;
-        // handle for audio HAL patch handle present only when the audio HAL version is >= 3.0
-        audio_patch_handle_t            mHalHandle = AUDIO_PATCH_HANDLE_NONE;
-        // below members are used by a software audio patch connecting a source device from a
-        // given audio HW module to a sink device on an other audio HW module.
-        // the objects are created by createConnections() and released by clearConnections()
-        // playback thread is created if no existing playback thread can be used
-        // connects playback thread output to sink device
-        Endpoint<PlaybackThread, PlaybackThread::PatchTrack> mPlayback;
-        // connects source device to record thread input
-        Endpoint<RecordThread, RecordThread::PatchRecord> mRecord;
-
-        wp<ThreadBase> mThread;
-        bool mIsEndpointPatch;
-    };
-
-    // Call with AudioFlinger mLock held
-    std::map<audio_patch_handle_t, Patch>& patches_l() { return mPatches; }
+    /**
+     * Get the attributes of the mix port when connecting to the given device port
+     */
+    status_t getAudioMixPort_l(const audio_port_v7* devicePort, audio_port_v7* mixPort) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
 
 private:
-    AudioHwDevice* findAudioHwDeviceByModule(audio_module_handle_t module);
-    sp<DeviceHalInterface> findHwDeviceByModule(audio_module_handle_t module);
-    void addSoftwarePatchToInsertedModules(
+    AudioHwDevice* findAudioHwDeviceByModule_l(audio_module_handle_t module)
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    sp<DeviceHalInterface> findHwDeviceByModule_l(audio_module_handle_t module)
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    void addSoftwarePatchToInsertedModules_l(
             audio_module_handle_t module, audio_patch_handle_t handle,
-            const struct audio_patch *patch);
+            const struct audio_patch *patch)
+            REQUIRES(audio_utils::AudioFlinger_Mutex);
     void removeSoftwarePatchFromInsertedModules(audio_patch_handle_t handle);
-    void erasePatch(audio_patch_handle_t handle);
+    /**
+     * erase the patch referred by its handle.
+     * @param handle of the patch to be erased
+     * @param reuseExistingHalPatch if set, do not trig the callback of listeners, listener
+     * would receive instead a onUpdateAudioPatch when the patch will be recreated.
+     * It prevents for example DeviceEffectManager to spuriously remove / add a device on an already
+     * opened input / output mix.
+     */
+    void erasePatch(audio_patch_handle_t handle, bool reuseExistingHalPatch = false);
 
-    AudioFlinger &mAudioFlinger;
+    /**
+     * Returns true if the old and new patches passed as arguments describe the same
+     * connections between the first sink and the first source
+     * @param oldPatch previous patch
+     * @param newPatch new patch
+     * @return true if the route is unchanged between the old and new patch, false otherwise
+     */
+    inline bool patchesHaveSameRoute(
+            const struct audio_patch &newPatch, const struct audio_patch &oldPatch) const {
+        return (newPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                oldPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                newPatch.sources[0].id == oldPatch.sources[0].id &&
+                newPatch.sinks[0].type == AUDIO_PORT_TYPE_MIX &&
+                oldPatch.sinks[0].type == AUDIO_PORT_TYPE_MIX &&
+                newPatch.sinks[0].ext.mix.handle == oldPatch.sinks[0].ext.mix.handle) ||
+                (newPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                oldPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE &&
+                newPatch.sinks[0].id == oldPatch.sinks[0].id &&
+                newPatch.sources[0].type == AUDIO_PORT_TYPE_MIX &&
+                oldPatch.sources[0].type == AUDIO_PORT_TYPE_MIX &&
+                newPatch.sources[0].ext.mix.handle == oldPatch.sources[0].ext.mix.handle);
+    }
+
+    const sp<IAfPatchPanelCallback> mAfPatchPanelCallback;
     std::map<audio_patch_handle_t, Patch> mPatches;
 
     // This map allows going from a thread to "downstream" software patches
@@ -265,3 +151,5 @@ private:
     };
     std::map<audio_module_handle_t, ModuleConnections> mInsertedModules;
 };
+
+}  // namespace android

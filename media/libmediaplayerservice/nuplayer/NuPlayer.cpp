@@ -370,7 +370,7 @@ status_t NuPlayer::setBufferingSettings(const BufferingSettings& buffering) {
 }
 
 void NuPlayer::setDataSourceAsync(const String8& rtpParams) {
-    ALOGD("setDataSourceAsync for RTP = %s", rtpParams.string());
+    ALOGD("setDataSourceAsync for RTP = %s", rtpParams.c_str());
     sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
 
     sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
@@ -1977,6 +1977,8 @@ status_t NuPlayer::instantiateDecoder(
         if (rate > 0) {
             format->setFloat("operating-rate", rate * mPlaybackSettings.mSpeed);
         }
+
+        format->setInt32("android._video-scaling", mVideoScalingMode);
     }
 
     Mutex::Autolock autoLock(mDecoderLock);
@@ -2223,6 +2225,11 @@ status_t NuPlayer::setVideoScalingMode(int32_t mode) {
             ALOGE("Failed to set scaling mode (%d): %s",
                 -ret, strerror(-ret));
             return ret;
+        }
+        if (mVideoDecoder != NULL) {
+            sp<AMessage> params = new AMessage();
+            params->setInt32("android._video-scaling", mode);
+            mVideoDecoder->setParameters(params);
         }
     }
     return OK;

@@ -1,0 +1,4 @@
+# owners for frameworks/av/media/module/codecs/m4v_h263
+include platform/frameworks/av:/media/janitors/avic_OWNERS
+include platform/frameworks/av:/media/janitors/codec_OWNERS
+essick@google.com

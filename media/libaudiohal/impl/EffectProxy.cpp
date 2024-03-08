@@ -51,6 +51,7 @@ EffectProxy::EffectProxy(const AudioUuid& uuid, const std::vector<Descriptor>& d
                       SubEffect sub({.descriptor = desc});
                       status = factory->createEffect(desc.common.id.uuid, &sub.handle);
                       if (!status.isOk() || !sub.handle) {
+                          sub.handle = nullptr;
                           ALOGW("%s create sub-effect %s failed", __func__,
                                 ::android::audio::utils::toString(desc.common.id.uuid).c_str());
                       }
@@ -91,9 +92,7 @@ ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* of
                                                                 "noActiveEffctFound");
     }
 
-    const size_t newIndex = std::distance(mSubEffects.begin(), itor);
-    mActiveSubIdx = newIndex;
-
+    mActiveSubIdx = std::distance(mSubEffects.begin(), itor);
     ALOGI("%s: active %soffload sub-effect %zu descriptor: %s", __func__,
           offload->isOffload ? "" : "non-", mActiveSubIdx,
           ::android::audio::utils::toString(mSubEffects[mActiveSubIdx].descriptor.common.id.uuid)
@@ -163,7 +162,12 @@ ndk::ScopedAStatus EffectProxy::buildDescriptor(const AudioUuid& uuid,
 
 Descriptor::Common EffectProxy::buildDescriptorCommon(
         const AudioUuid& uuid, const std::vector<Descriptor>& subEffectDescs) {
-    Descriptor::Common common;
+    // initial flag values before we know which sub-effect to active (with setOffloadParam)
+    // align to HIDL EffectProxy flags
+    Descriptor::Common common = {.flags = {.type = Flags::Type::INSERT,
+                                           .insert = Flags::Insert::LAST,
+                                           .volume = Flags::Volume::CTRL}};
+
     for (const auto& desc : subEffectDescs) {
         if (desc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL) {
             common.flags.hwAcceleratorMode = Flags::HardwareAccelerator::TUNNEL;
@@ -174,6 +178,10 @@ Descriptor::Common EffectProxy::buildDescriptorCommon(
         common.flags.deviceIndication |= desc.common.flags.deviceIndication;
         common.flags.audioModeIndication |= desc.common.flags.audioModeIndication;
         common.flags.audioSourceIndication |= desc.common.flags.audioSourceIndication;
+        // Set to NONE if any sub-effect not supporting any Volume command
+        if (desc.common.flags.volume == Flags::Volume::NONE) {
+            common.flags.volume = Flags::Volume::NONE;
+        }
     }
 
     // copy type UUID from any of sub-effects, all sub-effects should have same type
@@ -272,6 +280,11 @@ bool EffectProxy::isBypassing() const {
     return mSubEffects[mActiveSubIdx].descriptor.common.flags.bypass;
 }
 
+bool EffectProxy::isTunnel() const {
+    return mSubEffects[mActiveSubIdx].descriptor.common.flags.hwAcceleratorMode ==
+           Flags::HardwareAccelerator::TUNNEL;
+}
+
 binder_status_t EffectProxy::dump(int fd, const char** args, uint32_t numArgs) {
     const std::string dumpString = toString();
     write(fd, dumpString.c_str(), dumpString.size());
@@ -292,7 +305,7 @@ std::string EffectProxy::toString(size_t level) const {
     base::StringAppendF(&ss, "%sAllSubEffects:\n", prefixSpace.c_str());
     for (size_t i = 0; i < mSubEffects.size(); i++) {
         base::StringAppendF(&ss, "%s[%zu] - Handle: %p, %s\n", prefixSpace.c_str(), i,
-                            mSubEffects[i].handle ? mSubEffects[i].handle.get() : nullptr,
+                            mSubEffects[i].handle.get(),
                             mSubEffects[i].descriptor.toString().c_str());
     }
     return ss;

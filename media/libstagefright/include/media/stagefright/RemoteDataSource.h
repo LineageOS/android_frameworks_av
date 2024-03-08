@@ -106,7 +106,7 @@ private:
         if (mMemory.get() == nullptr) {
             ALOGE("Failed to allocate memory!");
         }
-        mName = String8::format("RemoteDataSource(%s)", mSource->toString().string());
+        mName = String8::format("RemoteDataSource(%s)", mSource->toString().c_str());
     }
 
     DISALLOW_EVIL_CONSTRUCTORS(RemoteDataSource);

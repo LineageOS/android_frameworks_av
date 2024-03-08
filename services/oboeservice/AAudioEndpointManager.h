@@ -58,18 +58,25 @@ public:
      * @param sharingMode
      * @return endpoint or null
      */
-    android::sp<AAudioServiceEndpoint> openEndpoint(android::AAudioService &audioService,
-                                        const aaudio::AAudioStreamRequest &request);
+    android::sp<AAudioServiceEndpoint> openEndpoint(
+            android::AAudioService &audioService,
+            const aaudio::AAudioStreamRequest &request)
+            EXCLUDES(mExclusiveLock, mSharedLock);
 
-    void closeEndpoint(const android::sp<AAudioServiceEndpoint>& serviceEndpoint);
+    void closeEndpoint(const android::sp<AAudioServiceEndpoint>& serviceEndpoint)
+            EXCLUDES(mExclusiveLock, mSharedLock);;
 
 private:
-    android::sp<AAudioServiceEndpoint> openExclusiveEndpoint(android::AAudioService &aaudioService,
-                                                 const aaudio::AAudioStreamRequest &request,
-                                                 sp<AAudioServiceEndpoint> &endpointToSteal);
+    android::sp<AAudioServiceEndpoint> openExclusiveEndpoint(
+            android::AAudioService &aaudioService,
+            const aaudio::AAudioStreamRequest &request,
+            sp<AAudioServiceEndpoint> &endpointToSteal)
+            EXCLUDES(mExclusiveLock);
 
-    android::sp<AAudioServiceEndpoint> openSharedEndpoint(android::AAudioService &aaudioService,
-                                              const aaudio::AAudioStreamRequest &request);
+    android::sp<AAudioServiceEndpoint> openSharedEndpoint(
+            android::AAudioService &aaudioService,
+            const aaudio::AAudioStreamRequest &request)
+            EXCLUDES(mSharedLock);
 
     android::sp<AAudioServiceEndpoint> findExclusiveEndpoint_l(
             const AAudioStreamConfiguration& configuration)
@@ -77,7 +84,8 @@ private:
 
     android::sp<AAudioServiceEndpointShared> findSharedEndpoint_l(
             const AAudioStreamConfiguration& configuration)
-            REQUIRES(mSharedLock);
+            REQUIRES(mSharedLock)
+            EXCLUDES(mExclusiveLock);
 
     void closeExclusiveEndpoint(const android::sp<AAudioServiceEndpoint>& serviceEndpoint);
     void closeSharedEndpoint(const android::sp<AAudioServiceEndpoint>& serviceEndpoint);

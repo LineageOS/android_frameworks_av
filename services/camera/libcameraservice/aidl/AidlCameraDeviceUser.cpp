@@ -119,7 +119,7 @@ ndk::ScopedAStatus AidlCameraDeviceUser::submitRequestList(
                                                    in_isRepeating, &submitInfo);
     if (!ret.isOk()) {
         ALOGE("%s: Failed submitRequestList to cameraservice: %s",
-              __FUNCTION__, ret.toString8().string());
+              __FUNCTION__, ret.toString8().c_str());
         return fromUStatus(ret);
     }
     mRequestId = submitInfo.mRequestId;
@@ -158,7 +158,7 @@ ndk::ScopedAStatus AidlCameraDeviceUser::createStream(
     int32_t newStreamId;
     UStatus ret = mDeviceRemote->createStream(outputConfig, &newStreamId);
     if (!ret.isOk()) {
-        ALOGE("%s: Failed to create stream: %s", __FUNCTION__, ret.toString8().string());
+        ALOGE("%s: Failed to create stream: %s", __FUNCTION__, ret.toString8().c_str());
     }
     *_aidl_return = newStreamId;
     return fromUStatus(ret);
@@ -170,7 +170,7 @@ ndk::ScopedAStatus AidlCameraDeviceUser::createDefaultRequest(STemplateId in_tem
     UStatus ret = mDeviceRemote->createDefaultRequest(convertFromAidl(in_templateId),
                                                       &metadata);
     if (!ret.isOk()) {
-        ALOGE("%s: Failed to create default request: %s", __FUNCTION__, ret.toString8().string());
+        ALOGE("%s: Failed to create default request: %s", __FUNCTION__, ret.toString8().c_str());
         return fromUStatus(ret);
     }
 
@@ -202,7 +202,7 @@ ndk::ScopedAStatus AidlCameraDeviceUser::updateOutputConfiguration(
     UStatus ret = mDeviceRemote->updateOutputConfiguration(in_streamId, outputConfig);
     if (!ret.isOk()) {
         ALOGE("%s: Failed to update output config for stream id: %d: %s",
-              __FUNCTION__, in_streamId, ret.toString8().string());
+              __FUNCTION__, in_streamId, ret.toString8().c_str());
     }
     return fromUStatus(ret);
 }

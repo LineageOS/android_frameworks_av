@@ -32,7 +32,6 @@
 #include <chrono>
 #include <thread>
 #include <time.h>
-#include <utils/String8.h>
 #include <utils/Thread.h>
 #include <utils/Log.h>
 #include <unordered_map>
@@ -45,7 +44,7 @@
         watchThread([&]() { return toMonitor;}, gettid(), __FUNCTION__, cycles, cycleLength);
 
 // Default cycles and cycle length values used to calculate permitted elapsed time
-const static size_t   kMaxCycles     = 100;
+const static size_t   kMaxCycles     = 650;
 const static uint32_t kCycleLengthMs = 100;
 
 namespace android {
@@ -58,13 +57,13 @@ struct MonitoredFunction {
 };
 
 public:
-    explicit CameraServiceWatchdog(const String8 &cameraId,
+    explicit CameraServiceWatchdog(const std::string &cameraId,
             std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper) :
                     mCameraId(cameraId), mPause(true), mMaxCycles(kMaxCycles),
                     mCycleLengthMs(kCycleLengthMs), mEnabled(true),
                     mCameraServiceProxyWrapper(cameraServiceProxyWrapper) {};
 
-    explicit CameraServiceWatchdog (const String8 &cameraId, size_t maxCycles,
+    explicit CameraServiceWatchdog (const std::string &cameraId, size_t maxCycles,
             uint32_t cycleLengthMs, bool enabled,
             std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper) :
                     mCameraId(cameraId), mPause(true), mMaxCycles(maxCycles),
@@ -151,7 +150,7 @@ private:
     Mutex           mWatchdogLock;      // Lock for condition variable
     Mutex           mEnabledLock;       // Lock for enabled status
     Condition       mWatchdogCondition; // Condition variable for stop/start
-    String8         mCameraId;          // Camera Id the watchdog belongs to
+    std::string     mCameraId;          // Camera Id the watchdog belongs to
     bool            mPause;             // True if tid map is empty
     uint32_t        mMaxCycles;         // Max cycles
     uint32_t        mCycleLengthMs;     // Length of time elapsed per cycle

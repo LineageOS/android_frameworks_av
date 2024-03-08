@@ -282,8 +282,8 @@ void DumpReader::dump(int fd, size_t indent)
         default:
             break;
         }
-        if (!body.isEmpty()) {
-            dprintf(fd, "%.*s%s %s\n", (int)indent, "", timestamp.string(), body.string());
+        if (!body.empty()) {
+            dprintf(fd, "%.*s%s %s\n", (int)indent, "", timestamp.c_str(), body.c_str());
             body.clear();
         }
         timestamp.clear();

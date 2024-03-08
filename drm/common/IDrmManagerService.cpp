@@ -303,8 +303,8 @@ DrmInfo* BpDrmManagerService::acquireDrmInfo(int uniqueId, const DrmInfoRequest*
         const String8 value = drmInforequest->get(key);
         if (key == String8("FileDescriptorKey")) {
             int fd = -1;
-            if (sscanf(value.string(), "FileDescriptor[%d]", &fd) != 1) {
-                sscanf(value.string(), "%d", &fd);
+            if (sscanf(value.c_str(), "FileDescriptor[%d]", &fd) != 1) {
+                sscanf(value.c_str(), "%d", &fd);
             }
             data.writeFileDescriptor(fd);
         } else {
@@ -1330,7 +1330,7 @@ status_t BnDrmManagerService::onTransact(
         const String8 mime = data.readString8();
 
         sp<DecryptHandle> handle
-            = openDecryptSession(uniqueId, fd, offset, length, mime.string());
+            = openDecryptSession(uniqueId, fd, offset, length, mime.c_str());
 
         if (NULL != handle.get()) {
             writeDecryptHandleToParcelData(handle.get(), reply);
@@ -1349,7 +1349,7 @@ status_t BnDrmManagerService::onTransact(
         const String8 uri = data.readString8();
         const String8 mime = data.readString8();
 
-        sp<DecryptHandle> handle = openDecryptSession(uniqueId, uri.string(), mime.string());
+        sp<DecryptHandle> handle = openDecryptSession(uniqueId, uri.c_str(), mime.c_str());
 
         if (NULL != handle.get()) {
             writeDecryptHandleToParcelData(handle.get(), reply);

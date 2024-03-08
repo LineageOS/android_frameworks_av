@@ -15,10 +15,13 @@
  */
 
 //#define LOG_NDEBUG 0
+#define LOG_TAG "AudioRoutingTest"
 
+#include <string.h>
+
+#include <binder/ProcessState.h>
 #include <cutils/properties.h>
 #include <gtest/gtest.h>
-#include <string.h>
 
 #include "audio_test_utils.h"
 
@@ -53,7 +56,7 @@ TEST(AudioTrackTest, TestPerformanceMode) {
         ASSERT_NE(nullptr, ap);
         ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
                 << "Unable to open Resource";
-        EXPECT_EQ(OK, ap->create()) << "track creation failed";
+        ASSERT_EQ(OK, ap->create()) << "track creation failed";
         sp<OnAudioDeviceUpdateNotifier> cb = sp<OnAudioDeviceUpdateNotifier>::make();
         EXPECT_EQ(OK, ap->getAudioTrackHandle()->addAudioDeviceCallback(cb));
         EXPECT_EQ(OK, ap->start()) << "audio track start failed";
@@ -63,12 +66,16 @@ TEST(AudioTrackTest, TestPerformanceMode) {
         EXPECT_NE(0, ap->getAudioTrackHandle()->getFlags() & output_flags[i]);
         audio_patch patch;
         EXPECT_EQ(OK, getPatchForOutputMix(cb->mAudioIo, patch));
-        for (auto j = 0; j < patch.num_sources; j++) {
-            if (patch.sources[j].type == AUDIO_PORT_TYPE_MIX &&
-                patch.sources[j].ext.mix.handle == cb->mAudioIo) {
-                if ((patch.sources[j].flags.output & output_flags[i]) == 0) {
-                    ADD_FAILURE() << "expected output flag " << output_flags[i] << " is absent";
-                    std::cerr << dumpPortConfig(patch.sources[j]);
+        if (output_flags[i] != AUDIO_OUTPUT_FLAG_FAST) {
+            // A "normal" output can still have a FastMixer, depending on the buffer size.
+            // Thus, a fast track can be created on a mix port which does not have the FAST flag.
+            for (auto j = 0; j < patch.num_sources; j++) {
+                if (patch.sources[j].type == AUDIO_PORT_TYPE_MIX &&
+                    patch.sources[j].ext.mix.handle == cb->mAudioIo) {
+                    SCOPED_TRACE(dumpPortConfig(patch.sources[j]));
+                    EXPECT_NE(0, patch.sources[j].flags.output & output_flags[i])
+                            << "expected output flag "
+                            << audio_output_flag_to_string(output_flags[i]) << " is absent";
                 }
             }
         }
@@ -87,7 +94,7 @@ TEST(AudioTrackTest, DefaultRoutingTest) {
     sp<AudioCapture> capture = sp<AudioCapture>::make(
             AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO);
     ASSERT_NE(nullptr, capture);
-    EXPECT_EQ(OK, capture->create()) << "record creation failed";
+    ASSERT_EQ(OK, capture->create()) << "record creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbCapture = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, capture->getAudioRecordHandle()->addAudioDeviceCallback(cbCapture));
 
@@ -98,7 +105,7 @@ TEST(AudioTrackTest, DefaultRoutingTest) {
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
-    EXPECT_EQ(OK, playback->create()) << "track creation failed";
+    ASSERT_EQ(OK, playback->create()) << "track creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbPlayback = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, playback->getAudioTrackHandle()->addAudioDeviceCallback(cbPlayback));
 
@@ -180,7 +187,7 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
     ASSERT_NE(nullptr, playback);
     ASSERT_EQ(OK, playback->loadResource("/data/local/tmp/bbb_2ch_24kHz_s16le.raw"))
             << "Unable to open Resource";
-    EXPECT_EQ(OK, playback->create()) << "track creation failed";
+    ASSERT_EQ(OK, playback->create()) << "track creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbPlayback = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, playback->getAudioTrackHandle()->addAudioDeviceCallback(cbPlayback));
 
@@ -188,7 +195,7 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
     sp<AudioCapture> captureA = sp<AudioCapture>::make(
             AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO);
     ASSERT_NE(nullptr, captureA);
-    EXPECT_EQ(OK, captureA->create()) << "record creation failed";
+    ASSERT_EQ(OK, captureA->create()) << "record creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbCaptureA = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, captureA->getAudioRecordHandle()->addAudioDeviceCallback(cbCaptureA));
 
@@ -199,7 +206,7 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
             AUDIO_SOURCE_REMOTE_SUBMIX, 48000, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO,
             AUDIO_INPUT_FLAG_NONE, AUDIO_SESSION_ALLOCATE, AudioRecord::TRANSFER_CALLBACK, &attr);
     ASSERT_NE(nullptr, captureB);
-    EXPECT_EQ(OK, captureB->create()) << "record creation failed";
+    ASSERT_EQ(OK, captureB->create()) << "record creation failed";
     sp<OnAudioDeviceUpdateNotifier> cbCaptureB = sp<OnAudioDeviceUpdateNotifier>::make();
     EXPECT_EQ(OK, captureB->getAudioRecordHandle()->addAudioDeviceCallback(cbCaptureB));
 
@@ -258,4 +265,26 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
 
     captureA->stop();
     playback->stop();
+}
+
+class TestExecutionTracer : public ::testing::EmptyTestEventListener {
+  public:
+    void OnTestStart(const ::testing::TestInfo& test_info) override {
+        TraceTestState("Started", test_info);
+    }
+    void OnTestEnd(const ::testing::TestInfo& test_info) override {
+        TraceTestState("Completed", test_info);
+    }
+
+  private:
+    static void TraceTestState(const std::string& state, const ::testing::TestInfo& test_info) {
+        ALOGI("%s %s::%s", state.c_str(), test_info.test_suite_name(), test_info.name());
+    }
+};
+
+int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
 }

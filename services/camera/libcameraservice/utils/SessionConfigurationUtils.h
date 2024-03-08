@@ -21,6 +21,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
+#include <camera/StringUtils.h>
 #include <aidl/android/hardware/camera/device/ICameraDevice.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
@@ -37,17 +38,29 @@
 
 #define STATUS_ERROR(errorCode, errorString) \
     binder::Status::fromServiceSpecificError(errorCode, \
-            String8::format("%s:%d: %s", __FUNCTION__, __LINE__, errorString))
+            fmt::sprintf("%s:%d: %s", __FUNCTION__, __LINE__, errorString).c_str())
 
 #define STATUS_ERROR_FMT(errorCode, errorString, ...) \
     binder::Status::fromServiceSpecificError(errorCode, \
-            String8::format("%s:%d: " errorString, __FUNCTION__, __LINE__, \
-                    __VA_ARGS__))
+            fmt::sprintf("%s:%d: " errorString, __FUNCTION__, __LINE__, \
+                    __VA_ARGS__).c_str())
 
 namespace android {
 namespace camera3 {
 
-typedef std::function<CameraMetadata (const String8 &, bool overrideForPerfClass)> metadataGetter;
+typedef enum camera_request_template {
+    CAMERA_TEMPLATE_PREVIEW = 1,
+    CAMERA_TEMPLATE_STILL_CAPTURE = 2,
+    CAMERA_TEMPLATE_VIDEO_RECORD = 3,
+    CAMERA_TEMPLATE_VIDEO_SNAPSHOT = 4,
+    CAMERA_TEMPLATE_ZERO_SHUTTER_LAG = 5,
+    CAMERA_TEMPLATE_MANUAL = 6,
+    CAMERA_TEMPLATE_COUNT,
+    CAMERA_VENDOR_TEMPLATE_START = 0x40000000
+} camera_request_template_t;
+
+typedef std::function<CameraMetadata (const std::string &, bool overrideForPerfClass)>
+        metadataGetter;
 
 class StreamConfiguration {
 public:
@@ -96,7 +109,7 @@ bool isPublicFormat(int32_t format);
 binder::Status createSurfaceFromGbp(
         camera3::OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
-        const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
+        const std::string &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed,  int64_t dynamicRangeProfile,
         int64_t streamUseCase, int timestampBase, int mirrorMode,
         int32_t colorSpace, bool isPriviledgedClient=false);
@@ -120,28 +133,30 @@ bool dataSpaceFromColorSpace(android_dataspace *dataSpace, int32_t colorSpace);
 bool isStreamUseCaseSupported(int64_t streamUseCase, const CameraMetadata &deviceInfo);
 
 void mapStreamInfo(const OutputStreamInfo &streamInfo,
-        camera3::camera_stream_rotation_t rotation, String8 physicalId,
+        camera3::camera_stream_rotation_t rotation, const std::string &physicalId,
         int32_t groupId, aidl::android::hardware::camera::device::Stream *stream /*out*/);
 
 // Check that the physicalCameraId passed in is spported by the camera
 // device.
 binder::Status checkPhysicalCameraId(
-const std::vector<std::string> &physicalCameraIds, const String8 &physicalCameraId,
-const String8 &logicalCameraId);
+const std::vector<std::string> &physicalCameraIds, const std::string &physicalCameraId,
+const std::string &logicalCameraId);
 
 binder::Status checkSurfaceType(size_t numBufferProducers,
 bool deferredConsumer, int surfaceType);
 
 binder::Status checkOperatingMode(int operatingMode,
-const CameraMetadata &staticInfo, const String8 &cameraId);
+const CameraMetadata &staticInfo, const std::string &cameraId);
 
 binder::Status
 convertToHALStreamCombination(
     const SessionConfiguration& sessionConfiguration,
-    const String8 &logicalCameraId, const CameraMetadata &deviceInfo, bool isCompositeJpegRDisabled,
-    metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
+    const std::string &logicalCameraId, const CameraMetadata &deviceInfo,
+    bool isCompositeJpegRDisabled, metadataGetter getMetadata,
+    const std::vector<std::string> &physicalCameraIds,
     aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration,
-    bool overrideForPerfClass, bool *earlyExit, bool isPriviledgedClient = false);
+    bool overrideForPerfClass, metadata_vendor_id_t vendorTagId,
+    bool checkSessionParams, bool *earlyExit, bool isPriviledgedClient = false);
 
 StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
 
@@ -153,6 +168,16 @@ status_t checkAndOverrideSensorPixelModesUsed(
 bool targetPerfClassPrimaryCamera(
         const std::set<std::string>& perfClassPrimaryCameraIds, const std::string& cameraId,
         int32_t targetSdkVersion);
+
+// Utility method that maps AIDL request templates.
+binder::Status mapRequestTemplateFromClient(const std::string& cameraId, int templateId,
+        camera_request_template_t* tempId /*out*/);
+
+status_t mapRequestTemplateToAidl(camera_request_template_t templateId,
+        aidl::android::hardware::camera::device::RequestTemplate* tempId /*out*/);
+
+void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
+        int vendorTagId, CameraMetadata& dst);
 
 constexpr int32_t MAX_SURFACES_PER_STREAM = 4;
 

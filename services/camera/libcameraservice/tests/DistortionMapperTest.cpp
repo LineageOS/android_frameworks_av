@@ -19,8 +19,8 @@
 
 #include <random>
 
+#include <fmt/printf.h>
 #include <gtest/gtest.h>
-#include <android-base/stringprintf.h>
 #include <android-base/chrono_utils.h>
 
 #include "../device3/DistortionMapper.h"
@@ -260,9 +260,9 @@ void RandomTransformTest(::testing::Test *test,
                 rawToCorrectedDurationMs) / (randCoords.size() / 2) ).count();
 
     test->RecordProperty("CorrectedToRawDurationPerCoordUs",
-            base::StringPrintf("%f", correctedToRawDurationPerCoordUs));
+            fmt::sprintf("%f", correctedToRawDurationPerCoordUs));
     test->RecordProperty("RawToCorrectedDurationPerCoordUs",
-            base::StringPrintf("%f", rawToCorrectedDurationPerCoordUs));
+            fmt::sprintf("%f", rawToCorrectedDurationPerCoordUs));
 
     // Calculate mapping errors after round trip
     float totalErrorSq = 0;
@@ -296,9 +296,9 @@ void RandomTransformTest(::testing::Test *test,
     }
 
     float rmsError = std::sqrt(totalErrorSq / randCoords.size());
-    test->RecordProperty("RmsError", base::StringPrintf("%f", rmsError));
+    test->RecordProperty("RmsError", fmt::sprintf("%f", rmsError));
     for (size_t i = 0; i < histogram.size(); i++) {
-        std::string label = base::StringPrintf("HistogramBin[%f,%f)",
+        std::string label = fmt::sprintf("HistogramBin[%f,%f)",
                 (float)i/bucketsPerPixel, (float)(i + 1)/bucketsPerPixel);
         test->RecordProperty(label, histogram[i]);
     }

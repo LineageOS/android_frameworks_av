@@ -63,7 +63,7 @@ cc_fuzz {
     ],
     data: [":audiopolicyfuzzer_configuration_files"],
     fuzz_config: {
-        cc: ["mnaganov@google.com"],
+        cc: ["android-audio-fuzzing-reports@google.com"],
         componentid: 155276,
         hotlists: [
             "4593311",

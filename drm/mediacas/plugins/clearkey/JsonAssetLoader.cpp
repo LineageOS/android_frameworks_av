@@ -80,7 +80,7 @@ sp<ABuffer> JsonAssetLoader::decodeBase64String(const String8& encodedText) {
         }
     }
 
-    return decodeBase64(AString(paddedText.string()));
+    return decodeBase64(AString(paddedText.c_str()));
 }
 
 bool JsonAssetLoader::findKey(const String8& jsonObject, Asset *asset) {
@@ -91,30 +91,30 @@ bool JsonAssetLoader::findKey(const String8& jsonObject, Asset *asset) {
         return false;
     }
     findValue(kIdTag, &value);
-    ALOGV("found %s=%s", kIdTag.string(), value.string());
-    asset->set_id(atoi(value.string()));
+    ALOGV("found %s=%s", kIdTag.c_str(), value.c_str());
+    asset->set_id(atoi(value.c_str()));
 
     if (jsonObject.find(kNameTag) < 0) {
         return false;
     }
     findValue(kNameTag, &value);
-    ALOGV("found %s=%s", kNameTag.string(), value.string());
-    asset->set_name(value.string());
+    ALOGV("found %s=%s", kNameTag.c_str(), value.c_str());
+    asset->set_name(value.c_str());
 
     if (jsonObject.find(kLowerCaseOgranizationNameTag) < 0) {
         return false;
     }
     findValue(kLowerCaseOgranizationNameTag, &value);
-    ALOGV("found %s=%s", kLowerCaseOgranizationNameTag.string(), value.string());
-    asset->set_lowercase_organization_name(value.string());
+    ALOGV("found %s=%s", kLowerCaseOgranizationNameTag.c_str(), value.c_str());
+    asset->set_lowercase_organization_name(value.c_str());
 
     if (jsonObject.find(kCasTypeTag) < 0) {
         return false;
     }
     findValue(kCasTypeTag, &value);
-    ALOGV("found %s=%s", kCasTypeTag.string(), value.string());
+    ALOGV("found %s=%s", kCasTypeTag.c_str(), value.c_str());
     // Asset_CasType_CLEARKEY_CAS = 1
-    asset->set_cas_type((Asset_CasType)atoi(value.string()));
+    asset->set_cas_type((Asset_CasType)atoi(value.c_str()));
 
     return true;
 }
@@ -127,8 +127,8 @@ void JsonAssetLoader::findValue(const String8 &key, String8* value) {
         if (0 == (*nextToken).compare(key)) {
             if (nextToken + 1 == mTokens.end())
                 break;
-            valueToken = (*(nextToken + 1)).string();
-            value->setTo(valueToken);
+            valueToken = (*(nextToken + 1)).c_str();
+            *value = valueToken;
             nextToken++;
             break;
         }
@@ -146,7 +146,7 @@ bool JsonAssetLoader::parseJsonObject(const String8& jsonObject,
 
     jsmn_init(&parser);
     int numTokens = jsmn_parse(&parser,
-        jsonObject.string(), jsonObject.size(), NULL, 0);
+        jsonObject.c_str(), jsonObject.size(), NULL, 0);
     if (numTokens < 0) {
         ALOGE("Parser returns error code=%d", numTokens);
         return false;
@@ -157,7 +157,7 @@ bool JsonAssetLoader::parseJsonObject(const String8& jsonObject,
     mJsmnTokens.setCapacity(jsmnTokensSize);
 
     jsmn_init(&parser);
-    int status = jsmn_parse(&parser, jsonObject.string(),
+    int status = jsmn_parse(&parser, jsonObject.c_str(),
         jsonObject.size(), mJsmnTokens.editArray(), numTokens);
     if (status < 0) {
         ALOGE("Parser returns error code=%d", status);
@@ -169,12 +169,12 @@ bool JsonAssetLoader::parseJsonObject(const String8& jsonObject,
     const char *pjs;
     ALOGV("numTokens: %d", numTokens);
     for (int j = 0; j < numTokens; ++j) {
-        pjs = jsonObject.string() + mJsmnTokens[j].start;
+        pjs = jsonObject.c_str() + mJsmnTokens[j].start;
         if (mJsmnTokens[j].type == JSMN_STRING ||
                 mJsmnTokens[j].type == JSMN_PRIMITIVE) {
-            token.setTo(pjs, mJsmnTokens[j].end - mJsmnTokens[j].start);
+            token = String8(pjs, mJsmnTokens[j].end - mJsmnTokens[j].start);
             tokens->add(token);
-            ALOGV("add token: %s", token.string());
+            ALOGV("add token: %s", token.c_str());
         }
     }
     return true;
@@ -187,7 +187,7 @@ bool JsonAssetLoader::parseJsonObject(const String8& jsonObject,
  */
 bool JsonAssetLoader::parseJsonAssetString(const String8& jsonAsset,
         Vector<String8>* jsonObjects) {
-    if (jsonAsset.isEmpty()) {
+    if (jsonAsset.empty()) {
         ALOGE("Empty JSON Web Key");
         return false;
     }
@@ -199,7 +199,7 @@ bool JsonAssetLoader::parseJsonAssetString(const String8& jsonAsset,
     // the original string.
     jsmn_init(&parser);
     int numTokens = jsmn_parse(&parser,
-            jsonAsset.string(), jsonAsset.size(), NULL, 0);
+            jsonAsset.c_str(), jsonAsset.size(), NULL, 0);
     if (numTokens < 0) {
         ALOGE("Parser returns error code=%d", numTokens);
         return false;
@@ -209,7 +209,7 @@ bool JsonAssetLoader::parseJsonAssetString(const String8& jsonAsset,
     mJsmnTokens.setCapacity(jsmnTokensSize);
 
     jsmn_init(&parser);
-    int status = jsmn_parse(&parser, jsonAsset.string(),
+    int status = jsmn_parse(&parser, jsonAsset.c_str(),
             jsonAsset.size(), mJsmnTokens.editArray(), numTokens);
     if (status < 0) {
         ALOGE("Parser returns error code=%d", status);
@@ -219,9 +219,9 @@ bool JsonAssetLoader::parseJsonAssetString(const String8& jsonAsset,
     String8 token;
     const char *pjs;
     for (int i = 0; i < numTokens; ++i) {
-        pjs = jsonAsset.string() + mJsmnTokens[i].start;
+        pjs = jsonAsset.c_str() + mJsmnTokens[i].start;
         if (mJsmnTokens[i].type == JSMN_OBJECT) {
-            token.setTo(pjs, mJsmnTokens[i].end - mJsmnTokens[i].start);
+            token = String8(pjs, mJsmnTokens[i].end - mJsmnTokens[i].start);
             jsonObjects->add(token);
         }
     }

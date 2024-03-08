@@ -16,12 +16,17 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2FenceFactory"
+#include <poll.h>
+
+#include <android-base/unique_fd.h>
 #include <cutils/native_handle.h>
 #include <utils/Log.h>
 #include <ui/Fence.h>
 
 #include <C2FenceFactory.h>
 #include <C2SurfaceSyncObj.h>
+
+#include <utility>
 
 #define MAX_FENCE_FDS 1
 
@@ -32,6 +37,7 @@ public:
         NULL_FENCE,
         SURFACE_FENCE,
         SYNC_FENCE,
+        PIPE_FENCE,
     };
 
     virtual c2_status_t wait(c2_nsecs_t timeoutNs) = 0;
@@ -190,7 +196,6 @@ public:
         if (timeoutMs > INT_MAX) {
             timeoutMs = INT_MAX;
         }
-
         switch (mFence->wait((int)timeoutMs)) {
             case NO_ERROR:
                 return C2_OK;
@@ -202,7 +207,7 @@ public:
     }
 
     virtual bool valid() const {
-        return mFence->getStatus() != Fence::Status::Invalid;
+        return (mFence && (mFence->getStatus() != Fence::Status::Invalid));
     }
 
     virtual bool ready() const {
@@ -211,6 +216,14 @@ public:
 
     virtual int fd() const {
         return mFence->dup();
+    }
+
+    std::vector<int> fds() const {
+        std::vector<int> retFds;
+        for (int index = 0; index < mListFences.size(); index++) {
+            retFds.push_back(mListFences[index]->dup());
+        }
+        return retFds;
     }
 
     virtual bool isHW() const {
@@ -222,38 +235,94 @@ public:
     }
 
     virtual native_handle_t *createNativeHandle() const {
-        native_handle_t* nh = native_handle_create(1, 1);
+        std::vector<int> nativeFds = fds();
+        nativeFds.push_back(fd());
+        native_handle_t* nh = native_handle_create(nativeFds.size(), 1);
         if (!nh) {
             ALOGE("Failed to allocate native handle for sync fence");
+            for (int fd : nativeFds) {
+                close(fd);
+            }
             return nullptr;
         }
-        nh->data[0] = fd();
-        nh->data[1] = type();
+
+        for (int i = 0; i < nativeFds.size(); i++) {
+            nh->data[i] = nativeFds[i];
+        }
+        nh->data[nativeFds.size()] = type();
         return nh;
     }
 
     virtual ~SyncFenceImpl() {};
 
     SyncFenceImpl(int fenceFd) :
-            mFence(sp<Fence>::make(fenceFd)) {}
+        mFence(sp<Fence>::make(fenceFd)) {
+        mListFences.clear();
+        if (mFence) {
+            mListFences.push_back(mFence);
+        }
+    }
+
+    SyncFenceImpl(const std::vector<int>& fenceFds, int mergedFd) {
+        mListFences.clear();
+
+        for (int fenceFd : fenceFds) {
+            if (fenceFd < 0) {
+                continue;
+            } else {
+                mListFences.push_back(sp<Fence>::make(fenceFd));
+                if (!mListFences.back()) {
+                    mFence.clear();
+                    break;
+                }
+                if (mergedFd == -1) {
+                    mFence = (mFence == nullptr) ? (mListFences.back()) :
+                        (Fence::merge("syncFence", mFence, mListFences.back()));
+                }
+            }
+        }
+        if (mergedFd != -1)
+        {
+            mFence = sp<Fence>::make(mergedFd);
+        }
+        if (!mFence) {
+            mListFences.clear();
+        }
+    }
 
     static std::shared_ptr<SyncFenceImpl> CreateFromNativeHandle(const native_handle_t* nh) {
-        if (!nh || nh->numFds != 1 || nh->numInts != 1) {
+        if (!nh || nh->numFds < 1 || nh->numInts < 1) {
             ALOGE("Invalid handle for sync fence");
             return nullptr;
         }
-        int fd = dup(nh->data[0]);
-        std::shared_ptr<SyncFenceImpl> p = std::make_shared<SyncFenceImpl>(fd);
+        std::vector<int> fds;
+        for (int i = 0; i < nh->numFds-1; i++) {
+            fds.push_back(dup(nh->data[i]));
+        }
+        std::shared_ptr<SyncFenceImpl> p = (nh->numFds == 1)?
+                (std::make_shared<SyncFenceImpl>(fds.back())):
+                (std::make_shared<SyncFenceImpl>(fds, (dup(nh->data[nh->numFds-1]))));
         if (!p) {
             ALOGE("Failed to allocate sync fence impl");
-            close(fd);
+            for (int fd : fds) {
+                close(fd);
+            }
         }
         return p;
     }
 
 private:
-    const sp<Fence> mFence;
+    std::vector<sp<Fence>> mListFences;
+    sp<Fence> mFence;  //merged fence in case mListFences size > 0
 };
+
+std::vector<int> ExtractFdsFromCodec2SyncFence(const C2Fence& fence) {
+    std::vector<int> retFds;
+    if ((fence.mImpl) && (fence.mImpl->type() == C2Fence::Impl::SYNC_FENCE)) {
+        retFds = static_cast<_C2FenceFactory::SyncFenceImpl *>(fence.mImpl.get())->fds();
+    }
+    return retFds;
+}
 
 C2Fence _C2FenceFactory::CreateSyncFence(int fenceFd) {
     std::shared_ptr<C2Fence::Impl> p;
@@ -262,12 +331,187 @@ C2Fence _C2FenceFactory::CreateSyncFence(int fenceFd) {
         if (!p) {
             ALOGE("Failed to allocate sync fence impl");
             close(fenceFd);
-        }
-        if (!p->valid()) {
+        } else if (!p->valid()) {
             p.reset();
         }
     } else {
         ALOGE("Create sync fence from invalid fd");
+    }
+    return C2Fence(p);
+}
+
+C2Fence _C2FenceFactory::CreateMultipleFdSyncFence(const std::vector<int>& fenceFds) {
+    std::shared_ptr<C2Fence::Impl> p;
+    if (fenceFds.size() > 0) {
+        p = std::make_shared<_C2FenceFactory::SyncFenceImpl>(fenceFds, -1);
+        if (!p) {
+            ALOGE("Failed to allocate sync fence impl closing FDs");
+            for (int fenceFd : fenceFds) {
+                close(fenceFd);
+            }
+        } else if (!p->valid()) {
+            ALOGE("Invalid sync fence created");
+            p.reset();
+        }
+    } else {
+        ALOGE("Create sync fence from invalid fd list of size 0");
+    }
+    return C2Fence(p);
+}
+
+/**
+ * Fence implementation for notifying # of events available based on
+ * file descriptors created by pipe()/pipe2(). The writing end of the
+ * file descriptors is used to create the implementation.
+ * The implementation supports all C2Fence interface.
+ */
+class _C2FenceFactory::PipeFenceImpl: public C2Fence::Impl {
+private:
+    bool waitEvent(c2_nsecs_t timeoutNs, bool *hangUp, bool *event) const {
+        if (!mValid) {
+            *hangUp = true;
+            return true;
+        }
+
+        struct pollfd pfd;
+        pfd.fd = mPipeFd.get();
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+        struct timespec ts;
+        if (timeoutNs >= 0) {
+            ts.tv_sec = int(timeoutNs / 1000000000);
+            ts.tv_nsec = timeoutNs % 1000000000;
+        } else {
+            ALOGD("polling for indefinite duration requested, but changed to wait for %d sec",
+                  kPipeFenceWaitLimitSecs);
+            ts.tv_sec = kPipeFenceWaitLimitSecs;
+            ts.tv_nsec = 0;
+        }
+        int ret = ::ppoll(&pfd, 1, &ts, nullptr);
+        if (ret >= 0) {
+            if (pfd.revents) {
+                if (pfd.revents & ~POLLIN) {
+                    // Mostly this means the writing end fd was closed.
+                    *hangUp = true;
+                    mValid = false;
+                    ALOGD("PipeFenceImpl: pipe fd hangup or err event returned");
+                }
+                *event = true;
+                return true;
+            }
+            // event not ready yet.
+            return true;
+        }
+        if (errno == EINTR) {
+            // poll() was cancelled by signal or inner kernel status.
+            return false;
+        }
+        // Since poll error happened here, treat the error is irrecoverable.
+        ALOGE("PipeFenceImpl: poll() error %d", errno);
+        *hangUp = true;
+        mValid = false;
+        return true;
+    }
+
+public:
+    virtual c2_status_t wait(c2_nsecs_t timeoutNs) {
+        if (!mValid) {
+            return C2_BAD_STATE;
+        }
+        bool hangUp = false;
+        bool event = false;
+        if (waitEvent(timeoutNs, &hangUp, &event)) {
+            if (hangUp) {
+                return C2_BAD_STATE;
+            }
+            if (event) {
+                return C2_OK;
+            }
+            return C2_TIMED_OUT;
+        } else {
+            return C2_CANCELED;
+        }
+    }
+
+    virtual bool valid() const {
+        if (!mValid) {
+            return false;
+        }
+        bool hangUp = false;
+        bool event = false;
+        if (waitEvent(0, &hangUp, &event)) {
+            if (hangUp) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    virtual bool ready() const {
+        if (!mValid) {
+            return false;
+        }
+        bool hangUp = false;
+        bool event = false;
+        if (waitEvent(0, &hangUp, &event)) {
+            if (event) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    virtual int fd() const {
+        if (!mValid) {
+            return -1;
+        }
+        return ::dup(mPipeFd.get());
+    }
+
+    virtual bool isHW() const {
+        return false;
+    }
+
+    virtual type_t type() const {
+        return PIPE_FENCE;
+    }
+
+    virtual native_handle_t *createNativeHandle() const {
+        // This is not supported.
+        return nullptr;
+    }
+
+    virtual ~PipeFenceImpl() = default;
+
+    PipeFenceImpl(int fd) : mPipeFd(fd) {
+        mValid = (mPipeFd.get() >= 0);
+    }
+
+    PipeFenceImpl(::android::base::unique_fd &&ufd) : mPipeFd{std::move(ufd)} {
+        mValid = (mPipeFd.get() >= 0);
+    }
+
+private:
+    friend struct _C2FenceFactory;
+    static constexpr int kPipeFenceWaitLimitSecs = 5;
+
+    mutable std::atomic<bool> mValid;
+    const ::android::base::unique_fd mPipeFd;
+};
+
+C2Fence _C2FenceFactory::CreatePipeFence(int fd) {
+    ::android::base::unique_fd ufd{fd};
+    return CreatePipeFence(std::move(ufd));
+}
+
+C2Fence _C2FenceFactory::CreatePipeFence(::android::base::unique_fd &&ufd) {
+    std::shared_ptr<_C2FenceFactory::PipeFenceImpl> impl =
+        std::make_shared<_C2FenceFactory::PipeFenceImpl>(std::move(ufd));
+    std::shared_ptr<C2Fence::Impl> p = std::static_pointer_cast<C2Fence::Impl>(impl);
+    if (!p) {
+        ALOGE("PipeFence creation failure");
+    } else if (!impl->mValid) {
+        p.reset();
     }
     return C2Fence(p);
 }

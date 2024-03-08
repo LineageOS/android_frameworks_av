@@ -56,6 +56,14 @@ cc_defaults {
             "android-media-fuzzing-reports@google.com",
         ],
         componentid: 155276,
+        hotlists: [
+            "4593311",
+        ],
+        description: "The fuzzer targets the APIs of libmediandk library",
+        vector: "local_no_privileges_required",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
     },
 }
 
@@ -63,6 +71,11 @@ cc_fuzz {
     name: "ndk_crypto_fuzzer",
     srcs: ["ndk_crypto_fuzzer.cpp"],
     defaults: ["libmediandk_fuzzer_defaults"],
+    fuzz_config: {
+        libfuzzer_options: [
+            "max_len=10000",
+        ],
+    },
 }
 
 cc_fuzz {
@@ -114,5 +127,18 @@ cc_fuzz {
              "NdkMediaCodecFuzzerBase.cpp",
           ],
     header_libs: ["libnativewindow_headers",],
+    defaults: ["libmediandk_fuzzer_defaults",],
+}
+
+cc_fuzz {
+    name: "ndk_async_codec_fuzzer",
+    srcs: [
+           "ndk_async_codec_fuzzer.cpp",
+           "NdkMediaCodecFuzzerBase.cpp",
+          ],
+    header_libs: [
+           "libnativewindow_headers",
+           "libutils_headers",
+          ],
     defaults: ["libmediandk_fuzzer_defaults",],
 }

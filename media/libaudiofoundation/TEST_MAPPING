@@ -20,5 +20,10 @@
         }
       ]
     }
+  ],
+  "postsubmit": [
+    {
+      "name": "audiofoundation_containers_test"
+    }
   ]
 }

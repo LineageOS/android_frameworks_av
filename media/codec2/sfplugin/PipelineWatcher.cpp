@@ -45,6 +45,11 @@ PipelineWatcher &PipelineWatcher::smoothnessFactor(uint32_t value) {
     return *this;
 }
 
+PipelineWatcher &PipelineWatcher::tunneled(bool value) {
+    mTunneled = value;
+    return *this;
+}
+
 void PipelineWatcher::onWorkQueued(
         uint64_t frameIndex,
         std::vector<std::shared_ptr<C2Buffer>> &&buffers,
@@ -87,8 +92,13 @@ void PipelineWatcher::onWorkDone(uint64_t frameIndex) {
     ALOGV("onWorkDone(frameIndex=%llu)", (unsigned long long)frameIndex);
     auto it = mFramesInPipeline.find(frameIndex);
     if (it == mFramesInPipeline.end()) {
-        ALOGD("onWorkDone: frameIndex not found (%llu); ignored",
-              (unsigned long long)frameIndex);
+        if (!mTunneled) {
+            ALOGD("onWorkDone: frameIndex not found (%llu); ignored",
+                  (unsigned long long)frameIndex);
+        } else {
+            ALOGV("onWorkDone: frameIndex not found (%llu); ignored",
+                  (unsigned long long)frameIndex);
+        }
         return;
     }
     (void)mFramesInPipeline.erase(it);

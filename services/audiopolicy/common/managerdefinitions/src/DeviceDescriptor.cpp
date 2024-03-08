@@ -154,6 +154,12 @@ void DeviceDescriptor::importAudioPortAndPickAudioProfile(
     policyPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
 }
 
+status_t DeviceDescriptor::readFromParcelable(const media::AudioPortFw& parcelable) {
+    RETURN_STATUS_IF_ERROR(DeviceDescriptorBase::readFromParcelable(parcelable));
+    mDeclaredAddress = DeviceDescriptorBase::address();
+    return OK;
+}
+
 void DeviceDescriptor::setEncapsulationInfoFromHal(
         AudioPolicyClientInterface *clientInterface) {
     AudioParameter param(String8(mDeviceTypeAddr.getAddress()));
@@ -185,7 +191,7 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, bool verbose) const
     }
 
     std::string descBaseDumpStr;
-    DeviceDescriptorBase::dump(&descBaseDumpStr, spaces, extraInfo.string(), verbose);
+    DeviceDescriptorBase::dump(&descBaseDumpStr, spaces, extraInfo.c_str(), verbose);
     dst->append(descBaseDumpStr.c_str());
 }
 
@@ -225,8 +231,7 @@ void DeviceVector::add(const DeviceVector &devices)
 {
     bool added = false;
     for (const auto& device : devices) {
-        ALOG_ASSERT(device != nullptr, "Null pointer found when adding DeviceVector");
-        if (indexOf(device) < 0 && SortedVector::add(device) >= 0) {
+        if (device && indexOf(device) < 0 && SortedVector::add(device) >= 0) {
             added = true;
         }
     }
@@ -238,7 +243,10 @@ void DeviceVector::add(const DeviceVector &devices)
 
 ssize_t DeviceVector::add(const sp<DeviceDescriptor>& item)
 {
-    ALOG_ASSERT(item != nullptr, "Adding null pointer to DeviceVector");
+    if (!item) {
+        ALOGW("DeviceVector::%s() null device", __func__);
+        return -1;
+    }
     ssize_t ret = indexOf(item);
 
     if (ret < 0) {
@@ -325,7 +333,7 @@ sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8
         }
     }
     ALOGV("DeviceVector::%s() for type %08x address \"%s\" found %p format %08x",
-            __func__, type, address.string(), device.get(), format);
+            __func__, type, address.c_str(), device.get(), format);
     return device;
 }
 
@@ -448,7 +456,7 @@ void DeviceVector::dump(String8 *dst, const String8 &tag, int spaces, bool verbo
     if (isEmpty()) {
         return;
     }
-    dst->appendFormat("%*s%s devices (%zu):\n", spaces, "", tag.string(), size());
+    dst->appendFormat("%*s%s devices (%zu):\n", spaces, "", tag.c_str(), size());
     for (size_t i = 0; i < size(); i++) {
         const std::string prefix = base::StringPrintf("%*s %zu. ", spaces, "", i + 1);
         dst->appendFormat("%s", prefix.c_str());

@@ -37,6 +37,9 @@ void RotateAndCropMapper::initRemappedKeys() {
 
     mRemappedKeys.insert(ANDROID_SCALER_ROTATE_AND_CROP);
     mRemappedKeys.insert(ANDROID_SCALER_CROP_REGION);
+    if (flags::concert_mode()) {
+        mRemappedKeys.insert(ANDROID_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_SENSOR_CROP_REGION);
+    }
 }
 
 bool RotateAndCropMapper::isNeeded(const CameraMetadata* deviceInfo) {

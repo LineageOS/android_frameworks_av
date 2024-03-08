@@ -373,7 +373,7 @@ status_t DrmManagerService::dump(int fd, const Vector<String16>& args)
         (void)args;
 #endif
     }
-    write(fd, result.string(), result.size());
+    write(fd, result.c_str(), result.size());
     return NO_ERROR;
 }
 

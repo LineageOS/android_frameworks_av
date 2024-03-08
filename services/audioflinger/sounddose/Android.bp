@@ -7,12 +7,39 @@ package {
     default_applicable_licenses: ["frameworks_av_services_audioflinger_license"],
 }
 
+audioflinger_sounddose_tidy_errors = audioflinger_base_tidy_errors + [
+    "modernize-avoid-c-arrays",
+    "modernize-deprecated-headers",
+    "modernize-pass-by-value",
+    "modernize-use-auto",
+    "modernize-use-nodiscard",
+
+    // TODO(b/275642749) Reenable these warnings
+    "-misc-non-private-member-variables-in-classes",
+]
+
+// Eventually use common tidy defaults
+cc_defaults {
+    name: "audioflinger_sounddose_flags_defaults",
+    // https://clang.llvm.org/docs/UsersManual.html#command-line-options
+    // https://clang.llvm.org/docs/DiagnosticsReference.html
+    cflags: audioflinger_base_cflags,
+    // https://clang.llvm.org/extra/clang-tidy/
+    tidy: true,
+    tidy_checks: audioflinger_sounddose_tidy_errors,
+    tidy_checks_as_errors: audioflinger_sounddose_tidy_errors,
+    tidy_flags: [
+      "-format-style=file",
+    ],
+}
+
 cc_library {
     name: "libsounddose",
 
     double_loadable: true,
 
     defaults: [
+        "audioflinger_sounddose_flags_defaults",
         "latest_android_media_audio_common_types_ndk_shared",
         "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "latest_android_hardware_audio_sounddose_ndk_shared",

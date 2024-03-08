@@ -26,25 +26,10 @@
 #define WAIT_PERIOD_MS 10  // from AudioTrack.cpp
 #define MAX_WAIT_TIME_MS 5000
 
-template <class T>
-constexpr void (*xmlDeleter)(T* t);
-template <>
-constexpr auto xmlDeleter<xmlDoc> = xmlFreeDoc;
-template <>
-constexpr auto xmlDeleter<xmlChar> = [](xmlChar* s) { xmlFree(s); };
-
-/** @return a unique_ptr with the correct deleter for the libxml2 object. */
-template <class T>
-constexpr auto make_xmlUnique(T* t) {
-    // Wrap deleter in lambda to enable empty base optimization
-    auto deleter = [](T* t) { xmlDeleter<T>(t); };
-    return std::unique_ptr<T, decltype(deleter)>{t, deleter};
-}
-
 void OnAudioDeviceUpdateNotifier::onAudioDeviceUpdate(audio_io_handle_t audioIo,
                                                       audio_port_handle_t deviceId) {
     std::unique_lock<std::mutex> lock{mMutex};
-    ALOGD("%s  audioIo=%d deviceId=%d", __func__, audioIo, deviceId);
+    ALOGI("%s: audioIo=%d deviceId=%d", __func__, audioIo, deviceId);
     mAudioIo = audioIo;
     mDeviceId = deviceId;
     mCondition.notify_all();
@@ -727,184 +712,17 @@ bool checkPatchCapture(audio_io_handle_t audioIo, audio_port_handle_t deviceId) 
 }
 
 std::string dumpPortConfig(const audio_port_config& port) {
-    std::ostringstream result;
-    std::string deviceInfo;
-    if (port.type == AUDIO_PORT_TYPE_DEVICE) {
-        if (port.ext.device.type & AUDIO_DEVICE_BIT_IN) {
-            InputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
-        } else {
-            OutputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
-        }
-        deviceInfo += std::string(", address = ") + port.ext.device.address;
-    }
-    result << "audio_port_handle_t = " << port.id << ", "
-           << "Role = " << (port.role == AUDIO_PORT_ROLE_SOURCE ? "source" : "sink") << ", "
-           << "Type = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? "device" : "mix") << ", "
-           << "deviceInfo = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? deviceInfo : "") << ", "
-           << "config_mask = 0x" << std::hex << port.config_mask << std::dec << ", ";
-    if (port.config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
-        result << "sample rate = " << port.sample_rate << ", ";
-    }
-    if (port.config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
-        result << "channel mask = " << port.channel_mask << ", ";
-    }
-    if (port.config_mask & AUDIO_PORT_CONFIG_FORMAT) {
-        result << "format = " << port.format << ", ";
-    }
-    result << "input flags = " << port.flags.input << ", ";
-    result << "output flags = " << port.flags.output << ", ";
-    result << "mix io handle = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? 0 : port.ext.mix.handle)
-           << "\n";
-    return result.str();
+    auto aidlPortConfig = legacy2aidl_audio_port_config_AudioPortConfigFw(port);
+    return aidlPortConfig.ok() ? aidlPortConfig.value().toString()
+                               : "Error while converting audio port config to AIDL";
 }
 
 std::string dumpPatch(const audio_patch& patch) {
-    std::ostringstream result;
-    result << "----------------- Dumping Patch ------------ \n";
-    result << "Patch Handle: " << patch.id << ", sources: " << patch.num_sources
-           << ", sink: " << patch.num_sinks << "\n";
-    audio_port_v7 port;
-    for (uint32_t i = 0; i < patch.num_sources; i++) {
-        result << "----------------- Dumping Source Port Config @ index " << i
-               << " ------------ \n";
-        result << dumpPortConfig(patch.sources[i]);
-        result << "----------------- Dumping Source Port for id " << patch.sources[i].id
-               << " ------------ \n";
-        getPortById(patch.sources[i].id, port);
-        result << dumpPort(port);
-    }
-    for (uint32_t i = 0; i < patch.num_sinks; i++) {
-        result << "----------------- Dumping Sink Port Config @ index " << i << " ------------ \n";
-        result << dumpPortConfig(patch.sinks[i]);
-        result << "----------------- Dumping Sink Port for id " << patch.sinks[i].id
-               << " ------------ \n";
-        getPortById(patch.sinks[i].id, port);
-        result << dumpPort(port);
-    }
-    return result.str();
+    auto aidlPatch = legacy2aidl_audio_patch_AudioPatchFw(patch);
+    return aidlPatch.ok() ? aidlPatch.value().toString() : "Error while converting patch to AIDL";
 }
 
 std::string dumpPort(const audio_port_v7& port) {
-    std::ostringstream result;
-    std::string deviceInfo;
-    if (port.type == AUDIO_PORT_TYPE_DEVICE) {
-        if (port.ext.device.type & AUDIO_DEVICE_BIT_IN) {
-            InputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
-        } else {
-            OutputDeviceConverter::maskToString(port.ext.device.type, deviceInfo);
-        }
-        deviceInfo += std::string(", address = ") + port.ext.device.address;
-    }
-    result << "audio_port_handle_t = " << port.id << ", "
-           << "Role = " << (port.role == AUDIO_PORT_ROLE_SOURCE ? "source" : "sink") << ", "
-           << "Type = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? "device" : "mix") << ", "
-           << "deviceInfo = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? deviceInfo : "") << ", "
-           << "Name = " << port.name << ", "
-           << "num profiles = " << port.num_audio_profiles << ", "
-           << "mix io handle = " << (port.type == AUDIO_PORT_TYPE_DEVICE ? 0 : port.ext.mix.handle)
-           << ", ";
-    for (int i = 0; i < port.num_audio_profiles; i++) {
-        result << "AudioProfile = " << i << " {";
-        result << "format = " << port.audio_profiles[i].format << ", ";
-        result << "samplerates = ";
-        for (int j = 0; j < port.audio_profiles[i].num_sample_rates; j++) {
-            result << port.audio_profiles[i].sample_rates[j] << ", ";
-        }
-        result << "channelmasks = ";
-        for (int j = 0; j < port.audio_profiles[i].num_channel_masks; j++) {
-            result << "0x" << std::hex << port.audio_profiles[i].channel_masks[j] << std::dec
-                   << ", ";
-        }
-        result << "} ";
-    }
-    result << dumpPortConfig(port.active_config);
-    return result.str();
-}
-
-std::string getXmlAttribute(const xmlNode* cur, const char* attribute) {
-    auto charPtr = make_xmlUnique(xmlGetProp(cur, reinterpret_cast<const xmlChar*>(attribute)));
-    if (charPtr == NULL) {
-        return "";
-    }
-    std::string value(reinterpret_cast<const char*>(charPtr.get()));
-    return value;
-}
-
-status_t parse_audio_policy_configuration_xml(std::vector<std::string>& attachedDevices,
-                                              std::vector<MixPort>& mixPorts,
-                                              std::vector<Route>& routes) {
-    std::string path = audio_find_readable_configuration_file("audio_policy_configuration.xml");
-    if (path.length() == 0) return UNKNOWN_ERROR;
-    auto doc = make_xmlUnique(xmlParseFile(path.c_str()));
-    if (doc == nullptr) return UNKNOWN_ERROR;
-    xmlNode* root = xmlDocGetRootElement(doc.get());
-    if (root == nullptr) return UNKNOWN_ERROR;
-    if (xmlXIncludeProcess(doc.get()) < 0) return UNKNOWN_ERROR;
-    mixPorts.clear();
-    if (!xmlStrcmp(root->name, reinterpret_cast<const xmlChar*>("audioPolicyConfiguration"))) {
-        std::string raw{getXmlAttribute(root, "version")};
-        for (auto* child = root->xmlChildrenNode; child != nullptr; child = child->next) {
-            if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>("modules"))) {
-                xmlNode* root = child;
-                for (auto* child = root->xmlChildrenNode; child != nullptr; child = child->next) {
-                    if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>("module"))) {
-                        xmlNode* root = child;
-                        for (auto* child = root->xmlChildrenNode; child != nullptr;
-                             child = child->next) {
-                            if (!xmlStrcmp(child->name,
-                                           reinterpret_cast<const xmlChar*>("mixPorts"))) {
-                                xmlNode* root = child;
-                                for (auto* child = root->xmlChildrenNode; child != nullptr;
-                                     child = child->next) {
-                                    if (!xmlStrcmp(child->name,
-                                                   reinterpret_cast<const xmlChar*>("mixPort"))) {
-                                        MixPort mixPort;
-                                        xmlNode* root = child;
-                                        mixPort.name = getXmlAttribute(root, "name");
-                                        mixPort.role = getXmlAttribute(root, "role");
-                                        mixPort.flags = getXmlAttribute(root, "flags");
-                                        if (mixPort.role == "source") mixPorts.push_back(mixPort);
-                                    }
-                                }
-                            } else if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>(
-                                                                       "attachedDevices"))) {
-                                xmlNode* root = child;
-                                for (auto* child = root->xmlChildrenNode; child != nullptr;
-                                     child = child->next) {
-                                    if (!xmlStrcmp(child->name,
-                                                   reinterpret_cast<const xmlChar*>("item"))) {
-                                        auto xmlValue = make_xmlUnique(xmlNodeListGetString(
-                                                child->doc, child->xmlChildrenNode, 1));
-                                        if (xmlValue == nullptr) {
-                                            raw = "";
-                                        } else {
-                                            raw = reinterpret_cast<const char*>(xmlValue.get());
-                                        }
-                                        std::string& value = raw;
-                                        attachedDevices.push_back(std::move(value));
-                                    }
-                                }
-                            } else if (!xmlStrcmp(child->name,
-                                                  reinterpret_cast<const xmlChar*>("routes"))) {
-                                xmlNode* root = child;
-                                for (auto* child = root->xmlChildrenNode; child != nullptr;
-                                     child = child->next) {
-                                    if (!xmlStrcmp(child->name,
-                                                   reinterpret_cast<const xmlChar*>("route"))) {
-                                        Route route;
-                                        xmlNode* root = child;
-                                        route.name = getXmlAttribute(root, "name");
-                                        route.sources = getXmlAttribute(root, "sources");
-                                        route.sink = getXmlAttribute(root, "sink");
-                                        routes.push_back(route);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return OK;
+    auto aidlPort = legacy2aidl_audio_port_v7_AudioPortFw(port);
+    return aidlPort.ok() ? aidlPort.value().toString() : "Error while converting port to AIDL";
 }

@@ -29,14 +29,8 @@ namespace aidl::android::hardware::audio::effect {
 class BundleContext final : public EffectContext {
   public:
     BundleContext(int statusDepth, const Parameter::Common& common,
-                  const lvm::BundleEffectType& type)
-        : EffectContext(statusDepth, common), mType(type) {
-        LOG(DEBUG) << __func__ << type;
-    }
-    ~BundleContext() override {
-        LOG(DEBUG) << __func__;
-        deInit();
-    }
+                  const lvm::BundleEffectType& type);
+    ~BundleContext();
 
     RetCode init();
     void deInit();
@@ -98,7 +92,7 @@ class BundleContext final : public EffectContext {
             const Virtualizer::SpeakerAnglesPayload payload);
 
     RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
-    Parameter::VolumeStereo getVolumeStereo() override { return mVolumeStereo; }
+    Parameter::VolumeStereo getVolumeStereo() override { return {1.0f, 1.0f}; }
 
     IEffect::Status lvmProcess(float* in, float* out, int samples);
 

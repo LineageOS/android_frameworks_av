@@ -33,12 +33,12 @@ FileInput::~FileInput() {
 
 status_t FileInput::open() {
     if (mOpen) {
-        ALOGW("%s: Open called when file %s already open.", __FUNCTION__, mPath.string());
+        ALOGW("%s: Open called when file %s already open.", __FUNCTION__, mPath.c_str());
         return OK;
     }
     mFp = ::fopen(mPath, "rb");
     if (!mFp) {
-        ALOGE("%s: Could not open file %s", __FUNCTION__, mPath.string());
+        ALOGE("%s: Could not open file %s", __FUNCTION__, mPath.c_str());
         return BAD_VALUE;
     }
     mOpen = true;
@@ -47,14 +47,14 @@ status_t FileInput::open() {
 
 ssize_t FileInput::read(uint8_t* buf, size_t offset, size_t count) {
     if (!mOpen) {
-        ALOGE("%s: Could not read file %s, file not open.", __FUNCTION__, mPath.string());
+        ALOGE("%s: Could not read file %s, file not open.", __FUNCTION__, mPath.c_str());
         return BAD_VALUE;
     }
 
     size_t bytesRead = ::fread(buf + offset, sizeof(uint8_t), count, mFp);
     int error = ::ferror(mFp);
     if (error != 0) {
-        ALOGE("%s: Error %d occurred while reading file %s.", __FUNCTION__, error, mPath.string());
+        ALOGE("%s: Error %d occurred while reading file %s.", __FUNCTION__, error, mPath.c_str());
         return BAD_VALUE;
     }
 
@@ -68,13 +68,13 @@ ssize_t FileInput::read(uint8_t* buf, size_t offset, size_t count) {
 
 status_t FileInput::close() {
     if(!mOpen) {
-        ALOGW("%s: Close called when file %s already close.", __FUNCTION__, mPath.string());
+        ALOGW("%s: Close called when file %s already close.", __FUNCTION__, mPath.c_str());
         return OK;
     }
 
     status_t ret = OK;
     if(::fclose(mFp) != 0) {
-        ALOGE("%s: Failed to close file %s.", __FUNCTION__, mPath.string());
+        ALOGE("%s: Failed to close file %s.", __FUNCTION__, mPath.c_str());
         ret = BAD_VALUE;
     }
     mOpen = false;

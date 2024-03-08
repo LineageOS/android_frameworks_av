@@ -1099,7 +1099,7 @@ public:
      * internal to the VolumeHandler.
      */
     void setIdIfNecessary(const sp<VolumeShaper::Configuration> &configuration) {
-        if (configuration->getType() == VolumeShaper::Configuration::TYPE_SCALE) {
+        if (configuration && configuration->getType() == VolumeShaper::Configuration::TYPE_SCALE) {
             const int id = configuration->getId();
             if (id == -1) {
                 // Reassign to a unique id, skipping system ids.

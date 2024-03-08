@@ -65,7 +65,7 @@ class Camera3FakeStream :
     /**
      * Query the physical camera id for the output stream.
      */
-    virtual const String8& getPhysicalCameraId() const override;
+    virtual const std::string& getPhysicalCameraId() const override;
 
     /**
      * Return if this output stream is for video encoding.
@@ -130,7 +130,7 @@ class Camera3FakeStream :
     static const android_dataspace FAKE_DATASPACE = HAL_DATASPACE_UNKNOWN;
     static const camera_stream_rotation_t FAKE_ROTATION = CAMERA_STREAM_ROTATION_0;
     static const uint64_t FAKE_USAGE = GRALLOC_USAGE_HW_COMPOSER;
-    static const String8 FAKE_ID;
+    static const std::string FAKE_ID;
 
     /**
      * Internal Camera3Stream interface

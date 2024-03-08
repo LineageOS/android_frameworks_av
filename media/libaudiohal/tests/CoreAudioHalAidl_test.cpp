@@ -201,6 +201,9 @@ class ModuleMock : public ::aidl::android::hardware::audio::core::BnModule,
     ndk::ScopedAStatus getAAudioHardwareBurstMinUsec(int32_t*) override {
         return ndk::ScopedAStatus::ok();
     }
+    ndk::ScopedAStatus prepareToDisconnectExternalDevice(int32_t) override {
+        return ndk::ScopedAStatus::ok();
+    }
 
     bool mIsScreenTurnedOn = false;
     ScreenRotation mScreenRotation = ScreenRotation::DEG_0;
@@ -452,7 +455,7 @@ TEST_F(DeviceHalAidlTest, VendorParameterIgnored) {
     String8 values;
     EXPECT_EQ(OK, mDevice->getParameters(String8("random_name"), &values));
     EXPECT_EQ(0UL, mModule->getRetrievedParameterIds().size());
-    EXPECT_TRUE(values.empty());
+    EXPECT_EQ(0UL, values.length());
 }
 
 class DeviceHalAidlVendorParametersTest : public testing::Test {

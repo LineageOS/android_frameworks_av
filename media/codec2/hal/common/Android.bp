@@ -1,0 +1,67 @@
+cc_library {
+    name: "libcodec2_hal_common",
+    double_loadable: true,
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+
+    srcs: [
+        "BufferTypes.cpp",
+    ],
+
+    export_include_dirs: ["include/"],
+
+    header_libs: [
+        "libcodec2_internal", // private
+        "libgui_headers",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
+        "liblog",
+        "libstagefright_foundation",
+    ],
+}
+
+cc_library_static {
+    name: "libcodec2_hal_selection_static",
+    double_loadable: true,
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+
+    srcs: [
+        "HalSelection.cpp",
+    ],
+
+    export_include_dirs: ["include/"],
+
+    shared_libs: [
+        "libbase",
+        "server_configurable_flags",
+    ],
+
+    static_libs: ["aconfig_mediacodec_flags_c_lib"],
+}
+
+cc_defaults {
+    name: "libcodec2_hal_selection",
+    static_libs: [
+        "aconfig_mediacodec_flags_c_lib",
+        "libcodec2_hal_selection_static",
+    ],
+    shared_libs: [
+        "libbase",
+        "server_configurable_flags",
+    ],
+}

@@ -23,6 +23,7 @@
 #include <utils/Trace.h>
 
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
+#include <camera/StringUtils.h>
 
 #include "device3/hidl/HidlCamera3OfflineSession.h"
 #include "device3/Camera3OutputStream.h"
@@ -38,7 +39,7 @@ namespace android {
 
 HidlCamera3OfflineSession::~HidlCamera3OfflineSession() {
     ATRACE_CALL();
-    ALOGV("%s: Tearing down hidl offline session for camera id %s", __FUNCTION__, mId.string());
+    ALOGV("%s: Tearing down hidl offline session for camera id %s", __FUNCTION__, mId.c_str());
     Camera3OfflineSession::disconnectImpl();
 }
 
@@ -94,7 +95,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult_3_4(
 
     std::string activePhysicalId("");
     HidlCaptureOutputStates states {
-      {mId,
+      { mId,
         mOfflineReqsLock, mLastCompletedRegularFrameNumber,
         mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
         mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
@@ -136,7 +137,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult(
 
     std::string activePhysicalId("");
     HidlCaptureOutputStates states {
-      {mId,
+      { mId,
         mOfflineReqsLock, mLastCompletedRegularFrameNumber,
         mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
         mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
@@ -173,7 +174,7 @@ hardware::Return<void> HidlCamera3OfflineSession::notify(
 
     std::string activePhysicalId("");
     HidlCaptureOutputStates states {
-      {mId,
+      { mId,
         mOfflineReqsLock, mLastCompletedRegularFrameNumber,
         mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
         mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,

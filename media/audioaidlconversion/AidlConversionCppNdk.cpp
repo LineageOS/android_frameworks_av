@@ -562,11 +562,11 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 GET_DEVICE_DESC_CONNECTION(IP_V4));
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_BUS, AUDIO_DEVICE_OUT_BUS,
-                AudioDeviceType::IN_DEVICE, AudioDeviceType::OUT_DEVICE,
-                GET_DEVICE_DESC_CONNECTION(BUS));
+                AudioDeviceType::IN_BUS, AudioDeviceType::OUT_BUS);
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_PROXY, AUDIO_DEVICE_OUT_PROXY,
-                AudioDeviceType::IN_AFE_PROXY, AudioDeviceType::OUT_AFE_PROXY);
+                AudioDeviceType::IN_AFE_PROXY, AudioDeviceType::OUT_AFE_PROXY,
+                GET_DEVICE_DESC_CONNECTION(VIRTUAL));
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_OUT_USB_HEADSET,
                 AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
@@ -1087,9 +1087,13 @@ AudioDeviceAddress::Tag suggestDeviceAddressTag(const AudioDeviceDescription& de
         case Tag::ipv6: {
             const std::vector<int32_t>& ipv6 = aidl.address.get<AudioDeviceAddress::ipv6>();
             if (ipv6.size() != 8) return BAD_VALUE;
+// FIXME: Code warning found by clang-r510928
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfortify-source"
             snprintf(addressBuffer, AUDIO_DEVICE_MAX_ADDRESS_LEN,
                     "%04X:%04X:%04X:%04X:%04X:%04X:%04X:%04X",
                     ipv6[0], ipv6[1], ipv6[2], ipv6[3], ipv6[4], ipv6[5], ipv6[6], ipv6[7]);
+#pragma clang diagnostic pop
         } break;
         case Tag::alsa: {
             const std::vector<int32_t>& alsa = aidl.address.get<AudioDeviceAddress::alsa>();

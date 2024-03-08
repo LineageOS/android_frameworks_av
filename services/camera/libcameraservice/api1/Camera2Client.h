@@ -103,9 +103,9 @@ public:
     Camera2Client(const sp<CameraService>& cameraService,
             const sp<hardware::ICameraClient>& cameraClient,
             std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
-            const String16& clientPackageName,
-            const std::optional<String16>& clientFeatureId,
-            const String8& cameraDeviceId,
+            const std::string& clientPackageName,
+            const std::optional<std::string>& clientFeatureId,
+            const std::string& cameraDeviceId,
             int api1CameraId,
             int cameraFacing,
             int sensorOrientation,
@@ -119,7 +119,7 @@ public:
     virtual ~Camera2Client();
 
     virtual status_t initialize(sp<CameraProviderManager> manager,
-            const String8& monitorTags) override;
+            const std::string& monitorTags) override;
 
     virtual status_t dump(int fd, const Vector<String16>& args);
 
@@ -244,7 +244,7 @@ private:
     status_t overrideVideoSnapshotSize(Parameters &params);
 
     template<typename TProviderPtr>
-    status_t initializeImpl(TProviderPtr providerPtr, const String8& monitorTags);
+    status_t initializeImpl(TProviderPtr providerPtr, const std::string& monitorTags);
 
     bool isZslEnabledInStillTemplate();
     // The current rotate & crop mode passed by camera service

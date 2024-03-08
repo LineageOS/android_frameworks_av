@@ -15,36 +15,24 @@
  */
 
 #include <Camera.h>
-#include <CameraBase.h>
-#include <CameraMetadata.h>
 #include <CameraParameters.h>
-#include <CameraUtils.h>
-#include <VendorTagDescriptor.h>
-#include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <fuzzer/FuzzedDataProvider.h>
-#include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
-#include <utils/Log.h>
 #include "camera2common.h"
-#include <android/hardware/ICameraService.h>
 
 using namespace std;
 using namespace android;
 using namespace android::hardware;
 
 constexpr int32_t kFrameRateMin = 1;
-constexpr int32_t kFrameRateMax = 120;
-constexpr int32_t kCamIdMin = 0;
-constexpr int32_t kCamIdMax = 1;
+constexpr int32_t kFrameRateMax = 1000;
 constexpr int32_t kNumMin = 0;
 constexpr int32_t kNumMax = 1024;
 constexpr int32_t kMemoryDealerSize = 1000;
-constexpr int32_t kRangeMin = 0;
-constexpr int32_t kRangeMax = 1000;
-constexpr int32_t kSizeMin = 0;
-constexpr int32_t kSizeMax = 1000;
+constexpr int8_t kMinElements = 1;
+constexpr int8_t kMaxElements = 10;
 
 constexpr int32_t kValidCMD[] = {CAMERA_CMD_START_SMOOTH_ZOOM,
                                  CAMERA_CMD_STOP_SMOOTH_ZOOM,
@@ -67,11 +55,6 @@ constexpr int32_t kValidPreviewCallbackFlag[] = {
         CAMERA_FRAME_CALLBACK_FLAG_COPY_OUT_MASK,  CAMERA_FRAME_CALLBACK_FLAG_NOOP,
         CAMERA_FRAME_CALLBACK_FLAG_CAMCORDER,      CAMERA_FRAME_CALLBACK_FLAG_CAMERA,
         CAMERA_FRAME_CALLBACK_FLAG_BARCODE_SCANNER};
-
-constexpr int32_t kValidFacing[] = {android::hardware::CAMERA_FACING_BACK,
-                                    android::hardware::CAMERA_FACING_FRONT};
-
-constexpr int32_t kValidOrientation[] = {0, 90, 180, 270};
 
 class TestCameraListener : public CameraListener {
   public:
@@ -100,36 +83,12 @@ class TestCameraListener : public CameraListener {
 class CameraFuzzer : public ::android::hardware::BnCameraClient {
   public:
     void process(const uint8_t* data, size_t size);
-    ~CameraFuzzer() {
-        delete mCameraMetadata;
-        mComposerClient.clear();
-        mSurfaceControl.clear();
-        mSurface.clear();
-        mCamera.clear();
-        mMemoryDealer.clear();
-        mIMem.clear();
-        mCameraListener.clear();
-        mCameraService.clear();
-    }
 
   private:
     bool initCamera();
-    void initCameraMetadata();
     void invokeCamera();
-    void invokeCameraUtils();
-    void invokeCameraBase();
-    void invokeCameraMetadata();
     void invokeSetParameters();
     sp<Camera> mCamera = nullptr;
-    CameraMetadata* mCameraMetadata = nullptr;
-    sp<SurfaceComposerClient> mComposerClient = nullptr;
-    sp<SurfaceControl> mSurfaceControl = nullptr;
-    sp<Surface> mSurface = nullptr;
-    sp<MemoryDealer> mMemoryDealer = nullptr;
-    sp<IMemory> mIMem = nullptr;
-    sp<TestCameraListener> mCameraListener = nullptr;
-    sp<ICameraService> mCameraService = nullptr;
-    sp<ICamera> cameraDevice = nullptr;
     FuzzedDataProvider* mFDP = nullptr;
 
     // CameraClient interface
@@ -147,12 +106,26 @@ bool CameraFuzzer::initCamera() {
     ProcessState::self()->startThreadPool();
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.camera"));
-    mCameraService = interface_cast<ICameraService>(binder);
-    mCameraService->connect(this, mFDP->ConsumeIntegral<int32_t>() /* cameraId */,
-                            String16("CAMERAFUZZ"), hardware::ICameraService::USE_CALLING_UID,
-                            hardware::ICameraService::USE_CALLING_PID,
-                            /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
-                            /*overrideToPortrait*/false, /*forceSlowJpegMode*/false, &cameraDevice);
+    sp<ICameraService> cameraService = nullptr;
+    cameraService = interface_cast<ICameraService>(binder);
+    sp<ICamera> cameraDevice = nullptr;
+    if (mFDP->ConsumeBool()) {
+        cameraService->connect(this, mFDP->ConsumeIntegral<int32_t>() /* cameraId */, "CAMERAFUZZ",
+                               hardware::ICameraService::USE_CALLING_UID,
+                               hardware::ICameraService::USE_CALLING_PID,
+                               /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
+                               /*overrideToPortrait*/ false, /*forceSlowJpegMode*/ false,
+                               &cameraDevice);
+    } else {
+        cameraService->connect(this, mFDP->ConsumeIntegral<int32_t>() /* cameraId */,
+                               mFDP->ConsumeRandomLengthString(kMaxBytes).c_str(),
+                               mFDP->ConsumeIntegral<int8_t>() /* clientUid */,
+                               mFDP->ConsumeIntegral<int8_t>() /* clientPid */,
+                               /*targetSdkVersion*/ mFDP->ConsumeIntegral<int32_t>(),
+                               /*overrideToPortrait*/ mFDP->ConsumeBool(),
+                               /*forceSlowJpegMode*/ mFDP->ConsumeBool(), &cameraDevice);
+    }
+
     mCamera = Camera::create(cameraDevice);
     if (!mCamera) {
         return false;
@@ -176,224 +149,195 @@ void CameraFuzzer::invokeCamera() {
         return;
     }
 
-    int32_t cameraId = mFDP->ConsumeIntegralInRange<int32_t>(kCamIdMin, kCamIdMax);
+    int32_t cameraId = mFDP->ConsumeIntegral<int32_t>();
     Camera::getNumberOfCameras();
     CameraInfo cameraInfo;
     cameraInfo.facing = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidFacing)
-                                            : mFDP->ConsumeIntegral<int>();
+                                            : mFDP->ConsumeIntegral<int32_t>();
     cameraInfo.orientation = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidOrientation)
-                                                 : mFDP->ConsumeIntegral<int>();
+                                                 : mFDP->ConsumeIntegral<int32_t>();
     Camera::getCameraInfo(cameraId, /*overrideToPortrait*/false, &cameraInfo);
     mCamera->reconnect();
 
-    mComposerClient = new SurfaceComposerClient;
-    mSurfaceControl = mComposerClient->createSurface(
-            static_cast<String8>(mFDP->ConsumeRandomLengthString().c_str()) /* name */,
-            mFDP->ConsumeIntegral<uint32_t>() /* width */,
-            mFDP->ConsumeIntegral<uint32_t>() /* height */,
-            mFDP->ConsumeIntegral<int32_t>() /* format */,
-            mFDP->ConsumeIntegral<int32_t>() /* flags */);
-    if (mSurfaceControl) {
-        mSurface = mSurfaceControl->getSurface();
-        mCamera->setPreviewTarget(mSurface->getIGraphicBufferProducer());
-        mCamera->startPreview();
-        mCamera->stopPreview();
-        mCamera->previewEnabled();
-        mCamera->startRecording();
-        mCamera->stopRecording();
-    }
-
-    mCamera->lock();
-    mCamera->unlock();
-    mCamera->autoFocus();
-    mCamera->cancelAutoFocus();
-
-    int32_t msgType = mFDP->ConsumeIntegral<int32_t>();
-    mCamera->takePicture(msgType);
-    invokeSetParameters();
-    int32_t cmd;
+    sp<SurfaceComposerClient> composerClient = new SurfaceComposerClient;
+    sp<SurfaceControl> surfaceControl = nullptr;
     if (mFDP->ConsumeBool()) {
-        cmd = mFDP->PickValueInArray(kValidCMD);
+        surfaceControl = composerClient->createSurface(String8("FUZZSURFACE"), 1280, 800,
+                                                       HAL_PIXEL_FORMAT_YV12);
     } else {
-        cmd = mFDP->ConsumeIntegral<int32_t>();
+        surfaceControl = composerClient->createSurface(
+                static_cast<String8>(mFDP->ConsumeRandomLengthString(kMaxBytes).c_str()) /* name */,
+                mFDP->ConsumeIntegral<uint32_t>() /* width */,
+                mFDP->ConsumeIntegral<uint32_t>() /* height */,
+                mFDP->ConsumeIntegral<int32_t>() /* format */,
+                mFDP->ConsumeIntegral<int32_t>() /* flags */);
     }
-    int32_t arg1 = mFDP->ConsumeIntegral<int32_t>();
-    int32_t arg2 = mFDP->ConsumeIntegral<int32_t>();
-    mCamera->sendCommand(cmd, arg1, arg2);
-
-    int32_t videoBufferMode = mFDP->PickValueInArray(kValidVideoBufferMode);
-    mCamera->setVideoBufferMode(videoBufferMode);
-    if (mSurfaceControl) {
-        mSurface = mSurfaceControl->getSurface();
-        mCamera->setVideoTarget(mSurface->getIGraphicBufferProducer());
-    }
-    mCameraListener = sp<TestCameraListener>::make();
-    mCamera->setListener(mCameraListener);
-    int32_t previewCallbackFlag;
-    if (mFDP->ConsumeBool()) {
-        previewCallbackFlag = mFDP->PickValueInArray(kValidPreviewCallbackFlag);
-    } else {
-        previewCallbackFlag = mFDP->ConsumeIntegral<int32_t>();
-    }
-    mCamera->setPreviewCallbackFlags(previewCallbackFlag);
-    if (mSurfaceControl) {
-        mSurface = mSurfaceControl->getSurface();
-        mCamera->setPreviewCallbackTarget(mSurface->getIGraphicBufferProducer());
-    }
-
-    mCamera->getRecordingProxy();
-    int32_t mode = mFDP->ConsumeIntegral<int32_t>();
-    mCamera->setAudioRestriction(mode);
-    mCamera->getGlobalAudioRestriction();
-    mCamera->recordingEnabled();
-
-    mMemoryDealer = new MemoryDealer(kMemoryDealerSize);
-    mIMem = mMemoryDealer->allocate(kMemoryDealerSize);
-    mCamera->releaseRecordingFrame(mIMem);
-
-    int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-    int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-    native_handle_t* handle = native_handle_create(numFds, numInts);
-    mCamera->releaseRecordingFrameHandle(handle);
-
-    int32_t msgTypeNC = mFDP->ConsumeIntegral<int32_t>();
-    int32_t ext = mFDP->ConsumeIntegral<int32_t>();
-    int32_t ext2 = mFDP->ConsumeIntegral<int32_t>();
-    mCamera->notifyCallback(msgTypeNC, ext, ext2);
-
-    int64_t timestamp = mFDP->ConsumeIntegral<int64_t>();
-    mCamera->dataCallbackTimestamp(timestamp, msgTypeNC, mIMem);
-    mCamera->recordingFrameHandleCallbackTimestamp(timestamp, handle);
-}
-
-void CameraFuzzer::invokeCameraUtils() {
-    CameraMetadata staticMetadata;
-    int32_t orientVal = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidOrientation)
-                                            : mFDP->ConsumeIntegral<int32_t>();
-    uint8_t facingVal = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidFacing)
-                                            : mFDP->ConsumeIntegral<uint8_t>();
-    staticMetadata.update(ANDROID_SENSOR_ORIENTATION, &orientVal, 1);
-    staticMetadata.update(ANDROID_LENS_FACING, &facingVal, 1);
-    int32_t transform = 0;
-    CameraUtils::getRotationTransform(
-            staticMetadata, mFDP->ConsumeIntegral<int32_t>() /* mirrorMode */, &transform /*out*/);
-    CameraUtils::isCameraServiceDisabled();
-}
-
-void CameraFuzzer::invokeCameraBase() {
-    CameraInfo cameraInfo;
-    cameraInfo.facing = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidFacing)
-                                            : mFDP->ConsumeIntegral<int>();
-    cameraInfo.orientation = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidOrientation)
-                                                 : mFDP->ConsumeIntegral<int>();
-    invokeReadWriteParcel<CameraInfo>(&cameraInfo);
-
-    CameraStatus* cameraStatus = nullptr;
 
     if (mFDP->ConsumeBool()) {
-        cameraStatus = new CameraStatus();
-    } else {
-        string cid = mFDP->ConsumeRandomLengthString();
-        String8 id(cid.c_str());
-        int32_t status = mFDP->ConsumeIntegral<int32_t>();
-        size_t unavailSubIdsSize = mFDP->ConsumeIntegralInRange<size_t>(kSizeMin, kSizeMax);
-        vector<String8> unavailSubIds;
-        for (size_t idx = 0; idx < unavailSubIdsSize; ++idx) {
-            string subId = mFDP->ConsumeRandomLengthString();
-            String8 unavailSubId(subId.c_str());
-            unavailSubIds.push_back(unavailSubId);
-        }
-        string clientPkg = mFDP->ConsumeRandomLengthString();
-        String8 clientPackage(clientPkg.c_str());
-        cameraStatus = new CameraStatus(id, status, unavailSubIds, clientPackage);
+        invokeSetParameters();
     }
-
-    invokeReadWriteParcel<CameraStatus>(cameraStatus);
-    delete cameraStatus;
-}
-
-void CameraFuzzer::initCameraMetadata() {
-    if (mFDP->ConsumeBool()) {
-        mCameraMetadata = new CameraMetadata();
-    } else {
-        size_t entryCapacity = mFDP->ConsumeIntegralInRange<size_t>(kSizeMin, kSizeMax);
-        size_t dataCapacity = mFDP->ConsumeIntegralInRange<size_t>(kSizeMin, kSizeMax);
-        mCameraMetadata = new CameraMetadata(entryCapacity, dataCapacity);
+    sp<Surface> surface = nullptr;
+    if (surfaceControl) {
+        surface = surfaceControl->getSurface();
     }
-}
+    sp<MemoryDealer> memoryDealer = nullptr;
+    sp<IMemory> iMem = nullptr;
+    sp<CameraListener> cameraListener = nullptr;
 
-void CameraFuzzer::invokeCameraMetadata() {
-    initCameraMetadata();
-
-    const camera_metadata_t* metadataBuffer = nullptr;
-    if (mFDP->ConsumeBool()) {
-        metadataBuffer = mCameraMetadata->getAndLock();
+    while (mFDP->remaining_bytes()) {
+        auto callCameraAPIs = mFDP->PickValueInArray<const std::function<void()>>({
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->setPreviewTarget(surface->getIGraphicBufferProducer());
+                    }
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->startPreview();
+                    }
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->stopPreview();
+                    }
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->stopPreview();
+                    }
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->previewEnabled();
+                    }
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->startRecording();
+                    }
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->stopRecording();
+                    }
+                },
+                [&]() { mCamera->lock(); },
+                [&]() { mCamera->unlock(); },
+                [&]() { mCamera->autoFocus(); },
+                [&]() { mCamera->cancelAutoFocus(); },
+                [&]() {
+                    int32_t msgType = mFDP->ConsumeIntegral<int32_t>();
+                    mCamera->takePicture(msgType);
+                },
+                [&]() {
+                    int32_t cmd;
+                    cmd = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidCMD)
+                                              : mFDP->ConsumeIntegral<int32_t>();
+                    int32_t arg1 = mFDP->ConsumeIntegral<int32_t>();
+                    int32_t arg2 = mFDP->ConsumeIntegral<int32_t>();
+                    mCamera->sendCommand(cmd, arg1, arg2);
+                },
+                [&]() {
+                    int32_t videoBufferMode =
+                            mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidVideoBufferMode)
+                                                : mFDP->ConsumeIntegral<int32_t>();
+                    mCamera->setVideoBufferMode(videoBufferMode);
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->setVideoTarget(surface->getIGraphicBufferProducer());
+                    }
+                },
+                [&]() {
+                    cameraListener = sp<TestCameraListener>::make();
+                    mCamera->setListener(cameraListener);
+                },
+                [&]() {
+                    int32_t previewCallbackFlag;
+                    previewCallbackFlag =
+                            mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidPreviewCallbackFlag)
+                                                : mFDP->ConsumeIntegral<int32_t>();
+                    mCamera->setPreviewCallbackFlags(previewCallbackFlag);
+                },
+                [&]() {
+                    if (surfaceControl) {
+                        mCamera->setPreviewCallbackTarget(surface->getIGraphicBufferProducer());
+                    }
+                },
+                [&]() { mCamera->getRecordingProxy(); },
+                [&]() {
+                    int32_t mode = mFDP->ConsumeIntegral<int32_t>();
+                    mCamera->setAudioRestriction(mode);
+                },
+                [&]() { mCamera->getGlobalAudioRestriction(); },
+                [&]() { mCamera->recordingEnabled(); },
+                [&]() {
+                    memoryDealer = new MemoryDealer(kMemoryDealerSize);
+                    iMem = memoryDealer->allocate(kMemoryDealerSize);
+                },
+                [&]() {
+                    int32_t msgTypeNC = mFDP->ConsumeIntegral<int32_t>();
+                    int32_t ext = mFDP->ConsumeIntegral<int32_t>();
+                    int32_t ext2 = mFDP->ConsumeIntegral<int32_t>();
+                    mCamera->notifyCallback(msgTypeNC, ext, ext2);
+                },
+                [&]() {
+                    int32_t msgTypeNC = mFDP->ConsumeIntegral<int32_t>();
+                    int64_t timestamp = mFDP->ConsumeIntegral<int64_t>();
+                    mCamera->dataCallbackTimestamp(timestamp, msgTypeNC, iMem);
+                },
+                [&]() {
+                    int64_t timestamp = mFDP->ConsumeIntegral<int64_t>();
+                    int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                    int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                    native_handle_t* handle = native_handle_create(numFds, numInts);
+                    mCamera->recordingFrameHandleCallbackTimestamp(timestamp, handle);
+                },
+                [&]() {
+                    int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                    int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                    native_handle_t* handle = native_handle_create(numFds, numInts);
+                    mCamera->releaseRecordingFrameHandle(handle);
+                },
+                [&]() { mCamera->releaseRecordingFrame(iMem); },
+                [&]() {
+                    std::vector<native_handle_t*> handles;
+                    for (int8_t i = 0;
+                         i < mFDP->ConsumeIntegralInRange<int8_t>(kMinElements, kMaxElements);
+                         ++i) {
+                        int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                        int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                        native_handle_t* handle = native_handle_create(numFds, numInts);
+                        handles.push_back(handle);
+                    }
+                    mCamera->releaseRecordingFrameHandleBatch(handles);
+                },
+                [&]() {
+                    std::vector<native_handle_t*> handles;
+                    for (int8_t i = 0;
+                         i < mFDP->ConsumeIntegralInRange<int8_t>(kMinElements, kMaxElements);
+                         ++i) {
+                        int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                        int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+                        native_handle_t* handle = native_handle_create(numFds, numInts);
+                        handles.push_back(handle);
+                    }
+                    std::vector<nsecs_t> timestamps;
+                    for (int8_t i = 0;
+                         i < mFDP->ConsumeIntegralInRange<int8_t>(kMinElements, kMaxElements);
+                         ++i) {
+                        timestamps.push_back(mFDP->ConsumeIntegral<int64_t>());
+                    }
+                    mCamera->recordingFrameHandleCallbackTimestampBatch(timestamps, handles);
+                },
+        });
+        callCameraAPIs();
     }
-
-    mCameraMetadata->entryCount();
-    mCameraMetadata->isEmpty();
-    mCameraMetadata->bufferSize();
-    mCameraMetadata->sort();
-
-    uint32_t tag = mFDP->ConsumeIntegral<uint32_t>();
-    uint8_t dataUint8 = mFDP->ConsumeIntegral<uint8_t>();
-    int32_t dataInt32 = mFDP->ConsumeIntegral<int32_t>();
-    int64_t dataInt64 = mFDP->ConsumeIntegral<int64_t>();
-    float dataFloat = mFDP->ConsumeFloatingPoint<float>();
-    double dataDouble = mFDP->ConsumeFloatingPoint<double>();
-    camera_metadata_rational dataRational;
-    dataRational.numerator = mFDP->ConsumeIntegral<int32_t>();
-    dataRational.denominator = mFDP->ConsumeIntegral<int32_t>();
-    string dataStr = mFDP->ConsumeRandomLengthString();
-    String8 dataString(dataStr.c_str());
-    size_t data_count = 1;
-    mCameraMetadata->update(tag, &dataUint8, data_count);
-    mCameraMetadata->update(tag, &dataInt32, data_count);
-    mCameraMetadata->update(tag, &dataFloat, data_count);
-    mCameraMetadata->update(tag, &dataInt64, data_count);
-    mCameraMetadata->update(tag, &dataRational, data_count);
-    mCameraMetadata->update(tag, &dataDouble, data_count);
-    mCameraMetadata->update(tag, dataString);
-
-    uint32_t tagExists = mFDP->ConsumeBool() ? tag : mFDP->ConsumeIntegral<uint32_t>();
-    mCameraMetadata->exists(tagExists);
-
-    uint32_t tagFind = mFDP->ConsumeBool() ? tag : mFDP->ConsumeIntegral<uint32_t>();
-    mCameraMetadata->find(tagFind);
-
-    uint32_t tagErase = mFDP->ConsumeBool() ? tag : mFDP->ConsumeIntegral<uint32_t>();
-    mCameraMetadata->erase(tagErase);
-
-    mCameraMetadata->unlock(metadataBuffer);
-    std::vector<int32_t> tagsRemoved;
-    uint64_t vendorId = mFDP->ConsumeIntegral<uint64_t>();
-    mCameraMetadata->removePermissionEntries(vendorId, &tagsRemoved);
-
-    string name = mFDP->ConsumeRandomLengthString();
-    VendorTagDescriptor vTags;
-    uint32_t tagName = mFDP->ConsumeIntegral<uint32_t>();
-    mCameraMetadata->getTagFromName(name.c_str(), &vTags, &tagName);
-
-    invokeReadWriteNullParcel<CameraMetadata>(mCameraMetadata);
-    invokeReadWriteParcel<CameraMetadata>(mCameraMetadata);
-
-    int32_t fd = open("/dev/null", O_CLOEXEC | O_RDWR | O_CREAT);
-    int32_t verbosity = mFDP->ConsumeIntegralInRange<int32_t>(kRangeMin, kRangeMax);
-    int32_t indentation = mFDP->ConsumeIntegralInRange<int32_t>(kRangeMin, kRangeMax);
-    mCameraMetadata->dump(fd, verbosity, indentation);
-
-    CameraMetadata metadataCopy(mCameraMetadata->release());
-    CameraMetadata otherCameraMetadata;
-    mCameraMetadata->swap(otherCameraMetadata);
-    close(fd);
 }
 
 void CameraFuzzer::process(const uint8_t* data, size_t size) {
     mFDP = new FuzzedDataProvider(data, size);
     invokeCamera();
-    invokeCameraUtils();
-    invokeCameraBase();
-    invokeCameraMetadata();
     delete mFDP;
 }
 

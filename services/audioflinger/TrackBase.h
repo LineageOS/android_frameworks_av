@@ -15,46 +15,26 @@
 ** limitations under the License.
 */
 
-#ifndef INCLUDING_FROM_AUDIOFLINGER_H
-    #error This header file should only be included from AudioFlinger.h
-#endif
+#pragma once
+
+#include "Configuration.h"  // TEE_SINK
+#include "IAfTrack.h"
+
+#include <afutils/NBAIO_Tee.h>
+#include <android-base/macros.h>  // DISALLOW_COPY_AND_ASSIGN
+#include <datapath/TrackMetrics.h>
+#include <mediautils/BatteryNotifier.h>
+
+#include <atomic>    // avoid transitive dependency
+#include <list>      // avoid transitive dependency
+#include <optional>  // avoid transitive dependency
+
+namespace android {
 
 // base for record and playback
-class TrackBase : public ExtendedAudioBufferProvider, public RefBase {
-
+class TrackBase : public ExtendedAudioBufferProvider, public virtual IAfTrackBase {
 public:
-    enum track_state : int32_t {
-        IDLE,
-        FLUSHED,        // for PlaybackTracks only
-        STOPPED,
-        // next 2 states are currently used for fast tracks
-        // and offloaded tracks only
-        STOPPING_1,     // waiting for first underrun
-        STOPPING_2,     // waiting for presentation complete
-        RESUMING,       // for PlaybackTracks only
-        ACTIVE,
-        PAUSING,
-        PAUSED,
-        STARTING_1,     // for RecordTrack only
-        STARTING_2,     // for RecordTrack only
-    };
-
-    // where to allocate the data buffer
-    enum alloc_type {
-        ALLOC_CBLK,     // allocate immediately after control block
-        ALLOC_READONLY, // allocate from a separate read-only heap per thread
-        ALLOC_PIPE,     // do not allocate; use the pipe buffer
-        ALLOC_LOCAL,    // allocate a local buffer
-        ALLOC_NONE,     // do not allocate:use the buffer passed to TrackBase constructor
-    };
-
-    enum track_type {
-        TYPE_DEFAULT,
-        TYPE_OUTPUT,
-        TYPE_PATCH,
-    };
-
-                        TrackBase(ThreadBase *thread,
+    TrackBase(IAfThreadBase* thread,
                                 const sp<Client>& client,
                                 const audio_attributes_t& mAttr,
                                 uint32_t sampleRate,
@@ -67,91 +47,83 @@ public:
                                 pid_t creatorPid,
                                 uid_t uid,
                                 bool isOut,
-                                alloc_type alloc = ALLOC_CBLK,
+                                const alloc_type alloc = ALLOC_CBLK,
                                 track_type type = TYPE_DEFAULT,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 std::string metricsId = {});
-    virtual             ~TrackBase();
-    virtual status_t    initCheck() const;
+    ~TrackBase() override;
+    status_t initCheck() const override;
+    sp<IMemory> getCblk() const final { return mCblkMemory; }
+    audio_track_cblk_t* cblk() const final { return mCblk; }
+    audio_session_t sessionId() const final { return mSessionId; }
+    uid_t uid() const final { return mUid; }
+    pid_t creatorPid() const final { return mCreatorPid; }
+    audio_port_handle_t portId() const final { return mPortId; }
+    status_t setSyncEvent(const sp<audioflinger::SyncEvent>& event) override;
+    track_state state() const final { return mState; }
+    void setState(track_state state) final { mState = state; }
+    sp<IMemory> getBuffers() const final { return mBufferMemory; }
+    void* buffer() const final { return mBuffer; }
+    size_t bufferSize() const final { return mBufferSize; }
 
-    virtual status_t    start(AudioSystem::sync_event_t event,
-                             audio_session_t triggerSession) = 0;
-    virtual void        stop() = 0;
-            sp<IMemory> getCblk() const { return mCblkMemory; }
-            audio_track_cblk_t* cblk() const { return mCblk; }
-            audio_session_t sessionId() const { return mSessionId; }
-            uid_t       uid() const { return mUid; }
-            pid_t       creatorPid() const { return mCreatorPid; }
-
-            audio_port_handle_t portId() const { return mPortId; }
-    virtual status_t    setSyncEvent(const sp<SyncEvent>& event);
-
-            sp<IMemory> getBuffers() const { return mBufferMemory; }
-            void*       buffer() const { return mBuffer; }
-            size_t      bufferSize() const { return mBufferSize; }
-    virtual bool        isFastTrack() const = 0;
-    virtual bool        isDirect() const = 0;
-            bool        isOutputTrack() const { return (mType == TYPE_OUTPUT); }
-            bool        isPatchTrack() const { return (mType == TYPE_PATCH); }
-            bool        isExternalTrack() const { return !isOutputTrack() && !isPatchTrack(); }
-
-    virtual void        invalidate() {
+    bool isOutputTrack() const final { return (mType == TYPE_OUTPUT); }
+    bool isPatchTrack() const final { return (mType == TYPE_PATCH); }
+    bool isExternalTrack() const final { return !isOutputTrack() && !isPatchTrack(); }
+    void invalidate() override {
                             if (mIsInvalid) return;
                             mTrackMetrics.logInvalidate();
                             mIsInvalid = true;
                         }
-            bool        isInvalid() const { return mIsInvalid; }
+    bool isInvalid() const final { return mIsInvalid; }
+    void terminate() final { mTerminated = true; }
+    bool isTerminated() const final { return mTerminated; }
+    audio_attributes_t attributes() const final { return mAttr; }
+    bool isSpatialized() const override { return false; }
+    bool isBitPerfect() const override { return false; }
 
-            void        terminate() { mTerminated = true; }
-            bool        isTerminated() const { return mTerminated; }
+    wp<IAfThreadBase> thread() const final { return mThread; }
 
-    audio_attributes_t  attributes() const { return mAttr; }
-
-    virtual bool        isSpatialized() const { return false; }
-
-    virtual bool        isBitPerfect() const { return false; }
+    const sp<ServerProxy>& serverProxy() const final { return mServerProxy; }
 
 #ifdef TEE_SINK
-           void         dumpTee(int fd, const std::string &reason) const {
-                                mTee.dump(fd, reason);
-                        }
+    void dumpTee(int fd, const std::string &reason) const final {
+        mTee.dump(fd, reason);
+    }
 #endif
-
-            /** returns the buffer contents size converted to time in milliseconds
-             * for PCM Playback or Record streaming tracks. The return value is zero for
-             * PCM static tracks and not defined for non-PCM tracks.
-             *
-             * This may be called without the thread lock.
-             */
-    virtual double      bufferLatencyMs() const {
+    /** returns the buffer contents size converted to time in milliseconds
+     * for PCM Playback or Record streaming tracks. The return value is zero for
+     * PCM static tracks and not defined for non-PCM tracks.
+     *
+     * This may be called without the thread lock.
+     */
+    double bufferLatencyMs() const override {
                             return mServerProxy->framesReadySafe() * 1000. / sampleRate();
                         }
 
-            /** returns whether the track supports server latency computation.
-             * This is set in the constructor and constant throughout the track lifetime.
-             */
+    /** returns whether the track supports server latency computation.
+     * This is set in the constructor and constant throughout the track lifetime.
+     */
+    bool isServerLatencySupported() const final { return mServerLatencySupported; }
 
-            bool        isServerLatencySupported() const { return mServerLatencySupported; }
-
-            /** computes the server latency for PCM Playback or Record track
-             * to the device sink/source.  This is the time for the next frame in the track buffer
-             * written or read from the server thread to the device source or sink.
-             *
-             * This may be called without the thread lock, but latencyMs and fromTrack
-             * may be not be synchronized. For example PatchPanel may not obtain the
-             * thread lock before calling.
-             *
-             * \param latencyMs on success is set to the latency in milliseconds of the
-             *        next frame written/read by the server thread to/from the track buffer
-             *        from the device source/sink.
-             * \param fromTrack on success is set to true if latency was computed directly
-             *        from the track timestamp; otherwise set to false if latency was
-             *        estimated from the server timestamp.
-             *        fromTrack may be nullptr or omitted if not required.
-             *
-             * \returns OK or INVALID_OPERATION on failure.
-             */
-            status_t    getServerLatencyMs(double *latencyMs, bool *fromTrack = nullptr) const {
+    /** computes the server latency for PCM Playback or Record track
+     * to the device sink/source.  This is the time for the next frame in the track buffer
+     * written or read from the server thread to the device source or sink.
+     *
+     * This may be called without the thread lock, but latencyMs and fromTrack
+     * may be not be synchronized. For example PatchPanel may not obtain the
+     * thread lock before calling.
+     *
+     * \param latencyMs on success is set to the latency in milliseconds of the
+     *        next frame written/read by the server thread to/from the track buffer
+     *        from the device source/sink.
+     * \param fromTrack on success is set to true if latency was computed directly
+     *        from the track timestamp; otherwise set to false if latency was
+     *        estimated from the server timestamp.
+     *        fromTrack may be nullptr or omitted if not required.
+     *
+     * \returns OK or INVALID_OPERATION on failure.
+     */
+    status_t getServerLatencyMs(double* latencyMs, bool* fromTrack = nullptr) const final {
                             if (!isServerLatencySupported()) {
                                 return INVALID_OPERATION;
                             }
@@ -170,25 +142,25 @@ public:
                             return OK;
                         }
 
-            /** computes the total client latency for PCM Playback or Record tracks
-             * for the next client app access to the device sink/source; i.e. the
-             * server latency plus the buffer latency.
-             *
-             * This may be called without the thread lock, but latencyMs and fromTrack
-             * may be not be synchronized. For example PatchPanel may not obtain the
-             * thread lock before calling.
-             *
-             * \param latencyMs on success is set to the latency in milliseconds of the
-             *        next frame written/read by the client app to/from the track buffer
-             *        from the device sink/source.
-             * \param fromTrack on success is set to true if latency was computed directly
-             *        from the track timestamp; otherwise set to false if latency was
-             *        estimated from the server timestamp.
-             *        fromTrack may be nullptr or omitted if not required.
-             *
-             * \returns OK or INVALID_OPERATION on failure.
-             */
-            status_t    getTrackLatencyMs(double *latencyMs, bool *fromTrack = nullptr) const {
+    /** computes the total client latency for PCM Playback or Record tracks
+     * for the next client app access to the device sink/source; i.e. the
+     * server latency plus the buffer latency.
+     *
+     * This may be called without the thread lock, but latencyMs and fromTrack
+     * may be not be synchronized. For example PatchPanel may not obtain the
+     * thread lock before calling.
+     *
+     * \param latencyMs on success is set to the latency in milliseconds of the
+     *        next frame written/read by the client app to/from the track buffer
+     *        from the device sink/source.
+     * \param fromTrack on success is set to true if latency was computed directly
+     *        from the track timestamp; otherwise set to false if latency was
+     *        estimated from the server timestamp.
+     *        fromTrack may be nullptr or omitted if not required.
+     *
+     * \returns OK or INVALID_OPERATION on failure.
+     */
+    status_t getTrackLatencyMs(double* latencyMs, bool* fromTrack = nullptr) const {
                             double serverLatencyMs;
                             status_t status = getServerLatencyMs(&serverLatencyMs, fromTrack);
                             if (status == OK) {
@@ -197,21 +169,15 @@ public:
                             return status;
                         }
 
-           // TODO: Consider making this external.
-           struct FrameTime {
-               int64_t frames;
-               int64_t timeNs;
-           };
-
-           // KernelFrameTime is updated per "mix" period even for non-pcm tracks.
-           void         getKernelFrameTime(FrameTime *ft) const {
+    // KernelFrameTime is updated per "mix" period even for non-pcm tracks.
+    void getKernelFrameTime(FrameTime* ft) const final {
                            *ft = mKernelFrameTime.load();
                         }
 
-           audio_format_t format() const { return mFormat; }
-           int id() const { return mId; }
+    audio_format_t format() const final { return mFormat; }
+    int id() const final { return mId; }
 
-    const char *getTrackStateAsString() const {
+    const char* getTrackStateAsString() const final {
         if (isTerminated()) {
             return "TERMINATED";
         }
@@ -245,19 +211,19 @@ public:
 
     // Called by the PlaybackThread to indicate that the track is becoming active
     // and a new interval should start with a given device list.
-    void logBeginInterval(const std::string& devices) {
+    void logBeginInterval(const std::string& devices) final {
         mTrackMetrics.logBeginInterval(devices);
     }
 
     // Called by the PlaybackThread to indicate the track is no longer active.
-    void logEndInterval() {
+    void logEndInterval() final {
         mTrackMetrics.logEndInterval();
     }
 
     // Called to tally underrun frames in playback.
-    virtual void tallyUnderrunFrames(size_t /* frames */) {}
+    void tallyUnderrunFrames(size_t /* frames */) override {}
 
-    audio_channel_mask_t channelMask() const { return mChannelMask; }
+    audio_channel_mask_t channelMask() const final { return mChannelMask; }
 
     /** @return true if the track has changed (metadata or volume) since
      *          the last time this function was called,
@@ -265,16 +231,16 @@ public:
      *          false otherwise.
      *  Thread safe.
      */
-    bool readAndClearHasChanged() { return !mChangeNotified.test_and_set(); }
+    bool readAndClearHasChanged() final { return !mChangeNotified.test_and_set(); }
 
     /** Set that a metadata has changed and needs to be notified to backend. Thread safe. */
-    void setMetadataHasChanged() { mChangeNotified.clear(); }
+    void setMetadataHasChanged() final { mChangeNotified.clear(); }
 
     /**
      * Called when a track moves to active state to record its contribution to battery usage.
      * Track state transitions should eventually be handled within the track class.
      */
-    void beginBatteryAttribution() {
+    void beginBatteryAttribution() final {
         mBatteryStatsHolder.emplace(uid());
     }
 
@@ -282,10 +248,9 @@ public:
      * Called when a track moves out of the active state to record its contribution
      * to battery usage.
      */
-    void endBatteryAttribution() {
+    void endBatteryAttribution() final {
         mBatteryStatsHolder.reset();
     }
-
 
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
@@ -302,31 +267,31 @@ protected:
     }
 
     // AudioBufferProvider interface
-    virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) = 0;
-    virtual void releaseBuffer(AudioBufferProvider::Buffer* buffer);
+    // status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
 
     // ExtendedAudioBufferProvider interface is only needed for Track,
     // but putting it in TrackBase avoids the complexity of virtual inheritance
-    virtual size_t  framesReady() const { return SIZE_MAX; }
+    size_t framesReady() const override { return SIZE_MAX; } // MmapTrack doesn't implement.
 
     uint32_t channelCount() const { return mChannelCount; }
 
-    size_t frameSize() const { return mFrameSize; }
+    size_t frameSize() const final { return mFrameSize; }
 
-    virtual uint32_t sampleRate() const { return mSampleRate; }
+    uint32_t sampleRate() const override { return mSampleRate; }
 
-    bool isStopped() const {
+    bool isStopped() const final {
         return (mState == STOPPED || mState == FLUSHED);
     }
 
     // for fast tracks and offloaded tracks only
-    bool isStopping() const {
+    bool isStopping() const final {
         return mState == STOPPING_1 || mState == STOPPING_2;
     }
-    bool isStopping_1() const {
+    bool isStopping_1() const final {
         return mState == STOPPING_1;
     }
-    bool isStopping_2() const {
+    bool isStopping_2() const final {
         return mState == STOPPING_2;
     }
 
@@ -368,7 +333,8 @@ protected:
                                     // true for Track, false for RecordTrack,
                                     // this could be a track type if needed later
 
-    const wp<ThreadBase> mThread;
+    const wp<IAfThreadBase> mThread;
+    const alloc_type     mAllocType;
     /*const*/ sp<Client> mClient;   // see explanation at ~TrackBase() why not const
     sp<IMemory>         mCblkMemory;
     audio_track_cblk_t* mCblk;
@@ -392,7 +358,7 @@ protected:
 
     const audio_session_t mSessionId;
     uid_t               mUid;
-    Vector < sp<SyncEvent> >mSyncEvents;
+    std::list<sp<audioflinger::SyncEvent>> mSyncEvents;
     const bool          mIsOut;
     sp<ServerProxy>     mServerProxy;
     const int           mId;
@@ -433,36 +399,27 @@ protected:
     std::optional<mediautils::BatteryStatsAudioHandle> mBatteryStatsHolder;
 };
 
-// PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.
-// it provides buffer access methods that map those of a ClientProxy (see AudioTrackShared.h)
-class PatchProxyBufferProvider
+class PatchTrackBase : public PatchProxyBufferProvider, public virtual IAfPatchTrackBase
 {
 public:
-
-    virtual ~PatchProxyBufferProvider() {}
-
-    virtual bool        producesBufferOnDemand() const = 0;
-    virtual status_t    obtainBuffer(Proxy::Buffer* buffer,
-                                     const struct timespec *requested = NULL) = 0;
-    virtual void        releaseBuffer(Proxy::Buffer* buffer) = 0;
-};
-
-class PatchTrackBase : public PatchProxyBufferProvider
-{
-public:
-    using Timeout = std::optional<std::chrono::nanoseconds>;
-                        PatchTrackBase(const sp<ClientProxy>& proxy, const ThreadBase& thread,
+                        PatchTrackBase(const sp<ClientProxy>& proxy,
+                                       IAfThreadBase* thread,
                                        const Timeout& timeout);
-            void        setPeerTimeout(std::chrono::nanoseconds timeout);
-            template <typename T>
-            void        setPeerProxy(const sp<T> &proxy, bool holdReference) {
-                            mPeerReferenceHold = holdReference ? proxy : nullptr;
-                            mPeerProxy = proxy.get();
-                        }
-            void        clearPeerProxy() {
+            void setPeerTimeout(std::chrono::nanoseconds timeout) final;
+            void setPeerProxy(const sp<IAfPatchTrackBase>& proxy, bool holdReference) final {
+                if (proxy) {
+                    mPeerReferenceHold = holdReference ? proxy : nullptr;
+                    mPeerProxy = proxy->asPatchProxyBufferProvider();
+                } else {
+                    clearPeerProxy();
+                }
+            }
+            void clearPeerProxy() final {
                             mPeerReferenceHold.clear();
                             mPeerProxy = nullptr;
                         }
+
+            PatchProxyBufferProvider* asPatchProxyBufferProvider() final { return this; }
 
             bool        producesBufferOnDemand() const override { return false; }
 
@@ -471,5 +428,6 @@ protected:
     sp<RefBase>                 mPeerReferenceHold;   // keeps mPeerProxy alive during access.
     PatchProxyBufferProvider*   mPeerProxy = nullptr;
     struct timespec             mPeerTimeout{};
-
 };
+
+} // namespace android

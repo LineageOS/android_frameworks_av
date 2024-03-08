@@ -16,7 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2Buffer"
+#define ATRACE_TAG  ATRACE_TAG_VIDEO
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <list>
 #include <map>
@@ -26,6 +28,7 @@
 #include <C2AllocatorGralloc.h>
 #include <C2AllocatorIon.h>
 #include <C2BufferPriv.h>
+#include <C2Debug.h>
 #include <C2BlockInternal.h>
 #include <C2PlatformSupport.h>
 #include <bufferpool/ClientManager.h>
@@ -33,6 +36,7 @@
 
 namespace {
 
+using android::ScopedTrace;
 using android::C2AllocatorBlob;
 using android::C2AllocatorGralloc;
 using android::C2AllocatorIon;
@@ -112,6 +116,32 @@ class BufferDataBuddy : public C2BufferData {
 };
 
 }  // namespace
+
+/*
+*/
+
+c2_status_t C2BlockPool::fetchLinearBlock(
+        uint32_t capacity, C2MemoryUsage usage,
+        std::shared_ptr<C2LinearBlock> *block /* nonnull */,
+        C2Fence *fence /* nonnull */) {
+    // fall back to non-waitable implementation, as long as it does not return C2_BLOCKING
+    c2_status_t result = fetchLinearBlock(capacity, usage, block);
+    C2_CHECK_NE(result, C2_BLOCKING);
+    *fence = C2Fence();
+    return result;
+}
+
+c2_status_t C2BlockPool::fetchGraphicBlock(
+        uint32_t width, uint32_t height, uint32_t format,
+        C2MemoryUsage usage,
+        std::shared_ptr<C2GraphicBlock> *block /* nonnull */,
+        C2Fence *fence /* nonnull */) {
+    // fall back to non-waitable implementation, as long as it does not return C2_BLOCKING
+    c2_status_t result = fetchGraphicBlock(width, height, format, usage, block);
+    C2_CHECK_NE(result, C2_BLOCKING);
+    *fence = C2Fence();
+    return result;
+}
 
 /* ========================================== 1D BLOCK ========================================= */
 
@@ -1159,6 +1189,7 @@ c2_status_t C2PooledBlockPool::fetchLinearBlock(
         uint32_t capacity,
         C2MemoryUsage usage,
         std::shared_ptr<C2LinearBlock> *block /* nonnull */) {
+    ScopedTrace trace(ATRACE_TAG,"C2PooledBlockPool::fetchLinearBlock");
     if (mBufferPoolVer == VER_HIDL && mImpl) {
         return mImpl->fetchLinearBlock(capacity, usage, block);
     }
@@ -1174,6 +1205,7 @@ c2_status_t C2PooledBlockPool::fetchGraphicBlock(
         uint32_t format,
         C2MemoryUsage usage,
         std::shared_ptr<C2GraphicBlock> *block) {
+    ScopedTrace trace(ATRACE_TAG,"C2PooledBlockPool::fetchGraphicBlock");
     if (mBufferPoolVer == VER_HIDL && mImpl) {
         return mImpl->fetchGraphicBlock(width, height, format, usage, block);
     }

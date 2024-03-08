@@ -22,15 +22,15 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/OpusHeaderTest/OpusHeaderTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/foundation/tests/OpusHeader/OpusHeader.zip). Download, unzip and push these files into device for testing.
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/module/foundation/tests/OpusHeader/OpusHeader-1.0.zip). Download, unzip and push these files into device for testing.
 
 ```
-adb push OpusHeader /data/local/tmp/
+adb push OpusHeader-1.0 /data/local/tmp/
 ```
 
 usage: OpusHeaderTest -P \<path_to_folder\>
 ```
-adb shell /data/local/tmp/OpusHeaderTest -P /data/local/tmp/OpusHeader/
+adb shell /data/local/tmp/OpusHeaderTest -P /data/local/tmp/OpusHeader-1.0/
 ```
 Alternatively, the test can also be run using atest command.
 

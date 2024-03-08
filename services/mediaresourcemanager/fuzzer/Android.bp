@@ -27,21 +27,18 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
-cc_fuzz {
-    name: "mediaresourcemanager_fuzzer",
-    srcs: [
-        "mediaresourcemanager_fuzzer.cpp",
+cc_defaults {
+    name: "mediaresourcemanager_fuzzer_defaults",
+    defaults: [
+        "service_fuzzer_defaults",
     ],
     static_libs: [
         "liblog",
         "libresourcemanagerservice",
     ],
     shared_libs: [
-        "libbinder",
-        "libbinder_ndk",
         "libmedia",
         "libmediautils",
-        "libutils",
         "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
@@ -52,5 +49,49 @@ cc_fuzz {
             "android-media-fuzzing-reports@google.com",
         ],
         componentid: 155276,
+        hotlists: [
+            "4593311",
+        ],
+        description: "The fuzzer targets the APIs of libresourcemanagerservice",
+        vector: "remote",
+        service_privilege: "constrained",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
+    },
+}
+
+cc_fuzz {
+    name: "mediaresourcemanager_fuzzer",
+    defaults: [
+        "mediaresourcemanager_fuzzer_defaults",
+    ],
+    srcs: [
+        "mediaresourcemanager_fuzzer.cpp",
+    ],
+}
+
+cc_fuzz {
+    name: "resourcemanager_service_fuzzer",
+    defaults: [
+        "mediaresourcemanager_fuzzer_defaults",
+    ],
+    srcs: [
+        "resourcemanager_service_fuzzer.cpp",
+    ],
+}
+
+cc_fuzz {
+    name: "resourceobserver_service_fuzzer",
+    defaults: [
+        "mediaresourcemanager_fuzzer_defaults",
+    ],
+    static_libs: [
+        "resourceobserver_aidl_interface-V1-ndk",
+    ],
+    srcs: [
+        "resourceobserver_service_fuzzer.cpp",
+    ],
+    fuzz_config: {
+        triage_assignee: "waghpawan@google.com",
     },
 }

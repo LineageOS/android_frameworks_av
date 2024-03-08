@@ -1,0 +1,75 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_base_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_services_audioflinger_license"],
+}
+
+// TODO(b/275642749) Reenable these warnings
+fastpath_tidy_errors = audioflinger_base_tidy_errors + [
+    "-misc-non-private-member-variables-in-classes",
+    "-performance-no-int-to-ptr",
+]
+
+// Eventually use common tidy defaults
+cc_defaults {
+    name: "fastpath_flags_defaults",
+    // https://clang.llvm.org/docs/UsersManual.html#command-line-options
+    // https://clang.llvm.org/docs/DiagnosticsReference.html
+    cflags: audioflinger_base_cflags,
+    // https://clang.llvm.org/extra/clang-tidy/
+    tidy: true,
+    tidy_checks: fastpath_tidy_errors,
+    tidy_checks_as_errors: fastpath_tidy_errors,
+    tidy_flags: [
+      "-format-style=file",
+    ],
+}
+
+cc_library_shared {
+    name: "libaudioflinger_fastpath",
+
+    defaults: [
+        "fastpath_flags_defaults",
+    ],
+
+    srcs: [
+        "FastCapture.cpp",
+        "FastCaptureDumpState.cpp",
+        "FastCaptureState.cpp",
+        "FastMixer.cpp",
+        "FastMixerDumpState.cpp",
+        "FastMixerState.cpp",
+        "FastThread.cpp",
+        "FastThreadDumpState.cpp",
+        "FastThreadState.cpp",
+        "StateQueue.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audioflinger", // for Configuration
+    ],
+
+    shared_libs: [
+        "libaudioflinger_utils", // NBAIO_Tee
+        "libaudioprocessing",
+        "libaudioutils",
+        "libcutils",
+        "liblog",
+        "libnbaio",
+        "libnblog", // legacy NBLog that can be removed.
+        "libutils",
+    ],
+
+    header_libs: [
+        "libaudiohal_headers",
+        "libmedia_headers",
+    ],
+
+    sanitize: {
+        integer_overflow: true,
+    },
+
+}

@@ -23,6 +23,7 @@
 #include <MtpStringBuffer.h>
 #include <android-base/unique_fd.h>
 #include <fcntl.h>
+#include <functional>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <linux/usb/ch9.h>
 #include <sys/mman.h>

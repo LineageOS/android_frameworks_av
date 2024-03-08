@@ -192,7 +192,9 @@ void WriterFuzzerBase::addWriterSource(int32_t trackIndex) {
     sp<MetaData> trackMeta = new MetaData;
     convertMessageToMetaData(format, trackMeta);
     mCurrentTrack[trackIndex] = new MediaAdapter(trackMeta);
-    mWriter->addSource(mCurrentTrack[trackIndex]);
+    if (mWriter->addSource(mCurrentTrack[trackIndex]) != OK) {
+        mCurrentTrack[trackIndex] = nullptr;
+    }
 }
 
 void WriterFuzzerBase::start() {
@@ -202,13 +204,17 @@ void WriterFuzzerBase::start() {
 
 void WriterFuzzerBase::sendBuffersToWriter(sp<MediaAdapter> &currentTrack, int32_t trackIndex,
                                            int32_t startFrameIndex, int32_t endFrameIndex) {
+    if (!mCurrentTrack[trackIndex]) {
+        return;
+    }
     vector<FrameData> bufferInfo = mBufferSource->getFrameList(trackIndex);
     for (int idx = startFrameIndex; idx < endFrameIndex; ++idx) {
+        if (!mWriter->isSampleMetadataValid(trackIndex, bufferInfo[idx].timeUs)) {
+            continue;
+        }
         sp<ABuffer> buffer = new ABuffer((void *)bufferInfo[idx].buf, bufferInfo[idx].size);
         MediaBuffer *mediaBuffer = new MediaBuffer(buffer);
 
-        // Released in MediaAdapter::signalBufferReturned().
-        mediaBuffer->add_ref();
         mediaBuffer->set_range(buffer->offset(), buffer->size());
         MetaDataBase &sampleMetaData = mediaBuffer->meta_data();
         sampleMetaData.setInt64(kKeyTime, bufferInfo[idx].timeUs);
@@ -219,8 +225,19 @@ void WriterFuzzerBase::sendBuffersToWriter(sp<MediaAdapter> &currentTrack, int32
             sampleMetaData.setInt32(kKeyIsSyncFrame, true);
         }
 
+        // Released in MediaAdapter::signalBufferReturned().
+        mediaBuffer->add_ref();
+
         // This pushBuffer will wait until the mediaBuffer is consumed.
-        currentTrack->pushBuffer(mediaBuffer);
+        android::status_t pushStatus = currentTrack->pushBuffer(mediaBuffer);
+
+        if (pushStatus != OK) {
+            if (pushStatus == INVALID_OPERATION) {
+                // In Case of INVALID_OPERATION, mObserver needs to be set before calling release()
+                mediaBuffer->setObserver(currentTrack.get());
+            }
+            mediaBuffer->release();
+        }
     }
 }
 

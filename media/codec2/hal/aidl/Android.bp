@@ -1,0 +1,182 @@
+package {
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+// DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-aidl-client-defaults instead
+cc_library {
+    name: "libcodec2_aidl_client",
+
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
+
+    srcs: [
+        "BufferTypes.cpp",
+        "ParamTypes.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
+        "libgui_headers",
+    ],
+
+    shared_libs: [
+        "android.hardware.common-V2-ndk",
+        "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.c2-V1-ndk",
+        "libbinder_ndk",
+        "libbase",
+        "libcodec2",
+        "libcodec2_hal_common",
+        "libcodec2_vndk",
+        "libcutils",
+        "liblog",
+        "libnativewindow",
+        "libstagefright_aidl_bufferpool2",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libaidlcommonsupport",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
+        "libcodec2",
+        "libcodec2_hal_common",
+    ],
+}
+
+// DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-aidl-defaults instead
+cc_library {
+    name: "libcodec2_aidl",
+    min_sdk_version: "30",
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+
+    defaults: [
+        "libcodec2_hal_selection",
+    ],
+
+    srcs: [
+        "BufferTypes.cpp",
+        "Component.cpp",
+        "ComponentInterface.cpp",
+        "ComponentStore.cpp",
+        "Configurable.cpp",
+        "InputBufferManager.cpp",
+        "ParamTypes.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
+    ],
+
+    shared_libs: [
+        "android.hardware.common-V2-ndk",
+        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.c2-V1-ndk",
+        "libbase",
+        "libbinder_ndk",
+        "libcodec2",
+        "libcodec2_hal_common",
+        "libcodec2_hidl_plugin_stub",
+        "libcodec2_vndk",
+        "libcutils",
+        "libhidlbase",
+        "liblog",
+        "libnativewindow",
+        "libstagefright_aidl_bufferpool2",
+        "libstagefright_bufferpool@2.0.1",
+        "libui",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libaidlcommonsupport",
+    ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libcodec2_hidl_plugin_stub",
+            ],
+            shared_libs: [
+                "libcodec2_hidl_plugin",
+            ],
+        },
+        apex: {
+            exclude_shared_libs: [
+                "libcodec2_hidl_plugin_stub",
+                "libcodec2_hidl_plugin",
+            ],
+        },
+    },
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
+        "libcodec2",
+        "libstagefright_bufferpool@2.0.1",
+        "libui",
+    ],
+}
+
+// public dependency for Codec 2.0 HAL service implementations
+cc_defaults {
+    name: "libcodec2-aidl-defaults",
+    min_sdk_version: "30",
+    defaults: ["libcodec2-impl-defaults"],
+
+    shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
+        "libbinder_ndk",
+        "libcodec2_aidl",
+    ],
+}
+
+// public dependency for Codec 2.0 HAL client
+cc_defaults {
+    name: "libcodec2-aidl-client-defaults",
+    defaults: ["libcodec2-impl-defaults"],
+
+    shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
+        "libcodec2_aidl_client",
+    ],
+}
+
+cc_fuzz {
+    name: "libcodec2-aidl-fuzzer",
+    vendor: true,
+    srcs: [
+        "fuzzer.cpp",
+    ],
+    defaults: [
+        "libcodec2-aidl-defaults",
+        "service_fuzzer_defaults",
+        "libcodec2-runtime-libs",
+    ],
+    shared_libs: [
+        "libcodec2_vndk",
+    ],
+    fuzz_config: {
+        cc: [
+            "wonsik@google.com",
+        ],
+        triage_assignee: "waghpawan@google.com",
+    },
+}

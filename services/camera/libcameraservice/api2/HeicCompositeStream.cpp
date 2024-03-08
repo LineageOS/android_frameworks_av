@@ -29,6 +29,7 @@
 #include <gui/Surface.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
+#include <camera/StringUtils.h>
 
 #include <mediadrm/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
@@ -98,17 +99,17 @@ bool HeicCompositeStream::isHeicCompositeStream(const sp<Surface> &surface) {
     status_t err;
     int format;
     if ((err = anw->query(anw, NATIVE_WINDOW_FORMAT, &format)) != OK) {
-        String8 msg = String8::format("Failed to query Surface format: %s (%d)", strerror(-err),
+        std::string msg = fmt::sprintf("Failed to query Surface format: %s (%d)", strerror(-err),
                 err);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return false;
     }
 
     int dataspace;
     if ((err = anw->query(anw, NATIVE_WINDOW_DEFAULT_DATASPACE, &dataspace)) != OK) {
-        String8 msg = String8::format("Failed to query Surface dataspace: %s (%d)", strerror(-err),
+        std::string msg = fmt::sprintf("Failed to query Surface dataspace: %s (%d)", strerror(-err),
                 err);
-        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return false;
     }
 
@@ -117,7 +118,7 @@ bool HeicCompositeStream::isHeicCompositeStream(const sp<Surface> &surface) {
 
 status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface>>& consumers,
         bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
-        camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
+        camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds,
         int /*streamSetId*/, bool /*isShared*/, int32_t colorSpace,
@@ -451,15 +452,27 @@ void HeicCompositeStream::onHeicFormatChanged(sp<AMessage>& newFormat) {
         newFormat->setString(KEY_MIME, mimeHeic);
         newFormat->setInt32(KEY_WIDTH, mOutputWidth);
         newFormat->setInt32(KEY_HEIGHT, mOutputHeight);
-        if (mUseGrid) {
+    }
+
+    if (mUseGrid || mUseHeic) {
+        int32_t gridRows, gridCols, tileWidth, tileHeight;
+        if (newFormat->findInt32(KEY_GRID_ROWS, &gridRows) &&
+                newFormat->findInt32(KEY_GRID_COLUMNS, &gridCols) &&
+                newFormat->findInt32(KEY_TILE_WIDTH, &tileWidth) &&
+                newFormat->findInt32(KEY_TILE_HEIGHT, &tileHeight)) {
+            mGridWidth = tileWidth;
+            mGridHeight = tileHeight;
+            mGridRows = gridRows;
+            mGridCols = gridCols;
+        } else {
             newFormat->setInt32(KEY_TILE_WIDTH, mGridWidth);
             newFormat->setInt32(KEY_TILE_HEIGHT, mGridHeight);
             newFormat->setInt32(KEY_GRID_ROWS, mGridRows);
             newFormat->setInt32(KEY_GRID_COLUMNS, mGridCols);
-            int32_t left, top, right, bottom;
-            if (newFormat->findRect("crop", &left, &top, &right, &bottom)) {
-                newFormat->setRect("crop", 0, 0, mOutputWidth - 1, mOutputHeight - 1);
-            }
+        }
+        int32_t left, top, right, bottom;
+        if (newFormat->findRect("crop", &left, &top, &right, &bottom)) {
+            newFormat->setRect("crop", 0, 0, mOutputWidth - 1, mOutputHeight - 1);
         }
     }
     newFormat->setInt32(KEY_IS_DEFAULT, 1 /*isPrimary*/);

@@ -151,7 +151,7 @@ DrmStatus DrmMetricsLogger::createPlugin(const uint8_t uuid[IDRM_UUID_SIZE],
     if (status == OK) {
         String8 version8;
         if (getPropertyString(String8("version"), version8) == OK) {
-            mVersion = version8.string();
+            mVersion = version8.c_str();
         }
         reportMediaDrmCreated();
     } else {

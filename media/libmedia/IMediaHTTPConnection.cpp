@@ -54,8 +54,8 @@ struct BpMediaHTTPConnection : public BpInterface<IMediaHTTPConnection> {
         tmp = String16("");
         if (headers != NULL) {
             for (size_t i = 0; i < headers->size(); ++i) {
-                String16 key(headers->keyAt(i).string());
-                String16 val(headers->valueAt(i).string());
+                String16 key(headers->keyAt(i).c_str());
+                String16 val(headers->valueAt(i).c_str());
 
                 tmp.append(key);
                 tmp.append(String16(": "));

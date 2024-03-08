@@ -7,8 +7,38 @@ package {
     default_applicable_licenses: ["frameworks_av_services_audioflinger_license"],
 }
 
+audioflinger_timing_tidy_errors = audioflinger_base_tidy_errors + [
+    "modernize-avoid-c-arrays",
+    "modernize-deprecated-headers",
+    "modernize-pass-by-value",
+    "modernize-use-auto",
+    "modernize-use-nodiscard",
+
+    // TODO(b/275642749) Reenable these warnings
+    "-misc-non-private-member-variables-in-classes",
+]
+
+// Eventually use common tidy defaults
+cc_defaults {
+    name: "audioflinger_timing_flags_defaults",
+    // https://clang.llvm.org/docs/UsersManual.html#command-line-options
+    // https://clang.llvm.org/docs/DiagnosticsReference.html
+    cflags: audioflinger_base_cflags,
+    // https://clang.llvm.org/extra/clang-tidy/
+    tidy: true,
+    tidy_checks: audioflinger_timing_tidy_errors,
+    tidy_checks_as_errors: audioflinger_timing_tidy_errors,
+    tidy_flags: [
+      "-format-style=file",
+    ],
+}
+
 cc_library {
     name: "libaudioflinger_timing",
+
+    defaults: [
+        "audioflinger_timing_flags_defaults",
+    ],
 
     host_supported: true,
 

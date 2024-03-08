@@ -19,15 +19,15 @@ To test 32-bit binary push binaries from nativetest.
 
 adb push ${OUT}/data/nativetest/writerTest/writerTest /data/local/tmp/
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/tests/writer/WriterTestRes-1.1.zip).
+The resource file for the tests is taken from [here](https://dl.google.com/android-unittest/media/frameworks/av/media/libstagefright/tests/writer/WriterTestRes-1.2.zip).
 Download and extract the folder. Push all the files in this folder to /data/local/tmp/ on the device.
 ```
-adb push WriterTestRes-1.1/. /data/local/tmp/WriterTestRes/
+adb push WriterTestRes-1.2 /data/local/tmp/
 ```
 
 usage: writerTest -P \<path_to_res_folder\> -C <remove_output_file>
 ```
-adb shell /data/local/tmp/writerTest -P /data/local/tmp/WriterTestRes/ -C true
+adb shell /data/local/tmp/writerTest -P /data/local/tmp/WriterTestRes-1.2/ -C true
 ```
 Alternatively, the test can also be run using atest command.
 
