@@ -7,10 +7,10 @@ container: "system"
 # ******************************************************************
 
 flag {
-  name: "large_audio_frame"
+  name: "aidl_hal"
   namespace: "codec_fwk"
-  description: "Feature flags for large audio frame support"
-  bug: "297219557"
+  description: "Feature flags for enabling AIDL HAL handling"
+  bug: "251850069"
 }
 
 flag {
@@ -21,8 +21,8 @@ flag {
 }
 
 flag {
-  name: "aidl_hal"
+  name: "large_audio_frame"
   namespace: "codec_fwk"
-  description: "Feature flags for enabling AIDL HAL handling"
-  bug: "251850069"
+  description: "Feature flags for large audio frame support"
+  bug: "297219557"
 }
