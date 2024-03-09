@@ -1369,6 +1369,7 @@ status_t AudioPolicyManagerTestDynamicPolicy::addPolicyMix(int mixType, int mixF
     AudioMix myAudioMix(matchCriteria, mixType, audioConfig, mixFlag,
             String8(mixAddress.c_str()), 0);
     myAudioMix.mDeviceType = deviceType;
+    myAudioMix.mToken = sp<BBinder>::make();
     // Clear mAudioMix before add new one to make sure we don't add already exist mixes.
     mAudioMixes.clear();
     return addPolicyMix(myAudioMix);
@@ -1569,8 +1570,7 @@ TEST_F_WITH_FLAGS(
     validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
 
     mAudioMixes.clear();
-    mAudioMixes.add(validAudioMix);
-    status_t ret = mManager->registerPolicyMixes(mAudioMixes);
+    status_t ret = addPolicyMix(validAudioMix);
 
     ASSERT_EQ(NO_ERROR, ret);
 
@@ -1586,8 +1586,7 @@ TEST_F_WITH_FLAGS(
                              MIX_ROUTE_FLAG_LOOP_BACK, String8(mMixAddress.c_str()), 0);
     validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
 
-    mAudioMixes.add(invalidAudioMix);
-    ret = mManager->registerPolicyMixes(mAudioMixes);
+    ret = addPolicyMix(invalidAudioMix);
 
     ASSERT_EQ(INVALID_OPERATION, ret);
 
@@ -1614,8 +1613,7 @@ TEST_F_WITH_FLAGS(
     validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
 
     mAudioMixes.clear();
-    mAudioMixes.add(validAudioMix);
-    status_t ret = mManager->registerPolicyMixes(mAudioMixes);
+    status_t ret = addPolicyMix(validAudioMix);
 
     ASSERT_EQ(NO_ERROR, ret);
 
@@ -1629,7 +1627,7 @@ TEST_F_WITH_FLAGS(
 
     AudioMix invalidAudioMix(invalidMixMatchCriteria, MIX_TYPE_PLAYERS, audioConfig,
                              MIX_ROUTE_FLAG_LOOP_BACK, String8(mMixAddress.c_str()), 0);
-    validAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
+    invalidAudioMix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
 
     Vector<AudioMix> mixes;
     mixes.add(invalidAudioMix);
