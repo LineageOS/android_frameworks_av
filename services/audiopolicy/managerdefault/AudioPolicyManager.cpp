@@ -3907,7 +3907,7 @@ status_t AudioPolicyManager::getRegisteredPolicyMixes(std::vector<AudioMix>& _ai
         _aidl_return.back().mToken = policyMix->mToken;
     }
 
-    ALOGVV("%s() returning %zu registered mixes", __func__, _aidl_return->size());
+    ALOGVV("%s() returning %zu registered mixes", __func__, _aidl_return.size());
     return OK;
 }
 
