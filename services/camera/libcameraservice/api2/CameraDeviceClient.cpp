@@ -18,6 +18,8 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <android-base/properties.h>
+#include <android-base/strings.h>
 #include <com_android_internal_camera_flags.h>
 #include <cutils/properties.h>
 #include <utils/CameraThreadState.h>
@@ -115,12 +117,11 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
     mOverrideForPerfClass(overrideForPerfClass),
     mOriginalCameraId(originalCameraId) {
 
-    char value[PROPERTY_VALUE_MAX];
-    property_get("persist.vendor.camera.privapp.list", value, "");
-    String16 packagelist(value);
-    if (packagelist.contains(clientPackageName.string())) {
-        mPrivilegedClient = true;
-    }
+    std::vector<std::string> privilegedClientList = android::base::Split(
+            android::base::GetProperty("persist.vendor.camera.privapp.list", ""), ",");
+    auto it = std::find(privilegedClientList.begin(), privilegedClientList.end(),
+            clientPackageName);
+    mPrivilegedClient = it != privilegedClientList.end();
 
     ATRACE_CALL();
     ALOGI("CameraDeviceClient %s: Opened", cameraId.c_str());
