@@ -536,7 +536,7 @@ sp<IRemoteDisplay> MediaPlayerService::listenForRemoteDisplay(
         return NULL;
     }
 
-    return new RemoteDisplay(opPackageName, client, iface.string());
+    return new RemoteDisplay(opPackageName, client, iface.c_str());
 }
 
 status_t MediaPlayerService::AudioOutput::dump(int fd, const Vector<String16>& args) const
