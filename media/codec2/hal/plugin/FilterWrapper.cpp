@@ -49,11 +49,6 @@ public:
             std::weak_ptr<FilterWrapper> filterWrapper)
         : mIntf(intf), mFilterWrapper(filterWrapper) {
         takeFilters(std::move(filters));
-        for (size_t i = 0; i < mFilters.size(); ++i) {
-            mControlParamTypes.insert(
-                    mFilters[i].desc.controlParams.begin(),
-                    mFilters[i].desc.controlParams.end());
-        }
     }
 
     ~WrappedDecoderInterface() override = default;
@@ -91,6 +86,12 @@ public:
 
         // TODO: documentation
         mFilters = std::move(filters);
+        mControlParamTypes.clear();
+        for (size_t i = 0; i < mFilters.size(); ++i) {
+            mControlParamTypes.insert(
+                    mFilters[i].desc.controlParams.begin(),
+                    mFilters[i].desc.controlParams.end());
+        }
         mTypeToIndexForQuery.clear();
         mTypeToIndexForConfig.clear();
         for (size_t i = 0; i < mFilters.size(); ++i) {
