@@ -35,6 +35,7 @@ LIBCAMERA2NDK {
     ACameraMetadata_copy;
     ACameraMetadata_free;
     ACameraMetadata_getAllTags;
+    ACameraMetadata_getTagFromName; #introduced=35
     ACameraMetadata_getConstEntry;
     ACameraMetadata_isLogicalMultiCamera; # introduced=29
     ACameraMetadata_fromCameraMetadata; # introduced=30
