@@ -908,7 +908,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig_ll(
             auto effectDescs = std::make_shared<EffectDescVector>();
             for (auto& effect : stream.effects) {
                 effectDescs->push_back(
-                        std::make_shared<EffectDesc>(effect->name.c_str(), effect->uuid));
+                        std::make_shared<EffectDesc>(effect->name, effect->uuid));
             }
             streams.add(stream.type, std::move(effectDescs));
         }
@@ -919,7 +919,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfig_ll(
             auto effectDescs = std::make_unique<EffectDescVector>();
             for (auto& effect : deviceProcess.effects) {
                 effectDescs->push_back(
-                        std::make_shared<EffectDesc>(effect->name.c_str(), effect->uuid));
+                        std::make_shared<EffectDesc>(effect->name, effect->uuid));
             }
             auto devEffects = std::make_unique<DeviceEffects>(
                         std::move(effectDescs), deviceProcess.type, deviceProcess.address);
