@@ -14,6 +14,7 @@ flag {
 
 flag {
   name: "dynamic_color_aspects"
+  is_exported: true
   namespace: "codec_fwk"
   description: "Feature flag for dynamic color aspect support"
   bug: "297914560"
@@ -21,6 +22,7 @@ flag {
 
 flag {
   name: "hlg_editing"
+  is_exported: true
   namespace: "codec_fwk"
   description: "Feature flag for HLG editing support"
   bug: "316397061"
@@ -28,6 +30,7 @@ flag {
 
 flag {
   name: "in_process_sw_audio_codec"
+  is_exported: true
   namespace: "codec_fwk"
   description: "Feature flag for in-process software audio codec API"
   bug: "297922713"
@@ -56,6 +59,7 @@ flag {
 
 flag {
   name: "null_output_surface"
+  is_exported: true
   namespace: "codec_fwk"
   description: "Feature flag for null output Surface API"
   bug: "297920102"
@@ -70,6 +74,7 @@ flag {
 
 flag {
   name: "region_of_interest"
+  is_exported: true
   namespace: "codec_fwk"
   description: "Feature flag for region of interest API"
   bug: "299191092"
