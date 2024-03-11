@@ -485,7 +485,7 @@ RetCode DynamicsProcessingContext::setDpChannels_l(
 
     if (!stageInUse) {
         LOG(WARNING) << __func__ << " not in use " << ::android::internal::ToString(channels);
-        return RetCode::SUCCESS;
+        return RetCode::ERROR_ILLEGAL_PARAMETER;
     }
 
     RETURN_VALUE_IF(!stageInUse, RetCode::ERROR_ILLEGAL_PARAMETER, "stageNotInUse");
