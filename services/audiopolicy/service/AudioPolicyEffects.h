@@ -249,21 +249,27 @@ private:
 
     // Legacy: End methods above.
 
+    // Note: The association of Effects to audio source, session, or stream
+    // is done through std::map instead of std::unordered_map.  This gives
+    // better reproducibility of issues, since map is ordered and more predictable
+    // in enumeration.
+
     // protects access to mInputSources, mInputSessions, mOutputStreams, mOutputSessions
     // never hold AudioPolicyService::mMutex when calling AudioPolicyEffects methods as
     // those can call back into AudioPolicyService methods and try to acquire the mutex
     mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAudioPolicyEffects_Mutex};
     // Automatic input effects are configured per audio_source_t
-    KeyedVector<audio_source_t, std::shared_ptr<EffectDescVector>> mInputSources
+    std::map<audio_source_t, std::shared_ptr<EffectDescVector>> mInputSources
             GUARDED_BY(mMutex);
     // Automatic input effects are unique for an audio_session_t.
-    KeyedVector<audio_session_t, std::shared_ptr<EffectVector>> mInputSessions GUARDED_BY(mMutex);
+    std::map<audio_session_t, std::shared_ptr<EffectVector>> mInputSessions
+            GUARDED_BY(mMutex);
 
     // Automatic output effects are organized per audio_stream_type_t
-    KeyedVector<audio_stream_type_t, std::shared_ptr<EffectDescVector>> mOutputStreams
+    std::map<audio_stream_type_t, std::shared_ptr<EffectDescVector>> mOutputStreams
             GUARDED_BY(mMutex);
     // Automatic output effects are unique for an audio_session_t.
-    KeyedVector<audio_session_t, std::shared_ptr<EffectVector>> mOutputSessions
+    std::map<audio_session_t, std::shared_ptr<EffectVector>> mOutputSessions
             GUARDED_BY(mMutex);
 
     /**
