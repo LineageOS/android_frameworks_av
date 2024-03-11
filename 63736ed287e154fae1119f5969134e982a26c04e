@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3d493854_2afd8a66",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 19979
+      },
+      "writtenOn": "2024-03-11T21:20:47Z",
+      "side": 1,
+      "message": "Since libcameraservice is already using libbase I updated the patch to use android-base/properties.h and android-base/strings.h:\n\n    std::vector\u003cstd::string\u003e privilegedClientList \u003d android::base::Split(\n            android::base::GetProperty(\"persist.vendor.camera.privapp.list\", \"\"), \",\");\n    auto it \u003d std::find(privilegedClientList.begin(), privilegedClientList.end(), clientPackageName);\n    mPrivilegedClient \u003d it !\u003d privilegedClientList.end();",
+      "revId": "63736ed287e154fae1119f5969134e982a26c04e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
