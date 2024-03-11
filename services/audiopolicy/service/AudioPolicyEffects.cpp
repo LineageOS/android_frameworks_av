@@ -66,35 +66,6 @@ void AudioPolicyEffects::setDefaultDeviceEffects() {
                 std::launch::async, &AudioPolicyEffects::initDefaultDeviceEffects, this);
 }
 
-AudioPolicyEffects::~AudioPolicyEffects()
-{
-    size_t i = 0;
-    // release audio input processing resources
-    for (i = 0; i < mInputSources.size(); i++) {
-        delete mInputSources.valueAt(i);
-    }
-    mInputSources.clear();
-
-    for (i = 0; i < mInputSessions.size(); i++) {
-        mInputSessions.valueAt(i)->mEffects.clear();
-        delete mInputSessions.valueAt(i);
-    }
-    mInputSessions.clear();
-
-    // release audio output processing resources
-    for (i = 0; i < mOutputStreams.size(); i++) {
-        delete mOutputStreams.valueAt(i);
-    }
-    mOutputStreams.clear();
-
-    for (i = 0; i < mOutputSessions.size(); i++) {
-        mOutputSessions.valueAt(i)->mEffects.clear();
-        delete mOutputSessions.valueAt(i);
-    }
-    mOutputSessions.clear();
-}
-
-
 status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
                              audio_source_t inputSource,
                              audio_session_t audioSession)
@@ -112,9 +83,9 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
         return status;
     }
     ssize_t idx = mInputSessions.indexOfKey(audioSession);
-    EffectVector *sessionDesc;
+    std::shared_ptr<EffectVector> sessionDesc;
     if (idx < 0) {
-        sessionDesc = new EffectVector(audioSession);
+        sessionDesc = std::make_shared<EffectVector>(audioSession);
         mInputSessions.add(audioSession, sessionDesc);
     } else {
         // EffectVector is existing and we just need to increase ref count
@@ -125,13 +96,12 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
     ALOGV("addInputEffects(): input: %d, refCount: %d", input, sessionDesc->mRefCount);
     if (sessionDesc->mRefCount == 1) {
         int64_t token = IPCThreadState::self()->clearCallingIdentity();
-        Vector <EffectDesc *> effects = mInputSources.valueAt(index)->mEffects;
-        for (size_t i = 0; i < effects.size(); i++) {
-            EffectDesc *effect = effects[i];
+        const std::shared_ptr<EffectDescVector>& effects = mInputSources.valueAt(index);
+        for (const std::shared_ptr<EffectDesc>& effect : *effects) {
             AttributionSourceState attributionSource;
             attributionSource.packageName = "android";
             attributionSource.token = sp<BBinder>::make();
-            sp<AudioEffect> fx = new AudioEffect(attributionSource);
+            auto fx = sp<AudioEffect>::make(attributionSource);
             fx->set(nullptr /*type */, &effect->mUuid, -1 /* priority */, nullptr /* callback */,
                     audioSession, input);
             status_t status = fx->initCheck();
@@ -147,7 +117,7 @@ status_t AudioPolicyEffects::addInputEffects(audio_io_handle_t input,
             }
             ALOGV("addInputEffects(): added Fx %s on source: %d",
                   effect->mName.c_str(), (int32_t)aliasSource);
-            sessionDesc->mEffects.add(fx);
+            sessionDesc->mEffects.push_back(std::move(fx));
         }
         sessionDesc->setProcessorEnabled(true);
         IPCThreadState::self()->restoreCallingIdentity(token);
@@ -166,12 +136,11 @@ status_t AudioPolicyEffects::releaseInputEffects(audio_io_handle_t input,
     if (index < 0) {
         return status;
     }
-    EffectVector *sessionDesc = mInputSessions.valueAt(index);
+    std::shared_ptr<EffectVector> sessionDesc = mInputSessions.valueAt(index);
     sessionDesc->mRefCount--;
     ALOGV("releaseInputEffects(): input: %d, refCount: %d", input, sessionDesc->mRefCount);
     if (sessionDesc->mRefCount == 0) {
         sessionDesc->setProcessorEnabled(false);
-        delete sessionDesc;
         mInputSessions.removeItemsAt(index);
         ALOGV("releaseInputEffects(): all effects released");
     }
@@ -195,7 +164,7 @@ status_t AudioPolicyEffects::queryDefaultInputEffects(audio_session_t audioSessi
         *count = 0;
         return BAD_VALUE;
     }
-    Vector< sp<AudioEffect> > effects = mInputSessions.valueAt(index)->mEffects;
+    const std::vector<sp<AudioEffect>>& effects = mInputSessions.valueAt(index)->mEffects;
 
     for (size_t i = 0; i < effects.size(); i++) {
         effect_descriptor_t desc = effects[i]->descriptor();
@@ -228,7 +197,7 @@ status_t AudioPolicyEffects::queryDefaultOutputSessionEffects(audio_session_t au
         *count = 0;
         return BAD_VALUE;
     }
-    Vector< sp<AudioEffect> > effects = mOutputSessions.valueAt(index)->mEffects;
+    const std::vector<sp<AudioEffect>>& effects = mOutputSessions.valueAt(index)->mEffects;
 
     for (size_t i = 0; i < effects.size(); i++) {
         effect_descriptor_t desc = effects[i]->descriptor();
@@ -264,9 +233,9 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
     }
 
     ssize_t idx = mOutputSessions.indexOfKey(audioSession);
-    EffectVector *procDesc;
+    std::shared_ptr<EffectVector> procDesc;
     if (idx < 0) {
-        procDesc = new EffectVector(audioSession);
+        procDesc = std::make_shared<EffectVector>(audioSession);
         mOutputSessions.add(audioSession, procDesc);
     } else {
         // EffectVector is existing and we just need to increase ref count
@@ -279,13 +248,12 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
     if (procDesc->mRefCount == 1) {
         // make sure effects are associated to audio server even if we are executing a binder call
         int64_t token = IPCThreadState::self()->clearCallingIdentity();
-        Vector <EffectDesc *> effects = mOutputStreams.valueAt(index)->mEffects;
-        for (size_t i = 0; i < effects.size(); i++) {
-            EffectDesc *effect = effects[i];
+        const std::shared_ptr<EffectDescVector>& effects = mOutputStreams.valueAt(index);
+        for (const std::shared_ptr<EffectDesc>& effect : *effects) {
             AttributionSourceState attributionSource;
             attributionSource.packageName = "android";
             attributionSource.token = sp<BBinder>::make();
-            sp<AudioEffect> fx = new AudioEffect(attributionSource);
+            auto fx = sp<AudioEffect>::make(attributionSource);
             fx->set(nullptr /* type */, &effect->mUuid, 0 /* priority */, nullptr /* callback */,
                     audioSession, output);
             status_t status = fx->initCheck();
@@ -297,7 +265,7 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
             }
             ALOGV("addOutputSessionEffects(): added Fx %s on session: %d for stream: %d",
                   effect->mName.c_str(), audioSession, (int32_t)stream);
-            procDesc->mEffects.add(fx);
+            procDesc->mEffects.push_back(std::move(fx));
         }
 
         procDesc->setProcessorEnabled(true);
@@ -321,14 +289,13 @@ status_t AudioPolicyEffects::releaseOutputSessionEffects(audio_io_handle_t outpu
         return NO_ERROR;
     }
 
-    EffectVector *procDesc = mOutputSessions.valueAt(index);
+    std::shared_ptr<EffectVector> procDesc = mOutputSessions.valueAt(index);
     procDesc->mRefCount--;
     ALOGV("releaseOutputSessionEffects(): session: %d, refCount: %d",
           audioSession, procDesc->mRefCount);
     if (procDesc->mRefCount == 0) {
         procDesc->setProcessorEnabled(false);
         procDesc->mEffects.clear();
-        delete procDesc;
         mOutputSessions.removeItemsAt(index);
         ALOGV("releaseOutputSessionEffects(): output processing released from session: %d",
               audioSession);
@@ -379,10 +346,10 @@ status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
 
     // Find the EffectDescVector for the given source type, or create a new one if necessary.
     ssize_t index = mInputSources.indexOfKey(source);
-    EffectDescVector *desc = NULL;
+    std::shared_ptr<EffectDescVector> desc;
     if (index < 0) {
         // No effects for this source type yet.
-        desc = new EffectDescVector();
+        desc = std::make_shared<EffectDescVector>();
         mInputSources.add(source, desc);
     } else {
         desc = mInputSources.valueAt(index);
@@ -394,9 +361,9 @@ status_t AudioPolicyEffects::addSourceDefaultEffect(const effect_uuid_t *type,
         ALOGE("addSourceDefaultEffect(): failed to get new unique id.");
         return res;
     }
-    EffectDesc *effect = new EffectDesc(
+    std::shared_ptr<EffectDesc> effect = std::make_shared<EffectDesc>(
             descriptor.name, descriptor.type, opPackageName, descriptor.uuid, priority, *id);
-    desc->mEffects.add(effect);
+    desc->push_back(std::move(effect));
     // TODO(b/71813697): Support setting params as well.
 
     // TODO(b/71814300): Retroactively attach to any existing sources of the given type.
@@ -444,10 +411,10 @@ status_t AudioPolicyEffects::addStreamDefaultEffect(const effect_uuid_t *type,
 
     // Find the EffectDescVector for the given stream type, or create a new one if necessary.
     ssize_t index = mOutputStreams.indexOfKey(stream);
-    EffectDescVector *desc = NULL;
+    std::shared_ptr<EffectDescVector> desc;
     if (index < 0) {
         // No effects for this stream type yet.
-        desc = new EffectDescVector();
+        desc = std::make_shared<EffectDescVector>();
         mOutputStreams.add(stream, desc);
     } else {
         desc = mOutputStreams.valueAt(index);
@@ -459,9 +426,9 @@ status_t AudioPolicyEffects::addStreamDefaultEffect(const effect_uuid_t *type,
         ALOGE("addStreamDefaultEffect(): failed to get new unique id.");
         return res;
     }
-    EffectDesc *effect = new EffectDesc(
+    std::shared_ptr<EffectDesc> effect = std::make_shared<EffectDesc>(
             descriptor.name, descriptor.type, opPackageName, descriptor.uuid, priority, *id);
-    desc->mEffects.add(effect);
+    desc->push_back(std::move(effect));
     // TODO(b/71813697): Support setting params as well.
 
     // TODO(b/71814300): Retroactively attach to any existing streams of the given type.
@@ -486,12 +453,12 @@ status_t AudioPolicyEffects::removeSourceDefaultEffect(audio_unique_id_t id)
     size_t numSources = mInputSources.size();
     for (size_t i = 0; i < numSources; ++i) {
         // Check each effect for each source.
-        EffectDescVector* descVector = mInputSources[i];
-        for (auto desc = descVector->mEffects.begin(); desc != descVector->mEffects.end(); ++desc) {
+        auto descVector = mInputSources[i];
+        for (auto desc = descVector->begin(); desc != descVector->end(); ++desc) {
             if ((*desc)->mId == id) {
                 // Found it!
                 // TODO(b/71814300): Remove from any sources the effect was attached to.
-                descVector->mEffects.erase(desc);
+                descVector->erase(desc);
                 // Handles are unique; there can only be one match, so return early.
                 return NO_ERROR;
             }
@@ -517,12 +484,12 @@ status_t AudioPolicyEffects::removeStreamDefaultEffect(audio_unique_id_t id)
     size_t numStreams = mOutputStreams.size();
     for (size_t i = 0; i < numStreams; ++i) {
         // Check each effect for each stream.
-        EffectDescVector* descVector = mOutputStreams[i];
-        for (auto desc = descVector->mEffects.begin(); desc != descVector->mEffects.end(); ++desc) {
+        auto descVector = mOutputStreams[i];
+        for (auto desc = descVector->begin(); desc != descVector->end(); ++desc) {
             if ((*desc)->mId == id) {
                 // Found it!
                 // TODO(b/71814300): Remove from any streams the effect was attached to.
-                descVector->mEffects.erase(desc);
+                descVector->erase(desc);
                 // Handles are unique; there can only be one match, so return early.
                 return NO_ERROR;
             }
@@ -536,7 +503,7 @@ status_t AudioPolicyEffects::removeStreamDefaultEffect(audio_unique_id_t id)
 void AudioPolicyEffects::EffectVector::setProcessorEnabled(bool enabled)
 {
     for (size_t i = 0; i < mEffects.size(); i++) {
-        mEffects.itemAt(i)->setEnabled(enabled);
+        mEffects[i]->setEnabled(enabled);
     }
 }
 
@@ -793,16 +760,15 @@ void AudioPolicyEffects::loadEffectParameters(
 }
 
 /* static */
-AudioPolicyEffects::EffectDescVector *AudioPolicyEffects::loadEffectConfig(
-                                                            cnode *root,
-                                                            const Vector <EffectDesc *>& effects)
+std::shared_ptr<AudioPolicyEffects::EffectDescVector> AudioPolicyEffects::loadEffectConfig(
+        cnode* root, const EffectDescVector& effects)
 {
     cnode *node = root->first_child;
     if (node == NULL) {
         ALOGW("loadInputSource() empty element %s", root->name);
         return NULL;
     }
-    EffectDescVector *desc = new EffectDescVector();
+    auto desc = std::make_shared<EffectDescVector>();
     while (node) {
         size_t i;
 
@@ -817,23 +783,22 @@ AudioPolicyEffects::EffectDescVector *AudioPolicyEffects::loadEffectConfig(
             node = node->next;
             continue;
         }
-        EffectDesc *effect = new EffectDesc(*effects[i]);   // deep copy
+        auto effect = std::make_shared<EffectDesc>(*effects[i]);   // deep copy
         loadEffectParameters(node, effect->mParams);
         ALOGV("loadEffectConfig() adding effect %s uuid %08x",
               effect->mName.c_str(), effect->mUuid.timeLow);
-        desc->mEffects.add(effect);
+        desc->push_back(std::move(effect));
         node = node->next;
     }
-    if (desc->mEffects.size() == 0) {
+    if (desc->empty()) {
         ALOGW("loadEffectConfig() no valid effects found in config %s", root->name);
-        delete desc;
-        return NULL;
+        return nullptr;
     }
     return desc;
 }
 
 status_t AudioPolicyEffects::loadInputEffectConfigurations_l(cnode* root,
-                                                           const Vector <EffectDesc *>& effects)
+        const EffectDescVector& effects)
 {
     cnode *node = config_find(root, PREPROCESSING_TAG);
     if (node == NULL) {
@@ -848,7 +813,7 @@ status_t AudioPolicyEffects::loadInputEffectConfigurations_l(cnode* root,
             continue;
         }
         ALOGV("%s() loading input source %s", __func__, node->name);
-        EffectDescVector *desc = loadEffectConfig(node, effects);
+        auto desc = loadEffectConfig(node, effects);
         if (desc == NULL) {
             node = node->next;
             continue;
@@ -860,7 +825,7 @@ status_t AudioPolicyEffects::loadInputEffectConfigurations_l(cnode* root,
 }
 
 status_t AudioPolicyEffects::loadStreamEffectConfigurations_l(cnode* root,
-                                                            const Vector <EffectDesc *>& effects)
+        const EffectDescVector& effects)
 {
     cnode *node = config_find(root, OUTPUT_SESSION_PROCESSING_TAG);
     if (node == NULL) {
@@ -875,7 +840,7 @@ status_t AudioPolicyEffects::loadStreamEffectConfigurations_l(cnode* root,
             continue;
         }
         ALOGV("%s() loading output stream %s", __func__, node->name);
-        EffectDescVector *desc = loadEffectConfig(node, effects);
+        std::shared_ptr<EffectDescVector> desc = loadEffectConfig(node, effects);
         if (desc == NULL) {
             node = node->next;
             continue;
@@ -887,7 +852,7 @@ status_t AudioPolicyEffects::loadStreamEffectConfigurations_l(cnode* root,
 }
 
 /* static */
-AudioPolicyEffects::EffectDesc *AudioPolicyEffects::loadEffect(cnode *root)
+std::shared_ptr<AudioPolicyEffects::EffectDesc> AudioPolicyEffects::loadEffect(cnode* root)
 {
     cnode *node = config_find(root, UUID_TAG);
     if (node == NULL) {
@@ -898,28 +863,30 @@ AudioPolicyEffects::EffectDesc *AudioPolicyEffects::loadEffect(cnode *root)
         ALOGW("loadEffect() invalid uuid %s", node->value);
         return NULL;
     }
-    return new EffectDesc(root->name, uuid);
+    return std::make_shared<EffectDesc>(root->name, uuid);
 }
 
 /* static */
-status_t AudioPolicyEffects::loadEffects(cnode *root, Vector <EffectDesc *>& effects)
+android::AudioPolicyEffects::EffectDescVector AudioPolicyEffects::loadEffects(cnode *root)
 {
+    EffectDescVector effects;
     cnode *node = config_find(root, EFFECTS_TAG);
     if (node == NULL) {
-        return -ENOENT;
+        ALOGW("%s() Cannot find %s configuration", __func__, EFFECTS_TAG);
+        return effects;
     }
     node = node->first_child;
     while (node) {
         ALOGV("loadEffects() loading effect %s", node->name);
-        EffectDesc *effect = loadEffect(node);
+        auto effect = loadEffect(node);
         if (effect == NULL) {
             node = node->next;
             continue;
         }
-        effects.add(effect);
+        effects.push_back(std::move(effect));
         node = node->next;
     }
-    return NO_ERROR;
+    return effects;
 }
 
 status_t AudioPolicyEffects::loadAudioEffectConfig_ll(
@@ -938,11 +905,12 @@ status_t AudioPolicyEffects::loadAudioEffectConfig_ll(
 
     auto loadProcessingChain = [](auto& processingChain, auto& streams) {
         for (auto& stream : processingChain) {
-            auto effectDescs = std::make_unique<EffectDescVector>();
+            auto effectDescs = std::make_shared<EffectDescVector>();
             for (auto& effect : stream.effects) {
-                effectDescs->mEffects.add(new EffectDesc{effect->name.c_str(), effect->uuid});
+                effectDescs->push_back(
+                        std::make_shared<EffectDesc>(effect->name.c_str(), effect->uuid));
             }
-            streams.add(stream.type, effectDescs.release());
+            streams.add(stream.type, std::move(effectDescs));
         }
     };
 
@@ -950,11 +918,12 @@ status_t AudioPolicyEffects::loadAudioEffectConfig_ll(
         for (auto& deviceProcess : processingChain) {
             auto effectDescs = std::make_unique<EffectDescVector>();
             for (auto& effect : deviceProcess.effects) {
-                effectDescs->mEffects.add(new EffectDesc{effect->name.c_str(), effect->uuid});
+                effectDescs->push_back(
+                        std::make_shared<EffectDesc>(effect->name.c_str(), effect->uuid));
             }
-            auto deviceEffects = std::make_unique<DeviceEffects>(
+            auto devEffects = std::make_unique<DeviceEffects>(
                         std::move(effectDescs), deviceProcess.type, deviceProcess.address);
-            devicesEffects.emplace(deviceProcess.address, std::move(deviceEffects));
+            devicesEffects.emplace(deviceProcess.address, std::move(devEffects));
         }
     };
 
@@ -980,17 +949,11 @@ status_t AudioPolicyEffects::loadAudioEffectConfigLegacy_l(const char *path)
     root = config_node("", "");
     config_load(root, data);
 
-    Vector <EffectDesc *> effects;
-    loadEffects(root, effects);
+    const EffectDescVector effects = loadEffects(root);
 
     // requires mMutex
     loadInputEffectConfigurations_l(root, effects);
     loadStreamEffectConfigurations_l(root, effects);
-
-    for (size_t i = 0; i < effects.size(); i++) {
-        delete effects[i];
-    }
-
     config_free(root);
     free(root);
     free(data);
@@ -1003,11 +966,11 @@ void AudioPolicyEffects::initDefaultDeviceEffects()
     std::lock_guard _l(mDeviceEffectsMutex);
     for (const auto& deviceEffectsIter : mDeviceEffects) {
         const auto& deviceEffects =  deviceEffectsIter.second;
-        for (const auto& effectDesc : deviceEffects->mEffectDescriptors->mEffects) {
+        for (const auto& effectDesc : *deviceEffects->mEffectDescriptors) {
             AttributionSourceState attributionSource;
             attributionSource.packageName = "android";
             attributionSource.token = sp<BBinder>::make();
-            sp<AudioEffect> fx = new AudioEffect(attributionSource);
+            sp<AudioEffect> fx = sp<AudioEffect>::make(attributionSource);
             fx->set(EFFECT_UUID_NULL, &effectDesc->mUuid, 0 /* priority */, nullptr /* callback */,
                     AUDIO_SESSION_DEVICE, AUDIO_IO_HANDLE_NONE,
                     AudioDeviceTypeAddr{deviceEffects->getDeviceType(),
@@ -1024,7 +987,7 @@ void AudioPolicyEffects::initDefaultDeviceEffects()
             ALOGV("%s(): create Fx %s added on port type=%d address=%s", __func__,
                   effectDesc->mName.c_str(), deviceEffects->getDeviceType(),
                   deviceEffects->getDeviceAddress().c_str());
-            deviceEffects->mEffects.push_back(fx);
+            deviceEffects->mEffects.push_back(std::move(fx));
         }
     }
 }
