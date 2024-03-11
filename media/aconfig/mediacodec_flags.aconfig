@@ -15,6 +15,7 @@ flag {
 
 flag {
   name: "codec_importance"
+  is_exported: true
   namespace: "codec_fwk"
   description: "Feature flags for media codec importance"
   bug: "297929011"
