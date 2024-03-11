@@ -39,7 +39,7 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
     /**
      * Return if this output stream is for video encoding.
      */
-    virtual bool isVideoStream() const = 0;
+    virtual bool isVideoStream() = 0;
 
     /**
      * Return if the consumer configuration of this stream is deferred.

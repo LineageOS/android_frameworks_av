@@ -43,7 +43,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
     Camera3InputStream(int id, uint32_t width, uint32_t height, int format);
     ~Camera3InputStream();
 
-    virtual void     dump(int fd, const Vector<String16> &args) const;
+    virtual void     dump(int fd, const Vector<String16> &args);
 
     // TODO: expose an interface to get the IGraphicBufferProducer
 
@@ -81,7 +81,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
 
     virtual status_t configureQueueLocked();
 
-    virtual status_t getEndpointUsage(uint64_t *usage) const;
+    virtual status_t getEndpointUsage(uint64_t *usage);
 
     /**
      * BufferItemConsumer::BufferFreedListener interface

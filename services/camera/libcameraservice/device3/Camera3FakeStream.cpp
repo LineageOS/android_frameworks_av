@@ -68,7 +68,7 @@ status_t Camera3FakeStream::returnBufferCheckedLocked(
     return INVALID_OPERATION;
 }
 
-void Camera3FakeStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
+void Camera3FakeStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) {
     std::string lines;
     lines += fmt::sprintf("    Stream[%d]: Fake\n", mId);
     write(fd, lines.c_str(), lines.size());
@@ -99,12 +99,12 @@ status_t Camera3FakeStream::disconnectLocked() {
     return OK;
 }
 
-status_t Camera3FakeStream::getEndpointUsage(uint64_t *usage) const {
+status_t Camera3FakeStream::getEndpointUsage(uint64_t *usage) {
     *usage = FAKE_USAGE;
     return OK;
 }
 
-bool Camera3FakeStream::isVideoStream() const {
+bool Camera3FakeStream::isVideoStream() {
     return false;
 }
 

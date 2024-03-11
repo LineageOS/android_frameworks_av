@@ -27,6 +27,7 @@
 #include "aidl/android/hardware/graphics/common/Dataspace.h"
 
 #include <android-base/unique_fd.h>
+#include <com_android_internal_camera_flags.h>
 #include <cutils/properties.h>
 #include <ui/GraphicBuffer.h>
 #include <utils/Log.h>
@@ -42,6 +43,8 @@
 #define container_of(ptr, type, member) \
     (type *)((char*)(ptr) - offsetof(type, member))
 #endif
+
+namespace flags = com::android::internal::camera::flags;
 
 namespace android {
 
@@ -165,7 +168,6 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mState = STATE_ERROR;
     }
 
-    mConsumerName = "Deferred";
     bool needsReleaseNotify = setId > CAMERA3_STREAM_SET_ID_INVALID;
     mBufferProducerListener = new BufferProducerListener(this, needsReleaseNotify);
 }
@@ -464,10 +466,11 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
     return res;
 }
 
-void Camera3OutputStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
+void Camera3OutputStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) {
     std::string lines;
     lines += fmt::sprintf("    Stream[%d]: Output\n", mId);
-    lines += fmt::sprintf("      Consumer name: %s\n", mConsumerName);
+    lines += fmt::sprintf("      Consumer name: %s\n", (mConsumer.get() != nullptr) ?
+            mConsumer->getConsumerName() : "Deferred");
     write(fd, lines.c_str(), lines.size());
 
     Camera3IOStreamBase::dump(fd, args);
@@ -560,8 +563,6 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
         return res;
     }
 
-    mConsumerName = mConsumer->getConsumerName();
-
     res = native_window_set_usage(mConsumer.get(), mUsage);
     if (res != OK) {
         ALOGE("%s: Unable to configure usage %" PRIu64 " for stream %d",
@@ -609,7 +610,7 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
         return res;
     }
 
-    int maxConsumerBuffers;
+    int maxConsumerBuffers = 0;
     res = static_cast<ANativeWindow*>(mConsumer.get())->query(
             mConsumer.get(),
             NATIVE_WINDOW_MIN_UNDEQUEUED_BUFFERS, &maxConsumerBuffers);
@@ -686,8 +687,11 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
         }
     }
 
-    res = native_window_set_buffer_count(mConsumer.get(),
-            mTotalBufferCount);
+    if (flags::surface_ipc()) {
+        res = mConsumer->setMaxDequeuedBufferCount(mTotalBufferCount - maxConsumerBuffers);
+    } else {
+        res = native_window_set_buffer_count(mConsumer.get(), mTotalBufferCount);
+    }
     if (res != OK) {
         ALOGE("%s: Unable to set buffer count for stream %d",
                 __FUNCTION__, mId);
@@ -989,7 +993,7 @@ status_t Camera3OutputStream::disconnectLocked() {
     return OK;
 }
 
-status_t Camera3OutputStream::getEndpointUsage(uint64_t *usage) const {
+status_t Camera3OutputStream::getEndpointUsage(uint64_t *usage) {
 
     status_t res;
 
@@ -1025,17 +1029,21 @@ void Camera3OutputStream::applyZSLUsageQuirk(int format, uint64_t *consumerUsage
 }
 
 status_t Camera3OutputStream::getEndpointUsageForSurface(uint64_t *usage,
-        const sp<Surface>& surface) const {
-    status_t res;
-    uint64_t u = 0;
+        const sp<Surface>& surface) {
+    if (mConsumerUsageCachedValue.has_value() && flags::surface_ipc()) {
+        *usage = mConsumerUsageCachedValue.value();
+        return OK;
+    }
 
-    res = native_window_get_consumer_usage(static_cast<ANativeWindow*>(surface.get()), &u);
-    applyZSLUsageQuirk(camera_stream::format, &u);
-    *usage = u;
+    status_t res;
+
+    res = native_window_get_consumer_usage(static_cast<ANativeWindow*>(surface.get()), usage);
+    applyZSLUsageQuirk(camera_stream::format, usage);
+    mConsumerUsageCachedValue = *usage;
     return res;
 }
 
-bool Camera3OutputStream::isVideoStream() const {
+bool Camera3OutputStream::isVideoStream() {
     uint64_t usage = 0;
     status_t res = getEndpointUsage(&usage);
     if (res != OK) {
@@ -1216,7 +1224,7 @@ status_t Camera3OutputStream::setConsumers(const std::vector<sp<Surface>>& consu
     return OK;
 }
 
-bool Camera3OutputStream::isConsumedByHWComposer() const {
+bool Camera3OutputStream::isConsumedByHWComposer() {
     uint64_t usage = 0;
     status_t res = getEndpointUsage(&usage);
     if (res != OK) {
@@ -1227,7 +1235,7 @@ bool Camera3OutputStream::isConsumedByHWComposer() const {
     return (usage & GRALLOC_USAGE_HW_COMPOSER) != 0;
 }
 
-bool Camera3OutputStream::isConsumedByHWTexture() const {
+bool Camera3OutputStream::isConsumedByHWTexture() {
     uint64_t usage = 0;
     status_t res = getEndpointUsage(&usage);
     if (res != OK) {
@@ -1238,7 +1246,7 @@ bool Camera3OutputStream::isConsumedByHWTexture() const {
     return (usage & GRALLOC_USAGE_HW_TEXTURE) != 0;
 }
 
-bool Camera3OutputStream::isConsumedByCPU() const {
+bool Camera3OutputStream::isConsumedByCPU() {
     uint64_t usage = 0;
     status_t res = getEndpointUsage(&usage);
     if (res != OK) {
