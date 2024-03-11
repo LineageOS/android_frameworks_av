@@ -27,9 +27,17 @@
 
 #ifdef __ANDROID_VNDK__
 #include <CameraMetadata.h>
+#include <aidl/android/frameworks/cameraservice/common/VendorTag.h>
+#include <aidl/android/frameworks/cameraservice/common/VendorTagSection.h>
+#include <aidl/android/frameworks/cameraservice/common/ProviderIdAndVendorTagSections.h>
+#include <VendorTagDescriptor.h>
 using CameraMetadata = android::hardware::camera::common::V1_0::helper::CameraMetadata;
+using ::aidl::android::frameworks::cameraservice::common::ProviderIdAndVendorTagSections;
+using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
+using ::android::hardware::camera::common::V1_0::helper::VendorTagDescriptorCache;
 #else
 #include <camera/CameraMetadata.h>
+#include <camera/VendorTagDescriptor.h>
 #endif
 
 #include <camera/NdkCameraMetadata.h>
@@ -73,6 +81,8 @@ struct ACameraMetadata : public RefBase {
 
     camera_status_t getTags(/*out*/int32_t* numTags,
                             /*out*/const uint32_t** tags) const;
+    camera_status_t
+    getTagFromName(const char *name, uint32_t *tag) const;
 
     const CameraMetadata& getInternalData() const;
     bool isLogicalMultiCamera(size_t* count, const char* const** physicalCameraIds) const;
@@ -134,6 +144,7 @@ struct ACameraMetadata : public RefBase {
 
     std::vector<const char*> mStaticPhysicalCameraIds;
     std::vector<String8> mStaticPhysicalCameraIdValues;
+    sp<VendorTagDescriptor> mVTags = nullptr;
 };
 
 #endif // _ACAMERA_METADATA_H
