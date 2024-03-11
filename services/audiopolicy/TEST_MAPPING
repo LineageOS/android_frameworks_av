@@ -46,6 +46,9 @@
           "include-filter": "com.google.android.gts.audio.AudioPolicyHostTest"
         }
       ]
+    },
+    {
+      "name": "spatializer_tests"
     }
   ]
 }

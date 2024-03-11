@@ -107,3 +107,9 @@ cc_library {
         "framework-permission-aidl-cpp",
     ],
 }
+
+cc_library_headers {
+    name: "libaudiopolicyservice_headers",
+    host_supported: true,
+    export_include_dirs: ["."],
+}
