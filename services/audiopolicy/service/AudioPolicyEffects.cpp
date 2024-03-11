@@ -42,15 +42,19 @@ using content::AttributionSourceState;
 // ----------------------------------------------------------------------------
 
 AudioPolicyEffects::AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& effectsFactoryHal) {
+    // Note: clang thread-safety permits the ctor to call guarded _l methods without
+    // acquiring the associated mutex capability as standard practice is to assume
+    // single threaded construction and destruction.
+
     // load xml config with effectsFactoryHal
-    status_t loadResult = loadAudioEffectConfig(effectsFactoryHal);
+    status_t loadResult = loadAudioEffectConfig_ll(effectsFactoryHal);
     if (loadResult < 0) {
         ALOGW("Failed to query effect configuration, fallback to load .conf");
         // load automatic audio effect modules
         if (access(AUDIO_EFFECT_VENDOR_CONFIG_FILE, R_OK) == 0) {
-            loadAudioEffectConfigLegacy(AUDIO_EFFECT_VENDOR_CONFIG_FILE);
+            loadAudioEffectConfigLegacy_l(AUDIO_EFFECT_VENDOR_CONFIG_FILE);
         } else if (access(AUDIO_EFFECT_DEFAULT_CONFIG_FILE, R_OK) == 0) {
-            loadAudioEffectConfigLegacy(AUDIO_EFFECT_DEFAULT_CONFIG_FILE);
+            loadAudioEffectConfigLegacy_l(AUDIO_EFFECT_DEFAULT_CONFIG_FILE);
         }
     } else if (loadResult > 0) {
         ALOGE("Effect config is partially invalid, skipped %d elements", loadResult);
@@ -540,7 +544,8 @@ void AudioPolicyEffects::EffectVector::setProcessorEnabled(bool enabled)
 // Audio processing configuration
 // ----------------------------------------------------------------------------
 
-/*static*/ const char * const AudioPolicyEffects::kInputSourceNames[AUDIO_SOURCE_CNT -1] = {
+// we keep to const char* instead of std::string_view as comparison is believed faster.
+constexpr const char* kInputSourceNames[AUDIO_SOURCE_CNT - 1] = {
     MIC_SRC_TAG,
     VOICE_UL_SRC_TAG,
     VOICE_DL_SRC_TAG,
@@ -567,7 +572,8 @@ void AudioPolicyEffects::EffectVector::setProcessorEnabled(bool enabled)
     return (audio_source_t)i;
 }
 
-const char *AudioPolicyEffects::kStreamNames[AUDIO_STREAM_PUBLIC_CNT+1] = {
+// +1 as enum starts from -1
+constexpr const char* kStreamNames[AUDIO_STREAM_PUBLIC_CNT + 1] = {
     AUDIO_STREAM_DEFAULT_TAG,
     AUDIO_STREAM_VOICE_CALL_TAG,
     AUDIO_STREAM_SYSTEM_TAG,
@@ -584,6 +590,7 @@ const char *AudioPolicyEffects::kStreamNames[AUDIO_STREAM_PUBLIC_CNT+1] = {
 
 // returns the audio_stream_t enum corresponding to the output stream name or
 // AUDIO_STREAM_PUBLIC_CNT is no match found
+/* static */
 audio_stream_type_t AudioPolicyEffects::streamNameToEnum(const char *name)
 {
     int i;
@@ -600,6 +607,7 @@ audio_stream_type_t AudioPolicyEffects::streamNameToEnum(const char *name)
 // Audio Effect Config parser
 // ----------------------------------------------------------------------------
 
+/* static */
 size_t AudioPolicyEffects::growParamSize(char **param,
                                          size_t size,
                                          size_t *curSize,
@@ -623,7 +631,7 @@ size_t AudioPolicyEffects::growParamSize(char **param,
     return pos;
 }
 
-
+/* static */
 size_t AudioPolicyEffects::readParamValue(cnode *node,
                                           char **param,
                                           size_t *curSize,
@@ -692,6 +700,7 @@ exit:
     return len;
 }
 
+/* static */
 effect_param_t *AudioPolicyEffects::loadEffectParameter(cnode *root)
 {
     cnode *param;
@@ -767,6 +776,7 @@ error:
     return NULL;
 }
 
+/* static */
 void AudioPolicyEffects::loadEffectParameters(cnode *root, Vector <effect_param_t *>& params)
 {
     cnode *node = root->first_child;
@@ -780,7 +790,7 @@ void AudioPolicyEffects::loadEffectParameters(cnode *root, Vector <effect_param_
     }
 }
 
-
+/* static */
 AudioPolicyEffects::EffectDescVector *AudioPolicyEffects::loadEffectConfig(
                                                             cnode *root,
                                                             const Vector <EffectDesc *>& effects)
@@ -820,7 +830,7 @@ AudioPolicyEffects::EffectDescVector *AudioPolicyEffects::loadEffectConfig(
     return desc;
 }
 
-status_t AudioPolicyEffects::loadInputEffectConfigurations(cnode *root,
+status_t AudioPolicyEffects::loadInputEffectConfigurations_l(cnode* root,
                                                            const Vector <EffectDesc *>& effects)
 {
     cnode *node = config_find(root, PREPROCESSING_TAG);
@@ -831,11 +841,11 @@ status_t AudioPolicyEffects::loadInputEffectConfigurations(cnode *root,
     while (node) {
         audio_source_t source = inputSourceNameToEnum(node->name);
         if (source == AUDIO_SOURCE_CNT) {
-            ALOGW("loadInputSources() invalid input source %s", node->name);
+            ALOGW("%s() invalid input source %s", __func__, node->name);
             node = node->next;
             continue;
         }
-        ALOGV("loadInputSources() loading input source %s", node->name);
+        ALOGV("%s() loading input source %s", __func__, node->name);
         EffectDescVector *desc = loadEffectConfig(node, effects);
         if (desc == NULL) {
             node = node->next;
@@ -847,7 +857,7 @@ status_t AudioPolicyEffects::loadInputEffectConfigurations(cnode *root,
     return NO_ERROR;
 }
 
-status_t AudioPolicyEffects::loadStreamEffectConfigurations(cnode *root,
+status_t AudioPolicyEffects::loadStreamEffectConfigurations_l(cnode* root,
                                                             const Vector <EffectDesc *>& effects)
 {
     cnode *node = config_find(root, OUTPUT_SESSION_PROCESSING_TAG);
@@ -858,11 +868,11 @@ status_t AudioPolicyEffects::loadStreamEffectConfigurations(cnode *root,
     while (node) {
         audio_stream_type_t stream = streamNameToEnum(node->name);
         if (stream == AUDIO_STREAM_PUBLIC_CNT) {
-            ALOGW("loadStreamEffectConfigurations() invalid output stream %s", node->name);
+            ALOGW("%s() invalid output stream %s", __func__, node->name);
             node = node->next;
             continue;
         }
-        ALOGV("loadStreamEffectConfigurations() loading output stream %s", node->name);
+        ALOGV("%s() loading output stream %s", __func__, node->name);
         EffectDescVector *desc = loadEffectConfig(node, effects);
         if (desc == NULL) {
             node = node->next;
@@ -874,6 +884,7 @@ status_t AudioPolicyEffects::loadStreamEffectConfigurations(cnode *root,
     return NO_ERROR;
 }
 
+/* static */
 AudioPolicyEffects::EffectDesc *AudioPolicyEffects::loadEffect(cnode *root)
 {
     cnode *node = config_find(root, UUID_TAG);
@@ -888,6 +899,7 @@ AudioPolicyEffects::EffectDesc *AudioPolicyEffects::loadEffect(cnode *root)
     return new EffectDesc(root->name, uuid);
 }
 
+/* static */
 status_t AudioPolicyEffects::loadEffects(cnode *root, Vector <EffectDesc *>& effects)
 {
     cnode *node = config_find(root, EFFECTS_TAG);
@@ -908,7 +920,7 @@ status_t AudioPolicyEffects::loadEffects(cnode *root, Vector <EffectDesc *>& eff
     return NO_ERROR;
 }
 
-status_t AudioPolicyEffects::loadAudioEffectConfig(
+status_t AudioPolicyEffects::loadAudioEffectConfig_ll(
         const sp<EffectsFactoryHalInterface>& effectsFactoryHal) {
     if (!effectsFactoryHal) {
         ALOGE("%s Null EffectsFactoryHalInterface", __func__);
@@ -944,18 +956,17 @@ status_t AudioPolicyEffects::loadAudioEffectConfig(
         }
     };
 
+    // access to mInputSources and mOutputStreams requires mMutex;
     loadProcessingChain(processings->preprocess, mInputSources);
     loadProcessingChain(processings->postprocess, mOutputStreams);
 
-    {
-        audio_utils::lock_guard _l(mMutex);
-        loadDeviceProcessingChain(processings->deviceprocess, mDeviceEffects);
-    }
+    // access to mDeviceEffects requires mDeviceEffectsMutex
+    loadDeviceProcessingChain(processings->deviceprocess, mDeviceEffects);
 
     return skippedElements;
 }
 
-status_t AudioPolicyEffects::loadAudioEffectConfigLegacy(const char *path)
+status_t AudioPolicyEffects::loadAudioEffectConfigLegacy_l(const char *path)
 {
     cnode *root;
     char *data;
@@ -969,8 +980,10 @@ status_t AudioPolicyEffects::loadAudioEffectConfigLegacy(const char *path)
 
     Vector <EffectDesc *> effects;
     loadEffects(root, effects);
-    loadInputEffectConfigurations(root, effects);
-    loadStreamEffectConfigurations(root, effects);
+
+    // requires mMutex
+    loadInputEffectConfigurations_l(root, effects);
+    loadStreamEffectConfigurations_l(root, effects);
 
     for (size_t i = 0; i < effects.size(); i++) {
         delete effects[i];
@@ -985,7 +998,7 @@ status_t AudioPolicyEffects::loadAudioEffectConfigLegacy(const char *path)
 
 void AudioPolicyEffects::initDefaultDeviceEffects()
 {
-    audio_utils::lock_guard _l(mMutex);
+    std::lock_guard _l(mDeviceEffectsMutex);
     for (const auto& deviceEffectsIter : mDeviceEffects) {
         const auto& deviceEffects =  deviceEffectsIter.second;
         for (const auto& effectDesc : deviceEffects->mEffectDescriptors->mEffects) {
