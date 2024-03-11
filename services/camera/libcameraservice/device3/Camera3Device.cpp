@@ -45,6 +45,7 @@
 #include <utility>
 
 #include <android-base/stringprintf.h>
+#include <sched.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <utils/Timers.h>
@@ -2387,6 +2388,42 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     return ret;
 }
 
+Camera3Device::RunThreadWithRealtimePriority::RunThreadWithRealtimePriority(int tid) : mTid(tid),
+        mPreviousPolicy(sched_getscheduler(tid)) {
+    if (flags::surface_ipc()) {
+        auto res = sched_getparam(mTid, &mPreviousParams);
+        if (res != OK) {
+            ALOGE("Can't retrieve thread scheduler parameters: %s (%d)",
+                    strerror(-res), res);
+            return;
+        }
+
+        struct sched_param param = {0};
+        param.sched_priority = kRequestThreadPriority;
+
+        res = sched_setscheduler(mTid, SCHED_FIFO, &param);
+        if (res != OK) {
+            ALOGW("Can't set realtime priority for thread: %s (%d)",
+                    strerror(-res), res);
+        } else {
+            ALOGD("Set real time priority for thread (tid %d)", mTid);
+            mPolicyBumped = true;
+        }
+    }
+}
+
+Camera3Device::RunThreadWithRealtimePriority::~RunThreadWithRealtimePriority() {
+    if (mPolicyBumped && flags::surface_ipc()) {
+        auto res = sched_setscheduler(mTid, mPreviousPolicy, &mPreviousParams);
+        if (res != OK) {
+            ALOGE("Can't set regular priority for thread: %s (%d)",
+                    strerror(-res), res);
+        } else {
+            ALOGD("Set regular priority for thread (tid %d)", mTid);
+        }
+    }
+}
+
 status_t Camera3Device::configureStreamsLocked(int operatingMode,
         const CameraMetadata& sessionParams, bool notifyRequestThread) {
     ATRACE_CALL();
@@ -2582,43 +2619,51 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         }
         mRequestThread->setHalBufferManagedStreams(mHalBufManagedStreamIds);
     }
-    // Finish all stream configuration immediately.
-    // TODO: Try to relax this later back to lazy completion, which should be
-    // faster
 
-    if (mInputStream != NULL && mInputStream->isConfiguring()) {
-        bool streamReConfigured = false;
-        res = mInputStream->finishConfiguration(&streamReConfigured);
-        if (res != OK) {
-            CLOGE("Can't finish configuring input stream %d: %s (%d)",
-                    mInputStream->getId(), strerror(-res), res);
-            cancelStreamsConfigurationLocked();
-            if ((res == NO_INIT || res == DEAD_OBJECT) && mInputStream->isAbandoned()) {
-                return DEAD_OBJECT;
-            }
-            return BAD_VALUE;
-        }
-        if (streamReConfigured) {
-            mInterface->onStreamReConfigured(mInputStream->getId());
-        }
-    }
+    {
+        // Stream/surface setup can include a lot of binder IPC. Raise the
+        // thread priority when running the binder IPC heavy configuration
+        // sequence.
+        RunThreadWithRealtimePriority priorityBump;
 
-    for (size_t i = 0; i < mOutputStreams.size(); i++) {
-        sp<Camera3OutputStreamInterface> outputStream = mOutputStreams[i];
-        if (outputStream->isConfiguring() && !outputStream->isConsumerConfigurationDeferred()) {
+        // Finish all stream configuration immediately.
+        // TODO: Try to relax this later back to lazy completion, which should be
+        // faster
+
+        if (mInputStream != NULL && mInputStream->isConfiguring()) {
             bool streamReConfigured = false;
-            res = outputStream->finishConfiguration(&streamReConfigured);
+            res = mInputStream->finishConfiguration(&streamReConfigured);
             if (res != OK) {
-                CLOGE("Can't finish configuring output stream %d: %s (%d)",
-                        outputStream->getId(), strerror(-res), res);
+                CLOGE("Can't finish configuring input stream %d: %s (%d)",
+                        mInputStream->getId(), strerror(-res), res);
                 cancelStreamsConfigurationLocked();
-                if ((res == NO_INIT || res == DEAD_OBJECT) && outputStream->isAbandoned()) {
+                if ((res == NO_INIT || res == DEAD_OBJECT) && mInputStream->isAbandoned()) {
                     return DEAD_OBJECT;
                 }
                 return BAD_VALUE;
             }
             if (streamReConfigured) {
-                mInterface->onStreamReConfigured(outputStream->getId());
+                mInterface->onStreamReConfigured(mInputStream->getId());
+            }
+        }
+
+        for (size_t i = 0; i < mOutputStreams.size(); i++) {
+            sp<Camera3OutputStreamInterface> outputStream = mOutputStreams[i];
+            if (outputStream->isConfiguring() && !outputStream->isConsumerConfigurationDeferred()) {
+                bool streamReConfigured = false;
+                res = outputStream->finishConfiguration(&streamReConfigured);
+                if (res != OK) {
+                    CLOGE("Can't finish configuring output stream %d: %s (%d)",
+                            outputStream->getId(), strerror(-res), res);
+                    cancelStreamsConfigurationLocked();
+                    if ((res == NO_INIT || res == DEAD_OBJECT) && outputStream->isAbandoned()) {
+                        return DEAD_OBJECT;
+                    }
+                    return BAD_VALUE;
+                }
+                if (streamReConfigured) {
+                    mInterface->onStreamReConfigured(outputStream->getId());
+                }
             }
         }
     }

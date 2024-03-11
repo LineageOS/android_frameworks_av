@@ -129,6 +129,16 @@ flag {
 
 flag {
      namespace: "camera_platform"
+     name: "surface_ipc"
+     description: "Optimize Surface binder IPC"
+     bug: "323292530"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
+
+flag {
+     namespace: "camera_platform"
      name: "extension_10_bit"
      description: "Enables 10-bit support in the camera extensions."
      bug: "316375635"

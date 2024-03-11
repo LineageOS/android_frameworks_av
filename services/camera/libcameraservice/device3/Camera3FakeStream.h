@@ -50,7 +50,7 @@ class Camera3FakeStream :
      * Camera3Stream interface
      */
 
-    virtual void     dump(int fd, const Vector<String16> &args) const;
+    virtual void     dump(int fd, const Vector<String16> &args);
 
     status_t         setTransform(int transform, bool mayChangeMirror);
 
@@ -70,7 +70,7 @@ class Camera3FakeStream :
     /**
      * Return if this output stream is for video encoding.
      */
-    bool isVideoStream() const;
+    bool isVideoStream();
 
     /**
      * Return if the consumer configuration of this stream is deferred.
@@ -144,7 +144,7 @@ class Camera3FakeStream :
 
     virtual status_t configureQueueLocked();
 
-    virtual status_t getEndpointUsage(uint64_t *usage) const;
+    virtual status_t getEndpointUsage(uint64_t *usage);
 
 }; // class Camera3FakeStream
 

@@ -137,7 +137,7 @@ private:
 
     virtual status_t disconnectLocked();
 
-    virtual status_t getEndpointUsage(uint64_t *usage) const;
+    virtual status_t getEndpointUsage(uint64_t *usage);
 
 }; // class Camera3SharedOutputStream
 

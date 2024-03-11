@@ -957,7 +957,7 @@ status_t Camera3Stream::disconnect() {
     }
 }
 
-void Camera3Stream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const
+void Camera3Stream::dump(int fd, [[maybe_unused]] const Vector<String16> &args)
 {
     mBufferLimitLatency.dump(fd,
             "      Latency histogram for wait on max_buffers");

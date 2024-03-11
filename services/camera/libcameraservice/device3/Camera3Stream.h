@@ -423,7 +423,7 @@ class Camera3Stream :
     /**
      * Debug dump of the stream's state.
      */
-    virtual void     dump(int fd, const Vector<String16> &args) const;
+    virtual void     dump(int fd, const Vector<String16> &args);
 
     /**
      * Add a camera3 buffer listener. Adding the same listener twice has
@@ -562,7 +562,7 @@ class Camera3Stream :
 
     // Get the usage flags for the other endpoint, or return
     // INVALID_OPERATION if they cannot be obtained.
-    virtual status_t getEndpointUsage(uint64_t *usage) const = 0;
+    virtual status_t getEndpointUsage(uint64_t *usage) = 0;
 
     // Return whether the buffer is in the list of outstanding buffers.
     bool isOutstandingBuffer(const camera_stream_buffer& buffer) const;

@@ -479,7 +479,7 @@ class Camera3StreamInterface : public virtual RefBase {
     /**
      * Debug dump of the stream's state.
      */
-    virtual void     dump(int fd, const Vector<String16> &args) const = 0;
+    virtual void     dump(int fd, const Vector<String16> &args) = 0;
 
     virtual void     addBufferListener(
             wp<Camera3StreamBufferListener> listener) = 0;
