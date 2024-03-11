@@ -20,9 +20,6 @@ license {
 cc_library_shared {
     name: "libstagefright_omx",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
 
     srcs: [
@@ -218,9 +215,6 @@ cc_defaults {
 cc_library_shared {
     name: "libstagefright_omx_utils",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
     srcs: ["OMXUtils.cpp"],
     export_include_dirs: [

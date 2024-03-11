@@ -33,9 +33,6 @@ cc_library_headers {
 cc_defaults {
     name: "libstagefright_foundation_defaults",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     host_supported: true,
     double_loadable: true,
 

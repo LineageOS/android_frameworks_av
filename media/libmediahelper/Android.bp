@@ -30,9 +30,6 @@ cc_library {
     name: "libmedia_helper",
     vendor_available: true,
     min_sdk_version: "29",
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
     srcs: [
         "AudioParameter.cpp",

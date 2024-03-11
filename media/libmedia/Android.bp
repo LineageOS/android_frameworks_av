@@ -81,9 +81,6 @@ filegroup {
 cc_library_shared {
     name: "libmedia_omx",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
 
     srcs: [
