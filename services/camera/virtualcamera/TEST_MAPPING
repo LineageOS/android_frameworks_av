@@ -9,7 +9,8 @@
         {
           "exclude-annotation": "androidx.test.filters.FlakyTest"
         }
-      ]
+      ],
+      "keywords": ["primary-device"]
     }
   ]
 }

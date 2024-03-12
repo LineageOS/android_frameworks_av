@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
 #define LOG_TAG "ServiceUtilities"
 
 #include <audio_utils/clock.h>
