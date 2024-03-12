@@ -270,6 +270,9 @@ struct Codec2Client : public Codec2ConfigurableClient {
     static std::shared_ptr<InputSurface> CreateInputSurface(
             char const* serviceName = nullptr);
 
+    // Whether AIDL is selected.
+    static bool IsAidlSelected();
+
     // base and/or configurable cannot be null.
     Codec2Client(
             sp<HidlBase> const& base,
