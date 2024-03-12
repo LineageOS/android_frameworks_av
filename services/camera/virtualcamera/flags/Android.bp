@@ -35,27 +35,3 @@ cc_library_static {
     export_include_dirs: ["."],
     defaults: ["virtual_device_build_flags_defaults"],
 }
-
-soong_config_module_type {
-    name: "virtual_device_build_flags_java_library",
-    module_type: "java_library",
-    config_namespace: "vdm",
-    bool_variables: [
-        "virtual_camera_service_enabled",
-    ],
-    properties: [
-        "srcs",
-    ],
-}
-
-virtual_device_build_flags_java_library {
-    name: "virtual_device_build_flag_java",
-    soong_config_variables: {
-        virtual_camera_service_enabled: {
-            srcs: ["java/enabled/**/*.java"],
-            conditions_default: {
-                srcs: ["java/disabled/**/*.java"],
-            },
-        },
-    },
-}
