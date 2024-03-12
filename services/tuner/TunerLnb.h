@@ -66,6 +66,7 @@ public:
 private:
     int mId;
     shared_ptr<ILnb> mLnb;
+    bool isClosed = false;
 };
 
 }  // namespace tuner

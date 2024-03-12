@@ -64,6 +64,7 @@ private:
     shared_ptr<IDemux> mDemux;
     int mDemuxId;
     shared_ptr<TunerService> mTunerService;
+    bool isClosed = false;
 };
 
 }  // namespace tuner

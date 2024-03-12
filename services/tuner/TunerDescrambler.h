@@ -48,6 +48,7 @@ public:
 
 private:
     shared_ptr<IDescrambler> mDescrambler;
+    bool isClosed = false;
 };
 
 }  // namespace tuner

@@ -41,7 +41,9 @@ TunerDescrambler::TunerDescrambler(shared_ptr<IDescrambler> descrambler) {
 }
 
 TunerDescrambler::~TunerDescrambler() {
-    close();
+    if (!isClosed) {
+        close();
+    }
     mDescrambler = nullptr;
 }
 
@@ -75,6 +77,7 @@ TunerDescrambler::~TunerDescrambler() {
 }
 
 ::ndk::ScopedAStatus TunerDescrambler::close() {
+    isClosed = true;
     return mDescrambler->close();
 }
 

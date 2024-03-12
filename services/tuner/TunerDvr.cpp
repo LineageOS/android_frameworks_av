@@ -37,7 +37,9 @@ TunerDvr::TunerDvr(shared_ptr<IDvr> dvr, DvrType type) {
 }
 
 TunerDvr::~TunerDvr() {
-    close();
+    if (!isClosed) {
+        close();
+    }
     mDvr = nullptr;
 }
 
@@ -92,6 +94,7 @@ TunerDvr::~TunerDvr() {
 }
 
 ::ndk::ScopedAStatus TunerDvr::close() {
+    isClosed = true;
     return mDvr->close();
 }
 

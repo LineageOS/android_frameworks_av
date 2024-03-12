@@ -37,7 +37,9 @@ TunerFrontend::TunerFrontend(shared_ptr<IFrontend> frontend, int id) {
 }
 
 TunerFrontend::~TunerFrontend() {
-    close();
+    if (!isClosed) {
+        close();
+    }
     mFrontend = nullptr;
     mId = -1;
 }
@@ -89,6 +91,7 @@ TunerFrontend::~TunerFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerFrontend::close() {
+    isClosed = true;
     return mFrontend->close();
 }
 

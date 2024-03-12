@@ -35,7 +35,9 @@ TunerTimeFilter::TunerTimeFilter(shared_ptr<ITimeFilter> timeFilter) {
 }
 
 TunerTimeFilter::~TunerTimeFilter() {
-    close();
+    if (!isClosed) {
+        close();
+    }
     mTimeFilter = nullptr;
 }
 
@@ -64,6 +66,7 @@ TunerTimeFilter::~TunerTimeFilter() {
 }
 
 ::ndk::ScopedAStatus TunerTimeFilter::close() {
+    isClosed = true;
     return mTimeFilter->close();
 }
 

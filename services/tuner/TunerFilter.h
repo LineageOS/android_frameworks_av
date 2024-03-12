@@ -116,6 +116,7 @@ private:
     shared_ptr<FilterCallback> mFilterCallback;
     Mutex mLock;
     shared_ptr<TunerService> mTunerService;
+    bool isClosed = false;
 };
 
 }  // namespace tuner
