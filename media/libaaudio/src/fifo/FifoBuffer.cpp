@@ -150,7 +150,7 @@ fifo_frames_t FifoBuffer::write(const void *buffer, fifo_frames_t numFrames) {
 
     getEmptyRoomAvailable(&wrappingBuffer);
 
-    // Read data in one or two parts.
+    // Write data in one or two parts.
     int partIndex = 0;
     while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
         fifo_frames_t framesToWrite = framesLeft;
@@ -191,4 +191,30 @@ void FifoBuffer::eraseMemory() {
     if (numBytes > 0) {
         memset(getStorage(), 0, (size_t) numBytes);
     }
+}
+
+fifo_frames_t FifoBuffer::eraseEmptyMemory(fifo_frames_t numFrames) {
+    WrappingBuffer wrappingBuffer;
+    fifo_frames_t framesLeft = numFrames;
+
+    getEmptyRoomAvailable(&wrappingBuffer);
+
+    // Erase data in one or two parts.
+    int partIndex = 0;
+    while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
+        fifo_frames_t framesToWrite = framesLeft;
+        fifo_frames_t framesAvailable = wrappingBuffer.numFrames[partIndex];
+        if (framesAvailable > 0) {
+            if (framesToWrite > framesAvailable) {
+                framesToWrite = framesAvailable;
+            }
+            int32_t numBytes = convertFramesToBytes(framesToWrite);
+            memset(wrappingBuffer.data[partIndex], 0, numBytes);
+            framesLeft -= framesToWrite;
+        } else {
+            break;
+        }
+        partIndex++;
+    }
+    return numFrames - framesLeft; // number erased
 }

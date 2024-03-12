@@ -107,6 +107,8 @@ public:
      */
     void eraseDataMemory();
 
+    void eraseEmptyDataMemory(int32_t numFrames);
+
     void freeDataQueue() { mDataQueue.reset(); }
 
     void dump() const;

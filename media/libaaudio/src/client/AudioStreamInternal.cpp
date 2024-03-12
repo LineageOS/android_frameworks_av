@@ -575,9 +575,19 @@ aaudio_result_t AudioStreamInternal::requestStop_l() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
+    // For playback, sleep until all the audio data has played.
+    // Then clear the buffer to prevent noise.
+    prepareBuffersForStop();
+
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_STOPPING);
     mAtomicInternalTimestamp.clear();
+
+#if 0
+    // Simulate very slow CPU, force race condition where the
+    // DSP keeps playing after we stop writing.
+    AudioClock::sleepForNanos(800 * AAUDIO_NANOS_PER_MILLISECOND);
+#endif
 
     result = mServiceInterface.stopStream(mServiceStreamHandleInfo);
     if (result == AAUDIO_ERROR_INVALID_HANDLE) {
