@@ -20,6 +20,8 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 
 #include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/hardware/camera/common/Status.h"
@@ -150,6 +152,16 @@ struct FpsRange {
     return maxFps == other.maxFps ? minFps < other.minFps
                                   : maxFps < other.maxFps;
   }
+};
+
+struct GpsCoordinates {
+  // Represented by a double[] in metadata with index 0 for
+  // latitude and index 1 for longitude, 2 for altitude.
+  double_t latitude;
+  double_t longitude;
+  double_t altitude;
+  std::optional<int64_t> timestamp;
+  std::string provider;
 };
 
 inline bool isApproximatellySameAspectRatio(const Resolution r1,

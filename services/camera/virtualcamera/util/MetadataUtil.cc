@@ -24,6 +24,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -435,6 +436,29 @@ MetadataBuilder& MetadataBuilder::setJpegAvailableThumbnailSizes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setJpegGpsCoordinates(
+    const GpsCoordinates& gpsCoordinates) {
+  mEntryMap[ANDROID_JPEG_GPS_COORDINATES] =
+      std::vector<double>({gpsCoordinates.latitude, gpsCoordinates.longitude,
+                           gpsCoordinates.altitude});
+
+  if (!gpsCoordinates.provider.empty()) {
+    mEntryMap[ANDROID_JPEG_GPS_PROCESSING_METHOD] = std::vector<uint8_t>{
+        gpsCoordinates.provider.begin(), gpsCoordinates.provider.end()};
+  }
+
+  if (gpsCoordinates.timestamp.has_value()) {
+    mEntryMap[ANDROID_JPEG_GPS_TIMESTAMP] =
+        asVectorOf<int64_t>(gpsCoordinates.timestamp.value());
+  }
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setJpegOrientation(const int32_t orientation) {
+  mEntryMap[ANDROID_JPEG_ORIENTATION] = asVectorOf<int32_t>(orientation);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setJpegQuality(const uint8_t quality) {
   mEntryMap[ANDROID_JPEG_QUALITY] = asVectorOf<uint8_t>(quality);
   return *this;
@@ -753,6 +777,20 @@ std::optional<int32_t> getJpegQuality(
   return *entry.data.i32;
 }
 
+int32_t getJpegOrientation(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_JPEG_ORIENTATION,
+                                    &entry) != OK) {
+    return 0;
+  }
+
+  return *entry.data.i32;
+}
+
 std::optional<Resolution> getJpegThumbnailSize(
     const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
   auto metadata =
@@ -830,6 +868,39 @@ getCaptureIntent(const aidl::android::hardware::camera::device::CameraMetadata&
 
   return static_cast<camera_metadata_enum_android_control_capture_intent>(
       entry.data.u8[0]);
+}
+
+std::optional<GpsCoordinates> getGpsCoordinates(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_JPEG_GPS_COORDINATES,
+                                    &entry) != OK) {
+    return std::nullopt;
+  }
+
+  GpsCoordinates coordinates{.latitude = entry.data.d[0],
+                             .longitude = entry.data.d[1],
+                             .altitude = entry.data.d[2]};
+
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_JPEG_GPS_TIMESTAMP,
+                                    &entry) == OK) {
+    coordinates.timestamp = entry.data.i64[0];
+  }
+
+  // According to types.hal, the string describing the GPS processing method has
+  // a 32 characters size
+  static constexpr float kGpsProviderStringLength = 32;
+  if (find_camera_metadata_ro_entry(
+          metadata, ANDROID_JPEG_GPS_PROCESSING_METHOD, &entry) == OK) {
+    coordinates.provider.assign(
+        reinterpret_cast<const char*>(entry.data.u8),
+        std::min(entry.count, static_cast<size_t>(kGpsProviderStringLength)));
+  }
+
+  return coordinates;
 }
 
 }  // namespace virtualcamera
