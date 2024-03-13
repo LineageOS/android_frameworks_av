@@ -18,6 +18,8 @@
 #define LOG_TAG "ACameraMetadata"
 
 #include "ACameraMetadata.h"
+
+#include <camera_metadata_hidden.h>
 #include <utils/Vector.h>
 #include <system/graphics.h>
 #include <media/NdkImage.h>
@@ -85,6 +87,19 @@ ACameraMetadata::init() {
         filterDurations(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS);
     }
     // TODO: filter request/result keys
+    const CameraMetadata& metadata = *mData;
+    const camera_metadata_t *rawMetadata = metadata.getAndLock();
+    metadata_vendor_id_t vendorTagId = get_camera_metadata_vendor_id(rawMetadata);
+    metadata.unlock(rawMetadata);
+    sp<VendorTagDescriptorCache> vtCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
+    if (vtCache == nullptr) {
+        ALOGE("%s: error vendor tag descriptor cache is not initialized", __FUNCTION__);
+        return;
+    }
+    vtCache->getVendorTagDescriptor(vendorTagId, &mVTags);
+    if (mVTags == nullptr) {
+        ALOGE("%s: error retrieving vendor tag descriptor", __FUNCTION__);
+    }
 }
 
 bool
@@ -471,6 +486,13 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
 const CameraMetadata&
 ACameraMetadata::getInternalData() const {
     return (*mData);
+}
+
+camera_status_t
+ACameraMetadata::getTagFromName(const char *name, uint32_t *tag) const {
+    Mutex::Autolock _l(mLock);
+    status_t status = CameraMetadata::getTagFromName(name, mVTags.get(), tag);
+    return status == OK ? ACAMERA_OK : ACAMERA_ERROR_METADATA_NOT_FOUND;
 }
 
 bool
