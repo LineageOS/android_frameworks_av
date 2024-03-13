@@ -310,10 +310,7 @@ private:
     };
 
     // singleton
-    static RunningTees &getRunningTees() {
-        static RunningTees runningTees;
-        return runningTees;
-    }
+    static RunningTees& getRunningTees();
 
     // The NBAIO TeeImpl may have lifetime longer than NBAIO_Tee if
     // RunningTees::dump() is being called simultaneous to ~NBAIO_Tee().
