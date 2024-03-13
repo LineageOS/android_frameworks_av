@@ -514,6 +514,12 @@ status_t AudioFileHandler::createInternal(
     return NO_ERROR; // return full path
 }
 
+/* static */
+NBAIO_Tee::RunningTees& NBAIO_Tee::getRunningTees() {
+    [[clang::no_destroy]] static RunningTees runningTees;
+    return runningTees;
+}
+
 } // namespace android
 
 #endif // TEE_SINK
