@@ -8,6 +8,7 @@ container: "system"
 
 flag {
     name: "virtual_ump"
+    is_exported: true
     namespace: "media_audio"
     description: "Enable virtual UMP MIDI."
     bug: "291115176"
