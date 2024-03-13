@@ -49,6 +49,8 @@ class EffectConversionHelperAidl {
     ::aidl::android::hardware::audio::effect::Descriptor getDescriptor() const;
     status_t reopen();
 
+    uint8_t mOutputAccessMode = EFFECT_BUFFER_ACCESS_WRITE;
+
   protected:
     const int32_t mSessionId;
     const int32_t mIoId;
