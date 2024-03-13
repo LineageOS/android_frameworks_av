@@ -19,6 +19,8 @@
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
+#include <algorithm>
+
 #include <media/MediaMetricsItem.h>
 #include <utils/Trace.h>
 
@@ -106,6 +108,61 @@ void AudioStreamInternalPlay::prepareBuffersForStart() {
     mFlowGraph.reset();
     // Prevent stale data from being played.
     mAudioEndpoint->eraseDataMemory();
+}
+
+void AudioStreamInternalPlay::prepareBuffersForStop() {
+    // If this is a shared stream and the FIFO is being read by the mixer then
+    // we don't have to worry about the DSP reading past the valid data. We can skip all this.
+    if(!mAudioEndpoint->isFreeRunning()) {
+        return;
+    }
+    // Sleep until the DSP has read all of the data written.
+    int64_t validFramesInBuffer = getFramesWritten() - getFramesRead();
+    if (validFramesInBuffer >= 0) {
+        int64_t emptyFramesInBuffer = ((int64_t) getBufferCapacity()) - validFramesInBuffer;
+
+        // Prevent stale data from being played if the DSP is still running.
+        // Erase some of the FIFO memory in front of the DSP read cursor.
+        // Subtract one burst so we do not accidentally erase data that the DSP might be using.
+        int64_t framesToErase = std::max((int64_t) 0,
+                                         emptyFramesInBuffer - getFramesPerBurst());
+        mAudioEndpoint->eraseEmptyDataMemory(framesToErase);
+
+        // Sleep until we are confident the DSP has consumed all of the valid data.
+        // Sleep for one extra burst as a safety margin because the IsochronousClockModel
+        // is not perfectly accurate.
+        int64_t positionInEmptyMemory = getFramesWritten() + getFramesPerBurst();
+        int64_t timeAllConsumed = mClockModel.convertPositionToTime(positionInEmptyMemory);
+        int64_t durationAllConsumed = timeAllConsumed - AudioClock::getNanoseconds();
+        // Prevent sleeping for too long.
+        durationAllConsumed = std::min(200 * AAUDIO_NANOS_PER_MILLISECOND, durationAllConsumed);
+        AudioClock::sleepForNanos(durationAllConsumed);
+    }
+
+    // Erase all of the memory in case the DSP keeps going and wraps around.
+    mAudioEndpoint->eraseDataMemory();
+
+    // Wait for the last buffer to reach the DAC.
+    // This is because the expected behavior of stop() is that all data written to the stream
+    // should be played before the hardware actually shuts down.
+    // This is different than pause(), where we just end as soon as possible.
+    // This can be important when, for example, playing car navigation and
+    // you want the user to hear the complete instruction.
+    if (mAtomicInternalTimestamp.isValid()) {
+        // Use timestamps to calculate the latency between the DSP reading
+        // a frame and when it reaches the DAC.
+        // This code assumes that timestamps are accurate.
+        Timestamp timestamp = mAtomicInternalTimestamp.read();
+        int64_t dacPosition = timestamp.getPosition();
+        int64_t hardwareReadTime = mClockModel.convertPositionToTime(dacPosition);
+        int64_t hardwareLatencyNanos = timestamp.getNanoseconds() - hardwareReadTime;
+        ALOGD("%s() hardwareLatencyNanos = %lld", __func__,
+              (long long) hardwareLatencyNanos);
+        // Prevent sleeping for too long.
+        hardwareLatencyNanos = std::min(30 * AAUDIO_NANOS_PER_MILLISECOND,
+                                        hardwareLatencyNanos);
+        AudioClock::sleepForNanos(hardwareLatencyNanos);
+    }
 }
 
 void AudioStreamInternalPlay::advanceClientToMatchServerPosition(int32_t serverMargin) {
@@ -353,20 +410,26 @@ void *AudioStreamInternalPlay::callbackLoop() {
         // Call application using the AAudio callback interface.
         callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
 
-        if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
-            // Write audio data to stream. This is a BLOCKING WRITE!
-            result = write(mCallbackBuffer.get(), mCallbackFrames, timeoutNanos);
-            if ((result != mCallbackFrames)) {
-                if (result >= 0) {
-                    // Only wrote some of the frames requested. The stream can be disconnected
-                    // or timed out.
-                    processCommands();
-                    result = isDisconnected() ? AAUDIO_ERROR_DISCONNECTED : AAUDIO_ERROR_TIMEOUT;
-                }
-                maybeCallErrorCallback(result);
-                break;
+        // Write audio data to stream. This is a BLOCKING WRITE!
+        // Write data regardless of the callbackResult because we assume the data
+        // is valid even when the callback returns AAUDIO_CALLBACK_RESULT_STOP.
+        // Imagine a callback that is playing a large sound in menory.
+        // When it gets to the end of the sound it can partially fill
+        // the last buffer with the end of the sound, then zero pad the buffer, then return STOP.
+        // If the callback has no valid data then it should zero-fill the entire buffer.
+        result = write(mCallbackBuffer.get(), mCallbackFrames, timeoutNanos);
+        if ((result != mCallbackFrames)) {
+            if (result >= 0) {
+                // Only wrote some of the frames requested. The stream can be disconnected
+                // or timed out.
+                processCommands();
+                result = isDisconnected() ? AAUDIO_ERROR_DISCONNECTED : AAUDIO_ERROR_TIMEOUT;
             }
-        } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
+            maybeCallErrorCallback(result);
+            break;
+        }
+
+        if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
             ALOGD("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
             result = systemStopInternal();
             break;

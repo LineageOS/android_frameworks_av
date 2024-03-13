@@ -115,6 +115,13 @@ public:
      */
     void eraseMemory();
 
+    /**
+     * Clear some memory after the write pointer.
+     * This can be used to prevent the reader from accidentally reading stale data
+     * in case it is reading asynchronously.
+     */
+    fifo_frames_t eraseEmptyMemory(fifo_frames_t numFrames);
+
 protected:
 
     virtual uint8_t *getStorage() const = 0;

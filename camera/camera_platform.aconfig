@@ -4,6 +4,7 @@ container: "system"
 flag {
      namespace: "camera_platform"
      name: "camera_hsum_permission"
+     is_exported: true
      description: "Camera access by headless system user"
      bug: "273539631"
 }
@@ -11,6 +12,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "concert_mode"
+     is_exported: true
      description: "Introduces a new concert mode camera extension type"
      bug: "297083874"
 }
@@ -18,6 +20,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "feature_combination_query"
+     is_exported: true
      description: "Query feature combination support and session specific characteristics"
      bug: "309627704"
 }
@@ -39,6 +42,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "camera_manual_flash_strength_control"
+     is_exported: true
      description: "Flash brightness level control in manual flash mode"
      bug: "238348881"
 }
@@ -74,6 +78,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "camera_ae_mode_low_light_boost"
+     is_exported: true
      description: "An AE mode that enables increased brightening in low light scenes"
      bug: "312803148"
 }
@@ -95,6 +100,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "camera_extensions_characteristics_get"
+     is_exported: true
      description: "Enable get extension specific camera characteristics API"
      bug: "280649914"
 }
@@ -116,6 +122,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "camera_device_setup"
+     is_exported: true
      description: "Create an intermediate Camera Device class for limited CameraDevice access."
      bug: "320741775"
 }
@@ -123,6 +130,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "camera_privacy_allowlist"
+     is_exported: true
      description: "Allowlisting to exempt safety-relevant cameras from privacy control for automotive devices"
      bug: "282814430"
 }
@@ -130,6 +138,7 @@ flag {
 flag {
      namespace: "camera_platform"
      name: "extension_10_bit"
+     is_exported: true
      description: "Enables 10-bit support in the camera extensions."
      bug: "316375635"
 }
@@ -143,3 +152,11 @@ flag {
        purpose: PURPOSE_BUGFIX
      }
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "concert_mode_api"
+     description: "Covers the eyes free videography public facing API"
+     bug: "297083874"
+}
+

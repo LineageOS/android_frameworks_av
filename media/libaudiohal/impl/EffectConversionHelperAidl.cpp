@@ -193,6 +193,7 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
         Parameter aidlParam = UNION_MAKE(Parameter, common, common);
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam)));
     }
+    mOutputAccessMode = config->outputCfg.accessMode;
     mCommon = common;
 
     return *static_cast<int32_t*>(pReplyData) = OK;
