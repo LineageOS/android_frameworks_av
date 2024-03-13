@@ -116,10 +116,8 @@ public:
     // Remove the default stream effect from wherever it's attached.
     status_t removeStreamDefaultEffect(audio_unique_id_t id) EXCLUDES_AudioPolicyEffects_Mutex;
 
-    // Called by AudioPolicyService::onFirstRef() to load device effects
-    // on a separate worker thread.
-    // TODO(b/319515492) move this initialization after AudioPolicyService::onFirstRef().
-    void setDefaultDeviceEffects();
+    // Initializes the Effects (AudioSystem must be ready as this creates audio client objects).
+    void initDefaultDeviceEffects() EXCLUDES(mDeviceEffectsMutex) EXCLUDES_EffectHandle_Mutex;
 
 private:
 
@@ -201,11 +199,6 @@ private:
 
     };
 
-    // Called on an async thread because it creates AudioEffects
-    // which register with AudioFlinger and AudioPolicy.
-    // We must therefore exclude the EffectHandle_Mutex.
-    void initDefaultDeviceEffects() EXCLUDES(mDeviceEffectsMutex) EXCLUDES_EffectHandle_Mutex;
-
     status_t loadAudioEffectConfig_ll(const sp<EffectsFactoryHalInterface>& effectsFactoryHal)
             REQUIRES(mMutex, mDeviceEffectsMutex);
 
@@ -281,18 +274,6 @@ private:
     std::mutex mDeviceEffectsMutex;
     std::map<std::string, std::unique_ptr<DeviceEffects>> mDeviceEffects
             GUARDED_BY(mDeviceEffectsMutex);
-
-    /**
-     * Device Effect initialization must be asynchronous: the audio_policy service parses and init
-     * effect on first reference. AudioFlinger will handle effect creation and register these
-     * effect on audio_policy service.
-     *
-     * The future is associated with the std::async launched thread - no need to lock as
-     * it is only set once on init.  Due to the async nature, it is conceivable that
-     * some device effects are not available immediately after AudioPolicyService::onFirstRef()
-     * while the effects are being created.
-     */
-    std::future<void> mDefaultDeviceEffectFuture;
 };
 
 } // namespace android

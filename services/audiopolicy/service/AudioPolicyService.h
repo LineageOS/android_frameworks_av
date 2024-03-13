@@ -320,6 +320,9 @@ public:
     // RefBase
     virtual     void        onFirstRef();
 
+    // Commence initialization when AudioSystem is ready.
+    void onAudioSystemReady();
+
     //
     // Helpers for the struct audio_policy_service_ops implementation.
     // This is used by the audio policy manager for certain operations that
