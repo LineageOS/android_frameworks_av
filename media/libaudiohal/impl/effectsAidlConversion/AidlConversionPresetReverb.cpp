@@ -71,7 +71,6 @@ status_t AidlConversionPresetReverb::setParameter(EffectParamReader& param) {
 status_t AidlConversionPresetReverb::getParameter(EffectParamWriter& param) {
     uint32_t type = 0;
     uint16_t value = 0;
-    ALOGE("%s enter %s", __func__, param.toString().c_str());
     if (!param.validateParamValueSize(sizeof(uint32_t), sizeof(uint16_t)) ||
         OK != param.readFromParameter(&type)) {
         ALOGE("%s invalid param %s", __func__, param.toString().c_str());

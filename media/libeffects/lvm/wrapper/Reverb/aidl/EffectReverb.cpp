@@ -55,7 +55,6 @@ extern "C" binder_exception_t createEffect(const AudioUuid* uuid,
     }
     if (instanceSpp) {
         *instanceSpp = ndk::SharedRefBase::make<EffectReverb>(*uuid);
-        LOG(DEBUG) << __func__ << " instance " << instanceSpp->get() << " created";
         return EX_NONE;
     } else {
         LOG(ERROR) << __func__ << " invalid input parameter!";

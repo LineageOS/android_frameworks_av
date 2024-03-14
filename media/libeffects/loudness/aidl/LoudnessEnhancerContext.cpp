@@ -24,16 +24,10 @@ namespace aidl::android::hardware::audio::effect {
 
 LoudnessEnhancerContext::LoudnessEnhancerContext(int statusDepth, const Parameter::Common& common)
     : EffectContext(statusDepth, common) {
-    LOG(DEBUG) << __func__;
     init_params();
 }
 
-LoudnessEnhancerContext::~LoudnessEnhancerContext() {
-    LOG(DEBUG) << __func__;
-}
-
 RetCode LoudnessEnhancerContext::enable() {
-    std::lock_guard lg(mMutex);
     if (mState != LOUDNESS_ENHANCER_STATE_INITIALIZED) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -42,7 +36,6 @@ RetCode LoudnessEnhancerContext::enable() {
 }
 
 RetCode LoudnessEnhancerContext::disable() {
-    std::lock_guard lg(mMutex);
     if (mState != LOUDNESS_ENHANCER_STATE_ACTIVE) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -52,7 +45,6 @@ RetCode LoudnessEnhancerContext::disable() {
 
 void LoudnessEnhancerContext::reset() {
     float targetAmp = pow(10, mGain / 2000.0f);  // mB to linear amplification
-    std::lock_guard lg(mMutex);
     if (mCompressor != nullptr) {
         // Get samplingRate from input
         mCompressor->Initialize(targetAmp, mCommon.input.base.sampleRate);
@@ -66,8 +58,6 @@ RetCode LoudnessEnhancerContext::setLeGain(int gainMb) {
 }
 
 IEffect::Status LoudnessEnhancerContext::process(float* in, float* out, int samples) {
-    LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
-
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!in, status, "nullInput");
     RETURN_VALUE_IF(!out, status, "nullOutput");
@@ -76,11 +66,9 @@ IEffect::Status LoudnessEnhancerContext::process(float* in, float* out, int samp
     auto frameSize = getInputFrameSize();
     RETURN_VALUE_IF(0 == frameSize, status, "zeroFrameSize");
 
-    std::lock_guard lg(mMutex);
     status = {STATUS_INVALID_OPERATION, 0, 0};
     RETURN_VALUE_IF(mState != LOUDNESS_ENHANCER_STATE_ACTIVE, status, "stateNotActive");
 
-    LOG(DEBUG) << __func__ << " start processing";
     // PcmType is always expected to be Float 32 bit.
     constexpr float scale = 1 << 15;  // power of 2 is lossless conversion to int16_t range
     constexpr float inverseScale = 1.f / scale;
@@ -124,9 +112,8 @@ void LoudnessEnhancerContext::init_params() {
 
     mGain = LOUDNESS_ENHANCER_DEFAULT_TARGET_GAIN_MB;
     float targetAmp = pow(10, mGain / 2000.0f);  // mB to linear amplification
-    LOG(DEBUG) << __func__ << "Target gain = " << mGain << "mB <=> factor = " << targetAmp;
+    LOG(VERBOSE) << __func__ << "Target gain = " << mGain << "mB <=> factor = " << targetAmp;
 
-    std::lock_guard lg(mMutex);
     mCompressor = std::make_unique<le_fx::AdaptiveDynamicRangeCompression>();
     mCompressor->Initialize(targetAmp, mCommon.input.base.sampleRate);
     mState = LOUDNESS_ENHANCER_STATE_INITIALIZED;

@@ -28,7 +28,6 @@ namespace aidl::android::hardware::audio::effect {
 
 HapticGeneratorContext::HapticGeneratorContext(int statusDepth, const Parameter::Common& common)
     : EffectContext(statusDepth, common) {
-    LOG(DEBUG) << __func__;
     mState = HAPTIC_GENERATOR_STATE_UNINITIALIZED;
     mSampleRate = common.input.base.sampleRate;
     mFrameCount = common.input.frameCount;
@@ -36,7 +35,6 @@ HapticGeneratorContext::HapticGeneratorContext(int statusDepth, const Parameter:
 }
 
 HapticGeneratorContext::~HapticGeneratorContext() {
-    LOG(DEBUG) << __func__;
     mState = HAPTIC_GENERATOR_STATE_UNINITIALIZED;
 }
 
@@ -70,7 +68,6 @@ void HapticGeneratorContext::reset() {
 
 RetCode HapticGeneratorContext::setHgHapticScales(
         const std::vector<HapticGenerator::HapticScale>& hapticScales) {
-    std::lock_guard lg(mMutex);
     for (auto hapticScale : hapticScales) {
         mParams.mHapticScales.insert_or_assign(hapticScale.id, hapticScale.scale);
     }
@@ -82,13 +79,11 @@ RetCode HapticGeneratorContext::setHgHapticScales(
 }
 
 HapticGenerator::VibratorInformation HapticGeneratorContext::getHgVibratorInformation() {
-    std::lock_guard lg(mMutex);
     return mParams.mVibratorInfo;
 }
 
 std::vector<HapticGenerator::HapticScale> HapticGeneratorContext::getHgHapticScales() {
     std::vector<HapticGenerator::HapticScale> result;
-    std::lock_guard lg(mMutex);
     for (const auto& [id, vibratorScale] : mParams.mHapticScales) {
         result.push_back({id, vibratorScale});
     }
@@ -97,30 +92,23 @@ std::vector<HapticGenerator::HapticScale> HapticGeneratorContext::getHgHapticSca
 
 RetCode HapticGeneratorContext::setHgVibratorInformation(
         const HapticGenerator::VibratorInformation& vibratorInfo) {
-    {
-        std::lock_guard lg(mMutex);
-        mParams.mVibratorInfo = vibratorInfo;
+    mParams.mVibratorInfo = vibratorInfo;
 
-        if (mProcessorsRecord.bpf != nullptr) {
-            mProcessorsRecord.bpf->setCoefficients(
-                    ::android::audio_effect::haptic_generator::bpfCoefs(
-                            mParams.mVibratorInfo.resonantFrequencyHz, DEFAULT_BPF_Q, mSampleRate));
-        }
-        if (mProcessorsRecord.bsf != nullptr) {
-            mProcessorsRecord.bsf->setCoefficients(
-                    ::android::audio_effect::haptic_generator::bsfCoefs(
-                            mParams.mVibratorInfo.resonantFrequencyHz,
-                            mParams.mVibratorInfo.qFactor, mParams.mVibratorInfo.qFactor / 2.0f,
-                            mSampleRate));
-        }
+    if (mProcessorsRecord.bpf != nullptr) {
+        mProcessorsRecord.bpf->setCoefficients(::android::audio_effect::haptic_generator::bpfCoefs(
+                mParams.mVibratorInfo.resonantFrequencyHz, DEFAULT_BPF_Q, mSampleRate));
     }
+    if (mProcessorsRecord.bsf != nullptr) {
+        mProcessorsRecord.bsf->setCoefficients(::android::audio_effect::haptic_generator::bsfCoefs(
+                mParams.mVibratorInfo.resonantFrequencyHz, mParams.mVibratorInfo.qFactor,
+                mParams.mVibratorInfo.qFactor / 2.0f, mSampleRate));
+    }
+
     configure();
     return RetCode::SUCCESS;
 }
 
 IEffect::Status HapticGeneratorContext::process(float* in, float* out, int samples) {
-    LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
-
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!in, status, "nullInput");
     RETURN_VALUE_IF(!out, status, "nullOutput");
@@ -129,17 +117,11 @@ IEffect::Status HapticGeneratorContext::process(float* in, float* out, int sampl
     auto frameSize = getInputFrameSize();
     RETURN_VALUE_IF(0 == frameSize, status, "zeroFrameSize");
 
-    LOG(DEBUG) << __func__ << " start processing";
     // The audio data must not be modified but just written to
     // output buffer according the access mode.
-    bool accumulate = false;
     if (in != out) {
         for (int i = 0; i < samples; i++) {
-            if (accumulate) {
-                out[i] += in[i];
-            } else {
-                out[i] = in[i];
-            }
+            out[i] = in[i];
         }
     }
 
@@ -147,7 +129,6 @@ IEffect::Status HapticGeneratorContext::process(float* in, float* out, int sampl
         return status;
     }
 
-    std::lock_guard lg(mMutex);
     if (mParams.mMaxVibratorScale == HapticGenerator::VibratorScale::MUTE) {
         // Haptic channels are muted, not need to generate haptic data.
         return {STATUS_OK, samples, samples};
@@ -189,7 +170,6 @@ IEffect::Status HapticGeneratorContext::process(float* in, float* out, int sampl
 
 void HapticGeneratorContext::init_params(media::audio::common::AudioChannelLayout inputChMask,
                                          media::audio::common::AudioChannelLayout outputChMask) {
-    std::lock_guard lg(mMutex);
     mParams.mMaxVibratorScale = HapticGenerator::VibratorScale::MUTE;
     mParams.mVibratorInfo.resonantFrequencyHz = DEFAULT_RESONANT_FREQUENCY;
     mParams.mVibratorInfo.qFactor = DEFAULT_BSF_ZERO_Q;
@@ -210,7 +190,6 @@ void HapticGeneratorContext::init_params(media::audio::common::AudioChannelLayou
 float HapticGeneratorContext::getDistortionOutputGain() {
     float distortionOutputGain = getFloatProperty(
             "vendor.audio.hapticgenerator.distortion.output.gain", DEFAULT_DISTORTION_OUTPUT_GAIN);
-    LOG(DEBUG) << "Using distortion output gain as " << distortionOutputGain;
     return distortionOutputGain;
 }
 
@@ -237,7 +216,6 @@ void HapticGeneratorContext::addBiquadFilter(std::shared_ptr<HapticBiquadFilter>
  * Build haptic generator processing chain.
  */
 void HapticGeneratorContext::buildProcessingChain() {
-    std::lock_guard lg(mMutex);
     const size_t channelCount = mParams.mHapticChannelCount;
     float highPassCornerFrequency = 50.0f;
     auto hpf = ::android::audio_effect::haptic_generator::createHPF2(highPassCornerFrequency,
