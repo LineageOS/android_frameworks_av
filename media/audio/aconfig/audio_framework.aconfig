@@ -91,4 +91,5 @@ flag {
     namespace: "media_audio"
     description: "Limit access to volume and ringer SDK APIs in AudioManager"
     bug: "296232417"
+    is_fixed_read_only: true
 }
