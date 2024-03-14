@@ -221,6 +221,24 @@ camera_status_t ACameraMetadata_getAllTags(
         /*out*/int32_t* numEntries, /*out*/const uint32_t** tags) __INTRODUCED_IN(24);
 
 /**
+ * Look up tag ID value for device-specific custom tags that are usable only
+ * for the particular device, by name. The name and type of the tag need to be
+ * discovered from some other source, such as the manufacturer. The ID value is
+ * stable during the lifetime of an application, but should be queried again after
+ * process restarts. This method can also be used to query tag values using the names
+ * for public tags which exist in the Java API, however it is just simpler and faster to
+ * use the values of the tags which exist in the ndk.
+ * @param metadata The {@link ACameraMetadata} of to query the tag value from.
+ * @param name The name of the tag being queried.
+ * @param tag The output tag assigned by this method.
+ *
+ * @return ACAMERA_OK only if the function call was successful.
+ */
+
+camera_status_t
+ACameraMetadata_getTagFromName(const ACameraMetadata* metadata, const char *name, uint32_t *tag)  __INTRODUCED_IN(35);
+
+/**
  * Create a copy of input {@link ACameraMetadata}.
  *
  * <p>The returned ACameraMetadata must be freed by the application by {@link ACameraMetadata_free}
