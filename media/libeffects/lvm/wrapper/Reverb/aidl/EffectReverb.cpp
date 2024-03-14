@@ -82,7 +82,6 @@ extern "C" binder_exception_t queryEffect(const AudioUuid* in_impl_uuid, Descrip
 namespace aidl::android::hardware::audio::effect {
 
 EffectReverb::EffectReverb(const AudioUuid& uuid) {
-    LOG(DEBUG) << __func__ << uuid.toString();
     if (uuid == getEffectImplUuidAuxEnvReverb()) {
         mType = lvm::ReverbEffectType::AUX_ENV;
         mDescriptor = &lvm::kAuxEnvReverbDesc;
@@ -106,18 +105,16 @@ EffectReverb::EffectReverb(const AudioUuid& uuid) {
 
 EffectReverb::~EffectReverb() {
     cleanUp();
-    LOG(DEBUG) << __func__;
 }
 
 ndk::ScopedAStatus EffectReverb::getDescriptor(Descriptor* _aidl_return) {
     RETURN_IF(!_aidl_return, EX_ILLEGAL_ARGUMENT, "Parameter:nullptr");
-    LOG(DEBUG) << _aidl_return->toString();
     *_aidl_return = *mDescriptor;
     return ndk::ScopedAStatus::ok();
 }
 
 ndk::ScopedAStatus EffectReverb::setParameterSpecific(const Parameter::Specific& specific) {
-    LOG(DEBUG) << __func__ << " specific " << specific.toString();
+    LOG(VERBOSE) << __func__ << " specific " << specific.toString();
     RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
 
     auto tag = specific.getTag();
