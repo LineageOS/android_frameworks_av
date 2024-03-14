@@ -68,24 +68,21 @@ RetCode ReverbContext::init() {
 
     // allocate lvm reverb instance
     LVREV_ReturnStatus_en status = LVREV_SUCCESS;
-    {
-        std::lock_guard lg(mMutex);
-        LVREV_InstanceParams_st params = {
-                .MaxBlockSize = lvm::kMaxCallSize,
-                // Max format, could be mono during process
-                .SourceFormat = LVM_STEREO,
-                .NumDelays = LVREV_DELAYLINES_4,
-        };
-        /* Init sets the instance handle */
-        status = LVREV_GetInstanceHandle(&mInstance, &params);
-        GOTO_IF_LVREV_ERROR(status, deinit, "LVREV_GetInstanceHandleFailed");
+    LVREV_InstanceParams_st params = {
+            .MaxBlockSize = lvm::kMaxCallSize,
+            // Max format, could be mono during process
+            .SourceFormat = LVM_STEREO,
+            .NumDelays = LVREV_DELAYLINES_4,
+    };
+    /* Init sets the instance handle */
+    status = LVREV_GetInstanceHandle(&mInstance, &params);
+    GOTO_IF_LVREV_ERROR(status, deinit, "LVREV_GetInstanceHandleFailed");
 
-        // set control
-        LVREV_ControlParams_st controlParams;
-        initControlParameter(controlParams);
-        status = LVREV_SetControlParameters(mInstance, &controlParams);
-        GOTO_IF_LVREV_ERROR(status, deinit, "LVREV_SetControlParametersFailed");
-    }
+    // set control
+    LVREV_ControlParams_st controlParams;
+    initControlParameter(controlParams);
+    status = LVREV_SetControlParameters(mInstance, &controlParams);
+    GOTO_IF_LVREV_ERROR(status, deinit, "LVREV_SetControlParametersFailed");
 
     return RetCode::SUCCESS;
 
@@ -95,7 +92,6 @@ deinit:
 }
 
 void ReverbContext::deInit() {
-    std::lock_guard lg(mMutex);
     if (mInstance) {
         LVREV_FreeInstance(mInstance);
         mInstance = nullptr;
@@ -143,19 +139,16 @@ RetCode ReverbContext::setPresetReverbPreset(const PresetReverb::Presets& preset
 RetCode ReverbContext::setEnvironmentalReverbRoomLevel(int roomLevel) {
     // Update Control Parameter
     LVREV_ControlParams_st params;
-    {
-        std::lock_guard lg(mMutex);
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-        // Sum of room and reverb level controls
-        // needs to subtract max levels for both room level and reverb level
-        int combinedLevel = (roomLevel + mLevel) - lvm::kMaxReverbLevel;
-        params.Level = convertLevel(combinedLevel);
+    // Sum of room and reverb level controls
+    // needs to subtract max levels for both room level and reverb level
+    int combinedLevel = (roomLevel + mLevel) - lvm::kMaxReverbLevel;
+    params.Level = convertLevel(combinedLevel);
 
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
-    }
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     mRoomLevel = roomLevel;
     return RetCode::SUCCESS;
 }
@@ -163,16 +156,13 @@ RetCode ReverbContext::setEnvironmentalReverbRoomLevel(int roomLevel) {
 RetCode ReverbContext::setEnvironmentalReverbRoomHfLevel(int roomHfLevel) {
     // Update Control Parameter
     LVREV_ControlParams_st params;
-    {
-        std::lock_guard lg(mMutex);
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-        params.LPF = convertHfLevel(roomHfLevel);
+    params.LPF = convertHfLevel(roomHfLevel);
 
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
-    }
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     mRoomHfLevel = roomHfLevel;
     return RetCode::SUCCESS;
 }
@@ -185,17 +175,15 @@ RetCode ReverbContext::setEnvironmentalReverbDecayTime(int decayTime) {
 
     // Update Control Parameter
     LVREV_ControlParams_st params;
-    {
-        std::lock_guard lg(mMutex);
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-        params.T60 = (LVM_UINT16)time;
-        mSamplesToExitCount = (params.T60 * mCommon.input.base.sampleRate) / 1000;
+    params.T60 = (LVM_UINT16)time;
+    mSamplesToExitCount = (params.T60 * mCommon.input.base.sampleRate) / 1000;
 
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
-    }
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+
     mDecayTime = time;
     return RetCode::SUCCESS;
 }
@@ -203,16 +191,13 @@ RetCode ReverbContext::setEnvironmentalReverbDecayTime(int decayTime) {
 RetCode ReverbContext::setEnvironmentalReverbDecayHfRatio(int decayHfRatio) {
     // Update Control Parameter
     LVREV_ControlParams_st params;
-    {
-        std::lock_guard lg(mMutex);
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-        params.Damping = (LVM_INT16)(decayHfRatio / 20);
+    params.Damping = (LVM_INT16)(decayHfRatio / 20);
 
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
-    }
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
     mDecayHfRatio = decayHfRatio;
     return RetCode::SUCCESS;
 }
@@ -220,19 +205,17 @@ RetCode ReverbContext::setEnvironmentalReverbDecayHfRatio(int decayHfRatio) {
 RetCode ReverbContext::setEnvironmentalReverbLevel(int level) {
     // Update Control Parameter
     LVREV_ControlParams_st params;
-    {
-        std::lock_guard lg(mMutex);
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-        // Sum of room and reverb level controls
-        // needs to subtract max levels for both room level and level
-        int combinedLevel = (level + mRoomLevel) - lvm::kMaxReverbLevel;
-        params.Level = convertLevel(combinedLevel);
+    // Sum of room and reverb level controls
+    // needs to subtract max levels for both room level and level
+    int combinedLevel = (level + mRoomLevel) - lvm::kMaxReverbLevel;
+    params.Level = convertLevel(combinedLevel);
 
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
-    }
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+
     mLevel = level;
     return RetCode::SUCCESS;
 }
@@ -245,16 +228,14 @@ RetCode ReverbContext::setEnvironmentalReverbDelay(int delay) {
 RetCode ReverbContext::setEnvironmentalReverbDiffusion(int diffusion) {
     // Update Control Parameter
     LVREV_ControlParams_st params;
-    {
-        std::lock_guard lg(mMutex);
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-        params.Density = (LVM_INT16)(diffusion / 10);
+    params.Density = (LVM_INT16)(diffusion / 10);
 
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
-    }
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+
     mDiffusion = diffusion;
     return RetCode::SUCCESS;
 }
@@ -262,16 +243,14 @@ RetCode ReverbContext::setEnvironmentalReverbDiffusion(int diffusion) {
 RetCode ReverbContext::setEnvironmentalReverbDensity(int density) {
     // Update Control Parameter
     LVREV_ControlParams_st params;
-    {
-        std::lock_guard lg(mMutex);
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_GetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " getControlParamFailed");
 
-        params.RoomSize = (LVM_INT16)(((density * 99) / 1000) + 1);
+    params.RoomSize = (LVM_INT16)(((density * 99) / 1000) + 1);
 
-        RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
-                        RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
-    }
+    RETURN_VALUE_IF(LVREV_SUCCESS != LVREV_SetControlParameters(mInstance, &params),
+                    RetCode::ERROR_EFFECT_LIB_ERROR, " setControlParamFailed");
+
     mDensity = density;
     return RetCode::SUCCESS;
 }
@@ -362,9 +341,6 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
     RETURN_VALUE_IF(inputFrameCount != outputFrameCount, status, "FrameCountMismatch");
     RETURN_VALUE_IF(0 == getInputFrameSize(), status, "zeroFrameSize");
 
-    LOG(DEBUG) << __func__ << " start processing";
-    std::lock_guard lg(mMutex);
-
     int channels = ::aidl::android::hardware::audio::common::getChannelCount(
             mCommon.input.base.channelMask);
     int outChannels = ::aidl::android::hardware::audio::common::getChannelCount(
@@ -405,7 +381,6 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
     } else {
         if (!mEnabled && mSamplesToExitCount > 0) {
             std::fill(outFrames.begin(), outFrames.end(), 0);
-            LOG(VERBOSE) << "Zeroing " << channels << " samples per frame at the end of call ";
         }
 
         /* Process the samples, producing a stereo output */
@@ -415,7 +390,7 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
                               outFrames.data(), /* Output buffer */
                               frameCount);      /* Number of samples to read */
         if (lvrevStatus != LVREV_SUCCESS) {
-            LOG(ERROR) << __func__ << lvrevStatus;
+            LOG(ERROR) << __func__ << " LVREV_Process error: " << lvrevStatus;
             return {EX_UNSUPPORTED_OPERATION, 0, 0};
         }
     }
@@ -464,19 +439,10 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
         }
     }
 
-    bool accumulate = false;
     if (outChannels > 2) {
-        // Accumulate if required
-        if (accumulate) {
-            for (int i = 0; i < frameCount; i++) {
-                out[outChannels * i] += outFrames[FCC_2 * i];
-                out[outChannels * i + 1] += outFrames[FCC_2 * i + 1];
-            }
-        } else {
-            for (int i = 0; i < frameCount; i++) {
-                out[outChannels * i] = outFrames[FCC_2 * i];
-                out[outChannels * i + 1] = outFrames[FCC_2 * i + 1];
-            }
+        for (int i = 0; i < frameCount; i++) {
+            out[outChannels * i] = outFrames[FCC_2 * i];
+            out[outChannels * i + 1] = outFrames[FCC_2 * i + 1];
         }
         if (!isAuxiliary()) {
             for (int i = 0; i < frameCount; i++) {
@@ -487,28 +453,14 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
             }
         }
     } else {
-        if (accumulate) {
-            if (outChannels == FCC_1) {
-                for (int i = 0; i < frameCount; i++) {
-                    out[i] += ((outFrames[i * FCC_2] + outFrames[i * FCC_2 + 1]) * 0.5f);
-                }
-            } else {
-                for (int i = 0; i < frameCount * FCC_2; i++) {
-                    out[i] += outFrames[i];
-                }
-            }
+        if (outChannels == FCC_1) {
+            From2iToMono_Float(outFrames.data(), out, frameCount);
         } else {
-            if (outChannels == FCC_1) {
-                From2iToMono_Float(outFrames.data(), out, frameCount);
-            } else {
-                for (int i = 0; i < frameCount * FCC_2; i++) {
-                    out[i] = outFrames[i];
-                }
+            for (int i = 0; i < frameCount * FCC_2; i++) {
+                out[i] = outFrames[i];
             }
         }
     }
-
-    LOG(DEBUG) << __func__ << " done processing";
 
     if (!mEnabled && mSamplesToExitCount > 0) {
         // signed - unsigned will trigger integer overflow if result becomes negative.
