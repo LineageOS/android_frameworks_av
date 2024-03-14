@@ -181,7 +181,7 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
     State state;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
     if (state == State::INIT) {
-        ALOGI("%s at state %s, opening effect with input %s output %s", __func__,
+        ALOGD("%s at state %s, opening effect with input %s output %s", __func__,
               android::internal::ToString(state).c_str(), common.input.toString().c_str(),
               common.output.toString().c_str());
         IEffect::OpenEffectReturn openReturn;
@@ -189,7 +189,8 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
                 statusTFromBinderStatus(mEffect->open(common, std::nullopt, &openReturn)));
         updateMqsAndEventFlags(openReturn);
     } else if (mCommon != common) {
-        ALOGI("%s at state %s, setParameter", __func__, android::internal::ToString(state).c_str());
+        ALOGV("%s at state %s, setCommonParameter %s", __func__,
+              android::internal::ToString(state).c_str(), common.toString().c_str());
         Parameter aidlParam = UNION_MAKE(Parameter, common, common);
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam)));
     }
@@ -398,12 +399,12 @@ status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const vo
     effect_offload_param_t* offload = (effect_offload_param_t*)pCmdData;
     // send to proxy to update active sub-effect
     if (mIsProxyEffect) {
-        ALOGI("%s offload param offload %s ioHandle %d", __func__,
+        ALOGV("%s offload param offload %s ioHandle %d", __func__,
               offload->isOffload ? "true" : "false", offload->ioHandle);
         const auto& effectProxy = std::static_pointer_cast<EffectProxy>(mEffect);
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(effectProxy->setOffloadParam(offload)));
         if (mCommon.ioHandle != offload->ioHandle) {
-            ALOGI("%s ioHandle update [%d to %d]", __func__, mCommon.ioHandle, offload->ioHandle);
+            ALOGV("%s ioHandle update [%d to %d]", __func__, mCommon.ioHandle, offload->ioHandle);
             mCommon.ioHandle = offload->ioHandle;
             Parameter aidlParam = UNION_MAKE(Parameter, common, mCommon);
             RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->setParameter(aidlParam)));

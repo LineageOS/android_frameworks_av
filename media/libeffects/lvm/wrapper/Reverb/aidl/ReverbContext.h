@@ -17,7 +17,6 @@
 #pragma once
 
 #include <android-base/logging.h>
-#include <android-base/thread_annotations.h>
 #include <unordered_map>
 
 #include "ReverbTypes.h"

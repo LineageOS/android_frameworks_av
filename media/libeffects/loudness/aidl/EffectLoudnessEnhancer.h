@@ -27,11 +27,8 @@ class LoudnessEnhancerImpl final : public EffectImpl {
   public:
     static const std::string kEffectName;
     static const Descriptor kDescriptor;
-    LoudnessEnhancerImpl() { LOG(DEBUG) << __func__; }
-    ~LoudnessEnhancerImpl() {
-        cleanUp();
-        LOG(DEBUG) << __func__;
-    }
+    LoudnessEnhancerImpl() = default;
+    ~LoudnessEnhancerImpl() { cleanUp(); }
 
     ndk::ScopedAStatus commandImpl(CommandId command) REQUIRES(mImplMutex) override;
     ndk::ScopedAStatus getDescriptor(Descriptor* _aidl_return) override;
