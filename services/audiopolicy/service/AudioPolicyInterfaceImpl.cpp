@@ -1561,17 +1561,20 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
     std::unique_ptr<audio_port_v7[]> ports(new audio_port_v7[num_ports]);
     unsigned int generation;
 
-    audio_utils::lock_guard _l(mMutex);
-    if (mAudioPolicyManager == NULL) {
-        return binderStatusFromStatusT(NO_INIT);
-    }
-
     const AttributionSourceState attributionSource = getCallingAttributionSource();
-
     AutoCallerClear acc;
-    RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->listAudioPorts(role, type, &num_ports, ports.get(), &generation)));
-    numPortsReq = std::min(numPortsReq, num_ports);
+    {
+        audio_utils::lock_guard _l(mMutex);
+        if (mAudioPolicyManager == NULL) {
+            return binderStatusFromStatusT(NO_INIT);
+        }
+        // AudioPolicyManager->listAudioPorts makes a deep copy of port structs into ports
+        // so it is safe to access after releasing the mutex
+        RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
+                mAudioPolicyManager->listAudioPorts(
+                        role, type, &num_ports, ports.get(), &generation)));
+        numPortsReq = std::min(numPortsReq, num_ports);
+    }
 
     if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
         for (size_t i = 0; i < numPortsReq; ++i) {
@@ -1601,15 +1604,19 @@ Status AudioPolicyService::listDeclaredDevicePorts(media::AudioPortRole role,
 Status AudioPolicyService::getAudioPort(int portId,
                                         media::AudioPortFw* _aidl_return) {
     audio_port_v7 port{ .id = portId };
-    audio_utils::lock_guard _l(mMutex);
-    if (mAudioPolicyManager == NULL) {
-        return binderStatusFromStatusT(NO_INIT);
-    }
 
     const AttributionSourceState attributionSource = getCallingAttributionSource();
-
     AutoCallerClear acc;
-    RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(mAudioPolicyManager->getAudioPort(&port)));
+
+    {
+        audio_utils::lock_guard _l(mMutex);
+        if (mAudioPolicyManager == NULL) {
+            return binderStatusFromStatusT(NO_INIT);
+        }
+        // AudioPolicyManager->getAudioPort makes a deep copy of the port struct into port
+        // so it is safe to access after releasing the mutex
+        RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(mAudioPolicyManager->getAudioPort(&port)));
+    }
 
     if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
         anonymizePortBluetoothAddress(&port);
@@ -1672,17 +1679,20 @@ Status AudioPolicyService::listAudioPatches(Int* count,
     std::unique_ptr<audio_patch[]> patches(new audio_patch[num_patches]);
     unsigned int generation;
 
-    audio_utils::lock_guard _l(mMutex);
-    if (mAudioPolicyManager == NULL) {
-        return binderStatusFromStatusT(NO_INIT);
-    }
-
     const AttributionSourceState attributionSource = getCallingAttributionSource();
-
     AutoCallerClear acc;
-    RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->listAudioPatches(&num_patches, patches.get(), &generation)));
-    numPatchesReq = std::min(numPatchesReq, num_patches);
+
+    {
+        audio_utils::lock_guard _l(mMutex);
+        if (mAudioPolicyManager == NULL) {
+            return binderStatusFromStatusT(NO_INIT);
+        }
+        // AudioPolicyManager->listAudioPatches makes a deep copy of patches structs into patches
+        // so it is safe to access after releasing the mutex
+        RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
+                mAudioPolicyManager->listAudioPatches(&num_patches, patches.get(), &generation)));
+        numPatchesReq = std::min(numPatchesReq, num_patches);
+    }
 
     if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
         for (size_t i = 0; i < numPatchesReq; ++i) {
