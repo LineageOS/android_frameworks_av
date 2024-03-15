@@ -29,11 +29,8 @@ class VisualizerImpl final : public EffectImpl {
     static const std::string kEffectName;
     static const Capability kCapability;
     static const Descriptor kDescriptor;
-    VisualizerImpl() { LOG(DEBUG) << __func__; }
-    ~VisualizerImpl() {
-        cleanUp();
-        LOG(DEBUG) << __func__;
-    }
+    VisualizerImpl() = default;
+    ~VisualizerImpl() { cleanUp(); }
 
     ndk::ScopedAStatus commandImpl(CommandId command) REQUIRES(mImplMutex) override;
     ndk::ScopedAStatus getDescriptor(Descriptor* _aidl_return) override;
