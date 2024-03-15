@@ -18,6 +18,7 @@
 
 #include <binder/AppOpsManager.h>
 #include <binder/PermissionController.h>
+#include <com_android_internal_camera_flags.h>
 #include <cutils/properties.h>
 #include <private/android_filesystem_config.h>
 
@@ -25,6 +26,8 @@
 #include "CameraThreadState.h"
 
 namespace android {
+
+namespace flags = com::android::internal::camera::flags;
 
 const std::string AttributionAndPermissionUtils::sDumpPermission("android.permission.DUMP");
 const std::string AttributionAndPermissionUtils::sManageCameraPermission(
@@ -75,9 +78,16 @@ bool AttributionAndPermissionUtils::checkPermissionForPreflight(const std::strin
         return true;
     }
 
-    PermissionChecker permissionChecker;
-    return permissionChecker.checkPermissionForPreflight(toString16(permission), attributionSource,
-            toString16(message), attributedOpCode) != PermissionChecker::PERMISSION_HARD_DENIED;
+    if (!flags::cache_permission_services()) {
+        PermissionChecker permissionChecker;
+        return permissionChecker.checkPermissionForPreflight(
+                       toString16(permission), attributionSource, toString16(message),
+                       attributedOpCode) != PermissionChecker::PERMISSION_HARD_DENIED;
+    } else {
+        return mPermissionChecker->checkPermissionForPreflight(
+                       toString16(permission), attributionSource, toString16(message),
+                       attributedOpCode) != PermissionChecker::PERMISSION_HARD_DENIED;
+    }
 }
 
 // Can camera service trust the caller based on the calling UID?

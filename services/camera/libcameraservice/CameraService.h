@@ -34,6 +34,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/IActivityManager.h>
 #include <binder/IAppOpsCallback.h>
+#include <binder/IPermissionController.h>
 #include <binder/IUidObserver.h>
 #include <hardware/camera.h>
 #include <sensorprivacy/SensorPrivacyManager.h>
@@ -675,7 +676,26 @@ private:
         return activityManager;
     }
 
-   /**
+    static const sp<IPermissionController>& getPermissionController() {
+        static const char* kPermissionControllerService = "permission";
+        static thread_local sp<IPermissionController> sPermissionController = nullptr;
+
+        if (sPermissionController == nullptr ||
+                !IInterface::asBinder(sPermissionController)->isBinderAlive()) {
+            sp<IServiceManager> sm = defaultServiceManager();
+            sp<IBinder> binder = sm->checkService(toString16(kPermissionControllerService));
+            if (binder == nullptr) {
+                ALOGE("%s: Could not get permission service", __FUNCTION__);
+                sPermissionController = nullptr;
+            } else {
+                sPermissionController = interface_cast<IPermissionController>(binder);
+            }
+        }
+
+        return sPermissionController;
+    }
+
+    /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
      * layer values.
      */
