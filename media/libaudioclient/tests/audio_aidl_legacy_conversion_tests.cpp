@@ -274,7 +274,6 @@ INSTANTIATE_TEST_SUITE_P(AudioDeviceDescriptionRoundTrip,
 
 class AudioFormatDescriptionRoundTripTest :
         public testing::TestWithParam<AudioFormatDescription> {};
-
 TEST_P(AudioFormatDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
     const auto initial = GetParam();
     auto conv = aidl2legacy_AudioFormatDescription_audio_format_t(initial);

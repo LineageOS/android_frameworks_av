@@ -1503,19 +1503,6 @@ Status AudioPolicyService::isDirectOutputSupported(
     return Status::ok();
 }
 
-template <typename Port>
-void anonymizePortBluetoothAddress(Port *port) {
-    if (port->type != AUDIO_PORT_TYPE_DEVICE) {
-        return;
-    }
-    if (!(audio_is_a2dp_device(port->ext.device.type)
-            || audio_is_ble_device(port->ext.device.type)
-            || audio_is_bluetooth_sco_device(port->ext.device.type)
-            || audio_is_hearing_aid_out_device(port->ext.device.type))) {
-        return;
-    }
-    anonymizeBluetoothAddress(port->ext.device.address);
-}
 
 Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
                                           media::AudioPortType typeAidl, Int* count,
@@ -1538,20 +1525,10 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
     }
-
-    const AttributionSourceState attributionSource = getCallingAttributionSource();
-
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             mAudioPolicyManager->listAudioPorts(role, type, &num_ports, ports.get(), &generation)));
     numPortsReq = std::min(numPortsReq, num_ports);
-
-    if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
-        for (size_t i = 0; i < numPortsReq; ++i) {
-            anonymizePortBluetoothAddress(&ports[i]);
-        }
-    }
-
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             convertRange(ports.get(), ports.get() + numPortsReq, std::back_inserter(*portsAidl),
                          legacy2aidl_audio_port_v7_AudioPort)));
@@ -1567,16 +1544,8 @@ Status AudioPolicyService::getAudioPort(int portId,
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
     }
-
-    const AttributionSourceState attributionSource = getCallingAttributionSource();
-
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(mAudioPolicyManager->getAudioPort(&port)));
-
-    if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
-        anonymizePortBluetoothAddress(&port);
-    }
-
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_port_v7_AudioPort(port));
     return Status::ok();
 }
@@ -1637,25 +1606,10 @@ Status AudioPolicyService::listAudioPatches(Int* count,
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
     }
-
-    const AttributionSourceState attributionSource = getCallingAttributionSource();
-
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             mAudioPolicyManager->listAudioPatches(&num_patches, patches.get(), &generation)));
     numPatchesReq = std::min(numPatchesReq, num_patches);
-
-    if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
-        for (size_t i = 0; i < numPatchesReq; ++i) {
-            for (size_t j = 0; j < patches[i].num_sources; ++j) {
-                anonymizePortBluetoothAddress(&patches[i].sources[j]);
-            }
-            for (size_t j = 0; j < patches[i].num_sinks; ++j) {
-                anonymizePortBluetoothAddress(&patches[i].sinks[j]);
-            }
-        }
-    }
-
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             convertRange(patches.get(), patches.get() + numPatchesReq,
                          std::back_inserter(*patchesAidl), legacy2aidl_audio_patch_AudioPatch)));
