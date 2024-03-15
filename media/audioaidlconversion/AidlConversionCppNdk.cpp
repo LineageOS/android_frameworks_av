@@ -1070,13 +1070,6 @@ AudioDeviceAddress::Tag suggestDeviceAddressTag(const AudioDeviceDescription& de
             if (mac.size() != 6) return BAD_VALUE;
             snprintf(addressBuffer, AUDIO_DEVICE_MAX_ADDRESS_LEN, "%02X:%02X:%02X:%02X:%02X:%02X",
                     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-            // special case for anonymized mac address:
-            // change anonymized bytes back from FD:FF:FF:FF to XX:XX:XX:XX
-            std::string address(addressBuffer);
-            if (address.compare(0, strlen("FD:FF:FF:FF"), "FD:FF:FF:FF") == 0) {
-                address.replace(0, strlen("FD:FF:FF:FF"), "XX:XX:XX:XX");
-            }
-            strcpy(addressBuffer, address.c_str());
         } break;
         case Tag::ipv4: {
             const std::vector<uint8_t>& ipv4 = aidl.address.get<AudioDeviceAddress::ipv4>();
@@ -1133,20 +1126,11 @@ legacy2aidl_audio_device_AudioDevice(
     if (!legacyAddress.empty()) {
         switch (suggestDeviceAddressTag(aidl.type)) {
             case Tag::mac: {
-                // special case for anonymized mac address:
-                // change anonymized bytes so that they can be scanned as HEX bytes
-                // Use '01' for LSB bits 0 and 1 as Bluetooth MAC addresses are never multicast
-                // and universaly administered
-                std::string address = legacyAddress;
-                if (address.compare(0, strlen("XX:XX:XX:XX"), "XX:XX:XX:XX") == 0) {
-                    address.replace(0, strlen("XX:XX:XX:XX"), "FD:FF:FF:FF");
-                }
-
                 std::vector<uint8_t> mac(6);
-                int status = sscanf(address.c_str(), "%hhX:%hhX:%hhX:%hhX:%hhX:%hhX",
+                int status = sscanf(legacyAddress.c_str(), "%hhX:%hhX:%hhX:%hhX:%hhX:%hhX",
                         &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
                 if (status != mac.size()) {
-                    ALOGE("%s: malformed MAC address: \"%s\"", __func__, address.c_str());
+                    ALOGE("%s: malformed MAC address: \"%s\"", __func__, legacyAddress.c_str());
                     return unexpected(BAD_VALUE);
                 }
                 aidl.address = AudioDeviceAddress::make<AudioDeviceAddress::mac>(std::move(mac));
