@@ -16,7 +16,6 @@
 
 #pragma once
 
-#define __STDC_LIMIT_MACROS
 #include <inttypes.h>
 
 #include <sys/types.h>
