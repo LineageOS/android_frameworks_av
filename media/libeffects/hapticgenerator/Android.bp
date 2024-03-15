@@ -23,7 +23,7 @@ package {
 }
 
 cc_defaults {
-    name : "hapticgeneratordefaults",
+    name: "hapticgeneratordefaults",
     srcs: [
         "Processors.cpp",
     ],
@@ -54,13 +54,15 @@ cc_library_shared {
     ],
 
     cflags: [
-        "-O2", // Turning on the optimization in order to reduce effect processing time.
-               // The latency is around 1/5 less than without the optimization.
+        // Turning on the optimization in order to reduce effect processing time.
+        // The latency is around 1/5 less than without the optimization.
+        "-O2",
         "-Wall",
         "-Werror",
-        "-ffast-math", // This is needed for the non-zero coefficients optimization for
-                       // BiquadFilter. Try the biquad_filter_benchmark test in audio_utils
-                       // with/without `-ffast-math` for more context.
+        // This is needed for the non-zero coefficients optimization for
+        // BiquadFilter. Try the biquad_filter_benchmark test in audio_utils
+        // with/without `-ffast-math` for more context.
+        "-ffast-math",
         "-fvisibility=hidden",
     ],
 }
@@ -69,9 +71,9 @@ cc_library_shared {
     name: "libhapticgeneratoraidl",
 
     srcs: [
+        ":effectCommonFile",
         "aidl/EffectHapticGenerator.cpp",
         "aidl/HapticGeneratorContext.cpp",
-        ":effectCommonFile",
     ],
 
     defaults: [

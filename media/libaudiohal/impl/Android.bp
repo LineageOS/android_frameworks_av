@@ -49,8 +49,8 @@ cc_defaults {
 
     cflags: [
         "-Wall",
-        "-Wextra",
         "-Werror",
+        "-Wextra",
         "-fvisibility=hidden",
     ],
     shared_libs: [
@@ -211,10 +211,10 @@ cc_library_shared {
         "libbinder_ndk",
     ],
     cflags: [
-        "-DMAJOR_VERSION=7",
-        "-DMINOR_VERSION=1",
         "-DCOMMON_TYPES_MINOR_VERSION=0",
         "-DCORE_TYPES_MINOR_VERSION=0",
+        "-DMAJOR_VERSION=7",
+        "-DMINOR_VERSION=1",
         "-include common/all-versions/VersionMacro.h",
     ],
 }
@@ -245,25 +245,25 @@ cc_defaults {
         "libeffectsconfig_headers",
     ],
     cflags: [
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-Wthread-safety",
         "-DBACKEND_CPP_NDK",
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+        "-Wthread-safety",
     ],
 }
 
 cc_library_shared {
     name: "libaudiohal@aidl",
     defaults: [
-        "libaudiohal_default",
         "libaudiohal_aidl_default",
+        "libaudiohal_default",
     ],
     srcs: [
-        "DevicesFactoryHalEntry.cpp",
-        "EffectsFactoryHalEntry.cpp",
         ":audio_effect_hal_aidl_src_files",
         ":core_audio_hal_aidl_src_files",
+        "DevicesFactoryHalEntry.cpp",
+        "EffectsFactoryHalEntry.cpp",
     ],
 }
 
@@ -281,8 +281,9 @@ filegroup {
 filegroup {
     name: "audio_effect_hal_aidl_src_files",
     srcs: [
-        "EffectConversionHelperAidl.cpp",
+        ":audio_effectproxy_src_files",
         "EffectBufferHalAidl.cpp",
+        "EffectConversionHelperAidl.cpp",
         "EffectHalAidl.cpp",
         "EffectsFactoryHalAidl.cpp",
         "effectsAidlConversion/AidlConversionAec.cpp",
@@ -301,7 +302,6 @@ filegroup {
         "effectsAidlConversion/AidlConversionVendorExtension.cpp",
         "effectsAidlConversion/AidlConversionVirtualizer.cpp",
         "effectsAidlConversion/AidlConversionVisualizer.cpp",
-        ":audio_effectproxy_src_files",
     ],
 }
 

@@ -53,9 +53,9 @@ cc_aconfig_library {
     // TODO(b/316909431) native_bridge_supported: true,
     apex_available: [
         "//apex_available:platform",
+        "com.android.btservices",
         "com.android.media",
         "com.android.media.swcodec",
-        "com.android.btservices",
     ],
     min_sdk_version: "29",
 }

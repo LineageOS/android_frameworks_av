@@ -18,8 +18,8 @@ cc_library_shared {
 
     cflags: [
         "-Wall",
-        "-Wextra",
         "-Werror",
+        "-Wextra",
     ],
 
     required: [
@@ -44,7 +44,7 @@ cc_library_shared {
         "libbase_headers",
         "liberror_headers",
         "libmediautils_headers",
-    ]
+    ],
 }
 
 cc_library_shared {
@@ -61,12 +61,12 @@ cc_library_shared {
 
     shared_libs: [
         "libhidlbase",
-        "libutils",
         "liblog",
+        "libutils",
     ],
 
     header_libs: [
-        "libaudiohal_headers"
+        "libaudiohal_headers",
     ],
 }
 

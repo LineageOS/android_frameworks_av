@@ -16,8 +16,8 @@ cc_defaults {
     ],
     sanitize: {
         misc_undefined: [
-            "unsigned-integer-overflow",
             "signed-integer-overflow",
+            "unsigned-integer-overflow",
         ],
     },
 }
@@ -26,8 +26,8 @@ cc_test {
     name: "audio_aidl_ndk_conversion_tests",
 
     defaults: [
-        "latest_android_media_audio_common_types_ndk_static",
         "latest_android_hardware_audio_common_ndk_static",
+        "latest_android_media_audio_common_types_ndk_static",
         "libaudio_aidl_conversion_tests_defaults",
     ],
     srcs: ["audio_aidl_ndk_conversion_tests.cpp"],

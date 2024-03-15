@@ -45,8 +45,8 @@ cc_defaults {
 
     cflags: [
         "-Wall",
-        "-Wextra",
         "-Werror",
+        "-Wextra",
         "-Wthread-safety",
     ],
 }

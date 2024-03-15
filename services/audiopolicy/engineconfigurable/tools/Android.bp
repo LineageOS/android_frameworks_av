@@ -67,8 +67,8 @@ python_binary_host {
     ],
     libs: [
         "EddParser.py",
-        "hostConfig.py",
         "PFWScriptGenerator.py",
+        "hostConfig.py",
     ],
     required: [
         "domainGeneratorConnector",
@@ -78,8 +78,8 @@ python_binary_host {
 genrule_defaults {
     name: "domaingeneratorpolicyrule",
     tools: [
-        "domainGeneratorPolicy",
         "domainGeneratorConnector",
+        "domainGeneratorPolicy",
     ],
     cmd: "mkdir -p $(genDir)/Structure/Policy && " +
         "cp $(locations :audio_policy_pfw_structure_files) $(genDir)/Structure/Policy && " +
