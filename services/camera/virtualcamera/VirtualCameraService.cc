@@ -46,6 +46,10 @@ using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 
+// TODO(b/301023410) Make camera id range configurable / dynamic
+// based on already registered devices.
+std::atomic_int VirtualCameraService::sNextId{1000};
+
 namespace {
 
 constexpr int kVgaWidth = 640;
@@ -110,6 +114,13 @@ VirtualCameraService::VirtualCameraService(
 ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
     const VirtualCameraConfiguration& configuration, bool* _aidl_return) {
+  return registerCamera(token, configuration, sNextId++, _aidl_return);
+}
+
+ndk::ScopedAStatus VirtualCameraService::registerCamera(
+    const ::ndk::SpAIBinder& token,
+    const VirtualCameraConfiguration& configuration, const int cameraId,
+    bool* _aidl_return) {
   if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
     ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
           getpid(), getuid(), kCreateVirtualDevicePermission);
@@ -141,7 +152,7 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
   }
 
   std::shared_ptr<VirtualCameraDevice> camera =
-      mVirtualCameraProvider->createCamera(configuration);
+      mVirtualCameraProvider->createCamera(configuration, cameraId);
   if (camera == nullptr) {
     ALOGE("Failed to create camera for binder token 0x%" PRIxPTR,
           reinterpret_cast<uintptr_t>(token.get()));
@@ -179,7 +190,7 @@ ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
 }
 
 ndk::ScopedAStatus VirtualCameraService::getCameraId(
-        const ::ndk::SpAIBinder& token, int32_t* _aidl_return) {
+    const ::ndk::SpAIBinder& token, int32_t* _aidl_return) {
   if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
     ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
           getpid(), getuid(), kCreateVirtualDevicePermission);
@@ -188,7 +199,7 @@ ndk::ScopedAStatus VirtualCameraService::getCameraId(
 
   if (_aidl_return == nullptr) {
     return ndk::ScopedAStatus::fromServiceSpecificError(
-            Status::EX_ILLEGAL_ARGUMENT);
+        Status::EX_ILLEGAL_ARGUMENT);
   }
 
   auto camera = getCamera(token);
@@ -235,7 +246,15 @@ binder_status_t VirtualCameraService::handleShellCommand(int in, int out,
   }
   const char* const cmd = args[0];
   if (strcmp(kEnableTestCameraCmd, cmd) == 0) {
-    enableTestCameraCmd(in, err);
+    int cameraId = 0;
+    if (numArgs > 1 && args[1] != nullptr) {
+      cameraId = atoi(args[1]);
+    }
+    if (cameraId == 0) {
+      cameraId = sNextId++;
+    }
+
+    enableTestCameraCmd(in, err, cameraId);
   } else if (strcmp(kDisableTestCameraCmd, cmd) == 0) {
     disableTestCameraCmd(in);
   } else {
@@ -246,7 +265,8 @@ binder_status_t VirtualCameraService::handleShellCommand(int in, int out,
   return STATUS_OK;
 }
 
-void VirtualCameraService::enableTestCameraCmd(const int out, const int err) {
+void VirtualCameraService::enableTestCameraCmd(const int out, const int err,
+                                               const int cameraId) {
   if (mTestCameraToken != nullptr) {
     dprintf(out, "Test camera is already enabled (%s).",
             getCamera(mTestCameraToken)->getCameraName().c_str());
@@ -263,7 +283,7 @@ void VirtualCameraService::enableTestCameraCmd(const int out, const int err) {
                                                   Format::YUV_420_888,
                                                   .maxFps = kMaxFps});
   configuration.lensFacing = LensFacing::EXTERNAL;
-  registerCamera(mTestCameraToken, configuration, &ret);
+  registerCamera(mTestCameraToken, configuration, cameraId, &ret);
   if (ret) {
     dprintf(out, "Successfully registered test camera %s",
             getCamera(mTestCameraToken)->getCameraName().c_str());

@@ -142,6 +142,14 @@ class VirtualCameraServiceTest : public ::testing::Test {
         Eq(NO_ERROR));
   }
 
+  void execute_shell_command(const std::string cmd, const std::string cameraId) {
+    std::array<const char*, 2> args{cmd.data(), cameraId.data()};
+    ASSERT_THAT(
+        mCameraService->handleShellCommand(mDevNullFd, mDevNullFd, mDevNullFd,
+                                           args.data(), args.size()),
+        Eq(NO_ERROR));
+  }
+
   std::vector<std::string> getCameraIds() {
     std::vector<std::string> cameraIds;
     EXPECT_TRUE(mCameraProvider->getCameraIdList(&cameraIds).isOk());
@@ -371,6 +379,18 @@ TEST_F(VirtualCameraServiceTest, ShellCmdWithNoArgs) {
 
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmd) {
   execute_shell_command("enable_test_camera");
+
+  std::vector<std::string> cameraIdsAfterEnable = getCameraIds();
+  EXPECT_THAT(cameraIdsAfterEnable, SizeIs(1));
+
+  execute_shell_command("disable_test_camera");
+
+  std::vector<std::string> cameraIdsAfterDisable = getCameraIds();
+  EXPECT_THAT(cameraIdsAfterDisable, IsEmpty());
+}
+
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithId) {
+  execute_shell_command("enable_test_camera", "12345");
 
   std::vector<std::string> cameraIdsAfterEnable = getCameraIds();
   EXPECT_THAT(cameraIdsAfterEnable, SizeIs(1));
