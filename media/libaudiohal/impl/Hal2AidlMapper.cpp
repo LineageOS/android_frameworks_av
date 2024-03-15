@@ -102,8 +102,8 @@ Hal2AidlMapper::Hal2AidlMapper(const std::string& instance, const std::shared_pt
 }
 
 void Hal2AidlMapper::addStream(
-        const sp<StreamHalInterface>& stream, int32_t portConfigId, int32_t patchId) {
-    mStreams.insert(std::pair(stream, std::pair(portConfigId, patchId)));
+        const sp<StreamHalInterface>& stream, int32_t mixPortConfigId, int32_t patchId) {
+    mStreams.insert(std::pair(stream, std::pair(mixPortConfigId, patchId)));
 }
 
 bool Hal2AidlMapper::audioDeviceMatches(const AudioDevice& device, const AudioPort& p) {
@@ -698,20 +698,23 @@ status_t Hal2AidlMapper::initialize() {
     return OK;
 }
 
-bool Hal2AidlMapper::isPortBeingHeld(int32_t portId) {
-    // It is assumed that mStreams has already been cleaned up.
-    for (const auto& s : mStreams) {
-        if (portConfigBelongsToPort(s.second.first, portId)) return true;
-    }
-    for (const auto& [_, patch] : mPatches) {
+std::set<int32_t> Hal2AidlMapper::getPatchIdsByPortId(int32_t portId) {
+    std::set<int32_t> result;
+    for (const auto& [patchId, patch] : mPatches) {
         for (int32_t id : patch.sourcePortConfigIds) {
-            if (portConfigBelongsToPort(id, portId)) return true;
+            if (portConfigBelongsToPort(id, portId)) {
+                result.insert(patchId);
+                break;
+            }
         }
         for (int32_t id : patch.sinkPortConfigIds) {
-            if (portConfigBelongsToPort(id, portId)) return true;
+            if (portConfigBelongsToPort(id, portId)) {
+                result.insert(patchId);
+                break;
+            }
         }
     }
-    return false;
+    return result;
 }
 
 status_t Hal2AidlMapper::prepareToDisconnectExternalDevice(const AudioPort& devicePort) {
@@ -730,7 +733,7 @@ status_t Hal2AidlMapper::prepareToOpenStream(
             this, __func__, ioHandle, device.toString().c_str(),
             flags.toString().c_str(), toString(source).c_str(),
             config->toString().c_str(), mixPortConfig->toString().c_str());
-    resetUnusedPatchesPortConfigsAndPorts();
+    resetUnusedPatchesAndPortConfigs();
     const AudioConfig initialConfig = *config;
     // Find / create AudioPortConfigs for the device port and the mix port,
     // then find / create a patch between them, and open a stream on the mix port.
@@ -843,39 +846,52 @@ status_t Hal2AidlMapper::releaseAudioPatch(int32_t patchId) {
     return releaseAudioPatches({patchId});
 }
 
+// Note: does not reset port configs.
+status_t Hal2AidlMapper::releaseAudioPatch(Patches::iterator it) {
+    const int32_t patchId = it->first;
+    if (ndk::ScopedAStatus status = mModule->resetAudioPatch(patchId); !status.isOk()) {
+        ALOGE("%s: error while resetting patch %d: %s",
+                __func__, patchId, status.getDescription().c_str());
+        return statusTFromBinderStatus(status);
+    }
+    mPatches.erase(it);
+    for (auto it = mFwkPatches.begin(); it != mFwkPatches.end(); ++it) {
+        if (it->second == patchId) {
+            mFwkPatches.erase(it);
+            break;
+        }
+    }
+    return OK;
+}
+
 status_t Hal2AidlMapper::releaseAudioPatches(const std::set<int32_t>& patchIds) {
     status_t result = OK;
     for (const auto patchId : patchIds) {
         if (auto it = mPatches.find(patchId); it != mPatches.end()) {
-            mPatches.erase(it);
-            if (ndk::ScopedAStatus status = mModule->resetAudioPatch(patchId); !status.isOk()) {
-                ALOGE("%s: error while resetting patch %d: %s",
-                        __func__, patchId, status.getDescription().c_str());
-                result = statusTFromBinderStatus(status);
-            }
+            releaseAudioPatch(it);
         } else {
             ALOGE("%s: patch id %d not found", __func__, patchId);
             result = BAD_VALUE;
         }
     }
-    resetUnusedPortConfigsAndPorts();
+    resetUnusedPortConfigs();
     return result;
 }
 
 void Hal2AidlMapper::resetPortConfig(int32_t portConfigId) {
     if (auto it = mPortConfigs.find(portConfigId); it != mPortConfigs.end()) {
-        mPortConfigs.erase(it);
         if (ndk::ScopedAStatus status = mModule->resetAudioPortConfig(portConfigId);
                 !status.isOk()) {
             ALOGE("%s: error while resetting port config %d: %s",
                     __func__, portConfigId, status.getDescription().c_str());
         }
+        mPortConfigs.erase(it);
         return;
     }
     ALOGE("%s: port config id %d not found", __func__, portConfigId);
 }
 
-void Hal2AidlMapper::resetUnusedPatchesPortConfigsAndPorts() {
+void Hal2AidlMapper::resetUnusedPatchesAndPortConfigs() {
     // Since patches can be created independently of streams via 'createOrUpdatePatch',
     // here we only clean up patches for released streams.
     std::set<int32_t> patchesToRelease;
@@ -889,52 +905,35 @@ void Hal2AidlMapper::resetUnusedPatchesPortConfigsAndPorts() {
             it = mStreams.erase(it);
         }
     }
-    // 'releaseAudioPatches' also resets unused port configs and ports.
+    // 'releaseAudioPatches' also resets unused port configs.
     releaseAudioPatches(patchesToRelease);
 }
 
-void Hal2AidlMapper::resetUnusedPortConfigsAndPorts() {
+void Hal2AidlMapper::resetUnusedPortConfigs() {
     // The assumption is that port configs are used to create patches
     // (or to open streams, but that involves creation of patches, too). Thus,
     // orphaned port configs can and should be reset.
-    std::map<int32_t, int32_t /*portID*/> portConfigIds;
+    std::set<int32_t> portConfigIdsToReset;
     std::transform(mPortConfigs.begin(), mPortConfigs.end(),
-            std::inserter(portConfigIds, portConfigIds.end()),
-            [](const auto& pcPair) { return std::make_pair(pcPair.first, pcPair.second.portId); });
+            std::inserter(portConfigIdsToReset, portConfigIdsToReset.end()),
+            [](const auto& pcPair) { return pcPair.first; });
     for (const auto& p : mPatches) {
-        for (int32_t id : p.second.sourcePortConfigIds) portConfigIds.erase(id);
-        for (int32_t id : p.second.sinkPortConfigIds) portConfigIds.erase(id);
+        for (int32_t id : p.second.sourcePortConfigIds) portConfigIdsToReset.erase(id);
+        for (int32_t id : p.second.sinkPortConfigIds) portConfigIdsToReset.erase(id);
     }
     for (int32_t id : mInitialPortConfigIds) {
-        portConfigIds.erase(id);
+        portConfigIdsToReset.erase(id);
     }
     for (const auto& s : mStreams) {
-        portConfigIds.erase(s.second.first);
+        portConfigIdsToReset.erase(s.second.first);
     }
-    std::set<int32_t> retryDeviceDisconnection;
-    for (const auto& portConfigAndIdPair : portConfigIds) {
-        resetPortConfig(portConfigAndIdPair.first);
-        if (const auto it = mConnectedPorts.find(portConfigAndIdPair.second);
-                it != mConnectedPorts.end() && it->second) {
-            retryDeviceDisconnection.insert(portConfigAndIdPair.second);
-        }
-    }
-    for (int32_t portId : retryDeviceDisconnection) {
-        if (!isPortBeingHeld(portId)) {
-            if (auto status = mModule->disconnectExternalDevice(portId); status.isOk()) {
-                eraseConnectedPort(portId);
-                ALOGD("%s: executed postponed external device disconnection for port ID %d",
-                        __func__, portId);
-            }
-        }
-    }
-    if (!retryDeviceDisconnection.empty()) {
-        updateRoutes();
+    for (const auto& portConfigId : portConfigIdsToReset) {
+        resetPortConfig(portConfigId);
     }
 }
 
 status_t Hal2AidlMapper::setDevicePortConnectedState(const AudioPort& devicePort, bool connected) {
-    resetUnusedPatchesPortConfigsAndPorts();
+    resetUnusedPatchesAndPortConfigs();
     if (connected) {
         AudioDevice matchDevice = devicePort.ext.get<AudioPortExt::device>().device;
         std::optional<AudioPort> templatePort;
@@ -980,7 +979,7 @@ status_t Hal2AidlMapper::setDevicePortConnectedState(const AudioPort& devicePort
                 "%s: module %s, duplicate port ID received from HAL: %s, existing port: %s",
                 __func__, mInstance.c_str(), connectedPort.toString().c_str(),
                 it->second.toString().c_str());
-        mConnectedPorts[connectedPort.id] = false;
+        mConnectedPorts.insert(connectedPort.id);
         if (erasePortAfterConnectionIt != mPorts.end()) {
             mPorts.erase(erasePortAfterConnectionIt);
         }
@@ -1007,17 +1006,27 @@ status_t Hal2AidlMapper::setDevicePortConnectedState(const AudioPort& devicePort
             port.ext.get<AudioPortExt::Tag::device>().device = matchDevice;
             port.profiles = portsIt->second.profiles;
         }
-        // Streams are closed by AudioFlinger independently from device disconnections.
-        // It is possible that the stream has not been closed yet.
-        if (!isPortBeingHeld(portId)) {
-            RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-                            mModule->disconnectExternalDevice(portId)));
-            eraseConnectedPort(portId);
-        } else {
-            ALOGD("%s: since device port ID %d is used by a stream, "
-                    "external device disconnection postponed", __func__, portId);
-            mConnectedPorts[portId] = true;
+
+        // Patches may still exist, the framework may reset or update them later.
+        // For disconnection to succeed, need to release these patches first.
+        if (std::set<int32_t> patchIdsToRelease = getPatchIdsByPortId(portId);
+                !patchIdsToRelease.empty()) {
+            FwkPatches releasedPatches;
+            status_t status = OK;
+            for (int32_t patchId : patchIdsToRelease) {
+                if (auto it = mPatches.find(patchId); it != mPatches.end()) {
+                    if (status = releaseAudioPatch(it); status != OK) break;
+                    releasedPatches.insert(std::make_pair(patchId, patchId));
+                }
+            }
+            resetUnusedPortConfigs();
+            mFwkPatches.merge(releasedPatches);
+            LOG_ALWAYS_FATAL_IF(!releasedPatches.empty(),
+                    "mFwkPatches already contains some of released patches");
+            if (status != OK) return status;
         }
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->disconnectExternalDevice(portId)));
+        eraseConnectedPort(portId);
     }
     return updateRoutes();
 }
