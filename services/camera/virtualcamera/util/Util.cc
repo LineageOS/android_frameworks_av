@@ -146,13 +146,6 @@ bool isFormatSupportedForInput(const int width, const int height,
     return false;
   }
 
-  if (width % kLibJpegDctSize != 0 || height % kLibJpegDctSize != 0) {
-    // Input dimension needs to be multiple of libjpeg DCT size.
-    // TODO(b/301023410) This restriction can be removed once we add support for
-    // unaligned jpeg compression.
-    return false;
-  }
-
   if (maxFps <= 0 || maxFps > kMaxFpsUpperLimit) {
     return false;
   }

@@ -19,17 +19,20 @@
 
 #include <optional>
 
-#include "system/graphics.h"
+#include "android/hardware_buffer.h"
+#include "util/Util.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
 
 // Jpeg-compress image into the output buffer.
-// * width - width of the image
-// * heigh - height of the image
+// * width - width of the image, can be less than width of inBuffer.
+// * heigh - height of the image, can be less than height of inBuffer.
 // * quality - 0-100, higher number corresponds to higher quality.
-// * ycbr - android_ycbr structure describing layout of input YUV420 image.
+// * inBuffer - Input buffer, the dimensions of the buffer must be aligned to
+//   2*DCT_SIZE (16) to include necessary padding in case width and height of
+//   image is not aligned with 2*DCT_SIZE.
 // * app1ExifData - vector containing data to be included in APP1
 //   segment. Can be empty.
 // * outBufferSize - capacity of the output buffer.
@@ -37,9 +40,13 @@ namespace virtualcamera {
 // Returns size of compressed data if the compression was successful,
 // empty optional otherwise.
 std::optional<size_t> compressJpeg(int width, int height, int quality,
-                                   const android_ycbcr& ycbcr,
+                                   std::shared_ptr<AHardwareBuffer> inBuffer,
                                    const std::vector<uint8_t>& app1ExifData,
                                    size_t outBufferSize, void* outBuffer);
+
+// Round the resolution to the closest higher resolution where width and height
+// are divisible by 2*DCT_SIZE ().
+Resolution roundTo2DctSize(Resolution resolution);
 
 }  // namespace virtualcamera
 }  // namespace companion
