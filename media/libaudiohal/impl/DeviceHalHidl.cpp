@@ -752,10 +752,14 @@ status_t DeviceHalHidl::getAudioMixPort(const struct audio_port_v7 *devicePort,
     // the attributes reported by `getParameters` API.
     struct audio_port_v7 temp = *devicePort;
     AudioProfileAttributesMultimap attrsFromDevice;
-    status_t status = getAudioPort(&temp);
-    if (status == NO_ERROR) {
-        attrsFromDevice = createAudioProfilesAttrMap(temp.audio_profiles, 0 /*first*/,
-                                                     temp.num_audio_profiles);
+    bool supportsPatches;
+    if (supportsAudioPatches(&supportsPatches) == OK && supportsPatches) {
+        // The audio patches are supported since HAL 3.0, which is the same HAL version
+        // requirement for 'getAudioPort' API.
+        if (getAudioPort(&temp) == NO_ERROR) {
+            attrsFromDevice = createAudioProfilesAttrMap(temp.audio_profiles, 0 /*first*/,
+                                                         temp.num_audio_profiles);
+        }
     }
     auto streamIt = mStreams.find(mixPort->ext.mix.handle);
     if (streamIt == mStreams.end()) {
@@ -767,7 +771,7 @@ status_t DeviceHalHidl::getAudioMixPort(const struct audio_port_v7 *devicePort,
     }
 
     String8 formatsStr;
-    status = getParametersFromStream(
+    status_t status = getParametersFromStream(
             stream, AudioParameter::keyStreamSupportedFormats, nullptr /*extraParameters*/,
             &formatsStr);
     if (status != NO_ERROR) {
