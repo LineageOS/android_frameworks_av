@@ -49,7 +49,7 @@ class Hal2AidlMapper {
             const std::string& instance,
             const std::shared_ptr<::aidl::android::hardware::audio::core::IModule>& module);
 
-    void addStream(const sp<StreamHalInterface>& stream, int32_t portConfigId, int32_t patchId);
+    void addStream(const sp<StreamHalInterface>& stream, int32_t mixPortConfigId, int32_t patchId);
     status_t createOrUpdatePatch(
             const std::vector<::aidl::android::media::audio::common::AudioPortConfig>& sources,
             const std::vector<::aidl::android::media::audio::common::AudioPortConfig>& sinks,
@@ -91,13 +91,32 @@ class Hal2AidlMapper {
         ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
         Cleanups* cleanups = nullptr);
     status_t releaseAudioPatch(int32_t patchId);
-    void resetUnusedPatchesPortConfigsAndPorts();
+    void resetUnusedPatchesAndPortConfigs();
     status_t setDevicePortConnectedState(
             const ::aidl::android::media::audio::common::AudioPort& devicePort, bool connected);
 
+    // Methods to work with FwkPatches.
+    void eraseFwkPatch(int32_t fwkPatchId) { mFwkPatches.erase(fwkPatchId); }
+    int32_t findFwkPatch(int32_t fwkPatchId) {
+        const auto it = mFwkPatches.find(fwkPatchId);
+        return it != mFwkPatches.end() ? it->second : 0;
+    }
+    void updateFwkPatch(int32_t fwkPatchId, int32_t halPatchId) {
+        mFwkPatches[fwkPatchId] = halPatchId;
+    }
+
   private:
-    // IDs of ports for connected external devices, and whether they are held by streams.
-    using ConnectedPorts = std::map<int32_t /*port ID*/, bool>;
+    // 'FwkPatches' is used to store patches that diverge from the framework's state.
+    // Uses framework patch ID (aka audio_patch_handle_t) values for indexing.
+    // When the 'key == value', that means Hal2AidlMapper has removed this patch, and it is absent
+    // from 'mPatches', but it still "exists" for the framework. It will either remove it or
+    // re-patch. If the framework re-patches, it will continue to use the same patch handle,
+    // but the HAL will use the new one (since the old patch was reset), thus 'key != value'
+    // for such patches. Since they "exist" both for the framework and the HAL, 'mPatches'
+    // contains their data under HAL patch ID ('value' of 'FwkPatches').
+    // To avoid confusion, all patchIDs used by Hal2AidlMapper are HAL IDs. Mapping between
+    // framework patch IDs and HAL patch IDs is done by DeviceHalAidl.
+    using FwkPatches = std::map<int32_t /*audio_patch_handle_t*/, int32_t /*patch ID*/>;
     using Patches = std::map<int32_t /*patch ID*/,
             ::aidl::android::hardware::audio::core::AudioPatch>;
     using PortConfigs = std::map<int32_t /*port config ID*/,
@@ -107,12 +126,12 @@ class Hal2AidlMapper {
     // Answers the question "whether portID 'first' is reachable from portID 'second'?"
     // It's not a map because both portIDs are known. The matrix is symmetric.
     using RoutingMatrix = std::set<std::pair<int32_t, int32_t>>;
-    // There is always a port config ID set. The patch ID is set after stream
+    // There is always a mix port config ID set. The patch ID is set after stream
     // creation, and can be set to '-1' later if the framework happens to create
     // a patch between the same endpoints. In that case, the ownership of the patch
     // is on the framework.
     using Streams = std::map<wp<StreamHalInterface>,
-            std::pair<int32_t /*port config ID*/, int32_t /*patch ID*/>>;
+            std::pair<int32_t /*mix port config ID*/, int32_t /*patch ID*/>>;
 
     const std::string mInstance;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
@@ -168,7 +187,7 @@ class Hal2AidlMapper {
             const std::optional<::aidl::android::media::audio::common::AudioConfig>& config,
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle);
-    bool isPortBeingHeld(int32_t portId);
+    std::set<int32_t> getPatchIdsByPortId(int32_t portId);
     status_t prepareToOpenStreamHelper(
         int32_t ioHandle, int32_t devicePortId, int32_t devicePortConfigId,
         const ::aidl::android::media::audio::common::AudioIoFlags& flags,
@@ -181,10 +200,11 @@ class Hal2AidlMapper {
         auto it = mPortConfigs.find(portConfigId);
         return it != mPortConfigs.end() && it->second.portId == portId;
     }
+    status_t releaseAudioPatch(Patches::iterator it);
     status_t releaseAudioPatches(const std::set<int32_t>& patchIds);
     void resetPatch(int32_t patchId) { (void)releaseAudioPatch(patchId); }
     void resetPortConfig(int32_t portConfigId);
-    void resetUnusedPortConfigsAndPorts();
+    void resetUnusedPortConfigs();
     status_t updateAudioPort(
             int32_t portId, ::aidl::android::media::audio::common::AudioPort* port);
     status_t updateRoutes();
@@ -197,13 +217,14 @@ class Hal2AidlMapper {
     std::optional<::aidl::android::media::audio::common::AudioPort> mRemoteSubmixOut;
     int32_t mDefaultInputPortId = -1;
     int32_t mDefaultOutputPortId = -1;
+    FwkPatches mFwkPatches;
     PortConfigs mPortConfigs;
     std::set<int32_t> mInitialPortConfigIds;
     Patches mPatches;
     Routes mRoutes;
     RoutingMatrix mRoutingMatrix;
     Streams mStreams;
-    ConnectedPorts mConnectedPorts;
+    std::set<int32_t> mConnectedPorts;
     std::pair<int32_t, ::aidl::android::media::audio::common::AudioPort>
             mDisconnectedPortReplacement;
     std::set<int32_t> mDynamicMixPortIds;
