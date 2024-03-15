@@ -4,6 +4,7 @@
 # Please add flags in alphabetical order.
 
 package: "android.media.audio"
+container: "system"
 
 flag {
     name: "auto_public_volume_api_hardening"
