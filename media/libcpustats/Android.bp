@@ -24,8 +24,8 @@ cc_library_static {
     ],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     host_supported: true,
