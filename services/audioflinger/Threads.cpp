@@ -8217,7 +8217,6 @@ bool RecordThread::threadLoop()
     inputStandBy();
 
 reacquire_wakelock:
-    sp<IAfRecordTrack> activeTrack;
     {
         audio_utils::lock_guard _l(mutex());
         acquireWakeLock_l();
@@ -8233,6 +8232,8 @@ reacquire_wakelock:
 
     // loop while there is work to do
     for (int64_t loopCount = 0;; ++loopCount) {  // loopCount used for statistics tracking
+        // Note: these sp<> are released at the end of the for loop outside of the mutex() lock.
+        sp<IAfRecordTrack> activeTrack;
         Vector<sp<IAfEffectChain>> effectChains;
 
         // activeTracks accumulates a copy of a subset of mActiveTracks
