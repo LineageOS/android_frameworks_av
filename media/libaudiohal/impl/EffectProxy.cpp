@@ -147,7 +147,7 @@ ndk::ScopedAStatus EffectProxy::reopen(OpenEffectReturn* ret __unused) {
 
     // close all opened effects if failure
     if (!status.isOk()) {
-        ALOGE("%s: closing all sub-effects with error %s", __func__,
+        ALOGW("%s: closing all sub-effects with error %s", __func__,
               status.getDescription().c_str());
         close();
     }
@@ -260,7 +260,7 @@ ndk::ScopedAStatus EffectProxy::runWithActiveSubEffectThenOthers(
         std::function<ndk::ScopedAStatus(const std::shared_ptr<IEffect>&)> const& func) {
     ndk::ScopedAStatus status = runWithActiveSubEffect(func);
     if (!status.isOk()) {
-        ALOGE("%s active sub-effect return error %s", __func__, status.getDescription().c_str());
+        ALOGW("%s active sub-effect return error %s", __func__, status.getDescription().c_str());
     }
 
     // proceed with others
@@ -269,7 +269,7 @@ ndk::ScopedAStatus EffectProxy::runWithActiveSubEffectThenOthers(
             continue;
         }
         if (!mSubEffects[i].handle) {
-            ALOGE("%s null sub-effect interface for %s", __func__,
+            ALOGW("%s null sub-effect interface for %s", __func__,
                   mSubEffects[i].descriptor.common.id.uuid.toString().c_str());
             continue;
         }

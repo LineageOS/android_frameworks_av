@@ -17,7 +17,6 @@
 #pragma once
 
 #include <android-base/logging.h>
-#include <android-base/thread_annotations.h>
 #include <audio_processing.h>
 #include <unordered_map>
 
@@ -37,10 +36,9 @@ class PreProcessingContext final : public EffectContext {
     PreProcessingContext(int statusDepth, const Parameter::Common& common,
                          const PreProcessingEffectType& type)
         : EffectContext(statusDepth, common), mType(type) {
-        LOG(DEBUG) << __func__ << type;
         mState = PRE_PROC_STATE_UNINITIALIZED;
     }
-    ~PreProcessingContext() override { LOG(DEBUG) << __func__; }
+    ~PreProcessingContext() = default;
 
     RetCode init(const Parameter::Common& common);
     RetCode deInit();
@@ -85,20 +83,19 @@ class PreProcessingContext final : public EffectContext {
     static constexpr inline webrtc::AudioProcessing::Config::NoiseSuppression::Level
             kNsDefaultLevel = webrtc::AudioProcessing::Config::NoiseSuppression::kModerate;
 
-    std::mutex mMutex;
     const PreProcessingEffectType mType;
     PreProcEffectState mState;  // current state
 
     // handle on webRTC audio processing module (APM)
-    rtc::scoped_refptr<webrtc::AudioProcessing> mAudioProcessingModule GUARDED_BY(mMutex);
+    rtc::scoped_refptr<webrtc::AudioProcessing> mAudioProcessingModule;
 
-    int mEnabledMsk GUARDED_BY(mMutex);       // bit field containing IDs of enabled pre processors
-    int mProcessedMsk GUARDED_BY(mMutex);     // bit field containing IDs of pre processors already
+    int mEnabledMsk;       // bit field containing IDs of enabled pre processors
+    int mProcessedMsk;     // bit field containing IDs of pre processors already
                                               // processed in current round
-    int mRevEnabledMsk GUARDED_BY(mMutex);    // bit field containing IDs of enabled pre processors
+    int mRevEnabledMsk;    // bit field containing IDs of enabled pre processors
                                               // with reverse channel
-    int mRevProcessedMsk GUARDED_BY(mMutex);  // bit field containing IDs of pre processors with
-                                              // reverse channel already processed in current round
+    int mRevProcessedMsk;  // bit field containing IDs of pre processors with
+                           // reverse channel already processed in current round
 
     webrtc::StreamConfig mInputConfig;   // input stream configuration
     webrtc::StreamConfig mOutputConfig;  // output stream configuration

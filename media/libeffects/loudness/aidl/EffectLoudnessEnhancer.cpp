@@ -37,7 +37,6 @@ extern "C" binder_exception_t createEffect(const AudioUuid* in_impl_uuid,
     }
     if (instanceSpp) {
         *instanceSpp = ndk::SharedRefBase::make<LoudnessEnhancerImpl>();
-        LOG(DEBUG) << __func__ << " instance " << instanceSpp->get() << " created";
         return EX_NONE;
     } else {
         LOG(ERROR) << __func__ << " invalid input parameter!";
@@ -67,7 +66,6 @@ const Descriptor LoudnessEnhancerImpl::kDescriptor = {
 
 ndk::ScopedAStatus LoudnessEnhancerImpl::getDescriptor(Descriptor* _aidl_return) {
     RETURN_IF(!_aidl_return, EX_ILLEGAL_ARGUMENT, "Parameter:nullptr");
-    LOG(DEBUG) << __func__ << kDescriptor.toString();
     *_aidl_return = kDescriptor;
     return ndk::ScopedAStatus::ok();
 }

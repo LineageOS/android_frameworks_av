@@ -27,11 +27,8 @@ class HapticGeneratorImpl final : public EffectImpl {
   public:
     static const std::string kEffectName;
     static const Descriptor kDescriptor;
-    HapticGeneratorImpl() { LOG(DEBUG) << __func__; }
-    ~HapticGeneratorImpl() {
-        cleanUp();
-        LOG(DEBUG) << __func__;
-    }
+    HapticGeneratorImpl() = default;
+    ~HapticGeneratorImpl() { cleanUp(); }
 
     ndk::ScopedAStatus commandImpl(CommandId command) REQUIRES(mImplMutex) override;
     ndk::ScopedAStatus getDescriptor(Descriptor* _aidl_return) override;

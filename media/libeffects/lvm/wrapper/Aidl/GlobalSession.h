@@ -21,7 +21,6 @@
 #include <unordered_map>
 
 #include <android-base/logging.h>
-#include <android-base/thread_annotations.h>
 
 #include "BundleContext.h"
 #include "BundleTypes.h"
@@ -39,11 +38,6 @@ class GlobalSession {
     static GlobalSession& getGlobalSession() {
         static GlobalSession instance;
         return instance;
-    }
-
-    bool isSessionIdExist(int sessionId) {
-        std::lock_guard lg(mMutex);
-        return mSessionMap.count(sessionId);
     }
 
     static bool findBundleTypeInList(std::vector<std::shared_ptr<BundleContext>>& list,
@@ -69,8 +63,7 @@ class GlobalSession {
     std::shared_ptr<BundleContext> createSession(const lvm::BundleEffectType& type, int statusDepth,
                                                  const Parameter::Common& common) {
         int sessionId = common.session;
-        LOG(DEBUG) << __func__ << type << " with sessionId " << sessionId;
-        std::lock_guard lg(mMutex);
+        LOG(VERBOSE) << __func__ << type << " with sessionId " << sessionId;
         if (mSessionMap.count(sessionId) == 0 && mSessionMap.size() >= MAX_BUNDLE_SESSIONS) {
             LOG(ERROR) << __func__ << " exceed max bundle session";
             return nullptr;
@@ -97,8 +90,7 @@ class GlobalSession {
     }
 
     void releaseSession(const lvm::BundleEffectType& type, int sessionId) {
-        LOG(DEBUG) << __func__ << type << " sessionId " << sessionId;
-        std::lock_guard lg(mMutex);
+        LOG(VERBOSE) << __func__ << type << " sessionId " << sessionId;
         if (mSessionMap.count(sessionId)) {
             auto& list = mSessionMap[sessionId];
             if (!findBundleTypeInList(list, type, true /* remove */)) {
@@ -112,11 +104,9 @@ class GlobalSession {
     }
 
   private:
-    // Lock for mSessionMap access.
-    std::mutex mMutex;
     // Max session number supported.
     static constexpr int MAX_BUNDLE_SESSIONS = 32;
     std::unordered_map<int /* session ID */, std::vector<std::shared_ptr<BundleContext>>>
-            mSessionMap GUARDED_BY(mMutex);
+            mSessionMap;
 };
 }  // namespace aidl::android::hardware::audio::effect

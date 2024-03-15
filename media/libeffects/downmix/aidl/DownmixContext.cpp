@@ -76,18 +76,15 @@ bool DownmixContext::validateCommonConfig(const Parameter::Common& common) {
 
 DownmixContext::DownmixContext(int statusDepth, const Parameter::Common& common)
     : EffectContext(statusDepth, common) {
-    LOG(DEBUG) << __func__;
     mState = DOWNMIX_STATE_UNINITIALIZED;
     init_params(common);
 }
 
 DownmixContext::~DownmixContext() {
-    LOG(DEBUG) << __func__;
     mState = DOWNMIX_STATE_UNINITIALIZED;
 }
 
 RetCode DownmixContext::enable() {
-    LOG(DEBUG) << __func__;
     if (mState != DOWNMIX_STATE_INITIALIZED) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -96,7 +93,6 @@ RetCode DownmixContext::enable() {
 }
 
 RetCode DownmixContext::disable() {
-    LOG(DEBUG) << __func__;
     if (mState != DOWNMIX_STATE_ACTIVE) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -105,7 +101,6 @@ RetCode DownmixContext::disable() {
 }
 
 void DownmixContext::reset() {
-    LOG(DEBUG) << __func__;
     disable();
     resetBuffer();
 }
@@ -127,7 +122,6 @@ IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int sample
         return status;
     }
 
-    LOG(DEBUG) << __func__ << " start processing";
     bool accumulate = false;
     int frames = samples * sizeof(float) / getInputFrameSize();
     if (mType == Downmix::Type::STRIP) {
@@ -152,9 +146,6 @@ IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int sample
         }
     }
     int producedSamples = (samples / mInputChannelCount) << 1;
-    LOG(DEBUG) << __func__ << " done processing " << samples << " samples, generated "
-               << producedSamples << " frameSize: " << getInputFrameSize() << " - "
-               << getOutputFrameSize();
     return {STATUS_OK, samples, producedSamples};
 }
 

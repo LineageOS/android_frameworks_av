@@ -120,8 +120,6 @@ status_t EffectsFactoryHalAidl::queryNumberEffects(uint32_t *pNumEffects) {
     }
 
     *pNumEffects = mEffectCount;
-    ALOGD("%s %u non %zu proxyMap %zu proxyDesc %zu", __func__, *pNumEffects,
-          mNonProxyDescList.size(), mProxyUuidDescriptorMap.size(), mProxyDescList.size());
     return OK;
 }
 
@@ -178,7 +176,7 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
     if (sessionId == AUDIO_SESSION_DEVICE && ioId == AUDIO_IO_HANDLE_NONE) {
         return INVALID_OPERATION;
     }
-    ALOGI("%s session %d ioId %d", __func__, sessionId, ioId);
+    ALOGV("%s session %d ioId %d", __func__, sessionId, ioId);
 
     AudioUuid aidlUuid =
             VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid(*uuid));
@@ -218,13 +216,11 @@ status_t EffectsFactoryHalAidl::dumpEffects(int fd) {
 }
 
 status_t EffectsFactoryHalAidl::allocateBuffer(size_t size, sp<EffectBufferHalInterface>* buffer) {
-    ALOGI("%s size %zu buffer %p", __func__, size, buffer);
     return EffectBufferHalAidl::allocate(size, buffer);
 }
 
 status_t EffectsFactoryHalAidl::mirrorBuffer(void* external, size_t size,
                                              sp<EffectBufferHalInterface>* buffer) {
-    ALOGI("%s extern %p size %zu buffer %p", __func__, external, size, buffer);
     return EffectBufferHalAidl::mirror(external, size, buffer);
 }
 
@@ -245,7 +241,6 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithImplUuid(const AudioUuid& uu
         ALOGE("%s UUID not found in HAL and proxy list %s", __func__, toString(uuid).c_str());
         return NAME_NOT_FOUND;
     }
-    ALOGI("%s UUID impl found %s", __func__, toString(uuid).c_str());
 
     *pDescriptor = VALUE_OR_RETURN_STATUS(
             ::aidl::android::aidl2legacy_Descriptor_effect_descriptor(*matchIt));
@@ -267,7 +262,6 @@ status_t EffectsFactoryHalAidl::getHalDescriptorWithTypeUuid(
         ALOGW("%s UUID type not found in HAL and proxy list %s", __func__, toString(type).c_str());
         return BAD_VALUE;
     }
-    ALOGI("%s UUID type found %zu \n %s", __func__, result.size(), toString(type).c_str());
 
     *descriptors = VALUE_OR_RETURN_STATUS(
             aidl::android::convertContainer<std::vector<effect_descriptor_t>>(

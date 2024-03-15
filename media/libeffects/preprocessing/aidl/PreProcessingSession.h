@@ -21,7 +21,6 @@
 #include <unordered_map>
 
 #include <android-base/logging.h>
-#include <android-base/thread_annotations.h>
 
 #include "PreProcessingContext.h"
 #include "PreProcessingTypes.h"
@@ -67,7 +66,6 @@ class PreProcessingSession {
                                                         const Parameter::Common& common) {
         int sessionId = common.session;
         LOG(DEBUG) << __func__ << type << " with sessionId " << sessionId;
-        std::lock_guard lg(mMutex);
         if (mSessionMap.count(sessionId) == 0 && mSessionMap.size() >= MAX_PRE_PROC_SESSIONS) {
             LOG(ERROR) << __func__ << " exceed max bundle session";
             return nullptr;
@@ -95,7 +93,6 @@ class PreProcessingSession {
 
     void releaseSession(const PreProcessingEffectType& type, int sessionId) {
         LOG(DEBUG) << __func__ << type << " sessionId " << sessionId;
-        std::lock_guard lg(mMutex);
         if (mSessionMap.count(sessionId)) {
             auto& list = mSessionMap[sessionId];
             if (!findPreProcessingTypeInList(list, type, true /* remove */)) {
@@ -109,11 +106,9 @@ class PreProcessingSession {
     }
 
   private:
-    // Lock for mSessionMap access.
-    std::mutex mMutex;
     // Max session number supported.
     static constexpr int MAX_PRE_PROC_SESSIONS = 8;
     std::unordered_map<int /* session ID */, std::vector<std::shared_ptr<PreProcessingContext>>>
-            mSessionMap GUARDED_BY(mMutex);
+            mSessionMap;
 };
 }  // namespace aidl::android::hardware::audio::effect
