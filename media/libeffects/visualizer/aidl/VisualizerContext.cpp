@@ -38,14 +38,10 @@ VisualizerContext::VisualizerContext(int statusDepth, const Parameter::Common& c
 }
 
 VisualizerContext::~VisualizerContext() {
-    std::lock_guard lg(mMutex);
-    LOG(DEBUG) << __func__;
     mState = State::UNINITIALIZED;
 }
 
 RetCode VisualizerContext::initParams(const Parameter::Common& common) {
-    std::lock_guard lg(mMutex);
-    LOG(DEBUG) << __func__;
     if (common.input != common.output) {
         LOG(ERROR) << __func__ << " mismatch input: " << common.input.toString()
                    << " and output: " << common.output.toString();
@@ -66,7 +62,6 @@ RetCode VisualizerContext::initParams(const Parameter::Common& common) {
 }
 
 RetCode VisualizerContext::enable() {
-    std::lock_guard lg(mMutex);
     if (mState != State::INITIALIZED) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -75,7 +70,6 @@ RetCode VisualizerContext::enable() {
 }
 
 RetCode VisualizerContext::disable() {
-    std::lock_guard lg(mMutex);
     if (mState != State::ACTIVE) {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
@@ -84,48 +78,39 @@ RetCode VisualizerContext::disable() {
 }
 
 void VisualizerContext::reset() {
-    std::lock_guard lg(mMutex);
     std::fill(mCaptureBuf.begin(), mCaptureBuf.end(), 0x80);
 }
 
 RetCode VisualizerContext::setCaptureSamples(int samples) {
-    std::lock_guard lg(mMutex);
     mCaptureSamples = samples;
     return RetCode::SUCCESS;
 }
 int32_t VisualizerContext::getCaptureSamples() {
-    std::lock_guard lg(mMutex);
     return mCaptureSamples;
 }
 
 RetCode VisualizerContext::setMeasurementMode(Visualizer::MeasurementMode mode) {
-    std::lock_guard lg(mMutex);
     mMeasurementMode = mode;
     return RetCode::SUCCESS;
 }
 Visualizer::MeasurementMode VisualizerContext::getMeasurementMode() {
-    std::lock_guard lg(mMutex);
     return mMeasurementMode;
 }
 
 RetCode VisualizerContext::setScalingMode(Visualizer::ScalingMode mode) {
-    std::lock_guard lg(mMutex);
     mScalingMode = mode;
     return RetCode::SUCCESS;
 }
 Visualizer::ScalingMode VisualizerContext::getScalingMode() {
-    std::lock_guard lg(mMutex);
     return mScalingMode;
 }
 
 RetCode VisualizerContext::setDownstreamLatency(int latency) {
-    std::lock_guard lg(mMutex);
     mDownstreamLatency = latency;
     return RetCode::SUCCESS;
 }
 
 int VisualizerContext::getDownstreamLatency() {
-    std::lock_guard lg(mMutex);
     return mDownstreamLatency;
 }
 
@@ -152,7 +137,6 @@ Visualizer::Measurement VisualizerContext::getMeasure() {
     uint8_t nbValidMeasurements = 0;
 
     {
-        std::lock_guard lg(mMutex);
         // reset measurements if last measurement was too long ago (which implies stored
         // measurements aren't relevant anymore and shouldn't bias the new one)
         const uint32_t delayMs = getDeltaTimeMsFromUpdatedTime_l();
@@ -185,13 +169,12 @@ Visualizer::Measurement VisualizerContext::getMeasure() {
     // convert from I16 sample values to mB and write results
     measure.rms = (rms < 0.000016f) ? -9600 : (int32_t)(2000 * log10(rms / 32767.0f));
     measure.peak = (peakU16 == 0) ? -9600 : (int32_t)(2000 * log10(peakU16 / 32767.0f));
-    LOG(INFO) << __func__ << " peak " << peakU16 << " (" << measure.peak << "mB), rms " << rms
-              << " (" << measure.rms << "mB)";
+    LOG(VERBOSE) << __func__ << " peak " << peakU16 << " (" << measure.peak << "mB), rms " << rms
+                 << " (" << measure.rms << "mB)";
     return measure;
 }
 
 std::vector<uint8_t> VisualizerContext::capture() {
-    std::lock_guard lg(mMutex);
     uint32_t captureSamples = mCaptureSamples;
     std::vector<uint8_t> result(captureSamples, 0x80);
     // cts android.media.audio.cts.VisualizerTest expecting silence data when effect not running
@@ -205,7 +188,6 @@ std::vector<uint8_t> VisualizerContext::capture() {
     // clear the capture buffer to return silence
     if ((mLastCaptureIdx == mCaptureIdx) && (mBufferUpdateTime.tv_sec != 0) &&
         (deltaMs > kMaxStallTimeMs)) {
-        LOG(INFO) << __func__ << " capture going to idle";
         mBufferUpdateTime.tv_sec = 0;
         return result;
     }
@@ -247,10 +229,8 @@ IEffect::Status VisualizerContext::process(float* in, float* out, int samples) {
     IEffect::Status result = {STATUS_NOT_ENOUGH_DATA, 0, 0};
     RETURN_VALUE_IF(in == nullptr || out == nullptr || samples == 0, result, "dataBufferError");
 
-    std::lock_guard lg(mMutex);
     result.status = STATUS_INVALID_OPERATION;
     RETURN_VALUE_IF(mState != State::ACTIVE, result, "stateNotActive");
-    LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
     // perform measurements if needed
     if (mMeasurementMode == Visualizer::MeasurementMode::PEAK_RMS) {
         // find the peak and RMS squared for the new buffer

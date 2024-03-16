@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <android-base/thread_annotations.h>
 #include <audio_effects/effect_dynamicsprocessing.h>
 #include <system/audio_effects/effect_visualizer.h>
 
@@ -79,28 +78,26 @@ class VisualizerContext final : public EffectContext {
     // note: buffer index is stored in uint8_t
     static const uint32_t kMeasurementWindowMaxSizeInBuffers = 25;
 
-    // serialize process() and parameter setting
-    std::mutex mMutex;
-    Parameter::Common mCommon GUARDED_BY(mMutex);
-    State mState GUARDED_BY(mMutex) = State::UNINITIALIZED;
-    uint32_t mCaptureIdx GUARDED_BY(mMutex) = 0;
-    uint32_t mLastCaptureIdx GUARDED_BY(mMutex) = 0;
-    Visualizer::ScalingMode mScalingMode GUARDED_BY(mMutex) = Visualizer::ScalingMode::NORMALIZED;
-    struct timespec mBufferUpdateTime GUARDED_BY(mMutex);
+    Parameter::Common mCommon;
+    State mState = State::UNINITIALIZED;
+    uint32_t mCaptureIdx = 0;
+    uint32_t mLastCaptureIdx = 0;
+    Visualizer::ScalingMode mScalingMode = Visualizer::ScalingMode::NORMALIZED;
+    struct timespec mBufferUpdateTime;
     // capture buf with 8 bits mono PCM samples
-    std::array<uint8_t, kMaxCaptureBufSize> mCaptureBuf GUARDED_BY(mMutex);
-    uint32_t mDownstreamLatency GUARDED_BY(mMutex) = 0;
-    int32_t mCaptureSamples GUARDED_BY(mMutex) = kMaxCaptureBufSize;
+    std::array<uint8_t, kMaxCaptureBufSize> mCaptureBuf;
+    uint32_t mDownstreamLatency = 0;
+    int32_t mCaptureSamples = kMaxCaptureBufSize;
 
     // to avoid recomputing it every time a buffer is processed
-    uint8_t mChannelCount GUARDED_BY(mMutex) = 0;
-    Visualizer::MeasurementMode mMeasurementMode GUARDED_BY(mMutex) =
+    uint8_t mChannelCount = 0;
+    Visualizer::MeasurementMode mMeasurementMode =
             Visualizer::MeasurementMode::NONE;
     uint8_t mMeasurementWindowSizeInBuffers = kMeasurementWindowMaxSizeInBuffers;
-    uint8_t mMeasurementBufferIdx GUARDED_BY(mMutex) = 0;
+    uint8_t mMeasurementBufferIdx = 0;
     std::array<BufferStats, kMeasurementWindowMaxSizeInBuffers> mPastMeasurements;
     void init_params();
 
-    uint32_t getDeltaTimeMsFromUpdatedTime_l() REQUIRES(mMutex);
+    uint32_t getDeltaTimeMsFromUpdatedTime_l();
 };
 }  // namespace aidl::android::hardware::audio::effect
