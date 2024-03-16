@@ -328,6 +328,12 @@ class MetadataBuilder {
   MetadataBuilder& setJpegAvailableThumbnailSizes(
       const std::vector<Resolution>& thumbnailSizes);
 
+  // See ANDROID_JPEG_GPS_COORDINATES.
+  MetadataBuilder& setJpegGpsCoordinates(const GpsCoordinates& gpsCoordinates);
+
+  // See JPEG_ORIENTATION in CaptureRequest.java.
+  MetadataBuilder& setJpegOrientation(int32_t orientation);
+
   // See JPEG_QUALITY in CaptureRequest.java.
   MetadataBuilder& setJpegQuality(uint8_t quality);
 
@@ -421,10 +427,11 @@ class MetadataBuilder {
 
  private:
   // Maps metadata tags to vectors of values for the given tag.
-  std::map<camera_metadata_tag_t,
-           std::variant<std::vector<int64_t>, std::vector<int32_t>,
-                        std::vector<uint8_t>, std::vector<float>,
-                        std::vector<camera_metadata_rational_t>>>
+  std::map<
+      camera_metadata_tag_t,
+      std::variant<std::vector<int64_t>, std::vector<int32_t>,
+                   std::vector<uint8_t>, std::vector<float>,
+                   std::vector<camera_metadata_rational_t>, std::vector<double>>>
       mEntryMap;
   // Extend metadata with ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS.
   bool mExtendWithAvailableCharacteristicsKeys = false;
@@ -432,6 +439,10 @@ class MetadataBuilder {
 
 // Returns JPEG_QUALITY from metadata, or nullopt if the key is not present.
 std::optional<int32_t> getJpegQuality(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
+// Return JPEG_ORIENTATION from metadata, or 0 if the key is not present
+int32_t getJpegOrientation(
     const aidl::android::hardware::camera::device::CameraMetadata& metadata);
 
 // Returns JPEG_THUMBNAIL_SIZE from metadata, or nullopt if the key is not present.
@@ -451,6 +462,11 @@ std::optional<FpsRange> getFpsRange(
     const aidl::android::hardware::camera::device::CameraMetadata& metadata);
 
 std::optional<camera_metadata_enum_android_control_capture_intent> getCaptureIntent(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
+// Returns ANDROID_JPEG_GPS_COORDINATES in a GpsCoordinate object or nullopt if
+// the key is not present.
+std::optional<GpsCoordinates> getGpsCoordinates(
     const aidl::android::hardware::camera::device::CameraMetadata& metadata);
 
 }  // namespace virtualcamera

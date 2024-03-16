@@ -112,7 +112,7 @@ binder::Status createSurfaceFromGbp(
         const std::string &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed,  int64_t dynamicRangeProfile,
         int64_t streamUseCase, int timestampBase, int mirrorMode,
-        int32_t colorSpace);
+        int32_t colorSpace, bool respectSurfaceSize);
 
 //check if format is 10-bit output compatible
 bool is10bitCompatibleFormat(int32_t format, android_dataspace_t dataSpace);
@@ -143,10 +143,10 @@ const std::vector<std::string> &physicalCameraIds, const std::string &physicalCa
 const std::string &logicalCameraId);
 
 binder::Status checkSurfaceType(size_t numBufferProducers,
-bool deferredConsumer, int surfaceType);
+        bool deferredConsumer, int surfaceType, bool isConfigurationComplete);
 
 binder::Status checkOperatingMode(int operatingMode,
-const CameraMetadata &staticInfo, const std::string &cameraId);
+        const CameraMetadata &staticInfo, const std::string &cameraId);
 
 binder::Status
 convertToHALStreamCombination(

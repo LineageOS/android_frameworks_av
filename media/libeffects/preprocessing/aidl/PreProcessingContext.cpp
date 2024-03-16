@@ -26,7 +26,6 @@ using aidl::android::media::audio::common::AudioDeviceDescription;
 using aidl::android::media::audio::common::AudioDeviceType;
 
 RetCode PreProcessingContext::init(const Parameter::Common& common) {
-    std::lock_guard lg(mMutex);
     webrtc::AudioProcessingBuilder apBuilder;
     mAudioProcessingModule = apBuilder.Create();
     if (mAudioProcessingModule == nullptr) {
@@ -64,7 +63,6 @@ RetCode PreProcessingContext::init(const Parameter::Common& common) {
 }
 
 RetCode PreProcessingContext::deInit() {
-    std::lock_guard lg(mMutex);
     mAudioProcessingModule = nullptr;
     mState = PRE_PROC_STATE_UNINITIALIZED;
     return RetCode::SUCCESS;
@@ -75,7 +73,6 @@ RetCode PreProcessingContext::enable() {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
     int typeMsk = (1 << int(mType));
-    std::lock_guard lg(mMutex);
     // Check if effect is already enabled.
     if ((mEnabledMsk & typeMsk) == typeMsk) {
         return RetCode::ERROR_ILLEGAL_PARAMETER;
@@ -110,7 +107,6 @@ RetCode PreProcessingContext::disable() {
         return RetCode::ERROR_EFFECT_LIB_ERROR;
     }
     int typeMsk = (1 << int(mType));
-    std::lock_guard lg(mMutex);
     // Check if effect is already disabled.
     if ((mEnabledMsk & typeMsk) != typeMsk) {
         return RetCode::ERROR_ILLEGAL_PARAMETER;
@@ -160,7 +156,6 @@ void PreProcessingContext::updateConfigs(const Parameter::Common& common) {
 
 RetCode PreProcessingContext::setAcousticEchoCancelerEchoDelay(int echoDelayUs) {
     mEchoDelayUs = echoDelayUs;
-    std::lock_guard lg(mMutex);
     mAudioProcessingModule->set_stream_delay_ms(mEchoDelayUs / 1000);
     return RetCode::SUCCESS;
 }
@@ -171,7 +166,6 @@ int PreProcessingContext::getAcousticEchoCancelerEchoDelay() const {
 
 RetCode PreProcessingContext::setAcousticEchoCancelerMobileMode(bool mobileMode) {
     mMobileMode = mobileMode;
-    std::lock_guard lg(mMutex);
     auto config = mAudioProcessingModule->GetConfig();
     config.echo_canceller.mobile_mode = mobileMode;
     mAudioProcessingModule->ApplyConfig(config);
@@ -184,7 +178,6 @@ bool PreProcessingContext::getAcousticEchoCancelerMobileMode() const {
 
 RetCode PreProcessingContext::setAutomaticGainControlV1TargetPeakLevel(int targetPeakLevel) {
     mTargetPeakLevel = targetPeakLevel;
-    std::lock_guard lg(mMutex);
     auto config = mAudioProcessingModule->GetConfig();
     config.gain_controller1.target_level_dbfs = -(mTargetPeakLevel / 100);
     mAudioProcessingModule->ApplyConfig(config);
@@ -197,7 +190,6 @@ int PreProcessingContext::getAutomaticGainControlV1TargetPeakLevel() const {
 
 RetCode PreProcessingContext::setAutomaticGainControlV1MaxCompressionGain(int maxCompressionGain) {
     mMaxCompressionGain = maxCompressionGain;
-    std::lock_guard lg(mMutex);
     auto config = mAudioProcessingModule->GetConfig();
     config.gain_controller1.compression_gain_db = mMaxCompressionGain / 100;
     mAudioProcessingModule->ApplyConfig(config);
@@ -210,7 +202,6 @@ int PreProcessingContext::getAutomaticGainControlV1MaxCompressionGain() const {
 
 RetCode PreProcessingContext::setAutomaticGainControlV1EnableLimiter(bool enableLimiter) {
     mEnableLimiter = enableLimiter;
-    std::lock_guard lg(mMutex);
     auto config = mAudioProcessingModule->GetConfig();
     config.gain_controller1.enable_limiter = mEnableLimiter;
     mAudioProcessingModule->ApplyConfig(config);
@@ -223,7 +214,6 @@ bool PreProcessingContext::getAutomaticGainControlV1EnableLimiter() const {
 
 RetCode PreProcessingContext::setAutomaticGainControlV2DigitalGain(int gain) {
     mDigitalGain = gain;
-    std::lock_guard lg(mMutex);
     auto config = mAudioProcessingModule->GetConfig();
     config.gain_controller2.fixed_digital.gain_db = mDigitalGain;
     mAudioProcessingModule->ApplyConfig(config);
@@ -256,7 +246,6 @@ int PreProcessingContext::getAutomaticGainControlV2SaturationMargin() const {
 
 RetCode PreProcessingContext::setNoiseSuppressionLevel(NoiseSuppression::Level level) {
     mLevel = level;
-    std::lock_guard lg(mMutex);
     auto config = mAudioProcessingModule->GetConfig();
     config.noise_suppression.level =
             (webrtc::AudioProcessing::Config::NoiseSuppression::Level)level;
@@ -277,9 +266,6 @@ IEffect::Status PreProcessingContext::process(float* in, float* out, int samples
     int64_t outputFrameCount = getCommon().output.frameCount;
     RETURN_VALUE_IF(inputFrameCount != outputFrameCount, status, "FrameCountMismatch");
     RETURN_VALUE_IF(0 == getInputFrameSize(), status, "zeroFrameSize");
-
-    LOG(DEBUG) << __func__ << " start processing";
-    std::lock_guard lg(mMutex);
 
     mProcessedMsk |= (1 << int(mType));
 

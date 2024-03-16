@@ -30,11 +30,8 @@ class DynamicsProcessingImpl final : public EffectImpl {
     static const Descriptor kDescriptor;
     static const Capability kCapability;
 
-    DynamicsProcessingImpl() { LOG(DEBUG) << __func__; }
-    ~DynamicsProcessingImpl() {
-        cleanUp();
-        LOG(DEBUG) << __func__;
-    }
+    DynamicsProcessingImpl() = default;
+    ~DynamicsProcessingImpl() { cleanUp(); }
 
     ndk::ScopedAStatus open(const Parameter::Common& common,
                             const std::optional<Parameter::Specific>& specific,

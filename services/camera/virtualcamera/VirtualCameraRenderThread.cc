@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "system/camera_metadata.h"
 #define LOG_TAG "VirtualCameraRenderThread"
 #include "VirtualCameraRenderThread.h"
 
@@ -45,6 +44,7 @@
 #include "android-base/thread_annotations.h"
 #include "android/binder_auto_utils.h"
 #include "android/hardware_buffer.h"
+#include "system/camera_metadata.h"
 #include "ui/GraphicBuffer.h"
 #include "util/EglFramebuffer.h"
 #include "util/JpegUtil.h"
@@ -128,6 +128,7 @@ CameraMetadata createCaptureResultMetadata(
           .setFlashMode(ANDROID_FLASH_MODE_OFF)
           .setFocalLength(VirtualCameraDevice::kFocalLength)
           .setJpegQuality(requestSettings.jpegQuality)
+          .setJpegOrientation(requestSettings.jpegOrientation)
           .setJpegThumbnailSize(requestSettings.thumbnailResolution.width,
                                 requestSettings.thumbnailResolution.height)
           .setJpegThumbnailQuality(requestSettings.thumbnailJpegQuality)
@@ -144,6 +145,11 @@ CameraMetadata createCaptureResultMetadata(
 
   if (requestSettings.fpsRange.has_value()) {
     builder.setControlAeTargetFpsRange(requestSettings.fpsRange.value());
+  }
+
+  if (requestSettings.gpsCoordinates.has_value()) {
+    const GpsCoordinates& coordinates = requestSettings.gpsCoordinates.value();
+    builder.setJpegGpsCoordinates(coordinates);
   }
 
   std::unique_ptr<CameraMetadata> metadata = builder.build();
@@ -224,12 +230,24 @@ bool isYuvFormat(const PixelFormat pixelFormat) {
 }
 
 std::vector<uint8_t> createExif(
-    Resolution imageSize, const std::vector<uint8_t>& compressedThumbnail = {}) {
+    Resolution imageSize, const CameraMetadata resultMetadata,
+    const std::vector<uint8_t>& compressedThumbnail = {}) {
   std::unique_ptr<ExifUtils> exifUtils(ExifUtils::create());
   exifUtils->initialize();
-  exifUtils->setImageWidth(imageSize.width);
-  exifUtils->setImageHeight(imageSize.height);
-  // TODO(b/324383963) Set Make/Model and orientation.
+
+  // Make a copy of the metadata in order to converting it the HAL metadata
+  // format (as opposed to the AIDL class) and use the setFromMetadata method
+  // from ExifUtil
+  camera_metadata_t* rawSettings =
+      clone_camera_metadata((camera_metadata_t*)resultMetadata.metadata.data());
+  if (rawSettings != nullptr) {
+    android::hardware::camera::common::helper::CameraMetadata halMetadata(
+        rawSettings);
+    exifUtils->setFromMetadata(halMetadata, imageSize.width, imageSize.height);
+  }
+  exifUtils->setMake(VirtualCameraDevice::kDefaultMakeAndModel);
+  exifUtils->setModel(VirtualCameraDevice::kDefaultMakeAndModel);
+  exifUtils->setFlash(0);
 
   std::vector<uint8_t> app1Data;
 
@@ -427,7 +445,8 @@ void VirtualCameraRenderThread::processCaptureRequest(
     auto status = streamConfig->format == PixelFormat::BLOB
                       ? renderIntoBlobStreamBuffer(
                             reqBuffer.getStreamId(), reqBuffer.getBufferId(),
-                            request.getRequestSettings(), reqBuffer.getFence())
+                            captureResult.result, request.getRequestSettings(),
+                            reqBuffer.getFence())
                       : renderIntoImageStreamBuffer(reqBuffer.getStreamId(),
                                                     reqBuffer.getBufferId(),
                                                     reqBuffer.getFence());
@@ -569,7 +588,7 @@ std::vector<uint8_t> VirtualCameraRenderThread::createThumbnail(
 }
 
 ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
-    const int streamId, const int bufferId,
+    const int streamId, const int bufferId, const CameraMetadata& resultMetadata,
     const RequestSettings& requestSettings, sp<Fence> fence) {
   std::shared_ptr<AHardwareBuffer> hwBuffer =
       mSessionContext.fetchHardwareBuffer(streamId, bufferId);
@@ -635,7 +654,7 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
   }
 
   std::vector<uint8_t> app1ExifData =
-      createExif(Resolution(stream->width, stream->height),
+      createExif(Resolution(stream->width, stream->height), resultMetadata,
                  createThumbnail(requestSettings.thumbnailResolution,
                                  requestSettings.thumbnailJpegQuality));
   std::optional<size_t> compressedSize = compressJpeg(

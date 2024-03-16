@@ -892,6 +892,11 @@ binder::Status CameraDeviceClient::createStream(
 
     Mutex::Autolock icl(mBinderSerializationLock);
 
+    if (!outputConfiguration.isComplete()) {
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "OutputConfiguration isn't valid!");
+    }
+
     const std::vector<sp<IGraphicBufferProducer>>& bufferProducers =
             outputConfiguration.getGraphicBufferProducers();
     size_t numBufferProducers = bufferProducers.size();
@@ -908,7 +913,7 @@ binder::Status CameraDeviceClient::createStream(
     bool useReadoutTimestamp = outputConfiguration.useReadoutTimestamp();
 
     res = SessionConfigurationUtils::checkSurfaceType(numBufferProducers, deferredConsumer,
-            outputConfiguration.getSurfaceType());
+            outputConfiguration.getSurfaceType(), /*isConfigurationComplete*/true);
     if (!res.isOk()) {
         return res;
     }
@@ -951,7 +956,7 @@ binder::Status CameraDeviceClient::createStream(
         res = SessionConfigurationUtils::createSurfaceFromGbp(streamInfo,
                 isStreamInfoValid, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode, colorSpace);
+                streamUseCase, timestampBase, mirrorMode, colorSpace, /*respectSurfaceSize*/false);
 
         if (!res.isOk())
             return res;
@@ -1063,6 +1068,10 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
 
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
+    }
+    if (!outputConfiguration.isComplete()) {
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "OutputConfiguration isn't valid!");
     }
 
     // Infer the surface info for deferred surface stream creation.
@@ -1256,6 +1265,10 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
+    if (!outputConfiguration.isComplete()) {
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "OutputConfiguration isn't valid!");
+    }
 
     const std::vector<sp<IGraphicBufferProducer> >& bufferProducers =
             outputConfiguration.getGraphicBufferProducers();
@@ -1323,7 +1336,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         res = SessionConfigurationUtils::createSurfaceFromGbp(outInfo,
                 /*isStreamInfoValid*/ false, surface, newOutputsMap.valueAt(i), mCameraIdStr,
                 mDevice->infoPhysical(physicalCameraId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode, colorSpace);
+                streamUseCase, timestampBase, mirrorMode, colorSpace, /*respectSurfaceSize*/false);
         if (!res.isOk())
             return res;
 
@@ -1636,6 +1649,11 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
 
     Mutex::Autolock icl(mBinderSerializationLock);
 
+    if (!outputConfiguration.isComplete()) {
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "OutputConfiguration isn't valid!");
+    }
+
     const std::vector<sp<IGraphicBufferProducer> >& bufferProducers =
             outputConfiguration.getGraphicBufferProducers();
     const std::string &physicalId = outputConfiguration.getPhysicalCameraId();
@@ -1701,7 +1719,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         res = SessionConfigurationUtils::createSurfaceFromGbp(mStreamInfoMap[streamId],
                 true /*isStreamInfoValid*/, surface, bufferProducer, mCameraIdStr,
                 mDevice->infoPhysical(physicalId), sensorPixelModesUsed, dynamicRangeProfile,
-                streamUseCase, timestampBase, mirrorMode, colorSpace);
+                streamUseCase, timestampBase, mirrorMode, colorSpace, /*respectSurfaceSize*/false);
 
         if (!res.isOk())
             return res;

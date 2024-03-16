@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG ATRACE_TAG_AUDIO
 #define LOG_TAG "AHAL_DownmixImpl"
 
 #include <android-base/logging.h>
 #include <system/audio_effects/effect_uuid.h>
+#include <utils/Trace.h>
 
 #include "EffectDownmix.h"
 
@@ -36,7 +38,6 @@ extern "C" binder_exception_t createEffect(const AudioUuid* in_impl_uuid,
     }
     if (instanceSpp) {
         *instanceSpp = ndk::SharedRefBase::make<DownmixImpl>();
-        LOG(DEBUG) << __func__ << " instance " << instanceSpp->get() << " created";
         return EX_NONE;
     } else {
         LOG(ERROR) << __func__ << " invalid input parameter!";
@@ -66,7 +67,6 @@ const Descriptor DownmixImpl::kDescriptor = {
 
 ndk::ScopedAStatus DownmixImpl::getDescriptor(Descriptor* _aidl_return) {
     RETURN_IF(!_aidl_return, EX_ILLEGAL_ARGUMENT, "Parameter:nullptr");
-    LOG(DEBUG) << __func__ << kDescriptor.toString();
     *_aidl_return = kDescriptor;
     return ndk::ScopedAStatus::ok();
 }
@@ -171,6 +171,7 @@ RetCode DownmixImpl::releaseContext() {
 }
 
 void DownmixImpl::process() {
+    ATRACE_NAME("Downmix::process");
     /**
      * wait for the EventFlag without lock, it's ok because the mEfGroup pointer will not change
      * in the life cycle of workerThread (threadLoop).
@@ -203,8 +204,6 @@ void DownmixImpl::process() {
             IEffect::Status status = effectProcessImpl(buffer, buffer, processSamples);
             outputMQ->write(buffer, status.fmqProduced);
             statusMQ->writeBlocking(&status, 1);
-            LOG(VERBOSE) << getEffectName() << __func__ << ": done processing, effect consumed "
-                        << status.fmqConsumed << " produced " << status.fmqProduced;
         }
     }
 }

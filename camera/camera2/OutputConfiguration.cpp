@@ -25,6 +25,7 @@
 #include <binder/Parcel.h>
 #include <gui/view/Surface.h>
 #include <system/camera_metadata.h>
+#include <system/graphics.h>
 #include <utils/String8.h>
 
 
@@ -102,6 +103,25 @@ bool OutputConfiguration::useReadoutTimestamp() const {
     return mUseReadoutTimestamp;
 }
 
+int OutputConfiguration::getFormat() const {
+    return mFormat;
+}
+
+int OutputConfiguration::getDataspace() const {
+    return mDataspace;
+}
+
+int64_t OutputConfiguration::getUsage() const {
+    return mUsage;
+}
+
+bool OutputConfiguration::isComplete() const {
+    return !((mSurfaceType == SURFACE_TYPE_MEDIA_RECORDER ||
+             mSurfaceType == SURFACE_TYPE_MEDIA_CODEC ||
+             mSurfaceType == SURFACE_TYPE_IMAGE_READER) &&
+             mGbps.empty());
+}
+
 OutputConfiguration::OutputConfiguration() :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID),
@@ -116,7 +136,10 @@ OutputConfiguration::OutputConfiguration() :
         mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
         mTimestampBase(TIMESTAMP_BASE_DEFAULT),
         mMirrorMode(MIRROR_MODE_AUTO),
-        mUseReadoutTimestamp(false) {
+        mUseReadoutTimestamp(false),
+        mFormat(HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED),
+        mDataspace(0),
+        mUsage(0) {
 }
 
 OutputConfiguration::OutputConfiguration(const android::Parcel& parcel) :
@@ -234,6 +257,24 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+    if ((err = parcel->readInt32(&format)) != OK) {
+        ALOGE("%s: Failed to read format from parcel", __FUNCTION__);
+        return err;
+    }
+
+    int dataspace = 0;
+    if ((err = parcel->readInt32(&dataspace)) != OK) {
+        ALOGE("%s: Failed to read dataspace from parcel", __FUNCTION__);
+        return err;
+    }
+
+    int64_t usage = 0;
+    if ((err = parcel->readInt64(&usage)) != OK) {
+        ALOGE("%s: Failed to read usage flag from parcel", __FUNCTION__);
+        return err;
+    }
+
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
@@ -256,13 +297,17 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mSensorPixelModesUsed = std::move(sensorPixelModesUsed);
     mDynamicRangeProfile = dynamicProfile;
     mColorSpace = colorSpace;
+    mFormat = format;
+    mDataspace = dataspace;
+    mUsage = usage;
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
           " physicalCameraId = %s, isMultiResolution = %d, streamUseCase = %" PRId64
-          ", timestampBase = %d, mirrorMode = %d, useReadoutTimestamp = %d",
+          ", timestampBase = %d, mirrorMode = %d, useReadoutTimestamp = %d, format = %d, "
+          "dataspace = %d, usage = %" PRId64,
           __FUNCTION__, mRotation, mSurfaceSetID, mSurfaceType,
           mPhysicalCameraId.c_str(), mIsMultiResolution, mStreamUseCase, timestampBase,
-          mMirrorMode, mUseReadoutTimestamp);
+          mMirrorMode, mUseReadoutTimestamp, mFormat, mDataspace, mUsage);
 
     return err;
 }
@@ -283,6 +328,9 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mTimestampBase = TIMESTAMP_BASE_DEFAULT;
     mMirrorMode = MIRROR_MODE_AUTO;
     mUseReadoutTimestamp = false;
+    mFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+    mDataspace = 0;
+    mUsage = 0;
 }
 
 OutputConfiguration::OutputConfiguration(
@@ -296,7 +344,9 @@ OutputConfiguration::OutputConfiguration(
     mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED),
     mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
     mTimestampBase(TIMESTAMP_BASE_DEFAULT),
-    mMirrorMode(MIRROR_MODE_AUTO), mUseReadoutTimestamp(false) { }
+    mMirrorMode(MIRROR_MODE_AUTO), mUseReadoutTimestamp(false),
+    mFormat(HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED), mDataspace(0),
+    mUsage(0) { }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
@@ -360,6 +410,15 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     if (err != OK) return err;
 
     err = parcel->writeInt32(mUseReadoutTimestamp ? 1 : 0);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mFormat);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mDataspace);
+    if (err != OK) return err;
+
+    err = parcel->writeInt64(mUsage);
     if (err != OK) return err;
 
     return OK;

@@ -198,7 +198,7 @@ status_t EffectHalAidl::process() {
                               ::android::OK == efGroup->wait(kEventFlagDataMqUpdate, &efState,
                                                              1 /* ns */, true /* retry */) &&
                               efState & kEventFlagDataMqUpdate) {
-        ALOGI("%s %s V%d receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str(),
+        ALOGV("%s %s V%d receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str(),
               halVersion);
         mConversion->reopen();
     }
@@ -258,8 +258,6 @@ status_t EffectHalAidl::process() {
         accumulate_float(mOutBuffer->audioBuffer()->f32, outputRawBuffer, floatsToRead);
     }
 
-    ALOGD("%s %s consumed %zu produced %zu", __func__, effectName.c_str(), floatsToWrite,
-          floatsToRead);
     return OK;
 }
 

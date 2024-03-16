@@ -57,11 +57,13 @@ class CaptureRequestBuffer {
 
 struct RequestSettings {
   int jpegQuality = VirtualCameraDevice::kDefaultJpegQuality;
+  int jpegOrientation = VirtualCameraDevice::kDefaultJpegOrientation;
   Resolution thumbnailResolution = Resolution(0, 0);
   int thumbnailJpegQuality = VirtualCameraDevice::kDefaultJpegQuality;
-  std::optional<FpsRange> fpsRange = {};
+  std::optional<FpsRange> fpsRange;
   camera_metadata_enum_android_control_capture_intent_t captureIntent =
       VirtualCameraDevice::kDefaultCaptureIntent;
+  std::optional<GpsCoordinates> gpsCoordinates;
 };
 
 // Represents single capture request to fill set of buffers.
@@ -153,6 +155,8 @@ class VirtualCameraRenderThread {
   // Always called on render thread.
   ndk::ScopedAStatus renderIntoBlobStreamBuffer(
       const int streamId, const int bufferId,
+      const ::aidl::android::hardware::camera::device::CameraMetadata&
+          resultMetadata,
       const RequestSettings& requestSettings, sp<Fence> fence = nullptr);
 
   // Render current image to the YCbCr buffer.

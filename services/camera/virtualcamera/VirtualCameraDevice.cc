@@ -296,8 +296,10 @@ std::optional<CameraMetadata> initCameraCharacteristics(
                                     ANDROID_CONTROL_ZOOM_RATIO,
                                     ANDROID_FLASH_MODE,
                                     ANDROID_JPEG_AVAILABLE_THUMBNAIL_SIZES,
+                                    ANDROID_JPEG_ORIENTATION,
                                     ANDROID_JPEG_QUALITY,
                                     ANDROID_JPEG_THUMBNAIL_QUALITY,
+                                    ANDROID_JPEG_THUMBNAIL_SIZE,
                                     ANDROID_NOISE_REDUCTION_MODE,
                                     ANDROID_STATISTICS_FACE_DETECT_MODE})
           .setAvailableResultKeys({

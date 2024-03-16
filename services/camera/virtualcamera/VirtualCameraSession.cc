@@ -257,13 +257,15 @@ RequestSettings createSettingsFromMetadata(const CameraMetadata& metadata) {
   return RequestSettings{
       .jpegQuality = getJpegQuality(metadata).value_or(
           VirtualCameraDevice::kDefaultJpegQuality),
+      .jpegOrientation = getJpegOrientation(metadata),
       .thumbnailResolution =
           getJpegThumbnailSize(metadata).value_or(Resolution(0, 0)),
       .thumbnailJpegQuality = getJpegThumbnailQuality(metadata).value_or(
           VirtualCameraDevice::kDefaultJpegQuality),
       .fpsRange = getFpsRange(metadata),
       .captureIntent = getCaptureIntent(metadata).value_or(
-          ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW)};
+          ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW),
+      .gpsCoordinates = getGpsCoordinates(metadata)};
 }
 
 }  // namespace
