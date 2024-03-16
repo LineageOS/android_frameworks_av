@@ -41,7 +41,6 @@ extern "C" binder_exception_t createEffect(const AudioUuid* in_impl_uuid,
     }
     if (instanceSpp) {
         *instanceSpp = ndk::SharedRefBase::make<DynamicsProcessingImpl>();
-        LOG(DEBUG) << __func__ << " instance " << instanceSpp->get() << " created";
         return EX_NONE;
     } else {
         LOG(ERROR) << __func__ << " invalid input parameter!";
@@ -206,7 +205,6 @@ const Descriptor DynamicsProcessingImpl::kDescriptor = {
 ndk::ScopedAStatus DynamicsProcessingImpl::open(const Parameter::Common& common,
                                                 const std::optional<Parameter::Specific>& specific,
                                                 OpenEffectReturn* ret) {
-    LOG(DEBUG) << __func__;
     // effect only support 32bits float
     RETURN_IF(common.input.base.format.pcm != common.output.base.format.pcm ||
                       common.input.base.format.pcm != PcmType::FLOAT_32_BIT,
@@ -240,7 +238,6 @@ ndk::ScopedAStatus DynamicsProcessingImpl::open(const Parameter::Common& common,
 
 ndk::ScopedAStatus DynamicsProcessingImpl::getDescriptor(Descriptor* _aidl_return) {
     RETURN_IF(!_aidl_return, EX_ILLEGAL_ARGUMENT, "Parameter:nullptr");
-    LOG(DEBUG) << __func__ << kDescriptor.toString();
     *_aidl_return = kDescriptor;
     return ndk::ScopedAStatus::ok();
 }

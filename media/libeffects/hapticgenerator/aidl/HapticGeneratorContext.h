@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <android-base/thread_annotations.h>
 #include <vibrator/ExternalVibrationUtils.h>
 #include <map>
 
@@ -88,9 +87,8 @@ class HapticGeneratorContext final : public EffectContext {
     static constexpr float DEFAULT_DISTORTION_INPUT_GAIN = 0.3f;
     static constexpr float DEFAULT_DISTORTION_CUBE_THRESHOLD = 0.1f;
 
-    std::mutex mMutex;
     HapticGeneratorState mState;
-    HapticGeneratorParam mParams GUARDED_BY(mMutex);
+    HapticGeneratorParam mParams;
     int mSampleRate;
     int64_t mFrameCount = 0;
 

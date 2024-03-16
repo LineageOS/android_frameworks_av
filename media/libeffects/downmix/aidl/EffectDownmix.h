@@ -28,11 +28,8 @@ class DownmixImpl final : public EffectImpl {
   public:
     static const std::string kEffectName;
     static const Descriptor kDescriptor;
-    DownmixImpl() { LOG(DEBUG) << __func__; }
-    ~DownmixImpl() {
-        cleanUp();
-        LOG(DEBUG) << __func__;
-    }
+    DownmixImpl() = default;
+    ~DownmixImpl() { cleanUp(); }
 
     ndk::ScopedAStatus commandImpl(CommandId command) REQUIRES(mImplMutex) override;
     ndk::ScopedAStatus getDescriptor(Descriptor* _aidl_return) override;

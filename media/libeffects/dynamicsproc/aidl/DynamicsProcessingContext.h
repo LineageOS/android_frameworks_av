@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <android-base/thread_annotations.h>
 #include <audio_effects/effect_dynamicsprocessing.h>
 
 #include "effect-impl/EffectContext.h"
@@ -37,8 +36,7 @@ enum DynamicsProcessingState {
 class DynamicsProcessingContext final : public EffectContext {
   public:
     DynamicsProcessingContext(int statusDepth, const Parameter::Common& common);
-    ~DynamicsProcessingContext();
-
+    ~DynamicsProcessingContext() = default;
     RetCode enable();
     RetCode disable();
     void reset();
@@ -73,12 +71,11 @@ class DynamicsProcessingContext final : public EffectContext {
   private:
     static constexpr float kPreferredProcessingDurationMs = 10.0f;
     static constexpr int kBandCount = 5;
-    std::mutex mMutex;
-    int mChannelCount GUARDED_BY(mMutex) = 0;
-    DynamicsProcessingState mState GUARDED_BY(mMutex) = DYNAMICS_PROCESSING_STATE_UNINITIALIZED;
-    std::unique_ptr<dp_fx::DPFrequency> mDpFreq GUARDED_BY(mMutex) = nullptr;
-    bool mEngineInited GUARDED_BY(mMutex) = false;
-    DynamicsProcessing::EngineArchitecture mEngineArchitecture GUARDED_BY(mMutex) = {
+    int mChannelCount = 0;
+    DynamicsProcessingState mState = DYNAMICS_PROCESSING_STATE_UNINITIALIZED;
+    std::unique_ptr<dp_fx::DPFrequency> mDpFreq = nullptr;
+    bool mEngineInited = false;
+    DynamicsProcessing::EngineArchitecture mEngineArchitecture = {
             .resolutionPreference =
                     DynamicsProcessing::ResolutionPreference::FAVOR_FREQUENCY_RESOLUTION,
             .preferredProcessingDurationMs = kPreferredProcessingDurationMs,
@@ -92,22 +89,21 @@ class DynamicsProcessingContext final : public EffectContext {
 
     void init();
 
-    void dpSetFreqDomainVariant_l(const DynamicsProcessing::EngineArchitecture& engine)
-            REQUIRES(mMutex);
-    dp_fx::DPChannel* getChannel_l(int ch) REQUIRES(mMutex);
-    dp_fx::DPEq* getPreEq_l(int ch) REQUIRES(mMutex);
-    dp_fx::DPEq* getPostEq_l(int ch) REQUIRES(mMutex);
-    dp_fx::DPMbc* getMbc_l(int ch) REQUIRES(mMutex);
-    dp_fx::DPLimiter* getLimiter_l(int ch) REQUIRES(mMutex);
-    dp_fx::DPBandStage* getStageWithType_l(StageType type, int ch) REQUIRES(mMutex);
-    dp_fx::DPEq* getEqWithType_l(StageType type, int ch) REQUIRES(mMutex);
+    void dpSetFreqDomainVariant_l(const DynamicsProcessing::EngineArchitecture& engine);
+    dp_fx::DPChannel* getChannel_l(int ch);
+    dp_fx::DPEq* getPreEq_l(int ch);
+    dp_fx::DPEq* getPostEq_l(int ch);
+    dp_fx::DPMbc* getMbc_l(int ch);
+    dp_fx::DPLimiter* getLimiter_l(int ch);
+    dp_fx::DPBandStage* getStageWithType_l(StageType type, int ch);
+    dp_fx::DPEq* getEqWithType_l(StageType type, int ch);
     template <typename D>
     RetCode setDpChannels_l(const std::vector<DynamicsProcessing::ChannelConfig>& channels,
-                            bool stageInUse, StageType type) REQUIRES(mMutex);
+                            bool stageInUse, StageType type);
     template <typename T /* BandConfig */>
-    RetCode setBands_l(const std::vector<T>& bands, StageType type) REQUIRES(mMutex);
+    RetCode setBands_l(const std::vector<T>& bands, StageType type);
     RetCode setDpChannelBand_l(const std::any& anyConfig, StageType type,
-                               std::set<std::pair<int, int>>& chBandSet) REQUIRES(mMutex);
+                               std::set<std::pair<int, int>>& chBandSet);
 
     std::vector<DynamicsProcessing::EqBandConfig> getEqBandConfigs(StageType type);
     std::vector<DynamicsProcessing::ChannelConfig> getChannelConfig(StageType type);

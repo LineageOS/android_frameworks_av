@@ -133,7 +133,6 @@ status_t AidlConversionVirtualizer::getParameter(EffectParamWriter& param) {
                 const audio_channel_mask_t chMask = ::aidl::android::
                         aidl2legacy_AudioChannelLayout_layout_audio_channel_mask_t_bits(
                                 angle.channel, false);
-                ALOGW("%s aidl %d ch %d", __func__, angle.channel, chMask);
                 if (OK != param.writeToValue(&chMask) ||
                     OK != param.writeToValue(&angle.azimuthDegree) ||
                     OK != param.writeToValue(&angle.elevationDegree)) {
