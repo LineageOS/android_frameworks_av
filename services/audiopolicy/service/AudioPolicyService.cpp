@@ -18,9 +18,6 @@
 //#define LOG_NDEBUG 0
 
 #include "Configuration.h"
-#undef __STRICT_ANSI__
-#define __STDINT_LIMITS
-#define __STDC_LIMIT_MACROS
 #include <stdint.h>
 #include <sys/time.h>
 #include <dlfcn.h>

@@ -10,8 +10,6 @@ package {
 cc_library_static {
     name: "libstagefright_webm",
 
-    cppflags: ["-D__STDINT_LIMITS"],
-
     cflags: [
         "-Werror",
         "-Wall",
