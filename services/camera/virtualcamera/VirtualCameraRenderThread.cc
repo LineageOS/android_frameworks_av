@@ -398,6 +398,12 @@ void VirtualCameraRenderThread::threadLoop() {
     processCaptureRequest(*task);
   }
 
+  // Destroy EGL utilities still on the render thread.
+  mEglSurfaceTexture.reset();
+  mEglTextureRgbProgram.reset();
+  mEglTextureYuvProgram.reset();
+  mEglDisplayContext.reset();
+
   ALOGV("Render thread exiting");
 }
 
