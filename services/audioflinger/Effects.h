@@ -616,9 +616,7 @@ public:
             mThreadType = thread->type();
             mAfThreadCallback = thread->afThreadCallback();
         }
-        bool hasThreadAttached() const {
-            return thread().promote() != nullptr;
-        }
+
     private:
         const wp<IAfEffectChain> mChain;
         mediautils::atomic_wp<IAfThreadBase> mThread;

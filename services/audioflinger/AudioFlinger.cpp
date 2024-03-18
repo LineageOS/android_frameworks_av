@@ -3059,25 +3059,6 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
 
 
             mPlaybackThreads.removeItem(output);
-            // Save AUDIO_SESSION_OUTPUT_MIX effect to orphan chains
-            // Output Mix Effect session is used to manage Music Effect by AudioPolicy Manager.
-            // It exists across all playback threads.
-            if (playbackThread->type() == IAfThreadBase::MIXER
-                    || playbackThread->type() == IAfThreadBase::OFFLOAD
-                    || playbackThread->type() == IAfThreadBase::SPATIALIZER) {
-                sp<IAfEffectChain> mixChain;
-                {
-                    audio_utils::scoped_lock sl(playbackThread->mutex());
-                    mixChain = playbackThread->getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
-                    if (mixChain != nullptr) {
-                        ALOGW("%s() output %d moving mix session to orphans", __func__, output);
-                        playbackThread->removeEffectChain_l(mixChain);
-                    }
-                }
-                if (mixChain != nullptr) {
-                    putOrphanEffectChain_l(mixChain);
-                }
-            }
             // save all effects to the default thread
             if (mPlaybackThreads.size()) {
                 IAfPlaybackThread* const dstThread =
@@ -4222,8 +4203,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             // before creating the AudioEffect or the io handle must be specified.
             //
             // Detect if the effect is created after an AudioRecord is destroyed.
-            if ((sessionId != AUDIO_SESSION_OUTPUT_MIX) &&
-                    getOrphanEffectChain_l(sessionId).get() != nullptr) {
+            if (getOrphanEffectChain_l(sessionId).get() != nullptr) {
                 ALOGE("%s: effect %s with no specified io handle is denied because the AudioRecord"
                       " for session %d no longer exists",
                       __func__, descOut.name, sessionId);
@@ -4279,8 +4259,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
                     goto Exit;
                 }
             }
-        }
-        if (thread->type() == IAfThreadBase::RECORD || sessionId == AUDIO_SESSION_OUTPUT_MIX) {
+        } else {
             // Check if one effect chain was awaiting for an effect to be created on this
             // session and used it instead of creating a new one.
             sp<IAfEffectChain> chain = getOrphanEffectChain_l(sessionId);
@@ -4384,39 +4363,17 @@ NO_THREAD_SAFETY_ANALYSIS
         }
         return ret;
     }
-
-    IAfPlaybackThread* dstThread = checkPlaybackThread_l(dstIo);
+    IAfPlaybackThread* const srcThread = checkPlaybackThread_l(srcIo);
+    if (srcThread == nullptr) {
+        ALOGW("%s() bad srcIo %d", __func__, srcIo);
+        return BAD_VALUE;
+    }
+    IAfPlaybackThread* const dstThread = checkPlaybackThread_l(dstIo);
     if (dstThread == nullptr) {
         ALOGW("%s() bad dstIo %d", __func__, dstIo);
         return BAD_VALUE;
     }
 
-    IAfPlaybackThread* srcThread = checkPlaybackThread_l(srcIo);
-    sp<IAfEffectChain> orphanChain = getOrphanEffectChain_l(sessionId);
-    if (srcThread == nullptr && orphanChain == nullptr && sessionId == AUDIO_SESSION_OUTPUT_MIX) {
-        ALOGW("%s() AUDIO_SESSION_OUTPUT_MIX not found in orphans, checking other mix", __func__);
-        for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-            const sp<IAfPlaybackThread> pt = mPlaybackThreads.valueAt(i);
-            const uint32_t sessionType = pt->hasAudioSession(AUDIO_SESSION_OUTPUT_MIX);
-            if ((pt->type() == IAfThreadBase::MIXER || pt->type() == IAfThreadBase::OFFLOAD) &&
-                    ((sessionType & IAfThreadBase::EFFECT_SESSION) != 0)) {
-                srcThread = pt.get();
-                ALOGW("%s() found srcOutput %d hosting AUDIO_SESSION_OUTPUT_MIX", __func__,
-                      pt->id());
-                break;
-            }
-        }
-    }
-    if (srcThread == nullptr && orphanChain == nullptr) {
-        ALOGW("moveEffects() bad srcIo %d", srcIo);
-        return BAD_VALUE;
-    }
-    // dstThread pointer validity has already been checked
-    if (orphanChain != nullptr) {
-        audio_utils::scoped_lock _ll(dstThread->mutex());
-        return moveEffectChain_ll(sessionId, nullptr, dstThread, orphanChain.get());
-    }
-    // srcThread pointer validity has already been checked
     audio_utils::scoped_lock _ll(dstThread->mutex(), srcThread->mutex());
     return moveEffectChain_ll(sessionId, srcThread, dstThread);
 }
@@ -4442,17 +4399,12 @@ void AudioFlinger::setEffectSuspended(int effectId,
 // moveEffectChain_ll must be called with the AudioFlinger::mutex()
 // and both srcThread and dstThread mutex()s held
 status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
-        IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread,
-        IAfEffectChain* srcChain)
+        IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread)
 {
-    ALOGV("%s: session %d from thread %p to thread %p %s",
-            __func__, sessionId, srcThread, dstThread,
-            (srcChain != nullptr ? "from specific chain" : ""));
-    ALOG_ASSERT((srcThread != nullptr) != (srcChain != nullptr),
-                "no source provided for source chain");
+    ALOGV("%s: session %d from thread %p to thread %p",
+            __func__, sessionId, srcThread, dstThread);
 
-    sp<IAfEffectChain> chain =
-          srcChain != nullptr ? srcChain : srcThread->getEffectChain_l(sessionId);
+    sp<IAfEffectChain> chain = srcThread->getEffectChain_l(sessionId);
     if (chain == 0) {
         ALOGW("%s: effect chain for session %d not on source thread %p",
                 __func__, sessionId, srcThread);
@@ -4472,9 +4424,8 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
     // otherwise unnecessary as removeEffect_l() will remove the chain when last effect is
     // removed.
     // TODO(b/216875016): consider holding the effect chain locks for the duration of the move.
-    if (srcThread != nullptr) {
-        srcThread->removeEffectChain_l(chain);
-    }
+    srcThread->removeEffectChain_l(chain);
+
     // transfer all effects one by one so that new effect chain is created on new thread with
     // correct buffer sizes and audio parameters and effect engines reconfigured accordingly
     sp<IAfEffectChain> dstChain;
@@ -4484,11 +4435,7 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
     // process effects one by one.
     for (sp<IAfEffectModule> effect = chain->getEffectFromId_l(0); effect != nullptr;
             effect = chain->getEffectFromId_l(0)) {
-        if (srcThread != nullptr) {
-            srcThread->removeEffect_l(effect);
-        } else {
-            chain->removeEffect_l(effect);
-        }
+        srcThread->removeEffect_l(effect);
         removed.add(effect);
         status = dstThread->addEffect_ll(effect);
         if (status != NO_ERROR) {
@@ -4516,7 +4463,7 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
         for (const auto& effect : removed) {
             dstThread->removeEffect_l(effect); // Note: Depending on error location, the last
                                                // effect may not have been placed on dstThread.
-            if (srcThread != nullptr && srcThread->addEffect_ll(effect) == NO_ERROR) {
+            if (srcThread->addEffect_ll(effect) == NO_ERROR) {
                 ++restored;
                 if (dstChain == nullptr) {
                     dstChain = effect->getCallback()->chain().promote();
@@ -4547,19 +4494,15 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
         if (errorString.empty()) {
             errorString = StringPrintf("%s: failed status %d", __func__, status);
         }
-        ALOGW("%s: %s unsuccessful move of session %d from %s %p to dstThread %p "
+        ALOGW("%s: %s unsuccessful move of session %d from srcThread %p to dstThread %p "
                 "(%zu effects removed from srcThread, %zu effects restored to srcThread, "
                 "%zu effects started)",
-                __func__, errorString.c_str(), sessionId,
-                (srcThread != nullptr ? "srcThread" : "srcChain"),
-                (srcThread != nullptr ? (void*) srcThread : (void*) srcChain), dstThread,
+                __func__, errorString.c_str(), sessionId, srcThread, dstThread,
                 removed.size(), restored, started);
     } else {
-        ALOGD("%s: successful move of session %d from %s %p to dstThread %p "
+        ALOGD("%s: successful move of session %d from srcThread %p to dstThread %p "
                 "(%zu effects moved, %zu effects started)",
-                __func__, sessionId, (srcThread != nullptr ? "srcThread" : "srcChain"),
-                (srcThread != nullptr ? (void*) srcThread : (void*) srcChain), dstThread,
-                removed.size(), started);
+                __func__, sessionId, srcThread, dstThread, removed.size(), started);
     }
     return status;
 }
