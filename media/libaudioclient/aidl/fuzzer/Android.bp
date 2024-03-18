@@ -71,7 +71,7 @@ cc_defaults {
         "libbinder_headers",
         "libmedia_headers",
     ],
-     fuzz_config: {
+    fuzz_config: {
         cc: [
             "android-media-fuzzing-reports@google.com",
         ],
@@ -90,6 +90,6 @@ cc_fuzz {
     srcs: ["audioflinger_aidl_fuzzer.cpp"],
     defaults: [
         "libaudioclient_aidl_fuzzer_defaults",
-        "service_fuzzer_defaults"
+        "service_fuzzer_defaults",
     ],
 }
