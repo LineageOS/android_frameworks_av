@@ -2697,7 +2697,8 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              audio_input_flags_t flags,
                                              audio_port_handle_t *selectedDeviceId,
                                              input_type_t *inputType,
-                                             audio_port_handle_t *portId)
+                                             audio_port_handle_t *portId,
+                                             uint32_t *virtualDeviceId)
 {
     ALOGV("%s() source %d, sampling rate %d, format %#x, channel mask %#x, session %d, "
           "flags %#x attributes=%s requested device ID %d",
@@ -2799,6 +2800,9 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         } else {
             *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE;
         }
+        if (virtualDeviceId) {
+            *virtualDeviceId = policyMix->mVirtualDeviceId;
+        }
     } else {
         if (explicitRoutingDevice != nullptr) {
             device = explicitRoutingDevice;
@@ -2822,6 +2826,10 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             // meaning it receives audio injected into the framework, so the recorder doesn't
             // know about it and is therefore considered "legacy"
             *inputType = API_INPUT_LEGACY;
+
+            if (virtualDeviceId) {
+                *virtualDeviceId = policyMix->mVirtualDeviceId;
+            }
         } else if (audio_is_remote_submix_device(device->type())) {
             *inputType = API_INPUT_MIX_CAPTURE;
         } else if (device->type() == AUDIO_DEVICE_IN_TELEPHONY_RX) {
@@ -2851,6 +2859,11 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             config->format = profiles[0]->getFormat();
         }
         goto error;
+    }
+
+
+    if (policyMix != nullptr && virtualDeviceId != nullptr) {
+        *virtualDeviceId = policyMix->mVirtualDeviceId;
     }
 
 exit:
@@ -3900,6 +3913,7 @@ status_t AudioPolicyManager::getRegisteredPolicyMixes(std::vector<AudioMix>& _ai
                              policyMix->mCbFlags);
         _aidl_return.back().mDeviceType = policyMix->mDeviceType;
         _aidl_return.back().mToken = policyMix->mToken;
+        _aidl_return.back().mVirtualDeviceId = policyMix->mVirtualDeviceId;
     }
 
     ALOGVV("%s() returning %zu registered mixes", __func__, _aidl_return.size());

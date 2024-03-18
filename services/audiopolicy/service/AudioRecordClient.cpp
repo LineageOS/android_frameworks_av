@@ -18,9 +18,10 @@
 
 #include "AudioRecordClient.h"
 #include "AudioPolicyService.h"
+#include <android_media_audiopolicy.h>
 
 namespace android::media::audiopolicy {
-
+namespace audiopolicy_flags = android::media::audiopolicy;
 using android::AudioPolicyService;
 
 namespace {
@@ -59,8 +60,10 @@ bool doesPackageTargetAtLeastU(std::string_view packageName) {
 // static
 sp<OpRecordAudioMonitor>
 OpRecordAudioMonitor::createIfNeeded(
-            const AttributionSourceState& attributionSource, const audio_attributes_t& attr,
-            wp<AudioPolicyService::AudioCommandThread> commandThread)
+        const AttributionSourceState &attributionSource,
+        const uint32_t virtualDeviceId,
+        const audio_attributes_t &attr,
+        wp<AudioPolicyService::AudioCommandThread> commandThread)
 {
     if (isAudioServerOrRootUid(attributionSource.uid)) {
         ALOGV("not silencing record for audio or root source %s",
@@ -78,15 +81,19 @@ OpRecordAudioMonitor::createIfNeeded(
             || attributionSource.packageName.value().size() == 0) {
         return nullptr;
     }
-    return new OpRecordAudioMonitor(attributionSource, getOpForSource(attr.source), commandThread);
+
+    return new OpRecordAudioMonitor(attributionSource, virtualDeviceId, attr,
+                                    getOpForSource(attr.source), commandThread);
 }
 
 OpRecordAudioMonitor::OpRecordAudioMonitor(
-        const AttributionSourceState& attributionSource, int32_t appOp,
+        const AttributionSourceState &attributionSource,
+        const uint32_t virtualDeviceId, const audio_attributes_t &attr,
+        int32_t appOp,
         wp<AudioPolicyService::AudioCommandThread> commandThread) :
-            mHasOp(true), mAttributionSource(attributionSource), mAppOp(appOp),
-            mCommandThread(commandThread)
-{
+        mHasOp(true), mAttributionSource(attributionSource),
+        mVirtualDeviceId(virtualDeviceId), mAttr(attr), mAppOp(appOp),
+        mCommandThread(commandThread) {
 }
 
 OpRecordAudioMonitor::~OpRecordAudioMonitor()
@@ -131,7 +138,12 @@ void OpRecordAudioMonitor::checkOp(bool updateUidStates)
     const int32_t mode = mAppOpsManager.checkOp(mAppOp,
             mAttributionSource.uid, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
                 mAttributionSource.packageName.value_or(""))));
-    const bool hasIt = (mode == AppOpsManager::MODE_ALLOWED);
+    bool hasIt = (mode == AppOpsManager::MODE_ALLOWED);
+
+    if (audiopolicy_flags::record_audio_device_aware_permission()) {
+        const bool canRecord = recordingAllowed(mAttributionSource, mVirtualDeviceId, mAttr.source);
+        hasIt = hasIt && canRecord;
+    }
     // verbose logging only log when appOp changed
     ALOGI_IF(hasIt != mHasOp.load(),
             "App op %d missing, %ssilencing record %s",

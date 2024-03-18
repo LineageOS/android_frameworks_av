@@ -166,7 +166,8 @@ public:
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
                                      input_type_t *inputType,
-                                     audio_port_handle_t *portId) = 0;
+                                     audio_port_handle_t *portId,
+                                     uint32_t *virtualDeviceId) = 0;
     // indicates to the audio policy manager that the input starts being used.
     virtual status_t startInput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the input stops being used.
