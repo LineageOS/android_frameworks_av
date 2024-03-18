@@ -458,7 +458,7 @@ status_t Hal2AidlMapper::findPortConfig(const AudioDevice& device, AudioPortConf
         *portConfig = it->second;
         return OK;
     }
-    ALOGE("%s: could not find a configured device port for device %s",
+    ALOGE("%s: could not find a device port config for device %s",
             __func__, device.toString().c_str());
     return BAD_VALUE;
 }
@@ -1037,6 +1037,13 @@ status_t Hal2AidlMapper::setDevicePortConnectedState(const AudioPort& devicePort
                 }
             }
             resetUnusedPortConfigs();
+            // Patches created by Hal2AidlMapper during stream creation and not "claimed"
+            // by the framework must not be surfaced to it.
+            for (auto& s : mStreams) {
+                if (auto it = releasedPatches.find(s.second.second); it != releasedPatches.end()) {
+                    releasedPatches.erase(it);
+                }
+            }
             mFwkPatches.merge(releasedPatches);
             LOG_ALWAYS_FATAL_IF(!releasedPatches.empty(),
                     "mFwkPatches already contains some of released patches");
