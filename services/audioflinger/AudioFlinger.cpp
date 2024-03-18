@@ -1079,7 +1079,6 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         client = registerPid(clientPid);
 
         IAfPlaybackThread* effectThread = nullptr;
-        sp<IAfEffectChain> effectChain = nullptr;
         // check if an effect chain with the same session ID is present on another
         // output thread and move it here.
         for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
@@ -1091,10 +1090,6 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
                     break;
                 }
             }
-        }
-        // Check if an orphan effect chain exists for this session
-        if (effectThread == nullptr) {
-            effectChain = getOrphanEffectChain_l(sessionId);
         }
         ALOGV("createTrack() sessionId: %d", sessionId);
 
@@ -1136,13 +1131,6 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
                 // No thread safety analysis: double lock on a thread capability.
                 audio_utils::lock_guard_no_thread_safety_analysis _sl(effectThread->mutex());
                 if (moveEffectChain_ll(sessionId, effectThread, thread) == NO_ERROR) {
-                    effectThreadId = thread->id();
-                    effectIds = thread->getEffectIds_l(sessionId);
-                }
-            }
-            if (effectChain != nullptr) {
-                if (moveEffectChain_ll(sessionId, nullptr, thread, effectChain.get())
-                        == NO_ERROR) {
                     effectThreadId = thread->id();
                     effectIds = thread->getEffectIds_l(sessionId);
                 }
@@ -4234,9 +4222,8 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             // before creating the AudioEffect or the io handle must be specified.
             //
             // Detect if the effect is created after an AudioRecord is destroyed.
-            if (sessionId != AUDIO_SESSION_OUTPUT_MIX
-                  && ((descOut.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC)
-                  && getOrphanEffectChain_l(sessionId).get() != nullptr) {
+            if ((sessionId != AUDIO_SESSION_OUTPUT_MIX) &&
+                    getOrphanEffectChain_l(sessionId).get() != nullptr) {
                 ALOGE("%s: effect %s with no specified io handle is denied because the AudioRecord"
                       " for session %d no longer exists",
                       __func__, descOut.name, sessionId);
@@ -4247,27 +4234,11 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             // Legacy handling of creating an effect on an expired or made-up
             // session id.  We think that it is a Playback effect.
             //
-            // If no output thread contains the requested session ID, park the effect to
-            // the orphan chains. The effect chain will be moved to the correct output
-            // thread when a track with the same session ID is created.
-            if (io == AUDIO_IO_HANDLE_NONE) {
-                if (probe) {
-                    // In probe mode, as no compatible thread found, exit with error.
-                    lStatus = BAD_VALUE;
-                    goto Exit;
-                }
-                ALOGV("%s() got io %d for effect %s", __func__, io, descOut.name);
-                sp<Client> client = registerPid(currentPid);
-                bool pinned = !audio_is_global_session(sessionId) && isSessionAcquired_l(sessionId);
-                handle = createOrphanEffect_l(client, effectClient, priority, sessionId,
-                                              &descOut, &enabledOut, &lStatus, pinned,
-                                              request.notifyFramesProcessed);
-                if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
-                    // remove local strong reference to Client with clientMutex() held
-                    audio_utils::lock_guard _cl(clientMutex());
-                    client.clear();
-                }
-                goto Register;
+            // If no output thread contains the requested session ID, default to
+            // first output. The effect chain will be moved to the correct output
+            // thread when a track with the same session ID is created
+            if (io == AUDIO_IO_HANDLE_NONE && mPlaybackThreads.size() > 0) {
+                io = mPlaybackThreads.keyAt(0);
             }
             ALOGV("createEffect() got io %d for effect %s", io, descOut.name);
         } else if (checkPlaybackThread_l(io) != nullptr
@@ -4383,78 +4354,6 @@ Register:
 
 Exit:
     return lStatus;
-}
-
-sp<IAfEffectHandle> AudioFlinger::createOrphanEffect_l(
-        const sp<Client>& client,
-        const sp<IEffectClient>& effectClient,
-        int32_t priority,
-        audio_session_t sessionId,
-        effect_descriptor_t *desc,
-        int *enabled,
-        status_t *status,
-        bool pinned,
-        bool notifyFramesProcessed)
-{
-    ALOGV("%s effectClient %p, priority %d, sessionId %d, factory %p",
-          __func__, effectClient.get(), priority, sessionId, mEffectsFactoryHal.get());
-
-    // Check if an orphan effect chain exists for this session or create new chain for this session
-    sp<IAfEffectModule> effect;
-    sp<IAfEffectChain> chain = getOrphanEffectChain_l(sessionId);
-    bool chainCreated = false;
-    if (chain == nullptr) {
-        chain = IAfEffectChain::create(/* ThreadBase= */ nullptr, sessionId, this);
-        chainCreated = true;
-    } else {
-        effect = chain->getEffectFromDesc(desc);
-    }
-    bool effectCreated = false;
-    if (effect == nullptr) {
-        audio_unique_id_t effectId = nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT);
-        // create a new effect module if none present in the chain
-        status_t llStatus =
-                chain->createEffect(effect, desc, effectId, sessionId, pinned);
-        if (llStatus != NO_ERROR) {
-            *status = llStatus;
-            return nullptr;
-        }
-        effect->setMode(getMode());
-
-        if (effect->isHapticGenerator()) {
-            // TODO(b/184194057): Use the vibrator information from the vibrator that will be used
-            // for the HapticGenerator.
-            const std::optional<media::AudioVibratorInfo> defaultVibratorInfo =
-                    std::move(getDefaultVibratorInfo_l());
-            if (defaultVibratorInfo) {
-                // Only set the vibrator info when it is a valid one.
-                audio_utils::lock_guard _cl(chain->mutex());
-                effect->setVibratorInfo_l(*defaultVibratorInfo);
-            }
-        }
-        effectCreated = true;
-    }
-    // create effect handle and connect it to effect module
-    sp<IAfEffectHandle> handle =
-            IAfEffectHandle::create(effect, client, effectClient, priority, notifyFramesProcessed);
-    status_t lStatus = handle->initCheck();
-    if (lStatus == OK) {
-        lStatus = effect->addHandle(handle.get());
-    }
-    if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
-        if (effectCreated) {
-            chain->removeEffect(effect);
-        }
-    } else {
-        if (enabled != NULL) {
-            *enabled = (int)effect->isEnabled();
-        }
-        if (chainCreated) {
-            putOrphanEffectChain_l(chain);
-        }
-    }
-    *status = lStatus;
-    return handle;
 }
 
 status_t AudioFlinger::moveEffects(audio_session_t sessionId, audio_io_handle_t srcIo,
@@ -4588,7 +4487,7 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
         if (srcThread != nullptr) {
             srcThread->removeEffect_l(effect);
         } else {
-            chain->removeEffect(effect);
+            chain->removeEffect_l(effect);
         }
         removed.add(effect);
         status = dstThread->addEffect_ll(effect);
@@ -4831,7 +4730,7 @@ bool AudioFlinger::updateOrphanEffectChains_l(const sp<IAfEffectModule>& effect)
     ALOGV("updateOrphanEffectChains session %d index %zd", session, index);
     if (index >= 0) {
         sp<IAfEffectChain> chain = mOrphanEffectChains.valueAt(index);
-        if (chain->removeEffect(effect, true) == 0) {
+        if (chain->removeEffect_l(effect, true) == 0) {
             ALOGV("updateOrphanEffectChains removing effect chain at index %zd", index);
             mOrphanEffectChains.removeItemsAt(index);
         }

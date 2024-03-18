@@ -703,16 +703,6 @@ private:
 
     sp<Client> registerPid(pid_t pid) EXCLUDES_AudioFlinger_ClientMutex; // always returns non-0
 
-    sp<IAfEffectHandle> createOrphanEffect_l(const sp<Client>& client,
-                                          const sp<media::IEffectClient>& effectClient,
-                                          int32_t priority,
-                                          audio_session_t sessionId,
-                                          effect_descriptor_t *desc,
-                                          int *enabled,
-                                          status_t *status /*non-NULL*/,
-                                          bool pinned,
-                                          bool notifyFramesProcessed) REQUIRES(mutex());
-
     // for use from destructor
     status_t closeOutput_nonvirtual(audio_io_handle_t output) EXCLUDES_AudioFlinger_Mutex;
     status_t closeInput_nonvirtual(audio_io_handle_t input) EXCLUDES_AudioFlinger_Mutex;
