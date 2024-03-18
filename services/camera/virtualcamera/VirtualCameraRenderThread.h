@@ -170,8 +170,9 @@ class VirtualCameraRenderThread {
   // If fence is specified, this function will block until the fence is cleared
   // before writing to the buffer.
   // Always called on the render thread.
-  ndk::ScopedAStatus renderIntoEglFramebuffer(EglFrameBuffer& framebuffer,
-                                              sp<Fence> fence = nullptr);
+  ndk::ScopedAStatus renderIntoEglFramebuffer(
+      EglFrameBuffer& framebuffer, sp<Fence> fence = nullptr,
+      std::optional<Rect> viewport = std::nullopt);
 
   // Camera callback
   const std::shared_ptr<

@@ -238,17 +238,6 @@ TEST_F(VirtualCameraServiceTest, ConfigurationWithTooHighResFails) {
   EXPECT_THAT(getCameraIds(), IsEmpty());
 }
 
-TEST_F(VirtualCameraServiceTest, ConfigurationWithUnalignedResolutionFails) {
-  bool aidlRet;
-  VirtualCameraConfiguration config =
-      createConfiguration(641, 481, Format::YUV_420_888, kMaxFps);
-
-  ASSERT_FALSE(
-      mCameraService->registerCamera(mNdkOwnerToken, config, &aidlRet).isOk());
-  EXPECT_FALSE(aidlRet);
-  EXPECT_THAT(getCameraIds(), IsEmpty());
-}
-
 TEST_F(VirtualCameraServiceTest, ConfigurationWithNegativeResolutionFails) {
   bool aidlRet;
   VirtualCameraConfiguration config =
