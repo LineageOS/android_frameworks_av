@@ -46,6 +46,7 @@
 #include "android/hardware_buffer.h"
 #include "system/camera_metadata.h"
 #include "ui/GraphicBuffer.h"
+#include "ui/Rect.h"
 #include "util/EglFramebuffer.h"
 #include "util/JpegUtil.h"
 #include "util/MetadataUtil.h"
@@ -397,6 +398,12 @@ void VirtualCameraRenderThread::threadLoop() {
     processCaptureRequest(*task);
   }
 
+  // Destroy EGL utilities still on the render thread.
+  mEglSurfaceTexture.reset();
+  mEglTextureRgbProgram.reset();
+  mEglTextureYuvProgram.reset();
+  mEglDisplayContext.reset();
+
   ALOGV("Render thread exiting");
 }
 
@@ -535,8 +542,9 @@ std::vector<uint8_t> VirtualCameraRenderThread::createThumbnail(
 
   ALOGV("%s: Creating thumbnail with size %d x %d, quality %d", __func__,
         resolution.width, resolution.height, quality);
+  Resolution bufferSize = roundTo2DctSize(resolution);
   std::shared_ptr<EglFrameBuffer> framebuffer = allocateTemporaryFramebuffer(
-      mEglDisplayContext->getEglDisplay(), resolution.width, resolution.height);
+      mEglDisplayContext->getEglDisplay(), bufferSize.width, bufferSize.height);
   if (framebuffer == nullptr) {
     ALOGE(
         "Failed to allocate temporary framebuffer for JPEG thumbnail "
@@ -547,38 +555,23 @@ std::vector<uint8_t> VirtualCameraRenderThread::createThumbnail(
   // TODO(b/324383963) Add support for letterboxing if the thumbnail size
   // doesn't correspond
   //  to input texture aspect ratio.
-  if (!renderIntoEglFramebuffer(*framebuffer).isOk()) {
+  if (!renderIntoEglFramebuffer(*framebuffer, /*fence=*/nullptr,
+                                Rect(resolution.width, resolution.height))
+           .isOk()) {
     ALOGE(
         "Failed to render input texture into temporary framebuffer for JPEG "
         "thumbnail");
     return {};
   }
 
-  std::shared_ptr<AHardwareBuffer> inHwBuffer = framebuffer->getHardwareBuffer();
-  GraphicBuffer* gBuffer = GraphicBuffer::fromAHardwareBuffer(inHwBuffer.get());
-
-  if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
-    // This should never happen since we're allocating the temporary buffer
-    // with YUV420 layout above.
-    ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
-          gBuffer->getPixelFormat());
-    return {};
-  }
-
-  YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
-  if (yCbCrLock.getStatus() != NO_ERROR) {
-    ALOGE("%s: Failed to lock graphic buffer while generating thumbnail: %d",
-          __func__, yCbCrLock.getStatus());
-    return {};
-  }
-
   std::vector<uint8_t> compressedThumbnail;
   compressedThumbnail.resize(kJpegThumbnailBufferSize);
-  ALOGE("%s: Compressing thumbnail %d x %d", __func__, gBuffer->getWidth(),
-        gBuffer->getHeight());
-  std::optional<size_t> compressedSize = compressJpeg(
-      gBuffer->getWidth(), gBuffer->getHeight(), quality, *yCbCrLock, {},
-      compressedThumbnail.size(), compressedThumbnail.data());
+  ALOGE("%s: Compressing thumbnail %d x %d", __func__, resolution.width,
+        resolution.height);
+  std::optional<size_t> compressedSize =
+      compressJpeg(resolution.width, resolution.height, quality,
+                   framebuffer->getHardwareBuffer(), {},
+                   compressedThumbnail.size(), compressedThumbnail.data());
   if (!compressedSize.has_value()) {
     ALOGE("%s: Failed to compress jpeg thumbnail", __func__);
     return {};
@@ -609,15 +602,22 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
 
   // Let's create YUV framebuffer and render the surface into this.
   // This will take care about rescaling as well as potential format conversion.
+  // The buffer dimensions need to be rounded to nearest multiple of JPEG DCT
+  // size, however we pass the viewport corresponding to size of the stream so
+  // the image will be only rendered to the area corresponding to the stream
+  // size.
+  Resolution bufferSize =
+      roundTo2DctSize(Resolution(stream->width, stream->height));
   std::shared_ptr<EglFrameBuffer> framebuffer = allocateTemporaryFramebuffer(
-      mEglDisplayContext->getEglDisplay(), stream->width, stream->height);
+      mEglDisplayContext->getEglDisplay(), bufferSize.width, bufferSize.height);
   if (framebuffer == nullptr) {
     ALOGE("Failed to allocate temporary framebuffer for JPEG compression");
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
   // Render into temporary framebuffer.
-  ndk::ScopedAStatus status = renderIntoEglFramebuffer(*framebuffer);
+  ndk::ScopedAStatus status = renderIntoEglFramebuffer(
+      *framebuffer, /*fence=*/nullptr, Rect(stream->width, stream->height));
   if (!status.isOk()) {
     ALOGE("Failed to render input texture into temporary framebuffer");
     return status;
@@ -629,38 +629,14 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
-  std::shared_ptr<AHardwareBuffer> inHwBuffer = framebuffer->getHardwareBuffer();
-  GraphicBuffer* gBuffer = GraphicBuffer::fromAHardwareBuffer(inHwBuffer.get());
-
-  if (gBuffer == nullptr) {
-    ALOGE(
-        "%s: Encountered invalid temporary buffer while rendering JPEG "
-        "into BLOB stream",
-        __func__);
-    return cameraStatus(Status::INTERNAL_ERROR);
-  }
-
-  if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
-    // This should never happen since we're allocating the temporary buffer
-    // with YUV420 layout above.
-    ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
-          gBuffer->getPixelFormat());
-    return cameraStatus(Status::INTERNAL_ERROR);
-  }
-
-  YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
-  if (yCbCrLock.getStatus() != OK) {
-    return cameraStatus(Status::INTERNAL_ERROR);
-  }
-
   std::vector<uint8_t> app1ExifData =
       createExif(Resolution(stream->width, stream->height), resultMetadata,
                  createThumbnail(requestSettings.thumbnailResolution,
                                  requestSettings.thumbnailJpegQuality));
   std::optional<size_t> compressedSize = compressJpeg(
-      gBuffer->getWidth(), gBuffer->getHeight(), requestSettings.jpegQuality,
-      *yCbCrLock, app1ExifData, stream->bufferSize - sizeof(CameraBlob),
-      (*planesLock).planes[0].data);
+      stream->width, stream->height, requestSettings.jpegQuality,
+      framebuffer->getHardwareBuffer(), app1ExifData,
+      stream->bufferSize - sizeof(CameraBlob), (*planesLock).planes[0].data);
 
   if (!compressedSize.has_value()) {
     ALOGE("%s: Failed to compress JPEG image", __func__);
@@ -714,7 +690,7 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoImageStreamBuffer(
 }
 
 ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoEglFramebuffer(
-    EglFrameBuffer& framebuffer, sp<Fence> fence) {
+    EglFrameBuffer& framebuffer, sp<Fence> fence, std::optional<Rect> viewport) {
   ALOGV("%s", __func__);
   // Wait for fence to clear.
   if (fence != nullptr && fence->isValid()) {
@@ -727,6 +703,11 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoEglFramebuffer(
 
   mEglDisplayContext->makeCurrent();
   framebuffer.beforeDraw();
+
+  Rect viewportRect =
+      viewport.value_or(Rect(framebuffer.getWidth(), framebuffer.getHeight()));
+  glViewport(viewportRect.leftTop().x, viewportRect.leftTop().y,
+             viewportRect.getWidth(), viewportRect.getHeight());
 
   sp<GraphicBuffer> textureBuffer = mEglSurfaceTexture->getCurrentBuffer();
   if (textureBuffer == nullptr) {

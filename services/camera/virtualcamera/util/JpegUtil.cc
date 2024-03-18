@@ -14,25 +14,28 @@
  * limitations under the License.
  */
 // #define LOG_NDEBUG 0
+#include "system/graphics.h"
 #define LOG_TAG "JpegUtil"
-#include "JpegUtil.h"
-
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <vector>
 
+#include "JpegUtil.h"
 #include "android/hardware_buffer.h"
 #include "jpeglib.h"
 #include "log/log.h"
 #include "ui/GraphicBuffer.h"
 #include "ui/GraphicBufferMapper.h"
+#include "util/Util.h"
 #include "utils/Errors.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
 namespace {
+
+constexpr int k2DCTSIZE = 2 * DCTSIZE;
 
 class LibJpegContext {
  public:
@@ -98,23 +101,55 @@ class LibJpegContext {
     return *this;
   }
 
-  std::optional<size_t> compress(const android_ycbcr& ycbr) {
-    // TODO(b/301023410) - Add support for compressing image sizes not aligned
-    // with DCT size.
-    if (mWidth % (2 * DCTSIZE) || (mHeight % (2 * DCTSIZE))) {
+  std::optional<size_t> compress(std::shared_ptr<AHardwareBuffer> inBuffer) {
+    GraphicBuffer* gBuffer = GraphicBuffer::fromAHardwareBuffer(inBuffer.get());
+
+    if (gBuffer == nullptr) {
+      ALOGE("%s: Input graphic buffer is nullptr", __func__);
+      return std::nullopt;
+    }
+
+    if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+      // This should never happen since we're allocating the temporary buffer
+      // with YUV420 layout above.
+      ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
+            gBuffer->getPixelFormat());
+      return std::nullopt;
+    }
+
+    YCbCrLockGuard yCbCrLock(inBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
+    if (yCbCrLock.getStatus() != OK) {
+      ALOGE("%s: Failed to lock the input buffer: %s", __func__,
+            statusToString(yCbCrLock.getStatus()).c_str());
+      return std::nullopt;
+    }
+    const android_ycbcr& ycbr = *yCbCrLock;
+
+    const int inBufferWidth = gBuffer->getWidth();
+    const int inBufferHeight = gBuffer->getHeight();
+
+    if (inBufferWidth % k2DCTSIZE || (inBufferHeight % k2DCTSIZE)) {
       ALOGE(
-          "%s: Compressing YUV420 image with size %dx%d not aligned with 2 * "
+          "%s: Compressing YUV420 buffer with size %dx%d not aligned with 2 * "
           "DCTSIZE (%d) is not currently supported.",
-          __func__, mWidth, mHeight, 2 * DCTSIZE);
+          __func__, inBufferWidth, inBufferHeight, DCTSIZE);
+      return std::nullopt;
+    }
+
+    if (inBufferWidth < mWidth || inBufferHeight < mHeight) {
+      ALOGE(
+          "%s: Input buffer has smaller size (%dx%d) than image to be "
+          "compressed (%dx%d)",
+          __func__, inBufferWidth, inBufferHeight, mWidth, mHeight);
       return std::nullopt;
     }
 
     // Chroma planes have 1/2 resolution of the original image.
-    const int cHeight = mHeight / 2;
-    const int cWidth = mWidth / 2;
+    const int cHeight = inBufferHeight / 2;
+    const int cWidth = inBufferWidth / 2;
 
     // Prepare arrays of pointers to scanlines of each plane.
-    std::vector<JSAMPROW> yLines(mHeight);
+    std::vector<JSAMPROW> yLines(inBufferHeight);
     std::vector<JSAMPROW> cbLines(cHeight);
     std::vector<JSAMPROW> crLines(cHeight);
 
@@ -142,12 +177,12 @@ class LibJpegContext {
     }
 
     // Collect pointers to individual scanline of each plane.
-    for (int i = 0; i < mHeight; ++i) {
+    for (int i = 0; i < inBufferHeight; ++i) {
       yLines[i] = y + i * ycbr.ystride;
     }
     for (int i = 0; i < cHeight; ++i) {
-      cbLines[i] = cb_plane.data() + i * (mWidth / 2);
-      crLines[i] = cr_plane.data() + i * (mWidth / 2);
+      cbLines[i] = cb_plane.data() + i * cWidth;
+      crLines[i] = cr_plane.data() + i * cWidth;
     }
 
     return compress(yLines, cbLines, crLines);
@@ -254,17 +289,28 @@ class LibJpegContext {
   boolean mSuccess = true;
 };
 
+int roundTo2DCTMultiple(const int n) {
+  const int mod = n % k2DCTSIZE;
+  return mod == 0 ? n : n + (k2DCTSIZE - mod);
+}
+
 }  // namespace
 
 std::optional<size_t> compressJpeg(const int width, const int height,
-                                   const int quality, const android_ycbcr& ycbcr,
+                                   const int quality,
+                                   std::shared_ptr<AHardwareBuffer> inBuffer,
                                    const std::vector<uint8_t>& app1ExifData,
                                    size_t outBufferSize, void* outBuffer) {
   LibJpegContext context(width, height, quality, outBufferSize, outBuffer);
   if (!app1ExifData.empty()) {
     context.setApp1Data(app1ExifData.data(), app1ExifData.size());
   }
-  return context.compress(ycbcr);
+  return context.compress(inBuffer);
+}
+
+Resolution roundTo2DctSize(const Resolution resolution) {
+  return Resolution(roundTo2DCTMultiple(resolution.width),
+                    roundTo2DCTMultiple(resolution.height));
 }
 
 }  // namespace virtualcamera

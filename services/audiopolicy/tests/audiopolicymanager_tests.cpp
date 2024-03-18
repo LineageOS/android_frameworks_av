@@ -204,7 +204,8 @@ class AudioPolicyManagerTest : public testing::Test {
             audio_channel_mask_t channelMask,
             int sampleRate,
             audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
-            audio_port_handle_t *portId = nullptr);
+            audio_port_handle_t *portId = nullptr,
+            uint32_t *virtualDeviceId = nullptr);
     PatchCountCheck snapshotPatchCount() { return PatchCountCheck(mClient.get()); }
 
     void getAudioPorts(audio_port_type_t type, audio_port_role_t role,
@@ -316,7 +317,8 @@ void AudioPolicyManagerTest::getInputForAttr(
         audio_channel_mask_t channelMask,
         int sampleRate,
         audio_input_flags_t flags,
-        audio_port_handle_t *portId) {
+        audio_port_handle_t *portId,
+        uint32_t *virtualDeviceId) {
     audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
     config.sample_rate = sampleRate;
     config.channel_mask = channelMask;
@@ -324,11 +326,12 @@ void AudioPolicyManagerTest::getInputForAttr(
     audio_port_handle_t localPortId;
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
+    if (!virtualDeviceId) virtualDeviceId = 0;
     AudioPolicyInterface::input_type_t inputType;
     AttributionSourceState attributionSource = createAttributionSourceState(/*uid=*/ 0);
     ASSERT_EQ(OK, mManager->getInputForAttr(
             &attr, input, riid, session, attributionSource, &config, flags,
-            selectedDeviceId, &inputType, portId));
+            selectedDeviceId, &inputType, portId, virtualDeviceId));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }
 
@@ -1296,10 +1299,11 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferExactConfigForInput) {
     };
     audio_config_base_t config = requestedConfig;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    uint32_t *virtualDeviceId = 0;
     ASSERT_EQ(OK, mManager->getInputForAttr(
             &attr, &input, 1 /*riid*/, AUDIO_SESSION_NONE, attributionSource, &config,
             AUDIO_INPUT_FLAG_NONE,
-            &selectedDeviceId, &inputType, &portId));
+            &selectedDeviceId, &inputType, &portId, virtualDeviceId));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, portId);
     ASSERT_TRUE(equals(requestedConfig, config));
 
@@ -1313,7 +1317,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferExactConfigForInput) {
     ASSERT_EQ(OK, mManager->getInputForAttr(
             &attr, &input, 1 /*riid*/, AUDIO_SESSION_NONE, attributionSource, &config,
             AUDIO_INPUT_FLAG_NONE,
-            &selectedDeviceId, &inputType, &portId));
+            &selectedDeviceId, &inputType, &portId, virtualDeviceId));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, portId);
     ASSERT_TRUE(equals(requestedConfig, config));
 

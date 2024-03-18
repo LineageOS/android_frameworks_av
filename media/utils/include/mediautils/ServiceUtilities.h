@@ -87,6 +87,10 @@ static inline bool isAudioServerOrMediaServerUid(uid_t uid) {
 
 bool recordingAllowed(const AttributionSourceState& attributionSource,
         audio_source_t source = AUDIO_SOURCE_DEFAULT);
+
+bool recordingAllowed(const AttributionSourceState &attributionSource,
+                      uint32_t virtualDeviceId,
+                      audio_source_t source);
 bool startRecording(const AttributionSourceState& attributionSource,
     const String16& msg, audio_source_t source);
 void finishRecording(const AttributionSourceState& attributionSource, audio_source_t source);

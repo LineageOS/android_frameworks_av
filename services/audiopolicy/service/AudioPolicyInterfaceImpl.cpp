@@ -20,6 +20,7 @@
 #include "AudioPolicyService.h"
 #include "AudioRecordClient.h"
 #include "TypeConverter.h"
+#include <android_media_audiopolicy.h>
 #include <media/AidlConversion.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioValidator.h>
@@ -45,6 +46,7 @@
 #define MAX_ITEMS_PER_LIST 1024
 
 namespace android {
+namespace audiopolicy_flags = android::media::audiopolicy;
 using binder::Status;
 using aidl_utils::binderStatusFromStatusT;
 using content::AttributionSourceState;
@@ -61,6 +63,8 @@ using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
 using media::audio::common::AudioUuid;
 using media::audio::common::Int;
+
+constexpr int kDefaultVirtualDeviceId = 0;
 
 const std::vector<audio_usage_t>& SYSTEM_USAGES = {
     AUDIO_USAGE_CALL_ASSISTANT,
@@ -627,6 +631,8 @@ Status AudioPolicyService::getInputForAttr(const media::audio::common::AudioAttr
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(validateUsage(attr,
             attributionSource)));
 
+    uint32_t virtualDeviceId = kDefaultVirtualDeviceId;
+
     // check calling permissions.
     // Capturing from the following sources does not require permission RECORD_AUDIO
     // as the captured audio does not come from a microphone:
@@ -698,7 +704,8 @@ Status AudioPolicyService::getInputForAttr(const media::audio::common::AudioAttr
             status = mAudioPolicyManager->getInputForAttr(&attr, &input, riid, session,
                                                           attributionSource, &config,
                                                           flags, &selectedDeviceId,
-                                                          &inputType, &portId);
+                                                          &inputType, &portId,
+                                                          &virtualDeviceId);
 
         }
         audioPolicyEffects = mAudioPolicyEffects;
@@ -737,6 +744,14 @@ Status AudioPolicyService::getInputForAttr(const media::audio::common::AudioAttr
                 LOG_ALWAYS_FATAL("%s encountered an invalid input type %d",
                         __func__, (int)inputType);
             }
+
+            if (audiopolicy_flags::record_audio_device_aware_permission()) {
+                // enforce device-aware RECORD_AUDIO permission
+                if (virtualDeviceId != kDefaultVirtualDeviceId &&
+                    !recordingAllowed(attributionSource, virtualDeviceId, inputSource)) {
+                    status = PERMISSION_DENIED;
+                }
+            }
         }
 
         if (status != NO_ERROR) {
@@ -752,6 +767,7 @@ Status AudioPolicyService::getInputForAttr(const media::audio::common::AudioAttr
 
         sp<AudioRecordClient> client = new AudioRecordClient(attr, input, session, portId,
                                                              selectedDeviceId, attributionSource,
+                                                             virtualDeviceId,
                                                              canCaptureOutput, canCaptureHotword,
                                                              mOutputCommandThread);
         mAudioRecordClients.add(portId, client);

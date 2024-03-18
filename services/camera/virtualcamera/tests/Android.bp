@@ -17,6 +17,7 @@ cc_test {
     ],
     srcs: [
         "EglUtilTest.cc",
+        "JpegUtilTest.cc",
         "VirtualCameraDeviceTest.cc",
         "VirtualCameraProviderTest.cc",
         "VirtualCameraRenderThreadTest.cc",
