@@ -40,6 +40,7 @@ cc_defaults {
         "packagemanager_aidl-cpp",
     ],
     static_libs: [
+        "libaudiomockhal",
         "libfakeservicemanager",
         "libmediaplayerservice",
     ],
@@ -69,6 +70,9 @@ cc_fuzz {
     srcs: ["audiopolicy_aidl_fuzzer.cpp"],
     defaults: [
         "audiopolicy_aidl_fuzzer_defaults",
+        "latest_android_hardware_audio_core_ndk_shared",
+        "latest_android_hardware_audio_core_sounddose_ndk_shared",
+        "latest_android_hardware_audio_effect_ndk_shared",
         "service_fuzzer_defaults",
     ],
 }
