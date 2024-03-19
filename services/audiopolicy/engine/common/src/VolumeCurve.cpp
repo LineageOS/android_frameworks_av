@@ -69,7 +69,7 @@ float VolumeCurve::volIndexToDb(int indexInUi, int volIndexMin, int volIndexMax)
         return mCurvePoints[nbCurvePoints - 1].mAttenuationInMb / 100.0f;
     }
     if (indexInUiPosition == 0) {
-        if (indexInUiPosition != mCurvePoints[0].mIndex) {
+        if ((size_t)volIdx != mCurvePoints[0].mIndex) {
             return VOLUME_MIN_DB; // out of bounds
         }
         return mCurvePoints[0].mAttenuationInMb / 100.0f;
