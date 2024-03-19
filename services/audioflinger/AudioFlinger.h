@@ -373,7 +373,8 @@ private:
             EXCLUDES_AudioFlinger_Mutex;
 
     status_t moveEffectChain_ll(audio_session_t sessionId,
-            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread) final
+            IAfPlaybackThread* srcThread, IAfPlaybackThread* dstThread,
+            IAfEffectChain* srcChain = nullptr) final
             REQUIRES(mutex(), audio_utils::ThreadBase_Mutex);
 
     // This is a helper that is called during incoming binder calls.
