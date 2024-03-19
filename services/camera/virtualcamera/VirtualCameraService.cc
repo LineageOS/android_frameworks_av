@@ -175,6 +175,7 @@ ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
 
   mVirtualCameraProvider->removeCamera(it->second);
 
+  mTokenToCameraName.erase(it);
   return ndk::ScopedAStatus::ok();
 }
 
