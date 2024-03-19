@@ -160,3 +160,13 @@ flag {
      bug: "297083874"
 }
 
+
+flag {
+     namespace: "camera_platform"
+     name: "cache_permission_services"
+     description: "Cache IPermissionController and IPermissionChecker in CameraService to reduce query latency."
+     bug: "326139956"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
