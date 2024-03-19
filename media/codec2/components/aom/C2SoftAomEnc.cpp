@@ -605,7 +605,7 @@ status_t C2SoftAomEnc::initEncoder() {
     mCodecConfiguration->g_timebase.den = 1000000;
     // rc_target_bitrate is in kbps, mBitrate in bps
     mCodecConfiguration->rc_target_bitrate = (mBitrate->value + 500) / 1000;
-    mCodecConfiguration->rc_end_usage = mBitrateControlMode == AOM_Q ? AOM_Q : AOM_CBR;
+    mCodecConfiguration->rc_end_usage = mBitrateControlMode;
     // Disable frame drop - not allowed in MediaCodec now.
     mCodecConfiguration->rc_dropframe_thresh = 0;
     // Disable lagged encoding.
