@@ -23,6 +23,7 @@ cc_defaults {
     static_libs: [
         "android.hardware.audio.common@7.0-enums",
         "effect-aidl-cpp",
+        "libaudiomockhal",
         "libcgrouprc",
         "libcgrouprc_format",
         "libfakeservicemanager",
@@ -94,6 +95,9 @@ cc_fuzz {
     srcs: ["audioflinger_aidl_fuzzer.cpp"],
     defaults: [
         "libaudioclient_aidl_fuzzer_defaults",
+        "latest_android_hardware_audio_core_ndk_shared",
+        "latest_android_hardware_audio_core_sounddose_ndk_shared",
+        "latest_android_hardware_audio_effect_ndk_shared",
         "service_fuzzer_defaults",
     ],
 }
