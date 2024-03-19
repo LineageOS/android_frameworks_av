@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -22,6 +24,7 @@
 #include <gtest/gtest.h>
 
 #include <DeviceHalAidl.h>
+#include <Hal2AidlMapper.h>
 #include <StreamHalAidl.h>
 #include <aidl/android/hardware/audio/core/BnModule.h>
 #include <aidl/android/hardware/audio/core/BnStreamCommon.h>
@@ -31,7 +34,24 @@
 
 namespace {
 
+using ::aidl::android::hardware::audio::core::AudioPatch;
+using ::aidl::android::hardware::audio::core::AudioRoute;
 using ::aidl::android::hardware::audio::core::VendorParameter;
+using ::aidl::android::media::audio::common::AudioChannelLayout;
+using ::aidl::android::media::audio::common::AudioConfig;
+using ::aidl::android::media::audio::common::AudioDeviceDescription;
+using ::aidl::android::media::audio::common::AudioDeviceType;
+using ::aidl::android::media::audio::common::AudioFormatDescription;
+using ::aidl::android::media::audio::common::AudioFormatType;
+using ::aidl::android::media::audio::common::AudioIoFlags;
+using ::aidl::android::media::audio::common::AudioPort;
+using ::aidl::android::media::audio::common::AudioPortConfig;
+using ::aidl::android::media::audio::common::AudioPortDeviceExt;
+using ::aidl::android::media::audio::common::AudioPortExt;
+using ::aidl::android::media::audio::common::AudioPortMixExt;
+using ::aidl::android::media::audio::common::AudioProfile;
+using ::aidl::android::media::audio::common::AudioSource;
+using ::aidl::android::media::audio::common::PcmType;
 
 class VendorParameterMock {
   public:
@@ -63,9 +83,105 @@ class VendorParameterMock {
     std::vector<VendorParameter> mSyncParameters;
 };
 
+struct Configuration {
+    std::vector<AudioPort> ports;
+    std::vector<AudioPortConfig> portConfigs;
+    std::vector<AudioRoute> routes;
+    std::vector<AudioPatch> patches;
+    int32_t nextPortId = 1;
+    int32_t nextPatchId = 1;
+};
+
+void fillProfile(AudioProfile* profile, const std::vector<int32_t>& channelLayouts,
+                 const std::vector<int32_t>& sampleRates) {
+    for (auto layout : channelLayouts) {
+        profile->channelMasks.push_back(
+                AudioChannelLayout::make<AudioChannelLayout::layoutMask>(layout));
+    }
+    profile->sampleRates.insert(profile->sampleRates.end(), sampleRates.begin(), sampleRates.end());
+}
+
+AudioProfile createProfile(PcmType pcmType, const std::vector<int32_t>& channelLayouts,
+                           const std::vector<int32_t>& sampleRates) {
+    AudioProfile profile;
+    profile.format.type = AudioFormatType::PCM;
+    profile.format.pcm = pcmType;
+    fillProfile(&profile, channelLayouts, sampleRates);
+    return profile;
+}
+
+AudioPortExt createPortDeviceExt(AudioDeviceType devType, int32_t flags,
+                                 std::string connection = "") {
+    AudioPortDeviceExt deviceExt;
+    deviceExt.device.type.type = devType;
+    if (devType == AudioDeviceType::IN_MICROPHONE && connection.empty()) {
+        deviceExt.device.address = "bottom";
+    } else if (devType == AudioDeviceType::IN_MICROPHONE_BACK && connection.empty()) {
+        deviceExt.device.address = "back";
+    }
+    deviceExt.device.type.connection = std::move(connection);
+    deviceExt.flags = flags;
+    return AudioPortExt::make<AudioPortExt::device>(deviceExt);
+}
+
+AudioPortExt createPortMixExt(int32_t maxOpenStreamCount, int32_t maxActiveStreamCount) {
+    AudioPortMixExt mixExt;
+    mixExt.maxOpenStreamCount = maxOpenStreamCount;
+    mixExt.maxActiveStreamCount = maxActiveStreamCount;
+    return AudioPortExt::make<AudioPortExt::mix>(mixExt);
+}
+
+AudioPort createPort(int32_t id, const std::string& name, int32_t flags, bool isInput,
+                     const AudioPortExt& ext) {
+    AudioPort port;
+    port.id = id;
+    port.name = name;
+    port.flags = isInput ? AudioIoFlags::make<AudioIoFlags::input>(flags)
+                         : AudioIoFlags::make<AudioIoFlags::output>(flags);
+    port.ext = ext;
+    return port;
+}
+
+AudioRoute createRoute(const std::vector<AudioPort>& sources, const AudioPort& sink) {
+    AudioRoute route;
+    route.sinkPortId = sink.id;
+    std::transform(sources.begin(), sources.end(), std::back_inserter(route.sourcePortIds),
+                   [](const auto& port) { return port.id; });
+    return route;
+}
+
+template <typename T>
+auto findById(std::vector<T>& v, int32_t id) {
+    return std::find_if(v.begin(), v.end(), [&](const auto& e) { return e.id == id; });
+}
+
+Configuration getTestConfiguration() {
+    const std::vector<AudioProfile> standardPcmAudioProfiles = {
+            createProfile(PcmType::INT_16_BIT, {AudioChannelLayout::LAYOUT_STEREO}, {48000})};
+    Configuration c;
+
+    AudioPort btOutDevice =
+            createPort(c.nextPortId++, "BT A2DP Out", 0, false,
+                       createPortDeviceExt(AudioDeviceType::OUT_DEVICE, 0,
+                                           AudioDeviceDescription::CONNECTION_BT_A2DP));
+    btOutDevice.profiles = standardPcmAudioProfiles;
+    c.ports.push_back(btOutDevice);
+
+    AudioPort btOutMix =
+            createPort(c.nextPortId++, "a2dp output", 0, false, createPortMixExt(1, 1));
+    btOutMix.profiles = standardPcmAudioProfiles;
+    c.ports.push_back(btOutMix);
+
+    c.routes.push_back(createRoute({btOutMix}, btOutDevice));
+
+    return c;
+}
+
 class ModuleMock : public ::aidl::android::hardware::audio::core::BnModule,
                    public VendorParameterMock {
   public:
+    ModuleMock() = default;
+    explicit ModuleMock(const Configuration& config) : mConfig(config) {}
     bool isScreenTurnedOn() const { return mIsScreenTurnedOn; }
     ScreenRotation getScreenRotation() const { return mScreenRotation; }
 
@@ -91,35 +207,91 @@ class ModuleMock : public ::aidl::android::hardware::audio::core::BnModule,
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus connectExternalDevice(
-            const ::aidl::android::media::audio::common::AudioPort&,
-            ::aidl::android::media::audio::common::AudioPort*) override {
+            const ::aidl::android::media::audio::common::AudioPort& portIdAndData,
+            ::aidl::android::media::audio::common::AudioPort* port) override {
+        auto src = portIdAndData;  // Make a copy to mimic RPC behavior.
+        auto iter = findById<AudioPort>(mConfig.ports, src.id);
+        if (iter == mConfig.ports.end()) {
+            return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+        }
+        *port = *iter;
+        port->ext = src.ext;
+        port->id = mConfig.nextPortId++;
+        ALOGD("%s: returning %s", __func__, port->toString().c_str());
+        mConfig.ports.push_back(*port);
+        std::vector<AudioRoute> newRoutes;
+        for (auto& r : mConfig.routes) {
+            if (r.sinkPortId == src.id) {
+                newRoutes.push_back(AudioRoute{.sourcePortIds = r.sourcePortIds,
+                                               .sinkPortId = port->id,
+                                               .isExclusive = r.isExclusive});
+            } else if (std::find(r.sourcePortIds.begin(), r.sourcePortIds.end(), src.id) !=
+                       r.sourcePortIds.end()) {
+                r.sourcePortIds.push_back(port->id);
+            }
+        }
+        mConfig.routes.insert(mConfig.routes.end(), newRoutes.begin(), newRoutes.end());
         return ndk::ScopedAStatus::ok();
     }
-    ndk::ScopedAStatus disconnectExternalDevice(int32_t) override {
+    ndk::ScopedAStatus disconnectExternalDevice(int32_t portId) override {
+        auto iter = findById<AudioPort>(mConfig.ports, portId);
+        if (iter == mConfig.ports.end()) {
+            return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+        }
+        mConfig.ports.erase(iter);
+        for (auto it = mConfig.routes.begin(); it != mConfig.routes.end();) {
+            if (it->sinkPortId == portId) {
+                it = mConfig.routes.erase(it);
+            } else {
+                if (auto srcIt =
+                            std::find(it->sourcePortIds.begin(), it->sourcePortIds.end(), portId);
+                    srcIt != it->sourcePortIds.end()) {
+                    it->sourcePortIds.erase(srcIt);
+                }
+                ++it;
+            }
+        }
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus getAudioPatches(
-            std::vector<::aidl::android::hardware::audio::core::AudioPatch>*) override {
+            std::vector<::aidl::android::hardware::audio::core::AudioPatch>* patches) override {
+        *patches = mConfig.patches;
         return ndk::ScopedAStatus::ok();
     }
-    ndk::ScopedAStatus getAudioPort(int32_t,
-                                    ::aidl::android::media::audio::common::AudioPort*) override {
+    ndk::ScopedAStatus getAudioPort(
+            int32_t portId, ::aidl::android::media::audio::common::AudioPort* port) override {
+        auto iter = findById<AudioPort>(mConfig.ports, portId);
+        if (iter == mConfig.ports.end()) {
+            return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+        }
+        *port = *iter;
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus getAudioPortConfigs(
-            std::vector<::aidl::android::media::audio::common::AudioPortConfig>*) override {
+            std::vector<::aidl::android::media::audio::common::AudioPortConfig>* configs) override {
+        *configs = mConfig.portConfigs;
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus getAudioPorts(
-            std::vector<::aidl::android::media::audio::common::AudioPort>*) override {
+            std::vector<::aidl::android::media::audio::common::AudioPort>* ports) override {
+        *ports = mConfig.ports;
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus getAudioRoutes(
-            std::vector<::aidl::android::hardware::audio::core::AudioRoute>*) override {
+            std::vector<::aidl::android::hardware::audio::core::AudioRoute>* routes) override {
+        *routes = mConfig.routes;
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus getAudioRoutesForAudioPort(
-            int32_t, std::vector<::aidl::android::hardware::audio::core::AudioRoute>*) override {
+            int32_t portId,
+            std::vector<::aidl::android::hardware::audio::core::AudioRoute>* routes) override {
+        for (auto& r : mConfig.routes) {
+            const auto& srcs = r.sourcePortIds;
+            if (r.sinkPortId == portId ||
+                std::find(srcs.begin(), srcs.end(), portId) != srcs.end()) {
+                routes->push_back(r);
+            }
+        }
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus openInputStream(const OpenInputStreamArguments&,
@@ -133,17 +305,69 @@ class ModuleMock : public ::aidl::android::hardware::audio::core::BnModule,
     ndk::ScopedAStatus getSupportedPlaybackRateFactors(SupportedPlaybackRateFactors*) override {
         return ndk::ScopedAStatus::ok();
     }
-    ndk::ScopedAStatus setAudioPatch(const ::aidl::android::hardware::audio::core::AudioPatch&,
-                                     ::aidl::android::hardware::audio::core::AudioPatch*) override {
+    ndk::ScopedAStatus setAudioPatch(
+            const ::aidl::android::hardware::audio::core::AudioPatch& requested,
+            ::aidl::android::hardware::audio::core::AudioPatch* patch) override {
+        if (requested.id == 0) {
+            *patch = requested;
+            patch->id = mConfig.nextPatchId++;
+            mConfig.patches.push_back(*patch);
+            ALOGD("%s: returning %s", __func__, patch->toString().c_str());
+        } else {
+            auto iter = findById<AudioPatch>(mConfig.patches, requested.id);
+            if (iter == mConfig.patches.end()) {
+                return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+            }
+            *iter = *patch = requested;
+            ALOGD("%s: updated %s", __func__, patch->toString().c_str());
+        }
         return ndk::ScopedAStatus::ok();
     }
     ndk::ScopedAStatus setAudioPortConfig(
-            const ::aidl::android::media::audio::common::AudioPortConfig&,
-            ::aidl::android::media::audio::common::AudioPortConfig*, bool*) override {
+            const ::aidl::android::media::audio::common::AudioPortConfig& requested,
+            ::aidl::android::media::audio::common::AudioPortConfig* config,
+            bool* applied) override {
+        *applied = false;
+        auto src = requested;  // Make a copy to mimic RPC behavior.
+        if (src.id == 0) {
+            *config = src;
+            if (config->ext.getTag() == AudioPortExt::unspecified) {
+                auto iter = findById<AudioPort>(mConfig.ports, src.portId);
+                if (iter == mConfig.ports.end()) {
+                    return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+                }
+                config->ext = iter->ext;
+            }
+            config->id = mConfig.nextPortId++;
+            mConfig.portConfigs.push_back(*config);
+            ALOGD("%s: returning %s", __func__, config->toString().c_str());
+        } else {
+            auto iter = findById<AudioPortConfig>(mConfig.portConfigs, src.id);
+            if (iter == mConfig.portConfigs.end()) {
+                return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+            }
+            *iter = *config = src;
+            ALOGD("%s: updated %s", __func__, config->toString().c_str());
+        }
+        *applied = true;
         return ndk::ScopedAStatus::ok();
     }
-    ndk::ScopedAStatus resetAudioPatch(int32_t) override { return ndk::ScopedAStatus::ok(); }
-    ndk::ScopedAStatus resetAudioPortConfig(int32_t) override { return ndk::ScopedAStatus::ok(); }
+    ndk::ScopedAStatus resetAudioPatch(int32_t patchId) override {
+        auto iter = findById<AudioPatch>(mConfig.patches, patchId);
+        if (iter == mConfig.patches.end()) {
+            return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+        }
+        mConfig.patches.erase(iter);
+        return ndk::ScopedAStatus::ok();
+    }
+    ndk::ScopedAStatus resetAudioPortConfig(int32_t portConfigId) override {
+        auto iter = findById<AudioPortConfig>(mConfig.portConfigs, portConfigId);
+        if (iter == mConfig.portConfigs.end()) {
+            return ndk::ScopedAStatus::fromExceptionCode(EX_ILLEGAL_ARGUMENT);
+        }
+        mConfig.portConfigs.erase(iter);
+        return ndk::ScopedAStatus::ok();
+    }
     ndk::ScopedAStatus getMasterMute(bool*) override { return ndk::ScopedAStatus::ok(); }
     ndk::ScopedAStatus setMasterMute(bool) override { return ndk::ScopedAStatus::ok(); }
     ndk::ScopedAStatus getMasterVolume(float*) override { return ndk::ScopedAStatus::ok(); }
@@ -205,6 +429,7 @@ class ModuleMock : public ::aidl::android::hardware::audio::core::BnModule,
         return ndk::ScopedAStatus::ok();
     }
 
+    Configuration mConfig;
     bool mIsScreenTurnedOn = false;
     ScreenRotation mScreenRotation = ScreenRotation::DEG_0;
 };
@@ -397,6 +622,35 @@ std::enable_if_t<std::is_enum_v<E>, std::ostream&> operator<<(std::ostream& os, 
 }  // namespace aidl::android::hardware::audio::core
 
 using namespace android;
+
+namespace {
+
+class StreamHalMock : public virtual StreamHalInterface {
+  public:
+    StreamHalMock() = default;
+    ~StreamHalMock() override = default;
+    status_t getBufferSize(size_t*) override { return OK; }
+    status_t getAudioProperties(audio_config_base_t*) override { return OK; }
+    status_t setParameters(const String8&) override { return OK; }
+    status_t getParameters(const String8&, String8*) override { return OK; }
+    status_t getFrameSize(size_t*) override { return OK; }
+    status_t addEffect(sp<EffectHalInterface>) override { return OK; }
+    status_t removeEffect(sp<EffectHalInterface>) override { return OK; }
+    status_t standby() override { return OK; }
+    status_t dump(int, const Vector<String16>&) override { return OK; }
+    status_t start() override { return OK; }
+    status_t stop() override { return OK; }
+    status_t createMmapBuffer(int32_t, struct audio_mmap_buffer_info*) override { return OK; }
+    status_t getMmapPosition(struct audio_mmap_position*) override { return OK; }
+    status_t setHalThreadPriority(int) override { return OK; }
+    status_t legacyCreateAudioPatch(const struct audio_port_config&, std::optional<audio_source_t>,
+                                    audio_devices_t) override {
+        return OK;
+    }
+    status_t legacyReleaseAudioPatch() override { return OK; }
+};
+
+}  // namespace
 
 class DeviceHalAidlTest : public testing::Test {
   public:
@@ -592,4 +846,298 @@ TEST_F(StreamHalAidlVendorParametersTest, SetInvalidVendorParameters) {
     EXPECT_EQ(android::BAD_VALUE, mStream->setParameters(legacy.toString()));
     EXPECT_EQ(0UL, mStreamCommon->getAsyncParameters().size());
     EXPECT_EQ(0UL, mStreamCommon->getSyncParameters().size());
+}
+
+class Hal2AidlMapperTest : public testing::Test {
+  public:
+    void SetUp() override {
+        mModule = ndk::SharedRefBase::make<ModuleMock>(getTestConfiguration());
+        mMapper = std::make_unique<Hal2AidlMapper>("test", mModule);
+        ASSERT_EQ(OK, mMapper->initialize());
+
+        mConnectedPort.ext = createPortDeviceExt(AudioDeviceType::OUT_DEVICE, 0,
+                                                 AudioDeviceDescription::CONNECTION_BT_A2DP);
+        mConnectedPort.ext.get<AudioPortExt::device>().device.address = "00:11:22:33:44:55";
+        ASSERT_EQ(OK, mMapper->setDevicePortConnectedState(mConnectedPort, true /*connected*/));
+
+        std::mutex mutex;  // Only needed for cleanups.
+        auto mapperAccessor = std::make_unique<LockedAccessor<Hal2AidlMapper>>(*mMapper, mutex);
+        Hal2AidlMapper::Cleanups cleanups(*mapperAccessor);
+        AudioConfig config;
+        config.base.channelMask = AudioChannelLayout::make<AudioChannelLayout::layoutMask>(
+                AudioChannelLayout::LAYOUT_STEREO);
+        config.base.format =
+                AudioFormatDescription{.type = AudioFormatType::PCM, .pcm = PcmType::INT_16_BIT};
+        config.base.sampleRate = 48000;
+        ASSERT_EQ(OK,
+                  mMapper->prepareToOpenStream(
+                          42 /*ioHandle*/, mConnectedPort.ext.get<AudioPortExt::device>().device,
+                          AudioIoFlags::make<AudioIoFlags::output>(0), AudioSource::DEFAULT,
+                          &cleanups, &config, &mMixPortConfig, &mPatch));
+        cleanups.disarmAll();
+        ASSERT_NE(0, mPatch.id);
+        ASSERT_NE(0, mMixPortConfig.id);
+        mStream = sp<StreamHalMock>::make();
+        mMapper->addStream(mStream, mMixPortConfig.id, mPatch.id);
+
+        ASSERT_EQ(OK, mMapper->findPortConfig(mConnectedPort.ext.get<AudioPortExt::device>().device,
+                                              &mDevicePortConfig));
+        ASSERT_EQ(1UL, mPatch.sourcePortConfigIds.size());
+        ASSERT_EQ(mMixPortConfig.id, mPatch.sourcePortConfigIds[0]);
+        ASSERT_EQ(1UL, mPatch.sinkPortConfigIds.size());
+        ASSERT_EQ(mDevicePortConfig.id, mPatch.sinkPortConfigIds[0]);
+    }
+
+    void TearDown() override {
+        mStream.clear();
+        mMapper.reset();
+        mModule.reset();
+    }
+
+  protected:
+    void CloseDisconnectImpl() {
+        mStream.clear();
+        ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    }
+
+    void ConnectAnotherDevice() {
+        mConnectedPort.ext.get<AudioPortExt::device>().device.address = "00:11:22:33:44:66";
+        ASSERT_EQ(OK, mMapper->setDevicePortConnectedState(mConnectedPort, true /*connected*/));
+    }
+
+    void CreateFwkPatch(int32_t* patchId) {
+        std::mutex mutex;  // Only needed for cleanups.
+        auto mapperAccessor = std::make_unique<LockedAccessor<Hal2AidlMapper>>(*mMapper, mutex);
+        Hal2AidlMapper::Cleanups cleanups(*mapperAccessor);
+        ASSERT_EQ(OK, mMapper->createOrUpdatePatch({mMixPortConfig}, {mDevicePortConfig}, patchId,
+                                                   &cleanups));
+        cleanups.disarmAll();
+    }
+
+    void DisconnectDevice() {
+        ASSERT_EQ(OK, mMapper->prepareToDisconnectExternalDevice(mConnectedPort));
+        ASSERT_EQ(OK, mMapper->setDevicePortConnectedState(mConnectedPort, false /*connected*/));
+    }
+
+    void ReleaseFwkOnlyPatch(int32_t patchId) {
+        // The patch only exists for the framework.
+        EXPECT_EQ(patchId, mMapper->findFwkPatch(patchId));
+        ASSERT_EQ(BAD_VALUE, mMapper->releaseAudioPatch(patchId));
+        mMapper->eraseFwkPatch(patchId);
+        // The patch is now erased.
+        EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+    }
+
+    std::shared_ptr<ModuleMock> mModule;
+    std::unique_ptr<Hal2AidlMapper> mMapper;
+    AudioPort mConnectedPort;
+    AudioPortConfig mMixPortConfig;
+    AudioPortConfig mDevicePortConfig;
+    AudioPatch mPatch;
+    sp<StreamHalInterface> mStream;
+};
+
+/**
+ * External device connections and patches tests diagram.
+ *
+ * [Connect device] -> [Create Stream]
+ *                            |-> [ (1) Close Stream] -> [Disconnect Device]
+ *                            |-> [ (2) Disconnect Device]
+ *                            |          |-> [ (3) Close Stream]
+ *                            |          \-> [ (4) Connect Another Device]
+ *                            |                    |-> (1)
+ *                            |                    |-> (2) -> (3)
+ *                            |                    \-> (5) -> (7)
+ *                            \-> [ (5) Create/Update Fwk Patch]
+ *                                       |-> [(6) Release Fwk Patch]
+ *                                       |        |-> (1)
+ *                                       |        \-> (2) (including reconnection)
+ *                                       \-> [(7) Disconnect Device]
+ *                                                |-> [Release Fwk Patch] -> [Close Stream]
+ *                                                \-> (4) -> (5) -> (6) -> (1)
+ *
+ * Note that the test (acting on behalf of DeviceHalAidl) is responsible
+ * for calling `eraseFwkPatch` and `updateFwkPatch` when needed.
+ */
+
+// (1)
+TEST_F(Hal2AidlMapperTest, CloseDisconnect) {
+    ASSERT_NO_FATAL_FAILURE(CloseDisconnectImpl());
+    // The patch is owned by HAL, must not be listed under fwkPatches after disconnection.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+}
+
+// (2) -> (3)
+TEST_F(Hal2AidlMapperTest, DisconnectClose) {
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch is owned by HAL, must not be listed under fwkPatches after disconnection.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    mStream.clear();
+}
+
+// (2) -> (4) -> (1)
+TEST_F(Hal2AidlMapperTest, DisconnectConnectCloseDisconnect) {
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch is owned by HAL, must not be listed under fwkPatches after disconnection.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    ASSERT_NO_FATAL_FAILURE(ConnectAnotherDevice());
+    ASSERT_NO_FATAL_FAILURE(CloseDisconnectImpl());
+    // The patch is owned by HAL, must not be listed under fwkPatches after disconnection.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+}
+
+// (2) -> (4) -> (2) -> (3)
+TEST_F(Hal2AidlMapperTest, DisconnectConnectDisconnectClose) {
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch is owned by HAL, must not be listed under fwkPatches after disconnection.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    ASSERT_NO_FATAL_FAILURE(ConnectAnotherDevice());
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch is owned by HAL, must not be listed under fwkPatches after disconnection.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    mStream.clear();
+}
+
+// (5) -> (6) -> (1)
+TEST_F(Hal2AidlMapperTest, CreateFwkPatchReleaseCloseDisconnect) {
+    int32_t patchId;
+    ASSERT_NO_FATAL_FAILURE(CreateFwkPatch(&patchId));
+    // Must be the patch created during stream opening.
+    ASSERT_EQ(mPatch.id, patchId);
+    // The patch was not reset by HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_EQ(OK, mMapper->releaseAudioPatch(patchId));
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+    ASSERT_NO_FATAL_FAILURE(CloseDisconnectImpl());
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+}
+
+// (5) -> (6) -> (2) -> (3)
+TEST_F(Hal2AidlMapperTest, CreateFwkPatchReleaseDisconnectClose) {
+    int32_t patchId;
+    ASSERT_NO_FATAL_FAILURE(CreateFwkPatch(&patchId));
+    // Must be the patch created during stream opening.
+    ASSERT_EQ(mPatch.id, patchId);
+    // The patch was not reset by HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_EQ(OK, mMapper->releaseAudioPatch(patchId));
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    mStream.clear();
+}
+
+// (5) -> (6) -> (2) -> (4) -> (2) -> (3)
+TEST_F(Hal2AidlMapperTest, CreateFwkPatchReleaseDisconnectConnectDisconnectClose) {
+    int32_t patchId;
+    ASSERT_NO_FATAL_FAILURE(CreateFwkPatch(&patchId));
+    // Must be the patch created during stream opening.
+    ASSERT_EQ(mPatch.id, patchId);
+    // The patch was not reset by HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_EQ(OK, mMapper->releaseAudioPatch(patchId));
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_NO_FATAL_FAILURE(ConnectAnotherDevice());
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    mStream.clear();
+}
+
+// (5) -> (7) -> Release -> Close
+TEST_F(Hal2AidlMapperTest, CreateFwkPatchDisconnectReleaseClose) {
+    int32_t patchId;
+    ASSERT_NO_FATAL_FAILURE(CreateFwkPatch(&patchId));
+    // Must be the patch created during stream opening.
+    ASSERT_EQ(mPatch.id, patchId);
+    // The patch was not reset by HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    ASSERT_NO_FATAL_FAILURE(ReleaseFwkOnlyPatch(patchId));
+
+    mStream.clear();
+    EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+}
+
+// (5) -> (7) -> (4) -> (5) -> (6) -> (1)
+TEST_F(Hal2AidlMapperTest, CreateFwkPatchDisconnectConnectUpdateReleaseCloseDisconnect) {
+    int32_t patchId;
+    ASSERT_NO_FATAL_FAILURE(CreateFwkPatch(&patchId));
+    // Must be the patch created during stream opening.
+    ASSERT_EQ(mPatch.id, patchId);
+    // The patch was not reset by HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch now only exists for the framework.
+    EXPECT_EQ(mPatch.id, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_NO_FATAL_FAILURE(ConnectAnotherDevice());
+    // Change the device address locally, for patch update.
+    mDevicePortConfig.ext.get<AudioPortExt::device>().device.address =
+            mConnectedPort.ext.get<AudioPortExt::device>().device.address;
+    int32_t newPatchId = patchId;
+    ASSERT_NO_FATAL_FAILURE(CreateFwkPatch(&newPatchId));
+    EXPECT_NE(patchId, newPatchId);
+    mMapper->updateFwkPatch(patchId, newPatchId);
+    EXPECT_EQ(newPatchId, mMapper->findFwkPatch(patchId));
+    // Just in case, check that HAL patch ID is not listed as a fwk patch.
+    EXPECT_EQ(0, mMapper->findFwkPatch(newPatchId));
+    // Verify that device port config was updated.
+    ASSERT_EQ(OK, mMapper->findPortConfig(mConnectedPort.ext.get<AudioPortExt::device>().device,
+                                          &mDevicePortConfig));
+
+    ASSERT_EQ(OK, mMapper->releaseAudioPatch(newPatchId));
+    // The patch does not exist both for the fwk and the HAL, must not be listed under fwkPatches.
+    EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+    // Just in case, check that HAL patch ID is not listed.
+    EXPECT_EQ(0, mMapper->findFwkPatch(newPatchId));
+
+    ASSERT_NO_FATAL_FAILURE(CloseDisconnectImpl());
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    EXPECT_EQ(0, mMapper->findFwkPatch(patchId));
+    EXPECT_EQ(0, mMapper->findFwkPatch(newPatchId));
+}
+
+// (2) -> (4) -> (5) -> (7) -> Release -> Close
+TEST_F(Hal2AidlMapperTest, DisconnectConnectCreateFwkPatchDisconnectReleaseClose) {
+    const int32_t patchId = mPatch.id;
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    // The patch is owned by HAL, must not be listed under fwkPatches after disconnection.
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+
+    ASSERT_NO_FATAL_FAILURE(ConnectAnotherDevice());
+    // Change the device address locally, for patch update.
+    mDevicePortConfig.ext.get<AudioPortExt::device>().device.address =
+            mConnectedPort.ext.get<AudioPortExt::device>().device.address;
+    int32_t newPatchId = 0;  // Use 0 since the fwk does not know about the HAL patch.
+    EXPECT_EQ(0, mMapper->findFwkPatch(newPatchId));
+    ASSERT_NO_FATAL_FAILURE(CreateFwkPatch(&newPatchId));
+    EXPECT_NE(0, newPatchId);
+    EXPECT_NE(patchId, newPatchId);
+    // Just in case, check that HAL patch ID is not listed as a fwk patch.
+    EXPECT_EQ(0, mMapper->findFwkPatch(newPatchId));
+    // Verify that device port config was updated.
+    ASSERT_EQ(OK, mMapper->findPortConfig(mConnectedPort.ext.get<AudioPortExt::device>().device,
+                                          &mDevicePortConfig));
+
+    ASSERT_NO_FATAL_FAILURE(DisconnectDevice());
+    ASSERT_NO_FATAL_FAILURE(ReleaseFwkOnlyPatch(newPatchId));
+
+    mStream.clear();
+    EXPECT_EQ(0, mMapper->findFwkPatch(mPatch.id));
+    EXPECT_EQ(0, mMapper->findFwkPatch(newPatchId));
 }
