@@ -25,6 +25,8 @@
 #include <private/media/AudioEffectShared.h>
 
 #include <map>  // avoid transitive dependency
+#include <optional>
+#include <vector>
 
 namespace android {
 
@@ -215,7 +217,7 @@ public:
     }
     status_t setDevices(const AudioDeviceTypeAddrVector& devices) final EXCLUDES_EffectBase_Mutex;
     status_t setInputDevice(const AudioDeviceTypeAddr& device) final EXCLUDES_EffectBase_Mutex;
-    status_t setVolume(uint32_t *left, uint32_t *right, bool controller) final;
+    status_t setVolume(uint32_t *left, uint32_t *right, bool controller, bool force) final;
     status_t setMode(audio_mode_t mode) final EXCLUDES_EffectBase_Mutex;
     status_t setAudioSource(audio_source_t source) final EXCLUDES_EffectBase_Mutex;
     status_t start_l() final REQUIRES(audio_utils::EffectChain_Mutex) EXCLUDES_EffectBase_Mutex;
@@ -304,6 +306,8 @@ private:
     static constexpr pid_t INVALID_PID = (pid_t)-1;
     // this tid is allowed to call setVolume() without acquiring the mutex.
     pid_t mSetVolumeReentrantTid = INVALID_PID;
+
+    std::optional<std::vector<uint32_t>> mVolume;
 };
 
 // The EffectHandle class implements the IEffect interface. It provides resources

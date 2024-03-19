@@ -1356,7 +1356,7 @@ void EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>& buffer) {
     }
 }
 
-status_t EffectModule::setVolume(uint32_t* left, uint32_t* right, bool controller) {
+status_t EffectModule::setVolume(uint32_t* left, uint32_t* right, bool controller, bool force) {
     AutoLockReentrant _l(mutex(), mSetVolumeReentrantTid);
     if (mStatus != NO_ERROR) {
         return mStatus;
@@ -1364,7 +1364,7 @@ status_t EffectModule::setVolume(uint32_t* left, uint32_t* right, bool controlle
     status_t status = NO_ERROR;
     // Send volume indication if EFFECT_FLAG_VOLUME_IND is set and read back altered volume
     // if controller flag is set (Note that controller == TRUE => EFFECT_FLAG_VOLUME_CTRL set)
-    if (isProcessEnabled() &&
+    if ((isProcessEnabled() || force) &&
             ((mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_CTRL ||
              (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_IND ||
              (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_MONITOR)) {
@@ -1375,6 +1375,9 @@ status_t EffectModule::setVolume(uint32_t* left, uint32_t* right, bool controlle
 
 status_t EffectModule::setVolumeInternal(
         uint32_t *left, uint32_t *right, bool controller) {
+    if (mVolume.has_value() && *left == mVolume.value()[0] && *right == mVolume.value()[1]) {
+        return NO_ERROR;
+    }
     uint32_t volume[2] = {*left, *right};
     uint32_t *pVolume = controller ? volume : nullptr;
     uint32_t size = sizeof(volume);
@@ -1386,6 +1389,7 @@ status_t EffectModule::setVolumeInternal(
     if (controller && status == NO_ERROR && size == sizeof(volume)) {
         *left = volume[0];
         *right = volume[1];
+        mVolume = {*left, *right};
     }
     return status;
 }
@@ -2327,10 +2331,11 @@ status_t EffectChain::addEffect_l(const sp<IAfEffectModule>& effect)
     effect->setCallback(mEffectCallback);
 
     effect_descriptor_t desc = effect->desc();
+    ssize_t idx_insert = 0;
     if ((desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         // Auxiliary effects are inserted at the beginning of mEffects vector as
         // they are processed first and accumulated in chain input buffer
-        mEffects.insertAt(effect, 0);
+        mEffects.insertAt(effect, idx_insert);
 
         // the input buffer for auxiliary effect contains mono samples in
         // 32 bit format. This is to avoid saturation in AudoMixer
@@ -2350,7 +2355,7 @@ status_t EffectChain::addEffect_l(const sp<IAfEffectModule>& effect)
         // by insert effects
         effect->setOutBuffer(mInBuffer);
     } else {
-        ssize_t idx_insert = getInsertIndex_l(desc);
+        idx_insert = getInsertIndex_l(desc);
         if (idx_insert < 0) {
             return INVALID_OPERATION;
         }
@@ -2398,6 +2403,18 @@ status_t EffectChain::addEffect_l(const sp<IAfEffectModule>& effect)
                 __func__, effect.get(), this, idx_insert);
     }
     effect->configure_l();
+
+    if (effect->isVolumeControl()) {
+        const auto volumeControlIndex = findVolumeControl_l(0, mEffects.size());
+        if (!volumeControlIndex.has_value() || (ssize_t)volumeControlIndex.value() < idx_insert) {
+            // If this effect will be the new volume control effect when it is enabled, force
+            // initializing the volume as 0 for volume control effect for safer ramping. The actual
+            // volume will be set from setVolume_l.
+            uint32_t left = 0;
+            uint32_t right = 0;
+            effect->setVolume(&left, &right, true /*controller*/, true /*force*/);
+        }
+    }
 
     return NO_ERROR;
 }
@@ -2607,21 +2624,16 @@ bool EffectChain::setVolume_l(uint32_t* left, uint32_t* right, bool force) {
         return volumeControlIndex.has_value();
     }
 
-    if (volumeControlEffect != cachedVolumeControlEffect) {
-        // The volume control effect is a new one. Set the old one as full volume. Set the new onw
-        // as zero for safe ramping.
-        if (cachedVolumeControlEffect != nullptr) {
+    for (int i = 0; i < ctrlIdx; ++i) {
+        // For all volume control effects before the effect that controls volume, set the volume
+        // to maximum to avoid double attenuation.
+        if (mEffects[i]->isVolumeControl()) {
             uint32_t leftMax = 1 << 24;
             uint32_t rightMax = 1 << 24;
-            cachedVolumeControlEffect->setVolume(&leftMax, &rightMax, true /*controller*/);
+            mEffects[i]->setVolume(&leftMax, &rightMax, true /*controller*/, true /*force*/);
         }
-        if (volumeControlEffect != nullptr) {
-            uint32_t leftZero = 0;
-            uint32_t rightZero = 0;
-            volumeControlEffect->setVolume(&leftZero, &rightZero, true /*controller*/);
-        }
-        mVolumeControlEffect = volumeControlEffect;
     }
+
     mLeftVolume = newLeft;
     mRightVolume = newRight;
 
