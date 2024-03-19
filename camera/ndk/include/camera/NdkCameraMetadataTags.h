@@ -2688,7 +2688,9 @@ typedef enum acamera_metadata_tag {
      * upright.</p>
      * <p>Camera devices may either encode this value into the JPEG EXIF header, or
      * rotate the image data to match this orientation. When the image data is rotated,
-     * the thumbnail data will also be rotated.</p>
+     * the thumbnail data will also be rotated. Additionally, in the case where the image data
+     * is rotated, <a href="https://developer.android.com/reference/android/media/Image.html#getWidth">Image#getWidth</a> and <a href="https://developer.android.com/reference/android/media/Image.html#getHeight">Image#getHeight</a>
+     * will not be updated to reflect the height and width of the rotated image.</p>
      * <p>Note that this orientation is relative to the orientation of the camera sensor, given
      * by ACAMERA_SENSOR_ORIENTATION.</p>
      * <p>To translate from the device orientation given by the Android sensor APIs for camera
