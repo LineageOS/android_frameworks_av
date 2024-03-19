@@ -6,6 +6,13 @@ cc_defaults {
 }
 
 aconfig_declarations {
+    name: "com.android.media.audioclient-aconfig",
+    package: "com.android.media.audioclient",
+    container: "system",
+    srcs: ["audioclient.aconfig"],
+}
+
+aconfig_declarations {
     name: "com.android.media.audioserver-aconfig",
     package: "com.android.media.audioserver",
     container: "system",
@@ -63,6 +70,12 @@ cc_aconfig_library {
 cc_aconfig_library {
     name: "com.android.media.aaudio-aconfig-cc",
     aconfig_declarations: "com.android.media.aaudio-aconfig",
+    defaults: ["audio-aconfig-cc-defaults"],
+}
+
+cc_aconfig_library {
+    name: "com.android.media.audioclient-aconfig-cc",
+    aconfig_declarations: "com.android.media.audioclient-aconfig",
     defaults: ["audio-aconfig-cc-defaults"],
 }
 
