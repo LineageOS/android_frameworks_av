@@ -48,6 +48,9 @@ namespace android {
 static const int64_t kBufferTimeOutUs = 10000LL; // 10 msec
 static const size_t kRetryCount = 100; // must be >0
 static const int64_t kDefaultSampleDurationUs = 33333LL; // 33ms
+// For codec, 0 is the highest importance; higher the number lesser important.
+// To make codec for thumbnail less important, give it a value more than 0.
+static const int kThumbnailImportance = 1;
 
 sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         int32_t width, int32_t height, int32_t tileWidth, int32_t tileHeight,
@@ -585,6 +588,9 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
         }
     }
 
+    // Set the importance for thumbnail.
+    videoFormat->setInt32(KEY_IMPORTANCE, kThumbnailImportance);
+
     int32_t frameRate;
     if (trackMeta()->findInt32(kKeyFrameRate, &frameRate) && frameRate > 0) {
         mDefaultSampleDurationUs = 1000000LL / frameRate;
@@ -902,6 +908,10 @@ sp<AMessage> MediaImageDecoder::onGetFormatAndSeekOptions(
         videoFormat->setInt32("android._num-input-buffers", 1);
         videoFormat->setInt32("android._num-output-buffers", 1);
     }
+
+    /// Set the importance for thumbnail.
+    videoFormat->setInt32(KEY_IMPORTANCE, kThumbnailImportance);
+
     return videoFormat;
 }
 

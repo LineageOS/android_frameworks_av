@@ -46,8 +46,9 @@ flag {
     namespace: "media_audio"
     description:
         "Audio focus gain requires FGS or delegation to "
-	"take effect"
+        "take effect"
     bug: "296232417"
+    is_fixed_read_only: true
 }
 
 # TODO remove

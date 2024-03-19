@@ -76,7 +76,8 @@ class VirtualCameraProvider
   // Returns nullptr if creation was not successful.
   std::shared_ptr<VirtualCameraDevice> createCamera(
       const aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
-          configuration);
+          configuration,
+      int cameraId);
 
   std::shared_ptr<VirtualCameraDevice> getCamera(const std::string& name);
 
@@ -91,9 +92,6 @@ class VirtualCameraProvider
 
   std::map<std::string, std::shared_ptr<VirtualCameraDevice>> mCameras
       GUARDED_BY(mLock);
-
-  // Numerical id to assign to next created camera.
-  static std::atomic_int sNextId;
 };
 
 }  // namespace virtualcamera

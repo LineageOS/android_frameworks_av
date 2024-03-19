@@ -1662,12 +1662,12 @@ sp<IAfEffectHandle> ThreadBase::createEffect_l(
         if (chain == 0) {
             // create a new chain for this session
             ALOGV("createEffect_l() new effect chain for session %d", sessionId);
-            chain = IAfEffectChain::create(this, sessionId, mAfThreadCallback);
+            chain = IAfEffectChain::create(this, sessionId);
             addEffectChain_l(chain);
             chain->setStrategy(getStrategyForSession_l(sessionId));
             chainCreated = true;
         } else {
-            effect = chain->getEffectFromDesc(desc);
+            effect = chain->getEffectFromDesc_l(desc);
         }
 
         ALOGV("createEffect_l() got effect %p on chain %p", effect.get(), chain.get());
@@ -1675,7 +1675,7 @@ sp<IAfEffectHandle> ThreadBase::createEffect_l(
         if (effect == 0) {
             effectId = mAfThreadCallback->nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT);
             // create a new effect module if none present in the chain
-            lStatus = chain->createEffect(effect, desc, effectId, sessionId, pinned);
+            lStatus = chain->createEffect_l(effect, desc, effectId, sessionId, pinned);
             if (lStatus != NO_ERROR) {
                 goto Exit;
             }
@@ -1693,7 +1693,6 @@ sp<IAfEffectHandle> ThreadBase::createEffect_l(
             const std::optional<media::AudioVibratorInfo> defaultVibratorInfo =
                     std::move(mAfThreadCallback->getDefaultVibratorInfo_l());
             if (defaultVibratorInfo) {
-                audio_utils::lock_guard _cl(chain->mutex());
                 // Only set the vibrator info when it is a valid one.
                 effect->setVibratorInfo_l(*defaultVibratorInfo);
             }
@@ -1715,7 +1714,7 @@ Exit:
     if (!probe && lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
         audio_utils::lock_guard _l(mutex());
         if (effectCreated) {
-            chain->removeEffect(effect);
+            chain->removeEffect_l(effect);
         }
         if (chainCreated) {
             removeEffectChain_l(chain);
@@ -1816,7 +1815,7 @@ status_t ThreadBase::addEffect_ll(const sp<IAfEffectModule>& effect)
     if (chain == 0) {
         // create a new chain for this session
         ALOGV("%s: new effect chain for session %d", __func__, sessionId);
-        chain = IAfEffectChain::create(this, sessionId, mAfThreadCallback);
+        chain = IAfEffectChain::create(this, sessionId);
         addEffectChain_l(chain);
         chain->setStrategy(getStrategyForSession_l(sessionId));
         chainCreated = true;
@@ -1831,7 +1830,7 @@ status_t ThreadBase::addEffect_ll(const sp<IAfEffectModule>& effect)
 
     effect->setOffloaded_l(mType == OFFLOAD, mId);
 
-    status_t status = chain->addEffect(effect);
+    status_t status = chain->addEffect_l(effect);
     if (status != NO_ERROR) {
         if (chainCreated) {
             removeEffectChain_l(chain);
@@ -1858,7 +1857,7 @@ void ThreadBase::removeEffect_l(const sp<IAfEffectModule>& effect, bool release)
     sp<IAfEffectChain> chain = effect->getCallback()->chain().promote();
     if (chain != 0) {
         // remove effect chain if removing last effect
-        if (chain->removeEffect(effect, release) == 0) {
+        if (chain->removeEffect_l(effect, release) == 0) {
             removeEffectChain_l(chain);
         }
     } else {
@@ -2898,7 +2897,7 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
         sp<IAfEffectChain> chain = getEffectChain_l(track->sessionId());
         if (mHapticChannelMask != AUDIO_CHANNEL_NONE
                 && ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
-                        || (chain != nullptr && chain->containsHapticGeneratingEffect()))) {
+                        || (chain != nullptr && chain->containsHapticGeneratingEffect_l()))) {
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.
             mutex().unlock();
@@ -4801,7 +4800,7 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
         }
         if (mHapticChannelCount > 0 &&
                 ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
-                        || (chain != nullptr && chain->containsHapticGeneratingEffect()))) {
+                        || (chain != nullptr && chain->containsHapticGeneratingEffect_l()))) {
             mutex().unlock();
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.

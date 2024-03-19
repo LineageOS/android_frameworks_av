@@ -3590,7 +3590,7 @@ status_t AudioPolicyManager::registerEffect(const effect_descriptor_t *desc,
                                 int session,
                                 int id)
 {
-    if (session != AUDIO_SESSION_DEVICE && io != AUDIO_IO_HANDLE_NONE) {
+    if (session != AUDIO_SESSION_DEVICE) {
         ssize_t index = mOutputs.indexOfKey(io);
         if (index < 0) {
             index = mInputs.indexOfKey(io);
