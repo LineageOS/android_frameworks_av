@@ -17,8 +17,12 @@
 #include <AudioFlinger.h>
 #include <android-base/logging.h>
 #include <android/binder_interface_utils.h>
+#include <android/binder_manager.h>
 #include <android/binder_process.h>
 #include <android/media/IAudioPolicyService.h>
+#include <core-mock/ConfigMock.h>
+#include <core-mock/ModuleMock.h>
+#include <effect-mock/FactoryMock.h>
 #include <fakeservicemanager/FakeServiceManager.h>
 #include <fuzzbinder/libbinder_driver.h>
 #include <fuzzbinder/random_binder.h>
@@ -53,13 +57,25 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     });
     gFakeServiceManager->clear();
 
-    for (const char* service :
-         {"activity", "sensor_privacy", "permission", "scheduling_policy",
-          "android.hardware.audio.core.IConfig", "batterystats", "media.metrics"}) {
+    for (const char* service : {"activity", "sensor_privacy", "permission", "scheduling_policy",
+                                "batterystats", "media.metrics"}) {
         if (!addService(String16(service), gFakeServiceManager, fdp)) {
             return 0;
         }
     }
+
+    auto configService = ndk::SharedRefBase::make<ConfigMock>();
+    CHECK_EQ(NO_ERROR, AServiceManager_addService(configService.get()->asBinder().get(),
+                                                  "android.hardware.audio.core.IConfig/default"));
+
+    auto factoryService = ndk::SharedRefBase::make<FactoryMock>();
+    CHECK_EQ(NO_ERROR,
+             AServiceManager_addService(factoryService.get()->asBinder().get(),
+                                        "android.hardware.audio.effect.IFactory/default"));
+
+    auto moduleService = ndk::SharedRefBase::make<ModuleMock>();
+    CHECK_EQ(NO_ERROR, AServiceManager_addService(moduleService.get()->asBinder().get(),
+                                                  "android.hardware.audio.core.IModule/default"));
 
     const auto audioFlinger = sp<AudioFlinger>::make();
     const auto afAdapter = sp<AudioFlingerServerAdapter>::make(audioFlinger);
@@ -77,12 +93,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
                                              false /* allowIsolated */,
                                              IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
 
-    sp<IBinder> audioFlingerServiceBinder =
-            gFakeServiceManager->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
-    sp<media::IAudioFlingerService> audioFlingerService =
-            interface_cast<media::IAudioFlingerService>(audioFlingerServiceBinder);
-
-    fuzzService(media::IAudioFlingerService::asBinder(audioFlingerService), std::move(fdp));
+    fuzzService(media::IAudioFlingerService::asBinder(afAdapter), std::move(fdp));
 
     return 0;
 }
