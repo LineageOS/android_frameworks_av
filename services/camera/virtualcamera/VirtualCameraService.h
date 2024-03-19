@@ -45,6 +45,13 @@ class VirtualCameraService
           configuration,
       bool* _aidl_return) override EXCLUDES(mLock);
 
+  // Register camera corresponding to the binder token.
+  ndk::ScopedAStatus registerCamera(
+      const ::ndk::SpAIBinder& token,
+      const ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
+          configuration,
+      int cameraId, bool* _aidl_return) EXCLUDES(mLock);
+
   // Unregisters camera corresponding to the binder token.
   ndk::ScopedAStatus unregisterCamera(const ::ndk::SpAIBinder& token) override
       EXCLUDES(mLock);
@@ -64,7 +71,7 @@ class VirtualCameraService
 
  private:
   // Create and enable test camera instance if there's none.
-  void enableTestCameraCmd(int out, int err);
+  void enableTestCameraCmd(int out, int err, int cameraId);
   // Disable and destroy test camera instance if there's one.
   void disableTestCameraCmd(int out);
 
@@ -84,6 +91,9 @@ class VirtualCameraService
 
   // Local binder token for test camera instance, or nullptr if there's none.
   ::ndk::SpAIBinder mTestCameraToken;
+
+  // Numerical id to assign to next created camera.
+  static std::atomic_int sNextId;
 };
 
 }  // namespace virtualcamera

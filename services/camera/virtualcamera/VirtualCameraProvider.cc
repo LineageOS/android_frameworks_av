@@ -42,10 +42,6 @@ using ::aidl::android::hardware::camera::provider::CameraIdAndStreamCombination;
 using ::aidl::android::hardware::camera::provider::ConcurrentCameraIdCombination;
 using ::aidl::android::hardware::camera::provider::ICameraProviderCallback;
 
-// TODO(b/301023410) Make camera id range configurable / dynamic
-// based on already registered devices.
-std::atomic_int VirtualCameraProvider::sNextId{42};
-
 ndk::ScopedAStatus VirtualCameraProvider::setCallback(
     const std::shared_ptr<ICameraProviderCallback>& in_callback) {
   ALOGV("%s", __func__);
@@ -154,9 +150,15 @@ ndk::ScopedAStatus VirtualCameraProvider::isConcurrentStreamCombinationSupported
 }
 
 std::shared_ptr<VirtualCameraDevice> VirtualCameraProvider::createCamera(
-    const VirtualCameraConfiguration& configuration) {
+    const VirtualCameraConfiguration& configuration, const int cameraId) {
+  if (cameraId < 0) {
+    ALOGE("%s: Cannot create camera with negative id. cameraId: %d", __func__,
+          cameraId);
+    return nullptr;
+  }
+
   auto camera =
-      ndk::SharedRefBase::make<VirtualCameraDevice>(sNextId++, configuration);
+      ndk::SharedRefBase::make<VirtualCameraDevice>(cameraId, configuration);
   std::shared_ptr<ICameraProviderCallback> callback;
   {
     const std::lock_guard<std::mutex> lock(mLock);
