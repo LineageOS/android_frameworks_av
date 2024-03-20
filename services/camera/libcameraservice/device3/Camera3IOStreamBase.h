@@ -52,7 +52,7 @@ class Camera3IOStreamBase :
      * Camera3Stream interface
      */
 
-    virtual void     dump(int fd, const Vector<String16> &args) const;
+    virtual void     dump(int fd, const Vector<String16> &args);
 
     int              getMaxTotalBuffers() const { return mTotalBufferCount; }
   protected:
@@ -108,7 +108,7 @@ class Camera3IOStreamBase :
     virtual size_t   getCachedOutputBufferCountLocked() const;
     virtual size_t   getMaxCachedOutputBuffersLocked() const;
 
-    virtual status_t getEndpointUsage(uint64_t *usage) const = 0;
+    virtual status_t getEndpointUsage(uint64_t *usage) = 0;
 
     status_t getBufferPreconditionCheckLocked() const;
     status_t returnBufferPreconditionCheckLocked() const;
