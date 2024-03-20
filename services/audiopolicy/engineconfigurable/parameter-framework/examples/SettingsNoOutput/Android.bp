@@ -18,8 +18,8 @@
 
 soong_namespace {
     imports: [
-        "frameworks/av/services/audiopolicy/engineconfigurable/config/example/phone",
         "frameworks/av/services/audiopolicy/config",
+        "frameworks/av/services/audiopolicy/engineconfigurable/config/example/phone",
     ],
 }
 
@@ -41,25 +41,28 @@ prebuilt_etc {
     sub_dir: "parameter-framework/Settings/Policy",
     required: [
         "PolicyClass.xml",
-        "PolicySubsystem.xml",
         "PolicySubsystem-CommonTypes.xml",
+        "PolicySubsystem.xml",
     ],
 }
+
 genrule {
     name: "domaingeneratorpolicyrule_gen",
     enabled: false, // TODO: This module fails to build
     defaults: ["domaingeneratorpolicyrule"],
     srcs: [
-        ":audio_policy_pfw_toplevel",
-        ":audio_policy_pfw_structure_files",
         ":audio_policy_engine_criterion_types",
+        ":audio_policy_pfw_structure_files",
+        ":audio_policy_pfw_toplevel",
         ":edd_files",
     ],
 }
+
 filegroup {
     name: "audio_policy_pfw_toplevel",
     srcs: [":ParameterFrameworkConfigurationPolicy.userdebug.xml"],
 }
+
 filegroup {
     name: "audio_policy_pfw_structure_files",
     srcs: [
@@ -68,14 +71,16 @@ filegroup {
         ":buildcommontypesstructure_gen",
     ],
 }
+
 filegroup {
     name: "edd_files",
     srcs: [
-        "device_for_strategies.pfw",
-        ":volumes.pfw",
         ":device_for_input_source.pfw",
+        ":volumes.pfw",
+        "device_for_strategies.pfw",
     ],
 }
+
 prebuilt_etc {
     name: "PolicySubsystem.xml",
     vendor: true,

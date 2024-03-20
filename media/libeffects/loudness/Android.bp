@@ -48,10 +48,10 @@ cc_library_shared {
 cc_library_shared {
     name: "libloudnessenhanceraidl",
     srcs: [
+        ":effectCommonFile",
         "aidl/EffectLoudnessEnhancer.cpp",
         "aidl/LoudnessEnhancerContext.cpp",
         "dsp/core/dynamic_range_compression.cpp",
-        ":effectCommonFile",
     ],
     defaults: [
         "aidlaudioeffectservice_defaults",

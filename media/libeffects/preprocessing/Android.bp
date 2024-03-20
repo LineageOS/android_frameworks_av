@@ -62,30 +62,30 @@ cc_library {
 cc_library_shared {
     name: "libpreprocessingaidl",
     srcs: [
-        "aidl/PreProcessingContext.cpp",
-        "aidl/EffectPreProcessing.cpp",
         ":effectCommonFile",
+        "aidl/EffectPreProcessing.cpp",
+        "aidl/PreProcessingContext.cpp",
     ],
     defaults: [
         "aidlaudioeffectservice_defaults",
     ],
     local_include_dirs: ["aidl"],
     shared_libs: [
+        "libaudioutils",
         "liblog",
         "libutils",
-        "libaudioutils",
     ],
     static_libs: [
         "webrtc_audio_processing",
     ],
     header_libs: [
-        "libwebrtc_absl_headers",
         "libaudioeffects",
         "libhardware_headers",
+        "libwebrtc_absl_headers",
     ],
     cflags: [
-        "-Wthread-safety",
         "-Wno-unused-parameter",
+        "-Wthread-safety",
     ],
     relative_install_path: "soundfx",
     visibility: [

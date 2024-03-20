@@ -183,9 +183,9 @@ cc_test {
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_full_queue.cpp"],
     shared_libs: [
-		"libaaudio",
-		"liblog"
-	],
+        "libaaudio",
+        "liblog",
+    ],
 }
 
 cc_test {
@@ -205,9 +205,9 @@ cc_binary {
     srcs: ["test_steal_exclusive.cpp"],
     shared_libs: [
         "libaaudio",
-        "liblog",
         "libbinder",
         "libcutils",
+        "liblog",
         "libutils",
     ],
 }

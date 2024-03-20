@@ -33,7 +33,7 @@ license {
 }
 
 cc_defaults {
-    name : "dynamicsprocessingdefaults",
+    name: "dynamicsprocessingdefaults",
     srcs: [
         "dsp/DPBase.cpp",
         "dsp/DPFrequency.cpp",
@@ -50,9 +50,9 @@ cc_defaults {
         "libeigen",
     ],
     cflags: [
-        "-Wthread-safety",
         "-Wall",
         "-Werror",
+        "-Wthread-safety",
     ],
     relative_install_path: "soundfx",
 }
@@ -80,9 +80,9 @@ cc_library_shared {
     name: "libdynamicsprocessingaidl",
 
     srcs: [
+        ":effectCommonFile",
         "aidl/DynamicsProcessing.cpp",
         "aidl/DynamicsProcessingContext.cpp",
-        ":effectCommonFile",
     ],
 
     defaults: [

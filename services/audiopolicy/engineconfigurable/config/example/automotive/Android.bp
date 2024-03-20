@@ -36,22 +36,25 @@ prebuilt_etc {
     vendor: true,
     src: ":audio_policy_engine_configuration",
     required: [
-        ":audio_policy_engine_criterion_types.xml",
         ":audio_policy_engine_criteria.xml",
+        ":audio_policy_engine_criterion_types.xml",
         ":audio_policy_engine_product_strategies.xml",
         ":audio_policy_engine_volumes.xml",
     ],
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_product_strategies.xml",
     vendor: true,
     src: "audio_policy_engine_product_strategies.xml",
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_volumes.xml",
     vendor: true,
     src: ":audio_policy_engine_volumes",
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_criterion_types.xml",
     vendor: true,
@@ -65,39 +68,44 @@ genrule {
     name: "audio_policy_engine_criterion_types",
     defaults: ["buildpolicycriteriontypesrule"],
     srcs: [
-        ":audio_policy_configuration_top_file",
         ":audio_policy_configuration_files",
+        ":audio_policy_configuration_top_file",
     ],
 }
+
 filegroup {
     name: "audio_policy_configuration_files",
     srcs: [
-        ":r_submix_audio_policy_configuration",
-        ":default_volume_tables",
         ":audio_policy_volumes",
-        ":surround_sound_configuration_5_0",
+        ":default_volume_tables",
         ":primary_audio_policy_configuration",
+        ":r_submix_audio_policy_configuration",
+        ":surround_sound_configuration_5_0",
     ],
 }
+
 filegroup {
-    name : "audio_policy_configuration_top_file",
+    name: "audio_policy_configuration_top_file",
     srcs: [":audio_policy_configuration_generic"],
 }
+
 filegroup {
     name: "audio_policy_engine_configuration",
     srcs: ["audio_policy_engine_configuration.xml"],
 }
+
 filegroup {
     name: "audio_policy_engine_volumes",
     srcs: ["audio_policy_engine_volumes.xml"],
 }
+
 filegroup {
     name: "audio_policy_engine_configuration_files",
     srcs: [
         ":audio_policy_engine_configuration",
-        "audio_policy_engine_product_strategies.xml",
-        ":audio_policy_engine_volumes",
-        ":audio_policy_engine_criterion_types",
         ":audio_policy_engine_criteria",
+        ":audio_policy_engine_criterion_types",
+        ":audio_policy_engine_volumes",
+        "audio_policy_engine_product_strategies.xml",
     ],
 }

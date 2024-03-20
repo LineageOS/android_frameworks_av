@@ -24,8 +24,8 @@ cc_defaults {
     name: "libaudiohal_aidl_test_default",
     test_suites: ["device-tests"],
     defaults: [
-        "libaudiohal_default",
         "libaudiohal_aidl_default",
+        "libaudiohal_default",
     ],
     shared_libs: [
         "libaudiohal",
@@ -35,8 +35,8 @@ cc_defaults {
 cc_test {
     name: "CoreAudioHalAidlTest",
     srcs: [
-        "CoreAudioHalAidl_test.cpp",
         ":core_audio_hal_aidl_src_files",
+        "CoreAudioHalAidl_test.cpp",
     ],
     defaults: ["libaudiohal_aidl_test_default"],
     header_libs: ["libaudiohalimpl_headers"],
@@ -55,8 +55,8 @@ cc_test {
 cc_test {
     name: "EffectProxyTest",
     srcs: [
-        "EffectProxy_test.cpp",
         ":audio_effectproxy_src_files",
+        "EffectProxy_test.cpp",
     ],
     defaults: [
         "libaudiohal_aidl_test_default",
@@ -68,8 +68,8 @@ cc_test {
 cc_test {
     name: "EffectHalVersionCompatibilityTest",
     srcs: [
-        "EffectHalVersionCompatibility_test.cpp",
         ":audio_effect_hal_aidl_src_files",
+        "EffectHalVersionCompatibility_test.cpp",
     ],
     defaults: ["libaudiohal_aidl_test_default"],
     header_libs: ["libaudiohalimpl_headers"],

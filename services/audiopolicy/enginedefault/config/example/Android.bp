@@ -33,21 +33,24 @@ prebuilt_etc {
     vendor: true,
     src: "phone/audio_policy_engine_configuration.xml",
     required: [
-        ":audio_policy_engine_stream_volumes.xml",
         ":audio_policy_engine_default_stream_volumes.xml",
         ":audio_policy_engine_product_strategies.xml",
+        ":audio_policy_engine_stream_volumes.xml",
     ],
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_product_strategies.xml",
     vendor: true,
     src: "phone/audio_policy_engine_product_strategies.xml",
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_stream_volumes.xml",
     vendor: true,
     src: "phone/audio_policy_engine_stream_volumes.xml",
 }
+
 prebuilt_etc {
     name: "audio_policy_engine_default_stream_volumes.xml",
     vendor: true,

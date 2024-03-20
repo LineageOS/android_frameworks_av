@@ -29,7 +29,7 @@ cc_defaults {
     tidy_checks: audioflinger_sounddose_tidy_errors,
     tidy_checks_as_errors: audioflinger_sounddose_tidy_errors,
     tidy_flags: [
-      "-format-style=file",
+        "-format-style=file",
     ],
 }
 
@@ -40,9 +40,9 @@ cc_library {
 
     defaults: [
         "audioflinger_sounddose_flags_defaults",
-        "latest_android_media_audio_common_types_ndk_shared",
         "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "latest_android_hardware_audio_sounddose_ndk_shared",
+        "latest_android_media_audio_common_types_ndk_shared",
     ],
 
     srcs: [
@@ -66,9 +66,9 @@ cc_library {
     ],
 
     cflags: [
+        "-DBACKEND_NDK",
         "-Wall",
         "-Werror",
-        "-DBACKEND_NDK",
     ],
 }
 

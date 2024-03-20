@@ -22,8 +22,8 @@ cc_defaults {
     ],
     sanitize: {
         misc_undefined: [
-            "unsigned-integer-overflow",
             "signed-integer-overflow",
+            "unsigned-integer-overflow",
         ],
     },
 }
@@ -31,8 +31,8 @@ cc_defaults {
 cc_defaults {
     name: "audio_aidl_conversion_test_defaults",
     defaults: [
-        "libaudioclient_tests_defaults",
         "latest_android_media_audio_common_types_cpp_static",
+        "libaudioclient_tests_defaults",
     ],
     static_libs: [
         "audioclient-types-aidl-cpp",
@@ -109,9 +109,9 @@ cc_defaults {
         "libcgrouprc",
         "libdl",
         "libmedia",
+        "libmedia_helper",
         "libmediametrics",
         "libmediautils",
-        "libmedia_helper",
         "libnblog",
         "libprocessgroup",
         "libshmemcompat",

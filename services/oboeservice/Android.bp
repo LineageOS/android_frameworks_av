@@ -69,10 +69,10 @@ tidy_errors = [
     "-android-cloexec-dup", // found in AAudioServiceEndpointMMAP.cpp
     "-bugprone-narrowing-conversions", // found in several interface from size_t to int32_t
 
-    "-google-readability-casting", // C++ casts not always necessary and may be verbose
-    "-google-readability-todo", // do not require TODO(info)
     "-google-build-using-namespace", // Reenable and fix later.
     "-google-global-names-in-headers", // found in several files
+    "-google-readability-casting", // C++ casts not always necessary and may be verbose
+    "-google-readability-todo", // do not require TODO(info)
 
     "-misc-non-private-member-variables-in-classes", // found in aidl generated files
 
@@ -82,26 +82,27 @@ cc_defaults {
     name: "libaaudioservice_dependencies",
 
     shared_libs: [
+        "aaudio-aidl-cpp",
+        "com.android.media.aaudio-aconfig-cc",
+        "framework-permission-aidl-cpp",
         "libaaudio_internal",
         "libaudioclient",
+        "libaudioclient_aidl_conversion",
         "libaudioutils",
-        "libmedia_helper",
-        "libmediametrics",
-        "libmediautils",
         "libbase",
         "libbinder",
         "libcutils",
         "liblog",
+        "libmedia_helper",
+        "libmediametrics",
+        "libmediautils",
         "libutils",
-        "aaudio-aidl-cpp",
-        "framework-permission-aidl-cpp",
-        "libaudioclient_aidl_conversion",
         "packagemanager_aidl-cpp",
     ],
 
     static_libs: [
         "libaudioflinger",
-    ]
+    ],
 }
 
 cc_library_static {
@@ -109,8 +110,8 @@ cc_library_static {
     name: "libaaudioservice",
 
     defaults: [
-        "libaaudioservice_dependencies",
         "latest_android_media_audio_common_types_cpp_shared",
+        "libaaudioservice_dependencies",
     ],
 
     srcs: [
@@ -136,15 +137,15 @@ cc_library_static {
     ],
 
     cflags: [
-        "-Wthread-safety",
-        "-Wno-unused-parameter",
         "-Wall",
         "-Werror",
+        "-Wno-unused-parameter",
+        "-Wthread-safety",
     ],
 
     export_shared_lib_headers: [
-        "libaaudio_internal",
         "framework-permission-aidl-cpp",
+        "libaaudio_internal",
     ],
 
     header_libs: [
@@ -152,8 +153,8 @@ cc_library_static {
     ],
 
     include_dirs: [
-        "frameworks/av/media/libnbaio/include_mono",
         "frameworks/av/media/libnbaio/include",
+        "frameworks/av/media/libnbaio/include_mono",
     ],
 
     tidy: true,
@@ -161,5 +162,5 @@ cc_library_static {
     tidy_checks_as_errors: tidy_errors,
     tidy_flags: [
         "-format-style=file",
-    ]
+    ],
 }

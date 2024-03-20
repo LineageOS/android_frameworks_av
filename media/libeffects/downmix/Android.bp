@@ -37,9 +37,9 @@ cc_library {
     relative_install_path: "soundfx",
 
     cflags: [
-        "-fvisibility=hidden",
         "-Wall",
         "-Werror",
+        "-fvisibility=hidden",
     ],
 
     header_libs: [
@@ -51,16 +51,16 @@ cc_library {
 cc_library_shared {
     name: "libdownmixaidl",
     srcs: [
-        "aidl/EffectDownmix.cpp",
-        "aidl/DownmixContext.cpp",
         ":effectCommonFile",
+        "aidl/DownmixContext.cpp",
+        "aidl/EffectDownmix.cpp",
     ],
     defaults: [
         "aidlaudioeffectservice_defaults",
     ],
     header_libs: [
         "libaudioeffects",
-        "libhardware_headers"
+        "libhardware_headers",
     ],
     shared_libs: [
         "libaudioutils",
