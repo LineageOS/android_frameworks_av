@@ -36,7 +36,9 @@ TunerLnb::TunerLnb(shared_ptr<ILnb> lnb, int id) {
 }
 
 TunerLnb::~TunerLnb() {
-    close();
+    if (!isClosed) {
+        close();
+    }
     mLnb = nullptr;
     mId = -1;
 }
@@ -70,6 +72,7 @@ TunerLnb::~TunerLnb() {
 }
 
 ::ndk::ScopedAStatus TunerLnb::close() {
+    isClosed = true;
     return mLnb->close();
 }
 

@@ -50,7 +50,9 @@ TunerDemux::TunerDemux(const shared_ptr<IDemux> demux, const int id,
 }
 
 TunerDemux::~TunerDemux() {
-    close();
+    if (!isClosed) {
+        close();
+    }
     mDemux = nullptr;
     mTunerService = nullptr;
 }
@@ -125,6 +127,7 @@ TunerDemux::~TunerDemux() {
 }
 
 ::ndk::ScopedAStatus TunerDemux::close() {
+    isClosed = true;
     return mDemux->close();
 }
 

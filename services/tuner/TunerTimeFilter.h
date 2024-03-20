@@ -45,6 +45,7 @@ public:
 
 private:
     shared_ptr<ITimeFilter> mTimeFilter;
+    bool isClosed = false;
 };
 
 }  // namespace tuner
