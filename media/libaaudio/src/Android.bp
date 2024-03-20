@@ -56,10 +56,10 @@ tidy_errors = [
     "-bugprone-macro-parentheses", // found in SharedMemoryParcelable.h
     "-bugprone-narrowing-conversions", // found in several interface from size_t to int32_t
 
-    "-google-readability-casting", // C++ casts not always necessary and may be verbose
-    "-google-readability-todo", // do not require TODO(info)
     "-google-build-using-namespace", // Reenable and fix later.
     "-google-global-names-in-headers", // found in several files
+    "-google-readability-casting", // C++ casts not always necessary and may be verbose
+    "-google-readability-todo", // do not require TODO(info)
 
     "-misc-non-private-member-variables-in-classes", // found in aidl generated files
 
@@ -89,28 +89,30 @@ cc_library {
     ],
 
     cflags: [
-        "-Wthread-safety",
-        "-Wno-unused-parameter",
         "-Wall",
         "-Werror",
         // By default, all symbols are hidden.
+
         // "-fvisibility=hidden",
         // AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
+        "-Wno-unused-parameter",
+        "-Wthread-safety",
+
         "-DAAUDIO_API=__attribute__((visibility(\"default\")))",
     ],
 
     shared_libs: [
+        "framework-permission-aidl-cpp",
         "libaaudio_internal",
         "libaudioclient",
         "libaudioutils",
+        "libbinder",
+        "libcutils",
+        "liblog",
         "libmedia_helper",
         "libmediametrics",
         "libmediautils",
-        "liblog",
-        "libcutils",
         "libutils",
-        "libbinder",
-        "framework-permission-aidl-cpp",
     ],
 
     sanitize: {
@@ -128,7 +130,7 @@ cc_library {
     tidy_checks_as_errors: tidy_errors,
     tidy_flags: [
         "-format-style=file",
-    ]
+    ],
 }
 
 cc_library {
@@ -160,56 +162,49 @@ cc_library {
     ],
 
     shared_libs: [
+        "aaudio-aidl-cpp",
+        "audioclient-types-aidl-cpp",
+        "com.android.media.aaudio-aconfig-cc",
+        "framework-permission-aidl-cpp",
         "libaudioclient",
+        "libaudioclient_aidl_conversion",
         "libaudioutils",
+        "libbinder",
+        "libcutils",
+        "liblog",
         "libmedia_helper",
         "libmediametrics",
         "libmediautils",
-        "liblog",
-        "libcutils",
         "libutils",
-        "libbinder",
-        "framework-permission-aidl-cpp",
-        "aaudio-aidl-cpp",
-        "audioclient-types-aidl-cpp",
-        "libaudioclient_aidl_conversion",
-        "com.android.media.aaudio-aconfig-cc",
     ],
 
     cflags: [
-        "-Wno-unused-parameter",
         "-Wall",
         "-Werror",
+        "-Wno-unused-parameter",
     ],
 
     srcs: [
-        "core/AudioGlobal.cpp",
-        "core/AudioStream.cpp",
-        "core/AudioStreamBuilder.cpp",
-        "core/AAudioStreamParameters.cpp",
-        "legacy/AudioStreamLegacy.cpp",
-        "legacy/AudioStreamRecord.cpp",
-        "legacy/AudioStreamTrack.cpp",
-        "utility/AAudioUtilities.cpp",
-        "utility/FixedBlockAdapter.cpp",
-        "utility/FixedBlockReader.cpp",
-        "utility/FixedBlockWriter.cpp",
-        "fifo/FifoBuffer.cpp",
-        "fifo/FifoControllerBase.cpp",
+        "binding/AAudioBinderAdapter.cpp",
+        "binding/AAudioBinderClient.cpp",
+        "binding/AAudioStreamConfiguration.cpp",
+        "binding/AAudioStreamRequest.cpp",
+        "binding/AudioEndpointParcelable.cpp",
+        "binding/RingBufferParcelable.cpp",
+        "binding/SharedMemoryParcelable.cpp",
+        "binding/SharedRegionParcelable.cpp",
         "client/AAudioFlowGraph.cpp",
         "client/AudioEndpoint.cpp",
         "client/AudioStreamInternal.cpp",
         "client/AudioStreamInternalCapture.cpp",
         "client/AudioStreamInternalPlay.cpp",
         "client/IsochronousClockModel.cpp",
-        "binding/AudioEndpointParcelable.cpp",
-        "binding/AAudioBinderAdapter.cpp",
-        "binding/AAudioBinderClient.cpp",
-        "binding/AAudioStreamRequest.cpp",
-        "binding/AAudioStreamConfiguration.cpp",
-        "binding/RingBufferParcelable.cpp",
-        "binding/SharedMemoryParcelable.cpp",
-        "binding/SharedRegionParcelable.cpp",
+        "core/AAudioStreamParameters.cpp",
+        "core/AudioGlobal.cpp",
+        "core/AudioStream.cpp",
+        "core/AudioStreamBuilder.cpp",
+        "fifo/FifoBuffer.cpp",
+        "fifo/FifoControllerBase.cpp",
         "flowgraph/ChannelCountConverter.cpp",
         "flowgraph/ClipToRange.cpp",
         "flowgraph/FlowGraphNode.cpp",
@@ -217,20 +212,20 @@ cc_library {
         "flowgraph/ManyToMultiConverter.cpp",
         "flowgraph/MonoBlend.cpp",
         "flowgraph/MonoToMultiConverter.cpp",
-        "flowgraph/MultiToMonoConverter.cpp",
         "flowgraph/MultiToManyConverter.cpp",
+        "flowgraph/MultiToMonoConverter.cpp",
         "flowgraph/RampLinear.cpp",
         "flowgraph/SampleRateConverter.cpp",
         "flowgraph/SinkFloat.cpp",
+        "flowgraph/SinkI8_24.cpp",
         "flowgraph/SinkI16.cpp",
         "flowgraph/SinkI24.cpp",
         "flowgraph/SinkI32.cpp",
-        "flowgraph/SinkI8_24.cpp",
         "flowgraph/SourceFloat.cpp",
+        "flowgraph/SourceI8_24.cpp",
         "flowgraph/SourceI16.cpp",
         "flowgraph/SourceI24.cpp",
         "flowgraph/SourceI32.cpp",
-        "flowgraph/SourceI8_24.cpp",
         "flowgraph/resampler/IntegerRatio.cpp",
         "flowgraph/resampler/LinearResampler.cpp",
         "flowgraph/resampler/MultiChannelResampler.cpp",
@@ -239,6 +234,13 @@ cc_library {
         "flowgraph/resampler/PolyphaseResamplerStereo.cpp",
         "flowgraph/resampler/SincResampler.cpp",
         "flowgraph/resampler/SincResamplerStereo.cpp",
+        "legacy/AudioStreamLegacy.cpp",
+        "legacy/AudioStreamRecord.cpp",
+        "legacy/AudioStreamTrack.cpp",
+        "utility/AAudioUtilities.cpp",
+        "utility/FixedBlockAdapter.cpp",
+        "utility/FixedBlockReader.cpp",
+        "utility/FixedBlockWriter.cpp",
     ],
     sanitize: {
         integer_overflow: true,
@@ -250,7 +252,7 @@ cc_library {
     tidy_checks_as_errors: tidy_errors,
     tidy_flags: [
         "-format-style=file",
-    ]
+    ],
 }
 
 aidl_interface {
@@ -262,20 +264,19 @@ aidl_interface {
     ],
     srcs: [
         "binding/aidl/aaudio/Endpoint.aidl",
+        "binding/aidl/aaudio/IAAudioClient.aidl",
+        "binding/aidl/aaudio/IAAudioService.aidl",
         "binding/aidl/aaudio/RingBuffer.aidl",
         "binding/aidl/aaudio/SharedRegion.aidl",
         "binding/aidl/aaudio/StreamParameters.aidl",
         "binding/aidl/aaudio/StreamRequest.aidl",
-        "binding/aidl/aaudio/IAAudioClient.aidl",
-        "binding/aidl/aaudio/IAAudioService.aidl",
     ],
     imports: [
         "audioclient-types-aidl",
-        "shared-file-region-aidl",
         "framework-permission-aidl",
+        "shared-file-region-aidl",
     ],
-    backend:
-    {
+    backend: {
         java: {
             sdk_version: "module_current",
         },

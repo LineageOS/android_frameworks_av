@@ -18,9 +18,9 @@
 
 soong_namespace {
     imports: [
+        "frameworks/av/services/audiopolicy/config",
         "frameworks/av/services/audiopolicy/engineconfigurable/config/example/caremu",
         "frameworks/av/services/audiopolicy/engineconfigurable/parameter-framework/examples/Car",
-        "frameworks/av/services/audiopolicy/config",
     ],
 }
 
@@ -43,6 +43,7 @@ prebuilt_etc {
     sub_dir: "parameter-framework/Structure/Policy",
     required: ["libpolicy-subsystem"],
 }
+
 genrule {
     name: "buildstrategiesstructure_gen",
     defaults: ["buildstrategiesstructurerule"],
@@ -62,23 +63,25 @@ prebuilt_etc {
     src: ":domaingeneratorpolicyrule_gen",
     sub_dir: "parameter-framework/Settings/Policy",
     required: [
-        "ProductStrategies.xml",
         "PolicyClass.xml",
-        "PolicySubsystem.xml",
         "PolicySubsystem-CommonTypes.xml",
+        "PolicySubsystem.xml",
+        "ProductStrategies.xml",
     ],
 }
+
 genrule {
     name: "domaingeneratorpolicyrule_gen",
     enabled: false, // TODO: This module fails to build
     defaults: ["domaingeneratorpolicyrule"],
     srcs: [
-        ":audio_policy_pfw_toplevel",
-        ":audio_policy_pfw_structure_files",
         ":audio_policy_engine_criterion_types",
+        ":audio_policy_pfw_structure_files",
+        ":audio_policy_pfw_toplevel",
         ":edd_files",
     ],
 }
+
 filegroup {
     name: "edd_files",
     srcs: [
@@ -87,11 +90,13 @@ filegroup {
         "Settings/device_for_product_strategies.pfw",
     ],
 }
+
 // This is for Settings generation, must use socket port, so userdebug version is required
 filegroup {
     name: "audio_policy_pfw_toplevel",
     srcs: [":ParameterFrameworkConfigurationPolicy.userdebug.xml"],
 }
+
 filegroup {
     name: "audio_policy_pfw_structure_files",
     srcs: [

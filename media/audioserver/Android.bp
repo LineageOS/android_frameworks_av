@@ -26,11 +26,11 @@ cc_binary {
     ],
 
     defaults: [
+        "latest_android_hardware_audio_core_sounddose_ndk_shared",
+        "latest_android_media_audio_common_types_cpp_shared",
         "libaaudioservice_dependencies",
         "libaudioflinger_dependencies",
         "libaudiopolicyservice_dependencies",
-        "latest_android_media_audio_common_types_cpp_shared",
-        "latest_android_hardware_audio_core_sounddose_ndk_shared",
     ],
 
     static_libs: [
@@ -70,7 +70,6 @@ cc_binary {
         "frameworks/av/services/audiopolicy/service",
         "frameworks/av/services/medialog",
         "frameworks/av/services/oboeservice", // TODO oboeservice is the old folder name for aaudioservice. It will be changed.
-
 
     ],
 

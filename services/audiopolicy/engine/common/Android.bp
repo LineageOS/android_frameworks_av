@@ -31,10 +31,10 @@ cc_library_static {
     name: "libaudiopolicyengine_common",
     srcs: [
         "src/EngineBase.cpp",
+        "src/LastRemovableMediaDevices.cpp",
         "src/ProductStrategy.cpp",
         "src/VolumeCurve.cpp",
         "src/VolumeGroup.cpp",
-        "src/LastRemovableMediaDevices.cpp",
     ],
     cflags: [
         "-Wall",
@@ -42,10 +42,10 @@ cc_library_static {
         "-Wextra",
     ],
     header_libs: [
-        "libbase_headers",
         "libaudiopolicycommon",
         "libaudiopolicyengine_common_headers",
         "libaudiopolicyengine_interface_headers",
+        "libbase_headers",
     ],
     export_header_lib_headers: [
         "libaudiopolicyengine_common_headers",
@@ -58,7 +58,7 @@ cc_library_static {
         "libaudiopolicycomponents",
     ],
     whole_static_libs: [
-        "server_configurable_flags",
         "com.android.media.audio-aconfig-cc",
+        "server_configurable_flags",
     ],
 }

@@ -23,25 +23,25 @@ cc_library_shared {
 
     shared_libs: [
         "libaudiofoundation",
+        "libaudiopolicy",
         "libaudiopolicycomponents",
+        "libbinder",
         "libcutils",
         "libdl",
-        "libutils",
+        "libhidlbase",
         "liblog",
-        "libaudiopolicy",
         "libmedia_helper",
         "libmediametrics",
-        "libbinder",
-        "libhidlbase",
+        "libutils",
         "libxml2",
         // The default audio policy engine is always present in the system image.
         // libaudiopolicyengineconfigurable can be built in addition by specifying
         // a dependency on it in the device makefile. There will be no build time
         // conflict with libaudiopolicyenginedefault.
-        "libaudiopolicyenginedefault",
+        "audioclient-types-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
-        "audioclient-types-aidl-cpp",
+        "libaudiopolicyenginedefault",
     ],
 
     header_libs: [

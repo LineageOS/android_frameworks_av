@@ -20,11 +20,11 @@ cc_library {
     ],
 
     shared_libs: [
+        "libcutils",
         "liblog",
+        "libmedia_helper",
         "libtinyxml2",
         "libutils",
-        "libmedia_helper",
-        "libcutils",
     ],
 
     header_libs: [

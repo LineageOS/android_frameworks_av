@@ -54,9 +54,9 @@ cc_library_shared {
 cc_library_shared {
     name: "libvisualizeraidl",
     srcs: [
+        ":effectCommonFile",
         "aidl/Visualizer.cpp",
         "aidl/VisualizerContext.cpp",
-        ":effectCommonFile",
     ],
     defaults: [
         "aidlaudioeffectservice_defaults",
