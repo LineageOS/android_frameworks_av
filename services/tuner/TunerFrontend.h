@@ -83,6 +83,7 @@ public:
 private:
     int mId;
     shared_ptr<IFrontend> mFrontend;
+    bool isClosed = false;
 };
 
 }  // namespace tuner

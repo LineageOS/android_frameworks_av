@@ -21,17 +21,17 @@ cc_library_shared {
     name: "libeffects",
     vendor: true,
     srcs: [
-        "EffectsFactory.c",
         "EffectsConfigLoader.c",
+        "EffectsFactory.c",
         "EffectsFactoryState.c",
         "EffectsXmlConfigLoader.cpp",
     ],
 
     shared_libs: [
         "libcutils",
-        "liblog",
         "libdl",
         "libeffectsconfig",
+        "liblog",
     ],
     cflags: ["-fvisibility=hidden"],
 
@@ -54,13 +54,13 @@ cc_binary {
 
     cflags: [
         "-Wall",
-        "-Wextra",
         "-Werror",
+        "-Wextra",
     ],
 
     shared_libs: [
-        "libeffectsconfig",
         "libeffects",
+        "libeffectsconfig",
     ],
     local_include_dirs: [
         ".",

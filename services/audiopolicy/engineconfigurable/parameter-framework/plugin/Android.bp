@@ -11,11 +11,11 @@ package {
 cc_library_shared {
     name: "libpolicy-subsystem",
     srcs: [
-        "PolicySubsystemBuilder.cpp",
-        "PolicySubsystem.cpp",
         "InputSource.cpp",
-        "Stream.cpp",
+        "PolicySubsystem.cpp",
+        "PolicySubsystemBuilder.cpp",
         "ProductStrategy.cpp",
+        "Stream.cpp",
     ],
     cflags: [
         "-Wall",
@@ -25,11 +25,11 @@ cc_library_shared {
         "-fvisibility=hidden",
     ],
     header_libs: [
-        "libbase_headers",
-        "libaudiopolicycommon",
         "libaudioclient_headers",
+        "libaudiopolicycommon",
         "libaudiopolicyengine_interface_headers",
         "libaudiopolicyengineconfigurable_interface_headers",
+        "libbase_headers",
     ],
     static_libs: [
         "libaudiopolicyengine_common",
@@ -39,8 +39,8 @@ cc_library_shared {
         "libaudiopolicycomponents",
         "libaudiopolicyengineconfigurable",
         "liblog",
-        "libutils",
         "libmedia_helper",
         "libparameter",
+        "libutils",
     ],
 }

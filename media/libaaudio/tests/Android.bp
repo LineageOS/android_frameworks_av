@@ -206,9 +206,9 @@ cc_binary {
     srcs: ["test_steal_exclusive.cpp"],
     shared_libs: [
         "libaaudio",
-        "liblog",
         "libbinder",
         "libcutils",
+        "liblog",
         "libutils",
     ],
 }

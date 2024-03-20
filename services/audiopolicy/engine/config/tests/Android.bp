@@ -28,8 +28,8 @@ cc_test {
     data: [":audiopolicy_engineconfig_files"],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     test_suites: ["device-tests"],

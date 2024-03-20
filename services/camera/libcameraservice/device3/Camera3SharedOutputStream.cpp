@@ -279,7 +279,7 @@ status_t Camera3SharedOutputStream::disconnectLocked() {
     return res;
 }
 
-status_t Camera3SharedOutputStream::getEndpointUsage(uint64_t *usage) const {
+status_t Camera3SharedOutputStream::getEndpointUsage(uint64_t *usage) {
 
     status_t res = OK;
     uint64_t u = 0;

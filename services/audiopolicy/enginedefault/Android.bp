@@ -15,15 +15,15 @@ cc_library_shared {
         "src/EngineInstance.cpp",
     ],
     cflags: [
-        "-fvisibility=hidden",
         "-Wall",
         "-Werror",
         "-Wextra",
+        "-fvisibility=hidden",
     ],
     header_libs: [
-        "libbase_headers",
         "libaudiopolicycommon",
         "libaudiopolicyengine_interface_headers",
+        "libbase_headers",
     ],
     static_libs: [
         "libaudiopolicyengine_common",
@@ -32,13 +32,13 @@ cc_library_shared {
     shared_libs: [
         "libaudio_aidl_conversion_common_cpp",
         "libaudiofoundation",
+        "libaudiopolicy",
         "libaudiopolicycomponents",
         "libbase",
-        "liblog",
         "libcutils",
-        "libutils",
+        "liblog",
         "libmedia_helper",
-        "libaudiopolicy",
+        "libutils",
         "libxml2",
     ],
 }

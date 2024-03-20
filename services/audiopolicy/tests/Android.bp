@@ -28,11 +28,11 @@ cc_test {
         "libbase",
         "libbinder",
         "libcutils",
+        "libcutils",
         "libhidlbase",
         "liblog",
         "libmedia_helper",
         "libutils",
-        "libcutils",
         "libxml2",
         "server_configurable_flags",
     ],
@@ -56,13 +56,13 @@ cc_test {
     data: [":audiopolicytest_configuration_files"],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     test_suites: [
-        "device-tests",
         "automotive-tests",
+        "device-tests",
     ],
 
 }
@@ -101,8 +101,8 @@ cc_test {
     srcs: ["audio_health_tests.cpp"],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     test_suites: ["device-tests"],
@@ -131,9 +131,9 @@ cc_test {
     ],
 
     header_libs: [
-          "libaudiohal_headers",
-          "libaudiopolicyservice_headers",
-          "libmediametrics_headers",
+        "libaudiohal_headers",
+        "libaudiopolicyservice_headers",
+        "libmediametrics_headers",
     ],
 
     srcs: ["spatializer_tests.cpp"],

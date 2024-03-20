@@ -77,6 +77,7 @@ public:
 private:
     shared_ptr<IDvr> mDvr;
     DvrType mType;
+    bool isClosed = false;
 };
 
 }  // namespace tuner

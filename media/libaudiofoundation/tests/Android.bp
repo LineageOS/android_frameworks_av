@@ -22,8 +22,8 @@ cc_test {
 
     static_libs: [
         "audioclient-types-aidl-cpp",
-        "libaudioclient_aidl_conversion",
         "libaudio_aidl_conversion_common_cpp",
+        "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libstagefright_foundation",
     ],
@@ -37,8 +37,8 @@ cc_test {
     ],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     test_suites: ["device-tests"],
@@ -64,8 +64,8 @@ cc_test {
     ],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     test_suites: ["device-tests"],

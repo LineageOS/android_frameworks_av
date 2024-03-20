@@ -29,19 +29,19 @@ cc_library_shared {
     srcs: ["EffectProxy.cpp"],
 
     cflags: [
-        "-fvisibility=hidden",
         "-Wall",
         "-Werror",
+        "-fvisibility=hidden",
     ],
 
     include_dirs: ["frameworks/av/media/libeffects/factory"],
 
     header_libs: ["libaudioeffects"],
     shared_libs: [
-        "liblog",
         "libcutils",
-        "libutils",
         "libdl",
         "libeffects",
+        "liblog",
+        "libutils",
     ],
 }

@@ -18,14 +18,14 @@ cc_library {
         "-Wextra",
     ],
     header_libs: [
-        "libbase_headers",
-        "libaudiopolicycommon",
         "libaudiofoundation_headers",
+        "libaudiopolicycommon",
+        "libbase_headers",
     ],
     shared_libs: [
         "liblog",
-        "libutils",
         "libmedia_helper",
         "libparameter",
+        "libutils",
     ],
 }

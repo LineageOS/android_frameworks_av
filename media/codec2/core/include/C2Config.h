@@ -164,6 +164,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexLargeFrame,
     kParamIndexAccessUnitInfos, // struct
 
+    /* Region of Interest Encoding parameters */
+    kParamIndexQpOffsetMapBuffer, // info-buffer, used to signal qp-offset map for a frame
+
     // deprecated
     kParamIndexDelayRequest = kParamIndexDelay | C2Param::CoreIndex::IS_REQUEST_FLAG,
 
@@ -201,6 +204,8 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexPictureQuantization,
     kParamIndexHdrDynamicMetadata,
     kParamIndexHdrFormat,
+    kParamIndexQpOffsetRect,
+    kParamIndexQpOffsetRects,
 
     /* ------------------------------------ video components ------------------------------------ */
 
@@ -1392,6 +1397,47 @@ struct C2RotationStruct {
 typedef C2StreamParam<C2Info, C2RotationStruct, kParamIndexRotation> C2StreamRotationInfo;
 constexpr char C2_PARAMKEY_ROTATION[] = "raw.rotation";
 constexpr char C2_PARAMKEY_VUI_ROTATION[] = "coded.vui.rotation";
+
+/**
+ * Region of Interest of an image/video frame communicated as an array of C2QpOffsetRectStruct
+ *
+ * Fields width, height, left and top of C2QpOffsetRectStruct form a bounding box contouring RoI.
+ * Field qpOffset of C2QpOffsetRectStruct indicates the qp bias to be used for quantizing the
+ * coding units of the bounding box.
+ *
+ * If Roi rect is not valid that is bounding box width is < 0 or bounding box height is < 0,
+ * components may ignore the configuration silently. If Roi rect extends outside frame
+ * boundaries, then rect shall be clamped to the frame boundaries.
+ *
+ * The scope of this key is throughout the encoding session until it is reconfigured with a
+ * different value.
+ *
+ * The number of elements in C2StreamQpOffset array is not limited by C2 specification.
+ * However components may mandate a limit. Implementations may drop the rectangles that are beyond
+ * the supported limits. Hence it is preferable to place the rects in descending order of
+ * importance. Transitively, if the bounding boxes overlap, then the most preferred
+ * rectangle's qp offset (earlier rectangle qp offset) will be used to quantize the block.
+ */
+struct C2QpOffsetRectStruct : C2Rect {
+    C2QpOffsetRectStruct() = default;
+    C2QpOffsetRectStruct(const C2Rect &rect, int32_t offset) : C2Rect(rect), qpOffset(offset) {}
+
+    bool operator==(const C2QpOffsetRectStruct &) = delete;
+    bool operator!=(const C2QpOffsetRectStruct &) = delete;
+
+    int32_t qpOffset;
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(QpOffsetRect)
+    C2FIELD(width, "width")
+    C2FIELD(height, "height")
+    C2FIELD(left, "left")
+    C2FIELD(top, "top")
+    C2FIELD(qpOffset, "qp-offset")
+};
+
+typedef C2StreamParam<C2Info, C2SimpleArrayStruct<C2QpOffsetRectStruct>, kParamIndexQpOffsetRects>
+        C2StreamQpOffsetRects;
+constexpr char C2_PARAMKEY_QP_OFFSET_RECTS[] = "coding.qp-offset-rects";
 
 /**
  * Pixel (sample) aspect ratio.

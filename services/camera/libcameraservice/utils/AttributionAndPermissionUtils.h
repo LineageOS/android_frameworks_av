@@ -32,7 +32,7 @@ using permission::PermissionChecker;
  * caller.
  */
 class AttributionAndPermissionUtils {
-public:
+  public:
     AttributionAndPermissionUtils() { }
     virtual ~AttributionAndPermissionUtils() {}
 
@@ -90,11 +90,15 @@ public:
     static const std::string sCameraOpenCloseListenerPermission;
     static const std::string sCameraInjectExternalCameraPermission;
 
-protected:
+  protected:
     wp<CameraService> mCameraService;
 
     bool checkAutomotivePrivilegedClient(const std::string &cameraId,
             const AttributionSourceState &attributionSource);
+
+  private:
+    std::unique_ptr<permission::PermissionChecker> mPermissionChecker =
+            std::make_unique<permission::PermissionChecker>();
 };
 
 /**

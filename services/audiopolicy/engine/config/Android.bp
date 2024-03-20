@@ -33,7 +33,7 @@ cc_library {
     ],
     header_libs: [
         "libaudio_system_headers",
-        "libmedia_headers",
         "libaudioclient_headers",
+        "libmedia_headers",
     ],
 }

@@ -2309,16 +2309,31 @@ bool CameraService::isCameraPrivacyEnabled(const String16& packageName, const st
 std::string CameraService::getPackageNameFromUid(int clientUid) {
     std::string packageName("");
 
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(toString16(kPermissionServiceName));
-    if (binder == 0) {
-        ALOGE("Cannot get permission service");
+    sp<IPermissionController> permCtrl;
+    if (flags::cache_permission_services()) {
+        permCtrl = getPermissionController();
+    } else {
+        sp<IServiceManager> sm = defaultServiceManager();
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        // Using deprecated function to preserve functionality until the
+        // cache_permission_services flag is removed.
+        sp<IBinder> binder = sm->getService(toString16(kPermissionServiceName));
+#pragma clang diagnostic pop
+        if (binder == 0) {
+            ALOGE("Cannot get permission service");
+            permCtrl = nullptr;
+        } else {
+            permCtrl = interface_cast<IPermissionController>(binder);
+        }
+    }
+
+    if (permCtrl == nullptr) {
         // Return empty package name and the further interaction
         // with camera will likely fail
         return packageName;
     }
 
-    sp<IPermissionController> permCtrl = interface_cast<IPermissionController>(binder);
     Vector<String16> packages;
 
     permCtrl->getPackagesForUid(clientUid, packages);

@@ -216,7 +216,7 @@ status_t Camera3InputStream::disconnectLocked() {
     return OK;
 }
 
-void Camera3InputStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) const {
+void Camera3InputStream::dump(int fd, [[maybe_unused]] const Vector<String16> &args) {
     std::string lines;
     lines += fmt::sprintf("    Stream[%d]: Input\n", mId);
     write(fd, lines.c_str(), lines.size());
@@ -297,7 +297,7 @@ status_t Camera3InputStream::configureQueueLocked() {
     return OK;
 }
 
-status_t Camera3InputStream::getEndpointUsage(uint64_t *usage) const {
+status_t Camera3InputStream::getEndpointUsage(uint64_t *usage) {
     // Per HAL3 spec, input streams have 0 for their initial usage field.
     *usage = 0;
     return OK;
