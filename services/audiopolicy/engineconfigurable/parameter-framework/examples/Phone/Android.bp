@@ -18,8 +18,8 @@
 
 soong_namespace {
     imports: [
-        "frameworks/av/services/audiopolicy/engineconfigurable/config/example/phone",
         "frameworks/av/services/audiopolicy/config",
+        "frameworks/av/services/audiopolicy/engineconfigurable/config/example/phone",
     ],
 }
 
@@ -63,10 +63,10 @@ prebuilt_etc {
     src: ":domaingeneratorpolicyrule_gen",
     sub_dir: "parameter-framework/Settings/Policy",
     required: [
-        "ProductStrategies.xml",
         "PolicyClass.xml",
-        "PolicySubsystem.xml",
         "PolicySubsystem-CommonTypes.xml",
+        "PolicySubsystem.xml",
+        "ProductStrategies.xml",
     ],
 }
 
@@ -75,9 +75,9 @@ genrule {
     enabled: false, // TODO: This module fails to build
     defaults: ["domaingeneratorpolicyrule"],
     srcs: [
-        ":audio_policy_pfw_toplevel",
-        ":audio_policy_pfw_structure_files",
         ":audio_policy_engine_criterion_types",
+        ":audio_policy_pfw_structure_files",
+        ":audio_policy_pfw_toplevel",
         ":edd_files",
     ],
 }
@@ -87,16 +87,16 @@ filegroup {
     srcs: [
         ":device_for_input_source.pfw",
         ":volumes.pfw",
-        "Settings/device_for_product_strategy_media.pfw",
         "Settings/device_for_product_strategy_accessibility.pfw",
         "Settings/device_for_product_strategy_dtmf.pfw",
         "Settings/device_for_product_strategy_enforced_audible.pfw",
+        "Settings/device_for_product_strategy_media.pfw",
+        "Settings/device_for_product_strategy_patch.pfw",
         "Settings/device_for_product_strategy_phone.pfw",
+        "Settings/device_for_product_strategy_rerouting.pfw",
         "Settings/device_for_product_strategy_sonification.pfw",
         "Settings/device_for_product_strategy_sonification_respectful.pfw",
         "Settings/device_for_product_strategy_transmitted_through_speaker.pfw",
-        "Settings/device_for_product_strategy_rerouting.pfw",
-        "Settings/device_for_product_strategy_patch.pfw",
     ],
 }
 

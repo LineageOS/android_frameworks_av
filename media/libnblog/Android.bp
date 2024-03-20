@@ -35,8 +35,8 @@ cc_library_shared {
     ],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     include_dirs: ["system/media/audio_utils/include"],

@@ -20,8 +20,8 @@ cc_library_shared {
     srcs: [
         "src/Engine.cpp",
         "src/EngineInstance.cpp",
-        "src/Stream.cpp",
         "src/InputSource.cpp",
+        "src/Stream.cpp",
     ],
     cflags: [
         "-Wall",
@@ -30,10 +30,10 @@ cc_library_shared {
     ],
     local_include_dirs: ["include"],
     header_libs: [
-        "libbase_headers",
         "libaudiopolicycommon",
         "libaudiopolicyengine_interface_headers",
         "libaudiopolicyengineconfigurable_interface_headers",
+        "libbase_headers",
     ],
     static_libs: [
         "libaudiopolicyengine_common",
@@ -44,14 +44,14 @@ cc_library_shared {
     shared_libs: [
         "libaudio_aidl_conversion_common_cpp",
         "libaudiofoundation",
+        "libaudiopolicy",
         "libaudiopolicycomponents",
         "libbase",
-        "liblog",
         "libcutils",
-        "libutils",
+        "liblog",
         "libmedia_helper",
-        "libaudiopolicy",
         "libparameter",
+        "libutils",
         "libxml2",
     ],
 }

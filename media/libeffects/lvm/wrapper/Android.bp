@@ -52,8 +52,8 @@ cc_library {
     local_include_dirs: ["Bundle"],
 
     header_libs: [
-        "libhardware_headers",
         "libaudioeffects",
+        "libhardware_headers",
     ],
 }
 
@@ -93,8 +93,8 @@ cc_library {
     export_include_dirs: ["Reverb"],
 
     header_libs: [
-        "libhardware_headers",
         "libaudioeffects",
+        "libhardware_headers",
     ],
 
     sanitize: {
@@ -105,9 +105,9 @@ cc_library {
 cc_library_shared {
     name: "libbundleaidl",
     srcs: [
+        ":effectCommonFile",
         "Aidl/BundleContext.cpp",
         "Aidl/EffectBundleAidl.cpp",
-        ":effectCommonFile",
     ],
     static_libs: ["libmusicbundle"],
     defaults: [
@@ -125,8 +125,8 @@ cc_library_shared {
         "libstagefright_foundation",
     ],
     cflags: [
-        "-Wthread-safety",
         "-DBACKEND_NDK",
+        "-Wthread-safety",
     ],
     relative_install_path: "soundfx",
     visibility: [
@@ -137,9 +137,9 @@ cc_library_shared {
 cc_library_shared {
     name: "libreverbaidl",
     srcs: [
-        "Reverb/aidl/ReverbContext.cpp",
-        "Reverb/aidl/EffectReverb.cpp",
         ":effectCommonFile",
+        "Reverb/aidl/EffectReverb.cpp",
+        "Reverb/aidl/ReverbContext.cpp",
     ],
     static_libs: ["libreverb"],
     defaults: [
@@ -151,8 +151,8 @@ cc_library_shared {
         "libhardware_headers",
     ],
     shared_libs: [
-        "libbase",
         "libaudioutils",
+        "libbase",
         "libcutils",
         "liblog",
     ],

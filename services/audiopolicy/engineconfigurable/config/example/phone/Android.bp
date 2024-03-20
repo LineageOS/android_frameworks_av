@@ -37,8 +37,8 @@ prebuilt_etc {
     vendor: true,
     src: ":audio_policy_engine_configuration",
     required: [
-        ":audio_policy_engine_criterion_types.xml",
         ":audio_policy_engine_criteria.xml",
+        ":audio_policy_engine_criterion_types.xml",
         ":audio_policy_engine_product_strategies.xml",
         ":audio_policy_engine_volumes.xml",
     ],
@@ -75,19 +75,19 @@ genrule {
     name: "audio_policy_engine_criterion_types",
     defaults: ["buildpolicycriteriontypesrule"],
     srcs: [
-        ":audio_policy_configuration_top_file",
         ":audio_policy_configuration_files",
+        ":audio_policy_configuration_top_file",
     ],
 }
 
 filegroup {
     name: "audio_policy_configuration_files",
     srcs: [
-        ":r_submix_audio_policy_configuration",
-        ":default_volume_tables",
         ":audio_policy_volumes",
-        ":surround_sound_configuration_5_0",
+        ":default_volume_tables",
         ":primary_audio_policy_configuration",
+        ":r_submix_audio_policy_configuration",
+        ":surround_sound_configuration_5_0",
     ],
 }
 
@@ -115,10 +115,10 @@ filegroup {
     name: "audio_policy_engine_configuration_files",
     srcs: [
         ":audio_policy_engine_configuration",
-        "audio_policy_engine_product_strategies.xml",
-        ":audio_policy_engine_stream_volumes",
-        ":audio_policy_engine_default_stream_volumes",
-        ":audio_policy_engine_criterion_types",
         ":audio_policy_engine_criteria",
+        ":audio_policy_engine_criterion_types",
+        ":audio_policy_engine_default_stream_volumes",
+        ":audio_policy_engine_stream_volumes",
+        "audio_policy_engine_product_strategies.xml",
     ],
 }

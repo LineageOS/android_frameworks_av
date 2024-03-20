@@ -23,7 +23,7 @@ cc_defaults {
     tidy_checks: audioflinger_utils_tidy_errors,
     tidy_checks_as_errors: audioflinger_utils_tidy_errors,
     tidy_flags: [
-      "-format-style=file",
+        "-format-style=file",
     ],
 }
 
@@ -64,10 +64,10 @@ cc_library {
     ],
 
     header_libs: [
-        "libaaudio_headers",  // PropertyUtils.cpp
+        "libaaudio_headers", // PropertyUtils.cpp
     ],
 
     include_dirs: [
-        "frameworks/av/services/audioflinger",  // for configuration
+        "frameworks/av/services/audioflinger", // for configuration
     ],
 }

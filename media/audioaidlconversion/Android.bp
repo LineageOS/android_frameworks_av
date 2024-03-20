@@ -58,10 +58,10 @@ cc_library_headers {
 cc_defaults {
     name: "audio_aidl_conversion_common_default_cpp",
     shared_libs: [
+        "framework-permission-aidl-cpp",
         "libbinder",
         "libshmemcompat",
         "shared-file-region-aidl-cpp",
-        "framework-permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
         "shared-file-region-aidl-cpp",
@@ -94,8 +94,8 @@ cc_defaults {
     ],
     sanitize: {
         misc_undefined: [
-            "unsigned-integer-overflow",
             "signed-integer-overflow",
+            "unsigned-integer-overflow",
         ],
     },
     target: {
@@ -148,8 +148,8 @@ cc_library {
         "latest_android_media_audio_common_types_ndk_shared",
     ],
     shared_libs: [
-        "libbinder_ndk",
         "libbase",
+        "libbinder_ndk",
     ],
     static_libs: [
         "libaudioaidlcommon",
@@ -182,8 +182,8 @@ cc_library {
     ],
     shared_libs: [
         "libaudio_aidl_conversion_common_ndk",
-        "libbinder_ndk",
         "libbase",
+        "libbinder_ndk",
     ],
     cflags: [
         "-DBACKEND_NDK",
@@ -213,8 +213,8 @@ cc_library {
     ],
     shared_libs: [
         "libaudio_aidl_conversion_common_ndk",
-        "libbinder_ndk",
         "libbase",
+        "libbinder_ndk",
     ],
     cflags: [
         "-DBACKEND_NDK",
@@ -238,8 +238,8 @@ cc_library {
         "latest_android_media_audio_common_types_ndk_shared",
     ],
     shared_libs: [
-        "libbinder_ndk",
         "libbase",
+        "libbinder_ndk",
     ],
     cflags: [
         "-DBACKEND_CPP_NDK",

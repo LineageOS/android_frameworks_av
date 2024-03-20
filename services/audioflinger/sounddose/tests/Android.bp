@@ -16,9 +16,9 @@ cc_test {
     ],
 
     defaults: [
-        "latest_android_media_audio_common_types_ndk_static",
         "latest_android_hardware_audio_core_sounddose_ndk_static",
         "latest_android_hardware_audio_sounddose_ndk_static",
+        "latest_android_media_audio_common_types_ndk_static",
     ],
 
     shared_libs: [
@@ -43,10 +43,10 @@ cc_test {
     ],
 
     cflags: [
+        "-DBACKEND_NDK",
         "-Wall",
         "-Werror",
         "-Wextra",
-        "-DBACKEND_NDK",
     ],
 
     test_suites: [
