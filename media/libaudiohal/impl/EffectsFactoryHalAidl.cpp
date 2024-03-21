@@ -31,6 +31,7 @@
 #include <system/audio_aidl_utils.h>
 #include <utils/Log.h>
 
+#include "AidlUtils.h"
 #include "EffectBufferHalAidl.h"
 #include "EffectHalAidl.h"
 #include "EffectProxy.h"
@@ -356,14 +357,7 @@ std::shared_ptr<const effectsConfig::Processings> EffectsFactoryHalAidl::getProc
 // exports from a static library are optimized out unless actually used by
 // the shared library. See EffectsFactoryHalEntry.cpp.
 extern "C" void* createIEffectsFactoryImpl() {
-    auto serviceName = std::string(IFactory::descriptor) + "/default";
-    auto service = IFactory::fromBinder(
-            ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
-    if (!service) {
-        ALOGE("%s binder service %s not exist", __func__, serviceName.c_str());
-        return nullptr;
-    }
-    return new effect::EffectsFactoryHalAidl(service);
+    return new effect::EffectsFactoryHalAidl(getServiceInstance<IFactory>("default"));
 }
 
 } // namespace android
