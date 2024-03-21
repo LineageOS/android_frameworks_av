@@ -693,16 +693,27 @@ status_t AudioRecord::setInputDevice(audio_port_handle_t deviceId) {
     AutoMutex lock(mLock);
     ALOGV("%s(%d): deviceId=%d mSelectedDeviceId=%d",
             __func__, mPortId, deviceId, mSelectedDeviceId);
+
     if (mSelectedDeviceId != deviceId) {
         mSelectedDeviceId = deviceId;
         if (mStatus == NO_ERROR) {
-            // stop capture so that audio policy manager does not reject the new instance start request
-            // as only one capture can be active at a time.
-            if (mAudioRecord != 0 && mActive) {
-                mAudioRecord->stop();
+            if (mActive) {
+                if (mSelectedDeviceId != mRoutedDeviceId) {
+                    // stop capture so that audio policy manager does not reject the new instance
+                    // start request as only one capture can be active at a time.
+                    if (mAudioRecord != 0) {
+                        mAudioRecord->stop();
+                    }
+                    android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+                    mProxy->interrupt();
+                }
+            } else {
+                // if the track is idle, try to restore now and
+                // defer to next start if not possible
+                if (restoreRecord_l("setInputDevice") != OK) {
+                    android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
+                }
             }
-            android_atomic_or(CBLK_INVALID, &mCblk->mFlags);
-            mProxy->interrupt();
         }
     }
     return NO_ERROR;
@@ -1521,7 +1532,7 @@ status_t AudioRecord::restoreRecord_l(const char *from)
             .set(AMEDIAMETRICS_PROP_WHERE, from)
             .record(); });
 
-    ALOGW("%s(%d): dead IAudioRecord, creating a new one from %s()", __func__, mPortId, from);
+    ALOGW("%s(%d) called from %s()", __func__, mPortId, from);
     ++mSequence;
 
     const int INITIAL_RETRIES = 3;
