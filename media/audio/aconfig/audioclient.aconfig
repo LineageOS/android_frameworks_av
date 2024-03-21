@@ -1,0 +1,16 @@
+# Flags for libaudioclient, and other native client libraries.
+#
+# Please add flags in alphabetical order.
+
+package: "com.android.media.audioclient"
+container: "system"
+
+flag {
+    name: "audiosystem_service_acquisition"
+    namespace: "media_audio"
+    description: "Clean up audiosystem service acquisition."
+    bug: "330358287"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
