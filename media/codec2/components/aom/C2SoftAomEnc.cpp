@@ -50,11 +50,13 @@ C2SoftAomEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helpe
                                  0u, (uint64_t)C2MemoryUsage::CPU_READ))
                          .build());
 
+    // Odd dimension support in encoders requires Android V and above
+    size_t stepSize = isAtLeastV() ? 1 : 2;
     addParameter(DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
                          .withDefault(new C2StreamPictureSizeInfo::input(0u, 320, 240))
                          .withFields({
-                                 C2F(mSize, width).inRange(2, 2048, 2),
-                                 C2F(mSize, height).inRange(2, 2048, 2),
+                                 C2F(mSize, width).inRange(2, 2048, stepSize),
+                                 C2F(mSize, height).inRange(2, 2048, stepSize),
                          })
                          .withSetter(SizeSetter)
                          .build());
