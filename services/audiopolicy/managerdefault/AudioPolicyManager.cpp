@@ -3177,7 +3177,12 @@ void AudioPolicyManager::releaseInput(audio_port_handle_t portId)
     ALOGV("%s %d", __FUNCTION__, input);
 
     inputDesc->removeClient(portId);
-    mEffects.putOrphanEffects(client->session(), input, &mInputs, mpClientInterface);
+
+    // If no more clients are present in this session, park effects to an orphan chain
+    RecordClientVector clientsOnSession = inputDesc->getClientsForSession(client->session());
+    if (clientsOnSession.size() == 0) {
+        mEffects.putOrphanEffects(client->session(), input, &mInputs, mpClientInterface);
+    }
     if (inputDesc->getClientCount() > 0) {
         ALOGV("%s(%d) %zu clients remaining", __func__, portId, inputDesc->getClientCount());
         return;
