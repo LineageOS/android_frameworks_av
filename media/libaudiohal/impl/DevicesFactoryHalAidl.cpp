@@ -31,6 +31,7 @@
 #include <media/AidlConversionUtil.h>
 #include <utils/Log.h>
 
+#include "AidlUtils.h"
 #include "DeviceHalAidl.h"
 #include "DevicesFactoryHalAidl.h"
 
@@ -179,16 +180,8 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
     if (name == nullptr || device == nullptr) {
         return BAD_VALUE;
     }
-    std::shared_ptr<IModule> service;
     if (strcmp(name, "primary") == 0) name = "default";
-    auto serviceName = std::string(IModule::descriptor) + "/" + name;
-    service = IModule::fromBinder(
-            ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
-    if (service == nullptr) {
-        ALOGE("%s fromBinder %s failed", __func__, serviceName.c_str());
-        return NO_INIT;
-    }
-    *device = sp<DeviceHalAidl>::make(name, service, mVendorExt);
+    *device = sp<DeviceHalAidl>::make(name, getServiceInstance<IModule>(name), mVendorExt);
     return OK;
 }
 
@@ -229,14 +222,7 @@ status_t DevicesFactoryHalAidl::getEngineConfig(
 
 // Main entry-point to the shared library.
 extern "C" __attribute__((visibility("default"))) void* createIDevicesFactoryImpl() {
-    auto serviceName = std::string(IConfig::descriptor) + "/default";
-    auto service = IConfig::fromBinder(
-            ndk::SpAIBinder(AServiceManager_waitForService(serviceName.c_str())));
-    if (!service) {
-        ALOGE("%s binder service %s not exist", __func__, serviceName.c_str());
-        return nullptr;
-    }
-    return new DevicesFactoryHalAidl(service);
+    return new DevicesFactoryHalAidl(getServiceInstance<IConfig>("default"));
 }
 
 } // namespace android
