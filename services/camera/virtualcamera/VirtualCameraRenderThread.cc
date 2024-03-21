@@ -489,7 +489,7 @@ void VirtualCameraRenderThread::processCaptureRequest(
     return;
   }
 
-  ALOGD("%s: Successfully called processCaptureResult", __func__);
+  ALOGV("%s: Successfully called processCaptureResult", __func__);
 }
 
 void VirtualCameraRenderThread::flushCaptureRequest(
