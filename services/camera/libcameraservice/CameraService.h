@@ -1529,6 +1529,12 @@ private:
     // responsibility to acquire mLogLock before calling this functions.
     bool isClientWatchedLocked(const BasicClient *client);
 
+    // Filters out fingerprintable keys if the calling process does not have CAMERA permission.
+    // Note: function caller should ensure that shouldRejectSystemCameraConnection is checked
+    // for the calling process before calling this function.
+    binder::Status filterSensitiveMetadataIfNeeded(const std::string& cameraId,
+                                                   CameraMetadata* metadata);
+
     /**
      * Get the current system time as a formatted string.
      */
