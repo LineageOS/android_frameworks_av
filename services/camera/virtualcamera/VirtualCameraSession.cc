@@ -516,7 +516,7 @@ std::set<int> VirtualCameraSession::getStreamIds() const {
 
 ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
     const CaptureRequest& request) {
-  ALOGD("%s: request: %s", __func__, request.toString().c_str());
+  ALOGV("%s: request: %s", __func__, request.toString().c_str());
 
   std::shared_ptr<ICameraDeviceCallback> cameraCallback = nullptr;
   RequestSettings requestSettings;
