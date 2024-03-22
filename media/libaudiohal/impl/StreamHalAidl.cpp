@@ -616,7 +616,19 @@ status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
 status_t StreamOutHalAidl::setVolume(float left, float right) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return statusTFromBinderStatus(mStream->setHwVolume({left, right}));
+    size_t channelCount = audio_channel_out_mask_from_count(mConfig.channel_mask);
+    if (channelCount == 0) channelCount = 2;
+    std::vector<float> volumes(channelCount);
+    if (channelCount == 1) {
+        volumes[0] = (left + right) / 2;
+    } else {
+        volumes[0] = left;
+        volumes[1] = right;
+        for (size_t i = 2; i < channelCount; ++i) {
+            volumes[i] = (left + right) / 2;
+        }
+    }
+    return statusTFromBinderStatus(mStream->setHwVolume(volumes));
 }
 
 status_t StreamOutHalAidl::selectPresentation(int presentationId, int programId) {
@@ -928,7 +940,9 @@ StreamInHalAidl::StreamInHalAidl(
 status_t StreamInHalAidl::setGain(float gain) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return statusTFromBinderStatus(mStream->setHwGain({gain}));
+    const size_t channelCount = audio_channel_count_from_in_mask(mConfig.channel_mask);
+    std::vector<float> gains(channelCount != 0 ? channelCount : 1, gain);
+    return statusTFromBinderStatus(mStream->setHwGain(gains));
 }
 
 status_t StreamInHalAidl::read(void *buffer, size_t bytes, size_t *read) {
