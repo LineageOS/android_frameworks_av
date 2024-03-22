@@ -694,6 +694,10 @@ void ThreadBase::exit()
     }
     // When Thread::requestExitAndWait is made virtual and this method is renamed to
     // "virtual status_t requestExitAndWait()", replace by "return Thread::requestExitAndWait();"
+
+    // For TimeCheck: track waiting on the thread join of getTid().
+    audio_utils::mutex::scoped_join_wait_check sjw(getTid());
+
     requestExitAndWait();
 }
 
