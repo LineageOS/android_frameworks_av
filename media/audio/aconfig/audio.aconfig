@@ -53,6 +53,15 @@ flag {
 }
 
 flag {
+    name: "set_stream_volume_order"
+    namespace: "media_audio"
+    description:
+        "Fix race condition by adjusting the order when"
+        "setStreamVolume is calling into the BT stack"
+    bug: "329202581"
+}
+
+flag {
     name: "spatializer_offload"
     namespace: "media_audio"
     description: "Enable spatializer offload"
