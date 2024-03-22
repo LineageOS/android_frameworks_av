@@ -181,9 +181,9 @@ public:
     virtual bool isSpatializer() const = 0;
 
     virtual status_t setHapticScale_l(int id, os::HapticScale hapticScale)
-            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectBase_Mutex = 0;
+            REQUIRES(audio_utils::EffectChain_Mutex) EXCLUDES_EffectBase_Mutex = 0;
     virtual status_t setVibratorInfo_l(const media::AudioVibratorInfo& vibratorInfo)
-            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectBase_Mutex = 0;
+            REQUIRES(audio_utils::EffectChain_Mutex) EXCLUDES_EffectBase_Mutex = 0;
     virtual status_t sendMetadata_ll(const std::vector<playback_track_metadata_v7_t>& metadata)
             REQUIRES(audio_utils::ThreadBase_Mutex,
                      audio_utils::EffectChain_Mutex) EXCLUDES_EffectBase_Mutex = 0;
@@ -218,7 +218,8 @@ class IAfEffectChain : public RefBase {
 public:
     static sp<IAfEffectChain> create(
             const sp<IAfThreadBase>& thread,
-            audio_session_t sessionId);
+            audio_session_t sessionId,
+            const sp<IAfThreadCallback>& afThreadCallback);
 
     // special key used for an entry in mSuspendedEffects keyed vector
     // corresponding to a suspend all request.
@@ -232,35 +233,36 @@ public:
 
     virtual audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::EffectChain_Mutex) = 0;
 
-    virtual status_t createEffect_l(sp<IAfEffectModule>& effect, effect_descriptor_t* desc, int id,
+    virtual status_t createEffect(sp<IAfEffectModule>& effect, effect_descriptor_t* desc, int id,
                                     audio_session_t sessionId, bool pinned)
-            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
+            EXCLUDES_EffectChain_Mutex = 0;
 
+    virtual status_t addEffect(const sp<IAfEffectModule>& handle)
+            EXCLUDES_EffectChain_Mutex = 0;
     virtual status_t addEffect_l(const sp<IAfEffectModule>& handle)
-            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
-    virtual status_t addEffect_ll(const sp<IAfEffectModule>& handle)
-            REQUIRES(audio_utils::ThreadBase_Mutex, audio_utils::EffectChain_Mutex) = 0;
-    virtual size_t removeEffect_l(const sp<IAfEffectModule>& handle,
+            REQUIRES(audio_utils::EffectChain_Mutex) = 0;
+    virtual size_t removeEffect(const sp<IAfEffectModule>& handle,
                                   bool release = false) EXCLUDES_EffectChain_Mutex = 0;
 
     virtual audio_session_t sessionId() const = 0;
     virtual void setSessionId(audio_session_t sessionId) = 0;
 
-    virtual sp<IAfEffectModule> getEffectFromDesc_l(effect_descriptor_t* descriptor) const
-            REQUIRES(audio_utils::ThreadBase_Mutex) = 0;
+    virtual sp<IAfEffectModule> getEffectFromDesc(effect_descriptor_t* descriptor) const
+            EXCLUDES_EffectChain_Mutex = 0;
     virtual sp<IAfEffectModule> getEffectFromId_l(int id) const
-            REQUIRES(audio_utils::ThreadBase_Mutex) = 0;
+            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
     virtual sp<IAfEffectModule> getEffectFromType_l(const effect_uuid_t* type) const
-            REQUIRES(audio_utils::ThreadBase_Mutex) = 0;
+            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
     virtual std::vector<int> getEffectIds_l() const = 0;
     virtual bool setVolume(uint32_t* left, uint32_t* right,
                            bool force = false) EXCLUDES_EffectChain_Mutex = 0;
     virtual void resetVolume_l() REQUIRES(audio_utils::EffectChain_Mutex) = 0;
     virtual void setDevices_l(const AudioDeviceTypeAddrVector& devices)
-            REQUIRES(audio_utils::ThreadBase_Mutex) = 0;
+            REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
     virtual void setInputDevice_l(const AudioDeviceTypeAddr& device)
-            REQUIRES(audio_utils::ThreadBase_Mutex) = 0;
-    virtual void setMode_l(audio_mode_t mode) REQUIRES(audio_utils::ThreadBase_Mutex) = 0;
+            REQUIRES(audio_utils::ThreadBase_Mutex)  EXCLUDES_EffectChain_Mutex = 0;
+    virtual void setMode_l(audio_mode_t mode)
+            REQUIRES(audio_utils::ThreadBase_Mutex)  EXCLUDES_EffectChain_Mutex = 0;
     virtual void setAudioSource_l(audio_source_t source)
             REQUIRES(audio_utils::ThreadBase_Mutex) = 0;
 
@@ -317,7 +319,11 @@ public:
     virtual bool isCompatibleWithThread_l(const sp<IAfThreadBase>& thread) const
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
 
-    virtual bool containsHapticGeneratingEffect_l() = 0;
+    virtual bool containsHapticGeneratingEffect()
+            EXCLUDES_EffectChain_Mutex = 0;
+
+    virtual bool containsHapticGeneratingEffect_l()
+            REQUIRES(audio_utils::EffectChain_Mutex) = 0;
 
     virtual void setHapticScale_l(int id, os::HapticScale hapticScale)
             REQUIRES(audio_utils::ThreadBase_Mutex) EXCLUDES_EffectChain_Mutex = 0;
@@ -327,7 +333,7 @@ public:
     virtual wp<IAfThreadBase> thread() const = 0;
     virtual void setThread(const sp<IAfThreadBase>& thread) EXCLUDES_EffectChain_Mutex = 0;
 
-    virtual bool isFirstEffect(int id) const = 0;
+    virtual bool isFirstEffect_l(int id) const REQUIRES(audio_utils::EffectChain_Mutex) = 0;
 
     virtual size_t numberOfEffects() const = 0;
     virtual sp<IAfEffectModule> getEffectModule(size_t index) const = 0;
