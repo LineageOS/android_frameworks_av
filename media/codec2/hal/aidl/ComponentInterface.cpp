@@ -79,6 +79,26 @@ struct CompIntf : public ConfigurableC2Intf {
         }
         c2_status_t err2 = C2_OK;
         if (paramsToLargeFrameIntf.size() > 0) {
+            C2ComponentKindSetting kind;
+            C2StreamMaxBufferSizeInfo::input maxInputSize(0);
+            c2_status_t err = mIntf->query_vb(
+                    {&kind, &maxInputSize}, {}, C2_MAY_BLOCK, nullptr);
+            if ((err == C2_OK) && (kind.value == C2Component::KIND_ENCODER)) {
+                for (int i = 0 ; i < paramsToLargeFrameIntf.size(); i++) {
+                    if (paramsToLargeFrameIntf[i]->index() ==
+                            C2LargeFrame::output::PARAM_TYPE) {
+                        C2LargeFrame::output *lfp = C2LargeFrame::output::From(
+                                    paramsToLargeFrameIntf[i]);
+                        // This is assuming a worst case compression ratio of 1:1
+                        // In no case the encoder should give an output more than
+                        // what is being provided to the encoder in a single call.
+                        if (lfp && (lfp->maxSize < maxInputSize.value)) {
+                            lfp->maxSize = maxInputSize.value;
+                        }
+                        break;
+                    }
+                }
+            }
             err2 = mMultiAccessUnitIntf->config(
                     paramsToLargeFrameIntf, mayBlock, failures);
         }

@@ -19,7 +19,6 @@
 //#define LOG_NDEBUG 0
 
 #include "CameraOfflineSessionClient.h"
-#include "utils/CameraThreadState.h"
 #include <utils/Trace.h>
 #include <camera/StringUtils.h>
 
@@ -163,7 +162,7 @@ binder::Status CameraOfflineSessionClient::disconnect() {
         return res;
     }
     // Allow both client and the media server to disconnect at all times
-    int callingPid = CameraThreadState::getCallingPid();
+    int callingPid = getCallingPid();
     if (callingPid != mClientPid &&
             callingPid != mServicePid) {
         return res;

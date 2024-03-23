@@ -134,6 +134,8 @@ cc_fuzz {
     ],
 
     dictionary: "mp4_extractor_fuzzer.dict",
+
+    corpus: ["corpus_mp4/*"],
 }
 
 cc_fuzz {
@@ -201,7 +203,6 @@ cc_fuzz {
     srcs: [
         "ogg_extractor_fuzzer.cpp",
     ],
-
 
     static_libs: [
         "libstagefright_metadatautils",

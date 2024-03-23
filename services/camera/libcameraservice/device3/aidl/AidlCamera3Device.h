@@ -41,6 +41,7 @@ class AidlCamera3Device :
     friend class AidlCameraDeviceCallbacks;
     explicit AidlCamera3Device(
             std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
+            std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
             const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
             bool legacyClient = false);
 

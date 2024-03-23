@@ -23,7 +23,10 @@
 #include <private/android_filesystem_config.h>
 
 #include "CameraService.h"
-#include "CameraThreadState.h"
+
+#include <binder/IPCThreadState.h>
+#include <hwbinder/IPCThreadState.h>
+#include <binderthreadstate/CallerUtils.h>
 
 namespace android {
 
@@ -46,6 +49,36 @@ const std::string AttributionAndPermissionUtils::sCameraOpenCloseListenerPermiss
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
 const std::string AttributionAndPermissionUtils::sCameraInjectExternalCameraPermission(
         "android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
+
+int AttributionAndPermissionUtils::getCallingUid() {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
+        return hardware::IPCThreadState::self()->getCallingUid();
+    }
+    return IPCThreadState::self()->getCallingUid();
+}
+
+int AttributionAndPermissionUtils::getCallingPid() {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
+        return hardware::IPCThreadState::self()->getCallingPid();
+    }
+    return IPCThreadState::self()->getCallingPid();
+}
+
+int64_t AttributionAndPermissionUtils::clearCallingIdentity() {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
+        return hardware::IPCThreadState::self()->clearCallingIdentity();
+    }
+    return IPCThreadState::self()->clearCallingIdentity();
+}
+
+void AttributionAndPermissionUtils::restoreCallingIdentity(int64_t token) {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
+        hardware::IPCThreadState::self()->restoreCallingIdentity(token);
+    } else {
+        IPCThreadState::self()->restoreCallingIdentity(token);
+    }
+    return;
+}
 
 bool AttributionAndPermissionUtils::checkAutomotivePrivilegedClient(const std::string &cameraId,
         const AttributionSourceState &attributionSource) {
@@ -150,7 +183,7 @@ status_t AttributionAndPermissionUtils::getUidForPackage(const std::string &pack
 }
 
 bool AttributionAndPermissionUtils::isCallerCameraServerNotDelegating() {
-    return CameraThreadState::getCallingPid() == getpid();
+    return (getCallingPid() == getpid());
 }
 
 bool AttributionAndPermissionUtils::hasPermissionsForCamera(const std::string& cameraId,

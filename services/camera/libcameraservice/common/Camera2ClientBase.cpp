@@ -37,7 +37,6 @@
 #include "device3/Camera3Device.h"
 #include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
-#include "utils/CameraThreadState.h"
 
 namespace android {
 
@@ -83,7 +82,7 @@ template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::checkPid(const char* checkLocation)
         const {
 
-    int callingPid = CameraThreadState::getCallingPid();
+    int callingPid = TClientBase::getCallingPid();
     if (callingPid == TClientBase::mClientPid) return NO_ERROR;
 
     ALOGE("%s: attempt to use a locked camera from a different process"
@@ -116,12 +115,14 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         case IPCTransport::HIDL:
             mDevice =
                     new HidlCamera3Device(mCameraServiceProxyWrapper,
+                            TClientBase::mAttributionAndPermissionUtils,
                             TClientBase::mCameraIdStr, mOverrideForPerfClass,
                             TClientBase::mOverrideToPortrait, mLegacyClient);
             break;
         case IPCTransport::AIDL:
             mDevice =
                     new AidlCamera3Device(mCameraServiceProxyWrapper,
+                            TClientBase::mAttributionAndPermissionUtils,
                             TClientBase::mCameraIdStr, mOverrideForPerfClass,
                             TClientBase::mOverrideToPortrait, mLegacyClient);
              break;
@@ -267,7 +268,7 @@ binder::Status Camera2ClientBase<TClientBase>::disconnectImpl() {
     ALOGD("Camera %s: serializationLock acquired", TClientBase::mCameraIdStr.c_str());
     binder::Status res = binder::Status::ok();
     // Allow both client and the media server to disconnect at all times
-    int callingPid = CameraThreadState::getCallingPid();
+    int callingPid = TClientBase::getCallingPid();
     if (callingPid != TClientBase::mClientPid &&
         callingPid != TClientBase::mServicePid) return res;
 
@@ -306,18 +307,18 @@ status_t Camera2ClientBase<TClientBase>::connect(
     Mutex::Autolock icl(mBinderSerializationLock);
 
     if (TClientBase::mClientPid != 0 &&
-        CameraThreadState::getCallingPid() != TClientBase::mClientPid) {
+        TClientBase::getCallingPid() != TClientBase::mClientPid) {
 
         ALOGE("%s: Camera %s: Connection attempt from pid %d; "
                 "current locked to pid %d",
                 __FUNCTION__,
                 TClientBase::mCameraIdStr.c_str(),
-                CameraThreadState::getCallingPid(),
+                TClientBase::getCallingPid(),
                 TClientBase::mClientPid);
         return BAD_VALUE;
     }
 
-    TClientBase::mClientPid = CameraThreadState::getCallingPid();
+    TClientBase::mClientPid = TClientBase::getCallingPid();
 
     TClientBase::mRemoteCallback = client;
     mSharedCameraCallbacks = client;
