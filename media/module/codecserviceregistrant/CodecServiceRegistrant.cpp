@@ -837,9 +837,13 @@ extern "C" void RegisterCodecServices() {
         std::string(c2_aidl::IComponentStore::descriptor) + "/software";
     if (__builtin_available(android __ANDROID_API_S__, *)) {
         if (AServiceManager_isDeclared(aidlServiceName.c_str())) {
-            std::shared_ptr<c2_aidl::IComponentStore> aidlStore =
-                    ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
-                            std::make_shared<H2C2ComponentStore>(nullptr));
+            std::shared_ptr<c2_aidl::IComponentStore> aidlStore;
+            if (aidlSelected) {
+                aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(store);
+            } else {
+                aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
+                        std::make_shared<H2C2ComponentStore>(nullptr));
+            }
             binder_exception_t ex = AServiceManager_addService(
                     aidlStore->asBinder().get(), aidlServiceName.c_str());
             if (ex == EX_NONE) {
