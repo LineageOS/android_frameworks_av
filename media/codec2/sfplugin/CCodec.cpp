@@ -40,6 +40,7 @@
 #include <media/openmax/OMX_Core.h>
 #include <media/openmax/OMX_IndexExt.h>
 #include <media/stagefright/foundation/avc_utils.h>
+#include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
 #include <media/stagefright/omx/OmxGraphicBufferSource.h>
 #include <media/stagefright/CCodec.h>
@@ -1458,7 +1459,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 int64_t blockUsage =
                     usage.value | C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE;
                 std::shared_ptr<C2GraphicBlock> block = FetchGraphicBlock(
-                        width, height, componentColorFormat, blockUsage, {comp->getName()});
+                        align(width, 2), align(height, 2), componentColorFormat, blockUsage,
+                        {comp->getName()});
                 sp<GraphicBlockBuffer> buffer;
                 if (block) {
                     buffer = GraphicBlockBuffer::Allocate(
