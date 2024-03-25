@@ -62,6 +62,7 @@ struct C2SoftDav1dDec : public SimpleC2Component {
     // configurations used by component in process
     // (TODO: keep this in intf but make them internal only)
     std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormatInfo;
+    std::shared_ptr<C2PortActualDelayTuning::output> mActualOutputDelayInfo;
 
     uint32_t mHalPixelFormat;
     uint32_t mWidth;
