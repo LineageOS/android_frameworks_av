@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <cstdio>
+#include <iterator>
 #include <memory>
+#include <regex>
 
 #include "VirtualCameraService.h"
 #include "aidl/android/companion/virtualcamera/BnVirtualCameraCallback.h"
@@ -48,6 +51,7 @@ using ::aidl::android::hardware::camera::provider::BnCameraProviderCallback;
 using ::aidl::android::hardware::graphics::common::PixelFormat;
 using ::aidl::android::view::Surface;
 using ::testing::_;
+using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::Ge;
 using ::testing::IsEmpty;
@@ -134,19 +138,22 @@ class VirtualCameraServiceTest : public ::testing::Test {
     close(mDevNullFd);
   }
 
-  void execute_shell_command(const std::string cmd) {
-    std::array<const char*, 1> args{cmd.data()};
-    ASSERT_THAT(
-        mCameraService->handleShellCommand(mDevNullFd, mDevNullFd, mDevNullFd,
-                                           args.data(), args.size()),
-        Eq(NO_ERROR));
-  }
+  void execute_shell_command(const std::string& cmd) {
+    const static std::regex whitespaceRegex("\\s+");
+    std::vector<std::string> tokens;
+    std::copy_if(
+        std::sregex_token_iterator(cmd.begin(), cmd.end(), whitespaceRegex, -1),
+        std::sregex_token_iterator(), std::back_inserter(tokens),
+        [](const std::string& token) { return !token.empty(); });
 
-  void execute_shell_command(const std::string cmd, const std::string cameraId) {
-    std::array<const char*, 2> args{cmd.data(), cameraId.data()};
+    std::vector<const char*> argv;
+    argv.reserve(tokens.size());
+    std::transform(tokens.begin(), tokens.end(), std::back_inserter(argv),
+                   [](const std::string& str) { return str.c_str(); });
+
     ASSERT_THAT(
         mCameraService->handleShellCommand(mDevNullFd, mDevNullFd, mDevNullFd,
-                                           args.data(), args.size()),
+                                           argv.data(), argv.size()),
         Eq(NO_ERROR));
   }
 
@@ -379,10 +386,10 @@ TEST_F(VirtualCameraServiceTest, TestCameraShellCmd) {
 }
 
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithId) {
-  execute_shell_command("enable_test_camera", "12345");
+  execute_shell_command("enable_test_camera 12345");
 
   std::vector<std::string> cameraIdsAfterEnable = getCameraIds();
-  EXPECT_THAT(cameraIdsAfterEnable, SizeIs(1));
+  EXPECT_THAT(cameraIdsAfterEnable, ElementsAre("device@1.1/virtual/12345"));
 
   execute_shell_command("disable_test_camera");
 
