@@ -260,6 +260,7 @@ cc_library_shared {
         "libaudiohal_aidl_default",
     ],
     srcs: [
+        "AidlUtils.cpp",
         "DevicesFactoryHalEntry.cpp",
         "EffectsFactoryHalEntry.cpp",
         ":audio_effect_hal_aidl_src_files",
