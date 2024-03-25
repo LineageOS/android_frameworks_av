@@ -262,6 +262,7 @@ cc_library_shared {
     srcs: [
         ":audio_effect_hal_aidl_src_files",
         ":core_audio_hal_aidl_src_files",
+        "AidlUtils.cpp",
         "DevicesFactoryHalEntry.cpp",
         "EffectsFactoryHalEntry.cpp",
     ],

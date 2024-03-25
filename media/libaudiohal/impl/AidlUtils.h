@@ -20,9 +20,23 @@
 #include <string>
 
 #include <android/binder_auto_utils.h>
+#include <android/binder_ibinder.h>
 #include <android/binder_manager.h>
 
 namespace android {
+
+class HalDeathHandler {
+  public:
+    static HalDeathHandler& getInstance();
+
+    bool registerHandler(AIBinder* binder);
+  private:
+    static void OnBinderDied(void*);
+
+    HalDeathHandler();
+
+    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
+};
 
 template<class Intf>
 std::shared_ptr<Intf> getServiceInstance(const std::string& instanceName) {
@@ -37,6 +51,9 @@ std::shared_ptr<Intf> getServiceInstance(const std::string& instanceName) {
         }
         // `fromBinder` may fail and return a nullptr if the service has died in the meantime.
         service = Intf::fromBinder(ndk::SpAIBinder(serviceBinder));
+        if (service != nullptr) {
+            HalDeathHandler::getInstance().registerHandler(serviceBinder);
+        }
     }
     return service;
 }
