@@ -32,6 +32,7 @@
 #include "binder/Binder.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "util/MetadataUtil.h"
 #include "util/Permissions.h"
 #include "utils/Errors.h"
 
@@ -47,6 +48,7 @@ using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 using ::aidl::android::hardware::camera::common::CameraDeviceStatus;
 using ::aidl::android::hardware::camera::common::TorchModeStatus;
+using ::aidl::android::hardware::camera::device::CameraMetadata;
 using ::aidl::android::hardware::camera::provider::BnCameraProviderCallback;
 using ::aidl::android::hardware::graphics::common::PixelFormat;
 using ::aidl::android::view::Surface;
@@ -57,6 +59,7 @@ using ::testing::Ge;
 using ::testing::IsEmpty;
 using ::testing::IsNull;
 using ::testing::Not;
+using ::testing::Optional;
 using ::testing::Return;
 using ::testing::SizeIs;
 
@@ -138,7 +141,7 @@ class VirtualCameraServiceTest : public ::testing::Test {
     close(mDevNullFd);
   }
 
-  void execute_shell_command(const std::string& cmd) {
+  binder_status_t execute_shell_command(const std::string& cmd) {
     const static std::regex whitespaceRegex("\\s+");
     std::vector<std::string> tokens;
     std::copy_if(
@@ -151,16 +154,25 @@ class VirtualCameraServiceTest : public ::testing::Test {
     std::transform(tokens.begin(), tokens.end(), std::back_inserter(argv),
                    [](const std::string& str) { return str.c_str(); });
 
-    ASSERT_THAT(
-        mCameraService->handleShellCommand(mDevNullFd, mDevNullFd, mDevNullFd,
-                                           argv.data(), argv.size()),
-        Eq(NO_ERROR));
+    return mCameraService->handleShellCommand(
+        mDevNullFd, mDevNullFd, mDevNullFd, argv.data(), argv.size());
   }
 
   std::vector<std::string> getCameraIds() {
     std::vector<std::string> cameraIds;
     EXPECT_TRUE(mCameraProvider->getCameraIdList(&cameraIds).isOk());
     return cameraIds;
+  }
+
+  std::optional<camera_metadata_enum_android_lens_facing> getCameraLensFacing(
+      const std::string& id) {
+    std::shared_ptr<VirtualCameraDevice> camera = mCameraProvider->getCamera(id);
+    if (camera == nullptr) {
+      return std::nullopt;
+    }
+    CameraMetadata metadata;
+    camera->getCameraCharacteristics(&metadata);
+    return getLensFacing(metadata);
   }
 
  protected:
@@ -374,27 +386,59 @@ TEST_F(VirtualCameraServiceTest, ShellCmdWithNoArgs) {
 }
 
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmd) {
-  execute_shell_command("enable_test_camera");
+  EXPECT_THAT(execute_shell_command("enable_test_camera"), Eq(NO_ERROR));
 
   std::vector<std::string> cameraIdsAfterEnable = getCameraIds();
   EXPECT_THAT(cameraIdsAfterEnable, SizeIs(1));
 
-  execute_shell_command("disable_test_camera");
+  EXPECT_THAT(execute_shell_command("disable_test_camera"), Eq(NO_ERROR));
 
   std::vector<std::string> cameraIdsAfterDisable = getCameraIds();
   EXPECT_THAT(cameraIdsAfterDisable, IsEmpty());
 }
 
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithId) {
-  execute_shell_command("enable_test_camera 12345");
+  EXPECT_THAT(execute_shell_command("enable_test_camera --camera_id=12345"),
+              Eq(NO_ERROR));
 
   std::vector<std::string> cameraIdsAfterEnable = getCameraIds();
   EXPECT_THAT(cameraIdsAfterEnable, ElementsAre("device@1.1/virtual/12345"));
 
-  execute_shell_command("disable_test_camera");
+  EXPECT_THAT(execute_shell_command("disable_test_camera"), Eq(NO_ERROR));
 
   std::vector<std::string> cameraIdsAfterDisable = getCameraIds();
   EXPECT_THAT(cameraIdsAfterDisable, IsEmpty());
+}
+
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithInvalidId) {
+  EXPECT_THAT(
+      execute_shell_command("enable_test_camera --camera_id=NotNumericalId"),
+      Eq(STATUS_BAD_VALUE));
+}
+
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithUnknownCommand) {
+  EXPECT_THAT(execute_shell_command("brew_coffee --flavor=vanilla"),
+              Eq(STATUS_BAD_VALUE));
+}
+
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithMalformedOption) {
+  EXPECT_THAT(execute_shell_command("enable_test_camera **camera_id=12345"),
+              Eq(STATUS_BAD_VALUE));
+}
+
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithLensFacing) {
+  EXPECT_THAT(execute_shell_command("enable_test_camera --lens_facing=front"),
+              Eq(NO_ERROR));
+
+  std::vector<std::string> cameraIds = getCameraIds();
+  ASSERT_THAT(cameraIds, SizeIs(1));
+  EXPECT_THAT(getCameraLensFacing(cameraIds[0]),
+              Optional(Eq(ANDROID_LENS_FACING_FRONT)));
+}
+
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithInvalidLensFacing) {
+  EXPECT_THAT(execute_shell_command("enable_test_camera --lens_facing=west"),
+              Eq(STATUS_BAD_VALUE));
 }
 
 }  // namespace

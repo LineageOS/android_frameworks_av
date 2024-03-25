@@ -71,7 +71,8 @@ class VirtualCameraService
 
  private:
   // Create and enable test camera instance if there's none.
-  void enableTestCameraCmd(int out, int err, int cameraId);
+  binder_status_t enableTestCameraCmd(
+      int out, int err, const std::map<std::string, std::string>& options);
   // Disable and destroy test camera instance if there's one.
   void disableTestCameraCmd(int out);
 

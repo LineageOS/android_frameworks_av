@@ -469,6 +469,9 @@ std::optional<camera_metadata_enum_android_control_capture_intent> getCaptureInt
 std::optional<GpsCoordinates> getGpsCoordinates(
     const aidl::android::hardware::camera::device::CameraMetadata& metadata);
 
+std::optional<camera_metadata_enum_android_lens_facing> getLensFacing(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android
