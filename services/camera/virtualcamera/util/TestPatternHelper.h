@@ -17,19 +17,11 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_TESTPATTERNHELPER_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_TESTPATTERNHELPER_H
 
-#include <memory>
-
-#include "android/hardware_buffer.h"
 #include "gui/Surface.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
-
-// Helper function filling hardware buffer with test pattern for debugging /
-// testing purposes.
-void renderTestPatternYCbCr420(std::shared_ptr<AHardwareBuffer> buffer,
-                               int frameNumber, int fence = -1);
 
 // Helper function for rendering test pattern into Surface.
 void renderTestPatternYCbCr420(sp<Surface> surface, int frameNumber);

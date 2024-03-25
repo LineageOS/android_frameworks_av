@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "hardware/gralloc.h"
 #define LOG_TAG "VirtualCameraRenderThread"
 #include "VirtualCameraRenderThread.h"
 
@@ -392,6 +393,11 @@ void VirtualCameraRenderThread::threadLoop() {
       EglTextureProgram::TextureFormat::RGBA);
   mEglSurfaceTexture = std::make_unique<EglSurfaceTexture>(
       mInputSurfaceSize.width, mInputSurfaceSize.height);
+
+  sp<Surface> inputSurface = mEglSurfaceTexture->getSurface();
+  if (mTestMode) {
+    inputSurface->connect(NATIVE_WINDOW_API_CPU, false, nullptr);
+  }
   mInputSurfacePromise.set_value(mEglSurfaceTexture->getSurface());
 
   while (std::unique_ptr<ProcessCaptureRequestTask> task = dequeueTask()) {
