@@ -24,6 +24,7 @@
 #include <C2PlatformSupport.h>
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/MediaCodecConstants.h>
@@ -57,7 +58,7 @@ sp<GraphicBlockBuffer> AllocateInputGraphicBuffer(
 
     std::shared_ptr<C2GraphicBlock> block;
     c2_status_t err = pool->fetchGraphicBlock(
-            width, height, pixelFormat, fullUsage, &block);
+            align(width, 2), align(height, 2), pixelFormat, fullUsage, &block);
     if (err != C2_OK) {
         ALOGD("fetch graphic block failed: %d", err);
         return nullptr;
