@@ -33,6 +33,23 @@
       "message": "Fixes camera on salami (sm8550) as well. Will submit once merged in AOSP, or at the very least before re-enabling builds.",
       "revId": "5f431141f604597ee2a164e0171123bc76efc691",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "29840387_f759c620",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32548
+      },
+      "writtenOn": "2024-03-26T14:42:19Z",
+      "side": 1,
+      "message": "Fixes camera on marble | sm8450",
+      "revId": "5f431141f604597ee2a164e0171123bc76efc691",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
