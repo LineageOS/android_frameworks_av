@@ -1461,6 +1461,11 @@ status_t Camera2Client::cancelAutoFocus() {
     int triggerId;
     {
         SharedParameters::Lock l(mParameters);
+        if (l.mParameters.state == Parameters::DISCONNECTED) {
+            ALOGE("%s: Camera %d has been disconnected.", __FUNCTION__, mCameraId);
+            return INVALID_OPERATION;
+        }
+
         // Canceling does nothing in FIXED or INFINITY modes
         if (l.mParameters.focusMode == Parameters::FOCUS_MODE_FIXED ||
                 l.mParameters.focusMode == Parameters::FOCUS_MODE_INFINITY) {
