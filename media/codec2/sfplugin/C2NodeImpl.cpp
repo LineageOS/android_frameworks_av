@@ -41,7 +41,7 @@
 #include <utils/Thread.h>
 
 #include "utils/Codec2Mapper.h"
-#include "C2OMXNode.h"
+#include "C2NodeImpl.h"
 #include "Codec2Buffer.h"
 
 namespace android {

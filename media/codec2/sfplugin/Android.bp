@@ -19,7 +19,7 @@ cc_library_shared {
     export_include_dirs: ["include"],
 
     srcs: [
-        "C2OMXNode.cpp",
+        "C2NodeImpl.cpp",
         "CCodec.cpp",
         "CCodecBufferChannel.cpp",
         "CCodecBuffers.cpp",
