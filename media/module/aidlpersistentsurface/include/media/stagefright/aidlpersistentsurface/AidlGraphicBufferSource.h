@@ -28,7 +28,7 @@
 namespace android::media {
 
 /*
- * This class is used to emulate feed OMX codecs from a Surface via BufferQueue or
+ * This class is used to feed codec encoders from a Surface via BufferQueue or
  * HW producer using AIDL binder interfaces.
  *
  * See media/stagefright/bqhelper/GraphicBufferSource.h for documentation.

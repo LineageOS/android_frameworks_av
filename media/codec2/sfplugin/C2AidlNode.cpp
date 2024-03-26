@@ -29,9 +29,6 @@ namespace android {
 using ::aidl::android::media::IAidlBufferSource;
 using ::aidl::android::media::IAidlNode;
 
-using ::android::media::CommandStateSet;
-using ::android::media::NodeStatusLoaded;
-
 // Conversion
 using ::android::media::aidl_conversion::toAidlStatus;
 
@@ -41,13 +38,6 @@ C2AidlNode::C2AidlNode(const std::shared_ptr<Codec2Client::Component> &comp)
 // aidl ndk interfaces
 ::ndk::ScopedAStatus C2AidlNode::freeNode() {
     return toAidlStatus(mImpl->freeNode());
-}
-
-::ndk::ScopedAStatus C2AidlNode::sendCommand(int32_t cmd, int32_t param) {
-    if (cmd == CommandStateSet && param == NodeStatusLoaded) {
-        mImpl->onFirstInputFrame();
-    }
-    return toAidlStatus(ERROR_UNSUPPORTED);
 }
 
 ::ndk::ScopedAStatus C2AidlNode::getConsumerUsage(int64_t* _aidl_return) {
