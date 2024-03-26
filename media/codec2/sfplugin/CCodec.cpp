@@ -51,7 +51,7 @@
 #include <media/stagefright/RenderedFrameInfo.h>
 #include <utils/NativeHandle.h>
 
-#include "C2OMXNode.h"
+#include "C2NodeImpl.h"
 #include "CCodecBufferChannel.h"
 #include "CCodecConfig.h"
 #include "Codec2Mapper.h"
