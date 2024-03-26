@@ -1,6 +1,29 @@
 {
   "comments": [
     {
+      "unresolved": true,
+      "key": {
+        "uuid": "d5be427b_c088543d",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2024-03-26T12:46:33Z",
+      "side": 1,
+      "message": "filterParameters",
+      "range": {
+        "startLine": 7,
+        "startChar": 56,
+        "endLine": 7,
+        "endChar": 71
+      },
+      "revId": "6c212052bfcbe94b6a9cbf944efd15e29640b9fe",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": false,
       "key": {
         "uuid": "651049be_5d85c548",
@@ -31,6 +54,23 @@
       "writtenOn": "2024-03-26T12:46:22Z",
       "side": 1,
       "message": "Verified fixes Fairphone 5 camera.",
+      "revId": "6c212052bfcbe94b6a9cbf944efd15e29640b9fe",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b933c425_322102c9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2024-03-26T12:46:33Z",
+      "side": 1,
+      "message": "Can you fix typo and re-upload to AOSP?",
       "revId": "6c212052bfcbe94b6a9cbf944efd15e29640b9fe",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
