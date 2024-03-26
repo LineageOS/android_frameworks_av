@@ -837,9 +837,13 @@ extern "C" void RegisterCodecServices() {
         std::string(c2_aidl::IComponentStore::descriptor) + "/software";
     if (__builtin_available(android __ANDROID_API_S__, *)) {
         if (AServiceManager_isDeclared(aidlServiceName.c_str())) {
-            std::shared_ptr<c2_aidl::IComponentStore> aidlStore =
-                    ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
-                            std::make_shared<H2C2ComponentStore>(nullptr));
+            std::shared_ptr<c2_aidl::IComponentStore> aidlStore;
+            if (aidlSelected) {
+                aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(store);
+            } else {
+                aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
+                        std::make_shared<H2C2ComponentStore>(nullptr));
+            }
             binder_exception_t ex = AServiceManager_addService(
                     aidlStore->asBinder().get(), aidlServiceName.c_str());
             if (ex == EX_NONE) {
@@ -854,6 +858,14 @@ extern "C" void RegisterCodecServices() {
     // If the software component store isn't declared in the manifest, we don't
     // need to create the service and register it.
     if (hidlStore) {
+        if (registered && aidlSelected) {
+            LOG(INFO) << "Both HIDL and AIDL software codecs are declared in the vintf "
+                      << "manifest, but AIDL was selected. "
+                      << "Creating a null HIDL service so it's not accidentally "
+                      << "used. The AIDL software codec is already registered.";
+            hidlStore = ::android::sp<V1_2::utils::ComponentStore>::make(
+                    std::make_shared<H2C2ComponentStore>(nullptr));
+        }
         if (hidlStore->registerAsService("software") == android::OK) {
             registered = true;
         } else {
