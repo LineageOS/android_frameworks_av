@@ -67,6 +67,23 @@
       "message": "Moto eqs sm8475 fixed",
       "revId": "5f431141f604597ee2a164e0171123bc76efc691",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "60afa16d_13c525ba",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 23878
+      },
+      "writtenOn": "2024-03-26T15:17:17Z",
+      "side": 1,
+      "message": "verified working on berlna sm7325",
+      "revId": "5f431141f604597ee2a164e0171123bc76efc691",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
