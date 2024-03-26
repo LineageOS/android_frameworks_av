@@ -177,7 +177,7 @@ status_t mapRequestTemplateToAidl(camera_request_template_t templateId,
         aidl::android::hardware::camera::device::RequestTemplate* tempId /*out*/);
 
 void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
-        int vendorTagId, CameraMetadata& dst);
+        metadata_vendor_id_t vendorTagId, CameraMetadata& dst);
 
 constexpr int32_t MAX_SURFACES_PER_STREAM = 4;
 
