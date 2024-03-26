@@ -16,6 +16,23 @@
       "message": "Done",
       "revId": "5f431141f604597ee2a164e0171123bc76efc691",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "91868646_378b9966",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2024-03-26T12:54:41Z",
+      "side": 1,
+      "message": "Fixes camera on salami (sm8550) as well. Will submit once merged in AOSP, or at the very least before re-enabling builds.",
+      "revId": "5f431141f604597ee2a164e0171123bc76efc691",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
