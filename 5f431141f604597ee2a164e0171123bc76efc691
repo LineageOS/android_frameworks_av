@@ -84,6 +84,23 @@
       "message": "verified working on berlna sm7325",
       "revId": "5f431141f604597ee2a164e0171123bc76efc691",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "737c240c_bc0499c3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 17062
+      },
+      "writtenOn": "2024-03-26T15:38:48Z",
+      "side": 1,
+      "message": "Fixes cam on 8150 xiaomi nabu",
+      "revId": "5f431141f604597ee2a164e0171123bc76efc691",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
