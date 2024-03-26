@@ -1868,6 +1868,10 @@ std::shared_ptr<Codec2Client::InputSurface> Codec2Client::CreateInputSurface(
     return nullptr;
 }
 
+bool Codec2Client::IsAidlSelected() {
+    return c2_aidl::utils::IsSelected();
+}
+
 // Codec2Client::Interface
 Codec2Client::Interface::Interface(const sp<HidlBase>& base)
       : Configurable{
