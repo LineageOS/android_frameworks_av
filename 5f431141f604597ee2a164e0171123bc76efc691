@@ -101,6 +101,23 @@
       "message": "Fixes cam on 8150 xiaomi nabu",
       "revId": "5f431141f604597ee2a164e0171123bc76efc691",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "abe2e0f4_c33ab7fe",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 33095
+      },
+      "writtenOn": "2024-03-26T17:55:03Z",
+      "side": 1,
+      "message": "verified working on Samsung sm8550 q5q",
+      "revId": "5f431141f604597ee2a164e0171123bc76efc691",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
