@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, The Android Open Source Project
+ * Copyright 2024, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,72 +14,58 @@
  * limitations under the License.
  */
 
-#ifndef C2_OMX_NODE_H_
-#define C2_OMX_NODE_H_
+#pragma once
 
 #include <atomic>
 
 #include <android/IOMXBufferSource.h>
+#include <aidl/android/media/IAidlBufferSource.h>
+#include <aidl/android/media/IAidlNode.h>
 #include <codec2/hidl/client.h>
 #include <media/stagefright/foundation/Mutexed.h>
-#include <media/IOMX.h>
-#include <media/OMXBuffer.h>
+#include <media/stagefright/aidlpersistentsurface/C2NodeDef.h>
 
 namespace android {
 
 /**
  * IOmxNode implementation around codec 2.0 component, only to be used in
- * IGraphicBufferSource::configure. Only subset of IOmxNode API is implemented
- * and others are left as stub. As a result, one cannot expect this IOmxNode
- * to work in any other usage than IGraphicBufferSource.
+ * IGraphicBufferSource::configure. Only subset of IOmxNode API is implemented.
+ * As a result, one cannot expect this IOmxNode to work in any other usage than
+ * IGraphicBufferSource(if aidl hal is used, IAidlGraphicBufferSource).
  */
-struct C2OMXNode : public BnOMXNode {
-    explicit C2OMXNode(const std::shared_ptr<Codec2Client::Component> &comp);
-    ~C2OMXNode() override = default;
+struct C2NodeImpl {
+    explicit C2NodeImpl(const std::shared_ptr<Codec2Client::Component> &comp, bool aidl);
+    ~C2NodeImpl();
 
-    // IOMXNode
-    status_t freeNode() override;
-    status_t sendCommand(OMX_COMMANDTYPE cmd, OMX_S32 param) override;
-    status_t getParameter(
-            OMX_INDEXTYPE index, void *params, size_t size) override;
-    status_t setParameter(
-            OMX_INDEXTYPE index, const void *params, size_t size) override;
-    status_t getConfig(
-            OMX_INDEXTYPE index, void *params, size_t size) override;
-    status_t setConfig(
-            OMX_INDEXTYPE index, const void *params, size_t size) override;
-    status_t setPortMode(OMX_U32 port_index, IOMX::PortMode mode) override;
-    status_t prepareForAdaptivePlayback(
-            OMX_U32 portIndex, OMX_BOOL enable,
-            OMX_U32 maxFrameWidth, OMX_U32 maxFrameHeight) override;
-    status_t configureVideoTunnelMode(
-            OMX_U32 portIndex, OMX_BOOL tunneled,
-            OMX_U32 audioHwSync, native_handle_t **sidebandHandle) override;
-    status_t getGraphicBufferUsage(
-            OMX_U32 port_index, OMX_U32* usage) override;
+    // IOMXNode and/or IAidlNode
+    status_t freeNode();
+
+    void onFirstInputFrame();
+    void getConsumerUsageBits(uint64_t *usage /* nonnull */);
+    void getInputBufferParams(
+            ::aidl::android::media::IAidlNode::InputBufferParams *params /* nonnull */);
+    void setConsumerUsageBits(uint64_t usage);
+    void setAdjustTimestampGapUs(int32_t gapUs);
+
     status_t setInputSurface(
-            const sp<IOMXBufferSource> &bufferSource) override;
-    status_t allocateSecureBuffer(
-            OMX_U32 port_index, size_t size, buffer_id *buffer,
-            void **buffer_data, sp<NativeHandle> *native_handle) override;
-    status_t useBuffer(
-            OMX_U32 port_index, const OMXBuffer &omxBuf, buffer_id *buffer) override;
-    status_t freeBuffer(
-            OMX_U32 port_index, buffer_id buffer) override;
-    status_t fillBuffer(
-            buffer_id buffer, const OMXBuffer &omxBuf, int fenceFd) override;
-    status_t emptyBuffer(
-            buffer_id buffer, const OMXBuffer &omxBuf,
-            OMX_U32 flags, OMX_TICKS timestamp, int fenceFd) override;
-    status_t getExtensionIndex(
-            const char *parameter_name,
-            OMX_INDEXTYPE *index) override;
-    status_t dispatchMessage(const omx_message &msg) override;
+            const sp<IOMXBufferSource> &bufferSource);
+    status_t setAidlInputSurface(
+            const std::shared_ptr<::aidl::android::media::IAidlBufferSource> &aidlBufferSource);
+
+    status_t submitBuffer(
+            uint32_t buffer, const sp<GraphicBuffer> &graphicBuffer,
+            uint32_t flags, int64_t timestamp, int fenceFd);
+    status_t onDataspaceChanged(uint32_t dataSpace, uint32_t pixelFormat);
 
     /**
      * Returns underlying IOMXBufferSource object.
      */
     sp<IOMXBufferSource> getSource();
+
+    /**
+     * Returns underlying IAidlBufferSource object.
+     */
+    std::shared_ptr<::aidl::android::media::IAidlBufferSource> getAidlSource();
 
     /**
      * Configure the frame size.
@@ -110,7 +96,10 @@ struct C2OMXNode : public BnOMXNode {
 
 private:
     std::weak_ptr<Codec2Client::Component> mComp;
+
     sp<IOMXBufferSource> mBufferSource;
+    std::shared_ptr<::aidl::android::media::IAidlBufferSource> mAidlBufferSource;
+
     std::shared_ptr<C2Allocator> mAllocator;
     std::atomic_uint64_t mFrameIndex;
     uint32_t mWidth;
@@ -129,12 +118,12 @@ private:
     c2_cntr64_t mPrevInputTimestamp; // input timestamp for previous frame
     c2_cntr64_t mPrevCodecTimestamp; // adjusted (codec) timestamp for previous frame
 
-    Mutexed<std::map<uint64_t, buffer_id>> mBufferIdsInUse;
+    Mutexed<std::map<uint64_t, uint32_t>> mBufferIdsInUse;
 
     class QueueThread;
     sp<QueueThread> mQueueThread;
+
+    bool mAidlHal;
 };
 
 }  // namespace android
-
-#endif  // C2_OMX_NODE_H_
