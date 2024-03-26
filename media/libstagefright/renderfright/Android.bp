@@ -118,3 +118,11 @@ cc_library_static {
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
+
+cc_library_headers {
+    name: "librenderfright_gl_headers",
+    export_include_dirs: ["gl"],
+    visibility: [
+        "//frameworks/av/media/libstagefright/renderfright/fuzzer:__subpackages__",
+    ],
+}
