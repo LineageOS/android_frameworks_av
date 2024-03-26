@@ -1,0 +1,69 @@
+aidl_interface {
+    name: "graphicbuffersource-aidl",
+    unstable: true,
+    local_include_dir: "aidl",
+    min_sdk_version: "29",
+    srcs: [
+        "aidl/android/media/AidlColorAspects.aidl",
+        "aidl/android/media/IAidlGraphicBufferSource.aidl",
+        "aidl/android/media/IAidlBufferSource.aidl",
+        "aidl/android/media/IAidlNode.aidl",
+    ],
+    headers: [
+        "HardwareBuffer_aidl",
+    ],
+    imports: [
+        "android.hardware.graphics.common-V5",
+    ],
+    include_dirs: [
+        "frameworks/native/aidl/gui",
+    ],
+    backend: {
+        cpp: {
+            enabled: false,
+        },
+        java: {
+            enabled: false,
+        },
+        ndk: {
+            enabled: true,
+            additional_shared_libraries: [
+                "libnativewindow",
+            ],
+        },
+        rust: {
+            // No users, and no rust implementation of android.os.Surface yet
+            enabled: false,
+        },
+    },
+}
+
+cc_library_shared {
+    name: "libstagefright_graphicbuffersource_aidl",
+    min_sdk_version: "29",
+    srcs: [
+        "AidlGraphicBufferSource.cpp",
+        "wrapper/WAidlGraphicBufferSource.cpp",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    header_libs: [
+        "media_plugin_headers",
+    ],
+
+    export_header_lib_headers: [
+        "media_plugin_headers",
+    ],
+    shared_libs: [
+        "android.hardware.graphics.common-V5-ndk",
+        "graphicbuffersource-aidl-ndk",
+        "libbinder_ndk",
+        "libcutils",
+        "libgui",
+        "liblog",
+        "libnativewindow",
+        "libstagefright_bufferqueue_helper",
+        "libutils",
+    ],
+}
