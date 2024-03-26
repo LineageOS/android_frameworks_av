@@ -137,16 +137,17 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         return NO_INIT;
     }
 
+    // Verify ops permissions
+    res = TClientBase::startCameraOps();
+    if (res != OK) {
+        TClientBase::finishCameraOps();
+        return res;
+    }
+
     res = mDevice->initialize(providerPtr, monitorTags);
     if (res != OK) {
         ALOGE("%s: Camera %s: unable to initialize device: %s (%d)",
                 __FUNCTION__, TClientBase::mCameraIdStr.c_str(), strerror(-res), res);
-        return res;
-    }
-
-    // Verify ops permissions
-    res = TClientBase::startCameraOps();
-    if (res != OK) {
         TClientBase::finishCameraOps();
         return res;
     }
