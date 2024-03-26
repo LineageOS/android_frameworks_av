@@ -1165,7 +1165,7 @@ status_t mapRequestTemplateToAidl(camera_request_template_t templateId,
 }
 
 void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
-        int vendorTagId, CameraMetadata& dst) {
+        metadata_vendor_id_t vendorTagId, CameraMetadata& dst) {
     const CameraMetadata params(src);
     camera_metadata_ro_entry_t availableSessionKeys = deviceInfo.find(
             ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
