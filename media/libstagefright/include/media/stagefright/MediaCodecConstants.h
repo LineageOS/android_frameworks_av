@@ -893,6 +893,8 @@ inline constexpr char PARAMETER_KEY_SUSPEND[] = "drop-input-frames";
 inline constexpr char PARAMETER_KEY_SUSPEND_TIME[] = "drop-start-time-us";
 inline constexpr char PARAMETER_KEY_TUNNEL_PEEK[] =  "tunnel-peek";
 inline constexpr char PARAMETER_KEY_VIDEO_BITRATE[] = "video-bitrate";
+inline constexpr char PARAMETER_KEY_QP_OFFSET_MAP[] = "qp-offset-map";
+inline constexpr char PARAMETER_KEY_QP_OFFSET_RECTS[] = "qp-offset-rects";
 
 }
 

@@ -26,6 +26,9 @@
 
 namespace android {
 
+// Device id of a context associated with the default device.
+constexpr int32_t kDefaultDeviceId = 0;
+
 /**
  * CameraUtils contains utility methods that are shared between the native
  * camera client, and the camera service.

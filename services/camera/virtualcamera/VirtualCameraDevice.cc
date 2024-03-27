@@ -214,7 +214,8 @@ std::map<Resolution, int> getResolutionToMaxFpsMap(
 // TODO(b/301023410) - Populate camera characteristics according to camera configuration.
 std::optional<CameraMetadata> initCameraCharacteristics(
     const std::vector<SupportedStreamConfiguration>& supportedInputConfig,
-    const SensorOrientation sensorOrientation, const LensFacing lensFacing) {
+    const SensorOrientation sensorOrientation, const LensFacing lensFacing,
+    const int32_t deviceId) {
   if (!std::all_of(supportedInputConfig.begin(), supportedInputConfig.end(),
                    [](const SupportedStreamConfiguration& config) {
                      return isFormatSupportedForInput(
@@ -229,6 +230,7 @@ std::optional<CameraMetadata> initCameraCharacteristics(
       MetadataBuilder()
           .setSupportedHardwareLevel(
               ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL)
+          .setDeviceId(deviceId)
           .setFlashAvailable(false)
           .setLensFacing(
               static_cast<camera_metadata_enum_android_lens_facing>(lensFacing))
@@ -389,13 +391,14 @@ std::optional<CameraMetadata> initCameraCharacteristics(
 }  // namespace
 
 VirtualCameraDevice::VirtualCameraDevice(
-    const uint32_t cameraId, const VirtualCameraConfiguration& configuration)
+    const uint32_t cameraId, const VirtualCameraConfiguration& configuration,
+    int32_t deviceId)
     : mCameraId(cameraId),
       mVirtualCameraClientCallback(configuration.virtualCameraCallback),
       mSupportedInputConfigurations(configuration.supportedStreamConfigs) {
   std::optional<CameraMetadata> metadata = initCameraCharacteristics(
       mSupportedInputConfigurations, configuration.sensorOrientation,
-      configuration.lensFacing);
+      configuration.lensFacing, deviceId);
   if (metadata.has_value()) {
     mCameraCharacteristics = *metadata;
   } else {

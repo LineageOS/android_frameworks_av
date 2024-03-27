@@ -25,6 +25,7 @@
 
 #include <hidl/HidlTransportSupport.h>
 
+#include <camera/CameraUtils.h>
 #include <utils/Utils.h>
 
 namespace android {
@@ -69,7 +70,7 @@ HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
     binder::Status serviceRet =
         mAidlICameraService->getCameraCharacteristics(cameraId,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
-                &cameraMetadata);
+                kDefaultDeviceId, 0, &cameraMetadata);
     HCameraMetadata hidlMetadata;
     if (!serviceRet.isOk()) {
         switch(serviceRet.serviceSpecificErrorCode()) {
@@ -121,7 +122,7 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
             callbacks, cameraId, std::string(), {},
             hardware::ICameraService::USE_CALLING_UID, 0/*oomScoreOffset*/,
             /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
-            /*out*/&deviceRemote);
+            kDefaultDeviceId, /*devicePolicy*/0, /*out*/&deviceRemote);
     HStatus status = HStatus::NO_ERROR;
     if (!serviceRet.isOk()) {
         ALOGE("%s: Unable to connect to camera device", __FUNCTION__);

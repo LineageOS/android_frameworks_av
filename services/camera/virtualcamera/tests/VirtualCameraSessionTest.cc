@@ -47,6 +47,7 @@ constexpr int kMaxFps = 30;
 constexpr int kStreamId = 0;
 constexpr int kSecondStreamId = 1;
 constexpr int kCameraId = 42;
+constexpr int kDefaultDeviceId = 0;
 
 using ::aidl::android::companion::virtualcamera::BnVirtualCameraCallback;
 using ::aidl::android::companion::virtualcamera::Format;
@@ -160,7 +161,8 @@ class VirtualCameraSessionTest : public VirtualCameraSessionTestBase {
                                            .maxFps = kMaxFps}},
             .virtualCameraCallback = mMockVirtualCameraClientCallback,
             .sensorOrientation = SensorOrientation::ORIENTATION_0,
-            .lensFacing = LensFacing::FRONT});
+            .lensFacing = LensFacing::FRONT},
+        kDefaultDeviceId);
     mVirtualCameraSession = ndk::SharedRefBase::make<VirtualCameraSession>(
         mVirtualCameraDevice, mMockCameraDeviceCallback,
         mMockVirtualCameraClientCallback);
@@ -305,11 +307,13 @@ class VirtualCameraSessionInputChoiceTest : public VirtualCameraSessionTestBase 
   std::shared_ptr<VirtualCameraSession> createSession(
       const std::vector<SupportedStreamConfiguration>& supportedInputConfigs) {
     mVirtualCameraDevice = ndk::SharedRefBase::make<VirtualCameraDevice>(
-        kCameraId, VirtualCameraConfiguration{
-                       .supportedStreamConfigs = supportedInputConfigs,
-                       .virtualCameraCallback = mMockVirtualCameraClientCallback,
-                       .sensorOrientation = SensorOrientation::ORIENTATION_0,
-                       .lensFacing = LensFacing::FRONT});
+        kCameraId,
+        VirtualCameraConfiguration{
+            .supportedStreamConfigs = supportedInputConfigs,
+            .virtualCameraCallback = mMockVirtualCameraClientCallback,
+            .sensorOrientation = SensorOrientation::ORIENTATION_0,
+            .lensFacing = LensFacing::FRONT},
+        kDefaultDeviceId);
     return ndk::SharedRefBase::make<VirtualCameraSession>(
         mVirtualCameraDevice, mMockCameraDeviceCallback,
         mMockVirtualCameraClientCallback);

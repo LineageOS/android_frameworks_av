@@ -308,6 +308,15 @@ class Camera3Device :
     status_t setCameraMute(bool enabled);
 
     /**
+     * Mute the camera.
+     *
+     * When muted, black image data is output on all output streams.
+     * This method assumes the caller already acquired the 'mInterfaceLock'
+     * and 'mLock' locks.
+     */
+    status_t setCameraMuteLocked(bool enabled);
+
+    /**
      * Enables/disables camera service watchdog
      */
     status_t setCameraServiceWatchdog(bool enabled);
@@ -1512,6 +1521,10 @@ class Camera3Device :
 
     // Auto framing override value
     camera_metadata_enum_android_control_autoframing mAutoframingOverride;
+
+    // Initial camera mute state stored before the request thread
+    // is active.
+    bool mCameraMuteInitial = false;
 
     // Settings override value
     int32_t mSettingsOverride; // -1 = use original, otherwise

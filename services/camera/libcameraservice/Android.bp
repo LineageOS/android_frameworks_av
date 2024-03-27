@@ -74,6 +74,7 @@ cc_defaults {
         "libstagefright_foundation",
         "libxml2",
         "libyuv",
+        "android.companion.virtual.virtualdevice_aidl-cpp",
         "android.companion.virtualdevice.flags-aconfig-cc",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.device@1.0",
@@ -197,6 +198,7 @@ cc_library {
         "utils/TagMonitor.cpp",
         "utils/LatencyHistogram.cpp",
         "utils/Utils.cpp",
+        "utils/VirtualDeviceCameraIdMapper.cpp",
     ],
 
     header_libs: [
@@ -228,7 +230,6 @@ cc_library {
         "-Werror",
         "-Wno-ignored-qualifiers",
     ],
-
 }
 
 cc_library_static {
@@ -278,5 +279,4 @@ cc_library_static {
         "-Werror",
         "-Wno-ignored-qualifiers",
     ],
-
 }

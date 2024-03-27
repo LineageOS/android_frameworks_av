@@ -4,6 +4,17 @@
       "name": "cameraservice_test"
     }
   ],
+  "postsubmit": [
+    {
+      "name": "CtsVirtualDevicesCameraTestCases",
+      "options": [
+        {
+          "exclude-annotation": "androidx.test.filters.FlakyTest"
+        }
+      ],
+      "keywords": ["primary-device"]
+    }
+  ],
   "imports": [
     {
       "path": "frameworks/av/camera"

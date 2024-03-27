@@ -42,6 +42,7 @@ cc_test {
     ],
 
     static_libs: [
+        "android.media.codec-aconfig-cc",
         "libcodec2_hidl@1.0",
         "libstagefright_bufferpool@2.0",
     ],

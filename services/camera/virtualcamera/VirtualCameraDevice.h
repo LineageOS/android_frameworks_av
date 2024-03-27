@@ -39,7 +39,8 @@ class VirtualCameraDevice
   explicit VirtualCameraDevice(
       uint32_t cameraId,
       const aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
-          configuration);
+          configuration,
+      int32_t deviceId);
 
   virtual ~VirtualCameraDevice() override = default;
 

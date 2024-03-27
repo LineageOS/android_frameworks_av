@@ -150,15 +150,16 @@ ndk::ScopedAStatus VirtualCameraProvider::isConcurrentStreamCombinationSupported
 }
 
 std::shared_ptr<VirtualCameraDevice> VirtualCameraProvider::createCamera(
-    const VirtualCameraConfiguration& configuration, const int cameraId) {
+    const VirtualCameraConfiguration& configuration, const int cameraId,
+    const int32_t deviceId) {
   if (cameraId < 0) {
     ALOGE("%s: Cannot create camera with negative id. cameraId: %d", __func__,
           cameraId);
     return nullptr;
   }
 
-  auto camera =
-      ndk::SharedRefBase::make<VirtualCameraDevice>(cameraId, configuration);
+  auto camera = ndk::SharedRefBase::make<VirtualCameraDevice>(
+      cameraId, configuration, deviceId);
   std::shared_ptr<ICameraProviderCallback> callback;
   {
     const std::lock_guard<std::mutex> lock(mLock);

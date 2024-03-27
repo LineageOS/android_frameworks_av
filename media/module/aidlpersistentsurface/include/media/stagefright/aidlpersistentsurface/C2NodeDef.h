@@ -29,12 +29,4 @@ enum C2NodeBufferFlag : uint32_t {
     BUFFERFLAG_ENDOFFRAME = (1 << 4)
 };
 
-enum C2NodeCommand : int32_t {
-    CommandStateSet = 1
-};
-
-enum C2NodeStatus : int32_t {
-    NodeStatusLoaded = 1
-};
-
 }  // namespace android::media

@@ -54,6 +54,7 @@ constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kMaxFps = 30;
 constexpr int kCameraId = 9999;
+constexpr int kDefaultDeviceId = 0;
 constexpr char kVirtualCameraNameRegex[] =
     "device@[0-9]+\\.[0-9]+/virtual/[0-9]+";
 
@@ -119,7 +120,7 @@ TEST_F(VirtualCameraProviderTest, CreateCamera) {
 
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfig, kCameraId);
+      mCameraProvider->createCamera(mInputConfig, kCameraId, kDefaultDeviceId);
   EXPECT_THAT(camera, Not(IsNull()));
   EXPECT_THAT(camera->getCameraName(), MatchesRegex(kVirtualCameraNameRegex));
 
@@ -137,7 +138,7 @@ TEST_F(VirtualCameraProviderTest, CreateCameraBeforeCallbackIsSet) {
       .WillOnce(Return(ndk::ScopedAStatus::ok()));
 
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfig, kCameraId);
+      mCameraProvider->createCamera(mInputConfig, kCameraId, kDefaultDeviceId);
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
 
   // Created camera should be in the list of cameras.
@@ -149,7 +150,7 @@ TEST_F(VirtualCameraProviderTest, CreateCameraBeforeCallbackIsSet) {
 TEST_F(VirtualCameraProviderTest, RemoveCamera) {
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfig, kCameraId);
+      mCameraProvider->createCamera(mInputConfig, kCameraId, kDefaultDeviceId);
 
   EXPECT_CALL(*mMockCameraProviderCallback,
               cameraDeviceStatusChange(Eq(camera->getCameraName()),
@@ -166,7 +167,7 @@ TEST_F(VirtualCameraProviderTest, RemoveCamera) {
 TEST_F(VirtualCameraProviderTest, RemoveNonExistingCamera) {
   ASSERT_TRUE(mCameraProvider->setCallback(mMockCameraProviderCallback).isOk());
   std::shared_ptr<VirtualCameraDevice> camera =
-      mCameraProvider->createCamera(mInputConfig, kCameraId);
+      mCameraProvider->createCamera(mInputConfig, kCameraId, kDefaultDeviceId);
 
   // Removing non-existing camera should fail.
   const std::string cameraName = "DefinitelyNoTCamera";

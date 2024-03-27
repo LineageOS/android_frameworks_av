@@ -66,6 +66,9 @@ class MetadataBuilder {
   MetadataBuilder& setSupportedHardwareLevel(
       camera_metadata_enum_android_info_supported_hardware_level_t hwLevel);
 
+  // See ANDROID_INFO_DEVICE_ID in CameraMetadataTag.aidl.
+  MetadataBuilder& setDeviceId(int32_t deviceId);
+
   // Whether this camera device has a flash unit
   // See ANDROID_FLASH_INFO_AVAILABLE in CameraMetadataTag.aidl.
   MetadataBuilder& setFlashAvailable(bool flashAvailable);
@@ -467,6 +470,9 @@ std::optional<camera_metadata_enum_android_control_capture_intent> getCaptureInt
 // Returns ANDROID_JPEG_GPS_COORDINATES in a GpsCoordinate object or nullopt if
 // the key is not present.
 std::optional<GpsCoordinates> getGpsCoordinates(
+    const aidl::android::hardware::camera::device::CameraMetadata& metadata);
+
+std::optional<camera_metadata_enum_android_lens_facing> getLensFacing(
     const aidl::android::hardware::camera::device::CameraMetadata& metadata);
 
 }  // namespace virtualcamera

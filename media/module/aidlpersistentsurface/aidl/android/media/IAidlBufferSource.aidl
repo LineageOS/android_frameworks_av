@@ -52,7 +52,7 @@ interface IAidlBufferSource {
     void onInputBufferAdded(int bufferID);
 
     /**
-     * Called from OnEmptyBufferDone. If we have a BQ buffer available,
+     * If we have a BQ buffer available,
      * fill it with a new frame of data; otherwise, just mark it as available.
      *
      * fence contains the fence's fd that the callee should wait on before

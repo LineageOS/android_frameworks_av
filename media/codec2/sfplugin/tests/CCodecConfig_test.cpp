@@ -20,6 +20,8 @@
 
 #include <gtest/gtest.h>
 
+#include <android_media_codec.h>
+
 #include <codec2/hidl/1.0/Configurable.h>
 #include <codec2/hidl/client.h>
 #include <util/C2InterfaceHelper.h>
@@ -235,6 +237,22 @@ public:
                             })
                             .withSetter(Setter<C2StreamProfileLevelInfo::output>)
                             .build());
+
+                    std::vector<C2QpOffsetRectStruct> c2QpOffsetRectsInfo;
+                    addParameter(
+                            DefineParam(mInputQpOffsetRects, C2_PARAMKEY_QP_OFFSET_RECTS)
+                                    .withDefault(C2StreamQpOffsetRects::output::AllocShared(
+                                            c2QpOffsetRectsInfo.size(), 0, c2QpOffsetRectsInfo))
+                                    .withFields({
+                                            C2F(mInputQpOffsetRects, m.values[0].qpOffset)
+                                                    .inRange(-128, 127),
+                                            C2F(mInputQpOffsetRects, m.values[0].left).any(),
+                                            C2F(mInputQpOffsetRects, m.values[0].top).any(),
+                                            C2F(mInputQpOffsetRects, m.values[0].width).any(),
+                                            C2F(mInputQpOffsetRects, m.values[0].height).any(),
+                                    })
+                                    .withSetter(Setter<C2StreamQpOffsetRects::output>)
+                                    .build());
                 }
 
                 // TODO: more SDK params
@@ -254,6 +272,7 @@ public:
             std::shared_ptr<C2StreamBitrateInfo::output> mOutputBitrate;
             std::shared_ptr<C2StreamProfileLevelInfo::input> mInputProfileLevel;
             std::shared_ptr<C2StreamProfileLevelInfo::output> mOutputProfileLevel;
+            std::shared_ptr<C2StreamQpOffsetRects::output> mInputQpOffsetRects;
 
             template<typename T>
             static C2R Setter(bool, C2P<T> &) {
@@ -635,5 +654,57 @@ INSTANTIATE_TEST_SUITE_P(
         CCodecConfig,
         HdrProfilesTest,
         ::testing::ValuesIn(kHdrProfilesParams));
+
+TEST_F(CCodecConfigTest, SetRegionOfInterestParams) {
+    if (!android::media::codec::provider_->region_of_interest()
+        || !android::media::codec::provider_->region_of_interest_support()) {
+        GTEST_SKIP() << "Skipping the test as region_of_interest flags are not enabled.\n";
+    }
+
+    init(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER, MIMETYPE_VIDEO_VP9);
+
+    ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
+
+    const int kWidth = 32;
+    const int kHeight = 32;
+    const int kNumBlocks = ((kWidth + 15) / 16) * ((kHeight + 15) / 16);
+    int8_t mapInfo[kNumBlocks] = {-1, 0, 1, 1};
+    int top[kNumBlocks] = {0, 0, 16, 16};
+    int left[kNumBlocks] = {0, 16, 0, 16};
+    int bottom[kNumBlocks] = {16, 16, 32, 32};
+    int right[kNumBlocks] = {16, 32, 16, 32};
+    sp<AMessage> format{new AMessage};
+    format->setInt32(KEY_WIDTH, kWidth);
+    format->setInt32(KEY_HEIGHT, kHeight);
+    AString val;
+    for (int i = 0; i < kNumBlocks; i++) {
+        val.append(AStringPrintf("%d,%d-%d,%d=%d;", top[i], left[i], bottom[i],
+                                 right[i], mapInfo[i]));
+    }
+    format->setString(PARAMETER_KEY_QP_OFFSET_RECTS, val);
+
+    std::vector<std::unique_ptr<C2Param>> configUpdate;
+    ASSERT_EQ(OK, mConfig.getConfigUpdateFromSdkParams(mConfigurable, format, D::CONFIG,
+                                                       C2_MAY_BLOCK, &configUpdate));
+
+    EXPECT_EQ(1u, configUpdate.size());
+
+    C2StreamQpOffsetRects::output* qpRectParam =
+            FindParam<std::remove_pointer<decltype(qpRectParam)>::type>(configUpdate);
+    ASSERT_NE(nullptr, qpRectParam);
+    ASSERT_EQ(kNumBlocks, qpRectParam->flexCount());
+    for (auto i = 0; i < kNumBlocks; i++) {
+        EXPECT_EQ(mapInfo[i], (int8_t)qpRectParam->m.values[i].qpOffset)
+                << "qp offset for index " << i << " is not as expected ";
+        EXPECT_EQ(left[i], qpRectParam->m.values[i].left)
+                << "left for index " << i << " is not as expected ";
+        EXPECT_EQ(top[i], qpRectParam->m.values[i].top)
+                << "top for index " << i << " is not as expected ";
+        EXPECT_EQ(right[i] - left[i], qpRectParam->m.values[i].width)
+                << "width for index " << i << " is not as expected ";
+        EXPECT_EQ(bottom[i] - top[i], qpRectParam->m.values[i].height)
+                << "height for index " << i << " is not as expected ";
+    }
+}
 
 } // namespace android

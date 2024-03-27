@@ -18,18 +18,25 @@
 #define LOG_TAG "VirtualCameraService"
 #include "VirtualCameraService.h"
 
+#include <algorithm>
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
+#include <iterator>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <regex>
+#include <variant>
 
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraProvider.h"
 #include "aidl/android/companion/virtualcamera/Format.h"
+#include "aidl/android/companion/virtualcamera/LensFacing.h"
 #include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "android/binder_auto_utils.h"
 #include "android/binder_libbinder.h"
+#include "android/binder_status.h"
 #include "binder/Status.h"
 #include "util/Permissions.h"
 #include "util/Util.h"
@@ -55,11 +62,18 @@ namespace {
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kMaxFps = 60;
+constexpr int kDefaultDeviceId = 0;
 constexpr char kEnableTestCameraCmd[] = "enable_test_camera";
 constexpr char kDisableTestCameraCmd[] = "disable_test_camera";
+constexpr char kHelp[] = "help";
 constexpr char kShellCmdHelp[] = R"(
+Usage:
+   cmd virtual_camera command [--option=value]
 Available commands:
  * enable_test_camera
+     Options:
+       --camera_id=(ID) - override numerical ID for test camera instance
+       --lens_facing=(front|back|external) - specifies lens facing for test camera instance
  * disable_test_camera
 )";
 constexpr char kCreateVirtualDevicePermission[] =
@@ -102,6 +116,66 @@ ndk::ScopedAStatus validateConfiguration(
   return ndk::ScopedAStatus::ok();
 }
 
+enum class Command {
+  ENABLE_TEST_CAMERA,
+  DISABLE_TEST_CAMERA,
+  HELP,
+};
+
+struct CommandWithOptions {
+  Command command;
+  std::map<std::string, std::string> optionToValueMap;
+};
+
+std::optional<int> parseInt(const std::string& s) {
+  if (!std::all_of(s.begin(), s.end(), [](char c) { return std::isdigit(c); })) {
+    return std::nullopt;
+  }
+  int ret = atoi(s.c_str());
+  return ret > 0 ? std::optional(ret) : std::nullopt;
+}
+
+std::optional<LensFacing> parseLensFacing(const std::string& s) {
+  static const std::map<std::string, LensFacing> strToLensFacing{
+      {"front", LensFacing::FRONT},
+      {"back", LensFacing::BACK},
+      {"external", LensFacing::EXTERNAL}};
+  auto it = strToLensFacing.find(s);
+  return it == strToLensFacing.end() ? std::nullopt : std::optional(it->second);
+}
+
+std::variant<CommandWithOptions, std::string> parseCommand(
+    const char** args, const uint32_t numArgs) {
+  static const std::regex optionRegex("^--(\\w+)(?:=(.+))?$");
+  static const std::map<std::string, Command> strToCommand{
+      {kHelp, Command::HELP},
+      {kEnableTestCameraCmd, Command::ENABLE_TEST_CAMERA},
+      {kDisableTestCameraCmd, Command::DISABLE_TEST_CAMERA}};
+
+  if (numArgs < 1) {
+    return CommandWithOptions{.command = Command::HELP};
+  }
+
+  // We interpret the first argument as command;
+  auto it = strToCommand.find(args[0]);
+  if (it == strToCommand.end()) {
+    return "Unknown command: " + std::string(args[0]);
+  }
+
+  CommandWithOptions cmd{.command = it->second};
+
+  for (int i = 1; i < numArgs; i++) {
+    std::cmatch cm;
+    if (!std::regex_match(args[i], cm, optionRegex)) {
+      return "Not an option: " + std::string(args[i]);
+    }
+
+    cmd.optionToValueMap[cm[1]] = cm[2];
+  }
+
+  return cmd;
+};
+
 }  // namespace
 
 VirtualCameraService::VirtualCameraService(
@@ -113,14 +187,15 @@ VirtualCameraService::VirtualCameraService(
 
 ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
-    const VirtualCameraConfiguration& configuration, bool* _aidl_return) {
-  return registerCamera(token, configuration, sNextId++, _aidl_return);
+    const VirtualCameraConfiguration& configuration, const int32_t deviceId,
+    bool* _aidl_return) {
+  return registerCamera(token, configuration, sNextId++, deviceId, _aidl_return);
 }
 
 ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
     const VirtualCameraConfiguration& configuration, const int cameraId,
-    bool* _aidl_return) {
+    const int32_t deviceId, bool* _aidl_return) {
   if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
     ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
           getpid(), getuid(), kCreateVirtualDevicePermission);
@@ -152,7 +227,7 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
   }
 
   std::shared_ptr<VirtualCameraDevice> camera =
-      mVirtualCameraProvider->createCamera(configuration, cameraId);
+      mVirtualCameraProvider->createCamera(configuration, cameraId, deviceId);
   if (camera == nullptr) {
     ALOGE("Failed to create camera for binder token 0x%" PRIxPTR,
           reinterpret_cast<uintptr_t>(token.get()));
@@ -232,8 +307,7 @@ std::shared_ptr<VirtualCameraDevice> VirtualCameraService::getCamera(
   return mVirtualCameraProvider->getCamera(it->second);
 }
 
-binder_status_t VirtualCameraService::handleShellCommand(int in, int out,
-                                                         int err,
+binder_status_t VirtualCameraService::handleShellCommand(int, int out, int err,
                                                          const char** args,
                                                          uint32_t numArgs) {
   if (numArgs <= 0) {
@@ -242,36 +316,68 @@ binder_status_t VirtualCameraService::handleShellCommand(int in, int out,
     return STATUS_OK;
   }
 
-  if (args == nullptr || args[0] == nullptr) {
+  auto isNullptr = [](const char* ptr) { return ptr == nullptr; };
+  if (args == nullptr || std::any_of(args, args + numArgs, isNullptr)) {
     return STATUS_BAD_VALUE;
   }
-  const char* const cmd = args[0];
-  if (strcmp(kEnableTestCameraCmd, cmd) == 0) {
-    int cameraId = 0;
-    if (numArgs > 1 && args[1] != nullptr) {
-      cameraId = atoi(args[1]);
-    }
-    if (cameraId == 0) {
-      cameraId = sNextId++;
-    }
 
-    enableTestCameraCmd(in, err, cameraId);
-  } else if (strcmp(kDisableTestCameraCmd, cmd) == 0) {
-    disableTestCameraCmd(in);
-  } else {
-    dprintf(out, kShellCmdHelp);
+  std::variant<CommandWithOptions, std::string> cmdOrErrorMessage =
+      parseCommand(args, numArgs);
+  if (std::holds_alternative<std::string>(cmdOrErrorMessage)) {
+    dprintf(err, "Error: %s\n",
+            std::get<std::string>(cmdOrErrorMessage).c_str());
+    return STATUS_BAD_VALUE;
   }
 
+  const CommandWithOptions& cmd =
+      std::get<CommandWithOptions>(cmdOrErrorMessage);
+  binder_status_t status = STATUS_OK;
+  switch (cmd.command) {
+    case Command::HELP:
+      dprintf(out, kShellCmdHelp);
+      break;
+    case Command::ENABLE_TEST_CAMERA:
+      status = enableTestCameraCmd(out, err, cmd.optionToValueMap);
+      break;
+    case Command::DISABLE_TEST_CAMERA:
+      disableTestCameraCmd(out);
+      break;
+  }
+
+  fsync(err);
   fsync(out);
-  return STATUS_OK;
+  return status;
 }
 
-void VirtualCameraService::enableTestCameraCmd(const int out, const int err,
-                                               const int cameraId) {
+binder_status_t VirtualCameraService::enableTestCameraCmd(
+    const int out, const int err,
+    const std::map<std::string, std::string>& options) {
   if (mTestCameraToken != nullptr) {
-    dprintf(out, "Test camera is already enabled (%s).",
+    dprintf(out, "Test camera is already enabled (%s).\n",
             getCamera(mTestCameraToken)->getCameraName().c_str());
-    return;
+    return STATUS_OK;
+  }
+
+  std::optional<int> cameraId;
+  auto it = options.find("camera_id");
+  if (it != options.end()) {
+    cameraId = parseInt(it->second);
+    if (!cameraId.has_value()) {
+      dprintf(err, "Invalid camera_id: %s\n, must be number > 0",
+              it->second.c_str());
+      return STATUS_BAD_VALUE;
+    }
+  }
+
+  std::optional<LensFacing> lensFacing;
+  it = options.find("lens_facing");
+  if (it != options.end()) {
+    lensFacing = parseLensFacing(it->second);
+    if (!lensFacing.has_value()) {
+      dprintf(err, "Invalid lens_facing: %s\n, must be front|back|external",
+              it->second.c_str());
+      return STATUS_BAD_VALUE;
+    }
   }
 
   sp<BBinder> token = sp<BBinder>::make();
@@ -283,14 +389,16 @@ void VirtualCameraService::enableTestCameraCmd(const int out, const int err,
                                                   .height = kVgaHeight,
                                                   Format::YUV_420_888,
                                                   .maxFps = kMaxFps});
-  configuration.lensFacing = LensFacing::EXTERNAL;
-  registerCamera(mTestCameraToken, configuration, cameraId, &ret);
+  configuration.lensFacing = lensFacing.value_or(LensFacing::EXTERNAL);
+  registerCamera(mTestCameraToken, configuration, cameraId.value_or(sNextId++),
+                 kDefaultDeviceId, &ret);
   if (ret) {
-    dprintf(out, "Successfully registered test camera %s",
+    dprintf(out, "Successfully registered test camera %s\n",
             getCamera(mTestCameraToken)->getCameraName().c_str());
   } else {
-    dprintf(err, "Failed to create test camera");
+    dprintf(err, "Failed to create test camera\n");
   }
+  return STATUS_OK;
 }
 
 void VirtualCameraService::disableTestCameraCmd(const int out) {

@@ -47,25 +47,28 @@ struct H2BCameraServiceListener :
     ~H2BCameraServiceListener() { }
 
     virtual ::android::binder::Status onStatusChanged(int32_t status,
-            const std::string& cameraId) override;
+            const std::string& cameraId, int32_t deviceId) override;
     virtual ::android::binder::Status onPhysicalCameraStatusChanged(int32_t status,
             const std::string& cameraId,
-            const std::string& physicalCameraId) override;
+            const std::string& physicalCameraId,
+            int32_t deviceId) override;
 
     virtual ::android::binder::Status onTorchStatusChanged(
-            int32_t status, const std::string& cameraId) override;
+            int32_t status, const std::string& cameraId, int32_t deviceId) override;
     virtual ::android::binder::Status onTorchStrengthLevelChanged(
-            const std::string& cameraId, int32_t newStrengthLevel) override;
+            const std::string& cameraId, int32_t newStrengthLevel, int32_t deviceId) override;
     virtual binder::Status onCameraAccessPrioritiesChanged() {
         // TODO: no implementation yet.
         return binder::Status::ok();
     }
-    virtual binder::Status onCameraOpened(const std::string& /*cameraId*/,
-            const std::string& /*clientPackageId*/) {
+    virtual binder::Status onCameraOpened([[maybe_unused]] const std::string& /*cameraId*/,
+            [[maybe_unused]] const std::string& /*clientPackageId*/,
+            [[maybe_unused]] int32_t /*deviceId*/) {
         // empty implementation
         return binder::Status::ok();
     }
-    virtual binder::Status onCameraClosed(const std::string& /*cameraId*/) {
+    virtual binder::Status onCameraClosed([[maybe_unused]] const std::string& /*cameraId*/,
+            [[maybe_unused]] int32_t /*deviceId*/) {
         // empty implementation
         return binder::Status::ok();
     }

@@ -34,8 +34,6 @@ public:
     // IAidlNode
     ::ndk::ScopedAStatus freeNode() override;
 
-    ::ndk::ScopedAStatus sendCommand(int32_t cmd, int32_t param) override;
-
     ::ndk::ScopedAStatus getConsumerUsage(int64_t *_aidl_return) override;
 
     ::ndk::ScopedAStatus getInputBufferParams(

@@ -198,6 +198,8 @@ status_t Camera3Device::initializeCommonLocked() {
         return res;
     }
 
+    setCameraMuteLocked(mCameraMuteInitial);
+
     mPreparerThread = new PreparerThread();
 
     internalUpdateStatusLocked(STATUS_UNCONFIGURED);
@@ -5606,10 +5608,19 @@ status_t Camera3Device::setCameraMute(bool enabled) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
+    return setCameraMuteLocked(enabled);
+}
 
-    if (mRequestThread == nullptr || !mSupportCameraMute) {
+status_t Camera3Device::setCameraMuteLocked(bool enabled) {
+    if (mRequestThread == nullptr) {
+        mCameraMuteInitial = enabled;
+        return OK;
+    }
+
+    if (!mSupportCameraMute) {
         return INVALID_OPERATION;
     }
+
     int32_t muteMode =
             !enabled                      ? ANDROID_SENSOR_TEST_PATTERN_MODE_OFF :
             mSupportTestPatternSolidColor ? ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR :

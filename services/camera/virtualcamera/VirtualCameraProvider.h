@@ -77,7 +77,7 @@ class VirtualCameraProvider
   std::shared_ptr<VirtualCameraDevice> createCamera(
       const aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
           configuration,
-      int cameraId);
+      int cameraId, int32_t deviceId);
 
   std::shared_ptr<VirtualCameraDevice> getCamera(const std::string& name);
 

@@ -73,6 +73,9 @@ status_t CameraStatus::writeToParcel(android::Parcel* parcel) const {
     if (res != OK) return res;
 
     res = parcel->writeString16(toString16(clientPackage));
+    if (res != OK) return res;
+
+    res = parcel->writeInt32(deviceId);
     return res;
 }
 
@@ -97,6 +100,7 @@ status_t CameraStatus::readFromParcel(const android::Parcel* parcel) {
     if (res != OK) return res;
     clientPackage = toStdString(tempClientPackage);
 
+    res = parcel->readInt32(&deviceId);
     return res;
 }
 
@@ -123,7 +127,7 @@ namespace {
     };
 
     sp<DeathNotifier>         gDeathNotifier;
-}; // namespace anonymous
+} // namespace anonymous
 
 ///////////////////////////////////////////////////////////
 // CameraBase definition
@@ -159,7 +163,8 @@ template <typename TCam, typename TCamTraits>
 sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
                                                const std::string& clientPackageName,
                                                int clientUid, int clientPid, int targetSdkVersion,
-                                               bool overrideToPortrait, bool forceSlowJpegMode)
+                                               bool overrideToPortrait, bool forceSlowJpegMode,
+                                               int32_t deviceId, int32_t devicePolicy)
 {
     ALOGV("%s: connect", __FUNCTION__);
     sp<TCam> c = new TCam(cameraId);
@@ -172,8 +177,8 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
         ALOGI("Connect camera (legacy API) - overrideToPortrait %d, forceSlowJpegMode %d",
                 overrideToPortrait, forceSlowJpegMode);
         ret = (cs.get()->*fnConnectService)(cl, cameraId, clientPackageName, clientUid,
-                clientPid, targetSdkVersion, overrideToPortrait, forceSlowJpegMode,
-                 /*out*/ &c->mCamera);
+                clientPid, targetSdkVersion, overrideToPortrait, forceSlowJpegMode, deviceId,
+                devicePolicy, /*out*/ &c->mCamera);
     }
     if (ret.isOk() && c->mCamera != nullptr) {
         IInterface::asBinder(c->mCamera)->linkToDeath(c);
@@ -252,7 +257,7 @@ void CameraBase<TCam, TCamTraits>::notifyCallback(int32_t msgType,
 }
 
 template <typename TCam, typename TCamTraits>
-int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
+int CameraBase<TCam, TCamTraits>::getNumberOfCameras(int32_t deviceId, int32_t devicePolicy) {
     const sp<::android::hardware::ICameraService> cs = getCameraService();
 
     if (!cs.get()) {
@@ -261,8 +266,8 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
     }
     int32_t count;
     binder::Status res = cs->getNumberOfCameras(
-            ::android::hardware::ICameraService::CAMERA_TYPE_BACKWARD_COMPATIBLE,
-            &count);
+            ::android::hardware::ICameraService::CAMERA_TYPE_BACKWARD_COMPATIBLE, deviceId,
+            devicePolicy, &count);
     if (!res.isOk()) {
         ALOGE("Error reading number of cameras: %s",
                 res.toString8().c_str());
@@ -274,11 +279,12 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras() {
 // this can be in BaseCamera but it should be an instance method
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
-        bool overrideToPortrait,
+        bool overrideToPortrait, int32_t deviceId, int32_t devicePolicy,
         struct hardware::CameraInfo* cameraInfo) {
     const sp<::android::hardware::ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
-    binder::Status res = cs->getCameraInfo(cameraId, overrideToPortrait, cameraInfo);
+    binder::Status res = cs->getCameraInfo(cameraId, overrideToPortrait, deviceId, devicePolicy,
+            cameraInfo);
     return res.isOk() ? OK : res.serviceSpecificErrorCode();
 }
 
