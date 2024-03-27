@@ -37,7 +37,6 @@ interface IAidlNode {
     }
 
     void freeNode();
-    void sendCommand(int cmd, int param);
     long getConsumerUsage();
     InputBufferParams getInputBufferParams();
     void setConsumerUsage(long usage);
