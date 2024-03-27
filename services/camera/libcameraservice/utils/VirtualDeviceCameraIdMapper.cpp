@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
 #define LOG_TAG "VirtualDeviceCameraIdMapper"
 
 #include <android_companion_virtualdevice_flags.h>
@@ -99,8 +100,8 @@ std::pair<int32_t, std::string> VirtualDeviceCameraIdMapper::getDeviceIdAndMappe
             return deviceIdMappedCameraIdPair;
         }
     }
-    ALOGD("%s: No device id and mapped camera id found for camera id %s, so it must belong "
-          "to the default device", __func__, cameraId.c_str());
+    ALOGV("%s: No device id and mapped camera id found for camera id %s, so it must belong "
+            "to the default device ? ", __func__, cameraId.c_str());
     return std::make_pair(kDefaultDeviceId, cameraId);
 }
 
