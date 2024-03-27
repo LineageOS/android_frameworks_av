@@ -28,6 +28,8 @@
 #include <thread>
 #include <chrono>
 
+#include <android_media_codec.h>
+
 #include <C2AllocatorGralloc.h>
 #include <C2PlatformSupport.h>
 #include <C2BlockInternal.h>
@@ -370,7 +372,17 @@ status_t CCodecBufferChannel::queueInputBufferInternal(
         }
     } else {
         work->input.flags = (C2FrameData::flags_t)flags;
+
         // TODO: fill info's
+        if (android::media::codec::provider_->region_of_interest()
+                && android::media::codec::provider_->region_of_interest_support()) {
+            if (mInfoBuffers.size()) {
+                for (auto infoBuffer : mInfoBuffers) {
+                    work->input.infoBuffers.emplace_back(*infoBuffer);
+                }
+                mInfoBuffers.clear();
+            }
+        }
 
         work->input.configUpdate = std::move(mParamsToBeSet);
         if (tunnelFirstFrame) {
@@ -2058,6 +2070,7 @@ status_t CCodecBufferChannel::requestInitialInputBuffers(
 void CCodecBufferChannel::stop() {
     mSync.stop();
     mFirstValidFrameIndex = mFrameIndex.load(std::memory_order_relaxed);
+    mInfoBuffers.clear();
 }
 
 void CCodecBufferChannel::stopUseOutputSurface(bool pushBlankBuffer) {
@@ -2099,6 +2112,7 @@ void CCodecBufferChannel::reset() {
 }
 
 void CCodecBufferChannel::release() {
+    mInfoBuffers.clear();
     mComponent.reset();
     mInputAllocator.reset();
     mOutputSurface.lock()->surface.clear();
@@ -2164,6 +2178,7 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
             output->buffers->flushStash();
         }
     }
+    mInfoBuffers.clear();
 }
 
 void CCodecBufferChannel::onWorkDone(
@@ -2766,6 +2781,10 @@ void CCodecBufferChannel::resetBuffersPixelFormat(bool isEncoder) {
         }
         output->buffers->resetPixelFormatIfApplicable();
     }
+}
+
+void CCodecBufferChannel::setInfoBuffer(const std::shared_ptr<C2InfoBuffer> &buffer) {
+    mInfoBuffers.push_back(buffer);
 }
 
 status_t toStatusT(c2_status_t c2s, c2_operation_t c2op) {
