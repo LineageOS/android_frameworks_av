@@ -903,6 +903,20 @@ std::optional<GpsCoordinates> getGpsCoordinates(
   return coordinates;
 }
 
+std::optional<camera_metadata_enum_android_lens_facing> getLensFacing(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_LENS_FACING, &entry) !=
+      OK) {
+    return std::nullopt;
+  }
+
+  return static_cast<camera_metadata_enum_android_lens_facing>(entry.data.u8[0]);
+}
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android
