@@ -46,6 +46,10 @@ bool isAtLeastU() {
     return isAtLeast(__ANDROID_API_U__, "UpsideDownCake");
 }
 
+bool isAtLeastV() {
+    return isAtLeast(__ANDROID_API_V__, "VanillaIceCream");
+}
+
 static bool isP010Allowed() {
     // The Vendor API level which is min(ro.product.first_api_level, ro.board.[first_]api_level).
     // This is the api level to which VSR requirement the device conform.

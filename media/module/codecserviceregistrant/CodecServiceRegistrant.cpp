@@ -49,6 +49,7 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::Return;
 using ::android::sp;
 using ::ndk::ScopedAStatus;
+namespace c2_hidl_V1_0 = ::android::hardware::media::c2::V1_0;
 namespace c2_hidl = ::android::hardware::media::c2::V1_2;
 namespace c2_aidl = ::aidl::android::hardware::media::c2;
 
@@ -734,6 +735,46 @@ bool ionPropertiesDefined() {
 
 } // unnamed namespace
 
+static android::sp<c2_hidl_V1_0::IComponentStore> getDeclaredHidlSwcodec(
+        const std::shared_ptr<C2ComponentStore>& store) {
+    using ::android::hidl::manager::V1_2::IServiceManager;
+    using namespace ::android::hardware::media::c2;
+
+    int platformVersion = android_get_device_api_level();
+    // STOPSHIP: Remove code name checking once platform version bumps up to 35.
+    std::string codeName = android::base::GetProperty("ro.build.version.codename", "");
+
+    if (codeName == "VanillaIceCream") {
+        platformVersion = __ANDROID_API_V__;
+    }
+    IServiceManager::Transport transport =
+            android::hardware::defaultServiceManager1_2()->getTransport(
+                    V1_2::IComponentStore::descriptor, "software");
+    if (transport == IServiceManager::Transport::HWBINDER) {
+        if (platformVersion < __ANDROID_API_S__) {
+            LOG(ERROR) << "We don't expect V1.2::IComponentStore to be declared on this device";
+        }
+        return ::android::sp<V1_2::utils::ComponentStore>::make(store);
+    }
+    transport = android::hardware::defaultServiceManager1_2()->getTransport(
+            V1_1::IComponentStore::descriptor, "software");
+    if (transport == IServiceManager::Transport::HWBINDER) {
+        if (platformVersion != __ANDROID_API_R__) {
+            LOG(ERROR) << "We don't expect V1.1::IComponentStore to be declared on this device";
+        }
+        return ::android::sp<V1_1::utils::ComponentStore>::make(store);
+    }
+    transport = android::hardware::defaultServiceManager1_2()->getTransport(
+            V1_0::IComponentStore::descriptor, "software");
+    if (transport == IServiceManager::Transport::HWBINDER) {
+        if (platformVersion != __ANDROID_API_Q__) {
+            LOG(ERROR) << "We don't expect V1.0::IComponentStore to be declared on this device";
+        }
+        return ::android::sp<V1_0::utils::ComponentStore>::make(store);
+    }
+    return nullptr;
+}
+
 extern "C" void RegisterCodecServices() {
     const bool aidlSelected = c2_aidl::utils::IsSelected();
     constexpr int kThreadCount = 64;
@@ -751,33 +792,6 @@ extern "C" void RegisterCodecServices() {
 
     using namespace ::android::hardware::media::c2;
 
-    int platformVersion = android_get_device_api_level();
-    // STOPSHIP: Remove code name checking once platform version bumps up to 35.
-    std::string codeName =
-        android::base::GetProperty("ro.build.version.codename", "");
-    if (codeName == "VanillaIceCream") {
-        platformVersion = __ANDROID_API_V__;
-    }
-
-    android::sp<V1_0::IComponentStore> hidlStore;
-    std::shared_ptr<c2_aidl::IComponentStore> aidlStore;
-    const char *hidlVer = "(unknown)";
-    if (aidlSelected) {
-        aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(store);
-    } else if (platformVersion >= __ANDROID_API_S__) {
-        hidlStore = ::android::sp<V1_2::utils::ComponentStore>::make(store);
-        hidlVer = "1.2";
-    } else if (platformVersion == __ANDROID_API_R__) {
-        hidlStore = ::android::sp<V1_1::utils::ComponentStore>::make(store);
-        hidlVer = "1.1";
-    } else if (platformVersion == __ANDROID_API_Q__) {
-        hidlStore = ::android::sp<V1_0::utils::ComponentStore>::make(store);
-        hidlVer = "1.0";
-    } else {  // platformVersion < __ANDROID_API_Q__
-        LOG(ERROR) << "The platform version " << platformVersion <<
-                      " is not supported.";
-        return;
-    }
     if (!ionPropertiesDefined()) {
         using IComponentStore =
             ::android::hardware::media::c2::V1_0::IComponentStore;
@@ -823,7 +837,10 @@ extern "C" void RegisterCodecServices() {
         std::string(c2_aidl::IComponentStore::descriptor) + "/software";
     if (__builtin_available(android __ANDROID_API_S__, *)) {
         if (AServiceManager_isDeclared(aidlServiceName.c_str())) {
-            if (!aidlStore) {
+            std::shared_ptr<c2_aidl::IComponentStore> aidlStore;
+            if (aidlSelected) {
+                aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(store);
+            } else {
                 aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
                         std::make_shared<H2C2ComponentStore>(nullptr));
             }
@@ -837,22 +854,23 @@ extern "C" void RegisterCodecServices() {
         }
     }
 
+    android::sp<V1_0::IComponentStore> hidlStore = getDeclaredHidlSwcodec(store);
     // If the software component store isn't declared in the manifest, we don't
     // need to create the service and register it.
-    using ::android::hidl::manager::V1_2::IServiceManager;
-    IServiceManager::Transport transport =
-            android::hardware::defaultServiceManager1_2()->getTransport(
-                    V1_2::utils::ComponentStore::descriptor, "software");
-    if (transport == IServiceManager::Transport::HWBINDER) {
-        if (!hidlStore) {
+    if (hidlStore) {
+        if (registered && aidlSelected) {
+            LOG(INFO) << "Both HIDL and AIDL software codecs are declared in the vintf "
+                      << "manifest, but AIDL was selected. "
+                      << "Creating a null HIDL service so it's not accidentally "
+                      << "used. The AIDL software codec is already registered.";
             hidlStore = ::android::sp<V1_2::utils::ComponentStore>::make(
                     std::make_shared<H2C2ComponentStore>(nullptr));
-            hidlVer = "1.2";
         }
         if (hidlStore->registerAsService("software") == android::OK) {
             registered = true;
         } else {
-            LOG(ERROR) << "Cannot register software Codec2 v" << hidlVer << " service.";
+            LOG(ERROR) << "Cannot register software Codec2 " << hidlStore->descriptor
+                       << " service.";
         }
     } else {
         LOG(INFO) << "The HIDL software Codec2 service is deprecated"

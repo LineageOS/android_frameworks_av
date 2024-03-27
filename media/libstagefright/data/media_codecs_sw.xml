@@ -335,7 +335,7 @@
         </MediaCodec>
         <MediaCodec name="c2.android.vp8.encoder" type="video/x-vnd.on2.vp8" variant="slow-cpu,!slow-cpu">
             <Alias name="OMX.google.vp8.encoder" />
-            <Limit name="alignment" value="2x2" />
+            <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
                 <Limit name="size" min="2x2" max="2048x2048" />
@@ -371,7 +371,7 @@
             <Alias name="OMX.google.vp9.encoder" />
             <!-- profiles and levels:  ProfileMain : Level_Version0-3 -->
             <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
+            <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <!-- 2016 devices can encode at about 8fps at this block count -->
             <Limit name="block-count" range="1-3600" /> <!-- max 1280x720 -->
@@ -380,7 +380,7 @@
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.av1.encoder" type="video/av01" enabled="false" minsdk="34" variant="slow-cpu,!slow-cpu">
-            <Limit name="alignment" value="2x2" />
+            <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
                 <Limit name="size" min="2x2" max="1920x1920" />

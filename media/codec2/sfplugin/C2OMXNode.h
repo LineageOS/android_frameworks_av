@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, The Android Open Source Project
+ * Copyright 2024, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +17,14 @@
 #ifndef C2_OMX_NODE_H_
 #define C2_OMX_NODE_H_
 
-#include <atomic>
-
 #include <android/IOMXBufferSource.h>
 #include <codec2/hidl/client.h>
-#include <media/stagefright/foundation/Mutexed.h>
 #include <media/IOMX.h>
 #include <media/OMXBuffer.h>
 
 namespace android {
+
+struct C2NodeImpl;
 
 /**
  * IOmxNode implementation around codec 2.0 component, only to be used in
@@ -109,30 +108,7 @@ struct C2OMXNode : public BnOMXNode {
     void setPriority(int priority);
 
 private:
-    std::weak_ptr<Codec2Client::Component> mComp;
-    sp<IOMXBufferSource> mBufferSource;
-    std::shared_ptr<C2Allocator> mAllocator;
-    std::atomic_uint64_t mFrameIndex;
-    uint32_t mWidth;
-    uint32_t mHeight;
-    uint64_t mUsage;
-    Mutexed<android_dataspace> mDataspace;
-    Mutexed<uint32_t> mPixelFormat;
-
-    // WORKAROUND: timestamp adjustment
-
-    // if >0: this is the max timestamp gap, if <0: this is -1 times the fixed timestamp gap
-    // if 0: no timestamp adjustment is made
-    // note that C2OMXNode can be recycled between encoding sessions.
-    int32_t mAdjustTimestampGapUs;
-    bool mFirstInputFrame; // true for first input
-    c2_cntr64_t mPrevInputTimestamp; // input timestamp for previous frame
-    c2_cntr64_t mPrevCodecTimestamp; // adjusted (codec) timestamp for previous frame
-
-    Mutexed<std::map<uint64_t, buffer_id>> mBufferIdsInUse;
-
-    class QueueThread;
-    sp<QueueThread> mQueueThread;
+    std::shared_ptr<C2NodeImpl> mImpl;
 };
 
 }  // namespace android
