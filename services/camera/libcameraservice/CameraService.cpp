@@ -1092,7 +1092,11 @@ Status CameraService::filterSensitiveMetadataIfNeeded(
     }
 
     std::vector<int32_t> tagsRemoved;
-    bool hasCameraPermission = hasPermissionsForCamera(cameraId, callingPid, callingUid);
+    // Get the device id that owns this camera.
+    auto [cameraOwnerDeviceId, _] = mVirtualDeviceCameraIdMapper.getDeviceIdAndMappedCameraIdPair(
+            cameraId);
+    bool hasCameraPermission = hasPermissionsForCamera(cameraId, callingPid, callingUid,
+            cameraOwnerDeviceId);
     if (hasCameraPermission) {
         // Caller has camera permission; no need to remove keys
         return Status::ok();
@@ -1910,14 +1914,16 @@ Status CameraService::validateClientPermissionsLocked(const std::string& cameraI
         ALOGE("%s: Invalid camera id %s, skipping", __FUNCTION__, cameraId.c_str());
         return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT, "No camera device with ID \"%s\""
                 "found while trying to query device kind", cameraId.c_str());
-
     }
+
+    // Get the device id that owns this camera.
+    auto [deviceId, _] = mVirtualDeviceCameraIdMapper.getDeviceIdAndMappedCameraIdPair(cameraId);
 
     // If it's not calling from cameraserver, check the permission if the
     // device isn't a system only camera (shouldRejectSystemCameraConnection already checks for
     // android.permission.SYSTEM_CAMERA for system only camera devices).
     bool checkPermissionForCamera =
-            hasPermissionsForCamera(cameraId, clientPid, clientUid, clientName);
+            hasPermissionsForCamera(cameraId, clientPid, clientUid, clientName, deviceId);
     if (callingPid != getpid() &&
                 (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) && !checkPermissionForCamera) {
         ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
@@ -3446,8 +3452,9 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
     // Check for camera permissions
     int callingPid = getCallingPid();
     int callingUid = getCallingUid();
+    // TODO(b/291736219): Pass deviceId owning the camera if we make this method device-aware.
     bool hasCameraPermission = ((callingPid == getpid()) ||
-            hasPermissionsForCamera(callingPid, callingUid));
+            hasPermissionsForCamera(callingPid, callingUid, kDefaultDeviceId));
     if (!hasCameraPermission) {
         return STATUS_ERROR(ERROR_PERMISSION_DENIED,
                 "android.permission.CAMERA needed to call"
