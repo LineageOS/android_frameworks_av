@@ -1424,7 +1424,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     if (!msg->contains(PARAMETER_KEY_QP_OFFSET_MAP) &&
                         !msg->contains(PARAMETER_KEY_QP_OFFSET_RECTS)) {
                         msg->setString(PARAMETER_KEY_QP_OFFSET_RECTS,
-                                       AStringPrintf("%d,%d-%d,%d=%d;", 0, 0, 16, 16, 0));
+                                       AStringPrintf("%d,%d-%d,%d=%d;", 0, 0, height, width, 0));
                     }
                 }
             }
@@ -2552,6 +2552,40 @@ void CCodec::signalSetParameters(const sp<AMessage> &msg) {
                     "android._stop-time-offset-us", config->mISConfig->mInputDelayUs);
         }
     }
+
+    /**
+     * Handle ROI QP map configuration. Recover the QP map configuration from AMessage as an
+     * ABuffer and configure to CCodecBufferChannel as a C2InfoBuffer
+     */
+    if (android::media::codec::provider_->region_of_interest()
+            && android::media::codec::provider_->region_of_interest_support()) {
+        sp<ABuffer> qpOffsetMap;
+        if ((config->mDomain & (Config::IS_VIDEO | Config::IS_IMAGE))
+                && (config->mDomain & Config::IS_ENCODER)
+                &&  params->findBuffer(PARAMETER_KEY_QP_OFFSET_MAP, &qpOffsetMap)) {
+            std::shared_ptr<C2BlockPool> pool;
+            // TODO(b/331443865) Use pooled block pool to improve efficiency
+            c2_status_t status = GetCodec2BlockPool(C2BlockPool::BASIC_LINEAR, nullptr, &pool);
+
+            if (status == C2_OK) {
+                size_t mapSize = qpOffsetMap->size();
+                std::shared_ptr<C2LinearBlock> block;
+                status = pool->fetchLinearBlock(mapSize,
+                        C2MemoryUsage{C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block);
+                if (status == C2_OK && !block->map().get().error()) {
+                    C2WriteView wView = block->map().get();
+                    uint8_t* outData = wView.data();
+                    memcpy(outData, qpOffsetMap->data(), mapSize);
+                    C2InfoBuffer info = C2InfoBuffer::CreateLinearBuffer(
+                            kParamIndexQpOffsetMapBuffer,
+                            block->share(0, mapSize, C2Fence()));
+                    mChannel->setInfoBuffer(std::make_shared<C2InfoBuffer>(info));
+                }
+            }
+            params->removeEntryByName(PARAMETER_KEY_QP_OFFSET_MAP);
+        }
+    }
+
 
     std::vector<std::unique_ptr<C2Param>> configUpdate;
     (void)config->getConfigUpdateFromSdkParams(
