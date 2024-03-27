@@ -28,7 +28,8 @@ interface IVirtualCameraService {
      * Registers a new camera with the virtual camera hal.
      * @return true if the camera was successfully registered
      */
-    boolean registerCamera(in IBinder token, in VirtualCameraConfiguration configuration);
+    boolean registerCamera(in IBinder token, in VirtualCameraConfiguration configuration,
+            int deviceId);
 
     /**
      * Unregisters the camera from the virtual camera hal. After this call the virtual camera won't

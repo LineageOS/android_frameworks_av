@@ -66,6 +66,9 @@ class MetadataBuilder {
   MetadataBuilder& setSupportedHardwareLevel(
       camera_metadata_enum_android_info_supported_hardware_level_t hwLevel);
 
+  // See ANDROID_INFO_DEVICE_ID in CameraMetadataTag.aidl.
+  MetadataBuilder& setDeviceId(int32_t deviceId);
+
   // Whether this camera device has a flash unit
   // See ANDROID_FLASH_INFO_AVAILABLE in CameraMetadataTag.aidl.
   MetadataBuilder& setFlashAvailable(bool flashAvailable);

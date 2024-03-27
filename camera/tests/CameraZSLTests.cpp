@@ -27,6 +27,7 @@
 #include <camera/CameraParameters.h>
 #include <camera/CameraMetadata.h>
 #include <camera/Camera.h>
+#include <camera/CameraUtils.h>
 #include <camera/StringUtils.h>
 #include <android/hardware/ICameraService.h>
 
@@ -84,7 +85,8 @@ void CameraZSLTests::SetUp() {
     sp<IBinder> binder = sm->getService(String16("media.camera"));
     mCameraService = interface_cast<ICameraService>(binder);
     rc = mCameraService->getNumberOfCameras(
-            hardware::ICameraService::CAMERA_TYPE_ALL, &numCameras);
+            hardware::ICameraService::CAMERA_TYPE_ALL, kDefaultDeviceId, /*devicePolicy*/0,
+            &numCameras);
     EXPECT_TRUE(rc.isOk());
 
     mComposerClient = new SurfaceComposerClient;
@@ -109,7 +111,6 @@ void CameraZSLTests::notifyCallback(int32_t msgType, int32_t,
 
 void CameraZSLTests::dataCallback(int32_t msgType, const sp<IMemory>& /*data*/,
         camera_frame_metadata_t *) {
-
     switch (msgType) {
     case CAMERA_MSG_PREVIEW_FRAME: {
         Mutex::Autolock l(mPreviewLock);
@@ -127,7 +128,7 @@ void CameraZSLTests::dataCallback(int32_t msgType, const sp<IMemory>& /*data*/,
     default:
         ALOGV("%s: msgType: %d", __FUNCTION__, msgType);
     }
-};
+}
 
 status_t CameraZSLTests::waitForPreviewStart() {
     status_t rc = NO_ERROR;
@@ -184,7 +185,7 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
         CameraMetadata metadata;
         rc = mCameraService->getCameraCharacteristics(cameraIdStr,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
-                &metadata);
+                kDefaultDeviceId, /*devicePolicy*/0, &metadata);
         if (!rc.isOk()) {
             // The test is relevant only for cameras with Hal 3.x
             // support.
@@ -212,7 +213,8 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
                 "ZSLTest", hardware::ICameraService::USE_CALLING_UID,
                 hardware::ICameraService::USE_CALLING_PID,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                /*overrideToPortrait*/false, /*forceSlowJpegMode*/false, &cameraDevice);
+                /*overrideToPortrait*/false, /*forceSlowJpegMode*/false, kDefaultDeviceId,
+                /*devicePolicy*/0, &cameraDevice);
         EXPECT_TRUE(rc.isOk());
 
         CameraParameters params(cameraDevice->getParameters());

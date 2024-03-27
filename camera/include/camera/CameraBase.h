@@ -62,16 +62,15 @@ struct CameraInfo : public android::Parcelable {
 
     virtual status_t writeToParcel(android::Parcel* parcel) const;
     virtual status_t readFromParcel(const android::Parcel* parcel);
-
 };
 
 /**
- * Basic status information about a camera device - its name and its current
+ * Basic status information about a camera device - its id and its current
  * state.
  */
 struct CameraStatus : public android::Parcelable {
     /**
-     * The name of the camera device
+     * The app-visible id of the camera device
      */
     std::string cameraId;
 
@@ -90,19 +89,25 @@ struct CameraStatus : public android::Parcelable {
      */
     std::string clientPackage;
 
+    /**
+     * The id of the device owning the camera. For virtual cameras, this is the id of the virtual
+     * device owning the camera. For real cameras, this is the default device id, i.e.,
+     * kDefaultDeviceId.
+     */
+    int32_t deviceId;
+
     virtual status_t writeToParcel(android::Parcel* parcel) const;
     virtual status_t readFromParcel(const android::Parcel* parcel);
 
     CameraStatus(std::string id, int32_t s, const std::vector<std::string>& unavailSubIds,
-            const std::string& clientPkg) : cameraId(id), status(s),
-            unavailablePhysicalIds(unavailSubIds), clientPackage(clientPkg) {}
+            const std::string& clientPkg, int32_t devId) : cameraId(id), status(s),
+            unavailablePhysicalIds(unavailSubIds), clientPackage(clientPkg), deviceId(devId) {}
     CameraStatus() : status(ICameraServiceListener::STATUS_PRESENT) {}
 };
 
 } // namespace hardware
 
 using hardware::CameraInfo;
-
 
 template <typename TCam>
 struct CameraTraits {
@@ -120,15 +125,18 @@ public:
     static sp<TCam>      connect(int cameraId,
                                  const std::string& clientPackageName,
                                  int clientUid, int clientPid, int targetSdkVersion,
-                                 bool overrideToPortrait, bool forceSlowJpegMode);
+                                 bool overrideToPortrait, bool forceSlowJpegMode,
+                                 int32_t deviceId, int32_t devicePolicy);
     virtual void         disconnect();
 
     void                 setListener(const sp<TCamListener>& listener);
 
-    static int           getNumberOfCameras();
+    static int           getNumberOfCameras(int32_t deviceId, int32_t devicePolicy);
 
     static status_t      getCameraInfo(int cameraId,
                                        bool overrideToPortrait,
+                                       int32_t deviceId,
+                                       int32_t devicePolicy,
                                        /*out*/
                                        struct hardware::CameraInfo* cameraInfo);
 
@@ -167,6 +175,6 @@ protected:
     typedef CameraBase<TCam>         CameraBaseT;
 };
 
-}; // namespace android
+} // namespace android
 
 #endif

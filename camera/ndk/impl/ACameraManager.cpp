@@ -32,6 +32,9 @@ using namespace android::acam;
 
 namespace android {
 namespace acam {
+
+// TODO(b/291736219): Add device-awareness to ACameraManager.
+
 // Static member definitions
 const char* CameraManagerGlobal::kCameraIdKey   = "CameraId";
 const char* CameraManagerGlobal::kPhysicalCameraIdKey   = "PhysicalCameraId";
@@ -125,6 +128,12 @@ sp<hardware::ICameraService> CameraManagerGlobal::getCameraServiceLocked() {
         std::vector<hardware::CameraStatus> cameraStatuses{};
         mCameraService->addListener(mCameraServiceListener, &cameraStatuses);
         for (auto& c : cameraStatuses) {
+            // Skip callback for cameras not belonging to the default device, as NDK doesn't support
+            // device awareness yet.
+            if (c.deviceId != kDefaultDeviceId) {
+                continue;
+            }
+
             onStatusChangedLocked(c.status, c.cameraId);
 
             for (auto& unavailablePhysicalId : c.unavailablePhysicalIds) {
@@ -461,7 +470,13 @@ binder::Status CameraManagerGlobal::CameraServiceListener::onCameraAccessPriorit
 }
 
 binder::Status CameraManagerGlobal::CameraServiceListener::onStatusChanged(
-        int32_t status, const std::string& cameraId) {
+        int32_t status, const std::string& cameraId, int deviceId) {
+    // Skip callback for cameras not belonging to the default device, as NDK doesn't support
+    // device awareness yet.
+    if (deviceId != kDefaultDeviceId) {
+        return binder::Status::ok();
+    }
+
     sp<CameraManagerGlobal> cm = mCameraManager.promote();
     if (cm != nullptr) {
         cm->onStatusChanged(status, cameraId);
@@ -472,7 +487,14 @@ binder::Status CameraManagerGlobal::CameraServiceListener::onStatusChanged(
 }
 
 binder::Status CameraManagerGlobal::CameraServiceListener::onPhysicalCameraStatusChanged(
-        int32_t status, const std::string& cameraId, const std::string& physicalCameraId) {
+        int32_t status, const std::string& cameraId, const std::string& physicalCameraId,
+        int deviceId) {
+    // Skip callback for cameras not belonging to the default device, as NDK doesn't support
+    // device awareness yet.
+    if (deviceId != kDefaultDeviceId) {
+        return binder::Status::ok();
+    }
+
     sp<CameraManagerGlobal> cm = mCameraManager.promote();
     if (cm != nullptr) {
         cm->onStatusChanged(status, cameraId, physicalCameraId);
@@ -697,7 +719,8 @@ camera_status_t ACameraManager::getCameraCharacteristics(
     CameraMetadata rawMetadata;
     int targetSdkVersion = android_get_application_target_sdk_version();
     binder::Status serviceRet = cs->getCameraCharacteristics(cameraIdStr,
-            targetSdkVersion, /*overrideToPortrait*/false, &rawMetadata);
+            targetSdkVersion, /*overrideToPortrait*/false, kDefaultDeviceId, /*devicePolicy*/0,
+            &rawMetadata);
     if (!serviceRet.isOk()) {
         switch(serviceRet.serviceSpecificErrorCode()) {
             case hardware::ICameraService::ERROR_DISCONNECTED:
@@ -749,7 +772,8 @@ ACameraManager::openCamera(
     binder::Status serviceRet = cs->connectDevice(
             callbacks, cameraId, "", {},
             hardware::ICameraService::USE_CALLING_UID, /*oomScoreOffset*/0,
-            targetSdkVersion, /*overrideToPortrait*/false, /*out*/&deviceRemote);
+            targetSdkVersion, /*overrideToPortrait*/false, kDefaultDeviceId, /*devicePolicy*/0,
+            /*out*/&deviceRemote);
 
     if (!serviceRet.isOk()) {
         ALOGE("%s: connect camera device failed: %s", __FUNCTION__, serviceRet.toString8().c_str());

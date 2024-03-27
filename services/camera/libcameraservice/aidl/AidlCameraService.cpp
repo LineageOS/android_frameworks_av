@@ -26,6 +26,7 @@
 #include <android/binder_ibinder.h>
 #include <android/binder_manager.h>
 #include <binder/Status.h>
+#include <camera/CameraUtils.h>
 #include <hidl/HidlTransportSupport.h>
 #include <utils/Utils.h>
 
@@ -90,6 +91,8 @@ ScopedAStatus AidlCameraService::getCameraCharacteristics(const std::string& in_
     UStatus ret = mCameraService->getCameraCharacteristics(in_cameraId,
                                                            mVndkVersion,
                                                            /* overrideToPortrait= */ false,
+                                                           kDefaultDeviceId,
+                                                           /* devicePolicy= */ 0,
                                                            &cameraMetadata);
     if (!ret.isOk()) {
         if (ret.exceptionCode() != EX_SERVICE_SPECIFIC) {
@@ -148,6 +151,8 @@ ndk::ScopedAStatus AidlCameraService::connectDevice(
             /* scoreOffset= */ 0,
             /* targetSdkVersion= */ __ANDROID_API_FUTURE__,
             /* overrideToPortrait= */ false,
+            kDefaultDeviceId,
+            /* devicePolicy= */ 0,
             &unstableDevice);
     if (!serviceRet.isOk()) {
         ALOGE("%s: Unable to connect to camera device: %s", __FUNCTION__,

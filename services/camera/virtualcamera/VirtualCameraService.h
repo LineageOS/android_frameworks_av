@@ -43,14 +43,14 @@ class VirtualCameraService
       const ::ndk::SpAIBinder& token,
       const ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
           configuration,
-      bool* _aidl_return) override EXCLUDES(mLock);
+      int32_t deviceId, bool* _aidl_return) override EXCLUDES(mLock);
 
   // Register camera corresponding to the binder token.
   ndk::ScopedAStatus registerCamera(
       const ::ndk::SpAIBinder& token,
       const ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
           configuration,
-      int cameraId, bool* _aidl_return) EXCLUDES(mLock);
+      int cameraId, int32_t deviceId, bool* _aidl_return) EXCLUDES(mLock);
 
   // Unregisters camera corresponding to the binder token.
   ndk::ScopedAStatus unregisterCamera(const ::ndk::SpAIBinder& token) override
