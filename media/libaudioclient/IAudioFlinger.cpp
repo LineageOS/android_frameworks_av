@@ -923,6 +923,7 @@ status_t AudioFlingerClientAdapter::getAudioMixPort(const struct audio_port_v7 *
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
         const sp<AudioFlingerServerAdapter::Delegate>& delegate) : mDelegate(delegate) {
     setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
+    setInheritRt(true);
 }
 
 status_t AudioFlingerServerAdapter::onTransact(uint32_t code,
