@@ -795,10 +795,10 @@ bool CameraService::checkPermission(const std::string& cameraId, const std::stri
         return isAutomotiveExteriorSystemCamera(cameraId);
     }
 
-    permission::PermissionChecker permissionChecker;
-    return permissionChecker.checkPermissionForPreflight(toString16(permission), attributionSource,
-            toString16(message), attributedOpCode)
-            != permission::PermissionChecker::PERMISSION_HARD_DENIED;
+
+    return mPermissionChecker->checkPermissionForPreflight(
+            toString16(permission), attributionSource, toString16(message),
+            attributedOpCode) != permission::PermissionChecker::PERMISSION_HARD_DENIED;
 }
 
 bool CameraService::hasPermissionsForSystemCamera(const std::string& cameraId, int callingPid,
@@ -2432,16 +2432,15 @@ bool CameraService::isCameraPrivacyEnabled(const String16& packageName, const st
 std::string CameraService::getPackageNameFromUid(int clientUid) {
     std::string packageName("");
 
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(toString16(kPermissionServiceName));
-    if (binder == 0) {
-        ALOGE("Cannot get permission service");
+    sp<IPermissionController> permCtrl;
+    permCtrl = getPermissionController();
+
+    if (permCtrl == nullptr) {
         // Return empty package name and the further interaction
         // with camera will likely fail
         return packageName;
     }
 
-    sp<IPermissionController> permCtrl = interface_cast<IPermissionController>(binder);
     Vector<String16> packages;
 
     permCtrl->getPackagesForUid(clientUid, packages);
