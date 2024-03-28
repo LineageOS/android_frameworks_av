@@ -478,15 +478,21 @@ status_t DeviceHalAidl::openOutputStream(
                 __func__, ret.desc.toString().c_str());
         return NO_INIT;
     }
-    *outStream = sp<StreamOutHalAidl>::make(*config, std::move(context), aidlPatch.latenciesMs[0],
+    auto stream = sp<StreamOutHalAidl>::make(*config, std::move(context), aidlPatch.latenciesMs[0],
             std::move(ret.stream), mVendorExt, this /*callbackBroker*/);
-    void* cbCookie = (*outStream).get();
+    *outStream = stream;
+    /* StreamOutHalInterface* */ void* cbCookie = (*outStream).get();
     {
         std::lock_guard l(mLock);
         mCallbacks.emplace(cbCookie, Callbacks{});
         mMapper.addStream(*outStream, mixPortConfig.id, aidlPatch.id);
     }
-    if (streamCb) streamCb->setCookie(cbCookie);
+    if (streamCb) {
+        streamCb->setCookie(cbCookie);
+        // Although StreamOutHalAidl implements StreamOutHalInterfaceCallback,
+        // we always go via the CallbackBroker for consistency.
+        setStreamOutCallback(cbCookie, stream);
+    }
     eventCb->setCookie(cbCookie);
     cleanups.disarmAll();
     return OK;
