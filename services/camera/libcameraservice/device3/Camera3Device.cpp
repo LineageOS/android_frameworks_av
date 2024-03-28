@@ -1366,7 +1366,8 @@ status_t Camera3Device::configureStreams(const CameraMetadata& sessionParams, in
 status_t Camera3Device::filterParamsAndConfigureLocked(const CameraMetadata& params,
         int operatingMode) {
     CameraMetadata filteredParams;
-    SessionConfigurationUtils::filterParameters(params, mDeviceInfo, mVendorTagId, filteredParams);
+    SessionConfigurationUtils::filterParameters(params, mDeviceInfo,
+            /*additionalKeys*/{}, mVendorTagId, filteredParams);
 
     camera_metadata_entry_t availableSessionKeys = mDeviceInfo.find(
             ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
@@ -1487,27 +1488,11 @@ status_t Camera3Device::createDefaultRequest(camera_request_template_t templateI
         set_camera_metadata_vendor_id(rawRequest, mVendorTagId);
         mRequestTemplateCache[templateId].acquire(rawRequest);
 
-        // Override the template request with zoomRatioMapper
-        res = mZoomRatioMappers[mId].initZoomRatioInTemplate(
-                &mRequestTemplateCache[templateId]);
+        res = overrideDefaultRequestKeys(&mRequestTemplateCache[templateId]);
         if (res != OK) {
-            CLOGE("Failed to update zoom ratio for template %d: %s (%d)",
+            CLOGE("Failed to overrideDefaultRequestKeys for template %d: %s (%d)",
                     templateId, strerror(-res), res);
             return res;
-        }
-
-        // Fill in JPEG_QUALITY if not available
-        if (!mRequestTemplateCache[templateId].exists(ANDROID_JPEG_QUALITY)) {
-            static const uint8_t kDefaultJpegQuality = 95;
-            mRequestTemplateCache[templateId].update(ANDROID_JPEG_QUALITY,
-                    &kDefaultJpegQuality, 1);
-        }
-
-        // Fill in AUTOFRAMING if not available
-        if (!mRequestTemplateCache[templateId].exists(ANDROID_CONTROL_AUTOFRAMING)) {
-            static const uint8_t kDefaultAutoframingMode = ANDROID_CONTROL_AUTOFRAMING_OFF;
-            mRequestTemplateCache[templateId].update(ANDROID_CONTROL_AUTOFRAMING,
-                    &kDefaultAutoframingMode, 1);
         }
 
         *request = mRequestTemplateCache[templateId];
