@@ -106,7 +106,7 @@ int32_t C2Decoder::decodeFrames(uint8_t *inputBuffer, vector<AMediaCodecBufferIn
         work->input.ordinal.frameIndex = mNumInputFrame;
         work->input.buffers.clear();
         int size = frameInfo[mNumInputFrame].size;
-        int alignedSize = ALIGN(size, PAGE_SIZE);
+        int alignedSize = ALIGN(size, getpagesize());
         if (size) {
             std::shared_ptr<C2LinearBlock> block;
             status = mLinearPool->fetchLinearBlock(
