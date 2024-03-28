@@ -228,6 +228,7 @@ AudioPolicyService::AudioPolicyService()
       mDestroyAudioPolicyManager(destroyAudioPolicyManager),
       mUsecaseValidator(media::createUsecaseValidator()) {
       setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
+      setInheritRt(true);
 }
 
 void AudioPolicyService::loadAudioPolicyManager()
