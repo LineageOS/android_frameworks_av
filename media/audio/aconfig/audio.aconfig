@@ -83,6 +83,15 @@ flag {
 }
 
 flag {
+    name: "vgs_vss_sync_mute_order"
+    namespace: "media_audio"
+    description:
+        "When syncing the VGS to VSS we need to first adjust the"
+        "mute state before the index."
+    bug: "329202581"
+}
+
+flag {
     name: "volume_refactoring"
     namespace: "media_audio"
     description: "Refactor the audio volume internal architecture logic"
