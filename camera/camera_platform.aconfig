@@ -155,6 +155,16 @@ flag {
 
 flag {
      namespace: "camera_platform"
+     name: "single_thread_executor"
+     description: "Ensure device logic is run within one thread."
+     bug: "305857746"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
+
+flag {
+     namespace: "camera_platform"
      name: "surface_leak_fix"
      description: "Address Surface release leaks in CaptureRequest"
      bug: "324071855"
