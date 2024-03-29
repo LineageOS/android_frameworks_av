@@ -5,7 +5,7 @@ cc_library {
         "src/**/*.cpp",
     ],
     export_include_dirs: [
-        "include"
+        "include",
     ],
     shared_libs: [
         "libbinder_ndk",
