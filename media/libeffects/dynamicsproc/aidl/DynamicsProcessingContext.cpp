@@ -118,26 +118,21 @@ RetCode DynamicsProcessingContext::setEngineArchitecture(
 
 RetCode DynamicsProcessingContext::setPreEq(
         const std::vector<DynamicsProcessing::ChannelConfig>& channels) {
-    return setDpChannels_l<dp_fx::DPEq>(channels, mEngineArchitecture.preEqStage.inUse,
-                                        StageType::PREEQ);
+    return setDpChannels_l<dp_fx::DPEq>(channels, StageType::PREEQ);
 }
 
 RetCode DynamicsProcessingContext::setPostEq(
         const std::vector<DynamicsProcessing::ChannelConfig>& channels) {
-    return setDpChannels_l<dp_fx::DPEq>(channels, mEngineArchitecture.postEqStage.inUse,
-                                        StageType::POSTEQ);
+    return setDpChannels_l<dp_fx::DPEq>(channels, StageType::POSTEQ);
 }
 
 RetCode DynamicsProcessingContext::setMbc(
         const std::vector<DynamicsProcessing::ChannelConfig>& channels) {
-    return setDpChannels_l<dp_fx::DPMbc>(channels, mEngineArchitecture.mbcStage.inUse,
-                                         StageType::MBC);
+    return setDpChannels_l<dp_fx::DPMbc>(channels, StageType::MBC);
 }
 
 RetCode DynamicsProcessingContext::setPreEqBand(
         const std::vector<DynamicsProcessing::EqBandConfig>& bands) {
-    RETURN_VALUE_IF(!mEngineArchitecture.preEqStage.inUse, RetCode::ERROR_ILLEGAL_PARAMETER,
-                    "preEqNotInUse");
     RETURN_VALUE_IF(
             !validateBandConfig(bands, mChannelCount, mEngineArchitecture.preEqStage.bandCount),
             RetCode::ERROR_ILLEGAL_PARAMETER, "eqBandNotValid");
@@ -146,8 +141,6 @@ RetCode DynamicsProcessingContext::setPreEqBand(
 
 RetCode DynamicsProcessingContext::setPostEqBand(
         const std::vector<DynamicsProcessing::EqBandConfig>& bands) {
-    RETURN_VALUE_IF(!mEngineArchitecture.postEqStage.inUse, RetCode::ERROR_ILLEGAL_PARAMETER,
-                    "postEqNotInUse");
     RETURN_VALUE_IF(
             !validateBandConfig(bands, mChannelCount, mEngineArchitecture.postEqStage.bandCount),
             RetCode::ERROR_ILLEGAL_PARAMETER, "eqBandNotValid");
@@ -156,8 +149,6 @@ RetCode DynamicsProcessingContext::setPostEqBand(
 
 RetCode DynamicsProcessingContext::setMbcBand(
         const std::vector<DynamicsProcessing::MbcBandConfig>& bands) {
-    RETURN_VALUE_IF(!mEngineArchitecture.mbcStage.inUse, RetCode::ERROR_ILLEGAL_PARAMETER,
-                    "mbcNotInUse");
     RETURN_VALUE_IF(
             !validateBandConfig(bands, mChannelCount, mEngineArchitecture.mbcStage.bandCount),
             RetCode::ERROR_ILLEGAL_PARAMETER, "eqBandNotValid");
@@ -166,8 +157,6 @@ RetCode DynamicsProcessingContext::setMbcBand(
 
 RetCode DynamicsProcessingContext::setLimiter(
         const std::vector<DynamicsProcessing::LimiterConfig>& limiters) {
-    RETURN_VALUE_IF(!mEngineArchitecture.limiterInUse, RetCode::ERROR_ILLEGAL_PARAMETER,
-                    "limiterNotInUse");
     RETURN_VALUE_IF(!validateLimiterConfig(limiters, mChannelCount),
                     RetCode::ERROR_ILLEGAL_PARAMETER, "limiterConfigNotValid");
     return setBands_l<DynamicsProcessing::LimiterConfig>(limiters, StageType::LIMITER);
@@ -419,9 +408,7 @@ bool DynamicsProcessingContext::validateBandConfig(const std::vector<T>& bands, 
         }
         freqs[band.band] = band.cutoffFrequencyHz;
     }
-    return std::is_sorted(freqs.begin(), freqs.end(), [](const auto& a, const auto& b) {
-        return a.second <= b.second; //index is already sorted as map key
-    });
+    return true;
 }
 
 bool DynamicsProcessingContext::validateLimiterConfig(
@@ -442,17 +429,10 @@ bool DynamicsProcessingContext::validateInputGainConfig(
 
 template <typename D>
 RetCode DynamicsProcessingContext::setDpChannels_l(
-        const std::vector<DynamicsProcessing::ChannelConfig>& channels, bool stageInUse,
-        StageType type) {
+        const std::vector<DynamicsProcessing::ChannelConfig>& channels, StageType type) {
     RetCode ret = RetCode::SUCCESS;
     std::unordered_set<int> channelSet;
 
-    if (!stageInUse) {
-        LOG(WARNING) << __func__ << " not in use " << ::android::internal::ToString(channels);
-        return RetCode::ERROR_ILLEGAL_PARAMETER;
-    }
-
-    RETURN_VALUE_IF(!stageInUse, RetCode::ERROR_ILLEGAL_PARAMETER, "stageNotInUse");
     for (auto& it : channels) {
         if (0 != channelSet.count(it.channel)) {
             LOG(WARNING) << __func__ << " duplicated channel " << it.channel;
