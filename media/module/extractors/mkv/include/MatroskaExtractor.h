@@ -95,6 +95,7 @@ private:
     status_t synthesizeAVCC(TrackInfo *trackInfo, size_t index);
     status_t synthesizeMPEG2(TrackInfo *trackInfo, size_t index);
     status_t synthesizeMPEG4(TrackInfo *trackInfo, size_t index);
+    status_t synthesizeVP9(TrackInfo* trackInfo, size_t index);
     status_t initTrackInfo(
             const mkvparser::Track *track,
             AMediaFormat *meta,
