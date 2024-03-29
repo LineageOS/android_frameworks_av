@@ -99,7 +99,7 @@ class DynamicsProcessingContext final : public EffectContext {
     dp_fx::DPEq* getEqWithType_l(StageType type, int ch);
     template <typename D>
     RetCode setDpChannels_l(const std::vector<DynamicsProcessing::ChannelConfig>& channels,
-                            bool stageInUse, StageType type);
+                            StageType type);
     template <typename T /* BandConfig */>
     RetCode setBands_l(const std::vector<T>& bands, StageType type);
     RetCode setDpChannelBand_l(const std::any& anyConfig, StageType type,
