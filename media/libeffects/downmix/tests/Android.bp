@@ -14,7 +14,7 @@ package {
 //
 // Use "atest downmix_tests" to run.
 cc_test {
-    name:"downmix_tests",
+    name: "downmix_tests",
     gtest: true,
     host_supported: true,
     vendor: true,
@@ -45,7 +45,7 @@ cc_test {
 // test application and outputs then compares files in a local directory
 // on device (/data/local/tmp/downmixtest/).
 cc_test {
-    name:"downmixtest",
+    name: "downmixtest",
     host_supported: false,
     proprietary: true,
 

@@ -16,8 +16,8 @@ cc_library {
     name: "libmediametrics",
 
     srcs: [
-        "MediaMetricsItem.cpp",
         "MediaMetrics.cpp",
+        "MediaMetricsItem.cpp",
     ],
 
     shared_libs: [
@@ -40,8 +40,8 @@ cc_library {
 
     sanitize: {
         misc_undefined: [
-            "unsigned-integer-overflow",
             "signed-integer-overflow",
+            "unsigned-integer-overflow",
         ],
         cfi: true,
     },
@@ -50,8 +50,8 @@ cc_library {
     stubs: {
         symbol_file: "libmediametrics.map.txt",
         versions: [
-            "1" ,
-        ]
+            "1",
+        ],
     },
 
     header_abi_checker: {
@@ -65,7 +65,7 @@ cc_library {
         "//frameworks/base/apex/media/framework",
         "//frameworks/base/core/jni",
         "//frameworks/base/media/jni",
-	"//packages/modules/Media/apex/framework",
+        "//packages/modules/Media/apex/framework",
     ],
 }
 
