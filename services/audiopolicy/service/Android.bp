@@ -12,6 +12,7 @@ cc_defaults {
     name: "libaudiopolicyservice_dependencies",
 
     shared_libs: [
+        "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
@@ -46,7 +47,6 @@ cc_defaults {
         "libstagefright_foundation",
         "libutils",
         "libxml2",
-        "android.media.audiopolicy-aconfig-cc",
         "packagemanager_aidl-cpp",
         "spatializer-aidl-cpp",
     ],

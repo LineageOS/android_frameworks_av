@@ -26,9 +26,8 @@ cc_defaults {
 
         // uncomment to disable NEON on architectures that actually do support NEON, for benchmarking
 
-        // "-DUSE_NEON=false",
         "-Werror",
-
+        // "-DUSE_NEON=false",
     ],
 
     arch: {
