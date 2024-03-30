@@ -40,6 +40,21 @@
 
 __BEGIN_DECLS
 
+/*
+ * Note: The following enum values were incorrect and have been updated:
+ * enum                                                        old value                        updated value
+ * ACAMERA_CONTROL_SETTINGS_OVERRIDE                           ACAMERA_CONTROL_START + 49       ACAMERA_CONTROL_START + 52;
+ * ACAMERA_CONTROL_AVAILABLE_SETTINGS_OVERRIDES                ACAMERA_CONTROL_START + 50       ACAMERA_CONTROL_START + 53;
+ * ACAMERA_CONTROL_AUTOFRAMING                                 ACAMERA_CONTROL_START + 52       ACAMERA_CONTROL_START + 55;
+ * ACAMERA_CONTROL_AUTOFRAMING_AVAILABLE                       ACAMERA_CONTROL_START + 53       ACAMERA_CONTROL_START + 56;
+ * ACAMERA_CONTROL_AUTOFRAMING_STATE                           ACAMERA_CONTROL_START + 54       ACAMERA_CONTROL_START + 57;
+ * ACAMERA_CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE        ACAMERA_CONTROL_START + 55       ACAMERA_CONTROL_START + 58;
+ * ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE                       ACAMERA_CONTROL_START + 56       ACAMERA_CONTROL_START + 59;
+
+ * ACAMERA_SCALER_AVAILABLE_STREAM_USE_CASES                   ACAMERA_SCALER_START + 25        ACAMERA_SCALER_START + 26;
+ * ACAMERA_SCALER_CROP_REGION                                  ACAMERA_SCALER_START + 26        ACAMERA_SCALER_START + 27;
+ */
+
 
 typedef enum acamera_metadata_section {
     ACAMERA_COLOR_CORRECTION,

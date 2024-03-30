@@ -5,7 +5,7 @@ cc_library {
         "src/**/*.cpp",
     ],
     export_include_dirs: [
-        "include"
+        "include",
     ],
     shared_libs: [
         "libbinder_ndk",
@@ -17,7 +17,7 @@ cc_library {
         "android.hardware.drm-V1-ndk",
         "android.hardware.security.rkp-V3-ndk",
         "libbase",
-        "libcppbor_external",
+        "libcppbor",
     ],
     defaults: [
         "keymint_use_latest_hal_aidl_ndk_shared",
@@ -42,7 +42,7 @@ cc_binary {
         "android.hardware.drm-V1-ndk",
         "android.hardware.security.rkp-V3-ndk",
         "libbase",
-        "libcppbor_external",
+        "libcppbor",
         "libmediadrmrkp",
     ],
     vendor: true,
