@@ -1858,7 +1858,7 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addSessionConfigQuery
 
     auto& c = mCameraCharacteristics;
     status_t res = c.update(ANDROID_INFO_SESSION_CONFIGURATION_QUERY_VERSION, &versionCode, 1);
-
+    mSessionConfigQueryVersion = versionCode;
     return res;
 }
 

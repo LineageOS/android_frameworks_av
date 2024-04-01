@@ -137,7 +137,7 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
         virtual status_t getSessionCharacteristics(
                 const SessionConfiguration &/*configuration*/,
                 bool overrideForPerfClass, camera3::metadataGetter /*getMetadata*/,
-                CameraMetadata *sessionCharacteristics /*sessionCharacteristics*/);
+                CameraMetadata */*outChars*/);
 
         std::shared_ptr<aidl::android::hardware::camera::device::ICameraDevice>
                 startDeviceInterface();
