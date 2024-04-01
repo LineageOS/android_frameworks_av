@@ -991,12 +991,6 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
         /*out*/ CameraMetadata* outMetadata) {
     ATRACE_CALL();
 
-    if (!mInitialized) {
-        ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
-        logServiceError("Camera subsystem is not available", ERROR_DISCONNECTED);
-        return STATUS_ERROR(ERROR_DISCONNECTED, "Camera subsystem is not available");
-    }
-
     if (outMetadata == nullptr) {
         std::string msg =
                 fmt::sprintf("Camera %s: Invalid 'outMetadata' input!", unresolvedCameraId.c_str());
@@ -1004,15 +998,28 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
     }
 
+    if (!mInitialized) {
+        ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        logServiceError("Camera subsystem is not available", ERROR_DISCONNECTED);
+        return STATUS_ERROR(ERROR_DISCONNECTED, "Camera subsystem is not available");
+    }
+
     std::optional<std::string> cameraIdOptional = resolveCameraId(unresolvedCameraId, deviceId,
-            devicePolicy, getCallingUid());
+                                                                  devicePolicy, getCallingUid());
     if (!cameraIdOptional.has_value()) {
         std::string msg = fmt::sprintf("Camera %s: Invalid camera id for device id %d",
-                unresolvedCameraId.c_str(), deviceId);
+                                       unresolvedCameraId.c_str(), deviceId);
         ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
     }
     std::string cameraId = cameraIdOptional.value();
+
+    if (shouldRejectSystemCameraConnection(cameraId)) {
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                                "Unable to retrieve camera"
+                                "characteristics for system only device %s: ",
+                                cameraId.c_str());
+    }
 
     bool overrideForPerfClass = SessionConfigurationUtils::targetPerfClassPrimaryCamera(
             mPerfClassPrimaryCameraIds, cameraId, targetSdkVersion);
@@ -1020,10 +1027,6 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
     status_t ret = mCameraProviderManager->getSessionCharacteristics(
             cameraId, sessionConfiguration, overrideForPerfClass, overrideToPortrait, outMetadata);
 
-    // TODO(b/303645857): Remove fingerprintable metadata if the caller process does not have
-    //                    camera access permission.
-
-    Status res = Status::ok();
     switch (ret) {
         case OK:
             // Expected, no handling needed.
@@ -1033,18 +1036,90 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
                         "Camera %s: Session characteristics query not supported!",
                         cameraId.c_str());
                 ALOGD("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
+                logServiceError(msg, CameraService::ERROR_INVALID_OPERATION);
+                outMetadata->clear();
+                return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
+            }
+            break;
+        case NAME_NOT_FOUND: {
+                std::string msg = fmt::sprintf(
+                        "Camera %s: Unknown camera ID.",
+                        cameraId.c_str());
+                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
+                logServiceError(msg, CameraService::ERROR_ILLEGAL_ARGUMENT);
+                outMetadata->clear();
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
             }
             break;
         default: {
-                std::string msg = fmt::sprintf("Camera %s: Error: %s (%d)", cameraId.c_str(),
-                                               strerror(-ret), ret);
+                std::string msg = fmt::sprintf(
+                        "Unable to retrieve session characteristics for camera device %s: "
+                        "Error: %s (%d)",
+                        cameraId.c_str(), strerror(-ret), ret);
                 ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+                logServiceError(msg, CameraService::ERROR_INVALID_OPERATION);
+                outMetadata->clear();
+                return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
             }
     }
 
-    return res;
+    return filterSensitiveMetadataIfNeeded(cameraId, outMetadata);
+}
+
+Status CameraService::filterSensitiveMetadataIfNeeded(
+        const std::string& cameraId, CameraMetadata* metadata) {
+    int callingPid = getCallingPid();
+    int callingUid = getCallingUid();
+
+    if (callingPid == getpid()) {
+        // Caller is cameraserver; no need to remove keys
+        return Status::ok();
+    }
+
+    SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
+    if (getSystemCameraKind(cameraId, &deviceKind) != OK) {
+        ALOGE("%s: Couldn't get camera kind for camera id %s", __FUNCTION__, cameraId.c_str());
+        metadata->clear();
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                                "Unable to retrieve camera kind for device %s", cameraId.c_str());
+    }
+    if (deviceKind == SystemCameraKind::SYSTEM_ONLY_CAMERA) {
+        // Attempting to query system only camera without system camera permission would have
+        // failed the shouldRejectSystemCameraConnection in the caller. So if we get here
+        // for a system only camera, then the caller has the required permission.
+        // No need to remove keys
+        return Status::ok();
+    }
+
+    std::vector<int32_t> tagsRemoved;
+    bool hasCameraPermission = hasPermissionsForCamera(cameraId, callingPid, callingUid);
+    if (hasCameraPermission) {
+        // Caller has camera permission; no need to remove keys
+        return Status::ok();
+    }
+
+    status_t ret = metadata->removePermissionEntries(
+            mCameraProviderManager->getProviderTagIdLocked(cameraId), &tagsRemoved);
+    if (ret != OK) {
+        metadata->clear();
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                                "Failed to remove camera characteristics needing camera permission "
+                                "for device %s:%s (%d)",
+                                cameraId.c_str(), strerror(-ret), ret);
+    }
+
+    if (!tagsRemoved.empty()) {
+        ret = metadata->update(ANDROID_REQUEST_CHARACTERISTIC_KEYS_NEEDING_PERMISSION,
+                                  tagsRemoved.data(), tagsRemoved.size());
+        if (ret != OK) {
+            metadata->clear();
+            return STATUS_ERROR_FMT(
+                    ERROR_INVALID_OPERATION,
+                    "Failed to insert camera keys needing permission for device %s: %s (%d)",
+                    cameraId.c_str(), strerror(-ret), ret);
+        }
+    }
+    return Status::ok();
 }
 
 Status CameraService::parseCameraIdRemapping(
@@ -1381,8 +1456,6 @@ Status CameraService::getCameraCharacteristics(const std::string& unresolvedCame
                 "characteristics for system only device %s: ", cameraId.c_str());
     }
 
-    Status ret{};
-
     bool overrideForPerfClass =
             SessionConfigurationUtils::targetPerfClassPrimaryCamera(mPerfClassPrimaryCameraIds,
                     cameraId, targetSdkVersion);
@@ -1401,45 +1474,8 @@ Status CameraService::getCameraCharacteristics(const std::string& unresolvedCame
                     strerror(-res), res);
         }
     }
-    SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
-    if (getSystemCameraKind(cameraId, &deviceKind) != OK) {
-        ALOGE("%s: Invalid camera id %s, skipping", __FUNCTION__, cameraId.c_str());
-        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to retrieve camera kind "
-                "for device %s", cameraId.c_str());
-    }
-    int callingPid = getCallingPid();
-    int callingUid = getCallingUid();
-    std::vector<int32_t> tagsRemoved;
-    // If it's not calling from cameraserver, check the permission only if
-    // android.permission.CAMERA is required. If android.permission.SYSTEM_CAMERA was needed,
-    // it would've already been checked in shouldRejectSystemCameraConnection.
-    bool checkPermissionForCamera = hasPermissionsForCamera(cameraId, callingPid, callingUid);
-    if ((callingPid != getpid()) &&
-            (deviceKind != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
-            !checkPermissionForCamera) {
-        res = cameraInfo->removePermissionEntries(
-                mCameraProviderManager->getProviderTagIdLocked(cameraId),
-                &tagsRemoved);
-        if (res != OK) {
-            cameraInfo->clear();
-            return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Failed to remove camera"
-                    " characteristics needing camera permission for device %s: %s (%d)",
-                    cameraId.c_str(), strerror(-res), res);
-        }
-    }
 
-    if (!tagsRemoved.empty()) {
-        res = cameraInfo->update(ANDROID_REQUEST_CHARACTERISTIC_KEYS_NEEDING_PERMISSION,
-                tagsRemoved.data(), tagsRemoved.size());
-        if (res != OK) {
-            cameraInfo->clear();
-            return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Failed to insert camera "
-                    "keys needing permission for device %s: %s (%d)", cameraId.c_str(),
-                    strerror(-res), res);
-        }
-    }
-
-    return ret;
+    return filterSensitiveMetadataIfNeeded(cameraId, cameraInfo);
 }
 
 Status CameraService::getTorchStrengthLevel(const std::string& unresolvedCameraId, int32_t deviceId,

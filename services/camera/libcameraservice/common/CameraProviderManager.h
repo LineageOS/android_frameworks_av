@@ -654,8 +654,7 @@ private:
             virtual status_t getSessionCharacteristics(
                     const SessionConfiguration &/*configuration*/,
                     bool /*overrideForPerfClass*/,
-                    camera3::metadataGetter /*getMetadata*/,
-                    CameraMetadata* /*sessionCharacteristics*/) {
+                    camera3::metadataGetter /*getMetadata*/, CameraMetadata* /*outChars*/) {
                 return INVALID_OPERATION;
             }
 
@@ -737,6 +736,10 @@ private:
             // Only contains characteristics for hidden physical cameras,
             // not for public physical cameras.
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
+            // Value filled in from addSessionConfigQueryVersionTag.
+            // Cached to make lookups faster
+            int mSessionConfigQueryVersion = 0;
+
             void queryPhysicalCameraIds();
             SystemCameraKind getSystemCameraKind();
             status_t fixupMonochromeTags();

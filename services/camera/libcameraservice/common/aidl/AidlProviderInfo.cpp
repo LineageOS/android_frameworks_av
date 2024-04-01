@@ -17,6 +17,8 @@
 #include "common/HalConversionsTemplated.h"
 #include "common/CameraProviderInfoTemplated.h"
 
+#include <aidl/AidlUtils.h>
+
 #include <com_android_internal_camera_flags.h>
 #include <cutils/properties.h>
 
@@ -43,6 +45,7 @@ namespace vd_flags = android::companion::virtualdevice::flags;
 
 using namespace aidl::android::hardware;
 using namespace hardware::camera;
+using android::hardware::cameraservice::utils::conversion::aidl::copySessionCharacteristics;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 using hardware::ICameraService;
 using SessionConfigurationUtils::overrideDefaultRequestKeys;
@@ -927,7 +930,7 @@ status_t AidlProviderInfo::AidlDeviceInfo3::createDefaultRequest(
 
 status_t AidlProviderInfo::AidlDeviceInfo3::getSessionCharacteristics(
         const SessionConfiguration &configuration, bool overrideForPerfClass,
-        camera3::metadataGetter getMetadata, CameraMetadata *sessionCharacteristics) {
+        camera3::metadataGetter getMetadata, CameraMetadata* outChars) {
     camera::device::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
     auto res = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
@@ -953,24 +956,32 @@ status_t AidlProviderInfo::AidlDeviceInfo3::getSessionCharacteristics(
     aidl::android::hardware::camera::device::CameraMetadata chars;
     ::ndk::ScopedAStatus ret =
         interface->getSessionCharacteristics(streamConfiguration, &chars);
-    std::vector<uint8_t> &metadata = chars.metadata;
+    if (!ret.isOk()) {
+        ALOGE("%s: Unexpected binder error while getting session characteristics (%d): %s",
+              __FUNCTION__, ret.getExceptionCode(), ret.getMessage());
+        return mapToStatusT(ret);
+    }
 
-    camera_metadata_t *buffer = reinterpret_cast<camera_metadata_t*>(metadata.data());
+    std::vector<uint8_t> &metadata = chars.metadata;
+    auto *buffer = reinterpret_cast<camera_metadata_t*>(metadata.data());
     size_t expectedSize = metadata.size();
     int resV = validate_camera_metadata_structure(buffer, &expectedSize);
     if (resV == OK || resV == CAMERA_METADATA_VALIDATION_SHIFTED) {
         set_camera_metadata_vendor_id(buffer, mProviderTagid);
-        *sessionCharacteristics = buffer;
     } else {
         ALOGE("%s: Malformed camera metadata received from HAL", __FUNCTION__);
         return BAD_VALUE;
     }
 
-    if (!ret.isOk()) {
-        ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.getMessage());
-        return mapToStatusT(ret);
-    }
-    return OK;
+    CameraMetadata rawSessionChars;
+    rawSessionChars = buffer;  //  clone buffer
+    rawSessionChars.sort();    // sort for faster lookups
+
+    *outChars = mCameraCharacteristics;
+    outChars->sort();  // sort for faster reads and (hopefully!) writes
+
+    return copySessionCharacteristics(/*from=*/rawSessionChars, /*to=*/outChars,
+                                      mSessionConfigQueryVersion);
 }
 
 status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
