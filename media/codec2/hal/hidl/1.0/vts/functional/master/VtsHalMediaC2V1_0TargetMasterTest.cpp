@@ -83,6 +83,7 @@ TEST_P(Codec2MasterHalTest, ListComponents) {
     }
 }
 
+// @VsrTest = 3.2-001.003
 TEST_P(Codec2MasterHalTest, MustUseAidlBeyond202404) {
     static int sVendorApiLevel = android::base::GetIntProperty("ro.vendor.api_level", 0);
     if (sVendorApiLevel < 202404) {
