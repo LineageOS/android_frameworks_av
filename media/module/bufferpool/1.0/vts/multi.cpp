@@ -24,7 +24,6 @@
 #include <hidl/HidlSupport.h>
 #include <hidl/HidlTransportSupport.h>
 #include <hidl/LegacySupport.h>
-#include <hidl/ServiceManagement.h>
 #include <hidl/Status.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -37,7 +36,6 @@
 
 using android::hardware::configureRpcThreadpool;
 using android::hardware::hidl_handle;
-using android::hardware::isHidlSupported;
 using android::hardware::media::bufferpool::V1_0::IClientManager;
 using android::hardware::media::bufferpool::V1_0::ResultStatus;
 using android::hardware::media::bufferpool::V1_0::implementation::BufferId;
@@ -180,7 +178,6 @@ TEST_F(BufferpoolMultiTest, TransferBuffer) {
   ResultStatus status;
   PipeMessage message;
 
-  if (!isHidlSupported()) GTEST_SKIP() << "HIDL is not supported on this device";
   ASSERT_TRUE(receiveMessage(mResultPipeFds, &message));
 
   android::sp<IClientManager> receiver = IClientManager::getService();
