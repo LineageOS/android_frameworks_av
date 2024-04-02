@@ -1030,7 +1030,8 @@ void Camera3OutputStream::applyZSLUsageQuirk(int format, uint64_t *consumerUsage
 
 status_t Camera3OutputStream::getEndpointUsageForSurface(uint64_t *usage,
         const sp<Surface>& surface) {
-    if (mConsumerUsageCachedValue.has_value() && flags::surface_ipc()) {
+    bool internalConsumer = (mConsumer.get() != nullptr) && (mConsumer == surface);
+    if (mConsumerUsageCachedValue.has_value() && flags::surface_ipc() && internalConsumer) {
         *usage = mConsumerUsageCachedValue.value();
         return OK;
     }
@@ -1039,7 +1040,9 @@ status_t Camera3OutputStream::getEndpointUsageForSurface(uint64_t *usage,
 
     res = native_window_get_consumer_usage(static_cast<ANativeWindow*>(surface.get()), usage);
     applyZSLUsageQuirk(camera_stream::format, usage);
-    mConsumerUsageCachedValue = *usage;
+    if (internalConsumer) {
+        mConsumerUsageCachedValue = *usage;
+    }
     return res;
 }
 
