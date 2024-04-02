@@ -52,7 +52,7 @@ class ESDSUnitTest : public ::testing::TestWithParam<tuple<
                              /* BitrateMax */ int32_t,
                              /* BitrateAvg */ int32_t>> {
   public:
-    ESDSUnitTest() : mESDSData(nullptr) {
+    ESDSUnitTest() {
         mESDSParams.inputFile = get<0>(GetParam());
         mESDSParams.objectTypeIndication = get<1>(GetParam());
         mESDSParams.codecSpecificInfoData = get<2>(GetParam());
@@ -60,6 +60,13 @@ class ESDSUnitTest : public ::testing::TestWithParam<tuple<
         mESDSParams.bitrateMax = get<4>(GetParam());
         mESDSParams.bitrateAvg = get<5>(GetParam());
     };
+
+    ~ESDSUnitTest() {
+        if (mESDSData != nullptr) {
+            free(mESDSData);
+            mESDSData = nullptr;
+        }
+    }
 
     virtual void TearDown() override {
         if (mDataSource) mDataSource.clear();
@@ -70,8 +77,8 @@ class ESDSUnitTest : public ::testing::TestWithParam<tuple<
     }
 
     virtual void SetUp() override { ASSERT_NO_FATAL_FAILURE(readESDSData()); }
-    const void *mESDSData;
-    size_t mESDSSize;
+    void *mESDSData = nullptr;
+    size_t mESDSSize = 0;
     ESDSParams mESDSParams;
 
   private:
@@ -105,10 +112,19 @@ class ESDSUnitTest : public ::testing::TestWithParam<tuple<
     bool esdsDataPresent(size_t numTracks, sp<IMediaExtractor> extractor) {
         bool foundESDS = false;
         uint32_t type;
+        if (mESDSData != nullptr) {
+            free(mESDSData);
+            mESDSData = nullptr;
+        }
         for (size_t i = 0; i < numTracks; ++i) {
             sp<MetaData> trackMeta = extractor->getTrackMetaData(i);
+            const void *esdsData = nullptr;
+            size_t esdsSize = 0;
             if (trackMeta != nullptr &&
-                trackMeta->findData(kKeyESDS, &type, &mESDSData, &mESDSSize)) {
+                trackMeta->findData(kKeyESDS, &type, &esdsData, &esdsSize)) {
+                mESDSData = malloc(esdsSize);
+                mESDSSize = esdsSize;
+                memcpy(mESDSData, esdsData, esdsSize);
                 trackMeta->clear();
                 foundESDS = true;
                 break;
