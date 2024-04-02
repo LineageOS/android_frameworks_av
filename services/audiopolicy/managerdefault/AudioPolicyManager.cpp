@@ -7834,9 +7834,17 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(const sp<DeviceDescriptor> &de
 float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
                                         VolumeSource volumeSource,
                                         int index,
-                                        const DeviceTypeSet& deviceTypes)
+                                        const DeviceTypeSet& deviceTypes,
+                                        bool computeInternalInteraction)
 {
     float volumeDb = curves.volIndexToDb(Volume::getDeviceCategory(deviceTypes), index);
+
+    ALOGV("%s volume source %d, index %d,  devices %s, compute internal %b ", __func__,
+          volumeSource, index, dumpDeviceTypes(deviceTypes).c_str(), computeInternalInteraction);
+
+    if (!computeInternalInteraction) {
+        return volumeDb;
+    }
 
     // handle the case of accessibility active while a ringtone is playing: if the ringtone is much
     // louder than the accessibility prompt, the prompt cannot be heard, thus masking the touch
@@ -7847,14 +7855,11 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
     const auto musicVolumeSrc = toVolumeSource(AUDIO_STREAM_MUSIC, false);
     const auto alarmVolumeSrc = toVolumeSource(AUDIO_STREAM_ALARM, false);
     const auto a11yVolumeSrc = toVolumeSource(AUDIO_STREAM_ACCESSIBILITY, false);
-    // Verify that the current volume source is not the ringer volume to prevent recursively
-    // calling to compute volume. This could happen in cases where a11y and ringer sounds belong
-    // to the same volume group.
-    if (volumeSource != ringVolumeSrc && volumeSource == a11yVolumeSrc
-            && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState()) &&
+    if (AUDIO_MODE_RINGTONE == mEngine->getPhoneState() &&
             mOutputs.isActive(ringVolumeSrc, 0)) {
         auto &ringCurves = getVolumeCurves(AUDIO_STREAM_RING);
-        const float ringVolumeDb = computeVolume(ringCurves, ringVolumeSrc, index, deviceTypes);
+        const float ringVolumeDb = computeVolume(ringCurves, ringVolumeSrc, index, deviceTypes,
+                /* computeInternalInteraction= */ false);
         return ringVolumeDb - 4 > volumeDb ? ringVolumeDb - 4 : volumeDb;
     }
 
@@ -7871,7 +7876,8 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
         auto &voiceCurves = getVolumeCurves(callVolumeSrc);
         int voiceVolumeIndex = voiceCurves.getVolumeIndex(deviceTypes);
         const float maxVoiceVolDb =
-                computeVolume(voiceCurves, callVolumeSrc, voiceVolumeIndex, deviceTypes)
+                computeVolume(voiceCurves, callVolumeSrc, voiceVolumeIndex, deviceTypes,
+                              /* computeInternalInteraction= */ false)
                 + IN_CALL_EARPIECE_HEADROOM_DB;
         // FIXME: Workaround for call screening applications until a proper audio mode is defined
         // to support this scenario : Exempt the RING stream from the audio cap if the audio was
@@ -7913,12 +7919,8 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
         // when the phone is ringing we must consider that music could have been paused just before
         // by the music application and behave as if music was active if the last music track was
         // just stopped
-        // Verify that the current volume source is not the music volume to prevent recursively
-        // calling to compute volume. This could happen in cases where music and
-        // (alarm, ring, notification, system, etc.) sounds belong to the same volume group.
-        if (volumeSource != musicVolumeSrc &&
-            (isStreamActive(AUDIO_STREAM_MUSIC, SONIFICATION_HEADSET_MUSIC_DELAY)
-                || mLimitRingtoneVolume)) {
+        if (isStreamActive(AUDIO_STREAM_MUSIC, SONIFICATION_HEADSET_MUSIC_DELAY)
+                || mLimitRingtoneVolume) {
             volumeDb += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
             DeviceTypeSet musicDevice =
                     mEngine->getOutputDevicesForAttributes(attributes_initializer(AUDIO_USAGE_MEDIA),
@@ -7927,7 +7929,8 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
             float musicVolDb = computeVolume(musicCurves,
                                              musicVolumeSrc,
                                              musicCurves.getVolumeIndex(musicDevice),
-                                             musicDevice);
+                                             musicDevice,
+                                             /* computeInternalInteraction= */ false);
             float minVolDb = (musicVolDb > SONIFICATION_HEADSET_VOLUME_MIN_DB) ?
                         musicVolDb : SONIFICATION_HEADSET_VOLUME_MIN_DB;
             if (volumeDb > minVolDb) {
