@@ -2279,6 +2279,8 @@ void MatroskaExtractor::findThumbnails() {
         int64_t thumbnailTimeUs = 0;
         size_t maxBlockSize = 0;
         while (!iter.eos() && j < 20) {
+            int64_t blockTimeUs = iter.blockTimeUs();
+
             if (iter.block()->IsKey()) {
                 ++j;
 
@@ -2289,8 +2291,12 @@ void MatroskaExtractor::findThumbnails() {
 
                 if (blockSize > maxBlockSize) {
                     maxBlockSize = blockSize;
-                    thumbnailTimeUs = iter.blockTimeUs();
+                    thumbnailTimeUs = blockTimeUs;
                 }
+            }
+            // Exit after 20s if we've already found at least one key frame.
+            if (blockTimeUs > 20000000 && maxBlockSize > 0) {
+                break;
             }
             iter.advance();
         }
