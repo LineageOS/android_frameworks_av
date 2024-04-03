@@ -223,7 +223,6 @@ cc_library_static {
         "com.android.media",
     ],
 
-
     srcs: ["MidiIoWrapper.cpp"],
 
     static_libs: [
@@ -276,6 +275,10 @@ cc_library_shared {
         "liblog",
         "libstagefright_foundation",
         "libutils",
+    ],
+
+    static_libs: [
+        "android.media.codec-aconfig-cc",
     ],
 
     include_dirs: [
