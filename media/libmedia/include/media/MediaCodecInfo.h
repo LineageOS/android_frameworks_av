@@ -69,6 +69,7 @@ struct MediaCodecInfo : public RefBase {
         constexpr static char FEATURE_MULTIPLE_FRAMES[] = "feature-multiple-frames";
         constexpr static char FEATURE_SECURE_PLAYBACK[] = "feature-secure-playback";
         constexpr static char FEATURE_TUNNELED_PLAYBACK[] = "feature-tunneled-playback";
+        constexpr static char FEATURE_DETACHED_SURFACE[] = "feature-detached-surface";
 
         /**
          * Returns the supported levels for each supported profile in a target array.

@@ -687,6 +687,11 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 const MediaCodecsXmlParser::AttributeMap &attrMap = typeIt->second;
                 std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
                     codecInfo->addMediaType(mediaType.c_str());
+
+                // we could detect tunneled playback via the playback interface, but we never did
+                // that for the advertised feature, so for now use only the advertised feature.
+                bool canDoTunneledPlayback = false;
+
                 for (const auto &v : attrMap) {
                     std::string key = v.first;
                     std::string value = v.second;
@@ -707,6 +712,11 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                         // Ignore trailing bad characters and default to 0.
                         (void)sscanf(value.c_str(), "%d", &intValue);
                         caps->addDetail(key.c_str(), intValue);
+
+                        if (key.compare(
+                                MediaCodecInfo::Capabilities::FEATURE_TUNNELED_PLAYBACK) == 0) {
+                            canDoTunneledPlayback = true;
+                        }
                     } else {
                         caps->addDetail(key.c_str(), value.c_str());
                     }
@@ -772,6 +782,17 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                                 }
                             }
                         }
+                    }
+                }
+
+                if (android::media::codec::provider_->null_output_surface_support() &&
+                        android::media::codec::provider_->null_output_surface()) {
+                    // all non-tunneled video decoders support detached surface mode
+                    if (trait.kind == C2Component::KIND_DECODER &&
+                            trait.domain == C2Component::DOMAIN_VIDEO &&
+                            !canDoTunneledPlayback) {
+                        caps->addDetail(
+                                MediaCodecInfo::Capabilities::FEATURE_DETACHED_SURFACE, 0);
                     }
                 }
             }
