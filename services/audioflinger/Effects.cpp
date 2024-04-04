@@ -562,12 +562,9 @@ NO_THREAD_SAFETY_ANALYSIS // conditional try lock
 #undef LOG_TAG
 #define LOG_TAG "EffectModule"
 
-EffectModule::EffectModule(const sp<EffectCallbackInterface>& callback,
-                                         effect_descriptor_t *desc,
-                                         int id,
-                                         audio_session_t sessionId,
-                                         bool pinned,
-                                         audio_port_handle_t deviceId)
+EffectModule::EffectModule(const sp<EffectCallbackInterface>& callback, effect_descriptor_t* desc,
+                           int id, audio_session_t sessionId, bool pinned,
+                           audio_port_handle_t deviceId)
     : EffectBase(callback, desc, id, sessionId, pinned),
       // clear mConfig to ensure consistent initial value of buffer framecount
       // in case buffers are associated by setInBuffer() or setOutBuffer()
@@ -577,9 +574,9 @@ EffectModule::EffectModule(const sp<EffectCallbackInterface>& callback,
       mMaxDisableWaitCnt(1), // set by configure_l(), should be >= 1
       mDisableWaitCnt(0),    // set by process() and updateState()
       mOffloaded(false),
-      mIsOutput(false)
-      , mSupportsFloat(false)
-{
+      mIsOutput(false),
+      mSupportsFloat(false),
+      mEffectInterfaceDebug(desc->name) {
     ALOGV("Constructor %p pinned %d", this, pinned);
     int lStatus;
 
@@ -587,6 +584,7 @@ EffectModule::EffectModule(const sp<EffectCallbackInterface>& callback,
     mStatus = callback->createEffectHal(
             &desc->uuid, sessionId, deviceId, &mEffectInterface);
     if (mStatus != NO_ERROR) {
+        ALOGE("%s createEffectHal failed: %d", __func__, mStatus);
         return;
     }
     lStatus = init_l();
@@ -596,12 +594,14 @@ EffectModule::EffectModule(const sp<EffectCallbackInterface>& callback,
     }
 
     setOffloaded_l(callback->isOffload(), callback->io());
-    ALOGV("Constructor success name %s, Interface %p", mDescriptor.name, mEffectInterface.get());
+    ALOGV("%s Constructor success name %s, Interface %p", __func__, mDescriptor.name,
+          mEffectInterface.get());
 
     return;
 Error:
     mEffectInterface.clear();
-    ALOGV("Constructor Error %d", mStatus);
+    mEffectInterfaceDebug += " init failed:" + std::to_string(lStatus);
+    ALOGE("%s Constructor Error %d", __func__, mStatus);
 }
 
 EffectModule::~EffectModule()
@@ -612,7 +612,7 @@ EffectModule::~EffectModule()
         AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
         ALOGW("EffectModule %p destructor called with unreleased interface, effect %s",
                 this, uuidStr);
-        release_l();
+        release_l("~EffectModule");
     }
 
 }
@@ -1127,13 +1127,14 @@ status_t EffectModule::stop_ll()
 }
 
 // must be called with EffectChain::mutex() held
-void EffectModule::release_l()
+void EffectModule::release_l(const std::string& from)
 {
     if (mEffectInterface != 0) {
         removeEffectFromHal_l();
         // release effect engine
         mEffectInterface->close();
         mEffectInterface.clear();
+        mEffectInterfaceDebug += " released by: " + from;
     }
 }
 
@@ -1379,6 +1380,7 @@ status_t EffectModule::setVolumeInternal(
     if (mVolume.has_value() && *left == mVolume.value()[0] && *right == mVolume.value()[1]) {
         return NO_ERROR;
     }
+    LOG_ALWAYS_FATAL_IF(mEffectInterface == nullptr, "%s", mEffectInterfaceDebug.c_str());
     uint32_t volume[2] = {*left, *right};
     uint32_t *pVolume = controller ? volume : nullptr;
     uint32_t size = sizeof(volume);
@@ -2524,7 +2526,7 @@ size_t EffectChain::removeEffect(const sp<IAfEffectModule>& effect,
                 mEffects[i]->stop_l();
             }
             if (release) {
-                mEffects[i]->release_l();
+                mEffects[i]->release_l("EffectChain::removeEffect");
             }
             // Skip operation when no thread attached (could lead to sigfpe as framecount is 0...)
             if (hasThreadAttached && type != EFFECT_FLAG_TYPE_AUXILIARY) {
@@ -3560,7 +3562,7 @@ size_t DeviceEffectProxy::removeEffect(const sp<IAfEffectModule>& effect)
 {
     audio_utils::lock_guard _l(proxyMutex());
     if (effect == mHalEffect) {
-        mHalEffect->release_l();
+        mHalEffect->release_l("DeviceEffectProxy::removeEffect");
         mHalEffect.clear();
         mDevicePort.id = AUDIO_PORT_HANDLE_NONE;
     }
