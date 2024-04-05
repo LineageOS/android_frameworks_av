@@ -256,11 +256,10 @@ public:
             hardware::camera2::impl::CameraMetadataNative* request);
 
     virtual binder::Status isSessionConfigurationWithParametersSupported(
-            const std::string& cameraId,
+            const std::string& cameraId, int targetSdkVersion,
             const SessionConfiguration& sessionConfiguration,
             int32_t deviceId, int32_t devicePolicy,
-            /*out*/
-            bool* supported);
+            /*out*/ bool* supported);
 
     virtual binder::Status getSessionCharacteristics(
             const std::string& cameraId, int targetSdkVersion, bool overrideToPortrait,

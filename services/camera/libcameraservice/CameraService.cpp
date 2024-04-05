@@ -915,11 +915,10 @@ Status CameraService::createDefaultRequest(const std::string& unresolvedCameraId
 }
 
 Status CameraService::isSessionConfigurationWithParametersSupported(
-        const std::string& unresolvedCameraId,
+        const std::string& unresolvedCameraId, int targetSdkVersion,
         const SessionConfiguration& sessionConfiguration,
         int32_t deviceId, int32_t devicePolicy,
-        /*out*/
-        bool* supported) {
+        /*out*/ bool* supported) {
     ATRACE_CALL();
 
     if (!flags::feature_combination_query()) {
@@ -955,9 +954,12 @@ Status CameraService::isSessionConfigurationWithParametersSupported(
                 cameraId.c_str());
     }
 
+    bool overrideForPerfClass = flags::calculate_perf_override_during_session_support() &&
+                                SessionConfigurationUtils::targetPerfClassPrimaryCamera(
+                                        mPerfClassPrimaryCameraIds, cameraId, targetSdkVersion);
+
     return isSessionConfigurationWithParametersSupportedUnsafe(cameraId, sessionConfiguration,
-                                                               /*overrideForPerfClass=*/false,
-                                                               supported);
+                                                               overrideForPerfClass, supported);
 }
 
 Status CameraService::isSessionConfigurationWithParametersSupportedUnsafe(

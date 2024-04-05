@@ -200,3 +200,13 @@ flag {
        purpose: PURPOSE_BUGFIX
      }
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "calculate_perf_override_during_session_support"
+     description: "Dynamically calulate whether perf class override should be set in isSessionConfigurationWithParametersSupported."
+     bug: "332975108"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
