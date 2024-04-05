@@ -955,34 +955,54 @@ Status CameraService::isSessionConfigurationWithParametersSupported(
                 cameraId.c_str());
     }
 
+    return isSessionConfigurationWithParametersSupportedUnsafe(cameraId, sessionConfiguration,
+                                                               /*overrideForPerfClass=*/false,
+                                                               supported);
+}
+
+Status CameraService::isSessionConfigurationWithParametersSupportedUnsafe(
+        const std::string& cameraId, const SessionConfiguration& sessionConfiguration,
+        bool overrideForPerfClass, /*out*/ bool* supported) {
     *supported = false;
-    status_t ret = mCameraProviderManager->isSessionConfigurationSupported(cameraId.c_str(),
-            sessionConfiguration, /*mOverrideForPerfClass*/false, /*checkSessionParams*/true,
-            supported);
+    status_t ret = mCameraProviderManager->isSessionConfigurationSupported(
+            cameraId, sessionConfiguration, overrideForPerfClass,
+            /*checkSessionParams=*/true, supported);
     binder::Status res;
     switch (ret) {
         case OK:
-            // Expected, do nothing.
-            break;
+            // Expected. Do Nothing.
+            return Status::ok();
         case INVALID_OPERATION: {
                 std::string msg = fmt::sprintf(
-                        "Camera %s: Session configuration query not supported!",
+                        "Camera %s: Session configuration with parameters supported query not "
+                        "supported!",
                         cameraId.c_str());
-                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
+                ALOGW("%s: %s", __FUNCTION__, msg.c_str());
+                logServiceError(msg, CameraService::ERROR_INVALID_OPERATION);
+                *supported = false;
+                return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
             }
-
+            break;
+        case NAME_NOT_FOUND: {
+                std::string msg = fmt::sprintf("Camera %s: Unknown camera ID.", cameraId.c_str());
+                ALOGW("%s: %s", __FUNCTION__, msg.c_str());
+                logServiceError(msg, CameraService::ERROR_ILLEGAL_ARGUMENT);
+                *supported = false;
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+            }
             break;
         default: {
-                std::string msg = fmt::sprintf( "Camera %s: Error: %s (%d)", cameraId.c_str(),
-                        strerror(-ret), ret);
+                std::string msg = fmt::sprintf(
+                        "Unable to retrieve session configuration support for camera "
+                        "device %s: Error: %s (%d)",
+                        cameraId.c_str(), strerror(-ret), ret);
                 ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                        msg.c_str());
+                logServiceError(msg, CameraService::ERROR_ILLEGAL_ARGUMENT);
+                *supported = false;
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
             }
+            break;
     }
-
-    return res;
 }
 
 Status CameraService::getSessionCharacteristics(const std::string& unresolvedCameraId,
@@ -1023,6 +1043,24 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
 
     bool overrideForPerfClass = SessionConfigurationUtils::targetPerfClassPrimaryCamera(
             mPerfClassPrimaryCameraIds, cameraId, targetSdkVersion);
+    if (flags::check_session_support_before_session_char()) {
+        bool sessionConfigSupported;
+        Status res = isSessionConfigurationWithParametersSupportedUnsafe(
+                cameraId, sessionConfiguration, overrideForPerfClass, &sessionConfigSupported);
+        if (!res.isOk()) {
+            // isSessionConfigurationWithParametersSupportedUnsafe should log what went wrong and
+            // report the correct Status to send to the client. Simply forward the error to
+            // the client.
+            outMetadata->clear();
+            return res;
+        }
+        if (!sessionConfigSupported) {
+            std::string msg = fmt::sprintf(
+                    "Session configuration not supported for camera device %s.", cameraId.c_str());
+            outMetadata->clear();
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+        }
+    }
 
     status_t ret = mCameraProviderManager->getSessionCharacteristics(
             cameraId, sessionConfiguration, overrideForPerfClass, overrideToPortrait, outMetadata);
@@ -1035,7 +1073,7 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
                 std::string msg = fmt::sprintf(
                         "Camera %s: Session characteristics query not supported!",
                         cameraId.c_str());
-                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
+                ALOGW("%s: %s", __FUNCTION__, msg.c_str());
                 logServiceError(msg, CameraService::ERROR_INVALID_OPERATION);
                 outMetadata->clear();
                 return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
@@ -1045,7 +1083,7 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
                 std::string msg = fmt::sprintf(
                         "Camera %s: Unknown camera ID.",
                         cameraId.c_str());
-                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
+                ALOGW("%s: %s", __FUNCTION__, msg.c_str());
                 logServiceError(msg, CameraService::ERROR_ILLEGAL_ARGUMENT);
                 outMetadata->clear();
                 return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());

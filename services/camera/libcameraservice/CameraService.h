@@ -1031,6 +1031,10 @@ private:
     // Adds client logs during closed session to the file pointed by fd.
     void dumpClosedSessionClientLogs(int fd, const std::string& cameraId);
 
+    binder::Status isSessionConfigurationWithParametersSupportedUnsafe(
+            const std::string& cameraId, const SessionConfiguration& sessionConfiguration,
+            bool overrideForPerfClass, /*out*/ bool* supported);
+
     // Mapping from camera ID -> state for each device, map is protected by mCameraStatesLock
     std::map<std::string, std::shared_ptr<CameraState>> mCameraStates;
 
