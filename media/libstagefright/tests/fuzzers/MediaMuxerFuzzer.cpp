@@ -13,94 +13,221 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Authors: corbin.souffrant@leviathansecurity.com
-//          dylan.katz@leviathansecurity.com
 
-#include <MediaMuxerFuzzer.h>
-#include <cutils/ashmem.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include <media/stagefright/MediaMuxer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 
 namespace android {
+const uint8_t kMinSize = 0;
+const uint8_t kMinTrackCount = 0;
 
-// Can't seem to get setBuffer or setString working. It always segfaults on a
-// null pointer read or memleaks. So that functionality is missing.
-void createMessage(AMessage *msg, FuzzedDataProvider *fdp) {
-  size_t count = fdp->ConsumeIntegralInRange<size_t>(0, 32);
-  while (fdp->remaining_bytes() > 0 && count > 0) {
-    uint8_t function_id =
-        fdp->ConsumeIntegralInRange<uint8_t>(0, amessage_setvals.size() - 1);
-    amessage_setvals[function_id](msg, fdp);
-    count--;
-  }
+enum kBufferFlags { BUFFER_FLAG_SYNCFRAME = 1, BUFFER_FLAG_CODECCONFIG = 2, BUFFER_FLAG_EOS = 4 };
+
+constexpr char kMuxerFile[] = "MediaMuxer";
+
+const std::string kAudioMimeTypes[] = {
+        MEDIA_MIMETYPE_AUDIO_AMR_NB,
+        MEDIA_MIMETYPE_AUDIO_AMR_WB,
+        MEDIA_MIMETYPE_AUDIO_MPEG,
+        MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_I,
+        MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II,
+        MEDIA_MIMETYPE_AUDIO_MIDI,
+        MEDIA_MIMETYPE_AUDIO_AAC,
+        MEDIA_MIMETYPE_AUDIO_QCELP,
+        MEDIA_MIMETYPE_AUDIO_VORBIS,
+        MEDIA_MIMETYPE_AUDIO_OPUS,
+        MEDIA_MIMETYPE_AUDIO_G711_ALAW,
+        MEDIA_MIMETYPE_AUDIO_G711_MLAW,
+        MEDIA_MIMETYPE_AUDIO_RAW,
+        MEDIA_MIMETYPE_AUDIO_FLAC,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS,
+        MEDIA_MIMETYPE_AUDIO_MSGSM,
+        MEDIA_MIMETYPE_AUDIO_AC3,
+        MEDIA_MIMETYPE_AUDIO_EAC3,
+        MEDIA_MIMETYPE_AUDIO_EAC3_JOC,
+        MEDIA_MIMETYPE_AUDIO_AC4,
+        MEDIA_MIMETYPE_AUDIO_MPEGH_MHA1,
+        MEDIA_MIMETYPE_AUDIO_MPEGH_MHM1,
+        MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L3,
+        MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L4,
+        MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L3,
+        MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L4,
+        MEDIA_MIMETYPE_AUDIO_SCRAMBLED,
+        MEDIA_MIMETYPE_AUDIO_ALAC,
+        MEDIA_MIMETYPE_AUDIO_WMA,
+        MEDIA_MIMETYPE_AUDIO_MS_ADPCM,
+        MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM,
+        MEDIA_MIMETYPE_AUDIO_DTS,
+        MEDIA_MIMETYPE_AUDIO_DTS_HD,
+        MEDIA_MIMETYPE_AUDIO_DTS_HD_MA,
+        MEDIA_MIMETYPE_AUDIO_DTS_UHD,
+        MEDIA_MIMETYPE_AUDIO_DTS_UHD_P1,
+        MEDIA_MIMETYPE_AUDIO_DTS_UHD_P2,
+        MEDIA_MIMETYPE_AUDIO_EVRC,
+        MEDIA_MIMETYPE_AUDIO_EVRCB,
+        MEDIA_MIMETYPE_AUDIO_EVRCWB,
+        MEDIA_MIMETYPE_AUDIO_EVRCNW,
+        MEDIA_MIMETYPE_AUDIO_AMR_WB_PLUS,
+        MEDIA_MIMETYPE_AUDIO_APTX,
+        MEDIA_MIMETYPE_AUDIO_DRA,
+        MEDIA_MIMETYPE_AUDIO_DOLBY_MAT,
+        MEDIA_MIMETYPE_AUDIO_DOLBY_MAT_1_0,
+        MEDIA_MIMETYPE_AUDIO_DOLBY_MAT_2_0,
+        MEDIA_MIMETYPE_AUDIO_DOLBY_MAT_2_1,
+        MEDIA_MIMETYPE_AUDIO_DOLBY_TRUEHD,
+        MEDIA_MIMETYPE_AUDIO_AAC_MP4,
+        MEDIA_MIMETYPE_AUDIO_AAC_MAIN,
+        MEDIA_MIMETYPE_AUDIO_AAC_LC,
+        MEDIA_MIMETYPE_AUDIO_AAC_SSR,
+        MEDIA_MIMETYPE_AUDIO_AAC_LTP,
+        MEDIA_MIMETYPE_AUDIO_AAC_HE_V1,
+        MEDIA_MIMETYPE_AUDIO_AAC_SCALABLE,
+        MEDIA_MIMETYPE_AUDIO_AAC_ERLC,
+        MEDIA_MIMETYPE_AUDIO_AAC_LD,
+        MEDIA_MIMETYPE_AUDIO_AAC_HE_V2,
+        MEDIA_MIMETYPE_AUDIO_AAC_ELD,
+        MEDIA_MIMETYPE_AUDIO_AAC_XHE,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADIF,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_MAIN,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LC,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_SSR,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LTP,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_HE_V1,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_SCALABLE,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_ERLC,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LD,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_HE_V2,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_ELD,
+        MEDIA_MIMETYPE_AUDIO_AAC_ADTS_XHE,
+        MEDIA_MIMETYPE_AUDIO_AAC_LATM_LC,
+        MEDIA_MIMETYPE_AUDIO_AAC_LATM_HE_V1,
+        MEDIA_MIMETYPE_AUDIO_AAC_LATM_HE_V2,
+        MEDIA_MIMETYPE_AUDIO_IEC61937,
+        MEDIA_MIMETYPE_AUDIO_IEC60958,
+};
+
+const std::string kVideoMimeTypes[] = {
+        MEDIA_MIMETYPE_VIDEO_VP8,       MEDIA_MIMETYPE_VIDEO_VP9,
+        MEDIA_MIMETYPE_VIDEO_AV1,       MEDIA_MIMETYPE_VIDEO_AVC,
+        MEDIA_MIMETYPE_VIDEO_HEVC,      MEDIA_MIMETYPE_VIDEO_MPEG4,
+        MEDIA_MIMETYPE_VIDEO_H263,      MEDIA_MIMETYPE_VIDEO_MPEG2,
+        MEDIA_MIMETYPE_VIDEO_RAW,       MEDIA_MIMETYPE_VIDEO_DOLBY_VISION,
+        MEDIA_MIMETYPE_VIDEO_SCRAMBLED, MEDIA_MIMETYPE_VIDEO_DIVX,
+        MEDIA_MIMETYPE_VIDEO_DIVX3,     MEDIA_MIMETYPE_VIDEO_XVID,
+        MEDIA_MIMETYPE_VIDEO_MJPEG,
+};
+
+void getSampleAudioFormat(FuzzedDataProvider& fdp, AMessage* format) {
+    std::string mimeType = fdp.PickValueInArray(kAudioMimeTypes);
+    format->setString("mime", mimeType.c_str(), mimeType.length());
+    format->setInt32("sample-rate", fdp.ConsumeIntegral<int32_t>());
+    format->setInt32("channel-count", fdp.ConsumeIntegral<int32_t>());
+}
+
+void getSampleVideoFormat(FuzzedDataProvider& fdp, AMessage* format) {
+    std::string mimeType = fdp.PickValueInArray(kVideoMimeTypes);
+    format->setString("mime", mimeType.c_str(), mimeType.length());
+    format->setInt32("height", fdp.ConsumeIntegral<int32_t>());
+    format->setInt32("width", fdp.ConsumeIntegral<int32_t>());
+    format->setInt32("time-lapse-fps", fdp.ConsumeIntegral<int32_t>());
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  FuzzedDataProvider fdp = FuzzedDataProvider(data, size);
+    FuzzedDataProvider fdp(data, size);
 
-  size_t data_size = fdp.ConsumeIntegralInRange<size_t>(0, size);
-  int fd = ashmem_create_region("mediamuxer_fuzz_region", data_size);
-  if (fd < 0)
+    // memfd_create() creates an anonymous file and returns a file
+    // descriptor that refers to it. MFD_ALLOW_SEALING allows sealing
+    // operations on this file.
+    int32_t fd = memfd_create(kMuxerFile, MFD_ALLOW_SEALING);
+    if (fd == -1) {
+        ALOGE("memfd_create failed: %s", strerror(errno));
+        return 0;
+    }
+
+    auto outputFormat = (MediaMuxer::OutputFormat)fdp.ConsumeIntegralInRange<int32_t>(
+            MediaMuxer::OutputFormat::OUTPUT_FORMAT_MPEG_4,
+            MediaMuxer::OutputFormat::OUTPUT_FORMAT_LIST_END);
+
+    sp<MediaMuxer> mMuxer = MediaMuxer::create(fd, outputFormat);
+    if (mMuxer == nullptr) {
+        close(fd);
+        return 0;
+    }
+
+    // Used to consume a maximum of 80% of the data to send buffer data to writeSampleData().
+    // This ensures that we don't completely exhaust data and use the rest 20% for fuzzing
+    // of APIs.
+    const size_t kMaxSize = (size * 80) / 100;
+    while (fdp.remaining_bytes()) {
+        auto invokeMediaMuxerAPI = fdp.PickValueInArray<const std::function<void()>>({
+                [&]() {
+                    // Using 'return' here due to a timeout bug present in OGGWriter.cpp
+                    // (b/310316183).
+                    if (outputFormat == MediaMuxer::OutputFormat::OUTPUT_FORMAT_OGG) {
+                        return;
+                    }
+
+                    sp<AMessage> format = sp<AMessage>::make();
+                    fdp.ConsumeBool() ? getSampleAudioFormat(fdp, format.get())
+                                      : getSampleVideoFormat(fdp, format.get());
+
+                    mMuxer->addTrack(fdp.ConsumeBool() ? format : nullptr);
+                },
+                [&]() {
+                    mMuxer->setLocation(fdp.ConsumeIntegral<int32_t>() /* latitude */,
+                                        fdp.ConsumeIntegral<int32_t>() /* longitude */);
+                },
+                [&]() { mMuxer->setOrientationHint(fdp.ConsumeIntegral<int32_t>() /* degrees */); },
+                [&]() { mMuxer->start(); },
+                [&]() {
+                    std::vector<uint8_t> sample = fdp.ConsumeBytes<uint8_t>(
+                            fdp.ConsumeIntegralInRange<size_t>(kMinSize, kMaxSize));
+                    sp<ABuffer> buffer = sp<ABuffer>::make(sample.data(), sample.size());
+
+                    size_t offset = fdp.ConsumeIntegralInRange<size_t>(kMinSize, sample.size());
+                    size_t length =
+                            fdp.ConsumeIntegralInRange<size_t>(kMinSize, buffer->size() - offset);
+                    buffer->setRange(offset, length);
+
+                    sp<AMessage> meta = buffer->meta();
+                    meta->setInt64("sample-file-offset", fdp.ConsumeIntegral<int64_t>());
+                    meta->setInt64("last-sample-index-in-chunk", fdp.ConsumeIntegral<int64_t>());
+
+                    uint32_t flags = 0;
+                    if (fdp.ConsumeBool()) {
+                        flags |= kBufferFlags::BUFFER_FLAG_SYNCFRAME;
+                    }
+                    if (fdp.ConsumeBool()) {
+                        flags |= kBufferFlags::BUFFER_FLAG_CODECCONFIG;
+                    }
+                    if (fdp.ConsumeBool()) {
+                        flags |= kBufferFlags::BUFFER_FLAG_EOS;
+                    }
+
+                    size_t trackIndex = fdp.ConsumeBool()
+                                                ? fdp.ConsumeIntegralInRange<size_t>(
+                                                          kMinTrackCount, mMuxer->getTrackCount())
+                                                : fdp.ConsumeIntegral<size_t>();
+                    int64_t timeUs = fdp.ConsumeIntegral<int64_t>();
+                    mMuxer->writeSampleData(fdp.ConsumeBool() ? buffer : nullptr, trackIndex,
+                                            timeUs, flags);
+                },
+                [&]() {
+                    mMuxer->getTrackFormat(
+                            fdp.ConsumeBool() ? fdp.ConsumeIntegralInRange<size_t>(
+                                                        kMinTrackCount, mMuxer->getTrackCount())
+                                              : fdp.ConsumeIntegral<size_t>() /* idx */);
+                },
+                [&]() { mMuxer->stop(); },
+        });
+
+        invokeMediaMuxerAPI();
+    }
+
+    close(fd);
     return 0;
-
-  uint8_t *sh_data = static_cast<uint8_t *>(
-      mmap(NULL, data_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-  if (sh_data == MAP_FAILED)
-    return 0;
-
-  MediaMuxer::OutputFormat format =
-      (MediaMuxer::OutputFormat)fdp.ConsumeIntegralInRange<int32_t>(0, 4);
-  sp<MediaMuxer> mMuxer = MediaMuxer::create(fd, format);
-  if (mMuxer == nullptr) {
-    return 0;
-  }
-
-  while (fdp.remaining_bytes() > 1) {
-    switch (fdp.ConsumeIntegralInRange<uint8_t>(0, 4)) {
-    case 0: {
-      // For some reason it only likes mp4s here...
-      if (format == 1 || format == 4)
-        break;
-
-      sp<AMessage> a_format(new AMessage);
-      createMessage(a_format.get(), &fdp);
-      mMuxer->addTrack(a_format);
-      break;
-    }
-    case 1: {
-      mMuxer->start();
-      break;
-    }
-    case 2: {
-      int degrees = fdp.ConsumeIntegral<int>();
-      mMuxer->setOrientationHint(degrees);
-      break;
-    }
-    case 3: {
-      int latitude = fdp.ConsumeIntegral<int>();
-      int longitude = fdp.ConsumeIntegral<int>();
-      mMuxer->setLocation(latitude, longitude);
-      break;
-    }
-    case 4: {
-      size_t buf_size = fdp.ConsumeIntegralInRange<size_t>(0, data_size);
-      sp<ABuffer> a_buffer(new ABuffer(buf_size));
-
-      size_t trackIndex = fdp.ConsumeIntegral<size_t>();
-      int64_t timeUs = fdp.ConsumeIntegral<int64_t>();
-      uint32_t flags = fdp.ConsumeIntegral<uint32_t>();
-      mMuxer->writeSampleData(a_buffer, trackIndex, timeUs, flags);
-    }
-    }
-  }
-
-  if (fdp.ConsumeBool())
-    mMuxer->stop();
-
-  munmap(sh_data, data_size);
-  close(fd);
-  return 0;
 }
 } // namespace android
