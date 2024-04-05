@@ -68,7 +68,7 @@ void ACameraManager_deleteCameraIdList(ACameraIdList* cameraIdList) {
 
 EXPORT
 camera_status_t ACameraManager_registerAvailabilityCallback(
-        ACameraManager*, const ACameraManager_AvailabilityCallbacks *callback) {
+        ACameraManager* manager, const ACameraManager_AvailabilityCallbacks* callback) {
     ATRACE_CALL();
     if (callback == nullptr) {
         ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
@@ -81,13 +81,13 @@ camera_status_t ACameraManager_registerAvailabilityCallback(
                callback->onCameraAvailable, callback->onCameraUnavailable);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    CameraManagerGlobal::getInstance()->registerAvailabilityCallback(callback);
+    manager->registerAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 
 EXPORT
 camera_status_t ACameraManager_unregisterAvailabilityCallback(
-        ACameraManager*, const ACameraManager_AvailabilityCallbacks *callback) {
+        ACameraManager* manager, const ACameraManager_AvailabilityCallbacks* callback) {
     ATRACE_CALL();
     if (callback == nullptr) {
         ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
@@ -100,13 +100,13 @@ camera_status_t ACameraManager_unregisterAvailabilityCallback(
                callback->onCameraAvailable, callback->onCameraUnavailable);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    CameraManagerGlobal::getInstance()->unregisterAvailabilityCallback(callback);
+    manager->unregisterAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 
 EXPORT
 camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
-        ACameraManager* /*manager*/, const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+        ACameraManager* manager, const ACameraManager_ExtendedAvailabilityCallbacks* callback) {
     ATRACE_CALL();
     if (callback == nullptr) {
         ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
@@ -131,13 +131,13 @@ camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
             return ACAMERA_ERROR_INVALID_PARAMETER;
         }
     }
-    CameraManagerGlobal::getInstance()->registerExtendedAvailabilityCallback(callback);
+    manager->registerExtendedAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 
 EXPORT
 camera_status_t ACameraManager_unregisterExtendedAvailabilityCallback(
-        ACameraManager* /*manager*/, const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+        ACameraManager* manager, const ACameraManager_ExtendedAvailabilityCallbacks* callback) {
     ATRACE_CALL();
     if (callback == nullptr) {
         ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
@@ -154,7 +154,7 @@ camera_status_t ACameraManager_unregisterExtendedAvailabilityCallback(
                callback->onCameraAccessPrioritiesChanged);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    CameraManagerGlobal::getInstance()->unregisterExtendedAvailabilityCallback(callback);
+    manager->unregisterExtendedAvailabilityCallback(callback);
     return ACAMERA_OK;
 }
 

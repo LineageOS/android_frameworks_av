@@ -866,6 +866,25 @@ ACameraManager::getTagFromName(const char *cameraId, const char *name, uint32_t 
     return status == OK ? ACAMERA_OK : ACAMERA_ERROR_METADATA_NOT_FOUND;
 }
 
-ACameraManager::~ACameraManager() {
+void ACameraManager::registerAvailabilityCallback(
+        const ACameraManager_AvailabilityCallbacks* callback) {
+    mGlobalManager->registerAvailabilityCallback(callback);
+}
 
+void ACameraManager::unregisterAvailabilityCallback(
+        const ACameraManager_AvailabilityCallbacks* callback) {
+    mGlobalManager->unregisterAvailabilityCallback(callback);
+}
+
+void ACameraManager::registerExtendedAvailabilityCallback(
+        const ACameraManager_ExtendedAvailabilityCallbacks* callback) {
+    mGlobalManager->registerExtendedAvailabilityCallback(callback);
+}
+
+void ACameraManager::unregisterExtendedAvailabilityCallback(
+        const ACameraManager_ExtendedAvailabilityCallbacks* callback) {
+    mGlobalManager->unregisterExtendedAvailabilityCallback(callback);
+}
+
+ACameraManager::~ACameraManager() {
 }
