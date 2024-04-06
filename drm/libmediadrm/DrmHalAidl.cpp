@@ -466,6 +466,12 @@ DrmStatus DrmHalAidl::createPlugin(const uint8_t uuid[16], const String8& appPac
     mMetrics->SetAppPackageName(appPackageName);
     mMetrics->SetAppUid(AIBinder_getCallingUid());
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
+        CryptoSchemes schemes{};
+        auto err = mFactories[i]->getSupportedCryptoSchemes(&schemes);
+        if (!err.isOk() || !std::count(schemes.uuids.begin(), schemes.uuids.end(), uuidAidl)) {
+            continue;
+        }
+
         ::ndk::ScopedAStatus status =
                 mFactories[i]->createDrmPlugin(uuidAidl, appPackageNameAidl, &pluginAidl);
         if (status.isOk()) {
