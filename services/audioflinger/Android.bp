@@ -115,12 +115,12 @@ audioflinger_base_cflags = [
     "-Wstrict-aliasing",
     "-Wthread-safety",
     //"-Wthread-safety-negative", // experimental - looks broken in R.
-    "-fstrict-aliasing",
     "-Wunreachable-code",
     "-Wunreachable-code-break",
     "-Wunreachable-code-return",
     "-Wunused",
     "-Wused-but-marked-unused",
+    "-fstrict-aliasing",
 ]
 
 // Eventually use common tidy defaults

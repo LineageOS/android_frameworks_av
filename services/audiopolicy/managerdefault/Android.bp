@@ -42,11 +42,11 @@ cc_library_shared {
         // conflict with libaudiopolicyenginedefault.
         "audioclient-types-aidl-cpp",
         // Flag support
+        "android.media.audiopolicy-aconfig-cc",
+        "com.android.media.audioserver-aconfig-cc",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiopolicyenginedefault",
-        "android.media.audiopolicy-aconfig-cc",
-        "com.android.media.audioserver-aconfig-cc",
     ],
 
     header_libs: [
