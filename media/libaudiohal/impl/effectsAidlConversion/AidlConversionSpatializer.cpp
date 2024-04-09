@@ -147,8 +147,12 @@ status_t AidlConversionSpatializer::setParameter(EffectParamReader& param) {
                 return statusTFromBinderStatus(mEffect->setParameter(aidlParam));
             }
             default: {
-                ALOGE("%s %d invalid command %u", __func__, __LINE__, command);
-                return BAD_VALUE;
+                // for vendor extension, copy data area to the DefaultExtension, parameter ignored
+                VendorExtension ext = VALUE_OR_RETURN_STATUS(
+                        aidl::android::legacy2aidl_EffectParameterReader_VendorExtension(param));
+                aidlParam =
+                        MAKE_SPECIFIC_PARAMETER(Spatializer, spatializer, vendor, ext);
+                break;
             }
         }
     } else {
@@ -321,8 +325,7 @@ status_t AidlConversionSpatializer::getParameter(EffectParamWriter& param) {
                 return OK;
             }
             default: {
-                ALOGE("%s %d invalid command %u", __func__, __LINE__, command);
-                return BAD_VALUE;
+                VENDOR_EXTENSION_GET_AND_RETURN(Spatializer, spatializer, param);
             }
         }
     } else {
