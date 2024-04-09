@@ -130,8 +130,16 @@ public:
     }
 
     static AttributionSourceState buildAttributionSource(int callingPid, int callingUid,
-            const std::string& packageName) {
+            int32_t deviceId) {
         AttributionSourceState attributionSource = buildAttributionSource(callingPid, callingUid);
+        attributionSource.deviceId = deviceId;
+        return attributionSource;
+    }
+
+    static AttributionSourceState buildAttributionSource(int callingPid, int callingUid,
+            const std::string& packageName, int32_t deviceId) {
+        AttributionSourceState attributionSource = buildAttributionSource(callingPid, callingUid,
+                deviceId);
         attributionSource.packageName = packageName;
         return attributionSource;
     }
@@ -158,24 +166,27 @@ public:
         return (getCallingUid() < AID_APP_START);
     }
 
-    bool hasPermissionsForCamera(int callingPid, int callingUid) const {
-        return hasPermissionsForCamera(std::string(), callingPid, callingUid);
+    bool hasPermissionsForCamera(int callingPid, int callingUid, int32_t deviceId) const {
+        return hasPermissionsForCamera(std::string(), callingPid, callingUid, deviceId);
     }
 
     bool hasPermissionsForCamera(int callingPid, int callingUid,
-            const std::string& packageName) const {
-        return hasPermissionsForCamera(std::string(), callingPid, callingUid, packageName);
+            const std::string& packageName, int32_t deviceId) const {
+        return hasPermissionsForCamera(std::string(), callingPid, callingUid, packageName,
+                deviceId);
     }
 
     bool hasPermissionsForCamera(const std::string& cameraId, int callingPid,
-            int callingUid) const {
-        auto attributionSource = buildAttributionSource(callingPid, callingUid);
+            int callingUid, int32_t deviceId) const {
+        auto attributionSource = buildAttributionSource(callingPid, callingUid,
+                deviceId);
         return mAttributionAndPermissionUtils->hasPermissionsForCamera(cameraId, attributionSource);
     }
 
     bool hasPermissionsForCamera(const std::string& cameraId, int callingPid, int callingUid,
-            const std::string& packageName) const {
-        auto attributionSource = buildAttributionSource(callingPid, callingUid, packageName);
+            const std::string& packageName, int32_t deviceId) const {
+        auto attributionSource = buildAttributionSource(callingPid, callingUid, packageName,
+                deviceId);
         return mAttributionAndPermissionUtils->hasPermissionsForCamera(cameraId, attributionSource);
     }
 
