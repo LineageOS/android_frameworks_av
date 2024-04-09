@@ -83,7 +83,7 @@ template <typename ServiceInterface, typename Client, typename AidlInterface,
         typename ServiceTraits>
 class ServiceHandler {
 public:
-    sp<ServiceInterface> getService(bool canStartThreadPool = true)
+    sp<ServiceInterface> getService()
             EXCLUDES(mMutex) NO_THREAD_SAFETY_ANALYSIS {  // std::unique_ptr
         sp<ServiceInterface> service;
         sp<Client> client;
@@ -140,7 +140,7 @@ public:
         client = mClient;
         service = mService;
         // Make sure callbacks can be received by the client
-        if (canStartThreadPool) {
+        if (mCanStartThreadPool) {
             ProcessState::self()->startThreadPool();
         }
         ul.unlock();
@@ -183,6 +183,10 @@ public:
         if (mClient) ServiceTraits::onClearService(mClient);
     }
 
+    void disableThreadPool() {
+        mCanStartThreadPool = false;
+    }
+
 private:
     std::mutex mSingleGetter;
     std::mutex mMutex;
@@ -191,6 +195,7 @@ private:
     sp<ServiceInterface> mLocalService GUARDED_BY(mMutex);
     sp<ServiceInterface> mService GUARDED_BY(mMutex);
     sp<Client> mClient GUARDED_BY(mMutex);
+    std::atomic<bool> mCanStartThreadPool = true;
 };
 
 struct AudioFlingerTraits {
@@ -219,10 +224,6 @@ struct AudioFlingerTraits {
 
 sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
     return gAudioFlingerServiceHandler.getService();
-}
-
-sp<IAudioFlinger> AudioSystem::get_audio_flinger_for_fuzzer() {
-    return gAudioFlingerServiceHandler.getService(false /* canStartThreadPool */);
 }
 
 sp<AudioSystem::AudioFlingerClient> AudioSystem::getAudioFlingerClient() {
@@ -952,6 +953,11 @@ sp<IAudioPolicyService> AudioSystem::get_audio_policy_service() {
 
 void AudioSystem::clearAudioPolicyService() {
     gAudioPolicyServiceHandler.clearService();
+}
+
+void AudioSystem::disableThreadPool() {
+    gAudioFlingerServiceHandler.disableThreadPool();
+    gAudioPolicyServiceHandler.disableThreadPool();
 }
 
 // ---------------------------------------------------------------------------

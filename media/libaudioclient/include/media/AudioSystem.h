@@ -187,7 +187,10 @@ public:
 
     // helper function to obtain AudioFlinger service handle
     static sp<IAudioFlinger> get_audio_flinger();
-    static sp<IAudioFlinger> get_audio_flinger_for_fuzzer();
+
+    // function to disable creation of thread pool (Used for testing).
+    // This should be called before get_audio_flinger() or get_audio_policy_service().
+    static void disableThreadPool();
 
     static float linearToLog(int volume);
     static int logToLinear(float volume);
