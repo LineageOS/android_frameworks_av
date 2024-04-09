@@ -189,9 +189,6 @@ AudioRecord::~AudioRecord()
 }
 
 void AudioRecord::stopAndJoinCallbacks() {
-    // Prevent nullptr crash if it did not open properly.
-    if (mStatus != NO_ERROR) return;
-
     // Make sure that callback function exits in the case where
     // it is looping on buffer empty condition in obtainBuffer().
     // Otherwise the callback thread will never exit.
