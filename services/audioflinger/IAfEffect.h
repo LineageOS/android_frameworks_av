@@ -211,7 +211,7 @@ private:
 
     virtual status_t stop_l() = 0;
     virtual void addEffectToHal_l() = 0;
-    virtual void release_l() = 0;
+    virtual void release_l(const std::string& from) = 0;
 };
 
 class IAfEffectChain : public RefBase {
