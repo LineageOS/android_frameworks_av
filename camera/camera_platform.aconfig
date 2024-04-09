@@ -190,3 +190,23 @@ flag {
        purpose: PURPOSE_BUGFIX
      }
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "check_session_support_before_session_char"
+     description: "Validate that a SessionConfiguration is supported before fetching SessionCharacteristics."
+     bug: "327008530"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "calculate_perf_override_during_session_support"
+     description: "Dynamically calulate whether perf class override should be set in isSessionConfigurationWithParametersSupported."
+     bug: "332975108"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
