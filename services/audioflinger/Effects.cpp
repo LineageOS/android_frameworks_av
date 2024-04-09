@@ -1388,9 +1388,9 @@ status_t EffectModule::setVolumeInternal(
                                                 &size,
                                                 pVolume);
     if (controller && status == NO_ERROR && size == sizeof(volume)) {
+        mVolume = {*left, *right}; // Cache the value that has been set
         *left = volume[0];
         *right = volume[1];
-        mVolume = {*left, *right};
     }
     return status;
 }
@@ -2628,6 +2628,7 @@ bool EffectChain::setVolume_l(uint32_t* left, uint32_t* right, bool force) {
         }
         return volumeControlIndex.has_value();
     }
+    mVolumeControlEffect = volumeControlEffect;
 
     for (int i = 0; i < ctrlIdx; ++i) {
         // For all volume control effects before the effect that controls volume, set the volume
