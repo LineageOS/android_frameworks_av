@@ -800,7 +800,7 @@ status_t AidlProviderInfo::AidlDeviceInfo3::dumpState(int fd) {
 
 status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
         const SessionConfiguration &configuration, bool overrideForPerfClass,
-        bool checkSessionParams, bool *status) {
+        camera3::metadataGetter getMetadata, bool checkSessionParams, bool *status) {
 
     auto operatingMode = configuration.getOperatingMode();
 
@@ -812,8 +812,6 @@ status_t AidlProviderInfo::AidlDeviceInfo3::isSessionConfigurationSupported(
 
     camera::device::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
-    camera3::metadataGetter getMetadata = [this](const std::string &id,
-            bool /*overrideForPerfClass*/) {return this->deviceInfo(id);};
     auto bRes = SessionConfigurationUtils::convertToHALStreamCombination(configuration,
             mId, mCameraCharacteristics, mCompositeJpegRDisabled, getMetadata,
             mPhysicalIds, streamConfiguration, overrideForPerfClass, mProviderTagid,

@@ -127,8 +127,8 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
 
         virtual status_t isSessionConfigurationSupported(
                 const SessionConfiguration &/*configuration*/,
-                bool overrideForPerfClass, bool checkSessionParams,
-                bool *status/*status*/);
+                bool overrideForPerfClass, camera3::metadataGetter getMetadata,
+                bool checkSessionParams, bool *status/*status*/);
 
         virtual status_t createDefaultRequest(
                     camera3::camera_request_template_t templateId,

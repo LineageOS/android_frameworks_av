@@ -564,10 +564,40 @@ RetCode BundleContext::setVirtualizerStrength(int strength) {
 
 RetCode BundleContext::setForcedDevice(
         const ::aidl::android::media::audio::common::AudioDeviceDescription& device) {
-    RETURN_VALUE_IF(true != isDeviceSupportedVirtualizer({device}), RetCode::ERROR_EFFECT_LIB_ERROR,
-                    " deviceNotSupportVirtualizer");
-    mForceDevice = device;
-    return RetCode::SUCCESS;
+    RetCode ret = RetCode::SUCCESS;
+    bool enableVirtualizer = mType == lvm::BundleEffectType::VIRTUALIZER && mEnabled;
+
+    if (isDeviceSupportedVirtualizer({device})) {
+        mVirtualizerForcedDevice = device;
+    } else {
+        // disabling forced virtualization mode
+        AudioDeviceDescription noneDevice;
+        if (device != noneDevice) {
+            // device is not supported, make it behave as a reset of forced mode but return an error
+            ret = RetCode::ERROR_ILLEGAL_PARAMETER;
+        }
+        // verify whether the virtualization should be enabled or disabled
+        if (!isDeviceSupportedVirtualizer(mOutputDevice)) {
+            enableVirtualizer = false;
+        }
+        mVirtualizerForcedDevice = noneDevice;
+    }
+
+    if (enableVirtualizer) {
+        if (mVirtualizerTempDisabled) {
+            LOG(VERBOSE) << __func__ << " re-enable virtualizer";
+            enableOperatingMode();
+            mVirtualizerTempDisabled = false;
+        }
+    } else {
+        if (!mVirtualizerTempDisabled) {
+            LOG(VERBOSE) << __func__ << " disable virtualizer";
+            disableOperatingMode();
+            mVirtualizerTempDisabled = true;
+        }
+    }
+
+    return ret;
 }
 
 RetCode BundleContext::initControlParameter(LVM_ControlParams_t& params) const {

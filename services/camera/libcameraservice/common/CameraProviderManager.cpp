@@ -421,8 +421,15 @@ status_t CameraProviderManager::isSessionConfigurationSupported(const std::strin
         return NAME_NOT_FOUND;
     }
 
+    metadataGetter getMetadata = [this](const std::string &id,
+            bool overrideForPerfClass) {
+        CameraMetadata metadata;
+        this->getCameraCharacteristicsLocked(id, overrideForPerfClass,
+                                             &metadata, /*overrideToPortrait*/false);
+        return metadata;
+    };
     return deviceInfo->isSessionConfigurationSupported(configuration,
-            overrideForPerfClass, checkSessionParams, status);
+            overrideForPerfClass, getMetadata, checkSessionParams, status);
 }
 
 status_t  CameraProviderManager::createDefaultRequest(const std::string& cameraId,
@@ -1083,20 +1090,6 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::queryPhysicalCameraIds() 
                 mPhysicalIds.push_back((const char*)ids+start);
             }
             start = i+1;
-        }
-    }
-}
-
-CameraMetadata CameraProviderManager::ProviderInfo::DeviceInfo3::deviceInfo(
-        const std::string &id) {
-    if (id.empty()) {
-        return mCameraCharacteristics;
-    } else {
-        if (mPhysicalCameraCharacteristics.find(id) != mPhysicalCameraCharacteristics.end()) {
-            return mPhysicalCameraCharacteristics.at(id);
-        } else {
-            ALOGE("%s: Invalid physical camera id %s", __FUNCTION__, id.c_str());
-            return mCameraCharacteristics;
         }
     }
 }

@@ -646,6 +646,7 @@ private:
             virtual status_t isSessionConfigurationSupported(
                     const SessionConfiguration &/*configuration*/,
                     bool /*overrideForPerfClass*/,
+                    camera3::metadataGetter /*getMetadata*/,
                     bool /*checkSessionParams*/,
                     bool * /*status*/) {
                 return INVALID_OPERATION;
@@ -777,8 +778,6 @@ private:
                     std::vector<int64_t>* stallDurations,
                     const camera_metadata_entry& halStreamConfigs,
                     const camera_metadata_entry& halStreamDurations);
-
-            CameraMetadata deviceInfo(const std::string &id);
         };
     protected:
         std::string mType;
