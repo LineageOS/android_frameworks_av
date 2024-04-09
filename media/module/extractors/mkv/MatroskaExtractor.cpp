@@ -1769,6 +1769,30 @@ status_t MatroskaExtractor::synthesizeMPEG4(TrackInfo *trackInfo, size_t index) 
 
 }
 
+status_t MatroskaExtractor::synthesizeVP9(TrackInfo* trackInfo, size_t index) {
+    BlockIterator iter(this, trackInfo->mTrackNum, index);
+    if (iter.eos()) {
+        return ERROR_MALFORMED;
+    }
+
+    const mkvparser::Block* block = iter.block();
+    if (block->GetFrameCount() <= 0) {
+        return ERROR_MALFORMED;
+    }
+
+    const mkvparser::Block::Frame& frame = block->GetFrame(0);
+    auto tmpData = heapbuffer<unsigned char>(frame.len);
+    long n = frame.Read(mReader, tmpData.get());
+    if (n != 0) {
+        return ERROR_MALFORMED;
+    }
+
+    if (!MakeVP9CodecSpecificData(trackInfo->mMeta, tmpData.get(), frame.len)) {
+        return ERROR_MALFORMED;
+    }
+
+    return OK;
+}
 
 static inline bool isValidInt32ColourValue(long long value) {
     return value != mkvparser::Colour::kValueNotPresent
@@ -2002,6 +2026,8 @@ void MatroskaExtractor::addTracks() {
                       // specified in http://www.webmproject.org/vp9/profiles/.
                       AMediaFormat_setBuffer(meta,
                              AMEDIAFORMAT_KEY_CSD_0, codecPrivate, codecPrivateSize);
+                    } else {
+                        isSetCsdFrom1stFrame = true;
                     }
                 } else if (!strcmp("V_AV1", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AV1);
@@ -2253,6 +2279,13 @@ void MatroskaExtractor::addTracks() {
             if (err != OK) {
                 mTracks.pop();
                 continue;
+            }
+        } else if ((!strcmp("V_VP9", codecID) && codecPrivateSize == 0) ||
+                   (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_VP9) && isSetCsdFrom1stFrame)) {
+            // Attempt to recover from VP9 track without codec private data
+            err = synthesizeVP9(trackInfo, n);
+            if (err != OK) {
+                ALOGW("ignoring error %d in synthesizeVP9", err);
             }
         }
         // the TrackInfo owns the metadata now
