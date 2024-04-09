@@ -681,7 +681,7 @@ private:
 
     // Current client state:  false = stopped, true = active.  Protected by mLock.  If more states
     // are added, consider changing this to enum State { ... } mState as in AudioTrack.
-    bool                    mActive;
+    bool mActive = false;
 
     // for client callback handler
 
@@ -708,7 +708,7 @@ private:
     Modulo<uint32_t>        mNewPosition;           // in frames
     uint32_t                mUpdatePeriod;          // in frames, zero means no EVENT_NEW_POS
 
-    status_t                mStatus;
+    status_t mStatus = NO_INIT;
 
     android::content::AttributionSourceState mClientAttributionSource; // Owner's attribution source
 
@@ -736,8 +736,8 @@ private:
                                                     // held to read or write those bits reliably.
     audio_input_flags_t     mOrigFlags;             // as specified in constructor or set(), const
 
-    audio_session_t         mSessionId;
-    audio_port_handle_t     mPortId;                    // Id from Audio Policy Manager
+    audio_session_t mSessionId = AUDIO_SESSION_ALLOCATE;
+    audio_port_handle_t mPortId = AUDIO_PORT_HANDLE_NONE;
 
     /**
      * mLogSessionId is a string identifying this AudioRecord for the metrics service.
@@ -756,9 +756,9 @@ private:
     sp<IMemory>             mBufferMemory;
     audio_io_handle_t       mInput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getInputforAttr()
 
-    int                     mPreviousPriority;  // before start()
-    SchedPolicy             mPreviousSchedulingGroup;
-    bool                    mAwaitBoost;    // thread should wait for priority boost before running
+    int mPreviousPriority = ANDROID_PRIORITY_NORMAL;  // before start()
+    SchedPolicy mPreviousSchedulingGroup = SP_DEFAULT;
+    bool mAwaitBoost = false;  // thread should wait for priority boost before running
 
     // The proxy should only be referenced while a lock is held because the proxy isn't
     // multi-thread safe.
@@ -799,14 +799,17 @@ private:
 
     // For Device Selection API
     //  a value of AUDIO_PORT_HANDLE_NONE indicated default (AudioPolicyManager) routing.
-    audio_port_handle_t     mSelectedDeviceId; // Device requested by the application.
-    audio_port_handle_t     mRoutedDeviceId;   // Device actually selected by audio policy manager:
-                                              // May not match the app selection depending on other
-                                              // activity and connected devices
+
+    // Device requested by the application.
+    audio_port_handle_t     mSelectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    // Device actually selected by AudioPolicyManager: This may not match the app
+    // selection depending on other activity and connected devices
+    audio_port_handle_t     mRoutedDeviceId = AUDIO_PORT_HANDLE_NONE;
+
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
 
-    audio_microphone_direction_t mSelectedMicDirection;
-    float mSelectedMicFieldDimension;
+    audio_microphone_direction_t mSelectedMicDirection = MIC_DIRECTION_UNSPECIFIED;
+    float mSelectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT;
 
     int32_t                    mMaxSharedAudioHistoryMs = 0;
     std::string                mSharedAudioPackageName = {};

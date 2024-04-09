@@ -130,11 +130,7 @@ status_t AudioRecord::getMetrics(mediametrics::Item * &item)
 }
 
 AudioRecord::AudioRecord(const AttributionSourceState &client)
-    : mActive(false), mStatus(NO_INIT), mClientAttributionSource(client),
-      mSessionId(AUDIO_SESSION_ALLOCATE), mPreviousPriority(ANDROID_PRIORITY_NORMAL),
-      mPreviousSchedulingGroup(SP_DEFAULT), mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE), mSelectedMicDirection(MIC_DIRECTION_UNSPECIFIED),
-      mSelectedMicFieldDimension(MIC_FIELD_DIMENSION_DEFAULT)
+    : mClientAttributionSource(client)
 {
 }
 
@@ -154,13 +150,7 @@ AudioRecord::AudioRecord(
         audio_port_handle_t selectedDeviceId,
         audio_microphone_direction_t selectedMicDirection,
         float microphoneFieldDimension)
-    : mActive(false),
-      mStatus(NO_INIT),
-      mClientAttributionSource(client),
-      mSessionId(AUDIO_SESSION_ALLOCATE),
-      mPreviousPriority(ANDROID_PRIORITY_NORMAL),
-      mPreviousSchedulingGroup(SP_DEFAULT),
-      mProxy(nullptr)
+    : mClientAttributionSource(client)
 {
     uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mClientAttributionSource.uid));
     pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mClientAttributionSource.pid));
