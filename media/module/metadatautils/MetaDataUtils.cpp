@@ -81,6 +81,177 @@ bool MakeAVCCodecSpecificData(AMediaFormat *meta, const uint8_t *data, size_t si
     return true;
 }
 
+// Check if the next 24 bits are VP9 SYNC_CODE
+static bool isVp9SyncCode(ABitReader &bits) {
+    if (bits.numBitsLeft() < 24) {
+        return false;
+    }
+    return bits.getBits(24) == 0x498342;
+}
+
+// This parses bitdepth and subsampling in a VP9 uncompressed header
+// (refer section bitdepth_colorspace_sampling in 6.2 of the VP9 bitstream spec)
+static bool getVp9BitdepthChromaSubSampling(ABitReader &bits,
+        int32_t profile,
+        int32_t *bitDepth,
+        int32_t *chromaSubsampling) {
+    if (profile >= 2) {
+        if (bits.numBitsLeft() < 1) {
+            return false;
+        }
+        *bitDepth = bits.getBits(1) ? 12 : 10;
+    } else {
+        *bitDepth = 8;
+    }
+
+    uint32_t colorspace;
+    if (!bits.getBitsGraceful(3, &colorspace)) {
+        return false;
+    }
+
+    *chromaSubsampling = -1;
+    if (colorspace != 7 /*SRGB*/) {
+        // Skip yuv_range_flag
+        if (!bits.skipBits(1)) {
+            return false;
+        }
+        // Check for subsampling only for profiles 1 and 3.
+        if (profile == 1 || profile == 3) {
+            uint32_t ss_x;
+            uint32_t ss_y;
+            if (bits.getBitsGraceful(1, &ss_x) && bits.getBitsGraceful(1, &ss_y)) {
+                *chromaSubsampling = ss_x << 1 & ss_y;
+            } else {
+                return false;
+            }
+        } else {
+            *chromaSubsampling = 3;
+        }
+    } else {
+        if (profile == 1 || profile == 3) {
+            *chromaSubsampling = 0;
+        }
+    }
+    return true;
+}
+// The param data contains the first frame data, starting with the uncompressed frame
+// header. This uncompressed header (refer section 6.2 of the VP9 bitstream spec) is
+// used to parse profile, bitdepth and subsampling.
+bool MakeVP9CodecSpecificData(AMediaFormat* meta, const uint8_t* data, size_t size) {
+    if (meta == nullptr || data == nullptr || size == 0) {
+        return false;
+    }
+
+    ABitReader bits(data, size);
+
+    // First 2 bits of the uncompressed header should be the frame_marker.
+    if (bits.getBits(2) != 0b10) {
+        return false;
+    }
+
+    int32_t profileLowBit = bits.getBits(1);
+    int32_t profileHighBit = bits.getBits(1);
+    int32_t profile = profileHighBit * 2 + profileLowBit;
+
+    // One reserved '0' bit if profile is 3.
+    if (profile == 3 && bits.getBits(1) != 0) {
+        return false;
+    }
+
+    // If show_existing_frame is set, we get no more data. Since this is
+    // expected to be the first frame, we can return false which will cascade
+    // into ERROR_MALFORMED.
+    if (bits.getBits(1)) {
+        return false;
+    }
+
+    int32_t frame_type = bits.getBits(1);
+
+    // Upto 7 bits could be read till now, which were guaranteed to be available
+    // since size > 0. Check for bits available before reading them from now on.
+    if (bits.numBitsLeft() < 2) {
+        return false;
+    }
+
+    int32_t show_frame = bits.getBits(1);
+    int32_t error_resilient_mode = bits.getBits(1);
+    int32_t bitDepth = 8;
+    int32_t chromaSubsampling = -1;
+
+    if (frame_type == 0 /* KEY_FRAME */) {
+        // Check for sync code.
+        if (!isVp9SyncCode(bits)) {
+            return false;
+        }
+
+        if (!getVp9BitdepthChromaSubSampling(bits, profile, &bitDepth, &chromaSubsampling)) {
+            return false;
+        }
+    } else {
+        int32_t intra_only = 0;
+        if (!show_frame) {
+            if (bits.numBitsLeft() < 1) {
+                return false;
+            }
+            intra_only = bits.getBits(1);
+        }
+
+        if (!error_resilient_mode) {
+            if (bits.numBitsLeft() < 2) {
+                return false;
+            }
+            // ignore reset_frame_context
+            bits.skipBits(2);
+        }
+
+        if (!intra_only) {
+            // Require first frame to be either KEY_FRAME or INTER_FRAME with intra_only set to true
+            return false;
+        }
+
+        // Check for sync code.
+        if (!isVp9SyncCode(bits)) {
+            return false;
+        }
+
+        if (profile > 0) {
+            if (!getVp9BitdepthChromaSubSampling(bits, profile, &bitDepth, &chromaSubsampling)) {
+                return false;
+            }
+        } else {
+            bitDepth = 8;
+            chromaSubsampling = 3;
+        }
+    }
+    int32_t csdSize = 6;
+    if (chromaSubsampling != -1) {
+        csdSize += 3;
+    }
+
+    // Create VP9 Codec Feature Metadata (CodecPrivate) that can be parsed
+    // https://www.webmproject.org/docs/container/#vp9-codec-feature-metadata-codecprivate
+    sp<ABuffer> csd = sp<ABuffer>::make(csdSize);
+    uint8_t* csdData = csd->data();
+
+    *csdData++ = 0x01 /* FEATURE PROFILE */;
+    *csdData++ = 0x01 /* length */;
+    *csdData++ = profile;
+
+    *csdData++ = 0x03 /* FEATURE BITDEPTH */;
+    *csdData++ = 0x01 /* length */;
+    *csdData++ = bitDepth;
+
+    // csdSize more than 6 means chroma subsampling data was found.
+    if (csdSize > 6) {
+        *csdData++ = 0x04 /* FEATURE SUBSAMPLING */;
+        *csdData++ = 0x01 /* length */;
+        *csdData++ = chromaSubsampling;
+    }
+
+    AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CSD_0, csd->data(), csd->size());
+    return true;
+}
+
 bool MakeAACCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size) {
     if (data == nullptr || size < 7) {
         return false;
