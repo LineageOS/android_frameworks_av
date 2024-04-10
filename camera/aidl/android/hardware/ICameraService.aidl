@@ -383,6 +383,7 @@ interface ICameraService
      * has camera device support.
      *
      * @param cameraId The camera id to query session configuration for
+     * @param targetSdkVersion the target sdk level of the application calling this function.
      * @param sessionConfiguration Specific session configuration to be verified.
      * @param deviceId The device id of the context associated with the caller.
      * @param devicePolicy The camera policy of the device of the associated context (default
@@ -393,15 +394,19 @@ interface ICameraService
      *         false - in case there is no device support.
      */
     boolean isSessionConfigurationWithParametersSupported(@utf8InCpp String cameraId,
-            in SessionConfiguration sessionConfiguration, int deviceId, int devicePolicy);
+            int targetSdkVersion, in SessionConfiguration sessionConfiguration,
+            int deviceId, int devicePolicy);
 
     /**
      * Get the camera characteristics for a particular session configuration for
      * the given camera device.
      *
      * @param cameraId ID of the device for which the session characteristics must be fetched.
+     * @param targetSdkVersion the target sdk level of the application calling this function.
+     * @param overrideToPortrait Whether to override the sensor orientation information to
+     *                           correspond to portrait.
      * @param sessionConfiguration Session configuration for which the characteristics
-     * must be fetched.
+     *                             must be fetched.
      * @param deviceId The device id of the context associated with the caller.
      * @param devicePolicy The camera policy of the device of the associated context (default
      *                     policy for default device context). Only virtual cameras would be exposed
