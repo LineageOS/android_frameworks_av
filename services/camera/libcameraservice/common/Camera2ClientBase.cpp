@@ -380,6 +380,7 @@ status_t Camera2ClientBase<TClientBase>::notifyActive(float maxPreviewFps) {
 template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
+        std::pair<int32_t, int32_t> mostRequestedFpsRange,
         const std::vector<hardware::CameraStreamStats>& streamStats,
         const std::string& userTag, int videoStabilizationMode, bool usedUltraWide,
         bool usedZoomOverride) {
@@ -391,7 +392,7 @@ void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         }
         mCameraServiceProxyWrapper->logIdle(TClientBase::mCameraIdStr,
                 requestCount, resultErrorCount, deviceError, userTag, videoStabilizationMode,
-                usedUltraWide, usedZoomOverride, streamStats);
+                usedUltraWide, usedZoomOverride, mostRequestedFpsRange, streamStats);
     }
     mDeviceActive = false;
 

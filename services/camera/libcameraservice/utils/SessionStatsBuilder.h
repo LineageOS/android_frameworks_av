@@ -22,6 +22,8 @@
 #include <array>
 #include <map>
 #include <mutex>
+#include <unordered_map>
+#include <utility>
 
 namespace android {
 
@@ -64,7 +66,8 @@ public:
     void buildAndReset(/*out*/int64_t* requestCount,
             /*out*/int64_t* errorResultCount,
             /*out*/bool* deviceError,
-            /*out*/std::map<int, StreamStats> *statsMap);
+            /*out*/std::pair<int32_t, int32_t>* mostRequestedFpsRange,
+            /*out*/std::map<int, StreamStats>* statsMap);
 
     // Stream specific counter
     void startCounter(int streamId);
@@ -76,6 +79,13 @@ public:
     void incResultCounter(bool dropped);
     void onDeviceError();
 
+    // Session specific statistics
+
+    // Limit on size of FPS range histogram
+    static const size_t FPS_HISTOGRAM_MAX_SIZE = 10;
+
+    void incFpsRequestedCount(int32_t minFps, int32_t maxFps, int64_t frameNumber);
+
     SessionStatsBuilder() : mRequestCount(0), mErrorResultCount(0),
              mCounterStopped(false), mDeviceError(false) {}
 private:
@@ -85,6 +95,11 @@ private:
     bool mCounterStopped;
     bool mDeviceError;
     std::string mUserTag;
+
+    // Histogram of frame counts of requested target FPS ranges
+    // (min_fps << 32 | max_fps) -> (# of frames with this fps, last seen framenumber)
+    std::unordered_map<uint64_t, std::pair<int64_t, int64_t>> mRequestedFpsRangeHistogram;
+
     // Map from stream id to stream statistics
     std::map<int, StreamStats> mStatsMap;
 };

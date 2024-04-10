@@ -325,6 +325,7 @@ status_t CameraOfflineSessionClient::notifyActive(float maxPreviewFps __unused) 
 
 void CameraOfflineSessionClient::notifyIdle(
         int64_t /*requestCount*/, int64_t /*resultErrorCount*/, bool /*deviceError*/,
+        std::pair<int32_t, int32_t> /*mostRequestedFpsRange*/,
         const std::vector<hardware::CameraStreamStats>& /*streamStats*/) {
     if (mRemoteCallback.get() != nullptr) {
         mRemoteCallback->onDeviceIdle();

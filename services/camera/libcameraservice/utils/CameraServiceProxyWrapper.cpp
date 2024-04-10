@@ -95,7 +95,8 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
         sp<hardware::ICameraServiceProxy>& proxyBinder,
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
-        bool usedZoomOverride, const std::vector<hardware::CameraStreamStats>& streamStats) {
+        bool usedZoomOverride, std::pair<int32_t, int32_t> mostRequestedFpsRange,
+        const std::vector<hardware::CameraStreamStats>& streamStats) {
     Mutex::Autolock l(mLock);
 
     mSessionStats.mNewCameraState = CameraSessionStats::CAMERA_STATE_IDLE;
@@ -106,6 +107,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onIdle(
     mSessionStats.mVideoStabilizationMode = videoStabilizationMode;
     mSessionStats.mUsedUltraWide = usedUltraWide;
     mSessionStats.mUsedZoomOverride = usedZoomOverride;
+    mSessionStats.mMostRequestedFpsRange = mostRequestedFpsRange;
     mSessionStats.mStreamStats = streamStats;
 
     updateProxyDeviceState(proxyBinder);
@@ -281,7 +283,8 @@ void CameraServiceProxyWrapper::logActive(const std::string& id, float maxPrevie
 void CameraServiceProxyWrapper::logIdle(const std::string& id,
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
-        bool usedZoomOverride, const std::vector<hardware::CameraStreamStats>& streamStats) {
+        bool usedZoomOverride, std::pair<int32_t, int32_t> mostRequestedFpsRange,
+        const std::vector<hardware::CameraStreamStats>& streamStats) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
@@ -294,8 +297,9 @@ void CameraServiceProxyWrapper::logIdle(const std::string& id,
     }
 
     ALOGV("%s: id %s, requestCount %" PRId64 ", resultErrorCount %" PRId64 ", deviceError %d"
-            ", userTag %s, videoStabilizationMode %d", __FUNCTION__, id.c_str(), requestCount,
-            resultErrorCount, deviceError, userTag.c_str(), videoStabilizationMode);
+            ", userTag %s, videoStabilizationMode %d, most common FPS [%d,%d]",
+            __FUNCTION__, id.c_str(), requestCount, resultErrorCount, deviceError, userTag.c_str(),
+            videoStabilizationMode, mostRequestedFpsRange.first, mostRequestedFpsRange.second);
     for (size_t i = 0; i < streamStats.size(); i++) {
         ALOGV("%s: streamStats[%zu]: w %d h %d, requestedCount %" PRId64 ", dropCount %"
                 PRId64 ", startTimeMs %d" ,
@@ -306,7 +310,8 @@ void CameraServiceProxyWrapper::logIdle(const std::string& id,
 
     sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     sessionStats->onIdle(proxyBinder, requestCount, resultErrorCount, deviceError, userTag,
-            videoStabilizationMode, usedUltraWide, usedZoomOverride, streamStats);
+            videoStabilizationMode, usedUltraWide, usedZoomOverride,
+            mostRequestedFpsRange, streamStats);
 }
 
 void CameraServiceProxyWrapper::logOpen(const std::string& id, int facing,

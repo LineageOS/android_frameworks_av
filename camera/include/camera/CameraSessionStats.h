@@ -167,6 +167,8 @@ public:
 
     CameraExtensionSessionStats mCameraExtensionSessionStats;
 
+    std::pair<int32_t, int32_t> mMostRequestedFpsRange;
+
     // Constructors
     CameraSessionStats();
     CameraSessionStats(const std::string& cameraId, int facing, int newCameraState,

@@ -62,7 +62,8 @@ private:
         void onIdle(sp<hardware::ICameraServiceProxy>& proxyBinder,
                 int64_t requestCount, int64_t resultErrorCount, bool deviceError,
                 const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
-                bool usedZoomOverride, const std::vector<hardware::CameraStreamStats>& streamStats);
+                bool usedZoomOverride, std::pair<int32_t, int32_t> mostRequestedFpsRange,
+                const std::vector<hardware::CameraStreamStats>& streamStats);
 
         std::string updateExtensionSessionStats(
                 const hardware::CameraExtensionSessionStats& extStats);
@@ -111,7 +112,8 @@ public:
     void logIdle(const std::string& id,
             int64_t requestCount, int64_t resultErrorCount, bool deviceError,
             const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
-            bool usedZoomOverride, const std::vector<hardware::CameraStreamStats>& streamStats);
+            bool usedZoomOverride, std::pair<int32_t, int32_t> mostRequestedFpsRange,
+            const std::vector<hardware::CameraStreamStats>& streamStats);
 
     // Ping camera service proxy for user update
     void pingCameraServiceProxy();

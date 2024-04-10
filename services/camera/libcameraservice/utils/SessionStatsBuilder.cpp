@@ -48,12 +48,26 @@ status_t SessionStatsBuilder::removeStream(int id) {
 
 void SessionStatsBuilder::buildAndReset(int64_t* requestCount,
         int64_t* errorResultCount, bool* deviceError,
-        std::map<int, StreamStats> *statsMap) {
+        std::pair<int32_t, int32_t>* mostRequestedFpsRange,
+        std::map<int, StreamStats>* statsMap) {
     std::lock_guard<std::mutex> l(mLock);
     *requestCount = mRequestCount;
     *errorResultCount = mErrorResultCount;
     *deviceError = mDeviceError;
     *statsMap = mStatsMap;
+
+    int32_t minFps = 0, maxFps = 0;
+    if (mRequestedFpsRangeHistogram.size() > 0) {
+        auto mostCommonIt = mRequestedFpsRangeHistogram.begin();
+        for (auto it = mostCommonIt; it != mRequestedFpsRangeHistogram.end(); it++) {
+            if (it->second.first > mostCommonIt->second.first) {
+                mostCommonIt = it;
+            }
+        }
+        minFps = mostCommonIt->first >> 32;
+        maxFps = mostCommonIt->first & 0xFFFF'FFFFU;
+    }
+    *mostRequestedFpsRange = std::make_pair(minFps, maxFps);
 
     // Reset internal states
     mRequestCount = 0;
@@ -61,6 +75,8 @@ void SessionStatsBuilder::buildAndReset(int64_t* requestCount,
     mCounterStopped = false;
     mDeviceError = false;
     mUserTag.clear();
+    mRequestedFpsRangeHistogram.clear();
+
     for (auto& streamStats : mStatsMap) {
         StreamStats& streamStat = streamStats.second;
         streamStat.mRequestedFrameCount = 0;
@@ -123,6 +139,31 @@ void SessionStatsBuilder::incResultCounter(bool dropped) {
 void SessionStatsBuilder::onDeviceError() {
     std::lock_guard<std::mutex> l(mLock);
     mDeviceError = true;
+}
+
+void SessionStatsBuilder::incFpsRequestedCount(int32_t minFps, int32_t maxFps,
+        int64_t frameNumber) {
+    std::lock_guard<std::mutex> l(mLock);
+
+    // Stuff range into a 64-bit value to make hashing simple
+    uint64_t currentFpsTarget = minFps;
+    currentFpsTarget = currentFpsTarget << 32 | maxFps;
+
+    auto &stats = mRequestedFpsRangeHistogram[currentFpsTarget];
+    stats.first++;
+    stats.second = frameNumber;
+
+    // Ensure weird app input of target FPS ranges doesn't cause unbounded memory growth
+    if (mRequestedFpsRangeHistogram.size() > FPS_HISTOGRAM_MAX_SIZE) {
+        // Find oldest used fps to drop by last seen frame number
+        auto deleteIt = mRequestedFpsRangeHistogram.begin();
+        for (auto it = deleteIt; it != mRequestedFpsRangeHistogram.end(); it++) {
+            if (it->second.second < deleteIt->second.second) {
+                deleteIt = it;
+            }
+        }
+        mRequestedFpsRangeHistogram.erase(deleteIt);
+    }
 }
 
 void StreamStats::updateLatencyHistogram(int32_t latencyMs) {
