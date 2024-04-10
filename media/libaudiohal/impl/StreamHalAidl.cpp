@@ -415,8 +415,10 @@ status_t StreamHalAidl::exit() {
 
 void StreamHalAidl::onAsyncTransferReady() {
     if (auto state = getState(); state == StreamDescriptor::State::TRANSFERRING) {
-        // Retrieve the current state together with position counters.
-        updateCountersIfNeeded();
+        // Retrieve the current state together with position counters unconditionally
+        // to ensure that the state on our side gets updated.
+        sendCommand(makeHalCommand<HalCommand::Tag::getStatus>(),
+                nullptr, true /*safeFromNonWorkerThread */);
     } else {
         ALOGW("%s: unexpected onTransferReady in the state %s", __func__, toString(state).c_str());
     }
@@ -424,8 +426,10 @@ void StreamHalAidl::onAsyncTransferReady() {
 
 void StreamHalAidl::onAsyncDrainReady() {
     if (auto state = getState(); state == StreamDescriptor::State::DRAINING) {
-        // Retrieve the current state together with position counters.
-        updateCountersIfNeeded();
+        // Retrieve the current state together with position counters unconditionally
+        // to ensure that the state on our side gets updated.
+        sendCommand(makeHalCommand<HalCommand::Tag::getStatus>(),
+                nullptr, true /*safeFromNonWorkerThread */);
     } else {
         ALOGW("%s: unexpected onDrainReady in the state %s", __func__, toString(state).c_str());
     }
