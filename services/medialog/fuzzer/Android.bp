@@ -30,8 +30,8 @@ cc_fuzz {
         "frameworks/av/services/medialog",
     ],
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
     fuzz_config: {
         cc: [

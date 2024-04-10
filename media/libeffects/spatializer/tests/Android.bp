@@ -12,7 +12,7 @@ package {
 cc_test {
     name: "SpatializerTest",
     defaults: [
-      "libeffects-test-defaults",
+        "libeffects-test-defaults",
     ],
     host_supported: false,
     srcs: [
