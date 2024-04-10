@@ -30,10 +30,12 @@ prebuilt_etc {
     vendor: true,
     src: ":audio_policy_engine_criteria",
 }
+
 filegroup {
     name: "audio_policy_engine_criterion_types_template",
     srcs: ["example/common/audio_policy_engine_criterion_types.xml.in"],
 }
+
 filegroup {
     name: "audio_policy_engine_criteria",
     srcs: ["example/common/audio_policy_engine_criteria.xml"],

@@ -91,13 +91,10 @@ cc_library {
     cflags: [
         "-Wall",
         "-Werror",
-        // By default, all symbols are hidden.
-
-        // "-fvisibility=hidden",
-        // AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
         "-Wno-unused-parameter",
         "-Wthread-safety",
 
+        // AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
         "-DAAUDIO_API=__attribute__((visibility(\"default\")))",
     ],
 
