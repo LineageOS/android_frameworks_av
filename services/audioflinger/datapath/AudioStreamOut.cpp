@@ -64,7 +64,7 @@ status_t AudioStreamOut::getRenderPosition(uint64_t *frames)
     int32_t deltaHalPosition; // initialization not needed, overwitten by __builtin_sub_overflow()
     (void) __builtin_sub_overflow(halPosition, truncatedPosition, &deltaHalPosition);
 
-    if (deltaHalPosition > 0) {
+    if (deltaHalPosition >= 0) {
         mRenderPosition += deltaHalPosition;
     } else if (mExpectRetrograde) {
         mExpectRetrograde = false;
