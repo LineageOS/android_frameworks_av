@@ -72,7 +72,7 @@ const Descriptor VisualizerImpl::kDescriptor = {
                           .uuid = getEffectImplUuidVisualizer(),
                           .proxy = std::nullopt},
                    .flags = {.type = Flags::Type::INSERT,
-                             .insert = Flags::Insert::LAST,
+                             .insert = Flags::Insert::FIRST,
                              .volume = Flags::Volume::NONE},
                    .name = VisualizerImpl::kEffectName,
                    .implementor = "The Android Open Source Project"},
