@@ -118,6 +118,7 @@ class VirtualCameraServiceTest : public ::testing::Test {
     mCameraProvider->setCallback(mMockCameraProviderCallback);
     mCameraService = ndk::SharedRefBase::make<VirtualCameraService>(
         mCameraProvider, mMockPermissionsProxy);
+    mCameraService->disableEglVerificationForTest();
 
     ON_CALL(mMockPermissionsProxy, checkCallingPermission)
         .WillByDefault(Return(true));

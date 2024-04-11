@@ -244,6 +244,13 @@ std::optional<CameraMetadata> initCameraCharacteristics(
               {ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF})
           .setAvailableNoiseReductionModes({ANDROID_NOISE_REDUCTION_MODE_OFF})
           .setAvailableFaceDetectModes({ANDROID_STATISTICS_FACE_DETECT_MODE_OFF})
+          .setAvailableStreamUseCases(
+              {ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
+               ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW,
+               ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_STILL_CAPTURE,
+               ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_RECORD,
+               ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_PREVIEW_VIDEO_STILL,
+               ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_VIDEO_CALL})
           .setAvailableTestPatternModes({ANDROID_SENSOR_TEST_PATTERN_MODE_OFF})
           .setAvailableMaxDigitalZoom(1.0)
           .setControlAvailableModes({ANDROID_CONTROL_MODE_AUTO})
