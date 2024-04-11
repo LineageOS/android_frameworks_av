@@ -179,10 +179,17 @@ sp<ConstLinearBlockBuffer> ConstLinearBlockBuffer::Allocate(
     if (!buffer
             || buffer->data().type() != C2BufferData::LINEAR
             || buffer->data().linearBlocks().size() != 1u) {
+        if (!buffer) {
+            ALOGD("ConstLinearBlockBuffer::Allocate: null buffer");
+        } else {
+            ALOGW("ConstLinearBlockBuffer::Allocate: type=%d # linear blocks=%zu",
+                  buffer->data().type(), buffer->data().linearBlocks().size());
+        }
         return nullptr;
     }
     C2ReadView readView(buffer->data().linearBlocks()[0].map().get());
     if (readView.error() != C2_OK) {
+        ALOGW("ConstLinearBlockBuffer::Allocate: readView.error()=%d", readView.error());
         return nullptr;
     }
     return new ConstLinearBlockBuffer(format, std::move(readView), buffer);
