@@ -19,10 +19,9 @@
 #include "VirtualCameraService.h"
 
 #include <algorithm>
+#include <array>
 #include <cinttypes>
 #include <cstdint>
-#include <cstdio>
-#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -38,6 +37,9 @@
 #include "android/binder_libbinder.h"
 #include "android/binder_status.h"
 #include "binder/Status.h"
+#include "fmt/format.h"
+#include "util/EglDisplayContext.h"
+#include "util/EglUtil.h"
 #include "util/Permissions.h"
 #include "util/Util.h"
 
@@ -78,6 +80,12 @@ Available commands:
 )";
 constexpr char kCreateVirtualDevicePermission[] =
     "android.permission.CREATE_VIRTUAL_DEVICE";
+
+constexpr std::array<const char*, 3> kRequiredEglExtensions = {
+    "GL_OES_EGL_image_external",
+    "GL_OES_EGL_image_external_essl3",
+    "GL_EXT_YUV_target",
+};
 
 ndk::ScopedAStatus validateConfiguration(
     const VirtualCameraConfiguration& configuration) {
@@ -176,6 +184,23 @@ std::variant<CommandWithOptions, std::string> parseCommand(
   return cmd;
 };
 
+ndk::ScopedAStatus verifyRequiredEglExtensions() {
+  EglDisplayContext context;
+  for (const char* eglExtension : kRequiredEglExtensions) {
+    if (!isGlExtensionSupported(eglExtension)) {
+      ALOGE("%s not supported", eglExtension);
+      return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
+          EX_UNSUPPORTED_OPERATION,
+          fmt::format(
+              "Cannot create virtual camera, because required EGL extension {} "
+              "is not supported on this system",
+              eglExtension)
+              .c_str());
+    }
+  }
+  return ndk::ScopedAStatus::ok();
+}
+
 }  // namespace
 
 VirtualCameraService::VirtualCameraService(
@@ -207,7 +232,13 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
         Status::EX_ILLEGAL_ARGUMENT);
   }
 
-  *_aidl_return = true;
+  if (mVerifyEglExtensions) {
+    auto status = verifyRequiredEglExtensions();
+    if (!status.isOk()) {
+      *_aidl_return = false;
+      return status;
+    }
+  }
 
   auto status = validateConfiguration(configuration);
   if (!status.isOk()) {
@@ -237,6 +268,7 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
   }
 
   mTokenToCameraName[token] = camera->getCameraName();
+  *_aidl_return = true;
   return ndk::ScopedAStatus::ok();
 }
 
