@@ -353,45 +353,62 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
         return status;
     }
 
-    std::vector<float> inFrames(samples);
-    std::vector<float> outFrames(frameCount * FCC_2);
+    std::vector<float> inputSamples;
+    std::vector<float> outputSamples(frameCount * FCC_2);
 
     if (isPreset() && mNextPreset != mPreset) {
         loadPreset();
     }
 
     if (isAuxiliary()) {
-        inFrames.assign(in, in + samples);
+        inputSamples.resize(samples);
+        inputSamples.assign(in, in + samples);
     } else {
-        // mono input is duplicated
+        // Resizing to stereo is required to duplicate mono input
+        inputSamples.resize(frameCount * FCC_2);
         if (channels >= FCC_2) {
             for (int i = 0; i < frameCount; i++) {
-                inFrames[FCC_2 * i] = in[channels * i] * kSendLevel;
-                inFrames[FCC_2 * i + 1] = in[channels * i + 1] * kSendLevel;
+                inputSamples[FCC_2 * i] = in[channels * i] * kSendLevel;
+                inputSamples[FCC_2 * i + 1] = in[channels * i + 1] * kSendLevel;
             }
         } else {
             for (int i = 0; i < frameCount; i++) {
-                inFrames[FCC_2 * i] = inFrames[FCC_2 * i + 1] = in[i] * kSendLevel;
+                inputSamples[FCC_2 * i] = inputSamples[FCC_2 * i + 1] = in[i] * kSendLevel;
             }
         }
     }
 
     if (isPreset() && mPreset == PresetReverb::Presets::NONE) {
-        std::fill(outFrames.begin(), outFrames.end(), 0);  // always stereo here
+        std::fill(outputSamples.begin(), outputSamples.end(), 0);  // always stereo here
     } else {
         if (!mEnabled && mSamplesToExitCount > 0) {
-            std::fill(outFrames.begin(), outFrames.end(), 0);
+            std::fill(outputSamples.begin(), outputSamples.end(), 0);
         }
+        int inputBufferIndex = 0;
+        int outputBufferIndex = 0;
+
+        // LVREV library supports max of int16_t frames at a time
+        constexpr int kMaxBlockFrames = std::numeric_limits<int16_t>::max();
+        const auto inputFrameSize = getInputFrameSize();
+        const auto outputFrameSize = getOutputFrameSize();
 
         /* Process the samples, producing a stereo output */
-        LVREV_ReturnStatus_en lvrevStatus =
-                LVREV_Process(mInstance,        /* Instance handle */
-                              inFrames.data(),  /* Input buffer */
-                              outFrames.data(), /* Output buffer */
-                              frameCount);      /* Number of samples to read */
-        if (lvrevStatus != LVREV_SUCCESS) {
-            LOG(ERROR) << __func__ << " LVREV_Process error: " << lvrevStatus;
-            return {EX_UNSUPPORTED_OPERATION, 0, 0};
+        for (int fc = frameCount; fc > 0;) {
+            int processFrames = std::min(fc, kMaxBlockFrames);
+            LVREV_ReturnStatus_en lvrevStatus =
+                    LVREV_Process(mInstance,                            /* Instance handle */
+                                  inputSamples.data() + inputBufferIndex,   /* Input buffer */
+                                  outputSamples.data() + outputBufferIndex, /* Output buffer */
+                                  processFrames); /* Number of samples to process */
+            if (lvrevStatus != LVREV_SUCCESS) {
+                LOG(ERROR) << __func__ << " LVREV_Process error: " << lvrevStatus;
+                return {EX_UNSUPPORTED_OPERATION, 0, 0};
+            }
+
+            fc -= processFrames;
+
+            inputBufferIndex += processFrames * inputFrameSize / sizeof(float);
+            outputBufferIndex += processFrames * outputFrameSize / sizeof(float);
         }
     }
     // Convert to 16 bits
@@ -401,14 +418,14 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
         if (channels >= FCC_2) {
             for (int i = 0; i < frameCount; i++) {
                 // Mix with dry input
-                outFrames[FCC_2 * i] += in[channels * i];
-                outFrames[FCC_2 * i + 1] += in[channels * i + 1];
+                outputSamples[FCC_2 * i] += in[channels * i];
+                outputSamples[FCC_2 * i + 1] += in[channels * i + 1];
             }
         } else {
             for (int i = 0; i < frameCount; i++) {
                 // Mix with dry input
-                outFrames[FCC_2 * i] += in[i];
-                outFrames[FCC_2 * i + 1] += in[i];
+                outputSamples[FCC_2 * i] += in[i];
+                outputSamples[FCC_2 * i + 1] += in[i];
             }
         }
 
@@ -420,8 +437,8 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
             float incr = (mVolume.right - vr) / frameCount;
 
             for (int i = 0; i < frameCount; i++) {
-                outFrames[FCC_2 * i] *= vl;
-                outFrames[FCC_2 * i + 1] *= vr;
+                outputSamples[FCC_2 * i] *= vl;
+                outputSamples[FCC_2 * i + 1] *= vr;
 
                 vl += incl;
                 vr += incr;
@@ -430,8 +447,8 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
         } else if (volumeMode != VOLUME_OFF) {
             if (mVolume.left != kUnitVolume || mVolume.right != kUnitVolume) {
                 for (int i = 0; i < frameCount; i++) {
-                    outFrames[FCC_2 * i] *= mVolume.left;
-                    outFrames[FCC_2 * i + 1] *= mVolume.right;
+                    outputSamples[FCC_2 * i] *= mVolume.left;
+                    outputSamples[FCC_2 * i + 1] *= mVolume.right;
                 }
             }
             mPrevVolume = mVolume;
@@ -441,8 +458,8 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
 
     if (outChannels > 2) {
         for (int i = 0; i < frameCount; i++) {
-            out[outChannels * i] = outFrames[FCC_2 * i];
-            out[outChannels * i + 1] = outFrames[FCC_2 * i + 1];
+            out[outChannels * i] = outputSamples[FCC_2 * i];
+            out[outChannels * i + 1] = outputSamples[FCC_2 * i + 1];
         }
         if (!isAuxiliary()) {
             for (int i = 0; i < frameCount; i++) {
@@ -454,10 +471,10 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
         }
     } else {
         if (outChannels == FCC_1) {
-            From2iToMono_Float(outFrames.data(), out, frameCount);
+            From2iToMono_Float(outputSamples.data(), out, frameCount);
         } else {
             for (int i = 0; i < frameCount * FCC_2; i++) {
-                out[i] = outFrames[i];
+                out[i] = outputSamples[i];
             }
         }
     }
