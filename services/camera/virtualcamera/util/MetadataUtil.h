@@ -129,6 +129,11 @@ class MetadataBuilder {
       const std::vector<camera_metadata_enum_android_sensor_test_pattern_mode>&
           testPatternModes);
 
+  // See ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES in CameraCharacteristics.java
+  MetadataBuilder& setAvailableStreamUseCases(
+      const std::vector<
+          camera_metadata_enum_android_scaler_available_stream_use_cases>& availableUseCases);
+
   // See ANDROID_STATISTICS_FACE_DETECT_MODE in CaptureRequest.java.
   MetadataBuilder& setFaceDetectMode(
       camera_metadata_enum_android_statistics_face_detect_mode_t faceDetectMode);

@@ -152,6 +152,15 @@ MetadataBuilder& MetadataBuilder::setAvailableTestPatternModes(
   return *this;
 }
 
+MetadataBuilder& MetadataBuilder::setAvailableStreamUseCases(
+    const std::vector<
+        camera_metadata_enum_android_scaler_available_stream_use_cases>&
+        availableUseCases) {
+  mEntryMap[ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES] =
+      convertTo<int64_t>(availableUseCases);
+  return *this;
+}
+
 MetadataBuilder& MetadataBuilder::setFaceDetectMode(
     const camera_metadata_enum_android_statistics_face_detect_mode_t
         faceDetectMode) {
