@@ -216,6 +216,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="low-latency" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.av1-dav1d.decoder" type="video/av01" variant="slow-cpu,!slow-cpu" rank="1024">
@@ -234,6 +235,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="low-latency" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.mpeg2.decoder" type="video/mpeg2" domain="tv">
