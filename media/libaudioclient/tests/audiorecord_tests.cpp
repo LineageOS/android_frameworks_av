@@ -28,6 +28,25 @@
 
 using namespace android;
 
+// Test that the basic constructor returns an object that doesn't crash
+// on stop() or destruction.
+
+TEST(AudioRecordTestBasic, EmptyAudioRecord) {
+    AttributionSourceState attributionSource;
+    attributionSource.packageName = "AudioRecordTest";
+    attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+    attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
+    attributionSource.token = sp<BBinder>::make();
+    const auto ar = sp<AudioRecord>::make(attributionSource);
+
+    // test key commands on an unset AudioRecord.
+    EXPECT_EQ(NO_INIT, ar->initCheck());
+    EXPECT_EQ(true, ar->stopped());
+
+    // just don't crash.
+    ar->stop();
+}
+
 class AudioRecordTest : public ::testing::Test {
   public:
     void SetUp() override {
