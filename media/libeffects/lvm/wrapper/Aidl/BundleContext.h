@@ -76,7 +76,7 @@ class BundleContext final : public EffectContext {
     RetCode setForcedDevice(
             const ::aidl::android::media::audio::common::AudioDeviceDescription& device);
     aidl::android::media::audio::common::AudioDeviceDescription getForcedDevice() const {
-        return mForceDevice;
+        return mVirtualizerForcedDevice;
     }
     std::vector<Virtualizer::ChannelAngle> getSpeakerAngles(
             const Virtualizer::SpeakerAnglesPayload payload);
@@ -92,8 +92,6 @@ class BundleContext final : public EffectContext {
     const lvm::BundleEffectType mType;
     bool mEnabled = false;
     LVM_Handle_t mInstance;
-
-    aidl::android::media::audio::common::AudioDeviceDescription mVirtualizerForcedDevice;
 
     int mSamplesPerSecond = 0;
     int mSamplesToExitCountEq = 0;
@@ -120,7 +118,7 @@ class BundleContext final : public EffectContext {
     // Virtualizer
     int mVirtStrengthSaved = 0; /* Conversion between Get/Set */
     bool mVirtualizerTempDisabled = false;
-    ::aidl::android::media::audio::common::AudioDeviceDescription mForceDevice;
+    ::aidl::android::media::audio::common::AudioDeviceDescription mVirtualizerForcedDevice;
     // Volume
     float mLevelSaveddB = 0; /* for when mute is set, level must be saved */
     float mVolumedB = 0;
