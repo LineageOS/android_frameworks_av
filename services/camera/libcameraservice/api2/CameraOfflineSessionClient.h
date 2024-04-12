@@ -112,6 +112,7 @@ public:
     void notifyShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp) override;
     status_t notifyActive(float maxPreviewFps) override;
     void notifyIdle(int64_t requestCount, int64_t resultErrorCount, bool deviceError,
+            std::pair<int32_t, int32_t> mostRequestedFpsRange,
             const std::vector<hardware::CameraStreamStats>& streamStats) override;
     void notifyAutoFocus(uint8_t newState, int triggerId) override;
     void notifyAutoExposure(uint8_t newState, int triggerId) override;

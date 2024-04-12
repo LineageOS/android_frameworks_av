@@ -229,6 +229,7 @@ public:
      */
 
     virtual void notifyIdle(int64_t requestCount, int64_t resultErrorCount, bool deviceError,
+                            std::pair<int32_t, int32_t> mostRequestedFpsRange,
                             const std::vector<hardware::CameraStreamStats>& streamStats);
     virtual void notifyError(int32_t errorCode,
                              const CaptureResultExtras& resultExtras);
@@ -364,14 +365,17 @@ private:
     // Override the camera characteristics for performance class primary cameras.
     bool mOverrideForPerfClass;
 
-    // The string representation of object passed into CaptureRequest.setTag.
-    std::string mUserTag;
-    // The last set video stabilization mode
-    int mVideoStabilizationMode = -1;
-    // Whether a zoom_ratio < 1.0 has been used during this session
-    bool mUsedUltraWide = false;
-    // Whether a zoom settings override has been used during this session
-    bool mUsedSettingsOverrideZoom = false;
+    // Various fields used to collect session statistics
+    struct RunningSessionStats {
+        // The string representation of object passed into CaptureRequest.setTag.
+        std::string mUserTag;
+        // The last set video stabilization mode
+        int mVideoStabilizationMode = -1;
+        // Whether a zoom_ratio < 1.0 has been used during this session
+        bool mUsedUltraWide = false;
+        // Whether a zoom settings override has been used during this session
+        bool mUsedSettingsOverrideZoom = false;
+    } mRunningSessionStats;
 
     // This only exists in case of camera ID Remapping.
     const std::string mOriginalCameraId;

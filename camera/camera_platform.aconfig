@@ -210,3 +210,10 @@ flag {
        purpose: PURPOSE_BUGFIX
      }
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "analytics_24q3"
+     description: "Miscellaneous camera platform metrics for 24Q3"
+     bug: "332557570"
+}

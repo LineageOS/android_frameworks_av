@@ -86,6 +86,7 @@ public:
     virtual status_t      notifyActive(float maxPreviewFps);
     virtual void          notifyIdle(int64_t /*requestCount*/, int64_t /*resultErrorCount*/,
                                      bool /*deviceError*/,
+                                     std::pair<int32_t, int32_t> /*mostRequestedFpsRange*/,
                                      const std::vector<hardware::CameraStreamStats>&) {}
     virtual void          notifyShutter(const CaptureResultExtras& resultExtras,
                                         nsecs_t timestamp);
@@ -99,6 +100,7 @@ public:
 
     void                  notifyIdleWithUserTag(int64_t requestCount, int64_t resultErrorCount,
                                      bool deviceError,
+                                     std::pair<int32_t, int32_t> mostRequestedFpsRange,
                                      const std::vector<hardware::CameraStreamStats>& streamStats,
                                      const std::string& userTag, int videoStabilizationMode,
                                      bool usedUltraWide, bool usedZoomOverride);
