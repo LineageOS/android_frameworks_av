@@ -563,6 +563,8 @@ void GraphicsTracker::commitAllocate(c2_status_t res, const std::shared_ptr<Buff
         auto mapRet = mDequeued.emplace(bid, *pBuffer);
         CHECK(mapRet.second);
     } else {
+        ALOGD("allocate error(%d): Dequeued(%zu), Dequeuable(%d)",
+              (int)res, mDequeued.size(), mDequeueable + 1);
         if (adjustDequeueConfLocked(updateDequeue)) {
             return;
         }
@@ -629,7 +631,11 @@ c2_status_t GraphicsTracker::_allocate(const std::shared_ptr<BufferCache> &cache
     ::android::status_t status = igbp->dequeueBuffer(
             &slotId, &fence, width, height, format, usage, &outBufferAge, &outTimestamps);
     if (status < ::android::OK) {
-        ALOGE("dequeueBuffer() error %d", (int)status);
+        if (status == ::android::TIMED_OUT || status == ::android::WOULD_BLOCK) {
+            ALOGW("BQ might not be ready for dequeueBuffer()");
+            return C2_BLOCKING;
+        }
+        ALOGE("BQ in inconsistent status. dequeueBuffer() error %d", (int)status);
         return C2_CORRUPTED;
     }
     cache->waitOnSlot(slotId);
