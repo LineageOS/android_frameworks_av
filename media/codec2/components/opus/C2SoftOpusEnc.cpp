@@ -29,7 +29,6 @@ extern "C" {
     #include <opus_multistream.h>
 }
 
-#define DEFAULT_FRAME_DURATION_MS 20
 namespace android {
 
 namespace {
@@ -38,7 +37,6 @@ constexpr char COMPONENT_NAME[] = "c2.android.opus.encoder";
 
 }  // namespace
 
-static const int kMaxNumChannelsSupported = 2;
 
 class C2SoftOpusEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
 public:
@@ -248,10 +246,11 @@ c2_status_t C2SoftOpusEnc::initEncoder() {
     mAnchorTimeStamp = 0;
     mProcessedSamples = 0;
     mFilledLen = 0;
-    mFrameDurationMs = DEFAULT_FRAME_DURATION_MS;
+    mFrameDurationMs = kDefaultFrameDurationMs;
     if (!mInputBufferPcm16) {
+        size_t frameSize = (mFrameDurationMs * kMaxSampleRateSupported) / 1000;
         mInputBufferPcm16 =
-            (int16_t*)malloc(kFrameSize * kMaxNumChannels * sizeof(int16_t));
+            (int16_t*)malloc(frameSize * kMaxNumChannelsSupported * sizeof(int16_t));
     }
     if (!mInputBufferPcm16) return C2_NO_MEMORY;
 
@@ -368,7 +367,9 @@ void C2SoftOpusEnc::process(const std::unique_ptr<C2Work>& work,
     }
 
     C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
-    err = pool->fetchLinearBlock(kMaxPayload, usage, &mOutputBlock);
+    int outCapacity =
+        kMaxPayload * ((inSize + mNumPcmBytesPerInputFrame) / mNumPcmBytesPerInputFrame);
+    err = pool->fetchLinearBlock(outCapacity, usage, &mOutputBlock);
     if (err != C2_OK) {
         ALOGE("fetchLinearBlock for Output failed with status %d", err);
         work->result = C2_NO_MEMORY;
@@ -497,11 +498,11 @@ void C2SoftOpusEnc::process(const std::unique_ptr<C2Work>& work,
         uint8_t* outPtr = wView.data() + mBytesEncoded;
         int encodedBytes =
             opus_multistream_encode(mEncoder, mInputBufferPcm16,
-                                    mNumSamplesPerFrame, outPtr, kMaxPayload - mBytesEncoded);
+                                    mNumSamplesPerFrame, outPtr, outCapacity - mBytesEncoded);
         ALOGV("encoded %i Opus bytes from %zu PCM bytes", encodedBytes,
               processSize);
 
-        if (encodedBytes < 0 || encodedBytes > (kMaxPayload - mBytesEncoded)) {
+        if (encodedBytes < 0 || encodedBytes > (outCapacity - mBytesEncoded)) {
             ALOGE("opus_encode failed, encodedBytes : %d", encodedBytes);
             mSignalledError = true;
             work->result = C2_CORRUPTED;
