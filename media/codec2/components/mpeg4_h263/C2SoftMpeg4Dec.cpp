@@ -469,11 +469,12 @@ void C2SoftMpeg4Dec::process(
         mInitialized = false;
     }
 
+    bool codecConfig = (work->input.flags & C2FrameData::FLAG_CODEC_CONFIG) != 0;
+
     if (!mInitialized) {
         uint8_t *vol_data[1]{};
         int32_t vol_size = 0;
 
-        bool codecConfig = (work->input.flags & C2FrameData::FLAG_CODEC_CONFIG) != 0;
         if (codecConfig || volHeader) {
             vol_data[0] = bitstream;
             vol_size = inSize;
@@ -512,10 +513,11 @@ void C2SoftMpeg4Dec::process(
                 return;
             }
         }
-        if (codecConfig) {
-            fillEmptyWork(work);
-            return;
-        }
+    }
+
+    if (codecConfig) {
+        fillEmptyWork(work);
+        return;
     }
 
     size_t inPos = 0;
