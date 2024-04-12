@@ -1881,6 +1881,12 @@ void Track::disable()
     signalClientFlag(CBLK_DISABLED);
 }
 
+bool Track::isDisabled() const {
+    audio_track_cblk_t* cblk = mCblk;
+    return (cblk != nullptr)
+            && ((android_atomic_release_load(&cblk->mFlags) & CBLK_DISABLED) != 0);
+}
+
 void Track::signalClientFlag(int32_t flag)
 {
     // FIXME should use proxy, and needs work

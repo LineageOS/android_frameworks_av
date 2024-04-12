@@ -275,6 +275,8 @@ protected:
     void triggerEvents(AudioSystem::sync_event_t type) final;
     void invalidate() final;
     void disable() final;
+    bool isDisabled() const final;
+
     int& fastIndex() final { return mFastIndex; }
     bool isPlaybackRestricted() const final {
         // The monitor is only created for tracks that can be silenced.
