@@ -257,9 +257,7 @@ public:
     /* Constructs an uninitialized AudioTrack. No connection with
      * AudioFlinger takes place.  Use set() after this.
      */
-                        AudioTrack();
-
-                        AudioTrack(const AttributionSourceState& attributionSourceState);
+    explicit AudioTrack(const AttributionSourceState& attributionSourceState = {});
 
     /* Creates an AudioTrack object and registers it with AudioFlinger.
      * Once created, the track needs to be started before it can be used.
@@ -1312,11 +1310,11 @@ public:
     sp<IMemory>             mSharedBuffer;
     transfer_type           mTransfer;
     audio_offload_info_t    mOffloadInfoCopy;
-    audio_attributes_t      mAttributes;
+    audio_attributes_t mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
 
     size_t                  mFrameSize;             // frame size in bytes
 
-    status_t                mStatus;
+    status_t mStatus = NO_INIT;
 
     // can change dynamically when IAudioTrack invalidated
     uint32_t                mLatency;               // in ms
@@ -1329,7 +1327,7 @@ public:
         STATE_PAUSED_STOPPING,
         STATE_FLUSHED,
         STATE_STOPPING,
-    }                       mState;
+    } mState = STATE_STOPPED;
 
     static constexpr const char *stateToString(State state)
     {
@@ -1459,8 +1457,8 @@ public:
 
     mutable Mutex           mLock;
 
-    int                     mPreviousPriority;          // before start()
-    SchedPolicy             mPreviousSchedulingGroup;
+    int mPreviousPriority = ANDROID_PRIORITY_NORMAL;  // before start()
+    SchedPolicy mPreviousSchedulingGroup = SP_DEFAULT;
     bool                    mAwaitBoost;    // thread should wait for priority boost before running
 
     // The proxy should only be referenced while a lock is held because the proxy isn't
@@ -1472,14 +1470,17 @@ public:
     sp<AudioTrackClientProxy>       mProxy;         // primary owner of the memory
 
     bool                    mInUnderrun;            // whether track is currently in underrun state
-    uint32_t                mPausedPosition;
+    uint32_t mPausedPosition = 0;
 
     // For Device Selection API
     //  a value of AUDIO_PORT_HANDLE_NONE indicated default (AudioPolicyManager) routing.
-    audio_port_handle_t    mSelectedDeviceId; // Device requested by the application.
-    audio_port_handle_t    mRoutedDeviceId;   // Device actually selected by audio policy manager:
-                                              // May not match the app selection depending on other
-                                              // activity and connected devices.
+
+    // Device requested by the application.
+    audio_port_handle_t mSelectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+
+    // Device actually selected by AudioPolicyManager: This may not match the app
+    // selection depending on other activity and connected devices.
+    audio_port_handle_t mRoutedDeviceId = AUDIO_PORT_HANDLE_NONE;
 
     sp<media::VolumeHandler>       mVolumeHandler;
 
@@ -1537,7 +1538,7 @@ private:
         Mutex mAudioTrackCbLock;
         wp<media::IAudioTrackCallback> mCallback;
     };
-    sp<AudioTrackCallback> mAudioTrackCallback;
+    sp<AudioTrackCallback> mAudioTrackCallback = sp<AudioTrackCallback>::make();
 };
 
 }; // namespace android
