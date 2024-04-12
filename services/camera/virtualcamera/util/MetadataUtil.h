@@ -475,6 +475,10 @@ std::optional<GpsCoordinates> getGpsCoordinates(
 std::optional<camera_metadata_enum_android_lens_facing> getLensFacing(
     const aidl::android::hardware::camera::device::CameraMetadata& metadata);
 
+std::optional<camera_metadata_enum_android_control_ae_precapture_trigger>
+getPrecaptureTrigger(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata);
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android

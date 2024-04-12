@@ -265,7 +265,8 @@ RequestSettings createSettingsFromMetadata(const CameraMetadata& metadata) {
       .fpsRange = getFpsRange(metadata),
       .captureIntent = getCaptureIntent(metadata).value_or(
           ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW),
-      .gpsCoordinates = getGpsCoordinates(metadata)};
+      .gpsCoordinates = getGpsCoordinates(metadata),
+      .aePrecaptureTrigger = getPrecaptureTrigger(metadata)};
 }
 
 }  // namespace

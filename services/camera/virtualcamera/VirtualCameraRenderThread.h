@@ -64,6 +64,8 @@ struct RequestSettings {
   camera_metadata_enum_android_control_capture_intent_t captureIntent =
       VirtualCameraDevice::kDefaultCaptureIntent;
   std::optional<GpsCoordinates> gpsCoordinates;
+  std::optional<camera_metadata_enum_android_control_ae_precapture_trigger>
+      aePrecaptureTrigger;
 };
 
 // Represents single capture request to fill set of buffers.
