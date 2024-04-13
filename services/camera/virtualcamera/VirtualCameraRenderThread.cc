@@ -109,7 +109,14 @@ CameraMetadata createCaptureResultMetadata(
           .setControlAeLock(ANDROID_CONTROL_AE_LOCK_OFF)
           .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
           .setControlAePrecaptureTrigger(
-              ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
+              // Limited devices are expected to have precapture ae enabled and
+              // respond to cancellation request. Since we don't actuall support
+              // AE at all, let's just respect the cancellation expectation in
+              // case it's requested
+              requestSettings.aePrecaptureTrigger ==
+                      ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL
+                  ? ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL
+                  : ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
           .setControlAeState(ANDROID_CONTROL_AE_STATE_INACTIVE)
           .setControlAfMode(ANDROID_CONTROL_AF_MODE_OFF)
           .setControlAfTrigger(ANDROID_CONTROL_AF_TRIGGER_IDLE)

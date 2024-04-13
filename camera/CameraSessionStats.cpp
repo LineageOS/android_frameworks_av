@@ -439,6 +439,16 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    auto mostRequestedFpsRange = std::make_pair(0,0);
+    if ((err = parcel->readInt32(&mostRequestedFpsRange.first)) != OK) {
+        ALOGE("%s: Failed to read frame rate range min info!", __FUNCTION__);
+        return err;
+    }
+    if ((err = parcel->readInt32(&mostRequestedFpsRange.second)) != OK) {
+        ALOGE("%s: Failed to read frame rate range max info!", __FUNCTION__);
+        return err;
+    }
+
     mCameraId = toStdString(id);
     mFacing = facing;
     mNewCameraState = newCameraState;
@@ -460,6 +470,7 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
     mUsedZoomOverride = usedZoomOverride;
     mSessionIndex = sessionIdx;
     mCameraExtensionSessionStats = extStats;
+    mMostRequestedFpsRange = mostRequestedFpsRange;
 
     return OK;
 }
@@ -574,6 +585,16 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = mCameraExtensionSessionStats.writeToParcel(parcel)) != OK) {
         ALOGE("%s: Failed to write extension sessions stats!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt32(mMostRequestedFpsRange.first)) != OK) {
+        ALOGE("%s: Failed to write frame rate range min info!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt32(mMostRequestedFpsRange.second)) != OK) {
+        ALOGE("%s: Failed to write frame rate range max info!", __FUNCTION__);
         return err;
     }
 

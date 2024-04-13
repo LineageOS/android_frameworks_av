@@ -1404,6 +1404,10 @@ class Camera3Device :
             const camera_stream_buffer_t *outputBuffers, uint32_t numOutputBuffers,
             int32_t inputStreamId);
 
+    // Collect any statistics that are based on the stream of capture requests sent
+    // to the HAL
+    void collectRequestStats(int64_t frameNumber, const CameraMetadata& request);
+
     metadata_vendor_id_t mVendorTagId;
 
     // Cached last requested template id

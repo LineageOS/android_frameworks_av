@@ -46,6 +46,7 @@ class NotificationListener : public virtual RefBase {
     // May return an error since it checks appops
     virtual status_t notifyActive(float maxPreviewFps) = 0;
     virtual void notifyIdle(int64_t requestCount, int64_t resultError, bool deviceError,
+            std::pair<int32_t, int32_t> mostRequestedFpsRange,
             const std::vector<hardware::CameraStreamStats>& streamStats) = 0;
 
     // Required only for API2

@@ -1425,142 +1425,11 @@ status_t AudioPolicyService::shellCommand(int in, int out, int err, Vector<Strin
     if (in == BAD_TYPE || out == BAD_TYPE || err == BAD_TYPE) {
         return BAD_VALUE;
     }
-    if (args.size() >= 3 && args[0] == String16("set-uid-state")) {
-        return handleSetUidState(args, err);
-    } else if (args.size() >= 2 && args[0] == String16("reset-uid-state")) {
-        return handleResetUidState(args, err);
-    } else if (args.size() >= 2 && args[0] == String16("get-uid-state")) {
-        return handleGetUidState(args, out, err);
-    } else if (args.size() >= 1 && args[0] == String16("purge_permission-cache")) {
+    if (args.size() >= 1 && args[0] == String16("purge_permission-cache")) {
         purgePermissionCache();
         return NO_ERROR;
-    } else if (args.size() == 1 && args[0] == String16("help")) {
-        printHelp(out);
-        return NO_ERROR;
     }
-    printHelp(err);
     return BAD_VALUE;
-}
-
-static status_t getUidForPackage(String16 packageName, int userId, /*inout*/uid_t& uid, int err) {
-    if (userId < 0) {
-        ALOGE("Invalid user: %d", userId);
-        dprintf(err, "Invalid user: %d\n", userId);
-        return BAD_VALUE;
-    }
-
-    PermissionController pc;
-    uid = pc.getPackageUid(packageName, 0);
-    if (uid <= 0) {
-        ALOGE("Unknown package: '%s'", String8(packageName).c_str());
-        dprintf(err, "Unknown package: '%s'\n", String8(packageName).c_str());
-        return BAD_VALUE;
-    }
-
-    uid = multiuser_get_uid(userId, uid);
-    return NO_ERROR;
-}
-
-status_t AudioPolicyService::handleSetUidState(Vector<String16>& args, int err) {
-    // Valid arg.size() is 3 or 5, args.size() is 5 with --user option.
-    if (!(args.size() == 3 || args.size() == 5)) {
-        printHelp(err);
-        return BAD_VALUE;
-    }
-
-    bool active = false;
-    if (args[2] == String16("active")) {
-        active = true;
-    } else if ((args[2] != String16("idle"))) {
-        ALOGE("Expected active or idle but got: '%s'", String8(args[2]).c_str());
-        return BAD_VALUE;
-    }
-
-    int userId = 0;
-    if (args.size() >= 5 && args[3] == String16("--user")) {
-        userId = atoi(String8(args[4]));
-    }
-
-    uid_t uid;
-    if (getUidForPackage(args[1], userId, uid, err) == BAD_VALUE) {
-        return BAD_VALUE;
-    }
-
-    sp<UidPolicy> uidPolicy;
-    {
-        audio_utils::lock_guard _l(mMutex);
-        uidPolicy = mUidPolicy;
-    }
-    if (uidPolicy) {
-        uidPolicy->addOverrideUid(uid, active);
-        return NO_ERROR;
-    }
-    return NO_INIT;
-}
-
-status_t AudioPolicyService::handleResetUidState(Vector<String16>& args, int err) {
-    // Valid arg.size() is 2 or 4, args.size() is 4 with --user option.
-    if (!(args.size() == 2 || args.size() == 4)) {
-        printHelp(err);
-        return BAD_VALUE;
-    }
-
-    int userId = 0;
-    if (args.size() >= 4 && args[2] == String16("--user")) {
-        userId = atoi(String8(args[3]));
-    }
-
-    uid_t uid;
-    if (getUidForPackage(args[1], userId, uid, err) == BAD_VALUE) {
-        return BAD_VALUE;
-    }
-
-    sp<UidPolicy> uidPolicy;
-    {
-        audio_utils::lock_guard _l(mMutex);
-        uidPolicy = mUidPolicy;
-    }
-    if (uidPolicy) {
-        uidPolicy->removeOverrideUid(uid);
-        return NO_ERROR;
-    }
-    return NO_INIT;
-}
-
-status_t AudioPolicyService::handleGetUidState(Vector<String16>& args, int out, int err) {
-    // Valid arg.size() is 2 or 4, args.size() is 4 with --user option.
-    if (!(args.size() == 2 || args.size() == 4)) {
-        printHelp(err);
-        return BAD_VALUE;
-    }
-
-    int userId = 0;
-    if (args.size() >= 4 && args[2] == String16("--user")) {
-        userId = atoi(String8(args[3]));
-    }
-
-    uid_t uid;
-    if (getUidForPackage(args[1], userId, uid, err) == BAD_VALUE) {
-        return BAD_VALUE;
-    }
-
-    sp<UidPolicy> uidPolicy;
-    {
-        audio_utils::lock_guard _l(mMutex);
-        uidPolicy = mUidPolicy;
-    }
-    if (uidPolicy) {
-        return dprintf(out, uidPolicy->isUidActive(uid) ? "active\n" : "idle\n");
-    }
-    return NO_INIT;
-}
-
-status_t AudioPolicyService::printHelp(int out) {
-    return dprintf(out, "Audio policy service commands:\n"
-        "  get-uid-state <PACKAGE> [--user USER_ID] gets the uid state\n"
-        "  set-uid-state <PACKAGE> <active|idle> [--user USER_ID] overrides the uid state\n"
-        "  reset-uid-state <PACKAGE> [--user USER_ID] clears the uid state override\n"
-        "  help print this message\n");
 }
 
 status_t AudioPolicyService::registerOutput(audio_io_handle_t output,
@@ -1623,10 +1492,6 @@ bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
     checkRegistered();
     {
         audio_utils::lock_guard _l(mMutex);
-        auto overrideIter = mOverrideUids.find(uid);
-        if (overrideIter != mOverrideUids.end()) {
-            return overrideIter->second.first;
-        }
         // In an absense of the ActivityManager, assume everything to be active.
         if (!mObserverRegistered) return true;
         auto cacheIter = mCachedUids.find(uid);
@@ -1652,20 +1517,6 @@ int AudioPolicyService::UidPolicy::getUidState(uid_t uid) {
     checkRegistered();
     {
         audio_utils::lock_guard _l(mMutex);
-        auto overrideIter = mOverrideUids.find(uid);
-        if (overrideIter != mOverrideUids.end()) {
-            if (overrideIter->second.first) {
-                if (overrideIter->second.second != ActivityManager::PROCESS_STATE_UNKNOWN) {
-                    return overrideIter->second.second;
-                } else {
-                    auto cacheIter = mCachedUids.find(uid);
-                    if (cacheIter != mCachedUids.end()) {
-                        return cacheIter->second.second;
-                    }
-                }
-            }
-            return ActivityManager::PROCESS_STATE_UNKNOWN;
-        }
         // In an absense of the ActivityManager, assume everything to be active.
         if (!mObserverRegistered) {
             return ActivityManager::PROCESS_STATE_TOP;
@@ -1716,10 +1567,6 @@ void AudioPolicyService::UidPolicy::onUidStateChanged(uid_t uid,
 }
 
 void AudioPolicyService::UidPolicy::onUidProcAdjChanged(uid_t uid __unused, int32_t adj __unused) {
-}
-
-void AudioPolicyService::UidPolicy::updateOverrideUid(uid_t uid, bool active, bool insert) {
-    updateUid(&mOverrideUids, uid, active, ActivityManager::PROCESS_STATE_UNKNOWN, insert);
 }
 
 void AudioPolicyService::UidPolicy::notifyService() {

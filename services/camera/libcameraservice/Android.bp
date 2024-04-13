@@ -194,7 +194,6 @@ cc_library {
         "utils/SchedulingPolicyUtils.cpp",
         "utils/SessionConfigurationUtils.cpp",
         "utils/SessionConfigurationUtilsHidl.cpp",
-        "utils/SessionStatsBuilder.cpp",
         "utils/TagMonitor.cpp",
         "utils/LatencyHistogram.cpp",
         "utils/Utils.cpp",
@@ -246,6 +245,7 @@ cc_library_static {
         "device3/ZoomRatioMapper.cpp",
         "utils/ExifUtils.cpp",
         "utils/SessionConfigurationUtilsHost.cpp",
+        "utils/SessionStatsBuilder.cpp",
     ],
 
     header_libs: [

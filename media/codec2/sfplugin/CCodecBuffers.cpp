@@ -1550,18 +1550,22 @@ void LinearOutputBuffers::flush(
 
 sp<Codec2Buffer> LinearOutputBuffers::wrap(const std::shared_ptr<C2Buffer> &buffer) {
     if (buffer == nullptr) {
-        ALOGV("[%s] using a dummy buffer", mName);
+        ALOGD("[%s] received null buffer", mName);
         return new LocalLinearBuffer(mFormat, new ABuffer(0));
     }
     if (buffer->data().type() != C2BufferData::LINEAR) {
-        ALOGV("[%s] non-linear buffer %d", mName, buffer->data().type());
+        ALOGW("[%s] non-linear buffer %d", mName, buffer->data().type());
         // We expect linear output buffers from the component.
         return nullptr;
     }
     if (buffer->data().linearBlocks().size() != 1u) {
-        ALOGV("[%s] no linear buffers", mName);
+        ALOGW("[%s] no linear buffers", mName);
         // We expect one and only one linear block from the component.
         return nullptr;
+    }
+    if (buffer->data().linearBlocks().front().size() == 0) {
+        ALOGD("[%s] received 0-sized buffer", mName);
+        return new LocalLinearBuffer(mFormat, new ABuffer(0));
     }
     sp<Codec2Buffer> clientBuffer = ConstLinearBlockBuffer::Allocate(mFormat, buffer);
     if (clientBuffer == nullptr) {

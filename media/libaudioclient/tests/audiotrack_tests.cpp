@@ -25,6 +25,21 @@
 
 using namespace android;
 
+// Test that the basic constructor returns an object that doesn't crash
+// on stop() or destruction.
+
+TEST(AudioTrackTestBasic, EmptyAudioTrack) {
+    AttributionSourceState attributionSource;
+    attributionSource.packageName = "AudioTrackTest";
+    attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+    attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
+    attributionSource.token = sp<BBinder>::make();
+    const auto at = sp<AudioTrack>::make(attributionSource);
+
+    EXPECT_EQ(NO_INIT, at->initCheck());
+    EXPECT_EQ(true, at->stopped());
+}
+
 TEST(AudioTrackTest, TestPlayTrack) {
     const auto ap = sp<AudioPlayback>::make(44100 /* sampleRate */, AUDIO_FORMAT_PCM_16_BIT,
                                             AUDIO_CHANNEL_OUT_STEREO, AUDIO_OUTPUT_FLAG_NONE,

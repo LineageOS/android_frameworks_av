@@ -45,12 +45,13 @@ struct C2SoftOpusEnc : public SimpleC2Component {
             uint32_t drainMode,
             const std::shared_ptr<C2BlockPool> &pool) override;
 private:
-    /* OPUS_FRAMESIZE_20_MS */
-    const int kFrameSize = 960;
-    const int kMaxSampleRate = 48000;
-    const int kMinSampleRate = 8000;
-    const int kMaxPayload = (4000 * kMaxSampleRate) / kMinSampleRate;
-    const int kMaxNumChannels = 8;
+    static const int kMaxNumChannelsSupported = 2;
+    static const int kMaxSampleRateSupported = 48000;
+    static const int kDefaultFrameDurationMs = 20;
+    // For a frame duration of 20ms, payload recommended size is 1276 as per
+    // https://www.opus-codec.org/docs/html_api/group__opusencoder.html.
+    // For 40ms, 60ms, .. payload size will change proportionately, 1276 x 2, 1276 x 3, ..
+    static const int kMaxPayload = 1500; // from tests/test_opus_encode.c
 
     std::shared_ptr<IntfImpl> mIntf;
     std::shared_ptr<C2LinearBlock> mOutputBlock;

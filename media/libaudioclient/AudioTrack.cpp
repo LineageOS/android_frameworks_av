@@ -233,25 +233,10 @@ status_t AudioTrack::getMetrics(mediametrics::Item * &item)
     return NO_ERROR;
 }
 
-AudioTrack::AudioTrack() : AudioTrack(AttributionSourceState())
-{
-}
-
 AudioTrack::AudioTrack(const AttributionSourceState& attributionSource)
-    : mStatus(NO_INIT),
-      mState(STATE_STOPPED),
-      mPreviousPriority(ANDROID_PRIORITY_NORMAL),
-      mPreviousSchedulingGroup(SP_DEFAULT),
-      mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mClientAttributionSource(attributionSource),
-      mAudioTrackCallback(new AudioTrackCallback())
+    : mClientAttributionSource(attributionSource)
 {
-    mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
-    mAttributes.usage = AUDIO_USAGE_UNKNOWN;
-    mAttributes.flags = AUDIO_FLAG_NONE;
-    strcpy(mAttributes.tags, "");
+
 }
 
 AudioTrack::AudioTrack(
@@ -271,21 +256,13 @@ AudioTrack::AudioTrack(
         bool doNotReconnect,
         float maxRequiredSpeed,
         audio_port_handle_t selectedDeviceId)
-    : mStatus(NO_INIT),
-      mState(STATE_STOPPED),
-      mPreviousPriority(ANDROID_PRIORITY_NORMAL),
-      mPreviousSchedulingGroup(SP_DEFAULT),
-      mPausedPosition(0),
-      mAudioTrackCallback(new AudioTrackCallback())
 {
-    mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
-
     // make_unique does not aggregate init until c++20
-    mSetParams = std::unique_ptr<SetParams>{
-            new SetParams{streamType, sampleRate, format, channelMask, frameCount, flags, callback,
-                          notificationFrames, 0 /*sharedBuffer*/, false /*threadCanCallJava*/,
-                          sessionId, transferType, offloadInfo, attributionSource, pAttributes,
-                          doNotReconnect, maxRequiredSpeed, selectedDeviceId}};
+    mSetParams = std::make_unique<SetParams>(
+        streamType, sampleRate, format, channelMask, frameCount, flags, callback,
+        notificationFrames, nullptr /*sharedBuffer*/, false /*threadCanCallJava*/,
+        sessionId, transferType, offloadInfo, attributionSource, pAttributes,
+        doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 
 namespace {

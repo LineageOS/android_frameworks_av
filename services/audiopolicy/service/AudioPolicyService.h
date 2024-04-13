@@ -500,8 +500,6 @@ private:
                 int32_t capability) override;
         void onUidProcAdjChanged(uid_t uid, int32_t adj) override;
 
-        void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
-        void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
 
         void updateUid(std::unordered_map<uid_t, std::pair<bool, int>> *uids,
                        uid_t uid, bool active, int state, bool insert);
@@ -510,7 +508,6 @@ private:
 
      private:
         void notifyService();
-        void updateOverrideUid(uid_t uid, bool active, bool insert);
         void updateUidLocked(std::unordered_map<uid_t, std::pair<bool, int>> *uids,
                              uid_t uid, bool active, int state, bool insert);
         void checkRegistered();
@@ -519,7 +516,6 @@ private:
         audio_utils::mutex mMutex{audio_utils::MutexOrder::kUidPolicy_Mutex};
         ActivityManager mAm;
         bool mObserverRegistered = false;
-        std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids GUARDED_BY(mMutex);
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids GUARDED_BY(mMutex);
         std::vector<uid_t> mAssistantUids;
         std::vector<uid_t> mActiveAssistantUids;
