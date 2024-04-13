@@ -502,27 +502,31 @@ status_t StreamHalAidl::sendCommand(
                 "%s %s: must be invoked from the worker thread (%d)",
                 __func__, command.toString().c_str(), workerTid);
     }
-    if (!mContext.getCommandMQ()->writeBlocking(&command, 1)) {
-        ALOGE("%s: failed to write command %s to MQ", __func__, command.toString().c_str());
-        return NOT_ENOUGH_DATA;
-    }
-    StreamDescriptor::Reply localReply{};
-    if (reply == nullptr) {
-        reply = &localReply;
-    }
-    if (!mContext.getReplyMQ()->readBlocking(reply, 1)) {
-        ALOGE("%s: failed to read from reply MQ, command %s", __func__, command.toString().c_str());
-        return NOT_ENOUGH_DATA;
-    }
     {
-        std::lock_guard l(mLock);
-        // Not every command replies with 'latencyMs' field filled out, substitute the last
-        // returned value in that case.
-        if (reply->latencyMs <= 0) {
-            reply->latencyMs = mLastReply.latencyMs;
+        std::lock_guard l(mCommandReplyLock);
+        if (!mContext.getCommandMQ()->writeBlocking(&command, 1)) {
+            ALOGE("%s: failed to write command %s to MQ", __func__, command.toString().c_str());
+            return NOT_ENOUGH_DATA;
         }
-        mLastReply = *reply;
-        mLastReplyExpirationNs = uptimeNanos() + mLastReplyLifeTimeNs;
+        StreamDescriptor::Reply localReply{};
+        if (reply == nullptr) {
+            reply = &localReply;
+        }
+        if (!mContext.getReplyMQ()->readBlocking(reply, 1)) {
+            ALOGE("%s: failed to read from reply MQ, command %s",
+                    __func__, command.toString().c_str());
+            return NOT_ENOUGH_DATA;
+        }
+        {
+            std::lock_guard l(mLock);
+            // Not every command replies with 'latencyMs' field filled out, substitute the last
+            // returned value in that case.
+            if (reply->latencyMs <= 0) {
+                reply->latencyMs = mLastReply.latencyMs;
+            }
+            mLastReply = *reply;
+            mLastReplyExpirationNs = uptimeNanos() + mLastReplyLifeTimeNs;
+        }
     }
     switch (reply->status) {
         case STATUS_OK: return OK;
