@@ -236,7 +236,6 @@ status_t AudioTrack::getMetrics(mediametrics::Item * &item)
 AudioTrack::AudioTrack(const AttributionSourceState& attributionSource)
     : mClientAttributionSource(attributionSource)
 {
-
 }
 
 AudioTrack::AudioTrack(
@@ -257,7 +256,6 @@ AudioTrack::AudioTrack(
         float maxRequiredSpeed,
         audio_port_handle_t selectedDeviceId)
 {
-    // make_unique does not aggregate init until c++20
     mSetParams = std::make_unique<SetParams>(
         streamType, sampleRate, format, channelMask, frameCount, flags, callback,
         notificationFrames, nullptr /*sharedBuffer*/, false /*threadCanCallJava*/,
@@ -377,9 +375,6 @@ AudioTrack::~AudioTrack()
 }
 
 void AudioTrack::stopAndJoinCallbacks() {
-    // Prevent nullptr crash if it did not open properly.
-    if (mStatus != NO_ERROR) return;
-
     // Make sure that callback function exits in the case where
     // it is looping on buffer full condition in obtainBuffer().
     // Otherwise the callback thread will never exit.
@@ -896,6 +891,7 @@ void AudioTrack::stop()
     const int64_t beginNs = systemTime();
 
     AutoMutex lock(mLock);
+    if (mProxy == nullptr) return;  // not successfully initialized.
     mediametrics::Defer defer([&]() {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
