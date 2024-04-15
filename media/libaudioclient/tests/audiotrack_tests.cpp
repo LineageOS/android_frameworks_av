@@ -38,6 +38,9 @@ TEST(AudioTrackTestBasic, EmptyAudioTrack) {
 
     EXPECT_EQ(NO_INIT, at->initCheck());
     EXPECT_EQ(true, at->stopped());
+
+    // ensure we do not crash.
+    at->stop();
 }
 
 TEST(AudioTrackTest, TestPlayTrack) {
