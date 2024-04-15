@@ -446,6 +446,7 @@ status_t C2SoftVpxDec::initDecoder() {
     {
         IntfImpl::Lock lock = mIntf->lock();
         mPixelFormatInfo = mIntf->getPixelFormat_l();
+        mColorAspects = mIntf->getDefaultColorAspects_l();
     }
 
     mWidth = 320;
@@ -589,6 +590,41 @@ void C2SoftVpxDec::process(
     if (mSignalledError || mSignalledOutputEos) {
         work->result = C2_BAD_VALUE;
         return;
+    }
+
+    // handle dynamic config parameters
+    {
+        IntfImpl::Lock lock = mIntf->lock();
+        std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects =
+            mIntf->getDefaultColorAspects_l();
+        lock.unlock();
+
+        if (mColorAspects->range != defaultColorAspects->range ||
+            mColorAspects->primaries != defaultColorAspects->primaries ||
+            mColorAspects->matrix != defaultColorAspects->matrix ||
+            mColorAspects->transfer != defaultColorAspects->transfer) {
+
+            mColorAspects->range = defaultColorAspects->range;
+            mColorAspects->primaries = defaultColorAspects->primaries;
+            mColorAspects->matrix = defaultColorAspects->matrix;
+            mColorAspects->transfer = defaultColorAspects->transfer;
+
+            C2StreamColorAspectsTuning::output colorAspect(0u, defaultColorAspects->range,
+                defaultColorAspects->primaries, defaultColorAspects->transfer,
+                defaultColorAspects->matrix);
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            c2_status_t err = mIntf->config({&colorAspect}, C2_MAY_BLOCK, &failures);
+            if (err == C2_OK) {
+                work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(colorAspect));
+            } else {
+                ALOGE("Config update colorAspect failed");
+                mSignalledError = true;
+                work->workletsProcessed = 1u;
+                work->result = C2_CORRUPTED;
+                return;
+            }
+        }
     }
 
     size_t inOffset = 0u;
