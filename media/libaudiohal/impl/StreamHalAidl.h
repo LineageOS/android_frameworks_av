@@ -243,6 +243,15 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     const bool mIsInput;
     const audio_config_base_t mConfig;
     const StreamContextAidl mContext;
+    // This lock is used to make sending of a command and receiving a reply an atomic
+    // operation. Otherwise, when two threads are trying to send a command, they may both advance to
+    // reading of the reply once the HAL has consumed the command from the MQ, and that creates a
+    // race condition between them.
+    //
+    // Note that only access to command and reply MQs needs to be protected because the data MQ is
+    // only accessed by the I/O thread. Also, there is no need to protect lookup operations on the
+    // queues as they are thread-safe, only send/receive operation must be protected.
+    std::mutex mCommandReplyLock;
 
   private:
     static audio_config_base_t configToBase(const audio_config& config) {
@@ -256,6 +265,8 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
         std::lock_guard l(mLock);
         return mLastReply.state;
     }
+    // Note: Since `sendCommand` takes mLock while holding mCommandReplyLock, never call
+    // it with `mLock` being held.
     status_t sendCommand(
             const ::aidl::android::hardware::audio::core::StreamDescriptor::Command &command,
             ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply = nullptr,
