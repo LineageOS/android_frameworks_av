@@ -502,13 +502,13 @@ status_t StreamHalAidl::sendCommand(
                 "%s %s: must be invoked from the worker thread (%d)",
                 __func__, command.toString().c_str(), workerTid);
     }
+    StreamDescriptor::Reply localReply{};
     {
         std::lock_guard l(mCommandReplyLock);
         if (!mContext.getCommandMQ()->writeBlocking(&command, 1)) {
             ALOGE("%s: failed to write command %s to MQ", __func__, command.toString().c_str());
             return NOT_ENOUGH_DATA;
         }
-        StreamDescriptor::Reply localReply{};
         if (reply == nullptr) {
             reply = &localReply;
         }
