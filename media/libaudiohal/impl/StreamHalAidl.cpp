@@ -29,6 +29,7 @@
 #include <media/AudioParameter.h>
 #include <mediautils/TimeCheck.h>
 #include <system/audio.h>
+#include <Utils.h>
 #include <utils/Log.h>
 
 #include "DeviceHalAidl.h"
@@ -36,13 +37,14 @@
 #include "StreamHalAidl.h"
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::hardware::audio::common::kDumpFromAudioServerArgument;
 using ::aidl::android::hardware::audio::common::PlaybackTrackMetadata;
 using ::aidl::android::hardware::audio::common::RecordTrackMetadata;
 using ::aidl::android::hardware::audio::core::IStreamCommon;
 using ::aidl::android::hardware::audio::core::IStreamIn;
 using ::aidl::android::hardware::audio::core::IStreamOut;
-using ::aidl::android::hardware::audio::core::StreamDescriptor;
 using ::aidl::android::hardware::audio::core::MmapBufferDescriptor;
+using ::aidl::android::hardware::audio::core::StreamDescriptor;
 using ::aidl::android::media::audio::common::MicrophoneDynamicInfo;
 using ::aidl::android::media::audio::IHalAdapterVendorExtension;
 
@@ -239,7 +241,9 @@ status_t StreamHalAidl::dump(int fd, const Vector<String16>& args) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    status_t status = mStream->dump(fd, Args(args).args(), args.size());
+    Vector<String16> newArgs = args;
+    newArgs.push(String16(kDumpFromAudioServerArgument));
+    status_t status = mStream->dump(fd, Args(newArgs).args(), newArgs.size());
     mStreamPowerLog.dump(fd);
     return status;
 }
