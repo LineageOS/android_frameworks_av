@@ -92,6 +92,7 @@ std::map<int, std::vector<camera_metadata_tag>> static_api_level_to_keys{
           ANDROID_FLASH_SINGLE_STRENGTH_MAX_LEVEL,
           ANDROID_FLASH_TORCH_STRENGTH_DEFAULT_LEVEL,
           ANDROID_FLASH_TORCH_STRENGTH_MAX_LEVEL,
+          ANDROID_INFO_SESSION_CONFIGURATION_QUERY_VERSION,
         } },
 };
 
