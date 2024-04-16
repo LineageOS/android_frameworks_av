@@ -64,7 +64,6 @@ namespace {
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kMaxFps = 60;
-constexpr int kDefaultDeviceId = 0;
 constexpr char kEnableTestCameraCmd[] = "enable_test_camera";
 constexpr char kDisableTestCameraCmd[] = "disable_test_camera";
 constexpr char kHelp[] = "help";

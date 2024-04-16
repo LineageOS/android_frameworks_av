@@ -484,6 +484,10 @@ std::optional<camera_metadata_enum_android_control_ae_precapture_trigger>
 getPrecaptureTrigger(
     const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata);
 
+// Returns the virtual device id. This is not the camera id.
+std::optional<int32_t> getDeviceId(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata);
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android

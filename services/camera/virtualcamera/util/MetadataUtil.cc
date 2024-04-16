@@ -947,6 +947,20 @@ getPrecaptureTrigger(
       entry.data.u8[0]);
 }
 
+std::optional<int32_t> getDeviceId(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_INFO_DEVICE_ID, &entry) !=
+      OK) {
+    return std::nullopt;
+  }
+
+  return static_cast<int32_t>(entry.data.i32[0]);
+}
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android
