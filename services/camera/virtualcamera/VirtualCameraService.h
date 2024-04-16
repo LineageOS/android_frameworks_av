@@ -75,6 +75,9 @@ class VirtualCameraService
     mVerifyEglExtensions = false;
   }
 
+  // Default virtual device id (the host device id)
+  static constexpr int kDefaultDeviceId = 0;
+
  private:
   // Create and enable test camera instance if there's none.
   binder_status_t enableTestCameraCmd(
