@@ -191,14 +191,14 @@ public:
     virtual binder::Status    removeListener(
             const sp<hardware::ICameraServiceListener>& listener);
 
-    // TODO(b/291736219): This to be made device-aware.
     virtual binder::Status getConcurrentCameraIds(
         /*out*/
         std::vector<hardware::camera2::utils::ConcurrentCameraIdCombination>* concurrentCameraIds);
 
     virtual binder::Status isConcurrentSessionConfigurationSupported(
         const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>& sessions,
-        int targetSdkVersion, /*out*/bool* supported);
+        int targetSdkVersion, int32_t deviceId, int32_t devicePolicy,
+        /*out*/bool* supported);
 
     virtual binder::Status    getLegacyParameters(
             int32_t cameraId,

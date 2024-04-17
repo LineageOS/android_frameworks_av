@@ -15,6 +15,7 @@
  */
 
 #include <camera2/ConcurrentCamera.h>
+#include <CameraUtils.h>
 #include <fuzzer/FuzzedDataProvider.h>
 #include "camera2common.h"
 
@@ -33,7 +34,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         size_t concurrentCameraIdSize = fdp.ConsumeIntegralInRange<size_t>(kRangeMin, kRangeMax);
         for (size_t idx = 0; idx < concurrentCameraIdSize; ++idx) {
             string concurrentCameraId = fdp.ConsumeRandomLengthString();
-            camIdCombination.mConcurrentCameraIds.push_back(concurrentCameraId);
+            camIdCombination.mConcurrentCameraIdDeviceIdPairs.push_back(
+                    {concurrentCameraId, kDefaultDeviceId});
         }
     }
 

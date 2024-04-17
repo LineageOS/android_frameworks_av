@@ -165,19 +165,24 @@ interface ICameraService
     ConcurrentCameraIdCombination[] getConcurrentCameraIds();
 
     /**
-      * Check whether a particular set of session configurations are concurrently supported by the
-      * corresponding camera ids.
-      *
-      * @param sessions the set of camera id and session configuration pairs to be queried.
-      * @param targetSdkVersion the target sdk level of the application calling this function.
-      * @return true  - the set of concurrent camera id and stream combinations is supported.
-      *         false - the set of concurrent camera id and stream combinations is not supported
-      *                 OR the method was called with a set of camera ids not returned by
-      *                 getConcurrentCameraIds().
-      */
+     * Check whether a particular set of session configurations are concurrently supported by the
+     * corresponding camera ids.
+     *
+     * @param sessions the set of camera id and session configuration pairs to be queried.
+     * @param targetSdkVersion the target sdk level of the application calling this function.
+     * @param deviceId The device id of the context associated with the caller.
+     * @param devicePolicy The camera policy of the device of the associated context (default
+     *                     policy for default device context). Only virtual cameras would be exposed
+     *                     only for custom policy and only real cameras would be exposed for default
+     *                     policy.
+     * @return true  - the set of concurrent camera id and stream combinations is supported.
+     *         false - the set of concurrent camera id and stream combinations is not supported
+     *                 OR the method was called with a set of camera ids not returned by
+     *                 getConcurrentCameraIds().
+     */
     boolean isConcurrentSessionConfigurationSupported(
             in CameraIdAndSessionConfiguration[] sessions,
-            int targetSdkVersion);
+            int targetSdkVersion, int deviceId, int devicePolicy);
 
     /**
      * Remap Camera Ids in the CameraService.
