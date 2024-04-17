@@ -307,7 +307,11 @@ private:
     // this tid is allowed to call setVolume() without acquiring the mutex.
     pid_t mSetVolumeReentrantTid = INVALID_PID;
 
+    // Cache the volume that has been set successfully.
     std::optional<std::vector<uint32_t>> mVolume;
+    // Cache the volume that returned from the effect when setting volume successfully. The value
+    // here is used to indicate the volume to apply before this effect.
+    std::optional<std::vector<uint32_t>> mReturnedVolume;
 };
 
 // The EffectHandle class implements the IEffect interface. It provides resources
