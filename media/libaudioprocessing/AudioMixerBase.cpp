@@ -1122,7 +1122,7 @@ void AudioMixerBase::process__genericNoResampling()
                     aux = t->auxBuffer + numFrames;
                 }
                 for (int outFrames = frameCount; outFrames > 0; ) {
-                    // t->in == nullptr can happen if the track was flushed just after having
+                    // t->mIn == nullptr can happen if the track was flushed just after having
                     // been enabled for mixing.
                     if (t->mIn == nullptr) {
                         break;

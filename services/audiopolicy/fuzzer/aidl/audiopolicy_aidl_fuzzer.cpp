@@ -38,6 +38,7 @@ using android::fuzzService;
 
 [[clang::no_destroy]] static std::once_flag gSmOnce;
 sp<FakeServiceManager> gFakeServiceManager;
+sp<AudioPolicyService> gAudioPolicyService;
 
 bool addService(const String16& serviceName, const sp<FakeServiceManager>& fakeServiceManager,
                 FuzzedDataProvider& fdp) {
@@ -49,22 +50,10 @@ bool addService(const String16& serviceName, const sp<FakeServiceManager>& fakeS
     return true;
 }
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-    FuzzedDataProvider fdp(data, size);
-
-    std::call_once(gSmOnce, [&] {
-        /* Create a FakeServiceManager instance and add required services */
-        gFakeServiceManager = sp<FakeServiceManager>::make();
-        setDefaultServiceManager(gFakeServiceManager);
-    });
-    gFakeServiceManager->clear();
-
-    for (const char* service : {"activity", "sensor_privacy", "permission", "scheduling_policy",
-                                "batterystats", "media.metrics"}) {
-        if (!addService(String16(service), gFakeServiceManager, fdp)) {
-            return 0;
-        }
-    }
+extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** /*argv*/) {
+    /* Create a FakeServiceManager instance and add required services */
+    gFakeServiceManager = sp<FakeServiceManager>::make();
+    setDefaultServiceManager(gFakeServiceManager);
 
     auto configService = ndk::SharedRefBase::make<ConfigMock>();
     CHECK_EQ(NO_ERROR, AServiceManager_addService(configService.get()->asBinder().get(),
@@ -82,22 +71,37 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     // Disable creating thread pool for fuzzer instance of audio flinger and audio policy services
     AudioSystem::disableThreadPool();
 
-    const auto audioFlinger = sp<AudioFlinger>::make();
-    const auto afAdapter = sp<AudioFlingerServerAdapter>::make(audioFlinger);
+    return 0;
+}
 
-    CHECK_EQ(NO_ERROR,
-             gFakeServiceManager->addService(
-                     String16(IAudioFlinger::DEFAULT_SERVICE_NAME), IInterface::asBinder(afAdapter),
-                     false /* allowIsolated */, IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    FuzzedDataProvider fdp(data, size);
 
-    const auto audioPolicyService = sp<AudioPolicyService>::make();
+    for (const char* service : {"activity", "sensor_privacy", "permission", "scheduling_policy",
+                                "batterystats", "media.metrics"}) {
+        if (!addService(String16(service), gFakeServiceManager, fdp)) {
+            return 0;
+        }
+    }
 
-    CHECK_EQ(NO_ERROR,
-             gFakeServiceManager->addService(String16("media.audio_policy"), audioPolicyService,
-                                             false /* allowIsolated */,
-                                             IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
+    // TODO(330882064) : Initialise Audio Flinger and Audio Policy services every time
+    std::call_once(gSmOnce, [&] {
+        const auto audioFlinger = sp<AudioFlinger>::make();
+        const auto audioFlingerServerAdapter = sp<AudioFlingerServerAdapter>::make(audioFlinger);
+        CHECK_EQ(NO_ERROR,
+                 gFakeServiceManager->addService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME),
+                                                 IInterface::asBinder(audioFlingerServerAdapter),
+                                                 false /* allowIsolated */,
+                                                 IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
 
-    fuzzService(media::IAudioPolicyService::asBinder(audioPolicyService), std::move(fdp));
+        gAudioPolicyService = sp<AudioPolicyService>::make();
+        CHECK_EQ(NO_ERROR,
+                 gFakeServiceManager->addService(String16("media.audio_policy"),
+                                                 gAudioPolicyService, false /* allowIsolated */,
+                                                 IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT));
+    });
+
+    fuzzService(media::IAudioPolicyService::asBinder(gAudioPolicyService), std::move(fdp));
 
     return 0;
 }

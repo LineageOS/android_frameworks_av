@@ -109,6 +109,7 @@ struct C2SoftAomEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
+    std::shared_ptr<C2StreamPictureQuantizationTuning::output> mQpBounds;
 
     aom_codec_err_t setupCodecParameters();
 };
@@ -126,6 +127,8 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
                                   const C2P<C2StreamPictureSizeInfo::input>& size,
                                   const C2P<C2StreamFrameRateInfo::output>& frameRate,
                                   const C2P<C2StreamBitrateInfo::output>& bitrate);
+    static C2R PictureQuantizationSetter(bool mayBlock,
+                                         C2P<C2StreamPictureQuantizationTuning::output> &me);
 
     // unsafe getters
     std::shared_ptr<C2StreamPictureSizeInfo::input> getSize_l() const { return mSize; }
@@ -150,6 +153,9 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamPixelFormatInfo::input> getPixelFormat_l() const {
         return mPixelFormat;
     }
+    std::shared_ptr<C2StreamPictureQuantizationTuning::output> getPictureQuantization_l() const {
+        return mPictureQuantization;
+    }
     uint32_t getSyncFramePeriod() const;
     static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input>& me);
     static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output>& me,
@@ -171,6 +177,7 @@ class C2SoftAomEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mCodedColorAspects;
     std::shared_ptr<C2StreamPixelFormatInfo::input> mPixelFormat;
+    std::shared_ptr<C2StreamPictureQuantizationTuning::output> mPictureQuantization;
 
 };
 
