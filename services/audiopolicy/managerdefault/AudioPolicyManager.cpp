@@ -129,8 +129,8 @@ void AudioPolicyManager::broadcastDeviceConnectionState(const sp<DeviceDescripto
     device->toAudioPort(&devicePort);
     if (status_t status = mpClientInterface->setDeviceConnectedState(&devicePort, state);
             status != OK) {
-        ALOGE("Error %d while setting connected state for device %s",
-                static_cast<int>(state),
+        ALOGE("Error %d while setting connected state %d for device %s",
+                status, static_cast<int>(state),
                 device->getDeviceTypeAddr().toString(false).c_str());
     }
 }
@@ -218,9 +218,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
             if (checkOutputsForDevice(device, state, outputs) != NO_ERROR) {
                 mAvailableOutputDevices.remove(device);
 
-                mHwModules.cleanUpForDevice(device);
-
                 broadcastDeviceConnectionState(device, media::DeviceConnectedState::DISCONNECTED);
+
+                mHwModules.cleanUpForDevice(device);
                 return INVALID_OPERATION;
             }
 
