@@ -182,7 +182,7 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t getAudioMixPort(const struct audio_port_v7* devicePort,
                              struct audio_port_v7* mixPort) override;
 
-    status_t dump(int __unused, const Vector<String16>& __unused) override;
+    status_t dump(int fd, const Vector<String16>& args) override;
 
   private:
     friend class sp<DeviceHalAidl>;

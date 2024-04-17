@@ -58,6 +58,7 @@ using aidl::android::media::audio::common::MicrophoneInfo;
 using aidl::android::media::audio::IHalAdapterVendorExtension;
 using aidl::android::hardware::audio::common::getFrameSizeInBytes;
 using aidl::android::hardware::audio::common::isBitPositionFlagSet;
+using aidl::android::hardware::audio::common::kDumpFromAudioServerArgument;
 using aidl::android::hardware::audio::common::RecordTrackMetadata;
 using aidl::android::hardware::audio::core::sounddose::ISoundDose;
 using aidl::android::hardware::audio::core::AudioPatch;
@@ -913,7 +914,9 @@ error::Result<audio_hw_sync_t> DeviceHalAidl::getHwAvSync() {
 status_t DeviceHalAidl::dump(int fd, const Vector<String16>& args) {
     TIME_CHECK();
     if (mModule == nullptr) return NO_INIT;
-    return mModule->dump(fd, Args(args).args(), args.size());
+    Vector<String16> newArgs = args;
+    newArgs.push(String16(kDumpFromAudioServerArgument));
+    return mModule->dump(fd, Args(newArgs).args(), newArgs.size());
 }
 
 status_t DeviceHalAidl::supportsBluetoothVariableLatency(bool* supports) {
