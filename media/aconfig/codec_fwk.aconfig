@@ -13,16 +13,6 @@ flag {
 }
 
 flag {
-  name: "set_state_early"
-  namespace: "codec_fwk"
-  description: "Bugfix flag for setting state early to avoid a race condition"
-  bug: "298613712"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "dynamic_color_aspects"
   is_exported: true
   namespace: "codec_fwk"
@@ -95,6 +85,26 @@ flag {
   namespace: "codec_fwk"
   description: "Feature flag for region of interest support"
   bug: "325549730"
+}
+
+flag {
+  name: "set_callback_stall"
+  namespace: "codec_fwk"
+  description: "Bugfix flag for setCallback stall"
+  bug: "326010604"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "set_state_early"
+  namespace: "codec_fwk"
+  description: "Bugfix flag for setting state early to avoid a race condition"
+  bug: "298613711"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
