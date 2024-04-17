@@ -12,6 +12,7 @@ filegroup {
     name: "audiopolicytest_configuration_files",
     srcs: [
         "test_audio_policy_configuration.xml",
+        "test_audio_policy_configuration_bluetooth.xml",
         "test_audio_policy_primary_only_configuration.xml",
         "test_car_ap_atmos_offload_configuration.xml",
         "test_invalid_audio_policy_configuration.xml",

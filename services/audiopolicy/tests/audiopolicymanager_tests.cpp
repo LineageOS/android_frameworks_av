@@ -2589,6 +2589,116 @@ INSTANTIATE_TEST_CASE_P(
                 )
         );
 
+namespace {
+
+class AudioPolicyManagerTestClientOpenFails : public AudioPolicyManagerTestClient {
+  public:
+    status_t openOutput(audio_module_handle_t module,
+                        audio_io_handle_t *output,
+                        audio_config_t * halConfig,
+                        audio_config_base_t * mixerConfig,
+                        const sp<DeviceDescriptorBase>& device,
+                        uint32_t * latencyMs,
+                        audio_output_flags_t flags) override {
+        return mSimulateFailure ? BAD_VALUE :
+                AudioPolicyManagerTestClient::openOutput(
+                        module, output, halConfig, mixerConfig, device, latencyMs, flags);
+    }
+
+    status_t openInput(audio_module_handle_t module,
+                       audio_io_handle_t *input,
+                       audio_config_t * config,
+                       audio_devices_t * device,
+                       const String8 & address,
+                       audio_source_t source,
+                       audio_input_flags_t flags) override {
+        return mSimulateFailure ? BAD_VALUE :
+                AudioPolicyManagerTestClient::openInput(
+                        module, input, config, device, address, source, flags);
+    }
+
+    void setSimulateFailure(bool simulateFailure) { mSimulateFailure = simulateFailure; }
+
+  private:
+    bool mSimulateFailure = false;
+};
+
+}  // namespace
+
+using DeviceConnectionWithFormatTestParams =
+        std::tuple<audio_devices_t /*type*/, std::string /*name*/, std::string /*address*/,
+        audio_format_t /*format*/>;
+
+class AudioPolicyManagerTestDeviceConnectionFailed :
+        public AudioPolicyManagerTestWithConfigurationFile,
+        public testing::WithParamInterface<DeviceConnectionWithFormatTestParams> {
+  protected:
+    std::string getConfigFile() override { return sBluetoothConfig; }
+  AudioPolicyManagerTestClient* getClient() override {
+        mFullClient = new AudioPolicyManagerTestClientOpenFails;
+        return mFullClient;
+    }
+    void setSimulateOpenFailure(bool simulateFailure) {
+        mFullClient->setSimulateFailure(simulateFailure); }
+
+    static const std::string sBluetoothConfig;
+
+  private:
+    AudioPolicyManagerTestClientOpenFails* mFullClient;
+};
+
+const std::string AudioPolicyManagerTestDeviceConnectionFailed::sBluetoothConfig =
+        AudioPolicyManagerTestDeviceConnectionFailed::sExecutableDir +
+        "test_audio_policy_configuration_bluetooth.xml";
+
+TEST_P(AudioPolicyManagerTestDeviceConnectionFailed, SetDeviceConnectedStateHasAddress) {
+    const audio_devices_t type = std::get<0>(GetParam());
+    const std::string name = std::get<1>(GetParam());
+    const std::string address = std::get<2>(GetParam());
+    const audio_format_t format = std::get<3>(GetParam());
+
+    EXPECT_EQ(0, mClient->getConnectedDevicePortCount());
+    EXPECT_EQ(0, mClient->getDisconnectedDevicePortCount());
+
+    setSimulateOpenFailure(true);
+    ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            address.c_str(), name.c_str(), format));
+
+    // Since the failure happens when opening input/output, the device must be connected
+    // first and then disconnected.
+    EXPECT_EQ(1, mClient->getConnectedDevicePortCount());
+    EXPECT_EQ(1, mClient->getDisconnectedDevicePortCount());
+
+    if (mClient->getConnectedDevicePortCount() > 0) {
+        auto port = mClient->getLastConnectedDevicePort();
+        EXPECT_EQ(type, port->ext.device.type);
+        EXPECT_EQ(0, strncmp(port->ext.device.address, address.c_str(),
+                        AUDIO_DEVICE_MAX_ADDRESS_LEN)) << "\"" << port->ext.device.address << "\"";
+    }
+    if (mClient->getDisconnectedDevicePortCount() > 0) {
+        auto port = mClient->getLastDisconnectedDevicePort();
+        EXPECT_EQ(type, port->ext.device.type);
+        EXPECT_EQ(0, strncmp(port->ext.device.address, address.c_str(),
+                        AUDIO_DEVICE_MAX_ADDRESS_LEN)) << "\"" << port->ext.device.address << "\"";
+    }
+}
+
+INSTANTIATE_TEST_CASE_P(
+        DeviceConnectionFailure,
+        AudioPolicyManagerTestDeviceConnectionFailed,
+        testing::Values(
+                DeviceConnectionWithFormatTestParams({AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET,
+                            "bt_hfp_in", "00:11:22:33:44:55", AUDIO_FORMAT_DEFAULT}),
+                DeviceConnectionWithFormatTestParams({AUDIO_DEVICE_OUT_BLUETOOTH_SCO,
+                            "bt_hfp_out", "00:11:22:33:44:55", AUDIO_FORMAT_DEFAULT}),
+                DeviceConnectionWithFormatTestParams({AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
+                            "bt_a2dp_out", "00:11:22:33:44:55", AUDIO_FORMAT_DEFAULT}),
+                DeviceConnectionWithFormatTestParams({AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
+                            "bt_a2dp_out", "00:11:22:33:44:66", AUDIO_FORMAT_LDAC})
+                )
+        );
+
 class AudioPolicyManagerCarTest : public AudioPolicyManagerTestDynamicPolicy {
 protected:
     std::string getConfigFile() override { return sCarConfig; }
