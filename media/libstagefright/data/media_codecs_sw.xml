@@ -353,6 +353,7 @@
                 <Limit name="bitrate" range="1-20000000" />
             </Variant>
             <Feature name="bitrate-modes" value="VBR,CBR" />
+            <Feature name="qp-bounds" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.hevc.encoder" type="video/hevc" variant="!slow-cpu">
@@ -367,6 +368,7 @@
             <Limit name="complexity" range="0-10"  default="0" />
             <Limit name="quality" range="0-100"  default="80" />
             <Feature name="bitrate-modes" value="VBR,CBR,CQ" />
+            <Feature name="qp-bounds" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.vp9.encoder" type="video/x-vnd.on2.vp9" variant="!slow-cpu">
@@ -379,6 +381,7 @@
             <Limit name="block-count" range="1-3600" /> <!-- max 1280x720 -->
             <Limit name="bitrate" range="1-40000000" />
             <Feature name="bitrate-modes" value="VBR,CBR" />
+            <Feature name="qp-bounds" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.av1.encoder" type="video/av01" enabled="false" minsdk="34" variant="slow-cpu,!slow-cpu">
@@ -397,6 +400,7 @@
             <Limit name="quality" range="0-100"  default="80" />
             <Limit name="complexity" range="0-5"  default="0" />
             <Feature name="bitrate-modes" value="VBR,CBR,CQ" />
+            <Feature name="qp-bounds" />
             <Attribute name="software-codec" />
         </MediaCodec>
     </Encoders>
