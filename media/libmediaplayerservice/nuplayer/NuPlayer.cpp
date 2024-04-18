@@ -2098,9 +2098,12 @@ void NuPlayer::updateVideoSize(
              displayHeight,
              cropLeft, cropTop);
     } else {
-        CHECK(inputFormat->findInt32("width", &displayWidth));
-        CHECK(inputFormat->findInt32("height", &displayHeight));
-
+        if (!inputFormat->findInt32("width", &displayWidth)
+            || !inputFormat->findInt32("height", &displayHeight)) {
+            ALOGW("Either video width or video height missing, reporting 0x0!");
+            notifyListener(MEDIA_SET_VIDEO_SIZE, 0, 0);
+            return;
+        }
         ALOGV("Video input format %d x %d", displayWidth, displayHeight);
     }
 
