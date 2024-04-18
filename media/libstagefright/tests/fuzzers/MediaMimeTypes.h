@@ -18,6 +18,7 @@
 #define FUZZER_MEDIAMIMETYPES_H_
 
 #include <media/stagefright/foundation/MediaDefs.h>
+#include <unordered_map>
 
 namespace android {
 
@@ -79,6 +80,15 @@ static const std::vector<const char*> kMimeTypes {
     MEDIA_MIMETYPE_TEXT_CEA_708,
     MEDIA_MIMETYPE_DATA_TIMED_ID3
 };
+
+static const std::unordered_map<std::string, const char*> decoderToMediaType = {
+        {"c2.android.vp8.decoder", MEDIA_MIMETYPE_VIDEO_VP8},
+        {"c2.android.vp9.decoder", MEDIA_MIMETYPE_VIDEO_VP9},
+        {"c2.android.av1.decoder", MEDIA_MIMETYPE_VIDEO_AV1},
+        {"c2.android.avc.decoder", MEDIA_MIMETYPE_VIDEO_AVC},
+        {"c2.android.hevc.decoder", MEDIA_MIMETYPE_VIDEO_HEVC},
+        {"c2.android.mpeg4.decoder", MEDIA_MIMETYPE_VIDEO_MPEG4},
+        {"c2.android.h263.decoder", MEDIA_MIMETYPE_VIDEO_H263}};
 
 }  // namespace android
 
