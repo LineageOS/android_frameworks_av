@@ -1378,6 +1378,11 @@ status_t EffectModule::setVolume(uint32_t* left, uint32_t* right, bool controlle
 status_t EffectModule::setVolumeInternal(
         uint32_t *left, uint32_t *right, bool controller) {
     if (mVolume.has_value() && *left == mVolume.value()[0] && *right == mVolume.value()[1]) {
+        LOG_ALWAYS_FATAL_IF(
+                !mReturnedVolume.has_value(),
+                "The cached returned volume must not be null when the cached volume has value");
+        *left = mReturnedVolume.value()[0];
+        *right = mReturnedVolume.value()[1];
         return NO_ERROR;
     }
     LOG_ALWAYS_FATAL_IF(mEffectInterface == nullptr, "%s", mEffectInterfaceDebug.c_str());
@@ -1393,6 +1398,7 @@ status_t EffectModule::setVolumeInternal(
         mVolume = {*left, *right}; // Cache the value that has been set
         *left = volume[0];
         *right = volume[1];
+        mReturnedVolume = {*left, *right};
     }
     return status;
 }
