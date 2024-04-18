@@ -366,24 +366,26 @@ status_t StreamHalAidl::resume(StreamDescriptor::Reply* reply) {
     if (mIsInput) {
         return sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), reply);
     } else {
-        if (mContext.isAsynchronous()) {
+        if (const auto state = getState(); state == StreamDescriptor::State::IDLE) {
             // Handle pause-flush-resume sequence. 'flush' from PAUSED goes to
             // IDLE. We move here from IDLE to ACTIVE (same as 'start' from PAUSED).
-            const auto state = getState();
-            if (state == StreamDescriptor::State::IDLE) {
-                StreamDescriptor::Reply localReply{};
-                StreamDescriptor::Reply* innerReply = reply ?: &localReply;
-                RETURN_STATUS_IF_ERROR(
-                        sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), innerReply));
-                if (innerReply->state != StreamDescriptor::State::ACTIVE) {
-                    ALOGE("%s: unexpected stream state: %s (expected ACTIVE)",
-                            __func__, toString(innerReply->state).c_str());
-                    return INVALID_OPERATION;
-                }
-                return OK;
+            StreamDescriptor::Reply localReply{};
+            StreamDescriptor::Reply* innerReply = reply ?: &localReply;
+            RETURN_STATUS_IF_ERROR(
+                    sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), innerReply));
+            if (innerReply->state != StreamDescriptor::State::ACTIVE) {
+                ALOGE("%s: unexpected stream state: %s (expected ACTIVE)",
+                        __func__, toString(innerReply->state).c_str());
+                return INVALID_OPERATION;
             }
+            return OK;
+        } else if (state == StreamDescriptor::State::PAUSED) {
+            return sendCommand(makeHalCommand<HalCommand::Tag::start>(), reply);
+        } else {
+            ALOGE("%s: unexpected stream state: %s (expected IDLE or PAUSED)",
+                        __func__, toString(state).c_str());
+            return INVALID_OPERATION;
         }
-        return sendCommand(makeHalCommand<HalCommand::Tag::start>(), reply);
     }
 }
 
