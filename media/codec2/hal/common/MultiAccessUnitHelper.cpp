@@ -439,6 +439,7 @@ c2_status_t MultiAccessUnitHelper::gather(
             std::list<MultiAccessUnitInfo>::iterator frame =
                     mFrameHolder.begin();
             while (!foundFrame && frame != mFrameHolder.end()) {
+                c2_status_t res = C2_OK;
                 auto it = frame->mComponentFrameIds.find(thisFrameIndex);
                 if (it != frame->mComponentFrameIds.end()) {
                     foundFrame = true;
@@ -466,10 +467,27 @@ c2_status_t MultiAccessUnitHelper::gather(
                         addOutWork(frame->mLargeWork);
                         frame->reset();
                         if (workResult != C2_OK) {
-                            frame->mAccessUnitInfos.clear();
+                            frame->mComponentFrameIds.clear();
+                            removeEntry = false;
                         }
-                    } else if (C2_OK != processWorklets(*frame, work, addOutWork)) {
-                        LOG(DEBUG) << "Error while processing work";
+                    } else if (C2_OK != (res = processWorklets(*frame, work, addOutWork))) {
+                        // Upon error in processing worklets, we return the work with
+                        // result set to the error. This should indicate the error to the
+                        // framework and thus doing what is necessary to handle the
+                        // error.
+                        LOG(DEBUG) << "Error while processing worklets";
+                        if (frame->mLargeWork == nullptr) {
+                            frame->mLargeWork.reset(new C2Work);
+                            frame->mLargeWork->input.ordinal = frame->inOrdinal;
+                            frame->mLargeWork->input.ordinal.frameIndex =
+                                    frame->inOrdinal.frameIndex;
+                        }
+                        frame->mLargeWork->result = res;
+                        finalizeWork(*frame);
+                        addOutWork(frame->mLargeWork);
+                        frame->reset();
+                        frame->mComponentFrameIds.clear();
+                        removeEntry = false;
                     }
                     if (removeEntry) {
                         LOG(DEBUG) << "Removing entry: " << thisFrameIndex
@@ -606,9 +624,6 @@ c2_status_t MultiAccessUnitHelper::processWorklets(MultiAccessUnitInfo &frame,
 
         LOG(DEBUG) << "maxOutSize " << frame.mLargeFrameTuning.maxSize
                 << " threshold " << frame.mLargeFrameTuning.thresholdSize;
-        if ((*worklet)->output.buffers.size() > 0) {
-            allocateWork(frame, true, true);
-        }
         LOG(DEBUG) << "This worklet has " << (*worklet)->output.buffers.size() << " buffers"
                 << " ts: " << (*worklet)->output.ordinal.timestamp.peekull();
         int64_t workletTimestamp = (*worklet)->output.ordinal.timestamp.peekull();
@@ -630,43 +645,39 @@ c2_status_t MultiAccessUnitHelper::processWorklets(MultiAccessUnitInfo &frame,
                     inputSize -= (inputSize % frameSize);
                 }
                 while (inputOffset < inputSize) {
-                    if (frame.mWview->offset() >= frame.mLargeFrameTuning.thresholdSize) {
+                    if ((frame.mWview != nullptr)
+                            && (frame.mWview->offset() >= frame.mLargeFrameTuning.thresholdSize)) {
                         frame.mLargeWork->result = C2_OK;
                         finalizeWork(frame, flagsForCopy);
                         addWork(frame.mLargeWork);
                         frame.reset();
-                        allocateWork(frame, true, true);
                     }
                     if (mInterface->kind() == C2Component::KIND_ENCODER) {
                         if (inputSize > frame.mLargeFrameTuning.maxSize) {
-                            LOG(ERROR) << "Enc: Output buffer too small for AU, configured with "
-                                    << frame.mLargeFrameTuning.maxSize
-                                    << " block size: " << blocks.front().size()
-                                    << "alloc size " << frame.mWview->size();
-                            if (frame.mLargeWork
-                                    && frame.mWview && frame.mWview->offset() > 0) {
+                            LOG(WARNING) << "WARNING Encoder:"
+                                    << " Output buffer too small for configuration"
+                                    << " configured max size " << frame.mLargeFrameTuning.maxSize
+                                    << " access unit size " << inputSize;
+                            if (frame.mLargeWork && (frame.mWview && frame.mWview->offset() > 0)) {
+                                frame.mLargeWork->result = C2_OK;
                                 finalizeWork(frame, flagsForCopy);
                                 addWork(frame.mLargeWork);
                                 frame.reset();
-                                allocateWork(frame, true, false);
                             }
-                            frame.mLargeWork->result = C2_NO_MEMORY;
-                            finalizeWork(frame, 0, true);
-                            addWork(frame.mLargeWork);
-                            frame.reset();
-                            return C2_NO_MEMORY;
-                        } else if (inputSize > frame.mWview->size()) {
+                            frame.mLargeFrameTuning.maxSize = inputSize;
+                        } else if ((frame.mWview != nullptr)
+                                && (inputSize > frame.mWview->size())) {
                             LOG(DEBUG) << "Enc: Large frame hitting bufer limit, current size "
                                 << frame.mWview->offset();
-                            if (frame.mLargeWork
-                                    && frame.mWview && frame.mWview->offset() > 0) {
+                            if (frame.mWview->offset() > 0) {
+                                frame.mLargeWork->result = C2_OK;
                                 finalizeWork(frame, flagsForCopy);
                                 addWork(frame.mLargeWork);
                                 frame.reset();
-                                allocateWork(frame, true, true);
                             }
                         }
                     }
+                    allocateWork(frame, true, true);
                     C2ReadView rView = blocks.front().map().get();
                     if (rView.error()) {
                         LOG(ERROR) << "Buffer read view error";
