@@ -24,61 +24,64 @@
 
 namespace android {
 
-#define MAX_MEDIA_BUFFER_SIZE 2048
+static const android_pixel_format_t kColorFormats[] = {
+        HAL_PIXEL_FORMAT_RGBA_8888,
+        HAL_PIXEL_FORMAT_RGB_565,
+        HAL_PIXEL_FORMAT_BGRA_8888,
+        HAL_PIXEL_FORMAT_RGBA_1010102,
+        HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, /* To cover the default case */
+};
 
-// Fuzzer entry point.
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    // Init our wrapper
+static const MediaSource::ReadOptions::SeekMode kSeekModes[] = {
+        MediaSource::ReadOptions::SeekMode::SEEK_PREVIOUS_SYNC,
+        MediaSource::ReadOptions::SeekMode::SEEK_NEXT_SYNC,
+        MediaSource::ReadOptions::SeekMode::SEEK_CLOSEST_SYNC,
+        MediaSource::ReadOptions::SeekMode::SEEK_CLOSEST,
+        MediaSource::ReadOptions::SeekMode::SEEK_FRAME_INDEX,
+};
+
+static const std::string kComponentNames[] = {
+        "c2.android.avc.decoder",  "c2.android.hevc.decoder", "c2.android.vp8.decoder",
+        "c2.android.vp9.decoder",  "c2.android.av1.decoder",  "c2.android.mpeg4.decoder",
+        "c2.android.h263.decoder",
+};
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     FuzzedDataProvider fdp(data, size);
+    std::string component = fdp.PickValueInArray(kComponentNames);
+    AString componentName(component.c_str());
+    sp<MetaData> trackMeta = generateMetaData(&fdp, component);
+    sp<IMediaSource> source = sp<IMediaSourceFuzzImpl>::make(&fdp, gMaxMediaBufferSize);
 
-    std::string name = fdp.ConsumeRandomLengthString(fdp.remaining_bytes());
-    AString componentName(name.c_str());
-    sp<MetaData> trackMeta = generateMetaData(&fdp);
-    sp<IMediaSource> source = new IMediaSourceFuzzImpl(&fdp, MAX_MEDIA_BUFFER_SIZE);
-
-    // Image or video Decoder?
-    sp<FrameDecoder> decoder;
-    bool isVideoDecoder = fdp.ConsumeBool();
-    if (isVideoDecoder) {
-        decoder = new VideoFrameDecoder(componentName, trackMeta, source);
+    sp<FrameDecoder> decoder = nullptr;
+    if (fdp.ConsumeBool()) {
+        decoder = sp<MediaImageDecoder>::make(componentName, trackMeta, source);
     } else {
-        decoder = new MediaImageDecoder(componentName, trackMeta, source);
+        decoder = sp<VideoFrameDecoder>::make(componentName, trackMeta, source);
     }
 
-    while (fdp.remaining_bytes()) {
-        uint8_t switchCase = fdp.ConsumeIntegralInRange<uint8_t>(0, 3);
-        switch (switchCase) {
-            case 0: {
-                int64_t frameTimeUs = fdp.ConsumeIntegral<int64_t>();
-                int option = fdp.ConsumeIntegral<int>();
-                int colorFormat = fdp.ConsumeIntegral<int>();
-                decoder->init(frameTimeUs, option, colorFormat);
-                break;
-            }
-            case 1:
-                decoder->extractFrame();
-                break;
-            case 2: {
-                FrameRect rect;
-                rect.left = fdp.ConsumeIntegral<int32_t>();
-                rect.top = fdp.ConsumeIntegral<int32_t>();
-                rect.right = fdp.ConsumeIntegral<int32_t>();
-                rect.bottom = fdp.ConsumeIntegral<int32_t>();
-                decoder->extractFrame(&rect);
-                break;
-            }
-            case 3: {
-                sp<MetaData> trackMeta = generateMetaData(&fdp);
-                decoder->getMetadataOnly(trackMeta,
-                                         /*colorFormat*/ fdp.ConsumeIntegral<int>(),
-                                         /*thumbnail*/ fdp.ConsumeBool());
-                break;
-            }
-        }
+    if (decoder.get() &&
+        decoder->init(fdp.ConsumeIntegral<uint64_t>() /* frameTimeUs */,
+                      fdp.PickValueInArray(kSeekModes) /* option */,
+                      fdp.PickValueInArray(kColorFormats) /* colorFormat */) == OK) {
+        auto frameDecoderAPI = fdp.PickValueInArray<const std::function<void()>>({
+                [&]() { decoder->extractFrame(); },
+                [&]() {
+                    FrameRect rect(fdp.ConsumeIntegral<int32_t>() /* left */,
+                                   fdp.ConsumeIntegral<int32_t>() /* top */,
+                                   fdp.ConsumeIntegral<int32_t>() /* right */,
+                                   fdp.ConsumeIntegral<int32_t>() /* bottom */
+                    );
+                    decoder->extractFrame(&rect);
+                },
+                [&]() {
+                    FrameDecoder::getMetadataOnly(
+                            trackMeta, fdp.PickValueInArray(kColorFormats) /* colorFormat */,
+                            fdp.ConsumeBool() /* thumbnail */);
+                },
+        });
+        frameDecoderAPI();
     }
-
-    generated_mime_types.clear();
-
     return 0;
 }
 
