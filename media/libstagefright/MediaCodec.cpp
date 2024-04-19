@@ -3975,6 +3975,15 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     switch (mState) {
                         case INITIALIZING:
                         {
+                            // Resource error during INITIALIZING state needs to be logged
+                            // through metrics, to be able to track such occurrences.
+                            if (isResourceError(err)) {
+                                mediametrics_setInt32(mMetricsHandle, kCodecError, err);
+                                mediametrics_setCString(mMetricsHandle, kCodecErrorState,
+                                                        stateString(mState).c_str());
+                                flushMediametrics();
+                                initMediametrics();
+                            }
                             setState(UNINITIALIZED);
                             break;
                         }
