@@ -66,6 +66,7 @@ struct C2SoftVpxDec : public SimpleC2Component {
     // configurations used by component in process
     // (TODO: keep this in intf but make them internal only)
     std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormatInfo;
+    std::shared_ptr<C2StreamColorAspectsTuning::output> mColorAspects;
 
     std::shared_ptr<IntfImpl> mIntf;
     vpx_codec_ctx_t *mCodecCtx;
