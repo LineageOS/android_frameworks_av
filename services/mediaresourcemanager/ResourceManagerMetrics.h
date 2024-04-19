@@ -171,6 +171,9 @@ public:
     // Get the current concurrent pixel count (associated with the video codecs) for the process.
     long getCurrentConcurrentPixelCount(int pid) const;
 
+    // retrieves metrics log.
+    std::string dump() const;
+
 private:
     ResourceManagerMetrics(const ResourceManagerMetrics&) = delete;
     ResourceManagerMetrics(ResourceManagerMetrics&&) = delete;
@@ -204,9 +207,9 @@ private:
     // Map of resources (name) and number of concurrent instances
     std::map<std::string, int> mConcurrentResourceCountMap;
 
-    // Map of concurrent codes by CodecBucket across the system.
+    // Map of concurrent codecs by CodecBucket across the system.
     ConcurrentCodecsMap mConcurrentCodecsMap;
-    // Map of concurrent and peak codes by CodecBucket for each process/application.
+    // Map of concurrent and peak codecs by CodecBucket for each process/application.
     std::map<int32_t, ConcurrentCodecs> mProcessConcurrentCodecsMap;
 
     // Uid Observer to monitor the application termination.
