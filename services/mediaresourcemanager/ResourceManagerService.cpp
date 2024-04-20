@@ -108,9 +108,16 @@ binder_status_t ResourceManagerService::dump(int fd, const char** /*args*/, uint
         serviceLog = mServiceLog->toString("    " /* linePrefix */);
     }
 
-    // Get all the resource (and overload pid) logs
+    // Get all the resource (and overload pid) log.
     std::string resourceLog;
     getResourceDump(resourceLog);
+
+    // Get all the metrics log.
+    std::string metricsLog;
+    {
+        std::scoped_lock lock{mLock};
+        metricsLog = mResourceManagerMetrics->dump();
+    }
 
     const size_t SIZE = 256;
     char buffer[SIZE];
@@ -123,10 +130,15 @@ binder_status_t ResourceManagerService::dump(int fd, const char** /*args*/, uint
             supportsSecureWithNonSecureCodec);
     result.append(buffer);
 
+    // Add resource log.
     result.append(resourceLog.c_str());
 
+    // Add service log.
     result.append("  Events logs (most recent at top):\n");
     result.append(serviceLog);
+
+    // Add metrics log.
+    result.append(metricsLog.c_str());
 
     write(fd, result.c_str(), result.size());
     return OK;

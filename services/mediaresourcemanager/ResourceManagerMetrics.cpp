@@ -109,23 +109,17 @@ static CodecBucket getCodecBucket(bool isEncoder, MediaResourceSubType codecType
     return CodecBucketUnspecified;
 }
 
-static bool getLogMessage(int hwCount, int swCount, std::stringstream& logMsg) {
-    bool update = false;
-    logMsg.clear();
+static std::string getLogMessage(const std::string& firstKey, const long& firstValue,
+                                 const std::string& secondKey, const long& secondValue) {
 
-    if (hwCount > 0) {
-        logMsg << " HW: " << hwCount;
-        update = true;
+    std::stringstream logMsg;
+    if (firstValue > 0) {
+        logMsg << firstKey << firstValue;
     }
-    if (swCount > 0) {
-        logMsg << " SW: " << swCount;
-        update = true;
+    if (secondValue > 0) {
+        logMsg << secondKey << secondValue;
     }
-
-    if (update) {
-        logMsg << " ] ";
-    }
-    return update;
+    return logMsg.str();
 }
 
 ResourceManagerMetrics::ResourceManagerMetrics(const sp<ProcessInfoInterface>& processInfo) {
@@ -364,6 +358,15 @@ void ResourceManagerMetrics::onProcessTerminated(int32_t pid, uid_t uid) {
     std::scoped_lock lock(mLock);
     // post MediaCodecConcurrentUsageReported for this terminated pid.
     pushConcurrentUsageReport(pid, uid);
+    // Remove all the metrics associated with this process.
+    std::map<int32_t, ConcurrentCodecs>::iterator it1 = mProcessConcurrentCodecsMap.find(pid);
+    if (it1 != mProcessConcurrentCodecsMap.end()) {
+        mProcessConcurrentCodecsMap.erase(it1);
+    }
+    std::map<int32_t, PixelCount>::iterator it2 = mProcessPixelsMap.find(pid);
+    if (it2 != mProcessPixelsMap.end()) {
+        mProcessPixelsMap.erase(it2);
+    }
 }
 
 void ResourceManagerMetrics::pushConcurrentUsageReport(int32_t pid, uid_t uid) {
@@ -400,24 +403,30 @@ void ResourceManagerMetrics::pushConcurrentUsageReport(int32_t pid, uid_t uid) {
 
     std::stringstream peakCodecLog;
     peakCodecLog << "Peak { ";
-    std::stringstream logMsg;
-    if (getLogMessage(peakHwAudioEncoderCount, peakSwAudioEncoderCount, logMsg)) {
-        peakCodecLog << "AudioEnc[" << logMsg.str();
+    std::string logMsg;
+    logMsg = getLogMessage(" HW: ", peakHwAudioEncoderCount, " SW: ", peakSwAudioEncoderCount);
+    if (!logMsg.empty()) {
+        peakCodecLog << "AudioEnc[ " << logMsg << " ] ";
     }
-    if (getLogMessage(peakHwAudioDecoderCount, peakSwAudioDecoderCount, logMsg)) {
-        peakCodecLog << "AudioDec[" << logMsg.str();
+    logMsg = getLogMessage(" HW: ", peakHwAudioDecoderCount, " SW: ", peakSwAudioDecoderCount);
+    if (!logMsg.empty()) {
+        peakCodecLog << "AudioDec[" << logMsg << " ] ";
     }
-    if (getLogMessage(peakHwVideoEncoderCount, peakSwVideoEncoderCount, logMsg)) {
-        peakCodecLog << "VideoEnc[" << logMsg.str();
+    logMsg = getLogMessage(" HW: ", peakHwVideoEncoderCount, " SW: ", peakSwVideoEncoderCount);
+    if (!logMsg.empty()) {
+        peakCodecLog << "VideoEnc[" << logMsg << " ] ";
     }
-    if (getLogMessage(peakHwVideoDecoderCount, peakSwVideoDecoderCount, logMsg)) {
-        peakCodecLog << "VideoDec[" << logMsg.str();
+    logMsg = getLogMessage(" HW: ", peakHwVideoDecoderCount, " SW: ", peakSwVideoDecoderCount);
+    if (!logMsg.empty()) {
+        peakCodecLog << "VideoDec[" << logMsg << " ] ";
     }
-    if (getLogMessage(peakHwImageEncoderCount, peakSwImageEncoderCount, logMsg)) {
-        peakCodecLog << "ImageEnc[" << logMsg.str();
+    logMsg = getLogMessage(" HW: ", peakHwImageEncoderCount, " SW: ", peakSwImageEncoderCount);
+    if (!logMsg.empty()) {
+        peakCodecLog << "ImageEnc[" << logMsg << " ] ";
     }
-    if (getLogMessage(peakHwImageDecoderCount, peakSwImageDecoderCount, logMsg)) {
-        peakCodecLog << "ImageDec[" << logMsg.str();
+    logMsg = getLogMessage(" HW: ", peakHwImageDecoderCount, " SW: ", peakSwImageDecoderCount);
+    if (!logMsg.empty()) {
+        peakCodecLog << "ImageDec[" << logMsg << " ] ";
     }
     peakCodecLog << "}";
 
@@ -703,6 +712,116 @@ long ResourceManagerMetrics::getCurrentConcurrentPixelCount(int pid) const {
     }
 
     return 0;
+}
+
+static std::string getConcurrentInstanceCount(const std::map<std::string, int>& resourceMap) {
+    if (resourceMap.empty()) {
+        return "";
+    }
+    std::stringstream concurrentInstanceInfo;
+    for (const auto& [name, count] : resourceMap) {
+        if (count > 0) {
+            concurrentInstanceInfo << "      Name: " << name << " Instances: " << count << "\n";
+        }
+    }
+
+    std::string info = concurrentInstanceInfo.str();
+    if (info.empty()) {
+        return "";
+    }
+    return "    Current Concurrent Codec Instances:\n" + info;
+}
+
+static std::string getAppsPixelCount(const std::map<int32_t, PixelCount>& pixelMap) {
+    if (pixelMap.empty()) {
+        return "";
+    }
+    std::stringstream pixelInfo;
+    for (const auto& [pid, pixelCount] : pixelMap) {
+        std::string logMsg = getLogMessage(" Current Pixels: ", pixelCount.mCurrent,
+                                           " Peak Pixels: ", pixelCount.mPeak);
+        if (!logMsg.empty()) {
+            pixelInfo  << "      PID[" << pid << "]: {" << logMsg << " }\n";
+        }
+    }
+
+    return "    Applications Pixel Usage:\n" + pixelInfo.str();
+}
+
+static std::string getCodecUsageMetrics(const ConcurrentCodecsMap& codecsMap) {
+    int peakHwAudioEncoderCount = codecsMap[HwAudioEncoder];
+    int peakHwAudioDecoderCount = codecsMap[HwAudioDecoder];
+    int peakHwVideoEncoderCount = codecsMap[HwVideoEncoder];
+    int peakHwVideoDecoderCount = codecsMap[HwVideoDecoder];
+    int peakHwImageEncoderCount = codecsMap[HwImageEncoder];
+    int peakHwImageDecoderCount = codecsMap[HwImageDecoder];
+    int peakSwAudioEncoderCount = codecsMap[SwAudioEncoder];
+    int peakSwAudioDecoderCount = codecsMap[SwAudioDecoder];
+    int peakSwVideoEncoderCount = codecsMap[SwVideoEncoder];
+    int peakSwVideoDecoderCount = codecsMap[SwVideoDecoder];
+    int peakSwImageEncoderCount = codecsMap[SwImageEncoder];
+    int peakSwImageDecoderCount = codecsMap[SwImageDecoder];
+    std::stringstream usageMetrics;
+    std::string logMsg;
+    logMsg = getLogMessage(" HW: ", peakHwAudioEncoderCount, " SW: ", peakSwAudioEncoderCount);
+    if (!logMsg.empty()) {
+        usageMetrics << "AudioEnc[" << logMsg << " ] ";
+    }
+    logMsg = getLogMessage(" HW: ", peakHwAudioDecoderCount, " SW: ", peakSwAudioDecoderCount);
+    if (!logMsg.empty()) {
+        usageMetrics << "AudioDec[" << logMsg << " ] ";
+    }
+    logMsg = getLogMessage(" HW: ", peakHwVideoEncoderCount, " SW: ", peakSwVideoEncoderCount);
+    if (!logMsg.empty()) {
+        usageMetrics << "VideoEnc[" << logMsg << " ] ";
+    }
+    logMsg = getLogMessage(" HW: ", peakHwVideoDecoderCount, " SW: ", peakSwVideoDecoderCount);
+    if (!logMsg.empty()) {
+        usageMetrics << "VideoDec[" << logMsg << " ] ";
+    }
+    logMsg = getLogMessage(" HW: ", peakHwImageEncoderCount, " SW: ", peakSwImageEncoderCount);
+    if (!logMsg.empty()) {
+        usageMetrics << "ImageEnc[" << logMsg << " ] ";
+    }
+    logMsg = getLogMessage(" HW: ", peakHwImageDecoderCount, " SW: ", peakSwImageDecoderCount);
+    if (!logMsg.empty()) {
+        usageMetrics << "ImageDec[" << logMsg << " ] ";
+    }
+
+    return usageMetrics.str();
+}
+
+static std::string getAppsCodecUsageMetrics(
+        const std::map<int32_t, ConcurrentCodecs>& processCodecsMap) {
+    if (processCodecsMap.empty()) {
+        return "";
+    }
+    std::stringstream codecUsage;
+    std::string info;
+    for (const auto& [pid, codecMap] : processCodecsMap) {
+        codecUsage << "      PID[" << pid << "]: ";
+        info = getCodecUsageMetrics(codecMap.mCurrent);
+        if (!info.empty()) {
+            codecUsage << "Current Codec Usage: { " << info << "} ";
+        }
+        info = getCodecUsageMetrics(codecMap.mPeak);
+        if (!info.empty()) {
+            codecUsage << "Peak Codec Usage: { " << info << "}";
+        }
+        codecUsage << "\n";
+    }
+
+    return "    Applications Codec Usage:\n" + codecUsage.str();
+}
+
+
+std::string ResourceManagerMetrics::dump() const {
+    std::string metricsLog("  Metrics logs:\n");
+    metricsLog += getConcurrentInstanceCount(mConcurrentResourceCountMap);
+    metricsLog += getAppsPixelCount(mProcessPixelsMap);
+    metricsLog += getAppsCodecUsageMetrics(mProcessConcurrentCodecsMap);
+
+    return std::move(metricsLog);
 }
 
 } // namespace android
