@@ -14,5 +14,8 @@ robertshih@google.com
 taklee@google.com
 wonsik@google.com
 
+# For TEST_MAPPING tv-presubmit and tv-postsubmit configurations:
+per-file TEST_MAPPING = blindahl@google.com
+
 # go/android-fwk-media-solutions for info on areas of ownership.
 include platform/frameworks/av:/media/janitors/media_solutions_OWNERS
