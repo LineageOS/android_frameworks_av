@@ -44,5 +44,11 @@
             ],
             "file_patterns": ["(?i)drm|crypto"]
         }
+    ],
+    // Postsubmit tests for TV devices
+    "tv-postsubmit": [
+       {
+           "name": "DecoderRenderTest"
+       }
     ]
 }
