@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "EglUtil.h"
 #include "android/hardware_buffer.h"
 #include "jpeglib.h"
 #include "ui/GraphicBuffer.h"
@@ -35,11 +36,6 @@ namespace virtualcamera {
 using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::hardware::common::NativeHandle;
 
-// Lower bound for maximal supported texture size is at least 2048x2048
-// but on most platforms will be more.
-// TODO(b/301023410) - Query actual max texture size.
-constexpr int kMaxTextureSize = 2048;
-constexpr int kLibJpegDctSize = DCTSIZE;
 constexpr int kMaxFpsUpperLimit = 60;
 
 constexpr std::array<Format, 2> kSupportedFormats{Format::YUV_420_888,
@@ -141,8 +137,9 @@ bool isFormatSupportedForInput(const int width, const int height,
     return false;
   }
 
-  if (width <= 0 || height <= 0 || width > kMaxTextureSize ||
-      height > kMaxTextureSize) {
+  int maxTextureSize = getMaximumTextureSize();
+  if (width <= 0 || height <= 0 || width > maxTextureSize ||
+      height > maxTextureSize) {
     return false;
   }
 

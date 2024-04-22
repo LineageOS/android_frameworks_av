@@ -20,12 +20,16 @@
 
 #include <cstring>
 
+#include "EglDisplayContext.h"
 #include "GLES/gl.h"
 #include "log/log.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
+
+// Lower bound for maximum supported texture size is at least 2048x2048
+constexpr int kDefaultMaxTextureSize = 2048;
 
 bool checkEglError(const char* operation) {
   GLenum err = glGetError();
@@ -43,6 +47,20 @@ bool isGlExtensionSupported(const char* extension) {
     return false;
   }
   return strstr(extensions, extension) != nullptr;
+}
+
+int getMaximumTextureSize() {
+  static const int kMaxTextureSize = [] {
+    EglDisplayContext displayContext;
+    displayContext.makeCurrent();
+    int maxTextureSize = -1;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+    return maxTextureSize;
+  }();
+  if (kMaxTextureSize <= 0) {
+    return kDefaultMaxTextureSize;
+  }
+  return kMaxTextureSize;
 }
 
 }  // namespace virtualcamera

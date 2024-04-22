@@ -27,6 +27,8 @@ bool checkEglError(const char* operation = "EGL operation");
 // Returns true if the GL extension is supported, false otherwise.
 bool isGlExtensionSupported(const char* extension);
 
+int getMaximumTextureSize();
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android
