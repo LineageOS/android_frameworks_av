@@ -54,7 +54,7 @@ cc_library {
 
     static_libs: [
         "libarect",
-        "libyuv_static",
+        "libyuv",
     ],
 
     sanitize: {
