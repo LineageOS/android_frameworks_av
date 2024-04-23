@@ -143,3 +143,13 @@ flag {
      description: "Enables 10-bit support in the camera extensions."
      bug: "316375635"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "realtime_priority_bump"
+     description: "Bump the scheduling priority of performance critical code paths"
+     bug: "336628522"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}
