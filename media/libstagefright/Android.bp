@@ -322,7 +322,7 @@ cc_library {
         "android.media.codec-aconfig-cc",
         "libstagefright_esds",
         "libstagefright_color_conversion",
-        "libyuv_static",
+        "libyuv",
         "libstagefright_webm",
         "libstagefright_timedtext",
         "libogg",

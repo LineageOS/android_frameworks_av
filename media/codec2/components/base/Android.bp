@@ -43,7 +43,7 @@ cc_library {
     ],
 
     static_libs: [
-        "libyuv_static", // for conversion routines
+        "libyuv", // for conversion routines
     ],
 
     shared_libs: [
