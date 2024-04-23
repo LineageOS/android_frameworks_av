@@ -163,7 +163,7 @@ cc_fuzz {
 
     static_libs: [
         "libgav1",
-        "libyuv_static",
+        "libyuv",
         "libcodec2_soft_av1dec_gav1",
     ],
 }

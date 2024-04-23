@@ -27,7 +27,7 @@ package {
 cc_defaults {
     name: "libcolorconversion_fuzzer_defaults",
     static_libs: [
-        "libyuv_static",
+        "libyuv",
         "libstagefright_color_conversion",
         "libstagefright",
         "liblog",

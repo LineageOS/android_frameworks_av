@@ -23,7 +23,7 @@ cc_library {
     srcs: ["C2SoftGav1Dec.cpp"],
     static_libs: [
         "libgav1",
-        "libyuv_static",
+        "libyuv",
     ],
 
     apex_available: [
