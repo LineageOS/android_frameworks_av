@@ -217,3 +217,13 @@ flag {
      description: "Miscellaneous camera platform metrics for 24Q3"
      bug: "332557570"
 }
+
+flag {
+     namespace: "camera_platform"
+     name: "realtime_priority_bump"
+     description: "Bump the scheduling priority of performance critical code paths"
+     bug: "336628522"
+     metadata {
+       purpose: PURPOSE_BUGFIX
+     }
+}

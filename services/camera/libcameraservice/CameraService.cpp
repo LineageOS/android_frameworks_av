@@ -82,10 +82,11 @@
 #include "CameraService.h"
 #include "api1/Camera2Client.h"
 #include "api2/CameraDeviceClient.h"
-#include "utils/CameraTraces.h"
-#include "utils/TagMonitor.h"
 #include "utils/CameraServiceProxyWrapper.h"
+#include "utils/CameraTraces.h"
 #include "utils/SessionConfigurationUtils.h"
+#include "utils/TagMonitor.h"
+#include "utils/Utils.h"
 
 namespace {
     const char* kPermissionServiceName = "permission";
@@ -2423,6 +2424,7 @@ Status CameraService::connectDevice(
         /*out*/
         sp<hardware::camera2::ICameraDeviceUser>* device) {
     ATRACE_CALL();
+    RunThreadWithRealtimePriority priorityBump;
     Status ret = Status::ok();
     sp<CameraDeviceClient> client = nullptr;
     std::string clientPackageNameAdj = clientPackageName;
