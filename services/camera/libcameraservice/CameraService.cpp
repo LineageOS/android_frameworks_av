@@ -4444,8 +4444,10 @@ status_t CameraService::BasicClient::handleAppOpMode(int32_t mode) {
         // connection has been fully established and at that time camera muting
         // capabilities are unknown.
         if (!isUidActive || !isCameraPrivacyEnabled) {
-            ALOGI("Camera %s: Access for \"%s\" has been restricted",
-                    mCameraIdStr.c_str(), mClientPackageName.c_str());
+            ALOGI("Camera %s: Access for \"%s\" has been restricted."
+                    "uid active: %s, privacy enabled: %s", mCameraIdStr.c_str(),
+                    mClientPackageName.c_str(), isUidActive ? "true" : "false",
+                    isCameraPrivacyEnabled ? "true" : "false");
             // Return the same error as for device policy manager rejection
             return -EACCES;
         }
