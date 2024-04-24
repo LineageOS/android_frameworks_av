@@ -7575,6 +7575,22 @@ bool ACodec::LoadedToIdleState::onOMXEvent(
             return true;
         }
 
+        // When Acodec receive an error event at LoadedToIdleState, it will not release
+        // allocated buffers, which will cause gralloc buffer leak issue. We need to first release
+        // these buffers and then process the error event
+        case OMX_EventError:
+        {
+            if (mCodec->allYourBuffersAreBelongToUs(kPortIndexInput)) {
+                mCodec->freeBuffersOnPort(kPortIndexInput);
+            }
+
+            if (mCodec->allYourBuffersAreBelongToUs(kPortIndexOutput)) {
+                mCodec->freeBuffersOnPort(kPortIndexOutput);
+            }
+
+            return BaseState::onOMXEvent(event, data1, data2);
+        }
+
         default:
             return BaseState::onOMXEvent(event, data1, data2);
     }
