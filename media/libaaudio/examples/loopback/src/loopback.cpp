@@ -323,7 +323,6 @@ static void usage() {
     printf("      -C{channels}      number of input channels\n");
     printf("      -D{deviceId}      input device ID\n");
     printf("      -F{0,1,2}         input format, 1=I16, 2=FLOAT\n");
-    printf("      -g{gain}          recirculating loopback gain\n");
     printf("      -h{hangMillis}    occasionally hang in the callback\n");
     printf("      -P{inPerf}        set input AAUDIO_PERFORMANCE_MODE*\n");
     printf("          n for _NONE\n");
@@ -436,7 +435,6 @@ int main(int argc, const char **argv)
     int                   written                    = 0;
 
     int                   testMode                   = TEST_LATENCY;
-    double                gain                       = 1.0;
     int                   hangTimeMillis             = 0;
     std::string           report;
 
@@ -467,9 +465,6 @@ int main(int argc, const char **argv)
                         break;
                     case 'F':
                         requestedInputFormat = atoi(&arg[2]);
-                        break;
-                    case 'g':
-                        gain = atof(&arg[2]);
                         break;
                     case 'h':
                         // Was there a number after the "-h"?
