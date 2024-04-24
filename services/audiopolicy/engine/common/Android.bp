@@ -61,4 +61,7 @@ cc_library_static {
         "com.android.media.audio-aconfig-cc",
         "server_configurable_flags",
     ],
+    defaults: [
+        "aconfig_lib_cc_static_link.defaults",
+    ],
 }
