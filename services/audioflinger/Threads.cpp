@@ -8239,6 +8239,7 @@ reacquire_wakelock:
     for (int64_t loopCount = 0;; ++loopCount) {  // loopCount used for statistics tracking
         // Note: these sp<> are released at the end of the for loop outside of the mutex() lock.
         sp<IAfRecordTrack> activeTrack;
+        std::vector<sp<IAfRecordTrack>> oldActiveTracks;
         Vector<sp<IAfEffectChain>> effectChains;
 
         // activeTracks accumulates a copy of a subset of mActiveTracks
@@ -8288,7 +8289,9 @@ reacquire_wakelock:
             bool doBroadcast = false;
             bool allStopped = true;
             for (size_t i = 0; i < size; ) {
-
+                if (activeTrack) {  // ensure track release is outside lock.
+                    oldActiveTracks.emplace_back(std::move(activeTrack));
+                }
                 activeTrack = mActiveTracks[i];
                 if (activeTrack->isTerminated()) {
                     if (activeTrack->isFastTrack()) {
