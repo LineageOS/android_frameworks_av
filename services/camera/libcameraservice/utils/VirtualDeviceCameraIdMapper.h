@@ -79,6 +79,9 @@ private:
     // Map of (deviceId, app-visible cameraId) -> HAL-visible cameraId
     std::map<std::pair<int32_t, std::string>, std::string>
             mDeviceIdMappedCameraIdPairToCameraIdMap GUARDED_BY(mLock);
+    // Map of HAL-visible cameraId -> (deviceId, app-visible cameraId)
+    std::map<std::string, std::pair<int32_t, std::string>>
+            mCameraIdToDeviceIdMappedCameraIdPairMap GUARDED_BY(mLock);
 };
 
 } // namespace android

@@ -29,48 +29,46 @@ namespace vd_flags = android::companion::virtualdevice::flags;
 void VirtualDeviceCameraIdMapper::addCamera(const std::string& cameraId,
         int32_t deviceId, const std::string& mappedCameraId) {
     if (!vd_flags::camera_device_awareness()) {
-        ALOGD("%s: Device-aware camera feature is not enabled", __func__);
+        ALOGV("%s: Device-aware camera feature is not enabled", __func__);
         return;
     }
 
     if (deviceId == kDefaultDeviceId) {
-        ALOGD("%s: Not adding entry for a camera of the default device", __func__);
+        ALOGV("%s: Not adding entry for a camera of the default device", __func__);
         return;
     }
 
-    ALOGD("%s: Adding camera %s for device %d with mapped id %s", __func__, cameraId.c_str(),
+    ALOGV("%s: Adding camera %s for device %d with mapped id %s", __func__, cameraId.c_str(),
           deviceId, mappedCameraId.c_str());
 
     std::scoped_lock lock(mLock);
     mDeviceIdMappedCameraIdPairToCameraIdMap[{deviceId, mappedCameraId}] = cameraId;
+    mCameraIdToDeviceIdMappedCameraIdPairMap[cameraId] = {deviceId, mappedCameraId};
 }
 
 void VirtualDeviceCameraIdMapper::removeCamera(const std::string& cameraId) {
     if (!vd_flags::camera_device_awareness()) {
-        ALOGD("%s: Device-aware camera feature is not enabled", __func__);
+        ALOGV("%s: Device-aware camera feature is not enabled", __func__);
         return;
     }
 
+    auto deviceIdAndMappedCameraIdPair = getDeviceIdAndMappedCameraIdPair(cameraId);
+
     std::scoped_lock lock(mLock);
-    for (auto it = mDeviceIdMappedCameraIdPairToCameraIdMap.begin();
-         it != mDeviceIdMappedCameraIdPairToCameraIdMap.end(); ++it) {
-        if (it->first.second == cameraId) {
-            mDeviceIdMappedCameraIdPairToCameraIdMap.erase(it);
-            return;
-        }
-    }
+    mCameraIdToDeviceIdMappedCameraIdPairMap.erase(cameraId);
+    mDeviceIdMappedCameraIdPairToCameraIdMap.erase(deviceIdAndMappedCameraIdPair);
 }
 
 std::optional<std::string> VirtualDeviceCameraIdMapper::getActualCameraId(
         int32_t deviceId, const std::string& mappedCameraId) const {
     if (deviceId == kDefaultDeviceId) {
-        ALOGD("%s: Returning the camera id as the mapped camera id for camera %s, as it "
+        ALOGV("%s: Returning the camera id as the mapped camera id for camera %s, as it "
               "belongs to the default device", __func__, mappedCameraId.c_str());
         return mappedCameraId;
     }
 
     if (!vd_flags::camera_device_awareness()) {
-        ALOGD("%s: Device-aware camera feature is not enabled, returning the camera id as "
+        ALOGV("%s: Device-aware camera feature is not enabled, returning the camera id as "
               "the mapped camera id for camera %s", __func__, mappedCameraId.c_str());
         return mappedCameraId;
     }
@@ -79,7 +77,7 @@ std::optional<std::string> VirtualDeviceCameraIdMapper::getActualCameraId(
     auto iterator = mDeviceIdMappedCameraIdPairToCameraIdMap.find(
             {deviceId, mappedCameraId});
     if (iterator == mDeviceIdMappedCameraIdPairToCameraIdMap.end()) {
-        ALOGW("%s: No entry found for device id %d and mapped camera id %s", __func__,
+        ALOGV("%s: No entry found for device id %d and mapped camera id %s", __func__,
               deviceId, mappedCameraId.c_str());
         return std::nullopt;
     }
@@ -89,19 +87,17 @@ std::optional<std::string> VirtualDeviceCameraIdMapper::getActualCameraId(
 std::pair<int32_t, std::string> VirtualDeviceCameraIdMapper::getDeviceIdAndMappedCameraIdPair(
         const std::string& cameraId) const {
     if (!vd_flags::camera_device_awareness()) {
-        ALOGD("%s: Device-aware camera feature is not enabled", __func__);
+        ALOGV("%s: Device-aware camera feature is not enabled", __func__);
         return std::make_pair(kDefaultDeviceId, cameraId);
     }
 
     std::scoped_lock lock(mLock);
-    for (const auto& [deviceIdMappedCameraIdPair, actualCameraId]
-            : mDeviceIdMappedCameraIdPairToCameraIdMap) {
-        if (actualCameraId == cameraId) {
-            return deviceIdMappedCameraIdPair;
-        }
+    auto iterator = mCameraIdToDeviceIdMappedCameraIdPairMap.find(cameraId);
+    if (iterator != mCameraIdToDeviceIdMappedCameraIdPairMap.end()) {
+        return iterator->second;
     }
     ALOGV("%s: No device id and mapped camera id found for camera id %s, so it must belong "
-            "to the default device ? ", __func__, cameraId.c_str());
+            "to the default device ?", __func__, cameraId.c_str());
     return std::make_pair(kDefaultDeviceId, cameraId);
 }
 
@@ -124,7 +120,7 @@ int VirtualDeviceCameraIdMapper::getNumberOfCameras(int32_t deviceId) const {
 std::optional<std::string> VirtualDeviceCameraIdMapper::getActualCameraId(
         int api1CameraId, int32_t deviceId) const {
     if (!vd_flags::camera_device_awareness()) {
-        ALOGD("%s: Device-aware camera feature is not enabled", __func__);
+        ALOGV("%s: Device-aware camera feature is not enabled", __func__);
         return std::nullopt;
     }
 
@@ -139,7 +135,7 @@ std::optional<std::string> VirtualDeviceCameraIdMapper::getActualCameraId(
             matchingCameraIndex++;
         }
     }
-    ALOGW("%s: No entry found for device id %d and API 1 camera id %d", __func__,
+    ALOGV("%s: No entry found for device id %d and API 1 camera id %d", __func__,
           deviceId, api1CameraId);
     return std::nullopt;
 }
