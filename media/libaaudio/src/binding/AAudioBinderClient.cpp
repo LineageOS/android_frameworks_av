@@ -71,18 +71,10 @@ std::shared_ptr<AAudioServiceInterface> AAudioBinderClient::getAAudioService() {
     {
         Mutex::Autolock _l(mServiceLock);
         if (mAdapter == nullptr) {
-            sp<IBinder> binder;
             sp<IServiceManager> sm = defaultServiceManager();
-            // Try several times to get the service.
-            int retries = 4;
-            do {
-                binder = sm->getService(String16(AAUDIO_SERVICE_NAME)); // This will wait a while.
-                if (binder.get() != nullptr) {
-                    break;
-                }
-            } while (retries-- > 0);
+            sp<IBinder> binder = sm->waitForService(String16(AAUDIO_SERVICE_NAME));
 
-            if (binder.get() != nullptr) {
+            if (binder != nullptr) {
                 // Ask for notification if the service dies.
                 status_t status = binder->linkToDeath(mAAudioClient);
                 // TODO review what we should do if this fails
