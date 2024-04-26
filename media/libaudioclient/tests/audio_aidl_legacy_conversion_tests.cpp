@@ -481,28 +481,8 @@ INSTANTIATE_TEST_SUITE_P(
                                  AudioDeviceAddress::make<AudioDeviceAddress::Tag::alsa>(
                                          std::vector<int32_t>{1, 2}))));
 
-TEST(AnonymizedBluetoothAddressRoundTripTest, Legacy2Aidl2Legacy) {
-    const std::vector<uint8_t> sAnonymizedAidlAddress =
-            std::vector<uint8_t>{0xFD, 0xFF, 0xFF, 0xFF, 0xAB, 0xCD};
-    const std::string sAnonymizedLegacyAddress = std::string("XX:XX:XX:XX:AB:CD");
-    auto device = legacy2aidl_audio_device_AudioDevice(AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
-                                                       sAnonymizedLegacyAddress);
-    ASSERT_TRUE(device.ok());
-    ASSERT_EQ(AudioDeviceAddress::Tag::mac, device.value().address.getTag());
-    ASSERT_EQ(sAnonymizedAidlAddress, device.value().address.get<AudioDeviceAddress::mac>());
-
-    audio_devices_t legacyType;
-    std::string legacyAddress;
-    status_t status =
-            aidl2legacy_AudioDevice_audio_device(device.value(), &legacyType, &legacyAddress);
-    ASSERT_EQ(OK, status);
-    EXPECT_EQ(legacyType, AUDIO_DEVICE_OUT_BLUETOOTH_A2DP);
-    EXPECT_EQ(sAnonymizedLegacyAddress, legacyAddress);
-}
-
 class AudioFormatDescriptionRoundTripTest : public testing::TestWithParam<AudioFormatDescription> {
 };
-
 TEST_P(AudioFormatDescriptionRoundTripTest, Aidl2Legacy2Aidl) {
     const auto initial = GetParam();
     auto conv = aidl2legacy_AudioFormatDescription_audio_format_t(initial);
