@@ -5114,7 +5114,7 @@ bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled() {
 
 bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled(const String16& packageName) {
     if (!hasCameraPrivacyFeature()) {
-        return SensorPrivacyManager::DISABLED;
+        return false;
     }
     return mSpm.isCameraPrivacyEnabled(packageName);
 }
