@@ -505,6 +505,7 @@ class AudioPolicyManagerTestMsd : public AudioPolicyManagerTest,
     sp<DeviceDescriptor> mSpdifDevice;
 
     sp<DeviceDescriptor> mHdmiInputDevice;
+    const uid_t mUid = 8675;
 };
 
 AudioPolicyManagerTestMsd::AudioPolicyManagerTestMsd()
@@ -630,7 +631,7 @@ void AudioPolicyManagerTestMsd::TearDown() {
 AudioProfileVector AudioPolicyManagerTestMsd::getDirectProfilesForAttributes(
                                                     const audio_attributes_t& attr) {
     AudioProfileVector audioProfilesVector;
-    mManager->getDirectProfilesForAttributes(&attr, audioProfilesVector);
+    mManager->getDirectProfilesForAttributes(&attr, mUid, audioProfilesVector);
     return audioProfilesVector;
 }
 
@@ -925,18 +926,18 @@ TEST_P(AudioPolicyManagerTestMsd, GetDirectPlaybackSupportWithMsd) {
     msdNonDirectConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
 
     ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &directConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &directConfig));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &nonDirectConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &nonDirectConfig));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &nonExistentConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &nonExistentConfig));
     // before setting MSD patches the direct MSD configs return AUDIO_DIRECT_NOT_SUPPORTED
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig1));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdDirectConfig1));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig2));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdDirectConfig2));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdNonDirectConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdNonDirectConfig));
 
     DeviceVector outputDevices = mManager->getAvailableOutputDevices();
     // Remove MSD output device to avoid patching to itself
@@ -944,34 +945,34 @@ TEST_P(AudioPolicyManagerTestMsd, GetDirectPlaybackSupportWithMsd) {
     mManager->setMsdOutputPatches(&outputDevices);
 
     ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &directConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &directConfig));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &nonDirectConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &nonDirectConfig));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &nonExistentConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &nonExistentConfig));
     // after setting MSD patches the direct MSD configs return values according to their flags
     ASSERT_EQ(AUDIO_DIRECT_OFFLOAD_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig1));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdDirectConfig1));
     ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig2));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdDirectConfig2));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdNonDirectConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdNonDirectConfig));
 
     mManager->releaseMsdOutputPatches(outputDevices);
 
     ASSERT_EQ(AUDIO_DIRECT_BITSTREAM_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &directConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &directConfig));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &nonDirectConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &nonDirectConfig));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &nonExistentConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &nonExistentConfig));
     // after releasing MSD patches the direct MSD configs return AUDIO_DIRECT_NOT_SUPPORTED
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig1));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdDirectConfig1));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdDirectConfig2));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdDirectConfig2));
     ASSERT_EQ(AUDIO_DIRECT_NOT_SUPPORTED,
-                mManager->getDirectPlaybackSupport(&attr, &msdNonDirectConfig));
+                mManager->getDirectPlaybackSupport(&attr, mUid, &msdNonDirectConfig));
 }
 
 class AudioPolicyManagerTestWithConfigurationFile : public AudioPolicyManagerTest {
@@ -1784,7 +1785,6 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, GetFlushFromFrameSupport) {
 class AudioPolicyManagerTestDynamicPolicy : public AudioPolicyManagerTestWithConfigurationFile {
 protected:
     void TearDown() override;
-
     status_t addPolicyMix(int mixType, int mixFlag, audio_devices_t deviceType,
             std::string mixAddress, const audio_config_t& audioConfig,
             const std::vector<AudioMixMatchCriterion>& matchCriteria);
@@ -4909,6 +4909,7 @@ class AudioPolicyManagerTestVolumeGroupID : public AudioPolicyManagerTestWithCon
 public:
     static constexpr int sMinIndex = 5;
     static constexpr int sMaxIndex = 10;
+    const uid_t mUid = 1979;
     static const std::vector<audio_stream_type_t> sStreams;
 protected:
     void SetUp() override;
@@ -5004,7 +5005,8 @@ TEST_F_WITH_FLAGS(AudioPolicyManagerTestVolumeGroupID, SetAndGetVolumeWithId,
         if (streamType >= AUDIO_STREAM_PUBLIC_CNT) continue;
         int setIndex;
 
-        EXPECT_EQ(OK, mManager->setVolumeIndexForGroup(vg, testIndex, /* muted= */ false, type));
+        EXPECT_EQ(OK, mManager->setVolumeIndexForGroup(vg, mUid, testIndex, /* muted= */ false,
+                                                       type));
         EXPECT_EQ(OK, mManager->getVolumeIndexForGroup(vg, setIndex, type));
 
         EXPECT_EQ(testIndex, setIndex) << "Set index for group " << group.getName().c_str();
@@ -5047,8 +5049,8 @@ TEST_F_WITH_FLAGS(AudioPolicyManagerTestVolumeGroupID, SetWithIDAndGetVolumeWith
         if (streamType >= AUDIO_STREAM_PUBLIC_CNT) continue;
         int setIndex;
 
-        EXPECT_EQ(OK, mManager->setVolumeIndexForGroup(vg, testIndex, /* muted= */ false, type));
-
+        EXPECT_EQ(OK, mManager->setVolumeIndexForGroup(vg, mUid, testIndex, /* muted= */ false,
+                                                       type));
         EXPECT_EQ(OK, mManager->getStreamVolumeIndex(streamType, &setIndex, type));
         EXPECT_EQ(testIndex, setIndex) << "Get index for stream in " << group.getName().c_str();
     }
@@ -5068,7 +5070,7 @@ TEST_F_WITH_FLAGS(AudioPolicyManagerTestVolumeGroupID, SetWithInvalidIndexVolume
         if (streamType >= AUDIO_STREAM_PUBLIC_CNT) continue;
 
         EXPECT_EQ(BAD_VALUE,
-                  mManager->setVolumeIndexForGroup(vg, testIndex, /* muted= */ false, type));
+                  mManager->setVolumeIndexForGroup(vg, mUid, testIndex, /* muted= */ false, type));
     }
 }
 
@@ -5077,7 +5079,7 @@ TEST_F_WITH_FLAGS(AudioPolicyManagerTestVolumeGroupID, SetWithInvalidId,
                                             volume_group_management_update))) {
     audio_devices_t type = AUDIO_DEVICE_OUT_SPEAKER;
 
-    EXPECT_EQ(BAD_VALUE, mManager->setVolumeIndexForGroup(VOLUME_GROUP_NONE, sMaxIndex,
+    EXPECT_EQ(BAD_VALUE, mManager->setVolumeIndexForGroup(VOLUME_GROUP_NONE, mUid, sMaxIndex,
                                                           /* muted= */ false, type));
 }
 
