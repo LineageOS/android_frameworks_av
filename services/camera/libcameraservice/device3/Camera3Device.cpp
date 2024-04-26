@@ -3649,19 +3649,18 @@ bool Camera3Device::RequestThread::threadLoop() {
         cleanUpFailedRequests(/*sendRequestError*/ true);
         // Check if any stream is abandoned.
         checkAndStopRepeatingRequest();
+        // Inform waitUntilRequestProcessed thread of a failed request ID
+        wakeupLatestRequest(/*failedRequestId*/true, latestRequestId);
         return true;
     } else if (res != OK) {
         cleanUpFailedRequests(/*sendRequestError*/ false);
+        // Inform waitUntilRequestProcessed thread of a failed request ID
+        wakeupLatestRequest(/*failedRequestId*/true, latestRequestId);
         return false;
     }
 
     // Inform waitUntilRequestProcessed thread of a new request ID
-    {
-        Mutex::Autolock al(mLatestRequestMutex);
-
-        mLatestRequestId = latestRequestId;
-        mLatestRequestSignal.signal();
-    }
+    wakeupLatestRequest(/*failedRequestId*/false, latestRequestId);
 
     // Submit a batch of requests to HAL.
     // Use flush lock only when submitting multilple requests in a batch.
@@ -4393,12 +4392,7 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
                         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST,
                         captureRequest->mResultExtras);
             }
-            {
-                Mutex::Autolock al(mLatestRequestMutex);
-
-                mLatestFailedRequestId = captureRequest->mResultExtras.requestId;
-                mLatestRequestSignal.signal();
-            }
+            wakeupLatestRequest(/*failedRequestId*/true, captureRequest->mResultExtras.requestId);
         }
 
         // Remove yet-to-be submitted inflight request from inflightMap
@@ -5059,6 +5053,20 @@ status_t Camera3Device::RequestThread::setHalInterface(
 
     return OK;
 }
+
+void  Camera3Device::RequestThread::wakeupLatestRequest(
+        bool latestRequestFailed,
+        int32_t latestRequestId) {
+    Mutex::Autolock al(mLatestRequestMutex);
+
+    if (latestRequestFailed) {
+        mLatestFailedRequestId = latestRequestId;
+    } else {
+        mLatestRequestId = latestRequestId;
+    }
+    mLatestRequestSignal.signal();
+}
+
 
 /**
  * PreparerThread inner class methods

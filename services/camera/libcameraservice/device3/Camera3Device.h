@@ -1026,6 +1026,11 @@ class Camera3Device :
             const sp<CaptureRequest> &request,
             const CameraMetadata& injectedSessionParams);
 
+        /**
+         * signal mLatestRequestmutex
+         **/
+        void wakeupLatestRequest(bool latestRequestFailed, int32_t latestRequestId);
+
       protected:
 
         virtual bool threadLoop();
