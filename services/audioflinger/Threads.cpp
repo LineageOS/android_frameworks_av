@@ -1482,8 +1482,8 @@ status_t PlaybackThread::checkEffectCompatibility_l(
     }
 
     if (IAfEffectModule::isHapticGenerator(&desc->type) && mHapticChannelCount == 0) {
-        ALOGW("%s: thread doesn't support haptic playback while the effect is HapticGenerator",
-                __func__);
+        ALOGW("%s: thread (%s) doesn't support haptic playback while the effect is HapticGenerator",
+              __func__, threadTypeToString(mType));
         return BAD_VALUE;
     }
 
