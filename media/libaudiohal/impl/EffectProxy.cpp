@@ -206,10 +206,6 @@ Descriptor::Common EffectProxy::buildDescriptorCommon(
             ALOGW("Inconsistent flags %s vs %s", desc.common.flags.toString().c_str(),
                   firstFlag.toString().c_str());
         }
-        // set to AUXILIARY if any sub-effect is of AUXILIARY type
-        if (desc.common.flags.type == Flags::Type::AUXILIARY) {
-            common.flags.type = Flags::Type::AUXILIARY;
-        }
     }
 
     swCommon.flags.offloadIndication = offloadExist;
