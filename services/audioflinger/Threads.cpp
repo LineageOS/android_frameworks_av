@@ -7145,11 +7145,14 @@ void DirectOutputThread::flushHw_l()
 {
     PlaybackThread::flushHw_l();
     mOutput->flush();
-    mHwPaused = false;
     mFlushPending = false;
     mTimestampVerifier.discontinuity(discontinuityForStandbyOrFlush());
     mTimestamp.clear();
     mMonotonicFrameCounter.onFlush();
+    // We do not reset mHwPaused which is hidden from the Track client.
+    // Note: the client track in Tracks.cpp and AudioTrack.cpp
+    // has a FLUSHED state but the DirectOutputThread does not;
+    // those tracks will continue to show isStopped().
 }
 
 int64_t DirectOutputThread::computeWaitTimeNs_l() const {
