@@ -383,10 +383,12 @@ status_t StreamHalAidl::resume(StreamDescriptor::Reply* reply) {
                 return INVALID_OPERATION;
             }
             return OK;
-        } else if (state == StreamDescriptor::State::PAUSED) {
+        } else if (state == StreamDescriptor::State::PAUSED ||
+                   state == StreamDescriptor::State::TRANSFER_PAUSED ||
+                   state == StreamDescriptor::State::DRAIN_PAUSED) {
             return sendCommand(makeHalCommand<HalCommand::Tag::start>(), reply);
         } else {
-            ALOGE("%s: unexpected stream state: %s (expected IDLE or PAUSED)",
+            ALOGE("%s: unexpected stream state: %s (expected IDLE or one of *PAUSED states)",
                         __func__, toString(state).c_str());
             return INVALID_OPERATION;
         }
