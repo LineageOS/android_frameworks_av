@@ -84,9 +84,6 @@ class EffectsFactoryHalAidl final : public EffectsFactoryHalInterface {
     // Query result of pre and post processing from effect factory
     const std::vector<Processing> mAidlProcessings;
 
-    // list of the EffectProxy instances
-    std::list<std::shared_ptr<EffectProxy>> mProxyList;
-
     virtual ~EffectsFactoryHalAidl() = default;
     status_t getHalDescriptorWithImplUuid(
             const ::aidl::android::media::audio::common::AudioUuid& uuid,
