@@ -82,8 +82,7 @@ ndk::ScopedAStatus EffectProxy::destroy() {
 ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* offload) {
     const auto& itor = std::find_if(mSubEffects.begin(), mSubEffects.end(), [&](const auto& sub) {
         const auto& desc = sub.descriptor;
-        return offload->isOffload ==
-               (desc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL);
+        return offload->isOffload == desc.common.flags.offloadIndication;
     });
     if (itor == mSubEffects.end()) {
         ALOGE("%s no %soffload sub-effect found", __func__, offload->isOffload ? "" : "non-");
@@ -93,7 +92,7 @@ ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* of
     }
 
     mActiveSubIdx = std::distance(mSubEffects.begin(), itor);
-    ALOGI("%s: active %soffload sub-effect %zu descriptor: %s", __func__,
+    ALOGI("%s: active %soffload sub-effect %zu: %s", __func__,
           offload->isOffload ? "" : "non-", mActiveSubIdx,
           ::android::audio::utils::toString(mSubEffects[mActiveSubIdx].descriptor.common.id.uuid)
                   .c_str());
@@ -163,7 +162,7 @@ ndk::ScopedAStatus EffectProxy::close() {
 
 ndk::ScopedAStatus EffectProxy::getDescriptor(Descriptor* desc) {
     *desc = mSubEffects[mActiveSubIdx].descriptor;
-    desc->common.id.uuid = desc->common.id.proxy.value();
+    desc->common = mDescriptorCommon;
     return ndk::ScopedAStatus::ok();
 }
 
@@ -185,42 +184,35 @@ ndk::ScopedAStatus EffectProxy::buildDescriptor(const AudioUuid& uuid,
     return ndk::ScopedAStatus::ok();
 }
 
+// Sub-effects are required to have identical features, so here we return the SW sub-effect
+// descriptor, with the implementation UUID replaced with proxy UUID, and flags setting respect all
+// sub-effects.
 Descriptor::Common EffectProxy::buildDescriptorCommon(
         const AudioUuid& uuid, const std::vector<Descriptor>& subEffectDescs) {
-    // initial flag values before we know which sub-effect to active (with setOffloadParam)
-    // align to HIDL EffectProxy flags
-    Descriptor::Common common = {.flags = {.type = Flags::Type::INSERT,
-                                           .insert = Flags::Insert::LAST,
-                                           .volume = Flags::Volume::CTRL}};
-
+    Descriptor::Common swCommon;
+    const Flags& firstFlag = subEffectDescs[0].common.flags;
+    bool offloadExist = false;
     for (const auto& desc : subEffectDescs) {
-        if (desc.common.flags.hwAcceleratorMode == Flags::HardwareAccelerator::TUNNEL) {
-            common.flags.hwAcceleratorMode = Flags::HardwareAccelerator::TUNNEL;
+        if (desc.common.flags.offloadIndication) {
+            offloadExist = true;
+        } else {
+            swCommon = desc.common;
         }
-
-        // set indication if any sub-effect indication was set
-        common.flags.offloadIndication |= desc.common.flags.offloadIndication;
-        common.flags.deviceIndication |= desc.common.flags.deviceIndication;
-        common.flags.audioModeIndication |= desc.common.flags.audioModeIndication;
-        common.flags.audioSourceIndication |= desc.common.flags.audioSourceIndication;
-        // Set to NONE if any sub-effect not supporting any Volume command
-        if (desc.common.flags.volume == Flags::Volume::NONE) {
-            common.flags.volume = Flags::Volume::NONE;
-        }
-        // set to AUXILIARY if any sub-effect is of AUXILIARY type
-        if (desc.common.flags.type == Flags::Type::AUXILIARY) {
-            common.flags.type = Flags::Type::AUXILIARY;
+        if (desc.common.flags.audioModeIndication != firstFlag.audioModeIndication ||
+            desc.common.flags.audioSourceIndication != firstFlag.audioSourceIndication ||
+            desc.common.flags.sinkMetadataIndication != firstFlag.sinkMetadataIndication ||
+            desc.common.flags.sourceMetadataIndication != firstFlag.sourceMetadataIndication ||
+            desc.common.flags.deviceIndication != firstFlag.deviceIndication) {
+            ALOGW("Inconsistent flags %s vs %s", desc.common.flags.toString().c_str(),
+                  firstFlag.toString().c_str());
         }
     }
 
-    // copy type UUID from any of sub-effects, all sub-effects should have same type
-    common.id.type = subEffectDescs[0].common.id.type;
+    swCommon.flags.offloadIndication = offloadExist;
     // replace implementation UUID with proxy UUID.
-    common.id.uuid = uuid;
-    common.id.proxy = std::nullopt;
-    common.name = "Proxy";
-    common.implementor = "AOSP";
-    return common;
+    swCommon.id.uuid = uuid;
+    swCommon.id.proxy = std::nullopt;
+    return swCommon;
 }
 
 // Handle with active sub-effect first, only send to other sub-effects when success
