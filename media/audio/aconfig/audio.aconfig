@@ -45,6 +45,14 @@ flag {
 }
 
 flag {
+    name: "port_to_piid_simplification"
+    namespace: "media_audio"
+    description: "PAM only needs for each piid the last portId mapping"
+    bug: "335747248"
+
+}
+
+flag {
     name: "ringer_mode_affects_alarm"
     namespace: "media_audio"
     description:
