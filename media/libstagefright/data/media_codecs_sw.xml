@@ -139,6 +139,7 @@
                 <Limit name="bitrate" range="1-40000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="dynamic-color-aspects" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.hevc.decoder" type="video/hevc" variant="slow-cpu,!slow-cpu">
@@ -160,6 +161,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="dynamic-color-aspects" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.vp8.decoder" type="video/x-vnd.on2.vp8" variant="slow-cpu,!slow-cpu">
@@ -178,6 +180,7 @@
                 <Limit name="bitrate" range="1-40000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="dynamic-color-aspects" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.vp9.decoder" type="video/x-vnd.on2.vp9" variant="slow-cpu,!slow-cpu">
@@ -197,6 +200,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="dynamic-color-aspects" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.av1.decoder" type="video/av01" variant="slow-cpu,!slow-cpu">
@@ -216,6 +220,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="dynamic-color-aspects" />
             <Feature name="low-latency" />
             <Attribute name="software-codec" />
         </MediaCodec>
@@ -235,6 +240,7 @@
                 <Limit name="bitrate" range="1-5000000" />
             </Variant>
             <Feature name="adaptive-playback" />
+            <Feature name="dynamic-color-aspects" />
             <Feature name="low-latency" />
             <Attribute name="software-codec" />
         </MediaCodec>
