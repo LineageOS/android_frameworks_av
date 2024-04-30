@@ -53,6 +53,7 @@ cc_library {
     ],
 
     defaults: [
+	"aconfig_lib_cc_static_link.defaults",
         "libcodec2_hal_selection",
     ],
 

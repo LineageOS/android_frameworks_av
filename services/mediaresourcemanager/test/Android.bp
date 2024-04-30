@@ -29,6 +29,9 @@ cc_test {
         "libactivitymanager_aidl",
         "server_configurable_flags",
     ],
+    defaults: [
+        "aconfig_lib_cc_static_link.defaults",
+    ],
     include_dirs: [
         "frameworks/av/include",
         "frameworks/av/services/mediaresourcemanager",

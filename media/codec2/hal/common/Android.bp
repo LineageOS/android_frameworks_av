@@ -31,6 +31,10 @@ cc_library {
     ],
 
     static_libs: ["aconfig_mediacodec_flags_c_lib"],
+
+    defaults: [
+        "aconfig_lib_cc_static_link.defaults",
+    ],
 }
 
 cc_library_static {
