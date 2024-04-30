@@ -20,6 +20,13 @@ flag {
 }
 
 flag {
+    name: "audioserver_permissions"
+    namespace: "media_audio"
+    description: "Refactoring permission management in audioserver"
+    bug: "338089555"
+}
+
+flag {
     name: "bluetooth_mac_address_anonymization"
     namespace: "media_audio"
     description:
