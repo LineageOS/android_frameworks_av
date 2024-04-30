@@ -46,6 +46,7 @@ struct MultiAccessUnitInterface : public C2InterfaceHelper {
 protected:
     bool getDecoderSampleRateAndChannelCount(
             uint32_t * const sampleRate_, uint32_t * const channelCount_) const;
+    bool getMaxInputSize(C2StreamMaxBufferSizeInfo::input* const maxInputSize) const;
     const std::shared_ptr<C2ComponentInterface> mC2ComponentIntf;
     std::shared_ptr<C2LargeFrame::output> mLargeFrameParams;
     C2ComponentKindSetting mKind;
@@ -140,6 +141,11 @@ protected:
         std::vector<std::shared_ptr<const C2Info>> mInfos;
 
         /*
+         * Vector for holding config updates from the wrapper
+         */
+        std::vector<std::unique_ptr<C2Param>> mConfigUpdate;
+
+        /*
          * C2AccessUnitInfos for the current buffer
          */
         std::vector<C2AccessUnitInfosStruct> mAccessUnitInfos;
@@ -170,6 +176,11 @@ protected:
     };
 
     /*
+     * Reconfigure helper
+     */
+    bool tryReconfigure(const std::unique_ptr<C2Param> &p);
+
+    /*
      * Creates a linear block to be used with work
      */
     c2_status_t createLinearBlock(MultiAccessUnitInfo &frame);
@@ -194,6 +205,14 @@ protected:
             uint32_t flags,
             uint32_t size,
             int64_t timestamp);
+
+    // Flag to allow dynamic on/off settings on this helper.
+    // Once enabled and buffers in transit, it is not possible
+    // to turn this module off by setting the max output value
+    // to 0. This is because the skip cut buffer expects the
+    // metadata to be always present along with a valid buffer.
+    // This flag is used to monitor that state of this module.
+    bool mMultiAccessOnOffAllowed;
 
     bool mInit;
 

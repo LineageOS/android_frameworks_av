@@ -27,6 +27,7 @@
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
 
+static inline constexpr  uint32_t MAX_SUPPORTED_SIZE = ( 10 * 512000 * 8 * 2u);
 namespace android {
 
 static C2R MultiAccessUnitParamsSetter(
@@ -39,8 +40,6 @@ static C2R MultiAccessUnitParamsSetter(
         res = res.plus(C2SettingResultBuilder::BadValue(me.F(me.v.thresholdSize)));
     } else if (me.v.maxSize < me.v.thresholdSize) {
         me.set().maxSize = me.v.thresholdSize;
-    } else if (me.v.thresholdSize == 0 && me.v.maxSize > 0) {
-        me.set().thresholdSize = me.v.maxSize;
     }
     std::vector<std::unique_ptr<C2SettingResult>> failures;
     res.retrieveFailures(&failures);
@@ -61,9 +60,9 @@ MultiAccessUnitInterface::MultiAccessUnitInterface(
             .withDefault(new C2LargeFrame::output(0u, 0, 0))
             .withFields({
                 C2F(mLargeFrameParams, maxSize).inRange(
-                        0, c2_min(UINT_MAX, 10 * 512000 * 8 * 2u)),
+                        0, c2_min(UINT_MAX, MAX_SUPPORTED_SIZE)),
                 C2F(mLargeFrameParams, thresholdSize).inRange(
-                        0, c2_min(UINT_MAX, 10 * 512000 * 8 * 2u))
+                        0, c2_min(UINT_MAX, MAX_SUPPORTED_SIZE))
             })
             .withSetter(MultiAccessUnitParamsSetter)
             .build());
@@ -115,6 +114,18 @@ bool MultiAccessUnitInterface::getDecoderSampleRateAndChannelCount(
     return false;
 }
 
+bool MultiAccessUnitInterface::getMaxInputSize(
+        C2StreamMaxBufferSizeInfo::input* const maxInputSize) const {
+    if (maxInputSize == nullptr || mC2ComponentIntf == nullptr) {
+        return false;
+    }
+    c2_status_t err = mC2ComponentIntf->query_vb({maxInputSize}, {}, C2_MAY_BLOCK, nullptr);
+    if (err != OK) {
+        return false;
+    }
+    return true;
+}
+
 //C2MultiAccessUnitBuffer
 class C2MultiAccessUnitBuffer : public C2Buffer {
     public:
@@ -128,6 +139,7 @@ class C2MultiAccessUnitBuffer : public C2Buffer {
 MultiAccessUnitHelper::MultiAccessUnitHelper(
         const std::shared_ptr<MultiAccessUnitInterface>& intf,
         std::shared_ptr<C2BlockPool>& linearPool):
+        mMultiAccessOnOffAllowed(true),
         mInit(false),
         mInterface(intf),
         mLinearPool(linearPool) {
@@ -152,6 +164,63 @@ bool MultiAccessUnitHelper::isEnabledOnPlatform() {
     return result;
 }
 
+bool MultiAccessUnitHelper::tryReconfigure(const std::unique_ptr<C2Param> &param) {
+    C2LargeFrame::output *lfp = C2LargeFrame::output::From(param.get());
+    if (lfp == nullptr) {
+        return false;
+    }
+    bool isDecoder = (mInterface->kind() == C2Component::KIND_DECODER) ? true : false;
+    if (!isDecoder) {
+        C2StreamMaxBufferSizeInfo::input maxInputSize(0);
+        if (!mInterface->getMaxInputSize(&maxInputSize)) {
+            LOG(ERROR) << "Error in reconfigure: "
+                    << "Encoder failed to respond with a valid max input size";
+            return false;
+        }
+        // This is assuming a worst case compression ratio of 1:1
+        // In no case the encoder should give an output more than
+        // what is being provided to the encoder in a single call.
+        if (lfp->maxSize < maxInputSize.value) {
+            lfp->maxSize = maxInputSize.value;
+        }
+    }
+    lfp->maxSize =
+            (lfp->maxSize > MAX_SUPPORTED_SIZE) ? MAX_SUPPORTED_SIZE :
+                    (lfp->maxSize < 0) ? 0 : lfp->maxSize;
+    lfp->thresholdSize =
+            (lfp->thresholdSize > MAX_SUPPORTED_SIZE) ? MAX_SUPPORTED_SIZE :
+                    (lfp->thresholdSize < 0) ? 0 : lfp->thresholdSize;
+    C2LargeFrame::output currentConfig = mInterface->getLargeFrameParam();
+    if ((currentConfig.maxSize == lfp->maxSize)
+            && (currentConfig.thresholdSize == lfp->thresholdSize)) {
+        // no need to update
+        return false;
+    }
+    if (isDecoder) {
+        bool isOnOffTransition =
+                (currentConfig.maxSize == 0 && lfp->maxSize != 0)
+                || (currentConfig.maxSize != 0 && lfp->maxSize == 0);
+            if (isOnOffTransition && !mMultiAccessOnOffAllowed) {
+                LOG(ERROR) << "Setting new configs not allowed"
+                        << " MaxSize: " << lfp->maxSize
+                        << " ThresholdSize: " << lfp->thresholdSize;
+                return false;
+            }
+    }
+    std::vector<C2Param*> config{lfp};
+    std::vector<std::unique_ptr<C2SettingResult>> failures;
+    if (C2_OK != mInterface->config(config, C2_MAY_BLOCK, &failures)) {
+        LOG(ERROR) << "Dynamic config not applied for"
+                << " MaxSize: " << lfp->maxSize
+                << " ThresholdSize: " << lfp->thresholdSize;
+        return false;
+    }
+    LOG(DEBUG) << "Updated from param maxSize "
+            << lfp->maxSize
+            << " ThresholdSize " << lfp->thresholdSize;
+    return true;
+}
+
 std::shared_ptr<MultiAccessUnitInterface> MultiAccessUnitHelper::getInterface() {
     return mInterface;
 }
@@ -163,6 +232,7 @@ bool MultiAccessUnitHelper::getStatus() {
 void MultiAccessUnitHelper::reset() {
     std::lock_guard<std::mutex> l(mLock);
     mFrameHolder.clear();
+    mMultiAccessOnOffAllowed = true;
 }
 
 c2_status_t MultiAccessUnitHelper::error(
@@ -181,6 +251,7 @@ c2_status_t MultiAccessUnitHelper::error(
         }
     }
     mFrameHolder.clear();
+    mMultiAccessOnOffAllowed = true;
     return C2_OK;
 }
 
@@ -232,16 +303,23 @@ c2_status_t MultiAccessUnitHelper::scatter(
         uint64_t newFrameIdx = mFrameIndex++;
         // TODO: Do not split buffers if component inherantly supports MultipleFrames.
         // if thats case, only replace frameindex.
-        auto cloneInputWork = [&newFrameIdx](std::unique_ptr<C2Work>& inWork, uint32_t flags) {
+        auto cloneInputWork = [&frameInfo, &newFrameIdx, this]
+                (std::unique_ptr<C2Work>& inWork, uint32_t flags) -> std::unique_ptr<C2Work> {
             std::unique_ptr<C2Work> newWork(new C2Work);
             newWork->input.flags = (C2FrameData::flags_t)flags;
             newWork->input.ordinal = inWork->input.ordinal;
             newWork->input.ordinal.frameIndex = newFrameIdx;
             if (!inWork->input.configUpdate.empty()) {
                 for (std::unique_ptr<C2Param>& param : inWork->input.configUpdate) {
-                    newWork->input.configUpdate.push_back(
-                            std::move(C2Param::Copy(*(param.get()))));
+                    if (param->index() == C2LargeFrame::output::PARAM_TYPE) {
+                        if (tryReconfigure(param)) {
+                            frameInfo.mConfigUpdate.push_back(std::move(param));
+                        }
+                    } else {
+                        newWork->input.configUpdate.push_back(std::move(param));
+                    }
                 }
+                inWork->input.configUpdate.clear();
             }
             newWork->input.infoBuffers = (inWork->input.infoBuffers);
             if (!inWork->worklets.empty() && inWork->worklets.front() != nullptr) {
@@ -331,6 +409,7 @@ c2_status_t MultiAccessUnitHelper::scatter(
             frameInfo.mLargeFrameTuning = multiAccessParams;
             std::lock_guard<std::mutex> l(mLock);
             mFrameHolder.push_back(std::move(frameInfo));
+            mMultiAccessOnOffAllowed = false;
         }
     }
     return C2_OK;
@@ -360,6 +439,7 @@ c2_status_t MultiAccessUnitHelper::gather(
             std::list<MultiAccessUnitInfo>::iterator frame =
                     mFrameHolder.begin();
             while (!foundFrame && frame != mFrameHolder.end()) {
+                c2_status_t res = C2_OK;
                 auto it = frame->mComponentFrameIds.find(thisFrameIndex);
                 if (it != frame->mComponentFrameIds.end()) {
                     foundFrame = true;
@@ -369,8 +449,7 @@ c2_status_t MultiAccessUnitHelper::gather(
                     if (work->result != C2_OK
                             || work->worklets.empty()
                             || !work->worklets.front()
-                            || (frame->mLargeFrameTuning.thresholdSize == 0
-                            || frame->mLargeFrameTuning.maxSize == 0)) {
+                            || frame->mLargeFrameTuning.maxSize == 0) {
                         if (removeEntry) {
                             frame->mComponentFrameIds.erase(it);
                             removeEntry = false;
@@ -388,10 +467,27 @@ c2_status_t MultiAccessUnitHelper::gather(
                         addOutWork(frame->mLargeWork);
                         frame->reset();
                         if (workResult != C2_OK) {
-                            frame->mAccessUnitInfos.clear();
+                            frame->mComponentFrameIds.clear();
+                            removeEntry = false;
                         }
-                    } else if (C2_OK != processWorklets(*frame, work, addOutWork)) {
-                        LOG(DEBUG) << "Error while processing work";
+                    } else if (C2_OK != (res = processWorklets(*frame, work, addOutWork))) {
+                        // Upon error in processing worklets, we return the work with
+                        // result set to the error. This should indicate the error to the
+                        // framework and thus doing what is necessary to handle the
+                        // error.
+                        LOG(DEBUG) << "Error while processing worklets";
+                        if (frame->mLargeWork == nullptr) {
+                            frame->mLargeWork.reset(new C2Work);
+                            frame->mLargeWork->input.ordinal = frame->inOrdinal;
+                            frame->mLargeWork->input.ordinal.frameIndex =
+                                    frame->inOrdinal.frameIndex;
+                        }
+                        frame->mLargeWork->result = res;
+                        finalizeWork(*frame);
+                        addOutWork(frame->mLargeWork);
+                        frame->reset();
+                        frame->mComponentFrameIds.clear();
+                        removeEntry = false;
                     }
                     if (removeEntry) {
                         LOG(DEBUG) << "Removing entry: " << thisFrameIndex
@@ -528,9 +624,6 @@ c2_status_t MultiAccessUnitHelper::processWorklets(MultiAccessUnitInfo &frame,
 
         LOG(DEBUG) << "maxOutSize " << frame.mLargeFrameTuning.maxSize
                 << " threshold " << frame.mLargeFrameTuning.thresholdSize;
-        if ((*worklet)->output.buffers.size() > 0) {
-            allocateWork(frame, true, true);
-        }
         LOG(DEBUG) << "This worklet has " << (*worklet)->output.buffers.size() << " buffers"
                 << " ts: " << (*worklet)->output.ordinal.timestamp.peekull();
         int64_t workletTimestamp = (*worklet)->output.ordinal.timestamp.peekull();
@@ -552,43 +645,39 @@ c2_status_t MultiAccessUnitHelper::processWorklets(MultiAccessUnitInfo &frame,
                     inputSize -= (inputSize % frameSize);
                 }
                 while (inputOffset < inputSize) {
-                    if (frame.mWview->offset() >= frame.mLargeFrameTuning.thresholdSize) {
+                    if ((frame.mWview != nullptr)
+                            && (frame.mWview->offset() >= frame.mLargeFrameTuning.thresholdSize)) {
                         frame.mLargeWork->result = C2_OK;
                         finalizeWork(frame, flagsForCopy);
                         addWork(frame.mLargeWork);
                         frame.reset();
-                        allocateWork(frame, true, true);
                     }
                     if (mInterface->kind() == C2Component::KIND_ENCODER) {
                         if (inputSize > frame.mLargeFrameTuning.maxSize) {
-                            LOG(ERROR) << "Enc: Output buffer too small for AU, configured with "
-                                    << frame.mLargeFrameTuning.maxSize
-                                    << " block size: " << blocks.front().size()
-                                    << "alloc size " << frame.mWview->size();
-                            if (frame.mLargeWork
-                                    && frame.mWview && frame.mWview->offset() > 0) {
+                            LOG(WARNING) << "WARNING Encoder:"
+                                    << " Output buffer too small for configuration"
+                                    << " configured max size " << frame.mLargeFrameTuning.maxSize
+                                    << " access unit size " << inputSize;
+                            if (frame.mLargeWork && (frame.mWview && frame.mWview->offset() > 0)) {
+                                frame.mLargeWork->result = C2_OK;
                                 finalizeWork(frame, flagsForCopy);
                                 addWork(frame.mLargeWork);
                                 frame.reset();
-                                allocateWork(frame, true, false);
                             }
-                            frame.mLargeWork->result = C2_NO_MEMORY;
-                            finalizeWork(frame, 0, true);
-                            addWork(frame.mLargeWork);
-                            frame.reset();
-                            return C2_NO_MEMORY;
-                        } else if (inputSize > frame.mWview->size()) {
+                            frame.mLargeFrameTuning.maxSize = inputSize;
+                        } else if ((frame.mWview != nullptr)
+                                && (inputSize > frame.mWview->size())) {
                             LOG(DEBUG) << "Enc: Large frame hitting bufer limit, current size "
                                 << frame.mWview->offset();
-                            if (frame.mLargeWork
-                                    && frame.mWview && frame.mWview->offset() > 0) {
+                            if (frame.mWview->offset() > 0) {
+                                frame.mLargeWork->result = C2_OK;
                                 finalizeWork(frame, flagsForCopy);
                                 addWork(frame.mLargeWork);
                                 frame.reset();
-                                allocateWork(frame, true, true);
                             }
                         }
                     }
+                    allocateWork(frame, true, true);
                     C2ReadView rView = blocks.front().map().get();
                     if (rView.error()) {
                         LOG(ERROR) << "Buffer read view error";
@@ -683,26 +772,39 @@ c2_status_t MultiAccessUnitHelper::finalizeWork(
             frame.mWview->setOffset(0);
             std::shared_ptr<C2Buffer> c2Buffer = C2Buffer::CreateLinearBuffer(
                     frame.mBlock->share(0, size, ::C2Fence()));
-            if (frame.mAccessUnitInfos.size() > 0) {
-                if (finalFlags & C2FrameData::FLAG_END_OF_STREAM) {
-                    frame.mAccessUnitInfos.back().flags |=
-                            C2FrameData::FLAG_END_OF_STREAM;
-                }
-                std::shared_ptr<C2AccessUnitInfos::output> largeFrame =
-                        C2AccessUnitInfos::output::AllocShared(
-                        frame.mAccessUnitInfos.size(), 0u, frame.mAccessUnitInfos);
-                frame.mInfos.push_back(largeFrame);
-                frame.mAccessUnitInfos.clear();
-            }
-            for (auto &info : frame.mInfos) {
-                c2Buffer->setInfo(std::const_pointer_cast<C2Info>(info));
-            }
             frame.mLargeWork->worklets.front()->output.buffers.push_back(std::move(c2Buffer));
-            frame.mInfos.clear();
-            frame.mBlock.reset();
-            frame.mWview.reset();
+        }
+        if (frame.mLargeWork->worklets.front()->output.buffers.size() > 0) {
+            std::shared_ptr<C2Buffer>& c2Buffer =
+                frame.mLargeWork->worklets.front()->output.buffers.front();
+            if (c2Buffer != nullptr) {
+                if (frame.mAccessUnitInfos.size() > 0) {
+                    if (finalFlags & C2FrameData::FLAG_END_OF_STREAM) {
+                        frame.mAccessUnitInfos.back().flags |= C2FrameData::FLAG_END_OF_STREAM;
+                    }
+                    std::shared_ptr<C2AccessUnitInfos::output> largeFrame =
+                            C2AccessUnitInfos::output::AllocShared(
+                                    frame.mAccessUnitInfos.size(), 0u, frame.mAccessUnitInfos);
+                    frame.mInfos.push_back(largeFrame);
+                    frame.mAccessUnitInfos.clear();
+                }
+                for (auto &info : frame.mInfos) {
+                    c2Buffer->setInfo(std::const_pointer_cast<C2Info>(info));
+                }
+            }
+        }
+        if (frame.mConfigUpdate.size() > 0) {
+            outFrameData.configUpdate.insert(
+                    outFrameData.configUpdate.end(),
+                    make_move_iterator(frame.mConfigUpdate.begin()),
+                    make_move_iterator(frame.mConfigUpdate.end()));
         }
     }
+    frame.mConfigUpdate.clear();
+    frame.mInfos.clear();
+    frame.mBlock.reset();
+    frame.mWview.reset();
+
     LOG(DEBUG) << "Multi access-unitflag setting as " << finalFlags;
     return C2_OK;
 }
@@ -735,6 +837,7 @@ void MultiAccessUnitHelper::MultiAccessUnitInfo::reset() {
     mBlock.reset();
     mWview.reset();
     mInfos.clear();
+    mConfigUpdate.clear();
     mAccessUnitInfos.clear();
     mLargeWork.reset();
 }
