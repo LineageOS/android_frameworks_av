@@ -91,6 +91,10 @@ cc_library_shared {
         "libcodec2_client",
     ],
 
+    defaults: [
+        "aconfig_lib_cc_static_link.defaults",
+    ],
+
     sanitize: {
         cfi: true,
         misc_undefined: [
