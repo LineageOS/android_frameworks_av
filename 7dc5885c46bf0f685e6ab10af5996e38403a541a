@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d5ab4b2c_897568b2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2024-05-01T17:04:38Z",
+      "side": 1,
+      "message": "This seems to have fixed audio service crash on my sargo after plugging in the Pixel 3 stock USB C to 3.5mm adapter, which resulted in audio playing from speaker.",
+      "revId": "7dc5885c46bf0f685e6ab10af5996e38403a541a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
