@@ -181,7 +181,9 @@ status_t Hal2AidlMapper::createOrUpdatePatch(
     };
     // When looking up port configs, the destinationPortId is only used for mix ports.
     // Thus, we process device port configs first, and look up the destination port ID from them.
-    bool sourceIsDevice = std::any_of(sources.begin(), sources.end(),
+    const bool sourceIsDevice = std::any_of(sources.begin(), sources.end(),
+            [](const auto& config) { return config.ext.getTag() == AudioPortExt::device; });
+    const bool sinkIsDevice = std::any_of(sinks.begin(), sinks.end(),
             [](const auto& config) { return config.ext.getTag() == AudioPortExt::device; });
     const std::vector<AudioPortConfig>& devicePortConfigs =
             sourceIsDevice ? sources : sinks;
@@ -202,7 +204,13 @@ status_t Hal2AidlMapper::createOrUpdatePatch(
         existingPatchIt->second = patch;
     } else {
         bool created = false;
-        RETURN_STATUS_IF_ERROR(findOrCreatePatch(patch, &patch, &created));
+        // When the framework does not specify a patch ID, only the mix port config
+        // is used for finding an existing patch. That's because the framework assumes
+        // that there can only be one patch for an I/O thread.
+        PatchMatch match = sourceIsDevice && sinkIsDevice ?
+                MATCH_BOTH : (sourceIsDevice ? MATCH_SINKS : MATCH_SOURCES);
+        RETURN_STATUS_IF_ERROR(findOrCreatePatch(patch, match,
+                                                 &patch, &created));
         // No cleanup of the patch is needed, it is managed by the framework.
         *patchId = patch.id;
         if (!created) {
@@ -274,18 +282,18 @@ void Hal2AidlMapper::eraseConnectedPort(int32_t portId) {
 }
 
 status_t Hal2AidlMapper::findOrCreatePatch(
-        const AudioPatch& requestedPatch, AudioPatch* patch, bool* created) {
+        const AudioPatch& requestedPatch, PatchMatch match, AudioPatch* patch, bool* created) {
     std::set<int32_t> sourcePortConfigIds(requestedPatch.sourcePortConfigIds.begin(),
             requestedPatch.sourcePortConfigIds.end());
     std::set<int32_t> sinkPortConfigIds(requestedPatch.sinkPortConfigIds.begin(),
             requestedPatch.sinkPortConfigIds.end());
-    return findOrCreatePatch(sourcePortConfigIds, sinkPortConfigIds, patch, created);
+    return findOrCreatePatch(sourcePortConfigIds, sinkPortConfigIds, match, patch, created);
 }
 
 status_t Hal2AidlMapper::findOrCreatePatch(
         const std::set<int32_t>& sourcePortConfigIds, const std::set<int32_t>& sinkPortConfigIds,
-        AudioPatch* patch, bool* created) {
-    auto patchIt = findPatch(sourcePortConfigIds, sinkPortConfigIds);
+        PatchMatch match, AudioPatch* patch, bool* created) {
+    auto patchIt = findPatch(sourcePortConfigIds, sinkPortConfigIds, match);
     if (patchIt == mPatches.end()) {
         AudioPatch requestedPatch, appliedPatch;
         requestedPatch.sourcePortConfigIds.insert(requestedPatch.sourcePortConfigIds.end(),
@@ -456,7 +464,8 @@ status_t Hal2AidlMapper::findPortConfig(const AudioDevice& device, AudioPortConf
 }
 
 Hal2AidlMapper::Patches::iterator Hal2AidlMapper::findPatch(
-        const std::set<int32_t>& sourcePortConfigIds, const std::set<int32_t>& sinkPortConfigIds) {
+        const std::set<int32_t>& sourcePortConfigIds, const std::set<int32_t>& sinkPortConfigIds,
+        PatchMatch match) {
     return std::find_if(mPatches.begin(), mPatches.end(),
             [&](const auto& pair) {
                 const auto& p = pair.second;
@@ -464,7 +473,15 @@ Hal2AidlMapper::Patches::iterator Hal2AidlMapper::findPatch(
                         p.sourcePortConfigIds.begin(), p.sourcePortConfigIds.end());
                 std::set<int32_t> patchSinks(
                         p.sinkPortConfigIds.begin(), p.sinkPortConfigIds.end());
-                return sourcePortConfigIds == patchSrcs && sinkPortConfigIds == patchSinks; });
+                switch (match) {
+                    case MATCH_SOURCES:
+                        return sourcePortConfigIds == patchSrcs;
+                    case MATCH_SINKS:
+                        return sinkPortConfigIds == patchSinks;
+                    case MATCH_BOTH:
+                        return sourcePortConfigIds == patchSrcs && sinkPortConfigIds == patchSinks;
+                }
+            });
 }
 
 Hal2AidlMapper::Ports::iterator Hal2AidlMapper::findPort(const AudioDevice& device) {
@@ -816,10 +833,10 @@ status_t Hal2AidlMapper::prepareToOpenStreamHelper(
     }
     if (isInput) {
         RETURN_STATUS_IF_ERROR(findOrCreatePatch(
-                        {devicePortConfigId}, {mixPortConfig->id}, patch, &created));
+                        {devicePortConfigId}, {mixPortConfig->id}, MATCH_BOTH, patch, &created));
     } else {
         RETURN_STATUS_IF_ERROR(findOrCreatePatch(
-                        {mixPortConfig->id}, {devicePortConfigId}, patch, &created));
+                        {mixPortConfig->id}, {devicePortConfigId}, MATCH_BOTH, patch, &created));
     }
     if (created) {
         cleanups->add(&Hal2AidlMapper::resetPatch, patch->id);
