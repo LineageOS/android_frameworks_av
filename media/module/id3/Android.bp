@@ -17,6 +17,24 @@ license {
     ],
 }
 
+cc_library_headers {
+    name: "libstagefright_id3_headers",
+    export_include_dirs: ["include"],
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
+
 cc_library_static {
     name: "libstagefright_id3",
     min_sdk_version: "29",
@@ -24,7 +42,6 @@ cc_library_static {
         "//apex_available:platform",
         "com.android.media",
     ],
-
 
     srcs: ["ID3.cpp"],
 
@@ -34,6 +51,8 @@ cc_library_static {
         "libstagefright_headers",
         "media_ndk_headers",
     ],
+
+    export_include_dirs: ["include"],
 
     cflags: [
         "-Werror",
