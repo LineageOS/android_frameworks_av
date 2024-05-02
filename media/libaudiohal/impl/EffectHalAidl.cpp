@@ -15,6 +15,7 @@
  */
 
 #include <cstddef>
+#include <cstring>
 #define LOG_TAG "EffectHalAidl"
 //#define LOG_NDEBUG 0
 
@@ -128,6 +129,7 @@ status_t EffectHalAidl::createAidlConversion(
                ::aidl::android::hardware::audio::effect::getEffectTypeUuidHapticGenerator()) {
         mConversion = std::make_unique<android::effect::AidlConversionHapticGenerator>(
                 effect, sessionId, ioId, desc, mIsProxyEffect);
+        mIsHapticGenerator = true;
     } else if (typeUuid ==
                ::aidl::android::hardware::audio::effect::getEffectTypeUuidLoudnessEnhancer()) {
         mConversion = std::make_unique<android::effect::AidlConversionLoudnessEnhancer>(
@@ -200,7 +202,7 @@ status_t EffectHalAidl::process() {
                               ::android::OK == efGroup->wait(kEventFlagDataMqUpdate, &efState,
                                                              1 /* ns */, true /* retry */) &&
                               efState & kEventFlagDataMqUpdate) {
-        ALOGV("%s %s V%d receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str(),
+        ALOGD("%s %s V%d receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str(),
               halVersion);
 
         mConversion->reopen();
@@ -216,7 +218,7 @@ status_t EffectHalAidl::process() {
     }
 
     size_t available = inputQ->availableToWrite();
-    size_t floatsToWrite = std::min(available, mInBuffer->getSize() / sizeof(float));
+    const size_t floatsToWrite = std::min(available, mInBuffer->getSize() / sizeof(float));
     if (floatsToWrite == 0) {
         ALOGE("%s not able to write, floats in buffer %zu, space in FMQ %zu", __func__,
               mInBuffer->getSize() / sizeof(float), available);
@@ -248,7 +250,7 @@ status_t EffectHalAidl::process() {
     }
 
     available = outputQ->availableToRead();
-    size_t floatsToRead = std::min(available, mOutBuffer->getSize() / sizeof(float));
+    const size_t floatsToRead = std::min(available, mOutBuffer->getSize() / sizeof(float));
     if (floatsToRead == 0) {
         ALOGE("%s not able to read, buffer space %zu, floats in FMQ %zu", __func__,
               mOutBuffer->getSize() / sizeof(float), available);
@@ -257,7 +259,8 @@ status_t EffectHalAidl::process() {
 
     float *outputRawBuffer = mOutBuffer->audioBuffer()->f32;
     std::vector<float> tempBuffer;
-    if (mConversion->mOutputAccessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+    // keep original data in the output buffer for accumulate mode or HapticGenerator effect
+    if (mConversion->mOutputAccessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE || mIsHapticGenerator) {
         tempBuffer.resize(floatsToRead);
         outputRawBuffer = tempBuffer.data();
     }
@@ -267,7 +270,31 @@ status_t EffectHalAidl::process() {
               mOutBuffer->audioBuffer());
         return INVALID_OPERATION;
     }
-    if (mConversion->mOutputAccessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+
+    // HapticGenerator needs special handling because the generated haptic samples should append to
+    // the end of audio samples, the generated haptic data pass back from HAL in output FMQ at same
+    // offset as input buffer, here we skip the audio samples in output FMQ and append haptic
+    // samples to the end of input buffer
+    if (mIsHapticGenerator) {
+        static constexpr float kHalFloatSampleLimit = 2.0f;
+        assert(floatsToRead == floatsToWrite);
+        const auto audioChNum = mConversion->getAudioChannelCount();
+        const auto audioSamples =
+                floatsToWrite * audioChNum / (audioChNum + mConversion->getHapticChannelCount());
+        // accumulate or copy input to output, haptic samples remains all zero
+        if (mConversion->mOutputAccessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+            accumulate_float(mOutBuffer->audioBuffer()->f32, mInBuffer->audioBuffer()->f32,
+                             audioSamples);
+        } else {
+            memcpy_to_float_from_float_with_clamping(mOutBuffer->audioBuffer()->f32,
+                                                     mInBuffer->audioBuffer()->f32, audioSamples,
+                                                     kHalFloatSampleLimit);
+        }
+        // append the haptic sample at the end of input audio samples
+        memcpy_to_float_from_float_with_clamping(mInBuffer->audioBuffer()->f32 + audioSamples,
+                                                 outputRawBuffer + audioSamples,
+                                                 floatsToRead - audioSamples, kHalFloatSampleLimit);
+    } else if (mConversion->mOutputAccessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
         accumulate_float(mOutBuffer->audioBuffer()->f32, outputRawBuffer, floatsToRead);
     }
 

@@ -49,6 +49,9 @@ class EffectConversionHelperAidl {
     ::aidl::android::hardware::audio::effect::Descriptor getDescriptor() const;
     status_t reopen();
 
+    size_t getAudioChannelCount() const;
+    size_t getHapticChannelCount() const;
+
     uint8_t mOutputAccessMode = EFFECT_BUFFER_ACCESS_WRITE;
 
   protected:

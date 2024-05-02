@@ -263,9 +263,6 @@ TEST_P(Codec2ComponentHidlTest, Timeout) {
     ALOGV("mComponent->reset() timeConsumed=%" PRId64 " us", timeConsumed);
     ASSERT_EQ(err, C2_OK);
 
-    err = mComponent->start();
-    ASSERT_EQ(err, C2_OK);
-
     // Query supported params by the component
     std::vector<std::shared_ptr<C2ParamDescriptor>> params;
     startTime = getNowUs();
@@ -297,6 +294,9 @@ TEST_P(Codec2ComponentHidlTest, Timeout) {
         ALOGV("mComponent->config() for %s timeConsumed=%" PRId64 " us", p->name().c_str(),
               timeConsumed);
     }
+
+    err = mComponent->start();
+    ASSERT_EQ(err, C2_OK);
 
     std::list<std::unique_ptr<C2Work>> workList;
     startTime = getNowUs();

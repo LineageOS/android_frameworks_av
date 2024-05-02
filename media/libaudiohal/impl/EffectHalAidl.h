@@ -73,6 +73,7 @@ class EffectHalAidl : public EffectHalInterface {
     const int32_t mSessionId;
     const int32_t mIoId;
     const bool mIsProxyEffect;
+    bool mIsHapticGenerator = false;
 
     std::unique_ptr<EffectConversionHelperAidl> mConversion;
 

@@ -1383,6 +1383,9 @@ private:
 
         PortHandleVector getClientsForStream(audio_stream_type_t streamType) const;
         void invalidateStreams(StreamTypeVector streams) const;
+
+        bool checkHapticCompatibilityOnSpatializerOutput(const audio_config_t* config,
+                                                         audio_session_t sessionId) const;
 };
 
 };
