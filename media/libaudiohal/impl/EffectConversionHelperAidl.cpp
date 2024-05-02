@@ -29,6 +29,7 @@
 #include <system/audio_effects/effect_visualizer.h>
 
 #include <utils/Log.h>
+#include <Utils.h>
 
 #include "EffectConversionHelperAidl.h"
 #include "EffectProxy.h"
@@ -37,18 +38,20 @@ namespace android {
 namespace effect {
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::hardware::audio::common::getChannelCount;
 using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::Flags;
 using ::aidl::android::hardware::audio::effect::IEffect;
 using ::aidl::android::hardware::audio::effect::Parameter;
 using ::aidl::android::hardware::audio::effect::State;
+using ::aidl::android::media::audio::common::AudioChannelLayout;
 using ::aidl::android::media::audio::common::AudioDeviceDescription;
 using ::aidl::android::media::audio::common::AudioMode;
 using ::aidl::android::media::audio::common::AudioSource;
-using ::android::hardware::EventFlag;
 using android::effect::utils::EffectParamReader;
 using android::effect::utils::EffectParamWriter;
+using android::hardware::EventFlag;
 
 using ::android::status_t;
 
@@ -517,6 +520,16 @@ status_t EffectConversionHelperAidl::reopen() {
     // status MQ won't be changed after open
     updateDataMqs(openReturn);
     return OK;
+}
+
+size_t EffectConversionHelperAidl::getAudioChannelCount() const {
+    return getChannelCount(mCommon.input.base.channelMask,
+                           ~AudioChannelLayout::LAYOUT_HAPTIC_AB /* mask */);
+}
+
+size_t EffectConversionHelperAidl::getHapticChannelCount() const {
+    return getChannelCount(mCommon.input.base.channelMask,
+                           AudioChannelLayout::LAYOUT_HAPTIC_AB /* mask */);
 }
 
 }  // namespace effect
