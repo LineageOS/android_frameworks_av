@@ -616,7 +616,7 @@ status_t StreamOutHalAidl::getLatency(uint32_t *latency) {
 status_t StreamOutHalAidl::setVolume(float left, float right) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    size_t channelCount = audio_channel_out_mask_from_count(mConfig.channel_mask);
+    size_t channelCount = audio_channel_count_from_out_mask(mConfig.channel_mask);
     if (channelCount == 0) channelCount = 2;
     std::vector<float> volumes(channelCount);
     if (channelCount == 1) {
