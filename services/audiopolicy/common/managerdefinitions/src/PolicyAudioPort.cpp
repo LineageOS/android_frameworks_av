@@ -63,21 +63,11 @@ const char *PolicyAudioPort::getModuleName() const
 
 status_t PolicyAudioPort::checkExactAudioProfile(const struct audio_port_config *config) const
 {
-    status_t status = NO_ERROR;
-    auto config_mask = config->config_mask;
-    if (config_mask & AUDIO_PORT_CONFIG_GAIN) {
-        config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
-        status = asAudioPort()->checkGain(&config->gain, config->gain.index);
-        if (status != NO_ERROR) {
-            return status;
-        }
-    }
-    if (config_mask != 0) {
-        // TODO should we check sample_rate / channel_mask / format separately?
-        status = checkExactProfile(asAudioPort()->getAudioProfiles(), config->sample_rate,
-                config->channel_mask, config->format);
-    }
-    return status;
+    return checkAudioProfile(config, checkExactProfile);
+}
+
+status_t PolicyAudioPort::checkIdenticalAudioProfile(const struct audio_port_config *config) const {
+    return checkAudioProfile(config, checkIdenticalProfile);
 }
 
 void PolicyAudioPort::pickSamplingRate(uint32_t &pickedRate,
@@ -264,6 +254,30 @@ void PolicyAudioPort::pickAudioProfile(uint32_t &samplingRate,
     }
     ALOGV("%s Port[nm:%s] profile rate=%d, format=%d, channels=%d", __FUNCTION__,
             asAudioPort()->getName().c_str(), samplingRate, channelMask, format);
+}
+
+status_t PolicyAudioPort::checkAudioProfile(
+        const struct audio_port_config *config,
+        std::function<status_t(const AudioProfileVector &,
+                               const uint32_t,
+                               audio_channel_mask_t,
+                               audio_format_t)> checkProfile) const {
+    status_t status = NO_ERROR;
+    auto config_mask = config->config_mask;
+    if (config_mask & AUDIO_PORT_CONFIG_GAIN) {
+        config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
+        status = asAudioPort()->checkGain(&config->gain, config->gain.index);
+        if (status != NO_ERROR) {
+            return status;
+        }
+    }
+    if (config_mask != 0) {
+        // TODO should we check sample_rate / channel_mask / format separately?
+        status = checkProfile(asAudioPort()->getAudioProfiles(), config->sample_rate,
+                   config->channel_mask, config->format);
+    }
+    return status;
+
 }
 
 } // namespace android
