@@ -88,7 +88,7 @@ class Camera3Device :
 
     explicit Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
             std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
-            const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
+            const std::string& id, bool overrideForPerfClass, int rotationOverride,
             bool legacyClient = false);
 
     virtual ~Camera3Device();
@@ -879,7 +879,7 @@ class Camera3Device :
 
     // Override rotate_and_crop control if needed
     static bool    overrideAutoRotateAndCrop(const sp<CaptureRequest> &request /*out*/,
-            bool overrideToPortrait,
+            int rotationOverride,
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropOverride);
 
     // Override auto framing control if needed
@@ -916,7 +916,7 @@ class Camera3Device :
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait,
+                int rotationOverride,
                 bool supportSettingsOverride);
         ~RequestThread();
 
@@ -1231,7 +1231,7 @@ class Camera3Device :
         bool               mUseHalBufManager = false;
         std::set<int32_t > mHalBufManagedStreamIds;
         const bool         mSupportCameraMute;
-        const bool         mOverrideToPortrait;
+        const bool         mRotationOverride;
         const bool         mSupportSettingsOverride;
         int32_t            mVndkVersion = -1;
     };
@@ -1242,7 +1242,7 @@ class Camera3Device :
                 const Vector<int32_t>& /*sessionParamKeys*/,
                 bool /*useHalBufManager*/,
                 bool /*supportCameraMute*/,
-                bool /*overrideToPortrait*/,
+                int /*rotationOverride*/,
                 bool /*supportSettingsOverride*/) = 0;
 
     sp<RequestThread> mRequestThread;
@@ -1524,7 +1524,7 @@ class Camera3Device :
 
     // Whether the camera framework overrides the device characteristics for
     // app compatibility reasons.
-    bool mOverrideToPortrait;
+    int mRotationOverride;
     camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
     bool mComposerOutput;
 

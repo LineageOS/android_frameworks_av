@@ -114,7 +114,7 @@ public:
             uid_t clientUid,
             int servicePid,
             bool overrideForPerfClass,
-            bool overrideToPortrait,
+            int rotationOverride,
             bool forceSlowJpegMode);
 
     virtual ~Camera2Client();

@@ -61,7 +61,7 @@ protected:
             int clientPid,
             uid_t clientUid,
             int servicePid,
-            bool overrideToPortrait);
+            int rotationOverride);
 
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
 };
@@ -193,7 +193,7 @@ public:
             uid_t clientUid,
             int servicePid,
             bool overrideForPerfClass,
-            bool overrideToPortrait,
+            int rotationOverride,
             const std::string& originalCameraId);
     virtual ~CameraDeviceClient();
 

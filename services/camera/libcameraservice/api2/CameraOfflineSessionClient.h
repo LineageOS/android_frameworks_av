@@ -17,6 +17,7 @@
 #ifndef ANDROID_SERVERS_CAMERA_PHOTOGRAPHY_CAMERAOFFLINESESSIONCLIENT_H
 #define ANDROID_SERVERS_CAMERA_PHOTOGRAPHY_CAMERAOFFLINESESSIONCLIENT_H
 
+#include <android/hardware/ICameraService.h>
 #include <android/hardware/camera2/BnCameraOfflineSession.h>
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
 #include "common/FrameProcessorBase.h"
@@ -59,7 +60,7 @@ public:
                     // (v)ndk doesn't have offline session support
                     clientPackageName, /*overridePackageName*/false, clientFeatureId,
                     cameraIdStr, cameraFacing, sensorOrientation, clientPid, clientUid, servicePid,
-                    /*overrideToPortrait*/false),
+                    hardware::ICameraService::ROTATION_OVERRIDE_NONE),
             mRemoteCallback(remoteCallback), mOfflineSession(session),
             mCompositeStreamMap(offlineCompositeStreamMap) {}
 

@@ -719,7 +719,8 @@ camera_status_t ACameraManager::getCameraCharacteristics(
     CameraMetadata rawMetadata;
     int targetSdkVersion = android_get_application_target_sdk_version();
     binder::Status serviceRet = cs->getCameraCharacteristics(cameraIdStr,
-            targetSdkVersion, /*overrideToPortrait*/false, kDefaultDeviceId, /*devicePolicy*/0,
+            targetSdkVersion, /*rotationOverride*/hardware::ICameraService::ROTATION_OVERRIDE_NONE,
+            kDefaultDeviceId, /*devicePolicy*/0,
             &rawMetadata);
     if (!serviceRet.isOk()) {
         switch(serviceRet.serviceSpecificErrorCode()) {
@@ -772,7 +773,8 @@ ACameraManager::openCamera(
     binder::Status serviceRet = cs->connectDevice(
             callbacks, cameraId, "", {},
             hardware::ICameraService::USE_CALLING_UID, /*oomScoreOffset*/0,
-            targetSdkVersion, /*overrideToPortrait*/false, kDefaultDeviceId, /*devicePolicy*/0,
+            targetSdkVersion, /*rotationOverride*/hardware::ICameraService::ROTATION_OVERRIDE_NONE,
+            kDefaultDeviceId, /*devicePolicy*/0,
             /*out*/&deviceRemote);
 
     if (!serviceRet.isOk()) {

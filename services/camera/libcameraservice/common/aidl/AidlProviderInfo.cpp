@@ -1001,16 +1001,16 @@ status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
                 SessionConfigurationUtils::targetPerfClassPrimaryCamera(
                         perfClassPrimaryCameraIds, cameraId, targetSdkVersion);
         res = mManager->getCameraCharacteristicsLocked(cameraId, overrideForPerfClass, &deviceInfo,
-                /*overrideToPortrait*/false);
+                hardware::ICameraService::ROTATION_OVERRIDE_NONE);
         if (res != OK) {
             return res;
         }
         camera3::metadataGetter getMetadata =
                 [this](const std::string &id, bool overrideForPerfClass) {
                     CameraMetadata physicalDeviceInfo;
-                    mManager->getCameraCharacteristicsLocked(id, overrideForPerfClass,
-                                                   &physicalDeviceInfo,
-                                                   /*overrideToPortrait*/false);
+                    mManager->getCameraCharacteristicsLocked(
+                            id, overrideForPerfClass, &physicalDeviceInfo,
+                            hardware::ICameraService::ROTATION_OVERRIDE_NONE);
                     return physicalDeviceInfo;
                 };
         std::vector<std::string> physicalCameraIds;

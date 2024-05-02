@@ -87,6 +87,7 @@ cc_defaults {
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
         "camera_platform_flags_c_lib",
+        "com.android.window.flags.window-aconfig_flags_c_lib",
         "media_permission-aidl-cpp",
     ],
 

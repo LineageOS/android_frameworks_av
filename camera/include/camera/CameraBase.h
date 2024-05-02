@@ -125,7 +125,7 @@ public:
     static sp<TCam>      connect(int cameraId,
                                  const std::string& clientPackageName,
                                  int clientUid, int clientPid, int targetSdkVersion,
-                                 bool overrideToPortrait, bool forceSlowJpegMode,
+                                 int rotationOverride, bool forceSlowJpegMode,
                                  int32_t deviceId, int32_t devicePolicy);
     virtual void         disconnect();
 
@@ -134,7 +134,7 @@ public:
     static int           getNumberOfCameras(int32_t deviceId, int32_t devicePolicy);
 
     static status_t      getCameraInfo(int cameraId,
-                                       bool overrideToPortrait,
+                                       int rotationOverride,
                                        int32_t deviceId,
                                        int32_t devicePolicy,
                                        /*out*/

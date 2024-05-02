@@ -27,8 +27,10 @@
 #include <gui/Surface.h>
 #include <gui/Surface.h>
 
+#include <android/hardware/ICameraService.h>
 #include <camera/CameraSessionStats.h>
 #include <camera/StringUtils.h>
+#include <com_android_window_flags.h>
 
 #include "common/Camera2ClientBase.h"
 
@@ -41,6 +43,8 @@
 namespace android {
 
 using namespace camera2;
+
+namespace wm_flags = com::android::window::flags;
 
 // Interface used by CameraService
 
@@ -61,11 +65,11 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         uid_t clientUid,
         int servicePid,
         bool overrideForPerfClass,
-        bool overrideToPortrait,
+        int rotationOverride,
         bool legacyClient):
         TClientBase(cameraService, remoteCallback, attributionAndPermissionUtils, clientPackageName,
                 systemNativeClient, clientFeatureId, cameraId, api1CameraId, cameraFacing,
-                sensorOrientation, clientPid, clientUid, servicePid, overrideToPortrait),
+                sensorOrientation, clientPid, clientUid, servicePid, rotationOverride),
         mSharedCameraCallbacks(remoteCallback),
         mCameraServiceProxyWrapper(cameraServiceProxyWrapper),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
@@ -117,14 +121,14 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
                     new HidlCamera3Device(mCameraServiceProxyWrapper,
                             TClientBase::mAttributionAndPermissionUtils,
                             TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            TClientBase::mOverrideToPortrait, mLegacyClient);
+                            TClientBase::mRotationOverride, mLegacyClient);
             break;
         case IPCTransport::AIDL:
             mDevice =
                     new AidlCamera3Device(mCameraServiceProxyWrapper,
                             TClientBase::mAttributionAndPermissionUtils,
                             TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            TClientBase::mOverrideToPortrait, mLegacyClient);
+                            TClientBase::mRotationOverride, mLegacyClient);
              break;
         default:
             ALOGE("%s Invalid transport for camera id %s", __FUNCTION__,
@@ -339,8 +343,9 @@ void Camera2ClientBase<TClientBase>::notifyError(
 
 template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyPhysicalCameraChange(const std::string &physicalId) {
-    // We're only interested in this notification if overrideToPortrait is turned on.
-    if (!TClientBase::mOverrideToPortrait) {
+    using android::hardware::ICameraService;
+    // We're only interested in this notification if rotationOverride is turned on.
+    if (TClientBase::mRotationOverride == ICameraService::ROTATION_OVERRIDE_NONE) {
         return;
     }
 
@@ -350,8 +355,13 @@ void Camera2ClientBase<TClientBase>::notifyPhysicalCameraChange(const std::strin
     if (orientationEntry.count == 1) {
         int orientation = orientationEntry.data.i32[0];
         int rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_NONE;
-
-        if (orientation == 0 || orientation == 180) {
+        bool landscapeSensor =  (orientation == 0 || orientation == 180);
+        if (((TClientBase::mRotationOverride ==
+                ICameraService::ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT) && landscapeSensor) ||
+                        ((wm_flags::camera_compat_for_freeform() &&
+                                TClientBase::mRotationOverride ==
+                                ICameraService::ROTATION_OVERRIDE_ROTATION_ONLY)
+                                && !landscapeSensor)) {
             rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
         }
 
