@@ -28,9 +28,9 @@ namespace camera2 {
 namespace utils {
 
 struct ConcurrentCameraIdCombination : public Parcelable {
-    std::vector<std::string> mConcurrentCameraIds;
+    std::vector<std::pair<std::string, int32_t>> mConcurrentCameraIdDeviceIdPairs;
     ConcurrentCameraIdCombination();
-    ConcurrentCameraIdCombination(std::vector<std::string> &&combination);
+    ConcurrentCameraIdCombination(std::vector<std::pair<std::string, int32_t>> &&combination);
     virtual ~ConcurrentCameraIdCombination();
 
     virtual status_t writeToParcel(android::Parcel *parcel) const override;

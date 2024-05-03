@@ -166,6 +166,8 @@ static const std::string kServiceName("cameraserver");
 const std::string CameraService::kOfflineDevice("offline-");
 const std::string CameraService::kWatchAllClientsFlag("all");
 
+constexpr int32_t kInvalidDeviceId = -1;
+
 // Set to keep track of logged service error events.
 static std::set<std::string> sServiceErrorEventSet;
 
@@ -3441,7 +3443,6 @@ Status CameraService::notifyDisplayConfigurationChange() {
     return Status::ok();
 }
 
-// TODO(b/291736219): This to be made device-aware.
 Status CameraService::getConcurrentCameraIds(
         std::vector<ConcurrentCameraIdCombination>* concurrentCameraIds) {
     ATRACE_CALL();
@@ -3461,7 +3462,8 @@ Status CameraService::getConcurrentCameraIds(
     std::vector<std::unordered_set<std::string>> concurrentCameraCombinations =
             mCameraProviderManager->getConcurrentCameraIds();
     for (auto &combination : concurrentCameraCombinations) {
-        std::vector<std::string> validCombination;
+        std::vector<std::pair<std::string, int32_t>> validCombination;
+        int32_t firstDeviceId = kInvalidDeviceId;
         for (auto &cameraId : combination) {
             // if the camera state is not present, skip
             auto state = getCameraState(cameraId);
@@ -3476,7 +3478,17 @@ Status CameraService::getConcurrentCameraIds(
             if (shouldRejectSystemCameraConnection(cameraId)) {
                 continue;
             }
-            validCombination.push_back(cameraId);
+            auto [cameraOwnerDeviceId, mappedCameraId] =
+                    mVirtualDeviceCameraIdMapper.getDeviceIdAndMappedCameraIdPair(cameraId);
+            if (firstDeviceId == kInvalidDeviceId) {
+                firstDeviceId = cameraOwnerDeviceId;
+            } else if (firstDeviceId != cameraOwnerDeviceId) {
+                // Found an invalid combination which contains cameras with different device id's,
+                // hence discard it.
+                validCombination.clear();
+                break;
+            }
+            validCombination.push_back({mappedCameraId, cameraOwnerDeviceId});
         }
         if (validCombination.size() != 0) {
             concurrentCameraIds->push_back(std::move(validCombination));
@@ -3487,7 +3499,8 @@ Status CameraService::getConcurrentCameraIds(
 
 Status CameraService::isConcurrentSessionConfigurationSupported(
         const std::vector<CameraIdAndSessionConfiguration>& cameraIdsAndSessionConfigurations,
-        int targetSdkVersion, /*out*/bool* isSupported) {
+        int targetSdkVersion, int32_t deviceId, int32_t devicePolicy,
+        /*out*/bool* isSupported) {
     if (!isSupported) {
         ALOGE("%s: isSupported is NULL", __FUNCTION__);
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, "isSupported is NULL");
@@ -3499,12 +3512,26 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
                 "Camera subsystem is not available");
     }
 
+    for (auto cameraIdAndSessionConfiguration : cameraIdsAndSessionConfigurations) {
+        std::optional<std::string> cameraIdOptional =
+                resolveCameraId(cameraIdAndSessionConfiguration.mCameraId, deviceId, devicePolicy,
+                                getCallingUid());
+        if (!cameraIdOptional.has_value()) {
+            std::string msg = fmt::sprintf("Camera %s: Invalid camera id for device id %d",
+                    cameraIdAndSessionConfiguration.mCameraId.c_str(), deviceId);
+            ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+        }
+        cameraIdAndSessionConfiguration.mCameraId = cameraIdOptional.value();
+    }
+
     // Check for camera permissions
     int callingPid = getCallingPid();
     int callingUid = getCallingUid();
-    // TODO(b/291736219): Pass deviceId owning the camera if we make this method device-aware.
     bool hasCameraPermission = ((callingPid == getpid()) ||
-            hasPermissionsForCamera(callingPid, callingUid, kDefaultDeviceId));
+            hasPermissionsForCamera(callingPid, callingUid,
+                    devicePolicy == IVirtualDeviceManagerNative::DEVICE_POLICY_DEFAULT
+                        ? kDefaultDeviceId : deviceId));
     if (!hasCameraPermission) {
         return STATUS_ERROR(ERROR_PERMISSION_DENIED,
                 "android.permission.CAMERA needed to call"
