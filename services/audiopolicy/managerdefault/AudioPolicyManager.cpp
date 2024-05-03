@@ -6397,6 +6397,15 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
         if ((desc->mFlags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0
                 && !isOutputOnlyAvailableRouteToSomeDevice(desc)) {
             outputsClosed.push_back(desc->mIoHandle);
+            nextAudioPortGeneration();
+            ssize_t index = mAudioPatches.indexOfKey(desc->getPatchHandle());
+            if (index >= 0) {
+                sp<AudioPatch> patchDesc = mAudioPatches.valueAt(index);
+                (void) /*status_t status*/ mpClientInterface->releaseAudioPatch(
+                            patchDesc->getAfHandle(), 0);
+                mAudioPatches.removeItemsAt(index);
+                mpClientInterface->onAudioPatchListUpdate();
+            }
             desc->close();
         }
     }
