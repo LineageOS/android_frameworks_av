@@ -8,18 +8,21 @@ cc_defaults {
 aconfig_declarations {
     name: "com.android.media.audioserver-aconfig",
     package: "com.android.media.audioserver",
+    container: "system",
     srcs: ["audioserver.aconfig"],
 }
 
 aconfig_declarations {
     name: "com.android.media.audio-aconfig",
     package: "com.android.media.audio",
+    container: "system",
     srcs: ["audio.aconfig"],
 }
 
 aconfig_declarations {
     name: "com.android.media.aaudio-aconfig",
     package: "com.android.media.aaudio",
+    container: "system",
     srcs: ["aaudio.aconfig"],
 }
 
@@ -63,6 +66,7 @@ java_aconfig_library {
 aconfig_declarations {
     name: "android.media.audio-aconfig",
     package: "android.media.audio",
+    container: "system",
     srcs: ["audio_framework.aconfig"],
     visibility: ["//visibility:private"],
 }
@@ -70,6 +74,7 @@ aconfig_declarations {
 aconfig_declarations {
     name: "android.media.audiopolicy-aconfig",
     package: "android.media.audiopolicy",
+    container: "system",
     srcs: ["audiopolicy_framework.aconfig"],
     visibility: ["//visibility:private"],
 }
@@ -77,6 +82,7 @@ aconfig_declarations {
 aconfig_declarations {
     name: "android.media.midi-aconfig",
     package: "android.media.midi",
+    container: "system",
     srcs: ["midi_flags.aconfig"],
     visibility: ["//visibility:private"],
 }

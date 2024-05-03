@@ -3,6 +3,7 @@
 # Please add flags in alphabetical order.
 
 package: "com.android.media.audioserver"
+container: "system"
 
 flag {
     name: "direct_track_reprioritization"
