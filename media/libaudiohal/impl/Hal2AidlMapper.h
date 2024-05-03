@@ -133,6 +133,8 @@ class Hal2AidlMapper {
     using Streams = std::map<wp<StreamHalInterface>,
             std::pair<int32_t /*mix port config ID*/, int32_t /*patch ID*/>>;
 
+    enum PatchMatch { MATCH_SOURCES, MATCH_SINKS, MATCH_BOTH };
+
     const std::string mInstance;
     const std::shared_ptr<::aidl::android::hardware::audio::core::IModule> mModule;
 
@@ -150,11 +152,13 @@ class Hal2AidlMapper {
             ::aidl::android::media::audio::common::AudioPortConfig* result, bool *created);
     void eraseConnectedPort(int32_t portId);
     status_t findOrCreatePatch(
-        const std::set<int32_t>& sourcePortConfigIds,
-        const std::set<int32_t>& sinkPortConfigIds,
+            const std::set<int32_t>& sourcePortConfigIds,
+            const std::set<int32_t>& sinkPortConfigIds,
+            PatchMatch match,
         ::aidl::android::hardware::audio::core::AudioPatch* patch, bool* created);
     status_t findOrCreatePatch(
         const ::aidl::android::hardware::audio::core::AudioPatch& requestedPatch,
+        PatchMatch match,
         ::aidl::android::hardware::audio::core::AudioPatch* patch, bool* created);
     status_t findOrCreateDevicePortConfig(
             const ::aidl::android::media::audio::common::AudioDevice& device,
@@ -175,7 +179,7 @@ class Hal2AidlMapper {
         const std::set<int32_t>& destinationPortIds,
         ::aidl::android::media::audio::common::AudioPortConfig* portConfig, bool* created);
     Patches::iterator findPatch(const std::set<int32_t>& sourcePortConfigIds,
-            const std::set<int32_t>& sinkPortConfigIds);
+            const std::set<int32_t>& sinkPortConfigIds, PatchMatch match);
     Ports::iterator findPort(const ::aidl::android::media::audio::common::AudioDevice& device);
     Ports::iterator findPort(
             const ::aidl::android::media::audio::common::AudioConfig& config,
