@@ -154,7 +154,7 @@ namespace camera3 {
         bool legacyClient;
         nsecs_t& minFrameDuration;
         bool& isFixedFps;
-        bool overrideToPortrait;
+        int rotationOverride;
         std::string &activePhysicalId;
     };
 

@@ -163,7 +163,7 @@ template <typename TCam, typename TCamTraits>
 sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
                                                const std::string& clientPackageName,
                                                int clientUid, int clientPid, int targetSdkVersion,
-                                               bool overrideToPortrait, bool forceSlowJpegMode,
+                                               int rotationOverride, bool forceSlowJpegMode,
                                                int32_t deviceId, int32_t devicePolicy)
 {
     ALOGV("%s: connect", __FUNCTION__);
@@ -174,10 +174,10 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
     binder::Status ret;
     if (cs != nullptr) {
         TCamConnectService fnConnectService = TCamTraits::fnConnectService;
-        ALOGI("Connect camera (legacy API) - overrideToPortrait %d, forceSlowJpegMode %d",
-                overrideToPortrait, forceSlowJpegMode);
+        ALOGI("Connect camera (legacy API) - rotationOverride %d, forceSlowJpegMode %d",
+                rotationOverride, forceSlowJpegMode);
         ret = (cs.get()->*fnConnectService)(cl, cameraId, clientPackageName, clientUid,
-                clientPid, targetSdkVersion, overrideToPortrait, forceSlowJpegMode, deviceId,
+                clientPid, targetSdkVersion, rotationOverride, forceSlowJpegMode, deviceId,
                 devicePolicy, /*out*/ &c->mCamera);
     }
     if (ret.isOk() && c->mCamera != nullptr) {
@@ -279,11 +279,11 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras(int32_t deviceId, int32_t d
 // this can be in BaseCamera but it should be an instance method
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
-        bool overrideToPortrait, int32_t deviceId, int32_t devicePolicy,
+        int rotationOverride, int32_t deviceId, int32_t devicePolicy,
         struct hardware::CameraInfo* cameraInfo) {
     const sp<::android::hardware::ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
-    binder::Status res = cs->getCameraInfo(cameraId, overrideToPortrait, deviceId, devicePolicy,
+    binder::Status res = cs->getCameraInfo(cameraId, rotationOverride, deviceId, devicePolicy,
             cameraInfo);
     return res.isOk() ? OK : res.serviceSpecificErrorCode();
 }

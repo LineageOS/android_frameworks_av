@@ -375,6 +375,8 @@ public:
     virtual void triggerEvents(AudioSystem::sync_event_t type) = 0;
 
     virtual void disable() = 0;
+    virtual bool isDisabled() const = 0;
+
     virtual int& fastIndex() = 0;
     virtual bool isPlaybackRestricted() const = 0;
 

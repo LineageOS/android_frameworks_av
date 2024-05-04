@@ -32,7 +32,8 @@ namespace utils {
 ConcurrentCameraIdCombination::ConcurrentCameraIdCombination() = default;
 
 ConcurrentCameraIdCombination::ConcurrentCameraIdCombination(
-        std::vector<std::string> &&combination) : mConcurrentCameraIds(std::move(combination)) { }
+        std::vector<std::pair<std::string, int32_t>> &&combination)
+            : mConcurrentCameraIdDeviceIdPairs(std::move(combination)) { }
 
 ConcurrentCameraIdCombination::~ConcurrentCameraIdCombination() = default;
 
@@ -42,25 +43,29 @@ status_t ConcurrentCameraIdCombination::readFromParcel(const android::Parcel* pa
         return BAD_VALUE;
     }
     status_t err = OK;
-    mConcurrentCameraIds.clear();
-    int32_t cameraIdCount = 0;
-    if ((err = parcel->readInt32(&cameraIdCount)) != OK) {
-        ALOGE("%s: Failed to read the camera id count from parcel: %d", __FUNCTION__, err);
+    mConcurrentCameraIdDeviceIdPairs.clear();
+    int32_t cameraCount = 0;
+    if ((err = parcel->readInt32(&cameraCount)) != OK) {
+        ALOGE("%s: Failed to read the camera count from parcel: %d", __FUNCTION__, err);
         return err;
     }
-    for (int32_t i = 0; i < cameraIdCount; i++) {
-        String16 id;
-        if ((err = parcel->readString16(&id)) != OK) {
+    for (int32_t i = 0; i < cameraCount; i++) {
+        String16 cameraId;
+        if ((err = parcel->readString16(&cameraId)) != OK) {
             ALOGE("%s: Failed to read camera id!", __FUNCTION__);
             return err;
         }
-        mConcurrentCameraIds.push_back(toStdString(id));
+        int32_t deviceId;
+        if ((err = parcel->readInt32(&deviceId)) != OK) {
+            ALOGE("%s: Failed to read device id!", __FUNCTION__);
+            return err;
+        }
+        mConcurrentCameraIdDeviceIdPairs.push_back({toStdString(cameraId), deviceId});
     }
     return OK;
 }
 
 status_t ConcurrentCameraIdCombination::writeToParcel(android::Parcel* parcel) const {
-
     if (parcel == nullptr) {
         ALOGE("%s: Null parcel", __FUNCTION__);
         return BAD_VALUE;
@@ -68,14 +73,18 @@ status_t ConcurrentCameraIdCombination::writeToParcel(android::Parcel* parcel) c
 
     status_t err = OK;
 
-    if ((err = parcel->writeInt32(mConcurrentCameraIds.size())) != OK) {
+    if ((err = parcel->writeInt32(mConcurrentCameraIdDeviceIdPairs.size())) != OK) {
         ALOGE("%s: Failed to write the camera id count to parcel: %d", __FUNCTION__, err);
         return err;
     }
 
-    for (const auto &it : mConcurrentCameraIds) {
-        if ((err = parcel->writeString16(toString16(it))) != OK) {
+    for (const auto &it : mConcurrentCameraIdDeviceIdPairs) {
+        if ((err = parcel->writeString16(toString16(it.first))) != OK) {
             ALOGE("%s: Failed to write the camera id string to parcel: %d", __FUNCTION__, err);
+            return err;
+        }
+        if ((err = parcel->writeInt32(it.second)) != OK) {
+            ALOGE("%s: Failed to write the device id integer to parcel: %d", __FUNCTION__, err);
             return err;
         }
     }
@@ -105,7 +114,6 @@ status_t CameraIdAndSessionConfiguration::readFromParcel(const android::Parcel* 
 }
 
 status_t CameraIdAndSessionConfiguration::writeToParcel(android::Parcel* parcel) const {
-
     if (parcel == nullptr) {
         ALOGE("%s: Null parcel", __FUNCTION__);
         return BAD_VALUE;

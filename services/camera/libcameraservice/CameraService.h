@@ -158,10 +158,10 @@ public:
     virtual binder::Status     getNumberOfCameras(int32_t type, int32_t deviceId,
             int32_t devicePolicy, int32_t* numCameras);
 
-    virtual binder::Status     getCameraInfo(int cameraId, bool overrideToPortrait,
+    virtual binder::Status     getCameraInfo(int cameraId, int rotationOverride,
             int32_t deviceId, int32_t devicePolicy, hardware::CameraInfo* cameraInfo) override;
     virtual binder::Status     getCameraCharacteristics(const std::string& cameraId,
-            int targetSdkVersion, bool overrideToPortrait, int32_t deviceId,
+            int targetSdkVersion, int rotationOverride, int32_t deviceId,
             int32_t devicePolicy, CameraMetadata* cameraInfo) override;
     virtual binder::Status     getCameraVendorTagDescriptor(
             /*out*/
@@ -173,14 +173,14 @@ public:
     virtual binder::Status     connect(const sp<hardware::ICameraClient>& cameraClient,
             int32_t cameraId, const std::string& clientPackageName,
             int32_t clientUid, int clientPid, int targetSdkVersion,
-            bool overrideToPortrait, bool forceSlowJpegMode, int32_t deviceId,
+            int rotationOverride, bool forceSlowJpegMode, int32_t deviceId,
             int32_t devicePolicy, /*out*/ sp<hardware::ICamera>* device) override;
 
     virtual binder::Status     connectDevice(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
             const std::string& cameraId,
             const std::string& clientPackageName, const std::optional<std::string>& clientFeatureId,
-            int32_t clientUid, int scoreOffset, int targetSdkVersion, bool overrideToPortrait,
+            int32_t clientUid, int scoreOffset, int targetSdkVersion, int rotationOverride,
             int32_t deviceId, int32_t devicePolicy,
             /*out*/
             sp<hardware::camera2::ICameraDeviceUser>* device);
@@ -191,14 +191,14 @@ public:
     virtual binder::Status    removeListener(
             const sp<hardware::ICameraServiceListener>& listener);
 
-    // TODO(b/291736219): This to be made device-aware.
     virtual binder::Status getConcurrentCameraIds(
         /*out*/
         std::vector<hardware::camera2::utils::ConcurrentCameraIdCombination>* concurrentCameraIds);
 
     virtual binder::Status isConcurrentSessionConfigurationSupported(
         const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>& sessions,
-        int targetSdkVersion, /*out*/bool* supported);
+        int targetSdkVersion, int32_t deviceId, int32_t devicePolicy,
+        /*out*/bool* supported);
 
     virtual binder::Status    getLegacyParameters(
             int32_t cameraId,
@@ -262,7 +262,7 @@ public:
             /*out*/ bool* supported);
 
     virtual binder::Status getSessionCharacteristics(
-            const std::string& cameraId, int targetSdkVersion, bool overrideToPortrait,
+            const std::string& cameraId, int targetSdkVersion, int rotationOverride,
             const SessionConfiguration& sessionConfiguration, int32_t deviceId,
             int32_t devicePolicy, /*out*/ CameraMetadata* outMetadata);
 
@@ -307,7 +307,8 @@ public:
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
     std::pair<int, IPCTransport>    getDeviceVersion(const std::string& cameraId,
-            bool overrideToPortrait, int* portraitRotation,
+            int rotationOverride,
+            int* portraitRotation,
             int* facing = nullptr, int* orientation = nullptr);
 
     /////////////////////////////////////////////////////////////////////
@@ -357,7 +358,7 @@ public:
         }
 
         bool getOverrideToPortrait() const {
-            return mOverrideToPortrait;
+            return mRotationOverride == ICameraService::ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT;
         }
 
         // Disallows dumping over binder interface
@@ -461,7 +462,7 @@ public:
                 int clientPid,
                 uid_t clientUid,
                 int servicePid,
-                bool overrideToPortrait);
+                int rotationOverride);
 
         virtual ~BasicClient();
 
@@ -484,7 +485,7 @@ public:
         const pid_t                     mServicePid;
         bool                            mDisconnected;
         bool                            mUidIsTrusted;
-        bool                            mOverrideToPortrait;
+        int                             mRotationOverride;
 
         mutable Mutex                   mAudioRestrictionLock;
         int32_t                         mAudioRestriction;
@@ -576,7 +577,7 @@ public:
                 int clientPid,
                 uid_t clientUid,
                 int servicePid,
-                bool overrideToPortrait);
+                int rotationOverride);
         ~Client();
 
         // return our camera client
@@ -1008,7 +1009,8 @@ private:
             int api1CameraId, const std::string& clientPackageNameMaybe, bool systemNativeClient,
             const std::optional<std::string>& clientFeatureId, int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
-            bool overrideToPortrait, bool forceSlowJpegMode, const std::string& originalCameraId,
+            int rotationOverride, bool forceSlowJpegMode,
+            const std::string& originalCameraId,
             /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
@@ -1549,7 +1551,7 @@ private:
             const std::string& cameraId, int api1CameraId, int facing, int sensorOrientation,
             int clientPid, uid_t clientUid, int servicePid,
             std::pair<int, IPCTransport> deviceVersionAndIPCTransport, apiLevel effectiveApiLevel,
-            bool overrideForPerfClass, bool overrideToPortrait, bool forceSlowJpegMode,
+            bool overrideForPerfClass, int rotationOverride, bool forceSlowJpegMode,
             const std::string& originalCameraId,
             /*out*/ sp<BasicClient>* client);
 

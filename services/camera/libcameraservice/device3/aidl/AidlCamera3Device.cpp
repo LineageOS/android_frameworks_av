@@ -173,10 +173,10 @@ uint64_t AidlCamera3Device::mapProducerToFrameworkUsage(
 AidlCamera3Device::AidlCamera3Device(
         std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
         std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
-        const std::string& id, bool overrideForPerfClass, bool overrideToPortrait,
+        const std::string& id, bool overrideForPerfClass, int rotationOverride,
         bool legacyClient) :
         Camera3Device(cameraServiceProxyWrapper, attributionAndPermissionUtils, id,
-                overrideForPerfClass, overrideToPortrait, legacyClient) {
+                overrideForPerfClass, rotationOverride, legacyClient) {
     mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
 }
 
@@ -207,7 +207,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
       return INVALID_OPERATION;
     }
     res = manager->getCameraCharacteristics(mId, mOverrideForPerfClass, &mDeviceInfo,
-            mOverrideToPortrait);
+            mRotationOverride);
     if (res != OK) {
         SET_ERR_L("Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
@@ -223,7 +223,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
             // Do not override characteristics for physical cameras
             res = manager->getCameraCharacteristics(
                     physicalId, /*overrideForPerfClass*/false, &mPhysicalDeviceInfoMap[physicalId],
-                    mOverrideToPortrait);
+                    mRotationOverride);
             if (res != OK) {
                 SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
                         physicalId.c_str(), strerror(-res), res);
@@ -417,7 +417,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mOverrideToPortrait, mActivePhysicalId}, mResultMetadataQueue
+        mRotationOverride, mActivePhysicalId}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -459,7 +459,7 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mOverrideToPortrait, mActivePhysicalId}, mResultMetadataQueue
+        mRotationOverride, mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg, mSensorReadoutTimestampSupported);
@@ -1480,10 +1480,10 @@ AidlCamera3Device::AidlRequestThread::AidlRequestThread(wp<Camera3Device> parent
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait,
+                int rotationOverride,
                 bool supportSettingsOverride) :
           RequestThread(parent, statusTracker, interface, sessionParamKeys,
-                  useHalBufManager, supportCameraMute, overrideToPortrait,
+                  useHalBufManager, supportCameraMute, rotationOverride,
                   supportSettingsOverride) {}
 
 status_t AidlCamera3Device::AidlRequestThread::switchToOffline(
@@ -1714,10 +1714,10 @@ sp<Camera3Device::RequestThread> AidlCamera3Device::createNewRequestThread(
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                bool overrideToPortrait,
+                int rotationOverride,
                 bool supportSettingsOverride) {
     return new AidlRequestThread(parent, statusTracker, interface, sessionParamKeys,
-            useHalBufManager, supportCameraMute, overrideToPortrait,
+            useHalBufManager, supportCameraMute, rotationOverride,
             supportSettingsOverride);
 };
 

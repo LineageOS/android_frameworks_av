@@ -36,6 +36,7 @@
 #include <utils/SortedVector.h>
 #include <utils/Trace.h>
 
+#include <android/hardware/ICameraService.h>
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
 
 #include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
@@ -675,8 +676,9 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                     states.listener->notifyPhysicalCameraChange(physicalId);
                 }
                 states.activePhysicalId = physicalId;
-
-                if (!states.legacyClient && !states.overrideToPortrait) {
+                using hardware::ICameraService::ROTATION_OVERRIDE_NONE;
+                if (!states.legacyClient &&
+                        states.rotationOverride == ROTATION_OVERRIDE_NONE) {
                     auto deviceInfo = states.physicalDeviceInfoMap.find(physicalId);
                     if (deviceInfo != states.physicalDeviceInfoMap.end()) {
                         auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);

@@ -6159,8 +6159,8 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                 // No buffers for this track. Give it a few chances to
                 // fill a buffer, then remove it from active list.
                 if (--(track->retryCount()) <= 0) {
-                    ALOGI("BUFFER TIMEOUT: remove(%d) from active list on thread %p",
-                            trackId, this);
+                    ALOGI("%s BUFFER TIMEOUT: remove track(%d) from active list due to underrun"
+                          " on thread %d", __func__, trackId, mId);
                     tracksToRemove->add(track);
                     // indicate to client process that the track was disabled because of underrun;
                     // it will then automatically call start() when data is available
@@ -6917,7 +6917,8 @@ PlaybackThread::mixer_state DirectOutputThread::prepareTracks_l(
                     if (isTimestampAdvancing) { // HAL is still playing audio, give us more time.
                         track->retryCount() = kMaxTrackRetriesOffload;
                     } else {
-                        ALOGV("BUFFER TIMEOUT: remove track(%d) from active list", trackId);
+                        ALOGI("%s BUFFER TIMEOUT: remove track(%d) from active list due to"
+                              " underrun on thread %d", __func__, trackId, mId);
                         tracksToRemove->add(track);
                         // indicate to client process that the track was disabled because of
                         // underrun; it will then automatically call start() when data is available
@@ -7037,16 +7038,20 @@ bool DirectOutputThread::shouldStandby_l()
 {
     bool trackPaused = false;
     bool trackStopped = false;
+    bool trackDisabled = false;
 
-    // do not put the HAL in standby when paused. AwesomePlayer clear the offloaded AudioTrack
+    // do not put the HAL in standby when paused. NuPlayer clear the offloaded AudioTrack
     // after a timeout and we will enter standby then.
+    // On offload threads, do not enter standby if the main track is still underrunning.
     if (mTracks.size() > 0) {
-        trackPaused = mTracks[mTracks.size() - 1]->isPaused();
-        trackStopped = mTracks[mTracks.size() - 1]->isStopped() ||
-                           mTracks[mTracks.size() - 1]->state() == IAfTrackBase::IDLE;
+        const auto& mainTrack = mTracks[mTracks.size() - 1];
+
+        trackPaused = mainTrack->isPaused();
+        trackStopped = mainTrack->isStopped() || mainTrack->state() == IAfTrackBase::IDLE;
+        trackDisabled = (mType == OFFLOAD) && mainTrack->isDisabled();
     }
 
-    return !mStandby && !(trackPaused || (mHwPaused && !trackStopped));
+    return !mStandby && !(trackPaused || (mHwPaused && !trackStopped) || trackDisabled);
 }
 
 // checkForNewParameter_l() must be called with ThreadBase::mutex() held
@@ -7514,8 +7519,8 @@ PlaybackThread::mixer_state OffloadThread::prepareTracks_l(
                     if (isTimestampAdvancing) { // HAL is still playing audio, give us more time.
                         track->retryCount() = kMaxTrackRetriesOffload;
                     } else {
-                        ALOGV("OffloadThread: BUFFER TIMEOUT: remove track(%d) from active list",
-                                track->id());
+                        ALOGI("%s BUFFER TIMEOUT: remove track(%d) from active list due to"
+                              " underrun on thread %d", __func__, track->id(), mId);
                         tracksToRemove->add(track);
                         // tell client process that the track was disabled because of underrun;
                         // it will then automatically call start() when data is available

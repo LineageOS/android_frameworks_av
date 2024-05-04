@@ -29,6 +29,7 @@
 
 #include <utils/Trace.h>
 
+#include <android/hardware/ICameraService.h>
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
 #include <android/binder_ibinder_platform.h>
 #include <camera/StringUtils.h>
@@ -127,7 +128,7 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        /*overrideToPortrait*/false, activePhysicalId}, mResultMetadataQueue
+        hardware::ICameraService::ROTATION_OVERRIDE_NONE, activePhysicalId}, mResultMetadataQueue
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -174,7 +175,7 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        /*overrideToPortrait*/false, activePhysicalId}, mResultMetadataQueue
+        hardware::ICameraService::ROTATION_OVERRIDE_NONE, activePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg, mSensorReadoutTimestampSupported);
