@@ -9175,7 +9175,7 @@ bool RecordThread::stop(IAfRecordTrack* recordTrack) {
     // This is needed for proper patchRecord peer release.
     while (recordTrack->state() == IAfTrackBase::PAUSING && !recordTrack->isInvalid()) {
         mWaitWorkCV.notify_all(); // signal thread to stop
-        mStartStopCV.wait(_l);
+        mStartStopCV.wait(_l, getTid());
     }
 
     if (recordTrack->state() == IAfTrackBase::PAUSED) { // successful stop
