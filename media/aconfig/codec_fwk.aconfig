@@ -108,6 +108,16 @@ flag {
 }
 
 flag {
+  name: "stop_hal_before_surface"
+  namespace: "codec_fwk"
+  description: "Bugfix flag for setting state early to avoid a race condition"
+  bug: "339247977"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "teamfood"
   namespace: "codec_fwk"
   description: "Feature flag to track teamfood population"
