@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "Camera3-Utils"
+
 #include "Utils.h"
 #include <android-base/properties.h>
 #include <com_android_internal_camera_flags.h>
-
+#include <utils/Errors.h>
+#include <utils/Log.h>
 
 namespace android {
 
-using namespace com::android::internal::camera::flags;
+namespace flags = com::android::internal::camera::flags;
 
 constexpr const char *LEGACY_VNDK_VERSION_PROP = "ro.vndk.version";
 constexpr const char *BOARD_API_LEVEL_PROP = "ro.board.api_level";
@@ -52,4 +55,37 @@ int getVNDKVersionFromProp(int defaultVersion) {
     return __ANDROID_API_V__ + vndkVersion;
 }
 
-} // namespace android
+RunThreadWithRealtimePriority::RunThreadWithRealtimePriority(int tid)
+    : mTid(tid), mPreviousPolicy(sched_getscheduler(tid)) {
+    if (flags::realtime_priority_bump()) {
+        auto res = sched_getparam(mTid, &mPreviousParams);
+        if (res != OK) {
+            ALOGE("Can't retrieve thread scheduler parameters: %s (%d)", strerror(-res), res);
+            return;
+        }
+
+        struct sched_param param = {0};
+        param.sched_priority = kRequestThreadPriority;
+
+        res = sched_setscheduler(mTid, SCHED_FIFO, &param);
+        if (res != OK) {
+            ALOGW("Can't set realtime priority for thread: %s (%d)", strerror(-res), res);
+        } else {
+            ALOGD("Set real time priority for thread (tid %d)", mTid);
+            mPolicyBumped = true;
+        }
+    }
+}
+
+RunThreadWithRealtimePriority::~RunThreadWithRealtimePriority() {
+    if (mPolicyBumped && flags::realtime_priority_bump()) {
+        auto res = sched_setscheduler(mTid, mPreviousPolicy, &mPreviousParams);
+        if (res != OK) {
+            ALOGE("Can't set regular priority for thread: %s (%d)", strerror(-res), res);
+        } else {
+            ALOGD("Set regular priority for thread (tid %d)", mTid);
+        }
+    }
+}
+
+}  // namespace android

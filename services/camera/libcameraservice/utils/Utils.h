@@ -17,6 +17,9 @@
 #ifndef ANDROID_SERVERS_CAMERA_UTILS_H
 #define ANDROID_SERVERS_CAMERA_UTILS_H
 
+#include <sched.h>
+#include <unistd.h>
+
 namespace android {
 
 /**
@@ -27,6 +30,40 @@ namespace android {
  * Returns defaultVersion if the property is not found.
  */
 int getVNDKVersionFromProp(int defaultVersion);
+
+/**
+ * An instance of this class will raise the scheduling policy of a given
+ * given thread to real time and keep it this way throughout the lifetime
+ * of the object. The thread scheduling policy will revert back to its original
+ * state after the instances is released. By default the implementation will
+ * raise the priority of the current thread unless clients explicitly specify
+ * another thread id.
+ * Client must avoid:
+ *  - Keeping an instance of this class for extended and long running operations.
+ *    This is only intended for short/temporarily priority bumps that mitigate
+ *    scheduling delays within critical camera paths.
+ *  - Allocating instances of this class on the memory heap unless clients have
+ *    complete control over the object lifetime. It is preferable to allocate
+ *    instances of this class on the stack instead.
+ *  - Nesting multiple instances of this class using the same default or same thread id.
+ */
+class RunThreadWithRealtimePriority final {
+  public:
+    RunThreadWithRealtimePriority(int tid = gettid());
+    ~RunThreadWithRealtimePriority();
+
+    RunThreadWithRealtimePriority(const RunThreadWithRealtimePriority&) = delete;
+    RunThreadWithRealtimePriority& operator=(const RunThreadWithRealtimePriority&) = delete;
+
+    // SCHED_FIFO priority for request submission thread in HFR mode
+    static const int kRequestThreadPriority = 1;
+
+  private:
+    int mTid;
+    int mPreviousPolicy;
+    bool mPolicyBumped = false;
+    struct sched_param mPreviousParams;
+};
 
 } // namespace android
 
