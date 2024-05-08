@@ -78,7 +78,7 @@ cc_defaults {
     ],
     fuzz_config: {
         cc: [
-            "android-media-fuzzing-reports@google.com",
+            "android-audio-fuzzing-reports@google.com",
         ],
         componentid: 155276,
         hotlists: ["4593311"],
