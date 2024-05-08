@@ -26,8 +26,6 @@
 
 #include "EGL/egl.h"
 #include "aidl/android/hardware/camera/device/Stream.h"
-#include "aidl/android/hardware/camera/device/StreamBuffer.h"
-#include "aidl/android/hardware/graphics/common/PixelFormat.h"
 #include "aidlcommonsupport/NativeHandle.h"
 #include "android/hardware_buffer.h"
 #include "cutils/native_handle.h"
@@ -39,52 +37,33 @@ namespace companion {
 namespace virtualcamera {
 
 using ::aidl::android::hardware::camera::device::Stream;
-using ::aidl::android::hardware::camera::device::StreamBuffer;
 using ::aidl::android::hardware::common::NativeHandle;
-using ::aidl::android::hardware::graphics::common::PixelFormat;
 
 namespace {
 
-sp<GraphicBuffer> createBlobGraphicBuffer(GraphicBufferMapper& mapper,
-                                          buffer_handle_t bufferHandle) {
-  uint64_t allocationSize;
-  uint64_t usage;
-  uint64_t layerCount;
-  if (mapper.getAllocationSize(bufferHandle, &allocationSize) != NO_ERROR ||
-      mapper.getUsage(bufferHandle, &usage) != NO_ERROR ||
-      mapper.getLayerCount(bufferHandle, &layerCount) != NO_ERROR) {
-    ALOGE("Error fetching metadata for the imported BLOB buffer handle.");
-    return nullptr;
-  }
-
-  return sp<GraphicBuffer>::make(
-      bufferHandle, GraphicBuffer::HandleWrapMethod::TAKE_HANDLE,
-      allocationSize, /*height=*/1, static_cast<int>(ui::PixelFormat::BLOB),
-      layerCount, usage, 0);
-}
-
-sp<GraphicBuffer> createYCbCr420GraphicBuffer(GraphicBufferMapper& mapper,
-                                              buffer_handle_t bufferHandle) {
+sp<GraphicBuffer> createGraphicBuffer(GraphicBufferMapper& mapper,
+                                      const buffer_handle_t bufferHandle) {
   uint64_t width;
   uint64_t height;
   uint64_t usage;
   uint64_t layerCount;
+  ui::PixelFormat pixelFormat;
   if (mapper.getWidth(bufferHandle, &width) != NO_ERROR ||
       mapper.getHeight(bufferHandle, &height) != NO_ERROR ||
       mapper.getUsage(bufferHandle, &usage) != NO_ERROR ||
-      mapper.getLayerCount(bufferHandle, &layerCount) != NO_ERROR) {
+      mapper.getLayerCount(bufferHandle, &layerCount) != NO_ERROR ||
+      mapper.getPixelFormatRequested(bufferHandle, &pixelFormat) != NO_ERROR) {
     ALOGE("Error fetching metadata for the imported YCbCr420 buffer handle.");
     return nullptr;
   }
 
   return sp<GraphicBuffer>::make(
       bufferHandle, GraphicBuffer::HandleWrapMethod::TAKE_HANDLE, width, height,
-      static_cast<int>(ui::PixelFormat::YCBCR_420_888), /*layers=*/1, usage,
-      width);
+      static_cast<int>(pixelFormat), layerCount, usage, width);
 }
 
 std::shared_ptr<AHardwareBuffer> importBufferInternal(
-    const NativeHandle& aidlHandle, const Stream& streamConfig) {
+    const NativeHandle& aidlHandle) {
   if (aidlHandle.fds.empty()) {
     ALOGE("Empty handle - nothing to import");
     return nullptr;
@@ -103,12 +82,9 @@ std::shared_ptr<AHardwareBuffer> importBufferInternal(
     return nullptr;
   }
 
-  sp<GraphicBuffer> buf =
-      streamConfig.format == PixelFormat::BLOB
-          ? createBlobGraphicBuffer(mapper, bufferHandle)
-          : createYCbCr420GraphicBuffer(mapper, bufferHandle);
+  sp<GraphicBuffer> buf = createGraphicBuffer(mapper, bufferHandle);
 
-  if (buf->initCheck() != NO_ERROR) {
+  if (buf == nullptr || buf->initCheck() != NO_ERROR) {
     ALOGE("Imported graphic buffer is not correcly initialized.");
     return nullptr;
   }
@@ -128,7 +104,7 @@ VirtualCameraStream::VirtualCameraStream(const Stream& stream)
 
 std::shared_ptr<AHardwareBuffer> VirtualCameraStream::importBuffer(
     const ::aidl::android::hardware::camera::device::StreamBuffer& buffer) {
-  auto hwBufferPtr = importBufferInternal(buffer.buffer, mStreamConfig);
+  auto hwBufferPtr = importBufferInternal(buffer.buffer);
   if (hwBufferPtr != nullptr) {
     std::lock_guard<std::mutex> lock(mLock);
     mBuffers.emplace(std::piecewise_construct,
