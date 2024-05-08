@@ -21,18 +21,20 @@
 #include <com_android_internal_camera_flags.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
+#include <vendorsupport/api_level.h>
 
 namespace android {
 
 namespace flags = com::android::internal::camera::flags;
 
-constexpr const char *LEGACY_VNDK_VERSION_PROP = "ro.vndk.version";
-constexpr const char *BOARD_API_LEVEL_PROP = "ro.board.api_level";
+namespace {
+constexpr const char* LEGACY_VNDK_VERSION_PROP = "ro.vndk.version";
+constexpr const char* BOARD_API_LEVEL_PROP = "ro.board.api_level";
 constexpr int MAX_VENDOR_API_LEVEL = 1000000;
 constexpr int FIRST_VNDK_VERSION = 202404;
 
-int getVNDKVersionFromProp(int defaultVersion) {
-    if (!com_android_internal_camera_flags_use_ro_board_api_level_for_vndk_version()) {
+int legacyGetVNDKVersionFromProp(int defaultVersion) {
+    if (!flags::use_ro_board_api_level_for_vndk_version()) {
         return base::GetIntProperty(LEGACY_VNDK_VERSION_PROP, defaultVersion);
     }
 
@@ -53,6 +55,24 @@ int getVNDKVersionFromProp(int defaultVersion) {
     // This is the same assumption as that made in system/core/init/property_service.cpp.
     vndkVersion = (vndkVersion - FIRST_VNDK_VERSION) / 100;
     return __ANDROID_API_V__ + vndkVersion;
+}
+}  // anonymous namespace
+
+int getVNDKVersionFromProp(int defaultVersion) {
+    if (!flags::use_system_api_for_vndk_version()) {
+        return legacyGetVNDKVersionFromProp(defaultVersion);
+    }
+
+    int vendorApiLevel = AVendorSupport_getVendorApiLevel();
+    if (vendorApiLevel == 0) {
+        // Couldn't find vendor API level, return default
+        return defaultVersion;
+    }
+
+    // Vendor API level for Android V and above are of the format YYYYMM starting with 202404.
+    // AVendorSupport_getSdkApiLevelOf maps them back to SDK API levels while leaving older
+    // values unchanged.
+    return AVendorSupport_getSdkApiLevelOf(vendorApiLevel);
 }
 
 RunThreadWithRealtimePriority::RunThreadWithRealtimePriority(int tid)
