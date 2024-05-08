@@ -3683,7 +3683,8 @@ status_t CameraService::BasicClient::startCameraOps() {
         // Notify app ops that the camera is not available
         mOpsCallback = new OpsCallback(this);
         mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
-                mClientPackageName, mOpsCallback);
+                mClientPackageName,
+                AppOpsManager::WATCH_FOREGROUND_CHANGES, mOpsCallback);
 
         // Just check for camera acccess here on open - delay startOp until
         // camera frames start streaming in startCameraStreamingOps
@@ -3842,6 +3843,12 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
         block();
     } else if (res == AppOpsManager::MODE_IGNORED) {
         bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid, mClientPackageName);
+
+        // Uid may be active, but not visible to the user (e.g. PROCESS_STATE_FOREGROUND_SERVICE).
+        // If not visible, but still active, then we want to block instead of muting the camera.
+        int32_t procState = sCameraService->mUidPolicy->getProcState(mClientUid);
+        bool isUidVisible = (procState <= ActivityManager::PROCESS_STATE_BOUND_TOP);
+
         bool isCameraPrivacyEnabled =
                 sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled();
         ALOGI("Camera %s: Access for \"%s\" has been restricted, isUidTrusted %d, isUidActive %d",
@@ -3851,10 +3858,9 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
         // b/175320666), the AppOpsManager could return MODE_IGNORED. Do not treat such cases as
         // error.
         if (!mUidIsTrusted) {
-            if (isUidActive && isCameraPrivacyEnabled && supportsCameraMute()) {
+            if (isUidVisible && isCameraPrivacyEnabled && supportsCameraMute()) {
                 setCameraMute(true);
-            } else if (!isUidActive
-                || (isCameraPrivacyEnabled && !supportsCameraMute())) {
+            } else {
                 block();
             }
         }
