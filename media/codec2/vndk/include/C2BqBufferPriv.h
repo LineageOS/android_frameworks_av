@@ -28,6 +28,24 @@ namespace android {
 class GraphicBuffer;
 }  // namespace android
 
+/**
+ * BufferQueue based BlockPool.
+ *
+ * This creates graphic blocks from BufferQueue. BufferQueue here is HIDL-ized IGBP.
+ * HIDL-ized IGBP enables vendor HAL to call IGBP interfaces via HIDL over process boundary.
+ * HIDL-ized IGBP is called as HGBP. HGBP had been used from multiple places in android,
+ * but now this is the only place HGBP is still used.
+ *
+ * Initially there is no HGBP configured, in the case graphic blocks are allocated
+ * from gralloc directly upon \fetchGraphicBlock() requests.
+ *
+ * HGBP can be configured as null as well, in the case graphic blocks are allocated
+ * from gralloc directly upon \fetchGraphicBlock() requests.
+ *
+ * If a specific HGBP is configured, the HGBP acts as an allocator for creating graphic blocks.
+ *
+ * TODO: add more ducumentation(graphic block life-cycle, waitable object and workaounds)
+ */
 class C2BufferQueueBlockPool : public C2BlockPool {
 public:
     C2BufferQueueBlockPool(const std::shared_ptr<C2Allocator> &allocator, const local_id_t localId);
@@ -77,6 +95,8 @@ public:
      * is configured as nullptr, unique id which is bundled in native_handle is zero.
      *
      * \param producer      the IGBP, which will be used to fetch blocks
+     *                      This could be null, in the case this blockpool will
+     *                      allocate backed GraphicBuffer via allocator(gralloc).
      */
     virtual void configureProducer(const android::sp<HGraphicBufferProducer> &producer);
 
@@ -89,6 +109,8 @@ public:
      * is configured as nullptr, unique id which is bundled in native_handle is zero.
      *
      * \param producer      the IGBP, which will be used to fetch blocks
+     *                      This could be null, in the case this blockpool will
+     *                      allocate backed GraphicBuffer via allocator(gralloc).
      * \param syncMemory    Shared memory for synchronization of allocation & deallocation.
      * \param bqId          Id of IGBP
      * \param generationId  Generation Id for rendering output
@@ -109,6 +131,26 @@ public:
      * After the call, fetchGraphicBlock() will return C2_BAD_STATE.
      */
     virtual void invalidate();
+
+    /**
+     * Defer deallocation of cached blocks.
+     *
+     * Deallocation of cached blocks will be deferred until
+     * \clearDeferredBlocks() is called. Or a new block allocation is
+     * requested by \fetchGraphicBlock().
+     */
+    void setDeferDeallocationAfterStop();
+
+
+    /**
+     * Clear deferred blocks.
+     *
+     * Deallocation of cached blocks can be deferred by
+     * \setDeferDeallocationAfterStop().
+     * clear(deallocate) those deferred cached blocks explicitly.
+     * Use this interface, if the blockpool could be inactive indefinitely.
+     */
+    void clearDeferredBlocks();
 
 private:
     const std::shared_ptr<C2Allocator> mAllocator;

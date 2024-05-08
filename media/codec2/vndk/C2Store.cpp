@@ -478,13 +478,25 @@ static C2PooledBlockPool::BufferPoolVer GetBufferPoolVer() {
 
 class _C2BlockPoolCache {
 public:
-    _C2BlockPoolCache() : mBlockPoolSeqId(C2BlockPool::PLATFORM_START + 1) {}
+    _C2BlockPoolCache() : mBlockPoolSeqId(C2BlockPool::PLATFORM_START + 1) {
+        mBqPoolDeferDeallocAfterStop = false;
+#ifdef __ANDROID_APEX__
+        bool stopHalBeforeSurface = ::android::base::GetBoolProperty(
+                "debug.codec2.stop_hal_before_surface", false);
+        if (!stopHalBeforeSurface) {
+            mBqPoolDeferDeallocAfterStop =
+                    ::android::base::GetIntProperty(
+                            "debug.codec2.bqpool_dealloc_after_stop", 0) != 0;
+        }
+#endif
+    }
 
 private:
     c2_status_t _createBlockPool(
             C2PlatformAllocatorDesc &allocatorParam,
             std::vector<std::shared_ptr<const C2Component>> components,
             C2BlockPool::local_id_t poolId,
+            bool deferDeallocAfterStop,
             std::shared_ptr<C2BlockPool> *pool) {
         std::shared_ptr<C2AllocatorStore> allocatorStore =
                 GetCodec2PlatformAllocatorStore();
@@ -548,6 +560,11 @@ private:
                 if (res == C2_OK) {
                     std::shared_ptr<C2BlockPool> ptr(
                             new C2BufferQueueBlockPool(allocator, poolId), deleter);
+                    if (deferDeallocAfterStop) {
+                        std::shared_ptr<C2BufferQueueBlockPool> bqPool =
+                            std::static_pointer_cast<C2BufferQueueBlockPool>(ptr);
+                        bqPool->setDeferDeallocationAfterStop();
+                    }
                     *pool = ptr;
                     mBlockPools[poolId] = ptr;
                     mComponents[poolId].insert(
@@ -603,7 +620,8 @@ public:
             std::vector<std::shared_ptr<const C2Component>> components,
             std::shared_ptr<C2BlockPool> *pool) {
         std::unique_lock lock(mMutex);
-        return _createBlockPool(allocator, components, mBlockPoolSeqId++, pool);
+        return _createBlockPool(allocator, components, mBlockPoolSeqId++,
+                                mBqPoolDeferDeallocAfterStop, pool);
     }
 
 
@@ -638,7 +656,7 @@ public:
             C2PlatformAllocatorDesc allocator;
             allocator.allocatorId = C2PlatformAllocatorStore::BUFFERQUEUE;
             return _createBlockPool(
-                    allocator, {component}, blockPoolId, pool);
+                    allocator, {component}, blockPoolId, mBqPoolDeferDeallocAfterStop, pool);
         }
         return C2_NOT_FOUND;
     }
@@ -651,6 +669,8 @@ private:
 
     std::map<C2BlockPool::local_id_t, std::weak_ptr<C2BlockPool>> mBlockPools;
     std::map<C2BlockPool::local_id_t, std::vector<std::weak_ptr<const C2Component>>> mComponents;
+
+    bool mBqPoolDeferDeallocAfterStop;
 };
 
 static std::unique_ptr<_C2BlockPoolCache> sBlockPoolCache =
