@@ -63,6 +63,8 @@ cc_library_shared {
         // BiquadFilter. Try the biquad_filter_benchmark test in audio_utils
         // with/without `-ffast-math` for more context.
         "-ffast-math",
+        "-fhonor-infinities",
+        "-fhonor-nans",
         "-fvisibility=hidden",
     ],
 }
