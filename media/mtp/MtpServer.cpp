@@ -132,6 +132,10 @@ MtpServer::MtpServer(IMtpDatabase* database, int controlFd, bool ptp,
 }
 
 MtpServer::~MtpServer() {
+    if (mHandle) {
+        delete mHandle;
+        mHandle = NULL;
+    }
 }
 
 void MtpServer::addStorage(MtpStorage* storage) {
