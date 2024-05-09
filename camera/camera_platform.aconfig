@@ -237,3 +237,13 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "multi_res_raw_reprocessing"
+    description: "Allow multi-resolution raw reprocessing without reprocessing capability"
+    bug: "336922859"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
