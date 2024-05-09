@@ -16,11 +16,13 @@
 
 #pragma once
 
-#include <vibrator/ExternalVibrationUtils.h>
-#include <map>
-
-#include "Processors.h"
 #include "effect-impl/EffectContext.h"
+#include "Processors.h"
+
+#include <vibrator/ExternalVibrationUtils.h>
+
+#include <cstddef>
+#include <map>
 
 namespace aidl::android::hardware::audio::effect {
 

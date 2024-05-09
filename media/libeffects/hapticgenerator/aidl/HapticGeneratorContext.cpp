@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-#include <cstddef>
 #define LOG_TAG "AHAL_HapticGeneratorContext"
 
-#include <Utils.h>
+#include "HapticGeneratorContext.h"
 #include <android-base/logging.h>
 #include <android-base/parsedouble.h>
 #include <android-base/properties.h>
 #include <audio_utils/primitives.h>
+#include <audio_utils/safe_math.h>
+#include <Utils.h>
 
-#include "HapticGeneratorContext.h"
+#include <cstddef>
 
 using aidl::android::hardware::audio::common::getChannelCount;
 using aidl::android::hardware::audio::common::getPcmSampleSizeInBytes;
@@ -110,6 +111,15 @@ std::vector<HapticGenerator::HapticScale> HapticGeneratorContext::getHgHapticSca
 RetCode HapticGeneratorContext::setHgVibratorInformation(
         const HapticGenerator::VibratorInformation& vibratorInfo) {
     mParams.mVibratorInfo = vibratorInfo;
+    if (::android::audio_utils::safe_isnan(mParams.mVibratorInfo.resonantFrequencyHz)) {
+        LOG(WARNING) << __func__ << " resonantFrequencyHz reset from nan to "
+                     << DEFAULT_RESONANT_FREQUENCY;
+        mParams.mVibratorInfo.resonantFrequencyHz = DEFAULT_RESONANT_FREQUENCY;
+    }
+    if (::android::audio_utils::safe_isnan(mParams.mVibratorInfo.qFactor)) {
+        LOG(WARNING) << __func__ << " qFactor reset from nan to " << DEFAULT_BSF_ZERO_Q;
+        mParams.mVibratorInfo.qFactor = DEFAULT_BSF_ZERO_Q;
+    }
 
     if (mProcessorsRecord.bpf != nullptr) {
         mProcessorsRecord.bpf->setCoefficients(::android::audio_effect::haptic_generator::bpfCoefs(

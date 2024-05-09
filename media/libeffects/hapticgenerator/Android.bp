@@ -37,6 +37,14 @@ cc_defaults {
     header_libs: [
         "libaudioeffects",
     ],
+    cflags: [
+        // This is needed for the non-zero coefficients optimization for
+        // BiquadFilter. Try the biquad_filter_benchmark test in audio_utils
+        // with/without `-ffast-math` for more context.
+        "-ffast-math",
+        "-fhonor-infinities",
+        "-fhonor-nans",
+    ],
     relative_install_path: "soundfx",
 }
 
@@ -59,12 +67,6 @@ cc_library_shared {
         "-O2",
         "-Wall",
         "-Werror",
-        // This is needed for the non-zero coefficients optimization for
-        // BiquadFilter. Try the biquad_filter_benchmark test in audio_utils
-        // with/without `-ffast-math` for more context.
-        "-ffast-math",
-        "-fhonor-infinities",
-        "-fhonor-nans",
         "-fvisibility=hidden",
     ],
 }
