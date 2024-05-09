@@ -640,7 +640,10 @@ sp<ABuffer> LocalBufferPool::newBuffer(size_t capacity) {
             return nullptr;
         }
     }
-    std::vector<uint8_t> vec(capacity);
+    std::vector<uint8_t> vec;
+    // Use reserve to avoid overhead of CPU & memory cycles in place of constructor which does
+    // implicit initialization with zero.
+    vec.reserve(capacity);
     mUsedSize += vec.capacity();
     return new VectorBuffer(std::move(vec), shared_from_this());
 }
