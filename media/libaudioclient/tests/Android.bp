@@ -122,6 +122,7 @@ cc_defaults {
     ],
     static_libs: [
         "android.hardware.audio.common@7.0-enums",
+        "audio-permission-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",

@@ -58,6 +58,8 @@ import android.media.audio.common.AudioUsage;
 import android.media.audio.common.AudioUuid;
 import android.media.audio.common.Int;
 
+import com.android.media.permission.INativePermissionController;
+
 /**
  * IAudioPolicyService interface (see AudioPolicyInterface for method descriptions).
  *
@@ -471,6 +473,11 @@ interface IAudioPolicyService {
                                        int /* uid_t */ uid);
 
 
+    /**
+     * Get the native permission controller for audioserver, to push package and permission info
+     * required to control audio access.
+     */
+    INativePermissionController getPermissionController();
     // When adding a new method, please review and update
     // AudioPolicyService.cpp AudioPolicyService::onTransact()
     // AudioPolicyService.cpp IAUDIOPOLICYSERVICE_BINDER_METHOD_MACRO_LIST
