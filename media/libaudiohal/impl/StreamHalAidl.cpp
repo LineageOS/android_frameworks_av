@@ -323,8 +323,11 @@ status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred
             return INVALID_OPERATION;
         }
     }
+    StreamContextAidl::DataMQ::Error fmqError = StreamContextAidl::DataMQ::Error::NONE;
+    std::string fmqErrorMsg;
     if (!mIsInput) {
-        bytes = std::min(bytes, mContext.getDataMQ()->availableToWrite());
+        bytes = std::min(bytes,
+                mContext.getDataMQ()->availableToWrite(&fmqError, &fmqErrorMsg));
     }
     StreamDescriptor::Command burst =
             StreamDescriptor::Command::make<StreamDescriptor::Command::Tag::burst>(bytes);
@@ -341,12 +344,14 @@ status_t StreamHalAidl::transfer(void *buffer, size_t bytes, size_t *transferred
         LOG_ALWAYS_FATAL_IF(*transferred > bytes,
                 "%s: HAL module read %zu bytes, which exceeds requested count %zu",
                 __func__, *transferred, bytes);
-        if (auto toRead = mContext.getDataMQ()->availableToRead();
+        if (auto toRead = mContext.getDataMQ()->availableToRead(&fmqError, &fmqErrorMsg);
                 toRead != 0 && !mContext.getDataMQ()->read(static_cast<int8_t*>(buffer), toRead)) {
             ALOGE("%s: failed to read %zu bytes to data MQ", __func__, toRead);
             return NOT_ENOUGH_DATA;
         }
     }
+    LOG_ALWAYS_FATAL_IF(fmqError != StreamContextAidl::DataMQ::Error::NONE,
+            "%s", fmqErrorMsg.c_str());
     mStreamPowerLog.log(buffer, *transferred);
     return OK;
 }
