@@ -362,8 +362,8 @@ static status_t prepareVirtualDisplay(
         const ui::DisplayState& displayState,
         const sp<IGraphicBufferProducer>& bufferProducer,
         sp<IBinder>* pDisplayHandle, sp<SurfaceControl>* mirrorRoot) {
-    sp<IBinder> dpy = SurfaceComposerClient::createDisplay(
-            String8("ScreenRecorder"), gSecureDisplay);
+    static const std::string kDisplayName("ScreenRecorder");
+    sp<IBinder> dpy = SurfaceComposerClient::createVirtualDisplay(kDisplayName, gSecureDisplay);
     SurfaceComposerClient::Transaction t;
     t.setDisplaySurface(dpy, bufferProducer);
     setDisplayProjection(t, dpy, displayState);
@@ -797,7 +797,7 @@ struct RecordingData {
     sp<Overlay> overlay;
 
     ~RecordingData() {
-        if (dpy != nullptr) SurfaceComposerClient::destroyDisplay(dpy);
+        if (dpy != nullptr) SurfaceComposerClient::destroyVirtualDisplay(dpy);
         if (overlay != nullptr) overlay->stop();
         if (encoder != nullptr) {
             encoder->stop();
