@@ -46,6 +46,7 @@ static const String16 sAndroidPermissionRecordAudio("android.permission.RECORD_A
 static const String16 sModifyPhoneState("android.permission.MODIFY_PHONE_STATE");
 static const String16 sModifyAudioRouting("android.permission.MODIFY_AUDIO_ROUTING");
 static const String16 sCallAudioInterception("android.permission.CALL_AUDIO_INTERCEPTION");
+static const String16 sAndroidPermissionBluetoothConnect("android.permission.BLUETOOTH_CONNECT");
 
 static String16 resolveCallingPackage(PermissionController& permissionController,
         const std::optional<String16> opPackageName, uid_t uid) {
@@ -372,6 +373,48 @@ status_t checkIMemory(const sp<IMemory>& iMemory)
     }
 
     return NO_ERROR;
+}
+
+/**
+ * Determines if the MAC address in Bluetooth device descriptors returned by APIs of
+ * a native audio service (audio flinger, audio policy) must be anonymized.
+ * MAC addresses returned to system server or apps with BLUETOOTH_CONNECT permission
+ * are not anonymized.
+ *
+ * @param attributionSource The attribution source of the calling app.
+ * @param caller string identifying the caller for logging.
+ * @return true if the MAC addresses must be anonymized, false otherwise.
+ */
+bool mustAnonymizeBluetoothAddress(
+        const AttributionSourceState& attributionSource, const String16& caller) {
+    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
+    if (isAudioServerOrSystemServerUid(uid)) {
+        return false;
+    }
+    const std::optional<AttributionSourceState> resolvedAttributionSource =
+            resolveAttributionSource(attributionSource);
+    if (!resolvedAttributionSource.has_value()) {
+        return true;
+    }
+    permission::PermissionChecker permissionChecker;
+    return permissionChecker.checkPermissionForPreflightFromDatasource(
+            sAndroidPermissionBluetoothConnect, resolvedAttributionSource.value(), caller,
+            AppOpsManager::OP_BLUETOOTH_CONNECT)
+                != permission::PermissionChecker::PERMISSION_GRANTED;
+}
+
+/**
+ * Modifies the passed MAC address string in place for consumption by unprivileged clients.
+ * the string is assumed to have a valid MAC address format.
+ * the anonymzation must be kept in sync with toAnonymizedAddress() in BluetoothUtils.java
+ *
+ * @param address input/output the char string contining the MAC address to anonymize.
+ */
+void anonymizeBluetoothAddress(char *address) {
+    if (address == nullptr || strlen(address) != strlen("AA:BB:CC:DD:EE:FF")) {
+        return;
+    }
+    memcpy(address, "XX:XX:XX:XX", strlen("XX:XX:XX:XX"));
 }
 
 sp<content::pm::IPackageManagerNative> MediaPackageManager::retrievePackageManager() {
