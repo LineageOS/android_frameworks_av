@@ -654,19 +654,14 @@ status_t StreamOutHalAidl::write(const void *buffer, size_t bytes, size_t *writt
     return transfer(const_cast<void*>(buffer), bytes, written);
 }
 
-status_t StreamOutHalAidl::getRenderPosition(uint32_t *dspFrames) {
+status_t StreamOutHalAidl::getRenderPosition(uint64_t *dspFrames) {
     if (dspFrames == nullptr) {
         return BAD_VALUE;
     }
     int64_t aidlFrames = 0, aidlTimestamp = 0;
     RETURN_STATUS_IF_ERROR(getObservablePosition(&aidlFrames, &aidlTimestamp));
-    *dspFrames = static_cast<uint32_t>(aidlFrames);
+    *dspFrames = aidlFrames;
     return OK;
-}
-
-status_t StreamOutHalAidl::getNextWriteTimestamp(int64_t *timestamp __unused) {
-    // Obsolete, use getPresentationPosition.
-    return INVALID_OPERATION;
 }
 
 status_t StreamOutHalAidl::setCallback(wp<StreamOutHalInterfaceCallback> callback) {
@@ -726,6 +721,11 @@ status_t StreamOutHalAidl::getPresentationPosition(uint64_t *frames, struct time
     *frames = aidlFrames;
     timestamp->tv_sec = aidlTimestamp / NANOS_PER_SECOND;
     timestamp->tv_nsec = aidlTimestamp - timestamp->tv_sec * NANOS_PER_SECOND;
+    return OK;
+}
+
+status_t StreamOutHalAidl::presentationComplete() {
+    ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     return OK;
 }
 

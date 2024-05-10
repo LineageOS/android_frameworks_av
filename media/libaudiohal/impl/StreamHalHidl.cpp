@@ -17,6 +17,8 @@
 #define LOG_TAG "StreamHalHidl"
 //#define LOG_NDEBUG 0
 
+#include <cinttypes>
+
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioParameter.h>
@@ -589,32 +591,39 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
     return OK;
 }
 
-status_t StreamOutHalHidl::getRenderPosition(uint32_t *dspFrames) {
+status_t StreamOutHalHidl::getRenderPosition(uint64_t *dspFrames) {
     // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.
     if (mStream == 0) return NO_INIT;
     Result retval;
+    uint32_t halPosition = 0;
     Return<void> ret = mStream->getRenderPosition(
             [&](Result r, uint32_t d) {
                 retval = r;
                 if (retval == Result::OK) {
-                    *dspFrames = d;
+                    halPosition = d;
                 }
             });
-    return processReturn("getRenderPosition", ret, retval);
-}
+    status_t status = processReturn("getRenderPosition", ret, retval);
+    if (status != OK) {
+        return status;
+    }
+    // Maintain a 64-bit render position using the 32-bit result from the HAL.
+    // This delta calculation relies on the arithmetic overflow behavior
+    // of integers. For example (100 - 0xFFFFFFF0) = 116.
+    std::lock_guard l(mPositionMutex);
+    const auto truncatedPosition = (uint32_t)mRenderPosition;
+    int32_t deltaHalPosition; // initialization not needed, overwitten by __builtin_sub_overflow()
+    (void) __builtin_sub_overflow(halPosition, truncatedPosition, &deltaHalPosition);
 
-status_t StreamOutHalHidl::getNextWriteTimestamp(int64_t *timestamp) {
-    TIME_CHECK();
-    if (mStream == 0) return NO_INIT;
-    Result retval;
-    Return<void> ret = mStream->getNextWriteTimestamp(
-            [&](Result r, int64_t t) {
-                retval = r;
-                if (retval == Result::OK) {
-                    *timestamp = t;
-                }
-            });
-    return processReturn("getRenderPosition", ret, retval);
+    if (deltaHalPosition >= 0) {
+        mRenderPosition += deltaHalPosition;
+    } else if (mExpectRetrograde) {
+        mExpectRetrograde = false;
+        mRenderPosition -= static_cast<uint64_t>(-deltaHalPosition);
+        ALOGW("Retrograde motion of %" PRId32 " frames", -deltaHalPosition);
+    }
+    *dspFrames = mRenderPosition;
+    return OK;
 }
 
 status_t StreamOutHalHidl::setCallback(wp<StreamOutHalInterfaceCallback> callback) {
@@ -667,7 +676,21 @@ status_t StreamOutHalHidl::drain(bool earlyNotify) {
 status_t StreamOutHalHidl::flush() {
     TIME_CHECK();
     if (mStream == 0) return NO_INIT;
+    {
+        std::lock_guard l(mPositionMutex);
+        mRenderPosition = 0;
+        mExpectRetrograde = false;
+    }
     return processReturn("pause", mStream->flush());
+}
+
+status_t StreamOutHalHidl::standby() {
+    {
+        std::lock_guard l(mPositionMutex);
+        mRenderPosition = 0;
+        mExpectRetrograde = false;
+    }
+    return StreamHalHidl::standby();
 }
 
 status_t StreamOutHalHidl::getPresentationPosition(uint64_t *frames, struct timespec *timestamp) {
@@ -694,6 +717,16 @@ status_t StreamOutHalHidl::getPresentationPosition(uint64_t *frames, struct time
                 });
         return processReturn("getPresentationPosition", ret, retval);
     }
+}
+
+status_t StreamOutHalHidl::presentationComplete() {
+    // Avoid suppressing retrograde motion in mRenderPosition for gapless offload/direct when
+    // transitioning between tracks.
+    // The HAL resets the frame position without flush/stop being called, but calls back prior to
+    // this event. So, on the next occurrence of retrograde motion, we permit backwards movement of
+    // mRenderPosition.
+    mExpectRetrograde = true;
+    return OK;
 }
 
 #if MAJOR_VERSION == 2
