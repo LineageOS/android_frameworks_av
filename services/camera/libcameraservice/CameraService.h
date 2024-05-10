@@ -21,7 +21,6 @@
 #include <android/hardware/BnCameraService.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
-#include <android/hardware/CameraIdRemapping.h>
 #include <android/hardware/camera2/BnCameraInjectionSession.h>
 #include <android/hardware/camera2/ICameraInjectionCallback.h>
 
@@ -153,7 +152,7 @@ public:
     // ICameraService
     // IMPORTANT: All binder calls that deal with logicalCameraId should use
     // resolveCameraId(logicalCameraId, deviceId, devicePolicy) to arrive at the correct
-    // cameraId to perform the operation on (in case of Id Remapping, or in case of contexts
+    // cameraId to perform the operation on (in case of contexts
     // associated with virtual devices).
     virtual binder::Status     getNumberOfCameras(int32_t type, int32_t deviceId,
             int32_t devicePolicy, int32_t* numCameras);
@@ -242,9 +241,6 @@ public:
 
     virtual binder::Status reportExtensionSessionStats(
             const hardware::CameraExtensionSessionStats& stats, std::string* sessionKey /*out*/);
-
-    virtual binder::Status remapCameraIds(const hardware::CameraIdRemapping&
-            cameraIdRemapping);
 
     virtual binder::Status injectSessionParams(
             const std::string& cameraId,
@@ -1043,42 +1039,8 @@ private:
     mutable Mutex mCameraStatesLock;
 
     /**
-     * Mapping from packageName -> {cameraIdToReplace -> newCameraIdtoUse}.
-     *
-     * This specifies that for packageName, for every binder operation targeting
-     * cameraIdToReplace, use newCameraIdToUse instead.
-     */
-    typedef std::map<std::string, std::map<std::string, std::string>> TCameraIdRemapping;
-    TCameraIdRemapping mCameraIdRemapping{};
-    /** Mutex guarding mCameraIdRemapping. */
-    Mutex mCameraIdRemappingLock;
-
-    /** Parses cameraIdRemapping parcelable into the native cameraIdRemappingMap. */
-    binder::Status parseCameraIdRemapping(
-            const hardware::CameraIdRemapping& cameraIdRemapping,
-            /* out */ TCameraIdRemapping* cameraIdRemappingMap);
-
-    /**
-     * Resolve the (potentially remapped) camera id to use for packageName for the default device
-     * context.
-     *
-     * This returns the Camera id to use in case inputCameraId was remapped to a
-     * different id for the given packageName. Otherwise, it returns the inputCameraId.
-     *
-     * If the packageName is not provided, it will be inferred from the clientUid.
-     */
-    std::string resolveCameraId(
-            const std::string& inputCameraId,
-            int clientUid,
-            const std::string& packageName = "");
-
-    /**
      * Resolve the (potentially remapped) camera id for the given input camera id and the given
      * device id and device policy (for the device associated with the context of the caller).
-     *
-     * For any context associated with the default device or a virtual device with default camera
-     * policy, this will return the actual camera id (in case inputCameraId was remapped using
-     * the remapCameraIds method).
      *
      * For any context associated with a virtual device with custom camera policy, this will return
      * the actual camera id if inputCameraId corresponds to the mapped id of a virtual camera
@@ -1088,20 +1050,7 @@ private:
     std::optional<std::string> resolveCameraId(
             const std::string& inputCameraId,
             int32_t deviceId,
-            int32_t devicePolicy,
-            int clientUid,
-            const std::string& packageName = "");
-
-    /**
-     * Updates the state of mCameraIdRemapping, while disconnecting active clients as necessary.
-     */
-    void remapCameraIds(const TCameraIdRemapping& cameraIdRemapping);
-
-    /**
-     * Finds the Camera Ids that were remapped to the inputCameraId for the given client.
-     */
-    std::vector<std::string> findOriginalIdsForRemappedCameraId(
-        const std::string& inputCameraId, int clientUid);
+            int32_t devicePolicy);
 
     // Circular buffer for storing event logging for dumps
     RingBuffer<std::string> mEventLog;

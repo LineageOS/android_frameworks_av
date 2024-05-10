@@ -30,7 +30,6 @@ import android.hardware.camera2.utils.CameraIdAndSessionConfiguration;
 import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.ICameraServiceListener;
 import android.hardware.CameraInfo;
-import android.hardware.CameraIdRemapping;
 import android.hardware.CameraStatus;
 import android.hardware.CameraExtensionSessionStats;
 
@@ -208,22 +207,6 @@ interface ICameraService
     boolean isConcurrentSessionConfigurationSupported(
             in CameraIdAndSessionConfiguration[] sessions,
             int targetSdkVersion, int deviceId, int devicePolicy);
-
-    /**
-     * Remap Camera Ids in the CameraService.
-     *
-     * Once this is in effect, all binder calls in the ICameraService that
-     * use logicalCameraId should consult remapping state to arrive at the
-     * correct cameraId to perform the operation on.
-     *
-     * Note: Before the new cameraIdRemapping state is applied, the previous
-     * state is cleared.
-     *
-     * @param cameraIdRemapping the camera ids to remap. Sending an unpopulated
-     *        cameraIdRemapping object will result in clearing of any previous
-     *        cameraIdRemapping state in the camera service.
-     */
-    void remapCameraIds(in CameraIdRemapping cameraIdRemapping);
 
     /**
      * Inject Session Params into an existing camera session.
