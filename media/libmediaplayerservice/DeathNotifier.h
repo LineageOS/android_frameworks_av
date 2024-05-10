@@ -37,10 +37,11 @@ public:
     DeathNotifier(DeathNotifier&& other);
     ~DeathNotifier();
 
+    class DeathRecipient;
+
 private:
     std::variant<std::monostate, sp<IBinder>, sp<HBase>, ::ndk::SpAIBinder> mService;
 
-    class DeathRecipient;
     sp<DeathRecipient> mDeathRecipient;
 };
 
