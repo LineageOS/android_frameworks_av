@@ -88,7 +88,8 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
                 }
 
                 aaudio_stream_state_t state = clientStream->getState();
-                if (state == AAUDIO_STREAM_STATE_STOPPING) {
+                if (state == AAUDIO_STREAM_STATE_STOPPING ||
+                    state == AAUDIO_STREAM_STATE_PAUSING) {
                     allowUnderflow = false; // just read what is already in the FIFO
                 } else if (state != AAUDIO_STREAM_STATE_STARTED) {
                     continue; // this stream is not running so skip it.
