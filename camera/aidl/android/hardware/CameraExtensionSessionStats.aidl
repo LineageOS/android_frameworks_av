@@ -66,4 +66,9 @@ parcelable CameraExtensionSessionStats {
      * true if advanced extensions are being used, false otherwise
      */
     boolean isAdvanced = false;
+
+    /**
+     * Format of image capture request
+     */
+    int captureFormat;
 }
