@@ -51,9 +51,6 @@ public:
 
     virtual ~AudioStreamOut();
 
-    // Get the bottom 32-bits of the 64-bit render position.
-    status_t getRenderPosition(uint32_t *frames);
-
     virtual status_t getRenderPosition(uint64_t *frames);
 
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp);
@@ -91,21 +88,14 @@ public:
     virtual status_t flush();
     virtual status_t standby();
 
-    // Avoid suppressing retrograde motion in mRenderPosition for gapless offload/direct when
-    // transitioning between tracks.
-    // The HAL resets the frame position without flush/stop being called, but calls back prior to
-    // this event. So, on the next occurrence of retrograde motion, we permit backwards movement of
-    // mRenderPosition.
-    virtual void presentationComplete() { mExpectRetrograde = true; }
+    virtual void presentationComplete();
 
 protected:
     uint64_t mFramesWritten = 0; // reset by flush
     uint64_t mFramesWrittenAtStandby = 0;
-    uint64_t mRenderPosition = 0; // reset by flush, standby, or presentation complete
     int mRateMultiplier = 1;
     bool mHalFormatHasProportionalFrames = false;
     size_t mHalFrameSize = 0;
-    bool mExpectRetrograde = false; // see presentationComplete
 };
 
 } // namespace android
