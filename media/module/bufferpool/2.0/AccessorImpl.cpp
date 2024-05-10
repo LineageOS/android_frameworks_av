@@ -609,7 +609,7 @@ void Accessor::Impl::BufferPool::processStatusMessages() {
         }
         if (ret == false) {
             ALOGW("buffer status message processing failure - message : %d connection : %lld",
-                  message.newStatus, (long long)message.connectionId);
+                  (int)message.newStatus, (long long)message.connectionId);
         }
     }
     messages.clear();
