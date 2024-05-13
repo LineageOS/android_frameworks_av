@@ -15,6 +15,7 @@
  */
 
 #define LOG_TAG "AidlUtils"
+//#define LOG_NDEBUG 0
 
 #include <aidl/AidlUtils.h>
 #include <aidl/ExtensionMetadataTags.h>
@@ -314,6 +315,7 @@ status_t filterVndkKeys(int vndkVersion, CameraMetadata &metadata, bool isStatic
     if (vndkVersion == __ANDROID_API_FUTURE__) {
         // VNDK version derived from ro.board.api_level is a version code-name that
         // corresponds to the current SDK version.
+        ALOGV("%s: VNDK version is API FUTURE, not filtering any keys", __FUNCTION__);
         return OK;
     }
     const auto &apiLevelToKeys =
@@ -322,9 +324,14 @@ status_t filterVndkKeys(int vndkVersion, CameraMetadata &metadata, bool isStatic
     // versions above the given one, need to have their keys filtered from the
     // metadata in order to avoid metadata invalidation.
     auto it = apiLevelToKeys.upper_bound(vndkVersion);
+    ALOGV("%s: VNDK version for filtering is %d", __FUNCTION__ , vndkVersion);
     while (it != apiLevelToKeys.end()) {
         for (const auto &key : it->second) {
             status_t res = metadata.erase(key);
+            // Should be okay to not use get_local_camera_metadata_tag_name
+            // since we're not filtering vendor tags
+            ALOGV("%s: Metadata key being filtered is %s", __FUNCTION__ ,
+                    get_camera_metadata_tag_name(key));
             if (res != OK) {
                 ALOGE("%s metadata key %d could not be erased", __FUNCTION__, key);
                 return res;
