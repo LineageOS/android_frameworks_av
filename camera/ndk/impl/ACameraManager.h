@@ -20,6 +20,7 @@
 #include <camera/NdkCameraManager.h>
 
 #include <android-base/parseint.h>
+#include <android/companion/virtualnative/IVirtualDeviceManagerNative.h>
 #include <android/hardware/ICameraService.h>
 #include <android/hardware/BnCameraServiceListener.h>
 #include <camera/CameraMetadata.h>
@@ -37,6 +38,36 @@
 namespace android {
 namespace acam {
 
+enum class DevicePolicy {
+  DEVICE_POLICY_DEFAULT =
+    ::android::companion::virtualnative::IVirtualDeviceManagerNative::DEVICE_POLICY_DEFAULT,
+  DEVICE_POLICY_CUSTOM =
+    ::android::companion::virtualnative::IVirtualDeviceManagerNative::DEVICE_POLICY_CUSTOM
+};
+
+/**
+ * Device context within which are cameras accessed.
+ *
+ * When constructed, the device id is set to id of virtual device corresponding to
+ * caller's UID (or default device id if current app process is not running on virtual device).
+ *
+ * See getDeviceId() in Context.java for more context (no pun intented).
+ */
+struct DeviceContext {
+    DeviceContext();
+
+    // Id of virtual device asociated with this context (or DEFAULT_DEVICE_ID = 0 in case
+    // caller UID is not running on virtual device).
+    int deviceId;
+    // Device policy corresponding to VirtualDeviceParams.POLICY_TYPE_CAMERA:
+    //
+    // Can be either:
+    // * (0) DEVICE_POLICY_DEFAULT - virtual devices have access to default device cameras.
+    // * (1) DEVICE_POLICY_CUSTOM - virtual devices do not have access to default device cameras
+    //                              and can only access virtual cameras owned by the same device.
+    DevicePolicy policy;
+};
+
 /**
  * Per-process singleton instance of CameraManger. Shared by all ACameraManager
  * instances. Created when first ACameraManager is created and destroyed when
@@ -49,20 +80,22 @@ class CameraManagerGlobal final : public RefBase {
     static sp<CameraManagerGlobal> getInstance();
     sp<hardware::ICameraService> getCameraService();
 
-    void registerAvailabilityCallback(
-            const ACameraManager_AvailabilityCallbacks *callback);
-    void unregisterAvailabilityCallback(
-            const ACameraManager_AvailabilityCallbacks *callback);
+    void registerAvailabilityCallback(const DeviceContext& context,
+                                      const ACameraManager_AvailabilityCallbacks* callback);
+    void unregisterAvailabilityCallback(const DeviceContext& context,
+                                        const ACameraManager_AvailabilityCallbacks* callback);
 
     void registerExtendedAvailabilityCallback(
+            const DeviceContext& context,
             const ACameraManager_ExtendedAvailabilityCallbacks* callback);
     void unregisterExtendedAvailabilityCallback(
+            const DeviceContext& context,
             const ACameraManager_ExtendedAvailabilityCallbacks* callback);
 
     /**
      * Return camera IDs that support camera2
      */
-    void getCameraIdList(std::vector<std::string> *cameraIds);
+    void getCameraIdList(const DeviceContext& deviceContext, std::vector<std::string>* cameraIds);
 
   private:
     sp<hardware::ICameraService> mCameraService;
@@ -70,8 +103,8 @@ class CameraManagerGlobal final : public RefBase {
     const char*                  kCameraServiceName      = "media.camera";
     Mutex                        mLock;
 
-    template<class T>
-    void registerAvailCallback(const T *callback);
+    template <class T>
+    void registerAvailCallback(const DeviceContext& deviceContext, const T* callback);
 
     class DeathNotifier : public IBinder::DeathRecipient {
       public:
@@ -115,29 +148,34 @@ class CameraManagerGlobal final : public RefBase {
 
     // Wrapper of ACameraManager_AvailabilityCallbacks so we can store it in std::set
     struct Callback {
-        explicit Callback(const ACameraManager_AvailabilityCallbacks *callback) :
-            mAvailable(callback->onCameraAvailable),
-            mUnavailable(callback->onCameraUnavailable),
-            mAccessPriorityChanged(nullptr),
-            mPhysicalCamAvailable(nullptr),
-            mPhysicalCamUnavailable(nullptr),
-            mContext(callback->context) {}
+        explicit Callback(const DeviceContext& deviceContext,
+                 const ACameraManager_AvailabilityCallbacks* callback)
+            : mDeviceContext(deviceContext),
+              mAvailable(callback->onCameraAvailable),
+              mUnavailable(callback->onCameraUnavailable),
+              mAccessPriorityChanged(nullptr),
+              mPhysicalCamAvailable(nullptr),
+              mPhysicalCamUnavailable(nullptr),
+              mContext(callback->context) {}
 
-        explicit Callback(const ACameraManager_ExtendedAvailabilityCallbacks *callback) :
-            mAvailable(callback->availabilityCallbacks.onCameraAvailable),
-            mUnavailable(callback->availabilityCallbacks.onCameraUnavailable),
-            mAccessPriorityChanged(callback->onCameraAccessPrioritiesChanged),
-            mPhysicalCamAvailable(callback->onPhysicalCameraAvailable),
-            mPhysicalCamUnavailable(callback->onPhysicalCameraUnavailable),
-            mContext(callback->availabilityCallbacks.context) {}
+        explicit Callback(const DeviceContext& deviceContext,
+                 const ACameraManager_ExtendedAvailabilityCallbacks* callback)
+            : mDeviceContext(deviceContext),
+              mAvailable(callback->availabilityCallbacks.onCameraAvailable),
+              mUnavailable(callback->availabilityCallbacks.onCameraUnavailable),
+              mAccessPriorityChanged(callback->onCameraAccessPrioritiesChanged),
+              mPhysicalCamAvailable(callback->onPhysicalCameraAvailable),
+              mPhysicalCamUnavailable(callback->onPhysicalCameraUnavailable),
+              mContext(callback->availabilityCallbacks.context) {}
 
         bool operator == (const Callback& other) const {
-            return (mAvailable == other.mAvailable &&
-                    mUnavailable == other.mUnavailable &&
+            return (mAvailable == other.mAvailable && mUnavailable == other.mUnavailable &&
                     mAccessPriorityChanged == other.mAccessPriorityChanged &&
                     mPhysicalCamAvailable == other.mPhysicalCamAvailable &&
                     mPhysicalCamUnavailable == other.mPhysicalCamUnavailable &&
-                    mContext == other.mContext);
+                    mContext == other.mContext &&
+                    mDeviceContext.deviceId == other.mDeviceContext.deviceId &&
+                    mDeviceContext.policy == other.mDeviceContext.policy);
         }
         bool operator != (const Callback& other) const {
             return !(*this == other);
@@ -146,6 +184,9 @@ class CameraManagerGlobal final : public RefBase {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wordered-compare-function-pointers"
             if (*this == other) return false;
+            if (mDeviceContext.deviceId != other.mDeviceContext.deviceId) {
+                return mDeviceContext.deviceId < other.mDeviceContext.deviceId;
+            }
             if (mContext != other.mContext) return mContext < other.mContext;
             if (mPhysicalCamAvailable != other.mPhysicalCamAvailable) {
                 return mPhysicalCamAvailable < other.mPhysicalCamAvailable;
@@ -163,6 +204,7 @@ class CameraManagerGlobal final : public RefBase {
         bool operator > (const Callback& other) const {
             return (*this != other && !(*this < other));
         }
+        DeviceContext mDeviceContext;
         ACameraManager_AvailabilityCallback mAvailable;
         ACameraManager_AvailabilityCallback mUnavailable;
         ACameraManager_AccessPrioritiesChangedCallback mAccessPriorityChanged;
@@ -204,36 +246,16 @@ class CameraManagerGlobal final : public RefBase {
 
     sp<hardware::ICameraService> getCameraServiceLocked();
     void onCameraAccessPrioritiesChanged();
-    void onStatusChanged(int32_t status, const std::string& cameraId);
-    void onStatusChangedLocked(int32_t status, const std::string& cameraId);
-    void onStatusChanged(int32_t status, const std::string& cameraId, const std::string& physicalCameraId);
-    void onStatusChangedLocked(int32_t status, const std::string& cameraId,
-           const std::string& physicalCameraId);
+    void onStatusChanged(int32_t status, int deviceId, const std::string& cameraId);
+    void onStatusChangedLocked(int32_t status, int deviceId, const std::string& cameraId);
+    void onStatusChanged(int32_t status, int deviceId, const std::string& cameraId,
+                         const std::string& physicalCameraId);
+    void onStatusChangedLocked(int32_t status, int deviceId, const std::string& cameraId,
+                               const std::string& physicalCameraId);
     // Utils for status
     static bool validStatus(int32_t status);
     static bool isStatusAvailable(int32_t status);
     bool supportsCamera2ApiLocked(const std::string &cameraId);
-
-    // The sort logic must match the logic in
-    // libcameraservice/common/CameraProviderManager.cpp::getAPI1CompatibleCameraDeviceIds
-    struct CameraIdComparator {
-        bool operator()(const std::string& a, const std::string& b) const {
-            uint32_t aUint = 0, bUint = 0;
-            bool aIsUint = base::ParseUint(a.c_str(), &aUint);
-            bool bIsUint = base::ParseUint(b.c_str(), &bUint);
-
-            // Uint device IDs first
-            if (aIsUint && bIsUint) {
-                return aUint < bUint;
-            } else if (aIsUint) {
-                return true;
-            } else if (bIsUint) {
-                return false;
-            }
-            // Simple string compare if both id are not uint
-            return a < b;
-        }
-    };
 
     struct StatusAndHAL3Support {
       private:
@@ -253,13 +275,40 @@ class CameraManagerGlobal final : public RefBase {
         std::set<std::string> getUnavailablePhysicalIds();
     };
 
-    // Map camera_id -> status
-    std::map<std::string, StatusAndHAL3Support, CameraIdComparator> mDeviceStatusMap;
+    struct DeviceStatusMapKey {
+        int deviceId;
+        std::string cameraId;
+
+        bool operator<(const DeviceStatusMapKey& other) const {
+            if (deviceId != other.deviceId) {
+                return deviceId < other.deviceId;
+            }
+
+            // The sort logic must match the logic in
+            // libcameraservice/common/CameraProviderManager.cpp::getAPI1CompatibleCameraDeviceIds
+            uint32_t cameraIdUint = 0, otherCameraIdUint = 0;
+            bool cameraIdIsUint = base::ParseUint(cameraId.c_str(), &cameraIdUint);
+            bool otherCameraIdIsUint = base::ParseUint(other.cameraId.c_str(), &otherCameraIdUint);
+
+            // Uint device IDs first
+            if (cameraIdIsUint && otherCameraIdIsUint) {
+                return cameraIdUint < otherCameraIdUint;
+            } else if (cameraIdIsUint) {
+                return true;
+            } else if (otherCameraIdIsUint) {
+                return false;
+            }
+            // Simple string compare if both id are not uint
+            return cameraIdIsUint < otherCameraIdIsUint;
+        }
+    };
+
+    std::map<DeviceStatusMapKey, StatusAndHAL3Support> mDeviceStatusMap;
 
     // For the singleton instance
     static Mutex sLock;
     static wp<CameraManagerGlobal> sInstance;
-    CameraManagerGlobal() {};
+    CameraManagerGlobal() {}
     ~CameraManagerGlobal();
 };
 
@@ -271,9 +320,7 @@ class CameraManagerGlobal final : public RefBase {
  * Leave outside of android namespace because it's NDK struct
  */
 struct ACameraManager {
-    ACameraManager() :
-            mGlobalManager(android::acam::CameraManagerGlobal::getInstance()) {}
-    ~ACameraManager();
+    ACameraManager() : mGlobalManager(android::acam::CameraManagerGlobal::getInstance()) {}
     camera_status_t getCameraIdList(ACameraIdList** cameraIdList);
     static void     deleteCameraIdList(ACameraIdList* cameraIdList);
 
@@ -282,6 +329,12 @@ struct ACameraManager {
     camera_status_t openCamera(const char* cameraId,
                                ACameraDevice_StateCallbacks* callback,
                                /*out*/ACameraDevice** device);
+    void registerAvailabilityCallback(const ACameraManager_AvailabilityCallbacks* callback);
+    void unregisterAvailabilityCallback(const ACameraManager_AvailabilityCallbacks* callback);
+    void registerExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
+    void unregisterExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
 
   private:
     enum {
@@ -289,6 +342,7 @@ struct ACameraManager {
     };
     android::Mutex         mLock;
     android::sp<android::acam::CameraManagerGlobal> mGlobalManager;
+    const android::acam::DeviceContext mDeviceContext;
 };
 
 #endif //_ACAMERA_MANAGER_H

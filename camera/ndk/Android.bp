@@ -77,6 +77,8 @@ cc_library_shared {
         "impl/ACameraCaptureSession.cpp",
     ],
     shared_libs: [
+        "android.companion.virtual.virtualdevice_aidl-cpp",
+        "android.companion.virtualdevice.flags-aconfig-cc",
         "libbinder",
         "liblog",
         "libgui",
