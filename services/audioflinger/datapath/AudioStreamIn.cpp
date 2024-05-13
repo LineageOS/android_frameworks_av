@@ -58,7 +58,7 @@ status_t AudioStreamIn::getCapturePosition(int64_t* frames, int64_t* time)
 
     if (mHalFormatHasProportionalFrames &&
             (flags & AUDIO_INPUT_FLAG_DIRECT) == AUDIO_INPUT_FLAG_DIRECT) {
-        // For DirectRecord reset timestamp to 0 on standby.
+        // For DirectRecord reset position to 0 on standby.
         const uint64_t adjustedPosition = (halPosition <= mFramesReadAtStandby) ?
                 0 : (halPosition - mFramesReadAtStandby);
         // Scale from HAL sample rate to application rate.
