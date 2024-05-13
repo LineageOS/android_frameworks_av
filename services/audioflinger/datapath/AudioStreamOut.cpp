@@ -51,39 +51,14 @@ status_t AudioStreamOut::getRenderPosition(uint64_t *frames)
         return NO_INIT;
     }
 
-    uint32_t halPosition = 0;
+    uint64_t halPosition = 0;
     const status_t status = stream->getRenderPosition(&halPosition);
     if (status != NO_ERROR) {
         return status;
     }
-
-    // Maintain a 64-bit render position using the 32-bit result from the HAL.
-    // This delta calculation relies on the arithmetic overflow behavior
-    // of integers. For example (100 - 0xFFFFFFF0) = 116.
-    const auto truncatedPosition = (uint32_t)mRenderPosition;
-    int32_t deltaHalPosition; // initialization not needed, overwitten by __builtin_sub_overflow()
-    (void) __builtin_sub_overflow(halPosition, truncatedPosition, &deltaHalPosition);
-
-    if (deltaHalPosition >= 0) {
-        mRenderPosition += deltaHalPosition;
-    } else if (mExpectRetrograde) {
-        mExpectRetrograde = false;
-        mRenderPosition -= static_cast<uint64_t>(-deltaHalPosition);
-    }
     // Scale from HAL sample rate to application rate.
-    *frames = mRenderPosition / mRateMultiplier;
+    *frames = halPosition / mRateMultiplier;
 
-    return status;
-}
-
-// return bottom 32-bits of the render position
-status_t AudioStreamOut::getRenderPosition(uint32_t *frames)
-{
-    uint64_t position64 = 0;
-    const status_t status = getRenderPosition(&position64);
-    if (status == NO_ERROR) {
-        *frames = (uint32_t)position64;
-    }
     return status;
 }
 
@@ -101,7 +76,7 @@ status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timesp
 
     if (mHalFormatHasProportionalFrames &&
             (flags & AUDIO_OUTPUT_FLAG_DIRECT) == AUDIO_OUTPUT_FLAG_DIRECT) {
-        // For DirectTrack reset timestamp to 0 on standby.
+        // For DirectTrack reset position to 0 on standby.
         const uint64_t adjustedPosition = (halPosition <= mFramesWrittenAtStandby) ?
                 0 : (halPosition - mFramesWrittenAtStandby);
         // Scale from HAL sample rate to application rate.
@@ -179,8 +154,6 @@ audio_config_base_t AudioStreamOut::getAudioProperties() const
 
 int AudioStreamOut::flush()
 {
-    mRenderPosition = 0;
-    mExpectRetrograde = false;
     mFramesWritten = 0;
     mFramesWrittenAtStandby = 0;
     const status_t result = stream->flush();
@@ -189,10 +162,12 @@ int AudioStreamOut::flush()
 
 int AudioStreamOut::standby()
 {
-    mRenderPosition = 0;
-    mExpectRetrograde = false;
     mFramesWrittenAtStandby = mFramesWritten;
     return stream->standby();
+}
+
+void AudioStreamOut::presentationComplete() {
+    stream->presentationComplete();
 }
 
 ssize_t AudioStreamOut::write(const void *buffer, size_t numBytes)
