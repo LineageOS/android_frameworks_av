@@ -22,6 +22,15 @@ flag {
 }
 
 flag {
+    name: "fix_concurrent_playback_behavior_with_bit_perfect_client"
+    namespace: "media_audio"
+    description:
+        "Treat playback use cases differently when bit-perfect client is active to improve the "
+        "user experience with bit-perfect playback."
+    bug: "339515899"
+}
+
+flag {
     name: "mutex_priority_inheritance"
     namespace: "media_audio"
     description:
