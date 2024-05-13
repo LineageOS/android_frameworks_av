@@ -265,6 +265,12 @@ struct ACameraManager {
                                ACameraDevice_StateCallbacks* callback,
                                /*out*/ACameraDevice** device);
     camera_status_t getTagFromName(const char *cameraId, const char *name, uint32_t *tag);
+    void registerAvailabilityCallback(const ACameraManager_AvailabilityCallbacks* callback);
+    void unregisterAvailabilityCallback(const ACameraManager_AvailabilityCallbacks* callback);
+    void registerExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
+    void unregisterExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
 
   private:
     enum {
