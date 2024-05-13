@@ -27,6 +27,7 @@ using ::android::binder::Status;
 using ::android::content::AttributionSourceState;
 using ::android::error::Result;
 using ::com::android::media::permission::IPermissionProvider;
+using ::com::android::media::permission::PermissionEnum;
 using ::com::android::media::permission::ValidatedAttributionSourceState;
 using ::testing::Return;
 
@@ -36,6 +37,7 @@ class MockPermissionProvider : public IPermissionProvider {
                 (override, const));
     MOCK_METHOD(Result<bool>, validateUidPackagePair, (uid_t uid, const std::string&),
                 (override, const));
+    MOCK_METHOD(Result<bool>, checkPermission, (PermissionEnum perm, uid_t), (override, const));
 };
 
 class ValidatedAttributionSourceStateTest : public ::testing::Test {

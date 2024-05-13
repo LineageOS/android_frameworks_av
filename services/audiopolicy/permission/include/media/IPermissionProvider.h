@@ -21,6 +21,7 @@
 #include <optional>
 #include <vector>
 
+#include <com/android/media/permission/PermissionEnum.h>
 #include <error/Result.h>
 
 namespace com::android::media::permission {
@@ -38,6 +39,11 @@ class IPermissionProvider {
     // Fails if the provider does not know about the app-id.
     virtual ::android::error::Result<bool> validateUidPackagePair(
             uid_t uid, const std::string& packageName) const = 0;
+
+    // True iff the uid holds the permission (user aware).
+    // Fails with NO_INIT if cache hasn't been populated.
+    virtual ::android::error::Result<bool> checkPermission(PermissionEnum permission,
+                                                           uid_t uid) const = 0;
     virtual ~IPermissionProvider() = default;
 };
 }  // namespace com::android::media::permission

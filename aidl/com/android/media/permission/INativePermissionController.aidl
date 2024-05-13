@@ -16,6 +16,7 @@
 
 package com.android.media.permission;
 
+import com.android.media.permission.PermissionEnum;
 import com.android.media.permission.UidPackageState;
 
 /**
@@ -33,4 +34,13 @@ interface INativePermissionController {
      * If the list is empty, the package no longer exists.
      */
     void updatePackagesForUid(in UidPackageState newPackageState);
+    /**
+     * Populate or replace the list of uids which holds a particular permission.
+     * Runtime permissions will need additional checks, and should not use the cache as-is.
+     * Not virtual device aware.
+     * Is is possible for updates to the permission state to be delayed during high traffic.
+     * @param perm - Enum representing the permission for which holders are being supplied
+     * @param uids - Uids (not app-ids) which hold the permission. Should be sorted
+     */
+    void populatePermissionState(in PermissionEnum perm, in int[] uids);
 }

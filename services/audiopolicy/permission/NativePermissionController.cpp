@@ -88,6 +88,19 @@ Status NativePermissionController::updatePackagesForUid(const UidPackageState& n
     return Status::ok();
 }
 
+Status NativePermissionController::populatePermissionState(PermissionEnum perm,
+                                                           const std::vector<int>& uids) {
+    if (perm >= PermissionEnum::ENUM_SIZE || static_cast<int>(perm) < 0) {
+        return Status::fromExceptionCode(Status::EX_ILLEGAL_ARGUMENT);
+    }
+    std::lock_guard l{m_};
+    auto& cursor = permission_map_[static_cast<size_t>(perm)];
+    cursor = std::vector<uid_t>{uids.begin(), uids.end()};
+    // should be sorted
+    std::sort(cursor.begin(), cursor.end());
+    return Status::ok();
+}
+
 // -- End Binder methods
 
 Result<std::vector<std::string>> NativePermissionController::getPackagesForUid(uid_t uid) const {
@@ -120,4 +133,15 @@ Result<bool> NativePermissionController::validateUidPackagePair(
            (std::find(cursor->second.begin(), cursor->second.end(), packageName) !=
             cursor->second.end());
 }
+
+Result<bool> NativePermissionController::checkPermission(PermissionEnum perm, uid_t uid) const {
+    std::lock_guard l{m_};
+    const auto& uids = permission_map_[static_cast<size_t>(perm)];
+    if (!uids.empty()) {
+        return std::binary_search(uids.begin(), uids.end(), uid);
+    } else {
+        return unexpected{::android::NO_INIT};
+    }
+}
+
 }  // namespace com::android::media::permission
