@@ -151,10 +151,7 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
 
     // Return the number of audio frames written by the audio dsp to DAC since
     // the output has exited standby.
-    virtual status_t getRenderPosition(uint32_t *dspFrames) = 0;
-
-    // Get the local time at which the next write to the audio driver will be presented.
-    virtual status_t getNextWriteTimestamp(int64_t *timestamp) = 0;
+    virtual status_t getRenderPosition(uint64_t *dspFrames) = 0;
 
     // Set the callback for notifying completion of non-blocking write and drain.
     // The callback must be owned by someone else. The output stream does not own it
@@ -181,6 +178,9 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
 
     // Return a recent count of the number of audio frames presented to an external observer.
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp) = 0;
+
+    // Notifies the HAL layer that the framework considers the current playback as completed.
+    virtual status_t presentationComplete() = 0;
 
     struct SourceMetadata {
         std::vector<playback_track_metadata_v7_t> tracks;

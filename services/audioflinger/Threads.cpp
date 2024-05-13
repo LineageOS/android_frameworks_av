@@ -3401,9 +3401,9 @@ status_t PlaybackThread::getRenderPosition(
         return NO_ERROR;
     } else {
         status_t status;
-        uint32_t frames;
+        uint64_t frames = 0;
         status = mOutput->getRenderPosition(&frames);
-        *dspFrames = (size_t)frames;
+        *dspFrames = (uint32_t)frames;
         return status;
     }
 }
