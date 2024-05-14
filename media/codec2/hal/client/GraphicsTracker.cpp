@@ -173,7 +173,7 @@ void GraphicsTracker::BufferCache::unblockSlot(int slot) {
 }
 
 GraphicsTracker::GraphicsTracker(int maxDequeueCount)
-    : mBufferCache(new BufferCache()), mMaxDequeue{maxDequeueCount},
+    : mBufferCache(new BufferCache()), mNumDequeueing{0}, mMaxDequeue{maxDequeueCount},
     mMaxDequeueCommitted{maxDequeueCount},
     mDequeueable{maxDequeueCount},
     mTotalDequeued{0}, mTotalCancelled{0}, mTotalDropped{0}, mTotalReleased{0},
@@ -235,6 +235,7 @@ c2_status_t GraphicsTracker::configureGraphics(
         const sp<IGraphicBufferProducer>& igbp, uint32_t generation) {
     // TODO: wait until operations to previous IGBP is completed.
     std::shared_ptr<BufferCache> prevCache;
+    int prevDequeueRequested = 0;
     int prevDequeueCommitted;
 
     std::unique_lock<std::mutex> cl(mConfigLock);
@@ -243,6 +244,9 @@ c2_status_t GraphicsTracker::configureGraphics(
         mInConfig = true;
         prevCache = mBufferCache;
         prevDequeueCommitted = mMaxDequeueCommitted;
+        if (mMaxDequeueRequested.has_value()) {
+            prevDequeueRequested = mMaxDequeueRequested.value();
+        }
     }
     // NOTE: Switching to the same surface is blocked from MediaCodec.
     // Switching to the same surface might not work if tried, since disconnect()
@@ -263,6 +267,11 @@ c2_status_t GraphicsTracker::configureGraphics(
         mInConfig = false;
         return C2_BAD_VALUE;
     }
+    ALOGD("new surface in configuration: maxDequeueRequested(%d), maxDequeueCommitted(%d)",
+          prevDequeueRequested, prevDequeueCommitted);
+    if (prevDequeueRequested > 0 && prevDequeueRequested > prevDequeueCommitted) {
+        prevDequeueCommitted = prevDequeueRequested;
+    }
     if (igbp) {
         ret = igbp->setMaxDequeuedBufferCount(prevDequeueCommitted);
         if (ret != ::android::OK) {
@@ -280,6 +289,34 @@ c2_status_t GraphicsTracker::configureGraphics(
         std::unique_lock<std::mutex> l(mLock);
         mInConfig = false;
         mBufferCache = newCache;
+        // {@code dequeued} is the number of currently dequeued buffers.
+        // {@code prevDequeueCommitted} is max dequeued buffer at any moment
+        //  from the new surface.
+        // {@code newDequeueable} is hence the current # of dequeueable buffers
+        //  if no change occurs.
+        int dequeued = mDequeued.size() + mNumDequeueing;
+        int newDequeueable = prevDequeueCommitted - dequeued;
+        if (newDequeueable < 0) {
+            // This will not happen.
+            // But if this happens, we respect the value and try to continue.
+            ALOGE("calculated new dequeueable is negative: %d max(%d),dequeued(%d)",
+                  newDequeueable, prevDequeueCommitted, dequeued);
+        }
+
+        if (mMaxDequeueRequested.has_value() && mMaxDequeueRequested == prevDequeueCommitted) {
+            mMaxDequeueRequested.reset();
+        }
+        mMaxDequeue = mMaxDequeueCommitted = prevDequeueCommitted;
+
+        int delta = newDequeueable - mDequeueable;
+        if (delta > 0) {
+            writeIncDequeueableLocked(delta);
+        } else if (delta < 0) {
+            drainDequeueableLocked(-delta);
+        }
+        ALOGV("new surfcace dequeueable %d(delta %d), maxDequeue %d",
+              newDequeueable, delta, mMaxDequeue);
+        mDequeueable = newDequeueable;
     }
     return C2_OK;
 }
@@ -529,6 +566,7 @@ c2_status_t GraphicsTracker::requestAllocate(std::shared_ptr<BufferCache> *cache
             ALOGE("writing end for the waitable object seems to be closed");
             return C2_BAD_STATE;
         }
+        mNumDequeueing++;
         mDequeueable--;
         *cache = mBufferCache;
         return C2_OK;
@@ -543,6 +581,7 @@ void GraphicsTracker::commitAllocate(c2_status_t res, const std::shared_ptr<Buff
                     bool cached, int slot, const sp<Fence> &fence,
                     std::shared_ptr<BufferItem> *pBuffer, bool *updateDequeue) {
     std::unique_lock<std::mutex> l(mLock);
+    mNumDequeueing--;
     if (res == C2_OK) {
         if (cached) {
             auto it = cache->mBuffers.find(slot);
@@ -655,7 +694,8 @@ c2_status_t GraphicsTracker::_allocate(const std::shared_ptr<BufferCache> &cache
             ALOGE("allocate by dequeueBuffer() successful, but requestBuffer() failed %d",
                   status);
             igbp->cancelBuffer(slotId, fence);
-            return C2_CORRUPTED;
+            // This might be due to life-cycle end and/or surface switching.
+            return C2_BLOCKING;
         }
         *buffer = std::make_shared<BufferItem>(generation, slotId, realloced, fence);
         if (!*buffer) {

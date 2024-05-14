@@ -234,6 +234,7 @@ private:
     // Maps bufferId to buffer
     std::map<uint64_t, std::shared_ptr<BufferItem>> mDequeued;
     std::set<uint64_t> mDeallocating;
+    int mNumDequeueing;
 
     // These member variables are read and modified accessed as follows.
     // 1. mConfigLock being held
