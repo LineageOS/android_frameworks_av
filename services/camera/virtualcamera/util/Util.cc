@@ -65,7 +65,6 @@ YCbCrLockGuard::~YCbCrLockGuard() {
   if (gBuffer == nullptr) {
     return;
   }
-  gBuffer->unlock();
   status_t status = gBuffer->unlock();
   if (status != NO_ERROR) {
     ALOGE("Failed to unlock graphic buffer: %s", statusToString(status).c_str());
