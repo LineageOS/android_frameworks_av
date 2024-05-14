@@ -200,8 +200,12 @@ status_t StreamHalAidl::standby() {
     StreamDescriptor::Reply reply;
     switch (state) {
         case StreamDescriptor::State::ACTIVE:
+        case StreamDescriptor::State::DRAINING:
+        case StreamDescriptor::State::TRANSFERRING:
             RETURN_STATUS_IF_ERROR(pause(&reply));
-            if (reply.state != StreamDescriptor::State::PAUSED) {
+            if (reply.state != StreamDescriptor::State::PAUSED &&
+                    reply.state != StreamDescriptor::State::DRAIN_PAUSED &&
+                    reply.state != StreamDescriptor::State::TRANSFER_PAUSED) {
                 ALOGE("%s: unexpected stream state: %s (expected PAUSED)",
                         __func__, toString(reply.state).c_str());
                 return INVALID_OPERATION;
@@ -209,6 +213,7 @@ status_t StreamHalAidl::standby() {
             FALLTHROUGH_INTENDED;
         case StreamDescriptor::State::PAUSED:
         case StreamDescriptor::State::DRAIN_PAUSED:
+        case StreamDescriptor::State::TRANSFER_PAUSED:
             if (mIsInput) return flush();
             RETURN_STATUS_IF_ERROR(flush(&reply));
             if (reply.state != StreamDescriptor::State::IDLE) {
