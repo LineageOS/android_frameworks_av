@@ -194,6 +194,11 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     // For tests.
     friend class sp<StreamHalAidl>;
 
+    struct StatePositions {
+        int64_t framesAtFlushOrDrain;
+        int64_t framesAtStandby;
+    };
+
     template<class T>
     static std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon> getStreamCommon(
             const std::shared_ptr<T>& stream);
@@ -212,7 +217,8 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     status_t getLatency(uint32_t *latency);
 
     // Always returns non-negative values.
-    status_t getObservablePosition(int64_t *frames, int64_t *timestamp);
+    status_t getObservablePosition(int64_t* frames, int64_t* timestamp,
+            StatePositions* statePositions = nullptr);
 
     // Always returns non-negative values.
     status_t getHardwarePosition(int64_t *frames, int64_t *timestamp);
@@ -268,11 +274,13 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     // Note: Since `sendCommand` takes mLock while holding mCommandReplyLock, never call
     // it with `mLock` being held.
     status_t sendCommand(
-            const ::aidl::android::hardware::audio::core::StreamDescriptor::Command &command,
+            const ::aidl::android::hardware::audio::core::StreamDescriptor::Command& command,
             ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply = nullptr,
-            bool safeFromNonWorkerThread = false);
+            bool safeFromNonWorkerThread = false,
+            StatePositions* statePositions = nullptr);
     status_t updateCountersIfNeeded(
-            ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply = nullptr);
+            ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply = nullptr,
+            StatePositions* statePositions = nullptr);
 
     const std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon> mStream;
     const std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension> mVendorExt;
@@ -280,6 +288,9 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     std::mutex mLock;
     ::aidl::android::hardware::audio::core::StreamDescriptor::Reply mLastReply GUARDED_BY(mLock);
     int64_t mLastReplyExpirationNs GUARDED_BY(mLock) = 0;
+    // Cached values of observable positions when the stream last entered certain state.
+    // Updated for output streams only.
+    StatePositions mStatePositions GUARDED_BY(mLock) = {};
     // mStreamPowerLog is used for audio signal power logging.
     StreamPowerLog mStreamPowerLog;
     std::atomic<pid_t> mWorkerTid = -1;
@@ -328,10 +339,14 @@ class StreamOutHalAidl : public virtual StreamOutHalInterface,
     // Requests notification when data buffered by the driver/hardware has been played.
     status_t drain(bool earlyNotify) override;
 
-    // Notifies to the audio driver to flush the queued data.
+    // Notifies to the audio driver to flush (that is, drop) the queued data. Stream must
+    // already be paused before calling 'flush'.
     status_t flush() override;
 
     // Return a recent count of the number of audio frames presented to an external observer.
+    // This excludes frames which have been written but are still in the pipeline. See the
+    // table at the start of the 'StreamOutHalInterface' for the specification of the frame
+    // count behavior w.r.t. 'flush', 'drain' and 'standby' operations.
     status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp) override;
 
     // Notifies the HAL layer that the framework considers the current playback as completed.
@@ -413,6 +428,7 @@ class StreamInHalAidl : public StreamInHalInterface, public StreamHalAidl {
 
     // Return a recent count of the number of audio frames received and
     // the clock time associated with that frame count.
+    // The count must not reset to zero when a PCM input enters standby.
     status_t getCapturePosition(int64_t *frames, int64_t *time) override;
 
     // Get active microphones
