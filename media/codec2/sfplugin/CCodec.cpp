@@ -2229,9 +2229,15 @@ void CCodec::stop(bool pushBlankBuffer) {
     // See also b/300350761.
     //
     // The workaround is no longer needed with fetchGraphicBlock & C2Fence changes.
-    // so we are reverting back to the logical sequence of the operations.
+    // so we are reverting back to the logical sequence of the operations when
+    // AIDL HALs are selected.
+    // When the HIDL HALs are selected, we retained workaround(the reversed
+    // order) as default in order to keep legacy behavior.
+    bool stopHalBeforeSurface =
+            Codec2Client::IsAidlSelected() ||
+            property_get_bool("debug.codec2.stop_hal_before_surface", false);
     status_t err = C2_OK;
-    if (android::media::codec::provider_->stop_hal_before_surface()) {
+    if (stopHalBeforeSurface && android::media::codec::provider_->stop_hal_before_surface()) {
         err = comp->stop();
         mChannel->stopUseOutputSurface(pushBlankBuffer);
     } else {
@@ -2334,8 +2340,14 @@ void CCodec::release(bool sendCallback, bool pushBlankBuffer) {
     // See also b/300350761.
     //
     // The workaround is no longer needed with fetchGraphicBlock & C2Fence changes.
-    // so we are reverting back to the logical sequence of the operations.
-    if (android::media::codec::provider_->stop_hal_before_surface()) {
+    // so we are reverting back to the logical sequence of the operations when
+    // AIDL HALs are selected.
+    // When the HIDL HALs are selected, we retained workaround(the reversed
+    // order) as default in order to keep legacy behavior.
+    bool stopHalBeforeSurface =
+            Codec2Client::IsAidlSelected() ||
+            property_get_bool("debug.codec2.stop_hal_before_surface", false);
+    if (stopHalBeforeSurface && android::media::codec::provider_->stop_hal_before_surface()) {
         comp->release();
         mChannel->stopUseOutputSurface(pushBlankBuffer);
     } else {
