@@ -148,6 +148,8 @@ public:
 
     void onMomentaryExposure(float currentMel, audio_port_handle_t deviceId) const override;
 
+    void resetReferencesForTest();
+
 private:
     class SoundDose : public media::BnSoundDose,
                       public IBinder::DeathRecipient {
@@ -218,7 +220,7 @@ private:
 
     mutable std::mutex mLock;
 
-    const sp<IMelReporterCallback> mMelReporterCallback;
+    sp<IMelReporterCallback> mMelReporterCallback;
 
     // no need for lock since MelAggregator is thread-safe
     const sp<audio_utils::MelAggregator> mMelAggregator;

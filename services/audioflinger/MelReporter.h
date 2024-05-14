@@ -102,6 +102,8 @@ public:
             const std::vector<playback_track_metadata_v7_t>& metadataVec)
             EXCLUDES_AudioFlinger_Mutex;
 
+    void resetReferencesForTest();
+
 private:
     struct ActiveMelPatch {
         audio_io_handle_t streamHandle{AUDIO_IO_HANDLE_NONE};
@@ -130,7 +132,7 @@ private:
 
     bool useHalSoundDoseInterface_l() REQUIRES(mutex());
 
-    const sp<IAfMelReporterCallback> mAfMelReporterCallback;
+    sp<IAfMelReporterCallback> mAfMelReporterCallback;
 
     /* const */ sp<SoundDoseManager> mSoundDoseManager;  // set onFirstRef
 
