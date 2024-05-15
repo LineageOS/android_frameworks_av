@@ -307,6 +307,8 @@ aaudio_result_t AAudioServiceStreamBase::pause_l() {
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
             .record(); });
 
+    setState(AAUDIO_STREAM_STATE_PAUSING);
+
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         ALOGE("%s() has no endpoint", __func__);
