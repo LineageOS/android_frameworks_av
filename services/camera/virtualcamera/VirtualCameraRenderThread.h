@@ -17,7 +17,6 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERARENDERTHREAD_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERARENDERTHREAD_H
 
-#include <atomic>
 #include <cstdint>
 #include <deque>
 #include <future>
@@ -195,9 +194,6 @@ class VirtualCameraRenderThread {
   std::deque<std::unique_ptr<ProcessCaptureRequestTask>> mQueue GUARDED_BY(mLock);
   std::condition_variable mCondVar;
   volatile bool mPendingExit GUARDED_BY(mLock);
-
-  // Acquisition timestamp of last frame.
-  std::atomic<uint64_t> mLastAcquisitionTimestampNanoseconds;
 
   // EGL helpers - constructed and accessed only from rendering thread.
   std::unique_ptr<EglDisplayContext> mEglDisplayContext;
