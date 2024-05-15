@@ -865,6 +865,8 @@ void AudioPolicyService::updateUidStates_l()
 //            OR client has CAPTURE_AUDIO_OUTPUT privileged permission
 //    OR the client is the current InputMethodService
 //        AND a RTT call is active AND the source is VOICE_RECOGNITION
+//    OR The client is an active communication owner
+//        AND is on TOP or latest started
 //    OR Any client
 //        AND The assistant is not on TOP
 //        AND is on TOP or latest started
@@ -1029,7 +1031,12 @@ void AudioPolicyService::updateUidStates_l()
         bool isTopOrLatestAssistant = latestActiveAssistant == nullptr ? false :
             current->attributionSource.uid == latestActiveAssistant->attributionSource.uid;
 
-        auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) REQUIRES(mMutex) {
+        // TODO: b/339112720
+        // Refine this logic when we have the correct phone state owner UID. The current issue is
+        // when a VOIP APP use Telecom API to manage calls, the mPhoneStateOwnerUid is AID_SYSTEM
+        // instead of the actual VOIP APP UID, so isPhoneStateOwnerActive here is not accurate.
+        const bool canCaptureIfInCallOrCommunication = [&](const auto& recordClient) REQUIRES(
+                                                               mMutex) {
             uid_t recordUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(
                 recordClient->attributionSource.uid));
             bool canCaptureCall = recordClient->canCaptureOutput;
@@ -1038,19 +1045,26 @@ void AudioPolicyService::updateUidStates_l()
                 || recordUid == mPhoneStateOwnerUid;
             return !(isInCall && !canCaptureCall)
                 && !(isInCommunication && !canCaptureCommunication);
-        };
+        }(current);
 
         // By default allow capture if:
         //     The assistant is not on TOP
-        //     AND is on TOP or latest started
-        //     AND there is no active privacy sensitive capture or call
+        //         AND is on TOP or latest started
+        //         AND there is no active privacy sensitive capture or call
         //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
-        bool allowSensitiveCapture =
+        //     The assistant is on TOP
+        //         AND is ongoing communication owner
+        //         AND is on TOP or latest started
+        const bool allowSensitiveCapture =
             !isSensitiveActive || isTopOrLatestSensitive || current->canCaptureOutput;
-        bool allowCapture = !isAssistantOnTop
-                && (isTopOrLatestActive || isTopOrLatestSensitive)
-                && allowSensitiveCapture
-                && canCaptureIfInCallOrCommunication(current);
+        bool allowCapture = false;
+        if (!isAssistantOnTop) {
+            allowCapture = (isTopOrLatestActive || isTopOrLatestSensitive) &&
+                           allowSensitiveCapture && canCaptureIfInCallOrCommunication;
+        } else {
+            allowCapture = isInCommunication && isTopOrLatestSensitive &&
+                           canCaptureIfInCallOrCommunication;
+        }
 
         if (!current->hasOp()) {
             // Never allow capture if app op is denied
@@ -1073,7 +1087,7 @@ void AudioPolicyService::updateUidStates_l()
                     allowCapture = true;
                 }
             } else if (allowSensitiveCapture
-                    && canCaptureIfInCallOrCommunication(current)) {
+                    && canCaptureIfInCallOrCommunication) {
                 if (isTopOrLatestAssistant
                     && (source == AUDIO_SOURCE_VOICE_RECOGNITION
                         || source == AUDIO_SOURCE_HOTWORD)) {
@@ -1094,7 +1108,7 @@ void AudioPolicyService::updateUidStates_l()
                     allowCapture = true;
                 }
             } else if (allowSensitiveCapture
-                        && canCaptureIfInCallOrCommunication(current)) {
+                        && canCaptureIfInCallOrCommunication) {
                 if ((source == AUDIO_SOURCE_VOICE_RECOGNITION) || (source == AUDIO_SOURCE_HOTWORD))
                 {
                     allowCapture = true;
@@ -1109,7 +1123,7 @@ void AudioPolicyService::updateUidStates_l()
             //         Is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
             if (!isAssistantOnTop
                     && allowSensitiveCapture
-                    && canCaptureIfInCallOrCommunication(current)) {
+                    && canCaptureIfInCallOrCommunication) {
                 allowCapture = true;
             }
             if (isA11yOnTop) {
@@ -1123,7 +1137,7 @@ void AudioPolicyService::updateUidStates_l()
             //     AND no call is active
             //         OR client has CAPTURE_AUDIO_OUTPUT privileged permission
             if (onlyHotwordActive
-                    && canCaptureIfInCallOrCommunication(current)) {
+                    && canCaptureIfInCallOrCommunication) {
                 allowCapture = true;
             }
         } else if (mUidPolicy->isCurrentImeUid(currentUid)) {
