@@ -130,7 +130,6 @@ cc_fuzz {
         "libplayerservice_datasource",
     ],
     shared_libs: [
-        "libmediaplayerservice",
         "libdatasource",
         "libdrmframework",
         "libstagefright_httplive",
