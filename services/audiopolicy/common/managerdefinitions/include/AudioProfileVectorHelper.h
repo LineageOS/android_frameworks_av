@@ -38,10 +38,39 @@ void addDynamicAudioProfileAndSort(AudioProfileVector &audioProfileVector,
 void appendAudioProfiles(AudioProfileVector &audioProfileVector,
                          const AudioProfileVector &audioProfileVectorToAppend);
 
+/**
+ * Check if the profile vector contains a profile that matches the given sampling rate, channel
+ * mask and format. Note that this method uses `audio_formats_match` from policy.h, which will
+ * consider PCM formats match if their bytes per sample are greater than 2.
+ *
+ * @param audioProfileVector
+ * @param samplingRate
+ * @param channelMask
+ * @param format
+ * @return NO_ERROR if the given profile vector is empty or it contains a profile that matches the
+ *         given sampling rate, channel mask and format. Otherwise, returns BAD_VALUE.
+ */
 status_t checkExactProfile(const AudioProfileVector &audioProfileVector,
                            const uint32_t samplingRate,
                            audio_channel_mask_t channelMask,
                            audio_format_t format);
+
+/**
+ * Check if the profile vector contains a profile that has exactly the same sampling rate, channel
+ * mask and format as the given values.
+ *
+ * @param audioProfileVector
+ * @param samplingRate
+ * @param channelMask
+ * @param format
+ * @return NO_ERROR if the given profile vector is empty or it contains a profile that that has
+ *         exactly the same sampling rate, channel mask and format as the given values. Otherwise,
+ *         returns BAD_VALUE.
+ */
+status_t checkIdenticalProfile(const AudioProfileVector &audioProfileVector,
+                               const uint32_t samplingRate,
+                               audio_channel_mask_t channelMask,
+                               audio_format_t format);
 
 status_t checkCompatibleProfile(const AudioProfileVector &audioProfileVector,
                                 uint32_t &samplingRate,

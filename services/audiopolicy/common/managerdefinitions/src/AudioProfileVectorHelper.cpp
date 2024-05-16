@@ -190,6 +190,18 @@ status_t checkExact(const sp<AudioProfile> &audioProfile,
     return BAD_VALUE;
 }
 
+status_t checkIdentical(const sp<AudioProfile> &audioProfile,
+                        uint32_t samplingRate,
+                        audio_channel_mask_t channelMask,
+                        audio_format_t format) {
+    if(audioProfile->getFormat() == format &&
+        audioProfile->supportsChannels(channelMask) &&
+        audioProfile->supportsRate(samplingRate)) {
+        return NO_ERROR;
+    }
+    return BAD_VALUE;
+}
+
 status_t checkCompatibleSamplingRate(const sp<AudioProfile> &audioProfile,
                                      uint32_t samplingRate,
                                      uint32_t &updatedSamplingRate)
@@ -320,21 +332,41 @@ status_t checkCompatibleChannelMask(const sp<AudioProfile> &audioProfile,
     return bestMatch > 0 ? NO_ERROR : BAD_VALUE;
 }
 
-status_t checkExactProfile(const AudioProfileVector& audioProfileVector,
-                           const uint32_t samplingRate,
-                           audio_channel_mask_t channelMask,
-                           audio_format_t format)
-{
+namespace {
+
+status_t checkProfile(const AudioProfileVector& audioProfileVector,
+                      const uint32_t samplingRate,
+                      audio_channel_mask_t channelMask,
+                      audio_format_t format,
+                      std::function<status_t(const sp<AudioProfile> &, uint32_t,
+                                             audio_channel_mask_t, audio_format_t)> check) {
     if (audioProfileVector.empty()) {
         return NO_ERROR;
     }
 
     for (const auto& profile : audioProfileVector) {
-        if (checkExact(profile, samplingRate, channelMask, format) == NO_ERROR) {
+        if (check(profile, samplingRate, channelMask, format) == NO_ERROR) {
             return NO_ERROR;
         }
     }
     return BAD_VALUE;
+}
+
+} // namespace
+
+status_t checkExactProfile(const AudioProfileVector& audioProfileVector,
+                           const uint32_t samplingRate,
+                           audio_channel_mask_t channelMask,
+                           audio_format_t format)
+{
+    return checkProfile(audioProfileVector, samplingRate, channelMask, format, checkExact);
+}
+
+status_t checkIdenticalProfile(const AudioProfileVector &audioProfileVector,
+                               const uint32_t samplingRate,
+                               audio_channel_mask_t channelMask,
+                               audio_format_t format) {
+    return checkProfile(audioProfileVector, samplingRate, channelMask, format, checkIdentical);
 }
 
 status_t checkCompatibleProfile(const AudioProfileVector &audioProfileVector,

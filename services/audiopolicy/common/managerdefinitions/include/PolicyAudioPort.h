@@ -56,8 +56,13 @@ public:
     // Audio port IDs are in a different namespace than AudioFlinger unique IDs
     static audio_port_handle_t getNextUniqueId();
 
-    // searches for an exact match
+    // searches for an exact match, note that this method use `audio_formats_match` from policy.h,
+    // which will consider PCM formats match if their bytes per sample are greater than 2.
     virtual status_t checkExactAudioProfile(const struct audio_port_config *config) const;
+
+    // searches for an identical match, unlike `checkExactAudioProfile` above, this will also
+    // require the formats to be exactly the same.
+    virtual status_t checkIdenticalAudioProfile(const struct audio_port_config *config) const;
 
     // searches for a compatible match, currently implemented for input
     // parameters are input|output, returned value is the best match.
@@ -99,6 +104,12 @@ private:
     void pickChannelMask(audio_channel_mask_t &channelMask,
                          const ChannelMaskSet &channelMasks) const;
     void pickSamplingRate(uint32_t &rate, const SampleRateSet &samplingRates) const;
+
+    status_t checkAudioProfile(const struct audio_port_config *config,
+                               std::function<status_t(const AudioProfileVector&,
+                                                      const uint32_t samplingRate,
+                                                      audio_channel_mask_t,
+                                                      audio_format_t)> checkProfile) const;
 
     sp<HwModule> mModule;     // audio HW module exposing this I/O stream
     AudioRouteVector mRoutes; // Routes involving this port

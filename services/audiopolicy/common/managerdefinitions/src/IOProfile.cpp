@@ -73,7 +73,7 @@ IOProfile::CompatibilityScore IOProfile::getCompatibilityScore(
     if (isRecordThread)
     {
         if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
-            if (checkExactAudioProfile(&config) != NO_ERROR) {
+            if (checkIdenticalAudioProfile(&config) != NO_ERROR) {
                 return result;
             }
             result = EXACT_MATCH;
@@ -86,7 +86,13 @@ IOProfile::CompatibilityScore IOProfile::getCompatibilityScore(
             return result;
         }
     } else {
-        if (checkExactAudioProfile(&config) == NO_ERROR) {
+        if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) != 0 ||
+            (flags & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != 0) {
+            if (checkIdenticalAudioProfile(&config) != NO_ERROR) {
+                return result;
+            }
+            result = EXACT_MATCH;
+        } else if (checkExactAudioProfile(&config) == NO_ERROR) {
             result = EXACT_MATCH;
         } else {
             return result;
