@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "hardware/gralloc.h"
 #define LOG_TAG "VirtualCameraRenderThread"
 #include "VirtualCameraRenderThread.h"
 
@@ -45,6 +44,7 @@
 #include "android-base/thread_annotations.h"
 #include "android/binder_auto_utils.h"
 #include "android/hardware_buffer.h"
+#include "hardware/gralloc.h"
 #include "system/camera_metadata.h"
 #include "ui/GraphicBuffer.h"
 #include "ui/Rect.h"
@@ -422,9 +422,47 @@ void VirtualCameraRenderThread::threadLoop() {
 
 void VirtualCameraRenderThread::processCaptureRequest(
     const ProcessCaptureRequestTask& request) {
-  const std::chrono::nanoseconds timestamp =
+  if (mTestMode) {
+    // In test mode let's just render something to the Surface ourselves.
+    renderTestPatternYCbCr420(mEglSurfaceTexture->getSurface(),
+                              request.getFrameNumber());
+  }
+
+  std::chrono::nanoseconds timestamp =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now().time_since_epoch());
+  std::chrono::nanoseconds lastAcquisitionTimestamp(
+      mLastAcquisitionTimestampNanoseconds.exchange(timestamp.count(),
+                                                    std::memory_order_relaxed));
+
+  if (request.getRequestSettings().fpsRange) {
+    const int maxFps =
+        std::max(1, request.getRequestSettings().fpsRange->maxFps);
+    const std::chrono::nanoseconds minFrameDuration(
+        static_cast<uint64_t>(1e9 / maxFps));
+    const std::chrono::nanoseconds frameDuration =
+        timestamp - lastAcquisitionTimestamp;
+    if (frameDuration < minFrameDuration) {
+      // We're too fast for the configured maxFps, let's wait a bit.
+      const std::chrono::nanoseconds sleepTime =
+          minFrameDuration - frameDuration;
+      ALOGV("Current frame duration would  be %" PRIu64
+            " ns corresponding to, "
+            "sleeping for %" PRIu64
+            " ns before updating texture to match maxFps %d",
+            static_cast<uint64_t>(frameDuration.count()),
+            static_cast<uint64_t>(sleepTime.count()), maxFps);
+
+      std::this_thread::sleep_for(sleepTime);
+      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now().time_since_epoch());
+      mLastAcquisitionTimestampNanoseconds.store(timestamp.count(),
+                                                 std::memory_order_relaxed);
+    }
+  }
+
+  // Acquire new (most recent) image from the Surface.
+  mEglSurfaceTexture->updateTexture();
 
   CaptureResult captureResult;
   captureResult.fmqResultSize = 0;
@@ -438,14 +476,6 @@ void VirtualCameraRenderThread::processCaptureRequest(
 
   const std::vector<CaptureRequestBuffer>& buffers = request.getBuffers();
   captureResult.outputBuffers.resize(buffers.size());
-
-  if (mTestMode) {
-    // In test mode let's just render something to the Surface ourselves.
-    renderTestPatternYCbCr420(mEglSurfaceTexture->getSurface(),
-                              request.getFrameNumber());
-  }
-
-  mEglSurfaceTexture->updateTexture();
 
   for (int i = 0; i < buffers.size(); ++i) {
     const CaptureRequestBuffer& reqBuffer = buffers[i];
