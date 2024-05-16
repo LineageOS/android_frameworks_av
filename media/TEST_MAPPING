@@ -48,7 +48,7 @@
     // Postsubmit tests for TV devices
     "tv-postsubmit": [
        {
-           "name": "DecoderRenderTest"
+           "name": "android.media.decoder.cts.DecoderRenderTest"
        }
     ]
 }
