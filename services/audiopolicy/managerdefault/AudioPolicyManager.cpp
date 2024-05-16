@@ -1577,6 +1577,11 @@ status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
     outputDesc->mDirectClientSession = session;
 
     addOutput(*output, outputDesc);
+    setOutputDevices(__func__, outputDesc,
+                     devices,
+                     true,
+                     0,
+                     NULL);
     mPreviousOutputs = mOutputs;
     ALOGV("%s returns new direct output %d", __func__, *output);
     mpClientInterface->onAudioPortListUpdate();
@@ -8589,7 +8594,11 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
     }
 
     addOutput(output, desc);
-
+    setOutputDevices(__func__, desc,
+                     devices,
+                     true,
+                     0,
+                     NULL);
     sp<DeviceDescriptor> speaker = mAvailableOutputDevices.getDevice(
             AUDIO_DEVICE_OUT_SPEAKER, String8(""), AUDIO_FORMAT_DEFAULT);
 
