@@ -93,7 +93,7 @@ std::unique_ptr<Snapshot> Reader::getSnapshot(bool flush)
     do {
         availToRead = mFifoReader->obtain(iovec, capacity, NULL /*timeout*/, &lostTemp);
         lost += lostTemp;
-    } while (availToRead < 0 || ++tries <= kMaxObtainTries);
+    } while (availToRead < 0 && ++tries <= kMaxObtainTries);
 
     if (availToRead <= 0) {
         ALOGW_IF(availToRead < 0, "NBLog Reader %s failed to catch up with Writer", mName.c_str());

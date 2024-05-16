@@ -6,6 +6,14 @@ package: "com.android.media.audio"
 container: "system"
 
 flag {
+    name: "abs_volume_index_fix"
+    namespace: "media_audio"
+    description:
+        "Fix double attenuation and index jumps in absolute volume mode"
+    bug: "340693050"
+}
+
+flag {
     name: "alarm_min_volume_zero"
     namespace: "media_audio"
     description: "Support configuring alarm min vol to zero"
