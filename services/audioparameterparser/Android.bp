@@ -35,10 +35,10 @@ cc_defaults {
     name: "android.hardware.audio.parameter_parser.example_defaults",
     defaults: [
         "latest_android_hardware_audio_core_ndk_shared",
+        "latest_av_audio_types_aidl_ndk_shared",
     ],
 
     shared_libs: [
-        "av-audio-types-aidl-V1-ndk",
         "libbase",
         "libbinder_ndk",
     ],
