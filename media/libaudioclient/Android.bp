@@ -315,6 +315,7 @@ aidl_interface {
         "aidl/android/media/DeviceConnectedState.aidl",
         "aidl/android/media/EffectDescriptor.aidl",
         "aidl/android/media/SurroundSoundConfig.aidl",
+        "aidl/android/media/TrackInternalMuteInfo.aidl",
         "aidl/android/media/TrackSecondaryOutputInfo.aidl",
     ],
     defaults: [

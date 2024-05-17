@@ -792,6 +792,16 @@ void SwAudioOutputDescriptor::setDevices(const android::DeviceVector &devices) {
     mDevices = devices;
 }
 
+bool SwAudioOutputDescriptor::isUsageActiveOnDevice(audio_usage_t usage,
+                                                    sp<android::DeviceDescriptor> device) const {
+    if (device != nullptr && !mDevices.contains(device)) {
+        return false;
+    }
+    return std::any_of(mActiveClients.begin(), mActiveClients.end(),
+                       [usage](sp<TrackClientDescriptor> client) {
+                           return client->attributes().usage == usage; });
+}
+
 // HwAudioOutputDescriptor implementation
 HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor>& source,
                                                  AudioPolicyClientInterface *clientInterface)
@@ -1015,6 +1025,17 @@ PortHandleVector SwAudioOutputDescriptor::getClientsForStream(
         }
     }
     return clientsForStream;
+}
+
+bool SwAudioOutputCollection::isUsageActiveOnDevice(audio_usage_t usage,
+                                                    sp<android::DeviceDescriptor> device) const {
+    for (size_t i = 0; i < this->size(); i++) {
+        const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
+        if (outputDesc->isUsageActiveOnDevice(usage, device)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string SwAudioOutputDescriptor::info() const {

@@ -29,6 +29,7 @@
 #include <android-base/properties.h>
 #include <android/content/AttributionSourceState.h>
 #include <android_media_audiopolicy.h>
+#include <com_android_media_audioserver.h>
 #include <flag_macros.h>
 #include <hardware/audio_effect.h>
 #include <media/AudioPolicy.h>
@@ -1150,129 +1151,6 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, RoutingChangedWithPreferredM
     EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                            "", "", AUDIO_FORMAT_LDAC));
-    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
-                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                                           "", "", AUDIO_FORMAT_LDAC));
-}
-
-TEST_F(AudioPolicyManagerTestWithConfigurationFile, BitPerfectPlayback) {
-    const audio_format_t bitPerfectFormat = AUDIO_FORMAT_PCM_16_BIT;
-    const audio_channel_mask_t bitPerfectChannelMask = AUDIO_CHANNEL_OUT_QUAD;
-    const uint32_t bitPerfectSampleRate = 48000;
-    mClient->addSupportedFormat(bitPerfectFormat);
-    mClient->addSupportedChannelMask(bitPerfectChannelMask);
-    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
-                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                                                           "", "", AUDIO_FORMAT_DEFAULT));
-    auto devices = mManager->getAvailableOutputDevices();
-    audio_port_handle_t usbPortId = AUDIO_PORT_HANDLE_NONE;
-    for (auto device : devices) {
-        if (device->type() == AUDIO_DEVICE_OUT_USB_DEVICE) {
-            usbPortId = device->getId();
-            break;
-        }
-    }
-    EXPECT_NE(AUDIO_PORT_HANDLE_NONE, usbPortId);
-
-    const uid_t uid = 1234;
-    const uid_t anotherUid = 5678;
-    const audio_attributes_t mediaAttr = {
-            .content_type = AUDIO_CONTENT_TYPE_MUSIC,
-            .usage = AUDIO_USAGE_MEDIA,
-    };
-
-    std::vector<audio_mixer_attributes_t> mixerAttributes;
-    EXPECT_EQ(NO_ERROR, mManager->getSupportedMixerAttributes(usbPortId, mixerAttributes));
-    EXPECT_GT(mixerAttributes.size(), 0);
-    size_t bitPerfectIndex = 0;
-    for (; bitPerfectIndex < mixerAttributes.size(); ++bitPerfectIndex) {
-        if (mixerAttributes[bitPerfectIndex].mixer_behavior == AUDIO_MIXER_BEHAVIOR_BIT_PERFECT) {
-            break;
-        }
-    }
-    EXPECT_LT(bitPerfectIndex, mixerAttributes.size());
-    EXPECT_EQ(bitPerfectFormat, mixerAttributes[bitPerfectIndex].config.format);
-    EXPECT_EQ(bitPerfectChannelMask, mixerAttributes[bitPerfectIndex].config.channel_mask);
-    EXPECT_EQ(bitPerfectSampleRate, mixerAttributes[bitPerfectIndex].config.sample_rate);
-    EXPECT_EQ(NO_ERROR,
-              mManager->setPreferredMixerAttributes(
-                      &mediaAttr, usbPortId, uid, &mixerAttributes[bitPerfectIndex]));
-
-    audio_io_handle_t bitPerfectOutput = AUDIO_IO_HANDLE_NONE;
-    audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    audio_port_handle_t bitPerfectPortId = AUDIO_PORT_HANDLE_NONE;
-    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
-    bool isBitPerfect;
-
-    // When there is no active bit-perfect playback, the output selection will follow default
-    // routing strategy.
-    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-            48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, mediaAttr, AUDIO_SESSION_NONE,
-            uid, &isBitPerfect);
-    EXPECT_FALSE(isBitPerfect);
-    EXPECT_NE(AUDIO_IO_HANDLE_NONE, output);
-    const auto outputDesc = mManager->getOutputs().valueFor(output);
-    EXPECT_NE(nullptr, outputDesc);
-    EXPECT_NE(AUDIO_OUTPUT_FLAG_BIT_PERFECT, outputDesc->mFlags & AUDIO_OUTPUT_FLAG_BIT_PERFECT);
-
-    // Start bit-perfect playback
-    getOutputForAttr(&selectedDeviceId, bitPerfectFormat, bitPerfectChannelMask,
-            bitPerfectSampleRate, AUDIO_OUTPUT_FLAG_NONE, &bitPerfectOutput, &bitPerfectPortId,
-            mediaAttr, AUDIO_SESSION_NONE, uid, &isBitPerfect);
-    status_t status = mManager->startOutput(bitPerfectPortId);
-    if (status == DEAD_OBJECT) {
-        getOutputForAttr(&selectedDeviceId, bitPerfectFormat, bitPerfectChannelMask,
-                bitPerfectSampleRate, AUDIO_OUTPUT_FLAG_NONE, &bitPerfectOutput, &bitPerfectPortId,
-                mediaAttr, AUDIO_SESSION_NONE, uid, &isBitPerfect);
-        status = mManager->startOutput(bitPerfectPortId);
-    }
-    EXPECT_EQ(NO_ERROR, status);
-    EXPECT_TRUE(isBitPerfect);
-    EXPECT_NE(AUDIO_IO_HANDLE_NONE, bitPerfectOutput);
-    const auto bitPerfectOutputDesc = mManager->getOutputs().valueFor(bitPerfectOutput);
-    EXPECT_NE(nullptr, bitPerfectOutputDesc);
-    EXPECT_EQ(AUDIO_OUTPUT_FLAG_BIT_PERFECT,
-              bitPerfectOutputDesc->mFlags & AUDIO_OUTPUT_FLAG_BIT_PERFECT);
-
-    // If the playback is from preferred mixer attributes owner but the request doesn't match
-    // preferred mixer attributes, it will not be bit-perfect.
-    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-            48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, mediaAttr, AUDIO_SESSION_NONE,
-            uid, &isBitPerfect);
-    EXPECT_FALSE(isBitPerfect);
-    EXPECT_EQ(bitPerfectOutput, output);
-
-    // When bit-perfect playback is active, all other playback will be routed to bit-perfect output.
-    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-            48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, mediaAttr, AUDIO_SESSION_NONE,
-            anotherUid, &isBitPerfect);
-    EXPECT_FALSE(isBitPerfect);
-    EXPECT_EQ(bitPerfectOutput, output);
-
-    const audio_attributes_t dtmfAttr = {
-            .content_type = AUDIO_CONTENT_TYPE_UNKNOWN,
-            .usage = AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING,
-    };
-    audio_io_handle_t dtmfOutput = AUDIO_IO_HANDLE_NONE;
-    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-    portId = AUDIO_PORT_HANDLE_NONE;
-    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-            48000, AUDIO_OUTPUT_FLAG_NONE, &dtmfOutput, &portId, dtmfAttr,
-            AUDIO_SESSION_NONE, anotherUid, &isBitPerfect);
-    EXPECT_FALSE(isBitPerfect);
-    EXPECT_EQ(bitPerfectOutput, dtmfOutput);
-
-    // When configuration matches preferred mixer attributes, which is bit-perfect, but the client
-    // is not the owner of preferred mixer attributes, the playback will not be bit-perfect.
-    getOutputForAttr(&selectedDeviceId, bitPerfectFormat, bitPerfectChannelMask,
-            bitPerfectSampleRate, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, mediaAttr,
-            AUDIO_SESSION_NONE, anotherUid, &isBitPerfect);
-    EXPECT_FALSE(isBitPerfect);
-    EXPECT_EQ(bitPerfectOutput, output);
-
-    EXPECT_EQ(NO_ERROR,
-              mManager->clearPreferredMixerAttributes(&mediaAttr, usbPortId, uid));
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                            "", "", AUDIO_FORMAT_LDAC));
@@ -3612,3 +3490,314 @@ TEST_F(AudioPolicyManagerPreProcEffectTest, DeviceDisconnectWhileClientActive) {
     // unregister effect should succeed since effect shall have been restore on the client session
     ASSERT_EQ(NO_ERROR, mManager->unregisterEffect(effectId));
 }
+
+class AudioPolicyManagerTestBitPerfectBase : public AudioPolicyManagerTestWithConfigurationFile {
+protected:
+    void SetUp() override;
+    void TearDown() override;
+
+    void startBitPerfectOutput();
+    void reset();
+    void getBitPerfectOutput(status_t expected);
+
+    const audio_format_t mBitPerfectFormat = AUDIO_FORMAT_PCM_16_BIT;
+    const audio_channel_mask_t mBitPerfectChannelMask = AUDIO_CHANNEL_OUT_STEREO;
+    const uint32_t mBitPerfectSampleRate = 48000;
+    const uid_t mUid = 1234;
+    audio_port_handle_t mUsbPortId = AUDIO_PORT_HANDLE_NONE;
+
+    audio_io_handle_t mBitPerfectOutput = AUDIO_IO_HANDLE_NONE;
+    audio_port_handle_t mSelectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t mBitPerfectPortId = AUDIO_PORT_HANDLE_NONE;
+
+    static constexpr audio_attributes_t sMediaAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_MUSIC,
+            .usage = AUDIO_USAGE_MEDIA,
+    };
+};
+
+void AudioPolicyManagerTestBitPerfectBase::SetUp() {
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestWithConfigurationFile::SetUp());
+
+    mClient->addSupportedFormat(mBitPerfectFormat);
+    mClient->addSupportedChannelMask(mBitPerfectChannelMask);
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+    auto devices = mManager->getAvailableOutputDevices();
+    mUsbPortId = AUDIO_PORT_HANDLE_NONE;
+    for (auto device : devices) {
+        if (device->type() == AUDIO_DEVICE_OUT_USB_DEVICE) {
+            mUsbPortId = device->getId();
+            break;
+        }
+    }
+    EXPECT_NE(AUDIO_PORT_HANDLE_NONE, mUsbPortId);
+
+    std::vector<audio_mixer_attributes_t> mixerAttributes;
+    EXPECT_EQ(NO_ERROR, mManager->getSupportedMixerAttributes(mUsbPortId, mixerAttributes));
+    EXPECT_GT(mixerAttributes.size(), 0);
+    size_t bitPerfectIndex = 0;
+    for (; bitPerfectIndex < mixerAttributes.size(); ++bitPerfectIndex) {
+        if (mixerAttributes[bitPerfectIndex].mixer_behavior == AUDIO_MIXER_BEHAVIOR_BIT_PERFECT) {
+            break;
+        }
+    }
+    EXPECT_LT(bitPerfectIndex, mixerAttributes.size());
+    EXPECT_EQ(mBitPerfectFormat, mixerAttributes[bitPerfectIndex].config.format);
+    EXPECT_EQ(mBitPerfectChannelMask, mixerAttributes[bitPerfectIndex].config.channel_mask);
+    EXPECT_EQ(mBitPerfectSampleRate, mixerAttributes[bitPerfectIndex].config.sample_rate);
+    EXPECT_EQ(NO_ERROR,
+              mManager->setPreferredMixerAttributes(
+                      &sMediaAttr, mUsbPortId, mUid, &mixerAttributes[bitPerfectIndex]));
+}
+
+void AudioPolicyManagerTestBitPerfectBase::TearDown() {
+    EXPECT_EQ(NO_ERROR,
+              mManager->clearPreferredMixerAttributes(&sMediaAttr, mUsbPortId, mUid));
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_LDAC));
+
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestWithConfigurationFile::TearDown());
+}
+
+void AudioPolicyManagerTestBitPerfectBase::startBitPerfectOutput() {
+    reset();
+    bool isBitPerfect;
+
+    getOutputForAttr(&mSelectedDeviceId, mBitPerfectFormat, mBitPerfectChannelMask,
+                     mBitPerfectSampleRate, AUDIO_OUTPUT_FLAG_NONE, &mBitPerfectOutput,
+                     &mBitPerfectPortId, sMediaAttr, AUDIO_SESSION_NONE, mUid, &isBitPerfect);
+    status_t status = mManager->startOutput(mBitPerfectPortId);
+    if (status == DEAD_OBJECT) {
+        getOutputForAttr(&mSelectedDeviceId, mBitPerfectFormat, mBitPerfectChannelMask,
+                         mBitPerfectSampleRate, AUDIO_OUTPUT_FLAG_NONE, &mBitPerfectOutput,
+                         &mBitPerfectPortId, sMediaAttr, AUDIO_SESSION_NONE, mUid, &isBitPerfect);
+        status = mManager->startOutput(mBitPerfectPortId);
+    }
+    EXPECT_EQ(NO_ERROR, status);
+    EXPECT_TRUE(isBitPerfect);
+    EXPECT_NE(AUDIO_IO_HANDLE_NONE, mBitPerfectOutput);
+    const auto bitPerfectOutputDesc = mManager->getOutputs().valueFor(mBitPerfectOutput);
+    EXPECT_NE(nullptr, bitPerfectOutputDesc);
+    EXPECT_EQ(AUDIO_OUTPUT_FLAG_BIT_PERFECT,
+              bitPerfectOutputDesc->mFlags & AUDIO_OUTPUT_FLAG_BIT_PERFECT);
+};
+
+void AudioPolicyManagerTestBitPerfectBase::reset() {
+    mBitPerfectOutput = AUDIO_IO_HANDLE_NONE;
+    mSelectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    mBitPerfectPortId = AUDIO_PORT_HANDLE_NONE;
+}
+
+void AudioPolicyManagerTestBitPerfectBase::getBitPerfectOutput(status_t expected) {
+    reset();
+    audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
+    AttributionSourceState attributionSource = createAttributionSourceState(mUid);
+    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+    config.sample_rate = mBitPerfectSampleRate;
+    config.channel_mask = mBitPerfectChannelMask;
+    config.format = mBitPerfectFormat;
+    audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_BIT_PERFECT;
+    AudioPolicyInterface::output_type_t outputType;
+    bool isSpatialized;
+    bool isBitPerfect;
+    EXPECT_EQ(expected,
+              mManager->getOutputForAttr(&sMediaAttr, &mBitPerfectOutput, AUDIO_SESSION_NONE,
+                                         &stream, attributionSource, &config, &flags,
+                                         &mSelectedDeviceId, &mBitPerfectPortId, {}, &outputType,
+                                         &isSpatialized, &isBitPerfect));
+}
+
+class AudioPolicyManagerTestBitPerfect : public AudioPolicyManagerTestBitPerfectBase {
+};
+
+TEST_F(AudioPolicyManagerTestBitPerfect, UseBitPerfectOutput) {
+    const uid_t anotherUid = 5678;
+    audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    bool isBitPerfect;
+
+    // When there is no active bit-perfect playback, the output selection will follow default
+    // routing strategy.
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_QUAD,
+                     48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, sMediaAttr,
+                     AUDIO_SESSION_NONE, mUid, &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_NE(AUDIO_IO_HANDLE_NONE, output);
+    const auto outputDesc = mManager->getOutputs().valueFor(output);
+    EXPECT_NE(nullptr, outputDesc);
+    EXPECT_NE(AUDIO_OUTPUT_FLAG_BIT_PERFECT, outputDesc->mFlags & AUDIO_OUTPUT_FLAG_BIT_PERFECT);
+
+    // Start bit-perfect playback
+    ASSERT_NO_FATAL_FAILURE(startBitPerfectOutput());
+
+    // If the playback is from preferred mixer attributes owner but the request doesn't match
+    // preferred mixer attributes, it will not be bit-perfect.
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_QUAD,
+                     48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, sMediaAttr,
+                     AUDIO_SESSION_NONE, mUid, &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_EQ(mBitPerfectOutput, output);
+
+    // When bit-perfect playback is active, all other playback will be routed to bit-perfect output.
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+                     48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, sMediaAttr,
+                     AUDIO_SESSION_NONE, anotherUid, &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_EQ(mBitPerfectOutput, output);
+
+    // When bit-pefect playback is active, dtmf will also be routed to bit-perfect output.
+    const audio_attributes_t dtmfAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_UNKNOWN,
+            .usage = AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING,
+    };
+    audio_io_handle_t dtmfOutput = AUDIO_IO_HANDLE_NONE;
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    portId = AUDIO_PORT_HANDLE_NONE;
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+                     48000, AUDIO_OUTPUT_FLAG_NONE, &dtmfOutput, &portId, dtmfAttr,
+                     AUDIO_SESSION_NONE, anotherUid, &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_EQ(mBitPerfectOutput, dtmfOutput);
+
+    // When configuration matches preferred mixer attributes, which is bit-perfect, but the client
+    // is not the owner of preferred mixer attributes, the playback will not be bit-perfect.
+    getOutputForAttr(&selectedDeviceId, mBitPerfectFormat, mBitPerfectChannelMask,
+                     mBitPerfectSampleRate, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, sMediaAttr,
+                     AUDIO_SESSION_NONE, anotherUid, &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_EQ(mBitPerfectOutput, output);
+}
+
+TEST_F_WITH_FLAGS(
+        AudioPolicyManagerTestBitPerfect,
+        InternalMuteWhenBitPerfectCLientIsActive,
+        REQUIRES_FLAGS_ENABLED(
+                ACONFIG_FLAG(com::android::media::audioserver,
+                             fix_concurrent_playback_behavior_with_bit_perfect_client))
+) {
+    ASSERT_NO_FATAL_FAILURE(startBitPerfectOutput());
+
+    // When bit-perfect playback is active, the system sound will be routed to bit-perfect output.
+    // The system sound will be muted internally in this case. The bit-perfect client will be
+    // played normally.
+    const uint32_t anotherSampleRate = 44100;
+    audio_port_handle_t systemSoundPortId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t systemSoundOutput = AUDIO_IO_HANDLE_NONE;
+    const audio_attributes_t systemSoundAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_SONIFICATION,
+            .usage = AUDIO_USAGE_ASSISTANCE_SONIFICATION,
+    };
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    bool isBitPerfect;
+    getOutputForAttr(&selectedDeviceId, mBitPerfectFormat, mBitPerfectChannelMask,
+                     anotherSampleRate, AUDIO_OUTPUT_FLAG_NONE, &systemSoundOutput,
+                     &systemSoundPortId, systemSoundAttr, AUDIO_SESSION_NONE, mUid, &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_EQ(mBitPerfectOutput, systemSoundOutput);
+    EXPECT_EQ(NO_ERROR, mManager->startOutput(systemSoundPortId));
+    EXPECT_TRUE(mClient->getTrackInternalMute(systemSoundPortId));
+    EXPECT_FALSE(mClient->getTrackInternalMute(mBitPerfectPortId));
+    EXPECT_EQ(NO_ERROR, mManager->stopOutput(systemSoundPortId));
+    EXPECT_FALSE(mClient->getTrackInternalMute(mBitPerfectPortId));
+
+    // When bit-perfect playback is active, the notification will be routed to bit-perfect output.
+    // The notification sound will be played normally while the bit-perfect client will be muted
+    // internally.
+    audio_port_handle_t notificationPortId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t notificationOutput = AUDIO_IO_HANDLE_NONE;
+    const audio_attributes_t notificationAttr = {
+            .content_type = AUDIO_CONTENT_TYPE_SONIFICATION,
+            .usage = AUDIO_USAGE_NOTIFICATION,
+    };
+    getOutputForAttr(&selectedDeviceId, mBitPerfectFormat, mBitPerfectChannelMask,
+                     anotherSampleRate, AUDIO_OUTPUT_FLAG_NONE, &notificationOutput,
+                     &notificationPortId, notificationAttr, AUDIO_SESSION_NONE, mUid,
+                     &isBitPerfect);
+    EXPECT_FALSE(isBitPerfect);
+    EXPECT_EQ(mBitPerfectOutput, notificationOutput);
+    EXPECT_EQ(NO_ERROR, mManager->startOutput(notificationPortId));
+    EXPECT_FALSE(mClient->getTrackInternalMute(notificationPortId));
+    EXPECT_TRUE(mClient->getTrackInternalMute(mBitPerfectPortId));
+    EXPECT_EQ(NO_ERROR, mManager->stopOutput(notificationPortId));
+    EXPECT_FALSE(mClient->getTrackInternalMute(mBitPerfectPortId));
+
+    EXPECT_EQ(NO_ERROR, mManager->stopOutput(mBitPerfectPortId));
+}
+
+class AudioPolicyManagerTestBitPerfectPhoneMode : public AudioPolicyManagerTestBitPerfectBase,
+        public testing::WithParamInterface<audio_mode_t> {
+};
+
+TEST_P(AudioPolicyManagerTestBitPerfectPhoneMode, RejectBitPerfectWhenPhoneModeIsNotNormal) {
+    if (!com::android::media::audioserver::
+            fix_concurrent_playback_behavior_with_bit_perfect_client()) {
+        GTEST_SKIP()
+                << "Flag fix_concurrent_playback_behavior_with_bit_perfect_client is not enabled";
+    }
+
+    ASSERT_NO_FATAL_FAILURE(startBitPerfectOutput());
+
+    audio_mode_t mode = GetParam();
+    mManager->setPhoneState(mode);
+    // When the phone mode is not normal, the bit-perfect output will be reopned
+    EXPECT_EQ(nullptr, mManager->getOutputs().valueFor(mBitPerfectOutput));
+
+    // When the phone mode is not normal, the bit-perfect output will be closed.
+    ASSERT_NO_FATAL_FAILURE(getBitPerfectOutput(INVALID_OPERATION));
+
+    mManager->setPhoneState(AUDIO_MODE_NORMAL);
+}
+
+INSTANTIATE_TEST_CASE_P(
+        PhoneMode,
+        AudioPolicyManagerTestBitPerfectPhoneMode,
+        testing::Values(AUDIO_MODE_IN_CALL,
+                        AUDIO_MODE_RINGTONE,
+                        AUDIO_MODE_IN_COMMUNICATION,
+                        AUDIO_MODE_CALL_SCREEN)
+);
+
+class AudioPolicyManagerTestBitPerfectHigherPriorityUseCaseActive :
+        public AudioPolicyManagerTestBitPerfectBase,
+        public testing::WithParamInterface<audio_usage_t> {
+};
+
+TEST_P(AudioPolicyManagerTestBitPerfectHigherPriorityUseCaseActive,
+       RejectBitPerfectWhenHigherPriorityUseCaseIsActive) {
+    if (!com::android::media::audioserver::
+                fix_concurrent_playback_behavior_with_bit_perfect_client()) {
+        GTEST_SKIP()
+                << "Flag fix_concurrent_playback_behavior_with_bit_perfect_client is not enabled";
+    }
+
+    ASSERT_NO_FATAL_FAILURE(startBitPerfectOutput());
+
+    audio_attributes_t attr = {
+            .usage = GetParam(),
+            .content_type = AUDIO_CONTENT_TYPE_UNKNOWN
+    };
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(
+            getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+                   48000, AUDIO_OUTPUT_FLAG_NONE, &output, &portId, attr));
+    EXPECT_NE(mBitPerfectOutput, output);
+    EXPECT_EQ(NO_ERROR, mManager->startOutput(portId));
+    // When a high priority use case is active, the bit-perfect output will be closed.
+    EXPECT_EQ(nullptr, mManager->getOutputs().valueFor(mBitPerfectOutput));
+
+    // When any higher priority use case is active, the bit-perfect request will be rejected.
+    ASSERT_NO_FATAL_FAILURE(getBitPerfectOutput(INVALID_OPERATION));
+}
+
+INSTANTIATE_TEST_CASE_P(
+        HigherPriorityUseCases,
+        AudioPolicyManagerTestBitPerfectHigherPriorityUseCaseActive,
+        testing::Values(AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE,
+                        AUDIO_USAGE_ALARM)
+);

@@ -33,6 +33,7 @@
 #include <afutils/Vibrator.h>
 #include <audio_utils/MelProcessor.h>
 #include <audio_utils/Metadata.h>
+#include <com_android_media_audioserver.h>
 #ifdef DEBUG_CPU_USAGE
 #include <audio_utils/Statistics.h>
 #include <cpustats/ThreadCpuUsage.h>
@@ -5771,6 +5772,11 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                 vlf *= volume;
                 vrf *= volume;
 
+                if (track->getInternalMute()) {
+                    vlf = 0.f;
+                    vrf = 0.f;
+                }
+
                 track->setFinalVolume(vlf, vrf);
                 ++fastTracks;
             } else {
@@ -5968,6 +5974,11 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                 }
                 // vaf is represented as [0.0, 1.0] float by rescaling sendLevel
                 vaf = v * sendLevel * (1. / MAX_GAIN_INT);
+            }
+
+            if (track->getInternalMute()) {
+                vrf = 0.f;
+                vlf = 0.f;
             }
 
             track->setFinalVolume(vlf, vrf);
@@ -11353,14 +11364,15 @@ PlaybackThread::mixer_state BitPerfectThread::prepareTracks_l(
     // If there is only one active track and it is bit-perfect, enable tee buffer.
     float volumeLeft = 1.0f;
     float volumeRight = 1.0f;
-    if (mActiveTracks.size() == 1 && mActiveTracks[0]->isBitPerfect()) {
-        const int trackId = mActiveTracks[0]->id();
+    if (sp<IAfTrack> bitPerfectTrack = getTrackToStreamBitPerfectly_l();
+        bitPerfectTrack != nullptr) {
+        const int trackId = bitPerfectTrack->id();
         mAudioMixer->setParameter(
                     trackId, AudioMixer::TRACK, AudioMixer::TEE_BUFFER, (void *)mSinkBuffer);
         mAudioMixer->setParameter(
                     trackId, AudioMixer::TRACK, AudioMixer::TEE_BUFFER_FRAME_COUNT,
                     (void *)(uintptr_t)mNormalFrameCount);
-        mActiveTracks[0]->getFinalVolume(&volumeLeft, &volumeRight);
+        bitPerfectTrack->getFinalVolume(&volumeLeft, &volumeRight);
         mIsBitPerfect = true;
     } else {
         mIsBitPerfect = false;
@@ -11383,6 +11395,41 @@ PlaybackThread::mixer_state BitPerfectThread::prepareTracks_l(
 void BitPerfectThread::threadLoop_mix() {
     MixerThread::threadLoop_mix();
     mHasDataCopiedToSinkBuffer = mIsBitPerfect;
+}
+
+void BitPerfectThread::setTracksInternalMute(
+        std::map<audio_port_handle_t, bool>* tracksInternalMute) {
+    for (auto& track : mTracks) {
+        if (auto it = tracksInternalMute->find(track->portId()); it != tracksInternalMute->end()) {
+            track->setInternalMute(it->second);
+            tracksInternalMute->erase(it);
+        }
+    }
+}
+
+sp<IAfTrack> BitPerfectThread::getTrackToStreamBitPerfectly_l() {
+    if (com::android::media::audioserver::
+                fix_concurrent_playback_behavior_with_bit_perfect_client()) {
+        sp<IAfTrack> bitPerfectTrack = nullptr;
+        bool allOtherTracksMuted = true;
+        // Return the bit perfect track if all other tracks are muted
+        for (const auto& track : mActiveTracks) {
+            if (track->isBitPerfect()) {
+                bitPerfectTrack = track;
+            } else if (track->getFinalVolume() != 0.f) {
+                allOtherTracksMuted = false;
+                if (bitPerfectTrack != nullptr) {
+                    break;
+                }
+            }
+        }
+        return allOtherTracksMuted ? bitPerfectTrack : nullptr;
+    } else {
+        if (mActiveTracks.size() == 1 && mActiveTracks[0]->isBitPerfect()) {
+            return mActiveTracks[0];
+        }
+    }
+    return nullptr;
 }
 
 } // namespace android

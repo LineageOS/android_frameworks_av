@@ -872,6 +872,9 @@ private:
         status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
                                  struct audio_port_v7 *port) override;
 
+        status_t setTracksInternalMute(
+                const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) override;
+
      private:
         AudioPolicyService *mAudioPolicyService;
     };

@@ -352,4 +352,13 @@ status_t AudioPolicyService::AudioPolicyClient::getAudioMixPort(
     return af->getAudioMixPort(devicePort, port);
 }
 
+status_t AudioPolicyService::AudioPolicyClient::setTracksInternalMute(
+        const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) {
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->setTracksInternalMute(tracksInternalMute);
+}
+
 } // namespace android
