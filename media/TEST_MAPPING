@@ -47,8 +47,13 @@
     ],
     // Postsubmit tests for TV devices
     "tv-postsubmit": [
-       {
-           "name": "DecoderRenderTest"
-       }
+        {
+            "name": "CtsMediaDecoderTestCases",
+            "options": [
+                {
+                    "include-filter": "android.media.decoder.cts.DecoderRenderTest"
+                }
+            ]
+        }
     ]
 }
