@@ -227,11 +227,11 @@ cc_defaults {
         "latest_android_hardware_audio_core_sounddose_ndk_shared",
         "latest_android_hardware_audio_effect_ndk_shared",
         "latest_android_media_audio_common_types_ndk_shared",
+        "latest_av_audio_types_aidl_ndk_shared",
     ],
     shared_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
-        "av-audio-types-aidl-V1-ndk",
         "libaudio_aidl_conversion_common_cpp",
         "libaudio_aidl_conversion_common_ndk",
         "libaudio_aidl_conversion_common_ndk_cpp",

@@ -163,3 +163,19 @@ aidl_interface {
     frozen: true,
 
 }
+
+latest_av_audio_types_aidl = "av-audio-types-aidl-V1"
+
+cc_defaults {
+    name: "latest_av_audio_types_aidl_ndk_shared",
+    shared_libs: [
+        latest_av_audio_types_aidl + "-ndk",
+    ],
+}
+
+cc_defaults {
+    name: "latest_av_audio_types_aidl_ndk_static",
+    static_libs: [
+        latest_av_audio_types_aidl + "-ndk",
+    ],
+}
