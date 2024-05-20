@@ -26,7 +26,7 @@
  *   and single call monitoring differently. See function documentation for
  *   more details.
  * To disable/enable:
- *   - adb shell cmd media.camera set-cameraservice-watchdog [0/1]
+ *   - adb shell cmd media.camera set-watchdog [0/1]
  */
 #pragma once
 #include <chrono>
