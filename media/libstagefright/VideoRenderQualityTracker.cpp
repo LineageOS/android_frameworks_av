@@ -302,13 +302,6 @@ void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t a
         mRenderDurationMs += (actualRenderTimeUs - mLastRenderTimeUs) / 1000;
     }
 
-    // Now that a frame has been rendered, the previously skipped frames can be processed as skipped
-    // frames since the app is not skipping them to terminate playback.
-    for (int64_t contentTimeUs : mPendingSkippedFrameContentTimeUsList) {
-        processMetricsForSkippedFrame(contentTimeUs);
-    }
-    mPendingSkippedFrameContentTimeUsList = {};
-
     // We can render a pending queued frame if it's the last frame of the video, so release it
     // immediately.
     if (contentTimeUs == mTunnelFrameQueuedContentTimeUs && mTunnelFrameQueuedContentTimeUs != -1) {
@@ -332,8 +325,24 @@ void VideoRenderQualityTracker::onFrameRendered(int64_t contentTimeUs, int64_t a
                   (long long) contentTimeUs, (long long) nextExpectedFrame.contentTimeUs);
             break;
         }
+        // Process all skipped frames before the dropped frame.
+        while (!mPendingSkippedFrameContentTimeUsList.empty()) {
+            if (mPendingSkippedFrameContentTimeUsList.front() >= nextExpectedFrame.contentTimeUs) {
+                break;
+            }
+            processMetricsForSkippedFrame(mPendingSkippedFrameContentTimeUsList.front());
+            mPendingSkippedFrameContentTimeUsList.pop_front();
+        }
         processMetricsForDroppedFrame(nextExpectedFrame.contentTimeUs,
                                       nextExpectedFrame.desiredRenderTimeUs);
+    }
+    // Process all skipped frames before the rendered frame.
+    while (!mPendingSkippedFrameContentTimeUsList.empty()) {
+        if (mPendingSkippedFrameContentTimeUsList.front() >= nextExpectedFrame.contentTimeUs) {
+            break;
+        }
+        processMetricsForSkippedFrame(mPendingSkippedFrameContentTimeUsList.front());
+        mPendingSkippedFrameContentTimeUsList.pop_front();
     }
     processMetricsForRenderedFrame(nextExpectedFrame.contentTimeUs,
                                    nextExpectedFrame.desiredRenderTimeUs, actualRenderTimeUs,
