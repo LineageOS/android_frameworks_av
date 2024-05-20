@@ -21,6 +21,7 @@
 #include "../api2/HeicCompositeStream.h"
 #include "aidl/android/hardware/graphics/common/Dataspace.h"
 #include "api2/JpegRCompositeStream.h"
+#include "binder/Status.h"
 #include "common/CameraDeviceBase.h"
 #include "common/HalConversionsTemplated.h"
 #include "../CameraService.h"
@@ -679,6 +680,67 @@ void mapStreamInfo(const OutputStreamInfo &streamInfo,
     stream->useCase = static_cast<StreamUseCases>(streamInfo.streamUseCase);
 }
 
+binder::Status mapStream(const OutputStreamInfo& streamInfo, bool isCompositeJpegRDisabled,
+        const CameraMetadata& deviceInfo, camera_stream_rotation_t rotation,
+        size_t* streamIdx/*out*/, const std::string &physicalId, int32_t groupId,
+        const std::string& logicalCameraId,
+        aidl::android::hardware::camera::device::StreamConfiguration &streamConfiguration /*out*/,
+        bool *earlyExit /*out*/) {
+    bool isDepthCompositeStream =
+            camera3::DepthCompositeStream::isDepthCompositeStreamInfo(streamInfo);
+    bool isHeicCompositeStream =
+            camera3::HeicCompositeStream::isHeicCompositeStreamInfo(streamInfo);
+    bool isJpegRCompositeStream =
+            camera3::JpegRCompositeStream::isJpegRCompositeStreamInfo(streamInfo) &&
+            !isCompositeJpegRDisabled;
+    if (isDepthCompositeStream || isHeicCompositeStream || isJpegRCompositeStream) {
+        // We need to take in to account that composite streams can have
+        // additional internal camera streams.
+        std::vector<OutputStreamInfo> compositeStreams;
+        status_t ret;
+        if (isDepthCompositeStream) {
+          // TODO: Take care of composite streams.
+            ret = camera3::DepthCompositeStream::getCompositeStreamInfo(streamInfo,
+                    deviceInfo, &compositeStreams);
+        } else if (isHeicCompositeStream) {
+            ret = camera3::HeicCompositeStream::getCompositeStreamInfo(streamInfo,
+                deviceInfo, &compositeStreams);
+        } else {
+            ret = camera3::JpegRCompositeStream::getCompositeStreamInfo(streamInfo,
+                deviceInfo, &compositeStreams);
+        }
+
+        if (ret != OK) {
+            std::string msg = fmt::sprintf(
+                    "Camera %s: Failed adding composite streams: %s (%d)",
+                    logicalCameraId.c_str(), strerror(-ret), ret);
+            ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+        }
+
+        if (compositeStreams.size() == 0) {
+            // No internal streams means composite stream not
+            // supported.
+            *earlyExit = true;
+            return binder::Status::ok();
+        } else if (compositeStreams.size() > 1) {
+            size_t streamCount = streamConfiguration.streams.size() + compositeStreams.size() - 1;
+            streamConfiguration.streams.resize(streamCount);
+        }
+
+        for (const auto& compositeStream : compositeStreams) {
+            mapStreamInfo(compositeStream, rotation,
+                    physicalId, groupId,
+                    &streamConfiguration.streams[(*streamIdx)++]);
+        }
+    } else {
+        mapStreamInfo(streamInfo, rotation,
+                physicalId, groupId, &streamConfiguration.streams[(*streamIdx)++]);
+    }
+
+    return binder::Status::ok();
+}
+
 binder::Status
 convertToHALStreamCombination(
         const SessionConfiguration& sessionConfiguration,
@@ -831,8 +893,13 @@ convertToHALStreamCombination(
                                 "Deferred surface sensor pixel modes not valid");
             }
             streamInfo.streamUseCase = streamUseCase;
-            mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId, groupId,
-                    &streamConfiguration.streams[streamIdx++]);
+            auto status = mapStream(streamInfo, isCompositeJpegRDisabled, deviceInfo,
+                    camera3::CAMERA_STREAM_ROTATION_0, &streamIdx, physicalCameraId, groupId,
+                    logicalCameraId, streamConfiguration, earlyExit);
+            if (*earlyExit || !status.isOk()) {
+                return status;
+            }
+
             isStreamInfoValid = true;
 
             if (numBufferProducers == 0) {
@@ -851,57 +918,11 @@ convertToHALStreamCombination(
                 return res;
 
             if (!isStreamInfoValid) {
-                bool isDepthCompositeStream =
-                        camera3::DepthCompositeStream::isDepthCompositeStream(surface);
-                bool isHeicCompositeStream =
-                        camera3::HeicCompositeStream::isHeicCompositeStream(surface);
-                bool isJpegRCompositeStream =
-                        camera3::JpegRCompositeStream::isJpegRCompositeStream(surface) &&
-                        !isCompositeJpegRDisabled;
-                if (isDepthCompositeStream || isHeicCompositeStream || isJpegRCompositeStream) {
-                    // We need to take in to account that composite streams can have
-                    // additional internal camera streams.
-                    std::vector<OutputStreamInfo> compositeStreams;
-                    if (isDepthCompositeStream) {
-                      // TODO: Take care of composite streams.
-                        ret = camera3::DepthCompositeStream::getCompositeStreamInfo(streamInfo,
-                                deviceInfo, &compositeStreams);
-                    } else if (isHeicCompositeStream) {
-                        ret = camera3::HeicCompositeStream::getCompositeStreamInfo(streamInfo,
-                            deviceInfo, &compositeStreams);
-                    } else {
-                        ret = camera3::JpegRCompositeStream::getCompositeStreamInfo(streamInfo,
-                            deviceInfo, &compositeStreams);
-                    }
-
-                    if (ret != OK) {
-                        std::string msg = fmt::sprintf(
-                                "Camera %s: Failed adding composite streams: %s (%d)",
-                                logicalCameraId.c_str(), strerror(-ret), ret);
-                        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-                        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
-                    }
-
-                    if (compositeStreams.size() == 0) {
-                        // No internal streams means composite stream not
-                        // supported.
-                        *earlyExit = true;
-                        return binder::Status::ok();
-                    } else if (compositeStreams.size() > 1) {
-                        streamCount += compositeStreams.size() - 1;
-                        streamConfiguration.streams.resize(streamCount);
-                    }
-
-                    for (const auto& compositeStream : compositeStreams) {
-                        mapStreamInfo(compositeStream,
-                                static_cast<camera_stream_rotation_t> (it.getRotation()),
-                                physicalCameraId, groupId,
-                                &streamConfiguration.streams[streamIdx++]);
-                    }
-                } else {
-                    mapStreamInfo(streamInfo,
-                            static_cast<camera_stream_rotation_t> (it.getRotation()),
-                            physicalCameraId, groupId, &streamConfiguration.streams[streamIdx++]);
+                auto status  = mapStream(streamInfo, isCompositeJpegRDisabled, deviceInfo,
+                        static_cast<camera_stream_rotation_t> (it.getRotation()), &streamIdx,
+                        physicalCameraId, groupId, logicalCameraId, streamConfiguration, earlyExit);
+                if (*earlyExit || !status.isOk()) {
+                    return status;
                 }
                 isStreamInfoValid = true;
             }

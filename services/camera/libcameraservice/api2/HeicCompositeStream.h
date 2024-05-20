@@ -42,6 +42,7 @@ public:
     ~HeicCompositeStream() override;
 
     static bool isHeicCompositeStream(const sp<Surface> &surface);
+    static bool isHeicCompositeStreamInfo(const OutputStreamInfo& streamInfo);
 
     status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
