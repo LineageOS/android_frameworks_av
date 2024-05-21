@@ -103,7 +103,7 @@ public:
         virtual status_t setDeviceConnectionState(audio_policy_dev_state_t state,
                 const android::media::audio::common::AudioPort& port, audio_format_t encodedFormat);
         virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
-                                                                              const char *device_address);
+                                                                  const char *device_address);
         virtual status_t handleDeviceConfigChange(audio_devices_t device,
                                                   const char *device_address,
                                                   const char *device_name,
@@ -151,6 +151,10 @@ public:
         virtual status_t stopInput(audio_port_handle_t portId);
         virtual void releaseInput(audio_port_handle_t portId);
         virtual void checkCloseInputs();
+        virtual status_t setDeviceAbsoluteVolumeEnabled(audio_devices_t deviceType,
+                                                        const char *address,
+                                                        bool enabled,
+                                                        audio_stream_type_t streamToDriveAbs);
         /**
          * @brief initStreamVolume: even if the engine volume files provides min and max, keep this
          * api for compatibility reason.
@@ -1388,6 +1392,15 @@ private:
                                                          audio_session_t sessionId) const;
 
         void updateClientsInternalMute(const sp<SwAudioOutputDescriptor>& desc);
+
+        float adjustDeviceAttenuationForAbsVolume(IVolumeCurves &curves,
+                                                  VolumeSource volumeSource,
+                                                  int index,
+                                                  const DeviceTypeSet &deviceTypes);
+
+        // Contains for devices that support absolute volume the audio attributes
+        // corresponding to the streams that are driving the volume changes
+        std::unordered_map<audio_devices_t, audio_attributes_t> mAbsoluteVolumeDrivingStreams;
 };
 
 };

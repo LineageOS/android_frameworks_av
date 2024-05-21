@@ -79,6 +79,7 @@ BINDER_METHOD_ENTRY(getInputForAttr) \
 BINDER_METHOD_ENTRY(startInput) \
 BINDER_METHOD_ENTRY(stopInput) \
 BINDER_METHOD_ENTRY(releaseInput) \
+BINDER_METHOD_ENTRY(setDeviceAbsoluteVolumeEnabled) \
 BINDER_METHOD_ENTRY(initStreamVolume) \
 BINDER_METHOD_ENTRY(setStreamVolumeIndex) \
 BINDER_METHOD_ENTRY(getStreamVolumeIndex) \
@@ -1321,6 +1322,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_setPhoneState:
 //FIXME: Allow setForceUse calls from system apps until a better use case routing API is available
 //      case TRANSACTION_setForceUse:
+        case TRANSACTION_setDeviceAbsoluteVolumeEnabled:
         case TRANSACTION_initStreamVolume:
         case TRANSACTION_setStreamVolumeIndex:
         case TRANSACTION_setVolumeIndexForAttributes:

@@ -3374,6 +3374,27 @@ void AudioPolicyManager::checkCloseInputs() {
     }
 }
 
+status_t AudioPolicyManager::setDeviceAbsoluteVolumeEnabled(audio_devices_t deviceType,
+                                                            const char *address __unused,
+                                                            bool enabled,
+                                                            audio_stream_type_t streamToDriveAbs)
+{
+    audio_attributes_t attributesToDriveAbs = mEngine->getAttributesForStreamType(streamToDriveAbs);
+    if (attributesToDriveAbs == AUDIO_ATTRIBUTES_INITIALIZER) {
+        ALOGW("%s: no attributes for stream %s, bailing out", __func__,
+              toString(streamToDriveAbs).c_str());
+        return BAD_VALUE;
+    }
+
+    if (enabled) {
+        mAbsoluteVolumeDrivingStreams[deviceType] = attributesToDriveAbs;
+    } else {
+        mAbsoluteVolumeDrivingStreams.erase(deviceType);
+    }
+
+    return NO_ERROR;
+}
+
 void AudioPolicyManager::initStreamVolume(audio_stream_type_t stream, int indexMin, int indexMax)
 {
     ALOGV("initStreamVolume() stream %d, min %d, max %d", stream , indexMin, indexMax);
@@ -4487,6 +4508,13 @@ void AudioPolicyManager::dump(String8 *dst) const
 
     dst->appendFormat("\nPolicy Engine dump:\n");
     mEngine->dump(dst);
+
+    dst->appendFormat("\nAbsolute volume devices with driving streams:\n");
+    for (const auto it : mAbsoluteVolumeDrivingStreams) {
+        dst->appendFormat("   - device type: %s, driving stream %d\n",
+                          dumpDeviceTypes({it.first}).c_str(),
+                          mEngine->getVolumeGroupForAttributes(it.second));
+    }
 }
 
 status_t AudioPolicyManager::dump(int fd)
@@ -7986,14 +8014,57 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(const sp<DeviceDescriptor> &de
     return nullptr;
 }
 
+float AudioPolicyManager::adjustDeviceAttenuationForAbsVolume(IVolumeCurves &curves,
+                                                              VolumeSource volumeSource,
+                                                              int index,
+                                                              const DeviceTypeSet &deviceTypes)
+{
+    audio_devices_t volumeDevice = Volume::getDeviceForVolume(deviceTypes);
+    device_category deviceCategory = Volume::getDeviceCategory({volumeDevice});
+    float volumeDb = curves.volIndexToDb(deviceCategory, index);
+
+    if (com_android_media_audio_abs_volume_index_fix()) {
+        if (mAbsoluteVolumeDrivingStreams.find(volumeDevice) !=
+            mAbsoluteVolumeDrivingStreams.end()) {
+            audio_attributes_t attributesToDriveAbs = mAbsoluteVolumeDrivingStreams[volumeDevice];
+            auto groupToDriveAbs = mEngine->getVolumeGroupForAttributes(attributesToDriveAbs);
+            if (groupToDriveAbs == VOLUME_GROUP_NONE) {
+                ALOGD("%s: no group matching with %s", __FUNCTION__,
+                      toString(attributesToDriveAbs).c_str());
+                return volumeDb;
+            }
+
+            float volumeDbMax = curves.volIndexToDb(deviceCategory, curves.getVolumeIndexMax());
+            VolumeSource vsToDriveAbs = toVolumeSource(groupToDriveAbs);
+            if (vsToDriveAbs == volumeSource) {
+                // attenuation is applied by the abs volume controller
+                return volumeDbMax;
+            } else {
+                IVolumeCurves &curvesAbs = getVolumeCurves(vsToDriveAbs);
+                int indexAbs = curvesAbs.getVolumeIndex({volumeDevice});
+                float volumeDbAbs = curvesAbs.volIndexToDb(deviceCategory, indexAbs);
+                float volumeDbAbsMax = curvesAbs.volIndexToDb(deviceCategory,
+                                                              curvesAbs.getVolumeIndexMax());
+                float newVolumeDb = fminf(volumeDb + volumeDbAbsMax - volumeDbAbs, volumeDbMax);
+                ALOGV("%s: abs vol stream %d with attenuation %f is adjusting stream %d from "
+                      "attenuation %f to attenuation %f %f", __func__, vsToDriveAbs, volumeDbAbs,
+                      volumeSource, volumeDb, newVolumeDb, volumeDbMax);
+                return newVolumeDb;
+            }
+        }
+        return volumeDb;
+    } else {
+        return volumeDb;
+    }
+}
+
 float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
                                         VolumeSource volumeSource,
                                         int index,
                                         const DeviceTypeSet& deviceTypes,
                                         bool computeInternalInteraction)
 {
-    float volumeDb = curves.volIndexToDb(Volume::getDeviceCategory(deviceTypes), index);
-
+    float volumeDb = adjustDeviceAttenuationForAbsVolume(curves, volumeSource, index, deviceTypes);
     ALOGV("%s volume source %d, index %d,  devices %s, compute internal %b ", __func__,
           volumeSource, index, dumpDeviceTypes(deviceTypes).c_str(), computeInternalInteraction);
 
