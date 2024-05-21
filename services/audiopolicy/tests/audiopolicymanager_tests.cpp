@@ -478,8 +478,8 @@ INSTANTIATE_TEST_CASE_P(
         MsdAudioPatchCount,
         AudioPolicyManagerTestMsd,
         ::testing::Values(
-                MsdAudioPatchCountSpecification(1u, "single"),
-                MsdAudioPatchCountSpecification(2u, "dual")
+                MsdAudioPatchCountSpecification(2u, "single"),
+                MsdAudioPatchCountSpecification(3u, "dual")
         ),
         [](const ::testing::TestParamInfo<MsdAudioPatchCountSpecification> &info) {
                 return std::get<MSD_AUDIO_PATCH_COUNT_NAME_INDEX>(info.param); }
@@ -506,7 +506,7 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
     mConfig->addDevice(mMsdOutputDevice);
     mConfig->addDevice(mMsdInputDevice);
 
-    if (mExpectedAudioPatchCount == 2) {
+    if (mExpectedAudioPatchCount == 3) {
         // Add SPDIF device with PCM output profile as a second device for dual MSD audio patching.
         mSpdifDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_SPDIF);
         mSpdifDevice->addAudioProfile(pcmOutputProfile);
@@ -559,7 +559,7 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
             addOutputProfile(primaryEncodedOutputProfile);
 
     mDefaultOutputDevice = mConfig->getDefaultOutputDevice();
-    if (mExpectedAudioPatchCount == 2) {
+    if (mExpectedAudioPatchCount == 3) {
         mSpdifDevice->addAudioProfile(dtsOutputProfile);
         primaryEncodedOutputProfile->addSupportedDevice(mSpdifDevice);
     }
@@ -608,7 +608,7 @@ TEST_P(AudioPolicyManagerTestMsd, PatchCreationOnSetForceUse) {
     const PatchCountCheck patchCount = snapshotPatchCount();
     mManager->setForceUse(AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND,
             AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
-    ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
+    ASSERT_EQ(mExpectedAudioPatchCount -1 , patchCount.deltaFromSnapshot());
 }
 
 TEST_P(AudioPolicyManagerTestMsd, PatchCreationSetReleaseMsdOutputPatches) {
@@ -616,15 +616,15 @@ TEST_P(AudioPolicyManagerTestMsd, PatchCreationSetReleaseMsdOutputPatches) {
     DeviceVector devices = mManager->getAvailableOutputDevices();
     // Remove MSD output device to avoid patching to itself
     devices.remove(mMsdOutputDevice);
-    ASSERT_EQ(mExpectedAudioPatchCount, devices.size());
+    ASSERT_EQ(mExpectedAudioPatchCount -1 , devices.size());
     mManager->setMsdOutputPatches(&devices);
-    ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
+    ASSERT_EQ(mExpectedAudioPatchCount - 1, patchCount.deltaFromSnapshot());
     // Dual patch: exercise creating one new audio patch and reusing another existing audio patch.
     DeviceVector singleDevice(devices[0]);
     mManager->releaseMsdOutputPatches(singleDevice);
-    ASSERT_EQ(mExpectedAudioPatchCount - 1, patchCount.deltaFromSnapshot());
+    ASSERT_EQ(mExpectedAudioPatchCount - 2, patchCount.deltaFromSnapshot());
     mManager->setMsdOutputPatches(&devices);
-    ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
+    ASSERT_EQ(mExpectedAudioPatchCount - 1, patchCount.deltaFromSnapshot());
     mManager->releaseMsdOutputPatches(devices);
     ASSERT_EQ(0, patchCount.deltaFromSnapshot());
 }
@@ -644,7 +644,7 @@ TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrPcmRoutesToMsd) {
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, k48000SamplingRate);
     ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
-    ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
+    ASSERT_EQ(mExpectedAudioPatchCount - 1, patchCount.deltaFromSnapshot());
 }
 
 TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrEncodedPlusPcmRoutesToMsd) {
@@ -667,7 +667,7 @@ TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrUnsupportedFormatBypassesMsd) 
     getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1,
             k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT);
     ASSERT_NE(selectedDeviceId, mMsdOutputDevice->getId());
-    ASSERT_EQ(0, patchCount.deltaFromSnapshot());
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
 TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
@@ -681,7 +681,7 @@ TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
         ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
         mManager->releaseOutput(portId);
-        ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
+        ASSERT_EQ(mExpectedAudioPatchCount - 1, patchCount.deltaFromSnapshot());
     }
     {
         const PatchCountCheck patchCount = snapshotPatchCount();
@@ -690,7 +690,7 @@ TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1,
                 k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT, nullptr /*output*/, &portId);
         ASSERT_NE(selectedDeviceId, mMsdOutputDevice->getId());
-        ASSERT_EQ(-static_cast<int>(mExpectedAudioPatchCount), patchCount.deltaFromSnapshot());
+        ASSERT_EQ(-static_cast<int>(mExpectedAudioPatchCount) + 2, patchCount.deltaFromSnapshot());
         mManager->releaseOutput(portId);
         ASSERT_EQ(0, patchCount.deltaFromSnapshot());
     }
@@ -700,7 +700,7 @@ TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1,
                 k48000SamplingRate, AUDIO_OUTPUT_FLAG_DIRECT);
         ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
-        ASSERT_EQ(0, patchCount.deltaFromSnapshot());
+        ASSERT_EQ(1, patchCount.deltaFromSnapshot());
     }
 }
 
