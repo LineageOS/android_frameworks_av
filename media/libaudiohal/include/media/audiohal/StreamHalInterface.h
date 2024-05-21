@@ -135,6 +135,38 @@ protected:
     virtual ~StreamOutHalInterfaceLatencyModeCallback() = default;
 };
 
+/**
+ * On position reporting. There are two methods: 'getRenderPosition' and
+ * 'getPresentationPosition'. The first difference is that they may have a
+ * time offset because "render" position relates to what happens between
+ * ADSP and DAC, while "observable" position is relative to the external
+ * observer. The second difference is that 'getRenderPosition' always
+ * resets on standby (for all types of stream data) according to its
+ * definition. Since the original C definition of 'getRenderPosition' used
+ * 32-bit frame counters, and also because in complex playback chains that
+ * include wireless devices the "observable" position has more practical
+ * meaning, 'getRenderPosition' does not exist in the AIDL HAL interface.
+ * The table below summarizes frame count behavior for 'getPresentationPosition':
+ *
+ *               | Mixed      | Direct       | Direct
+ *               |            | non-offload  | offload
+ * ==============|============|==============|==============
+ *  PCM and      | Continuous |              |
+ *  encapsulated |            |              |
+ *  bitstream    |            |              |
+ * --------------|------------| Continuous†  |
+ *  Bitstream    |            |              | Reset on
+ *  encapsulated |            |              | flush, drain
+ *  into PCM     |            |              | and standby
+ *               | Not        |              |
+ * --------------| supported  |--------------|
+ *  Bitstream    |            | Reset on     |
+ *               |            | flush, drain |
+ *               |            | and standby  |
+ *               |            |              |
+ *
+ * † - on standby, reset of the frame count happens at the framework level.
+ */
 class StreamOutHalInterface : public virtual StreamHalInterface {
   public:
     // Return the audio hardware driver estimated latency in milliseconds.
@@ -173,10 +205,14 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     // Requests notification when data buffered by the driver/hardware has been played.
     virtual status_t drain(bool earlyNotify) = 0;
 
-    // Notifies to the audio driver to flush the queued data.
+    // Notifies to the audio driver to flush (that is, drop) the queued data. Stream must
+    // already be paused before calling 'flush'.
     virtual status_t flush() = 0;
 
     // Return a recent count of the number of audio frames presented to an external observer.
+    // This excludes frames which have been written but are still in the pipeline. See the
+    // table at the start of the 'StreamOutHalInterface' for the specification of the frame
+    // count behavior w.r.t. 'flush', 'drain' and 'standby' operations.
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp) = 0;
 
     // Notifies the HAL layer that the framework considers the current playback as completed.
@@ -270,6 +306,7 @@ class StreamInHalInterface : public virtual StreamHalInterface {
 
     // Return a recent count of the number of audio frames received and
     // the clock time associated with that frame count.
+    // The count must not reset to zero when a PCM input enters standby.
     virtual status_t getCapturePosition(int64_t *frames, int64_t *time) = 0;
 
     // Get active microphones
