@@ -574,7 +574,7 @@ void CameraManagerGlobal::onStatusChanged(
 void CameraManagerGlobal::onStatusChangedLocked(
         const CameraDeviceStatus &status, const std::string &cameraId) {
     if (!validStatus(status)) {
-        ALOGE("%s: Invalid status %d", __FUNCTION__, status);
+        ALOGE("%s: Invalid status %d", __FUNCTION__, static_cast<int>(status));
         return;
     }
 
@@ -629,7 +629,7 @@ void CameraManagerGlobal::onStatusChangedLocked(
         const CameraDeviceStatus &status, const std::string& cameraId,
         const std::string& physicalCameraId) {
     if (!validStatus(status)) {
-        ALOGE("%s: Invalid status %d", __FUNCTION__, status);
+        ALOGE("%s: Invalid status %d", __FUNCTION__, static_cast<int>(status));
         return;
     }
 
@@ -643,7 +643,8 @@ void CameraManagerGlobal::onStatusChangedLocked(
     if (logicalCamStatus != CameraDeviceStatus::STATUS_PRESENT &&
             logicalCamStatus != CameraDeviceStatus::STATUS_NOT_AVAILABLE) {
         ALOGE("%s: Physical camera id %s status %d change for an invalid logical camera state %d",
-                __FUNCTION__, physicalCameraId.c_str(), status, logicalCamStatus);
+              __FUNCTION__, physicalCameraId.c_str(), static_cast<int>(status),
+              static_cast<int>(logicalCamStatus));
         return;
     }
 
