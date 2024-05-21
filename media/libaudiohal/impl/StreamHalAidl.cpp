@@ -451,15 +451,8 @@ void StreamHalAidl::onAsyncDrainReady() {
 
 void StreamHalAidl::onAsyncError() {
     std::lock_guard l(mLock);
-    if (mLastReply.state == StreamDescriptor::State::IDLE ||
-        mLastReply.state == StreamDescriptor::State::DRAINING ||
-        mLastReply.state == StreamDescriptor::State::TRANSFERRING) {
-        mLastReply.state = StreamDescriptor::State::ERROR;
-        ALOGW("%s: onError received", __func__);
-    } else {
-        ALOGW("%s: unexpected onError in the state %s", __func__,
-                toString(mLastReply.state).c_str());
-    }
+    ALOGW("%s: received in the state %s", __func__, toString(mLastReply.state).c_str());
+    mLastReply.state = StreamDescriptor::State::ERROR;
 }
 
 status_t StreamHalAidl::createMmapBuffer(int32_t minSizeFrames __unused,
