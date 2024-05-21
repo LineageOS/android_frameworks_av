@@ -192,7 +192,6 @@ cc_library {
     header_libs: [
         "libstagefright_headers",
         "libmedia_headers",
-        "libstagefright_headers",
     ],
 
     shared_libs: [
