@@ -2696,14 +2696,17 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
             }
         }
 
-        // Set DIRECT flag if current thread is DirectOutputThread. This can
-        // happen when the playback is rerouted to direct output thread by
+        // Set DIRECT/OFFLOAD flag if current thread is DirectOutputThread/OffloadThread.
+        // This can happen when the playback is rerouted to direct output/offload thread by
         // dynamic audio policy.
         // Do NOT report the flag changes back to client, since the client
-        // doesn't explicitly request a direct flag.
+        // doesn't explicitly request a direct/offload flag.
         audio_output_flags_t trackFlags = *flags;
         if (mType == DIRECT) {
             trackFlags = static_cast<audio_output_flags_t>(trackFlags | AUDIO_OUTPUT_FLAG_DIRECT);
+        } else if (mType == OFFLOAD) {
+            trackFlags = static_cast<audio_output_flags_t>(trackFlags |
+                                   AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT);
         }
         *afTrackFlags = trackFlags;
 
