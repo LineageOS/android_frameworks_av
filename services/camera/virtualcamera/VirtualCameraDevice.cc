@@ -73,12 +73,13 @@ const char* kDevicePathPrefix = "device@1.1/virtual/";
 
 constexpr int32_t kMaxJpegSize = 3 * 1024 * 1024 /*3MiB*/;
 
-constexpr int32_t kMinFps = 15;
-
 constexpr std::chrono::nanoseconds kMaxFrameDuration =
-    std::chrono::duration_cast<std::chrono::nanoseconds>(1e9ns / kMinFps);
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+        1e9ns / VirtualCameraDevice::kMinFps);
 
 constexpr uint8_t kPipelineMaxDepth = 2;
+
+constexpr int k30Fps = 30;
 
 constexpr MetadataBuilder::ControlRegion kDefaultEmptyControlRegion{};
 
@@ -130,16 +131,20 @@ std::vector<FpsRange> fpsRangesForInputConfig(
   std::set<FpsRange> availableRanges;
 
   for (const SupportedStreamConfiguration& config : configs) {
-    availableRanges.insert({.minFps = kMinFps, .maxFps = config.maxFps});
+    availableRanges.insert(
+        {.minFps = VirtualCameraDevice::kMinFps, .maxFps = config.maxFps});
     availableRanges.insert({.minFps = config.maxFps, .maxFps = config.maxFps});
   }
 
   if (std::any_of(configs.begin(), configs.end(),
                   [](const SupportedStreamConfiguration& config) {
-                    return config.maxFps >= 30;
+                    return config.maxFps >= k30Fps;
                   })) {
-    availableRanges.insert({.minFps = kMinFps, .maxFps = 30});
-    availableRanges.insert({.minFps = 30, .maxFps = 30});
+    // Extend the set of available ranges with (minFps <= 15, 30) & (30, 30) as
+    // required by CDD.
+    availableRanges.insert(
+        {.minFps = VirtualCameraDevice::kMinFps, .maxFps = k30Fps});
+    availableRanges.insert({.minFps = k30Fps, .maxFps = k30Fps});
   }
 
   return std::vector<FpsRange>(availableRanges.begin(), availableRanges.end());
