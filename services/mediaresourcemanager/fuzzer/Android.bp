@@ -47,7 +47,7 @@ cc_defaults {
     ],
     fuzz_config: {
         cc: [
-            "android-media-fuzzing-reports@google.com",
+            "girishshetty@google.com",
         ],
         componentid: 155276,
         hotlists: [
