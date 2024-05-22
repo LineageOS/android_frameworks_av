@@ -16,6 +16,23 @@
       "message": "https://android-review.googlesource.com/c/platform/frameworks/av/+/1522078\nuse the instead",
       "revId": "a0c76ab9233903a560280929cee6e060e45d0139",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "729cf485_c5303076",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 19390
+      },
+      "writtenOn": "2024-05-22T16:32:49Z",
+      "side": 1,
+      "message": "AmLogic\u0027s stagefright pie vendor blob, crashes OMX and mediaserver if fatal isn\u0027t set to false at the end of the component allocation",
+      "revId": "a0c76ab9233903a560280929cee6e060e45d0139",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
