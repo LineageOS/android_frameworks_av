@@ -387,7 +387,7 @@ class OutputStreamCallbackAidl : public StreamCallbackBase,
         return runCb([](CbRef cb) { cb->onWriteReady(); });
     }
     ndk::ScopedAStatus onError() override {
-        return runCb([](CbRef cb) { cb->onError(); });
+        return runCb([](CbRef cb) { cb->onError(true /*isHardError*/); });
     }
     ndk::ScopedAStatus onDrainReady() override {
         return runCb([](CbRef cb) { cb->onDrainReady(); });

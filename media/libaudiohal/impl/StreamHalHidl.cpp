@@ -997,7 +997,7 @@ void StreamOutHalHidl::onError() {
     sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
     if (callback == 0) return;
     ALOGV("asyncCallback onError");
-    callback->onError();
+    callback->onError(false /*isHardError*/);
 }
 
 void StreamOutHalHidl::onCodecFormatChanged(const std::vector<uint8_t>& metadataBs) {

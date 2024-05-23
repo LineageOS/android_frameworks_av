@@ -107,7 +107,7 @@ class StreamOutHalInterfaceCallback : public virtual RefBase {
   public:
     virtual void onWriteReady() {}
     virtual void onDrainReady() {}
-    virtual void onError() {}
+    virtual void onError(bool /*isHardError*/) {}
 
   protected:
     StreamOutHalInterfaceCallback() = default;
