@@ -517,6 +517,15 @@ bool DepthCompositeStream::isDepthCompositeStream(const sp<Surface> &surface) {
     return false;
 }
 
+bool DepthCompositeStream::isDepthCompositeStreamInfo(const OutputStreamInfo& streamInfo) {
+    if ((streamInfo.dataSpace == static_cast<android_dataspace_t>(HAL_DATASPACE_DYNAMIC_DEPTH)) &&
+            (streamInfo.format == HAL_PIXEL_FORMAT_BLOB)) {
+        return true;
+    }
+
+    return false;
+}
+
 static bool setContains(std::unordered_set<int32_t> containerSet, int32_t value) {
     return containerSet.find(value) != containerSet.end();
 }

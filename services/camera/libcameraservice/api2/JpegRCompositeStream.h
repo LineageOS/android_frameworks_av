@@ -43,6 +43,7 @@ public:
     ~JpegRCompositeStream() override;
 
     static bool isJpegRCompositeStream(const sp<Surface> &surface);
+    static bool isJpegRCompositeStreamInfo(const OutputStreamInfo& streamInfo);
 
     // CompositeStream overrides
     status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
