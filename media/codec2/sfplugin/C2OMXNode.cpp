@@ -291,6 +291,10 @@ void C2OMXNode::onInputBufferDone(c2_cntr64_t index) {
     return mImpl->onInputBufferDone(index);
 }
 
+void C2OMXNode::onInputBufferEmptied() {
+    return mImpl->onInputBufferEmptied();
+}
+
 android_dataspace C2OMXNode::getDataspace() {
     return mImpl->getDataspace();
 }

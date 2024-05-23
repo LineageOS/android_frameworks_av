@@ -25,6 +25,7 @@
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
 
+#include <android_media_codec.h>
 #include <android/fdsan.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <ui/Fence.h>
@@ -373,7 +374,10 @@ status_t C2NodeImpl::submitBuffer(
     }
     work->worklets.clear();
     work->worklets.emplace_back(new C2Worklet);
-    mBufferIdsInUse.lock()->emplace(work->input.ordinal.frameIndex.peeku(), buffer);
+    {
+        Mutexed<BuffersTracker>::Locked buffers(mBuffersTracker);
+        buffers->mIdsInUse.emplace(work->input.ordinal.frameIndex.peeku(), buffer);
+    }
     mQueueThread->queue(comp, fenceFd, std::move(work), std::move(fd0), std::move(fd1));
 
     return OK;
@@ -405,29 +409,74 @@ void C2NodeImpl::setFrameSize(uint32_t width, uint32_t height) {
 }
 
 void C2NodeImpl::onInputBufferDone(c2_cntr64_t index) {
-    if (mAidlHal) {
-        if (!mAidlBufferSource) {
-            ALOGD("Buffer source not set (index=%llu)", index.peekull());
-            return;
-        }
-    } else {
-        if (!mBufferSource) {
-            ALOGD("Buffer source not set (index=%llu)", index.peekull());
-            return;
-        }
-    }
-
-    int32_t bufferId = 0;
-    {
-        decltype(mBufferIdsInUse)::Locked bufferIds(mBufferIdsInUse);
-        auto it = bufferIds->find(index.peeku());
-        if (it == bufferIds->end()) {
+    if (android::media::codec::provider_->input_surface_throttle()) {
+        Mutexed<BuffersTracker>::Locked buffers(mBuffersTracker);
+        auto it = buffers->mIdsInUse.find(index.peeku());
+        if (it == buffers->mIdsInUse.end()) {
             ALOGV("Untracked input index %llu (maybe already removed)", index.peekull());
             return;
         }
-        bufferId = it->second;
-        (void)bufferIds->erase(it);
+        int32_t bufferId = it->second;
+        (void)buffers->mIdsInUse.erase(it);
+        buffers->mAvailableIds.push_back(bufferId);
+    } else {
+        if (!hasBufferSource()) {
+            return;
+        }
+        int32_t bufferId = 0;
+        {
+            Mutexed<BuffersTracker>::Locked buffers(mBuffersTracker);
+            auto it = buffers->mIdsInUse.find(index.peeku());
+            if (it == buffers->mIdsInUse.end()) {
+                ALOGV("Untracked input index %llu (maybe already removed)", index.peekull());
+                return;
+            }
+            bufferId = it->second;
+            (void)buffers->mIdsInUse.erase(it);
+        }
+        notifyInputBufferEmptied(bufferId);
     }
+}
+
+void C2NodeImpl::onInputBufferEmptied() {
+    if (!android::media::codec::provider_->input_surface_throttle()) {
+        ALOGE("onInputBufferEmptied should not be called "
+              "when input_surface_throttle is false");
+        return;
+    }
+    if (!hasBufferSource()) {
+        return;
+    }
+    int32_t bufferId = 0;
+    {
+        Mutexed<BuffersTracker>::Locked buffers(mBuffersTracker);
+        if (buffers->mAvailableIds.empty()) {
+            ALOGV("The codec is ready to take more input buffers "
+                    "but no input buffers are ready yet.");
+            return;
+        }
+        bufferId = buffers->mAvailableIds.front();
+        buffers->mAvailableIds.pop_front();
+    }
+    notifyInputBufferEmptied(bufferId);
+}
+
+bool C2NodeImpl::hasBufferSource() {
+    if (mAidlHal) {
+        if (!mAidlBufferSource) {
+            ALOGD("Buffer source not set");
+            return false;
+        }
+    } else {
+        if (!mBufferSource) {
+            ALOGD("Buffer source not set");
+            return false;
+        }
+    }
+    return true;
+}
+
+void C2NodeImpl::notifyInputBufferEmptied(int32_t bufferId) {
     if (mAidlHal) {
         ::ndk::ScopedFileDescriptor nullFence;
         (void)mAidlBufferSource->onInputBufferEmptied(bufferId, nullFence);

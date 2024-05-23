@@ -44,6 +44,16 @@ flag {
 }
 
 flag {
+  name: "input_surface_throttle"
+  namespace: "codec_fwk"
+  description: "Bugfix flag for input surface throttle"
+  bug: "342269852"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "large_audio_frame_finish"
   namespace: "codec_fwk"
   description: "Implementation flag for large audio frame finishing tasks"
