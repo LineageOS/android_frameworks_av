@@ -22,6 +22,7 @@
 #include <android/media/IAudioPolicyService.h>
 #include <android/media/AudioMixUpdate.h>
 #include <android/media/BnCaptureStateListener.h>
+#include <android_media_audiopolicy.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
 #include <binder/IPCThreadState.h>
@@ -43,6 +44,8 @@
        std::move(_tmp.value()); })
 
 // ----------------------------------------------------------------------------
+
+namespace audio_flags = android::media::audiopolicy;
 
 namespace android {
 using aidl_utils::statusTFromBinderStatus;
@@ -1880,6 +1883,25 @@ status_t AudioSystem::registerPolicyMixes(const Vector<AudioMix>& mixes, bool re
             convertRange(mixes.begin(), mixes.begin() + mixesSize, std::back_inserter(mixesAidl),
                          legacy2aidl_AudioMix));
     return statusTFromBinderStatus(aps->registerPolicyMixes(mixesAidl, registration));
+}
+
+status_t AudioSystem::getRegisteredPolicyMixes(std::vector<AudioMix>& mixes) {
+    if (!audio_flags::audio_mix_test_api()) {
+        return INVALID_OPERATION;
+    }
+
+    const sp<IAudioPolicyService> aps = AudioSystem::get_audio_policy_service();
+    if (aps == nullptr) return PERMISSION_DENIED;
+
+    std::vector<::android::media::AudioMix> aidlMixes;
+    Status status = aps->getRegisteredPolicyMixes(&aidlMixes);
+
+    for (const auto& aidlMix : aidlMixes) {
+        AudioMix mix = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioMix(aidlMix));
+        mixes.push_back(mix);
+    }
+
+    return statusTFromBinderStatus(status);
 }
 
 status_t AudioSystem::updatePolicyMixes(

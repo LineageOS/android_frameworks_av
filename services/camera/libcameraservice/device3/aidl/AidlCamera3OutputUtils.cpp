@@ -67,7 +67,8 @@ void processOneCaptureResultLocked(
 }
 
 void notify(CaptureOutputStates& states,
-        const aidl::android::hardware::camera::device::NotifyMsg& msg) {
+            const aidl::android::hardware::camera::device::NotifyMsg& msg,
+            bool hasReadoutTimestamp) {
 
     using ErrorCode = aidl::android::hardware::camera::device::ErrorCode;
     using Tag = aidl::android::hardware::camera::device::NotifyMsg::Tag;
@@ -110,8 +111,9 @@ void notify(CaptureOutputStates& states,
             m.type = CAMERA_MSG_SHUTTER;
             m.message.shutter.frame_number = msg.get<Tag::shutter>().frameNumber;
             m.message.shutter.timestamp = msg.get<Tag::shutter>().timestamp;
-            m.message.shutter.readout_timestamp_valid = true;
-            m.message.shutter.readout_timestamp = msg.get<Tag::shutter>().readoutTimestamp;
+            m.message.shutter.readout_timestamp_valid = hasReadoutTimestamp;
+            m.message.shutter.readout_timestamp =
+                    hasReadoutTimestamp ? msg.get<Tag::shutter>().readoutTimestamp : 0LL;
             break;
     }
     notify(states, &m);
@@ -143,12 +145,6 @@ void requestStreamBuffers(RequestBufferStates& states,
     std::lock_guard<std::mutex> lock(states.reqBufferLock);
     std::vector<StreamBufferRet> bufRets;
     outBuffers->clear();
-    if (!states.useHalBufManager) {
-        ALOGE("%s: Camera %s does not support HAL buffer management",
-                __FUNCTION__, states.cameraId.c_str());
-        *status = BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS;
-        return;
-    }
 
     SortedVector<int32_t> streamIds;
     ssize_t sz = streamIds.setCapacity(bufReqs.size());
@@ -171,6 +167,13 @@ void requestStreamBuffers(RequestBufferStates& states,
         if (streamIds.indexOf(bufReq.streamId) != NAME_NOT_FOUND) {
             ALOGE("%s: Stream %d appear multiple times in buffer requests",
                     __FUNCTION__, bufReq.streamId);
+            *status = BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS;
+            return;
+        }
+        if (!states.useHalBufManager &&
+                !contains(states.halBufManagedStreamIds, bufReq.streamId)) {
+            ALOGE("%s: Camera %s does not support HAL buffer management for stream id %d",
+                  __FUNCTION__, states.cameraId.c_str(), bufReq.streamId);
             *status = BufferRequestStatus::FAILED_ILLEGAL_ARGUMENTS;
             return;
         }
@@ -316,10 +319,15 @@ void requestStreamBuffers(RequestBufferStates& states,
                 sb.acquire_fence = -1;
                 sb.status = CAMERA_BUFFER_STATUS_ERROR;
             }
-            returnOutputBuffers(states.useHalBufManager, nullptr,
-                    streamBuffers.data(), numAllocatedBuffers, 0,
-                    0, false,
-                    0, states.sessionStatsBuilder);
+            std::vector<BufferToReturn> returnableBuffers{};
+            collectReturnableOutputBuffers(states.useHalBufManager, states.halBufManagedStreamIds,
+                    /*listener*/ nullptr,
+                    streamBuffers.data(), numAllocatedBuffers, /*timestamp*/ 0,
+                    /*readoutTimestamp*/ 0, /*requested*/ false,
+                    /*requestTimeNs*/ 0, states.sessionStatsBuilder,
+                    /*out*/ &returnableBuffers);
+            finishReturningOutputBuffers(returnableBuffers, /*listener*/ nullptr,
+                    states.sessionStatsBuilder);
             for (auto buf : newBuffers) {
                 states.bufferRecordsIntf.removeOneBufferCache(streamId, buf);
             }

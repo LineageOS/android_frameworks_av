@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -121,6 +122,7 @@ cc_library {
         "latest_android_media_audio_common_types_cpp_shared",
     ],
     shared_libs: [
+        "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",

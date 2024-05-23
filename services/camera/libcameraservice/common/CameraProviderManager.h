@@ -178,9 +178,15 @@ public:
     // Proxy to inject fake services in test.
     class AidlServiceInteractionProxy {
       public:
-        // Returns the Aidl service with the given serviceName
+        // Returns the Aidl service with the given serviceName. Will wait indefinitely
+        // for the service to come up if not running.
         virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
-        getAidlService(const std::string& serviceName) = 0;
+        getService(const std::string& serviceName) = 0;
+
+        // Attempts to get an already running AIDL service of the given serviceName.
+        // Returns nullptr immediately if service is not running.
+        virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+        tryGetService(const std::string& serviceName) = 0;
 
         virtual ~AidlServiceInteractionProxy() = default;
     };
@@ -190,7 +196,10 @@ public:
     class AidlServiceInteractionProxyImpl : public AidlServiceInteractionProxy {
       public:
         virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
-        getAidlService(const std::string& serviceName) override;
+        getService(const std::string& serviceName) override;
+
+        virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+        tryGetService(const std::string& serviceName) override;
     };
 
     /**
@@ -321,7 +330,8 @@ public:
      */
      status_t getSessionCharacteristics(const std::string& id,
             const SessionConfiguration &configuration,
-            bool overrideForPerfClass, camera3::metadataGetter getMetadata,
+            bool overrideForPerfClass,
+            bool overrideToPortrait,
             CameraMetadata* sessionCharacteristics /*out*/) const;
 
     /**

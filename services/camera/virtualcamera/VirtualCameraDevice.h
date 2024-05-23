@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,9 @@
 
 #include "aidl/android/companion/virtualcamera/IVirtualCameraCallback.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
+#include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/device/BnCameraDevice.h"
+#include "util/Util.h"
 
 namespace android {
 namespace companion {
@@ -35,12 +37,8 @@ class VirtualCameraDevice
  public:
   explicit VirtualCameraDevice(
       uint32_t cameraId,
-      const std::vector<
-          aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
-          supportedInputConfig,
-      std::shared_ptr<
-          ::aidl::android::companion::virtualcamera::IVirtualCameraCallback>
-          virtualCameraClientCallback = nullptr);
+      const aidl::android::companion::virtualcamera::VirtualCameraConfiguration&
+          configuration);
 
   virtual ~VirtualCameraDevice() override = default;
 
@@ -96,6 +94,32 @@ class VirtualCameraDevice
   std::string getCameraName() const;
 
   uint32_t getCameraId() const { return mCameraId; }
+
+  const std::vector<
+      aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
+  getInputConfigs() const;
+
+  // Returns largest supported input resolution.
+  Resolution getMaxInputResolution() const;
+
+  // Maximal number of RAW streams - virtual camera doesn't support RAW streams.
+  static constexpr int32_t kMaxNumberOfRawStreams = 0;
+
+  // Maximal number of non-jpeg streams configured concurrently in single
+  // session. This should be at least 3 and can be increased at the potential
+  // cost of more CPU/GPU load if there are many concurrent streams.
+  static constexpr int32_t kMaxNumberOfProcessedStreams = 3;
+
+  // Maximal number of stalling (in case of virtual camera only jpeg for now)
+  // streams. Can be increaed at the cost of potential cost of more GPU/CPU
+  // load.
+  static constexpr int32_t kMaxNumberOfStallStreams = 1;
+
+  // Focal length for full frame sensor.
+  static constexpr float kFocalLength = 43.0;
+
+  // Default JPEG compression quality.
+  static constexpr uint8_t kDefaultJpegQuality = 80;
 
  private:
   std::shared_ptr<VirtualCameraDevice> sharedFromThis();

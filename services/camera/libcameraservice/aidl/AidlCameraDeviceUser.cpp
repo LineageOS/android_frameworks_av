@@ -20,6 +20,7 @@
 #include <aidl/AidlUtils.h>
 #include <aidl/android/frameworks/cameraservice/device/CaptureMetadataInfo.h>
 #include <android-base/properties.h>
+#include <utils/Utils.h>
 
 namespace android::frameworks::cameraservice::device::implementation {
 
@@ -56,7 +57,7 @@ inline ScopedAStatus fromUStatus(const UStatus& status) {
 AidlCameraDeviceUser::AidlCameraDeviceUser(const sp<UICameraDeviceUser>& deviceRemote):
       mDeviceRemote(deviceRemote) {
     mInitSuccess = initDevice();
-    mVndkVersion = base::GetIntProperty("ro.vndk.version", __ANDROID_API_FUTURE__);
+    mVndkVersion = getVNDKVersionFromProp(__ANDROID_API_FUTURE__);
 }
 
 bool AidlCameraDeviceUser::initDevice() {

@@ -222,7 +222,8 @@ public:
                            const struct audio_port_config &config,
                            const sp<DeviceDescriptor>& srcDevice,
                            audio_stream_type_t stream, product_strategy_t strategy,
-                           VolumeSource volumeSource);
+                           VolumeSource volumeSource,
+                           bool isInternal);
 
     ~SourceClientDescriptor() override = default;
 
@@ -248,6 +249,7 @@ public:
     void setSwOutput(const sp<SwAudioOutputDescriptor>& swOutput, bool closeOutput = false);
     wp<HwAudioOutputDescriptor> hwOutput() const { return mHwOutput; }
     void setHwOutput(const sp<HwAudioOutputDescriptor>& hwOutput);
+    bool isInternal() const override { return mIsInternal; }
 
     using ClientDescriptor::dump;
     void dump(String8 *dst, int spaces) const override;
@@ -268,34 +270,17 @@ public:
      * behavior of AudioDeviceCallback.
      */
     bool mCloseOutput = false;
-};
-
-/**
- * @brief The InternalSourceClientDescriptor class
- * Specialized Client Descriptor for either a raw patch created from @see createAudioPatch API
- * or for internal audio patches managed by APM (e.g. phone call patches).
- * Whatever the bridge created (software or hardware), we need a client to track the activity
- * and manage volumes.
- * The Audio Patch requested sink is expressed as a preferred device which allows to route
- * the SwOutput. Then APM will performs checks on the UID (against UID of Audioserver) of the
- * requester to prevent rerouting SwOutput involved in raw patches.
- */
-class InternalSourceClientDescriptor: public SourceClientDescriptor
-{
-public:
-    InternalSourceClientDescriptor(
-            audio_port_handle_t portId, uid_t uid, audio_attributes_t attributes,
-            const struct audio_port_config &config, const sp<DeviceDescriptor>& srcDevice,
-             const sp<DeviceDescriptor>& sinkDevice,
-            product_strategy_t strategy, VolumeSource volumeSource) :
-        SourceClientDescriptor(
-            portId, uid, attributes, config, srcDevice, AUDIO_STREAM_PATCH, strategy,
-            volumeSource)
-    {
-        setPreferredDeviceId(sinkDevice->getId());
-    }
-    bool isInternal() const override { return true; }
-    ~InternalSourceClientDescriptor() override = default;
+    /**
+     * True for specialized Client Descriptor for either a raw patch created from
+     * @see createAudioPatch API or for internal audio patches managed by APM
+     * (e.g. phone call patches).
+     * Whatever the bridge created (software or hardware), we need a client to track the activity
+     * and manage volumes.
+     * The Audio Patch requested sink is expressed as a preferred device which allows to route
+     * the SwOutput. Then APM will performs checks on the UID (against UID of Audioserver) of the
+     * requester to prevent rerouting SwOutput involved in raw patches.
+     */
+    bool mIsInternal = false;
 };
 
 class SourceClientCollection :

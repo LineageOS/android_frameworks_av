@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "VirtualCameraSession.h"
 #include "aidl/android/companion/virtualcamera/BnVirtualCameraCallback.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
+#include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BnCameraDeviceCallback.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
@@ -29,21 +30,30 @@
 #include "android/binder_interface_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "util/MetadataBuilder.h"
+#include "util/MetadataUtil.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
 namespace {
 
-constexpr int kWidth = 640;
-constexpr int kHeight = 480;
+constexpr int kQvgaWidth = 320;
+constexpr int kQvgaHeight = 240;
+constexpr int kVgaWidth = 640;
+constexpr int kVgaHeight = 480;
+constexpr int kSvgaWidth = 800;
+constexpr int kSvgaHeight = 600;
+constexpr int kMaxFps = 30;
 constexpr int kStreamId = 0;
+constexpr int kSecondStreamId = 1;
 constexpr int kCameraId = 42;
 
 using ::aidl::android::companion::virtualcamera::BnVirtualCameraCallback;
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::LensFacing;
+using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BnCameraDeviceCallback;
 using ::aidl::android::hardware::camera::device::BufferRequest;
@@ -96,23 +106,13 @@ class MockVirtualCameraCallback : public BnVirtualCameraCallback {
   MOCK_METHOD(ndk::ScopedAStatus, onStreamClosed, (int), (override));
 };
 
-class VirtualCameraSessionTest : public ::testing::Test {
+class VirtualCameraSessionTestBase : public ::testing::Test {
  public:
-  void SetUp() override {
+  virtual void SetUp() override {
     mMockCameraDeviceCallback =
         ndk::SharedRefBase::make<MockCameraDeviceCallback>();
     mMockVirtualCameraClientCallback =
         ndk::SharedRefBase::make<MockVirtualCameraCallback>();
-    mVirtualCameraDevice = ndk::SharedRefBase::make<VirtualCameraDevice>(
-        kCameraId,
-        std::vector<SupportedStreamConfiguration>{
-            SupportedStreamConfiguration{.width = kWidth,
-                                         .height = kHeight,
-                                         .pixelFormat = Format::YUV_420_888}},
-        mMockVirtualCameraClientCallback);
-    mVirtualCameraSession = ndk::SharedRefBase::make<VirtualCameraSession>(
-        mVirtualCameraDevice, mMockCameraDeviceCallback,
-        mMockVirtualCameraClientCallback);
 
     // Explicitly defining default actions below to prevent gmock from
     // default-constructing ndk::ScopedAStatus, because default-constructed
@@ -138,6 +138,35 @@ class VirtualCameraSessionTest : public ::testing::Test {
  protected:
   std::shared_ptr<MockCameraDeviceCallback> mMockCameraDeviceCallback;
   std::shared_ptr<MockVirtualCameraCallback> mMockVirtualCameraClientCallback;
+};
+
+class VirtualCameraSessionTest : public VirtualCameraSessionTestBase {
+ public:
+  void SetUp() override {
+    VirtualCameraSessionTestBase::SetUp();
+
+    mVirtualCameraDevice = ndk::SharedRefBase::make<VirtualCameraDevice>(
+        kCameraId,
+        VirtualCameraConfiguration{
+            .supportedStreamConfigs = {SupportedStreamConfiguration{
+                                           .width = kVgaWidth,
+                                           .height = kVgaHeight,
+                                           .pixelFormat = Format::YUV_420_888,
+                                           .maxFps = kMaxFps},
+                                       SupportedStreamConfiguration{
+                                           .width = kSvgaWidth,
+                                           .height = kSvgaHeight,
+                                           .pixelFormat = Format::YUV_420_888,
+                                           .maxFps = kMaxFps}},
+            .virtualCameraCallback = mMockVirtualCameraClientCallback,
+            .sensorOrientation = SensorOrientation::ORIENTATION_0,
+            .lensFacing = LensFacing::FRONT});
+    mVirtualCameraSession = ndk::SharedRefBase::make<VirtualCameraSession>(
+        mVirtualCameraDevice, mMockCameraDeviceCallback,
+        mMockVirtualCameraClientCallback);
+  }
+
+ protected:
   std::shared_ptr<VirtualCameraDevice> mVirtualCameraDevice;
   std::shared_ptr<VirtualCameraSession> mVirtualCameraSession;
 };
@@ -146,18 +175,22 @@ TEST_F(VirtualCameraSessionTest, ConfigureTriggersClientConfigureCallback) {
   PixelFormat format = PixelFormat::YCBCR_420_888;
   StreamConfiguration streamConfiguration;
   streamConfiguration.streams = {
-      createStream(kStreamId, kWidth, kHeight, format)};
+      createStream(kStreamId, kVgaWidth, kVgaHeight, format),
+      createStream(kSecondStreamId, kSvgaWidth, kSvgaHeight, format)};
   std::vector<HalStream> halStreams;
-  EXPECT_CALL(
-      *mMockVirtualCameraClientCallback,
-      onStreamConfigured(kStreamId, _, kWidth, kHeight, Format::YUV_420_888));
+
+  // Expect highest resolution to be picked for the client input.
+  EXPECT_CALL(*mMockVirtualCameraClientCallback,
+              onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight,
+                                 Format::YUV_420_888));
 
   ASSERT_TRUE(
       mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)
           .isOk());
 
   EXPECT_THAT(halStreams, SizeIs(streamConfiguration.streams.size()));
-  EXPECT_THAT(mVirtualCameraSession->getStreamIds(), ElementsAre(0));
+  EXPECT_THAT(mVirtualCameraSession->getStreamIds(),
+              ElementsAre(kStreamId, kSecondStreamId));
 }
 
 TEST_F(VirtualCameraSessionTest, SecondConfigureDropsUnreferencedStreams) {
@@ -165,18 +198,18 @@ TEST_F(VirtualCameraSessionTest, SecondConfigureDropsUnreferencedStreams) {
   StreamConfiguration streamConfiguration;
   std::vector<HalStream> halStreams;
 
-  streamConfiguration.streams = {createStream(0, kWidth, kHeight, format),
-                                 createStream(1, kWidth, kHeight, format),
-                                 createStream(2, kWidth, kHeight, format)};
+  streamConfiguration.streams = {createStream(0, kVgaWidth, kVgaHeight, format),
+                                 createStream(1, kVgaWidth, kVgaHeight, format),
+                                 createStream(2, kVgaWidth, kVgaHeight, format)};
   ASSERT_TRUE(
       mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)
           .isOk());
 
   EXPECT_THAT(mVirtualCameraSession->getStreamIds(), ElementsAre(0, 1, 2));
 
-  streamConfiguration.streams = {createStream(0, kWidth, kHeight, format),
-                                 createStream(2, kWidth, kHeight, format),
-                                 createStream(3, kWidth, kHeight, format)};
+  streamConfiguration.streams = {createStream(0, kVgaWidth, kVgaHeight, format),
+                                 createStream(2, kVgaWidth, kVgaHeight, format),
+                                 createStream(3, kVgaWidth, kVgaHeight, format)};
   ASSERT_TRUE(
       mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)
           .isOk());
@@ -201,8 +234,8 @@ TEST_F(VirtualCameraSessionTest, FlushBeforeConfigure) {
 
 TEST_F(VirtualCameraSessionTest, onProcessCaptureRequestTriggersClientCallback) {
   StreamConfiguration streamConfiguration;
-  streamConfiguration.streams = {
-      createStream(kStreamId, kWidth, kHeight, PixelFormat::YCBCR_420_888)};
+  streamConfiguration.streams = {createStream(kStreamId, kVgaWidth, kVgaHeight,
+                                              PixelFormat::YCBCR_420_888)};
   std::vector<CaptureRequest> requests(1);
   requests[0].frameNumber = 42;
   requests[0].settings = *(
@@ -226,8 +259,8 @@ TEST_F(VirtualCameraSessionTest, onProcessCaptureRequestTriggersClientCallback) 
 
 TEST_F(VirtualCameraSessionTest, configureAfterCameraRelease) {
   StreamConfiguration streamConfiguration;
-  streamConfiguration.streams = {
-      createStream(kStreamId, kWidth, kHeight, PixelFormat::YCBCR_420_888)};
+  streamConfiguration.streams = {createStream(kStreamId, kVgaWidth, kVgaHeight,
+                                              PixelFormat::YCBCR_420_888)};
   std::vector<HalStream> halStreams;
 
   // Release virtual camera.
@@ -238,6 +271,108 @@ TEST_F(VirtualCameraSessionTest, configureAfterCameraRelease) {
       mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)
           .getServiceSpecificError(),
       Eq(static_cast<int32_t>(Status::CAMERA_DISCONNECTED)));
+}
+
+TEST_F(VirtualCameraSessionTest, ConfigureWithEmptyStreams) {
+  StreamConfiguration streamConfiguration;
+  std::vector<HalStream> halStreams;
+
+  // Expect configuration attempt returns CAMERA_DISCONNECTED service specific code.
+  EXPECT_THAT(
+      mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F(VirtualCameraSessionTest, ConfigureWithDifferentAspectRatioFails) {
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createStream(kStreamId, kVgaWidth, kVgaHeight, PixelFormat::YCBCR_420_888),
+      createStream(kSecondStreamId, kVgaHeight, kVgaWidth,
+                   PixelFormat::YCBCR_420_888)};
+
+  std::vector<HalStream> halStreams;
+
+  // Expect configuration attempt returns CAMERA_DISCONNECTED service specific code.
+  EXPECT_THAT(
+      mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+class VirtualCameraSessionInputChoiceTest : public VirtualCameraSessionTestBase {
+ public:
+  std::shared_ptr<VirtualCameraSession> createSession(
+      const std::vector<SupportedStreamConfiguration>& supportedInputConfigs) {
+    mVirtualCameraDevice = ndk::SharedRefBase::make<VirtualCameraDevice>(
+        kCameraId, VirtualCameraConfiguration{
+                       .supportedStreamConfigs = supportedInputConfigs,
+                       .virtualCameraCallback = mMockVirtualCameraClientCallback,
+                       .sensorOrientation = SensorOrientation::ORIENTATION_0,
+                       .lensFacing = LensFacing::FRONT});
+    return ndk::SharedRefBase::make<VirtualCameraSession>(
+        mVirtualCameraDevice, mMockCameraDeviceCallback,
+        mMockVirtualCameraClientCallback);
+  }
+
+ protected:
+  std::shared_ptr<VirtualCameraDevice> mVirtualCameraDevice;
+};
+
+TEST_F(VirtualCameraSessionInputChoiceTest,
+       configureChoosesCorrectInputStreamForDownsampledOutput) {
+  // Create camera configured to support SVGA YUV input and RGB QVGA input.
+  auto virtualCameraSession = createSession(
+      {SupportedStreamConfiguration{.width = kSvgaWidth,
+                                    .height = kSvgaHeight,
+                                    .pixelFormat = Format::YUV_420_888,
+                                    .maxFps = kMaxFps},
+       SupportedStreamConfiguration{.width = kQvgaWidth,
+                                    .height = kQvgaHeight,
+                                    .pixelFormat = Format::RGBA_8888,
+                                    .maxFps = kMaxFps}});
+
+  // Configure VGA stream. Expect SVGA input to be chosen to downscale from.
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {createStream(
+      kStreamId, kVgaWidth, kVgaHeight, PixelFormat::IMPLEMENTATION_DEFINED)};
+  std::vector<HalStream> halStreams;
+
+  // Expect configuration attempt returns CAMERA_DISCONNECTED service specific code.
+  EXPECT_CALL(*mMockVirtualCameraClientCallback,
+              onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight,
+                                 Format::YUV_420_888));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F(VirtualCameraSessionInputChoiceTest,
+       configureChoosesCorrectInputStreamForMatchingResolution) {
+  // Create camera configured to support SVGA YUV input and RGB QVGA input.
+  auto virtualCameraSession = createSession(
+      {SupportedStreamConfiguration{.width = kSvgaWidth,
+                                    .height = kSvgaHeight,
+                                    .pixelFormat = Format::YUV_420_888,
+                                    .maxFps = kMaxFps},
+       SupportedStreamConfiguration{.width = kQvgaWidth,
+                                    .height = kQvgaHeight,
+                                    .pixelFormat = Format::RGBA_8888,
+                                    .maxFps = kMaxFps}});
+
+  // Configure VGA stream. Expect SVGA input to be chosen to downscale from.
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {createStream(
+      kStreamId, kQvgaWidth, kQvgaHeight, PixelFormat::IMPLEMENTATION_DEFINED)};
+  std::vector<HalStream> halStreams;
+
+  // Expect configuration attempt returns CAMERA_DISCONNECTED service specific code.
+  EXPECT_CALL(*mMockVirtualCameraClientCallback,
+              onStreamConfigured(kStreamId, _, kQvgaWidth, kQvgaHeight,
+                                 Format::RGBA_8888));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
 }
 
 }  // namespace

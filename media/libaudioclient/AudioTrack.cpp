@@ -2873,7 +2873,9 @@ status_t AudioTrack::restoreTrack_l(const char *from, bool forceRestore)
     if (!forceRestore &&
         (isOffloadedOrDirect_l() || mDoNotReconnect)) {
         // FIXME re-creation of offloaded and direct tracks is not yet implemented;
-        // reconsider enabling for linear PCM encodings when position can be preserved.
+        // Disabled since (1) timestamp correction is not implemented for non-PCM and
+        // (2) We pre-empt existing direct tracks on resource constraint, so these tracks
+        // shouldn't reconnect.
         result = DEAD_OBJECT;
         return result;
     }

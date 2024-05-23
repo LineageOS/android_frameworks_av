@@ -49,12 +49,6 @@ enum {
 };
 typedef int32_t aaudio_policy_t;
 
-// Internal error codes. Only used by the framework.
-enum {
-    AAUDIO_INTERNAL_ERROR_BASE = -1000,
-    AAUDIO_ERROR_STANDBY,
-};
-
 /**
  * Control whether AAudioStreamBuilder_openStream() will use the new MMAP data path
  * or the older "Legacy" data path.

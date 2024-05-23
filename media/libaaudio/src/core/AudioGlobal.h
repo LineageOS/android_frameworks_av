@@ -22,6 +22,14 @@
 
 namespace aaudio {
 
+// Internal error codes. Only used by the framework.
+enum {
+    AAUDIO_INTERNAL_ERROR_BASE = -1000,
+    AAUDIO_ERROR_STANDBY,
+    AAUDIO_ERROR_ALREADY_CLOSED,
+
+};
+
 aaudio_policy_t AudioGlobal_getMMapPolicy();
 aaudio_result_t AudioGlobal_setMMapPolicy(aaudio_policy_t policy);
 

@@ -50,6 +50,7 @@ struct CameraDeviceClientBase :
 protected:
     CameraDeviceClientBase(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
+            std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
             const std::string& clientPackageName,
             bool systemNativeClient,
             const std::optional<std::string>& clientFeatureId,
@@ -108,11 +109,6 @@ public:
             const SessionConfiguration& sessionConfiguration,
             /*out*/
             bool* streamStatus) override;
-
-    virtual binder::Status getSessionCharacteristics(
-            const SessionConfiguration& sessionConfiguration,
-            /*out*/
-            hardware::camera2::impl::CameraMetadataNative* sessionCharacteristics) override;
 
     // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;
@@ -186,6 +182,7 @@ public:
     CameraDeviceClient(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
+            std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
             const std::string& clientPackageName,
             bool clientPackageOverride,
             const std::optional<std::string>& clientFeatureId,

@@ -51,7 +51,8 @@ class Camera3StreamInterface;
 struct Camera3OfflineStates {
     Camera3OfflineStates(
             const TagMonitor& tagMonitor, const metadata_vendor_id_t vendorTagId,
-            const bool useHalBufManager, const bool needFixupMonochromeTags,
+            const bool useHalBufManager, const std::set<int32_t> &halBufferManagedStreamIds,
+            const bool needFixupMonochromeTags,
             const bool usePartialResult, const uint32_t numPartialResults,
             const int64_t lastCompletedRegularFN, const int64_t lastCompletedReprocessFN,
             const int64_t lastCompletedZslFN, const uint32_t nextResultFN,
@@ -64,7 +65,8 @@ struct Camera3OfflineStates {
             const std::unordered_map<std::string, camera3::RotateAndCropMapper>&
                 rotateAndCropMappers) :
             mTagMonitor(tagMonitor), mVendorTagId(vendorTagId),
-            mUseHalBufManager(useHalBufManager), mNeedFixupMonochromeTags(needFixupMonochromeTags),
+            mUseHalBufManager(useHalBufManager), mHalBufManagedStreamIds(halBufferManagedStreamIds),
+            mNeedFixupMonochromeTags(needFixupMonochromeTags),
             mUsePartialResult(usePartialResult), mNumPartialResults(numPartialResults),
             mLastCompletedRegularFrameNumber(lastCompletedRegularFN),
             mLastCompletedReprocessFrameNumber(lastCompletedReprocessFN),
@@ -85,6 +87,7 @@ struct Camera3OfflineStates {
     const metadata_vendor_id_t mVendorTagId;
 
     const bool mUseHalBufManager;
+    const std::set<int32_t > &mHalBufManagedStreamIds;
     const bool mNeedFixupMonochromeTags;
 
     const bool mUsePartialResult;
@@ -181,6 +184,7 @@ class Camera3OfflineSession :
     const metadata_vendor_id_t mVendorTagId;
 
     const bool mUseHalBufManager;
+    const std::set<int32_t > &mHalBufManagedStreamIds;
     const bool mNeedFixupMonochromeTags;
 
     const bool mUsePartialResult;

@@ -61,6 +61,7 @@ namespace flags = com::android::internal::camera::flags;
 CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<CameraService>& cameraService,
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
+        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string& clientPackageName,
         bool systemNativeClient,
         const std::optional<std::string>& clientFeatureId,
@@ -74,6 +75,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         bool overrideToPortrait) :
     BasicClient(cameraService,
             IInterface::asBinder(remoteCallback),
+            attributionAndPermissionUtils,
             clientPackageName,
             systemNativeClient,
             clientFeatureId,
@@ -92,6 +94,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
 CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
         std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
+        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string& clientPackageName,
         bool systemNativeClient,
         const std::optional<std::string>& clientFeatureId,
@@ -104,7 +107,8 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         bool overrideForPerfClass,
         bool overrideToPortrait,
         const std::string& originalCameraId) :
-    Camera2ClientBase(cameraService, remoteCallback, cameraServiceProxyWrapper, clientPackageName,
+    Camera2ClientBase(cameraService, remoteCallback, cameraServiceProxyWrapper,
+            attributionAndPermissionUtils, clientPackageName,
             systemNativeClient, clientFeatureId, cameraId, /*API1 camera ID*/ -1, cameraFacing,
             sensorOrientation, clientPid, clientUid, servicePid, overrideForPerfClass,
             overrideToPortrait),
@@ -759,60 +763,6 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
         case INVALID_OPERATION: {
                 std::string msg = fmt::sprintf(
                         "Camera %s: Session configuration query not supported!",
-                        mCameraIdStr.c_str());
-                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
-            }
-
-            break;
-        default: {
-                std::string msg = fmt::sprintf( "Camera %s: Error: %s (%d)", mCameraIdStr.c_str(),
-                        strerror(-ret), ret);
-                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-                res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                        msg.c_str());
-            }
-    }
-
-    return res;
-}
-
-binder::Status CameraDeviceClient::getSessionCharacteristics(
-        const SessionConfiguration& sessionConfiguration,
-        /*out*/
-        hardware::camera2::impl::CameraMetadataNative* sessionCharacteristics) {
-    ATRACE_CALL();
-    binder::Status res;
-    status_t ret = OK;
-    if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
-
-    Mutex::Autolock icl(mBinderSerializationLock);
-
-    if (!mDevice.get()) {
-        return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
-    }
-
-    auto operatingMode = sessionConfiguration.getOperatingMode();
-    res = SessionConfigurationUtils::checkOperatingMode(operatingMode, mDevice->info(),
-            mCameraIdStr);
-    if (!res.isOk()) {
-        return res;
-    }
-
-    camera3::metadataGetter getMetadata = [this](const std::string &id,
-            bool /*overrideForPerfClass*/) {
-          return mDevice->infoPhysical(id);};
-    ret = mProviderManager->getSessionCharacteristics(mCameraIdStr.c_str(),
-            sessionConfiguration, mOverrideForPerfClass, getMetadata,
-            sessionCharacteristics);
-
-    switch (ret) {
-        case OK:
-            // Expected, do nothing.
-            break;
-        case INVALID_OPERATION: {
-                std::string msg = fmt::sprintf(
-                        "Camera %s: Session characteristics query not supported!",
                         mCameraIdStr.c_str());
                 ALOGD("%s: %s", __FUNCTION__, msg.c_str());
                 res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
@@ -1954,9 +1904,9 @@ binder::Status CameraDeviceClient::switchToOffline(
     sp<CameraOfflineSessionClient> offlineClient;
     if (offlineSession.get() != nullptr) {
         offlineClient = new CameraOfflineSessionClient(sCameraService,
-                offlineSession, offlineCompositeStreamMap, cameraCb, mClientPackageName,
-                mClientFeatureId, mCameraIdStr, mCameraFacing, mOrientation, mClientPid, mClientUid,
-                mServicePid);
+                offlineSession, offlineCompositeStreamMap, cameraCb, mAttributionAndPermissionUtils,
+                mClientPackageName, mClientFeatureId, mCameraIdStr, mCameraFacing, mOrientation,
+                mClientPid, mClientUid, mServicePid);
         ret = sCameraService->addOfflineClient(mCameraIdStr, offlineClient);
     }
 

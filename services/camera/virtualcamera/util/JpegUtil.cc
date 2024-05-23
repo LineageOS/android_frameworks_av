@@ -19,7 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
+#include <optional>
 #include <vector>
 
 #include "android/hardware_buffer.h"
@@ -34,11 +34,9 @@ namespace companion {
 namespace virtualcamera {
 namespace {
 
-constexpr int kJpegQuality = 80;
-
 class LibJpegContext {
  public:
-  LibJpegContext(int width, int height, const size_t outBufferSize,
+  LibJpegContext(int width, int height, int quality, const size_t outBufferSize,
                  void* outBuffer)
       : mWidth(width),
         mHeight(height),
@@ -76,7 +74,7 @@ class LibJpegContext {
     jpeg_set_defaults(&mCompressStruct);
 
     // Set quality and colorspace.
-    jpeg_set_quality(&mCompressStruct, kJpegQuality, 1);
+    jpeg_set_quality(&mCompressStruct, quality, 1);
     jpeg_set_colorspace(&mCompressStruct, JCS_YCbCr);
 
     // Configure RAW input mode - this let's libjpeg know we're providing raw,
@@ -94,11 +92,31 @@ class LibJpegContext {
     mCompressStruct.comp_info[2].v_samp_factor = 1;
   }
 
-  bool compress(const android_ycbcr& ycbr) {
+  LibJpegContext& setApp1Data(const uint8_t* app1Data, const size_t size) {
+    mApp1Data = app1Data;
+    mApp1DataSize = size;
+    return *this;
+  }
+
+  std::optional<size_t> compress(const android_ycbcr& ycbr) {
+    // TODO(b/301023410) - Add support for compressing image sizes not aligned
+    // with DCT size.
+    if (mWidth % (2 * DCTSIZE) || (mHeight % (2 * DCTSIZE))) {
+      ALOGE(
+          "%s: Compressing YUV420 image with size %dx%d not aligned with 2 * "
+          "DCTSIZE (%d) is not currently supported.",
+          __func__, mWidth, mHeight, 2 * DCTSIZE);
+      return std::nullopt;
+    }
+
+    // Chroma planes have 1/2 resolution of the original image.
+    const int cHeight = mHeight / 2;
+    const int cWidth = mWidth / 2;
+
     // Prepare arrays of pointers to scanlines of each plane.
     std::vector<JSAMPROW> yLines(mHeight);
-    std::vector<JSAMPROW> cbLines(mHeight / 2);
-    std::vector<JSAMPROW> crLines(mHeight / 2);
+    std::vector<JSAMPROW> cbLines(cHeight);
+    std::vector<JSAMPROW> crLines(cHeight);
 
     uint8_t* y = static_cast<uint8_t*>(ycbr.y);
     uint8_t* cb = static_cast<uint8_t*>(ycbr.cb);
@@ -107,40 +125,32 @@ class LibJpegContext {
     // Since UV samples might be interleaved (semiplanar) we need to copy
     // them to separate planes, since libjpeg doesn't directly
     // support processing semiplanar YUV.
-    const int c_samples = (mWidth / 2) * (mHeight / 2);
-    std::vector<uint8_t> cb_plane(c_samples);
-    std::vector<uint8_t> cr_plane(c_samples);
+    const int cSamples = cWidth * cHeight;
+    std::vector<uint8_t> cb_plane(cSamples);
+    std::vector<uint8_t> cr_plane(cSamples);
 
     // TODO(b/301023410) - Use libyuv or ARM SIMD for "unzipping" the data.
-    for (int i = 0; i < c_samples; ++i) {
-      cb_plane[i] = *cb;
-      cr_plane[i] = *cr;
-      cb += ycbr.chroma_step;
-      cr += ycbr.chroma_step;
+    int out_idx = 0;
+    for (int i = 0; i < cHeight; ++i) {
+      for (int j = 0; j < cWidth; ++j) {
+        cb_plane[out_idx] = cb[j * ycbr.chroma_step];
+        cr_plane[out_idx] = cr[j * ycbr.chroma_step];
+        out_idx++;
+      }
+      cb += ycbr.cstride;
+      cr += ycbr.cstride;
     }
 
     // Collect pointers to individual scanline of each plane.
     for (int i = 0; i < mHeight; ++i) {
       yLines[i] = y + i * ycbr.ystride;
     }
-    for (int i = 0; i < (mHeight / 2); ++i) {
+    for (int i = 0; i < cHeight; ++i) {
       cbLines[i] = cb_plane.data() + i * (mWidth / 2);
       crLines[i] = cr_plane.data() + i * (mWidth / 2);
     }
 
     return compress(yLines, cbLines, crLines);
-  }
-
-  bool compressBlackImage() {
-    // We only really need to prepare one scanline for Y and one shared scanline
-    // for Cb & Cr.
-    std::vector<uint8_t> yLine(mWidth, 0);
-    std::vector<uint8_t> chromaLine(mWidth / 2, 0xff / 2);
-
-    std::vector<JSAMPROW> yLines(mHeight, yLine.data());
-    std::vector<JSAMPROW> cLines(mHeight / 2, chromaLine.data());
-
-    return compress(yLines, cLines, cLines);
   }
 
  private:
@@ -165,10 +175,17 @@ class LibJpegContext {
   // Takes vector of pointers to Y / Cb / Cr scanlines as an input. Length of
   // each vector needs to correspond to height of corresponding plane.
   //
-  // Returns true if compression is successful, false otherwise.
-  bool compress(std::vector<JSAMPROW>& yLines, std::vector<JSAMPROW>& cbLines,
-                std::vector<JSAMPROW>& crLines) {
+  // Returns size of compressed image in bytes on success, empty optional otherwise.
+  std::optional<size_t> compress(std::vector<JSAMPROW>& yLines,
+                                 std::vector<JSAMPROW>& cbLines,
+                                 std::vector<JSAMPROW>& crLines) {
     jpeg_start_compress(&mCompressStruct, TRUE);
+
+    if (mApp1Data != nullptr && mApp1DataSize > 0) {
+      ALOGV("%s: Writing exif, size %zu B", __func__, mApp1DataSize);
+      jpeg_write_marker(&mCompressStruct, JPEG_APP0 + 1,
+                        static_cast<const JOCTET*>(mApp1Data), mApp1DataSize);
+    }
 
     while (mCompressStruct.next_scanline < mCompressStruct.image_height) {
       const uint32_t batchSize = DCTSIZE * 2;
@@ -181,11 +198,11 @@ class LibJpegContext {
         ALOGE("%s: compressed %u lines, expected %u (total %u/%u)",
               __FUNCTION__, done, batchSize, mCompressStruct.next_scanline,
               mCompressStruct.image_height);
-        return false;
+        return std::nullopt;
       }
     }
     jpeg_finish_compress(&mCompressStruct);
-    return mSuccess;
+    return mEncodedSize;
   }
 
   // === libjpeg callbacks below ===
@@ -217,6 +234,10 @@ class LibJpegContext {
   jpeg_error_mgr mErrorMgr;
   jpeg_destination_mgr mDestinationMgr;
 
+  // APP1 data.
+  const uint8_t* mApp1Data = nullptr;
+  size_t mApp1DataSize = 0;
+
   // Dimensions of the input image.
   int mWidth;
   int mHeight;
@@ -235,15 +256,15 @@ class LibJpegContext {
 
 }  // namespace
 
-bool compressJpeg(int width, int height, const android_ycbcr& ycbcr,
-                  size_t outBufferSize, void* outBuffer) {
-  return LibJpegContext(width, height, outBufferSize, outBuffer).compress(ycbcr);
-}
-
-bool compressBlackJpeg(int width, int height, size_t outBufferSize,
-                       void* outBuffer) {
-  return LibJpegContext(width, height, outBufferSize, outBuffer)
-      .compressBlackImage();
+std::optional<size_t> compressJpeg(const int width, const int height,
+                                   const int quality, const android_ycbcr& ycbcr,
+                                   const std::vector<uint8_t>& app1ExifData,
+                                   size_t outBufferSize, void* outBuffer) {
+  LibJpegContext context(width, height, quality, outBufferSize, outBuffer);
+  if (!app1ExifData.empty()) {
+    context.setApp1Data(app1ExifData.data(), app1ExifData.size());
+  }
+  return context.compress(ycbcr);
 }
 
 }  // namespace virtualcamera

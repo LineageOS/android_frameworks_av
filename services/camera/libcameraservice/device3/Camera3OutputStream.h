@@ -388,8 +388,6 @@ class Camera3OutputStream :
     virtual status_t getBufferLocked(camera_stream_buffer *buffer,
             const std::vector<size_t>& surface_ids);
 
-    virtual status_t getBuffersLocked(/*out*/std::vector<OutstandingBuffer>* buffers) override;
-
     virtual status_t returnBufferLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp, nsecs_t readoutTimestamp,

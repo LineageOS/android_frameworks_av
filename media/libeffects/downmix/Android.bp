@@ -1,5 +1,6 @@
 // Multichannel downmix effect library
 package {
+    default_team: "trendy_team_media_framework_audio",
     default_applicable_licenses: [
         "frameworks_av_media_libeffects_downmix_license",
     ],

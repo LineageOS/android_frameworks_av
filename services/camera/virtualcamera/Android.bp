@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_xr_framework",
     // See: http://go/android-license-faq
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
@@ -11,6 +12,7 @@ cc_defaults {
         "libbinder",
         "libbinder_ndk",
         "libcamera_metadata",
+        "libexif",
         "liblog",
         "libfmq",
         "libgui",
@@ -46,7 +48,7 @@ cc_library_static {
     name: "libvirtualcamera_utils",
     srcs: [
         "util/JpegUtil.cc",
-        "util/MetadataBuilder.cc",
+        "util/MetadataUtil.cc",
         "util/Util.cc",
         "util/TestPatternHelper.cc",
         "util/EglDisplayContext.cc",
@@ -54,7 +56,7 @@ cc_library_static {
         "util/EglProgram.cc",
         "util/EglSurfaceTexture.cc",
         "util/EglUtil.cc",
-        "util/Permissions.cc"
+        "util/Permissions.cc",
     ],
     defaults: [
         "libvirtualcamera_defaults",

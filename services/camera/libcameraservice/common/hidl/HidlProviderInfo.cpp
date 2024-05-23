@@ -692,6 +692,14 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
         mHasFlashUnit = false;
     }
 
+    if (flags::feature_combination_query()) {
+        res = addSessionConfigQueryVersionTag();
+        if (OK != res) {
+            ALOGE("%s: Unable to add sessionConfigurationQueryVersion tag: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+        }
+    }
+
     camera_metadata_entry entry =
             mCameraCharacteristics.find(ANDROID_FLASH_INFO_STRENGTH_DEFAULT_LEVEL);
     if (entry.count == 1) {

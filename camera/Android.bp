@@ -13,6 +13,7 @@
 // limitations under the License.
 
 package {
+    default_team: "trendy_team_camera_framework",
     default_applicable_licenses: ["frameworks_av_camera_license"],
 }
 
@@ -65,6 +66,7 @@ cc_library_headers {
     name: "camera_headers",
     export_include_dirs: ["include"],
 }
+
 cc_library {
     name: "libcamera_client",
 
@@ -120,10 +122,14 @@ cc_library {
         "frameworks/native/include/media/openmax",
     ],
     export_include_dirs: [
-         "include",
-         "include/camera"
+        "include",
+        "include/camera",
     ],
-    export_shared_lib_headers: ["libcamera_metadata", "libnativewindow", "libgui"],
+    export_shared_lib_headers: [
+        "libcamera_metadata",
+        "libnativewindow",
+        "libgui",
+    ],
 
     cflags: [
         "-Werror",
@@ -153,7 +159,7 @@ cc_library_host_static {
 
     export_include_dirs: [
         "include",
-        "include/camera"
+        "include/camera",
     ],
 }
 

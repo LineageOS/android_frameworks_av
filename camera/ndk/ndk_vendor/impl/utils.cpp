@@ -18,7 +18,6 @@
 
 #include "utils.h"
 
-#include <aidlcommonsupport/NativeHandle.h>
 #include <utils/Log.h>
 
 namespace android {
@@ -136,51 +135,6 @@ camera_status_t convertFromAidl(Status status) {
             break;
     }
     return ret;
-}
-
-bool isWindowNativeHandleEqual(const native_handle_t *nh1, const native_handle_t *nh2) {
-    if (nh1->numFds !=0 || nh2->numFds !=0) {
-        ALOGE("Invalid window native handles being compared");
-        return false;
-    }
-    if (nh1->version != nh2->version || nh1->numFds != nh2->numFds ||
-        nh1->numInts != nh2->numInts) {
-        return false;
-    }
-    for (int i = 0; i < nh1->numInts; i++) {
-        if(nh1->data[i] != nh2->data[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool isWindowNativeHandleEqual(const native_handle_t *nh1,
-                               const aidl::android::hardware::common::NativeHandle& nh2) {
-    native_handle_t* tempNh = makeFromAidl(nh2);
-    bool equal = isWindowNativeHandleEqual(nh1, tempNh);
-    native_handle_delete(tempNh);
-    return equal;
-}
-
-bool isWindowNativeHandleLessThan(const native_handle_t *nh1, const native_handle_t *nh2) {
-    if (isWindowNativeHandleEqual(nh1, nh2)) {
-        return false;
-    }
-    if (nh1->numInts != nh2->numInts) {
-        return nh1->numInts < nh2->numInts;
-    }
-
-    for (int i = 0; i < nh1->numInts; i++) {
-        if (nh1->data[i] != nh2->data[i]) {
-            return nh1->data[i] < nh2->data[i];
-        }
-    }
-    return false;
-}
-
-bool isWindowNativeHandleGreaterThan(const native_handle_t *nh1, const native_handle_t *nh2) {
-    return !isWindowNativeHandleLessThan(nh1, nh2) && !isWindowNativeHandleEqual(nh1, nh2);
 }
 
 } // namespace utils

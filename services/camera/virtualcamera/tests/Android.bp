@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_xr_framework",
     // See: http://go/android-license-faq
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
@@ -14,11 +15,13 @@ cc_test {
         "libgtest",
         "libgmock",
     ],
-    srcs: ["EglUtilTest.cc",
-           "VirtualCameraDeviceTest.cc",
-           "VirtualCameraProviderTest.cc",
-           "VirtualCameraRenderThreadTest.cc",
-           "VirtualCameraServiceTest.cc",
-           "VirtualCameraSessionTest.cc"],
+    srcs: [
+        "EglUtilTest.cc",
+        "VirtualCameraDeviceTest.cc",
+        "VirtualCameraProviderTest.cc",
+        "VirtualCameraRenderThreadTest.cc",
+        "VirtualCameraServiceTest.cc",
+        "VirtualCameraSessionTest.cc",
+    ],
     test_suites: ["device-tests"],
 }

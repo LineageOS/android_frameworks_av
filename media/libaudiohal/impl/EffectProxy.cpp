@@ -155,6 +155,7 @@ ndk::ScopedAStatus EffectProxy::reopen(OpenEffectReturn* ret __unused) {
 }
 
 ndk::ScopedAStatus EffectProxy::close() {
+    command(CommandId::STOP);
     return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
         return effect->close();
     });
