@@ -146,6 +146,11 @@ public:
         return mCameraServiceProxy->notifyCameraState(cameraSessionStats);
     }
 
+    virtual binder::Status notifyFeatureCombinationStats(
+            const hardware::CameraFeatureCombinationStats& featureCombStats) override {
+        return mCameraServiceProxy->notifyFeatureCombinationStats(featureCombStats);
+    }
+
     virtual binder::Status isCameraDisabled(int userId, bool *ret) override {
         if (mOverrideCameraDisabled) {
             *ret = mCameraDisabled;

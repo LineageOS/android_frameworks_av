@@ -168,6 +168,7 @@ filegroup {
     name: "libcamera_client_aidl",
     srcs: [
         "aidl/android/hardware/CameraExtensionSessionStats.aidl",
+        "aidl/android/hardware/CameraFeatureCombinationStats.aidl",
         "aidl/android/hardware/ICameraService.aidl",
         "aidl/android/hardware/ICameraServiceListener.aidl",
         "aidl/android/hardware/ICameraServiceProxy.aidl",

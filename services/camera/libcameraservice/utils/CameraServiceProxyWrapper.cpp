@@ -18,19 +18,25 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <gui/Surface.h>
 #include <inttypes.h>
 #include <utils/Log.h>
 #include <utils/String16.h>
 #include <camera/StringUtils.h>
 #include <binder/IServiceManager.h>
+#include <system/window.h>
+
+#include "aidl/android/hardware/graphics/common/Dataspace.h"
 
 #include "CameraServiceProxyWrapper.h"
 
 namespace android {
 
 using hardware::CameraExtensionSessionStats;
+using hardware::CameraFeatureCombinationStats;
 using hardware::CameraSessionStats;
 using hardware::ICameraServiceProxy;
+using hardware::camera2::params::SessionConfiguration;
 
 namespace {
 // Sentinel value to be returned when extension session with a stale or invalid key is reported.
@@ -213,6 +219,105 @@ void CameraServiceProxyWrapper::pingCameraServiceProxy() {
     sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     if (proxyBinder == nullptr) return;
     proxyBinder->pingForUserUpdate();
+}
+
+int64_t CameraServiceProxyWrapper::encodeSessionConfiguration(
+        const SessionConfiguration& sessionConfig) {
+    int64_t features = CameraFeatureCombinationStats::CAMERA_FEATURE_UNKNOWN;
+    const static int32_t WIDTH_4K = 3840;
+    const static int32_t HEIGHT_4K = 2160;
+
+    // Check session parameters
+    if (sessionConfig.hasSessionParameters()) {
+        const auto& parameters = sessionConfig.getSessionParameters();
+
+        camera_metadata_ro_entry fpsEntry = parameters.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE);
+        if (fpsEntry.count == 2 && fpsEntry.data.i32[1] == 60) {
+            features |= CameraFeatureCombinationStats::CAMERA_FEATURE_60_FPS;
+        }
+
+        camera_metadata_ro_entry stabEntry =
+                parameters.find(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE);
+        if (stabEntry.count == 1 && stabEntry.data.u8[0] ==
+                ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION) {
+            features |= CameraFeatureCombinationStats::CAMERA_FEATURE_STABILIZATION;
+        }
+    }
+
+    // Check output configurations
+    const auto& outputConfigs = sessionConfig.getOutputConfigurations();
+    for (const auto& config : outputConfigs) {
+        int format = config.getFormat();
+        int dataSpace = config.getDataspace();
+        int64_t dynamicRangeProfile = config.getDynamicRangeProfile();
+
+        // Check JPEG and JPEG_R features
+        if (format == HAL_PIXEL_FORMAT_BLOB) {
+            if (dataSpace == HAL_DATASPACE_V0_JFIF) {
+                features |= CameraFeatureCombinationStats::CAMERA_FEATURE_JPEG;
+            } else if (dataSpace == static_cast<android_dataspace_t>(
+                    aidl::android::hardware::graphics::common::Dataspace::JPEG_R)) {
+                features |= CameraFeatureCombinationStats::CAMERA_FEATURE_JPEG_R;
+            }
+        } else {
+            if (dynamicRangeProfile == HAL_DATASPACE_BT2020_HLG) {
+                features |= CameraFeatureCombinationStats::CAMERA_FEATURE_HLG10;
+            }
+
+            // Check 4K
+            const auto& gbps = config.getGraphicBufferProducers();
+            int32_t width = 0, height = 0;
+            if (gbps.size() > 0) {
+                sp<Surface> surface = new Surface(gbps[0], /*useAsync*/false);
+                ANativeWindow *anw = surface.get();
+
+                width = ANativeWindow_getWidth(anw);
+                if (width < 0) {
+                    ALOGE("%s: Failed to query Surface width: %s (%d)",
+                            __FUNCTION__, strerror(-width), width);
+                    return CameraFeatureCombinationStats::CAMERA_FEATURE_UNKNOWN;
+                }
+                height = ANativeWindow_getHeight(anw);
+                if (height < 0) {
+                    ALOGE("%s: Failed to query Surface height: %s (%d)",
+                            __FUNCTION__, strerror(-height), height);
+                    return CameraFeatureCombinationStats::CAMERA_FEATURE_UNKNOWN;
+                }
+            } else {
+                width = config.getWidth();
+                height = config.getHeight();
+            }
+            if (width == WIDTH_4K && height == HEIGHT_4K) {
+                features |= CameraFeatureCombinationStats::CAMERA_FEATURE_4K;
+            }
+        }
+    }
+    return features;
+}
+
+// Note: The `ret` parameter is the return value of the
+// `isSessionConfigurationWithParametersSupporteed` binder call from the app.
+void CameraServiceProxyWrapper::logFeatureCombinationInternal(
+        const std::string &cameraId, int clientUid,
+        const SessionConfiguration& sessionConfiguration, binder::Status ret,
+        int type) {
+    sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    if (proxyBinder == nullptr) return;
+
+    int64_t featureCombination = encodeSessionConfiguration(sessionConfiguration);
+    int queryStatus = ret.isOk() ? OK : ret.serviceSpecificErrorCode();
+    CameraFeatureCombinationStats stats;
+    stats.mCameraId = cameraId;
+    stats.mUid = clientUid;
+    stats.mFeatureCombination = featureCombination;
+    stats.mQueryType = type;
+    stats.mStatus = queryStatus;
+
+    auto status = proxyBinder->notifyFeatureCombinationStats(stats);
+    if (!status.isOk()) {
+        ALOGE("%s: Failed to notify feature combination stats: %s", __FUNCTION__,
+                status.exceptionMessage().c_str());
+    }
 }
 
 int CameraServiceProxyWrapper::getRotateAndCropOverride(const std::string &packageName,

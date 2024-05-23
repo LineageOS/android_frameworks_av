@@ -16,6 +16,7 @@
 
 package android.hardware;
 
+import android.hardware.CameraFeatureCombinationStats;
 import android.hardware.CameraSessionStats;
 import android.hardware.CameraExtensionSessionStats;
 
@@ -36,6 +37,12 @@ interface ICameraServiceProxy
      * Update the status of a camera device.
      */
     oneway void notifyCameraState(in CameraSessionStats cameraSessionStats);
+
+    /**
+     * Notify feature combination query for a camera device.
+     */
+    oneway void notifyFeatureCombinationStats(
+            in CameraFeatureCombinationStats cameraFeatureCombinationStats);
 
     /**
      * Returns the necessary rotate and crop override for the top activity which
