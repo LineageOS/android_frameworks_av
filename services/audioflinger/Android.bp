@@ -218,12 +218,16 @@ cc_library {
     ],
 
     header_libs: [
+        "audiopermissioncontroller_headers",
+        "audiopolicyservicelocal_headers",
         "libaaudio_headers",
         "libaudioclient_headers",
         "libaudiohal_headers",
         "libaudioutils_headers",
         "libmedia_headers",
     ],
+
+    export_header_lib_headers: ["audiopolicyservicelocal_headers"],
 
     export_shared_lib_headers: [
         "libpermission",

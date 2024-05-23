@@ -36,6 +36,7 @@
 #include <media/ToneGenerator.h>
 #include <media/AudioEffect.h>
 #include <media/AudioPolicy.h>
+#include <media/IAudioPolicyServiceLocal.h>
 #include <media/NativePermissionController.h>
 #include <media/UsecaseValidator.h>
 #include <mediautils/ServiceUtilities.h>
@@ -72,12 +73,14 @@ namespace media::audiopolicy {
 using ::android::media::audiopolicy::AudioRecordClient;
 using ::com::android::media::permission::INativePermissionController;
 using ::com::android::media::permission::NativePermissionController;
+using ::com::android::media::permission::IPermissionProvider;
 
 class AudioPolicyService :
     public BinderService<AudioPolicyService>,
     public media::BnAudioPolicyService,
     public IBinder::DeathRecipient,
-    public SpatializerPolicyCallback
+    public SpatializerPolicyCallback,
+    public media::IAudioPolicyServiceLocal
 {
     friend class sp<AudioPolicyService>;
 
@@ -322,6 +325,9 @@ public:
     binder::Status getPermissionController(sp<INativePermissionController>* out) override;
 
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
+
+    // -- IAudioPolicyLocal methods
+    const IPermissionProvider& getPermissionProvider() const override;
 
     // IBinder::DeathRecipient
     virtual     void        binderDied(const wp<IBinder>& who);

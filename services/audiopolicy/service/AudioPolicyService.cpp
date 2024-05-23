@@ -316,6 +316,10 @@ void AudioPolicyService::onFirstRef()
     AudioSystem::audioPolicyReady();
 }
 
+const IPermissionProvider& AudioPolicyService::getPermissionProvider() const {
+    return *mPermissionController;
+}
+
 void AudioPolicyService::onAudioSystemReady() {
     sp<AudioPolicyEffects> audioPolicyEffects;
     {
