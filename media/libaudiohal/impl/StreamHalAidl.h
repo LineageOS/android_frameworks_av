@@ -95,7 +95,8 @@ class StreamContextAidl {
     size_t getBufferSizeBytes() const { return mFrameSizeBytes * mBufferSizeFrames; }
     size_t getBufferSizeFrames() const { return mBufferSizeFrames; }
     size_t getBufferDurationMs(int32_t sampleRate) const {
-        return sampleRate != 0 ? mBufferSizeFrames * MILLIS_PER_SECOND / sampleRate : 0;
+        auto bufferSize = mIsMmapped ? getMmapBurstSize() : mBufferSizeFrames;
+        return sampleRate != 0 ? bufferSize * MILLIS_PER_SECOND / sampleRate : 0;
     }
     CommandMQ* getCommandMQ() const { return mCommandMQ.get(); }
     DataMQ* getDataMQ() const { return mDataMQ.get(); }
@@ -104,7 +105,7 @@ class StreamContextAidl {
     bool isAsynchronous() const { return mIsAsynchronous; }
     bool isMmapped() const { return mIsMmapped; }
     const MmapBufferDescriptor& getMmapBufferDescriptor() const { return mMmapBufferDescriptor; }
-
+    size_t getMmapBurstSize() const { return mMmapBufferDescriptor.burstSizeFrames;}
   private:
     static std::unique_ptr<DataMQ> maybeCreateDataMQ(
             const ::aidl::android::hardware::audio::core::StreamDescriptor& descriptor) {
