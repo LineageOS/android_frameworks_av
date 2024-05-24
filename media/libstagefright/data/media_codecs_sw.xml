@@ -203,8 +203,7 @@
             <Feature name="dynamic-color-aspects" />
             <Attribute name="software-codec" />
         </MediaCodec>
-        <MediaCodec name="c2.android.av1.decoder" type="video/av01" variant="slow-cpu,!slow-cpu">
-            <!-- TODO: implement a mechanism to prevent AV1 Decoder usage on pre-U devices -->
+        <MediaCodec name="c2.android.av1-dav1d.decoder" type="video/av01" variant="slow-cpu,!slow-cpu">
             <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
@@ -224,7 +223,8 @@
             <Feature name="low-latency" />
             <Attribute name="software-codec" />
         </MediaCodec>
-        <MediaCodec name="c2.android.av1-dav1d.decoder" type="video/av01" variant="slow-cpu,!slow-cpu" rank="1024">
+        <MediaCodec name="c2.android.av1.decoder" type="video/av01" variant="slow-cpu,!slow-cpu" rank="1024">
+            <!-- TODO: implement a mechanism to prevent AV1 Decoder usage on pre-U devices -->
             <Limit name="alignment" value="1x1" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
