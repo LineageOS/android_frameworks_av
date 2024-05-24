@@ -51,7 +51,6 @@
 #include "util/EglFramebuffer.h"
 #include "util/JpegUtil.h"
 #include "util/MetadataUtil.h"
-#include "util/TestPatternHelper.h"
 #include "util/Util.h"
 #include "utils/Errors.h"
 
@@ -300,11 +299,10 @@ sp<Fence> CaptureRequestBuffer::getFence() const {
 VirtualCameraRenderThread::VirtualCameraRenderThread(
     VirtualCameraSessionContext& sessionContext,
     const Resolution inputSurfaceSize, const Resolution reportedSensorSize,
-    std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback, bool testMode)
+    std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback)
     : mCameraDeviceCallback(cameraDeviceCallback),
       mInputSurfaceSize(inputSurfaceSize),
       mReportedSensorSize(reportedSensorSize),
-      mTestMode(testMode),
       mSessionContext(sessionContext) {
 }
 
@@ -401,10 +399,6 @@ void VirtualCameraRenderThread::threadLoop() {
   mEglSurfaceTexture = std::make_unique<EglSurfaceTexture>(
       mInputSurfaceSize.width, mInputSurfaceSize.height);
 
-  sp<Surface> inputSurface = mEglSurfaceTexture->getSurface();
-  if (mTestMode) {
-    inputSurface->connect(NATIVE_WINDOW_API_CPU, false, nullptr);
-  }
   mInputSurfacePromise.set_value(mEglSurfaceTexture->getSurface());
 
   while (std::unique_ptr<ProcessCaptureRequestTask> task = dequeueTask()) {
@@ -422,12 +416,6 @@ void VirtualCameraRenderThread::threadLoop() {
 
 void VirtualCameraRenderThread::processCaptureRequest(
     const ProcessCaptureRequestTask& request) {
-  if (mTestMode) {
-    // In test mode let's just render something to the Surface ourselves.
-    renderTestPatternYCbCr420(mEglSurfaceTexture->getSurface(),
-                              request.getFrameNumber());
-  }
-
   std::chrono::nanoseconds timestamp =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now().time_since_epoch());

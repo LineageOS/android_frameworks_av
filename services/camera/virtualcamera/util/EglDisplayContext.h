@@ -17,7 +17,10 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_EGLDISPLAYCONTEXT_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_EGLDISPLAYCONTEXT_H
 
+#include <memory>
+
 #include "EGL/egl.h"
+#include "system/window.h"
 
 namespace android {
 namespace companion {
@@ -30,7 +33,7 @@ namespace virtualcamera {
 // out of scope.
 class EglDisplayContext {
  public:
-  EglDisplayContext();
+  EglDisplayContext(std::shared_ptr<ANativeWindow> nativeWindow = nullptr);
   ~EglDisplayContext();
 
   // Sets EGLDisplay & EGLContext for current thread.
@@ -44,8 +47,13 @@ class EglDisplayContext {
   // EGLDisplay & EGLContext.
   bool isInitialized() const;
 
+  void swapBuffers() const;
+
  private:
+  std::shared_ptr<ANativeWindow> mNativeWindow;
+
   EGLDisplay mEglDisplay;
+  EGLSurface mEglSurface;
   EGLContext mEglContext;
   EGLConfig mEglConfig;
 };

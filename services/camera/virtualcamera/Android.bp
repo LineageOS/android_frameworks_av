@@ -50,7 +50,6 @@ cc_library_static {
         "util/JpegUtil.cc",
         "util/MetadataUtil.cc",
         "util/Util.cc",
-        "util/TestPatternHelper.cc",
         "util/EglDisplayContext.cc",
         "util/EglFramebuffer.cc",
         "util/EglProgram.cc",
@@ -72,6 +71,7 @@ cc_library_static {
         "VirtualCameraStream.cc",
         "VirtualCameraService.cc",
         "VirtualCameraSessionContext.cc",
+        "VirtualCameraTestInstance.cc",
         "VirtualCameraRenderThread.cc",
     ],
     defaults: [
