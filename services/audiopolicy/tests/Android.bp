@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -33,11 +34,14 @@ cc_test {
         "libmedia_helper",
         "libutils",
         "libxml2",
+        "server_configurable_flags",
     ],
 
     static_libs: [
+        "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "libaudiopolicycomponents",
+        "libflagtest",
         "libgmock",
     ],
 

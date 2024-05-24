@@ -279,7 +279,7 @@ public:
     // integrity of the chains during the process.
     // Also sets the parameter 'effectChains' to current value of mEffectChains.
     virtual void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains)
-            REQUIRES(mutex()) = 0;
+            REQUIRES(mutex()) EXCLUDES_EffectChain_Mutex = 0;
     // unlock effect chains after process
     virtual void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains)
             EXCLUDES_ThreadBase_Mutex = 0;

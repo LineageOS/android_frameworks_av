@@ -46,6 +46,18 @@ cc_aconfig_library {
     name: "com.android.media.audio-aconfig-cc",
     aconfig_declarations: "com.android.media.audio-aconfig",
     defaults: ["audio-aconfig-cc-defaults"],
+    double_loadable: true,
+    host_supported: true,
+    product_available: true,
+    vendor_available: true,
+    // TODO(b/316909431) native_bridge_supported: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+        "com.android.btservices",
+    ],
+    min_sdk_version: "29",
 }
 
 cc_aconfig_library {
@@ -59,6 +71,12 @@ java_aconfig_library {
     aconfig_declarations: "com.android.media.audio-aconfig",
 }
 
+// For CTS usage
+java_aconfig_library {
+    name: "com.android.media.audioserver-aconfig-java",
+    aconfig_declarations: "com.android.media.audioserver-aconfig",
+}
+
 // Framework available flags to follow
 // Care must be taken to avoid namespace conflicts.
 // These flags are accessible outside of the platform! Limit usage to @FlaggedApi wherever possible
@@ -68,7 +86,7 @@ aconfig_declarations {
     package: "android.media.audio",
     container: "system",
     srcs: ["audio_framework.aconfig"],
-    visibility: ["//visibility:private"],
+    visibility: ["//frameworks/base/api"],
 }
 
 aconfig_declarations {
@@ -76,7 +94,7 @@ aconfig_declarations {
     package: "android.media.audiopolicy",
     container: "system",
     srcs: ["audiopolicy_framework.aconfig"],
-    visibility: ["//visibility:private"],
+    visibility: ["//frameworks/base/api"],
 }
 
 aconfig_declarations {
@@ -84,7 +102,7 @@ aconfig_declarations {
     package: "android.media.midi",
     container: "system",
     srcs: ["midi_flags.aconfig"],
-    visibility: ["//visibility:private"],
+    visibility: ["//frameworks/base/api"],
 }
 
 java_aconfig_library {
@@ -97,12 +115,23 @@ java_aconfig_library {
     name: "android.media.audiopolicy-aconfig-java",
     aconfig_declarations: "android.media.audiopolicy-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "VanillaIceCream",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.car.framework",
+    ],
 }
 
 java_aconfig_library {
     name: "android.media.midi-aconfig-java",
     aconfig_declarations: "android.media.midi-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "android.media.audiopolicy-aconfig-cc",
+    aconfig_declarations: "android.media.audiopolicy-aconfig",
+    defaults: ["audio-aconfig-cc-defaults"],
 }
 
 aconfig_declarations_group {

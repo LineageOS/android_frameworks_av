@@ -29,6 +29,8 @@ using namespace android;
 constexpr int32_t kRangeMin = 0;
 constexpr int32_t kRangeMax = 1000;
 constexpr int32_t kVendorTagDescriptorId = -1;
+constexpr int8_t kMinLoopIterations = 1;
+constexpr int8_t kMaxLoopIterations = 50;
 
 extern "C" {
 
@@ -95,39 +97,63 @@ void VendorTagDescriptorFuzzer::invokeVendorTagDescriptor() {
     initVendorTagDescriptor();
 
     sp<VendorTagDescriptor> vdesc = new VendorTagDescriptor();
-    vdesc->copyFrom(*mVendorTagDescriptor);
-    VendorTagDescriptor::setAsGlobalVendorTagDescriptor(mVendorTagDescriptor);
-    VendorTagDescriptor::getGlobalVendorTagDescriptor();
 
-    int32_t tagCount = mVendorTagDescriptor->getTagCount();
-    if (tagCount > 0) {
-        uint32_t tagArray[tagCount];
-        mVendorTagDescriptor->getTagArray(tagArray);
-        uint32_t tag;
-        for (int32_t i = 0; i < tagCount; ++i) {
-            tag = tagArray[i];
-            get_local_camera_metadata_section_name_vendor_id(tag, kVendorTagDescriptorId);
-            get_local_camera_metadata_tag_name_vendor_id(tag, kVendorTagDescriptorId);
-            get_local_camera_metadata_tag_type_vendor_id(tag, kVendorTagDescriptorId);
-            mVendorTagDescriptor->getSectionIndex(tag);
-        }
-        mVendorTagDescriptor->getAllSectionNames();
+    int8_t count = mFDP->ConsumeIntegralInRange<int8_t>(kMinLoopIterations, kMaxLoopIterations);
+    while (--count > 0) {
+        auto callVendorTagDescriptor = mFDP->PickValueInArray<const std::function<void()>>({
+                [&]() {
+                    int32_t tagCount = mVendorTagDescriptor->getTagCount();
+                    if (tagCount > 0) {
+                        uint32_t tagArray[tagCount];
+                        mVendorTagDescriptor->getTagArray(tagArray);
+                        uint32_t tag;
+                        for (int32_t i = 0; i < tagCount; ++i) {
+                            tag = tagArray[i];
+                            get_local_camera_metadata_section_name_vendor_id(
+                                    tag, kVendorTagDescriptorId);
+                            get_local_camera_metadata_tag_name_vendor_id(tag,
+                                                                         kVendorTagDescriptorId);
+                            get_local_camera_metadata_tag_type_vendor_id(tag,
+                                                                         kVendorTagDescriptorId);
+                            mVendorTagDescriptor->getSectionIndex(tag);
+                        }
+                    }
+                },
+                [&]() {
+                    if (mVendorTagDescriptor->getTagCount() > 0) {
+                        mVendorTagDescriptor->getAllSectionNames();
+                    }
+                },
+                [&]() { vdesc->copyFrom(*mVendorTagDescriptor); },
+                [&]() {
+                    VendorTagDescriptor::setAsGlobalVendorTagDescriptor(mVendorTagDescriptor);
+                },
+                [&]() { VendorTagDescriptor::getGlobalVendorTagDescriptor(); },
+                [&]() {
+                    String8 name((mFDP->ConsumeRandomLengthString()).c_str());
+                    String8 section((mFDP->ConsumeRandomLengthString()).c_str());
+                    uint32_t lookupTag;
+                    mVendorTagDescriptor->lookupTag(name, section, &lookupTag);
+                },
+                [&]() {
+                    int32_t fd = open("/dev/null", O_CLOEXEC | O_RDWR | O_CREAT);
+                    int32_t verbosity = mFDP->ConsumeIntegralInRange<int32_t>(kRangeMin, kRangeMax);
+                    int32_t indentation =
+                            mFDP->ConsumeIntegralInRange<int32_t>(kRangeMin, kRangeMax);
+                    mVendorTagDescriptor->dump(fd, verbosity, indentation);
+                    close(fd);
+                },
+        });
+        callVendorTagDescriptor();
     }
 
-    String8 name((mFDP->ConsumeRandomLengthString()).c_str());
-    String8 section((mFDP->ConsumeRandomLengthString()).c_str());
-    uint32_t lookupTag;
-    mVendorTagDescriptor->lookupTag(name, section, &lookupTag);
-
-    int32_t fd = open("/dev/null", O_CLOEXEC | O_RDWR | O_CREAT);
-    int32_t verbosity = mFDP->ConsumeIntegralInRange<int32_t>(kRangeMin, kRangeMax);
-    int32_t indentation = mFDP->ConsumeIntegralInRange<int32_t>(kRangeMin, kRangeMax);
-    mVendorTagDescriptor->dump(fd, verbosity, indentation);
-
-    invokeReadWriteParcelsp<VendorTagDescriptor>(mVendorTagDescriptor);
+    // Do not keep invokeReadWrite() APIs in while loop to avoid possible OOM.
+    if (mFDP->ConsumeBool()) {
+        invokeReadWriteParcelsp<VendorTagDescriptor>(mVendorTagDescriptor);
+    } else {
+        invokeNewReadWriteParcelsp<VendorTagDescriptor>(mVendorTagDescriptor, *mFDP);
+    }
     VendorTagDescriptor::clearGlobalVendorTagDescriptor();
-    vdesc.clear();
-    close(fd);
 }
 
 void VendorTagDescriptorFuzzer::invokeVendorTagDescriptorCache() {
@@ -135,36 +161,52 @@ void VendorTagDescriptorFuzzer::invokeVendorTagDescriptorCache() {
     uint64_t id = mFDP->ConsumeIntegral<uint64_t>();
     initVendorTagDescriptor();
 
-    mVendorTagDescriptorCache->addVendorDescriptor(id, mVendorTagDescriptor);
-    VendorTagDescriptorCache::setAsGlobalVendorTagCache(mVendorTagDescriptorCache);
-    VendorTagDescriptorCache::getGlobalVendorTagCache();
-    sp<VendorTagDescriptor> tagDesc;
-    mVendorTagDescriptorCache->getVendorTagDescriptor(id, &tagDesc);
-
-    int32_t tagCount = mVendorTagDescriptorCache->getTagCount(id);
-    if (tagCount > 0) {
-        uint32_t tagArray[tagCount];
-        mVendorTagDescriptorCache->getTagArray(tagArray, id);
-        uint32_t tag;
-        for (int32_t i = 0; i < tagCount; ++i) {
-            tag = tagArray[i];
-            get_local_camera_metadata_section_name_vendor_id(tag, id);
-            get_local_camera_metadata_tag_name_vendor_id(tag, id);
-            get_local_camera_metadata_tag_type_vendor_id(tag, id);
-        }
+    int8_t count = mFDP->ConsumeIntegralInRange<int8_t>(kMinLoopIterations, kMaxLoopIterations);
+    while (--count > 0) {
+        auto callVendorTagDescriptorCache = mFDP->PickValueInArray<const std::function<void()>>({
+                [&]() { mVendorTagDescriptorCache->addVendorDescriptor(id, mVendorTagDescriptor); },
+                [&]() {
+                    VendorTagDescriptorCache::setAsGlobalVendorTagCache(mVendorTagDescriptorCache);
+                },
+                [&]() { VendorTagDescriptorCache::getGlobalVendorTagCache(); },
+                [&]() {
+                    sp<VendorTagDescriptor> tagDesc;
+                    mVendorTagDescriptorCache->getVendorTagDescriptor(id, &tagDesc);
+                },
+                [&]() {
+                    int32_t tagCount = mVendorTagDescriptorCache->getTagCount(id);
+                    if (tagCount > 0) {
+                        uint32_t tagArray[tagCount];
+                        mVendorTagDescriptorCache->getTagArray(tagArray, id);
+                        uint32_t tag;
+                        for (int32_t i = 0; i < tagCount; ++i) {
+                            tag = tagArray[i];
+                            get_local_camera_metadata_section_name_vendor_id(tag, id);
+                            get_local_camera_metadata_tag_name_vendor_id(tag, id);
+                            get_local_camera_metadata_tag_type_vendor_id(tag, id);
+                        }
+                    }
+                },
+                [&]() {
+                    int32_t fd = open("/dev/null", O_CLOEXEC | O_RDWR | O_CREAT);
+                    int32_t verbosity = mFDP->ConsumeIntegralInRange<int>(kRangeMin, kRangeMax);
+                    int32_t indentation = mFDP->ConsumeIntegralInRange<int>(kRangeMin, kRangeMax);
+                    mVendorTagDescriptorCache->dump(fd, verbosity, indentation);
+                    close(fd);
+                },
+                [&]() { VendorTagDescriptorCache::isVendorCachePresent(id); },
+                [&]() { mVendorTagDescriptorCache->getVendorIdsAndTagDescriptors(); },
+        });
+        callVendorTagDescriptorCache();
     }
 
-    int32_t fd = open("/dev/null", O_CLOEXEC | O_RDWR | O_CREAT);
-    int32_t verbosity = mFDP->ConsumeIntegralInRange<int>(kRangeMin, kRangeMax);
-    int32_t indentation = mFDP->ConsumeIntegralInRange<int>(kRangeMin, kRangeMax);
-    mVendorTagDescriptorCache->dump(fd, verbosity, indentation);
-
-    invokeReadWriteParcelsp<VendorTagDescriptorCache>(mVendorTagDescriptorCache);
-    VendorTagDescriptorCache::isVendorCachePresent(id);
-    mVendorTagDescriptorCache->getVendorIdsAndTagDescriptors();
+    // Do not keep invokeReadWrite() APIs in while loop to avoid possible OOM.
+    if (mFDP->ConsumeBool()) {
+        invokeReadWriteParcelsp<VendorTagDescriptorCache>(mVendorTagDescriptorCache);
+    } else {
+        invokeNewReadWriteParcelsp<VendorTagDescriptorCache>(mVendorTagDescriptorCache, *mFDP);
+    }
     mVendorTagDescriptorCache->clearGlobalVendorTagCache();
-    tagDesc.clear();
-    close(fd);
 }
 
 void VendorTagDescriptorFuzzer::invokeVendorTagErrorConditions() {
@@ -177,26 +219,39 @@ void VendorTagDescriptorFuzzer::invokeVendorTagErrorConditions() {
         VendorTagDescriptor::createDescriptorFromOps(/*vOps*/ NULL, vDesc);
     } else {
         VendorTagDescriptor::createDescriptorFromOps(&vOps, vDesc);
-        int32_t tagCount = vDesc->getTagCount();
-        uint32_t badTag = mFDP->ConsumeIntegral<uint32_t>();
-        uint32_t badTagArray[tagCount + 1];
-        vDesc->getTagArray(badTagArray);
-        vDesc->getSectionName(badTag);
-        vDesc->getTagName(badTag);
-        vDesc->getTagType(badTag);
-        VendorTagDescriptor::clearGlobalVendorTagDescriptor();
-        VendorTagDescriptor::getGlobalVendorTagDescriptor();
-        VendorTagDescriptor::setAsGlobalVendorTagDescriptor(vDesc);
+
+        int8_t count = mFDP->ConsumeIntegralInRange<int8_t>(kMinLoopIterations, kMaxLoopIterations);
+        while (--count > 0) {
+            int32_t tagCount = vDesc->getTagCount();
+            uint32_t badTag = mFDP->ConsumeIntegral<uint32_t>();
+            uint32_t badTagArray[tagCount + 1];
+            auto callVendorTagErrorConditions =
+                    mFDP->PickValueInArray<const std::function<void()>>({
+                            [&]() { vDesc->getTagArray(badTagArray); },
+                            [&]() { vDesc->getSectionName(badTag); },
+                            [&]() { vDesc->getTagName(badTag); },
+                            [&]() { vDesc->getTagType(badTag); },
+                            [&]() { VendorTagDescriptor::clearGlobalVendorTagDescriptor(); },
+                            [&]() { VendorTagDescriptor::getGlobalVendorTagDescriptor(); },
+                            [&]() { VendorTagDescriptor::setAsGlobalVendorTagDescriptor(vDesc); },
+                    });
+            callVendorTagErrorConditions();
+        }
         invokeReadWriteNullParcelsp<VendorTagDescriptor>(vDesc);
-        vDesc.clear();
     }
+    vDesc.clear();
 }
 
 void VendorTagDescriptorFuzzer::process(const uint8_t* data, size_t size) {
     mFDP = new FuzzedDataProvider(data, size);
-    invokeVendorTagDescriptor();
-    invokeVendorTagDescriptorCache();
-    invokeVendorTagErrorConditions();
+    while (mFDP->remaining_bytes()) {
+        auto invokeVendorTagDescriptorFuzzer = mFDP->PickValueInArray<const std::function<void()>>({
+                [&]() { invokeVendorTagDescriptor(); },
+                [&]() { invokeVendorTagDescriptorCache(); },
+                [&]() { invokeVendorTagErrorConditions(); },
+        });
+        invokeVendorTagDescriptorFuzzer();
+    }
     delete mFDP;
 }
 

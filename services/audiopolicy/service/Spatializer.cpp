@@ -31,6 +31,7 @@
 #include <audio_utils/fixedfft.h>
 #include <com_android_media_audio.h>
 #include <cutils/bitops.h>
+#include <cutils/properties.h>
 #include <hardware/sensors.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -396,7 +397,13 @@ status_t Spatializer::loadEngineConfiguration(sp<EffectHalInterface> effect) {
         return status;
     }
     for (const auto channelMask : channelMasks) {
-        if (!audio_is_channel_mask_spatialized(channelMask)) {
+        static const bool stereo_spatialization_enabled =
+                property_get_bool("ro.audio.stereo_spatialization_enabled", false);
+        const bool channel_mask_spatialized =
+                (stereo_spatialization_enabled && com_android_media_audio_stereo_spatialization())
+                ? audio_channel_mask_contains_stereo(channelMask)
+                : audio_is_channel_mask_spatialized(channelMask);
+        if (!channel_mask_spatialized) {
             ALOGW("%s: ignoring channelMask:%#x", __func__, channelMask);
             continue;
         }
@@ -1238,6 +1245,10 @@ std::string Spatializer::toString(unsigned level) const {
     base::StringAppendF(&ss, "%sEffectHandle: %p\n", prefixSpace.c_str(), mEngine.get());
     base::StringAppendF(&ss, "%sDisplayOrientation: %f\n", prefixSpace.c_str(),
                         mDisplayOrientation);
+
+    // 4. Show flag or property state.
+    base::StringAppendF(&ss, "%sStereo Spatialization: %s\n", prefixSpace.c_str(),
+            com_android_media_audio_stereo_spatialization() ? "true" : "false");
 
     ss.append(prefixSpace + "CommandLog:\n");
     ss += mLocalLog.dumpToString((prefixSpace + " ").c_str(), mMaxLocalLogLine);

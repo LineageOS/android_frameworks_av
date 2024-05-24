@@ -343,12 +343,6 @@ class Camera3Stream :
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
 
     /**
-     * Similar to getBuffer() except this method fills multiple buffers.
-     */
-    status_t         getBuffers(std::vector<OutstandingBuffer>* buffers,
-            nsecs_t waitBufferTimeout);
-
-    /**
      * Return a buffer to the stream after use by the HAL.
      *
      * Multiple surfaces could share the same HAL stream, but a request may
@@ -534,8 +528,6 @@ class Camera3Stream :
     virtual status_t returnBufferLocked(const camera_stream_buffer &buffer,
             nsecs_t timestamp, nsecs_t readoutTimestamp, int32_t transform,
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
-
-    virtual status_t getBuffersLocked(std::vector<OutstandingBuffer>*);
 
     virtual status_t getInputBufferLocked(camera_stream_buffer *buffer, Size* size);
 

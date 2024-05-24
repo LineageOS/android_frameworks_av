@@ -178,8 +178,8 @@ void FastMixer::updateMixerTrack(int index, Reason reason) {
                 (void *)(uintptr_t)mSinkChannelMask);
         mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_ENABLED,
                 (void *)(uintptr_t)fastTrack->mHapticPlaybackEnabled);
-        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_INTENSITY,
-                (void *)(uintptr_t)fastTrack->mHapticIntensity);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_SCALE,
+                (void *)(&(fastTrack->mHapticScale)));
         mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_MAX_AMPLITUDE,
                 (void *)(&(fastTrack->mHapticMaxAmplitude)));
 

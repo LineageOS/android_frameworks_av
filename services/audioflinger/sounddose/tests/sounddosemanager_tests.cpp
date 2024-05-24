@@ -20,6 +20,7 @@
 #include <SoundDoseManager.h>
 
 #include <aidl/android/hardware/audio/core/sounddose/BnSoundDose.h>
+#include <audio_utils/MelAggregator.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <media/AidlConversionCppNdk.h>
@@ -43,6 +44,15 @@ class MelReporterCallback : public IMelReporterCallback {
 public:
     MOCK_METHOD(void, startMelComputationForDeviceId, (audio_port_handle_t), (override));
     MOCK_METHOD(void, stopMelComputationForDeviceId, (audio_port_handle_t), (override));
+    MOCK_METHOD(void, applyAllAudioPatches, (), (override));
+};
+
+class MelAggregatorMock : public audio_utils::MelAggregator {
+public:
+    MelAggregatorMock() : MelAggregator(100) {}
+
+    MOCK_METHOD(std::vector<audio_utils::CsdRecord>, aggregateAndAddNewMelRecord,
+                (const audio_utils::MelRecord&), (override));
 };
 
 constexpr char kPrimaryModule[] = "primary";
@@ -52,7 +62,8 @@ class SoundDoseManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
         mMelReporterCallback = sp<MelReporterCallback>::make();
-        mSoundDoseManager = sp<SoundDoseManager>::make(mMelReporterCallback);
+        mMelAggregator = sp<MelAggregatorMock>::make();
+        mSoundDoseManager = sp<SoundDoseManager>::make(mMelReporterCallback, mMelAggregator);
         mHalSoundDose = ndk::SharedRefBase::make<HalSoundDoseMock>();
         mSecondaryHalSoundDose = ndk::SharedRefBase::make<HalSoundDoseMock>();
 
@@ -69,6 +80,7 @@ protected:
     }
 
     sp<MelReporterCallback> mMelReporterCallback;
+    sp<MelAggregatorMock> mMelAggregator;
     sp<SoundDoseManager> mSoundDoseManager;
     std::shared_ptr<HalSoundDoseMock> mHalSoundDose;
     std::shared_ptr<HalSoundDoseMock> mSecondaryHalSoundDose;
@@ -110,12 +122,33 @@ TEST_F(SoundDoseManagerTest, RemoveExistingStream) {
     EXPECT_NE(processor1, processor2);
 }
 
-TEST_F(SoundDoseManagerTest, NewMelValuesCacheNewRecord) {
-    std::vector<float>mels{1, 1};
+TEST_F(SoundDoseManagerTest, NewMelValuesAttenuatedAggregateMels) {
+    std::vector<float>mels{1.f, 1.f};
 
-    mSoundDoseManager->onNewMelValues(mels, 0, mels.size(), /*deviceId=*/1);
+    EXPECT_CALL(*mMelAggregator.get(), aggregateAndAddNewMelRecord)
+            .Times(1)
+            .WillOnce([&] (const audio_utils::MelRecord& record) {
+                EXPECT_THAT(record.mels, ::testing::ElementsAreArray(mels));
+                return std::vector<audio_utils::CsdRecord>();
+            });
 
-    EXPECT_EQ(mSoundDoseManager->getCachedMelRecordsSize(), size_t{1});
+    mSoundDoseManager->onNewMelValues(mels, 0, mels.size(), /*deviceId=*/1,
+                                      /*attenuated=*/true);
+}
+
+TEST_F(SoundDoseManagerTest, NewMelValuesUnattenuatedAreSplit) {
+    std::vector<float>mels{79.f, 80.f, 79.f, 80.f, 79.f, 79.f, 80.f};
+
+    EXPECT_CALL(*mMelAggregator.get(), aggregateAndAddNewMelRecord)
+            .Times(3)
+            .WillRepeatedly([&] (const audio_utils::MelRecord& record) {
+                EXPECT_EQ(record.mels.size(), size_t {1});
+                EXPECT_EQ(record.mels[0], 80.f);
+                return std::vector<audio_utils::CsdRecord>();
+            });
+
+    mSoundDoseManager->onNewMelValues(mels, 0, mels.size(), /*deviceId=*/1,
+            /*attenuated=*/false);
 }
 
 TEST_F(SoundDoseManagerTest, InvalidHalInterfaceIsNotSet) {

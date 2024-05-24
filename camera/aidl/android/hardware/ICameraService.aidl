@@ -278,14 +278,28 @@ interface ICameraService
     CameraMetadataNative createDefaultRequest(@utf8InCpp String cameraId, int templateId);
 
     /**
-      * Check whether a particular session configuration with optional session parameters
-      * has camera device support.
-      *
-      * @param cameraId The camera id to query session configuration on
-      * @param sessionConfiguration Specific session configuration to be verified.
-      * @return true  - in case the stream combination is supported.
-      *         false - in case there is no device support.
-      */
+     * Check whether a particular session configuration with optional session parameters
+     * has camera device support.
+     *
+     * @param cameraId The camera id to query session configuration for
+     * @param sessionConfiguration Specific session configuration to be verified.
+     * @return true  - in case the stream combination is supported.
+     *         false - in case there is no device support.
+     */
     boolean isSessionConfigurationWithParametersSupported(@utf8InCpp String cameraId,
             in SessionConfiguration sessionConfiguration);
+
+    /**
+     * Get the camera characteristics for a particular session configuration for
+     * the given camera device.
+     *
+     * @param cameraId ID of the device for which the session characteristics must be fetched.
+     * @param sessionConfiguration session configuration for which the characteristics
+     * must be fetched.
+     * @return - characteristics associated with the given session.
+     */
+    CameraMetadataNative getSessionCharacteristics(@utf8InCpp String cameraId,
+                int targetSdkVersion,
+                boolean overrideToPortrait,
+                in SessionConfiguration sessionConfiguration);
 }

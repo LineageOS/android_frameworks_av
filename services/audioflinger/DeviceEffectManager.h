@@ -139,7 +139,7 @@ public:
     // check if effects should be suspended or restored when a given effect is enable or disabled
     void checkSuspendOnEffectEnabled(const sp<IAfEffectBase>& effect __unused,
                           bool enabled __unused, bool threadLocked __unused) final {}
-    void resetVolume() final {}
+    void resetVolume_l() final REQUIRES(audio_utils::EffectChain_Mutex) {}
     product_strategy_t strategy() const final { return static_cast<product_strategy_t>(0); }
     int32_t activeTrackCnt() const final { return 0; }
     void onEffectEnable(const sp<IAfEffectBase>& effect __unused) final {}

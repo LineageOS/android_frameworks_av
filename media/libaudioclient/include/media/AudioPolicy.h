@@ -18,6 +18,7 @@
 #ifndef ANDROID_AUDIO_POLICY_H
 #define ANDROID_AUDIO_POLICY_H
 
+#include <binder/IBinder.h>
 #include <binder/Parcel.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <system/audio.h>
@@ -127,6 +128,7 @@ public:
     audio_devices_t mDeviceType;
     String8         mDeviceAddress;
     uint32_t        mCbFlags; // flags indicating which callbacks to use, see kCbFlag*
+    sp<IBinder>     mToken;
     /** Ignore the AUDIO_FLAG_NO_MEDIA_PROJECTION */
     bool            mAllowPrivilegedMediaPlaybackCapture = false;
     /** Indicates if the caller can capture voice communication output */

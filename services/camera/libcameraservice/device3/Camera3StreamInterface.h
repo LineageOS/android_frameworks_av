@@ -395,11 +395,6 @@ class Camera3StreamInterface : public virtual RefBase {
          */
         std::vector<size_t> surface_ids;
     };
-    /**
-     * Similar to getBuffer() except this method fills multiple buffers.
-     */
-    virtual status_t getBuffers(std::vector<OutstandingBuffer>* buffers,
-            nsecs_t waitBufferTimeout) = 0;
 
     /**
      * Return a buffer to the stream after use by the HAL.

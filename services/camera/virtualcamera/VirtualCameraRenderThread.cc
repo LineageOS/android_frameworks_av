@@ -14,21 +14,27 @@
  * limitations under the License.
  */
 
+#include "system/camera_metadata.h"
 #define LOG_TAG "VirtualCameraRenderThread"
 #include "VirtualCameraRenderThread.h"
 
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <future>
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <vector>
 
+#include "Exif.h"
 #include "GLES/gl.h"
+#include "VirtualCameraDevice.h"
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
+#include "aidl/android/hardware/camera/device/CameraBlob.h"
+#include "aidl/android/hardware/camera/device/CameraBlobId.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureResult.h"
 #include "aidl/android/hardware/camera/device/ErrorCode.h"
@@ -42,7 +48,7 @@
 #include "ui/GraphicBuffer.h"
 #include "util/EglFramebuffer.h"
 #include "util/JpegUtil.h"
-#include "util/MetadataBuilder.h"
+#include "util/MetadataUtil.h"
 #include "util/TestPatternHelper.h"
 #include "util/Util.h"
 #include "utils/Errors.h"
@@ -53,6 +59,8 @@ namespace virtualcamera {
 
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BufferStatus;
+using ::aidl::android::hardware::camera::device::CameraBlob;
+using ::aidl::android::hardware::camera::device::CameraBlobId;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
 using ::aidl::android::hardware::camera::device::CaptureResult;
 using ::aidl::android::hardware::camera::device::ErrorCode;
@@ -65,16 +73,49 @@ using ::aidl::android::hardware::camera::device::StreamBuffer;
 using ::aidl::android::hardware::graphics::common::PixelFormat;
 using ::android::base::ScopedLockAssertion;
 
+using ::android::hardware::camera::common::helper::ExifUtils;
+
 namespace {
 
 using namespace std::chrono_literals;
 
 static constexpr std::chrono::milliseconds kAcquireFenceTimeout = 500ms;
 
+// See REQUEST_PIPELINE_DEPTH in CaptureResult.java.
+// This roughly corresponds to frame latency, we set to
+// documented minimum of 2.
+static constexpr uint8_t kPipelineDepth = 2;
+
+static constexpr size_t kJpegThumbnailBufferSize = 32 * 1024;  // 32 KiB
+
 CameraMetadata createCaptureResultMetadata(
-    const std::chrono::nanoseconds timestamp) {
+    const std::chrono::nanoseconds timestamp,
+    const RequestSettings& requestSettings,
+    const Resolution reportedSensorSize) {
   std::unique_ptr<CameraMetadata> metadata =
-      MetadataBuilder().setSensorTimestamp(timestamp).build();
+      MetadataBuilder()
+          .setAberrationCorrectionMode(
+              ANDROID_COLOR_CORRECTION_ABERRATION_MODE_OFF)
+          .setControlAeMode(ANDROID_CONTROL_AE_MODE_ON)
+          .setControlAePrecaptureTrigger(
+              ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
+          .setControlAfMode(ANDROID_CONTROL_AF_MODE_OFF)
+          .setControlAwbMode(ANDROID_CONTROL_AWB_MODE_AUTO)
+          .setControlEffectMode(ANDROID_CONTROL_EFFECT_MODE_OFF)
+          .setControlMode(ANDROID_CONTROL_MODE_AUTO)
+          .setCropRegion(0, 0, reportedSensorSize.width,
+                         reportedSensorSize.height)
+          .setFaceDetectMode(ANDROID_STATISTICS_FACE_DETECT_MODE_OFF)
+          .setFlashState(ANDROID_FLASH_STATE_UNAVAILABLE)
+          .setFocalLength(VirtualCameraDevice::kFocalLength)
+          .setJpegQuality(requestSettings.jpegQuality)
+          .setJpegThumbnailSize(requestSettings.thumbnailResolution.width,
+                                requestSettings.thumbnailResolution.height)
+          .setJpegThumbnailQuality(requestSettings.thumbnailJpegQuality)
+          .setNoiseReductionMode(ANDROID_NOISE_REDUCTION_MODE_OFF)
+          .setPipelineDepth(kPipelineDepth)
+          .setSensorTimestamp(timestamp)
+          .build();
   if (metadata == nullptr) {
     ALOGE("%s: Failed to build capture result metadata", __func__);
     return CameraMetadata();
@@ -150,6 +191,34 @@ bool isYuvFormat(const PixelFormat pixelFormat) {
   }
 }
 
+std::vector<uint8_t> createExif(
+    Resolution imageSize, const std::vector<uint8_t>& compressedThumbnail = {}) {
+  std::unique_ptr<ExifUtils> exifUtils(ExifUtils::create());
+  exifUtils->initialize();
+  exifUtils->setImageWidth(imageSize.width);
+  exifUtils->setImageHeight(imageSize.height);
+  // TODO(b/324383963) Set Make/Model and orientation.
+
+  std::vector<uint8_t> app1Data;
+
+  size_t thumbnailDataSize = compressedThumbnail.size();
+  const void* thumbnailData =
+      thumbnailDataSize > 0
+          ? reinterpret_cast<const void*>(compressedThumbnail.data())
+          : nullptr;
+
+  if (!exifUtils->generateApp1(thumbnailData, thumbnailDataSize)) {
+    ALOGE("%s: Failed to generate APP1 segment for EXIF metadata", __func__);
+    return app1Data;
+  }
+
+  const uint8_t* data = exifUtils->getApp1Buffer();
+  const size_t size = exifUtils->getApp1Length();
+
+  app1Data.insert(app1Data.end(), data, data + size);
+  return app1Data;
+}
+
 }  // namespace
 
 CaptureRequestBuffer::CaptureRequestBuffer(int streamId, int bufferId,
@@ -170,12 +239,12 @@ sp<Fence> CaptureRequestBuffer::getFence() const {
 }
 
 VirtualCameraRenderThread::VirtualCameraRenderThread(
-    VirtualCameraSessionContext& sessionContext, const int mWidth,
-    const int mHeight,
+    VirtualCameraSessionContext& sessionContext,
+    const Resolution inputSurfaceSize, const Resolution reportedSensorSize,
     std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback, bool testMode)
     : mCameraDeviceCallback(cameraDeviceCallback),
-      mInputSurfaceWidth(mWidth),
-      mInputSurfaceHeight(mHeight),
+      mInputSurfaceSize(inputSurfaceSize),
+      mReportedSensorSize(reportedSensorSize),
       mTestMode(testMode),
       mSessionContext(sessionContext) {
 }
@@ -188,8 +257,11 @@ VirtualCameraRenderThread::~VirtualCameraRenderThread() {
 }
 
 ProcessCaptureRequestTask::ProcessCaptureRequestTask(
-    int frameNumber, const std::vector<CaptureRequestBuffer>& requestBuffers)
-    : mFrameNumber(frameNumber), mBuffers(requestBuffers) {
+    int frameNumber, const std::vector<CaptureRequestBuffer>& requestBuffers,
+    const RequestSettings& requestSettings)
+    : mFrameNumber(frameNumber),
+      mBuffers(requestBuffers),
+      mRequestSettings(requestSettings) {
 }
 
 int ProcessCaptureRequestTask::getFrameNumber() const {
@@ -199,6 +271,10 @@ int ProcessCaptureRequestTask::getFrameNumber() const {
 const std::vector<CaptureRequestBuffer>& ProcessCaptureRequestTask::getBuffers()
     const {
   return mBuffers;
+}
+
+const RequestSettings& ProcessCaptureRequestTask::getRequestSettings() const {
+  return mRequestSettings;
 }
 
 void VirtualCameraRenderThread::enqueueTask(
@@ -263,8 +339,8 @@ void VirtualCameraRenderThread::threadLoop() {
       std::make_unique<EglTextureProgram>(EglTextureProgram::TextureFormat::YUV);
   mEglTextureRgbProgram = std::make_unique<EglTextureProgram>(
       EglTextureProgram::TextureFormat::RGBA);
-  mEglSurfaceTexture = std::make_unique<EglSurfaceTexture>(mInputSurfaceWidth,
-                                                           mInputSurfaceHeight);
+  mEglSurfaceTexture = std::make_unique<EglSurfaceTexture>(
+      mInputSurfaceSize.width, mInputSurfaceSize.height);
   mInputSurfacePromise.set_value(mEglSurfaceTexture->getSurface());
 
   while (std::unique_ptr<ProcessCaptureRequestTask> task = dequeueTask()) {
@@ -287,7 +363,8 @@ void VirtualCameraRenderThread::processCaptureRequest(
   captureResult.partialResult = 1;
   captureResult.inputBuffer.streamId = -1;
   captureResult.physicalCameraMetadata.resize(0);
-  captureResult.result = createCaptureResultMetadata(timestamp);
+  captureResult.result = createCaptureResultMetadata(
+      timestamp, request.getRequestSettings(), mReportedSensorSize);
 
   const std::vector<CaptureRequestBuffer>& buffers = request.getBuffers();
   captureResult.outputBuffers.resize(buffers.size());
@@ -316,9 +393,9 @@ void VirtualCameraRenderThread::processCaptureRequest(
     }
 
     auto status = streamConfig->format == PixelFormat::BLOB
-                      ? renderIntoBlobStreamBuffer(reqBuffer.getStreamId(),
-                                                   reqBuffer.getBufferId(),
-                                                   reqBuffer.getFence())
+                      ? renderIntoBlobStreamBuffer(
+                            reqBuffer.getStreamId(), reqBuffer.getBufferId(),
+                            request.getRequestSettings(), reqBuffer.getFence())
                       : renderIntoImageStreamBuffer(reqBuffer.getStreamId(),
                                                     reqBuffer.getBufferId(),
                                                     reqBuffer.getFence());
@@ -398,9 +475,70 @@ void VirtualCameraRenderThread::flushCaptureRequest(
   }
 }
 
+std::vector<uint8_t> VirtualCameraRenderThread::createThumbnail(
+    const Resolution resolution, const int quality) {
+  if (resolution.width == 0 || resolution.height == 0) {
+    ALOGV("%s: Skipping thumbnail creation, zero size requested", __func__);
+    return {};
+  }
+
+  ALOGV("%s: Creating thumbnail with size %d x %d, quality %d", __func__,
+        resolution.width, resolution.height, quality);
+  std::shared_ptr<EglFrameBuffer> framebuffer = allocateTemporaryFramebuffer(
+      mEglDisplayContext->getEglDisplay(), resolution.width, resolution.height);
+  if (framebuffer == nullptr) {
+    ALOGE(
+        "Failed to allocate temporary framebuffer for JPEG thumbnail "
+        "compression");
+    return {};
+  }
+
+  // TODO(b/324383963) Add support for letterboxing if the thumbnail size
+  // doesn't correspond
+  //  to input texture aspect ratio.
+  if (!renderIntoEglFramebuffer(*framebuffer).isOk()) {
+    ALOGE(
+        "Failed to render input texture into temporary framebuffer for JPEG "
+        "thumbnail");
+    return {};
+  }
+
+  std::shared_ptr<AHardwareBuffer> inHwBuffer = framebuffer->getHardwareBuffer();
+  GraphicBuffer* gBuffer = GraphicBuffer::fromAHardwareBuffer(inHwBuffer.get());
+
+  if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+    // This should never happen since we're allocating the temporary buffer
+    // with YUV420 layout above.
+    ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
+          gBuffer->getPixelFormat());
+    return {};
+  }
+
+  YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
+  if (yCbCrLock.getStatus() != NO_ERROR) {
+    ALOGE("%s: Failed to lock graphic buffer while generating thumbnail: %d",
+          __func__, yCbCrLock.getStatus());
+    return {};
+  }
+
+  std::vector<uint8_t> compressedThumbnail;
+  compressedThumbnail.resize(kJpegThumbnailBufferSize);
+  ALOGE("%s: Compressing thumbnail %d x %d", __func__, gBuffer->getWidth(),
+        gBuffer->getHeight());
+  std::optional<size_t> compressedSize = compressJpeg(
+      gBuffer->getWidth(), gBuffer->getHeight(), quality, *yCbCrLock, {},
+      compressedThumbnail.size(), compressedThumbnail.data());
+  if (!compressedSize.has_value()) {
+    ALOGE("%s: Failed to compress jpeg thumbnail", __func__);
+    return {};
+  }
+  compressedThumbnail.resize(compressedSize.value());
+  return compressedThumbnail;
+}
+
 ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
-    const int streamId, const int bufferId, sp<Fence> fence) {
-  ALOGV("%s", __func__);
+    const int streamId, const int bufferId,
+    const RequestSettings& requestSettings, sp<Fence> fence) {
   std::shared_ptr<AHardwareBuffer> hwBuffer =
       mSessionContext.fetchHardwareBuffer(streamId, bufferId);
   if (hwBuffer == nullptr) {
@@ -414,6 +552,9 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     ALOGE("%s, failed to fetch information about stream %d", __func__, streamId);
     return cameraStatus(Status::INTERNAL_ERROR);
   }
+
+  ALOGV("%s: Rendering JPEG with size %d x %d, quality %d", __func__,
+        stream->width, stream->height, requestSettings.jpegQuality);
 
   // Let's create YUV framebuffer and render the surface into this.
   // This will take care about rescaling as well as potential format conversion.
@@ -431,58 +572,62 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     return status;
   }
 
-  AHardwareBuffer_Planes planes_info;
-
-  int32_t rawFence = fence != nullptr ? fence->get() : -1;
-  int result = AHardwareBuffer_lockPlanes(hwBuffer.get(),
-                                          AHARDWAREBUFFER_USAGE_CPU_READ_RARELY,
-                                          rawFence, nullptr, &planes_info);
-  if (result != OK) {
-    ALOGE("%s: Failed to lock planes for BLOB buffer: %d", __func__, result);
+  PlanesLockGuard planesLock(hwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_RARELY,
+                             fence);
+  if (planesLock.getStatus() != OK) {
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
   std::shared_ptr<AHardwareBuffer> inHwBuffer = framebuffer->getHardwareBuffer();
   GraphicBuffer* gBuffer = GraphicBuffer::fromAHardwareBuffer(inHwBuffer.get());
 
-  bool compressionSuccess = true;
-  if (gBuffer != nullptr) {
-    android_ycbcr ycbcr;
-    if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
-      // This should never happen since we're allocating the temporary buffer
-      // with YUV420 layout above.
-      ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
-            gBuffer->getPixelFormat());
-      AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
-      return cameraStatus(Status::INTERNAL_ERROR);
-    }
-
-    status_t status =
-        gBuffer->lockYCbCr(AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, &ycbcr);
-    ALOGV("Locked buffers");
-    if (status != NO_ERROR) {
-      AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
-      ALOGE("%s: Failed to lock graphic buffer: %d", __func__, status);
-      return cameraStatus(Status::INTERNAL_ERROR);
-    }
-
-    compressionSuccess =
-        compressJpeg(gBuffer->getWidth(), gBuffer->getHeight(), ycbcr,
-                     stream->bufferSize, planes_info.planes[0].data);
-
-    status_t res = gBuffer->unlock();
-    if (res != NO_ERROR) {
-      ALOGE("Failed to unlock graphic buffer: %d", res);
-    }
-  } else {
-    compressionSuccess =
-        compressBlackJpeg(stream->width, stream->height, stream->bufferSize,
-                          planes_info.planes[0].data);
+  if (gBuffer == nullptr) {
+    ALOGE(
+        "%s: Encountered invalid temporary buffer while rendering JPEG "
+        "into BLOB stream",
+        __func__);
+    return cameraStatus(Status::INTERNAL_ERROR);
   }
-  AHardwareBuffer_unlock(hwBuffer.get(), nullptr);
-  ALOGV("Unlocked buffers");
-  return compressionSuccess ? ndk::ScopedAStatus::ok()
-                            : cameraStatus(Status::INTERNAL_ERROR);
+
+  if (gBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+    // This should never happen since we're allocating the temporary buffer
+    // with YUV420 layout above.
+    ALOGE("%s: Cannot compress non-YUV buffer (pixelFormat %d)", __func__,
+          gBuffer->getPixelFormat());
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  YCbCrLockGuard yCbCrLock(inHwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
+  if (yCbCrLock.getStatus() != OK) {
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  std::vector<uint8_t> app1ExifData =
+      createExif(Resolution(stream->width, stream->height),
+                 createThumbnail(requestSettings.thumbnailResolution,
+                                 requestSettings.thumbnailJpegQuality));
+  std::optional<size_t> compressedSize = compressJpeg(
+      gBuffer->getWidth(), gBuffer->getHeight(), requestSettings.jpegQuality,
+      *yCbCrLock, app1ExifData, stream->bufferSize - sizeof(CameraBlob),
+      (*planesLock).planes[0].data);
+
+  if (!compressedSize.has_value()) {
+    ALOGE("%s: Failed to compress JPEG image", __func__);
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  CameraBlob cameraBlob{
+      .blobId = CameraBlobId::JPEG,
+      .blobSizeBytes = static_cast<int32_t>(compressedSize.value())};
+
+  memcpy(reinterpret_cast<uint8_t*>((*planesLock).planes[0].data) +
+             (stream->bufferSize - sizeof(cameraBlob)),
+         &cameraBlob, sizeof(cameraBlob));
+
+  ALOGV("%s: Successfully compressed JPEG image, resulting size %zu B",
+        __func__, compressedSize.value());
+
+  return ndk::ScopedAStatus::ok();
 }
 
 ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoImageStreamBuffer(
@@ -542,8 +687,12 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoEglFramebuffer(
   } else {
     const bool renderSuccess =
         isYuvFormat(static_cast<PixelFormat>(textureBuffer->getPixelFormat()))
-            ? mEglTextureYuvProgram->draw(mEglSurfaceTexture->updateTexture())
-            : mEglTextureRgbProgram->draw(mEglSurfaceTexture->updateTexture());
+            ? mEglTextureYuvProgram->draw(
+                  mEglSurfaceTexture->getTextureId(),
+                  mEglSurfaceTexture->getTransformMatrix())
+            : mEglTextureRgbProgram->draw(
+                  mEglSurfaceTexture->getTextureId(),
+                  mEglSurfaceTexture->getTransformMatrix());
     if (!renderSuccess) {
       ALOGE("%s: Failed to render texture", __func__);
       return cameraStatus(Status::INTERNAL_ERROR);

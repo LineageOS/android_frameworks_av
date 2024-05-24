@@ -275,53 +275,57 @@ const std::shared_ptr<ICameraProvider> AidlProviderInfo::startProviderInterface(
     if (mSavedInterface != nullptr) {
         return mSavedInterface;
     }
+
     if (!kEnableLazyHal) {
         ALOGE("Bad provider state! Should not be here on a non-lazy HAL!");
         return nullptr;
     }
 
     auto interface = mActiveInterface.lock();
-    if (interface == nullptr) {
-        // Try to get service without starting
-        interface =
-                    ICameraProvider::fromBinder(
-                            ndk::SpAIBinder(AServiceManager_checkService(mProviderName.c_str())));
-        if (interface == nullptr) {
-            ALOGV("Camera provider actually needs restart, calling getService(%s)",
-                  mProviderName.c_str());
-            interface = mManager->mAidlServiceProxy->getAidlService(mProviderName.c_str());
-
-            if (interface == nullptr) {
-                ALOGD("%s: %s service not started", __FUNCTION__, mProviderName.c_str());
-                return nullptr;
-            }
-
-            // Set all devices as ENUMERATING, provider should update status
-            // to PRESENT after initializing.
-            // This avoids failing getCameraDeviceInterface_V3_x before devices
-            // are ready.
-            for (auto& device : mDevices) {
-              device->mIsDeviceAvailable = false;
-            }
-
-            interface->setCallback(mCallbacks);
-            auto link = AIBinder_linkToDeath(interface->asBinder().get(), mDeathRecipient.get(),
-                    this);
-            if (link != STATUS_OK) {
-                ALOGW("%s: Unable to link to provider '%s' death notifications",
-                        __FUNCTION__, mProviderName.c_str());
-                mManager->removeProvider(mProviderInstance);
-                return nullptr;
-            }
-
-            // Send current device state
-            interface->notifyDeviceStateChange(mDeviceState);
-        }
-        mActiveInterface = interface;
-    } else {
-        ALOGV("Camera provider (%s) already in use. Re-using instance.",
-              mProviderName.c_str());
+    if (interface != nullptr) {
+        ALOGV("Camera provider (%s) already in use. Re-using instance.", mProviderName.c_str());
+        return interface;
     }
+
+    // Try to get service without starting
+    interface = ICameraProvider::fromBinder(
+            ndk::SpAIBinder(AServiceManager_checkService(mProviderName.c_str())));
+    if (interface != nullptr) {
+        // Service is already running. Cache and return.
+        mActiveInterface = interface;
+        return interface;
+    }
+
+    ALOGV("Camera provider actually needs restart, calling getService(%s)", mProviderName.c_str());
+    interface = mManager->mAidlServiceProxy->getService(mProviderName);
+
+    if (interface == nullptr) {
+        ALOGE("%s: %s service not started", __FUNCTION__, mProviderName.c_str());
+        return nullptr;
+    }
+
+    // Set all devices as ENUMERATING, provider should update status
+    // to PRESENT after initializing.
+    // This avoids failing getCameraDeviceInterface_V3_x before devices
+    // are ready.
+    for (auto& device : mDevices) {
+      device->mIsDeviceAvailable = false;
+    }
+
+    interface->setCallback(mCallbacks);
+    auto link = AIBinder_linkToDeath(interface->asBinder().get(), mDeathRecipient.get(),
+            this);
+    if (link != STATUS_OK) {
+        ALOGW("%s: Unable to link to provider '%s' death notifications",
+                __FUNCTION__, mProviderName.c_str());
+        mManager->removeProvider(mProviderInstance);
+        return nullptr;
+    }
+
+    // Send current device state
+    interface->notifyDeviceStateChange(mDeviceState);
+    // Cache interface to return early for future calls.
+    mActiveInterface = interface;
 
     return interface;
 }

@@ -17,6 +17,7 @@
 // frameworks/av/include.
 
 package {
+    default_team: "trendy_team_camera_framework",
     default_applicable_licenses: ["frameworks_av_camera_ndk_license"],
 }
 
@@ -154,8 +155,8 @@ cc_library_shared {
         "libcamera_metadata",
         "libmediandk",
         "android.frameworks.cameraservice.common-V1-ndk",
-        "android.frameworks.cameraservice.device-V1-ndk",
-        "android.frameworks.cameraservice.service-V1-ndk",
+        "android.frameworks.cameraservice.device-V2-ndk",
+        "android.frameworks.cameraservice.service-V2-ndk",
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
@@ -188,7 +189,6 @@ cc_test {
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
-        "android.hidl.token@1.0",
     ],
     cflags: [
         "-D__ANDROID_VNDK__",

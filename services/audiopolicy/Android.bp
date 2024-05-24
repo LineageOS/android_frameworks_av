@@ -1,10 +1,11 @@
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
     // to get the below license kinds:
     //   SPDX-license-identifier-Apache-2.0
-    default_applicable_licenses: ["frameworks_av_license"],
+    default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
 cc_library_headers {

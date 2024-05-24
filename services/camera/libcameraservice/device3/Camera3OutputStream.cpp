@@ -235,65 +235,6 @@ status_t Camera3OutputStream::getBufferLocked(camera_stream_buffer *buffer,
     return OK;
 }
 
-status_t Camera3OutputStream::getBuffersLocked(std::vector<OutstandingBuffer>* outBuffers) {
-    status_t res;
-
-    if ((res = getBufferPreconditionCheckLocked()) != OK) {
-        return res;
-    }
-
-    if (mUseBufferManager) {
-        ALOGE("%s: stream %d is managed by buffer manager and does not support batch operation",
-                __FUNCTION__, mId);
-        return INVALID_OPERATION;
-    }
-
-    sp<Surface> consumer = mConsumer;
-    /**
-     * Release the lock briefly to avoid deadlock for below scenario:
-     * Thread 1: StreamingProcessor::startStream -> Camera3Stream::isConfiguring().
-     * This thread acquired StreamingProcessor lock and try to lock Camera3Stream lock.
-     * Thread 2: Camera3Stream::returnBuffer->StreamingProcessor::onFrameAvailable().
-     * This thread acquired Camera3Stream lock and bufferQueue lock, and try to lock
-     * StreamingProcessor lock.
-     * Thread 3: Camera3Stream::getBuffer(). This thread acquired Camera3Stream lock
-     * and try to lock bufferQueue lock.
-     * Then there is circular locking dependency.
-     */
-    mLock.unlock();
-
-    size_t numBuffersRequested = outBuffers->size();
-    std::vector<Surface::BatchBuffer> buffers(numBuffersRequested);
-
-    nsecs_t dequeueStart = systemTime(SYSTEM_TIME_MONOTONIC);
-    res = consumer->dequeueBuffers(&buffers);
-    nsecs_t dequeueEnd = systemTime(SYSTEM_TIME_MONOTONIC);
-    mDequeueBufferLatency.add(dequeueStart, dequeueEnd);
-
-    mLock.lock();
-
-    if (res != OK) {
-        if (shouldLogError(res, mState)) {
-            ALOGE("%s: Stream %d: Can't dequeue %zu output buffers: %s (%d)",
-                    __FUNCTION__, mId, numBuffersRequested, strerror(-res), res);
-        }
-        checkRetAndSetAbandonedLocked(res);
-        return res;
-    }
-    checkRemovedBuffersLocked();
-
-    /**
-     * FenceFD now owned by HAL except in case of error,
-     * in which case we reassign it to acquire_fence
-     */
-    for (size_t i = 0; i < numBuffersRequested; i++) {
-        handoutBufferLocked(*(outBuffers->at(i).outBuffer),
-                &(buffers[i].buffer->handle), /*acquireFence*/buffers[i].fenceFd,
-                /*releaseFence*/-1, CAMERA_BUFFER_STATUS_OK, /*output*/true);
-    }
-    return OK;
-}
-
 status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
             ANativeWindowBuffer* buffer, int anwReleaseFence,
             const std::vector<size_t>&) {

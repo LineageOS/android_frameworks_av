@@ -199,6 +199,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         if (getSampleRate() != getDeviceSampleRate()) {
             ALOGD("%s - skipping sample rate converter. SR = %d, Device SR = %d", __func__,
                     getSampleRate(), getDeviceSampleRate());
+            result = AAUDIO_ERROR_INVALID_RATE;
             goto error;
         }
     }

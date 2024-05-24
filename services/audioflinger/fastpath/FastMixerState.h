@@ -54,7 +54,7 @@ struct FastTrack {
     audio_format_t          mFormat = AUDIO_FORMAT_INVALID;         // track format
     int                     mGeneration = 0;     // increment when any field is assigned
     bool                    mHapticPlaybackEnabled = false; // haptic playback is enabled or not
-    os::HapticScale         mHapticIntensity = os::HapticScale::MUTE; // intensity of haptic data
+    os::HapticScale mHapticScale = os::HapticScale::mute(); // scale of haptic data
     float                   mHapticMaxAmplitude = NAN; // max amplitude allowed for haptic data
 };
 

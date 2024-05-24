@@ -311,7 +311,8 @@ void AudioFlinger::onFirstRef()
     }
 
     mPatchPanel = IAfPatchPanel::create(sp<IAfPatchPanelCallback>::fromExisting(this));
-    mMelReporter = sp<MelReporter>::make(sp<IAfMelReporterCallback>::fromExisting(this));
+    mMelReporter = sp<MelReporter>::make(sp<IAfMelReporterCallback>::fromExisting(this),
+                                         mPatchPanel);
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
@@ -2191,30 +2192,24 @@ sp<IAfThreadBase> AudioFlinger::getEffectThread_l(audio_session_t sessionId,
     sp<IAfThreadBase> thread;
 
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        if (mPlaybackThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mPlaybackThreads.valueAt(i);
+        thread = mPlaybackThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
-    }
-    if (thread != nullptr) {
-        return thread;
     }
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        if (mRecordThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mRecordThreads.valueAt(i);
+        thread = mRecordThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
-    }
-    if (thread != nullptr) {
-        return thread;
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
-        if (mMmapThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mMmapThreads.valueAt(i);
+        thread = mMmapThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
     }
-    return thread;
+    return nullptr;
 }
 
 // ----------------------------------------------------------------------------
@@ -4197,7 +4192,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
         }
 
         // Only audio policy service can create a spatializer effect
-        if ((memcmp(&descOut.type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0) &&
+        if (IAfEffectModule::isSpatializer(&descOut.type) &&
             (callingUid != AID_AUDIOSERVER || currentPid != getpid())) {
             ALOGW("%s: attempt to create a spatializer effect from uid/pid %d/%d",
                     __func__, callingUid, currentPid);
@@ -4439,11 +4434,12 @@ void AudioFlinger::setEffectSuspended(int effectId,
 
     sp<IAfThreadBase> thread = getEffectThread_l(sessionId, effectId);
     if (thread == nullptr) {
-      return;
+        return;
     }
     audio_utils::lock_guard _sl(thread->mutex());
-    sp<IAfEffectModule> effect = thread->getEffect_l(sessionId, effectId);
-    thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
+    if (const auto& effect = thread->getEffect_l(sessionId, effectId)) {
+        thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
+    }
 }
 
 
@@ -4535,7 +4531,7 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
             if (effect->state() == IAfEffectModule::ACTIVE ||
                     effect->state() == IAfEffectModule::STOPPING) {
                 ++started;
-                effect->start();
+                effect->start_l();
             }
         }
         dstChain->mutex().unlock();
@@ -4638,7 +4634,7 @@ Exit:
         // removeEffect_l() has stopped the effect if it was active so it must be restarted
         if (effect->state() == IAfEffectModule::ACTIVE ||
             effect->state() == IAfEffectModule::STOPPING) {
-            effect->start();
+            effect->start_l();
         }
     }
 

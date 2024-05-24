@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -22,6 +23,7 @@ cc_library_shared {
     export_include_dirs: ["."],
 
     shared_libs: [
+        "com.android.media.audio-aconfig-cc",
         "libaudiofoundation",
         "libaudiopolicy",
         "libaudiopolicycomponents",
@@ -39,6 +41,9 @@ cc_library_shared {
         // a dependency on it in the device makefile. There will be no build time
         // conflict with libaudiopolicyenginedefault.
         "audioclient-types-aidl-cpp",
+        // Flag support
+        "android.media.audiopolicy-aconfig-cc",
+        "com.android.media.audioserver-aconfig-cc",
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiopolicyenginedefault",

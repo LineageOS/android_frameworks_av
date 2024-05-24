@@ -99,15 +99,6 @@ interface ICameraDeviceUser
       */
     boolean isSessionConfigurationSupported(in SessionConfiguration sessionConfiguration);
 
-    /**
-     * Get the camera characteristics for a particular session configuration
-     *
-     * @param sessionConfiguration Specific session configuration for which the characteristics
-     * are fetched.
-     * @return - characteristics associated with the given session.
-     */
-    CameraMetadataNative getSessionCharacteristics(in SessionConfiguration sessionConfiguration);
-
     void deleteStream(int streamId);
 
     /**

@@ -68,12 +68,13 @@ constexpr char kJuliaFractalFragmentShader[] = R"(
     })";
 
 constexpr char kExternalTextureVertexShader[] = R"(#version 300 es
+  uniform mat4 aTextureTransformMatrix; // Transform matrix given by surface texture.
   in vec4 aPosition;
   in vec2 aTextureCoord;
   out vec2 vTextureCoord;
   void main() {
     gl_Position = aPosition;
-    vTextureCoord = aTextureCoord;
+    vTextureCoord = (aTextureTransformMatrix * vec4(aTextureCoord, 0.0, 1.0)).xy;
   })";
 
 constexpr char kExternalYuvTextureFragmentShader[] = R"(#version 300 es
@@ -100,10 +101,12 @@ constexpr char kExternalRgbaTextureFragmentShader[] = R"(#version 300 es
     })";
 
 constexpr int kCoordsPerVertex = 3;
-constexpr std::array<float, 12> kSquareCoords{-1.f, 1.0f, 0.0f,  // top left
-                                              -1.f, -1.f, 0.0f,  // bottom left
-                                              1.0f, -1.f, 0.0f,  // bottom right
-                                              1.0f, 1.0f, 0.0f};  // top right
+
+constexpr std::array<float, 12> kSquareCoords{
+    -1.f, -1.0f, 0.0f,   // top left
+    -1.f, 1.f,   0.0f,   // bottom left
+    1.0f, 1.f,   0.0f,   // bottom right
+    1.0f, -1.0f, 0.0f};  // top right
 
 constexpr std::array<float, 8> kTextureCoords{0.0f, 1.0f,   // top left
                                               0.0f, 0.0f,   // bottom left
@@ -265,32 +268,50 @@ EglTextureProgram::EglTextureProgram(const TextureFormat textureFormat) {
   } else {
     ALOGE("External texture EGL shader program initialization failed.");
   }
+
+  // Lookup and cache handles to uniforms & attributes.
+  mPositionHandle = glGetAttribLocation(mProgram, "aPosition");
+  mTextureCoordHandle = glGetAttribLocation(mProgram, "aTextureCoord");
+  mTransformMatrixHandle =
+      glGetUniformLocation(mProgram, "aTextureTransformMatrix");
+  mTextureHandle = glGetUniformLocation(mProgram, "uTexture");
+
+  // Pass vertex array to the shader.
+  glEnableVertexAttribArray(mPositionHandle);
+  glVertexAttribPointer(mPositionHandle, kCoordsPerVertex, GL_FLOAT, false,
+                        kSquareCoords.size(), kSquareCoords.data());
+
+  // Pass texture coordinates corresponding to vertex array to the shader.
+  glEnableVertexAttribArray(mTextureCoordHandle);
+  glVertexAttribPointer(mTextureCoordHandle, 2, GL_FLOAT, false,
+                        kTextureCoords.size(), kTextureCoords.data());
 }
 
-bool EglTextureProgram::draw(GLuint textureId) {
+EglTextureProgram::~EglTextureProgram() {
+  if (mPositionHandle != -1) {
+    glDisableVertexAttribArray(mPositionHandle);
+  }
+  if (mTextureCoordHandle != -1) {
+    glDisableVertexAttribArray(mTextureCoordHandle);
+  }
+}
+
+bool EglTextureProgram::draw(GLuint textureId,
+                             const std::array<float, 16>& transformMatrix) {
   // Load compiled shader.
   glUseProgram(mProgram);
   if (checkEglError("glUseProgram")) {
     return false;
   }
 
-  // Pass vertex array to the shader.
-  int positionHandle = glGetAttribLocation(mProgram, "aPosition");
-  glEnableVertexAttribArray(positionHandle);
-  glVertexAttribPointer(positionHandle, kCoordsPerVertex, GL_FLOAT, false,
-                        kSquareCoords.size(), kSquareCoords.data());
-
-  // Pass texture coordinates corresponding to vertex array to the shader.
-  int textureCoordHandle = glGetAttribLocation(mProgram, "aTextureCoord");
-  glEnableVertexAttribArray(textureCoordHandle);
-  glVertexAttribPointer(textureCoordHandle, 2, GL_FLOAT, false,
-                        kTextureCoords.size(), kTextureCoords.data());
+  // Pass transformation matrix for the texture coordinates.
+  glUniformMatrix4fv(mTransformMatrixHandle, 1, /*transpose=*/GL_FALSE,
+                     transformMatrix.data());
 
   // Configure texture for the shader.
-  int textureHandle = glGetUniformLocation(mProgram, "uTexture");
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureId);
-  glUniform1i(textureHandle, 0);
+  glUniform1i(mTextureHandle, 0);
 
   // Draw triangle strip forming a square filling the viewport.
   glDrawElements(GL_TRIANGLES, kDrawOrder.size(), GL_UNSIGNED_BYTE,

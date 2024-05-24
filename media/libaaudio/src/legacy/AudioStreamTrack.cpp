@@ -69,16 +69,24 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     audio_channel_mask_t channelMask =
             AAudio_getChannelMaskForOpen(getChannelMask(), getSamplesPerFrame(), false /*isInput*/);
 
+    // Set flags based on selected parameters.
     audio_output_flags_t flags;
     aaudio_performance_mode_t perfMode = getPerformanceMode();
     switch(perfMode) {
-        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
+        case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY: {
             // Bypass the normal mixer and go straight to the FAST mixer.
-            // If the app asks for a sessionId then it means they want to use effects.
-            // So don't use RAW flag.
-            flags = (audio_output_flags_t) ((requestedSessionId == AAUDIO_SESSION_ID_NONE)
-                    ? (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW)
-                    : (AUDIO_OUTPUT_FLAG_FAST));
+            // Some Usages need RAW mode so they can get the lowest possible latency.
+            // Other Usages should avoid RAW because it can interfere with
+            // dual sink routing or other features.
+            bool usageBenefitsFromRaw = getUsage() == AAUDIO_USAGE_GAME ||
+                    getUsage() == AAUDIO_USAGE_MEDIA;
+            // If an app does not ask for a sessionId then there will be no effects.
+            // So we can use the use RAW flag.
+            flags = (audio_output_flags_t) (((requestedSessionId == AAUDIO_SESSION_ID_NONE)
+                                             && usageBenefitsFromRaw)
+                                            ? (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_RAW)
+                                            : (AUDIO_OUTPUT_FLAG_FAST));
+        }
             break;
 
         case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:

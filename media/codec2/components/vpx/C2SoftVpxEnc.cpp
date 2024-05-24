@@ -1049,7 +1049,7 @@ void C2SoftVpxEnc::process(
             memcpy(wView.data(), encoded_packet->data.frame.buf, encoded_packet->data.frame.sz);
             ++mNumInputFrames;
 
-            ALOGD("bytes generated %zu", encoded_packet->data.frame.sz);
+            ALOGV("bytes generated %zu", encoded_packet->data.frame.sz);
             uint32_t flags = 0;
             if (eos) {
                 flags |= C2FrameData::FLAG_END_OF_STREAM;

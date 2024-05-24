@@ -111,9 +111,12 @@ static const char *kRecorderNumPauses = "android.media.mediarecorder.NPauses";
 // To collect the encoder usage for the battery app
 static void addBatteryData(uint32_t params) {
     sp<IBinder> binder =
-        defaultServiceManager()->getService(String16("media.player"));
+        defaultServiceManager()->waitForService(String16("media.player"));
     sp<IMediaPlayerService> service = interface_cast<IMediaPlayerService>(binder);
-    CHECK(service.get() != NULL);
+    if (service.get() == nullptr) {
+        ALOGE("%s: Failed to get media.player service", __func__);
+        return;
+    }
 
     service->addBatteryData(params);
 }
@@ -1453,29 +1456,44 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
 }
 
 status_t StagefrightRecorder::setupAACRecording() {
-    // FIXME:
-    // Add support for OUTPUT_FORMAT_AAC_ADIF
-    CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_AAC_ADTS);
+    // TODO(b/324512842): Add support for OUTPUT_FORMAT_AAC_ADIF
+    if (mOutputFormat != OUTPUT_FORMAT_AAC_ADTS) {
+        ALOGE("Invalid output format %d used for AAC recording", mOutputFormat);
+        return BAD_VALUE;
+    }
 
-    CHECK(mAudioEncoder == AUDIO_ENCODER_AAC ||
-          mAudioEncoder == AUDIO_ENCODER_HE_AAC ||
-          mAudioEncoder == AUDIO_ENCODER_AAC_ELD);
-    CHECK(mAudioSource != AUDIO_SOURCE_CNT);
+    if (mAudioEncoder != AUDIO_ENCODER_AAC
+            && mAudioEncoder != AUDIO_ENCODER_HE_AAC
+            && mAudioEncoder != AUDIO_ENCODER_AAC_ELD) {
+        ALOGE("Invalid encoder %d used for AAC recording", mAudioEncoder);
+        return BAD_VALUE;
+    }
+
+    if (mAudioSource == AUDIO_SOURCE_CNT) {
+        ALOGE("Audio source hasn't been set correctly");
+        return BAD_VALUE;
+    }
 
     mWriter = new AACWriter(mOutputFd);
     return setupRawAudioRecording();
 }
 
 status_t StagefrightRecorder::setupOggRecording() {
-    CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_OGG);
+    if (mOutputFormat != OUTPUT_FORMAT_OGG) {
+        ALOGE("Invalid output format %d used for OGG recording", mOutputFormat);
+        return BAD_VALUE;
+    }
 
     mWriter = new OggWriter(mOutputFd);
     return setupRawAudioRecording();
 }
 
 status_t StagefrightRecorder::setupAMRRecording() {
-    CHECK(mOutputFormat == OUTPUT_FORMAT_AMR_NB ||
-          mOutputFormat == OUTPUT_FORMAT_AMR_WB);
+    if (mOutputFormat != OUTPUT_FORMAT_AMR_NB
+            && mOutputFormat != OUTPUT_FORMAT_AMR_WB) {
+        ALOGE("Invalid output format %d used for AMR recording", mOutputFormat);
+        return BAD_VALUE;
+    }
 
     if (mOutputFormat == OUTPUT_FORMAT_AMR_NB) {
         if (mAudioEncoder != AUDIO_ENCODER_DEFAULT &&
@@ -1528,7 +1546,10 @@ status_t StagefrightRecorder::setupRawAudioRecording() {
 }
 
 status_t StagefrightRecorder::setupRTPRecording() {
-    CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_RTP_AVP);
+    if (mOutputFormat != OUTPUT_FORMAT_RTP_AVP) {
+        ALOGE("Invalid output format %d used for RTP recording", mOutputFormat);
+        return BAD_VALUE;
+    }
 
     if ((mAudioSource != AUDIO_SOURCE_CNT
                 && mVideoSource != VIDEO_SOURCE_LIST_END)
@@ -1571,7 +1592,10 @@ status_t StagefrightRecorder::setupRTPRecording() {
 }
 
 status_t StagefrightRecorder::setupMPEG2TSRecording() {
-    CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_MPEG2TS);
+    if (mOutputFormat != OUTPUT_FORMAT_MPEG2TS) {
+        ALOGE("Invalid output format %d used for MPEG2TS recording", mOutputFormat);
+        return BAD_VALUE;
+    }
 
     sp<MediaWriter> writer = new MPEG2TSWriter(mOutputFd);
 

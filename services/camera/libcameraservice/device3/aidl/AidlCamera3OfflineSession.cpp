@@ -122,7 +122,7 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
         mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
-        mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
+        mUseHalBufManager, mHalBufManagedStreamIds, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
@@ -169,7 +169,7 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
         mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
-        mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
+        mUseHalBufManager, mHalBufManagedStreamIds, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
@@ -177,7 +177,7 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         /*overrideToPortrait*/false, activePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
-        camera3::notify(states, msg);
+        camera3::notify(states, msg, mSensorReadoutTimestampSupported);
     }
     return ::ndk::ScopedAStatus::ok();
 }
@@ -208,7 +208,8 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
     }
 
     RequestBufferStates states {
-        mId, mRequestBufferInterfaceLock, mUseHalBufManager, mOutputStreams, mSessionStatsBuilder,
+        mId, mRequestBufferInterfaceLock, mUseHalBufManager,
+        mHalBufManagedStreamIds, mOutputStreams, mSessionStatsBuilder,
         *this, mBufferRecords, *this};
     camera3::requestStreamBuffers(states, bufReqs, buffers, status);
     return ::ndk::ScopedAStatus::ok();
@@ -241,7 +242,7 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
     }
 
     ReturnBufferStates states {
-        mId, mUseHalBufManager, mOutputStreams, mSessionStatsBuilder,
+        mId, mUseHalBufManager, mHalBufManagedStreamIds, mOutputStreams, mSessionStatsBuilder,
         mBufferRecords};
 
     camera3::returnStreamBuffers(states, buffers);
