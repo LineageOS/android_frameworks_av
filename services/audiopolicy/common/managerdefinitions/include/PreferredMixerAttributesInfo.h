@@ -44,6 +44,17 @@ public:
 
     void increaseActiveClient() { mActiveClientsCount++; }
     void decreaseActiveClient() { mActiveClientsCount--; }
+    void resetActiveClient() { mActiveClientsCount = 0; }
+
+    bool isBitPerfect() const {
+        return (getFlags() & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != AUDIO_OUTPUT_FLAG_NONE;
+    }
+
+    bool configMatches(const audio_config_t& config) const {
+        return config.format == mMixerAttributes.config.format &&
+                config.channel_mask == mMixerAttributes.config.channel_mask &&
+                config.sample_rate == mMixerAttributes.config.sample_rate;
+    }
 
     void dump(String8 *dst);
 

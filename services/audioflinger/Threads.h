@@ -1200,6 +1200,11 @@ public:
                     }
                     return mHalStarted;
                 }
+
+    void setTracksInternalMute(std::map<audio_port_handle_t, bool>* /* tracksInternalMute */)
+            override EXCLUDES_ThreadBase_Mutex {
+        // Do nothing. It is only used for bit perfect thread
+    }
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -2449,12 +2454,17 @@ public:
     BitPerfectThread(const sp<IAfThreadCallback>& afThreadCallback, AudioStreamOut *output,
                      audio_io_handle_t id, bool systemReady);
 
+    void setTracksInternalMute(std::map<audio_port_handle_t, bool>* tracksInternalMuted)
+            final EXCLUDES_ThreadBase_Mutex;
+
 protected:
     mixer_state prepareTracks_l(Vector<sp<IAfTrack>>* tracksToRemove) final
             REQUIRES(mutex(), ThreadBase_ThreadLoop);
     void threadLoop_mix() final REQUIRES(ThreadBase_ThreadLoop);
 
 private:
+    sp<IAfTrack> getTrackToStreamBitPerfectly_l() REQUIRES(mutex());
+
     // These variables are only accessed on the threadLoop; hence need no mutex.
     bool mIsBitPerfect GUARDED_BY(ThreadBase_ThreadLoop) = false;
     float mVolumeLeft GUARDED_BY(ThreadBase_ThreadLoop) = 0.f;

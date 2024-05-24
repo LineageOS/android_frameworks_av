@@ -40,6 +40,7 @@ cc_test {
     static_libs: [
         "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
+        "com.android.media.audioserver-aconfig-cc",
         "libaudiopolicycomponents",
         "libflagtest",
         "libgmock",

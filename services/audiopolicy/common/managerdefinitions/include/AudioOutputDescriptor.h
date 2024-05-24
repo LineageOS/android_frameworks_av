@@ -29,6 +29,7 @@
 #include "ClientDescriptor.h"
 #include "DeviceDescriptor.h"
 #include "PolicyAudioPort.h"
+#include "PreferredMixerAttributesInfo.h"
 #include <vector>
 
 namespace android {
@@ -477,6 +478,16 @@ public:
 
     PortHandleVector getClientsForStream(audio_stream_type_t streamType) const;
 
+    bool isBitPerfect() const {
+        return (getFlags().output & AUDIO_OUTPUT_FLAG_BIT_PERFECT) != AUDIO_OUTPUT_FLAG_NONE;
+    }
+
+    /**
+     * Return true if there is any client with the same usage active on the given device.
+     * When the given device is null, return true if there is any client active.
+     */
+    bool isUsageActiveOnDevice(audio_usage_t usage, sp<DeviceDescriptor> device) const;
+
     virtual std::string info() const override;
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
@@ -489,7 +500,7 @@ public:
     audio_session_t mDirectClientSession; // session id of the direct output client
     bool mPendingReopenToQueryProfiles = false;
     audio_channel_mask_t mMixerChannelMask = AUDIO_CHANNEL_NONE;
-    bool mUsePreferredMixerAttributes = false;
+    sp<PreferredMixerAttributesInfo> mPreferredAttrInfo = nullptr;
 };
 
 // Audio output driven by an input device directly.
@@ -615,6 +626,8 @@ public:
      * return whether any output is active and routed to any of the specified devices
      */
     bool isAnyDeviceTypeActive(const DeviceTypeSet& deviceTypes) const;
+
+    bool isUsageActiveOnDevice(audio_usage_t usage, sp<DeviceDescriptor> device) const;
 
     void dump(String8 *dst) const;
 };

@@ -427,6 +427,10 @@ public:
     virtual FillingStatus& fillingStatus() = 0;
     virtual int8_t& retryCount() = 0;
     virtual FastTrackUnderruns& fastTrackUnderruns() = 0;
+
+    // Internal mute, this is currently only used for bit-perfect playback
+    virtual bool getInternalMute() const = 0;
+    virtual void setInternalMute(bool muted) = 0;
 };
 
 // playback track, used by DuplicatingThread

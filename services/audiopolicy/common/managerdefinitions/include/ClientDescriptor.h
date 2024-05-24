@@ -165,6 +165,18 @@ public:
         mIsInvalid = true;
     }
 
+    bool getInternalMute() const { return mInternalMute; }
+
+    /**
+     * Set the internal mute for a client. Return true if the existing value is different from
+     * the given value.
+     */
+    bool setInternalMute(bool muted) {
+        const bool result = (mInternalMute != muted);
+        mInternalMute = muted;
+        return result;
+    }
+
 private:
     const audio_stream_type_t mStream;
     const product_strategy_t mStrategy;
@@ -178,6 +190,7 @@ private:
      */
     uint32_t mActivityCount = 0;
     bool mIsInvalid = false;
+    bool mInternalMute = false;
 };
 
 class RecordClientDescriptor: public ClientDescriptor
