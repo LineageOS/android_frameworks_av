@@ -444,6 +444,10 @@ public:
         mNode->onInputBufferDone(index);
     }
 
+    void onInputBufferEmptied() override {
+        mNode->onInputBufferEmptied();
+    }
+
     android_dataspace getDataspace() override {
         return mNode->getDataspace();
     }
@@ -661,6 +665,10 @@ public:
 
     void onInputBufferDone(c2_cntr64_t index) override {
         mNode->onInputBufferDone(index);
+    }
+
+    void onInputBufferEmptied() override {
+        mNode->onInputBufferEmptied();
     }
 
     android_dataspace getDataspace() override {

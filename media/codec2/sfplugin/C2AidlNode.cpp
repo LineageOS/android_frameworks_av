@@ -105,6 +105,10 @@ void C2AidlNode::onInputBufferDone(c2_cntr64_t index) {
     return mImpl->onInputBufferDone(index);
 }
 
+void C2AidlNode::onInputBufferEmptied() {
+    return mImpl->onInputBufferEmptied();
+}
+
 android_dataspace C2AidlNode::getDataspace() {
     return mImpl->getDataspace();
 }
