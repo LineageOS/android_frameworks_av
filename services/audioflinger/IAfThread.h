@@ -536,6 +536,9 @@ public:
     virtual const std::atomic<int64_t>& framesWritten() const = 0;
 
     virtual bool usesHwAvSync() const = 0;
+
+    virtual void setTracksInternalMute(std::map<audio_port_handle_t, bool>* tracksInternalMute)
+            EXCLUDES_ThreadBase_Mutex = 0;
 };
 
 class IAfDirectOutputThread : public virtual IAfPlaybackThread {

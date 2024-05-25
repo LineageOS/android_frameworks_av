@@ -1386,6 +1386,8 @@ private:
 
         bool checkHapticCompatibilityOnSpatializerOutput(const audio_config_t* config,
                                                          audio_session_t sessionId) const;
+
+        void updateClientsInternalMute(const sp<SwAudioOutputDescriptor>& desc);
 };
 
 };

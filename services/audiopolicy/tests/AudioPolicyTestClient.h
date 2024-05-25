@@ -110,6 +110,11 @@ public:
                              struct audio_port_v7 *mixPort __unused) override {
         return INVALID_OPERATION;
     }
+
+    status_t setTracksInternalMute(
+            const std::vector<media::TrackInternalMuteInfo>& /*tracksInternalMute*/) override {
+        return INVALID_OPERATION;
+    }
 };
 
 } // namespace android

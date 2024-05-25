@@ -18,6 +18,7 @@
 #define ANDROID_AUDIOPOLICY_INTERFACE_H
 
 #include <android/media/DeviceConnectedState.h>
+#include <android/media/TrackInternalMuteInfo.h>
 #include <media/AudioCommonTypes.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -585,6 +586,9 @@ public:
     // Get the attributes of the mix port when connecting to the given device port.
     virtual status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
                                      struct audio_port_v7 *mixPort) = 0;
+
+    virtual status_t setTracksInternalMute(
+            const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager

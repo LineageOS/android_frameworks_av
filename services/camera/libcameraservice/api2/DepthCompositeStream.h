@@ -46,6 +46,7 @@ public:
     ~DepthCompositeStream() override;
 
     static bool isDepthCompositeStream(const sp<Surface> &surface);
+    static bool isDepthCompositeStreamInfo(const OutputStreamInfo& streamInfo);
 
     // CompositeStream overrides
     status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,

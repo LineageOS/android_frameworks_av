@@ -94,6 +94,11 @@ HeicCompositeStream::~HeicCompositeStream() {
     mMainImageSurface.clear();
 }
 
+bool HeicCompositeStream::isHeicCompositeStreamInfo(const OutputStreamInfo& streamInfo) {
+    return ((streamInfo.dataSpace == static_cast<android_dataspace_t>(HAL_DATASPACE_HEIF)) &&
+            (streamInfo.format == HAL_PIXEL_FORMAT_BLOB));
+}
+
 bool HeicCompositeStream::isHeicCompositeStream(const sp<Surface> &surface) {
     ANativeWindow *anw = surface.get();
     status_t err;

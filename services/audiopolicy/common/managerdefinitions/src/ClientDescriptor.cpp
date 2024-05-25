@@ -57,8 +57,8 @@ void ClientDescriptor::dump(String8 *dst, int spaces) const
 void TrackClientDescriptor::dump(String8 *dst, int spaces) const
 {
     ClientDescriptor::dump(dst, spaces);
-    dst->appendFormat("%*sStream: %d; Flags: %08x; Refcount: %d\n", spaces, "",
-            mStream, mFlags, mActivityCount);
+    dst->appendFormat("%*sStream: %d; Flags: %08x; Refcount: %d; InternalMute: %s\n",
+            spaces, "", mStream, mFlags, mActivityCount, mInternalMute ? "Yes" : "No");
     dst->appendFormat("%*sDAP Primary Mix: %p\n", spaces, "", mPrimaryMix.promote().get());
     if (!mSecondaryOutputs.empty()) {
         dst->appendFormat("%*sDAP Secondary Outputs: ", spaces - 2, "");
