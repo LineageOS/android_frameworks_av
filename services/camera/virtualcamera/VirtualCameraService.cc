@@ -30,10 +30,12 @@
 
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraProvider.h"
+#include "VirtualCameraTestInstance.h"
 #include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/companion/virtualcamera/LensFacing.h"
 #include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "android/binder_auto_utils.h"
+#include "android/binder_interface_utils.h"
 #include "android/binder_libbinder.h"
 #include "android/binder_status.h"
 #include "binder/Status.h"
@@ -64,6 +66,7 @@ namespace {
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kMaxFps = 60;
+constexpr int kTestCameraInputFps = 30;
 constexpr char kEnableTestCameraCmd[] = "enable_test_camera";
 constexpr char kDisableTestCameraCmd[] = "disable_test_camera";
 constexpr char kHelp[] = "help";
@@ -90,6 +93,13 @@ ndk::ScopedAStatus validateConfiguration(
     const VirtualCameraConfiguration& configuration) {
   if (configuration.supportedStreamConfigs.empty()) {
     ALOGE("%s: No supported input configuration specified", __func__);
+    return ndk::ScopedAStatus::fromServiceSpecificError(
+        Status::EX_ILLEGAL_ARGUMENT);
+  }
+
+  if (configuration.virtualCameraCallback == nullptr) {
+    ALOGE("%s: Input configuration is missing virtual camera callback",
+          __func__);
     return ndk::ScopedAStatus::fromServiceSpecificError(
         Status::EX_ILLEGAL_ARGUMENT);
   }
@@ -418,9 +428,11 @@ binder_status_t VirtualCameraService::enableTestCameraCmd(
   VirtualCameraConfiguration configuration;
   configuration.supportedStreamConfigs.push_back({.width = kVgaWidth,
                                                   .height = kVgaHeight,
-                                                  Format::YUV_420_888,
+                                                  Format::RGBA_8888,
                                                   .maxFps = kMaxFps});
   configuration.lensFacing = lensFacing.value_or(LensFacing::EXTERNAL);
+  configuration.virtualCameraCallback =
+      ndk::SharedRefBase::make<VirtualCameraTestInstance>(kTestCameraInputFps);
   registerCamera(mTestCameraToken, configuration, cameraId.value_or(sNextId++),
                  kDefaultDeviceId, &ret);
   if (ret) {

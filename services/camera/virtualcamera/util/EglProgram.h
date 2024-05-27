@@ -46,7 +46,12 @@ class EglTestPatternProgram : public EglProgram {
  public:
   EglTestPatternProgram();
 
-  bool draw(int width, int height, int frameNumber);
+  bool draw(int frameNumber);
+
+ private:
+  int mPositionHandle = -1;
+  int mTextureCoordHandle = -1;
+  int mCHandle = -1;
 };
 
 // Shader program to  draw texture.
