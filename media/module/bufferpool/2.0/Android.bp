@@ -60,7 +60,4 @@ cc_library {
     vendor_available: true,
     // TODO: b/147147992
     double_loadable: true,
-    vndk: {
-        enabled: true,
-    },
 }

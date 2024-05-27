@@ -26,9 +26,6 @@ cc_library {
         "//apex_available:platform",
         "com.android.media.swcodec",
     ],
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
 
     srcs: ["C2.cpp"],
