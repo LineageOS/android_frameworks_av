@@ -15,6 +15,7 @@
  */
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <iterator>
 #include <memory>
@@ -75,6 +76,17 @@ constexpr char kCreateVirtualDevicePermissions[] =
 
 const VirtualCameraConfiguration kEmptyVirtualCameraConfiguration;
 
+class MockVirtualCameraCallback : public BnVirtualCameraCallback {
+ public:
+  MOCK_METHOD(ndk::ScopedAStatus, onStreamConfigured,
+              (int32_t, const ::aidl::android::view::Surface&, int, int,
+               ::aidl::android::companion::virtualcamera::Format pixelFormat),
+              (override));
+  MOCK_METHOD(ndk::ScopedAStatus, onProcessCaptureRequest, (int32_t, int32_t),
+              (override));
+  MOCK_METHOD(ndk::ScopedAStatus, onStreamClosed, (int32_t), (override));
+};
+
 VirtualCameraConfiguration createConfiguration(const int width, const int height,
                                                const Format format,
                                                const int maxFps) {
@@ -85,6 +97,8 @@ VirtualCameraConfiguration createConfiguration(const int width, const int height
                                                   .maxFps = maxFps});
   configuration.sensorOrientation = kSensorOrientation;
   configuration.lensFacing = kLensFacing;
+  configuration.virtualCameraCallback =
+      ndk::SharedRefBase::make<MockVirtualCameraCallback>();
   return configuration;
 }
 
@@ -243,6 +257,24 @@ TEST_F(VirtualCameraServiceTest, EmptyConfigurationFails) {
                                     kEmptyVirtualCameraConfiguration,
                                     kDefaultDeviceId, &aidlRet)
                    .isOk());
+  EXPECT_FALSE(aidlRet);
+  EXPECT_THAT(getCameraIds(), IsEmpty());
+}
+
+TEST_F(VirtualCameraServiceTest,
+       ConfigurationWithoutVirtualCameraCallbackFails) {
+  sp<BBinder> token = sp<BBinder>::make();
+  ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
+  bool aidlRet;
+
+  VirtualCameraConfiguration config =
+      createConfiguration(kVgaWidth, kVgaHeight, Format::RGBA_8888, kMaxFps);
+  config.virtualCameraCallback = nullptr;
+
+  ASSERT_FALSE(mCameraService
+                   ->registerCamera(ndkToken, config, kDefaultDeviceId, &aidlRet)
+                   .isOk());
+
   EXPECT_FALSE(aidlRet);
   EXPECT_THAT(getCameraIds(), IsEmpty());
 }

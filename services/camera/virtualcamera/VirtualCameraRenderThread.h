@@ -111,8 +111,7 @@ class VirtualCameraRenderThread {
       Resolution reportedSensorSize,
       std::shared_ptr<
           ::aidl::android::hardware::camera::device::ICameraDeviceCallback>
-          cameraDeviceCallback,
-      bool testMode = false);
+          cameraDeviceCallback);
 
   ~VirtualCameraRenderThread();
 
@@ -184,7 +183,6 @@ class VirtualCameraRenderThread {
 
   const Resolution mInputSurfaceSize;
   const Resolution mReportedSensorSize;
-  const int mTestMode;
 
   VirtualCameraSessionContext& mSessionContext;
 

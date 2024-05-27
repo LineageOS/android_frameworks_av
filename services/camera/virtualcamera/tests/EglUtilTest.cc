@@ -55,6 +55,11 @@ private:
 };
 
 TEST_F(EglTest, EglTestPatternProgramSuccessfulInit) {
+  if (!isGlExtensionSupported(kGlExtYuvTarget)) {
+    GTEST_SKIP() << "Skipping test because of missing required GL extension "
+                 << kGlExtYuvTarget;
+  }
+
   EglTestPatternProgram eglTestPatternProgram;
 
   // Verify the shaders compiled and linked successfully.

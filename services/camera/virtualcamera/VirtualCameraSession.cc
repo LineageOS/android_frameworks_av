@@ -66,7 +66,6 @@
 #include "util/EglProgram.h"
 #include "util/JpegUtil.h"
 #include "util/MetadataUtil.h"
-#include "util/TestPatternHelper.h"
 #include "util/Util.h"
 
 namespace android {
@@ -360,12 +359,9 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       return cameraStatus(Status::ILLEGAL_ARGUMENT);
     }
     if (mRenderThread == nullptr) {
-      // If there's no client callback, start camera in test mode.
-      const bool testMode = mVirtualCameraClientCallback == nullptr;
       mRenderThread = std::make_unique<VirtualCameraRenderThread>(
           mSessionContext, resolutionFromInputConfig(*inputConfig),
-          virtualCamera->getMaxInputResolution(), mCameraDeviceCallback,
-          testMode);
+          virtualCamera->getMaxInputResolution(), mCameraDeviceCallback);
       mRenderThread->start();
       inputSurface = mRenderThread->getInputSurface();
     }

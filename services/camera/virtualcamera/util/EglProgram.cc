@@ -35,18 +35,27 @@ namespace {
 
 constexpr char kGlExtYuvTarget[] = "GL_EXT_YUV_target";
 
-constexpr char kIdentityVertexShader[] = R"(
-    attribute vec4 vPosition;
+constexpr char kJuliaFractalVertexShader[] = R"(#version 300 es
+    in vec4 aPosition;
+    in vec2 aTextureCoord;
+    out vec2 vFractalCoord;
+    out vec2 vUVCoord;
     void main() {
-      gl_Position = vPosition;
+      gl_Position = aPosition;
+      vUVCoord = aTextureCoord;
+      vFractalCoord = vec2(aTextureCoord.x - 0.5, aTextureCoord.y - 0.5) * 4.0;
     })";
 
-constexpr char kJuliaFractalFragmentShader[] = R"(
+constexpr char kJuliaFractalFragmentShader[] = R"(#version 300 es
+    #extension GL_EXT_YUV_target : require
     precision mediump float;
-    uniform vec2 uResolution;
-    uniform vec2 uC;
-    uniform vec2 uUV;
+
     const float kIter = 64.0;
+
+    in vec2 vFractalCoord;
+    in vec2 vUVCoord;
+    out vec4 fragColor;
+    uniform vec2 uC;
 
     vec2 imSq(vec2 n){
       return vec2(pow(n.x,2.0)-pow(n.y,2.0), 2.0*n.x*n.y);
@@ -62,9 +71,8 @@ constexpr char kJuliaFractalFragmentShader[] = R"(
     }
 
     void main() {
-      vec2 uv = vec2(gl_FragCoord.x / uResolution.x - 0.5, gl_FragCoord.y / uResolution.y - 0.5);
-      float juliaVal = julia(uv * 4.0, uC);
-      gl_FragColor = vec4( juliaVal,uUV.x,uUV.y,0.0);
+      float juliaVal = julia(vFractalCoord, uC);
+      fragColor = vec4(yuv_2_rgb(vec3(juliaVal, vUVCoord.x, vUVCoord.y), itu_601_full_range), 0.0);
     })";
 
 constexpr char kExternalTextureVertexShader[] = R"(#version 300 es
@@ -200,17 +208,28 @@ bool EglProgram::isInitialized() const {
 }
 
 EglTestPatternProgram::EglTestPatternProgram() {
-  if (initialize(kIdentityVertexShader, kJuliaFractalFragmentShader)) {
+  if (initialize(kJuliaFractalVertexShader, kJuliaFractalFragmentShader)) {
     ALOGV("Successfully initialized EGL shaders for test pattern program.");
   } else {
     ALOGE("Test pattern EGL shader program initialization failed.");
   }
+
+  mCHandle = glGetUniformLocation(mProgram, "uC");
+  mPositionHandle = glGetAttribLocation(mProgram, "aPosition");
+  mTextureCoordHandle = glGetAttribLocation(mProgram, "aTextureCoord");
+
+  // Pass vertex array to draw.
+  glEnableVertexAttribArray(mPositionHandle);
+  // Prepare the triangle coordinate data.
+  glVertexAttribPointer(mPositionHandle, kCoordsPerVertex, GL_FLOAT, false,
+                        kSquareCoords.size(), kSquareCoords.data());
+
+  glEnableVertexAttribArray(mTextureCoordHandle);
+  glVertexAttribPointer(mTextureCoordHandle, 2, GL_FLOAT, false,
+                        kTextureCoords.size(), kTextureCoords.data());
 }
 
-bool EglTestPatternProgram::draw(int width, int height, int frameNumber) {
-  glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
-  checkEglError("glViewport");
-
+bool EglTestPatternProgram::draw(int frameNumber) {
   // Load compiled shader.
   glUseProgram(mProgram);
   checkEglError("glUseProgram");
@@ -219,28 +238,8 @@ bool EglTestPatternProgram::draw(int width, int height, int frameNumber) {
   float time = float(frameNumber) / 120.0f;
   const std::complex<float> c(std::sin(time) * 0.78f, std::cos(time) * 0.78f);
 
-  // Pass uniform values to the shader.
-  int resolutionHandle = glGetUniformLocation(mProgram, "uResolution");
-  checkEglError("glGetUniformLocation -> uResolution");
-  glUniform2f(resolutionHandle, static_cast<float>(width),
-              static_cast<float>(height));
-  checkEglError("glUniform2f -> uResolution");
-
   // Pass "C" constant value determining the Julia set to the shader.
-  int cHandle = glGetUniformLocation(mProgram, "uC");
-  glUniform2f(cHandle, c.imag(), c.real());
-
-  // Pass chroma value to the shader.
-  int uvHandle = glGetUniformLocation(mProgram, "uUV");
-  glUniform2f(uvHandle, (c.imag() + 1.f) / 2.f, (c.real() + 1.f) / 2.f);
-
-  // Pass vertex array to draw.
-  int positionHandle = glGetAttribLocation(mProgram, "vPosition");
-  glEnableVertexAttribArray(positionHandle);
-
-  // Prepare the triangle coordinate data.
-  glVertexAttribPointer(positionHandle, kCoordsPerVertex, GL_FLOAT, false,
-                        kSquareCoords.size(), kSquareCoords.data());
+  glUniform2f(mCHandle, c.imag(), c.real());
 
   // Draw triangle strip forming a square filling the viewport.
   glDrawElements(GL_TRIANGLES, kDrawOrder.size(), GL_UNSIGNED_BYTE,
