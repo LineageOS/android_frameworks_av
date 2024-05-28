@@ -38,7 +38,7 @@ constexpr char kVirtualCameraServiceName[] = "virtual_camera";
 }  // namespace
 
 int main() {
-  ALOGI("CameraProvider: virtual webcam service is starting.");
+  ALOGI("virtual_camera service is starting.");
 
   ABinderProcess_setThreadPoolMaxThreadCount(HWBINDER_THREAD_COUNT);
 

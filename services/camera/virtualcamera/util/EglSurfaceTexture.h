@@ -17,6 +17,7 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_EGLSURFACETEXTURE_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_EGLSURFACETEXTURE_H
 
+#include <chrono>
 #include <cstdint>
 
 #include "GLES/gl.h"
@@ -50,6 +51,12 @@ class EglSurfaceTexture {
 
   // Get height of surface / texture.
   uint32_t getHeight() const;
+
+  // Wait for next frame to be available in the surface
+  // until timeout.
+  //
+  // Returns false on timeout, true if new frame was received before timeout.
+  bool waitForNextFrame(std::chrono::nanoseconds timeout);
 
   // Update the texture with the most recent submitted buffer.
   // Most be called on thread with EGL context.

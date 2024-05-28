@@ -277,6 +277,16 @@ std::vector<uint8_t> createExif(
   return app1Data;
 }
 
+std::chrono::nanoseconds getMaxFrameDuration(
+    const RequestSettings& requestSettings) {
+  if (requestSettings.fpsRange.has_value()) {
+    return std::chrono::nanoseconds(static_cast<uint64_t>(
+        1e9 / std::max(1, requestSettings.fpsRange->minFps)));
+  }
+  return std::chrono::nanoseconds(
+      static_cast<uint64_t>(1e9 / VirtualCameraDevice::kMinFps));
+}
+
 }  // namespace
 
 CaptureRequestBuffer::CaptureRequestBuffer(int streamId, int bufferId,
@@ -419,7 +429,7 @@ void VirtualCameraRenderThread::processCaptureRequest(
   std::chrono::nanoseconds timestamp =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now().time_since_epoch());
-  std::chrono::nanoseconds lastAcquisitionTimestamp(
+  const std::chrono::nanoseconds lastAcquisitionTimestamp(
       mLastAcquisitionTimestampNanoseconds.exchange(timestamp.count(),
                                                     std::memory_order_relaxed));
 
@@ -449,6 +459,29 @@ void VirtualCameraRenderThread::processCaptureRequest(
     }
   }
 
+  // Calculate the maximal amount of time we can afford to wait for next frame.
+  const std::chrono::nanoseconds maxFrameDuration =
+      getMaxFrameDuration(request.getRequestSettings());
+  const std::chrono::nanoseconds elapsedDuration =
+      timestamp - lastAcquisitionTimestamp;
+  if (elapsedDuration < maxFrameDuration) {
+    // We can afford to wait for next frame.
+    // Note that if there's already new frame in the input Surface, the call
+    // below returns immediatelly.
+    bool gotNewFrame = mEglSurfaceTexture->waitForNextFrame(maxFrameDuration -
+                                                            elapsedDuration);
+    timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch());
+    if (!gotNewFrame) {
+      ALOGV(
+          "%s: No new frame received on input surface after waiting for "
+          "%" PRIu64 "ns, repeating last frame.",
+          __func__,
+          static_cast<uint64_t>((timestamp - lastAcquisitionTimestamp).count()));
+    }
+    mLastAcquisitionTimestampNanoseconds.store(timestamp.count(),
+                                               std::memory_order_relaxed);
+  }
   // Acquire new (most recent) image from the Surface.
   mEglSurfaceTexture->updateTexture();
 
