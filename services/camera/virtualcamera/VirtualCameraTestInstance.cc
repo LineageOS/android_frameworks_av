@@ -122,8 +122,8 @@ VirtualCameraTestInstance::VirtualCameraTestInstance(const int fps)
 ScopedAStatus VirtualCameraTestInstance::onStreamConfigured(
     const int32_t streamId, const Surface& surface, const int32_t width,
     const int32_t height, const Format pixelFormat) {
-  ALOGV("%s: streamId %d, %dx%d pixFmt=%d", __func__, streamId, width, height,
-        pixelFormat);
+  ALOGV("%s: streamId %d, %dx%d pixFmt=%s", __func__, streamId, width, height,
+        toString(pixelFormat).c_str());
 
   std::lock_guard<std::mutex> lock(mLock);
   mRenderer = std::make_shared<TestPatternRenderer>(
