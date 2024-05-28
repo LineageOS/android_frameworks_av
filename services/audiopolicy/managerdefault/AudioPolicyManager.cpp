@@ -563,14 +563,30 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
         }
     }
     auto musicStrategy = streamToStrategy(AUDIO_STREAM_MUSIC);
+    uint32_t muteWaitMs = 0;
     for (size_t i = 0; i < mOutputs.size(); i++) {
        sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-       // mute media strategies and delay device switch by the largest
-       // This avoid sending the music tail into the earpiece or headset.
+       // mute media strategies to avoid sending the music tail into
+       // the earpiece or headset.
+       if (desc->isStrategyActive(musicStrategy)) {
+           uint32_t tempRecommendedMuteDuration = desc->getRecommendedMuteDurationMs();
+           uint32_t tempMuteDurationMs = tempRecommendedMuteDuration > 0 ?
+                        tempRecommendedMuteDuration : desc->latency() * 4;
+           if (muteWaitMs < tempMuteDurationMs) {
+               muteWaitMs = tempMuteDurationMs;
+           }
+       }
        setStrategyMute(musicStrategy, true, desc);
        setStrategyMute(musicStrategy, false, desc, MUTE_TIME_MS,
           mEngine->getOutputDevicesForAttributes(attributes_initializer(AUDIO_USAGE_MEDIA),
                                               nullptr, true /*fromCache*/).types());
+    }
+    // Wait for the muted audio to propagate down the audio path see checkDeviceMuteStrategies().
+    // We assume that MUTE_TIME_MS is way larger than muteWaitMs so that unmuting still
+    // happens after the actual device switch.
+    if (muteWaitMs > 0) {
+        ALOGW_IF(MUTE_TIME_MS < muteWaitMs * 2, "%s excessive mute wait %d", __func__, muteWaitMs);
+        usleep(muteWaitMs * 1000);
     }
     // Toggle the device state: UNAVAILABLE -> AVAILABLE
     // This will force reading again the device configuration
