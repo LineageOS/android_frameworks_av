@@ -488,6 +488,23 @@ TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithInvalidLensFacing) {
               Eq(STATUS_BAD_VALUE));
 }
 
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithInputFps) {
+  EXPECT_THAT(execute_shell_command("enable_test_camera --input_fps=15"),
+              Eq(NO_ERROR));
+
+  std::vector<std::string> cameraIds = getCameraIds();
+  ASSERT_THAT(cameraIds, SizeIs(1));
+}
+
+TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithInvalidInputFps) {
+  EXPECT_THAT(execute_shell_command("enable_test_camera --input_fps=1001"),
+              Eq(STATUS_BAD_VALUE));
+  EXPECT_THAT(execute_shell_command("enable_test_camera --input_fps=0"),
+              Eq(STATUS_BAD_VALUE));
+  EXPECT_THAT(execute_shell_command("enable_test_camera --input_fps=foo"),
+              Eq(STATUS_BAD_VALUE));
+}
+
 }  // namespace
 }  // namespace virtualcamera
 }  // namespace companion
