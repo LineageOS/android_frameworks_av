@@ -49,7 +49,7 @@ public:
 
     ::ndk::ScopedAStatus submitBuffer(
             int32_t buffer,
-            const ::aidl::android::hardware::HardwareBuffer& hBuffer,
+            const std::optional<::aidl::android::hardware::HardwareBuffer>& hBuffer,
             int32_t flags,
             int64_t timestampUs,
             const ::ndk::ScopedFileDescriptor& fence) override;

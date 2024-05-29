@@ -44,7 +44,7 @@ interface IAidlNode {
     void setInputSurface(IAidlBufferSource bufferSource);
     void submitBuffer(
             int buffer,
-            in HardwareBuffer hBuffer,
+            in @nullable HardwareBuffer hBuffer,
             int flags,
             long timestampUs,
             in @nullable ParcelFileDescriptor fence);

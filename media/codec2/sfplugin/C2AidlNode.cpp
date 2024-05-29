@@ -68,10 +68,15 @@ C2AidlNode::C2AidlNode(const std::shared_ptr<Codec2Client::Component> &comp)
 }
 
 ::ndk::ScopedAStatus C2AidlNode::submitBuffer(
-        int32_t buffer, const ::aidl::android::hardware::HardwareBuffer& hBuffer,
+        int32_t buffer,
+        const std::optional<::aidl::android::hardware::HardwareBuffer>& hBuffer,
         int32_t flags, int64_t timestamp, const ::ndk::ScopedFileDescriptor& fence) {
     sp<GraphicBuffer> gBuf;
-    AHardwareBuffer *ahwb = hBuffer.get();
+    AHardwareBuffer *ahwb = nullptr;
+    if (hBuffer.has_value()) {
+        ahwb = hBuffer.value().get();
+    }
+
     if (ahwb) {
         gBuf = AHardwareBuffer_to_GraphicBuffer(ahwb);
     }
