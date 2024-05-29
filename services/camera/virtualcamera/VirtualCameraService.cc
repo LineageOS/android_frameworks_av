@@ -66,7 +66,7 @@ namespace {
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kMaxFps = 60;
-constexpr int kTestCameraInputFps = 30;
+constexpr int kTestCameraDefaultInputFps = 30;
 constexpr char kEnableTestCameraCmd[] = "enable_test_camera";
 constexpr char kDisableTestCameraCmd[] = "disable_test_camera";
 constexpr char kHelp[] = "help";
@@ -78,6 +78,7 @@ Available commands:
      Options:
        --camera_id=(ID) - override numerical ID for test camera instance
        --lens_facing=(front|back|external) - specifies lens facing for test camera instance
+       --input_fps=(fps) - specify input fps for test camera, valid values are from 1 to 1000
  * disable_test_camera
 )";
 constexpr char kCreateVirtualDevicePermission[] =
@@ -421,6 +422,18 @@ binder_status_t VirtualCameraService::enableTestCameraCmd(
     }
   }
 
+  std::optional<int> inputFps;
+  it = options.find("input_fps");
+  if (it != options.end()) {
+    inputFps = parseInt(it->second);
+    if (!inputFps.has_value() || inputFps.value() < 1 ||
+        inputFps.value() > 1000) {
+      dprintf(err, "Invalid input fps: %s\n, must be integer in <1,1000> range.",
+              it->second.c_str());
+      return STATUS_BAD_VALUE;
+    }
+  }
+
   sp<BBinder> token = sp<BBinder>::make();
   mTestCameraToken.set(AIBinder_fromPlatformBinder(token));
 
@@ -432,7 +445,8 @@ binder_status_t VirtualCameraService::enableTestCameraCmd(
                                                   .maxFps = kMaxFps});
   configuration.lensFacing = lensFacing.value_or(LensFacing::EXTERNAL);
   configuration.virtualCameraCallback =
-      ndk::SharedRefBase::make<VirtualCameraTestInstance>(kTestCameraInputFps);
+      ndk::SharedRefBase::make<VirtualCameraTestInstance>(
+          inputFps.value_or(kTestCameraDefaultInputFps));
   registerCamera(mTestCameraToken, configuration, cameraId.value_or(sNextId++),
                  kDefaultDeviceId, &ret);
   if (ret) {
