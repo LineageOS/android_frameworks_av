@@ -946,7 +946,7 @@ protected:
     // StreamOutHalInterfaceCallback implementation
     virtual     void        onWriteReady();
     virtual     void        onDrainReady();
-    virtual     void        onError();
+    virtual     void        onError(bool /*isHardError*/);
 
 public: // AsyncCallbackThread
                 void        resetWriteBlocked(uint32_t sequence);
@@ -958,7 +958,7 @@ protected:
     virtual bool shouldStandby_l() REQUIRES(mutex(), ThreadBase_ThreadLoop);
     virtual void onAddNewTrack_l() REQUIRES(mutex());
 public:  // AsyncCallbackThread
-                void        onAsyncError(); // error reported by AsyncCallbackThread
+                void        onAsyncError(bool isHardError); // error reported by AsyncCallbackThread
 protected:
     // StreamHalInterfaceCodecFormatCallback implementation
                 void        onCodecFormatChanged(
@@ -1371,6 +1371,8 @@ protected:
     bool destroyTrack_l(const sp<IAfTrack>& track) final REQUIRES(mutex());
 
     void removeTrack_l(const sp<IAfTrack>& track) REQUIRES(mutex());
+    std::set<audio_port_handle_t> getTrackPortIds_l() REQUIRES(mutex());
+    std::set<audio_port_handle_t> getTrackPortIds();
 
     void readOutputParameters_l() REQUIRES(mutex());
     MetadataUpdate updateMetadata_l() final REQUIRES(mutex());
@@ -1834,7 +1836,7 @@ public:
             void        resetWriteBlocked();
             void        setDraining(uint32_t sequence);
             void        resetDraining();
-            void        setAsyncError();
+            void        setAsyncError(bool isHardError);
 
 private:
     const wp<PlaybackThread>   mPlaybackThread;
@@ -1848,7 +1850,8 @@ private:
     uint32_t                   mDrainSequence;
     audio_utils::condition_variable mWaitWorkCV;
     mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAsyncCallbackThread_Mutex};
-    bool                       mAsyncError;
+    enum AsyncError { ASYNC_ERROR_NONE, ASYNC_ERROR_SOFT, ASYNC_ERROR_HARD };
+    AsyncError                 mAsyncError;
 
     audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::AsyncCallbackThread_Mutex) {
         return mMutex;

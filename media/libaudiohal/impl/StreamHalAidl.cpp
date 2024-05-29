@@ -901,10 +901,10 @@ void StreamOutHalAidl::onDrainReady() {
     }
 }
 
-void StreamOutHalAidl::onError() {
+void StreamOutHalAidl::onError(bool isHardError) {
     onAsyncError();
     if (auto clientCb = mClientCallback.load().promote(); clientCb != nullptr) {
-        clientCb->onError();
+        clientCb->onError(isHardError);
     }
 }
 
