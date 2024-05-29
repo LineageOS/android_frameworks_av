@@ -51,6 +51,69 @@ const char dumpFile[] = "OutputDumpFile";
 
 enum DataSourceType { HTTP, FD, STREAM, FILETYPE, SOCKET, kMaxValue = SOCKET };
 
+constexpr audio_flags_mask_t kAudioFlagsMasks[] = {AUDIO_FLAG_NONE,
+                                                   AUDIO_FLAG_AUDIBILITY_ENFORCED,
+                                                   AUDIO_FLAG_SECURE,
+                                                   AUDIO_FLAG_SCO,
+                                                   AUDIO_FLAG_BEACON,
+                                                   AUDIO_FLAG_HW_AV_SYNC,
+                                                   AUDIO_FLAG_HW_HOTWORD,
+                                                   AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY,
+                                                   AUDIO_FLAG_BYPASS_MUTE,
+                                                   AUDIO_FLAG_LOW_LATENCY,
+                                                   AUDIO_FLAG_DEEP_BUFFER,
+                                                   AUDIO_FLAG_NO_MEDIA_PROJECTION,
+                                                   AUDIO_FLAG_MUTE_HAPTIC,
+                                                   AUDIO_FLAG_NO_SYSTEM_CAPTURE,
+                                                   AUDIO_FLAG_CAPTURE_PRIVATE,
+                                                   AUDIO_FLAG_CONTENT_SPATIALIZED,
+                                                   AUDIO_FLAG_NEVER_SPATIALIZE,
+                                                   AUDIO_FLAG_CALL_REDIRECTION};
+
+constexpr audio_content_type_t kAudioContentTypes[] = {
+        AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_CONTENT_TYPE_SPEECH,       AUDIO_CONTENT_TYPE_MUSIC,
+        AUDIO_CONTENT_TYPE_MOVIE,   AUDIO_CONTENT_TYPE_SONIFICATION, AUDIO_CONTENT_TYPE_ULTRASOUND};
+
+constexpr audio_source_t kAudioSources[] = {AUDIO_SOURCE_INVALID,
+                                            AUDIO_SOURCE_DEFAULT,
+                                            AUDIO_SOURCE_MIC,
+                                            AUDIO_SOURCE_VOICE_UPLINK,
+                                            AUDIO_SOURCE_VOICE_DOWNLINK,
+                                            AUDIO_SOURCE_VOICE_CALL,
+                                            AUDIO_SOURCE_CAMCORDER,
+                                            AUDIO_SOURCE_VOICE_RECOGNITION,
+                                            AUDIO_SOURCE_VOICE_COMMUNICATION,
+                                            AUDIO_SOURCE_REMOTE_SUBMIX,
+                                            AUDIO_SOURCE_UNPROCESSED,
+                                            AUDIO_SOURCE_VOICE_PERFORMANCE,
+                                            AUDIO_SOURCE_ECHO_REFERENCE,
+                                            AUDIO_SOURCE_FM_TUNER,
+                                            AUDIO_SOURCE_HOTWORD,
+                                            AUDIO_SOURCE_ULTRASOUND};
+
+constexpr audio_usage_t kAudioUsages[] = {AUDIO_USAGE_UNKNOWN,
+                                          AUDIO_USAGE_MEDIA,
+                                          AUDIO_USAGE_VOICE_COMMUNICATION,
+                                          AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING,
+                                          AUDIO_USAGE_ALARM,
+                                          AUDIO_USAGE_NOTIFICATION,
+                                          AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE,
+                                          AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST,
+                                          AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT,
+                                          AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED,
+                                          AUDIO_USAGE_NOTIFICATION_EVENT,
+                                          AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY,
+                                          AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE,
+                                          AUDIO_USAGE_ASSISTANCE_SONIFICATION,
+                                          AUDIO_USAGE_GAME,
+                                          AUDIO_USAGE_VIRTUAL_SOURCE,
+                                          AUDIO_USAGE_ASSISTANT,
+                                          AUDIO_USAGE_CALL_ASSISTANT,
+                                          AUDIO_USAGE_EMERGENCY,
+                                          AUDIO_USAGE_SAFETY,
+                                          AUDIO_USAGE_VEHICLE_STATUS,
+                                          AUDIO_USAGE_ANNOUNCEMENT};
+
 constexpr PixelFormat kPixelFormat[] = {
         PIXEL_FORMAT_UNKNOWN,       PIXEL_FORMAT_NONE,        PIXEL_FORMAT_CUSTOM,
         PIXEL_FORMAT_TRANSLUCENT,   PIXEL_FORMAT_TRANSPARENT, PIXEL_FORMAT_OPAQUE,
@@ -354,7 +417,18 @@ void MediaPlayerServiceFuzzer::invokeMediaPlayer() {
                 [&]() { mMediaPlayer->attachAuxEffect(mFdp.ConsumeIntegral<int32_t>()); },
                 [&]() {
                     int32_t key = mFdp.PickValueInArray(kMediaParamKeys);
-                    request.writeInt32(mFdp.ConsumeIntegral<int32_t>());
+                    request.writeInt32((audio_usage_t)mFdp.ConsumeIntegralInRange<int32_t>(
+                            AUDIO_USAGE_UNKNOWN, AUDIO_USAGE_ANNOUNCEMENT) /* usage */);
+                    request.writeInt32((audio_content_type_t)mFdp.ConsumeIntegralInRange<int32_t>(
+                            AUDIO_CONTENT_TYPE_UNKNOWN,
+                            AUDIO_CONTENT_TYPE_ULTRASOUND) /* content_type */);
+                    request.writeInt32((audio_source_t)mFdp.ConsumeIntegralInRange<int32_t>(
+                            AUDIO_SOURCE_INVALID, AUDIO_SOURCE_ULTRASOUND) /* source */);
+                    request.writeInt32((audio_flags_mask_t)mFdp.ConsumeIntegralInRange<int32_t>(
+                            AUDIO_FLAG_NONE, AUDIO_FLAG_CALL_REDIRECTION) /* flags */);
+                    request.writeInt32(mFdp.ConsumeBool() /* hasFlattenedTag */);
+                    request.writeString16(
+                            String16((mFdp.ConsumeRandomLengthString()).c_str()) /* tags */);
                     request.setDataPosition(0);
                     mMediaPlayer->setParameter(key, request);
                     key = mFdp.PickValueInArray(kMediaParamKeys);
