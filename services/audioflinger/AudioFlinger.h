@@ -397,6 +397,8 @@ private:
     void onSupportedLatencyModesChanged(
             audio_io_handle_t output, const std::vector<audio_latency_mode_t>& modes) final
             EXCLUDES_AudioFlinger_ClientMutex;
+    void onHardError(std::set<audio_port_handle_t>& trackPortIds) final
+            EXCLUDES_AudioFlinger_ClientMutex;
 
     // ---- end of IAfThreadCallback interface
 
