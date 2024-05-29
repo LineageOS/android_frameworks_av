@@ -86,11 +86,17 @@ struct C2OMXNode : public BnOMXNode {
     void setFrameSize(uint32_t width, uint32_t height);
 
     /**
-     * Clean up work item reference.
+     * Notify that the input buffer reference is no longer needed by the component.
+     * Clean up if necessary.
      *
      * \param index input work index
      */
     void onInputBufferDone(c2_cntr64_t index);
+
+    /**
+     * Notify input buffer is emptied.
+     */
+    void onInputBufferEmptied();
 
     /**
      * Returns dataspace information from GraphicBufferSource.

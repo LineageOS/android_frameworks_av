@@ -102,11 +102,18 @@ public:
     }
 
     /**
+     * Notify that the input buffer reference is no longer needed.
      * Clean up C2Work related references if necessary. No-op by default.
      *
      * \param index index of input work.
      */
     virtual void onInputBufferDone(c2_cntr64_t /* index */) {}
+
+    /**
+     * Signal one input buffer as emptied.
+     * No-op by default.
+     */
+    virtual void onInputBufferEmptied() {}
 
     /**
      * Returns dataspace information from GraphicBufferSource.
