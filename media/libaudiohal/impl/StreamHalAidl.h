@@ -386,7 +386,7 @@ class StreamOutHalAidl : public virtual StreamOutHalInterface,
     // StreamOutHalInterfaceCallback
     void onWriteReady() override;
     void onDrainReady() override;
-    void onError() override;
+    void onError(bool isHardError) override;
 
   private:
     friend class sp<StreamOutHalAidl>;
