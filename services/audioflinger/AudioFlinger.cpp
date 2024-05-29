@@ -2177,6 +2177,13 @@ void AudioFlinger::onSupportedLatencyModesChanged(
     }
 }
 
+void AudioFlinger::onHardError(std::set<audio_port_handle_t>& trackPortIds) {
+    ALOGI("releasing tracks due to a hard error occurred on an I/O thread");
+    for (const auto portId : trackPortIds) {
+        AudioSystem::releaseOutput(portId);
+    }
+}
+
 // removeClient_l() must be called with AudioFlinger::clientMutex() held
 void AudioFlinger::removeClient_l(pid_t pid)
 {

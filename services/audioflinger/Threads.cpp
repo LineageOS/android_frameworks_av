@@ -3002,6 +3002,23 @@ void PlaybackThread::removeTrack_l(const sp<IAfTrack>& track)
     }
 }
 
+std::set<audio_port_handle_t> PlaybackThread::getTrackPortIds_l()
+{
+    std::set<int32_t> result;
+    for (const auto& t : mTracks) {
+        if (t->isExternalTrack()) {
+            result.insert(t->portId());
+        }
+    }
+    return result;
+}
+
+std::set<audio_port_handle_t> PlaybackThread::getTrackPortIds()
+{
+    audio_utils::lock_guard _l(mutex());
+    return getTrackPortIds_l();
+}
+
 String8 PlaybackThread::getParameters(const String8& keys)
 {
     audio_utils::lock_guard _l(mutex());
@@ -3055,9 +3072,9 @@ void PlaybackThread::onDrainReady()
     mCallbackThread->resetDraining();
 }
 
-void PlaybackThread::onError()
+void PlaybackThread::onError(bool isHardError)
 {
-    mCallbackThread->setAsyncError();
+    mCallbackThread->setAsyncError(isHardError);
 }
 
 void PlaybackThread::onCodecFormatChanged(
@@ -5423,10 +5440,14 @@ void PlaybackThread::onAddNewTrack_l()
     broadcast_l();
 }
 
-void PlaybackThread::onAsyncError()
+void PlaybackThread::onAsyncError(bool isHardError)
 {
+    auto allTrackPortIds = getTrackPortIds();
     for (int i = AUDIO_STREAM_SYSTEM; i < (int)AUDIO_STREAM_CNT; i++) {
         invalidateTracks((audio_stream_type_t)i);
+    }
+    if (isHardError) {
+        mAfThreadCallback->onHardError(allTrackPortIds);
     }
 }
 
@@ -7166,7 +7187,7 @@ AsyncCallbackThread::AsyncCallbackThread(
         mPlaybackThread(playbackThread),
         mWriteAckSequence(0),
         mDrainSequence(0),
-        mAsyncError(false)
+        mAsyncError(ASYNC_ERROR_NONE)
 {
 }
 
@@ -7180,7 +7201,7 @@ bool AsyncCallbackThread::threadLoop()
     while (!exitPending()) {
         uint32_t writeAckSequence;
         uint32_t drainSequence;
-        bool asyncError;
+        AsyncError asyncError;
 
         {
             audio_utils::unique_lock _l(mutex());
@@ -7201,7 +7222,7 @@ bool AsyncCallbackThread::threadLoop()
             drainSequence = mDrainSequence;
             mDrainSequence &= ~1;
             asyncError = mAsyncError;
-            mAsyncError = false;
+            mAsyncError = ASYNC_ERROR_NONE;
         }
         {
             const sp<PlaybackThread> playbackThread = mPlaybackThread.promote();
@@ -7212,8 +7233,8 @@ bool AsyncCallbackThread::threadLoop()
                 if (drainSequence & 1) {
                     playbackThread->resetDraining(drainSequence >> 1);
                 }
-                if (asyncError) {
-                    playbackThread->onAsyncError();
+                if (asyncError != ASYNC_ERROR_NONE) {
+                    playbackThread->onAsyncError(asyncError == ASYNC_ERROR_HARD);
                 }
             }
         }
@@ -7263,10 +7284,10 @@ void AsyncCallbackThread::resetDraining()
     }
 }
 
-void AsyncCallbackThread::setAsyncError()
+void AsyncCallbackThread::setAsyncError(bool isHardError)
 {
     audio_utils::lock_guard _l(mutex());
-    mAsyncError = true;
+    mAsyncError = isHardError ? ASYNC_ERROR_HARD : ASYNC_ERROR_SOFT;
     mWaitWorkCV.notify_one();
 }
 
