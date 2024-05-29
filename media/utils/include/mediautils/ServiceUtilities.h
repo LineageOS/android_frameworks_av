@@ -113,9 +113,6 @@ bool modifyPhoneStateAllowed(const AttributionSourceState& attributionSource);
 bool bypassInterruptionPolicyAllowed(const AttributionSourceState& attributionSource);
 bool callAudioInterceptionAllowed(const AttributionSourceState& attributionSource);
 void purgePermissionCache();
-bool mustAnonymizeBluetoothAddress(const AttributionSourceState& attributionSource);
-void anonymizeBluetoothAddress(char *address);
-
 int32_t getOpForSource(audio_source_t source);
 
 AttributionSourceState getCallingAttributionSource();

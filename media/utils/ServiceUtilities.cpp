@@ -392,37 +392,6 @@ status_t checkIMemory(const sp<IMemory>& iMemory)
     return NO_ERROR;
 }
 
-/**
- * Determines if the MAC address in Bluetooth device descriptors returned by APIs of
- * a native audio service (audio flinger, audio policy) must be anonymized.
- * MAC addresses returned to system server or audioserver are not anonymized.
- *
- * @param attributionSource The attribution source of the calling app.
- * @return true if the MAC addresses must be anonymized, false otherwise.
- */
-bool mustAnonymizeBluetoothAddress(
-        const AttributionSourceState& attributionSource) {
-    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
-    if (isAudioServerOrSystemServerUid(uid)) {
-        return false;
-    }
-    return true;
-}
-
-/**
- * Modifies the passed MAC address string in place for consumption by unprivileged clients.
- * the string is assumed to have a valid MAC address format.
- * the anonymzation must be kept in sync with toAnonymizedAddress() in BluetoothUtils.java
- *
- * @param address input/output the char string contining the MAC address to anonymize.
- */
-void anonymizeBluetoothAddress(char *address) {
-    if (address == nullptr || strlen(address) != strlen("AA:BB:CC:DD:EE:FF")) {
-        return;
-    }
-    memcpy(address, "XX:XX:XX:XX", strlen("XX:XX:XX:XX"));
-}
-
 sp<content::pm::IPackageManagerNative> MediaPackageManager::retrievePackageManager() {
     const sp<IServiceManager> sm = defaultServiceManager();
     if (sm == nullptr) {
