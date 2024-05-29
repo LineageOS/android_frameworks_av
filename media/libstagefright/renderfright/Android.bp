@@ -84,9 +84,6 @@ cc_library_static {
     name: "librenderfright",
     defaults: ["librenderfright_defaults"],
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
     double_loadable: true,
 
     cflags: [
