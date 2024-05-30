@@ -1020,6 +1020,32 @@ Status AudioPolicyService::releaseInput(int32_t portIdAidl)
     return Status::ok();
 }
 
+Status AudioPolicyService::setDeviceAbsoluteVolumeEnabled(const AudioDevice& deviceAidl,
+                                                          bool enabled,
+                                                          AudioStreamType streamToDriveAbsAidl) {
+    audio_stream_type_t streamToDriveAbs = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioStreamType_audio_stream_type_t(streamToDriveAbsAidl));
+    audio_devices_t deviceType;
+    std::string address;
+    RETURN_BINDER_STATUS_IF_ERROR(
+            aidl2legacy_AudioDevice_audio_device(deviceAidl, &deviceType, &address));
+
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    if (!settingsAllowed()) {
+        return binderStatusFromStatusT(PERMISSION_DENIED);
+    }
+    if (uint32_t(streamToDriveAbs) >= AUDIO_STREAM_PUBLIC_CNT) {
+        return binderStatusFromStatusT(BAD_VALUE);
+    }
+    audio_utils::lock_guard _l(mMutex);
+    AutoCallerClear acc;
+    return binderStatusFromStatusT(
+            mAudioPolicyManager->setDeviceAbsoluteVolumeEnabled(deviceType, address.c_str(),
+                                                                enabled, streamToDriveAbs));
+}
+
 Status AudioPolicyService::initStreamVolume(AudioStreamType streamAidl,
                                             int32_t indexMinAidl,
                                             int32_t indexMaxAidl) {

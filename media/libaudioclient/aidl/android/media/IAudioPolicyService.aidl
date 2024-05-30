@@ -114,6 +114,10 @@ interface IAudioPolicyService {
 
     void releaseInput(int /* audio_port_handle_t */ portId);
 
+    oneway void setDeviceAbsoluteVolumeEnabled(in AudioDevice device,
+                                               boolean enabled,
+                                               AudioStreamType streamToDriveAbs);
+
     void initStreamVolume(AudioStreamType stream,
                           int indexMin,
                           int indexMax);

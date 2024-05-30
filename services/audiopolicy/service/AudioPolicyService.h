@@ -121,6 +121,9 @@ public:
     binder::Status startInput(int32_t portId) override;
     binder::Status stopInput(int32_t portId) override;
     binder::Status releaseInput(int32_t portId) override;
+    binder::Status setDeviceAbsoluteVolumeEnabled(const AudioDevice& device,
+                                                  bool enabled,
+                                                  AudioStreamType streamToDriveAbs) override;
     binder::Status initStreamVolume(AudioStreamType stream, int32_t indexMin,
                                     int32_t indexMax) override;
     binder::Status setStreamVolumeIndex(AudioStreamType stream,
