@@ -73,11 +73,17 @@ struct C2NodeImpl {
     void setFrameSize(uint32_t width, uint32_t height);
 
     /**
-     * Clean up work item reference.
+     * Notify that the input buffer reference is no longer needed by the component.
+     * Clean up if necessary.
      *
      * \param index input work index
      */
     void onInputBufferDone(c2_cntr64_t index);
+
+    /**
+     * Notify input buffer is emptied.
+     */
+    void onInputBufferEmptied();
 
     /**
      * Returns dataspace information from GraphicBufferSource.
@@ -118,12 +124,24 @@ private:
     c2_cntr64_t mPrevInputTimestamp; // input timestamp for previous frame
     c2_cntr64_t mPrevCodecTimestamp; // adjusted (codec) timestamp for previous frame
 
-    Mutexed<std::map<uint64_t, uint32_t>> mBufferIdsInUse;
+    // Tracks the status of buffers
+    struct BuffersTracker {
+        BuffersTracker() = default;
+
+        // Keeps track of buffers that are used by the component. Maps timestamp -> ID
+        std::map<uint64_t, uint32_t> mIdsInUse;
+        // Keeps track of the buffer IDs that are available after being released from the component.
+        std::list<uint32_t> mAvailableIds;
+    };
+    Mutexed<BuffersTracker> mBuffersTracker;
 
     class QueueThread;
     sp<QueueThread> mQueueThread;
 
     bool mAidlHal;
+
+    bool hasBufferSource();
+    void notifyInputBufferEmptied(int32_t bufferId);
 };
 
 }  // namespace android

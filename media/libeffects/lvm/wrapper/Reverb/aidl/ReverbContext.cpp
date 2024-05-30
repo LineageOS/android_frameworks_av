@@ -19,6 +19,7 @@
 #define LOG_TAG "ReverbContext"
 #include <android-base/logging.h>
 #include <Utils.h>
+#include <audio_utils/primitives.h>
 
 #include "ReverbContext.h"
 #include "VectorArithmetic.h"
@@ -346,6 +347,15 @@ IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
     int outChannels = ::aidl::android::hardware::audio::common::getChannelCount(
             mCommon.output.base.channelMask);
     int frameCount = mCommon.input.frameCount;
+
+    if (mBypass) {
+        if (isAuxiliary()) {
+            memset(out, 0, getOutputFrameSize() * frameCount);
+        } else {
+            memcpy_to_float_from_float_with_clamping(out, in, samples, 1);
+        }
+        return {STATUS_OK, samples, outChannels * frameCount};
+    }
 
     // Reverb only effects the stereo channels in multichannel source.
     if (channels < 1 || channels > LVM_MAX_CHANNELS) {

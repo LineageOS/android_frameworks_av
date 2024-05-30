@@ -89,6 +89,7 @@ class CameraFuzzer : public ::android::hardware::BnCameraClient {
     bool initCamera();
     void invokeCamera();
     void invokeSetParameters();
+    native_handle_t* createNativeHandle();
     sp<Camera> mCamera = nullptr;
     FuzzedDataProvider* mFDP = nullptr;
 
@@ -102,6 +103,18 @@ class CameraFuzzer : public ::android::hardware::BnCameraClient {
         return;
     };
 };
+
+native_handle_t* CameraFuzzer::createNativeHandle() {
+    int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kMinElements, kMaxElements);
+    int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
+    native_handle_t* handle = native_handle_create(numFds, numInts);
+    for (int32_t i = 0; i < numFds; ++i) {
+        std::string filename = mFDP->ConsumeRandomLengthString(kMaxBytes);
+        int32_t fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC);
+        handle->data[i] = fd;
+    }
+    return handle;
+}
 
 bool CameraFuzzer::initCamera() {
     ProcessState::self()->startThreadPool();
@@ -291,15 +304,11 @@ void CameraFuzzer::invokeCamera() {
                 },
                 [&]() {
                     int64_t timestamp = mFDP->ConsumeIntegral<int64_t>();
-                    int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                    int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                    native_handle_t* handle = native_handle_create(numFds, numInts);
+                    native_handle_t* handle = createNativeHandle();
                     mCamera->recordingFrameHandleCallbackTimestamp(timestamp, handle);
                 },
                 [&]() {
-                    int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                    int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                    native_handle_t* handle = native_handle_create(numFds, numInts);
+                    native_handle_t* handle = createNativeHandle();
                     mCamera->releaseRecordingFrameHandle(handle);
                 },
                 [&]() { mCamera->releaseRecordingFrame(iMem); },
@@ -308,9 +317,7 @@ void CameraFuzzer::invokeCamera() {
                     for (int8_t i = 0;
                          i < mFDP->ConsumeIntegralInRange<int8_t>(kMinElements, kMaxElements);
                          ++i) {
-                        int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                        int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                        native_handle_t* handle = native_handle_create(numFds, numInts);
+                        native_handle_t* handle = createNativeHandle();
                         handles.push_back(handle);
                     }
                     mCamera->releaseRecordingFrameHandleBatch(handles);
@@ -320,9 +327,7 @@ void CameraFuzzer::invokeCamera() {
                     for (int8_t i = 0;
                          i < mFDP->ConsumeIntegralInRange<int8_t>(kMinElements, kMaxElements);
                          ++i) {
-                        int32_t numFds = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                        int32_t numInts = mFDP->ConsumeIntegralInRange<int32_t>(kNumMin, kNumMax);
-                        native_handle_t* handle = native_handle_create(numFds, numInts);
+                        native_handle_t* handle = createNativeHandle();
                         handles.push_back(handle);
                     }
                     std::vector<nsecs_t> timestamps;
