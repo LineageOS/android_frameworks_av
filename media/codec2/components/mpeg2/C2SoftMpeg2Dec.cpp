@@ -16,6 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2SoftMpeg2Dec"
+#ifndef KEEP_THREADS_ACTIVE
+#define KEEP_THREADS_ACTIVE 0
+#endif
 #include <log/log.h>
 
 #include <media/stagefright/foundation/MediaDefs.h>
@@ -433,7 +436,7 @@ status_t C2SoftMpeg2Dec::fillMemRecords() {
 
     s_fill_mem_ip.s_ivd_fill_mem_rec_ip_t.u4_size = sizeof(ivdext_fill_mem_rec_ip_t);
     s_fill_mem_ip.u4_share_disp_buf = 0;
-    s_fill_mem_ip.u4_keep_threads_active = 1;
+    s_fill_mem_ip.u4_keep_threads_active = KEEP_THREADS_ACTIVE;
     s_fill_mem_ip.e_output_format = mIvColorformat;
     s_fill_mem_ip.u4_deinterlace = 1;
     s_fill_mem_ip.s_ivd_fill_mem_rec_ip_t.e_cmd = IV_CMD_FILL_NUM_MEM_REC;
@@ -475,7 +478,7 @@ status_t C2SoftMpeg2Dec::createDecoder() {
     s_init_ip.s_ivd_init_ip_t.u4_frm_max_ht = mHeight;
     s_init_ip.u4_share_disp_buf = 0;
     s_init_ip.u4_deinterlace = 1;
-    s_init_ip.u4_keep_threads_active = 1;
+    s_init_ip.u4_keep_threads_active = KEEP_THREADS_ACTIVE;
     s_init_ip.s_ivd_init_ip_t.u4_num_mem_rec = mNumMemRecords;
     s_init_ip.s_ivd_init_ip_t.e_output_format = mIvColorformat;
     s_init_op.s_ivd_init_op_t.u4_size = sizeof(ivdext_init_op_t);
