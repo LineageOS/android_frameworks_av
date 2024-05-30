@@ -70,6 +70,22 @@ public:
             return BAD_VALUE;
         }
         *input = mNextIoHandle++;
+        mOpenedInputs.insert(*input);
+        ALOGD("%s: opened input %d", __func__, *input);
+        return NO_ERROR;
+    }
+
+    status_t closeInput(audio_io_handle_t input) override {
+        if (mOpenedInputs.erase(input) != 1) {
+            if (input >= mNextIoHandle) {
+                ALOGE("%s: I/O handle %d has not been allocated yet (next is %d)",
+                      __func__, input, mNextIoHandle);
+            } else {
+                ALOGE("%s: Attempt to close input %d twice", __func__, input);
+            }
+            return BAD_VALUE;
+        }
+        ALOGD("%s: closed input %d", __func__, input);
         return NO_ERROR;
     }
 
@@ -123,6 +139,8 @@ public:
         auto it = --mActivePatches.end();
         return &it->second;
     };
+
+    size_t getOpenedInputsCount() const { return mOpenedInputs.size(); }
 
     audio_module_handle_t peekNextModuleHandle() const { return mNextModuleHandle; }
 
@@ -241,6 +259,7 @@ private:
     std::vector<struct audio_port_v7> mDisconnectedDevicePorts;
     std::set<audio_format_t> mSupportedFormats;
     std::set<audio_channel_mask_t> mSupportedChannelMasks;
+    std::set<audio_io_handle_t> mOpenedInputs;
 };
 
 } // namespace android
