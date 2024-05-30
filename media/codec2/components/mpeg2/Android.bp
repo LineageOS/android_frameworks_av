@@ -14,6 +14,10 @@ cc_library {
         "libcodec2_soft_sanitize_signed-defaults",
     ],
 
+    cflags: [
+        "-DKEEP_THREADS_ACTIVE=0",
+    ],
+
     srcs: ["C2SoftMpeg2Dec.cpp"],
 
     static_libs: ["libmpeg2dec"],
