@@ -126,9 +126,8 @@ class VirtualCameraDevice
   // Default JPEG orientation.
   static constexpr uint8_t kDefaultJpegOrientation = 0;
 
-  // TODO(b/342674104) CDD requires <= 15.
-  // Change this to lower value after confirming it doesn't cause any issue (timeouts).
-  static constexpr int kMinFps = 15;
+  // Lowest min fps advertised in supported fps ranges.
+  static constexpr int kMinFps = 1;
 
   // Default Make and Model for Exif
   static constexpr char kDefaultMakeAndModel[] = "Android Virtual Camera";
