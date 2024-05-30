@@ -22,6 +22,7 @@
 #include <iostream>
 #include <mutex>
 
+#include <com_android_media_aaudio.h>
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 #include <mediautils/SchedulingPolicyService.h>
@@ -219,7 +220,7 @@ aaudio_result_t AAudioServiceStreamBase::close_l() {
     return closeAndClear();
 }
 
-aaudio_result_t AAudioServiceStreamBase::startDevice() {
+aaudio_result_t AAudioServiceStreamBase::startDevice_l() {
     mClientHandle = AUDIO_PORT_HANDLE_NONE;
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
@@ -274,7 +275,7 @@ aaudio_result_t AAudioServiceStreamBase::start_l() {
     mAtomicStreamTimestamp.clear();
 
     mClientHandle = AUDIO_PORT_HANDLE_NONE;
-    result = startDevice();
+    result = startDevice_l();
     if (result != AAUDIO_OK) goto error;
 
     // This should happen at the end of the start.
@@ -520,6 +521,18 @@ void AAudioServiceStreamBase::run() {
                                                        : exitStandby_l(param->mParcelable);
                     standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
                 } break;
+                case START_CLIENT: {
+                    auto param = (StartClientParam *) command->parameter.get();
+                    command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
+                                                       : startClient_l(param->mClient,
+                                                                       param->mAttr,
+                                                                       param->mClientHandle);
+                } break;
+                case STOP_CLIENT: {
+                    auto param = (StopClientParam *) command->parameter.get();
+                    command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
+                                                       : stopClient_l(param->mClientHandle);
+                } break;
                 default:
                     ALOGE("Invalid command op code: %d", command->operationCode);
                     break;
@@ -727,6 +740,26 @@ aaudio_result_t AAudioServiceStreamBase::exitStandby(AudioEndpointParcelable *pa
     auto command = std::make_shared<AAudioCommand>(
             EXIT_STANDBY,
             std::make_shared<ExitStandbyParam>(parcelable),
+            true /*waitForReply*/,
+            TIMEOUT_NANOS);
+    return mCommandQueue.sendCommand(command);
+}
+
+aaudio_result_t AAudioServiceStreamBase::sendStartClientCommand(const android::AudioClient &client,
+                                                                const audio_attributes_t *attr,
+                                                                audio_port_handle_t *clientHandle) {
+    auto command = std::make_shared<AAudioCommand>(
+            START_CLIENT,
+            std::make_shared<StartClientParam>(client, attr, clientHandle),
+            true /*waitForReply*/,
+            TIMEOUT_NANOS);
+    return mCommandQueue.sendCommand(command);
+}
+
+aaudio_result_t AAudioServiceStreamBase::sendStopClientCommand(audio_port_handle_t clientHandle) {
+    auto command = std::make_shared<AAudioCommand>(
+            STOP_CLIENT,
+            std::make_shared<StopClientParam>(clientHandle),
             true /*waitForReply*/,
             TIMEOUT_NANOS);
     return mCommandQueue.sendCommand(command);
