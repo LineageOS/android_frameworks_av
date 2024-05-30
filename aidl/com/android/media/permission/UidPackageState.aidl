@@ -20,6 +20,7 @@ package com.android.media.permission;
  * Entity representing the package names associated with a particular uid/app-id
  * {@hide}
  */
+@JavaDerive(equals = true, toString = true)
 parcelable UidPackageState {
     int uid;
     @utf8InCpp List<String> packageNames;

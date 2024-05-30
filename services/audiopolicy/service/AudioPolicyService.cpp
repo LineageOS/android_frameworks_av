@@ -165,6 +165,7 @@ BINDER_METHOD_ENTRY(setPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(getPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(clearPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(getRegisteredPolicyMixes) \
+BINDER_METHOD_ENTRY(getPermissionController) \
                                                      \
 // singleton for Binder Method Statistics for IAudioPolicyService
 static auto& getIAudioPolicyServiceStatistics() {
@@ -227,7 +228,9 @@ AudioPolicyService::AudioPolicyService()
       mCaptureStateNotifier(false),
       mCreateAudioPolicyManager(createAudioPolicyManager),
       mDestroyAudioPolicyManager(destroyAudioPolicyManager),
-      mUsecaseValidator(media::createUsecaseValidator()) {
+      mUsecaseValidator(media::createUsecaseValidator()),
+      mPermissionController(sp<NativePermissionController>::make())
+{
       setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
       setInheritRt(true);
 }
@@ -1382,6 +1385,17 @@ status_t AudioPolicyService::onTransact(
         } break;
         default:
             break;
+    }
+
+    switch (code) {
+        case TRANSACTION_getPermissionController: {
+            if (!isAudioServerOrSystemServerUid(IPCThreadState::self()->getCallingUid())) {
+                ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
+                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      IPCThreadState::self()->getCallingUid());
+                return INVALID_OPERATION;
+            }
+        }
     }
 
     const std::string methodName = getIAudioPolicyServiceStatistics().getMethodForCode(code);

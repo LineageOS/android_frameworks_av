@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "AudioPolicyIntefaceImpl"
+#define LOG_TAG "AudioPolicyInterfaceImpl"
 //#define LOG_NDEBUG 0
 
 #include "AudioPolicyService.h"
 #include "AudioRecordClient.h"
 #include "TypeConverter.h"
+
+#include <android/content/AttributionSourceState.h>
 #include <android_media_audiopolicy.h>
 #include <media/AidlConversion.h>
 #include <media/AudioPolicy.h>
@@ -27,7 +29,6 @@
 #include <media/MediaMetricsItem.h>
 #include <media/PolicyAidlConversion.h>
 #include <utils/Log.h>
-#include <android/content/AttributionSourceState.h>
 
 #define VALUE_OR_RETURN_BINDER_STATUS(x) \
     ({ auto _tmp = (x); \
@@ -49,6 +50,7 @@ namespace android {
 namespace audiopolicy_flags = android::media::audiopolicy;
 using binder::Status;
 using aidl_utils::binderStatusFromStatusT;
+using com::android::media::permission::NativePermissionController;
 using content::AttributionSourceState;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
@@ -2667,6 +2669,11 @@ Status AudioPolicyService::clearPreferredMixerAttributes(
     audio_utils::lock_guard _l(mMutex);
     return binderStatusFromStatusT(
             mAudioPolicyManager->clearPreferredMixerAttributes(&attr, portId, uid));
+}
+
+Status AudioPolicyService::getPermissionController(sp<INativePermissionController>* out) {
+    *out = mPermissionController;
+    return Status::ok();
 }
 
 } // namespace android

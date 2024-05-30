@@ -48,6 +48,7 @@ cc_fuzz {
         "aaudio-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
+        "audio-permission-aidl-cpp",
         "audiopolicy-aidl-cpp",
         "audiopolicy-types-aidl-cpp",
         "av-types-aidl-cpp",
