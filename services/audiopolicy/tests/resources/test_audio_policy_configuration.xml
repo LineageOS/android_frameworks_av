@@ -99,7 +99,7 @@
                 <route type="mix" sink="primary input"
                        sources="Built-In Mic,Hdmi-In Mic,USB Device In"/>
                 <route type="mix" sink="voip_tx"
-                       sources="Built-In Mic"/>
+                       sources="Built-In Mic,USB Device In"/>
                 <route type="mix" sink="Hdmi"
                        sources="primary output"/>
                 <route type="mix" sink="BT SCO"
