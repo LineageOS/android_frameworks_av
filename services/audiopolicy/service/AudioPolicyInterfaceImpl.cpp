@@ -1622,7 +1622,7 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
         numPortsReq = std::min(numPortsReq, num_ports);
     }
 
-    if (mustAnonymizeBluetoothAddress(attributionSource)) {
+    if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
         for (size_t i = 0; i < numPortsReq; ++i) {
             anonymizePortBluetoothAddress(&ports[i]);
         }
@@ -1664,7 +1664,7 @@ Status AudioPolicyService::getAudioPort(int portId,
         RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(mAudioPolicyManager->getAudioPort(&port)));
     }
 
-    if (mustAnonymizeBluetoothAddress(attributionSource)) {
+    if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
         anonymizePortBluetoothAddress(&port);
     }
 
@@ -1740,7 +1740,7 @@ Status AudioPolicyService::listAudioPatches(Int* count,
         numPatchesReq = std::min(numPatchesReq, num_patches);
     }
 
-    if (mustAnonymizeBluetoothAddress(attributionSource)) {
+    if (mustAnonymizeBluetoothAddress(attributionSource, String16(__func__))) {
         for (size_t i = 0; i < numPatchesReq; ++i) {
             for (size_t j = 0; j < patches[i].num_sources; ++j) {
                 anonymizePortBluetoothAddress(&patches[i].sources[j]);
