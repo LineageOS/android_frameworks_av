@@ -204,6 +204,7 @@ class VirtualCameraRenderThread {
   std::unique_ptr<EglSurfaceTexture> mEglSurfaceTexture;
 
   std::promise<sp<Surface>> mInputSurfacePromise;
+  std::shared_future<sp<Surface>> mInputSurfaceFuture;
 };
 
 }  // namespace virtualcamera

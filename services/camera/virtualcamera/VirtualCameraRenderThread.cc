@@ -313,7 +313,8 @@ VirtualCameraRenderThread::VirtualCameraRenderThread(
     : mCameraDeviceCallback(cameraDeviceCallback),
       mInputSurfaceSize(inputSurfaceSize),
       mReportedSensorSize(reportedSensorSize),
-      mSessionContext(sessionContext) {
+      mSessionContext(sessionContext),
+      mInputSurfaceFuture(mInputSurfacePromise.get_future()) {
 }
 
 VirtualCameraRenderThread::~VirtualCameraRenderThread() {
@@ -373,7 +374,7 @@ void VirtualCameraRenderThread::stop() {
 }
 
 sp<Surface> VirtualCameraRenderThread::getInputSurface() {
-  return mInputSurfacePromise.get_future().get();
+  return mInputSurfaceFuture.get();
 }
 
 std::unique_ptr<ProcessCaptureRequestTask>
