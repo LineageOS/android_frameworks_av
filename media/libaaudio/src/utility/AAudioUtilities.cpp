@@ -680,12 +680,16 @@ aaudio_policy_t aidl2legacy_aaudio_policy(AudioMMapPolicy aidl) {
 
 } // namespace
 
-aaudio_policy_t AAudio_getAAudioPolicy(const std::vector<AudioMMapPolicyInfo>& policyInfos) {
-    if (policyInfos.empty()) return AAUDIO_POLICY_AUTO;
-    for (size_t i = 1; i < policyInfos.size(); ++i) {
-        if (policyInfos.at(i).mmapPolicy != policyInfos.at(0).mmapPolicy) {
+aaudio_policy_t AAudio_getAAudioPolicy(const std::vector<AudioMMapPolicyInfo>& policyInfos,
+                                       AudioMMapPolicy defaultPolicy) {
+    AudioMMapPolicy policy = defaultPolicy;
+    for (const auto& policyInfo : policyInfos) {
+        if (policyInfo.mmapPolicy == AudioMMapPolicy::NEVER) {
+            policy = policyInfo.mmapPolicy;
+        } else if (policyInfo.mmapPolicy == AudioMMapPolicy::AUTO ||
+                   policyInfo.mmapPolicy == AudioMMapPolicy::ALWAYS) {
             return AAUDIO_POLICY_AUTO;
         }
     }
-    return aidl2legacy_aaudio_policy(policyInfos.at(0).mmapPolicy);
+    return aidl2legacy_aaudio_policy(policy);
 }

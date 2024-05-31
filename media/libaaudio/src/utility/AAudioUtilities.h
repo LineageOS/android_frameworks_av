@@ -348,9 +348,19 @@ enum {
     AAUDIO_CHANNEL_INDEX_MASK_24 = AAUDIO_CHANNEL_BIT_INDEX | (1 << 24) - 1,
 };
 
-// The aaudio policy will be ALWAYS, NEVER, UNSPECIFIED only when all policy info are
-// ALWAYS, NEVER or UNSPECIFIED. Otherwise, the aaudio policy will be AUTO.
+/**
+ * Returns the aaudio mmap policy based on the vector of mmap policy info. The rule as
+ * 1. Returns AUTO if any of the policy is AUTO or ALWAYS
+ * 2. Returns NEVER if all of the policies are NEVER or UNSPECIFIED
+ * 3. Returns default policy if all of the policies are UNSPECIFIED
+ *
+ * @param policyInfos
+ * @param defaultPolicy
+ * @return
+ */
 aaudio_policy_t AAudio_getAAudioPolicy(
-        const std::vector<android::media::audio::common::AudioMMapPolicyInfo>& policyInfos);
+        const std::vector<android::media::audio::common::AudioMMapPolicyInfo>& policyInfos,
+        android::media::audio::common::AudioMMapPolicy defaultPolicy =
+                android::media::audio::common::AudioMMapPolicy::NEVER);
 
 #endif //UTILITY_AAUDIO_UTILITIES_H

@@ -24,6 +24,7 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
+#include <android/media/audio/common/AudioMMapPolicy.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <media/AudioSystem.h>
@@ -40,11 +41,14 @@
 
 using namespace aaudio;
 
+using android::media::audio::common::AudioMMapPolicy;
 using android::media::audio::common::AudioMMapPolicyInfo;
 using android::media::audio::common::AudioMMapPolicyType;
 
 #define AAUDIO_MMAP_POLICY_DEFAULT             AAUDIO_POLICY_NEVER
 #define AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT   AAUDIO_POLICY_NEVER
+#define AAUDIO_MMAP_POLICY_DEFAULT_AIDL        AudioMMapPolicy::NEVER
+#define AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT_AIDL AudioMMapPolicy::NEVER
 
 // These values are for a pre-check before we ask the lower level service to open a stream.
 // So they are just outside the maximum conceivable range of value,
@@ -116,7 +120,8 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     aaudio_policy_t mmapPolicy = AudioGlobal_getMMapPolicy();
     if (android::AudioSystem::getMmapPolicyInfo(
             AudioMMapPolicyType::DEFAULT, &policyInfos) == NO_ERROR) {
-        aaudio_policy_t systemMmapPolicy = AAudio_getAAudioPolicy(policyInfos);
+        aaudio_policy_t systemMmapPolicy = AAudio_getAAudioPolicy(
+                policyInfos, AAUDIO_MMAP_POLICY_DEFAULT_AIDL);
         if (mmapPolicy == AAUDIO_POLICY_ALWAYS && systemMmapPolicy == AAUDIO_POLICY_NEVER) {
             // No need to try as AAudioService is not created and the client only wants MMAP path.
             return AAUDIO_ERROR_NO_SERVICE;
@@ -145,7 +150,8 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     aaudio_policy_t mmapExclusivePolicy = AAUDIO_UNSPECIFIED;
     if (android::AudioSystem::getMmapPolicyInfo(
             AudioMMapPolicyType::EXCLUSIVE, &policyInfos) == NO_ERROR) {
-        mmapExclusivePolicy = AAudio_getAAudioPolicy(policyInfos);
+        mmapExclusivePolicy = AAudio_getAAudioPolicy(
+                policyInfos, AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT_AIDL);
     }
     if (mmapExclusivePolicy == AAUDIO_UNSPECIFIED) {
         mmapExclusivePolicy = AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT;
