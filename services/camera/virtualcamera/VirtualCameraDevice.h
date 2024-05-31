@@ -104,6 +104,9 @@ class VirtualCameraDevice
   // Returns largest supported input resolution.
   Resolution getMaxInputResolution() const;
 
+  // Allocate and return next id for input stream (input surface).
+  int allocateInputStreamId();
+
   // Maximal number of RAW streams - virtual camera doesn't support RAW streams.
   static constexpr int32_t kMaxNumberOfRawStreams = 0;
 
@@ -148,6 +151,8 @@ class VirtualCameraDevice
   const std::vector<
       aidl::android::companion::virtualcamera::SupportedStreamConfiguration>
       mSupportedInputConfigurations;
+
+  std::atomic_int mNextInputStreamId;
 };
 
 }  // namespace virtualcamera

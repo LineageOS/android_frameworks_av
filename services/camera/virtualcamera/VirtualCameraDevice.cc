@@ -618,6 +618,10 @@ Resolution VirtualCameraDevice::getMaxInputResolution() const {
   return maxResolution.value();
 }
 
+int VirtualCameraDevice::allocateInputStreamId() {
+  return mNextInputStreamId++;
+}
+
 std::shared_ptr<VirtualCameraDevice> VirtualCameraDevice::sharedFromThis() {
   // SharedRefBase which BnCameraDevice inherits from breaks
   // std::enable_shared_from_this. This is recommended replacement for

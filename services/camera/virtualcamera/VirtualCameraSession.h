@@ -143,6 +143,8 @@ class VirtualCameraSession
       GUARDED_BY(mLock);
 
   std::unique_ptr<VirtualCameraRenderThread> mRenderThread GUARDED_BY(mLock);
+
+  int mCurrentInputStreamId GUARDED_BY(mLock);
 };
 
 }  // namespace virtualcamera
