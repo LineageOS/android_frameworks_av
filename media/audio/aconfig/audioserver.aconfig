@@ -39,3 +39,12 @@ flag {
         "This feature helps reduce audio glitching caused by low priority blocking threads."
     bug: "209491695"
 }
+
+flag {
+    name: "fix_input_sharing_logic"
+    namespace: "media_audio"
+    description:
+        "Fix the audio policy logic that decides to reuse or close "
+        "input streams when resources are exhausted"
+    bug: "338446410"
+}

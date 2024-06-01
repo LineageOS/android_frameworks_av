@@ -8,6 +8,7 @@ cc_library {
 
     srcs: [
         "NativePermissionController.cpp",
+        "ValidatedAttributionSourceState.cpp",
     ],
     export_include_dirs: [
         "include",
@@ -22,6 +23,7 @@ cc_library {
     ],
     static_libs: [
         "audio-permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
     shared_libs: [
         "libbase",
@@ -94,6 +96,7 @@ cc_test {
     ],
     srcs: [
         "tests/NativePermissionControllerTest.cpp",
+        "tests/ValidatedAttributionSourceStateTest.cpp",
     ],
     test_options: {
         unit_test: true,
