@@ -279,7 +279,7 @@ protected:
      * Device specific startup.
      * @return AAUDIO_OK or negative error.
      */
-    virtual aaudio_result_t startDevice();
+    virtual aaudio_result_t startDevice_l() REQUIRES(mLock);
 
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command)
             EXCLUDES(mUpMessageQueueLock);
@@ -287,6 +287,12 @@ protected:
     aaudio_result_t sendCurrentTimestamp_l() REQUIRES(mLock);
 
     aaudio_result_t sendXRunCount(int32_t xRunCount);
+
+    aaudio_result_t sendStartClientCommand(const android::AudioClient& client,
+                                           const audio_attributes_t *attr,
+                                           audio_port_handle_t *clientHandle) EXCLUDES(mLock);
+
+    aaudio_result_t sendStopClientCommand(audio_port_handle_t clientHandle) EXCLUDES(mLock);
 
     /**
      * @param positionFrames
@@ -342,6 +348,40 @@ protected:
     }
     virtual void reportData_l() REQUIRES(mLock) { return; }
 
+    class StartClientParam : public AAudioCommandParam {
+    public:
+        StartClientParam(const android::AudioClient& client, const audio_attributes_t* attr,
+                         audio_port_handle_t* clientHandle)
+                : AAudioCommandParam(), mClient(client), mAttr(attr), mClientHandle(clientHandle) {
+        }
+        ~StartClientParam() override = default;
+
+        android::AudioClient mClient;
+        const audio_attributes_t* mAttr;
+        audio_port_handle_t* mClientHandle;
+    };
+    virtual aaudio_result_t startClient_l(
+            const android::AudioClient& client,
+            const audio_attributes_t *attr __unused,
+            audio_port_handle_t *clientHandle __unused) REQUIRES(mLock) {
+        ALOGD("AAudioServiceStreamBase::startClient_l(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    class StopClientParam : public AAudioCommandParam {
+    public:
+        explicit StopClientParam(audio_port_handle_t clientHandle)
+                : AAudioCommandParam(), mClientHandle(clientHandle) {
+        }
+        ~StopClientParam() override = default;
+
+        audio_port_handle_t mClientHandle;
+    };
+    virtual aaudio_result_t stopClient_l(audio_port_handle_t clientHandle) REQUIRES(mLock) {
+        ALOGD("AAudioServiceStreamBase::stopClient(%d) AAUDIO_ERROR_UNAVAILABLE", clientHandle);
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     std::mutex              mUpMessageQueueLock;
@@ -358,6 +398,8 @@ protected:
         UNREGISTER_AUDIO_THREAD,
         GET_DESCRIPTION,
         EXIT_STANDBY,
+        START_CLIENT,
+        STOP_CLIENT,
     };
     AAudioThread            mCommandThread;
     std::atomic_bool        mThreadEnabled{false};

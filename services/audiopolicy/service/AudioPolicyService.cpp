@@ -79,6 +79,7 @@ BINDER_METHOD_ENTRY(getInputForAttr) \
 BINDER_METHOD_ENTRY(startInput) \
 BINDER_METHOD_ENTRY(stopInput) \
 BINDER_METHOD_ENTRY(releaseInput) \
+BINDER_METHOD_ENTRY(setDeviceAbsoluteVolumeEnabled) \
 BINDER_METHOD_ENTRY(initStreamVolume) \
 BINDER_METHOD_ENTRY(setStreamVolumeIndex) \
 BINDER_METHOD_ENTRY(getStreamVolumeIndex) \
@@ -164,6 +165,7 @@ BINDER_METHOD_ENTRY(setPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(getPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(clearPreferredMixerAttributes) \
 BINDER_METHOD_ENTRY(getRegisteredPolicyMixes) \
+BINDER_METHOD_ENTRY(getPermissionController) \
                                                      \
 // singleton for Binder Method Statistics for IAudioPolicyService
 static auto& getIAudioPolicyServiceStatistics() {
@@ -226,7 +228,9 @@ AudioPolicyService::AudioPolicyService()
       mCaptureStateNotifier(false),
       mCreateAudioPolicyManager(createAudioPolicyManager),
       mDestroyAudioPolicyManager(destroyAudioPolicyManager),
-      mUsecaseValidator(media::createUsecaseValidator()) {
+      mUsecaseValidator(media::createUsecaseValidator()),
+      mPermissionController(sp<NativePermissionController>::make())
+{
       setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
       setInheritRt(true);
 }
@@ -1321,6 +1325,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_setPhoneState:
 //FIXME: Allow setForceUse calls from system apps until a better use case routing API is available
 //      case TRANSACTION_setForceUse:
+        case TRANSACTION_setDeviceAbsoluteVolumeEnabled:
         case TRANSACTION_initStreamVolume:
         case TRANSACTION_setStreamVolumeIndex:
         case TRANSACTION_setVolumeIndexForAttributes:
@@ -1380,6 +1385,17 @@ status_t AudioPolicyService::onTransact(
         } break;
         default:
             break;
+    }
+
+    switch (code) {
+        case TRANSACTION_getPermissionController: {
+            if (!isAudioServerOrSystemServerUid(IPCThreadState::self()->getCallingUid())) {
+                ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
+                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      IPCThreadState::self()->getCallingUid());
+                return INVALID_OPERATION;
+            }
+        }
     }
 
     const std::string methodName = getIAudioPolicyServiceStatistics().getMethodForCode(code);

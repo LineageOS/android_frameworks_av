@@ -44,6 +44,7 @@ cc_defaults {
         "packagemanager_aidl-cpp",
     ],
     static_libs: [
+        "audiopermissioncontroller",
         "libaudiomockhal",
         "libfakeservicemanager",
         "libmediaplayerservice",

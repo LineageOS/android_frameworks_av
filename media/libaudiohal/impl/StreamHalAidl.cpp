@@ -257,20 +257,71 @@ status_t StreamHalAidl::start() {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    const auto state = getState();
-    StreamDescriptor::Reply reply;
-    if (state == StreamDescriptor::State::STANDBY) {
-        RETURN_STATUS_IF_ERROR(sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply, true));
-        return sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), &reply, true);
+    if (!mContext.isMmapped()) {
+        return BAD_VALUE;
     }
-
-    return INVALID_OPERATION;
+    StreamDescriptor::Reply reply;
+    RETURN_STATUS_IF_ERROR(updateCountersIfNeeded(&reply));
+    switch (reply.state) {
+        case StreamDescriptor::State::STANDBY:
+            RETURN_STATUS_IF_ERROR(
+                    sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply, true));
+            if (reply.state != StreamDescriptor::State::IDLE) {
+                ALOGE("%s: unexpected stream state: %s (expected IDLE)",
+                        __func__, toString(reply.state).c_str());
+                return INVALID_OPERATION;
+            }
+            FALLTHROUGH_INTENDED;
+        case StreamDescriptor::State::IDLE:
+            RETURN_STATUS_IF_ERROR(
+                    sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), &reply, true));
+            if (reply.state != StreamDescriptor::State::ACTIVE) {
+                ALOGE("%s: unexpected stream state: %s (expected ACTIVE)",
+                        __func__, toString(reply.state).c_str());
+                return INVALID_OPERATION;
+            }
+            FALLTHROUGH_INTENDED;
+        case StreamDescriptor::State::ACTIVE:
+            return OK;
+        case StreamDescriptor::State::DRAINING:
+            RETURN_STATUS_IF_ERROR(
+                    sendCommand(makeHalCommand<HalCommand::Tag::start>(), &reply, true));
+            if (reply.state != StreamDescriptor::State::ACTIVE) {
+                ALOGE("%s: unexpected stream state: %s (expected ACTIVE)",
+                        __func__, toString(reply.state).c_str());
+                return INVALID_OPERATION;
+            }
+            return OK;
+        default:
+            ALOGE("%s: not supported from %s stream state %s",
+                    __func__, mIsInput ? "input" : "output", toString(reply.state).c_str());
+            return INVALID_OPERATION;
+    }
 }
 
 status_t StreamHalAidl::stop() {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
+    TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return standby();
+    if (!mContext.isMmapped()) {
+        return BAD_VALUE;
+    }
+    StreamDescriptor::Reply reply;
+    RETURN_STATUS_IF_ERROR(updateCountersIfNeeded(&reply));
+    if (const auto state = reply.state; state == StreamDescriptor::State::ACTIVE) {
+        return drain(false /*earlyNotify*/, nullptr);
+    } else if (state == StreamDescriptor::State::DRAINING) {
+        RETURN_STATUS_IF_ERROR(pause());
+        return flush();
+    } else if (state == StreamDescriptor::State::PAUSED) {
+        return flush();
+    } else if (state != StreamDescriptor::State::IDLE &&
+            state != StreamDescriptor::State::STANDBY) {
+        ALOGE("%s: not supported from %s stream state %s",
+                __func__, mIsInput ? "input" : "output", toString(state).c_str());
+        return INVALID_OPERATION;
+    }
+    return OK;
 }
 
 status_t StreamHalAidl::getLatency(uint32_t *latency) {

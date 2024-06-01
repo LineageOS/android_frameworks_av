@@ -52,6 +52,8 @@ cc_defaults {
     ],
 
     static_libs: [
+        "audio-permission-aidl-cpp",
+        "audiopermissioncontroller",
         "libaudiopolicycomponents",
         "libeffectsconfig",
     ],
@@ -81,7 +83,7 @@ cc_library {
     ],
 
     static_libs: [
-        "framework-permission-aidl-cpp",
+        "framework-permission-aidl-cpp", // TODO remove when unnnecessary
     ],
 
     header_libs: [

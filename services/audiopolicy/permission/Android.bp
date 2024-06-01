@@ -1,0 +1,102 @@
+package {
+    default_team: "trendy_team_android_media_audio_framework",
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+cc_library {
+    name: "audiopermissioncontroller",
+
+    srcs: [
+        "NativePermissionController.cpp",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+
+    header_libs: [
+        "libcutils_headers",
+        "liberror_headers",
+    ],
+    export_header_lib_headers: [
+        "liberror_headers",
+    ],
+    static_libs: [
+        "audio-permission-aidl-cpp",
+    ],
+    shared_libs: [
+        "libbase",
+        "libbinder",
+        "libutils",
+        "liblog",
+    ],
+
+    host_supported: true,
+    sanitize: {
+        integer_overflow: true,
+    },
+    cflags: [
+        "-Wall",
+        "-Wdeprecated",
+        "-Wextra",
+        "-Werror=format",
+        "-Wextra-semi",
+        "-Wthread-safety",
+        "-Wconditional-uninitialized",
+        "-Wimplicit-fallthrough",
+        "-Wreorder-init-list",
+        "-Werror=reorder-init-list",
+        "-Wshadow-all",
+        "-Wunreachable-code-aggressive",
+        "-Werror",
+        "-DANDROID_BASE_UNIQUE_FD_DISABLE_IMPLICIT_CONVERSION",
+        "-DANDROID_UTILS_REF_BASE_DISABLE_IMPLICIT_CONSTRUCTION",
+    ],
+    tidy: true,
+    tidy_checks: [
+        "android-*",
+        "bugprone-*",
+        "cert-*",
+        "clang-analyzer-security*",
+        "google-*",
+        "misc-*",
+        "modernize-*",
+        "performance-*",
+    ],
+    tidy_checks_as_errors: [
+        "android-*",
+        "bugprone-*",
+        "cert-*",
+        "clang-analyzer-security*",
+        "google-*",
+        "misc-*",
+        "modernize-*",
+        "performance-*",
+    ],
+}
+
+cc_test {
+    name: "audiopermissioncontroller_test",
+    host_supported: true,
+    defaults: [
+        "libmediautils_tests_config",
+    ],
+    static_libs: [
+        "audio-permission-aidl-cpp",
+        "audiopermissioncontroller",
+        "framework-permission-aidl-cpp",
+        "libgmock",
+    ],
+    shared_libs: [
+        "libbase",
+        "libbinder",
+        "liblog",
+        "libutils",
+    ],
+    srcs: [
+        "tests/NativePermissionControllerTest.cpp",
+    ],
+    test_options: {
+        unit_test: true,
+    },
+    test_suites: ["general-tests"],
+}

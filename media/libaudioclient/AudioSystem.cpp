@@ -1289,6 +1289,21 @@ void AudioSystem::releaseInput(audio_port_handle_t portId) {
     (void) status;
 }
 
+status_t AudioSystem::setDeviceAbsoluteVolumeEnabled(audio_devices_t deviceType,
+                                                     const char *address,
+                                                     bool enabled,
+                                                     audio_stream_type_t streamToDriveAbs) {
+    const sp<IAudioPolicyService> aps = get_audio_policy_service();
+    if (aps == nullptr) return PERMISSION_DENIED;
+
+    AudioDevice deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_device_AudioDevice(deviceType, address));
+    AudioStreamType streamToDriveAbsAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_stream_type_t_AudioStreamType(streamToDriveAbs));
+    return statusTFromBinderStatus(
+            aps->setDeviceAbsoluteVolumeEnabled(deviceAidl, enabled, streamToDriveAbsAidl));
+}
+
 status_t AudioSystem::initStreamVolume(audio_stream_type_t stream,
                                        int indexMin,
                                        int indexMax) {
