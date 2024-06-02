@@ -354,6 +354,17 @@ void WebmFrameMediaSourceThread::run() {
         }
 
         MetaDataBase &md = buffer->meta_data();
+
+        if (mType == kVideoType) {
+            int32_t isCodecConfig = 0;
+            if (md.findInt32(kKeyIsCodecConfig, &isCodecConfig) && isCodecConfig) {
+                ALOGI("ignoring CSD for video track");
+                buffer->release();
+                buffer = NULL;
+                continue;
+            }
+        }
+
         CHECK(md.findInt64(kKeyTime, &timestampUs));
         if (mStartTimeUs == kUninitialized) {
             mStartTimeUs = timestampUs;
