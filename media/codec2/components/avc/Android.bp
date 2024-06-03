@@ -17,6 +17,10 @@ cc_library {
 
     static_libs: ["libavcdec"],
 
+    cflags: [
+        "-DKEEP_THREADS_ACTIVE=1",
+    ],
+
     srcs: ["C2SoftAvcDec.cpp"],
 
     export_include_dirs: ["."],
