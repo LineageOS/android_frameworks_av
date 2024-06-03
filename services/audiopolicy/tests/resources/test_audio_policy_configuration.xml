@@ -65,6 +65,7 @@
                         samplingRates="48000"
                         channelMasks="AUDIO_CHANNEL_IN_STEREO"/>
                 </mixPort>
+                <mixPort name="hifi_input" role="sink" />
             </mixPorts>
             <devicePorts>
                 <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink">
@@ -98,7 +99,7 @@
                 <route type="mix" sink="primary input"
                        sources="Built-In Mic,Hdmi-In Mic,USB Device In"/>
                 <route type="mix" sink="voip_tx"
-                       sources="Built-In Mic"/>
+                       sources="Built-In Mic,USB Device In"/>
                 <route type="mix" sink="Hdmi"
                        sources="primary output"/>
                 <route type="mix" sink="BT SCO"
@@ -111,6 +112,8 @@
                        sources="primary output,hifi_output,mmap_no_irq_out"/>
                 <route type="mix" sink="mixport_bus_input"
                     sources="BUS Device In"/>
+                <route type="mix" sink="hifi_input"
+                        sources="USB Device In" />
             </routes>
         </module>
 

@@ -92,6 +92,12 @@ AttributionSourceState createAttributionSourceState(uid_t uid) {
     return attributionSourceState;
 }
 
+bool equals(const audio_config_base_t& config1, const audio_config_base_t& config2) {
+    return config1.format == config2.format
+            && config1.sample_rate == config2.sample_rate
+            && config1.channel_mask == config2.channel_mask;
+}
+
 } // namespace
 
 TEST(AudioPolicyConfigTest, DefaultConfigForTestsIsEmpty) {
@@ -1264,6 +1270,82 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, BitPerfectPlayback) {
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                            "", "", AUDIO_FORMAT_LDAC));
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferExactConfigForInput) {
+    const audio_channel_mask_t deviceChannelMask = AUDIO_CHANNEL_IN_3POINT1;
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedChannelMask(deviceChannelMask);
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_attributes_t attr = {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+                               AUDIO_SOURCE_VOICE_COMMUNICATION,AUDIO_FLAG_NONE, ""};
+    AudioPolicyInterface::input_type_t inputType;
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    AttributionSourceState attributionSource = createAttributionSourceState(/*uid=*/ 0);
+    audio_config_base_t requestedConfig = {
+            .channel_mask = AUDIO_CHANNEL_IN_STEREO,
+            .format = AUDIO_FORMAT_PCM_16_BIT,
+            .sample_rate = 48000
+    };
+    audio_config_base_t config = requestedConfig;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_EQ(OK, mManager->getInputForAttr(
+            &attr, &input, 1 /*riid*/, AUDIO_SESSION_NONE, attributionSource, &config,
+            AUDIO_INPUT_FLAG_NONE,
+            &selectedDeviceId, &inputType, &portId));
+    ASSERT_NE(AUDIO_PORT_HANDLE_NONE, portId);
+    ASSERT_TRUE(equals(requestedConfig, config));
+
+    attr = {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
+            AUDIO_SOURCE_VOICE_COMMUNICATION, AUDIO_FLAG_NONE, ""};
+    requestedConfig.channel_mask = deviceChannelMask;
+    config = requestedConfig;
+    selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    input = AUDIO_PORT_HANDLE_NONE;
+    portId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_EQ(OK, mManager->getInputForAttr(
+            &attr, &input, 1 /*riid*/, AUDIO_SESSION_NONE, attributionSource, &config,
+            AUDIO_INPUT_FLAG_NONE,
+            &selectedDeviceId, &inputType, &portId));
+    ASSERT_NE(AUDIO_PORT_HANDLE_NONE, portId);
+    ASSERT_TRUE(equals(requestedConfig, config));
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, CheckInputsForDeviceClosesStreams) {
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_24_BIT_PACKED);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    // Since 'checkInputsForDevice' is called as part of the 'setDeviceConnectionState',
+    // call it directly here, as we need to ensure that it does not keep all intermediate
+    // streams opened, as it may cause a rejection from the HAL based on the cap.
+    const size_t streamCountBefore = mClient->getOpenedInputsCount();
+    sp<DeviceDescriptor> device = mManager->getHwModules().getDeviceDescriptor(
+            AUDIO_DEVICE_IN_USB_DEVICE, "", "", AUDIO_FORMAT_DEFAULT, true /*allowToCreate*/);
+    ASSERT_NE(nullptr, device.get());
+    EXPECT_EQ(NO_ERROR,
+            mManager->checkInputsForDevice(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE));
+    EXPECT_EQ(streamCountBefore, mClient->getOpenedInputsCount());
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, SetDeviceConnectionStateClosesStreams) {
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_24_BIT_PACKED);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    const size_t streamCountBefore = mClient->getOpenedInputsCount();
+    EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+    EXPECT_EQ(streamCountBefore, mClient->getOpenedInputsCount());
 }
 
 class AudioPolicyManagerTestDynamicPolicy : public AudioPolicyManagerTestWithConfigurationFile {

@@ -390,8 +390,12 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
             // Before checking intputs, broadcast connect event to allow HAL to retrieve dynamic
             // parameters on newly connected devices (instead of opening the inputs...)
             broadcastDeviceConnectionState(device, media::DeviceConnectedState::CONNECTED);
+            // Propagate device availability to Engine
+            setEngineDeviceConnectionState(device, state);
 
             if (checkInputsForDevice(device, state) != NO_ERROR) {
+                setEngineDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE);
+
                 mAvailableInputDevices.remove(device);
 
                 broadcastDeviceConnectionState(device, media::DeviceConnectedState::DISCONNECTED);
@@ -425,15 +429,15 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
 
             // remove device from mReportedFormatsMap cache
             mReportedFormatsMap.erase(device);
+
+            // Propagate device availability to Engine
+            setEngineDeviceConnectionState(device, state);
         } break;
 
         default:
             ALOGE("%s() invalid state: %x", __func__, state);
             return BAD_VALUE;
         }
-
-        // Propagate device availability to Engine
-        setEngineDeviceConnectionState(device, state);
 
         checkCloseInputs();
         // As the input device list can impact the output device selection, update
@@ -1043,11 +1047,11 @@ sp<IOProfile> AudioPolicyManager::searchCompatibleProfileHwModules (
     sp<IOProfile> profile;
     for (const auto& hwModule : hwModules) {
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
-             if (!curProfile->isCompatibleProfile(devices,
+             if (curProfile->getCompatibilityScore(devices,
                      samplingRate, NULL /*updatedSamplingRate*/,
                      format, NULL /*updatedFormat*/,
                      channelMask, NULL /*updatedChannelMask*/,
-                     flags)) {
+                     flags) == IOProfile::NO_MATCH) {
                  continue;
              }
              // reject profiles not corresponding to a device currently available
@@ -3175,6 +3179,23 @@ void AudioPolicyManager::closeClient(audio_port_handle_t portId)
     releaseInput(portId);
 }
 
+bool AudioPolicyManager::checkCloseInput(const sp<AudioInputDescriptor>& input) {
+    if (input->clientsList().size() == 0
+            || !mAvailableInputDevices.containsAtLeastOne(input->supportedDevices())) {
+        return true;
+    }
+    for (const auto& client : input->clientsList()) {
+        sp<DeviceDescriptor> device =
+            mEngine->getInputDeviceForAttributes(client->attributes(), client->uid(),
+                                                 client->session());
+        if (!input->supportedDevices().contains(device)) {
+            return true;
+        }
+    }
+    setInputDevice(input->mIoHandle, getNewInputDevice(input));
+    return false;
+}
+
 void AudioPolicyManager::checkCloseInputs() {
     // After connecting or disconnecting an input device, close input if:
     // - it has no client (was just opened to check profile)  OR
@@ -3183,29 +3204,10 @@ void AudioPolicyManager::checkCloseInputs() {
     // devices anymore. Otherwise update device selection
     std::vector<audio_io_handle_t> inputsToClose;
     for (size_t i = 0; i < mInputs.size(); i++) {
-        const sp<AudioInputDescriptor> input = mInputs.valueAt(i);
-        if (input->clientsList().size() == 0
-                || !mAvailableInputDevices.containsAtLeastOne(input->supportedDevices())) {
+        if (checkCloseInput(mInputs.valueAt(i))) {
             inputsToClose.push_back(mInputs.keyAt(i));
-        } else {
-            bool close = false;
-            for (const auto& client : input->clientsList()) {
-                sp<DeviceDescriptor> device =
-                    mEngine->getInputDeviceForAttributes(client->attributes(), client->uid(),
-                                                         client->session());
-                if (!input->supportedDevices().contains(device)) {
-                    close = true;
-                    break;
-                }
-            }
-            if (close) {
-                inputsToClose.push_back(mInputs.keyAt(i));
-            } else {
-                setInputDevice(input->mIoHandle, getNewInputDevice(input));
-            }
         }
     }
-
     for (const audio_io_handle_t handle : inputsToClose) {
         ALOGV("%s closing input %d", __func__, handle);
         closeInput(handle);
@@ -4463,11 +4465,11 @@ audio_direct_mode_t AudioPolicyManager::getDirectPlaybackSupport(const audio_att
             outputDevices = getMsdAudioOutDevices();
         }
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
-            if (!curProfile->isCompatibleProfile(outputDevices,
+            if (curProfile->getCompatibilityScore(outputDevices,
                     config->sample_rate, nullptr /*updatedSamplingRate*/,
                     config->format, nullptr /*updatedFormat*/,
                     config->channel_mask, nullptr /*updatedChannelMask*/,
-                    flags)) {
+                    flags) == IOProfile::NO_MATCH) {
                 continue;
             }
             // reject profiles not corresponding to a device currently available
@@ -4573,15 +4575,17 @@ status_t AudioPolicyManager::setPreferredMixerAttributes(
     for (const auto& hwModule : mHwModules) {
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
             if (curProfile->hasDynamicAudioProfile()
-                    && curProfile->isCompatibleProfile(devices,
-                                                       mixerAttributes->config.sample_rate,
-                                                       nullptr /*updatedSamplingRate*/,
-                                                       mixerAttributes->config.format,
-                                                       nullptr /*updatedFormat*/,
-                                                       mixerAttributes->config.channel_mask,
-                                                       nullptr /*updatedChannelMask*/,
-                                                       flags,
-                                                       false /*exactMatchRequiredForInputFlags*/)) {
+                    && curProfile->getCompatibilityScore(
+                            devices,
+                            mixerAttributes->config.sample_rate,
+                            nullptr /*updatedSamplingRate*/,
+                            mixerAttributes->config.format,
+                            nullptr /*updatedFormat*/,
+                            mixerAttributes->config.channel_mask,
+                            nullptr /*updatedChannelMask*/,
+                            flags,
+                            false /*exactMatchRequiredForInputFlags*/)
+                            != IOProfile::NO_MATCH) {
                 profile = curProfile;
                 break;
             }
@@ -4984,14 +4988,15 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                 return BAD_VALUE;
             }
 
-            if (!outputDesc->mProfile->isCompatibleProfile(DeviceVector(devDesc),
-                                                           patch->sources[0].sample_rate,
-                                                           NULL,  // updatedSamplingRate
-                                                           patch->sources[0].format,
-                                                           NULL,  // updatedFormat
-                                                           patch->sources[0].channel_mask,
-                                                           NULL,  // updatedChannelMask
-                                                           AUDIO_OUTPUT_FLAG_NONE /*FIXME*/)) {
+            if (outputDesc->mProfile->getCompatibilityScore(
+                    DeviceVector(devDesc),
+                    patch->sources[0].sample_rate,
+                    nullptr,  // updatedSamplingRate
+                    patch->sources[0].format,
+                    nullptr,  // updatedFormat
+                    patch->sources[0].channel_mask,
+                    nullptr,  // updatedChannelMask
+                    AUDIO_OUTPUT_FLAG_NONE /*FIXME*/) == IOProfile::NO_MATCH) {
                 ALOGV("%s profile not supported for device %08x", __func__, devDesc->type());
                 return INVALID_OPERATION;
             }
@@ -5039,17 +5044,18 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                 return BAD_VALUE;
             }
 
-            if (!inputDesc->mProfile->isCompatibleProfile(DeviceVector(device),
-                                                          patch->sinks[0].sample_rate,
-                                                          NULL, /*updatedSampleRate*/
-                                                          patch->sinks[0].format,
-                                                          NULL, /*updatedFormat*/
-                                                          patch->sinks[0].channel_mask,
-                                                          NULL, /*updatedChannelMask*/
-                                                          // FIXME for the parameter type,
-                                                          // and the NONE
-                                                          (audio_output_flags_t)
-                                                            AUDIO_INPUT_FLAG_NONE)) {
+            if (inputDesc->mProfile->getCompatibilityScore(
+                    DeviceVector(device),
+                    patch->sinks[0].sample_rate,
+                    nullptr, /*updatedSampleRate*/
+                    patch->sinks[0].format,
+                    nullptr, /*updatedFormat*/
+                    patch->sinks[0].channel_mask,
+                    nullptr, /*updatedChannelMask*/
+                    // FIXME for the parameter type,
+                    // and the NONE
+                    (audio_output_flags_t)
+                    AUDIO_INPUT_FLAG_NONE) == IOProfile::NO_MATCH) {
                 return INVALID_OPERATION;
             }
             // TODO: reconfigure output format and channels here
@@ -6606,14 +6612,14 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
 status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& device,
                                                   audio_policy_dev_state_t state)
 {
-    sp<AudioInputDescriptor> desc;
-
     if (audio_device_is_digital(device->type())) {
         // erase all current sample rates, formats and channel masks
         device->clearAudioProfiles();
     }
 
     if (state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
+        sp<AudioInputDescriptor> desc;
+
         // first call getAudioPort to get the supported attributes from the HAL
         struct audio_port_v7 port = {};
         device->toAudioPort(&port);
@@ -6704,6 +6710,11 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                     device->importAudioPortAndPickAudioProfile(profile);
                 }
                 ALOGV("checkInputsForDevice(): adding input %d", input);
+
+                if (checkCloseInput(desc)) {
+                    ALOGV("%s closing input %d", __func__, input);
+                    closeInput(input);
+                }
             }
         } // end scan profiles
 
@@ -7675,9 +7686,6 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(const sp<DeviceDescriptor> &de
     // Choose an input profile based on the requested capture parameters: select the first available
     // profile supporting all requested parameters.
     // The flags can be ignored if it doesn't contain a much match flag.
-    //
-    // TODO: perhaps isCompatibleProfile should return a "matching" score so we can return
-    // the best matching profile, not the first one.
 
     using underlying_input_flag_t = std::underlying_type_t<audio_input_flags_t>;
     const underlying_input_flag_t mustMatchFlag = AUDIO_INPUT_FLAG_MMAP_NOIRQ |
@@ -7694,27 +7702,35 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(const sp<DeviceDescriptor> &de
             for (const auto& profile : hwModule->getInputProfiles()) {
                 // profile->log();
                 //updatedFormat = format;
-                if (profile->isCompatibleProfile(DeviceVector(device), samplingRate,
-                                                 &samplingRate  /*updatedSamplingRate*/,
-                                                 format,
-                                                 &format,       /*updatedFormat*/
-                                                 channelMask,
-                                                 &channelMask   /*updatedChannelMask*/,
-                                                 // FIXME ugly cast
-                                                 (audio_output_flags_t) flags,
-                                                 true /*exactMatchRequiredForInputFlags*/)) {
+                if (profile->getCompatibilityScore(
+                        DeviceVector(device),
+                        samplingRate,
+                        &updatedSamplingRate,
+                        format,
+                        &updatedFormat,
+                        channelMask,
+                        &updatedChannelMask,
+                        // FIXME ugly cast
+                        (audio_output_flags_t) flags,
+                        true /*exactMatchRequiredForInputFlags*/) == IOProfile::EXACT_MATCH) {
+                    samplingRate = updatedSamplingRate;
+                    format = updatedFormat;
+                    channelMask = updatedChannelMask;
                     return profile;
                 }
-                if (firstInexact == nullptr && profile->isCompatibleProfile(DeviceVector(device),
-                                                 samplingRate,
-                                                 &updatedSamplingRate,
-                                                 format,
-                                                 &updatedFormat,
-                                                 channelMask,
-                                                 &updatedChannelMask,
-                                                 // FIXME ugly cast
-                                                 (audio_output_flags_t) flags,
-                                                 false /*exactMatchRequiredForInputFlags*/)) {
+                if (firstInexact == nullptr
+                        && profile->getCompatibilityScore(
+                                DeviceVector(device),
+                                samplingRate,
+                                &updatedSamplingRate,
+                                format,
+                                &updatedFormat,
+                                channelMask,
+                                &updatedChannelMask,
+                                // FIXME ugly cast
+                                (audio_output_flags_t) flags,
+                                false /*exactMatchRequiredForInputFlags*/)
+                                != IOProfile::NO_MATCH) {
                     firstInexact = profile;
                 }
             }
