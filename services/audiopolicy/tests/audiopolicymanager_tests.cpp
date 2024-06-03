@@ -1322,6 +1322,35 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferExactConfigForInput) {
                                                            "", "", AUDIO_FORMAT_DEFAULT));
 }
 
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, CheckInputsForDeviceClosesStreams) {
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_24_BIT_PACKED);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    // Since 'checkInputsForDevice' is called as part of the 'setDeviceConnectionState',
+    // call it directly here, as we need to ensure that it does not keep all intermediate
+    // streams opened, as it may cause a rejection from the HAL based on the cap.
+    const size_t streamCountBefore = mClient->getOpenedInputsCount();
+    sp<DeviceDescriptor> device = mManager->getHwModules().getDeviceDescriptor(
+            AUDIO_DEVICE_IN_USB_DEVICE, "", "", AUDIO_FORMAT_DEFAULT, true /*allowToCreate*/);
+    ASSERT_NE(nullptr, device.get());
+    EXPECT_EQ(NO_ERROR,
+            mManager->checkInputsForDevice(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE));
+    EXPECT_EQ(streamCountBefore, mClient->getOpenedInputsCount());
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, SetDeviceConnectionStateClosesStreams) {
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_24_BIT_PACKED);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    const size_t streamCountBefore = mClient->getOpenedInputsCount();
+    EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+    EXPECT_EQ(streamCountBefore, mClient->getOpenedInputsCount());
+}
+
 class AudioPolicyManagerTestDynamicPolicy : public AudioPolicyManagerTestWithConfigurationFile {
 protected:
     void TearDown() override;

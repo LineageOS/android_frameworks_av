@@ -528,6 +528,7 @@ protected:
         void addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc);
         void removeOutput(audio_io_handle_t output);
         void addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc);
+        bool checkCloseInput(const sp<AudioInputDescriptor>& input);
 
         /**
          * @brief setOutputDevices change the route of the specified output.
