@@ -249,6 +249,11 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
         sampleMetaData.setInt32(kKeyIsMuxerData, 1);
     }
 
+    if (flags & MediaCodec::BUFFER_FLAG_CODECCONFIG) {
+        sampleMetaData.setInt32(kKeyIsCodecConfig, true);
+        ALOGV("BUFFER_FLAG_CODEC_CONFIG");
+    }
+
     if (flags & MediaCodec::BUFFER_FLAG_EOS) {
         sampleMetaData.setInt32(kKeyIsEndOfStream, 1);
         ALOGV("BUFFER_FLAG_EOS");

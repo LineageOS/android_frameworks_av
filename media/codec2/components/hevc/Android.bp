@@ -15,6 +15,10 @@ cc_library {
         "libcodec2_soft_sanitize_cfi-defaults",
     ],
 
+    cflags: [
+        "-DKEEP_THREADS_ACTIVE=1",
+    ],
+
     srcs: ["C2SoftHevcDec.cpp"],
 
     static_libs: ["libhevcdec"],

@@ -1,0 +1,14 @@
+# Flags for sound trigger
+#
+# Please add flags in alphabetical order.
+
+package: "android.media.soundtrigger"
+container: "system"
+
+flag {
+    name: "sound_trigger_generic_model_api"
+    is_exported: true
+    namespace: "soundtrigger"
+    description: "Feature flag for adding GenericSoundModel to SystemApi"
+    bug: "339267254"
+}
