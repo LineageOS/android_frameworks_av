@@ -33,6 +33,13 @@ cc_library {
         "libcodec2-aidl-client-defaults",
     ],
 
+    // http://b/343951602#comment4 Explicitly set cpp_std to gnu++20.  The
+    // default inherited from libcodec2-impl-defaults sets it to gnu++17 which
+    // causes a segfault when mixing global std::string symbols built with
+    // gnu++17 and gnu++20.  TODO(b/343951602): clean this after
+    // libcodec2-impl-defaults opt into gnu++17 is removed.
+    cpp_std: "gnu++20",
+
     header_libs: [
         "libcodec2_internal", // private
     ],
