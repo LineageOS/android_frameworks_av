@@ -310,9 +310,14 @@ protected:
         mDisconnected = flag;
     }
 
+    // If you implemented this method then please also override isStandbyImplemented().
     virtual aaudio_result_t standby_l() REQUIRES(mLock) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
+    virtual bool isStandbyImplemented() {
+        return false;
+    }
+
     class ExitStandbyParam : public AAudioCommandParam {
     public:
         explicit ExitStandbyParam(AudioEndpointParcelable* parcelable)
