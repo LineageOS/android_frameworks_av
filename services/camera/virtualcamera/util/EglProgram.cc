@@ -229,13 +229,12 @@ EglTestPatternProgram::EglTestPatternProgram() {
                         kTextureCoords.size(), kTextureCoords.data());
 }
 
-bool EglTestPatternProgram::draw(int frameNumber) {
+bool EglTestPatternProgram::draw(const std::chrono::nanoseconds timestamp) {
   // Load compiled shader.
   glUseProgram(mProgram);
   checkEglError("glUseProgram");
 
-  // Compute point in complex plane corresponding to fractal for this frame number.
-  float time = float(frameNumber) / 120.0f;
+  float time = float(timestamp.count() / 1e9) / 10;
   const std::complex<float> c(std::sin(time) * 0.78f, std::cos(time) * 0.78f);
 
   // Pass "C" constant value determining the Julia set to the shader.

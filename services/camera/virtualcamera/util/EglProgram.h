@@ -18,6 +18,7 @@
 #define ANDROID_COMPANION_VIRTUALCAMERA_EGLPROGRAM_H
 
 #include <array>
+#include <chrono>
 
 #include "GLES/gl.h"
 
@@ -46,7 +47,7 @@ class EglTestPatternProgram : public EglProgram {
  public:
   EglTestPatternProgram();
 
-  bool draw(int frameNumber);
+  bool draw(std::chrono::nanoseconds timestamp);
 
  private:
   int mPositionHandle = -1;
