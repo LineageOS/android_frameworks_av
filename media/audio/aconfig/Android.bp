@@ -118,6 +118,13 @@ aconfig_declarations {
     visibility: ["//frameworks/base/api"],
 }
 
+aconfig_declarations {
+    name: "android.media.soundtrigger-aconfig",
+    package: "android.media.soundtrigger",
+    container: "system",
+    srcs: ["soundtrigger.aconfig"],
+}
+
 java_aconfig_library {
     name: "android.media.audio-aconfig-java",
     aconfig_declarations: "android.media.audio-aconfig",
@@ -141,6 +148,12 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
+java_aconfig_library {
+    name: "android.media.soundtrigger-aconfig-java",
+    aconfig_declarations: "android.media.soundtrigger-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 cc_aconfig_library {
     name: "android.media.audiopolicy-aconfig-cc",
     aconfig_declarations: "android.media.audiopolicy-aconfig",
@@ -153,5 +166,6 @@ aconfig_declarations_group {
         "android.media.audio-aconfig-java",
         "android.media.audiopolicy-aconfig-java",
         "android.media.midi-aconfig-java",
+        "android.media.soundtrigger-aconfig-java",
     ],
 }
