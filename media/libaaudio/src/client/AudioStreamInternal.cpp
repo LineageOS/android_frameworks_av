@@ -620,17 +620,19 @@ aaudio_result_t AudioStreamInternal::startClient(const android::AudioClient& cli
                                                  audio_port_handle_t *portHandle) {
     ALOGV("%s() called", __func__);
     if (getServiceHandle() == AAUDIO_HANDLE_INVALID) {
+        ALOGE("%s() getServiceHandle() is invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
     aaudio_result_t result =  mServiceInterface.startClient(mServiceStreamHandleInfo,
                                                             client, attr, portHandle);
-    ALOGV("%s(%d) returning %d", __func__, *portHandle, result);
+    ALOGV("%s(), got %d, returning %d", __func__, *portHandle, result);
     return result;
 }
 
 aaudio_result_t AudioStreamInternal::stopClient(audio_port_handle_t portHandle) {
     ALOGV("%s(%d) called", __func__, portHandle);
     if (getServiceHandle() == AAUDIO_HANDLE_INVALID) {
+        ALOGE("%s(%d) getServiceHandle() is invalid", __func__, portHandle);
         return AAUDIO_ERROR_INVALID_STATE;
     }
     aaudio_result_t result = mServiceInterface.stopClient(mServiceStreamHandleInfo, portHandle);

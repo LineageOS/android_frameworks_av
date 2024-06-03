@@ -227,6 +227,10 @@ aaudio_result_t AAudioServiceStreamBase::startDevice_l() {
         ALOGE("%s() has no endpoint", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
+    if (!endpoint->isConnected()) {
+        ALOGE("%s() endpoint was already disconnected", __func__);
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
     return endpoint->startStream(this, &mClientHandle);
 }
 
@@ -334,6 +338,7 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
 aaudio_result_t AAudioServiceStreamBase::stop_l() {
     aaudio_result_t result = AAUDIO_OK;
     if (!isRunning()) {
+        ALOGW("%s() stream not running, returning early", __func__);
         return result;
     }
     const int64_t beginNs = AudioClock::getNanoseconds();

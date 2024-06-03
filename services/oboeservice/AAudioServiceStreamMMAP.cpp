@@ -150,9 +150,9 @@ aaudio_result_t AAudioServiceStreamMMAP::exitStandby_l(AudioEndpointParcelable* 
 
 aaudio_result_t AAudioServiceStreamMMAP::startClient(const android::AudioClient& client,
                                                      const audio_attributes_t *attr,
-                                                     audio_port_handle_t *clientHandle) {
+                                                     audio_port_handle_t *portHandlePtr) {
     if (com::android::media::aaudio::start_stop_client_from_command_thread()) {
-        return sendStartClientCommand(client, attr, clientHandle);
+        return sendStartClientCommand(client, attr, portHandlePtr);
     } else {
         sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
         if (endpoint == nullptr) {
@@ -160,7 +160,9 @@ aaudio_result_t AAudioServiceStreamMMAP::startClient(const android::AudioClient&
             return AAUDIO_ERROR_INVALID_STATE;
         }
         // Start the client on behalf of the application. Generate a new porthandle.
-        aaudio_result_t result = endpoint->startClient(client, attr, clientHandle);
+        aaudio_result_t result = endpoint->startClient(client, attr, portHandlePtr);
+        ALOGD("%s() flag off, got port %d", __func__,
+              ((portHandlePtr == nullptr) ? -1 : *portHandlePtr));
         return result;
     }
 }
