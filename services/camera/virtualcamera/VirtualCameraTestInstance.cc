@@ -107,7 +107,7 @@ void TestPatternRenderer::renderThreadLoop(
     }
 
     // Render the test pattern and update timestamp.
-    testPatternProgram.draw(frameNumber++);
+    testPatternProgram.draw(ts);
     eglDisplayContext.swapBuffers();
     lastFrameTs = getCurrentTimestamp();
   }
