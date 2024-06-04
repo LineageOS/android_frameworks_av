@@ -51,19 +51,24 @@ struct WAidlGraphicBufferSource::WAidlNodeWrapper : public IAidlNodeWrapper {
             int32_t bufferId, uint32_t flags,
             const sp<GraphicBuffer> &buffer,
             int64_t timestamp, int fenceFd) override {
-        AHardwareBuffer *ahwBuffer = nullptr;
-        ::aidl::android::hardware::HardwareBuffer hBuffer;
+        ::ndk::ScopedFileDescriptor fence(fenceFd);
         if (buffer.get()) {
-            ahwBuffer = AHardwareBuffer_from_GraphicBuffer(buffer.get());
+            ::aidl::android::hardware::HardwareBuffer hBuffer;
+            AHardwareBuffer *ahwBuffer = AHardwareBuffer_from_GraphicBuffer(buffer.get());
             AHardwareBuffer_acquire(ahwBuffer);
             hBuffer.reset(ahwBuffer);
-        }
 
-        ::ndk::ScopedFileDescriptor fence(fenceFd);
+            return fromAidlStatus(mNode->submitBuffer(
+                    bufferId,
+                    std::move(hBuffer),
+                    flags,
+                    timestamp,
+                    fence));
+        }
 
         return fromAidlStatus(mNode->submitBuffer(
               bufferId,
-              hBuffer,
+              {},
               flags,
               timestamp,
               fence));
