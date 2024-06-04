@@ -24,6 +24,7 @@
 using ::android::base::unexpected;
 using ::android::binder::Status;
 using com::android::media::permission::NativePermissionController;
+using com::android::media::permission::PermissionEnum;
 using com::android::media::permission::UidPackageState;
 
 class NativePermissionControllerTest : public ::testing::Test {
@@ -176,4 +177,42 @@ TEST_F(NativePermissionControllerTest, validateUidPackagePair_UnknownUid) {
     EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
 
     UNWRAP_EQ(controller_.validateUidPackagePair(12000, "any.package"), false);
+}
+
+TEST_F(NativePermissionControllerTest, populatePermissionState_InvalidPermission) {
+    EXPECT_EQ(controller_.populatePermissionState(PermissionEnum::ENUM_SIZE, {}).exceptionCode(),
+              Status::EX_ILLEGAL_ARGUMENT);
+    EXPECT_EQ(controller_
+                      .populatePermissionState(
+                              static_cast<PermissionEnum>(
+                                      static_cast<int>(PermissionEnum::ENUM_SIZE) + 1),
+                              {})
+                      .exceptionCode(),
+              Status::EX_ILLEGAL_ARGUMENT);
+}
+
+TEST_F(NativePermissionControllerTest, populatePermissionState_HoldsPermission) {
+    // Unsorted
+    std::vector<int> uids{3, 1, 2, 4, 5};
+
+    EXPECT_TRUE(
+            controller_.populatePermissionState(PermissionEnum::MODIFY_AUDIO_ROUTING, uids).isOk());
+
+    EXPECT_TRUE(*controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 3));
+}
+
+TEST_F(NativePermissionControllerTest, populatePermissionState_DoesNotHoldPermission) {
+    // Unsorted
+    std::vector<int> uids{3, 1, 2, 4, 5};
+
+    EXPECT_TRUE(
+            controller_.populatePermissionState(PermissionEnum::MODIFY_AUDIO_ROUTING, uids).isOk());
+
+    EXPECT_FALSE(*controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 6));
+}
+
+TEST_F(NativePermissionControllerTest, populatePermissionState_NotInitialized) {
+    const auto res = controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 3);
+    ASSERT_FALSE(res.has_value());
+    EXPECT_EQ(res.error(), ::android::NO_INIT);
 }
