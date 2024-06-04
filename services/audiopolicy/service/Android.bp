@@ -11,6 +11,8 @@ package {
 cc_defaults {
     name: "libaudiopolicyservice_dependencies",
 
+    header_libs: ["audiopolicyservicelocal_headers"],
+
     shared_libs: [
         "android.media.audiopolicy-aconfig-cc",
         "audioclient-types-aidl-cpp",
@@ -87,6 +89,7 @@ cc_library {
     ],
 
     header_libs: [
+        "audiopolicyservicelocal_headers",
         "libaudiohal_headers",
         "libaudiopolicycommon",
         "libaudiopolicyengine_interface_headers",
@@ -114,5 +117,16 @@ cc_library {
 cc_library_headers {
     name: "libaudiopolicyservice_headers",
     host_supported: true,
-    export_include_dirs: ["."],
+    export_include_dirs: [
+        ".",
+        "include",
+    ],
+}
+
+cc_library_headers {
+    name: "audiopolicyservicelocal_headers",
+    host_supported: true,
+    export_include_dirs: ["include"],
+    header_libs: ["audiopermissioncontroller_headers"],
+    export_header_lib_headers: ["audiopermissioncontroller_headers"],
 }

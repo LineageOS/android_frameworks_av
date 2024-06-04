@@ -3,6 +3,12 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
+cc_library_headers {
+    name: "audiopermissioncontroller_headers",
+    host_supported: true,
+    export_include_dirs: ["include"],
+}
+
 cc_library {
     name: "audiopermissioncontroller",
 
