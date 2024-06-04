@@ -17,7 +17,7 @@
 #define ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERATESTINSTANCE_H
 
 #include <atomic>
-#include <condition_variable>
+#include <map>
 #include <memory>
 #include <thread>
 
@@ -80,7 +80,10 @@ class VirtualCameraTestInstance
   const int mFps;
 
   std::mutex mLock;
-  std::shared_ptr<TestPatternRenderer> mRenderer GUARDED_BY(mLock);
+  // Map maintaining streamId -> TestPatternRenderer mapping for active
+  // input streams.
+  std::map<int, std::shared_ptr<TestPatternRenderer>> mInputRenderers
+      GUARDED_BY(mLock);
 };
 
 }  // namespace virtualcamera
