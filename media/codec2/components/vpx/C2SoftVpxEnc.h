@@ -207,6 +207,9 @@ struct C2SoftVpxEnc : public SimpleC2Component {
      // Signalled EOS
      bool mSignalledOutputEos;
 
+     // Header generated
+     bool mHeaderGenerated;
+
      // Signalled Error
      bool mSignalledError;
 
