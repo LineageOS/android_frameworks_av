@@ -125,10 +125,18 @@ ScopedAStatus VirtualCameraTestInstance::onStreamConfigured(
   ALOGV("%s: streamId %d, %dx%d pixFmt=%s", __func__, streamId, width, height,
         toString(pixelFormat).c_str());
 
-  std::lock_guard<std::mutex> lock(mLock);
-  mRenderer = std::make_shared<TestPatternRenderer>(
+  auto renderer = std::make_shared<TestPatternRenderer>(
       nativeWindowFromSurface(surface), mFps);
-  mRenderer->start();
+
+  std::lock_guard<std::mutex> lock(mLock);
+  if (mInputRenderers.try_emplace(streamId, renderer).second) {
+    renderer->start();
+  } else {
+    ALOGE(
+        "%s: Input stream with id %d is already active, ignoring "
+        "onStreamConfigured call",
+        __func__, streamId);
+  }
 
   return ScopedAStatus::ok();
 }
@@ -141,10 +149,17 @@ ScopedAStatus VirtualCameraTestInstance::onProcessCaptureRequest(
 ScopedAStatus VirtualCameraTestInstance::onStreamClosed(const int32_t streamId) {
   ALOGV("%s: streamId %d", __func__, streamId);
 
-  std::lock_guard<std::mutex> lock(mLock);
-  if (mRenderer != nullptr) {
-    mRenderer->stop();
-    mRenderer.reset();
+  std::shared_ptr<TestPatternRenderer> renderer;
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    auto it = mInputRenderers.find(streamId);
+    if (it != mInputRenderers.end()) {
+      renderer = std::move(it->second);
+      mInputRenderers.erase(it);
+    }
+  }
+  if (renderer != nullptr) {
+    renderer->stop();
   }
   return ScopedAStatus::ok();
 }
