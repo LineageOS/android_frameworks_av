@@ -686,11 +686,12 @@ status_t StreamOutHalAidl::getRenderPosition(uint64_t *dspFrames) {
     int64_t mostRecentResetPoint;
     if (!mContext.isAsynchronous() && audio_has_proportional_frames(mConfig.format)) {
         mostRecentResetPoint = statePositions.framesAtStandby;
+        *dspFrames = aidlFrames <= mostRecentResetPoint ? 0 : aidlFrames - mostRecentResetPoint;
     } else {
-        mostRecentResetPoint =
-                std::max(statePositions.framesAtStandby, statePositions.framesAtFlushOrDrain);
+        // Pixel HAL of 24D1 resets the position on flush/drain for compressed offload streams,
+        // thus is does not have to be reset here.
+        *dspFrames = aidlFrames;
     }
-    *dspFrames = aidlFrames <= mostRecentResetPoint ? 0 : aidlFrames - mostRecentResetPoint;
     return OK;
 }
 
