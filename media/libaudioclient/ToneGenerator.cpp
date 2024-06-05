@@ -1264,13 +1264,10 @@ void ToneGenerator::stopTone() {
                     nsec += 1000000000;
                 }
 
-                if ((sec + 1) > ((time_t)(INT_MAX / mSamplingRate))) {
-                    mMaxSmp = sec * mSamplingRate;
-                } else {
-                    // mSamplingRate is always > 1000
-                    sec = sec * 1000 + nsec / 1000000; // duration in milliseconds
-                    mMaxSmp = (unsigned int)(((int64_t)sec * mSamplingRate) / 1000);
-                }
+                const uint64_t msec = static_cast<uint64_t>(sec) * 1000 + nsec / 1'000'000;
+                mMaxSmp = std::min(static_cast<uint64_t>(TONEGEN_INF - 1),
+                        msec * mSamplingRate / 1000);
+
                 ALOGV("stopTone() forcing mMaxSmp to %d, total for far %" PRIu64, mMaxSmp,
                       mTotalSmp);
             } else {
@@ -1638,14 +1635,11 @@ bool ToneGenerator::prepareWave() {
 
     mpToneDesc = mpNewToneDesc;
 
-    if (mDurationMs == -1) {
+    if (mDurationMs < 0) {  // mDurationMs is signed, treat all neg numbers as INF.
         mMaxSmp = TONEGEN_INF;
     } else {
-        if (mDurationMs > (int)(TONEGEN_INF / mSamplingRate)) {
-            mMaxSmp = (mDurationMs / 1000) * mSamplingRate;
-        } else {
-            mMaxSmp = (mDurationMs * mSamplingRate) / 1000;
-        }
+        mMaxSmp = std::min(static_cast<uint64_t>(TONEGEN_INF - 1),
+                static_cast<uint64_t>(mDurationMs) * mSamplingRate / 1000);
         ALOGV("prepareWave, duration limited to %d ms", mDurationMs);
     }
 
@@ -1676,7 +1670,8 @@ bool ToneGenerator::prepareWave() {
     if (mpToneDesc->segments[0].duration == TONEGEN_INF) {
         mNextSegSmp = TONEGEN_INF;
     } else{
-        mNextSegSmp = (mpToneDesc->segments[0].duration * mSamplingRate) / 1000;
+        mNextSegSmp = std::min(static_cast<uint64_t>(TONEGEN_INF - 1),
+                static_cast<uint64_t>(mpToneDesc->segments[0].duration) * mSamplingRate / 1000);
     }
 
     return true;
