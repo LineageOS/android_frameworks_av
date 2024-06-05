@@ -186,7 +186,6 @@ cc_library {
         "aidl/AidlCameraServiceListener.cpp",
         "aidl/AidlUtils.cpp",
         "aidl/DeathPipe.cpp",
-        "utils/AttributionAndPermissionUtils.cpp",
         "utils/CameraServiceProxyWrapper.cpp",
         "utils/CameraThreadState.cpp",
         "utils/CameraTraces.cpp",
