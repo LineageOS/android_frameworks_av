@@ -168,6 +168,7 @@ int main(int argc __unused, char **argv)
         ALOGW_IF(AudioSystem::setLocalAudioFlinger(af) != OK,
                 "%s: AudioSystem already has an AudioFlinger instance!", __func__);
         const auto aps = sp<AudioPolicyService>::make();
+        af->initAudioPolicyLocal(aps);
         ALOGD("%s: AudioPolicy created", __func__);
         ALOGW_IF(AudioSystem::setLocalAudioPolicyService(aps) != OK,
                  "%s: AudioSystem already has an AudioPolicyService instance!", __func__);
