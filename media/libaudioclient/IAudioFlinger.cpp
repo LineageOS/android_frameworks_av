@@ -923,6 +923,11 @@ status_t AudioFlingerClientAdapter::setTracksInternalMute(
     return statusTFromBinderStatus(mDelegate->setTracksInternalMute(tracksInternalMuted));
 }
 
+status_t AudioFlingerClientAdapter::resetReferencesForTest() {
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mDelegate->resetReferencesForTest()));
+    return OK;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1485,6 +1490,11 @@ Status AudioFlingerServerAdapter::getAudioMixPort(const media::AudioPortFw &devi
 Status AudioFlingerServerAdapter::setTracksInternalMute(
         const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) {
     return Status::fromStatusT(mDelegate->setTracksInternalMute(tracksInternalMute));
+}
+
+Status AudioFlingerServerAdapter::resetReferencesForTest() {
+    RETURN_BINDER_IF_ERROR(mDelegate->resetReferencesForTest());
+    return Status::ok();
 }
 
 } // namespace android

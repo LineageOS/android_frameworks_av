@@ -62,6 +62,8 @@ class AudioFlinger
 public:
     static void instantiate() ANDROID_API;
 
+    status_t resetReferencesForTest();
+
 private:
 
     // ---- begin IAudioFlinger interface

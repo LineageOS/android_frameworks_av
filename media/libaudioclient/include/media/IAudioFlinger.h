@@ -392,6 +392,8 @@ public:
 
     virtual status_t setTracksInternalMute(
             const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) = 0;
+
+    virtual status_t resetReferencesForTest() = 0;
 };
 
 /**
@@ -510,6 +512,7 @@ public:
                              struct audio_port_v7 *mixPort) const override;
     status_t setTracksInternalMute(
             const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) override;
+    status_t resetReferencesForTest() override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -613,6 +616,8 @@ public:
                     media::BnAudioFlingerService::TRANSACTION_getAudioPolicyConfig,
             GET_AUDIO_MIX_PORT = media::BnAudioFlingerService::TRANSACTION_getAudioMixPort,
             SET_TRACKS_INTERNAL_MUTE = media::BnAudioFlingerService::TRANSACTION_setTracksInternalMute,
+            RESET_REFERENCES_FOR_TEST =
+                    media::BnAudioFlingerService::TRANSACTION_resetReferencesForTest,
         };
 
     protected:
@@ -751,6 +756,7 @@ public:
                            media::AudioPortFw* _aidl_return) override;
     Status setTracksInternalMute(
             const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) override;
+    Status resetReferencesForTest() override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };
