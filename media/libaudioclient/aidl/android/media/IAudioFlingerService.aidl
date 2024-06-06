@@ -299,6 +299,12 @@ interface IAudioFlingerService {
      */
     void setTracksInternalMute(in TrackInternalMuteInfo[] tracksInternalMute);
 
+    /*
+     * Reset Circular references in AudioFlinger service.
+     * Test API
+     */
+     void resetReferencesForTest();
+
     // When adding a new method, please review and update
     // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode
     // AudioFlinger.cpp AudioFlinger::onTransactWrapper()
