@@ -50,13 +50,12 @@ using ::testing::MatchesRegex;
 using ::testing::Not;
 using ::testing::Return;
 
+constexpr char kCameraId[] = "42";
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kMaxFps = 30;
-constexpr int kCameraId = 9999;
 constexpr int kDefaultDeviceId = 0;
-constexpr char kVirtualCameraNameRegex[] =
-    "device@[0-9]+\\.[0-9]+/virtual/[0-9]+";
+constexpr char kVirtualCameraNameRegex[] = "device@[0-9]+\\.[0-9]+/virtual/.+";
 
 class MockCameraProviderCallback : public BnCameraProviderCallback {
  public:

@@ -390,7 +390,7 @@ TEST_F(VirtualCameraServiceTest, UnregisterCameraWithoutPermissionFails) {
 }
 
 TEST_F(VirtualCameraServiceTest, GetIdWithoutPermissionFails) {
-  int32_t aidlRet;
+  std::string aidlRet;
   EXPECT_CALL(mMockPermissionsProxy,
               checkCallingPermission(kCreateVirtualDevicePermissions))
       .WillOnce(Return(false));
@@ -445,11 +445,13 @@ TEST_F(VirtualCameraServiceTest, TestCameraShellCmd) {
 }
 
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithId) {
-  EXPECT_THAT(execute_shell_command("enable_test_camera --camera_id=12345"),
-              Eq(NO_ERROR));
+  EXPECT_THAT(
+      execute_shell_command("enable_test_camera --camera_id=hello12345"),
+      Eq(NO_ERROR));
 
   std::vector<std::string> cameraIdsAfterEnable = getCameraIds();
-  EXPECT_THAT(cameraIdsAfterEnable, ElementsAre("device@1.1/virtual/12345"));
+  EXPECT_THAT(cameraIdsAfterEnable,
+              ElementsAre("device@1.1/virtual/hello12345"));
 
   EXPECT_THAT(execute_shell_command("disable_test_camera"), Eq(NO_ERROR));
 
@@ -458,9 +460,8 @@ TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithId) {
 }
 
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithInvalidId) {
-  EXPECT_THAT(
-      execute_shell_command("enable_test_camera --camera_id=NotNumericalId"),
-      Eq(STATUS_BAD_VALUE));
+  EXPECT_THAT(execute_shell_command("enable_test_camera --camera_id="),
+              Eq(STATUS_BAD_VALUE));
 }
 
 TEST_F(VirtualCameraServiceTest, TestCameraShellCmdWithUnknownCommand) {

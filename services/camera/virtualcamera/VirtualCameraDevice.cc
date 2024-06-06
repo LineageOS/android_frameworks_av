@@ -68,7 +68,7 @@ namespace {
 
 using namespace std::chrono_literals;
 
-// Prefix of camera name - "device@1.1/virtual/{numerical_id}"
+// Prefix of camera name - "device@1.1/virtual/{camera_id}"
 const char* kDevicePathPrefix = "device@1.1/virtual/";
 
 constexpr int32_t kMaxJpegSize = 3 * 1024 * 1024 /*3MiB*/;
@@ -404,8 +404,8 @@ std::optional<CameraMetadata> initCameraCharacteristics(
 }  // namespace
 
 VirtualCameraDevice::VirtualCameraDevice(
-    const uint32_t cameraId, const VirtualCameraConfiguration& configuration,
-    int32_t deviceId)
+    const std::string& cameraId,
+    const VirtualCameraConfiguration& configuration, int32_t deviceId)
     : mCameraId(cameraId),
       mVirtualCameraClientCallback(configuration.virtualCameraCallback),
       mSupportedInputConfigurations(configuration.supportedStreamConfigs) {
@@ -582,11 +582,11 @@ ndk::ScopedAStatus VirtualCameraDevice::getTorchStrengthLevel(
 }
 
 binder_status_t VirtualCameraDevice::dump(int fd, const char**, uint32_t) {
-  ALOGD("Dumping virtual camera %d", mCameraId);
+  ALOGD("Dumping virtual camera %s", mCameraId.c_str());
   const char* indent = "  ";
   const char* doubleIndent = "    ";
-  dprintf(fd, "%svirtual_camera %d belongs to virtual device %d\n", indent,
-          mCameraId,
+  dprintf(fd, "%svirtual_camera %s belongs to virtual device %d\n", indent,
+          mCameraId.c_str(),
           getDeviceId(mCameraCharacteristics)
               .value_or(VirtualCameraService::kDefaultDeviceId));
   dprintf(fd, "%sSupportedStreamConfiguration:\n", indent);
@@ -597,7 +597,7 @@ binder_status_t VirtualCameraDevice::dump(int fd, const char**, uint32_t) {
 }
 
 std::string VirtualCameraDevice::getCameraName() const {
-  return std::string(kDevicePathPrefix) + std::to_string(mCameraId);
+  return std::string(kDevicePathPrefix) + mCameraId;
 }
 
 const std::vector<SupportedStreamConfiguration>&
