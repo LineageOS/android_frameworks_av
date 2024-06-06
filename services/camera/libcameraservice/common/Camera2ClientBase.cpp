@@ -50,7 +50,6 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         const sp<CameraService>& cameraService,
         const sp<TCamCallbacks>& remoteCallback,
         std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
-        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string& clientPackageName,
         bool systemNativeClient,
         const std::optional<std::string>& clientFeatureId,
@@ -64,9 +63,9 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         bool overrideForPerfClass,
         bool overrideToPortrait,
         bool legacyClient):
-        TClientBase(cameraService, remoteCallback, attributionAndPermissionUtils, clientPackageName,
-                systemNativeClient, clientFeatureId, cameraId, api1CameraId, cameraFacing,
-                sensorOrientation, clientPid, clientUid, servicePid, overrideToPortrait),
+        TClientBase(cameraService, remoteCallback, clientPackageName, systemNativeClient,
+                clientFeatureId, cameraId, api1CameraId, cameraFacing, sensorOrientation, clientPid,
+                clientUid, servicePid, overrideToPortrait),
         mSharedCameraCallbacks(remoteCallback),
         mCameraServiceProxyWrapper(cameraServiceProxyWrapper),
         mDeviceActive(false), mApi1CameraId(api1CameraId)

@@ -61,7 +61,6 @@ namespace flags = com::android::internal::camera::flags;
 CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<CameraService>& cameraService,
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
-        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string& clientPackageName,
         bool systemNativeClient,
         const std::optional<std::string>& clientFeatureId,
@@ -75,7 +74,6 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         bool overrideToPortrait) :
     BasicClient(cameraService,
             IInterface::asBinder(remoteCallback),
-            attributionAndPermissionUtils,
             clientPackageName,
             systemNativeClient,
             clientFeatureId,
@@ -94,7 +92,6 @@ CameraDeviceClientBase::CameraDeviceClientBase(
 CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
         std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
-        std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const std::string& clientPackageName,
         bool systemNativeClient,
         const std::optional<std::string>& clientFeatureId,
@@ -107,8 +104,7 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         bool overrideForPerfClass,
         bool overrideToPortrait,
         const std::string& originalCameraId) :
-    Camera2ClientBase(cameraService, remoteCallback, cameraServiceProxyWrapper,
-            attributionAndPermissionUtils, clientPackageName,
+    Camera2ClientBase(cameraService, remoteCallback, cameraServiceProxyWrapper, clientPackageName,
             systemNativeClient, clientFeatureId, cameraId, /*API1 camera ID*/ -1, cameraFacing,
             sensorOrientation, clientPid, clientUid, servicePid, overrideForPerfClass,
             overrideToPortrait),
@@ -1904,9 +1900,9 @@ binder::Status CameraDeviceClient::switchToOffline(
     sp<CameraOfflineSessionClient> offlineClient;
     if (offlineSession.get() != nullptr) {
         offlineClient = new CameraOfflineSessionClient(sCameraService,
-                offlineSession, offlineCompositeStreamMap, cameraCb, mAttributionAndPermissionUtils,
-                mClientPackageName, mClientFeatureId, mCameraIdStr, mCameraFacing, mOrientation,
-                mClientPid, mClientUid, mServicePid);
+                offlineSession, offlineCompositeStreamMap, cameraCb, mClientPackageName,
+                mClientFeatureId, mCameraIdStr, mCameraFacing, mOrientation, mClientPid, mClientUid,
+                mServicePid);
         ret = sCameraService->addOfflineClient(mCameraIdStr, offlineClient);
     }
 

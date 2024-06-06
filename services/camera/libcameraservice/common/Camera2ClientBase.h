@@ -21,7 +21,6 @@
 #include "camera/CameraMetadata.h"
 #include "camera/CaptureResult.h"
 #include "utils/CameraServiceProxyWrapper.h"
-#include "utils/AttributionAndPermissionUtils.h"
 #include "CameraServiceWatchdog.h"
 
 namespace android {
@@ -52,7 +51,6 @@ public:
     Camera2ClientBase(const sp<CameraService>& cameraService,
                       const sp<TCamCallbacks>& remoteCallback,
                       std::shared_ptr<CameraServiceProxyWrapper> cameraServiceProxyWrapper,
-                      std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
                       const std::string& clientPackageName,
                       bool systemNativeClient,
                       const std::optional<std::string>& clientFeatureId,
