@@ -918,6 +918,11 @@ status_t AudioFlingerClientAdapter::getAudioMixPort(const struct audio_port_v7 *
     return OK;
 }
 
+status_t AudioFlingerClientAdapter::resetReferencesForTest() {
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mDelegate->resetReferencesForTest()));
+    return OK;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1473,6 +1478,11 @@ Status AudioFlingerServerAdapter::getAudioMixPort(const media::AudioPortFw &devi
             aidl2legacy_AudioPortFw_audio_port_v7(mixPort));
     RETURN_BINDER_IF_ERROR(mDelegate->getAudioMixPort(&devicePortLegacy, &mixPortLegacy));
     *_aidl_return = VALUE_OR_RETURN_BINDER(legacy2aidl_audio_port_v7_AudioPortFw(mixPortLegacy));
+    return Status::ok();
+}
+
+Status AudioFlingerServerAdapter::resetReferencesForTest() {
+    RETURN_BINDER_IF_ERROR(mDelegate->resetReferencesForTest());
     return Status::ok();
 }
 
