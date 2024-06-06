@@ -17,6 +17,8 @@
 #define LOG_TAG "BufferPoolAccessor2.0"
 //#define LOG_NDEBUG 0
 
+#include <android-base/no_destructor.h>
+
 #include <sys/types.h>
 #include <stdint.h>
 #include <time.h>
@@ -147,7 +149,25 @@ static constexpr uint32_t kSeqIdVndkBit = 0;
 #endif
 
 static constexpr uint32_t kSeqIdMax = 0x7fffffff;
-uint32_t Accessor::Impl::sSeqId = time(nullptr) & kSeqIdMax;
+
+Accessor::Impl::ConnectionIdGenerator::ConnectionIdGenerator() {
+    mSeqId = static_cast<uint32_t>(time(nullptr) & kSeqIdMax);
+    mPid = static_cast<int32_t>(getpid());
+}
+
+ConnectionId Accessor::Impl::ConnectionIdGenerator::getConnectionId() {
+    uint32_t seq;
+    {
+        std::lock_guard<std::mutex> l(mLock);
+        seq = mSeqId;
+        if (mSeqId == kSeqIdMax) {
+            mSeqId = 0;
+        } else {
+            ++mSeqId;
+        }
+    }
+    return (int64_t)mPid << 32 | seq | kSeqIdVndkBit;
+}
 
 Accessor::Impl::Impl(
         const std::shared_ptr<BufferPoolAllocator> &allocator)
@@ -163,13 +183,14 @@ ResultStatus Accessor::Impl::connect(
         uint32_t *pMsgId,
         const StatusDescriptor** statusDescPtr,
         const InvalidationDescriptor** invDescPtr) {
+    static ::android::base::NoDestructor<ConnectionIdGenerator> sConIdGenerator;
     sp<Connection> newConnection = new Connection();
     ResultStatus status = ResultStatus::CRITICAL_ERROR;
     {
         std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
         if (newConnection) {
             int32_t pid = getpid();
-            ConnectionId id = (int64_t)pid << 32 | sSeqId | kSeqIdVndkBit;
+            ConnectionId id = sConIdGenerator->getConnectionId();
             status = mBufferPool.mObserver.open(id, statusDescPtr);
             if (status == ResultStatus::OK) {
                 newConnection->initialize(accessor, id);
@@ -179,11 +200,6 @@ ResultStatus Accessor::Impl::connect(
                 mBufferPool.mConnectionIds.insert(id);
                 mBufferPool.mInvalidationChannel.getDesc(invDescPtr);
                 mBufferPool.mInvalidation.onConnect(id, observer);
-                if (sSeqId == kSeqIdMax) {
-                   sSeqId = 0;
-                } else {
-                    ++sSeqId;
-                }
             }
 
         }
