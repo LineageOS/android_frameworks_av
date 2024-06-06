@@ -150,11 +150,10 @@ ndk::ScopedAStatus VirtualCameraProvider::isConcurrentStreamCombinationSupported
 }
 
 std::shared_ptr<VirtualCameraDevice> VirtualCameraProvider::createCamera(
-    const VirtualCameraConfiguration& configuration, const int cameraId,
-    const int32_t deviceId) {
-  if (cameraId < 0) {
-    ALOGE("%s: Cannot create camera with negative id. cameraId: %d", __func__,
-          cameraId);
+    const VirtualCameraConfiguration& configuration,
+    const std::string& cameraId, const int32_t deviceId) {
+  if (cameraId.empty()) {
+    ALOGE("%s: Cannot create camera with empty cameraId", __func__);
     return nullptr;
   }
 

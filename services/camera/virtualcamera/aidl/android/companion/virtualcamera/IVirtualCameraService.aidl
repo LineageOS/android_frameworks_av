@@ -41,5 +41,5 @@ interface IVirtualCameraService {
      * Returns the camera id for a given binder token. Note that this id corresponds to the id of
      * the camera device in the camera framework.
      */
-    int getCameraId(in IBinder token);
+    @utf8InCpp String getCameraId(in IBinder token);
 }

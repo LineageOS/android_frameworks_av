@@ -54,11 +54,9 @@ using ::testing::UnorderedElementsAreArray;
 using metadata_stream_t =
     camera_metadata_enum_android_scaler_available_stream_configurations_t;
 
-constexpr int kCameraId = 42;
+constexpr char kCameraId[] = "42";
 constexpr int kQvgaWidth = 320;
 constexpr int kQvgaHeight = 240;
-constexpr int k360pWidth = 640;
-constexpr int k360pHeight = 360;
 constexpr int kVgaWidth = 640;
 constexpr int kVgaHeight = 480;
 constexpr int kHdWidth = 1280;

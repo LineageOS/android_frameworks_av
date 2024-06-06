@@ -37,6 +37,7 @@ namespace companion {
 namespace virtualcamera {
 namespace {
 
+constexpr char kCameraId[] = "42";
 constexpr int kQvgaWidth = 320;
 constexpr int kQvgaHeight = 240;
 constexpr int kVgaWidth = 640;
@@ -46,7 +47,6 @@ constexpr int kSvgaHeight = 600;
 constexpr int kMaxFps = 30;
 constexpr int kStreamId = 0;
 constexpr int kSecondStreamId = 1;
-constexpr int kCameraId = 42;
 constexpr int kDefaultDeviceId = 0;
 
 using ::aidl::android::companion::virtualcamera::BnVirtualCameraCallback;
