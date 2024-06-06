@@ -753,6 +753,10 @@ void SoundDoseManager::onMomentaryExposure(float currentMel, audio_port_handle_t
     }
 }
 
+void SoundDoseManager::resetReferencesForTest() {
+    mMelReporterCallback.clear();
+}
+
 sp<media::ISoundDose> SoundDoseManager::getSoundDoseInterface(
         const sp<media::ISoundDoseCallback>& callback) {
     ALOGV("%s: Register ISoundDoseCallback", __func__);

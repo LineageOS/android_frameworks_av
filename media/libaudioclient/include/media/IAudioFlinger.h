@@ -388,6 +388,8 @@ public:
 
     virtual status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
                                      struct audio_port_v7 *mixPort) const = 0;
+
+    virtual status_t resetReferencesForTest() = 0;
 };
 
 /**
@@ -504,6 +506,7 @@ public:
     status_t getAudioPolicyConfig(media::AudioPolicyConfig* output) override;
     status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
                              struct audio_port_v7 *mixPort) const override;
+    status_t resetReferencesForTest() override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -606,6 +609,8 @@ public:
             GET_AUDIO_POLICY_CONFIG =
                     media::BnAudioFlingerService::TRANSACTION_getAudioPolicyConfig,
             GET_AUDIO_MIX_PORT = media::BnAudioFlingerService::TRANSACTION_getAudioMixPort,
+            RESET_REFERENCES_FOR_TEST =
+                    media::BnAudioFlingerService::TRANSACTION_resetReferencesForTest,
         };
 
     protected:
@@ -742,6 +747,7 @@ public:
     Status getAudioMixPort(const media::AudioPortFw& devicePort,
                            const media::AudioPortFw& mixPort,
                            media::AudioPortFw* _aidl_return) override;
+    Status resetReferencesForTest() override;
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
 };

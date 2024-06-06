@@ -293,6 +293,12 @@ interface IAudioFlingerService {
      */
     AudioPortFw getAudioMixPort(in AudioPortFw devicePort, in AudioPortFw mixPort);
 
+    /*
+     * Reset Circular references in AudioFlinger service.
+     * Test API
+     */
+     void resetReferencesForTest();
+
     // When adding a new method, please review and update
     // IAudioFlinger.h AudioFlingerServerAdapter::Delegate::TransactionCode
     // AudioFlinger.cpp AudioFlinger::onTransactWrapper()
