@@ -20,31 +20,39 @@
 #include <error/expected_utils.h>
 #include <utils/Log.h>
 
+using ::android::binder::Status;
+using ::android::error::BinderResult;
+using ::android::error::unexpectedExceptionCode;
+
 namespace com::android::media::permission {
 
-using ::android::base::unexpected;
-
-Result<ValidatedAttributionSourceState> ValidatedAttributionSourceState::createFromBinderContext(
-        AttributionSourceState attr, const IPermissionProvider& provider) {
+BinderResult<ValidatedAttributionSourceState>
+ValidatedAttributionSourceState::createFromBinderContext(AttributionSourceState attr,
+                                                         const IPermissionProvider& provider) {
     attr.pid = ::android::IPCThreadState::self()->getCallingPid();
     attr.uid = ::android::IPCThreadState::self()->getCallingUid();
     return createFromTrustedUidNoPackage(std::move(attr), provider);
 }
 
-Result<ValidatedAttributionSourceState>
+BinderResult<ValidatedAttributionSourceState>
 ValidatedAttributionSourceState::createFromTrustedUidNoPackage(
         AttributionSourceState attr, const IPermissionProvider& provider) {
     if (attr.packageName.has_value() && attr.packageName->size() != 0) {
         if (VALUE_OR_RETURN(provider.validateUidPackagePair(attr.uid, attr.packageName.value()))) {
             return ValidatedAttributionSourceState{std::move(attr)};
         } else {
-            return unexpected{::android::PERMISSION_DENIED};
+            return unexpectedExceptionCode(Status::EX_SECURITY,
+                                           attr.toString()
+                                                   .insert(0, ": invalid attr ")
+                                                   .insert(0, __PRETTY_FUNCTION__)
+                                                   .c_str());
         }
     } else {
         // For APIs which don't appropriately pass attribution sources or packages, we need
         // to populate the package name with our best guess.
         const auto packageNames = VALUE_OR_RETURN(provider.getPackagesForUid(attr.uid));
-        LOG_ALWAYS_FATAL_IF(packageNames.empty());
+        LOG_ALWAYS_FATAL_IF(packageNames.empty(), "%s BUG: empty package list from controller",
+                            __PRETTY_FUNCTION__);
         attr.packageName = std::move(packageNames[0]);
         return ValidatedAttributionSourceState{std::move(attr)};
     }
