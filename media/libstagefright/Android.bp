@@ -315,11 +315,8 @@ cc_library {
         "libaudioclient_aidl_conversion",
         "packagemanager_aidl-cpp",
         "server_configurable_flags",
+        "libaconfig_storage_read_api_cc",
         "aconfig_mediacodec_flags_c_lib",
-    ],
-
-    defaults: [
-        "aconfig_lib_cc_static_link.defaults",
     ],
 
     static_libs: [

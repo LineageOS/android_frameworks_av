@@ -84,15 +84,12 @@ cc_library_shared {
         "libui",
         "libutils",
         "server_configurable_flags",
+        "libaconfig_storage_read_api_cc",
     ],
 
     export_shared_lib_headers: [
         "libcodec2",
         "libcodec2_client",
-    ],
-
-    defaults: [
-        "aconfig_lib_cc_static_link.defaults",
     ],
 
     sanitize: {
