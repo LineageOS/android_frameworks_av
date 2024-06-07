@@ -533,8 +533,7 @@ C2Fence _C2FenceFactory::CreateFromNativeHandle(const native_handle_t* handle) {
             break;
         default:
             ALOGV("Unsupported fence type %d", type);
-            // If this is malformed-handle close the handle here.
-            (void) native_handle_close(handle);
+            // Nothing else to do. The handle is owned by the caller.
             // return a null-fence in this case
             break;
     }
