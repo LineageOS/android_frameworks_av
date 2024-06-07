@@ -24,6 +24,7 @@
 
 #include <android-base/thread_annotations.h>
 #include <com/android/media/permission/BnNativePermissionController.h>
+#include <error/BinderResult.h>
 
 namespace com::android::media::permission {
 
@@ -36,11 +37,12 @@ class NativePermissionController : public BnNativePermissionController, public I
     Status populatePermissionState(PermissionEnum permission, const std::vector<int>& uids) final;
     // end binder methods
 
-    ::android::error::Result<std::vector<std::string>> getPackagesForUid(uid_t uid) const final;
-    ::android::error::Result<bool> validateUidPackagePair(
+    ::android::error::BinderResult<std::vector<std::string>> getPackagesForUid(
+            uid_t uid) const final;
+    ::android::error::BinderResult<bool> validateUidPackagePair(
             uid_t uid, const std::string& packageName) const final;
-    ::android::error::Result<bool> checkPermission(PermissionEnum permission,
-                                                   uid_t uid) const final;
+    ::android::error::BinderResult<bool> checkPermission(PermissionEnum permission,
+                                                         uid_t uid) const final;
 
   private:
     mutable std::mutex m_;
