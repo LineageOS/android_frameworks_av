@@ -392,7 +392,7 @@ TEST_F(ADataTest, AData_CopyMoveTest) {
     EXPECT_EQ(2L, _shared.use_count()); // still both u and _shared contains the object
 
     EXPECT_TRUE(u.clear());
-    EXPECT_TRUE(_shared.unique()); // now only _shared contains the object
+    EXPECT_EQ(1L, _shared.use_count()); // now only _shared contains the object
 
     EXPECT_TRUE(u.set(_constShared));
     EXPECT_EQ(2L, _constShared.use_count()); // even though it is const, we can add a use count
@@ -591,7 +591,7 @@ TEST_F(ADataTest, AData_RelaxedCopyMoveTest) {
     EXPECT_EQ(2L, _shared.use_count()); // still both u and _shared contains the object
 
     EXPECT_TRUE(u.clear());
-    EXPECT_TRUE(_shared.unique()); // now only _shared contains the object
+    EXPECT_EQ(1L, _shared.use_count()); // now only _shared contains the object
 
     EXPECT_TRUE(u.set(_constShared));
     EXPECT_EQ(2L, _constShared.use_count()); // even though it is const, we can add a use count
