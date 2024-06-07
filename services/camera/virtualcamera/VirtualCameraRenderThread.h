@@ -23,6 +23,7 @@
 #include <future>
 #include <memory>
 #include <thread>
+#include <variant>
 #include <vector>
 
 #include "VirtualCameraDevice.h"
@@ -34,7 +35,6 @@
 #include "util/EglFramebuffer.h"
 #include "util/EglProgram.h"
 #include "util/EglSurfaceTexture.h"
-#include "util/MetadataUtil.h"
 #include "util/Util.h"
 
 namespace android {
@@ -94,6 +94,24 @@ class ProcessCaptureRequestTask {
   const RequestSettings mRequestSettings;
 };
 
+struct UpdateTextureTask {};
+
+struct RenderThreadTask
+    : public std::variant<std::unique_ptr<ProcessCaptureRequestTask>,
+                          UpdateTextureTask> {
+  // Allow implicit conversion to bool.
+  //
+  // Returns false, if the RenderThreadTask consist of null
+  // ProcessCaptureRequestTask, which signals that the thread should terminate.
+  operator bool() const {
+    const bool isExitSignal =
+        std::holds_alternative<std::unique_ptr<ProcessCaptureRequestTask>>(
+            *this) &&
+        std::get<std::unique_ptr<ProcessCaptureRequestTask>>(*this) == nullptr;
+    return !isExitSignal;
+  }
+};
+
 // Wraps dedicated rendering thread and rendering business with corresponding
 // input surface.
 class VirtualCameraRenderThread {
@@ -120,6 +138,12 @@ class VirtualCameraRenderThread {
   // Stop rendering thread.
   void stop();
 
+  // Send request to render thread to update the texture.
+  // Currently queued buffers in the input surface will be consumed and the most
+  // recent buffer in the input surface will be attached to the texture), all
+  // other buffers will be returned to the buffer queue.
+  void requestTextureUpdate() EXCLUDES(mLock);
+
   // Equeue capture task for processing on render thread.
   void enqueueTask(std::unique_ptr<ProcessCaptureRequestTask> task)
       EXCLUDES(mLock);
@@ -131,13 +155,13 @@ class VirtualCameraRenderThread {
   sp<Surface> getInputSurface();
 
  private:
-  std::unique_ptr<ProcessCaptureRequestTask> dequeueTask() EXCLUDES(mLock);
+  RenderThreadTask dequeueTask() EXCLUDES(mLock);
 
   // Rendering thread entry point.
   void threadLoop();
 
   // Process single capture request task (always called on render thread).
-  void processCaptureRequest(const ProcessCaptureRequestTask& captureRequestTask);
+  void processTask(const ProcessCaptureRequestTask& captureRequestTask);
 
   // Flush single capture request task returning the error status immediately.
   void flushCaptureRequest(const ProcessCaptureRequestTask& captureRequestTask);
@@ -192,6 +216,7 @@ class VirtualCameraRenderThread {
   std::mutex mLock;
   std::deque<std::unique_ptr<ProcessCaptureRequestTask>> mQueue GUARDED_BY(mLock);
   std::condition_variable mCondVar;
+  volatile bool mTextureUpdateRequested GUARDED_BY(mLock);
   volatile bool mPendingExit GUARDED_BY(mLock);
 
   // Acquisition timestamp of last frame.

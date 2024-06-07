@@ -64,6 +64,11 @@ sp<GraphicBuffer> EglSurfaceTexture::getCurrentBuffer() {
   return mGlConsumer->getCurrentBuffer();
 }
 
+void EglSurfaceTexture::setFrameAvailableListener(
+    const wp<ConsumerBase::FrameAvailableListener>& listener) {
+  mGlConsumer->setFrameAvailableListener(listener);
+}
+
 bool EglSurfaceTexture::waitForNextFrame(const std::chrono::nanoseconds timeout) {
   return mSurface->waitForNextFrame(mGlConsumer->getFrameNumber(),
                                     static_cast<nsecs_t>(timeout.count()));
