@@ -459,13 +459,17 @@ status_t DeviceHalAidl::openOutputStream(
     args.portConfigId = mixPortConfig.id;
     const bool isOffload = isBitPositionFlagSet(
             aidlOutputFlags, AudioOutputFlags::COMPRESS_OFFLOAD);
+    const bool isHwAvSync = isBitPositionFlagSet(
+            aidlOutputFlags, AudioOutputFlags::HW_AV_SYNC);
     std::shared_ptr<OutputStreamCallbackAidl> streamCb;
     if (isOffload) {
         streamCb = ndk::SharedRefBase::make<OutputStreamCallbackAidl>(this);
     }
     auto eventCb = ndk::SharedRefBase::make<OutputStreamEventCallbackAidl>(this);
-    if (isOffload) {
+    if (isOffload || isHwAvSync) {
         args.offloadInfo = aidlConfig.offloadInfo;
+    }
+    if (isOffload) {
         args.callback = streamCb;
     }
     args.bufferSizeFrames = aidlConfig.frameCount;
