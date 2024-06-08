@@ -289,7 +289,7 @@ public:
 
     std::string toString() const {
         std::stringstream ss;
-        ss << "Interpolator{mInterpolatorType=" << static_cast<int32_t>(mInterpolatorType);
+        ss << "Interpolator{mInterpolatorType=" << media::toString(mInterpolatorType);
         ss << ", mFirstSlope=" << mFirstSlope;
         ss << ", mLastSlope=" << mLastSlope;
         ss << ", {";
