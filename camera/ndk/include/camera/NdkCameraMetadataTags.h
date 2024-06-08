@@ -2428,27 +2428,27 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>Flash strength level to use in capture mode i.e. when the applications control
-     * flash with either SINGLE or TORCH mode.</p>
+     * flash with either <code>SINGLE</code> or <code>TORCH</code> mode.</p>
      * <p>Use ACAMERA_FLASH_SINGLE_STRENGTH_MAX_LEVEL and
      * ACAMERA_FLASH_TORCH_STRENGTH_MAX_LEVEL to check whether the device supports
      * flash strength control or not.
-     * If the values of android.flash.info.singleStrengthMaxLevel and
+     * If the values of ACAMERA_FLASH_SINGLE_STRENGTH_MAX_LEVEL and
      * ACAMERA_FLASH_TORCH_STRENGTH_MAX_LEVEL are greater than 1,
      * then the device supports manual flash strength control.</p>
-     * <p>If the ACAMERA_FLASH_MODE <code>==</code> TORCH the value must be &gt;= 1
+     * <p>If the ACAMERA_FLASH_MODE <code>==</code> <code>TORCH</code> the value must be &gt;= 1
      * and &lt;= ACAMERA_FLASH_TORCH_STRENGTH_MAX_LEVEL.
      * If the application doesn't set the key and
      * ACAMERA_FLASH_TORCH_STRENGTH_MAX_LEVEL &gt; 1,
      * then the flash will be fired at the default level set by HAL in
      * ACAMERA_FLASH_TORCH_STRENGTH_DEFAULT_LEVEL.
-     * If the ACAMERA_FLASH_MODE <code>==</code> SINGLE, then the value must be &gt;= 1
+     * If the ACAMERA_FLASH_MODE <code>==</code> <code>SINGLE</code>, then the value must be &gt;= 1
      * and &lt;= ACAMERA_FLASH_SINGLE_STRENGTH_MAX_LEVEL.
      * If the application does not set this key and
      * ACAMERA_FLASH_SINGLE_STRENGTH_MAX_LEVEL &gt; 1,
      * then the flash will be fired at the default level set by HAL
      * in ACAMERA_FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL.
-     * If ACAMERA_CONTROL_AE_MODE is set to any of ON_AUTO_FLASH, ON_ALWAYS_FLASH,
-     * ON_AUTO_FLASH_REDEYE, ON_EXTERNAL_FLASH values, then the strengthLevel will be ignored.</p>
+     * If ACAMERA_CONTROL_AE_MODE is set to any of <code>ON_AUTO_FLASH</code>, <code>ON_ALWAYS_FLASH</code>,
+     * <code>ON_AUTO_FLASH_REDEYE</code>, <code>ON_EXTERNAL_FLASH</code> values, then the strengthLevel will be ignored.</p>
      *
      * @see ACAMERA_CONTROL_AE_MODE
      * @see ACAMERA_FLASH_MODE
@@ -2460,7 +2460,7 @@ typedef enum acamera_metadata_tag {
     ACAMERA_FLASH_STRENGTH_LEVEL =                              // int32
             ACAMERA_FLASH_START + 6,
     /**
-     * <p>Maximum flash brightness level for manual flash control in SINGLE mode.</p>
+     * <p>Maximum flash brightness level for manual flash control in <code>SINGLE</code> mode.</p>
      *
      * <p>Type: int32</p>
      *
@@ -2470,7 +2470,7 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>Maximum flash brightness level in camera capture mode and
-     * ACAMERA_FLASH_MODE set to SINGLE.
+     * ACAMERA_FLASH_MODE set to <code>SINGLE</code>.
      * Value will be &gt; 1 if the manual flash strength control feature is supported,
      * otherwise the value will be equal to 1.
      * Note that this level is just a number of supported levels (the granularity of control).
@@ -2481,7 +2481,7 @@ typedef enum acamera_metadata_tag {
     ACAMERA_FLASH_SINGLE_STRENGTH_MAX_LEVEL =                   // int32
             ACAMERA_FLASH_START + 7,
     /**
-     * <p>Default flash brightness level for manual flash control in SINGLE mode.</p>
+     * <p>Default flash brightness level for manual flash control in <code>SINGLE</code> mode.</p>
      *
      * <p>Type: int32</p>
      *
@@ -2500,7 +2500,7 @@ typedef enum acamera_metadata_tag {
     ACAMERA_FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL =               // int32
             ACAMERA_FLASH_START + 8,
     /**
-     * <p>Maximum flash brightness level for manual flash control in TORCH mode</p>
+     * <p>Maximum flash brightness level for manual flash control in <code>TORCH</code> mode</p>
      *
      * <p>Type: int32</p>
      *
@@ -2510,7 +2510,7 @@ typedef enum acamera_metadata_tag {
      * </ul></p>
      *
      * <p>Maximum flash brightness level in camera capture mode and
-     * ACAMERA_FLASH_MODE set to TORCH.
+     * ACAMERA_FLASH_MODE set to <code>TORCH</code>.
      * Value will be &gt; 1 if the manual flash strength control feature is supported,
      * otherwise the value will be equal to 1.</p>
      * <p>Note that this level is just a number of supported levels(the granularity of control).
@@ -2527,7 +2527,7 @@ typedef enum acamera_metadata_tag {
     ACAMERA_FLASH_TORCH_STRENGTH_MAX_LEVEL =                    // int32
             ACAMERA_FLASH_START + 9,
     /**
-     * <p>Default flash brightness level for manual flash control in TORCH mode</p>
+     * <p>Default flash brightness level for manual flash control in <code>TORCH</code> mode</p>
      *
      * <p>Type: int32</p>
      *
@@ -5875,10 +5875,16 @@ typedef enum acamera_metadata_tag {
      *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
      * </ul></p>
      *
-     * <p>If TRUE, all images produced by the camera device in the RAW image formats will
-     * have lens shading correction already applied to it. If FALSE, the images will
-     * not be adjusted for lens shading correction.
-     * See android.request.maxNumOutputRaw for a list of RAW image formats.</p>
+     * <p>If <code>true</code>, all images produced by the camera device in the <code>RAW</code> image formats will have
+     * at least some lens shading correction already applied to it. If <code>false</code>, the images will
+     * not be adjusted for lens shading correction.  See android.request.maxNumOutputRaw for a
+     * list of RAW image formats.</p>
+     * <p>When <code>true</code>, the <code>lensShadingCorrectionMap</code> key may still have values greater than 1.0,
+     * and those will need to be applied to any captured RAW frames for them to match the shading
+     * correction of processed buffers such as <code>YUV</code> or <code>JPEG</code> images. This may occur, for
+     * example, when some basic fixed lens shading correction is applied by hardware to RAW data,
+     * and additional correction is done dynamically in the camera processing pipeline after
+     * demosaicing.</p>
      * <p>This key will be <code>null</code> for all devices do not report this information.
      * Devices with RAW capability will always report this information in this key.</p>
      */
