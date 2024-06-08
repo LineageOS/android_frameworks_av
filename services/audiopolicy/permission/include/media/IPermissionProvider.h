@@ -22,7 +22,7 @@
 #include <vector>
 
 #include <com/android/media/permission/PermissionEnum.h>
-#include <error/Result.h>
+#include <error/BinderResult.h>
 
 namespace com::android::media::permission {
 
@@ -31,19 +31,20 @@ class IPermissionProvider {
     // Get all package names which run under a certain app-id. Returns non-empty.
     // Not user specific, since packages are across users. Special app-ids (system,
     // shell, etc.) are handled.  Fails if the provider does not know about the
-    // app-id.
-    virtual ::android::error::Result<std::vector<std::string>> getPackagesForUid(
+    // app-id or if the provider has not been initialized.
+    virtual ::android::error::BinderResult<std::vector<std::string>> getPackagesForUid(
             uid_t uid) const = 0;
     // True iff the provided package name runs under the app-id of uid.
     // Special app-ids (system, shell, etc.) are handled.
-    // Fails if the provider does not know about the app-id.
-    virtual ::android::error::Result<bool> validateUidPackagePair(
+    // Fails if the provider does not know about the app-id or if the provider has not been
+    // initialized.
+    virtual ::android::error::BinderResult<bool> validateUidPackagePair(
             uid_t uid, const std::string& packageName) const = 0;
 
     // True iff the uid holds the permission (user aware).
     // Fails with NO_INIT if cache hasn't been populated.
-    virtual ::android::error::Result<bool> checkPermission(PermissionEnum permission,
-                                                           uid_t uid) const = 0;
+    virtual ::android::error::BinderResult<bool> checkPermission(PermissionEnum permission,
+                                                                 uid_t uid) const = 0;
     virtual ~IPermissionProvider() = default;
 };
 }  // namespace com::android::media::permission

@@ -17,22 +17,22 @@
 #pragma once
 
 #include <android/content/AttributionSourceState.h>
-#include <error/Result.h>
+#include <error/BinderResult.h>
 
 #include "IPermissionProvider.h"
 
 namespace com::android::media::permission {
 
 using ::android::content::AttributionSourceState;
-using ::android::error::Result;
 
 class ValidatedAttributionSourceState {
   public:
     /**
      * Validates an attribution source from within the context of a binder transaction.
-     * Overwrites the uid/pid and validates the packageName
+     * Overwrites the uid/pid and validates the packageName.
+     * Returns EX_SECURITY on package validation fail.
      */
-    static Result<ValidatedAttributionSourceState> createFromBinderContext(
+    static ::android::error::BinderResult<ValidatedAttributionSourceState> createFromBinderContext(
             AttributionSourceState attr, const IPermissionProvider& provider);
 
     /**
@@ -47,9 +47,10 @@ class ValidatedAttributionSourceState {
      * Create a ValidatedAttribubtionSourceState in cases where the uid/pid is trusted, but the
      * packages have not been validated. Proper use of the previous two methods should avoid the
      * necessity of this, but it is useful for migration purposes as well as testing this class.
+     * Returns EX_SECURITY on package validation fail.
      */
-    static Result<ValidatedAttributionSourceState> createFromTrustedUidNoPackage(
-            AttributionSourceState attr, const IPermissionProvider& provider);
+    static ::android::error::BinderResult<ValidatedAttributionSourceState>
+    createFromTrustedUidNoPackage(AttributionSourceState attr, const IPermissionProvider& provider);
 
     operator AttributionSourceState() const { return state_; }
 

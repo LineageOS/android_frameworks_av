@@ -19,13 +19,21 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <android-base/expected.h>
+#include <error/BinderStatusMatcher.h>
+#include <error/ExpectedMatchers.h>
 
-using ::android::base::unexpected;
-using ::android::binder::Status;
+using android::binder::Status::EX_ILLEGAL_ARGUMENT;
+using android::binder::Status::EX_ILLEGAL_STATE;
+using android::error::BinderStatusMatcher;
+using android::error::IsErrorAnd;
+using android::error::IsOkAnd;
 using com::android::media::permission::NativePermissionController;
 using com::android::media::permission::PermissionEnum;
 using com::android::media::permission::UidPackageState;
+
+using ::testing::ElementsAre;
+using ::testing::IsFalse;
+using ::testing::IsTrue;
 
 class NativePermissionControllerTest : public ::testing::Test {
   protected:
@@ -40,50 +48,37 @@ static UidPackageState createState(uid_t uid, std::vector<std::string> packagesN
     return out;
 }
 
-static std::vector<std::string> makeVector(const char* one) {
-    return {one};
-}
-
-static std::vector<std::string> makeVector(const char* one, const char* two) {
-    return {one, two};
-}
-
-#define UNWRAP_EQ(expr, desired_expr)                         \
-    do {                                                      \
-        auto tmp_ = (expr);                                   \
-        EXPECT_TRUE(tmp_.has_value());                        \
-        if (tmp_.has_value()) EXPECT_EQ(*tmp_, desired_expr); \
-    } while (0)
-
 // ---  Tests for non-populated ----
 TEST_F(NativePermissionControllerTest, getPackagesForUid_NotPopulated) {
     // Verify errors are returned
-    EXPECT_EQ(controller_.getPackagesForUid(10000), unexpected{android::NO_INIT});
-    EXPECT_EQ(controller_.getPackagesForUid(10001), unexpected{android::NO_INIT});
+    EXPECT_THAT(controller_.getPackagesForUid(10000),
+                IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_STATE)));
+    EXPECT_THAT(controller_.getPackagesForUid(10001),
+                IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_STATE)));
 
     // fixed uids should work
-    UNWRAP_EQ(controller_.getPackagesForUid(1000), makeVector("system"));
+    EXPECT_THAT(controller_.getPackagesForUid(1000), IsOkAnd(ElementsAre(std::string{"system"})));
 }
 
 TEST_F(NativePermissionControllerTest, validateUidPackagePair_NotPopulated) {
     // Verify errors are returned
-    EXPECT_EQ(controller_.validateUidPackagePair(10000, "com.package"),
-              unexpected{android::NO_INIT});
+    EXPECT_THAT(controller_.validateUidPackagePair(10000, "com.package"),
+                IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_STATE)));
 
     // fixed uids should work
-    UNWRAP_EQ(controller_.validateUidPackagePair(1000, "system"), true);
+    EXPECT_THAT(controller_.validateUidPackagePair(1000, "system"), IsOkAnd(IsTrue()));
 }
+
 // ---  Tests for populatePackagesForUids ----
 TEST_F(NativePermissionControllerTest, populatePackages_EmptyInput) {
     std::vector<UidPackageState> input;
 
     // succeeds
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
 
     // Verify unknown uid behavior
-    const auto res1 = controller_.getPackagesForUid(10000);
-    ASSERT_FALSE(res1.has_value());
-    EXPECT_EQ(res1.error(), ::android::BAD_VALUE);
+    EXPECT_THAT(controller_.getPackagesForUid(10000),
+                IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_ARGUMENT)));
 }
 
 TEST_F(NativePermissionControllerTest, populatePackages_ValidInput) {
@@ -92,11 +87,11 @@ TEST_F(NativePermissionControllerTest, populatePackages_ValidInput) {
             createState(10001, {"com.example2.app1"}),
     };
 
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
 
-    UNWRAP_EQ(controller_.getPackagesForUid(10000),
-              makeVector("com.example.app1", "com.example.app2"));
-    UNWRAP_EQ(controller_.getPackagesForUid(10001), makeVector("com.example2.app1"));
+    EXPECT_THAT(controller_.getPackagesForUid(10000),
+                IsOkAnd(ElementsAre("com.example.app1", "com.example.app2")));
+    EXPECT_THAT(controller_.getPackagesForUid(10001), IsOkAnd(ElementsAre("com.example2.app1")));
 }
 
 // --- Tests for updatePackagesForUid ---
@@ -107,14 +102,14 @@ TEST_F(NativePermissionControllerTest, updatePackages_NewUid) {
     };
     UidPackageState newState = createState(12000, {"com.example.other"});
 
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
-    EXPECT_TRUE(controller_.updatePackagesForUid(newState).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
+    EXPECT_THAT(controller_.updatePackagesForUid(newState), BinderStatusMatcher::isOk());
 
     // Verify the results: only the updated package should be changed
-    UNWRAP_EQ(controller_.getPackagesForUid(10000),
-              makeVector("com.example.app1", "com.example.app2"));
-    UNWRAP_EQ(controller_.getPackagesForUid(10001), makeVector("com.example2.app1"));
-    UNWRAP_EQ(controller_.getPackagesForUid(12000), makeVector("com.example.other"));
+    EXPECT_THAT(controller_.getPackagesForUid(10000),
+                IsOkAnd(ElementsAre("com.example.app1", "com.example.app2")));
+    EXPECT_THAT(controller_.getPackagesForUid(10001), IsOkAnd(ElementsAre("com.example2.app1")));
+    EXPECT_THAT(controller_.getPackagesForUid(12000), IsOkAnd(ElementsAre("com.example.other")));
 }
 
 TEST_F(NativePermissionControllerTest, updatePackages_ExistingUid) {
@@ -123,14 +118,14 @@ TEST_F(NativePermissionControllerTest, updatePackages_ExistingUid) {
             createState(10001, {"com.example2.app1"}),
     };
 
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
     // Update packages for existing uid
     UidPackageState newState = createState(10000, {"com.example.other", "com.example.new"});
-    EXPECT_TRUE(controller_.updatePackagesForUid(newState).isOk());
+    EXPECT_THAT(controller_.updatePackagesForUid(newState), BinderStatusMatcher::isOk());
 
     // Verify update
-    UNWRAP_EQ(controller_.getPackagesForUid(10000),
-              makeVector("com.example.other", "com.example.new"));
+    EXPECT_THAT(controller_.getPackagesForUid(10000),
+                IsOkAnd(ElementsAre("com.example.other", "com.example.new")));
 }
 
 TEST_F(NativePermissionControllerTest, updatePackages_EmptyRemovesEntry) {
@@ -138,15 +133,14 @@ TEST_F(NativePermissionControllerTest, updatePackages_EmptyRemovesEntry) {
             createState(10000, {"com.example.app1"}),
     };
 
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
 
     UidPackageState newState{};  // Empty package list
     newState.uid = 10000;
-    EXPECT_TRUE(controller_.updatePackagesForUid(newState).isOk());
+    EXPECT_THAT(controller_.updatePackagesForUid(newState), BinderStatusMatcher::isOk());
     // getPackages for unknown UID should error out
-    const auto res = controller_.getPackagesForUid(10000);
-    ASSERT_FALSE(res.has_value());
-    EXPECT_EQ(res.error(), ::android::BAD_VALUE);
+    EXPECT_THAT(controller_.getPackagesForUid(10000),
+                IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_ARGUMENT)));
 }
 
 TEST_F(NativePermissionControllerTest, validateUidPackagePair_ValidPair) {
@@ -154,9 +148,9 @@ TEST_F(NativePermissionControllerTest, validateUidPackagePair_ValidPair) {
             createState(10000, {"com.example.app1", "com.example.app2"}),
     };
 
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
 
-    UNWRAP_EQ(controller_.validateUidPackagePair(10000, "com.example.app1"), true);
+    EXPECT_THAT(controller_.validateUidPackagePair(10000, "com.example.app1"), IsOkAnd(IsTrue()));
 }
 
 TEST_F(NativePermissionControllerTest, validateUidPackagePair_InvalidPackage) {
@@ -164,9 +158,9 @@ TEST_F(NativePermissionControllerTest, validateUidPackagePair_InvalidPackage) {
             createState(10000, {"com.example.app1", "com.example.app2"}),
     };
 
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
 
-    UNWRAP_EQ(controller_.validateUidPackagePair(10000, "com.example.other"), false);
+    EXPECT_THAT(controller_.validateUidPackagePair(10000, "com.example.other"), IsOkAnd(IsFalse()));
 }
 
 TEST_F(NativePermissionControllerTest, validateUidPackagePair_UnknownUid) {
@@ -174,45 +168,44 @@ TEST_F(NativePermissionControllerTest, validateUidPackagePair_UnknownUid) {
             createState(10000, {"com.example.app1", "com.example.app2"}),
     };
 
-    EXPECT_TRUE(controller_.populatePackagesForUids(input).isOk());
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
 
-    UNWRAP_EQ(controller_.validateUidPackagePair(12000, "any.package"), false);
+    EXPECT_THAT(controller_.validateUidPackagePair(12000, "any.package"), IsOkAnd(IsFalse()));
 }
 
 TEST_F(NativePermissionControllerTest, populatePermissionState_InvalidPermission) {
-    EXPECT_EQ(controller_.populatePermissionState(PermissionEnum::ENUM_SIZE, {}).exceptionCode(),
-              Status::EX_ILLEGAL_ARGUMENT);
-    EXPECT_EQ(controller_
-                      .populatePermissionState(
-                              static_cast<PermissionEnum>(
-                                      static_cast<int>(PermissionEnum::ENUM_SIZE) + 1),
-                              {})
-                      .exceptionCode(),
-              Status::EX_ILLEGAL_ARGUMENT);
+    EXPECT_THAT(controller_.populatePermissionState(PermissionEnum::ENUM_SIZE, {}),
+                BinderStatusMatcher::hasException(EX_ILLEGAL_ARGUMENT));
+    EXPECT_THAT(
+            controller_.populatePermissionState(
+                    static_cast<PermissionEnum>(static_cast<int>(PermissionEnum::ENUM_SIZE) + 1),
+                    {}),
+            BinderStatusMatcher::hasException(EX_ILLEGAL_ARGUMENT));
 }
 
 TEST_F(NativePermissionControllerTest, populatePermissionState_HoldsPermission) {
     // Unsorted
     std::vector<int> uids{3, 1, 2, 4, 5};
 
-    EXPECT_TRUE(
-            controller_.populatePermissionState(PermissionEnum::MODIFY_AUDIO_ROUTING, uids).isOk());
+    EXPECT_THAT(controller_.populatePermissionState(PermissionEnum::MODIFY_AUDIO_ROUTING, uids),
+                BinderStatusMatcher::isOk());
 
-    EXPECT_TRUE(*controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 3));
+    EXPECT_THAT(controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 3),
+                IsOkAnd(IsTrue()));
 }
 
 TEST_F(NativePermissionControllerTest, populatePermissionState_DoesNotHoldPermission) {
     // Unsorted
     std::vector<int> uids{3, 1, 2, 4, 5};
 
-    EXPECT_TRUE(
-            controller_.populatePermissionState(PermissionEnum::MODIFY_AUDIO_ROUTING, uids).isOk());
+    EXPECT_THAT(controller_.populatePermissionState(PermissionEnum::MODIFY_AUDIO_ROUTING, uids),
+                BinderStatusMatcher::isOk());
 
-    EXPECT_FALSE(*controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 6));
+    EXPECT_THAT(controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 6),
+                IsOkAnd(IsFalse()));
 }
 
 TEST_F(NativePermissionControllerTest, populatePermissionState_NotInitialized) {
-    const auto res = controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 3);
-    ASSERT_FALSE(res.has_value());
-    EXPECT_EQ(res.error(), ::android::NO_INIT);
+    EXPECT_THAT(controller_.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, 3),
+                IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_STATE)));
 }
