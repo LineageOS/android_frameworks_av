@@ -21,105 +21,256 @@
 #include <media/stagefright/MPEG2TSWriter.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/OggWriter.h>
-
-#include "MediaMimeTypes.h"
-
 #include <webm/WebmWriter.h>
 
 namespace android {
-std::string genMimeType(FuzzedDataProvider *dataProvider) {
-    uint8_t idx = dataProvider->ConsumeIntegralInRange<uint8_t>(0, kMimeTypes.size() - 1);
-    return std::string(kMimeTypes[idx]);
-}
 
-sp<IMediaExtractor> genMediaExtractor(FuzzedDataProvider *dataProvider, std::string mimeType,
-                                      uint16_t maxDataAmount) {
-    uint32_t dataBlobSize = dataProvider->ConsumeIntegralInRange<uint16_t>(0, maxDataAmount);
-    std::vector<uint8_t> data = dataProvider->ConsumeBytes<uint8_t>(dataBlobSize);
-    // data:[<mediatype>][;base64],<data>
-    std::string uri("data:");
-    uri += mimeType;
-    // Currently libstagefright only accepts base64 uris
-    uri += ";base64,";
-    android::AString out;
-    android::encodeBase64(data.data(), data.size(), &out);
-    uri += out.c_str();
-
-    sp<DataSource> source =
-        DataSourceFactory::getInstance()->CreateFromURI(NULL /* httpService */, uri.c_str());
-
-    if (source == NULL) {
-        return NULL;
-    }
-
-    return MediaExtractorFactory::Create(source);
-}
-
-sp<MediaSource> genMediaSource(FuzzedDataProvider *dataProvider, uint16_t maxMediaBlobSize) {
-    std::string mime = genMimeType(dataProvider);
-    sp<IMediaExtractor> extractor = genMediaExtractor(dataProvider, mime, maxMediaBlobSize);
-
-    if (extractor == NULL) {
-        return NULL;
-    }
-
-    for (size_t i = 0; i < extractor->countTracks(); ++i) {
-        sp<MetaData> meta = extractor->getTrackMetaData(i);
-
-        std::string trackMime = dataProvider->PickValueInArray(kTestedMimeTypes);
-        if (!strcasecmp(mime.c_str(), trackMime.c_str())) {
-            sp<IMediaSource> track = extractor->getTrack(i);
-            if (track == NULL) {
-                return NULL;
-            }
-            return new CallbackMediaSource(track);
-        }
-    }
-
-    return NULL;
-}
-
-sp<MediaWriter> createWriter(int fd, StandardWriters writerType, sp<MetaData> fileMeta) {
+sp<MediaWriter> createWriter(int fd, StandardWriters writerType, sp<MetaData> writerMeta,
+                             FuzzedDataProvider* fdp) {
     sp<MediaWriter> writer;
+
+    if (fdp->ConsumeBool()) {
+        writerMeta->setInt32(kKeyRealTimeRecording, fdp->ConsumeBool());
+    }
+
     switch (writerType) {
-        case OGG:
-            writer = new OggWriter(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_OGG);
-            break;
         case AAC:
-            writer = new AACWriter(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AAC_ADIF);
+            writer = sp<AACWriter>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AAC_ADIF);
+            }
             break;
         case AAC_ADTS:
-            writer = new AACWriter(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AAC_ADTS);
-            break;
-        case WEBM:
-            writer = new WebmWriter(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_WEBM);
-            break;
-        case MPEG4:
-            writer = new MPEG4Writer(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_MPEG_4);
+            writer = sp<AACWriter>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AAC_ADTS);
+            }
             break;
         case AMR_NB:
-            writer = new AMRWriter(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AMR_NB);
+            writer = sp<AMRWriter>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AMR_NB);
+            }
             break;
         case AMR_WB:
-            writer = new AMRWriter(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AMR_WB);
+            writer = sp<AMRWriter>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_AMR_WB);
+            }
             break;
         case MPEG2TS:
-            writer = new MPEG2TSWriter(fd);
-            fileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_MPEG2TS);
+            writer = sp<MPEG2TSWriter>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_MPEG2TS);
+            }
             break;
-        default:
-            return nullptr;
+        case MPEG4:
+            writer = sp<MPEG4Writer>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_MPEG_4);
+            } else if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_HEIF);
+            } else if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_THREE_GPP);
+            }
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKey2ByteNalLength, fdp->ConsumeBool());
+            }
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyTimeScale,
+                                     fdp->ConsumeIntegralInRange<int32_t>(600, 96000));
+            }
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKey4BitTrackIds, fdp->ConsumeBool());
+            }
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt64(kKeyTrackTimeStatus, fdp->ConsumeIntegral<int64_t>());
+            }
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyRotation, fdp->ConsumeIntegralInRange<uint8_t>(0, 3) * 90);
+            }
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt64(kKeyTime, fdp->ConsumeIntegral<int64_t>());
+            }
+            break;
+        case OGG:
+            writer = sp<OggWriter>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_OGG);
+            }
+            break;
+        case WEBM:
+            writer = sp<WebmWriter>::make(fd);
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_WEBM);
+            }
+
+            if (fdp->ConsumeBool()) {
+                writerMeta->setInt32(kKeyTimeScale,
+                                     fdp->ConsumeIntegralInRange<int32_t>(600, 96000));
+            }
+            break;
     }
-    if (writer != nullptr) {
-        fileMeta->setInt32(kKeyRealTimeRecording, false);
-    }
+
     return writer;
+}
+
+sp<FuzzSource> createSource(StandardWriters writerType, FuzzedDataProvider* fdp) {
+    sp<MetaData> meta = sp<MetaData>::make();
+
+    switch (writerType) {
+        case AAC:
+        case AAC_ADTS:
+            meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
+            meta->setInt32(kKeyChannelCount, fdp->ConsumeIntegralInRange<uint8_t>(1, 7));
+            meta->setInt32(kKeySampleRate, fdp->PickValueInArray<uint32_t>(kSampleRateTable));
+
+            if (fdp->ConsumeBool()) {
+                meta->setInt32(kKeyAACProfile, fdp->ConsumeIntegral<int32_t>());
+            }
+            break;
+        case AMR_NB:
+            meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AMR_NB);
+            meta->setInt32(kKeyChannelCount, 1);
+            meta->setInt32(kKeySampleRate, 8000);
+            break;
+        case AMR_WB:
+            meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AMR_WB);
+            meta->setInt32(kKeyChannelCount, 1);
+            meta->setInt32(kKeySampleRate, 16000);
+            break;
+        case MPEG2TS:
+            if (fdp->ConsumeBool()) {
+                meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
+                meta->setInt32(kKeyChannelCount, fdp->ConsumeIntegral<int32_t>());
+                meta->setInt32(kKeySampleRate, fdp->PickValueInArray<uint32_t>(kSampleRateTable));
+            } else {
+                meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
+                // The +1s ensure a minimum height and width of 1.
+                meta->setInt32(kKeyWidth, fdp->ConsumeIntegral<uint16_t>() + 1);
+                meta->setInt32(kKeyHeight, fdp->ConsumeIntegral<uint16_t>() + 1);
+            }
+            break;
+        case MPEG4: {
+            auto mime = fdp->PickValueInArray<std::string>(kMpeg4MimeTypes);
+            meta->setCString(kKeyMIMEType, mime.c_str());
+
+            if (fdp->ConsumeBool()) {
+                meta->setInt32(kKeyBackgroundMode, fdp->ConsumeBool());
+            }
+
+            if (!strncasecmp(mime.c_str(), "audio/", 6)) {
+                meta->setInt32(kKeyChannelCount, fdp->ConsumeIntegral<int32_t>());
+                meta->setInt32(kKeySampleRate, fdp->PickValueInArray<uint32_t>(kSampleRateTable));
+
+            } else {
+                // The +1s ensure a minimum height and width of 1.
+                meta->setInt32(kKeyWidth, fdp->ConsumeIntegral<uint16_t>() + 1);
+                meta->setInt32(kKeyHeight, fdp->ConsumeIntegral<uint16_t>() + 1);
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyDisplayWidth, fdp->ConsumeIntegral<uint16_t>());
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyDisplayHeight, fdp->ConsumeIntegral<uint16_t>());
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyTileWidth, fdp->ConsumeIntegral<uint16_t>());
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyTileHeight, fdp->ConsumeIntegral<uint16_t>());
+                }
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyGridRows, fdp->ConsumeIntegral<uint8_t>());
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyGridCols, fdp->ConsumeIntegral<uint8_t>());
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyTemporalLayerCount, fdp->ConsumeIntegral<int32_t>());
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeySARWidth, fdp->ConsumeIntegral<uint16_t>());
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeySARHeight, fdp->ConsumeIntegral<uint16_t>());
+                }
+            }
+
+            if (fdp->ConsumeBool()) {
+                meta->setInt32(kKeyBitRate, fdp->ConsumeIntegral<int32_t>());
+            }
+
+            if (fdp->ConsumeBool()) {
+                meta->setInt32(kKeyMaxBitRate, fdp->ConsumeIntegral<int32_t>());
+            }
+
+            if (fdp->ConsumeBool()) {
+                meta->setInt32(kKeyTrackIsDefault, fdp->ConsumeBool());
+            }
+            break;
+        }
+        case OGG:
+            meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_OPUS);
+
+            if (fdp->ConsumeBool()) {
+                meta->setInt32(kKeyChannelCount, fdp->ConsumeIntegral<int32_t>());
+            }
+
+            if (fdp->ConsumeBool()) {
+                meta->setInt32(kKeySampleRate, fdp->PickValueInArray<uint32_t>(kSampleRateTable));
+            }
+            break;
+        case WEBM:
+            if (fdp->ConsumeBool()) {
+                if (fdp->ConsumeBool()) {
+                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
+                } else {
+                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
+                }
+
+                if (fdp->ConsumeBool()) {
+                    // The +1s ensure a minimum height and width of 1.
+                    meta->setInt32(kKeyWidth, fdp->ConsumeIntegral<uint16_t>() + 1);
+                    meta->setInt32(kKeyHeight, fdp->ConsumeIntegral<uint16_t>() + 1);
+                }
+            } else {
+                if (fdp->ConsumeBool()) {
+                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_VORBIS);
+                } else {
+                    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_OPUS);
+                }
+
+                if (fdp->ConsumeBool()) {
+                    meta->setInt32(kKeyChannelCount, fdp->ConsumeIntegral<int32_t>());
+                }
+                meta->setInt32(kKeySampleRate, fdp->PickValueInArray<uint32_t>(kSampleRateTable));
+            }
+
+            break;
+    }
+
+    return sp<FuzzSource>::make(meta, fdp);
 }
 }  // namespace android
