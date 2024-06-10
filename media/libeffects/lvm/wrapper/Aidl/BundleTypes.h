@@ -65,9 +65,9 @@ constexpr inline std::array<std::array<int16_t, MAX_NUM_BANDS>, MAX_NUM_PRESETS>
          {5, 3, -1, 3, 5}}}; /* Rock Preset */
 
 static const std::vector<Equalizer::Preset> kEqPresets = {
-        {0, "Normal"},      {1, "Classical"}, {2, "Dance"}, {3, "Flat"}, {4, "Folk"},
-        {5, "Heavy Metal"}, {6, "Hip Hop"},   {7, "Jazz"},  {8, "Pop"},  {9, "Rock"}};
-
+        {-1, "Custom"}, {0, "Normal"}, {1, "Classical"},   {2, "Dance"},
+        {3, "Flat"},    {4, "Folk"},   {5, "Heavy Metal"}, {6, "Hip Hop"},
+        {7, "Jazz"},    {8, "Pop"},    {9, "Rock"}};
 
 const std::vector<Range::EqualizerRange> kEqRanges = {
         MAKE_RANGE(Equalizer, preset, 0, MAX_NUM_PRESETS - 1),
