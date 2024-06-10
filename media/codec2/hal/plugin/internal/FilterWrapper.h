@@ -104,6 +104,10 @@ public:
             const std::shared_ptr<C2ComponentInterface> &intf,
             std::vector<std::unique_ptr<C2Param>> *params);
 
+    /**
+     * Return the param reflector of the filter plugin store.
+     */
+    std::shared_ptr<C2ParamReflector> getParamReflector();
 private:
     status_t mInit;
     std::unique_ptr<Plugin> mPlugin;

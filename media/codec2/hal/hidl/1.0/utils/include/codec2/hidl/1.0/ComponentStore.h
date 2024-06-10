@@ -117,9 +117,12 @@ protected:
     // Does bookkeeping for an interface that has been loaded.
     void onInterfaceLoaded(const std::shared_ptr<C2ComponentInterface> &intf);
 
+    // describe from mParamReflectors
+    std::shared_ptr<C2StructDescriptor> describe(const C2Param::CoreIndex &index);
+
     c2_status_t mInit;
     std::shared_ptr<C2ComponentStore> mStore;
-    std::shared_ptr<C2ParamReflector> mParamReflector;
+    std::vector<std::shared_ptr<C2ParamReflector>> mParamReflectors;
 
     std::map<C2Param::CoreIndex, std::shared_ptr<C2StructDescriptor>> mStructDescriptors;
     std::set<C2Param::CoreIndex> mUnsupportedStructDescriptors;

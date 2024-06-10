@@ -1011,4 +1011,11 @@ c2_status_t FilterWrapper::queryParamsForPreviousComponent(
     return mPlugin->queryParamsForPreviousComponent(intf, params);
 }
 
+std::shared_ptr<C2ParamReflector> FilterWrapper::getParamReflector() {
+    if (mInit != OK) {
+        return nullptr;
+    }
+    return mStore->getParamReflector();
+}
+
 }  // namespace android
