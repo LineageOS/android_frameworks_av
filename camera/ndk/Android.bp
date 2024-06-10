@@ -114,7 +114,6 @@ cc_library_shared {
 
 cc_library_shared {
     name: "libcamera2ndk_vendor",
-    cpp_std: "gnu++17",
     vendor: true,
     srcs: [
         "ndk_vendor/impl/ACameraDevice.cpp",
