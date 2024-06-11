@@ -961,6 +961,20 @@ std::optional<int32_t> getDeviceId(
   return static_cast<int32_t>(entry.data.i32[0]);
 }
 
+std::optional<int32_t> getSensorOrientation(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata) {
+  auto metadata =
+      reinterpret_cast<const camera_metadata_t*>(cameraMetadata.metadata.data());
+
+  camera_metadata_ro_entry_t entry;
+  if (find_camera_metadata_ro_entry(metadata, ANDROID_SENSOR_ORIENTATION,
+                                    &entry) != OK) {
+    return std::nullopt;
+  }
+
+  return static_cast<int32_t>(entry.data.i32[0]);
+}
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android

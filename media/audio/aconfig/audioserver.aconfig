@@ -15,6 +15,13 @@ flag {
 }
 
 flag {
+    name: "effect_chain_callback_improve"
+    namespace: "media_audio"
+    description: "Improve effect chain callback mutex logic."
+    bug: "342413767"
+}
+
+flag {
     name: "fdtostring_timeout_fix"
     namespace: "media_audio"
     description: "Improve fdtostring implementation to properly handle timing out."

@@ -116,6 +116,16 @@ public:
             TYPE_SCALE,
         };
 
+        static std::string toString(Type type) {
+            switch (type) {
+                case TYPE_ID: return "TYPE_ID";
+                case TYPE_SCALE: return "TYPE_SCALE";
+                default:
+                    return std::string("Unknown Type: ")
+                            .append(std::to_string(static_cast<int>(type)));
+            }
+        }
+
         // Must match with VolumeShaper.java in frameworks/base.
         enum OptionFlag : int32_t {
             OPTION_FLAG_NONE           = 0,
@@ -124,6 +134,22 @@ public:
 
             OPTION_FLAG_ALL            = (OPTION_FLAG_VOLUME_IN_DBFS | OPTION_FLAG_CLOCK_TIME),
         };
+
+        static std::string toString(OptionFlag flag) {
+            std::string s;
+            for (const auto& flagPair : std::initializer_list<std::pair<OptionFlag, const char*>>{
+                    {OPTION_FLAG_VOLUME_IN_DBFS, "OPTION_FLAG_VOLUME_IN_DBFS"},
+                    {OPTION_FLAG_CLOCK_TIME, "OPTION_FLAG_CLOCK_TIME"},
+                }) {
+                if (flag & flagPair.first) {
+                    if (!s.empty()) {
+                        s.append("|");
+                    }
+                    s.append(flagPair.second);
+                }
+            }
+            return s;
+        }
 
         // Bring from base class; must match with VolumeShaper.java in frameworks/base.
         using InterpolatorType = Interpolator<S, T>::InterpolatorType;
@@ -329,10 +355,10 @@ public:
         // Returns a string for debug printing.
         std::string toString() const {
             std::stringstream ss;
-            ss << "VolumeShaper::Configuration{mType=" << static_cast<int32_t>(mType);
+            ss << "VolumeShaper::Configuration{mType=" << toString(mType);
             ss << ", mId=" << mId;
             if (mType != TYPE_ID) {
-                ss << ", mOptionFlags=" << static_cast<int32_t>(mOptionFlags);
+                ss << ", mOptionFlags=" << toString(mOptionFlags);
                 ss << ", mDurationMs=" << mDurationMs;
                 ss << ", " << Interpolator<S, T>::toString().c_str();
             }
@@ -413,6 +439,25 @@ public:
             FLAG_ALL       = (FLAG_REVERSE | FLAG_TERMINATE | FLAG_JOIN | FLAG_DELAY
                             | FLAG_CREATE_IF_NECESSARY),
         };
+
+        static std::string toString(Flag flag) {
+            std::string s;
+            for (const auto& flagPair : std::initializer_list<std::pair<Flag, const char*>>{
+                    {FLAG_REVERSE, "FLAG_REVERSE"},
+                    {FLAG_TERMINATE, "FLAG_TERMINATE"},
+                    {FLAG_JOIN, "FLAG_JOIN"},
+                    {FLAG_DELAY, "FLAG_DELAY"},
+                    {FLAG_CREATE_IF_NECESSARY, "FLAG_CREATE_IF_NECESSARY"},
+                }) {
+                if (flag & flagPair.first) {
+                    if (!s.empty()) {
+                        s.append("|");
+                    }
+                    s.append(flagPair.second);
+                }
+            }
+            return s;
+        }
 
         Operation()
             : Operation(FLAG_NONE, -1 /* replaceId */) {
@@ -508,7 +553,7 @@ public:
 
         std::string toString() const {
             std::stringstream ss;
-            ss << "VolumeShaper::Operation{mFlags=" << static_cast<int32_t>(mFlags) ;
+            ss << "VolumeShaper::Operation{mFlags=" << toString(mFlags);
             ss << ", mReplaceId=" << mReplaceId;
             ss << ", mXOffset=" << mXOffset;
             ss << "}";

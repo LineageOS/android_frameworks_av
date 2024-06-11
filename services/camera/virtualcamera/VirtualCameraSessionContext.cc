@@ -129,7 +129,8 @@ std::optional<Stream> VirtualCameraSessionContext::getStreamConfig(
           streamId);
     return std::optional<Stream>();
   }
-  return {it->second->getStreamConfig()};
+  VirtualCameraStream& stream = *it->second;
+  return {stream.getStreamConfig()};
 }
 
 std::shared_ptr<AHardwareBuffer> VirtualCameraSessionContext::fetchHardwareBuffer(
@@ -141,7 +142,8 @@ std::shared_ptr<AHardwareBuffer> VirtualCameraSessionContext::fetchHardwareBuffe
           streamId);
     return nullptr;
   }
-  return it->second->getHardwareBuffer(bufferId);
+  VirtualCameraStream& stream = *it->second;
+  return stream.getHardwareBuffer(bufferId);
 }
 
 std::shared_ptr<EglFrameBuffer>
@@ -154,7 +156,8 @@ VirtualCameraSessionContext::fetchOrCreateEglFramebuffer(
           streamId);
     return nullptr;
   }
-  return it->second->getEglFrameBuffer(eglDisplay, bufferId);
+  VirtualCameraStream& stream = *it->second;
+  return stream.getEglFrameBuffer(eglDisplay, bufferId);
 }
 
 std::set<int> VirtualCameraSessionContext::getStreamIds() const {

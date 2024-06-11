@@ -118,7 +118,7 @@ protected:
 
     c2_status_t mInit;
     std::shared_ptr<C2ComponentStore> mStore;
-    std::shared_ptr<C2ParamReflector> mParamReflector;
+    std::vector<std::shared_ptr<C2ParamReflector>> mParamReflectors;
 
     std::map<C2Param::CoreIndex, std::shared_ptr<C2StructDescriptor>> mStructDescriptors;
     std::set<C2Param::CoreIndex> mUnsupportedStructDescriptors;
@@ -134,6 +134,9 @@ protected:
 
     mutable std::mutex mComponentRosterMutex;
     std::map<Component*, ComponentStatus> mComponentRoster;
+
+    // describe from mParamReflectors
+    std::shared_ptr<C2StructDescriptor> describe(const C2Param::CoreIndex &index);
 
     // Called whenever Component is created.
     void reportComponentBirth(Component* component);

@@ -76,6 +76,8 @@ Available commands:
        --camera_id=(ID) - override numerical ID for test camera instance
        --lens_facing=(front|back|external) - specifies lens facing for test camera instance
        --input_fps=(fps) - specify input fps for test camera, valid values are from 1 to 1000
+       --sensor_orientation=(0|90|180|270) - Clockwise angle through which the output image 
+           needs to be rotated to be upright on the device screen in its native orientation
  * disable_test_camera
 )";
 constexpr char kCreateVirtualDevicePermission[] =
@@ -439,6 +441,31 @@ binder_status_t VirtualCameraService::enableTestCameraCmd(
     }
   }
 
+  std::optional<SensorOrientation> sensorOrientation;
+  std::optional<int> sensorOrientationInt;
+  it = options.find("sensor_orientation");
+  if (it != options.end()) {
+    sensorOrientationInt = parseInt(it->second);
+    switch (sensorOrientationInt.value_or(0)) {
+      case 0:
+        sensorOrientation = SensorOrientation::ORIENTATION_0;
+        break;
+      case 90:
+        sensorOrientation = SensorOrientation::ORIENTATION_90;
+        break;
+      case 180:
+        sensorOrientation = SensorOrientation::ORIENTATION_180;
+        break;
+      case 270:
+        sensorOrientation = SensorOrientation::ORIENTATION_270;
+        break;
+      default:
+        dprintf(err, "Invalid sensor rotation: %s\n, must be 0, 90, 180 or 270.",
+                it->second.c_str());
+        return STATUS_BAD_VALUE;
+    }
+  }
+
   sp<BBinder> token = sp<BBinder>::make();
   mTestCameraToken.set(AIBinder_fromPlatformBinder(token));
 
@@ -449,6 +476,8 @@ binder_status_t VirtualCameraService::enableTestCameraCmd(
                                                   Format::RGBA_8888,
                                                   .maxFps = kMaxFps});
   configuration.lensFacing = lensFacing.value_or(LensFacing::EXTERNAL);
+  configuration.sensorOrientation =
+      sensorOrientation.value_or(SensorOrientation::ORIENTATION_0);
   configuration.virtualCameraCallback =
       ndk::SharedRefBase::make<VirtualCameraTestInstance>(
           inputFps.value_or(kTestCameraDefaultInputFps));
