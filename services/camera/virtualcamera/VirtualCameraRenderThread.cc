@@ -833,8 +833,8 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoEglFramebuffer(
 
   Rect viewportRect =
       viewport.value_or(Rect(framebuffer.getWidth(), framebuffer.getHeight()));
-  glViewport(viewportRect.leftTop().x, viewportRect.leftTop().y,
-             viewportRect.getWidth(), viewportRect.getHeight());
+  glViewport(viewportRect.left, viewportRect.top, viewportRect.getWidth(),
+             viewportRect.getHeight());
 
   sp<GraphicBuffer> textureBuffer = mEglSurfaceTexture->getCurrentBuffer();
   if (textureBuffer == nullptr) {
