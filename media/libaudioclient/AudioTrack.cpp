@@ -1174,6 +1174,13 @@ status_t AudioTrack::setSampleRate(uint32_t rate)
     mSampleRate = rate;
     mProxy->setSampleRate(effectiveSampleRate);
 
+    mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETSAMPLERATE)
+            .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE AMEDIAMETRICS_PROP_SAMPLERATE,
+                    static_cast<int32_t>(effectiveSampleRate))
+            .set(AMEDIAMETRICS_PROP_SAMPLERATE, static_cast<int32_t>(rate))
+            .record();
+
     return NO_ERROR;
 }
 
