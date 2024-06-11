@@ -37,6 +37,19 @@ typedef C2StreamParam<C2Info, C2ColorAspectsStruct,
                 kParamIndexColorAspects | C2Param::CoreIndex::IS_REQUEST_FLAG>
         C2StreamColorAspectsRequestInfo;
 
+// In practice the vendor parameters will be defined in a separate header file,
+// but for the purpose of this sample, we just define it here.
+
+// Vendor-specific type index for filters start from this value. 0x7000 is added to
+// avoid conflict with existing vendor type indices.
+constexpr uint32_t kTypeIndexFilterStart = C2Param::TYPE_INDEX_VENDOR_START + 0x7000;
+// Answer to the Ultimate Question of Life, the Universe, and Everything
+// (Reference to The Hitchhiker's Guide to the Galaxy by Douglas Adams)
+constexpr uint32_t kParamIndexVendorUltimateAnswer = kTypeIndexFilterStart + 0;
+typedef C2StreamParam<C2Info, C2Int32Value, kParamIndexVendorUltimateAnswer>
+        C2StreamVendorUltimateAnswerInfo;
+constexpr char C2_PARAMKEY_VENDOR_ULTIMATE_ANSWER[] = "ultimate-answer";
+
 namespace android {
 
 using namespace std::literals::chrono_literals;
@@ -49,10 +62,9 @@ public:
         static const std::string NAME;
         static const FilterPlugin_V1::Descriptor DESCRIPTOR;
 
-        explicit Interface(c2_node_id_t id)
+        Interface(c2_node_id_t id, const std::shared_ptr<C2ReflectorHelper> &reflector)
             : mId(id),
-              mReflector(std::make_shared<C2ReflectorHelper>()),
-              mHelper(mReflector) {
+              mHelper(reflector) {
         }
         ~Interface() override = default;
         C2String getName() const override { return NAME; }
@@ -126,7 +138,6 @@ public:
         }
     private:
         const c2_node_id_t mId;
-        std::shared_ptr<C2ReflectorHelper> mReflector;
         struct Helper : public C2InterfaceHelper {
             explicit Helper(std::shared_ptr<C2ReflectorHelper> reflector)
                 : C2InterfaceHelper(reflector) {
@@ -266,6 +277,15 @@ public:
                         .build());
 
                 addParameter(
+                        DefineParam(mVendorUltimateAnswerInfo, C2_PARAMKEY_VENDOR_ULTIMATE_ANSWER)
+                        .withDefault(new C2StreamVendorUltimateAnswerInfo::input(0u))
+                        .withFields({
+                            C2F(mVendorUltimateAnswerInfo, value).any(),
+                        })
+                        .withSetter(VendorUltimateAnswerSetter)
+                        .build());
+
+                addParameter(
                         DefineParam(mOutputColorAspectInfo, C2_PARAMKEY_COLOR_ASPECTS)
                         .withDefault(new C2StreamColorAspectsInfo::output(0u))
                         .withFields({
@@ -336,6 +356,15 @@ public:
                 return C2R::Ok();
             }
 
+            static C2R VendorUltimateAnswerSetter(
+                    bool mayBlock,
+                    C2P<C2StreamVendorUltimateAnswerInfo::input> &me) {
+                (void)mayBlock;
+                ALOGI("Answer to the Ultimate Question of Life, the Universe, and Everything "
+                      "set to %d", me.v.value);
+                return C2R::Ok();
+            }
+
             std::shared_ptr<C2ApiFeaturesSetting> mApiFeatures;
 
             std::shared_ptr<C2ComponentNameSetting> mName;
@@ -362,11 +391,13 @@ public:
             std::shared_ptr<C2StreamColorAspectsInfo::input> mInputColorAspectInfo;
             std::shared_ptr<C2StreamColorAspectsInfo::output> mOutputColorAspectInfo;
             std::shared_ptr<C2StreamColorAspectsRequestInfo::output> mColorAspectRequestInfo;
+
+            std::shared_ptr<C2StreamVendorUltimateAnswerInfo::input> mVendorUltimateAnswerInfo;
         } mHelper;
     };
 
-    explicit SampleToneMappingFilter(c2_node_id_t id)
-        : mIntf(std::make_shared<Interface>(id)) {
+    SampleToneMappingFilter(c2_node_id_t id, const std::shared_ptr<C2ReflectorHelper> &reflector)
+        : mIntf(std::make_shared<Interface>(id, reflector)) {
     }
     ~SampleToneMappingFilter() override {
         if (mProcessingThread.joinable()) {
@@ -802,7 +833,10 @@ const std::string SampleToneMappingFilter::Interface::NAME = "c2.sample.tone-map
 // static
 const FilterPlugin_V1::Descriptor SampleToneMappingFilter::Interface::DESCRIPTOR = {
     // controlParams
-    { C2StreamColorAspectsRequestInfo::output::PARAM_TYPE },
+    {
+        C2StreamColorAspectsRequestInfo::output::PARAM_TYPE,
+        C2StreamVendorUltimateAnswerInfo::input::PARAM_TYPE,
+    },
     // affectedParams
     {
         C2StreamHdrStaticInfo::output::PARAM_TYPE,
@@ -815,7 +849,7 @@ public:
     SampleC2ComponentStore()
         : mReflector(std::make_shared<C2ReflectorHelper>()),
           mIntf(mReflector),
-          mFactories(CreateFactories()) {
+          mFactories(CreateFactories(mReflector)) {
     }
     ~SampleC2ComponentStore() = default;
 
@@ -892,36 +926,46 @@ private:
     template <class T>
     struct ComponentFactoryImpl : public ComponentFactory {
     public:
-        ComponentFactoryImpl(const std::shared_ptr<const C2Component::Traits> &traits)
-            : ComponentFactory(traits) {
+        ComponentFactoryImpl(
+                const std::shared_ptr<const C2Component::Traits> &traits,
+                const std::shared_ptr<C2ReflectorHelper> &reflector)
+            : ComponentFactory(traits),
+              mReflector(reflector) {
         }
         ~ComponentFactoryImpl() override = default;
         c2_status_t createComponent(
                 c2_node_id_t id,
                 std::shared_ptr<C2Component>* const component) const override {
-            *component = std::make_shared<T>(id);
+            *component = std::make_shared<T>(id, mReflector);
             return C2_OK;
         }
         c2_status_t createInterface(
                 c2_node_id_t id,
                 std::shared_ptr<C2ComponentInterface>* const interface) const override {
-            *interface = std::make_shared<typename T::Interface>(id);
+            *interface = std::make_shared<typename T::Interface>(id, mReflector);
             return C2_OK;
         }
+    private:
+        std::shared_ptr<C2ReflectorHelper> mReflector;
     };
 
     template <class T>
-    static void AddFactory(std::map<C2String, std::unique_ptr<ComponentFactory>> *factories) {
-        std::shared_ptr<C2ComponentInterface> intf{new typename T::Interface(0)};
+    static void AddFactory(
+            std::map<C2String, std::unique_ptr<ComponentFactory>> *factories,
+            const std::shared_ptr<C2ReflectorHelper> &reflector) {
+        std::shared_ptr<C2ComponentInterface> intf{new typename T::Interface(0, reflector)};
         std::shared_ptr<C2Component::Traits> traits(new (std::nothrow) C2Component::Traits);
         CHECK(C2InterfaceUtils::FillTraitsFromInterface(traits.get(), intf))
                 << "Failed to fill traits from interface";
-        factories->emplace(traits->name, new ComponentFactoryImpl<T>(traits));
+        factories->emplace(
+                traits->name,
+                new ComponentFactoryImpl<T>(traits, reflector));
     }
 
-    static std::map<C2String, std::unique_ptr<ComponentFactory>> CreateFactories() {
+    static std::map<C2String, std::unique_ptr<ComponentFactory>> CreateFactories(
+            const std::shared_ptr<C2ReflectorHelper> &reflector) {
         std::map<C2String, std::unique_ptr<ComponentFactory>> factories;
-        AddFactory<SampleToneMappingFilter>(&factories);
+        AddFactory<SampleToneMappingFilter>(&factories, reflector);
         return factories;
     }
 
