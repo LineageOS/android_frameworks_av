@@ -2287,12 +2287,11 @@ typedef enum acamera_metadata_tag {
      * <p>When low light boost is enabled by setting the AE mode to
      * 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY', it can dynamically apply a low light
      * boost when the light level threshold is exceeded.</p>
-     * <p>This field is present in the CaptureResult when the AE mode is set to
-     * 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY'. Otherwise, the field is not present.</p>
      * <p>This state indicates when low light boost is 'ACTIVE' and applied. Similarly, it can
      * indicate when it is not being applied by returning 'INACTIVE'.</p>
      * <p>This key will be absent from the CaptureResult if AE mode is not set to
      * 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY.</p>
+     * <p>The default value will always be 'INACTIVE'.</p>
      */
     ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE =                     // byte (acamera_metadata_enum_android_control_low_light_boost_state_t)
             ACAMERA_CONTROL_START + 59,
@@ -8305,11 +8304,8 @@ typedef enum acamera_metadata_enum_acamera_control_ae_mode {
      * <p>If the session configuration is not supported, the AE mode reported in the
      * CaptureResult will be 'ON' instead of 'ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY'.</p>
      * <p>When this AE mode is enabled, the CaptureResult field
-     * ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE will be present and not null. Otherwise, the
-     * ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE field will not be present in the CaptureResult.</p>
-     * <p>The application can observe the CaptureResult field
-     * ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE to determine when low light boost is 'ACTIVE' or
-     * 'INACTIVE'.</p>
+     * ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE will indicate when low light boost is 'ACTIVE'
+     * or 'INACTIVE'. By default ACAMERA_CONTROL_LOW_LIGHT_BOOST_STATE will be 'INACTIVE'.</p>
      * <p>The low light boost is 'ACTIVE' once the scene lighting condition is less than the
      * upper bound lux value defined by ACAMERA_CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE.
      * This mode will be 'INACTIVE' once the scene lighting condition is greater than the
