@@ -60,6 +60,13 @@ flag {
 }
 
 flag {
+    name: "music_fx_edge_to_edge"
+    namespace: "media_audio"
+    description: "Enable Edge-to-edge feature for MusicFx and handle insets"
+    bug: "336204940"
+}
+
+flag {
     name: "port_to_piid_simplification"
     namespace: "media_audio"
     description: "PAM only needs for each piid the last portId mapping"
