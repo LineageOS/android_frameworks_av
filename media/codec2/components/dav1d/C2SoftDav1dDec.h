@@ -91,7 +91,7 @@ struct C2SoftDav1dDec : public SimpleC2Component {
               coeffs(C2Color::MATRIX_UNSPECIFIED),
               fullRange(C2Color::RANGE_UNSPECIFIED) {}
 
-        bool operator==(const VuiColorAspects& o) const {
+        bool operator==(const VuiColorAspects& o) {
             return primaries == o.primaries && transfer == o.transfer && coeffs == o.coeffs &&
                    fullRange == o.fullRange;
         }
