@@ -57,4 +57,8 @@ c2_status_t FilterWrapper::createBlockPool(
     return CreateCodec2BlockPool(allocatorParam, component, pool);
 }
 
+std::shared_ptr<C2ParamReflector> FilterWrapper::getParamReflector() {
+    return nullptr;
+}
+
 }  // namespace android
