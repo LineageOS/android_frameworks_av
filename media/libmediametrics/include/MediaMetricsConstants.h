@@ -213,6 +213,7 @@
                                                              // format to transport packets.
                                                              // Raw byte streams are used if this
                                                              // is false.
+#define AMEDIAMETRICS_PROP_TOSTRING "toString"             // string
 #define AMEDIAMETRICS_PROP_TOTALINPUTBYTES "totalInputBytes" // int32 (MIDI)
 #define AMEDIAMETRICS_PROP_TOTALOUTPUTBYTES "totalOutputBytes" // int32 (MIDI)
 #define AMEDIAMETRICS_PROP_THREADID       "threadId"       // int32 value io handle
@@ -243,6 +244,7 @@
 // Values are strings accepted for a given property.
 
 // An event is a general description, which often is a function name.
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_APPLYVOLUMESHAPER "applyVolumeShaper"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_BEGINAUDIOINTERVALGROUP "beginAudioIntervalGroup"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CLOSE      "close"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE     "create"
