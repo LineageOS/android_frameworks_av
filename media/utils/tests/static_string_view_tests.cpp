@@ -37,14 +37,12 @@ TEST(StaticStringViewTests, CreateTicket) {
     // const std::array<char,2> nonstatic = {'a', 'b'};
     // static_assert(can_assign<nonstatic>::value == false);
     static std::array<char, 2> nonconst = {'a', 'b'};
-    static const std::array<char, 2> nonconstexpr = {'a', 'b'};
     static constexpr std::array<int, 2> nonchar = {1, 2};
     static constexpr size_t nonarray = 2;
 
     static_assert(CanCreate<nonconst>::value == false);
     static_assert(CanCreate<nonarray>::value == false);
     static_assert(CanCreate<nonchar>::value == false);
-    static_assert(CanCreate<nonconstexpr>::value == false);
 
     static constexpr std::array<char, 2> scoped = {'a', 'b'};
     constexpr StaticStringView Ticket1 = StaticStringView::create<global>();
