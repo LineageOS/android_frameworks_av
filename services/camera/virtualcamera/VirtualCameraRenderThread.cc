@@ -750,7 +750,7 @@ ndk::ScopedAStatus VirtualCameraRenderThread::renderIntoBlobStreamBuffer(
     return status;
   }
 
-  PlanesLockGuard planesLock(hwBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_RARELY,
+  PlanesLockGuard planesLock(hwBuffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
                              fence);
   if (planesLock.getStatus() != OK) {
     return cameraStatus(Status::INTERNAL_ERROR);
