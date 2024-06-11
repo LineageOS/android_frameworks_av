@@ -488,6 +488,11 @@ getPrecaptureTrigger(
 std::optional<int32_t> getDeviceId(
     const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata);
 
+// Return the value of ANDROID_SENSOR_ORIENTATION or nullopt if the key is not
+// present (which is equivalent to a orientation of 0).
+std::optional<int32_t> getSensorOrientation(
+    const aidl::android::hardware::camera::device::CameraMetadata& cameraMetadata);
+
 }  // namespace virtualcamera
 }  // namespace companion
 }  // namespace android
