@@ -37,6 +37,7 @@ using aidl::android::media::audio::common::AudioDeviceDescription;
 using aidl::android::media::audio::common::AudioDeviceType;
 using aidl::android::media::audio::common::AudioFormatDescription;
 using aidl::android::media::audio::common::AudioFormatType;
+using aidl::android::media::audio::common::AudioGainConfig;
 using aidl::android::media::audio::common::AudioInputFlags;
 using aidl::android::media::audio::common::AudioIoFlags;
 using aidl::android::media::audio::common::AudioOutputFlags;
@@ -325,8 +326,8 @@ status_t Hal2AidlMapper::findOrCreatePatch(
 }
 
 status_t Hal2AidlMapper::findOrCreateDevicePortConfig(
-        const AudioDevice& device, const AudioConfig* config, AudioPortConfig* portConfig,
-        bool* created) {
+        const AudioDevice& device, const AudioConfig* config, const AudioGainConfig* gainConfig,
+        AudioPortConfig* portConfig, bool* created) {
     if (auto portConfigIt = findPortConfig(device); portConfigIt == mPortConfigs.end()) {
         auto portsIt = findPort(device);
         if (portsIt == mPorts.end()) {
@@ -339,11 +340,17 @@ status_t Hal2AidlMapper::findOrCreateDevicePortConfig(
         if (config != nullptr) {
             setPortConfigFromConfig(&requestedPortConfig, *config);
         }
+        if (gainConfig != nullptr) {
+            requestedPortConfig.gain = *gainConfig;
+        }
         return createOrUpdatePortConfigRetry(requestedPortConfig, portConfig, created);
     } else {
         AudioPortConfig requestedPortConfig = portConfigIt->second;
         if (config != nullptr) {
             setPortConfigFromConfig(&requestedPortConfig, *config);
+        }
+        if (gainConfig != nullptr) {
+            requestedPortConfig.gain = *gainConfig;
         }
 
         if (requestedPortConfig != portConfigIt->second) {
@@ -447,18 +454,26 @@ status_t Hal2AidlMapper::findOrCreatePortConfig(
                 requestedPortConfig.ext.get<Tag::mix>().handle, source, destinationPortIds,
                 portConfig, created);
     } else if (requestedPortConfig.ext.getTag() == Tag::device) {
-        if (const auto& p = requestedPortConfig;
-                p.sampleRate.has_value() && p.channelMask.has_value() &&
-                p.format.has_value()) {
-            AudioConfig config;
-            setConfigFromPortConfig(&config, requestedPortConfig);
+        const auto& p = requestedPortConfig;
+        const bool hasAudioConfig =
+                p.sampleRate.has_value() && p.channelMask.has_value() && p.format.has_value();
+        const bool hasGainConfig = p.gain.has_value();
+        if (hasAudioConfig || hasGainConfig) {
+            AudioConfig config, *configPtr = nullptr;
+            if (hasAudioConfig) {
+                setConfigFromPortConfig(&config, requestedPortConfig);
+                configPtr = &config;
+            }
+            const AudioGainConfig* gainConfigPtr = nullptr;
+            if (hasGainConfig) gainConfigPtr = &(*(p.gain));
             return findOrCreateDevicePortConfig(
-                    requestedPortConfig.ext.get<Tag::device>().device, &config,
+                    requestedPortConfig.ext.get<Tag::device>().device, configPtr, gainConfigPtr,
                     portConfig, created);
         } else {
+            ALOGD("%s: device port config does not have audio or gain config specified", __func__);
             return findOrCreateDevicePortConfig(
                     requestedPortConfig.ext.get<Tag::device>().device, nullptr /*config*/,
-                    portConfig, created);
+                    nullptr /*gainConfig*/, portConfig, created);
         }
     }
     ALOGW("%s: unsupported audio port config: %s",
@@ -769,7 +784,7 @@ status_t Hal2AidlMapper::prepareToOpenStream(
     // then find / create a patch between them, and open a stream on the mix port.
     AudioPortConfig devicePortConfig;
     bool created = false;
-    RETURN_STATUS_IF_ERROR(findOrCreateDevicePortConfig(device, config,
+    RETURN_STATUS_IF_ERROR(findOrCreateDevicePortConfig(device, config, nullptr /*gainConfig*/,
                     &devicePortConfig, &created));
     LOG_ALWAYS_FATAL_IF(devicePortConfig.id == 0);
     if (created) {
