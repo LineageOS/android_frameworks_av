@@ -163,6 +163,7 @@ class Hal2AidlMapper {
     status_t findOrCreateDevicePortConfig(
             const ::aidl::android::media::audio::common::AudioDevice& device,
             const ::aidl::android::media::audio::common::AudioConfig* config,
+            const ::aidl::android::media::audio::common::AudioGainConfig* gainConfig,
             ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
             bool* created);
     // If the resulting 'portConfig->id' is 0, that means the config was not created,
