@@ -926,8 +926,13 @@ Status CameraService::isSessionConfigurationWithParametersSupported(
                                 SessionConfigurationUtils::targetPerfClassPrimaryCamera(
                                         mPerfClassPrimaryCameraIds, cameraId, targetSdkVersion);
 
-    return isSessionConfigurationWithParametersSupportedUnsafe(cameraId, sessionConfiguration,
-                                                               overrideForPerfClass, supported);
+    auto ret = isSessionConfigurationWithParametersSupportedUnsafe(cameraId,
+            sessionConfiguration, overrideForPerfClass, supported);
+    if (flags::analytics_24q3()) {
+        mCameraServiceProxyWrapper->logFeatureCombinationQuery(cameraId,
+                getCallingUid(), sessionConfiguration, ret);
+    }
+    return ret;
 }
 
 Status CameraService::isSessionConfigurationWithParametersSupportedUnsafe(
@@ -1071,7 +1076,12 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
             }
     }
 
-    return filterSensitiveMetadataIfNeeded(cameraId, outMetadata);
+    Status res = filterSensitiveMetadataIfNeeded(cameraId, outMetadata);
+    if (flags::analytics_24q3()) {
+        mCameraServiceProxyWrapper->logSessionCharacteristicsQuery(cameraId,
+                getCallingUid(), sessionConfiguration, res);
+    }
+    return res;
 }
 
 Status CameraService::filterSensitiveMetadataIfNeeded(
