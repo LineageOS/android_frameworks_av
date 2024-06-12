@@ -664,11 +664,10 @@ c2_status_t GraphicsTracker::_allocate(const std::shared_ptr<BufferCache> &cache
 
     int slotId;
     uint64_t outBufferAge;
-    ::android::FrameEventHistoryDelta outTimestamps;
     sp<Fence> fence;
 
     ::android::status_t status = igbp->dequeueBuffer(
-            &slotId, &fence, width, height, format, usage, &outBufferAge, &outTimestamps);
+            &slotId, &fence, width, height, format, usage, &outBufferAge, nullptr);
     if (status < ::android::OK) {
         if (status == ::android::TIMED_OUT || status == ::android::WOULD_BLOCK) {
             ALOGW("BQ might not be ready for dequeueBuffer()");
