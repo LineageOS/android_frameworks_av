@@ -185,7 +185,6 @@ RetCode BundleContext::disableOperatingMode() {
     }
     RETURN_VALUE_IF(LVM_SUCCESS != LVM_SetControlParameters(mInstance, &params),
                     RetCode::ERROR_EFFECT_LIB_ERROR, "failSetControlParams");
-    mEnabled = false;
     return limitLevel();
 }
 
