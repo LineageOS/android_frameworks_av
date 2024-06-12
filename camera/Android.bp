@@ -86,40 +86,40 @@ cc_library {
 
         // Source for camera interface parcelables, and manually-written interfaces
         "Camera.cpp",
+        "CameraBase.cpp",
         "CameraMetadata.cpp",
         "CameraParameters.cpp",
-        "CaptureResult.cpp",
         "CameraParameters2.cpp",
         "CameraSessionStats.cpp",
+        "CameraUtils.cpp",
+        "CaptureResult.cpp",
         "ICamera.cpp",
         "ICameraClient.cpp",
         "ICameraRecordingProxy.cpp",
+        "VendorTagDescriptor.cpp",
         "camera2/CaptureRequest.cpp",
         "camera2/ConcurrentCamera.cpp",
         "camera2/OutputConfiguration.cpp",
         "camera2/SessionConfiguration.cpp",
         "camera2/SubmitInfo.cpp",
-        "CameraBase.cpp",
-        "CameraUtils.cpp",
-        "VendorTagDescriptor.cpp",
     ],
 
     shared_libs: [
         "camera_platform_flags_c_lib",
-        "libbase",
-        "libcutils",
-        "libutils",
-        "liblog",
-        "libbinder",
-        "libgui",
-        "libcamera_metadata",
-        "libnativewindow",
         "lib-platform-compat-native-api",
+        "libbase",
+        "libbinder",
+        "libcamera_metadata",
+        "libcutils",
+        "libgui",
+        "liblog",
+        "libnativewindow",
+        "libutils",
     ],
 
     include_dirs: [
-        "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
+        "system/media/private/camera/include",
     ],
     export_include_dirs: [
         "include",
@@ -127,13 +127,13 @@ cc_library {
     ],
     export_shared_lib_headers: [
         "libcamera_metadata",
-        "libnativewindow",
         "libgui",
+        "libnativewindow",
     ],
 
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
         "-Wextra",
     ],
 
@@ -153,8 +153,8 @@ cc_library_host_static {
     ],
 
     include_dirs: [
-        "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
+        "system/media/private/camera/include",
     ],
 
     export_include_dirs: [
