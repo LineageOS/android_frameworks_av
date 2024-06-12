@@ -50,7 +50,7 @@ public:
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
-    void close() override;
+    void close() override EXCLUDES(mMmapStreamLock);
 
     aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
                                 audio_port_handle_t *clientHandle) override;
@@ -60,15 +60,19 @@ public:
 
     aaudio_result_t startClient(const android::AudioClient& client,
                                 const audio_attributes_t *attr,
-                                audio_port_handle_t *clientHandle)  override;
+                                audio_port_handle_t *clientHandle)  override
+                                EXCLUDES(mMmapStreamLock);
 
-    aaudio_result_t stopClient(audio_port_handle_t clientHandle)  override;
+    aaudio_result_t stopClient(audio_port_handle_t clientHandle)  override
+            EXCLUDES(mMmapStreamLock);
 
-    aaudio_result_t standby() override;
+    aaudio_result_t standby() override EXCLUDES(mMmapStreamLock);
 
-    aaudio_result_t exitStandby(AudioEndpointParcelable* parcelable) override;
+    aaudio_result_t exitStandby(AudioEndpointParcelable* parcelable) override
+            EXCLUDES(mMmapStreamLock);
 
-    aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
+    aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override
+             EXCLUDES(mMmapStreamLock);
 
     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
@@ -88,22 +92,31 @@ public:
         return mHardwareTimeOffsetNanos;
     }
 
-    aaudio_result_t getExternalPosition(uint64_t *positionFrames, int64_t *timeNanos);
+    aaudio_result_t getExternalPosition(uint64_t *positionFrames, int64_t *timeNanos)
+            EXCLUDES(mMmapStreamLock);
 
-    int64_t nextDataReportTime();
+    int64_t nextDataReportTime() EXCLUDES(mMmapStreamLock);
 
-    void reportData();
+    void reportData() EXCLUDES(mMmapStreamLock);
 
 private:
 
-    aaudio_result_t openWithConfig(audio_config_base_t* config);
+    /**
+     *
+     * @return true if mMapStream was cleared
+     */
+    bool close_l() REQUIRES(mMmapStreamLock);
 
-    aaudio_result_t createMmapBuffer();
+    aaudio_result_t openWithConfig(audio_config_base_t* config) EXCLUDES(mMmapStreamLock);
+
+    aaudio_result_t createMmapBuffer_l() REQUIRES(mMmapStreamLock);
 
     MonotonicCounter                          mFramesTransferred;
 
     // Interface to the AudioFlinger MMAP support.
-    android::sp<android::MmapStreamInterface> mMmapStream;
+    mutable std::mutex                        mMmapStreamLock;
+    android::sp<android::MmapStreamInterface> mMmapStream GUARDED_BY(mMmapStreamLock);
+
     struct audio_mmap_buffer_info             mMmapBufferinfo;
 
     // There is only one port associated with an MMAP endpoint.
