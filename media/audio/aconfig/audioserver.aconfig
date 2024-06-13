@@ -38,6 +38,15 @@ flag {
 }
 
 flag {
+    name: "fix_input_sharing_logic"
+    namespace: "media_audio"
+    description:
+        "Fix the audio policy logic that decides to reuse or close "
+        "input streams when resources are exhausted"
+    bug: "338446410"
+}
+
+flag {
     name: "mutex_priority_inheritance"
     namespace: "media_audio"
     description:
@@ -48,10 +57,9 @@ flag {
 }
 
 flag {
-    name: "fix_input_sharing_logic"
+    name: "use_bt_sco_for_media"
     namespace: "media_audio"
     description:
-        "Fix the audio policy logic that decides to reuse or close "
-        "input streams when resources are exhausted"
-    bug: "338446410"
+        "Play media strategy over Bluetooth SCO when active"
+    bug: "292037886"
 }

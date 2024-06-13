@@ -71,6 +71,9 @@ public:
         OUTPUT_BLUETOOTH_SCO    = 0x10,
         OUTPUT_BLUETOOTH_A2DP   = 0x20,
         OUTPUT_SPEAKER_SAFE     = 0x40,
+        OUTPUT_BLUETOOTH_BLE    = 0x80,
+        OUTPUT_DOCK             = 0x100,
+        OUTPUT_HDMI             = 0x200,
 
         INPUT_DEVICE_BIT        = 0x40000000,
         INPUT_BUILTIN_MIC       = INPUT_DEVICE_BIT | 0x1, // non-negative positive int32.
@@ -78,6 +81,7 @@ public:
         INPUT_WIRED_HEADSET_MIC = INPUT_DEVICE_BIT | 0x4,
         INPUT_USB_HEADSET_MIC   = INPUT_DEVICE_BIT | 0x8,
         INPUT_BLUETOOTH_SCO     = INPUT_DEVICE_BIT | 0x10,
+        INPUT_BLUETOOTH_BLE     = INPUT_DEVICE_BIT | 0x20,
     };
 
     static bool typeFromString(const std::string& type_string, int32_t& type);

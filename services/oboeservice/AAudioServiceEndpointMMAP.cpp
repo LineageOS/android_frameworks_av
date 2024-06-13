@@ -205,6 +205,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithConfig(
           "sample_rate=%u, channel_mask=%#x, device=%d",
           __func__, config->format, config->sample_rate,
           config->channel_mask, deviceId);
+
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
     const status_t status = MmapStreamInterface::openMmapStream(streamDirection,
                                                                 &attributes,
                                                                 config,
@@ -246,7 +248,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithConfig(
           __func__, config->format, getDeviceId(), getSessionId());
 
     // Create MMAP/NOIRQ buffer.
-    result = createMmapBuffer();
+    result = createMmapBuffer_l();
     if (result != AAUDIO_OK) {
         goto error;
     }
@@ -283,7 +285,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithConfig(
     return result;
 
 error:
-    close();
+    close_l();
     // restore original requests
     setDeviceId(mRequestedDeviceId);
     setSessionId(requestedSessionId);
@@ -291,11 +293,26 @@ error:
 }
 
 void AAudioServiceEndpointMMAP::close() {
-    if (mMmapStream != nullptr) {
-        // Needs to be explicitly cleared or CTS will fail but it is not clear why.
-        mMmapStream.clear();
+    bool closedIt = false;
+    {
+        const std::lock_guard<std::mutex> lock(mMmapStreamLock);
+        closedIt = close_l();
+    }
+    if (closedIt) {
+        // TODO Why is this needed?
         AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
     }
+}
+
+bool AAudioServiceEndpointMMAP::close_l() { // requires mMmapStreamLock
+    bool closedIt = false;
+    if (mMmapStream != nullptr) {
+        // Needs to be explicitly cleared or CTS will fail but it is not clear why.
+        ALOGD("%s() clear mMmapStream", __func__);
+        mMmapStream.clear();
+        closedIt = true;
+    }
+    return closedIt;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBase> stream,
@@ -318,7 +335,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase> /*stream*/,
-                                                      audio_port_handle_t /*clientHandle*/) {
+                                                      audio_port_handle_t clientHandle) {
     mFramesTransferred.reset32();
 
     // Round 64-bit counter up to a multiple of the buffer capacity.
@@ -328,36 +345,68 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
     mFramesTransferred.roundUp64(getBufferCapacity());
 
     // Use the port handle that was provided by openMmapStream().
-    ALOGV("%s() mPortHandle = %d", __func__, mPortHandle);
-    return stopClient(mPortHandle);
+    aaudio_result_t result = stopClient(mPortHandle);
+    ALOGD("%s(%d): called stopClient(%d=mPortHandle), returning %d", __func__,
+          (int)clientHandle, mPortHandle, result);
+    return result;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
                                                        const audio_attributes_t *attr,
-                                                       audio_port_handle_t *clientHandle) {
-    return mMmapStream == nullptr
-            ? AAUDIO_ERROR_NULL
-            : AAudioConvert_androidToAAudioResult(mMmapStream->start(client, attr, clientHandle));
+                                                       audio_port_handle_t *portHandlePtr) {
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
+    if (mMmapStream == nullptr) {
+        ALOGW("%s(): called after mMmapStream set to NULL", __func__);
+        return AAUDIO_ERROR_NULL;
+    } else if (!isConnected()) {
+        ALOGD("%s(): MMAP stream was disconnected", __func__);
+        return AAUDIO_ERROR_DISCONNECTED;
+    } else {
+        aaudio_result_t result = AAudioConvert_androidToAAudioResult(
+                mMmapStream->start(client, attr, portHandlePtr));
+        if (!isConnected() && (portHandlePtr != nullptr)) {
+            ALOGD("%s(): MMAP stream DISCONNECTED after starting port %d, will stop it",
+                  __func__, *portHandlePtr);
+            mMmapStream->stop(*portHandlePtr);
+            *portHandlePtr = AUDIO_PORT_HANDLE_NONE;
+            result = AAUDIO_ERROR_DISCONNECTED;
+        }
+        ALOGD("%s(): returning port %d, result %d", __func__,
+              (portHandlePtr == nullptr) ? -1 : *portHandlePtr, result);
+        return result;
+    }
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t clientHandle) {
-    return mMmapStream == nullptr
-            ? AAUDIO_ERROR_NULL
-            : AAudioConvert_androidToAAudioResult(mMmapStream->stop(clientHandle));
+aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t portHandle) {
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
+    if (mMmapStream == nullptr) {
+        ALOGE("%s(%d): called after mMmapStream set to NULL", __func__, (int)portHandle);
+        return AAUDIO_ERROR_NULL;
+    } else {
+        aaudio_result_t result = AAudioConvert_androidToAAudioResult(
+                mMmapStream->stop(portHandle));
+        ALOGD("%s(%d): returning %d", __func__, (int)portHandle, result);
+        return result;
+    }
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::standby() {
-    return mMmapStream == nullptr
-            ? AAUDIO_ERROR_NULL
-            : AAudioConvert_androidToAAudioResult(mMmapStream->standby());
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
+    if (mMmapStream == nullptr) {
+        ALOGW("%s(): called after mMmapStream set to NULL", __func__);
+        return AAUDIO_ERROR_NULL;
+    } else {
+        return AAudioConvert_androidToAAudioResult(mMmapStream->standby());
+    }
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::exitStandby(AudioEndpointParcelable* parcelable) {
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
     if (mMmapStream == nullptr) {
         return AAUDIO_ERROR_NULL;
     }
     mAudioDataWrapper->reset();
-    const aaudio_result_t result = createMmapBuffer();
+    const aaudio_result_t result = createMmapBuffer_l();
     if (result == AAUDIO_OK) {
         getDownDataDescription(parcelable);
     }
@@ -367,10 +416,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::exitStandby(AudioEndpointParcelable* 
 // Get free-running DSP or DMA hardware position from the HAL.
 aaudio_result_t AAudioServiceEndpointMMAP::getFreeRunningPosition(int64_t *positionFrames,
                                                                 int64_t *timeNanos) {
-    struct audio_mmap_position position;
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
     if (mMmapStream == nullptr) {
+        ALOGW("%s(): called after mMmapStream set to NULL", __func__);
         return AAUDIO_ERROR_NULL;
     }
+    struct audio_mmap_position position;
     const status_t status = mMmapStream->getMmapPosition(&position);
     ALOGV("%s() status= %d, pos = %d, nanos = %lld\n",
           __func__, status, position.position_frames, (long long) position.time_nanoseconds);
@@ -475,8 +526,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::getDownDataDescription(
 aaudio_result_t AAudioServiceEndpointMMAP::getExternalPosition(uint64_t *positionFrames,
                                                                int64_t *timeNanos)
 {
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
     if (mHalExternalPositionStatus != AAUDIO_OK) {
         return mHalExternalPositionStatus;
+    }
+    if (mMmapStream == nullptr) {
+        ALOGW("%s(): called after mMmapStream set to NULL", __func__);
+        return AAUDIO_ERROR_NULL;
     }
     uint64_t tempPositionFrames;
     int64_t tempTimeNanos;
@@ -552,13 +608,20 @@ aaudio_result_t AAudioServiceEndpointMMAP::getExternalPosition(uint64_t *positio
     return mHalExternalPositionStatus;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer()
+// mMmapStreamLock should be held when calling this function.
+aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer_l()
 {
     memset(&mMmapBufferinfo, 0, sizeof(struct audio_mmap_buffer_info));
     int32_t minSizeFrames = getBufferCapacity();
     if (minSizeFrames <= 0) { // zero will get rejected
         minSizeFrames = AAUDIO_BUFFER_CAPACITY_MIN;
     }
+
+    if (mMmapStream == nullptr) {
+        ALOGW("%s(): called after mMmapStream set to NULL", __func__);
+        return AAUDIO_ERROR_NULL;
+    }
+
     const status_t status = mMmapStream->createMmapBuffer(minSizeFrames, &mMmapBufferinfo);
     const bool isBufferShareable = mMmapBufferinfo.flags & AUDIO_MMAP_APPLICATION_SHAREABLE;
     if (status != OK) {
@@ -598,6 +661,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer()
     // Call to HAL to make sure the transport FD was able to be closed by binder.
     // This is a tricky workaround for a problem in Binder.
     // TODO:[b/192048842] When that problem is fixed we may be able to remove or change this code.
+    ALOGD("%s() - call getMmapPosition() as a hack to clear FD stuck in Binder", __func__);
     struct audio_mmap_position position;
     mMmapStream->getMmapPosition(&position);
 
@@ -613,11 +677,14 @@ int64_t AAudioServiceEndpointMMAP::nextDataReportTime() {
 }
 
 void AAudioServiceEndpointMMAP::reportData() {
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
+
     if (mMmapStream == nullptr) {
         // This must not happen
         ALOGE("%s() invalid state, mmap stream is not initialized", __func__);
         return;
     }
+
     auto fifo = mAudioDataWrapper->getFifoBuffer();
     if (fifo == nullptr) {
         ALOGE("%s() fifo buffer is not initialized, cannot report data", __func__);

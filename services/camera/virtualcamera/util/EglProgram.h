@@ -46,6 +46,7 @@ class EglProgram {
 class EglTestPatternProgram : public EglProgram {
  public:
   EglTestPatternProgram();
+  virtual ~EglTestPatternProgram();
 
   bool draw(std::chrono::nanoseconds timestamp);
 
