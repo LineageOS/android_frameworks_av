@@ -490,10 +490,11 @@ public:
                                    size_t bufferSize,
                                    audio_output_flags_t flags,
                                    const Timeout& timeout = {},
-                                   size_t frameCountToBeReady = 1 /** Default behaviour is to start
+                                   size_t frameCountToBeReady = 1, /** Default behaviour is to start
                                                                     *  as soon as possible to have
                                                                     *  the lowest possible latency
-                                                                    *  even if it might glitch. */);
+                                                                    *  even if it might glitch. */
+                                   float speed = 1.0f);
     ~PatchTrack() override;
 
     size_t framesReady() const final;
