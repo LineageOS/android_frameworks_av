@@ -72,6 +72,7 @@
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
 #include <media/nbaio/SourceAudioBufferProvider.h>
+#include <media/ValidatedAttributionSourceState.h>
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/Process.h>
 #include <mediautils/SchedulingPolicyService.h>
@@ -119,6 +120,8 @@ static inline T min(const T& a, const T& b)
 {
     return a < b ? a : b;
 }
+
+using com::android::media::permission::ValidatedAttributionSourceState;
 
 namespace android {
 
@@ -10291,8 +10294,23 @@ status_t MmapThread::start(const AudioClient& client,
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
 
     audio_io_handle_t io = mId;
-    const AttributionSourceState adjAttributionSource = afutils::checkAttributionSourcePackage(
-            client.attributionSource);
+    AttributionSourceState adjAttributionSource;
+    if (!com::android::media::audio::audioserver_permissions()) {
+        adjAttributionSource = afutils::checkAttributionSourcePackage(
+                client.attributionSource);
+    } else {
+        // TODO(b/342475009) validate in oboeservice, and plumb downwards
+        auto validatedRes = ValidatedAttributionSourceState::createFromTrustedUidNoPackage(
+                    client.attributionSource,
+                    mAfThreadCallback->getPermissionProvider()
+                );
+        if (!validatedRes.has_value()) {
+            ALOGE("MMAP client package validation fail: %s",
+                    validatedRes.error().toString8().c_str());
+            return aidl_utils::statusTFromBinderStatus(validatedRes.error());
+        }
+        adjAttributionSource = std::move(validatedRes.value()).unwrapInto();
+    }
 
     const auto localSessionId = mSessionId;
     auto localAttr = mAttr;
