@@ -4566,6 +4566,10 @@ NO_THREAD_SAFETY_ANALYSIS
             if ((pt->type() == IAfThreadBase::MIXER || pt->type() == IAfThreadBase::OFFLOAD) &&
                     ((sessionType & IAfThreadBase::EFFECT_SESSION) != 0)) {
                 srcThread = pt.get();
+                if (srcThread == dstThread) {
+                    ALOGD("%s() same dst and src threads, ignoring move", __func__);
+                    return NO_ERROR;
+                }
                 ALOGW("%s() found srcOutput %d hosting AUDIO_SESSION_OUTPUT_MIX", __func__,
                       pt->id());
                 break;
