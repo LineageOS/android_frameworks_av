@@ -17,10 +17,17 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaPlayerService-DeathNotifier"
 #include <android-base/logging.h>
+#include <map>
 
 #include "DeathNotifier.h"
 
 namespace android {
+
+// Only dereference the cookie if it's valid (if it's in this set)
+// Only used with ndk
+static uintptr_t sCookieKeyCounter = 0;
+static std::map<uintptr_t, wp<DeathNotifier::DeathRecipient>> sCookies;
+static std::mutex sCookiesMutex;
 
 class DeathNotifier::DeathRecipient :
         public IBinder::DeathRecipient,
@@ -44,13 +51,32 @@ public:
     }
 
     static void OnBinderDied(void *cookie) {
-        DeathRecipient *thiz = (DeathRecipient *)cookie;
-        thiz->mNotify();
+        std::unique_lock<std::mutex> guard(sCookiesMutex);
+        if (auto it = sCookies.find(reinterpret_cast<uintptr_t>(cookie)); it != sCookies.end()) {
+            sp<DeathRecipient> recipient = it->second.promote();
+            sCookies.erase(it);
+            guard.unlock();
+
+            if (recipient) {
+                LOG(INFO) << "Notifying DeathRecipient from OnBinderDied.";
+                recipient->mNotify();
+            } else {
+                LOG(INFO) <<
+                    "Tried to notify DeathRecipient from OnBinderDied but could not promote.";
+            }
+        }
     }
 
     AIBinder_DeathRecipient *getNdkRecipient() {
         return mNdkRecipient.get();;
     }
+    ~DeathRecipient() {
+        // lock must be taken so object is not used in OnBinderDied"
+        std::lock_guard<std::mutex> guard(sCookiesMutex);
+        sCookies.erase(mCookieKey);
+    }
+
+    uintptr_t mCookieKey;
 
 private:
     Notify mNotify;
@@ -73,8 +99,15 @@ DeathNotifier::DeathNotifier(::ndk::SpAIBinder const& service, Notify const& not
       : mService{std::in_place_index<3>, service},
         mDeathRecipient{new DeathRecipient(notify)} {
     mDeathRecipient->initNdk();
+    {
+        std::lock_guard<std::mutex> guard(sCookiesMutex);
+        mDeathRecipient->mCookieKey = sCookieKeyCounter++;
+        sCookies[mDeathRecipient->mCookieKey] = mDeathRecipient;
+    }
     AIBinder_linkToDeath(
-            service.get(), mDeathRecipient->getNdkRecipient(), mDeathRecipient.get());
+            service.get(),
+            mDeathRecipient->getNdkRecipient(),
+            reinterpret_cast<void*>(mDeathRecipient->mCookieKey));
 }
 
 DeathNotifier::DeathNotifier(DeathNotifier&& other)
@@ -94,10 +127,11 @@ DeathNotifier::~DeathNotifier() {
         std::get<2>(mService)->unlinkToDeath(mDeathRecipient);
         break;
     case 3:
+
         AIBinder_unlinkToDeath(
                 std::get<3>(mService).get(),
                 mDeathRecipient->getNdkRecipient(),
-                mDeathRecipient.get());
+                reinterpret_cast<void*>(mDeathRecipient->mCookieKey));
         break;
     default:
         CHECK(false) << "Corrupted service type during destruction.";
