@@ -93,16 +93,16 @@ EglDisplayContext::EglDisplayContext(std::shared_ptr<ANativeWindow> nativeWindow
 }
 
 EglDisplayContext::~EglDisplayContext() {
+  eglMakeCurrent(mEglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
   if (mEglSurface != EGL_NO_SURFACE) {
     eglDestroySurface(mEglDisplay, mEglSurface);
-  }
-  if (mEglDisplay != EGL_NO_DISPLAY) {
-    eglTerminate(mEglDisplay);
   }
   if (mEglContext != EGL_NO_CONTEXT) {
     eglDestroyContext(mEglDisplay, mEglContext);
   }
-  eglReleaseThread();
+  if (mEglDisplay != EGL_NO_DISPLAY) {
+    eglTerminate(mEglDisplay);
+  }
 }
 
 EGLDisplay EglDisplayContext::getEglDisplay() const {

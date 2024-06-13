@@ -229,6 +229,15 @@ EglTestPatternProgram::EglTestPatternProgram() {
                         kTextureCoords.size(), kTextureCoords.data());
 }
 
+EglTestPatternProgram::~EglTestPatternProgram() {
+  if (mPositionHandle != -1) {
+    glDisableVertexAttribArray(mPositionHandle);
+  }
+  if (mTextureCoordHandle != -1) {
+    glDisableVertexAttribArray(mTextureCoordHandle);
+  }
+}
+
 bool EglTestPatternProgram::draw(const std::chrono::nanoseconds timestamp) {
   // Load compiled shader.
   glUseProgram(mProgram);
