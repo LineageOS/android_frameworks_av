@@ -3917,7 +3917,8 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
                                                        patchRecord->bufferSize(),
                                                        outputFlags,
                                                        0ns /* timeout */,
-                                                       frameCountToBeReady);
+                                                       frameCountToBeReady,
+                                                       track->getSpeed());
         status = patchTrack->initCheck();
         if (status != NO_ERROR) {
             ALOGE("Secondary output patchTrack init failed: %d", status);
