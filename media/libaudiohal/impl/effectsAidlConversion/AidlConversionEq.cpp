@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <unordered_set>
 #define LOG_TAG "AidlConversionEQ"
 //#define LOG_NDEBUG 0
 
@@ -262,10 +263,21 @@ status_t AidlConversionEq::getParameter(EffectParamWriter& param) {
         }
         case EQ_PARAM_GET_NUM_OF_PRESETS: {
             Parameter aidlParam = VALUE_OR_RETURN_STATUS(getAidlParameter(Equalizer::presets));
-            const auto& presets = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
+            auto presets = VALUE_OR_RETURN_STATUS(GET_PARAMETER_SPECIFIC_FIELD(
                     aidlParam, Equalizer, equalizer, Equalizer::presets,
                     std::vector<Equalizer::Preset>));
-            uint16_t num = presets.size();
+            // it was assumed the presets index in the range of [0, NUM_OF_PRESETS - 1], so
+            // filter out presets out of this range (one example is preset {-1, "custom"})
+            std::erase_if(presets, [](const auto& preset) { return preset.index < 0; });
+            // validate remaining indexes are unique [0, num - 1]
+            std::unordered_set<uint16_t> uniqueIndices;
+            const uint16_t num = presets.size();
+            for (const auto& preset : presets) {
+                if (preset.index >= num || 0 != uniqueIndices.count(preset.index)) {
+                    return BAD_VALUE;
+                }
+                uniqueIndices.insert(preset.index);
+            }
             return param.writeToValue(&num);
         }
         case EQ_PARAM_GET_PRESET_NAME: {
