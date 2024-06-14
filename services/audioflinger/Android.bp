@@ -213,7 +213,6 @@ cc_library {
     ],
 
     static_libs: [
-        "audiopermissioncontroller",
         "libcpustats",
         "libpermission",
     ],

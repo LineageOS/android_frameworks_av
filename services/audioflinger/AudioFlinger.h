@@ -407,8 +407,6 @@ private:
     void onHardError(std::set<audio_port_handle_t>& trackPortIds) final
             EXCLUDES_AudioFlinger_ClientMutex;
 
-    const ::com::android::media::permission::IPermissionProvider& getPermissionProvider() final;
-
     // ---- end of IAfThreadCallback interface
 
     /* List available audio ports and their attributes */
