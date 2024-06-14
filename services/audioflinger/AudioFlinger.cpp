@@ -39,17 +39,13 @@
 #include <binder/IServiceManager.h>
 #include <binder/Parcel.h>
 #include <cutils/properties.h>
-#include <com_android_media_audio.h>
 #include <com_android_media_audioserver.h>
 #include <media/AidlConversion.h>
 #include <media/AudioParameter.h>
 #include <media/AudioValidator.h>
 #include <media/IMediaLogService.h>
-#include <media/IPermissionProvider.h>
 #include <media/MediaMetricsItem.h>
-#include <media/NativePermissionController.h>
 #include <media/TypeConverter.h>
-#include <media/ValidatedAttributionSourceState.h>
 #include <mediautils/BatteryNotifier.h>
 #include <mediautils/MemoryLeakTrackUtil.h>
 #include <mediautils/MethodStatistics.h>
@@ -85,17 +81,12 @@
 namespace android {
 
 using ::android::base::StringPrintf;
-using aidl_utils::statusTFromBinderStatus;
 using media::IEffectClient;
 using media::audio::common::AudioMMapPolicyInfo;
 using media::audio::common::AudioMMapPolicyType;
 using media::audio::common::AudioMode;
 using android::content::AttributionSourceState;
 using android::detail::AudioHalVersionInfo;
-using com::android::media::permission::INativePermissionController;
-using com::android::media::permission::IPermissionProvider;
-using com::android::media::permission::NativePermissionController;
-using com::android::media::permission::ValidatedAttributionSourceState;
 
 static const AudioHalVersionInfo kMaxAAudioPropertyDeviceHalVersion =
         AudioHalVersionInfo(AudioHalVersionInfo::Type::HIDL, 7, 1);
@@ -126,36 +117,6 @@ static void sMediaLogInit()
         sMediaLogService = interface_cast<IMediaLogService>(sMediaLogServiceAsBinder);
     }
 }
-
-static error::BinderResult<ValidatedAttributionSourceState>
-validateAttributionFromContextOrTrustedCaller(AttributionSourceState attr,
-        const IPermissionProvider& provider) {
-    const auto callingUid = IPCThreadState::self()->getCallingUid();
-    // We trust the following UIDs to appropriate validated identities above us
-    if (isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
-        // Legacy paths may not properly populate package name, so we attempt to handle.
-        if (!attr.packageName.has_value() || attr.packageName.value() == "") {
-            ALOGW("Trusted client %d provided attr with missing package name" , callingUid);
-            attr.packageName = VALUE_OR_RETURN(provider.getPackagesForUid(callingUid))[0];
-        }
-        return ValidatedAttributionSourceState::createFromTrustedSource(std::move(attr));
-    } else {
-        return ValidatedAttributionSourceState::createFromBinderContext(std::move(attr), provider);
-    }
-}
-
-#define VALUE_OR_RETURN_CONVERTED(exp)                                                \
-    ({                                                                                \
-        auto _tmp = (exp);                                                            \
-        if (!_tmp.ok()) {                                                             \
-            ALOGE("Function: %s Line: %d Failed result (%s)", __FUNCTION__, __LINE__, \
-                  errorToString(_tmp.error()).c_str());                               \
-            return statusTFromBinderStatus(_tmp.error());                             \
-        }                                                                             \
-        std::move(_tmp.value());                                                      \
-    })
-
-
 
 // Creates association between Binder code to name for IAudioFlinger.
 #define IAUDIOFLINGER_BINDER_METHOD_MACRO_LIST \
@@ -555,42 +516,30 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     audio_attributes_t localAttr = *attr;
 
     // TODO b/182392553: refactor or make clearer
-    AttributionSourceState adjAttributionSource;
-    if (!com::android::media::audio::audioserver_permissions()) {
-        pid_t clientPid =
-            VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(client.attributionSource.pid));
-        bool updatePid = (clientPid == (pid_t)-1);
-        const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    pid_t clientPid =
+        VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(client.attributionSource.pid));
+    bool updatePid = (clientPid == (pid_t)-1);
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
 
-        adjAttributionSource = client.attributionSource;
-        if (!isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
-            uid_t clientUid =
-                VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(client.attributionSource.uid));
-            ALOGW_IF(clientUid != callingUid,
-                    "%s uid %d tried to pass itself off as %d",
-                    __FUNCTION__, callingUid, clientUid);
-            adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_uid_t_int32_t(callingUid));
-            updatePid = true;
-        }
-        if (updatePid) {
-            const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-            ALOGW_IF(clientPid != (pid_t)-1 && clientPid != callingPid,
-                     "%s uid %d pid %d tried to pass itself off as pid %d",
-                     __func__, callingUid, callingPid, clientPid);
-            adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_pid_t_int32_t(callingPid));
-        }
-        adjAttributionSource = afutils::checkAttributionSourcePackage(
-            adjAttributionSource);
-    } else {
-        auto validatedAttrSource = VALUE_OR_RETURN_CONVERTED(
-                validateAttributionFromContextOrTrustedCaller(client.attributionSource,
-                getPermissionProvider()
-                ));
-        // TODO pass wrapped object around
-        adjAttributionSource = std::move(validatedAttrSource).unwrapInto();
+    AttributionSourceState adjAttributionSource = client.attributionSource;
+    if (!isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
+        uid_t clientUid =
+            VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(client.attributionSource.uid));
+        ALOGW_IF(clientUid != callingUid,
+                "%s uid %d tried to pass itself off as %d",
+                __FUNCTION__, callingUid, clientUid);
+        adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+        updatePid = true;
     }
+    if (updatePid) {
+        const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+        ALOGW_IF(clientPid != (pid_t)-1 && clientPid != callingPid,
+                 "%s uid %d pid %d tried to pass itself off as pid %d",
+                 __func__, callingUid, callingPid, clientPid);
+        adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
+    }
+    adjAttributionSource = afutils::checkAttributionSourcePackage(
+            adjAttributionSource);
 
     if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
         audio_config_t fullConfig = AUDIO_CONFIG_INITIALIZER;
@@ -1045,54 +994,36 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
     bool isSpatialized = false;
     bool isBitPerfect = false;
 
+    // TODO b/182392553: refactor or make clearer
+    pid_t clientPid =
+        VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(input.clientInfo.attributionSource.pid));
+    bool updatePid = (clientPid == (pid_t)-1);
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    uid_t clientUid =
+        VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(input.clientInfo.attributionSource.uid));
     audio_io_handle_t effectThreadId = AUDIO_IO_HANDLE_NONE;
     std::vector<int> effectIds;
     audio_attributes_t localAttr = input.attr;
 
-    AttributionSourceState adjAttributionSource;
-    pid_t clientPid;
-    pid_t callingPid;
-    if (!com::android::media::audio::audioserver_permissions()) {
-        adjAttributionSource = input.clientInfo.attributionSource;
-        const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-        uid_t clientUid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(
-                        input.clientInfo.attributionSource.uid));
-        clientPid =
-            VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(
-                        input.clientInfo.attributionSource.pid));
-        bool updatePid = (clientPid == (pid_t)-1);
-
-        if (!isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
-            ALOGW_IF(clientUid != callingUid,
-                    "%s uid %d tried to pass itself off as %d",
-                    __FUNCTION__, callingUid, clientUid);
-            adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_uid_t_int32_t(callingUid));
-            clientUid = callingUid;
-            updatePid = true;
-        }
-        callingPid = IPCThreadState::self()->getCallingPid();
-        if (updatePid) {
-            ALOGW_IF(clientPid != (pid_t)-1 && clientPid != callingPid,
-                     "%s uid %d pid %d tried to pass itself off as pid %d",
-                     __func__, callingUid, callingPid, clientPid);
-            clientPid = callingPid;
-            adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_pid_t_int32_t(callingPid));
-        }
-        adjAttributionSource = afutils::checkAttributionSourcePackage(
-                adjAttributionSource);
-
-    } else {
-        auto validatedAttrSource = VALUE_OR_RETURN_CONVERTED(
-                validateAttributionFromContextOrTrustedCaller(input.clientInfo.attributionSource,
-                getPermissionProvider()
-                ));
-        // TODO pass wrapped object around
-        adjAttributionSource = std::move(validatedAttrSource).unwrapInto();
-        clientPid = adjAttributionSource.pid;
-        callingPid = adjAttributionSource.pid;
+    AttributionSourceState adjAttributionSource = input.clientInfo.attributionSource;
+    if (!isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
+        ALOGW_IF(clientUid != callingUid,
+                "%s uid %d tried to pass itself off as %d",
+                __FUNCTION__, callingUid, clientUid);
+        adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+        clientUid = callingUid;
+        updatePid = true;
     }
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+    if (updatePid) {
+        ALOGW_IF(clientPid != (pid_t)-1 && clientPid != callingPid,
+                 "%s uid %d pid %d tried to pass itself off as pid %d",
+                 __func__, callingUid, callingPid, clientPid);
+        clientPid = callingPid;
+        adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
+    }
+    adjAttributionSource = afutils::checkAttributionSourcePackage(
+            adjAttributionSource);
 
     audio_session_t sessionId = input.sessionId;
     if (sessionId == AUDIO_SESSION_ALLOCATE) {
@@ -2265,12 +2196,6 @@ void AudioFlinger::onHardError(std::set<audio_port_handle_t>& trackPortIds) {
     }
 }
 
-const IPermissionProvider& AudioFlinger::getPermissionProvider() {
-    // This is inited as part of service construction, prior to binder registration,
-    // so it should always be non-null.
-    return mAudioPolicyServiceLocal.load()->getPermissionProvider();
-}
-
 // removeClient_l() must be called with AudioFlinger::clientMutex() held
 void AudioFlinger::removeClient_l(pid_t pid)
 {
@@ -2380,45 +2305,30 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     output.buffers.clear();
     output.inputId = AUDIO_IO_HANDLE_NONE;
 
-    AttributionSourceState adjAttributionSource;
-    pid_t callingPid;
-    if (!com::android::media::audio::audioserver_permissions()) {
-        adjAttributionSource = input.clientInfo.attributionSource;
-        bool updatePid = (adjAttributionSource.pid == -1);
-        const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-        const uid_t currentUid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(
-               adjAttributionSource.uid));
-        if (!isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
-            ALOGW_IF(currentUid != callingUid,
-                    "%s uid %d tried to pass itself off as %d",
-                    __FUNCTION__, callingUid, currentUid);
-            adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_uid_t_int32_t(callingUid));
-            updatePid = true;
-        }
-        callingPid = IPCThreadState::self()->getCallingPid();
-        const pid_t currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(
-                adjAttributionSource.pid));
-        if (updatePid) {
-            ALOGW_IF(currentPid != (pid_t)-1 && currentPid != callingPid,
-                     "%s uid %d pid %d tried to pass itself off as pid %d",
-                     __func__, callingUid, callingPid, currentPid);
-            adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_pid_t_int32_t(callingPid));
-        }
-        adjAttributionSource = afutils::checkAttributionSourcePackage(
-                adjAttributionSource);
-    } else {
-        auto validatedAttrSource = VALUE_OR_RETURN_CONVERTED(
-                validateAttributionFromContextOrTrustedCaller(
-                    input.clientInfo.attributionSource,
-                    getPermissionProvider()
-                    ));
-        // TODO pass wrapped object around
-        adjAttributionSource = std::move(validatedAttrSource).unwrapInto();
-        callingPid = adjAttributionSource.pid;
+    // TODO b/182392553: refactor or clean up
+    AttributionSourceState adjAttributionSource = input.clientInfo.attributionSource;
+    bool updatePid = (adjAttributionSource.pid == -1);
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    const uid_t currentUid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(
+           adjAttributionSource.uid));
+    if (!isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
+        ALOGW_IF(currentUid != callingUid,
+                "%s uid %d tried to pass itself off as %d",
+                __FUNCTION__, callingUid, currentUid);
+        adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+        updatePid = true;
     }
-
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+    const pid_t currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(
+            adjAttributionSource.pid));
+    if (updatePid) {
+        ALOGW_IF(currentPid != (pid_t)-1 && currentPid != callingPid,
+                 "%s uid %d pid %d tried to pass itself off as pid %d",
+                 __func__, callingUid, callingPid, currentPid);
+        adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
+    }
+    adjAttributionSource = afutils::checkAttributionSourcePackage(
+            adjAttributionSource);
     // further format checks are performed by createRecordTrack_l()
     if (!audio_is_valid_format(input.config.format)) {
         ALOGE("createRecord() invalid format %#x", input.config.format);
@@ -4203,33 +4113,20 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
     int idOut = -1;
 
     status_t lStatus = NO_ERROR;
-    uid_t callingUid;
-    pid_t currentPid;
-    if (!com::android::media::audio::audioserver_permissions()) {
-        callingUid = IPCThreadState::self()->getCallingUid();
-        adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
-        currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(adjAttributionSource.pid));
-        if (currentPid == -1 || !isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
-            const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-            ALOGW_IF(currentPid != -1 && currentPid != callingPid,
-                     "%s uid %d pid %d tried to pass itself off as pid %d",
-                     __func__, callingUid, callingPid, currentPid);
-            adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_pid_t_int32_t(callingPid));
-            currentPid = callingPid;
-        }
-        adjAttributionSource = afutils::checkAttributionSourcePackage(adjAttributionSource);
-    } else {
-        auto validatedAttrSource = VALUE_OR_RETURN_CONVERTED(
-                validateAttributionFromContextOrTrustedCaller(request.attributionSource,
-                getPermissionProvider()
-                ));
-        // TODO pass wrapped object around
-        adjAttributionSource = std::move(validatedAttrSource).unwrapInto();
-        callingUid = adjAttributionSource.uid;
-        currentPid = adjAttributionSource.pid;
-    }
 
+    // TODO b/182392553: refactor or make clearer
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+    pid_t currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(adjAttributionSource.pid));
+    if (currentPid == -1 || !isAudioServerOrMediaServerOrSystemServerOrRootUid(callingUid)) {
+        const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+        ALOGW_IF(currentPid != -1 && currentPid != callingPid,
+                 "%s uid %d pid %d tried to pass itself off as pid %d",
+                 __func__, callingUid, callingPid, currentPid);
+        adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
+        currentPid = callingPid;
+    }
+    adjAttributionSource = afutils::checkAttributionSourcePackage(adjAttributionSource);
 
     ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d, factory %p",
           adjAttributionSource.pid, effectClient.get(), priority, sessionId, io,
