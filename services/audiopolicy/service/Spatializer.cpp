@@ -291,6 +291,7 @@ Spatializer::Spatializer(effect_descriptor_t engineDescriptor, SpatializerPolicy
       mPolicyCallback(callback) {
     ALOGV("%s", __func__);
     setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_AUDIO);
+    setInheritRt(true);
 }
 
 void Spatializer::onFirstRef() {
