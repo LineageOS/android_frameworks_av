@@ -43,6 +43,28 @@ using stats::media_metrics::\
     MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_NO_CLIENTS;
 using stats::media_metrics::\
     MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_RECLAIM_RESOURCES;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_UNSPECIFIED;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_AUDIO;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_VIDEO;
+using stats::media_metrics::MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_IMAGE;
+
+// Map MediaResourceSubType to stats::media_metrics::CodecType
+inline int32_t getMetricsCodecType(MediaResourceSubType codecType) {
+    switch (codecType) {
+        case MediaResourceSubType::kHwAudioCodec:
+        case MediaResourceSubType::kSwAudioCodec:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_AUDIO;
+        case MediaResourceSubType::kHwVideoCodec:
+        case MediaResourceSubType::kSwVideoCodec:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_VIDEO;
+        case MediaResourceSubType::kHwImageCodec:
+        case MediaResourceSubType::kSwImageCodec:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_IMAGE;
+        case MediaResourceSubType::kUnspecifiedSubType:
+            return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_UNSPECIFIED;
+    }
+    return MEDIA_CODEC_STARTED__CODEC_TYPE__CODEC_TYPE_UNSPECIFIED;
+}
 
 inline const char* getCodecType(MediaResourceSubType codecType) {
     switch (codecType) {
@@ -229,7 +251,7 @@ void ResourceManagerMetrics::notifyClientStarted(const ClientConfigParcel& clien
          clientConfig.clientInfo.uid,
          clientConfig.id,
          clientConfig.clientInfo.name.c_str(),
-         static_cast<int32_t>(clientConfig.codecType),
+         getMetricsCodecType(clientConfig.codecType),
          clientConfig.isEncoder,
          isHardwareCodec(clientConfig.codecType),
          clientConfig.width, clientConfig.height,
@@ -311,7 +333,7 @@ void ResourceManagerMetrics::notifyClientStopped(const ClientConfigParcel& clien
          clientConfig.clientInfo.uid,
          clientConfig.id,
          clientConfig.clientInfo.name.c_str(),
-         static_cast<int32_t>(clientConfig.codecType),
+         getMetricsCodecType(clientConfig.codecType),
          clientConfig.isEncoder,
          isHardwareCodec(clientConfig.codecType),
          clientConfig.width, clientConfig.height,
@@ -425,6 +447,42 @@ void ResourceManagerMetrics::pushConcurrentUsageReport(int32_t pid, uid_t uid) {
 #endif
 }
 
+inline void pushReclaimStats(int32_t callingPid,
+                             int32_t requesterUid,
+                             int requesterPriority,
+                             const std::string& clientName,
+                             int32_t noOfConcurrentCodecs,
+                             int32_t reclaimStatus,
+                             int32_t noOfCodecsReclaimed = 0,
+                             int32_t targetIndex = -1,
+                             int32_t targetClientPid = -1,
+                             int32_t targetClientUid = -1,
+                             int32_t targetPriority = -1) {
+    // Post the pushed atom
+    int result = stats_write(
+        MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED,
+        requesterUid,
+        requesterPriority,
+        clientName.c_str(),
+        noOfConcurrentCodecs,
+        reclaimStatus,
+        noOfCodecsReclaimed,
+        targetIndex,
+        targetClientUid,
+        targetPriority);
+    ALOGI("%s: Pushed MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED atom: "
+          "Requester[pid(%d): uid(%d): priority(%d)] "
+          "Codec: [%s] "
+          "No of concurrent codecs: %d "
+          "Reclaim Status: %d "
+          "No of codecs reclaimed: %d "
+          "Target[%d][pid(%d): uid(%d): priority(%d)] result: %d",
+          __func__, callingPid, requesterUid, requesterPriority,
+              clientName.c_str(), noOfConcurrentCodecs,
+          reclaimStatus, noOfCodecsReclaimed,
+          targetIndex, targetClientPid, targetClientUid, targetPriority, result);
+}
+
 void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
                                              const std::vector<int>& priorities,
                                              const std::vector<ClientInfo>& targetClients,
@@ -463,33 +521,34 @@ void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
             MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_FAILED_RECLAIM_RESOURCES;
       }
     }
+
+    if (targetClients.empty()) {
+        // Push the reclaim atom to stats.
+        pushReclaimStats(callingPid,
+                         requesterUid,
+                         requesterPriority,
+                         clientName,
+                         noOfConcurrentCodecs,
+                         reclaimStatus);
+        return;
+    }
+
     int32_t noOfCodecsReclaimed = targetClients.size();
     int32_t targetIndex = 1;
     for (const ClientInfo& targetClient : targetClients) {
         int targetPriority = priorities[targetIndex];
-        // Post the pushed atom
-        int result = stats_write(
-            MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED,
-            requesterUid,
-            requesterPriority,
-            clientName.c_str(),
-            noOfConcurrentCodecs,
-            reclaimStatus,
-            noOfCodecsReclaimed,
-            targetIndex,
-            targetClient.mUid,
-            targetPriority);
-        ALOGI("%s: Pushed MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED atom: "
-              "Requester[pid(%d): uid(%d): priority(%d)] "
-              "Codec: [%s] "
-              "No of concurrent codecs: %d "
-              "Reclaim Status: %d "
-              "No of codecs reclaimed: %d "
-              "Target[%d][pid(%d): uid(%d): priority(%d)] result: %d",
-              __func__, callingPid, requesterUid, requesterPriority,
-              clientName.c_str(), noOfConcurrentCodecs,
-              reclaimStatus, noOfCodecsReclaimed,
-              targetIndex, targetClient.mPid, targetClient.mUid, targetPriority, result);
+        // Push the reclaim atom to stats.
+        pushReclaimStats(callingPid,
+                         requesterUid,
+                         requesterPriority,
+                         clientName,
+                         noOfConcurrentCodecs,
+                         reclaimStatus,
+                         noOfCodecsReclaimed,
+                         targetIndex,
+                         targetClient.mPid,
+                         targetClient.mUid,
+                         targetPriority);
         targetIndex++;
     }
 }

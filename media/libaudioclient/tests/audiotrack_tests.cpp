@@ -15,10 +15,13 @@
  */
 
 //#define LOG_NDEBUG 0
+#define LOG_TAG "AudioTrackTests"
 
+#include <binder/ProcessState.h>
 #include <gtest/gtest.h>
 
 #include "audio_test_utils.h"
+#include "test_execution_tracer.h"
 
 using namespace android;
 
@@ -209,3 +212,10 @@ INSTANTIATE_TEST_SUITE_P(
                                              AUDIO_OUTPUT_FLAG_RAW | AUDIO_OUTPUT_FLAG_FAST,
                                              AUDIO_OUTPUT_FLAG_DEEP_BUFFER),
                            ::testing::Values(AUDIO_SESSION_NONE)));
+
+int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
+}

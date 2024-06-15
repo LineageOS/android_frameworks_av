@@ -436,9 +436,11 @@ public:
                 // ThreadBase mutex before processing the mixer and effects. This guarantees the
                 // integrity of the chains during the process.
                 // Also sets the parameter 'effectChains' to current value of mEffectChains.
-    void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains) final REQUIRES(mutex());
+    void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains) final
+            REQUIRES(audio_utils::ThreadBase_Mutex) ACQUIRE(audio_utils::EffectChain_Mutex);
                 // unlock effect chains after process
-    void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains) final;
+    void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains) final
+            RELEASE(audio_utils::EffectChain_Mutex);
                 // get a copy of mEffectChains vector
     Vector<sp<IAfEffectChain>> getEffectChains_l() const final REQUIRES(mutex()) {
         return mEffectChains;
@@ -599,6 +601,35 @@ protected:
                 // check if some effects must be suspended when an effect chain is added
     void checkSuspendOnAddEffectChain_l(const sp<IAfEffectChain>& chain) REQUIRES(mutex());
 
+    /**
+     * waitWhileThreadBusy_l() serves as a mutex gate, which does not allow
+     * progress beyond the method while the PlaybackThread is busy (see setThreadBusy_l()).
+     * During the wait, the ThreadBase_Mutex is temporarily unlocked.
+     *
+     * This implementation uses a condition variable.  Alternative methods to gate
+     * the thread may use a second mutex (i.e. entry based on scoped_lock(mutex, gating_mutex)),
+     * but those have less flexibility and more lock order issues.
+     *
+     * Current usage by Track::destroy(), Track::start(), Track::stop(), Track::pause(),
+     * and Track::flush() block this way, and the primary caller is through TrackHandle
+     * with no other mutexes held.
+     *
+     * Special tracks like PatchTrack and OutputTrack may also hold the another thread's
+     * ThreadBase_Mutex during this time.  No other mutex is held.
+     */
+
+    void waitWhileThreadBusy_l(audio_utils::unique_lock& ul) final REQUIRES(mutex()) {
+        // the wait returns immediately if the predicate is satisfied.
+        mThreadBusyCv.wait(ul, [&]{ return mThreadBusy == false;});
+    }
+
+    void setThreadBusy_l(bool busy) REQUIRES(mutex()) {
+        if (busy == mThreadBusy) return;
+        mThreadBusy = busy;
+        if (busy == true) return;  // no need to wake threads if we become busy.
+        mThreadBusyCv.notify_all();
+    }
+
                 // sends the metadata of the active tracks to the HAL
                 struct MetadataUpdate {
                     std::vector<playback_track_metadata_v7_t> playbackMetadataUpdate;
@@ -640,6 +671,13 @@ protected:
                 const sp<IAfThreadCallback>  mAfThreadCallback;
                 ThreadMetrics           mThreadMetrics;
                 const bool              mIsOut;
+
+    // mThreadBusy is checked under the ThreadBase_Mutex to ensure that
+    // TrackHandle operations do not proceed while the ThreadBase is busy
+    // with the track.  mThreadBusy is only true if the track is active.
+    //
+    bool mThreadBusy = false; // GUARDED_BY(ThreadBase_Mutex) but read in lambda.
+    audio_utils::condition_variable mThreadBusyCv;
 
                 // updated by PlaybackThread::readOutputParameters_l() or
                 // RecordThread::readInputParameters_l()
@@ -839,7 +877,7 @@ protected:
 
                 SimpleLog mLocalLog;  // locked internally
 
-private:
+    private:
     void dumpBase_l(int fd, const Vector<String16>& args) REQUIRES(mutex());
     void dumpEffectChains_l(int fd, const Vector<String16>& args) REQUIRES(mutex());
 };
@@ -926,7 +964,7 @@ public:  // AsyncCallbackThread
 protected:
     // StreamHalInterfaceCodecFormatCallback implementation
                 void        onCodecFormatChanged(
-            const std::basic_string<uint8_t>& metadataBs) final;
+            const std::vector<uint8_t>& metadataBs) final;
 
     // ThreadBase virtuals
     void preExit() final EXCLUDES_ThreadBase_Mutex;

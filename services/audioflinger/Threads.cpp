@@ -47,6 +47,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/PersistableBundle.h>
+#include <com_android_media_audio.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <fastpath/AutoPark.h>
@@ -185,7 +186,7 @@ static const nsecs_t kDirectMinSleepTimeUs = 10000;
 // Minimum amount of time between checking to see if the timestamp is advancing
 // for underrun detection. If we check too frequently, we may not detect a
 // timestamp update and will falsely detect underrun.
-static const nsecs_t kMinimumTimeBetweenTimestampChecksNs = 150 /* ms */ * 1000;
+static constexpr nsecs_t kMinimumTimeBetweenTimestampChecksNs = 150 /* ms */ * 1'000'000;
 
 // The universal constant for ubiquitous 20ms value. The value of 20ms seems to provide a good
 // balance between power consumption and latency, and allows threads to be scheduled reliably
@@ -222,6 +223,8 @@ static const enum {
 static const int kPriorityAudioApp = 2;
 static const int kPriorityFastMixer = 3;
 static const int kPriorityFastCapture = 3;
+// Request real-time priority for PlaybackThread in ARC
+static const int kPriorityPlaybackThreadArc = 1;
 
 // IAudioFlinger::createTrack() has an in/out parameter 'pFrameCount' for the total size of the
 // track buffer in shared memory.  Zero on input means to use a default value.  For fast tracks,
@@ -721,8 +724,9 @@ NO_THREAD_SAFETY_ANALYSIS  // condition variable
     {
         audio_utils::unique_lock _l(event->mutex());
         while (event->mWaitStatus) {
-            if (event->mCondition.wait_for(_l, std::chrono::nanoseconds(kConfigEventTimeoutNs))
-                        == std::cv_status::timeout) {
+            if (event->mCondition.wait_for(
+                    _l, std::chrono::nanoseconds(kConfigEventTimeoutNs), getTid())
+                            == std::cv_status::timeout) {
                 event->mStatus = TIMED_OUT;
                 event->mWaitStatus = false;
             }
@@ -1483,7 +1487,7 @@ status_t PlaybackThread::checkEffectCompatibility_l(
         return BAD_VALUE;
     }
 
-    if (memcmp(&desc->type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0
+    if (IAfEffectModule::isSpatializer(&desc->type)
             && mType != SPATIALIZER) {
         ALOGW("%s: attempt to create a spatializer effect on a thread of type %d",
                 __func__, mType);
@@ -1571,7 +1575,7 @@ status_t PlaybackThread::checkEffectCompatibility_l(
             return BAD_VALUE;
         } else if (sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
             // only post processing , downmixer or spatializer effects on output stage session
-            if (memcmp(&desc->type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0
+            if (IAfEffectModule::isSpatializer(&desc->type)
                     || memcmp(&desc->type, EFFECT_UIID_DOWNMIX, sizeof(effect_uuid_t)) == 0) {
                 break;
             }
@@ -1690,7 +1694,7 @@ sp<IAfEffectHandle> ThreadBase::createEffect_l(
                     std::move(mAfThreadCallback->getDefaultVibratorInfo_l());
             if (defaultVibratorInfo) {
                 // Only set the vibrator info when it is a valid one.
-                effect->setVibratorInfo(*defaultVibratorInfo);
+                effect->setVibratorInfo_l(*defaultVibratorInfo);
             }
         }
         // create effect handle and connect it to effect module
@@ -1792,7 +1796,7 @@ sp<IAfEffectModule> ThreadBase::getEffect_l(audio_session_t sessionId,
 std::vector<int> ThreadBase::getEffectIds_l(audio_session_t sessionId) const
 {
     sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
-    return chain != nullptr ? chain->getEffectIds() : std::vector<int>{};
+    return chain != nullptr ? chain->getEffectIds_l() : std::vector<int>{};
 }
 
 // PlaybackThread::addEffect_ll() must be called with AudioFlinger::mutex() and
@@ -1824,7 +1828,7 @@ status_t ThreadBase::addEffect_ll(const sp<IAfEffectModule>& effect)
         return BAD_VALUE;
     }
 
-    effect->setOffloaded(mType == OFFLOAD, mId);
+    effect->setOffloaded_l(mType == OFFLOAD, mId);
 
     status_t status = chain->addEffect_l(effect);
     if (status != NO_ERROR) {
@@ -1861,22 +1865,20 @@ void ThreadBase::removeEffect_l(const sp<IAfEffectModule>& effect, bool release)
     }
 }
 
-void ThreadBase::lockEffectChains_l(
-        Vector<sp<IAfEffectChain>>& effectChains)
-NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::lock()
+void ThreadBase::lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains)
+        NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::lock()
 {
     effectChains = mEffectChains;
-    for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->mutex().lock();
+    for (const auto& effectChain : effectChains) {
+        effectChain->mutex().lock();
     }
 }
 
-void ThreadBase::unlockEffectChains(
-        const Vector<sp<IAfEffectChain>>& effectChains)
-NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
+void ThreadBase::unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains)
+        NO_THREAD_SAFETY_ANALYSIS  // calls EffectChain::unlock()
 {
-    for (size_t i = 0; i < effectChains.size(); i++) {
-        effectChains[i]->mutex().unlock();
+    for (const auto& effectChain : effectChains) {
+        effectChain->mutex().unlock();
     }
 }
 
@@ -2849,6 +2851,8 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
         // effectively get the latency it requested.
         if (track->isExternalTrack()) {
             IAfTrackBase::track_state state = track->state();
+            // Because the track is not on the ActiveTracks,
+            // at this point, only the TrackHandle will be adding the track.
             mutex().unlock();
             status = AudioSystem::startOutput(track->portId());
             mutex().lock();
@@ -2897,7 +2901,7 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.
             mutex().unlock();
-            const os::HapticScale intensity = afutils::onExternalVibrationStart(
+            const os::HapticScale hapticScale = afutils::onExternalVibrationStart(
                     track->getExternalVibration());
             std::optional<media::AudioVibratorInfo> vibratorInfo;
             {
@@ -2907,7 +2911,7 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
                 vibratorInfo = std::move(mAfThreadCallback->getDefaultVibratorInfo_l());
             }
             mutex().lock();
-            track->setHapticIntensity(intensity);
+            track->setHapticScale(hapticScale);
             if (vibratorInfo) {
                 track->setHapticMaxAmplitude(vibratorInfo->maxAmplitude);
             }
@@ -2923,13 +2927,19 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
 
             // Set haptic intensity for effect
             if (chain != nullptr) {
-                chain->setHapticIntensity_l(track->id(), intensity);
+                // TODO(b/324559333): Add adaptive haptics scaling support for the HapticGenerator.
+                chain->setHapticScale_l(track->id(), hapticScale);
             }
         }
 
         track->setResetDone(false);
         track->resetPresentationComplete();
+
+        // Do not release the ThreadBase mutex after the track is added to mActiveTracks unless
+        // all key changes are complete.  It is possible that the threadLoop will begin
+        // processing the added track immediately after the ThreadBase mutex is released.
         mActiveTracks.add(track);
+
         if (chain != 0) {
             ALOGV("addTrack_l() starting track on chain %p for session %d", chain.get(),
                     track->sessionId());
@@ -3048,7 +3058,7 @@ void PlaybackThread::onError()
 }
 
 void PlaybackThread::onCodecFormatChanged(
-        const std::basic_string<uint8_t>& metadataBs)
+        const std::vector<uint8_t>& metadataBs)
 {
     const auto weakPointerThis = wp<PlaybackThread>::fromExisting(this);
     std::thread([this, metadataBs, weakPointerThis]() {
@@ -3311,10 +3321,48 @@ ThreadBase::MetadataUpdate PlaybackThread::updateMetadata_l()
         return {}; // nothing to do
     }
     StreamOutHalInterface::SourceMetadata metadata;
-    auto backInserter = std::back_inserter(metadata.tracks);
-    for (const sp<IAfTrack>& track : mActiveTracks) {
-        // No track is invalid as this is called after prepareTrack_l in the same critical section
-        track->copyMetadataTo(backInserter);
+    static const bool stereo_spatialization_property =
+            property_get_bool("ro.audio.stereo_spatialization_enabled", false);
+    const bool stereo_spatialization_enabled =
+            stereo_spatialization_property && com_android_media_audio_stereo_spatialization();
+    if (stereo_spatialization_enabled) {
+        std::map<audio_session_t, std::vector<playback_track_metadata_v7_t> >allSessionsMetadata;
+        for (const sp<IAfTrack>& track : mActiveTracks) {
+            std::vector<playback_track_metadata_v7_t>& sessionMetadata =
+                    allSessionsMetadata[track->sessionId()];
+            auto backInserter = std::back_inserter(sessionMetadata);
+            // No track is invalid as this is called after prepareTrack_l in the same
+            // critical section
+            track->copyMetadataTo(backInserter);
+        }
+        std::vector<playback_track_metadata_v7_t> spatializedTracksMetaData;
+        for (const auto& [session, sessionTrackMetadata] : allSessionsMetadata) {
+            metadata.tracks.insert(metadata.tracks.end(),
+                    sessionTrackMetadata.begin(), sessionTrackMetadata.end());
+            if (auto chain = getEffectChain_l(session) ; chain != nullptr) {
+                chain->sendMetadata_l(sessionTrackMetadata, {});
+            }
+            if ((hasAudioSession_l(session) & IAfThreadBase::SPATIALIZED_SESSION) != 0) {
+                spatializedTracksMetaData.insert(spatializedTracksMetaData.end(),
+                        sessionTrackMetadata.begin(), sessionTrackMetadata.end());
+            }
+        }
+        if (auto chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX); chain != nullptr) {
+            chain->sendMetadata_l(metadata.tracks, {});
+        }
+        if (auto chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE); chain != nullptr) {
+            chain->sendMetadata_l(metadata.tracks, spatializedTracksMetaData);
+        }
+        if (auto chain = getEffectChain_l(AUDIO_SESSION_DEVICE); chain != nullptr) {
+            chain->sendMetadata_l(metadata.tracks, {});
+        }
+    } else {
+        auto backInserter = std::back_inserter(metadata.tracks);
+        for (const sp<IAfTrack>& track : mActiveTracks) {
+            // No track is invalid as this is called after prepareTrack_l in the same
+            // critical section
+            track->copyMetadataTo(backInserter);
+        }
     }
     sendMetadataToBackend_l(metadata);
     MetadataUpdate change;
@@ -3909,6 +3957,27 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                 stream()->setHalThreadPriority(priorityBoost);
             }
         }
+    } else if (property_get_bool("ro.boot.container", false /* default_value */)) {
+        // In ARC experiments (b/73091832), the latency under using CFS scheduler with any priority
+        // is not enough for PlaybackThread to process audio data in time. We request the lowest
+        // real-time priority, SCHED_FIFO=1, for PlaybackThread in ARC. ro.boot.container is true
+        // only on ARC.
+        const pid_t tid = getTid();
+        if (tid == -1) {
+            ALOGW("%s: Cannot update PlaybackThread priority for ARC, no tid", __func__);
+        } else {
+            const status_t status = requestPriority(getpid(),
+                                                    tid,
+                                                    kPriorityPlaybackThreadArc,
+                                                    false /* isForApp */,
+                                                    true /* asynchronous */);
+            if (status != OK) {
+                ALOGW("%s: Cannot update PlaybackThread priority for ARC, status %d", __func__,
+                        status);
+            } else {
+                stream()->setHalThreadPriority(kPriorityPlaybackThreadArc);
+            }
+        }
     }
 
     Vector<sp<IAfTrack>> tracksToRemove;
@@ -4120,6 +4189,30 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
             metadataUpdate = updateMetadata_l();
 
+            // Acquire a local copy of active tracks with lock (release w/o lock).
+            //
+            // Control methods on the track acquire the ThreadBase lock (e.g. start()
+            // stop(), pause(), etc.), but the threadLoop is entitled to call audio
+            // data / buffer methods on tracks from activeTracks without the ThreadBase lock.
+            activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
+
+            setHalLatencyMode_l();
+
+            // updateTeePatches_l will acquire the ThreadBase_Mutex of other threads,
+            // so this is done before we lock our effect chains.
+            for (const auto& track : mActiveTracks) {
+                track->updateTeePatches_l();
+            }
+
+            // signal actual start of output stream when the render position reported by
+            // the kernel starts moving.
+            if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
+                    && (mKernelPositionOnStandby
+                            != mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL])))) {
+                mHalStarted = true;
+                mWaitHalStartCV.notify_all();
+            }
+
             // prevent any changes in effect chain list and in each effect chain
             // during mixing and effect process as the audio buffers could be deleted
             // or modified if an effect is created or deleted
@@ -4146,28 +4239,6 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                                 mType == SPATIALIZER && track->isSpatialized();
                     }
                 }
-            }
-
-            // Acquire a local copy of active tracks with lock (release w/o lock).
-            //
-            // Control methods on the track acquire the ThreadBase lock (e.g. start()
-            // stop(), pause(), etc.), but the threadLoop is entitled to call audio
-            // data / buffer methods on tracks from activeTracks without the ThreadBase lock.
-            activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
-
-            setHalLatencyMode_l();
-
-            for (const auto &track : mActiveTracks ) {
-                track->updateTeePatches_l();
-            }
-
-            // signal actual start of output stream when the render position reported by the kernel
-            // starts moving.
-            if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
-                    && (mKernelPositionOnStandby
-                            != mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL])))) {
-                mHalStarted = true;
-                mWaitHalStartCV.notify_all();
             }
         } // mutex() scope ends
 
@@ -4704,8 +4775,12 @@ void PlaybackThread::collectTimestamps_l()
 void PlaybackThread::removeTracks_l(const Vector<sp<IAfTrack>>& tracksToRemove)
 NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
 {
+    if (tracksToRemove.empty()) return;
+
+    // Block all incoming TrackHandle requests until we are finished with the release.
+    setThreadBusy_l(true);
+
     for (const auto& track : tracksToRemove) {
-        mActiveTracks.remove(track);
         ALOGV("%s(%d): removing track on session %d", __func__, track->id(), track->sessionId());
         sp<IAfEffectChain> chain = getEffectChain_l(track->sessionId());
         if (chain != 0) {
@@ -4713,17 +4788,16 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
                     __func__, track->id(), chain.get(), track->sessionId());
             chain->decActiveTrackCnt();
         }
+
         // If an external client track, inform APM we're no longer active, and remove if needed.
-        // We do this under lock so that the state is consistent if the Track is destroyed.
+        // Since the track is active, we do it here instead of TrackBase::destroy().
         if (track->isExternalTrack()) {
+            mutex().unlock();
             AudioSystem::stopOutput(track->portId());
             if (track->isTerminated()) {
                 AudioSystem::releaseOutput(track->portId());
             }
-        }
-        if (track->isTerminated()) {
-            // remove from our tracks vector
-            removeTrack_l(track);
+            mutex().lock();
         }
         if (mHapticChannelCount > 0 &&
                 ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
@@ -4737,10 +4811,27 @@ NO_THREAD_SAFETY_ANALYSIS  // release and re-acquire mutex()
             // When the track is stop, set the haptic intensity as MUTE
             // for the HapticGenerator effect.
             if (chain != nullptr) {
-                chain->setHapticIntensity_l(track->id(), os::HapticScale::MUTE);
+                chain->setHapticScale_l(track->id(), os::HapticScale::mute());
             }
         }
+
+        // Under lock, the track is removed from the active tracks list.
+        //
+        // Once the track is no longer active, the TrackHandle may directly
+        // modify it as the threadLoop() is no longer responsible for its maintenance.
+        // Do not modify the track from threadLoop after the mutex is unlocked
+        // if it is not active.
+        mActiveTracks.remove(track);
+
+        if (track->isTerminated()) {
+            // remove from our tracks vector
+            removeTrack_l(track);
+        }
     }
+
+    // Allow incoming TrackHandle requests.  We still hold the mutex,
+    // so pending TrackHandle requests will occur after we unlock it.
+    setThreadBusy_l(false);
 }
 
 status_t PlaybackThread::getTimestamp_l(AudioTimestamp& timestamp)
@@ -5080,7 +5171,7 @@ MixerThread::MixerThread(const sp<IAfThreadCallback>& afThreadCallback, AudioStr
                                                     // audio to FastMixer
         fastTrack->mFormat = mFormat; // mPipeSink format for audio to FastMixer
         fastTrack->mHapticPlaybackEnabled = mHapticChannelMask != AUDIO_CHANNEL_NONE;
-        fastTrack->mHapticIntensity = os::HapticScale::NONE;
+        fastTrack->mHapticScale = {/*level=*/os::HapticLevel::NONE };
         fastTrack->mHapticMaxAmplitude = NAN;
         fastTrack->mGeneration++;
         state->mFastTracksGen++;
@@ -5439,7 +5530,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
     sp<IAfEffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
     if (chain != 0) {
         uint32_t v = (uint32_t)(masterVolume * (1 << 24));
-        chain->setVolume_l(&v, &v);
+        chain->setVolume(&v, &v);
         masterVolume = (float)((v + (1 << 23)) >> 24);
         chain.clear();
     }
@@ -5638,7 +5729,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                     fastTrack->mChannelMask = track->channelMask();
                     fastTrack->mFormat = track->format();
                     fastTrack->mHapticPlaybackEnabled = track->getHapticPlaybackEnabled();
-                    fastTrack->mHapticIntensity = track->getHapticIntensity();
+                    fastTrack->mHapticScale = track->getHapticScale();
                     fastTrack->mHapticMaxAmplitude = track->getHapticMaxAmplitude();
                     fastTrack->mGeneration++;
                     state->mTrackMask |= 1 << j;
@@ -5774,7 +5865,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
 
             mixedTracks++;
 
-            // track->mainBuffer() != mSinkBuffer or mMixerBuffer means
+            // track->mainBuffer() != mSinkBuffer and mMixerBuffer means
             // there is an effect chain connected to the track
             chain.clear();
             if (track->mainBuffer() != mSinkBuffer &&
@@ -5878,7 +5969,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
             track->setFinalVolume(vrf, vlf);
 
             // Delegate volume control to effect in track effect chain if needed
-            if (chain != 0 && chain->setVolume_l(&vl, &vr)) {
+            if (chain != 0 && chain->setVolume(&vl, &vr)) {
                 // Do not ramp volume if volume is controlled by effect
                 param = AudioMixer::VOLUME;
                 // Update remaining floating point volume levels
@@ -5999,10 +6090,11 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                 trackId,
                 AudioMixer::TRACK,
                 AudioMixer::HAPTIC_ENABLED, (void *)(uintptr_t)track->getHapticPlaybackEnabled());
+            const os::HapticScale hapticScale = track->getHapticScale();
             mAudioMixer->setParameter(
-                trackId,
-                AudioMixer::TRACK,
-                AudioMixer::HAPTIC_INTENSITY, (void *)(uintptr_t)track->getHapticIntensity());
+                    trackId,
+                    AudioMixer::TRACK,
+                    AudioMixer::HAPTIC_SCALE, (void *)&hapticScale);
             const float hapticMaxAmplitude = track->getHapticMaxAmplitude();
             mAudioMixer->setParameter(
                 trackId,
@@ -6618,8 +6710,8 @@ void DirectOutputThread::processVolume_l(IAfTrack* track, bool lastTrack)
                 // Convert volumes from float to 8.24
                 uint32_t vl = (uint32_t)(left * (1 << 24));
                 uint32_t vr = (uint32_t)(right * (1 << 24));
-                // Direct/Offload effect chains set output volume in setVolume_l().
-                (void)mEffectChains[0]->setVolume_l(&vl, &vr);
+                // Direct/Offload effect chains set output volume in setVolume().
+                (void)mEffectChains[0]->setVolume(&vl, &vr);
             } else {
                 // otherwise we directly set the volume.
                 setVolumeForOutput_l(left, right);
@@ -7813,15 +7905,11 @@ void SpatializerThread::setHalLatencyMode_l() {
         //   (mRequestedLatencyMode = AUDIO_LATENCY_MODE_LOW)
         //      AND
         // - At least one active track is spatialized
-        bool hasSpatializedActiveTrack = false;
         for (const auto& track : mActiveTracks) {
             if (track->isSpatialized()) {
-                hasSpatializedActiveTrack = true;
+                latencyMode = mRequestedLatencyMode;
                 break;
             }
-        }
-        if (hasSpatializedActiveTrack && mRequestedLatencyMode == AUDIO_LATENCY_MODE_LOW) {
-            latencyMode = AUDIO_LATENCY_MODE_LOW;
         }
     }
 
@@ -7836,7 +7924,7 @@ void SpatializerThread::setHalLatencyMode_l() {
 }
 
 status_t SpatializerThread::setRequestedLatencyMode(audio_latency_mode_t mode) {
-    if (mode != AUDIO_LATENCY_MODE_LOW && mode != AUDIO_LATENCY_MODE_FREE) {
+    if (mode < 0 || mode >= AUDIO_LATENCY_MODE_CNT) {
         return BAD_VALUE;
     }
     audio_utils::lock_guard _l(mutex());
@@ -9579,10 +9667,24 @@ void RecordThread::ioConfigChanged_l(audio_io_config_event_t event, pid_t pid,
 
 void RecordThread::readInputParameters_l()
 {
-    status_t result = mInput->stream->getAudioProperties(&mSampleRate, &mChannelMask, &mHALFormat);
-    LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving audio properties from HAL: %d", result);
-    mFormat = mHALFormat;
+    const audio_config_base_t audioConfig = mInput->getAudioProperties();
+    mSampleRate = audioConfig.sample_rate;
+    mChannelMask = audioConfig.channel_mask;
+    if (!audio_is_input_channel(mChannelMask)) {
+        LOG_ALWAYS_FATAL("Channel mask %#x not valid for input", mChannelMask);
+    }
+
     mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
+
+    // Get actual HAL format.
+    status_t result = mInput->stream->getAudioProperties(nullptr, nullptr, &mHALFormat);
+    LOG_ALWAYS_FATAL_IF(result != OK, "Error when retrieving input stream format: %d", result);
+    // Get format from the shim, which will be different than the HAL format
+    // if recording compressed audio from IEC61937 wrapped sources.
+    mFormat = audioConfig.format;
+    if (!audio_is_valid_format(mFormat)) {
+        LOG_ALWAYS_FATAL("Format %#x not valid for input", mFormat);
+    }
     if (audio_is_linear_pcm(mFormat)) {
         LOG_ALWAYS_FATAL_IF(mChannelCount > FCC_LIMIT, "HAL channel count %d > %d",
                 mChannelCount, FCC_LIMIT);
@@ -9590,8 +9692,7 @@ void RecordThread::readInputParameters_l()
         // Can have more that FCC_LIMIT channels in encoded streams.
         ALOGI("HAL format %#x is not linear pcm", mFormat);
     }
-    result = mInput->stream->getFrameSize(&mFrameSize);
-    LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving frame size from HAL: %d", result);
+    mFrameSize = mInput->getFrameSize();
     LOG_ALWAYS_FATAL_IF(mFrameSize <= 0, "Error frame size was %zu but must be greater than zero",
             mFrameSize);
     result = mInput->stream->getBufferSize(&mBufferSize);
@@ -9673,7 +9774,7 @@ status_t RecordThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
 
     // make sure enabled pre processing effects state is communicated to the HAL as we
     // just moved them to a new input stream.
-    chain->syncHalEffectsState();
+    chain->syncHalEffectsState_l();
 
     mEffectChains.add(chain);
 
@@ -10564,6 +10665,16 @@ NO_THREAD_SAFETY_ANALYSIS  // elease and re-acquire mutex()
         }
     }
 
+    // For mmap streams, once the routing has changed, they will be disconnected. It should be
+    // okay to notify the client earlier before the new patch creation.
+    if (mDeviceId != deviceId) {
+        if (const sp<MmapStreamCallback> callback = mCallback.promote()) {
+            // The aaudioservice handle the routing changed event asynchronously. In that case,
+            // it is safe to hold the lock here.
+            callback->onRoutingChanged(deviceId);
+        }
+    }
+
     if (mAudioHwDev->supportsAudioPatches()) {
         status = mHalDevice->createAudioPatch(patch->num_sources, patch->sources, patch->num_sinks,
                                               patch->sinks, handle);
@@ -10588,12 +10699,6 @@ NO_THREAD_SAFETY_ANALYSIS  // elease and re-acquire mutex()
         } else {
             sendIoConfigEvent_l(AUDIO_INPUT_CONFIG_CHANGED);
             mInDeviceTypeAddr = sourceDeviceTypeAddr;
-        }
-        sp<MmapStreamCallback> callback = mCallback.promote();
-        if (mDeviceId != deviceId && callback != 0) {
-            mutex().unlock();
-            callback->onRoutingChanged(deviceId);
-            mutex().lock();
         }
         mPatch = *patch;
         mDeviceId = deviceId;
@@ -10658,7 +10763,7 @@ status_t MmapThread::addEffectChain_l(const sp<IAfEffectChain>& chain)
     chain->setThread(this);
     chain->setInBuffer(nullptr);
     chain->setOutBuffer(nullptr);
-    chain->syncHalEffectsState();
+    chain->syncHalEffectsState_l();
 
     mEffectChains.add(chain);
     checkSuspendOnAddEffectChain_l(chain);
@@ -10746,21 +10851,18 @@ status_t MmapThread::checkEffectCompatibility_l(
 
 void MmapThread::checkInvalidTracks_l()
 {
-    sp<MmapStreamCallback> callback;
     for (const sp<IAfMmapTrack>& track : mActiveTracks) {
         if (track->isInvalid()) {
-            callback = mCallback.promote();
-            if (callback == nullptr &&  mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
+            if (const sp<MmapStreamCallback> callback = mCallback.promote()) {
+                // The aaudioservice handle the routing changed event asynchronously. In that case,
+                // it is safe to hold the lock here.
+                callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
+            } else if (mNoCallbackWarningCount < kMaxNoCallbackWarnings) {
                 ALOGW("Could not notify MMAP stream tear down: no onRoutingChanged callback!");
                 mNoCallbackWarningCount++;
             }
             break;
         }
-    }
-    if (callback != 0) {
-        mutex().unlock();
-        callback->onRoutingChanged(AUDIO_PORT_HANDLE_NONE);
-        mutex().lock();
     }
 }
 
@@ -10951,7 +11053,7 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent_l
         // only one effect chain can be present on DirectOutputThread, so if
         // there is one, the track is connected to it
         if (!mEffectChains.isEmpty()) {
-            mEffectChains[0]->setVolume_l(&vol, &vol);
+            mEffectChains[0]->setVolume(&vol, &vol);
             volume = (float)vol / (1 << 24);
         }
         // Try to use HW volume control and fall back to SW control if not implemented
@@ -11020,7 +11122,7 @@ void MmapPlaybackThread::checkSilentMode_l()
             char *endptr;
             unsigned long ul = strtoul(value, &endptr, 0);
             if (*endptr == '\0' && ul != 0) {
-                ALOGD("Silence is golden");
+                ALOGW("%s: mute from ro.audio.silent. Silence is golden", __func__);
                 // The setprop command will not allow a property to be changed after
                 // the first time it is set, so we don't have to worry about un-muting.
                 setMasterMute_l(true);

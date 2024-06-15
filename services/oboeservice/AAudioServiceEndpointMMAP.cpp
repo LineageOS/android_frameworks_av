@@ -37,6 +37,8 @@
 #include "AAudioServiceEndpointPlay.h"
 #include "AAudioServiceEndpointMMAP.h"
 
+#include <com_android_media_aaudio.h>
+
 #define AAUDIO_BUFFER_CAPACITY_MIN    (4 * 512)
 #define AAUDIO_SAMPLE_RATE_DEFAULT    48000
 
@@ -148,9 +150,15 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
         // Try other formats if the config from APM is the same as our current config.
         // Some HALs may report its format support incorrectly.
-        if ((previousConfig.format == config.format) &&
-                (previousConfig.sample_rate == config.sample_rate)) {
-            config.format = getNextFormatToTry(config.format);
+        if (previousConfig.format == config.format) {
+            if (previousConfig.sample_rate == config.sample_rate) {
+                config.format = getNextFormatToTry(config.format);
+            } else if (!com::android::media::aaudio::sample_rate_conversion()) {
+                ALOGI("%s() - AAudio SRC feature not enabled, different rates! %d != %d",
+                      __func__, previousConfig.sample_rate, config.sample_rate);
+                result = AAUDIO_ERROR_INVALID_RATE;
+                break;
+            }
         }
 
         ALOGD("%s() %#x %d failed, perhaps due to format or sample rate. Try again with %#x %d",

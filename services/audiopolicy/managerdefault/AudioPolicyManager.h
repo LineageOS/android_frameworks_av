@@ -292,6 +292,7 @@ public:
 
         virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes);
         virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes);
+        virtual status_t getRegisteredPolicyMixes(std::vector<AudioMix>& mixes) override;
         virtual status_t updatePolicyMix(
                 const AudioMix& mix,
                 const std::vector<AudioMixMatchCriterion>& updatedCriteria) override;
@@ -339,7 +340,8 @@ public:
         virtual status_t startAudioSource(const struct audio_port_config *source,
                                           const audio_attributes_t *attributes,
                                           audio_port_handle_t *portId,
-                                          uid_t uid);
+                                          uid_t uid,
+                                          bool internal = false);
         virtual status_t stopAudioSource(audio_port_handle_t portId);
 
         virtual status_t setMasterMono(bool mono);
@@ -580,6 +582,20 @@ protected:
                                            DeviceTypeSet deviceTypes,
                                            int delayMs = 0, bool force = false);
 
+        void setVoiceVolume(int index, IVolumeCurves &curves, bool isVoiceVolSrc, int delayMs);
+
+        // returns true if the supplied set of volume source and devices are consistent with
+        // call volume rules:
+        // if Bluetooth SCO and voice call use different volume curves:
+        // - do not apply voice call volume if Bluetooth SCO is used for call
+        // - do not apply Bluetooth SCO volume if SCO or Hearing Aid is not used for call.
+        // Also updates the booleans isVoiceVolSrc and isBtScoVolSrc according to the
+        // volume source supplied.
+        bool isVolumeConsistentForCalls(VolumeSource volumeSource,
+                                       const DeviceTypeSet& deviceTypes,
+                                       bool& isVoiceVolSrc,
+                                       bool& isBtScoVolSrc,
+                                       const char* caller);
         // apply all stream volumes to the specified output and device
         void applyStreamVolumes(const sp<AudioOutputDescriptor>& outputDesc,
                                 const DeviceTypeSet& deviceTypes,
@@ -1041,9 +1057,6 @@ protected:
         bool isMsdPatch(const audio_patch_handle_t &handle) const;
 
 private:
-        sp<SourceClientDescriptor> startAudioSourceInternal(
-                const struct audio_port_config *source, const audio_attributes_t *attributes,
-                uid_t uid);
 
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 

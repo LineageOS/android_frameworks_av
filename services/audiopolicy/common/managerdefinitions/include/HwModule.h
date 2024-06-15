@@ -89,10 +89,12 @@ public:
     status_t addProfile(const sp<IOProfile> &profile);
 
     status_t addOutputProfile(const std::string& name, const audio_config_t *config,
-            audio_devices_t device, const String8& address);
+            audio_devices_t device, const String8& address,
+            audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE);
     status_t removeOutputProfile(const std::string& name);
     status_t addInputProfile(const std::string& name, const audio_config_t *config,
-            audio_devices_t device, const String8& address);
+            audio_devices_t device, const String8& address,
+            audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE);
     status_t removeInputProfile(const std::string& name);
 
     audio_module_handle_t getHandle() const { return mHandle; }

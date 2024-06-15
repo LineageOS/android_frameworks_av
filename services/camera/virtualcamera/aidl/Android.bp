@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_xr_framework",
     // See: http://go/android-license-faq
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
@@ -8,9 +9,11 @@ aidl_interface {
     unstable: true,
     srcs: [
         "android/companion/virtualcamera/Format.aidl",
+        "android/companion/virtualcamera/LensFacing.aidl",
         "android/companion/virtualcamera/IVirtualCameraCallback.aidl",
         "android/companion/virtualcamera/IVirtualCameraService.aidl",
         "android/companion/virtualcamera/VirtualCameraConfiguration.aidl",
+        "android/companion/virtualcamera/SensorOrientation.aidl",
         "android/companion/virtualcamera/SupportedStreamConfiguration.aidl",
     ],
     local_include_dir: ".",
@@ -19,6 +22,9 @@ aidl_interface {
     ],
     backend: {
         cpp: {
+            enabled: false,
+        },
+        rust: {
             enabled: false,
         },
         ndk: {
@@ -31,6 +37,6 @@ aidl_interface {
         java: {
             enabled: true,
             platform_apis: true,
-        }
+        },
     },
 }

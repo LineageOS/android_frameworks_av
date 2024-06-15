@@ -19,11 +19,13 @@
 
 #include <string.h>
 
+#include <binder/Binder.h>
 #include <binder/ProcessState.h>
 #include <cutils/properties.h>
 #include <gtest/gtest.h>
 
 #include "audio_test_utils.h"
+#include "test_execution_tracer.h"
 
 using namespace android;
 
@@ -150,6 +152,7 @@ class AudioRoutingTest : public ::testing::Test {
         config.sample_rate = 48000;
         AudioMix mix(criteria, mixType, config, mixFlag, String8{mAddress.c_str()}, 0);
         mix.mDeviceType = deviceType;
+        mix.mToken = sp<BBinder>::make();
         mMixes.push(mix);
         if (OK == AudioSystem::registerPolicyMixes(mMixes, true)) {
             mPolicyMixRegistered = true;
@@ -266,21 +269,6 @@ TEST_F(AudioRoutingTest, ConcurrentDynamicRoutingTest) {
     captureA->stop();
     playback->stop();
 }
-
-class TestExecutionTracer : public ::testing::EmptyTestEventListener {
-  public:
-    void OnTestStart(const ::testing::TestInfo& test_info) override {
-        TraceTestState("Started", test_info);
-    }
-    void OnTestEnd(const ::testing::TestInfo& test_info) override {
-        TraceTestState("Completed", test_info);
-    }
-
-  private:
-    static void TraceTestState(const std::string& state, const ::testing::TestInfo& test_info) {
-        ALOGI("%s %s::%s", state.c_str(), test_info.test_suite_name(), test_info.name());
-    }
-};
 
 int main(int argc, char** argv) {
     android::ProcessState::self()->startThreadPool();

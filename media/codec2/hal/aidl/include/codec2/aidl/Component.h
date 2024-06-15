@@ -27,6 +27,11 @@
 #include <aidl/android/hardware/media/c2/IComponentInterface.h>
 #include <aidl/android/hardware/media/c2/IComponentListener.h>
 #include <aidl/android/hardware/media/c2/IComponentStore.h>
+#include <aidl/android/hardware/media/c2/IInputSink.h>
+#include <aidl/android/hardware/media/c2/IInputSurface.h>
+#include <aidl/android/hardware/media/c2/IInputSurfaceConnection.h>
+
+#include <codec2/common/MultiAccessUnitHelper.h>
 
 #include <C2Component.h>
 #include <C2Buffer.h>
@@ -43,6 +48,8 @@ namespace media {
 namespace c2 {
 namespace utils {
 
+using ::android::MultiAccessUnitInterface;
+using ::android::MultiAccessUnitHelper;
 
 struct ComponentStore;
 
@@ -71,12 +78,19 @@ struct Component : public BnComponent {
     ::ndk::ScopedAStatus configureVideoTunnel(
             int32_t avSyncHwId,
             common::NativeHandle* handle) override;
+    ::ndk::ScopedAStatus connectToInputSurface(
+            const std::shared_ptr<IInputSurface>& inputSurface,
+            std::shared_ptr<IInputSurfaceConnection> *connection) override;
+    ::ndk::ScopedAStatus asInputSink(
+            std::shared_ptr<IInputSink> *sink) override;
 
 protected:
     c2_status_t mInit;
     std::shared_ptr<C2Component> mComponent;
     std::shared_ptr<ComponentInterface> mInterface;
     std::shared_ptr<IComponentListener> mListener;
+    std::shared_ptr<MultiAccessUnitInterface> mMultiAccessUnitIntf;
+    std::shared_ptr<MultiAccessUnitHelper> mMultiAccessUnitHelper;
     std::shared_ptr<ComponentStore> mStore;
     DefaultBufferPoolSender mBufferPoolSender;
 
@@ -93,6 +107,8 @@ protected:
     friend struct ComponentStore;
 
     struct Listener;
+
+    friend struct MultiAccessUnitListener;
 
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
     static void OnBinderDied(void *cookie);

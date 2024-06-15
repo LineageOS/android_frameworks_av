@@ -441,10 +441,10 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
                 track->prepareForAdjustChannels(mFrameCount);
             }
             } break;
-        case HAPTIC_INTENSITY: {
-            const os::HapticScale hapticIntensity = static_cast<os::HapticScale>(valueInt);
-            if (track->mHapticIntensity != hapticIntensity) {
-                track->mHapticIntensity = hapticIntensity;
+        case HAPTIC_SCALE: {
+            const os::HapticScale hapticScale = *reinterpret_cast<os::HapticScale*>(value);
+            if (track->mHapticScale != hapticScale) {
+                track->mHapticScale = hapticScale;
             }
             } break;
         case HAPTIC_MAX_AMPLITUDE: {
@@ -585,7 +585,7 @@ status_t AudioMixer::postCreateTrack(TrackBase *track)
     t->mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
     // haptic
     t->mHapticPlaybackEnabled = false;
-    t->mHapticIntensity = os::HapticScale::NONE;
+    t->mHapticScale = {/*level=*/os::HapticLevel::NONE };
     t->mHapticMaxAmplitude = NAN;
     t->mMixerHapticChannelMask = AUDIO_CHANNEL_NONE;
     t->mMixerHapticChannelCount = 0;
@@ -636,7 +636,7 @@ void AudioMixer::postProcess()
                 switch (t->mMixerFormat) {
                 // Mixer format should be AUDIO_FORMAT_PCM_FLOAT.
                 case AUDIO_FORMAT_PCM_FLOAT: {
-                    os::scaleHapticData((float*) buffer, sampleCount, t->mHapticIntensity,
+                    os::scaleHapticData((float*) buffer, sampleCount, t->mHapticScale,
                                         t->mHapticMaxAmplitude);
                 } break;
                 default:

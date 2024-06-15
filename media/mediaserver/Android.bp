@@ -1,4 +1,3 @@
-
 package {
     default_applicable_licenses: ["frameworks_av_media_mediaserver_license"],
 }
@@ -86,7 +85,16 @@ mediaserver_cc_binary {
         "-Wall",
     ],
 
-    vintf_fragments: ["manifest_media_c2_software.xml"],
+    // AIDL is only used when release_aidl_use_unfrozen is true
+    // because the swcodec mainline module is a prebuilt from an
+    // Android U branch in that case.
+    // TODO(b/327508501)
+    vintf_fragments: ["manifest_media_c2_software_hidl.xml"],
+    product_variables: {
+        release_aidl_use_unfrozen: {
+            vintf_fragments: ["manifest_media_c2_software_aidl.xml"],
+        },
+    },
 
     soong_config_variables: {
         TARGET_DYNAMIC_64_32_MEDIASERVER: {

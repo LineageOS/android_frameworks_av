@@ -191,6 +191,7 @@ private:
     std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
 

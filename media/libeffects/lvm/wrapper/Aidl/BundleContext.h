@@ -41,15 +41,6 @@ class BundleContext final : public EffectContext {
     RetCode disable();
     RetCode disableOperatingMode();
 
-    void setSampleRate(const int sampleRate) { mSampleRate = sampleRate; }
-    int getSampleRate() const { return mSampleRate; }
-
-    void setChannelMask(const aidl::android::media::audio::common::AudioChannelLayout& chMask) {
-        mChMask = chMask;
-    }
-    aidl::android::media::audio::common::AudioChannelLayout getChannelMask() const {
-        return mChMask;
-    }
     bool isDeviceSupportedBassBoost(
             const std::vector<aidl::android::media::audio::common::AudioDeviceDescription>&
                     devices);
@@ -94,7 +85,7 @@ class BundleContext final : public EffectContext {
     RetCode setVolumeStereo(const Parameter::VolumeStereo& volumeStereo) override;
     Parameter::VolumeStereo getVolumeStereo() override { return {1.0f, 1.0f}; }
 
-    IEffect::Status lvmProcess(float* in, float* out, int samples);
+    IEffect::Status process(float* in, float* out, int samples);
 
     IEffect::Status processEffect(float* in, float* out, int sampleToProcess);
 
@@ -105,9 +96,7 @@ class BundleContext final : public EffectContext {
     LVM_Handle_t mInstance GUARDED_BY(mMutex);
 
     aidl::android::media::audio::common::AudioDeviceDescription mVirtualizerForcedDevice;
-    aidl::android::media::audio::common::AudioChannelLayout mChMask;
 
-    int mSampleRate = LVM_FS_44100;
     int mSamplesPerSecond = 0;
     int mSamplesToExitCountEq = 0;
     int mSamplesToExitCountBb = 0;
@@ -129,17 +118,17 @@ class BundleContext final : public EffectContext {
     int mBassStrengthSaved = 0;
     // Equalizer
     int mCurPresetIdx = lvm::PRESET_CUSTOM; /* Current preset being used */
-    std::array<int, lvm::MAX_NUM_BANDS> mBandGainMdB; /* band gain in millibels */
+    std::array<int, lvm::MAX_NUM_BANDS> mBandGainmB; /* band gain in millibels */
     // Virtualizer
     int mVirtStrengthSaved = 0; /* Conversion between Get/Set */
     bool mVirtualizerTempDisabled = false;
     ::aidl::android::media::audio::common::AudioDeviceDescription mForceDevice;
     // Volume
-    float mLevelSaved = 0; /* for when mute is set, level must be saved */
-    float mVolume = 0;
+    float mLevelSaveddB = 0; /* for when mute is set, level must be saved */
+    float mVolumedB = 0;
     bool mMuteEnabled = false; /* Must store as mute = -96dB level */
 
-    void initControlParameter(LVM_ControlParams_t& params) const;
+    RetCode initControlParameter(LVM_ControlParams_t& params) const;
     void initHeadroomParameter(LVM_HeadroomParams_t& params) const;
     RetCode limitLevel();
     static float VolToDb(float vol);

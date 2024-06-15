@@ -31,41 +31,51 @@ class EffectPreProcessing final : public EffectImpl {
 
     ndk::ScopedAStatus getDescriptor(Descriptor* _aidl_return) override;
 
-    ndk::ScopedAStatus setParameterSpecific(const Parameter::Specific& specific) override;
-    ndk::ScopedAStatus getParameterSpecific(const Parameter::Id& id,
-                                            Parameter::Specific* specific) override;
+    ndk::ScopedAStatus setParameterSpecific(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex) override;
+    ndk::ScopedAStatus getParameterSpecific(const Parameter::Id& id, Parameter::Specific* specific)
+            REQUIRES(mImplMutex) override;
 
-    std::shared_ptr<EffectContext> createContext(const Parameter::Common& common) override;
-    std::shared_ptr<EffectContext> getContext() override;
-    RetCode releaseContext() override;
+    std::shared_ptr<EffectContext> createContext(const Parameter::Common& common)
+            REQUIRES(mImplMutex) override;
+    RetCode releaseContext() REQUIRES(mImplMutex) override;
 
-    IEffect::Status effectProcessImpl(float* in, float* out, int samples) override;
+    IEffect::Status effectProcessImpl(float* in, float* out, int samples)
+            REQUIRES(mImplMutex) override;
 
-    ndk::ScopedAStatus commandImpl(CommandId command) override;
+    ndk::ScopedAStatus commandImpl(CommandId command) REQUIRES(mImplMutex) override;
 
     std::string getEffectName() override { return *mEffectName; }
 
   private:
-    std::shared_ptr<PreProcessingContext> mContext;
+    std::shared_ptr<PreProcessingContext> mContext GUARDED_BY(mImplMutex);
     const Descriptor* mDescriptor;
     const std::string* mEffectName;
     PreProcessingEffectType mType;
 
-    ndk::ScopedAStatus setParameterAcousticEchoCanceler(const Parameter::Specific& specific);
+    ndk::ScopedAStatus setParameterAcousticEchoCanceler(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex);
     ndk::ScopedAStatus getParameterAcousticEchoCanceler(const AcousticEchoCanceler::Id& id,
-                                                        Parameter::Specific* specific);
+                                                        Parameter::Specific* specific)
+            REQUIRES(mImplMutex);
 
-    ndk::ScopedAStatus setParameterAutomaticGainControlV1(const Parameter::Specific& specific);
+    ndk::ScopedAStatus setParameterAutomaticGainControlV1(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex);
     ndk::ScopedAStatus getParameterAutomaticGainControlV1(const AutomaticGainControlV1::Id& id,
-                                                          Parameter::Specific* specific);
+                                                          Parameter::Specific* specific)
+            REQUIRES(mImplMutex);
 
-    ndk::ScopedAStatus setParameterAutomaticGainControlV2(const Parameter::Specific& specific);
+    ndk::ScopedAStatus setParameterAutomaticGainControlV2(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex);
     ndk::ScopedAStatus getParameterAutomaticGainControlV2(const AutomaticGainControlV2::Id& id,
-                                                          Parameter::Specific* specific);
+                                                          Parameter::Specific* specific)
+            REQUIRES(mImplMutex);
 
-    ndk::ScopedAStatus setParameterNoiseSuppression(const Parameter::Specific& specific);
+    ndk::ScopedAStatus setParameterNoiseSuppression(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex);
     ndk::ScopedAStatus getParameterNoiseSuppression(const NoiseSuppression::Id& id,
-                                                    Parameter::Specific* specific);
+                                                    Parameter::Specific* specific)
+            REQUIRES(mImplMutex);
 };
 
 }  // namespace aidl::android::hardware::audio::effect

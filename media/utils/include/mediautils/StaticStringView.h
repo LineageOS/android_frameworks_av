@@ -21,15 +21,15 @@
 
 #pragma push_macro("EXPLICIT_CONVERSION_GENERATE_OPERATOR")
 #undef EXPLICIT_CONVERSION_GENERATE_OPERATOR
-#define EXPLICIT_CONVERSION_GENERATE_OPERATOR(T, U, op)               \
-    friend constexpr bool operator op(T lhs, T rhs) {                 \
-        return operator op(static_cast<U>(lhs), static_cast<U>(rhs)); \
-    }                                                                 \
-    friend constexpr bool operator op(T lhs, U rhs) {                 \
-        return operator op(static_cast<U>(lhs), rhs);                 \
-    }                                                                 \
-    friend constexpr bool operator op(U lhs, T rhs) {                 \
-        return operator op(lhs, static_cast<U>(rhs));                 \
+#define EXPLICIT_CONVERSION_GENERATE_OPERATOR(T, U, op)    \
+    friend constexpr bool operator op(T lhs, T rhs) {      \
+        return static_cast<U>(lhs) op static_cast<U>(rhs); \
+    }                                                      \
+    friend constexpr bool operator op(T lhs, U rhs) {      \
+        return static_cast<U>(lhs) op rhs;                 \
+    }                                                      \
+    friend constexpr bool operator op(U lhs, T rhs) {      \
+        return lhs op static_cast<U>(rhs);                 \
     }
 
 #pragma push_macro("EXPLICIT_CONVERSION_GENERATE_COMPARISON_OPERATORS")

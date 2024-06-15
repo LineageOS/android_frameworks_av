@@ -1,22 +1,24 @@
 /*
-**
-** Copyright 2015, The Android Open Source Project
-**
-** Licensed under the Apache License, Version 2.0 (the "License");
-** you may not use this file except in compliance with the License.
-** You may obtain a copy of the License at
-**
-**     http://www.apache.org/licenses/LICENSE-2.0
-**
-** Unless required by applicable law or agreed to in writing, software
-** distributed under the License is distributed on an "AS IS" BASIS,
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-** See the License for the specific language governing permissions and
-** limitations under the License.
-*/
+ *
+ * Copyright 2015, The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
+
+#include "AudioStreamOut.h"
 
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
@@ -24,7 +26,6 @@
 #include <utils/Log.h>
 
 #include "AudioHwDevice.h"
-#include "AudioStreamOut.h"
 
 namespace android {
 
@@ -98,15 +99,15 @@ status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timesp
         return status;
     }
 
-    // Adjust for standby using HAL rate frames.
-    // Only apply this correction if the HAL is getting PCM frames.
-    if (mHalFormatHasProportionalFrames) {
+    if (mHalFormatHasProportionalFrames &&
+            (flags & AUDIO_OUTPUT_FLAG_DIRECT) == AUDIO_OUTPUT_FLAG_DIRECT) {
+        // For DirectTrack reset timestamp to 0 on standby.
         const uint64_t adjustedPosition = (halPosition <= mFramesWrittenAtStandby) ?
                 0 : (halPosition - mFramesWrittenAtStandby);
         // Scale from HAL sample rate to application rate.
         *frames = adjustedPosition / mRateMultiplier;
     } else {
-        // For offloaded MP3 and other compressed formats.
+        // For offloaded MP3 and other compressed formats, and linear PCM.
         *frames = halPosition;
     }
 
@@ -132,14 +133,9 @@ status_t AudioStreamOut::open(
             config,
             address,
             &outStream);
-    ALOGV("AudioStreamOut::open(), HAL returned "
-            " stream %p, sampleRate %d, Format %#x, "
-            "channelMask %#x, status %d",
-            outStream.get(),
-            config->sample_rate,
-            config->format,
-            config->channel_mask,
-            status);
+    ALOGV("AudioStreamOut::open(), HAL returned stream %p, sampleRate %d, format %#x,"
+            " channelMask %#x, status %d", outStream.get(), config->sample_rate, config->format,
+            config->channel_mask, status);
 
     // Some HALs may not recognize AUDIO_FORMAT_IEC61937. But if we declare
     // it as PCM then it will probably work.
@@ -162,7 +158,7 @@ status_t AudioStreamOut::open(
         mHalFormatHasProportionalFrames = audio_has_proportional_frames(config->format);
         status = stream->getFrameSize(&mHalFrameSize);
         LOG_ALWAYS_FATAL_IF(status != OK, "Error retrieving frame size from HAL: %d", status);
-        LOG_ALWAYS_FATAL_IF(mHalFrameSize <= 0, "Error frame size was %zu but must be greater than"
+        LOG_ALWAYS_FATAL_IF(mHalFrameSize == 0, "Error frame size was %zu but must be greater than"
                 " zero", mHalFrameSize);
 
     }

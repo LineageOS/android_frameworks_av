@@ -248,6 +248,11 @@ public:
             /*out*/
             bool* supported);
 
+    virtual binder::Status getSessionCharacteristics(
+            const std::string& cameraId, int targetSdkVersion, bool overrideToPortrait,
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/ CameraMetadata* outMetadata);
+
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
                                    Parcel* reply, uint32_t flags);
@@ -681,6 +686,9 @@ private:
             int callingUid) const;
 
     bool hasCameraPermissions() const;
+
+    bool hasPermissionsForCameraPrivacyAllowlist(int callingPid, int callingUid) const;
+
    /**
      * Typesafe version of device status, containing both the HAL-layer and the service interface-
      * layer values.
@@ -692,6 +700,8 @@ private:
         NOT_AVAILABLE = static_cast<int32_t>(hardware::ICameraServiceListener::STATUS_NOT_AVAILABLE),
         UNKNOWN = static_cast<int32_t>(hardware::ICameraServiceListener::STATUS_UNKNOWN)
     };
+
+    friend int32_t format_as(StatusInternal s);
 
     /**
      * Container class for the state of each logical camera device, including: ID, status, and
@@ -866,16 +876,20 @@ private:
             public virtual IServiceManager::LocalRegistrationCallback {
         public:
             explicit SensorPrivacyPolicy(wp<CameraService> service)
-                    : mService(service), mSensorPrivacyEnabled(false), mRegistered(false) {}
+                    : mService(service), mSensorPrivacyEnabled(false),
+                    mCameraPrivacyState(SensorPrivacyManager::DISABLED), mRegistered(false) {}
 
             void registerSelf();
             void unregisterSelf();
 
             bool isSensorPrivacyEnabled();
             bool isCameraPrivacyEnabled();
+            int getCameraPrivacyState();
+            bool isCameraPrivacyEnabled(const String16& packageName);
 
             binder::Status onSensorPrivacyChanged(int toggleType, int sensor,
                                                   bool enabled);
+            binder::Status onSensorPrivacyStateChanged(int toggleType, int sensor, int state);
 
             // Implementation of IServiceManager::LocalRegistrationCallback
             virtual void onServiceRegistration(const String16& name,
@@ -888,6 +902,7 @@ private:
             wp<CameraService> mService;
             Mutex mSensorPrivacyLock;
             bool mSensorPrivacyEnabled;
+            int mCameraPrivacyState;
             bool mRegistered;
 
             bool hasCameraPrivacyFeature();
@@ -923,6 +938,9 @@ private:
     binder::Status validateClientPermissionsLocked(const std::string& cameraId,
             const std::string& clientName, /*inout*/int& clientUid, /*inout*/int& clientPid,
             /*out*/int& originalClientPid) const;
+
+    bool isCameraPrivacyEnabled(const String16& packageName,const std::string& cameraId,
+           int clientPid, int ClientUid);
 
     // Handle active client evictions, and update service state.
     // Only call with with mServiceLock held.
@@ -1382,6 +1400,9 @@ private:
 
     // Blocks all active clients.
     void blockAllClients();
+
+    // Blocks clients whose privacy is enabled.
+    void blockPrivacyEnabledClients();
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(const Vector<String16>& args, int err);

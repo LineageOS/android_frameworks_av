@@ -14,23 +14,26 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
-#define LOG_TAG "AudioEffectAnalyser"
-
-#include <android-base/file.h>
-#include <android-base/stringprintf.h>
-#include <gtest/gtest.h>
-#include <media/AudioEffect.h>
-#include <system/audio_effects/effect_bassboost.h>
-#include <system/audio_effects/effect_equalizer.h>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <tuple>
 #include <vector>
 
+// #define LOG_NDEBUG 0
+#define LOG_TAG "AudioEffectAnalyser"
+
+#include <android-base/file.h>
+#include <android-base/stringprintf.h>
+#include <binder/ProcessState.h>
+#include <gtest/gtest.h>
+#include <media/AudioEffect.h>
+#include <system/audio_effects/effect_bassboost.h>
+#include <system/audio_effects/effect_equalizer.h>
+
 #include "audio_test_utils.h"
 #include "pffft.hpp"
+#include "test_execution_tracer.h"
 
 #define CHECK_OK(expr, msg) \
     mStatus = (expr);       \
@@ -416,4 +419,11 @@ TEST(AudioEffectTest, CheckBassBoostEffect) {
         EXPECT_GE(diffB, prevGain) << "increase in boost strength causing fall in gain";
         prevGain = diffB;
     }
+}
+
+int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
 }

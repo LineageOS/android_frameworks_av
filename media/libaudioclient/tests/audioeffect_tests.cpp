@@ -15,8 +15,9 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "AudioEffectUnitTests"
+#define LOG_TAG "AudioEffectTests"
 
+#include <binder/ProcessState.h>
 #include <gtest/gtest.h>
 #include <media/AudioEffect.h>
 #include <system/audio_effects/effect_hapticgenerator.h>
@@ -24,6 +25,7 @@
 #include <system/audio_effects/effect_visualizer.h>
 
 #include "audio_test_utils.h"
+#include "test_execution_tracer.h"
 
 using namespace android;
 
@@ -80,7 +82,7 @@ bool isEffectDefaultOnRecord(const effect_uuid_t* type, const effect_uuid_t* uui
     uint32_t numEffects = AudioEffect::kMaxPreProcessing;
     status_t ret = AudioEffect::queryDefaultPreProcessing(audioRecord->getSessionId(), descriptors,
                                                           &numEffects);
-    if (ret != OK) {
+    if (ret != OK || numEffects > AudioEffect::kMaxPreProcessing) {
         return false;
     }
     for (int i = 0; i < numEffects; i++) {
@@ -247,6 +249,7 @@ TEST(AudioEffectTest, ManageSourceDefaultEffects) {
             ASSERT_NE(capture, nullptr) << "Unable to create Record Application";
             EXPECT_EQ(NO_ERROR, capture->create());
             EXPECT_EQ(NO_ERROR, capture->start());
+            ASSERT_NE(capture->getAudioRecordHandle(), nullptr);
             if (!isEffectDefaultOnRecord(&descriptors[i].type, &descriptors[i].uuid,
                                          capture->getAudioRecordHandle())) {
                 selectedEffect = i;
@@ -265,6 +268,7 @@ TEST(AudioEffectTest, ManageSourceDefaultEffects) {
     ASSERT_NE(capture, nullptr) << "Unable to create Record Application";
     EXPECT_EQ(NO_ERROR, capture->create());
     EXPECT_EQ(NO_ERROR, capture->start());
+    ASSERT_NE(capture->getAudioRecordHandle(), nullptr);
     EXPECT_FALSE(isEffectDefaultOnRecord(selectedEffectType, selectedEffectUuid,
                                          capture->getAudioRecordHandle()))
             << "Effect should not have been default on record. " << type;
@@ -287,6 +291,7 @@ TEST(AudioEffectTest, ManageSourceDefaultEffects) {
     ASSERT_NE(capture, nullptr) << "Unable to create Record Application";
     EXPECT_EQ(NO_ERROR, capture->create());
     EXPECT_EQ(NO_ERROR, capture->start());
+    ASSERT_NE(capture->getAudioRecordHandle(), nullptr);
     EXPECT_TRUE(isEffectDefaultOnRecord(selectedEffectType, selectedEffectUuid,
                                         capture->getAudioRecordHandle()))
             << "Effect should have been default on record. " << type;
@@ -304,6 +309,7 @@ TEST(AudioEffectTest, ManageSourceDefaultEffects) {
     ASSERT_NE(capture, nullptr) << "Unable to create Record Application";
     EXPECT_EQ(NO_ERROR, capture->create());
     EXPECT_EQ(NO_ERROR, capture->start());
+    ASSERT_NE(capture->getAudioRecordHandle(), nullptr);
     EXPECT_FALSE(isEffectDefaultOnRecord(selectedEffectType, selectedEffectUuid,
                                          capture->getAudioRecordHandle()))
             << "Effect should not have been default on record. " << type;
@@ -558,4 +564,11 @@ TEST(AudioEffectTest, TestHapticEffect) {
     playback.clear();
     EXPECT_TRUE(cb->receivedFramesProcessed)
             << "AudioEffect frames processed callback not received";
+}
+
+int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
+    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new TestExecutionTracer());
+    return RUN_ALL_TESTS();
 }

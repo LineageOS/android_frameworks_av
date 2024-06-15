@@ -1,0 +1,76 @@
+# Codec framework feature flags.
+#
+# !!! Please add flags in alphabetical order. !!!
+
+package: "android.media.codec"
+container: "system"
+
+flag {
+  name: "aidl_hal_input_surface"
+  namespace: "codec_fwk"
+  description: "Feature flags for enabling AIDL HAL InputSurface handling"
+  bug: "201479783"
+}
+
+flag {
+  name: "dynamic_color_aspects"
+  namespace: "codec_fwk"
+  description: "Feature flag for dynamic color aspect support"
+  bug: "297914560"
+}
+
+flag {
+  name: "hlg_editing"
+  namespace: "codec_fwk"
+  description: "Feature flag for HLG editing support"
+  bug: "316397061"
+}
+
+flag {
+  name: "in_process_sw_audio_codec"
+  namespace: "codec_fwk"
+  description: "Feature flag for in-process software audio codec API"
+  bug: "297922713"
+}
+
+flag {
+  name: "in_process_sw_audio_codec_support"
+  namespace: "codec_fwk"
+  description: "Feature flag for in-process software audio codec support"
+  bug: "325520135"
+}
+
+flag {
+  name: "large_audio_frame_finish"
+  namespace: "codec_fwk"
+  description: "Implementation flag for large audio frame finishing tasks"
+  bug: "325512893"
+}
+
+flag {
+  name: "null_output_surface"
+  namespace: "codec_fwk"
+  description: "Feature flag for null output Surface API"
+  bug: "297920102"
+}
+
+flag {
+  name: "null_output_surface_support"
+  namespace: "codec_fwk"
+  description: "Feature flag for null output Surface support"
+  bug: "325550522"
+}
+
+flag {
+  name: "region_of_interest"
+  namespace: "codec_fwk"
+  description: "Feature flag for region of interest API"
+  bug: "299191092"
+}
+
+flag {
+  name: "region_of_interest_support"
+  namespace: "codec_fwk"
+  description: "Feature flag for region of interest support"
+  bug: "325549730"
+}

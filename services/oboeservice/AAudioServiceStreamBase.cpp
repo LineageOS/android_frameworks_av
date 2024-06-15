@@ -75,11 +75,7 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
                         this, getState());
 
     // Stop the command thread before destroying.
-    if (mThreadEnabled) {
-        mThreadEnabled = false;
-        mCommandQueue.stopWaiting();
-        mCommandThread.stop();
-    }
+    stopCommandThread();
 }
 
 std::string AAudioServiceStreamBase::dumpHeader() {
@@ -194,26 +190,27 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
 
 error:
     closeAndClear();
-    mThreadEnabled = false;
-    mCommandQueue.stopWaiting();
-    mCommandThread.stop();
+    stopCommandThread();
     return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::close() {
     aaudio_result_t result = sendCommand(CLOSE, nullptr, true /*waitForReply*/, TIMEOUT_NANOS);
+    if (result == AAUDIO_ERROR_ALREADY_CLOSED) {
+        // AAUDIO_ERROR_ALREADY_CLOSED is not a really error but just indicate the stream has
+        // already been closed. In that case, there is no need to close the stream once more.
+        ALOGD("The stream(%d) is already closed", mHandle);
+        return AAUDIO_OK;
+    }
 
-    // Stop the command thread as the stream is closed.
-    mThreadEnabled = false;
-    mCommandQueue.stopWaiting();
-    mCommandThread.stop();
+    stopCommandThread();
 
     return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::close_l() {
     if (getState() == AAUDIO_STREAM_STATE_CLOSED) {
-        return AAUDIO_OK;
+        return AAUDIO_ERROR_ALREADY_CLOSED;
     }
 
     // This will stop the stream, just in case it was not already stopped.
@@ -643,7 +640,7 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
     int32_t count = mUpMessageQueue->getFifoBuffer()->write(command, 1);
     if (count != 1) {
         ALOGW("%s(): Queue full. Did client stop? Suspending stream. what = %u, %s",
-              __func__, command->what, getTypeText());
+              __func__, static_cast<unsigned>(command->what), getTypeText());
         setSuspended(true);
         return AAUDIO_ERROR_WOULD_BLOCK;
     } else {
@@ -765,4 +762,12 @@ aaudio_result_t AAudioServiceStreamBase::closeAndClear() {
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CLOSE)
         .record();
     return result;
+}
+
+void AAudioServiceStreamBase::stopCommandThread() {
+    bool threadEnabled = true;
+    if (mThreadEnabled.compare_exchange_strong(threadEnabled, false)) {
+        mCommandQueue.stopWaiting();
+        mCommandThread.stop();
+    }
 }

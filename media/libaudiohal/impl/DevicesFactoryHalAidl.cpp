@@ -17,13 +17,16 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #define LOG_TAG "DevicesFactoryHalAidl"
 //#define LOG_NDEBUG 0
 
 #include <aidl/android/hardware/audio/core/IModule.h>
+#include <aidl/android/media/audio/BnHalAdapterVendorExtension.h>
 #include <android/binder_manager.h>
+#include <cutils/properties.h>
 #include <media/AidlConversionNdkCpp.h>
 #include <media/AidlConversionUtil.h>
 #include <utils/Log.h>
@@ -35,6 +38,7 @@ using aidl::android::aidl_utils::statusTFromBinderStatus;
 using aidl::android::hardware::audio::core::IConfig;
 using aidl::android::hardware::audio::core::IModule;
 using aidl::android::hardware::audio::core::SurroundSoundConfig;
+using aidl::android::hardware::audio::core::VendorParameter;
 using aidl::android::media::audio::common::AudioHalEngineConfig;
 using aidl::android::media::audio::IHalAdapterVendorExtension;
 using android::detail::AudioHalVersionInfo;
@@ -62,10 +66,84 @@ ndk2cpp_SurroundSoundConfig(const SurroundSoundConfig& ndk) {
     return cpp;
 }
 
+class HalAdapterVendorExtensionWrapper :
+            public ::aidl::android::media::audio::BnHalAdapterVendorExtension {
+  private:
+    template<typename F>
+    ndk::ScopedAStatus callWithRetryOnCrash(F method) {
+        ndk::ScopedAStatus status = ndk::ScopedAStatus::ok();
+        for (auto service = getService(); service != nullptr; service = getService(true)) {
+            status = method(service);
+            if (status.getStatus() != STATUS_DEAD_OBJECT) break;
+        }
+        return status;
+    }
+
+    ndk::ScopedAStatus parseVendorParameterIds(ParameterScope in_scope,
+                                               const std::string& in_rawKeys,
+                                               std::vector<std::string>* _aidl_return) override {
+        return callWithRetryOnCrash([&](auto service) {
+            return service->parseVendorParameterIds(in_scope, in_rawKeys, _aidl_return);
+        });
+    }
+
+    ndk::ScopedAStatus parseVendorParameters(
+            ParameterScope in_scope, const std::string& in_rawKeysAndValues,
+            std::vector<VendorParameter>* out_syncParameters,
+            std::vector<VendorParameter>* out_asyncParameters) override {
+        return callWithRetryOnCrash([&](auto service) {
+            return service->parseVendorParameters(in_scope, in_rawKeysAndValues,
+                    out_syncParameters, out_asyncParameters);
+        });
+    }
+
+    ndk::ScopedAStatus parseBluetoothA2dpReconfigureOffload(
+            const std::string& in_rawValue, std::vector<VendorParameter>* _aidl_return) override {
+        return callWithRetryOnCrash([&](auto service) {
+            return service->parseBluetoothA2dpReconfigureOffload(in_rawValue, _aidl_return);
+        });
+    }
+
+    ndk::ScopedAStatus parseBluetoothLeReconfigureOffload(const std::string& in_rawValue,
+            std::vector<VendorParameter>* _aidl_return) override {
+        return callWithRetryOnCrash([&](auto service) {
+            return service->parseBluetoothLeReconfigureOffload(in_rawValue, _aidl_return);
+        });
+    }
+
+    ndk::ScopedAStatus processVendorParameters(ParameterScope in_scope,
+                                               const std::vector<VendorParameter>& in_parameters,
+                                               std::string* _aidl_return) override {
+        return callWithRetryOnCrash([&](auto service) {
+            return service->processVendorParameters(in_scope, in_parameters, _aidl_return);
+        });
+    }
+
+    std::shared_ptr<IHalAdapterVendorExtension> getService(bool reset = false) {
+        std::lock_guard l(mLock);
+        if (reset || !mVendorExt.has_value()) {
+            if (property_get_bool("ro.audio.ihaladaptervendorextension_enabled", false)) {
+                auto serviceName = std::string(IHalAdapterVendorExtension::descriptor) + "/default";
+                mVendorExt = std::shared_ptr<IHalAdapterVendorExtension>(
+                        IHalAdapterVendorExtension::fromBinder(ndk::SpAIBinder(
+                                        AServiceManager_waitForService(serviceName.c_str()))));
+            } else {
+                mVendorExt = nullptr;
+            }
+        }
+        return mVendorExt.value();
+    }
+
+    std::mutex mLock;
+    std::optional<std::shared_ptr<::aidl::android::media::audio::IHalAdapterVendorExtension>>
+            mVendorExt GUARDED_BY(mLock);
+};
+
 }  // namespace
 
 DevicesFactoryHalAidl::DevicesFactoryHalAidl(std::shared_ptr<IConfig> config)
-    : mConfig(std::move(config)) {
+        : mConfig(std::move(config)),
+          mVendorExt(ndk::SharedRefBase::make<HalAdapterVendorExtensionWrapper>()) {
 }
 
 status_t DevicesFactoryHalAidl::getDeviceNames(std::vector<std::string> *names) {
@@ -110,17 +188,8 @@ status_t DevicesFactoryHalAidl::openDevice(const char *name, sp<DeviceHalInterfa
         ALOGE("%s fromBinder %s failed", __func__, serviceName.c_str());
         return NO_INIT;
     }
-    *device = sp<DeviceHalAidl>::make(name, service, getVendorExtension());
+    *device = sp<DeviceHalAidl>::make(name, service, mVendorExt);
     return OK;
-}
-
-status_t DevicesFactoryHalAidl::getHalPids(std::vector<pid_t> *pids) {
-    if (pids == nullptr) {
-        return BAD_VALUE;
-    }
-    // Retrieval of HAL pids requires "list services" permission which is not granted
-    // to the audio server. This job is performed by AudioService (in Java) instead.
-    return PERMISSION_DENIED;
 }
 
 status_t DevicesFactoryHalAidl::setCallbackOnce(sp<DevicesFactoryHalCallback> callback) {
@@ -156,20 +225,6 @@ status_t DevicesFactoryHalAidl::getEngineConfig(
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mConfig->getEngineConfig(&ndkConfig)));
     *config = VALUE_OR_RETURN_STATUS(ndk2cpp_AudioHalEngineConfig(ndkConfig));
     return OK;
-}
-
-std::shared_ptr<IHalAdapterVendorExtension> DevicesFactoryHalAidl::getVendorExtension() {
-    if (!mVendorExt.has_value()) {
-        auto serviceName = std::string(IHalAdapterVendorExtension::descriptor) + "/default";
-        if (AServiceManager_isDeclared(serviceName.c_str())) {
-            mVendorExt = std::shared_ptr<IHalAdapterVendorExtension>(
-                    IHalAdapterVendorExtension::fromBinder(ndk::SpAIBinder(
-                                    AServiceManager_waitForService(serviceName.c_str()))));
-        } else {
-            mVendorExt = nullptr;
-        }
-    }
-    return mVendorExt.value();
 }
 
 // Main entry-point to the shared library.

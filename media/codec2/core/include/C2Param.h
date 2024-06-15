@@ -427,7 +427,9 @@ public:
     inline bool operator==(const C2Param &o) const {
         return equals(o) && memcmp(this, &o, _mSize) == 0;
     }
+#if __cplusplus < 202002
     inline bool operator!=(const C2Param &o) const { return !operator==(o); }
+#endif
 
     /// safe(r) type cast from pointer and size
     inline static C2Param* From(void *addr, size_t len) {

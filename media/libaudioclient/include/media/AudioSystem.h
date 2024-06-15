@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 
+#include <mutex>
 #include <set>
 #include <vector>
 
@@ -86,6 +87,7 @@ typedef void (*record_config_callback)(int event,
 typedef void (*routing_callback)();
 typedef void (*vol_range_init_req_callback)();
 
+class CaptureStateListenerImpl;
 class IAudioFlinger;
 class String8;
 
@@ -95,6 +97,13 @@ class IAudioPolicyService;
 
 class AudioSystem
 {
+    friend class AudioFlingerClient;
+    friend class AudioPolicyServiceClient;
+    friend class CaptureStateListenerImpl;
+    template <typename ServiceInterface, typename Client, typename AidlInterface,
+            typename ServiceTraits>
+    friend class ServiceHandler;
+
 public:
 
     // FIXME Declare in binder opcode order, similarly to IAudioFlinger.h and IAudioFlinger.cpp
@@ -177,8 +186,8 @@ public:
     static status_t setLocalAudioFlinger(const sp<IAudioFlinger>& af);
 
     // helper function to obtain AudioFlinger service handle
-    static const sp<IAudioFlinger> get_audio_flinger();
-    static const sp<IAudioFlinger> get_audio_flinger_for_fuzzer();
+    static sp<IAudioFlinger> get_audio_flinger();
+    static sp<IAudioFlinger> get_audio_flinger_for_fuzzer();
 
     static float linearToLog(int volume);
     static int logToLinear(float volume);
@@ -402,7 +411,12 @@ public:
     // and output configuration cache (gOutputs)
     static void clearAudioConfigCache();
 
-    static const sp<media::IAudioPolicyService> get_audio_policy_service();
+    // Sets a local AudioPolicyService interface to be used by AudioSystem.
+    // This is used by audioserver main() to allow client object initialization
+    // before exposing any interfaces to ServiceManager.
+    static status_t setLocalAudioPolicyService(const sp<media::IAudioPolicyService>& aps);
+
+    static sp<media::IAudioPolicyService> get_audio_policy_service();
     static void clearAudioPolicyService();
 
     // helpers for android.media.AudioManager.getProperty(), see description there for meaning
@@ -461,6 +475,8 @@ public:
     static audio_mode_t getPhoneState();
 
     static status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
+
+    static status_t getRegisteredPolicyMixes(std::vector<AudioMix>& mixes);
 
     static status_t updatePolicyMixes(
         const std::vector<
@@ -774,23 +790,18 @@ public:
 
     static int32_t getAAudioHardwareBurstMinUsec();
 
-private:
-
     class AudioFlingerClient: public IBinder::DeathRecipient, public media::BnAudioFlingerClient
     {
     public:
-        AudioFlingerClient() :
-            mInBuffSize(0), mInSamplingRate(0),
-            mInFormat(AUDIO_FORMAT_DEFAULT), mInChannelMask(AUDIO_CHANNEL_NONE) {
-        }
+        AudioFlingerClient() = default;
 
-        void clearIoCache();
+        void clearIoCache() EXCLUDES(mMutex);
         status_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
-                                    audio_channel_mask_t channelMask, size_t* buffSize);
-        sp<AudioIoDescriptor> getIoDescriptor(audio_io_handle_t ioHandle);
+                audio_channel_mask_t channelMask, size_t* buffSize) EXCLUDES(mMutex);
+        sp<AudioIoDescriptor> getIoDescriptor(audio_io_handle_t ioHandle) EXCLUDES(mMutex);
 
         // DeathRecipient
-        virtual void binderDied(const wp<IBinder>& who);
+        void binderDied(const wp<IBinder>& who) final;
 
         // IAudioFlingerClient
 
@@ -798,61 +809,71 @@ private:
         // values for output/input parameters up-to-date in client process
         binder::Status ioConfigChanged(
                 media::AudioIoConfigEvent event,
-                const media::AudioIoDescriptor& ioDesc) override;
+                const media::AudioIoDescriptor& ioDesc) final EXCLUDES(mMutex);
 
         binder::Status onSupportedLatencyModesChanged(
                 int output,
-                const std::vector<media::audio::common::AudioLatencyMode>& latencyModes) override;
+                const std::vector<media::audio::common::AudioLatencyMode>& latencyModes)
+                final EXCLUDES(mMutex);
 
         status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                               audio_io_handle_t audioIo,
-                                               audio_port_handle_t portId);
+                audio_io_handle_t audioIo, audio_port_handle_t portId) EXCLUDES(mMutex);
         status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                           audio_io_handle_t audioIo,
-                                           audio_port_handle_t portId);
+                audio_io_handle_t audioIo, audio_port_handle_t portId) EXCLUDES(mMutex);
 
         status_t addSupportedLatencyModesCallback(
-                        const sp<SupportedLatencyModesCallback>& callback);
+                const sp<SupportedLatencyModesCallback>& callback) EXCLUDES(mMutex);
         status_t removeSupportedLatencyModesCallback(
-                        const sp<SupportedLatencyModesCallback>& callback);
+                const sp<SupportedLatencyModesCallback>& callback) EXCLUDES(mMutex);
 
-        audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
+        audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo) EXCLUDES(mMutex);
 
     private:
-        Mutex                               mLock;
-        DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor> >   mIoDescriptors;
+        mutable std::mutex mMutex;
+        std::map<audio_io_handle_t, sp<AudioIoDescriptor>> mIoDescriptors GUARDED_BY(mMutex);
 
         std::map<audio_io_handle_t, std::map<audio_port_handle_t, wp<AudioDeviceCallback>>>
-                mAudioDeviceCallbacks;
+                mAudioDeviceCallbacks GUARDED_BY(mMutex);
 
         std::vector<wp<SupportedLatencyModesCallback>>
-                mSupportedLatencyModesCallbacks GUARDED_BY(mLock);
+                mSupportedLatencyModesCallbacks GUARDED_BY(mMutex);
 
         // cached values for recording getInputBufferSize() queries
-        size_t                              mInBuffSize;    // zero indicates cache is invalid
-        uint32_t                            mInSamplingRate;
-        audio_format_t                      mInFormat;
-        audio_channel_mask_t                mInChannelMask;
-        sp<AudioIoDescriptor> getIoDescriptor_l(audio_io_handle_t ioHandle);
+        size_t mInBuffSize GUARDED_BY(mMutex) = 0; // zero indicates cache is invalid
+        uint32_t mInSamplingRate GUARDED_BY(mMutex) = 0;
+        audio_format_t mInFormat GUARDED_BY(mMutex) = AUDIO_FORMAT_DEFAULT;
+        audio_channel_mask_t mInChannelMask GUARDED_BY(mMutex) = AUDIO_CHANNEL_NONE;
+
+        sp<AudioIoDescriptor> getIoDescriptor_l(audio_io_handle_t ioHandle) REQUIRES(mMutex);
     };
 
     class AudioPolicyServiceClient: public IBinder::DeathRecipient,
-                                    public media::BnAudioPolicyServiceClient
-    {
+                                    public media::BnAudioPolicyServiceClient {
     public:
-        AudioPolicyServiceClient() {
+        AudioPolicyServiceClient() = default;
+
+        int addAudioPortCallback(const sp<AudioPortCallback>& callback) EXCLUDES(mMutex);
+
+        int removeAudioPortCallback(const sp<AudioPortCallback>& callback) EXCLUDES(mMutex);
+
+        bool isAudioPortCbEnabled() const EXCLUDES(mMutex) {
+            std::lock_guard _l(mMutex);
+            return !mAudioPortCallbacks.empty();
         }
 
-        int addAudioPortCallback(const sp<AudioPortCallback>& callback);
-        int removeAudioPortCallback(const sp<AudioPortCallback>& callback);
-        bool isAudioPortCbEnabled() const { return (mAudioPortCallbacks.size() != 0); }
+        int addAudioVolumeGroupCallback(
+                const sp<AudioVolumeGroupCallback>& callback) EXCLUDES(mMutex);
 
-        int addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
-        int removeAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
-        bool isAudioVolumeGroupCbEnabled() const { return (mAudioVolumeGroupCallback.size() != 0); }
+        int removeAudioVolumeGroupCallback(
+                const sp<AudioVolumeGroupCallback>& callback) EXCLUDES(mMutex);
+
+        bool isAudioVolumeGroupCbEnabled() const EXCLUDES(mMutex) {
+            std::lock_guard _l(mMutex);
+            return !mAudioVolumeGroupCallbacks.empty();
+        }
 
         // DeathRecipient
-        virtual void binderDied(const wp<IBinder>& who);
+        void binderDied(const wp<IBinder>& who) final;
 
         // IAudioPolicyServiceClient
         binder::Status onAudioVolumeGroupChanged(int32_t group, int32_t flags) override;
@@ -873,43 +894,36 @@ private:
         binder::Status onVolumeRangeInitRequest();
 
     private:
-        Mutex                               mLock;
-        Vector <sp <AudioPortCallback> >    mAudioPortCallbacks;
-        Vector <sp <AudioVolumeGroupCallback> > mAudioVolumeGroupCallback;
+        mutable std::mutex mMutex;
+        std::set<sp<AudioPortCallback>> mAudioPortCallbacks GUARDED_BY(mMutex);
+        std::set<sp<AudioVolumeGroupCallback>> mAudioVolumeGroupCallbacks GUARDED_BY(mMutex);
     };
 
+    private:
+
     static audio_io_handle_t getOutput(audio_stream_type_t stream);
-    static const sp<AudioFlingerClient> getAudioFlingerClient();
+    static sp<AudioFlingerClient> getAudioFlingerClient();
     static sp<AudioIoDescriptor> getIoDescriptor(audio_io_handle_t ioHandle);
-    static const sp<IAudioFlinger> getAudioFlingerImpl(bool canStartThreadPool);
 
     // Invokes all registered error callbacks with the given error code.
     static void reportError(status_t err);
 
-    static sp<AudioFlingerClient> gAudioFlingerClient;
-    static sp<AudioPolicyServiceClient> gAudioPolicyServiceClient;
-    friend class AudioFlingerClient;
-    friend class AudioPolicyServiceClient;
+    [[clang::no_destroy]] static std::mutex gMutex;
+    static dynamic_policy_callback gDynPolicyCallback GUARDED_BY(gMutex);
+    static record_config_callback gRecordConfigCallback GUARDED_BY(gMutex);
+    static routing_callback gRoutingCallback GUARDED_BY(gMutex);
+    static vol_range_init_req_callback gVolRangeInitReqCallback GUARDED_BY(gMutex);
 
-    static Mutex gLock;      // protects gAudioFlinger
-    static Mutex gLockErrorCallbacks;      // protects gAudioErrorCallbacks
-    static Mutex gLockAPS;   // protects gAudioPolicyService and gAudioPolicyServiceClient
-    static sp<IAudioFlinger> gAudioFlinger;
-    static std::set<audio_error_callback> gAudioErrorCallbacks;
-    static dynamic_policy_callback gDynPolicyCallback;
-    static record_config_callback gRecordConfigCallback;
-    static routing_callback gRoutingCallback;
-    static vol_range_init_req_callback gVolRangeInitReqCallback;
+    [[clang::no_destroy]] static std::mutex gApsCallbackMutex;
+    [[clang::no_destroy]] static std::mutex gErrorCallbacksMutex;
+    [[clang::no_destroy]] static std::set<audio_error_callback> gAudioErrorCallbacks
+            GUARDED_BY(gErrorCallbacksMutex);
 
-    static size_t gInBuffSize;
-    // previous parameters for recording buffer size queries
-    static uint32_t gPrevInSamplingRate;
-    static audio_format_t gPrevInFormat;
-    static audio_channel_mask_t gPrevInChannelMask;
-
-    static sp<media::IAudioPolicyService> gAudioPolicyService;
+    [[clang::no_destroy]] static std::mutex gSoundTriggerMutex;
+    [[clang::no_destroy]] static sp<CaptureStateListenerImpl> gSoundTriggerCaptureStateListener
+            GUARDED_BY(gSoundTriggerMutex);
 };
 
-};  // namespace android
+}  // namespace android
 
 #endif  /*ANDROID_AUDIOSYSTEM_H_*/

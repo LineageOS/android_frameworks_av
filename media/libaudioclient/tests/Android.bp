@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_android_media_audio_framework",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -133,6 +134,10 @@ cc_defaults {
         "libaudiopolicy",
     ],
     data: ["bbb*.raw"],
+    srcs: [
+        "audio_test_utils.cpp",
+        "test_execution_tracer.cpp",
+    ],
     test_config_template: "audio_test_template.xml",
 }
 
@@ -141,7 +146,6 @@ cc_test {
     defaults: ["libaudioclient_gtests_defaults"],
     srcs: [
         "audiorecord_tests.cpp",
-        "audio_test_utils.cpp",
     ],
 }
 
@@ -150,7 +154,6 @@ cc_test {
     defaults: ["libaudioclient_gtests_defaults"],
     srcs: [
         "audiotrack_tests.cpp",
-        "audio_test_utils.cpp",
     ],
 }
 
@@ -159,7 +162,6 @@ cc_test {
     defaults: ["libaudioclient_gtests_defaults"],
     srcs: [
         "audioeffect_tests.cpp",
-        "audio_test_utils.cpp",
     ],
 }
 
@@ -172,7 +174,6 @@ cc_test {
     ],
     srcs: [
         "audioeffect_analyser.cpp",
-        "audio_test_utils.cpp",
     ],
     static_libs: [
         "libpffft",
@@ -184,7 +185,6 @@ cc_test {
     defaults: ["libaudioclient_gtests_defaults"],
     srcs: [
         "audiorouting_tests.cpp",
-        "audio_test_utils.cpp",
     ],
 }
 
@@ -193,14 +193,15 @@ cc_test {
     defaults: ["libaudioclient_gtests_defaults"],
     srcs: [
         "audioclient_serialization_tests.cpp",
-        "audio_test_utils.cpp",
     ],
 }
 
 cc_test {
     name: "trackplayerbase_tests",
     defaults: ["libaudioclient_gtests_defaults"],
-    srcs: ["trackplayerbase_tests.cpp"],
+    srcs: [
+        "trackplayerbase_tests.cpp",
+    ],
 }
 
 cc_test {
@@ -208,6 +209,5 @@ cc_test {
     defaults: ["libaudioclient_gtests_defaults"],
     srcs: [
         "audiosystem_tests.cpp",
-        "audio_test_utils.cpp",
     ],
 }

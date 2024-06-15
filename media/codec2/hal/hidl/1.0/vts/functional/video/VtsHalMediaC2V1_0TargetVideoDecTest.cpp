@@ -29,6 +29,7 @@
 #include <C2BufferPriv.h>
 #include <C2Config.h>
 #include <C2Debug.h>
+#include <codec2/common/HalSelection.h>
 #include <codec2/hidl/client.h>
 #include <gui/BufferQueue.h>
 #include <gui/IConsumerListener.h>
@@ -407,30 +408,45 @@ void setOutputSurface(const std::shared_ptr<android::Codec2Client::Component>& c
                       surfaceMode_t surfMode) {
     using namespace android;
     sp<IGraphicBufferProducer> producer = nullptr;
+    sp<IGraphicBufferConsumer> consumer = nullptr;
+    sp<GLConsumer> texture = nullptr;
+    sp<ANativeWindow> surface = nullptr;
     static std::atomic_uint32_t surfaceGeneration{0};
     uint32_t generation =
             (getpid() << 10) |
             ((surfaceGeneration.fetch_add(1, std::memory_order_relaxed) + 1) & ((1 << 10) - 1));
     int32_t maxDequeueBuffers = kSmoothnessFactor + kRenderingDepth;
+    C2BlockPool::local_id_t poolId = C2BlockPool::BASIC_GRAPHIC;
+    std::shared_ptr<Codec2Client::Configurable> configurable;
+    bool aidl = ::android::IsCodec2AidlHalSelected();
+    if (aidl) {
+        // AIDL does not support blockpool-less mode.
+        c2_status_t poolRet = component->createBlockPool(
+                C2PlatformAllocatorStore::IGBA, &poolId, &configurable);
+        ASSERT_EQ(poolRet, C2_OK) << "setOutputSurface failed";
+    }
+
     if (surfMode == SURFACE) {
-        sp<IGraphicBufferConsumer> consumer = nullptr;
         BufferQueue::createBufferQueue(&producer, &consumer);
         ASSERT_NE(producer, nullptr) << "createBufferQueue returned invalid producer";
         ASSERT_NE(consumer, nullptr) << "createBufferQueue returned invalid consumer";
 
-        sp<GLConsumer> texture =
+        texture =
                 new GLConsumer(consumer, 0 /* tex */, GLConsumer::TEXTURE_EXTERNAL,
                                true /* useFenceSync */, false /* isControlledByApp */);
 
-        sp<ANativeWindow> gSurface = new Surface(producer);
-        ASSERT_NE(gSurface, nullptr) << "getSurface failed";
+        surface = new Surface(producer);
+        ASSERT_NE(surface, nullptr) << "failed to create Surface object";
 
         producer->setGenerationNumber(generation);
     }
 
-    c2_status_t err = component->setOutputSurface(C2BlockPool::BASIC_GRAPHIC, producer, generation,
+    c2_status_t err = component->setOutputSurface(poolId, producer, generation,
                                                   maxDequeueBuffers);
-    ASSERT_EQ(err, C2_OK) << "setOutputSurface failed";
+    std::string surfStr = surfMode == NO_SURFACE ? "NO_SURFACE" :
+            (surfMode == NULL_SURFACE ? "NULL_SURFACE" : "WITH_SURFACE");
+
+    ASSERT_EQ(err, C2_OK) << "setOutputSurface failed, surfMode: " << surfStr;
 }
 
 void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
@@ -723,7 +739,7 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
             ASSERT_NE(vtsFlags, 0xFF) << "unrecognized flag entry in info file: " << mInfoFile;
             eleInfo >> timestamp;
             timestamp += timestampOffset;
-            Info.push_back({bytesCount, vtsFlags, timestamp});
+            Info.push_back({bytesCount, vtsFlags, timestamp, {}});
             bool codecConfig = (vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME)) != 0;
             bool nonDisplayFrame = (vtsFlags & (1 << VTS_BIT_FLAG_NO_SHOW_FRAME)) != 0;
 
@@ -962,7 +978,7 @@ TEST_P(Codec2VideoDecHidlTest, DecodeTestEmptyBuffersInserted) {
             eleInfo >> timestamp;
             codecConfig = (vtsFlags & (1 << VTS_BIT_FLAG_CSD_FRAME)) != 0;
         }
-        Info.push_back({bytesCount, vtsFlags, timestamp});
+        Info.push_back({bytesCount, vtsFlags, timestamp, {}});
         frameId++;
     }
     eleInfo.close();

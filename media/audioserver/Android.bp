@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -70,7 +71,6 @@ cc_binary {
         "frameworks/av/services/audiopolicy/service",
         "frameworks/av/services/medialog",
         "frameworks/av/services/oboeservice", // TODO oboeservice is the old folder name for aaudioservice. It will be changed.
-
 
     ],
 

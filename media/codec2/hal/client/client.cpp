@@ -635,21 +635,22 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
     if (heapParams) {
         heapParams->reserve(heapParams->size() + numIndices);
     }
-    c2_aidl::Params result;
+    c2_aidl::IConfigurable::QueryResult result;
     ndk::ScopedAStatus transStatus = mBase->query(indices, (mayBlock == C2_MAY_BLOCK), &result);
     c2_status_t status = GetC2Status(transStatus, "query");
     if (status != C2_OK) {
         return status;
     }
+    status = static_cast<c2_status_t>(result.status.status);
 
     std::vector<C2Param*> paramPointers;
-    if (!c2_aidl::utils::ParseParamsBlob(&paramPointers, result)) {
+    if (!c2_aidl::utils::ParseParamsBlob(&paramPointers, result.params)) {
         LOG(ERROR) << "query -- error while parsing params.";
         return C2_CORRUPTED;
     }
     size_t i = 0;
-    for (auto it = paramPointers.begin();
-            it != paramPointers.end(); ) {
+    size_t numQueried = 0;
+    for (auto it = paramPointers.begin(); it != paramPointers.end(); ) {
         C2Param* paramPointer = *it;
         if (numStackIndices > 0) {
             --numStackIndices;
@@ -676,7 +677,9 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
                 status = C2_BAD_INDEX;
                 continue;
             }
-            if (!stackParams[i++]->updateFrom(*paramPointer)) {
+            if (stackParams[i++]->updateFrom(*paramPointer)) {
+                ++numQueried;
+            } else {
                 LOG(WARNING) << "query -- param update failed: "
                                 "index = "
                              << paramPointer->index() << ".";
@@ -692,9 +695,13 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::query(
                                 "unexpected extra stack param.";
             } else {
                 heapParams->emplace_back(C2Param::Copy(*paramPointer));
+                ++numQueried;
             }
         }
         ++it;
+    }
+    if (status == C2_OK && indices.size() != numQueried) {
+        status = C2_BAD_INDEX;
     }
     return status;
 }
@@ -714,6 +721,7 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::config(
     if (status != C2_OK) {
         return status;
     }
+    status = static_cast<c2_status_t>(result.status.status);
     size_t i = failures->size();
     failures->resize(i + result.failures.size());
     for (const c2_aidl::SettingResult& sf : result.failures) {
@@ -764,21 +772,23 @@ c2_status_t Codec2ConfigurableClient::AidlImpl::querySupportedValues(
         }
     }
 
-    std::vector<c2_aidl::FieldSupportedValuesQueryResult> result;
+    c2_aidl::IConfigurable::QuerySupportedValuesResult result;
+
     ndk::ScopedAStatus transStatus = mBase->querySupportedValues(
             inFields, (mayBlock == C2_MAY_BLOCK), &result);
     c2_status_t status = GetC2Status(transStatus, "querySupportedValues");
     if (status != C2_OK) {
         return status;
     }
-    if (result.size() != fields.size()) {
+    status = static_cast<c2_status_t>(result.status.status);
+    if (result.values.size() != fields.size()) {
         LOG(ERROR) << "querySupportedValues -- "
                       "input and output lists "
                       "have different sizes.";
         return C2_CORRUPTED;
     }
     for (size_t i = 0; i < fields.size(); ++i) {
-        if (!c2_aidl::utils::FromAidl(&fields[i], inFields[i], result[i])) {
+        if (!c2_aidl::utils::FromAidl(&fields[i], inFields[i], result.values[i])) {
             LOG(ERROR) << "querySupportedValues -- "
                           "invalid returned value.";
             return C2_CORRUPTED;
@@ -2059,6 +2069,8 @@ c2_status_t Codec2Client::Component::createBlockPool(
         id = id == C2PlatformAllocatorStore::BUFFERQUEUE ?
                 C2PlatformAllocatorStore::IGBA : id;
 
+        c2_aidl::IComponent::BlockPoolAllocator allocator;
+        allocator.allocatorId = id;
         if (id == C2PlatformAllocatorStore::IGBA)  {
             std::shared_ptr<AidlGraphicBufferAllocator> gba =
                     mGraphicBufferAllocators->create();
@@ -2068,12 +2080,11 @@ c2_status_t Codec2Client::Component::createBlockPool(
             if (status != C2_OK) {
                 return status;
             }
-            c2_aidl::IComponent::BlockPoolAllocator allocator;
-            allocator.set<c2_aidl::IComponent::BlockPoolAllocator::allocator>();
-            allocator.get<c2_aidl::IComponent::BlockPoolAllocator::allocator>().igba =
+            c2_aidl::IComponent::GbAllocator gbAllocator;
+            gbAllocator.waitableFd = std::move(waitableFd);
+            gbAllocator.igba =
                     c2_aidl::IGraphicBufferAllocator::fromBinder(gba->asBinder());
-            allocator.get<c2_aidl::IComponent::BlockPoolAllocator::allocator>().waitableFd =
-                    std::move(waitableFd);
+            allocator.gbAllocator = std::move(gbAllocator);
             ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(
                     allocator, &aidlBlockPool);
             status = GetC2Status(transStatus, "createBlockPool");
@@ -2083,7 +2094,7 @@ c2_status_t Codec2Client::Component::createBlockPool(
             mGraphicBufferAllocators->setCurrentId(aidlBlockPool.blockPoolId);
         } else {
             ::ndk::ScopedAStatus transStatus = mAidlBase->createBlockPool(
-                    static_cast<int32_t>(id), &aidlBlockPool);
+                    allocator, &aidlBlockPool);
             status = GetC2Status(transStatus, "createBlockPool");
             if (status != C2_OK) {
                 return status;

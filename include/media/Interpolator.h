@@ -204,7 +204,7 @@ public:
             mInterpolatorType = interpolatorType;
             return NO_ERROR;
         default:
-            ALOGE("invalid interpolatorType: %d", interpolatorType);
+            ALOGE("invalid interpolatorType: %d", static_cast<int>(interpolatorType));
             return BAD_VALUE;
         }
     }

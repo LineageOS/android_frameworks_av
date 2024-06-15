@@ -39,6 +39,8 @@ public:
 
     virtual void stopMelComputationForDeviceId(audio_port_handle_t deviceId) = 0;
     virtual void startMelComputationForDeviceId(audio_port_handle_t deviceId) = 0;
+
+    virtual void applyAllAudioPatches() = 0;
 };
 
 class SoundDoseManager : public audio_utils::MelProcessor::MelCallback {
@@ -52,6 +54,13 @@ public:
         : mMelReporterCallback(melReporterCallback),
           mMelAggregator(sp<audio_utils::MelAggregator>::make(kCsdWindowSeconds)),
           mRs2UpperBound(kDefaultRs2UpperBound) {};
+
+    // Used only for testing
+    SoundDoseManager(const sp<IMelReporterCallback>& melReporterCallback,
+                     const sp<audio_utils::MelAggregator>& melAggregator)
+            : mMelReporterCallback(melReporterCallback),
+              mMelAggregator(melAggregator),
+              mRs2UpperBound(kDefaultRs2UpperBound) {};
 
     /**
      * \brief Creates or gets the MelProcessor assigned to the streamHandle
@@ -144,7 +153,7 @@ public:
 
     // ------ Override audio_utils::MelProcessor::MelCallback ------
     void onNewMelValues(const std::vector<float>& mels, size_t offset, size_t length,
-                        audio_port_handle_t deviceId) const override;
+                        audio_port_handle_t deviceId, bool attenuated) const override;
 
     void onMomentaryExposure(float currentMel, audio_port_handle_t deviceId) const override;
 
@@ -204,6 +213,8 @@ private:
     void resetCsd(float currentCsd, const std::vector<media::SoundDoseRecord>& records);
 
     sp<media::ISoundDoseCallback> getSoundDoseCallback() const;
+
+    float getAttenuationForDeviceId(audio_port_handle_t id) const;
 
     void updateAttenuation(float attenuationDB, audio_devices_t deviceType);
     void setCsdEnabled(bool enabled);

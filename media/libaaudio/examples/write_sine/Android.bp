@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -10,7 +11,10 @@ package {
 cc_test {
     name: "write_sine",
     srcs: ["src/write_sine.cpp"],
-    cflags: ["-Wall", "-Werror"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
     shared_libs: ["libaaudio"],
     header_libs: ["libaaudio_example_utils"],
 }
@@ -18,7 +22,10 @@ cc_test {
 cc_test {
     name: "write_sine_callback",
     srcs: ["src/write_sine_callback.cpp"],
-    cflags: ["-Wall", "-Werror"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
     shared_libs: ["libaaudio"],
     header_libs: ["libaaudio_example_utils"],
 }

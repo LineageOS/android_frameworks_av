@@ -534,7 +534,8 @@ media_status_t AImageReader_setBufferRemovedListener(
  * Get the native_handle_t corresponding to the ANativeWindow owned by the
  * AImageReader provided.
  *
- * This is deprecated in API level 35 and will return AMEDIA_ERROR_UNKNOWN.
+ * This is deprecated on devices with vendor API level greater than 34 and
+ * will return AMEDIA_ERROR_UNKNOWN on those devices.
  * The native_handle_t is no longer used with AIDL interfaces and
  * ANativeWindow is used directly instead.
  * Use AImageRead_getWindow to get the ANativeWindow and use that object.

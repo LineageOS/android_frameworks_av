@@ -50,7 +50,6 @@ class EffectBufferHalAidl : public EffectBufferHalInterface {
     const size_t mBufferSize;
     bool mFrameCountChanged;
     void* mExternalData;
-    aidl::android::hardware::common::Ashmem mMemory;
     audio_buffer_t mAudioBuffer;
 
     // Can not be constructed directly by clients.

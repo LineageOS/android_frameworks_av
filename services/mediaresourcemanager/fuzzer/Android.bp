@@ -43,6 +43,7 @@ cc_defaults {
         "libstatspull",
         "libstatssocket",
         "libactivitymanager_aidl",
+        "aconfig_mediacodec_flags_c_lib",
     ],
     fuzz_config: {
         cc: [

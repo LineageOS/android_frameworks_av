@@ -116,7 +116,7 @@ class StreamOutHalInterfaceCallback : public virtual RefBase {
 
 class StreamOutHalInterfaceEventCallback : public virtual RefBase {
 public:
-    virtual void onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs) = 0;
+    virtual void onCodecFormatChanged(const std::vector<uint8_t>& metadataBs) = 0;
 
 protected:
     StreamOutHalInterfaceEventCallback() = default;

@@ -105,19 +105,20 @@ class AidlCamera3OfflineSession :
     };
 
     // initialize by Camera3Device.
-    explicit AidlCamera3OfflineSession(const std::string& id,
-            const sp<camera3::Camera3Stream>& inputStream,
-            const camera3::StreamSet& offlineStreamSet,
-            camera3::BufferRecords&& bufferRecords,
+    explicit AidlCamera3OfflineSession(
+            const std::string& id, const sp<camera3::Camera3Stream>& inputStream,
+            const camera3::StreamSet& offlineStreamSet, camera3::BufferRecords&& bufferRecords,
             const camera3::InFlightRequestMap& offlineReqs,
             const Camera3OfflineStates& offlineStates,
             std::shared_ptr<aidl::android::hardware::camera::device::ICameraOfflineSession>
-                    offlineSession) :
-      Camera3OfflineSession(id, inputStream, offlineStreamSet, std::move(bufferRecords),
-              offlineReqs, offlineStates),
-      mSession(offlineSession) {
-        mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
-      };
+                    offlineSession,
+            bool sensorReadoutTimestampSupported)
+        : Camera3OfflineSession(id, inputStream, offlineStreamSet, std::move(bufferRecords),
+                                offlineReqs, offlineStates),
+          mSession(offlineSession),
+          mSensorReadoutTimestampSupported(sensorReadoutTimestampSupported) {
+            mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
+    };
 
     /**
      * End of CameraOfflineSessionBase interface
@@ -129,6 +130,8 @@ class AidlCamera3OfflineSession :
     std::unique_ptr<AidlResultMetadataQueue> mResultMetadataQueue;
 
     std::shared_ptr<AidlCameraDeviceCallbacks> mCallbacks;
+
+    bool mSensorReadoutTimestampSupported;
 
     virtual void closeSessionLocked() override;
 

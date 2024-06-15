@@ -21,6 +21,31 @@ flag {
     bug: "302323921"
 }
 
+flag {
+    name: "feature_spatial_audio_headtracking_low_latency"
+    namespace: "media_audio"
+    description: "Define feature for low latency headtracking for SA"
+    bug: "324291076"
+}
+
+flag {
+    name: "focus_exclusive_with_recording"
+    namespace: "media_audio"
+    description:
+        "Audio focus GAIN_TRANSIENT_EXCLUSIVE only mutes"
+        "notifications when the focus owner is also recording"
+    bug: "316414750"
+}
+
+flag {
+    name: "foreground_audio_control"
+    namespace: "media_audio"
+    description:
+        "Audio focus gain requires FGS or delegation to "
+	"take effect"
+    bug: "296232417"
+}
+
 # TODO remove
 flag {
     name: "focus_freeze_test_api"
@@ -42,5 +67,35 @@ flag {
 Enable the API for providing loudness metadata and CTA-2075 \
 support."
     bug: "298463873"
+    is_exported: true
 }
 
+flag {
+    name: "mute_background_audio"
+    namespace: "media_audio"
+    description: "mute audio playing in background"
+    bug: "296232417"
+}
+
+flag {
+    name: "sco_managed_by_audio"
+    namespace: "media_audio"
+    description: "\
+Enable new implementation of headset profile device connection and\
+SCO audio activation."
+    bug: "265057196"
+}
+
+flag {
+    name: "supported_device_types_api"
+    namespace: "media_audio"
+    description: "Surface new API method AudioManager.getSupportedDeviceTypes()"
+    bug: "307537538"
+}
+
+flag {
+    name: "volume_ringer_api_hardening"
+    namespace: "media_audio"
+    description: "Limit access to volume and ringer SDK APIs in AudioManager"
+    bug: "296232417"
+}

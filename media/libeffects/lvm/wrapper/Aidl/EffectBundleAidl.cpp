@@ -425,10 +425,6 @@ std::shared_ptr<EffectContext> EffectBundleAidl::createContext(const Parameter::
     return mContext;
 }
 
-std::shared_ptr<EffectContext> EffectBundleAidl::getContext() {
-    return mContext;
-}
-
 RetCode EffectBundleAidl::releaseContext() {
     if (mContext) {
         GlobalSession::getGlobalSession().releaseSession(mType, mContext->getSessionId());
@@ -462,7 +458,7 @@ ndk::ScopedAStatus EffectBundleAidl::commandImpl(CommandId command) {
 IEffect::Status EffectBundleAidl::effectProcessImpl(float* in, float* out, int sampleToProcess) {
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!mContext, status, "nullContext");
-    return mContext->lvmProcess(in, out, sampleToProcess);
+    return mContext->process(in, out, sampleToProcess);
 }
 
 }  // namespace aidl::android::hardware::audio::effect

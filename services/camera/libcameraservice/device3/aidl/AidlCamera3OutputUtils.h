@@ -79,11 +79,8 @@ namespace camera3 {
                     &physicalCameraMetadata);
 
     void notify(CaptureOutputStates& states,
-        const aidl::android::hardware::camera::device::NotifyMsg& msg,
-        bool hasReadoutTime, uint64_t readoutTime);
-
-    void notify(CaptureOutputStates& states,
-        const aidl::android::hardware::camera::device::NotifyMsg& msg);
+            const aidl::android::hardware::camera::device::NotifyMsg& msg,
+            bool hasReadoutTimestamp);
 
     void requestStreamBuffers(RequestBufferStates& states,
         const std::vector<aidl::android::hardware::camera::device::BufferRequest>& bufReqs,

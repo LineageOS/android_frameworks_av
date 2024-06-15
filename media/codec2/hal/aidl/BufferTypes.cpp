@@ -302,7 +302,7 @@ BufferPoolTypes::BufferPoolStatus DefaultBufferPoolSender::send(
                             "invalid receiver connection id (0).";
             return bufferpool2::ResultStatus::CRITICAL_ERROR;
         } else {
-            if (isNewConnection) {
+            if (foundConnection == mConnections.end()) {
                 foundConnection = mConnections.try_emplace(
                         connectionId, receiverConnectionId, now).first;
             } else {

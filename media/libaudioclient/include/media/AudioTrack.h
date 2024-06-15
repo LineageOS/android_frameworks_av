@@ -1220,7 +1220,7 @@ public:
             void setLoop_l(uint32_t loopStart, uint32_t loopEnd, int loopCount);
 
             // FIXME enum is faster than strcmp() for parameter 'from'
-            status_t restoreTrack_l(const char *from);
+            status_t restoreTrack_l(const char *from, bool forceRestore = false);
 
             uint32_t    getUnderrunCount_l() const;
 

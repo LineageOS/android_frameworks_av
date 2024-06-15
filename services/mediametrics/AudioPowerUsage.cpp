@@ -549,7 +549,7 @@ std::pair<std::string, int32_t> AudioPowerUsage::dump(int limit) const {
 
     int slot = 1;
     std::stringstream ss;
-    ss << "AudioPowerUsage:\n";
+    ss << "AudioPowerUsage interval " << mIntervalHours << " hours:\n";
     for (const auto &item : mItems) {
         if (slot >= limit - 1) {
             ss << "-- AudioPowerUsage may be truncated!\n";

@@ -29,6 +29,8 @@
 #include <hidl/HidlBinderSupport.h>
 #include <utils/Timers.h>
 
+#include <codec2/common/MultiAccessUnitHelper.h>
+
 #include <C2BqBufferPriv.h>
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
@@ -44,6 +46,8 @@ namespace V1_1 {
 namespace utils {
 
 using namespace ::android;
+using ::android::MultiAccessUnitInterface;
+using ::android::MultiAccessUnitHelper;
 
 // ComponentListener wrapper
 struct Component::Listener : public C2Component::Listener {
@@ -135,6 +139,52 @@ protected:
     wp<IComponentListener> mListener;
 };
 
+// Component listener for handle multiple access-units
+struct MultiAccessUnitListener : public Component::Listener {
+    MultiAccessUnitListener(const sp<Component> &component,
+            const std::shared_ptr<MultiAccessUnitHelper> &helper):
+        Listener(component), mHelper(helper) {
+    }
+
+    virtual void onError_nb(
+            std::weak_ptr<C2Component> c2component,
+            uint32_t errorCode) override {
+        if (mHelper) {
+            std::list<std::unique_ptr<C2Work>> worklist;
+            mHelper->error(&worklist);
+            if (!worklist.empty()) {
+                Listener::onWorkDone_nb(c2component, std::move(worklist));
+            }
+        }
+        Listener::onError_nb(c2component, errorCode);
+    }
+
+    virtual void onTripped_nb(
+            std::weak_ptr<C2Component> c2component,
+            std::vector<std::shared_ptr<C2SettingResult>> c2settingResult
+            ) override {
+        Listener::onTripped_nb(c2component,
+                c2settingResult);
+    }
+
+    virtual void onWorkDone_nb(
+            std::weak_ptr<C2Component> c2component,
+            std::list<std::unique_ptr<C2Work>> c2workItems) override {
+        if (mHelper) {
+            std::list<std::unique_ptr<C2Work>> processedWork;
+            mHelper->gather(c2workItems, &processedWork);
+            if (!processedWork.empty()) {
+                Listener::onWorkDone_nb(c2component, std::move(processedWork));
+            }
+        } else {
+            Listener::onWorkDone_nb(c2component, std::move(c2workItems));
+        }
+    }
+
+    protected:
+        std::shared_ptr<MultiAccessUnitHelper> mHelper;
+};
+
 // Component::Sink
 struct Component::Sink : public IInputSink {
     std::shared_ptr<Component> mComponent;
@@ -208,13 +258,14 @@ Component::Component(
         const sp<::android::hardware::media::bufferpool::V2_0::
         IClientManager>& clientPoolManager)
       : mComponent{component},
-        mInterface{new ComponentInterface(component->intf(),
-                                          store->getParameterCache())},
         mListener{listener},
         mStore{store},
         mBufferPoolSender{clientPoolManager} {
     // Retrieve supported parameters from store
     // TODO: We could cache this per component/interface type
+    mMultiAccessUnitIntf = store->tryCreateMultiAccessUnitInterface(component->intf());
+    mInterface = new ComponentInterface(
+            component->intf(), mMultiAccessUnitIntf, store->getParameterCache());
     mInit = mInterface->status();
 }
 
@@ -252,6 +303,19 @@ Return<Status> Component::queue(const WorkBundle& workBundle) {
                     registerFrameData(mListener, work->input);
         }
     }
+    c2_status_t err = C2_OK;
+    if (mMultiAccessUnitHelper) {
+        std::list<std::list<std::unique_ptr<C2Work>>> c2worklists;
+        mMultiAccessUnitHelper->scatter(c2works, &c2worklists);
+        for (auto &c2worklist : c2worklists) {
+            err = mComponent->queue_nb(&c2worklist);
+            if (err != C2_OK) {
+                LOG(ERROR) << "Error Queuing to component.";
+                break;
+            }
+        }
+        return static_cast<Status>(err);
+    }
 
     return static_cast<Status>(mComponent->queue_nb(&c2works));
 }
@@ -261,6 +325,9 @@ Return<void> Component::flush(flush_cb _hidl_cb) {
     c2_status_t c2res = mComponent->flush_sm(
             C2Component::FLUSH_COMPONENT,
             &c2flushedWorks);
+    if (mMultiAccessUnitHelper) {
+        c2res = mMultiAccessUnitHelper->flush(&c2flushedWorks);
+    }
 
     // Unregister input buffers.
     for (const std::unique_ptr<C2Work>& work : c2flushedWorks) {
@@ -469,6 +536,9 @@ Return<Status> Component::reset() {
         std::lock_guard<std::mutex> lock(mBlockPoolsMutex);
         mBlockPools.clear();
     }
+    if (mMultiAccessUnitHelper) {
+        mMultiAccessUnitHelper->reset();
+    }
     InputBufferManager::unregisterFrameData(mListener);
     return status;
 }
@@ -478,6 +548,9 @@ Return<Status> Component::release() {
     {
         std::lock_guard<std::mutex> lock(mBlockPoolsMutex);
         mBlockPools.clear();
+    }
+    if (mMultiAccessUnitHelper) {
+        mMultiAccessUnitHelper->reset();
     }
     InputBufferManager::unregisterFrameData(mListener);
     return status;
@@ -508,7 +581,12 @@ std::shared_ptr<C2Component> Component::findLocalComponent(
 }
 
 void Component::initListener(const sp<Component>& self) {
-    std::shared_ptr<C2Component::Listener> c2listener =
+    std::shared_ptr<C2Component::Listener> c2listener;
+    if (mMultiAccessUnitIntf) {
+        mMultiAccessUnitHelper = std::make_shared<MultiAccessUnitHelper>(mMultiAccessUnitIntf);
+    }
+    c2listener = mMultiAccessUnitHelper ?
+            std::make_shared<MultiAccessUnitListener>(self, mMultiAccessUnitHelper) :
             std::make_shared<Listener>(self);
     c2_status_t res = mComponent->setListener_vb(c2listener, C2_DONT_BLOCK);
     if (res != C2_OK) {

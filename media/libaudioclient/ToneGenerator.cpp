@@ -872,6 +872,18 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = 3,
           .repeatSegment = 0 },                              // TONE_NZ_CALL_WAITING
+        { .segments = { { .duration = 500, .waveFreq = { 425, 0 }, 0, 0 },
+                        { .duration = 250, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                             // TONE_MY_CONGESTION
+        { .segments = { { .duration = 400, .waveFreq = { 425, 0 }, 0, 0 },
+                        { .duration = 200, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 400, .waveFreq = { 425, 0 }, 0, 0 },
+                        { .duration = 2000, .waveFreq = { 0 }, 0, 0},
+                        { .duration = 0, .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 }                              // TONE_MY_RINGTONE
 };
 
 // Used by ToneGenerator::getToneForRegion() to convert user specified supervisory tone type
@@ -976,6 +988,16 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_ERROR,               // TONE_SUP_ERROR
             TONE_NZ_CALL_WAITING,         // TONE_SUP_CALL_WAITING
             TONE_GB_RINGTONE              // TONE_SUP_RINGTONE
+        },
+        {   // MALAYSIA
+            TONE_SUP_DIAL,                // TONE_SUP_DIAL
+            TONE_SUP_BUSY,                // TONE_SUP_BUSY
+            TONE_MY_CONGESTION,           // TONE_SUP_CONGESTION
+            TONE_SUP_RADIO_ACK,           // TONE_SUP_RADIO_ACK
+            TONE_SUP_RADIO_NOTAVAIL,      // TONE_SUP_RADIO_NOTAVAIL
+            TONE_SUP_ERROR,               // TONE_SUP_ERROR
+            TONE_SUP_CALL_WAITING,        // TONE_SUP_CALL_WAITING
+            TONE_MY_RINGTONE              // TONE_SUP_RINGTONE
         }
 };
 
@@ -1055,6 +1077,8 @@ ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool 
         mRegion = TAIWAN;
     } else if (strstr(value, "nz") != NULL) {
         mRegion = NZ;
+    } else if (strstr(value, "my") != NULL) {
+        mRegion = MY;
     } else {
         mRegion = CEPT;
     }

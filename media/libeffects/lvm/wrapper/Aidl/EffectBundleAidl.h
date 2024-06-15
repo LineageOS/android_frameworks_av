@@ -36,41 +36,47 @@ class EffectBundleAidl final : public EffectImpl {
     ~EffectBundleAidl() override;
 
     ndk::ScopedAStatus getDescriptor(Descriptor* _aidl_return) override;
-    ndk::ScopedAStatus setParameterCommon(const Parameter& param) override;
-    ndk::ScopedAStatus setParameterSpecific(const Parameter::Specific& specific) override;
-    ndk::ScopedAStatus getParameterSpecific(const Parameter::Id& id,
-                                            Parameter::Specific* specific) override;
+    ndk::ScopedAStatus setParameterCommon(const Parameter& param) REQUIRES(mImplMutex) override;
+    ndk::ScopedAStatus setParameterSpecific(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex) override;
+    ndk::ScopedAStatus getParameterSpecific(const Parameter::Id& id, Parameter::Specific* specific)
+            REQUIRES(mImplMutex) override;
 
-    std::shared_ptr<EffectContext> createContext(const Parameter::Common& common) override;
-    std::shared_ptr<EffectContext> getContext() override;
-    RetCode releaseContext() override;
+    std::shared_ptr<EffectContext> createContext(const Parameter::Common& common)
+            REQUIRES(mImplMutex) override;
+    RetCode releaseContext() REQUIRES(mImplMutex) override;
 
-    IEffect::Status effectProcessImpl(float* in, float* out, int samples) override;
+    IEffect::Status effectProcessImpl(float* in, float* out, int samples)
+            REQUIRES(mImplMutex) override;
 
-    ndk::ScopedAStatus commandImpl(CommandId command) override;
+    ndk::ScopedAStatus commandImpl(CommandId command) REQUIRES(mImplMutex) override;
 
     std::string getEffectName() override { return *mEffectName; }
 
   private:
-    std::shared_ptr<BundleContext> mContext;
+    std::shared_ptr<BundleContext> mContext GUARDED_BY(mImplMutex);
     const Descriptor* mDescriptor;
     const std::string* mEffectName;
     lvm::BundleEffectType mType = lvm::BundleEffectType::EQUALIZER;
 
     IEffect::Status status(binder_status_t status, size_t consumed, size_t produced);
 
-    ndk::ScopedAStatus setParameterBassBoost(const Parameter::Specific& specific);
-    ndk::ScopedAStatus getParameterBassBoost(const BassBoost::Id& id,
-                                             Parameter::Specific* specific);
+    ndk::ScopedAStatus setParameterBassBoost(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex);
+    ndk::ScopedAStatus getParameterBassBoost(const BassBoost::Id& id, Parameter::Specific* specific)
+            REQUIRES(mImplMutex);
 
-    ndk::ScopedAStatus setParameterEqualizer(const Parameter::Specific& specific);
-    ndk::ScopedAStatus getParameterEqualizer(const Equalizer::Id& id,
-                                             Parameter::Specific* specific);
-    ndk::ScopedAStatus setParameterVolume(const Parameter::Specific& specific);
-    ndk::ScopedAStatus getParameterVolume(const Volume::Id& id, Parameter::Specific* specific);
-    ndk::ScopedAStatus setParameterVirtualizer(const Parameter::Specific& specific);
+    ndk::ScopedAStatus setParameterEqualizer(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex);
+    ndk::ScopedAStatus getParameterEqualizer(const Equalizer::Id& id, Parameter::Specific* specific)
+            REQUIRES(mImplMutex);
+    ndk::ScopedAStatus setParameterVolume(const Parameter::Specific& specific) REQUIRES(mImplMutex);
+    ndk::ScopedAStatus getParameterVolume(const Volume::Id& id, Parameter::Specific* specific)
+            REQUIRES(mImplMutex);
+    ndk::ScopedAStatus setParameterVirtualizer(const Parameter::Specific& specific)
+            REQUIRES(mImplMutex);
     ndk::ScopedAStatus getParameterVirtualizer(const Virtualizer::Id& id,
-                                               Parameter::Specific* specific);
+                                               Parameter::Specific* specific) REQUIRES(mImplMutex);
 };
 
 }  // namespace aidl::android::hardware::audio::effect

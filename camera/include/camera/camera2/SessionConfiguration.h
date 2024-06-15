@@ -17,6 +17,8 @@
 #ifndef ANDROID_HARDWARE_CAMERA2_SESSIONCONFIGURATION_H
 #define ANDROID_HARDWARE_CAMERA2_SESSIONCONFIGURATION_H
 
+#include "OutputConfiguration.h"
+
 #include <binder/Parcelable.h>
 #include <camera/CameraMetadata.h>
 
@@ -25,8 +27,6 @@ namespace android {
 namespace hardware {
 namespace camera2 {
 namespace params {
-
-class OutputConfiguration;
 
 class SessionConfiguration : public android::Parcelable {
 public:

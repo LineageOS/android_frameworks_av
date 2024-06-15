@@ -71,42 +71,6 @@ ndk::ScopedAStatus DownmixImpl::getDescriptor(Descriptor* _aidl_return) {
     return ndk::ScopedAStatus::ok();
 }
 
-ndk::ScopedAStatus DownmixImpl::setParameterCommon(const Parameter& param) {
-    RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
-
-    auto tag = param.getTag();
-    switch (tag) {
-        case Parameter::common:
-            RETURN_IF(mContext->setCommon(param.get<Parameter::common>()) != RetCode::SUCCESS,
-                      EX_ILLEGAL_ARGUMENT, "setCommFailed");
-            break;
-        case Parameter::deviceDescription:
-            RETURN_IF(mContext->setOutputDevice(param.get<Parameter::deviceDescription>()) !=
-                              RetCode::SUCCESS,
-                      EX_ILLEGAL_ARGUMENT, "setDeviceFailed");
-            break;
-        case Parameter::mode:
-            RETURN_IF(mContext->setAudioMode(param.get<Parameter::mode>()) != RetCode::SUCCESS,
-                      EX_ILLEGAL_ARGUMENT, "setModeFailed");
-            break;
-        case Parameter::source:
-            RETURN_IF(mContext->setAudioSource(param.get<Parameter::source>()) != RetCode::SUCCESS,
-                      EX_ILLEGAL_ARGUMENT, "setSourceFailed");
-            break;
-        case Parameter::volumeStereo:
-            RETURN_IF(mContext->setVolumeStereo(param.get<Parameter::volumeStereo>()) !=
-                              RetCode::SUCCESS,
-                      EX_ILLEGAL_ARGUMENT, "setVolumeStereoFailed");
-            break;
-        default: {
-            LOG(ERROR) << __func__ << " unsupportedParameterTag " << toString(tag);
-            return ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_ARGUMENT,
-                                                                    "commonParamNotSupported");
-        }
-    }
-    return ndk::ScopedAStatus::ok();
-}
-
 ndk::ScopedAStatus DownmixImpl::commandImpl(CommandId command) {
     RETURN_IF(!mContext, EX_NULL_POINTER, "nullContext");
     switch (command) {
@@ -193,6 +157,8 @@ std::shared_ptr<EffectContext> DownmixImpl::createContext(const Parameter::Commo
         return mContext;
     }
 
+    if (!DownmixContext::validateCommonConfig(common)) return nullptr;
+
     mContext = std::make_shared<DownmixContext>(1 /* statusFmqDepth */, common);
     return mContext;
 }
@@ -204,13 +170,52 @@ RetCode DownmixImpl::releaseContext() {
     return RetCode::SUCCESS;
 }
 
+void DownmixImpl::process() {
+    /**
+     * wait for the EventFlag without lock, it's ok because the mEfGroup pointer will not change
+     * in the life cycle of workerThread (threadLoop).
+     */
+    uint32_t efState = 0;
+    if (!mEventFlag || ::android::OK != mEventFlag->wait(kEventFlagNotEmpty, &efState)) {
+        LOG(ERROR) << getEffectName() << __func__ << ": StatusEventFlag invalid";
+    }
+
+    {
+        std::lock_guard lg(mImplMutex);
+        RETURN_VALUE_IF(!mImplContext, void(), "nullContext");
+        auto statusMQ = mImplContext->getStatusFmq();
+        auto inputMQ = mImplContext->getInputDataFmq();
+        auto outputMQ = mImplContext->getOutputDataFmq();
+        auto buffer = mImplContext->getWorkBuffer();
+        if (!inputMQ || !outputMQ) {
+            return;
+        }
+
+        const auto availableToRead = inputMQ->availableToRead();
+        const auto availableToWrite = outputMQ->availableToWrite() *
+                                      mImplContext->getInputFrameSize() /
+                                      mImplContext->getOutputFrameSize();
+        assert(mImplContext->getWorkBufferSize() >=
+               std::max(availableToRead(), availableToWrite));
+        auto processSamples = std::min(availableToRead, availableToWrite);
+        if (processSamples) {
+            inputMQ->read(buffer, processSamples);
+            IEffect::Status status = effectProcessImpl(buffer, buffer, processSamples);
+            outputMQ->write(buffer, status.fmqProduced);
+            statusMQ->writeBlocking(&status, 1);
+            LOG(VERBOSE) << getEffectName() << __func__ << ": done processing, effect consumed "
+                        << status.fmqConsumed << " produced " << status.fmqProduced;
+        }
+    }
+}
+
 // Processing method running in EffectWorker thread.
 IEffect::Status DownmixImpl::effectProcessImpl(float* in, float* out, int sampleToProcess) {
     if (!mContext) {
         LOG(ERROR) << __func__ << " nullContext";
         return {EX_NULL_POINTER, 0, 0};
     }
-    return mContext->lvmProcess(in, out, sampleToProcess);
+    return mContext->downmixProcess(in, out, sampleToProcess);
 }
 
 }  // namespace aidl::android::hardware::audio::effect

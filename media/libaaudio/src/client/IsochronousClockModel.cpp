@@ -18,7 +18,6 @@
 //#define LOG_NDEBUG 0
 #include <log/log.h>
 
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <stdint.h>
 #include <algorithm>

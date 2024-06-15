@@ -28,6 +28,7 @@ package {
 cc_test {
     name: "FlacDecoderTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
         "FlacDecoderTest.cpp",

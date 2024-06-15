@@ -45,18 +45,18 @@ public:
                   pkt.size());
 
             // packet is bigger than what the caller can handle,
-            if (pkt.size() > len) {
+            if (pkt.size() - mPacketOffset > len) {
                 memcpy(data, pkt.data() + mPacketOffset, len);
 
                 mPacketOffset += len;
                 readAmt = len;
                 // packet is equal or smaller than the caller buffer
             } else {
-                memcpy(data, pkt.data() + mPacketOffset, pkt.size());
+                memcpy(data, pkt.data() + mPacketOffset, pkt.size() - mPacketOffset);
 
                 mPacketNumber++;
                 mPacketOffset = 0;
-                readAmt = pkt.size();
+                readAmt = pkt.size() - mPacketOffset;
             }
 
             return readAmt;

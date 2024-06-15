@@ -32,6 +32,8 @@ class AidlConversionSpatializer : public EffectConversionHelperAidl {
     ~AidlConversionSpatializer() {}
 
   private:
+    std::optional<bool> mIsSpatializerAidlParamSupported;
+    bool isSpatializerParameterSupported();
     status_t setParameter(utils::EffectParamReader& param) override;
     status_t getParameter(utils::EffectParamWriter& param) override;
 };

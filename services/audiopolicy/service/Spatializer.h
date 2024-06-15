@@ -23,6 +23,7 @@
 #include <android/media/audio/common/AudioLatencyMode.h>
 #include <android/media/audio/common/HeadTracking.h>
 #include <android/media/audio/common/Spatialization.h>
+#include <audio_utils/mutex.h>
 #include <audio_utils/SimpleLog.h>
 #include <math.h>
 #include <media/AudioEffect.h>
@@ -148,7 +149,7 @@ class Spatializer : public media::BnSpatializer,
 
     /** Level getter for use by local classes. */
     media::audio::common::Spatialization::Level getLevel() const {
-        std::lock_guard lock(mLock);
+        audio_utils::lock_guard lock(mMutex);
         return mLevel;
     }
 
@@ -161,7 +162,7 @@ class Spatializer : public media::BnSpatializer,
      */
     audio_io_handle_t detachOutput();
     /** Returns the output stream the spatializer is attached to. */
-    audio_io_handle_t getOutput() const { std::lock_guard lock(mLock); return mOutput; }
+    audio_io_handle_t getOutput() const { audio_utils::lock_guard lock(mMutex); return mOutput; }
 
     void updateActiveTracks(size_t numActiveTracks);
 
@@ -261,7 +262,7 @@ private:
      *  according to values vector size.
      */
     template<typename T>
-    status_t setEffectParameter_l(uint32_t type, const std::vector<T>& values) REQUIRES(mLock) {
+    status_t setEffectParameter_l(uint32_t type, const std::vector<T>& values) REQUIRES(mMutex) {
         static_assert(sizeof(T) <= sizeof(uint32_t), "The size of T must less than 32 bits");
 
         uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 1 + values.size()];
@@ -286,7 +287,7 @@ private:
      * The variant is for compound parameters with two values of different base types
      */
     template<typename P1, typename P2>
-    status_t setEffectParameter_l(uint32_t type, const P1 val1, const P2 val2) REQUIRES(mLock) {
+    status_t setEffectParameter_l(uint32_t type, const P1 val1, const P2 val2) REQUIRES(mMutex) {
         static_assert(sizeof(P1) <= sizeof(uint32_t), "The size of P1 must less than 32 bits");
         static_assert(sizeof(P2) <= sizeof(uint32_t), "The size of P2 must less than 32 bits");
 
@@ -314,7 +315,7 @@ private:
      * by specifying values vector size.
      */
     template<typename T>
-    status_t getEffectParameter_l(uint32_t type, std::vector<T> *values) REQUIRES(mLock) {
+    status_t getEffectParameter_l(uint32_t type, std::vector<T> *values) REQUIRES(mMutex) {
         static_assert(sizeof(T) <= sizeof(uint32_t), "The size of T must less than 32 bits");
 
         uint32_t cmd[sizeof(effect_param_t) / sizeof(uint32_t) + 1 + values->size()];
@@ -345,7 +346,7 @@ private:
      * The variant is for compound parameters with two values of different base types
      */
     template<typename P1, typename P2>
-    status_t getEffectParameter_l(uint32_t type, P1 *val1, P2 *val2) REQUIRES(mLock) {
+    status_t getEffectParameter_l(uint32_t type, P1 *val1, P2 *val2) REQUIRES(mMutex) {
         static_assert(sizeof(P1) <= sizeof(uint32_t), "The size of P1 must less than 32 bits");
         static_assert(sizeof(P2) <= sizeof(uint32_t), "The size of P2 must less than 32 bits");
 
@@ -375,25 +376,25 @@ private:
      * spatializer state and playback activity and configures the pose controller
      * accordingly.
      */
-    void checkSensorsState_l() REQUIRES(mLock);
+    void checkSensorsState_l() REQUIRES(mMutex);
 
     /**
      * Checks if the head pose controller should be created or destroyed according
      * to desired head tracking mode.
      */
-    void checkPoseController_l() REQUIRES(mLock);
+    void checkPoseController_l() REQUIRES(mMutex);
 
     /**
      * Checks if the spatializer effect should be enabled based on
      * playback activity and requested level.
      */
-    void checkEngineState_l() REQUIRES(mLock);
+    void checkEngineState_l() REQUIRES(mMutex);
 
     /**
      * Reset head tracking mode and recenter pose in engine: Called when the head tracking
      * is disabled.
      */
-    void resetEngineHeadPose_l() REQUIRES(mLock);
+    void resetEngineHeadPose_l() REQUIRES(mMutex);
 
     /** Read bluetooth.core.le.dsa_transport_preference property and populate the ordered list of
      * preferred low latency modes in mOrderedLowLatencyModes.
@@ -406,7 +407,7 @@ private:
      * Note: Because MODE_FREE is not in mOrderedLowLatencyModes, it will always be at
      * the end of the list.
      */
-    void sortSupportedLatencyModes_l() REQUIRES(mLock);
+    void sortSupportedLatencyModes_l() REQUIRES(mMutex);
 
     /**
      * Called after enabling head tracking in the spatializer engine to indicate which
@@ -415,14 +416,14 @@ private:
      * When the connection mode is direct to the sensor, the sensor ID is also communicated
      * to the spatializer engine.
      */
-    void setEngineHeadtrackingConnectionMode_l() REQUIRES(mLock);
+    void setEngineHeadtrackingConnectionMode_l() REQUIRES(mMutex);
 
     /**
      * Select the desired head tracking connection mode for the spatializer engine among the list
      * stored in mSupportedHeadtrackingConnectionModes at init time.
      * Also returns the desired low latency mode according to selected connection mode.
      */
-    audio_latency_mode_t selectHeadtrackingConnectionMode_l() REQUIRES(mLock);
+    audio_latency_mode_t selectHeadtrackingConnectionMode_l() REQUIRES(mMutex);
 
     /** Effect engine descriptor */
     const effect_descriptor_t mEngineDescriptor;
@@ -435,48 +436,48 @@ private:
     const std::string mMetricsId = kDefaultMetricsId;
 
     /** Mutex protecting internal state */
-    mutable std::mutex mLock;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kSpatializer_Mutex};
 
     /** Client AudioEffect for the engine */
-    sp<AudioEffect> mEngine GUARDED_BY(mLock);
+    sp<AudioEffect> mEngine GUARDED_BY(mMutex);
     /** Output stream the spatializer mixer thread is attached to */
-    audio_io_handle_t mOutput GUARDED_BY(mLock) = AUDIO_IO_HANDLE_NONE;
+    audio_io_handle_t mOutput GUARDED_BY(mMutex) = AUDIO_IO_HANDLE_NONE;
 
     /** Callback interface to the client (AudioService) controlling this`Spatializer */
-    sp<media::INativeSpatializerCallback> mSpatializerCallback GUARDED_BY(mLock);
+    sp<media::INativeSpatializerCallback> mSpatializerCallback GUARDED_BY(mMutex);
 
     /** Callback interface for head tracking */
-    sp<media::ISpatializerHeadTrackingCallback> mHeadTrackingCallback GUARDED_BY(mLock);
+    sp<media::ISpatializerHeadTrackingCallback> mHeadTrackingCallback GUARDED_BY(mMutex);
 
     /** Requested spatialization level */
-    media::audio::common::Spatialization::Level mLevel GUARDED_BY(mLock) =
+    media::audio::common::Spatialization::Level mLevel GUARDED_BY(mMutex) =
             media::audio::common::Spatialization::Level::NONE;
 
     /** Control logic for head-tracking, etc. */
-    std::shared_ptr<SpatializerPoseController> mPoseController GUARDED_BY(mLock);
+    std::shared_ptr<SpatializerPoseController> mPoseController GUARDED_BY(mMutex);
 
     /** Last requested head tracking mode */
-    media::HeadTrackingMode mDesiredHeadTrackingMode GUARDED_BY(mLock)
+    media::HeadTrackingMode mDesiredHeadTrackingMode GUARDED_BY(mMutex)
             = media::HeadTrackingMode::STATIC;
 
     /** Last-reported actual head-tracking mode. */
-    media::audio::common::HeadTracking::Mode mActualHeadTrackingMode GUARDED_BY(mLock)
+    media::audio::common::HeadTracking::Mode mActualHeadTrackingMode GUARDED_BY(mMutex)
             = media::audio::common::HeadTracking::Mode::DISABLED;
 
     /** Selected Head pose sensor */
-    int32_t mHeadSensor GUARDED_BY(mLock) = SpatializerPoseController::INVALID_SENSOR;
+    int32_t mHeadSensor GUARDED_BY(mMutex) = SpatializerPoseController::INVALID_SENSOR;
 
     /** Selected Screen pose sensor */
-    int32_t mScreenSensor GUARDED_BY(mLock) = SpatializerPoseController::INVALID_SENSOR;
+    int32_t mScreenSensor GUARDED_BY(mMutex) = SpatializerPoseController::INVALID_SENSOR;
 
     /** Last display orientation received */
-    float mDisplayOrientation GUARDED_BY(mLock) = 0.f;  // aligned to natural up orientation.
+    float mDisplayOrientation GUARDED_BY(mMutex) = 0.f;  // aligned to natural up orientation.
 
     /** Last folded state */
-    bool mFoldedState GUARDED_BY(mLock) = false;  // foldable: true means folded.
+    bool mFoldedState GUARDED_BY(mMutex) = false;  // foldable: true means folded.
 
     /** Last hinge angle */
-    float mHingeAngle GUARDED_BY(mLock) = 0.f;  // foldable: 0.f is closed, M_PI flat open.
+    float mHingeAngle GUARDED_BY(mMutex) = 0.f;  // foldable: 0.f is closed, M_PI flat open.
 
     std::vector<media::audio::common::Spatialization::Level> mLevels;
     std::vector<media::audio::common::HeadTracking::Mode> mHeadTrackingModes;
@@ -485,11 +486,13 @@ private:
     bool mSupportsHeadTracking;
     /** List of supported headtracking connection modes reported by the spatializer.
      * If the list is empty, the spatializer does not support any optional connection
-     * mode and mode HEADTRACKING_CONNECTION_FRAMEWORK_PROCESSED is assumed.
+     * mode and mode HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED is assumed.
      */
-    std::unordered_set<headtracking_connection_t> mSupportedHeadtrackingConnectionModes;
+    std::unordered_set<media::audio::common::HeadTracking::ConnectionMode>
+            mSupportedHeadtrackingConnectionModes;
     /** Selected HT connection mode when several modes are supported by the spatializer */
-    headtracking_connection_t mHeadtrackingConnectionMode;
+    media::audio::common::HeadTracking::ConnectionMode mHeadtrackingConnectionMode =
+            media::audio::common::HeadTracking::ConnectionMode::FRAMEWORK_PROCESSED;
 
     // Looper thread for mEngine callbacks
     class EngineCallbackHandler;
@@ -497,8 +500,8 @@ private:
     sp<ALooper> mLooper;
     sp<EngineCallbackHandler> mHandler;
 
-    size_t mNumActiveTracks GUARDED_BY(mLock) = 0;
-    std::vector<audio_latency_mode_t> mSupportedLatencyModes GUARDED_BY(mLock);
+    size_t mNumActiveTracks GUARDED_BY(mMutex) = 0;
+    std::vector<audio_latency_mode_t> mSupportedLatencyModes GUARDED_BY(mMutex);
     /** preference order for low latency modes according to persist.bluetooth.hid.transport */
     std::vector<audio_latency_mode_t> mOrderedLowLatencyModes;
     /** string to latency mode map used to parse bluetooth.core.le.dsa_transport_preference */
@@ -514,10 +517,10 @@ private:
      * Dump to local log with max/average pose angle every mPoseRecordThreshold.
      */
     // Record one log line per second (up to mMaxLocalLogLine) to capture most recent sensor data.
-    media::VectorRecorder mPoseRecorder GUARDED_BY(mLock) {
+    media::VectorRecorder mPoseRecorder GUARDED_BY(mMutex) {
         6 /* vectorSize */, std::chrono::seconds(1), mMaxLocalLogLine, { 3 } /* delimiterIdx */};
     // Record one log line per minute (up to mMaxLocalLogLine) to capture durable sensor data.
-    media::VectorRecorder mPoseDurableRecorder  GUARDED_BY(mLock) {
+    media::VectorRecorder mPoseDurableRecorder GUARDED_BY(mMutex) {
         6 /* vectorSize */, std::chrono::minutes(1), mMaxLocalLogLine, { 3 } /* delimiterIdx */};
 };  // Spatializer
 

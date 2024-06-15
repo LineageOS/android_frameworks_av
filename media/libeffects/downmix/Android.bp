@@ -1,5 +1,6 @@
 // Multichannel downmix effect library
 package {
+    default_team: "trendy_team_media_framework_audio",
     default_applicable_licenses: [
         "frameworks_av_media_libeffects_downmix_license",
     ],
@@ -56,13 +57,11 @@ cc_library_shared {
         ":effectCommonFile",
     ],
     defaults: [
-        "aidlaudioservice_defaults",
-        "latest_android_hardware_audio_effect_ndk_shared",
-        "latest_android_media_audio_common_types_ndk_shared",
+        "aidlaudioeffectservice_defaults",
     ],
     header_libs: [
         "libaudioeffects",
-        "libhardware_headers"
+        "libhardware_headers",
     ],
     shared_libs: [
         "libaudioutils",
@@ -71,6 +70,6 @@ cc_library_shared {
     ],
     relative_install_path: "soundfx",
     visibility: [
-        "//hardware/interfaces/audio/aidl/default",
+        "//hardware/interfaces/audio/aidl/default:__subpackages__",
     ],
 }

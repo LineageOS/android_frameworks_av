@@ -271,6 +271,37 @@ static const char *kJudderEventDetailsDistanceMs =
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
 
+typedef WrapperObject<std::vector<AccessUnitInfo>> BufferInfosWrapper;
+
+// Multi access unit helpers
+static status_t generateFlagsFromAccessUnitInfo(
+        sp<AMessage> &msg, const sp<BufferInfosWrapper> &bufferInfos) {
+    msg->setInt64("timeUs", bufferInfos->value[0].mTimestamp);
+    msg->setInt32("flags", bufferInfos->value[0].mFlags);
+    // will prevent any access-unit info copy.
+    if (bufferInfos->value.size() > 1) {
+        uint32_t bufferFlags = 0;
+        uint32_t flagsInAllAU = BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_CODEC_CONFIG;
+        uint32_t andFlags = flagsInAllAU;
+        int infoIdx = 0;
+        bool foundEndOfStream = false;
+        for ( ; infoIdx < bufferInfos->value.size() && !foundEndOfStream; ++infoIdx) {
+            bufferFlags |= bufferInfos->value[infoIdx].mFlags;
+            andFlags &= bufferInfos->value[infoIdx].mFlags;
+            if (bufferFlags & BUFFER_FLAG_END_OF_STREAM) {
+                foundEndOfStream = true;
+            }
+        }
+        bufferFlags = bufferFlags & (andFlags | (~flagsInAllAU));
+        if (infoIdx != bufferInfos->value.size()) {
+            ALOGE("Error: incorrect access-units");
+            return -EINVAL;
+        }
+        msg->setInt32("flags", bufferFlags);
+    }
+    return OK;
+}
+
 static int64_t getId(IResourceManagerClient const * client) {
     return (int64_t) client;
 }
@@ -318,8 +349,8 @@ struct ResourceManagerClient : public BnResourceManagerClient {
                 return Status::fromStatus(STATUS_INVALID_OPERATION);
             }
             ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(this)};
+                                        .uid = static_cast<int32_t>(mUid),
+                                        .id = getId(this)};
             service->removeClient(clientInfo);
             *_aidl_return = true;
             return Status::ok();
@@ -396,6 +427,10 @@ struct MediaCodec::ResourceManagerServiceProxy :
         mCodecName = name;
     }
 
+    inline void setImportance(int importance) {
+        mImportance = importance;
+    }
+
 private:
     // To get the binder interface to ResourceManagerService.
     void getService() {
@@ -435,12 +470,30 @@ private:
         mGetServiceFuture = std::async(std::launch::async, [this] { getService(); });
     }
 
+    /**
+     * Get the ClientInfo to communicate with the ResourceManager.
+     *
+     * ClientInfo includes:
+     *   - {pid, uid} of the process
+     *   - identifier for the client
+     *   - name of the client/codec
+     *   - importance associated with the client
+     */
+    inline ClientInfoParcel getClientInfo() const {
+        ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
+                                    .uid = static_cast<int32_t>(mUid),
+                                    .id = getId(mClient),
+                                    .name = mCodecName,
+                                    .importance = mImportance};
+        return std::move(clientInfo);
+    }
 
 private:
-    std::mutex mLock;
-    pid_t mPid;
-    uid_t mUid;
-    bool mBinderDied = false;
+    std::mutex  mLock;
+    bool        mBinderDied = false;
+    pid_t       mPid;
+    uid_t       mUid;
+    int         mImportance = 0;
     std::string mCodecName;
     /**
      * Reconnecting with the ResourceManagerService, after its binder interface dies,
@@ -548,11 +601,7 @@ void MediaCodec::ResourceManagerServiceProxy::reRegisterAllResources_l() {
     std::vector<MediaResourceParcel> resources;
     std::copy(mMediaResourceParcel.begin(), mMediaResourceParcel.end(),
               std::back_inserter(resources));
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    mService->addResource(clientInfo, mClient, resources);
+    mService->addResource(getClientInfo(), mClient, resources);
 }
 
 void MediaCodec::ResourceManagerServiceProxy::BinderDiedCallback(void* cookie) {
@@ -585,11 +634,7 @@ void MediaCodec::ResourceManagerServiceProxy::addResource(
     }
     std::vector<MediaResourceParcel> resources;
     resources.push_back(resource);
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->addResource(clientInfo, mClient, resources);
+    service->addResource(getClientInfo(), mClient, resources);
     mMediaResourceParcel.emplace(resource);
 }
 
@@ -603,11 +648,7 @@ void MediaCodec::ResourceManagerServiceProxy::removeResource(
     }
     std::vector<MediaResourceParcel> resources;
     resources.push_back(resource);
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->removeResource(clientInfo, resources);
+    service->removeResource(getClientInfo(), resources);
     mMediaResourceParcel.erase(resource);
 }
 
@@ -618,11 +659,7 @@ void MediaCodec::ResourceManagerServiceProxy::removeClient() {
         ALOGW("Service isn't available");
         return;
     }
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->removeClient(clientInfo);
+    service->removeClient(getClientInfo());
     mMediaResourceParcel.clear();
 }
 
@@ -633,11 +670,7 @@ void MediaCodec::ResourceManagerServiceProxy::markClientForPendingRemoval() {
         ALOGW("Service isn't available");
         return;
     }
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->markClientForPendingRemoval(clientInfo);
+    service->markClientForPendingRemoval(getClientInfo());
     mMediaResourceParcel.clear();
 }
 
@@ -650,11 +683,7 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
         return false;
     }
     bool success;
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    Status status = service->reclaimResource(clientInfo, resources, &success);
+    Status status = service->reclaimResource(getClientInfo(), resources, &success);
     return status.isOk() && success;
 }
 
@@ -665,11 +694,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientCreated() {
         ALOGW("Service isn't available");
         return;
     }
-    ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
-                                .uid = static_cast<int32_t>(mUid),
-                                .id = getId(mClient),
-                                .name = mCodecName};
-    service->notifyClientCreated(clientInfo);
+    service->notifyClientCreated(getClientInfo());
 }
 
 void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
@@ -680,10 +705,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientStarted(
         ALOGW("Service isn't available");
         return;
     }
-    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
-    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
-    clientConfig.clientInfo.id = getId(mClient);
-    clientConfig.clientInfo.name = mCodecName;
+    clientConfig.clientInfo = getClientInfo();
     service->notifyClientStarted(clientConfig);
 }
 
@@ -695,10 +717,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientStopped(
         ALOGW("Service isn't available");
         return;
     }
-    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
-    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
-    clientConfig.clientInfo.id = getId(mClient);
-    clientConfig.clientInfo.name = mCodecName;
+    clientConfig.clientInfo = getClientInfo();
     service->notifyClientStopped(clientConfig);
 }
 
@@ -710,10 +729,7 @@ void MediaCodec::ResourceManagerServiceProxy::notifyClientConfigChanged(
         ALOGW("Service isn't available");
         return;
     }
-    clientConfig.clientInfo.pid = static_cast<int32_t>(mPid);
-    clientConfig.clientInfo.uid = static_cast<int32_t>(mUid);
-    clientConfig.clientInfo.id = getId(mClient);
-    clientConfig.clientInfo.name = mCodecName;
+    clientConfig.clientInfo = getClientInfo();
     service->notifyClientConfigChanged(clientConfig);
 }
 
@@ -1714,6 +1730,21 @@ void MediaCodec::updateLowLatency(const sp<AMessage> &msg) {
     }
 }
 
+void MediaCodec::updateCodecImportance(const sp<AMessage>& msg) {
+    // Update the codec importance.
+    int32_t importance = 0;
+    if (msg->findInt32(KEY_IMPORTANCE, &importance)) {
+        // Ignoring the negative importance.
+        if (importance >= 0) {
+            // Notify RM about the change in the importance.
+            mResourceManagerProxy->setImportance(importance);
+            ClientConfigParcel clientConfig;
+            initClientConfigParcel(clientConfig);
+            mResourceManagerProxy->notifyClientConfigChanged(clientConfig);
+        }
+    }
+}
+
 constexpr const char *MediaCodec::asString(TunnelPeekState state, const char *default_string){
     switch(state) {
         case TunnelPeekState::kLegacyMode:
@@ -2222,23 +2253,12 @@ static const char enableMediaFormatShapingProperty[] = "debug.stagefright.enable
 static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
                       bool reverse);
 
-status_t MediaCodec::configure(
-        const sp<AMessage> &format,
-        const sp<Surface> &nativeWindow,
-        const sp<ICrypto> &crypto,
-        uint32_t flags) {
-    return configure(format, nativeWindow, crypto, NULL, flags);
-}
-
-status_t MediaCodec::configure(
-        const sp<AMessage> &format,
-        const sp<Surface> &surface,
-        const sp<ICrypto> &crypto,
-        const sp<IDescrambler> &descrambler,
-        uint32_t flags) {
-
-    sp<AMessage> msg = new AMessage(kWhatConfigure, this);
+mediametrics_handle_t MediaCodec::createMediaMetrics(const sp<AMessage>& format,
+                                                     uint32_t flags,
+                                                     status_t* err) {
+    *err = OK;
     mediametrics_handle_t nextMetricsHandle = mediametrics_create(kCodecKeyName);
+    bool isEncoder = (flags & CONFIGURE_FLAG_ENCODE);
 
     // TODO: validity check log-session-id: it should be a 32-hex-digit.
     format->findString("log-session-id", &mLogSessionId);
@@ -2253,8 +2273,7 @@ status_t MediaCodec::configure(
         if (format->findInt32("level", &level)) {
             mediametrics_setInt32(nextMetricsHandle, kCodecLevel, level);
         }
-        mediametrics_setInt32(nextMetricsHandle, kCodecEncoder,
-                              (flags & CONFIGURE_FLAG_ENCODE) ? 1 : 0);
+        mediametrics_setInt32(nextMetricsHandle, kCodecEncoder, isEncoder);
 
         if (!mLogSessionId.empty()) {
             mediametrics_setCString(nextMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
@@ -2317,7 +2336,9 @@ status_t MediaCodec::configure(
             mErrorLog.log(LOG_TAG, base::StringPrintf(
                     "Invalid size(s), width=%d, height=%d", mWidth, mHeight));
             mediametrics_delete(nextMetricsHandle);
-            return BAD_VALUE;
+            // Set the error code and return null handle.
+            *err = BAD_VALUE;
+            return 0;
         }
 
     } else {
@@ -2333,7 +2354,7 @@ status_t MediaCodec::configure(
         }
     }
 
-    if (flags & CONFIGURE_FLAG_ENCODE) {
+    if (isEncoder) {
         int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty,
                                                  enableMediaFormatShapingDefault);
         if (!enableShaping) {
@@ -2378,6 +2399,35 @@ status_t MediaCodec::configure(
 
     updateLowLatency(format);
 
+    return nextMetricsHandle;
+}
+
+status_t MediaCodec::configure(
+        const sp<AMessage> &format,
+        const sp<Surface> &nativeWindow,
+        const sp<ICrypto> &crypto,
+        uint32_t flags) {
+    return configure(format, nativeWindow, crypto, NULL, flags);
+}
+
+status_t MediaCodec::configure(
+        const sp<AMessage> &format,
+        const sp<Surface> &surface,
+        const sp<ICrypto> &crypto,
+        const sp<IDescrambler> &descrambler,
+        uint32_t flags) {
+
+    // Update the codec importance.
+    updateCodecImportance(format);
+
+    // Create and set up metrics for this codec.
+    status_t err = OK;
+    mediametrics_handle_t nextMetricsHandle = createMediaMetrics(format, flags, &err);
+    if (err != OK) {
+        return err;
+    }
+
+    sp<AMessage> msg = new AMessage(kWhatConfigure, this);
     msg->setMessage("format", format);
     msg->setInt32("flags", flags);
     msg->setObject("surface", surface);
@@ -2410,7 +2460,6 @@ status_t MediaCodec::configure(
 
     sp<AMessage> callback = mCallback;
 
-    status_t err;
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(mFlags & kFlagIsSecure,
             toMediaResourceSubType(mIsHardware, mDomain)));
@@ -3164,7 +3213,49 @@ status_t MediaCodec::queueInputBuffer(
     msg->setInt64("timeUs", presentationTimeUs);
     msg->setInt32("flags", flags);
     msg->setPointer("errorDetailMsg", errorDetailMsg);
+    sp<AMessage> response;
+    return PostAndAwaitResponse(msg, &response);
+}
 
+status_t MediaCodec::queueInputBuffers(
+        size_t index,
+        size_t offset,
+        size_t size,
+        const sp<BufferInfosWrapper> &infos,
+        AString *errorDetailMsg) {
+    sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
+    uint32_t bufferFlags = 0;
+    uint32_t flagsinAllAU = BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_CODECCONFIG;
+    uint32_t andFlags = flagsinAllAU;
+    if (infos == nullptr || infos->value.empty()) {
+        ALOGE("ERROR: Large Audio frame with no BufferInfo");
+        return BAD_VALUE;
+    }
+    int infoIdx = 0;
+    std::vector<AccessUnitInfo> &accessUnitInfo = infos->value;
+    int64_t minTimeUs = accessUnitInfo.front().mTimestamp;
+    bool foundEndOfStream = false;
+    for ( ; infoIdx < accessUnitInfo.size() && !foundEndOfStream; ++infoIdx) {
+        bufferFlags |= accessUnitInfo[infoIdx].mFlags;
+        andFlags &= accessUnitInfo[infoIdx].mFlags;
+        if (bufferFlags & BUFFER_FLAG_END_OF_STREAM) {
+            foundEndOfStream = true;
+        }
+    }
+    bufferFlags = bufferFlags & (andFlags | (~flagsinAllAU));
+    if (infoIdx != accessUnitInfo.size()) {
+        ALOGE("queueInputBuffers has incorrect access-units");
+        return -EINVAL;
+    }
+    msg->setSize("index", index);
+    msg->setSize("offset", offset);
+    msg->setSize("size", size);
+    msg->setInt64("timeUs", minTimeUs);
+    // Make this represent flags for the entire buffer
+    // decodeOnly Flag is set only when all buffers are decodeOnly
+    msg->setInt32("flags", bufferFlags);
+    msg->setObject("accessUnitInfo", infos);
+    msg->setPointer("errorDetailMsg", errorDetailMsg);
     sp<AMessage> response;
     return PostAndAwaitResponse(msg, &response);
 }
@@ -3205,27 +3296,50 @@ status_t MediaCodec::queueSecureInputBuffer(
     return err;
 }
 
-status_t MediaCodec::queueBuffer(
+status_t MediaCodec::queueSecureInputBuffers(
         size_t index,
-        const std::shared_ptr<C2Buffer> &buffer,
-        int64_t presentationTimeUs,
-        uint32_t flags,
-        const sp<AMessage> &tunings,
+        size_t offset,
+        size_t size,
+        const sp<BufferInfosWrapper> &auInfo,
+        const sp<CryptoInfosWrapper> &cryptoInfos,
         AString *errorDetailMsg) {
     if (errorDetailMsg != NULL) {
         errorDetailMsg->clear();
     }
-
     sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
-    msg->setSize("index", index);
-    sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
-        new WrapperObject<std::shared_ptr<C2Buffer>>{buffer}};
-    msg->setObject("c2buffer", obj);
-    msg->setInt64("timeUs", presentationTimeUs);
-    msg->setInt32("flags", flags);
-    if (tunings && tunings->countEntries() > 0) {
-        msg->setMessage("tunings", tunings);
+    uint32_t bufferFlags = 0;
+    uint32_t flagsinAllAU = BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_CODECCONFIG;
+    uint32_t andFlags = flagsinAllAU;
+    if (auInfo == nullptr
+            || auInfo->value.empty()
+            || cryptoInfos == nullptr
+            || cryptoInfos->value.empty()) {
+        ALOGE("ERROR: Large Audio frame with no BufferInfo/CryptoInfo");
+        return BAD_VALUE;
     }
+    int infoIdx = 0;
+    std::vector<AccessUnitInfo> &accessUnitInfo = auInfo->value;
+    int64_t minTimeUs = accessUnitInfo.front().mTimestamp;
+    bool foundEndOfStream = false;
+    for ( ; infoIdx < accessUnitInfo.size() && !foundEndOfStream; ++infoIdx) {
+        bufferFlags |= accessUnitInfo[infoIdx].mFlags;
+        andFlags &= accessUnitInfo[infoIdx].mFlags;
+        if (bufferFlags & BUFFER_FLAG_END_OF_STREAM) {
+            foundEndOfStream = true;
+        }
+    }
+    bufferFlags = bufferFlags & (andFlags | (~flagsinAllAU));
+    if (infoIdx != accessUnitInfo.size()) {
+        ALOGE("queueInputBuffers has incorrect access-units");
+        return -EINVAL;
+    }
+    msg->setSize("index", index);
+    msg->setSize("offset", offset);
+    msg->setSize("ssize", size);
+    msg->setInt64("timeUs", minTimeUs);
+    msg->setInt32("flags", bufferFlags);
+    msg->setObject("accessUnitInfo", auInfo);
+    msg->setObject("cryptoInfos", cryptoInfos);
     msg->setPointer("errorDetailMsg", errorDetailMsg);
 
     sp<AMessage> response;
@@ -3234,46 +3348,76 @@ status_t MediaCodec::queueBuffer(
     return err;
 }
 
-status_t MediaCodec::queueEncryptedBuffer(
+status_t MediaCodec::queueBuffer(
         size_t index,
-        const sp<hardware::HidlMemory> &buffer,
-        size_t offset,
-        const CryptoPlugin::SubSample *subSamples,
-        size_t numSubSamples,
-        const uint8_t key[16],
-        const uint8_t iv[16],
-        CryptoPlugin::Mode mode,
-        const CryptoPlugin::Pattern &pattern,
-        int64_t presentationTimeUs,
-        uint32_t flags,
+        const std::shared_ptr<C2Buffer> &buffer,
+        const sp<BufferInfosWrapper> &bufferInfos,
         const sp<AMessage> &tunings,
         AString *errorDetailMsg) {
     if (errorDetailMsg != NULL) {
         errorDetailMsg->clear();
     }
+    if (bufferInfos == nullptr || bufferInfos->value.empty()) {
+        return BAD_VALUE;
+    }
+    status_t err = OK;
+    sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
+    msg->setSize("index", index);
+    sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
+        new WrapperObject<std::shared_ptr<C2Buffer>>{buffer}};
+    msg->setObject("c2buffer", obj);
+    if (OK != (err = generateFlagsFromAccessUnitInfo(msg, bufferInfos))) {
+        return err;
+    }
+    msg->setObject("accessUnitInfo", bufferInfos);
+    if (tunings && tunings->countEntries() > 0) {
+        msg->setMessage("tunings", tunings);
+    }
+    msg->setPointer("errorDetailMsg", errorDetailMsg);
+    sp<AMessage> response;
+    err = PostAndAwaitResponse(msg, &response);
 
+    return err;
+}
+
+status_t MediaCodec::queueEncryptedBuffer(
+        size_t index,
+        const sp<hardware::HidlMemory> &buffer,
+        size_t offset,
+        size_t size,
+        const sp<BufferInfosWrapper> &bufferInfos,
+        const sp<CryptoInfosWrapper> &cryptoInfos,
+        const sp<AMessage> &tunings,
+        AString *errorDetailMsg) {
+    if (errorDetailMsg != NULL) {
+        errorDetailMsg->clear();
+    }
+    if (bufferInfos == nullptr || bufferInfos->value.empty()) {
+        return BAD_VALUE;
+    }
+    if (cryptoInfos == nullptr || cryptoInfos->value.empty()) {
+        return BAD_VALUE;
+    }
+    status_t err = OK;
     sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
     msg->setSize("index", index);
     sp<WrapperObject<sp<hardware::HidlMemory>>> memory{
         new WrapperObject<sp<hardware::HidlMemory>>{buffer}};
     msg->setObject("memory", memory);
     msg->setSize("offset", offset);
-    msg->setPointer("subSamples", (void *)subSamples);
-    msg->setSize("numSubSamples", numSubSamples);
-    msg->setPointer("key", (void *)key);
-    msg->setPointer("iv", (void *)iv);
-    msg->setInt32("mode", mode);
-    msg->setInt32("encryptBlocks", pattern.mEncryptBlocks);
-    msg->setInt32("skipBlocks", pattern.mSkipBlocks);
-    msg->setInt64("timeUs", presentationTimeUs);
-    msg->setInt32("flags", flags);
+    msg->setSize("ssize", size);
+    msg->setObject("cryptoInfos", cryptoInfos);
+    msg->setObject("accessUnitInfo", bufferInfos);
+    if (OK != (err = generateFlagsFromAccessUnitInfo(msg, bufferInfos))) {
+        return err;
+    }
     if (tunings && tunings->countEntries() > 0) {
         msg->setMessage("tunings", tunings);
     }
     msg->setPointer("errorDetailMsg", errorDetailMsg);
 
     sp<AMessage> response;
-    status_t err = PostAndAwaitResponse(msg, &response);
+    err = PostAndAwaitResponse(msg, &response);
 
     return err;
 }
@@ -4748,6 +4892,35 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
                 }
             }
+            int32_t largeFrameParamMax = 0, largeFrameParamThreshold = 0;
+            if (format->findInt32(KEY_BUFFER_BATCH_MAX_OUTPUT_SIZE, &largeFrameParamMax) ||
+                    format->findInt32(KEY_BUFFER_BATCH_THRESHOLD_OUTPUT_SIZE,
+                    &largeFrameParamThreshold)) {
+                if (largeFrameParamMax > 0 || largeFrameParamThreshold > 0) {
+                    if(mComponentName.startsWith("OMX")) {
+                        mErrorLog.log(LOG_TAG,
+                                "Large Frame params are not supported on OMX codecs."
+                                "Currently only supported on C2 audio codec.");
+                        PostReplyWithError(replyID, INVALID_OPERATION);
+                        break;
+                    }
+                    AString mime;
+                    CHECK(format->findString("mime", &mime));
+                    if (!mime.startsWith("audio")) {
+                        mErrorLog.log(LOG_TAG,
+                                "Large Frame params only works with audio codec");
+                        PostReplyWithError(replyID, INVALID_OPERATION);
+                        break;
+                    }
+                    if (!(mFlags & kFlagIsAsync)) {
+                            mErrorLog.log(LOG_TAG, "Large Frame audio" \
+                                    "config works only with async mode");
+                        PostReplyWithError(replyID, INVALID_OPERATION);
+                        break;
+                    }
+                }
+            }
+
             mReplyID = replyID;
             setState(CONFIGURING);
 
@@ -5896,10 +6069,10 @@ size_t MediaCodec::updateBuffers(
 
 status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     size_t index;
-    size_t offset;
-    size_t size;
-    int64_t timeUs;
-    uint32_t flags;
+    size_t offset = 0;
+    size_t size = 0;
+    int64_t timeUs = 0;
+    uint32_t flags = 0;
     CHECK(msg->findSize("index", &index));
     CHECK(msg->findInt64("timeUs", &timeUs));
     CHECK(msg->findInt32("flags", (int32_t *)&flags));
@@ -5944,22 +6117,26 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             mErrorLog.log(LOG_TAG, "queuing secure buffer without mCrypto or mDescrambler!");
             return -EINVAL;
         }
-        CHECK(msg->findPointer("subSamples", (void **)&subSamples));
-        CHECK(msg->findSize("numSubSamples", &numSubSamples));
-        CHECK(msg->findPointer("key", (void **)&key));
-        CHECK(msg->findPointer("iv", (void **)&iv));
-        CHECK(msg->findInt32("encryptBlocks", (int32_t *)&pattern.mEncryptBlocks));
-        CHECK(msg->findInt32("skipBlocks", (int32_t *)&pattern.mSkipBlocks));
+        sp<RefBase> obj;
+        if (msg->findObject("cryptoInfos", &obj)) {
+            CHECK(msg->findSize("ssize", &size));
+        } else {
+            CHECK(msg->findPointer("subSamples", (void **)&subSamples));
+            CHECK(msg->findSize("numSubSamples", &numSubSamples));
+            CHECK(msg->findPointer("key", (void **)&key));
+            CHECK(msg->findPointer("iv", (void **)&iv));
+            CHECK(msg->findInt32("encryptBlocks", (int32_t *)&pattern.mEncryptBlocks));
+            CHECK(msg->findInt32("skipBlocks", (int32_t *)&pattern.mSkipBlocks));
 
-        int32_t tmp;
-        CHECK(msg->findInt32("mode", &tmp));
+            int32_t tmp;
+            CHECK(msg->findInt32("mode", &tmp));
 
-        mode = (CryptoPlugin::Mode)tmp;
-
-        size = 0;
-        for (size_t i = 0; i < numSubSamples; ++i) {
-            size += subSamples[i].mNumBytesOfClearData;
-            size += subSamples[i].mNumBytesOfEncryptedData;
+            mode = (CryptoPlugin::Mode)tmp;
+            size = 0;
+            for (size_t i = 0; i < numSubSamples; ++i) {
+                size += subSamples[i].mNumBytesOfClearData;
+                size += subSamples[i].mNumBytesOfEncryptedData;
+            }
         }
     }
 
@@ -5981,9 +6158,13 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 "client does not own the buffer #%zu", index));
         return -EACCES;
     }
-    auto setInputBufferParams = [this, &buffer]
+    auto setInputBufferParams = [this, &msg, &buffer]
         (int64_t timeUs, uint32_t flags = 0) -> status_t {
         status_t err = OK;
+        sp<RefBase> obj;
+        if (msg->findObject("accessUnitInfo", &obj)) {
+            buffer->meta()->setObject("accessUnitInfo", obj);
+        }
         buffer->meta()->setInt64("timeUs", timeUs);
         if (flags & BUFFER_FLAG_EOS) {
             buffer->meta()->setInt32("eos", true);
@@ -6020,35 +6201,48 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
      return err;
     };
     auto buildCryptoInfoAMessage = [&](const sp<AMessage> & cryptoInfo, int32_t action) {
-        size_t key_len = (key != nullptr)? 16 : 0;
-        size_t iv_len = (iv != nullptr)? 16 : 0;
-        sp<ABuffer> shared_key;
-        sp<ABuffer> shared_iv;
-        if (key_len > 0) {
-            shared_key = ABuffer::CreateAsCopy((void*)key, key_len);
-        }
-        if (iv_len > 0) {
-            shared_iv = ABuffer::CreateAsCopy((void*)iv, iv_len);
-        }
-        sp<ABuffer> subSamples_buffer =
-            new ABuffer(sizeof(CryptoPlugin::SubSample) * numSubSamples);
-        CryptoPlugin::SubSample * samples =
-           (CryptoPlugin::SubSample *)(subSamples_buffer.get()->data());
-        for (int s = 0 ; s < numSubSamples ; s++) {
-            samples[s].mNumBytesOfClearData = subSamples[s].mNumBytesOfClearData;
-            samples[s].mNumBytesOfEncryptedData = subSamples[s].mNumBytesOfEncryptedData;
-        }
         // set decrypt Action
         cryptoInfo->setInt32("action", action);
         cryptoInfo->setObject("buffer", buffer);
         cryptoInfo->setInt32("secure", mFlags & kFlagIsSecure);
-        cryptoInfo->setBuffer("key", shared_key);
-        cryptoInfo->setBuffer("iv", shared_iv);
-        cryptoInfo->setInt32("mode", (int)mode);
-        cryptoInfo->setInt32("encryptBlocks", pattern.mEncryptBlocks);
-        cryptoInfo->setInt32("skipBlocks", pattern.mSkipBlocks);
-        cryptoInfo->setBuffer("subSamples", subSamples_buffer);
-        cryptoInfo->setSize("numSubSamples", numSubSamples);
+        sp<RefBase> obj;
+        if (msg->findObject("cryptoInfos", &obj)) {
+            sp<CryptoInfosWrapper> infos{(CryptoInfosWrapper*)obj.get()};
+            sp<CryptoInfosWrapper> asyncInfos{
+                    new CryptoInfosWrapper(std::vector<std::unique_ptr<CodecCryptoInfo>>())};
+            for (std::unique_ptr<CodecCryptoInfo> &info : infos->value) {
+                if (info) {
+                    asyncInfos->value.emplace_back(new CryptoAsync::CryptoAsyncInfo(info));
+                }
+            }
+            buffer->meta()->setObject("cryptoInfos", asyncInfos);
+        } else {
+            size_t key_len = (key != nullptr)? 16 : 0;
+            size_t iv_len = (iv != nullptr)? 16 : 0;
+            sp<ABuffer> shared_key;
+            sp<ABuffer> shared_iv;
+            if (key_len > 0) {
+                shared_key = ABuffer::CreateAsCopy((void*)key, key_len);
+            }
+            if (iv_len > 0) {
+                shared_iv = ABuffer::CreateAsCopy((void*)iv, iv_len);
+            }
+            sp<ABuffer> subSamples_buffer =
+                new ABuffer(sizeof(CryptoPlugin::SubSample) * numSubSamples);
+            CryptoPlugin::SubSample * samples =
+               (CryptoPlugin::SubSample *)(subSamples_buffer.get()->data());
+            for (int s = 0 ; s < numSubSamples ; s++) {
+                samples[s].mNumBytesOfClearData = subSamples[s].mNumBytesOfClearData;
+                samples[s].mNumBytesOfEncryptedData = subSamples[s].mNumBytesOfEncryptedData;
+            }
+            cryptoInfo->setBuffer("key", shared_key);
+            cryptoInfo->setBuffer("iv", shared_iv);
+            cryptoInfo->setInt32("mode", (int)mode);
+            cryptoInfo->setInt32("encryptBlocks", pattern.mEncryptBlocks);
+            cryptoInfo->setInt32("skipBlocks", pattern.mSkipBlocks);
+            cryptoInfo->setBuffer("subSamples", subSamples_buffer);
+            cryptoInfo->setSize("numSubSamples", numSubSamples);
+        }
     };
     if (c2Buffer || memory) {
         sp<AMessage> tunings = NULL;
@@ -6058,15 +6252,37 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         status_t err = OK;
         if (c2Buffer) {
             err = mBufferChannel->attachBuffer(c2Buffer, buffer);
+            // to prevent unnecessary copy for single info case.
+            if (msg->findObject("accessUnitInfo", &obj)) {
+                sp<BufferInfosWrapper> infos{(BufferInfosWrapper*)(obj.get())};
+                if (infos->value.size() == 1) {
+                   msg->removeEntryByName("accessUnitInfo");
+                }
+            }
         } else if (memory) {
             AString errorDetailMsg;
-            err = mBufferChannel->attachEncryptedBuffer(
-                    memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
-                    offset, subSamples, numSubSamples, buffer, &errorDetailMsg);
+            if (msg->findObject("cryptoInfos", &obj)) {
+                buffer->meta()->setSize("ssize", size);
+                buffer->meta()->setObject("cryptoInfos", obj);
+                if (msg->findObject("accessUnitInfo", &obj)) {
+                    // the reference will be same here and
+                    // setBufferParams
+                    buffer->meta()->setObject("accessUnitInfo", obj);
+                }
+                err = mBufferChannel->attachEncryptedBuffers(
+                    memory,
+                    offset,
+                    buffer,
+                    (mFlags & kFlagIsSecure),
+                    &errorDetailMsg);
+            } else {
+                err = mBufferChannel->attachEncryptedBuffer(
+                        memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
+                        offset, subSamples, numSubSamples, buffer, &errorDetailMsg);
+            }
             if (err != OK && hasCryptoOrDescrambler()
                     && (mFlags & kFlagUseCryptoAsync)) {
                 // create error detail
-                AString errorDetailMsg;
                 sp<AMessage> cryptoErrorInfo = new AMessage();
                 buildCryptoInfoAMessage(cryptoErrorInfo, CryptoAsync::kActionDecrypt);
                 cryptoErrorInfo->setInt32("err", err);
@@ -6138,10 +6354,17 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             }
         }
         if (mCryptoAsync) {
+            // TODO b/316565675 - enable async path for audio
             // prepare a message and enqueue
             sp<AMessage> cryptoInfo = new AMessage();
             buildCryptoInfoAMessage(cryptoInfo, CryptoAsync::kActionDecrypt);
             mCryptoAsync->decrypt(cryptoInfo);
+        } else if (msg->findObject("cryptoInfos", &obj)) {
+                buffer->meta()->setObject("cryptoInfos", obj);
+                err = mBufferChannel->queueSecureInputBuffers(
+                        buffer,
+                        (mFlags & kFlagIsSecure),
+                        errorDetailMsg);
         } else {
             err = mBufferChannel->queueSecureInputBuffer(
                 buffer,
@@ -6493,10 +6716,11 @@ void MediaCodec::onOutputBufferAvailable() {
         if (discardDecodeOnlyOutputBuffer(index)) {
             continue;
         }
+        sp<AMessage> msg = mCallback->dup();
         const sp<MediaCodecBuffer> &buffer =
             mPortBuffers[kPortIndexOutput][index].mData;
-        sp<AMessage> msg = mCallback->dup();
-        msg->setInt32("callbackID", CB_OUTPUT_AVAILABLE);
+        int32_t outputCallbackID = CB_OUTPUT_AVAILABLE;
+        sp<RefBase> accessUnitInfoObj;
         msg->setInt32("index", index);
         msg->setSize("offset", buffer->offset());
         msg->setSize("size", buffer->size());
@@ -6510,6 +6734,15 @@ void MediaCodec::onOutputBufferAvailable() {
         CHECK(buffer->meta()->findInt32("flags", &flags));
 
         msg->setInt32("flags", flags);
+        buffer->meta()->findObject("accessUnitInfo", &accessUnitInfoObj);
+        if (accessUnitInfoObj) {
+            outputCallbackID = CB_LARGE_FRAME_OUTPUT_AVAILABLE;
+            msg->setObject("accessUnitInfo", accessUnitInfoObj);
+            sp<BufferInfosWrapper> auInfo(
+                    (decltype(auInfo.get()))accessUnitInfoObj.get());
+             auInfo->value.back().mFlags |= flags & BUFFER_FLAG_END_OF_STREAM;
+        }
+        msg->setInt32("callbackID", outputCallbackID);
 
         statsBufferReceived(timeUs, buffer);
 
@@ -6589,6 +6822,7 @@ status_t MediaCodec::onSetParameters(const sp<AMessage> &params) {
         return NO_INIT;
     }
     updateLowLatency(params);
+    updateCodecImportance(params);
     mapFormat(mComponentName, params, nullptr, false);
     updateTunnelPeek(params);
     mCodec->signalSetParameters(params);

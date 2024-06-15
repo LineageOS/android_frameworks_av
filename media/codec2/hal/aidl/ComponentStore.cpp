@@ -199,12 +199,51 @@ std::shared_ptr<FilterWrapper> ComponentStore::GetFilterWrapper() {
 }
 #endif
 
+std::shared_ptr<MultiAccessUnitInterface> ComponentStore::tryCreateMultiAccessUnitInterface(
+        const std::shared_ptr<C2ComponentInterface> &c2interface) {
+    std::shared_ptr<MultiAccessUnitInterface> multiAccessUnitIntf = nullptr;
+    if (c2interface == nullptr) {
+        return nullptr;
+    }
+    if (MultiAccessUnitHelper::isEnabledOnPlatform()) {
+        c2_status_t err = C2_OK;
+        C2ComponentDomainSetting domain;
+        std::vector<std::unique_ptr<C2Param>> heapParams;
+        err = c2interface->query_vb({&domain}, {}, C2_MAY_BLOCK, &heapParams);
+        if (err == C2_OK && (domain.value == C2Component::DOMAIN_AUDIO)) {
+            std::vector<std::shared_ptr<C2ParamDescriptor>> params;
+            bool isComponentSupportsLargeAudioFrame = false;
+            c2interface->querySupportedParams_nb(&params);
+            for (const auto &paramDesc : params) {
+                if (paramDesc->name().compare(C2_PARAMKEY_OUTPUT_LARGE_FRAME) == 0) {
+                    isComponentSupportsLargeAudioFrame = true;
+                    break;
+                }
+            }
+            if (!isComponentSupportsLargeAudioFrame) {
+                multiAccessUnitIntf = std::make_shared<MultiAccessUnitInterface>(
+                        c2interface, std::static_pointer_cast<C2ReflectorHelper>(mParamReflector));
+            }
+        }
+    }
+    return multiAccessUnitIntf;
+}
+
 // Methods from ::aidl::android::hardware::media::c2::IComponentStore
 ScopedAStatus ComponentStore::createComponent(
         const std::string& name,
         const std::shared_ptr<IComponentListener>& listener,
         const std::shared_ptr<IClientManager>& pool,
         std::shared_ptr<IComponent> *component) {
+
+    if (!listener) {
+        ALOGE("createComponent(): listener is null");
+        return ScopedAStatus::fromServiceSpecificError(Status::BAD_VALUE);
+    }
+    if (!pool) {
+        ALOGE("createComponent(): pool is null");
+        return ScopedAStatus::fromServiceSpecificError(Status::BAD_VALUE);
+    }
 
     std::shared_ptr<C2Component> c2component;
     c2_status_t status =
@@ -218,7 +257,8 @@ ScopedAStatus ComponentStore::createComponent(
         std::shared_ptr<Component> comp =
             SharedRefBase::make<Component>(c2component, listener, ref<ComponentStore>(), pool);
         *component = comp;
-        if (!component) {
+        if (!component || !comp) {
+            ALOGE("createComponent(): component cannot be returned");
             status = C2_CORRUPTED;
         } else {
             reportComponentBirth(comp.get());
@@ -248,7 +288,10 @@ ScopedAStatus ComponentStore::createInterface(
         c2interface = GetFilterWrapper()->maybeWrapInterface(c2interface);
 #endif
         onInterfaceLoaded(c2interface);
-        *intf = SharedRefBase::make<ComponentInterface>(c2interface, mParameterCache);
+        std::shared_ptr<MultiAccessUnitInterface> multiAccessUnitIntf =
+                tryCreateMultiAccessUnitInterface(c2interface);
+        *intf = SharedRefBase::make<ComponentInterface>(
+                c2interface, multiAccessUnitIntf, mParameterCache);
         return ScopedAStatus::ok();
     }
     return ScopedAStatus::fromServiceSpecificError(res);
@@ -271,6 +314,13 @@ ScopedAStatus ComponentStore::listComponents(
     }
     traits->resize(ix);
     return ScopedAStatus::ok();
+}
+
+ScopedAStatus ComponentStore::createInputSurface(
+        std::shared_ptr<IInputSurface> *inputSurface) {
+    // TODO
+    (void)inputSurface;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
 }
 
 void ComponentStore::onInterfaceLoaded(const std::shared_ptr<C2ComponentInterface> &intf) {

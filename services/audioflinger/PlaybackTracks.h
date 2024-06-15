@@ -23,6 +23,7 @@
 #include <audio_utils/mutex.h>
 #include <audio_utils/LinearMap.h>
 #include <binder/AppOpsManager.h>
+#include <utils/RWLock.h>
 
 namespace android {
 
@@ -173,15 +174,15 @@ public:
     void setHapticPlaybackEnabled(bool hapticPlaybackEnabled) final {
                 mHapticPlaybackEnabled = hapticPlaybackEnabled;
             }
-            /** Return at what intensity to play haptics, used in mixer. */
-    os::HapticScale getHapticIntensity() const final { return mHapticIntensity; }
+            /** Return the haptics scale, used in mixer. */
+    os::HapticScale getHapticScale() const final { return mHapticScale; }
             /** Return the maximum amplitude allowed for haptics data, used in mixer. */
     float getHapticMaxAmplitude() const final { return mHapticMaxAmplitude; }
             /** Set intensity of haptic playback, should be set after querying vibrator service. */
-    void setHapticIntensity(os::HapticScale hapticIntensity) final {
-                if (os::isValidHapticScale(hapticIntensity)) {
-                    mHapticIntensity = hapticIntensity;
-                    setHapticPlaybackEnabled(mHapticIntensity != os::HapticScale::MUTE);
+    void setHapticScale(os::HapticScale hapticScale) final {
+                if (os::isValidHapticScale(hapticScale)) {
+                    mHapticScale = hapticScale;
+                    setHapticPlaybackEnabled(!mHapticScale.isScaleMute());
                 }
             }
             /** Set maximum amplitude allowed for haptic data, should be set after querying
@@ -193,7 +194,8 @@ public:
     sp<os::ExternalVibration> getExternalVibration() const final { return mExternalVibration; }
 
             // This function should be called with holding thread lock.
-    void updateTeePatches_l() final;
+    void updateTeePatches_l() final REQUIRES(audio_utils::ThreadBase_Mutex)
+            EXCLUDES_BELOW_ThreadBase_Mutex;
     void setTeePatchesToUpdate_l(TeePatches teePatchesToUpdate) final;
 
     void tallyUnderrunFrames(size_t frames) final {
@@ -327,8 +329,8 @@ protected:
     sp<OpPlayAudioMonitor>  mOpPlayAudioMonitor;
 
     bool                mHapticPlaybackEnabled = false; // indicates haptic playback enabled or not
-    // intensity to play haptic data
-    os::HapticScale mHapticIntensity = os::HapticScale::MUTE;
+    // scale to play haptic data
+    os::HapticScale mHapticScale = os::HapticScale::mute();
     // max amplitude allowed for haptic data
     float mHapticMaxAmplitude = NAN;
     class AudioVibrationController : public os::BnExternalVibrationController {
@@ -352,6 +354,7 @@ private:
     // Must hold thread lock to access tee patches
     template <class F>
     void                forEachTeePatchTrack_l(F f) {
+        RWLock::AutoRLock readLock(mTeePatchesRWLock);
         for (auto& tp : mTeePatches) { f(tp.patchTrack); }
     };
 
@@ -387,6 +390,7 @@ private:
     audio_output_flags_t mFlags;
     TeePatches mTeePatches;
     std::optional<TeePatches> mTeePatchesToUpdate;
+    RWLock              mTeePatchesRWLock;
     const float         mSpeed;
     const bool          mIsSpatialized;
     const bool          mIsBitPerfect;

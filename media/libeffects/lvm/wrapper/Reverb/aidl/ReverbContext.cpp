@@ -329,7 +329,7 @@ void ReverbContext::initControlParameter(LVREV_ControlParams_st& params) {
  */
 
 int ReverbContext::convertLevel(int level) {
-    for (int i = 0; i < kLevelMapping.size(); i++) {
+    for (std::size_t i = 0; i < kLevelMapping.size(); i++) {
         if (level <= kLevelMapping[i]) {
             return i;
         }
@@ -352,7 +352,7 @@ int16_t ReverbContext::convertHfLevel(int hfLevel) {
     return kDefaultLPF;
 }
 
-IEffect::Status ReverbContext::lvmProcess(float* in, float* out, int samples) {
+IEffect::Status ReverbContext::process(float* in, float* out, int samples) {
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!in, status, "nullInput");
     RETURN_VALUE_IF(!out, status, "nullOutput");

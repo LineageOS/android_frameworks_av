@@ -80,7 +80,7 @@
         </MediaCodec>
         <MediaCodec name="c2.android.raw.decoder" type="audio/raw">
             <Alias name="OMX.google.raw.decoder" />
-            <Limit name="channel-count" max="8" />
+            <Limit name="channel-count" max="12" />
             <Limit name="sample-rate" ranges="8000-192000" />
             <Limit name="bitrate" range="1-10000000" />
             <Attribute name="software-codec" />
@@ -330,6 +330,7 @@
             <!-- Video Quality control -->
                     <!-- supports QP bounding with standard keys -->
             <Feature name="qp-bounds" />
+            <Feature name="bitrate-modes" value="VBR,CBR" />
             <Attribute name="software-codec" />
         </MediaCodec>
         <MediaCodec name="c2.android.vp8.encoder" type="video/x-vnd.on2.vp8" variant="slow-cpu,!slow-cpu">

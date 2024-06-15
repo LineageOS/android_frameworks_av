@@ -778,6 +778,19 @@ void SwAudioOutputDescriptor::setTracksInvalidatedStatusByStrategy(product_strat
     }
 }
 
+void SwAudioOutputDescriptor::setDevices(const android::DeviceVector &devices) {
+    if ((mFlags & AUDIO_OUTPUT_FLAG_BIT_PERFECT) == AUDIO_OUTPUT_FLAG_BIT_PERFECT) {
+        for (auto device : mDevices) {
+            device->setPreferredConfig(nullptr);
+        }
+        auto config = getConfig();
+        for (auto device : devices) {
+            device->setPreferredConfig(&config);
+        }
+    }
+    mDevices = devices;
+}
+
 // HwAudioOutputDescriptor implementation
 HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor>& source,
                                                  AudioPolicyClientInterface *clientInterface)

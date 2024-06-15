@@ -32,7 +32,7 @@ SourceAudioBufferProvider::SourceAudioBufferProvider(const sp<NBAIO_Source>& sou
     // negotiate with source
     NBAIO_Format counterOffers[1];
     size_t numCounterOffers = 1;
-    ssize_t index = source->negotiate(NULL, 0, counterOffers, numCounterOffers);
+    [[maybe_unused]] ssize_t index = source->negotiate(NULL, 0, counterOffers, numCounterOffers);
     ALOG_ASSERT(index == (ssize_t) NEGOTIATE && numCounterOffers > 0);
     numCounterOffers = 0;
     index = source->negotiate(counterOffers, 1, NULL, numCounterOffers);

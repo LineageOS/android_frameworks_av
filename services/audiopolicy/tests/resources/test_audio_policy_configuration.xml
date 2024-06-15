@@ -65,6 +65,7 @@
                         samplingRates="48000"
                         channelMasks="AUDIO_CHANNEL_IN_STEREO"/>
                 </mixPort>
+                <mixPort name="hifi_input" role="sink" />
             </mixPorts>
             <devicePorts>
                 <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink">
@@ -111,6 +112,8 @@
                        sources="primary output,hifi_output,mmap_no_irq_out"/>
                 <route type="mix" sink="mixport_bus_input"
                     sources="BUS Device In"/>
+                <route type="mix" sink="hifi_input"
+                        sources="USB Device In" />
             </routes>
         </module>
 

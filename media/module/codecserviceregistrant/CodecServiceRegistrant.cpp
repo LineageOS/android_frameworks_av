@@ -25,6 +25,7 @@
 #include <C2Component.h>
 #include <C2PlatformSupport.h>
 
+#include <android/hidl/manager/1.2/IServiceManager.h>
 #include <codec2/hidl/1.0/ComponentStore.h>
 #include <codec2/hidl/1.1/ComponentStore.h>
 #include <codec2/hidl/1.2/ComponentStore.h>
@@ -147,6 +148,11 @@ public:
                 LOG(ERROR) << "config -- transaction failed.";
                 return C2_TRANSACTION_FAILED;
             }
+        }
+        status = static_cast<c2_status_t>(configResult.status.status);
+        if (status != C2_BAD_INDEX) {
+            LOG(DEBUG) << "config -- call failed: "
+                       << status << ".";
         }
         size_t i = failures->size();
         failures->resize(i + configResult.failures.size());
@@ -320,8 +326,8 @@ public:
             heapParams->reserve(heapParams->size() + numIndices);
         }
         c2_status_t status = C2_OK;
-        c2_aidl::Params aidlParams;
-        ScopedAStatus transResult = mAidlConfigurable->query(indices, true, &aidlParams);
+        c2_aidl::IConfigurable::QueryResult aidlResult;
+        ScopedAStatus transResult = mAidlConfigurable->query(indices, true, &aidlResult);
         if (!transResult.isOk()) {
             if (transResult.getExceptionCode() == EX_SERVICE_SPECIFIC) {
                 status = c2_status_t(transResult.getServiceSpecificError());
@@ -332,8 +338,12 @@ public:
                 return C2_TRANSACTION_FAILED;
             }
         }
+        status = static_cast<c2_status_t>(aidlResult.status.status);
+        if (status != C2_OK) {
+            LOG(DEBUG) << "query -- call failed: " << status << ".";
+        }
         std::vector<C2Param*> paramPointers;
-        if (!c2_aidl::utils::ParseParamsBlob(&paramPointers, aidlParams)) {
+        if (!c2_aidl::utils::ParseParamsBlob(&paramPointers, aidlResult.params)) {
             LOG(ERROR) << "query -- error while parsing params.";
             return C2_CORRUPTED;
         }
@@ -488,9 +498,9 @@ public:
         }
 
         c2_status_t status = C2_OK;
-        std::vector<c2_aidl::FieldSupportedValuesQueryResult> queryResults;
+        c2_aidl::IConfigurable::QuerySupportedValuesResult queryResult;
         ScopedAStatus transResult = mAidlConfigurable->querySupportedValues(
-                aidlFields, true, &queryResults);
+                aidlFields, true, &queryResult);
         if (!transResult.isOk()) {
             if (transResult.getExceptionCode() == EX_SERVICE_SPECIFIC) {
                 status = c2_status_t(transResult.getServiceSpecificError());
@@ -502,14 +512,19 @@ public:
                 return C2_TRANSACTION_FAILED;
             }
         }
-        if (queryResults.size() != fields.size()) {
+        status = static_cast<c2_status_t>(queryResult.status.status);
+        if (status != C2_OK) {
+            LOG(DEBUG) << "querySupportedValues -- call failed: "
+                       << status << ".";
+        }
+        if (queryResult.values.size() != fields.size()) {
             LOG(ERROR) << "querySupportedValues -- "
                           "input and output lists "
                           "have different sizes.";
             return C2_CORRUPTED;
         }
         for (size_t i = 0; i < fields.size(); ++i) {
-            if (!c2_aidl::utils::FromAidl(&fields[i], aidlFields[i], queryResults[i])) {
+            if (!c2_aidl::utils::FromAidl(&fields[i], aidlFields[i], queryResult.values[i])) {
                 LOG(ERROR) << "querySupportedValues -- "
                               "invalid returned value.";
                 return C2_CORRUPTED;
@@ -803,32 +818,50 @@ extern "C" void RegisterCodecServices() {
         }
     }
 
-    if (platformVersion >= __ANDROID_API_V__) {
-        if (!aidlStore) {
-            aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
+    bool registered = false;
+    const std::string aidlServiceName =
+        std::string(c2_aidl::IComponentStore::descriptor) + "/software";
+    if (__builtin_available(android __ANDROID_API_S__, *)) {
+        if (AServiceManager_isDeclared(aidlServiceName.c_str())) {
+            if (!aidlStore) {
+                aidlStore = ::ndk::SharedRefBase::make<c2_aidl::utils::ComponentStore>(
+                        std::make_shared<H2C2ComponentStore>(nullptr));
+            }
+            binder_exception_t ex = AServiceManager_addService(
+                    aidlStore->asBinder().get(), aidlServiceName.c_str());
+            if (ex == EX_NONE) {
+                registered = true;
+            } else {
+                LOG(WARNING) << "Cannot register software Codec2 AIDL service. Exception: " << ex;
+            }
+        }
+    }
+
+    // If the software component store isn't declared in the manifest, we don't
+    // need to create the service and register it.
+    using ::android::hidl::manager::V1_2::IServiceManager;
+    IServiceManager::Transport transport =
+            android::hardware::defaultServiceManager1_2()->getTransport(
+                    V1_2::utils::ComponentStore::descriptor, "software");
+    if (transport == IServiceManager::Transport::HWBINDER) {
+        if (!hidlStore) {
+            hidlStore = ::android::sp<V1_2::utils::ComponentStore>::make(
                     std::make_shared<H2C2ComponentStore>(nullptr));
+            hidlVer = "1.2";
         }
-        const std::string serviceName =
-            std::string(c2_aidl::IComponentStore::descriptor) + "/software";
-        binder_exception_t ex = AServiceManager_addService(
-                aidlStore->asBinder().get(), serviceName.c_str());
-        if (ex != EX_NONE) {
-            LOG(ERROR) << "Cannot register software Codec2 AIDL service.";
-            return;
+        if (hidlStore->registerAsService("software") == android::OK) {
+            registered = true;
+        } else {
+            LOG(ERROR) << "Cannot register software Codec2 v" << hidlVer << " service.";
         }
+    } else {
+        LOG(INFO) << "The HIDL software Codec2 service is deprecated"
+                     " so it is not being registered with hwservicemanager.";
     }
 
-    if (!hidlStore) {
-        hidlStore = ::android::sp<V1_0::utils::ComponentStore>::make(
-                std::make_shared<H2C2ComponentStore>(nullptr));
-        hidlVer = "1.0";
+    if (registered) {
+        LOG(INFO) << "Software Codec2 service created and registered.";
     }
-    if (hidlStore->registerAsService("software") != android::OK) {
-        LOG(ERROR) << "Cannot register software Codec2 v" << hidlVer << " service.";
-        return;
-    }
-
-    LOG(INFO) << "Software Codec2 service created and registered.";
 
     ABinderProcess_joinThreadPool();
     ::android::hardware::joinRpcThreadpool();

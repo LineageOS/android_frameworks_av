@@ -96,7 +96,32 @@ struct PixelCount {
 };
 
 //
-// ResourceManagerMetrics class that maintaines concurrent codec count based:
+//  Resource Manager Metrics is designed to answer some of the questions like:
+//    - What apps are causing reclaim and what apps are targeted (reclaimed from) in the process?
+//    - which apps use the most codecs and the most codec memory?
+//    - What is the % of total successful reclaims?
+//
+//  Though, it's not in the context of this class, metrics should also answer:
+//    - what % of codec errors are due to codec being reclaimed?
+//    - What % of successful codec creation(start) requires codec reclaims?
+//    - How often codec start fails even after successful reclaim?
+//
+//  The metrics are collected to analyze and understand the codec resource usage
+//  and use that information to help with:
+//    - minimize the no of reclaims
+//    - reduce the codec start delays by minimizing no of times we try to reclaim
+//    - minimize the reclaim errors in codec records
+//
+//  Success metrics for Resource Manager Service could be defined as:
+//   - increase in sucecssful codec creation for the foreground apps
+//   - reduce the number of reclaims for codecs
+//   - reduce the time to create codec
+//
+//  We would like to use this data to come up with a better resource management that would:
+//   - increase the successful codec creation (for all kind of apps)
+//   - decrease the codec errors due to resources
+//
+// This class that maintains concurrent codec counts based on:
 //
 //  1. # of concurrent active codecs (initialized, but aren't released yet) of given
 //     implementation (by codec name) across the system.
@@ -111,7 +136,7 @@ struct PixelCount {
 //  This should help with understanding the (video) memory usage per
 //  application.
 //
-//
+
 class ResourceManagerMetrics {
 public:
     ResourceManagerMetrics(const sp<ProcessInfoInterface>& processInfo);

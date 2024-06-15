@@ -74,10 +74,15 @@ cc_library {
     name: "libresourcemanagerservice",
 
     srcs: [
+        "ClientImportanceReclaimPolicy.cpp",
+        "DefaultResourceModel.cpp",
+        "ProcessPriorityReclaimPolicy.cpp",
         "ResourceManagerMetrics.cpp",
         "ResourceManagerService.cpp",
+        "ResourceManagerServiceNew.cpp",
         "ResourceObserverService.cpp",
         "ResourceManagerServiceUtils.cpp",
+        "ResourceTracker.cpp",
         "ServiceLog.cpp",
         "UidObserver.cpp",
 
@@ -97,6 +102,7 @@ cc_library {
         "libstatssocket",
         "libprotobuf-cpp-lite",
         "libactivitymanager_aidl",
+        "aconfig_mediacodec_flags_c_lib",
     ],
 
     static_libs: [

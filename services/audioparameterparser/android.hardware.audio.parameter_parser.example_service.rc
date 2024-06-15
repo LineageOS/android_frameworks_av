@@ -1,0 +1,6 @@
+service audio_parameter_parser_service /system_ext/bin/hw/android.hardware.audio.parameter_parser.example_service
+    class core
+    user audioserver
+    group media
+    ioprio rt 4
+    task_profiles ProcessCapacityHigh HighPerformance

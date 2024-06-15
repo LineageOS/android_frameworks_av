@@ -384,6 +384,17 @@ public:
      */
     native_handle_t *handle() const;
 
+    class MappedBlock {
+    public:
+        explicit MappedBlock(const std::shared_ptr<C2LinearBlock> &block);
+        virtual ~MappedBlock();
+        bool copyDecryptedContent(const sp<IMemory> &decrypted, size_t length);
+    private:
+        C2WriteView mView;
+    };
+
+    void getMappedBlock(std::unique_ptr<MappedBlock> * const mappedBlock) const;
+
 private:
 
     std::shared_ptr<C2LinearBlock> mBlock;

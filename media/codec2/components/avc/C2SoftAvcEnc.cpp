@@ -152,6 +152,17 @@ public:
                 .build());
 
         addParameter(
+                DefineParam(mBitrateMode, C2_PARAMKEY_BITRATE_MODE)
+                .withDefault(new C2StreamBitrateModeTuning::output(0u, C2Config::BITRATE_VARIABLE))
+                .withFields({C2F(mBitrateMode, value).oneOf({
+                                        C2Config::BITRATE_CONST,
+                                        C2Config::BITRATE_VARIABLE,
+                                        C2Config::BITRATE_IGNORE})
+                        })
+                .withSetter(Setter<decltype(*mBitrateMode)>::StrictValueWithNoDeps)
+                .build());
+
+        addParameter(
                 DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
                 .withDefault(new C2StreamBitrateInfo::output(0u, 64000))
                 .withFields({C2F(mBitrate, value).inRange(4096, 12000000)})
@@ -536,6 +547,9 @@ public:
     std::shared_ptr<C2StreamPictureSizeInfo::input> getSize_l() const { return mSize; }
     std::shared_ptr<C2StreamIntraRefreshTuning::output> getIntraRefresh_l() const { return mIntraRefresh; }
     std::shared_ptr<C2StreamFrameRateInfo::output> getFrameRate_l() const { return mFrameRate; }
+    std::shared_ptr<C2StreamBitrateModeTuning::output> getBitrateMode_l() const {
+        return mBitrateMode;
+    }
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const { return mBitrate; }
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
     std::shared_ptr<C2StreamGopTuning::output> getGop_l() const { return mGop; }
@@ -552,6 +566,7 @@ private:
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
     std::shared_ptr<C2StreamGopTuning::output> mGop;
@@ -1154,6 +1169,7 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
     {
         IntfImpl::Lock lock = mIntf->lock();
         mSize = mIntf->getSize_l();
+        mBitrateMode = mIntf->getBitrateMode_l();
         mBitrate = mIntf->getBitrate_l();
         mFrameRate = mIntf->getFrameRate_l();
         mIntraRefresh = mIntf->getIntraRefresh_l();
@@ -1326,8 +1342,23 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         } else {
             ps_init_ip->u4_enable_recon = 0;
         }
+
+        switch (mBitrateMode->value) {
+            case C2Config::BITRATE_IGNORE:
+                ps_init_ip->e_rc_mode = IVE_RC_NONE;
+                break;
+            case C2Config::BITRATE_CONST:
+                ps_init_ip->e_rc_mode = IVE_RC_CBR_NON_LOW_DELAY;
+                break;
+            case C2Config::BITRATE_VARIABLE:
+                ps_init_ip->e_rc_mode = IVE_RC_STORAGE;
+                break;
+            default:
+                ps_init_ip->e_rc_mode = DEFAULT_RC_MODE;
+                break;
+            break;
+        }
         ps_init_ip->e_recon_color_fmt = DEFAULT_RECON_COLOR_FORMAT;
-        ps_init_ip->e_rc_mode = DEFAULT_RC_MODE;
         ps_init_ip->u4_max_framerate = DEFAULT_MAX_FRAMERATE;
         ps_init_ip->u4_max_bitrate = DEFAULT_MAX_BITRATE;
         ps_init_ip->u4_num_bframes = mBframes;

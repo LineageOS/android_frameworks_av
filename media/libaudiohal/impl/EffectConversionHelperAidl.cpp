@@ -180,18 +180,6 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
 
     State state;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
-    // in case of buffer/ioHandle re-configure for an opened effect, close it and re-open
-    if (state != State::INIT && mCommon != common) {
-        ALOGI("%s at state %s, common parameter change from %s to %s, closing effect", __func__,
-              android::internal::ToString(state).c_str(), mCommon.toString().c_str(),
-              common.toString().c_str());
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->close()));
-        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->getState(&state)));
-        mStatusQ.reset();
-        mInputQ.reset();
-        mOutputQ.reset();
-    }
-
     if (state == State::INIT) {
         ALOGI("%s at state %s, opening effect with input %s output %s", __func__,
               android::internal::ToString(state).c_str(), common.input.toString().c_str(),
@@ -199,22 +187,7 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
         IEffect::OpenEffectReturn openReturn;
         RETURN_STATUS_IF_ERROR(
                 statusTFromBinderStatus(mEffect->open(common, std::nullopt, &openReturn)));
-
-        if (mIsProxyEffect) {
-            mStatusQ = std::static_pointer_cast<EffectProxy>(mEffect)->getStatusMQ();
-            mInputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getInputMQ();
-            mOutputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getOutputMQ();
-        } else {
-            mStatusQ = std::make_shared<StatusMQ>(openReturn.statusMQ);
-            mInputQ = std::make_shared<DataMQ>(openReturn.inputDataMQ);
-            mOutputQ = std::make_shared<DataMQ>(openReturn.outputDataMQ);
-        }
-
-        if (status_t status = updateEventFlags(); status != OK) {
-            ALOGV("%s closing at status %d", __func__, status);
-            mEffect->close();
-            return status;
-        }
+        updateMqsAndEventFlags(openReturn);
     } else if (mCommon != common) {
         ALOGI("%s at state %s, setParameter", __func__, android::internal::ToString(state).c_str());
         Parameter aidlParam = UNION_MAKE(Parameter, common, common);
@@ -223,6 +196,26 @@ status_t EffectConversionHelperAidl::handleSetConfig(uint32_t cmdSize, const voi
     mCommon = common;
 
     return *static_cast<int32_t*>(pReplyData) = OK;
+}
+
+void EffectConversionHelperAidl::updateMqsAndEventFlags(const IEffect::OpenEffectReturn& ret) {
+    if (mIsProxyEffect) {
+        mStatusQ = std::static_pointer_cast<EffectProxy>(mEffect)->getStatusMQ();
+    } else {
+        mStatusQ = std::make_shared<StatusMQ>(ret.statusMQ);
+    }
+    updateEventFlags();
+    updateDataMqs(ret);
+}
+
+void EffectConversionHelperAidl::updateDataMqs(const IEffect::OpenEffectReturn& ret) {
+    if (mIsProxyEffect) {
+        mInputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getInputMQ();
+        mOutputQ = std::static_pointer_cast<EffectProxy>(mEffect)->getOutputMQ();
+    } else {
+        mInputQ = std::make_shared<DataMQ>(ret.inputDataMQ);
+        mOutputQ = std::make_shared<DataMQ>(ret.outputDataMQ);
+    }
 }
 
 status_t EffectConversionHelperAidl::handleGetConfig(uint32_t cmdSize __unused,
@@ -416,10 +409,8 @@ status_t EffectConversionHelperAidl::handleSetOffload(uint32_t cmdSize, const vo
         }
         // update FMQs if the effect instance already open
         if (State state; effectProxy->getState(&state).isOk() && state != State::INIT) {
-            mStatusQ = effectProxy->getStatusMQ();
-            mInputQ = effectProxy->getInputMQ();
-            mOutputQ = effectProxy->getOutputMQ();
-            updateEventFlags();
+            IEffect::OpenEffectReturn openReturn;
+            updateMqsAndEventFlags(openReturn);
         }
     }
     return *static_cast<int32_t*>(pReplyData) = OK;
@@ -515,6 +506,15 @@ Descriptor EffectConversionHelperAidl::getDescriptor() const {
         return mDesc;
     }
     return desc;
+}
+
+status_t EffectConversionHelperAidl::reopen() {
+    IEffect::OpenEffectReturn openReturn;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mEffect->reopen(&openReturn)));
+
+    // status MQ won't be changed after open
+    updateDataMqs(openReturn);
+    return OK;
 }
 
 }  // namespace effect

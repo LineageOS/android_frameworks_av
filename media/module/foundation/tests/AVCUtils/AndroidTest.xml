@@ -16,7 +16,7 @@
 <configuration description="Test module config for AVC Utils unit tests">
     <option name="test-suite-tag" value="AVCUtilsUnitTest" />
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
-        <option name="cleanup" value="false" />
+        <option name="cleanup" value="true" />
         <option name="push" value="AVCUtilsUnitTest->/data/local/tmp/AVCUtilsUnitTest" />
     </target_preparer>
 

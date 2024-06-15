@@ -18,6 +18,9 @@
 #ifndef ANDROID_MEDIA_RESOURCEMANAGERSERVICEUTILS_H_
 #define ANDROID_MEDIA_RESOURCEMANAGERSERVICEUTILS_H_
 
+#include <map>
+#include <set>
+#include <memory>
 #include <vector>
 
 #include <aidl/android/media/BnResourceManagerService.h>
@@ -97,10 +100,47 @@ public:
     virtual void binderDied();
 };
 
-// A map of tuple(type, sub-type, id) and the resource parcel.
-typedef std::map<std::tuple<
-        MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>,
-        ::aidl::android::media::MediaResourceParcel> ResourceList;
+// Encapsulate Resource List as vector of resources instead of map.
+// Since the number of resource is very limited, maintaining it as
+// std::vector helps with both performance and memory requiremnts.
+struct ResourceList {
+    // Add or Update an entry into ResourceList.
+    // If a new entry is added, isNewEntry will be set to true upon return
+    // returns true on successful update, false otherwise.
+    bool add(const ::aidl::android::media::MediaResourceParcel& res, bool* isNewEntry = nullptr);
+
+    // reduce the resource usage by subtracting the resource value.
+    // If the resource value is 0 after reducing the resource usage,
+    // that entry will be removed and removedEntryValue is set to the
+    // value before it was removed upon return otherwise it will be set to -1.
+    // returns true on successful removal of the resource, false otherwise.
+    bool remove(const ::aidl::android::media::MediaResourceParcel& res,
+                long* removedEntryValue = nullptr);
+
+    // Returns true if there aren't any resource entries.
+    bool empty() const {
+        return mResourceList.empty();
+    }
+
+    // Returns resource list as a non-modifiable vectors
+    const std::vector<::aidl::android::media::MediaResourceParcel>& getResources() const {
+        return mResourceList;
+    }
+
+    // Converts resource list into string format
+    std::string toString() const;
+
+    // BEGIN: Test only function
+    // Check if two resource lists are the same.
+    bool operator==(const ResourceList& rhs) const;
+
+    // Add or Update an entry into ResourceList.
+    void addOrUpdate(const ::aidl::android::media::MediaResourceParcel& res);
+    // END: Test only function
+
+private:
+    std::vector<::aidl::android::media::MediaResourceParcel> mResourceList;
+};
 
 // Encapsulation for Resource Info, that contains
 // - pid of the app
@@ -120,16 +160,34 @@ struct ResourceInfo {
     std::shared_ptr<DeathNotifier> deathNotifier = nullptr;
     ResourceList resources;
     bool pendingRemoval{false};
+    uint32_t importance = 0;
+};
+
+/*
+ * Resource Reclaim request info that encapsulates
+ *  - the calling/requesting process pid.
+ *  - id of the client that made reclaim request.
+ *  - the calling/requesting client's importance.
+ *  - the list of resources requesting (to be reclaimed from others)
+ */
+struct ReclaimRequestInfo {
+    int mCallingPid = -1;
+    int64_t mClientId = 0;
+    uint32_t mCallingClientImportance = 0;
+    const std::vector<::aidl::android::media::MediaResourceParcel>& mResources;
 };
 
 /*
  * Resource request info that encapsulates
  *  - the calling/requesting process pid.
+ *  - the calling/requesting client's id.
  *  - the resource requesting (to be reclaimed from others)
  */
 struct ResourceRequestInfo {
     // pid of the calling/requesting process.
     int mCallingPid = -1;
+    // id of the calling/requesting client.
+    int64_t mClientId = 0;
     // resources requested.
     const ::aidl::android::media::MediaResourceParcel* mResource;
 };
@@ -170,7 +228,7 @@ String8 getString(const std::vector<T>& items) {
 
 //Check whether a given resource (of type and subtype) is found in given resource parcel.
 bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
-                     const MediaResourceParcel& resource);
+                     const ::aidl::android::media::MediaResourceParcel& resource);
 
 //Check whether a given resource (of type and subtype) is found in given resource list.
 bool hasResourceType(MediaResource::Type type, MediaResource::SubType subType,
@@ -193,7 +251,13 @@ ResourceInfo& getResourceInfoForEdit(
         ResourceInfos& infos);
 
 // Merge resources from r2 into r1.
-void mergeResources(MediaResourceParcel& r1, const MediaResourceParcel& r2);
+void mergeResources(::aidl::android::media::MediaResourceParcel& r1,
+                    const ::aidl::android::media::MediaResourceParcel& r2);
+
+// To notify the media_resource_monitor about the resource being granted.
+void notifyResourceGranted(
+        int pid,
+        const std::vector<::aidl::android::media::MediaResourceParcel>& resources);
 
 } // namespace android
 

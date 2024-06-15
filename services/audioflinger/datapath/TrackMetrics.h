@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_TRACKMETRICS_H
-#define ANDROID_AUDIO_TRACKMETRICS_H
+#pragma once
 
 #include <binder/IActivityManager.h>
 #include <binder/IPCThreadState.h>
@@ -306,5 +305,3 @@ private:
 };
 
 } // namespace android
-
-#endif // ANDROID_AUDIO_TRACKMETRICS_H

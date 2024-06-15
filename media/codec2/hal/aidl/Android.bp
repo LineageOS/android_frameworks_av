@@ -24,7 +24,7 @@ cc_library {
     shared_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool@2.0",
-        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.bufferpool2-V2-ndk",
         "android.hardware.media.c2-V1-ndk",
         "libbinder_ndk",
         "libbase",
@@ -84,7 +84,7 @@ cc_library {
 
     shared_libs: [
         "android.hardware.common-V2-ndk",
-        "android.hardware.media.bufferpool2-V1-ndk",
+        "android.hardware.media.bufferpool2-V2-ndk",
         "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",

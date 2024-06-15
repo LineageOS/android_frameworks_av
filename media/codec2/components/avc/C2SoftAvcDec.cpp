@@ -416,6 +416,7 @@ status_t C2SoftAvcDec::createDecoder() {
     ivdext_create_op_t s_create_op = {};
 
     s_create_ip.s_ivd_create_ip_t.u4_size = sizeof(ivdext_create_ip_t);
+    s_create_ip.u4_keep_threads_active = 1;
     s_create_ip.s_ivd_create_ip_t.e_cmd = IVD_CMD_CREATE;
     s_create_ip.s_ivd_create_ip_t.u4_share_disp_buf = 0;
     s_create_ip.s_ivd_create_ip_t.e_output_format = mIvColorFormat;

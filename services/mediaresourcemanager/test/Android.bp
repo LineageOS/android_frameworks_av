@@ -12,7 +12,10 @@ cc_test {
     name: "ResourceManagerService_test",
     srcs: ["ResourceManagerService_test.cpp"],
     test_suites: ["device-tests"],
-    static_libs: ["libresourcemanagerservice"],
+    static_libs: [
+        "libresourcemanagerservice",
+        "aconfig_mediacodec_flags_c_lib",
+    ],
     shared_libs: [
         "libbinder",
         "libbinder_ndk",
@@ -24,6 +27,7 @@ cc_test {
         "libstatspull",
         "libstatssocket",
         "libactivitymanager_aidl",
+        "server_configurable_flags",
     ],
     include_dirs: [
         "frameworks/av/include",
@@ -62,6 +66,7 @@ cc_test {
     static_libs: [
         "libresourcemanagerservice",
         "resourceobserver_aidl_interface-V1-ndk",
+        "aconfig_mediacodec_flags_c_lib",
     ],
     shared_libs: [
         "libbinder",
@@ -74,6 +79,7 @@ cc_test {
         "libstatspull",
         "libstatssocket",
         "libactivitymanager_aidl",
+        "server_configurable_flags",
     ],
     include_dirs: [
         "frameworks/av/include",

@@ -58,11 +58,11 @@ public:
      * @return {@code INVALID_SCORE} if not matching, {@code MATCH_ON_DEFAULT_SCORE} if matching
      * to default strategy, non zero positive score if matching a strategy.
      */
-    static int attributesMatchesScore(const audio_attributes_t refAttributes,
-                                      const audio_attributes_t clientAttritubes);
+    static int attributesMatchesScore(audio_attributes_t refAttributes,
+                                      audio_attributes_t clientAttritubes);
 
-    static bool attributesMatches(const audio_attributes_t refAttributes,
-                                      const audio_attributes_t clientAttritubes) {
+    static bool attributesMatches(audio_attributes_t refAttributes,
+                                  audio_attributes_t clientAttritubes) {
         return attributesMatchesScore(refAttributes, clientAttritubes) > 0;
     }
 

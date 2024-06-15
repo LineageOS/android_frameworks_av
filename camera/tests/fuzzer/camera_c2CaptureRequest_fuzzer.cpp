@@ -44,7 +44,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     }
 
     for (size_t idx = 0; idx < physicalCameraSettingsSize; ++idx) {
-        string id = fdp.ConsumeRandomLengthString();
+        string id = fdp.ConsumeRandomLengthString(kMaxBytes);
         if (fdp.ConsumeBool()) {
             parcelCamCaptureReq.writeString16(toString16(id));
         }
@@ -120,7 +120,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         }
     }
 
-    invokeReadWriteParcelsp<CaptureRequest>(captureRequest);
+    if (fdp.ConsumeBool()) {
+        invokeReadWriteParcelsp<CaptureRequest>(captureRequest);
+    } else {
+        invokeNewReadWriteParcelsp<CaptureRequest>(captureRequest, fdp);
+    }
     invokeReadWriteNullParcelsp<CaptureRequest>(captureRequest);
     parcelCamCaptureReq.setDataPosition(0);
     captureRequest->readFromParcel(&parcelCamCaptureReq);

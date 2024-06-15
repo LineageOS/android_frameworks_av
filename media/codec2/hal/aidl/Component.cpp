@@ -46,13 +46,17 @@ namespace utils {
 using ::aidl::android::hardware::common::NativeHandle;
 using ::aidl::android::hardware::media::bufferpool2::IClientManager;
 using ::ndk::ScopedAStatus;
+using ::android::MultiAccessUnitInterface;
+using ::android::MultiAccessUnitHelper;
 
 // ComponentListener wrapper
 struct Component::Listener : public C2Component::Listener {
 
     Listener(const std::shared_ptr<Component>& component) :
-        mComponent(component),
-        mListener(component->mListener) {
+            mComponent(component),
+            mListener(component->mListener) {
+        CHECK(component);
+        CHECK(component->mListener);
     }
 
     virtual void onError_nb(
@@ -137,6 +141,52 @@ protected:
     std::weak_ptr<IComponentListener> mListener;
 };
 
+// Component listener for handle multiple access-units
+struct MultiAccessUnitListener : public Component::Listener {
+    MultiAccessUnitListener(const std::shared_ptr<Component>& component,
+            const std::shared_ptr<MultiAccessUnitHelper> &helper):
+        Listener(component), mHelper(helper) {
+    }
+
+    virtual void onError_nb(
+            std::weak_ptr<C2Component> c2component,
+            uint32_t errorCode) override {
+        if (mHelper) {
+            std::list<std::unique_ptr<C2Work>> worklist;
+            mHelper->error(&worklist);
+            if (!worklist.empty()) {
+                Listener::onWorkDone_nb(c2component, std::move(worklist));
+            }
+        }
+        Listener::onError_nb(c2component, errorCode);
+    }
+
+    virtual void onTripped_nb(
+            std::weak_ptr<C2Component> c2component,
+            std::vector<std::shared_ptr<C2SettingResult>> c2settingResult
+            ) override {
+        Listener::onTripped_nb(c2component,
+                c2settingResult);
+    }
+
+    virtual void onWorkDone_nb(
+            std::weak_ptr<C2Component> c2component,
+            std::list<std::unique_ptr<C2Work>> c2workItems) override {
+        if (mHelper) {
+            std::list<std::unique_ptr<C2Work>> processedWork;
+            mHelper->gather(c2workItems, &processedWork);
+            if (!processedWork.empty()) {
+                Listener::onWorkDone_nb(c2component, std::move(processedWork));
+            }
+        } else {
+            Listener::onWorkDone_nb(c2component, std::move(c2workItems));
+        }
+    }
+
+    protected:
+        std::shared_ptr<MultiAccessUnitHelper> mHelper;
+};
+
 // Component::DeathContext
 struct Component::DeathContext {
     std::weak_ptr<Component> mWeakComp;
@@ -149,14 +199,15 @@ Component::Component(
         const std::shared_ptr<ComponentStore>& store,
         const std::shared_ptr<IClientManager>& clientPoolManager)
       : mComponent{component},
-        mInterface{SharedRefBase::make<ComponentInterface>(
-                component->intf(), store->getParameterCache())},
         mListener{listener},
         mStore{store},
         mBufferPoolSender{clientPoolManager},
         mDeathContext(nullptr) {
     // Retrieve supported parameters from store
     // TODO: We could cache this per component/interface type
+    mMultiAccessUnitIntf = store->tryCreateMultiAccessUnitInterface(component->intf());
+    mInterface = SharedRefBase::make<ComponentInterface>(
+            component->intf(), mMultiAccessUnitIntf, store->getParameterCache());
     mInit = mInterface->status();
 }
 
@@ -179,8 +230,21 @@ ScopedAStatus Component::queue(const WorkBundle& workBundle) {
                     registerFrameData(mListener, work->input);
         }
     }
+    c2_status_t err = C2_OK;
+    if (mMultiAccessUnitHelper) {
+        std::list<std::list<std::unique_ptr<C2Work>>> c2worklists;
+        mMultiAccessUnitHelper->scatter(c2works, &c2worklists);
+        for (auto &c2worklist : c2worklists) {
+            err = mComponent->queue_nb(&c2worklist);
+            if (err != C2_OK) {
+                LOG(ERROR) << "Error Queuing to component.";
+                return ScopedAStatus::fromServiceSpecificError(err);
+            }
+        }
+        return ScopedAStatus::ok();
+    }
 
-    c2_status_t err = mComponent->queue_nb(&c2works);
+    err = mComponent->queue_nb(&c2works);
     if (err == C2_OK) {
         return ScopedAStatus::ok();
     }
@@ -192,7 +256,9 @@ ScopedAStatus Component::flush(WorkBundle *flushedWorkBundle) {
     c2_status_t c2res = mComponent->flush_sm(
             C2Component::FLUSH_COMPONENT,
             &c2flushedWorks);
-
+    if (mMultiAccessUnitHelper) {
+        c2res = mMultiAccessUnitHelper->flush(&c2flushedWorks);
+    }
     // Unregister input buffers.
     for (const std::unique_ptr<C2Work>& work : c2flushedWorks) {
         if (work) {
@@ -289,30 +355,22 @@ ScopedAStatus Component::createBlockPool(
         const IComponent::BlockPoolAllocator &allocator,
         IComponent::BlockPool *blockPool) {
     std::shared_ptr<C2BlockPool> c2BlockPool;
-    static constexpr IComponent::BlockPoolAllocator::Tag ALLOCATOR_ID =
-        IComponent::BlockPoolAllocator::allocatorId;
-    static constexpr IComponent::BlockPoolAllocator::Tag IGBA =
-        IComponent::BlockPoolAllocator::allocator;
     c2_status_t status = C2_OK;
     ::android::C2PlatformAllocatorDesc allocatorParam;
-    switch (allocator.getTag()) {
-        case ALLOCATOR_ID: {
-            allocatorParam.allocatorId =
-                    allocator.get<IComponent::BlockPoolAllocator::allocatorId>();
-        }
-        break;
-        case IGBA: {
-            allocatorParam.allocatorId = ::android::C2PlatformAllocatorStore::IGBA;
-            allocatorParam.igba =
-                    allocator.get<IComponent::BlockPoolAllocator::allocator>().igba;
+    allocatorParam.allocatorId = allocator.allocatorId;
+    switch (allocator.allocatorId) {
+        case ::android::C2PlatformAllocatorStore::IGBA: {
+            allocatorParam.igba = allocator.gbAllocator->igba;
             allocatorParam.waitableFd.reset(
-                    allocator.get<IComponent::BlockPoolAllocator::allocator>()
-                    .waitableFd.dup().release());
+                    allocator.gbAllocator->waitableFd.dup().release());
         }
         break;
-        default:
-            return ScopedAStatus::fromServiceSpecificError(C2_CORRUPTED);
+        default: {
+            // no-op
+        }
+        break;
     }
+
 #ifdef __ANDROID_APEX__
     status = ::android::CreateCodec2BlockPool(
             allocatorParam,
@@ -370,6 +428,9 @@ ScopedAStatus Component::reset() {
         std::lock_guard<std::mutex> lock(mBlockPoolsMutex);
         mBlockPools.clear();
     }
+    if (mMultiAccessUnitHelper) {
+        mMultiAccessUnitHelper->reset();
+    }
     InputBufferManager::unregisterFrameData(mListener);
     if (status == C2_OK) {
         return ScopedAStatus::ok();
@@ -382,6 +443,9 @@ ScopedAStatus Component::release() {
     {
         std::lock_guard<std::mutex> lock(mBlockPoolsMutex);
         mBlockPools.clear();
+    }
+    if (mMultiAccessUnitHelper) {
+        mMultiAccessUnitHelper->reset();
     }
     InputBufferManager::unregisterFrameData(mListener);
     if (status == C2_OK) {
@@ -403,15 +467,38 @@ ScopedAStatus Component::configureVideoTunnel(
     return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
 }
 
+ScopedAStatus Component::connectToInputSurface(
+        const std::shared_ptr<IInputSurface>& inputSurface,
+        std::shared_ptr<IInputSurfaceConnection> *connection) {
+    // TODO
+    (void)inputSurface;
+    (void)connection;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
+}
+
+ScopedAStatus Component::asInputSink(
+        std::shared_ptr<IInputSink> *sink) {
+    // TODO
+    (void)sink;
+    return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
+}
+
 void Component::initListener(const std::shared_ptr<Component>& self) {
     if (__builtin_available(android __ANDROID_API_T__, *)) {
-        std::shared_ptr<C2Component::Listener> c2listener =
+        std::shared_ptr<C2Component::Listener> c2listener;
+        if (mMultiAccessUnitIntf) {
+            mMultiAccessUnitHelper = std::make_shared<MultiAccessUnitHelper>(mMultiAccessUnitIntf);
+        }
+        c2listener = mMultiAccessUnitHelper ?
+                std::make_shared<MultiAccessUnitListener>(self, mMultiAccessUnitHelper) :
                 std::make_shared<Listener>(self);
         c2_status_t res = mComponent->setListener_vb(c2listener, C2_DONT_BLOCK);
         if (res != C2_OK) {
             mInit = res;
         }
 
+        // b/321902635, mListener should not be null.
+        CHECK(mListener);
         mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
                 AIBinder_DeathRecipient_new(OnBinderDied));
         mDeathContext = new DeathContext{ref<Component>()};

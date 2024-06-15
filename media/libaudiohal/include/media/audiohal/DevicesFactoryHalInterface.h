@@ -42,8 +42,6 @@ class DevicesFactoryHalInterface : public RefBase
     // necessary to release references to the returned object.
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device) = 0;
 
-    virtual status_t getHalPids(std::vector<pid_t> *pids) = 0;
-
     // Sets a DevicesFactoryHalCallback to notify the client.
     // The callback can be only set once.
     virtual status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback) = 0;

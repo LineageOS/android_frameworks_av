@@ -396,6 +396,7 @@ void CameraManagerGlobal::drainPendingCallbacksLocked() {
 
 template <class T>
 void CameraManagerGlobal::registerAvailCallback(const T *callback) {
+    getCameraService();
     Mutex::Autolock _l(mLock);
     Callback cb(callback);
     auto res = mCallbacks.insert(cb);

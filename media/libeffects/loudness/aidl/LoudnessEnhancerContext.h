@@ -42,7 +42,7 @@ class LoudnessEnhancerContext final : public EffectContext {
     RetCode setLeGain(int gainMb);
     int getLeGain() const { return mGain; }
 
-    IEffect::Status lvmProcess(float* in, float* out, int samples);
+    IEffect::Status process(float* in, float* out, int samples);
 
   private:
     std::mutex mMutex;

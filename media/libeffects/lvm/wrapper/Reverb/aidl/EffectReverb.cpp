@@ -358,10 +358,6 @@ std::shared_ptr<EffectContext> EffectReverb::createContext(const Parameter::Comm
     return mContext;
 }
 
-std::shared_ptr<EffectContext> EffectReverb::getContext() {
-    return mContext;
-}
-
 RetCode EffectReverb::releaseContext() {
     if (mContext) {
         mContext.reset();
@@ -394,7 +390,7 @@ ndk::ScopedAStatus EffectReverb::commandImpl(CommandId command) {
 IEffect::Status EffectReverb::effectProcessImpl(float* in, float* out, int sampleToProcess) {
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!mContext, status, "nullContext");
-    return mContext->lvmProcess(in, out, sampleToProcess);
+    return mContext->process(in, out, sampleToProcess);
 }
 
 }  // namespace aidl::android::hardware::audio::effect

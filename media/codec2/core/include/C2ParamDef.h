@@ -212,6 +212,26 @@ protected:
     }
 };
 
+/// Define equality (and inequality) operators for params.
+#if __cplusplus < 202002
+
+#define DEFINE_EQUALITY_OPERATORS(_Type, T) \
+    inline bool operator==(const _Type &o) const { \
+        return this->T::operator==(o); \
+    } \
+    inline bool operator!=(const _Type &o) const { \
+    return !operator==(o); \
+    }
+
+#else
+
+#define DEFINE_EQUALITY_OPERATORS(_Type, T) \
+    inline bool operator==(const _Type &o) const { \
+        return this->T::operator==(o); \
+    }
+
+#endif
+
 /// Define From() cast operators for params.
 #define DEFINE_CAST_OPERATORS(_Type) \
     inline static _Type* From(C2Param *other) { \
@@ -409,6 +429,7 @@ public:
         template<typename ...Args>
         inline input(const Args(&... args)) : T(sizeof(_Type), input::PARAM_TYPE), S(args...) { }
 
+        DEFINE_EQUALITY_OPERATORS(input, T)
         DEFINE_CAST_OPERATORS(input)
 
     };
@@ -421,6 +442,7 @@ public:
         template<typename ...Args>
         inline output(const Args(&... args)) : T(sizeof(_Type), output::PARAM_TYPE), S(args...) { }
 
+        DEFINE_EQUALITY_OPERATORS(output, T)
         DEFINE_CAST_OPERATORS(output)
     };
 };
@@ -479,6 +501,7 @@ public:
     public:
         S m; ///< wrapped flexible structure
 
+        DEFINE_EQUALITY_OPERATORS(input, T)
         DEFINE_FLEXIBLE_METHODS(input, S)
         DEFINE_CAST_OPERATORS(input)
     };
@@ -495,6 +518,7 @@ public:
     public:
         S m; ///< wrapped flexible structure
 
+        DEFINE_EQUALITY_OPERATORS(output, T)
         DEFINE_FLEXIBLE_METHODS(output, S)
         DEFINE_CAST_OPERATORS(output)
     };
@@ -560,6 +584,7 @@ public:
         /// Set stream-id. \retval true if the stream-id was successfully set.
         inline bool setStream(unsigned stream) { return C2Param::setStream(stream); }
 
+        DEFINE_EQUALITY_OPERATORS(input, T)
         DEFINE_CAST_OPERATORS(input)
     };
 
@@ -578,6 +603,7 @@ public:
         /// Set stream-id. \retval true if the stream-id was successfully set.
         inline bool setStream(unsigned stream) { return C2Param::setStream(stream); }
 
+        DEFINE_EQUALITY_OPERATORS(output, T)
         DEFINE_CAST_OPERATORS(output)
     };
 };
@@ -648,6 +674,7 @@ public:
         /// Set stream-id. \retval true if the stream-id was successfully set.
         inline bool setStream(unsigned stream) { return C2Param::setStream(stream); }
 
+        DEFINE_EQUALITY_OPERATORS(input, T)
         DEFINE_FLEXIBLE_METHODS(input, S)
         DEFINE_CAST_OPERATORS(input)
     };
@@ -670,6 +697,7 @@ public:
         /// Set stream-id. \retval true if the stream-id was successfully set.
         inline bool setStream(unsigned stream) { return C2Param::setStream(stream); }
 
+        DEFINE_EQUALITY_OPERATORS(output, T)
         DEFINE_FLEXIBLE_METHODS(output, S)
         DEFINE_CAST_OPERATORS(output)
     };

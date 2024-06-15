@@ -22,7 +22,24 @@
 #include <C2Buffer.h>
 
 namespace android {
+// VNDK
+/**
+ * Extract pixel format from the extra data of gralloc handle.
+ *
+ * @return 0 when no valid pixel format exists.
+ */
+uint32_t ExtractFormatFromCodec2GrallocHandle(const C2Handle *const handle);
 
+/**
+ * Extract metadata from the extra data of gralloc handle.
+ *
+ * @return {@code false} if extraction was failed, {@code true} otherwise.
+ */
+bool ExtractMetadataFromCodec2GrallocHandle(
+    const C2Handle *const handle,
+    uint32_t *width, uint32_t *height, uint32_t *format, uint64_t *usage, uint32_t  *stride);
+
+// Not for VNDK (system partition and inside vndk only)
 /**
  * Unwrap the native handle from a Codec2 handle allocated by C2AllocatorGralloc.
  *
@@ -46,13 +63,6 @@ C2Handle *WrapNativeCodec2GrallocHandle(
         uint32_t generation = 0, uint64_t igbp_id = 0, uint32_t igbp_slot = 0);
 
 /**
- * Extract pixel format from the extra data of gralloc handle.
- *
- * @return 0 when no valid pixel format exists.
- */
-uint32_t ExtractFormatFromCodec2GrallocHandle(const C2Handle *const handle);
-
-/**
  * When the gralloc handle is migrated to another bufferqueue, update
  * bufferqueue information.
  *
@@ -71,16 +81,6 @@ void _UnwrapNativeCodec2GrallocMetadata(
         uint32_t *generation, uint64_t *igbp_id, uint32_t *igbp_slot);
 
 /**
- * Unwrap the native handle from a Codec2 handle allocated by C2AllocatorAhwb.
- *
- * @param handle a handle allocated by C2AllocatorAhwb. This includes handles returned for a
- * graphic block allocation handle based on an AHardwareBuffer.
- *
- * @return a new NON-OWNING native handle that must be deleted using native_handle_delete.
- */
-native_handle_t *UnwrapNativeCodec2AhwbHandle(const C2Handle *const handle);
-
-/**
  * Wrap the gralloc handle and metadata based on AHardwareBuffer into Codec2 handle
  * recognized by C2AllocatorAhwb.
  *
@@ -91,14 +91,6 @@ C2Handle *WrapNativeCodec2AhwbHandle(
         const native_handle_t *const handle,
         uint32_t width, uint32_t height, uint32_t format, uint64_t usage, uint32_t stride,
         uint64_t origId);
-
-/**
- * \todo Get this from the buffer
- */
-void _UnwrapNativeCodec2AhwbMetadata(
-        const C2Handle *const handle,
-        uint32_t *width, uint32_t *height, uint32_t *format, uint64_t *usage, uint32_t *stride,
-        uint64_t *origId);
 
 class C2AllocatorGralloc : public C2Allocator {
 public:

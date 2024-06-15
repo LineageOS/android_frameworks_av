@@ -174,20 +174,16 @@ void GraphicsTracker::BufferCache::unblockSlot(int slot) {
 
 GraphicsTracker::GraphicsTracker(int maxDequeueCount)
     : mBufferCache(new BufferCache()), mMaxDequeue{maxDequeueCount},
-    mMaxDequeueRequested{maxDequeueCount},
     mMaxDequeueCommitted{maxDequeueCount},
-    mMaxDequeueRequestedSeqId{0UL}, mMaxDequeueCommittedSeqId{0ULL},
     mDequeueable{maxDequeueCount},
     mTotalDequeued{0}, mTotalCancelled{0}, mTotalDropped{0}, mTotalReleased{0},
     mInConfig{false}, mStopped{false} {
     if (maxDequeueCount < kMaxDequeueMin) {
         mMaxDequeue = kMaxDequeueMin;
-        mMaxDequeueRequested = kMaxDequeueMin;
         mMaxDequeueCommitted = kMaxDequeueMin;
         mDequeueable = kMaxDequeueMin;
     } else if(maxDequeueCount > kMaxDequeueMax) {
         mMaxDequeue = kMaxDequeueMax;
-        mMaxDequeueRequested = kMaxDequeueMax;
         mMaxDequeueCommitted = kMaxDequeueMax;
         mDequeueable = kMaxDequeueMax;
     }
@@ -197,33 +193,35 @@ GraphicsTracker::GraphicsTracker(int maxDequeueCount)
     mReadPipeFd.reset(pipefd[0]);
     mWritePipeFd.reset(pipefd[1]);
 
-    mEventQueueThread = std::thread([this](){processEvent();});
-    writeIncDequeueable(mDequeueable);
+    // ctor does not require lock to be held.
+    writeIncDequeueableLocked(mDequeueable);
 
     CHECK(ret >= 0);
-    CHECK(mEventQueueThread.joinable());
 }
 
 GraphicsTracker::~GraphicsTracker() {
     stop();
-    if (mEventQueueThread.joinable()) {
-        mEventQueueThread.join();
-    }
 }
 
 bool GraphicsTracker::adjustDequeueConfLocked(bool *updateDequeue) {
     // TODO: can't we adjust during config? not committing it may safe?
     *updateDequeue = false;
-    if (!mInConfig && mMaxDequeueRequested < mMaxDequeue) {
-        int delta = mMaxDequeue - mMaxDequeueRequested;
+    if (!mInConfig && mMaxDequeueRequested.has_value() && mMaxDequeueRequested < mMaxDequeue) {
+        int delta = mMaxDequeue - mMaxDequeueRequested.value();
+        int drained = 0;
         // Since we are supposed to increase mDequeuable by one already
         int adjustable = mDequeueable + 1;
         if (adjustable >= delta) {
-            mMaxDequeue = mMaxDequeueRequested;
+            mMaxDequeue = mMaxDequeueRequested.value();
             mDequeueable -= (delta - 1);
+            drained = delta - 1;
         } else {
             mMaxDequeue -= adjustable;
+            drained = mDequeueable;
             mDequeueable = 0;
+        }
+        if (drained > 0) {
+            drainDequeueableLocked(drained);
         }
         if (mMaxDequeueRequested == mMaxDequeue && mMaxDequeueRequested != mMaxDequeueCommitted) {
             *updateDequeue = true;
@@ -235,6 +233,7 @@ bool GraphicsTracker::adjustDequeueConfLocked(bool *updateDequeue) {
 
 c2_status_t GraphicsTracker::configureGraphics(
         const sp<IGraphicBufferProducer>& igbp, uint32_t generation) {
+    // TODO: wait until operations to previous IGBP is completed.
     std::shared_ptr<BufferCache> prevCache;
     int prevDequeueCommitted;
 
@@ -254,14 +253,28 @@ c2_status_t GraphicsTracker::configureGraphics(
     if (igbp) {
         ret = igbp->getUniqueId(&bqId);
     }
-    if (ret != ::android::OK || prevCache->mGeneration == generation || prevCache->mBqId == bqId) {
+    if (ret != ::android::OK ||
+            prevCache->mGeneration == generation) {
+        ALOGE("new surface configure fail due to wrong or same bqId or same generation:"
+              "igbp(%d:%llu -> %llu), gen(%lu -> %lu)", (bool)igbp,
+              (unsigned long long)prevCache->mBqId, (unsigned long long)bqId,
+              (unsigned long)prevCache->mGeneration, (unsigned long)generation);
+        std::unique_lock<std::mutex> l(mLock);
+        mInConfig = false;
         return C2_BAD_VALUE;
     }
-    ret = igbp->setMaxDequeuedBufferCount(prevDequeueCommitted);
-    if (ret != ::android::OK) {
-        // TODO: sort out the error from igbp and return an error accordingly.
-        return C2_CORRUPTED;
+    if (igbp) {
+        ret = igbp->setMaxDequeuedBufferCount(prevDequeueCommitted);
+        if (ret != ::android::OK) {
+            ALOGE("new surface maxDequeueBufferCount configure fail");
+            // TODO: sort out the error from igbp and return an error accordingly.
+            std::unique_lock<std::mutex> l(mLock);
+            mInConfig = false;
+            return C2_CORRUPTED;
+        }
     }
+    ALOGD("new surface configured with id:%llu gen:%lu maxDequeue:%d",
+          (unsigned long long)bqId, (unsigned long)generation, prevDequeueCommitted);
     std::shared_ptr<BufferCache> newCache = std::make_shared<BufferCache>(bqId, generation, igbp);
     {
         std::unique_lock<std::mutex> l(mLock);
@@ -283,59 +296,74 @@ c2_status_t GraphicsTracker::configureMaxDequeueCount(int maxDequeueCount) {
     // (Sometimes maxDequeueCount cannot be committed if the number of
     // dequeued buffer count is bigger.)
     int maxDequeueToCommit;
-    // max dequeue count which is committed to IGBP currently
-    // (actually mMaxDequeueCommitted, but needs to be read outside lock.)
-    int curMaxDequeueCommitted;
     std::unique_lock<std::mutex> cl(mConfigLock);
     {
         std::unique_lock<std::mutex> l(mLock);
-        if (mMaxDequeueRequested == maxDequeueCount) {
+        if (mMaxDequeueRequested.has_value()) {
+            if (mMaxDequeueRequested == maxDequeueCount) {
+                ALOGD("maxDequeueCount requested with %d already", maxDequeueCount);
+                return C2_OK;
+            }
+        } else if (mMaxDequeue == maxDequeueCount) {
+            ALOGD("maxDequeueCount is already %d", maxDequeueCount);
             return C2_OK;
         }
         mInConfig = true;
         mMaxDequeueRequested = maxDequeueCount;
         cache = mBufferCache;
-        curMaxDequeueCommitted = mMaxDequeueCommitted;
         if (mMaxDequeue <= maxDequeueCount) {
             maxDequeueToCommit = maxDequeueCount;
         } else {
             // Since mDequeuable is decreasing,
             // a delievered ready to allocate event may not be fulfilled.
             // Another waiting via a waitable object may be necessary in the case.
-            int delta = mMaxDequeue - maxDequeueCount;
-            if (delta <= mDequeueable) {
-                maxDequeueToCommit = maxDequeueCount;
-                mDequeueable -= delta;
-            } else {
-                maxDequeueToCommit = mMaxDequeue - mDequeueable;
-                mDequeueable = 0;
+            int delta = std::min(mMaxDequeue - maxDequeueCount, mDequeueable);
+            maxDequeueToCommit = mMaxDequeue - delta;
+            mDequeueable -= delta;
+            if (delta > 0) {
+                drainDequeueableLocked(delta);
             }
         }
     }
 
     bool committed = true;
-    if (cache->mIgbp && maxDequeueToCommit != curMaxDequeueCommitted) {
+    if (cache->mIgbp && maxDequeueToCommit != mMaxDequeueCommitted) {
         ::android::status_t ret = cache->mIgbp->setMaxDequeuedBufferCount(maxDequeueToCommit);
         committed = (ret == ::android::OK);
-        if (!committed) {
+        if (committed) {
+            ALOGD("maxDequeueCount committed to IGBP: %d", maxDequeueToCommit);
+        } else {
             // This should not happen.
-            ALOGE("dequeueCount failed with error(%d)", (int)ret);
+            ALOGE("maxdequeueCount update to IGBP failed with error(%d)", (int)ret);
         }
     }
 
+    int oldMaxDequeue = 0;
+    int requested = 0;
     {
         std::unique_lock<std::mutex> l(mLock);
         mInConfig = false;
+        oldMaxDequeue = mMaxDequeue;
+        mMaxDequeue = maxDequeueToCommit; // we already drained dequeueable
         if (committed) {
+            clearCacheIfNecessaryLocked(cache, maxDequeueToCommit);
             mMaxDequeueCommitted = maxDequeueToCommit;
-            int delta = mMaxDequeueCommitted - mMaxDequeue;
+            if (mMaxDequeueRequested == mMaxDequeueCommitted &&
+                  mMaxDequeueRequested == mMaxDequeue) {
+                mMaxDequeueRequested.reset();
+            }
+            if (mMaxDequeueRequested.has_value()) {
+                requested = mMaxDequeueRequested.value();
+            }
+            int delta = mMaxDequeueCommitted - oldMaxDequeue;
             if (delta > 0) {
                 mDequeueable += delta;
-                l.unlock();
-                writeIncDequeueable(delta);
+                writeIncDequeueableLocked(delta);
             }
         }
     }
+    ALOGD("maxDqueueCount change %d -> %d: pending: %d",
+          oldMaxDequeue, maxDequeueToCommit, requested);
 
     if (!committed) {
         return C2_CORRUPTED;
@@ -350,48 +378,60 @@ void GraphicsTracker::updateDequeueConf() {
     std::unique_lock<std::mutex> cl(mConfigLock);
     {
         std::unique_lock<std::mutex> l(mLock);
-        if (mMaxDequeue == mMaxDequeueRequested && mMaxDequeueCommitted != mMaxDequeueRequested) {
-            dequeueCommit = mMaxDequeue;
-            mInConfig = true;
-            cache = mBufferCache;
-        } else {
+        if (!mMaxDequeueRequested.has_value() || mMaxDequeue != mMaxDequeueRequested) {
             return;
         }
+        if (mMaxDequeueCommitted == mMaxDequeueRequested) {
+            // already committed. may not happen.
+            mMaxDequeueRequested.reset();
+            return;
+        }
+        dequeueCommit = mMaxDequeue;
+        mInConfig = true;
+        cache = mBufferCache;
     }
     bool committed = true;
     if (cache->mIgbp) {
         ::android::status_t ret = cache->mIgbp->setMaxDequeuedBufferCount(dequeueCommit);
         committed = (ret == ::android::OK);
-        if (!committed) {
+        if (committed) {
+            ALOGD("delayed maxDequeueCount update to IGBP: %d", dequeueCommit);
+        } else {
             // This should not happen.
-            ALOGE("dequeueCount failed with error(%d)", (int)ret);
+            ALOGE("delayed maxdequeueCount update to IGBP failed with error(%d)", (int)ret);
         }
     }
-    int cleared = 0;
     {
         // cache == mCache here, since we locked config.
         std::unique_lock<std::mutex> l(mLock);
         mInConfig = false;
         if (committed) {
-            if (cache->mIgbp && dequeueCommit < mMaxDequeueCommitted) {
-                // we are shrinking # of buffers, so clearing the cache.
-                for (auto it = cache->mBuffers.begin(); it != cache->mBuffers.end();) {
-                    uint64_t bid = it->second->mId;
-                    if (mDequeued.count(bid) == 0 || mDeallocating.count(bid) > 0) {
-                        ++cleared;
-                        it = cache->mBuffers.erase(it);
-                    } else {
-                        ++it;
-                    }
-                }
-            }
+            clearCacheIfNecessaryLocked(cache, dequeueCommit);
             mMaxDequeueCommitted = dequeueCommit;
         }
+        mMaxDequeueRequested.reset();
     }
-    if (cleared > 0) {
-        ALOGD("%d buffers are cleared from cache, due to IGBP capacity change", cleared);
-    }
+}
 
+void GraphicsTracker::clearCacheIfNecessaryLocked(const std::shared_ptr<BufferCache> &cache,
+                                            int maxDequeueCommitted) {
+    int cleared = 0;
+    size_t origCacheSize = cache->mBuffers.size();
+    if (cache->mIgbp && maxDequeueCommitted < mMaxDequeueCommitted) {
+        // we are shrinking # of buffers in the case, so evict the previous
+        // cached buffers.
+        for (auto it = cache->mBuffers.begin(); it != cache->mBuffers.end();) {
+            uint64_t bid = it->second->mId;
+            if (mDequeued.count(bid) == 0 || mDeallocating.count(bid) > 0) {
+                ++cleared;
+                it = cache->mBuffers.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    ALOGD("Cache size %zu -> %zu: maybe_cleared(%d), dequeued(%zu)",
+          origCacheSize, cache->mBuffers.size(), cleared, mDequeued.size());
 }
 
 int GraphicsTracker::getCurDequeueable() {
@@ -400,70 +440,58 @@ int GraphicsTracker::getCurDequeueable() {
 }
 
 void GraphicsTracker::stop() {
-    bool expected = false;
-    std::unique_lock<std::mutex> l(mEventLock);
-    bool updated = mStopped.compare_exchange_strong(expected, true);
-    if (updated) {
-        int writeFd = mWritePipeFd.release();
+   // TODO: wait until all operation to current IGBP
+   // being completed.
+    std::unique_lock<std::mutex> l(mLock);
+    if (mStopped) {
+        return;
+    }
+    mStopped = true;
+    int writeFd = mWritePipeFd.release();
+    if (writeFd >= 0) {
         ::close(writeFd);
-        int readFd = mReadPipeFd.release();
-        ::close(readFd);
-        mEventCv.notify_one();
     }
 }
 
-void GraphicsTracker::writeIncDequeueable(int inc) {
+void GraphicsTracker::writeIncDequeueableLocked(int inc) {
     CHECK(inc > 0 && inc < kMaxDequeueMax);
     thread_local char buf[kMaxDequeueMax];
-    int diff = 0;
-    {
-        std::unique_lock<std::mutex> l(mEventLock);
-        if (mStopped) {
-            return;
-        }
-        CHECK(mWritePipeFd.get() >= 0);
-        int ret = ::write(mWritePipeFd.get(), buf, inc);
-        if (ret == inc) {
-            return;
-        }
-        diff = ret < 0 ? inc : inc - ret;
-
-        // Partial write or EINTR. This will not happen in a real scenario.
-        mIncDequeueable += diff;
-        if (mIncDequeueable > 0) {
-            l.unlock();
-            mEventCv.notify_one();
-            ALOGW("updating dequeueable to pipefd pending");
-        }
+    if (mStopped) { // reading end closed;
+        return;
     }
+    int writeFd = mWritePipeFd.get();
+    if (writeFd < 0) {
+        // initialization fail and not valid though.
+        return;
+    }
+    int ret = ::write(writeFd, buf, inc);
+    // Since this is non-blocking i/o, it never returns EINTR.
+    //
+    // ::write() to pipe guarantee to succeed atomically if it writes less than
+    // the given PIPE_BUF. And the buffer size in pipe/fifo is at least 4K and our total
+    // max pending buffer size is 64. So it never returns EAGAIN here either.
+    // See pipe(7) for further information.
+    //
+    // Other errors are serious errors and we cannot synchronize mDequeueable to
+    // length of pending buffer in pipe/fifo anymore. So better to abort here.
+    // TODO: do not abort here. (b/318717399)
+    CHECK(ret == inc);
 }
 
-void GraphicsTracker::processEvent() {
-    // This is for partial/failed writes to the writing end.
-    // This may not happen in the real scenario.
+void GraphicsTracker::drainDequeueableLocked(int dec) {
+    CHECK(dec > 0 && dec < kMaxDequeueMax);
     thread_local char buf[kMaxDequeueMax];
-    while (true) {
-        std::unique_lock<std::mutex> l(mEventLock);
-        if (mStopped) {
-            break;
-        }
-        if (mIncDequeueable > 0) {
-            int inc = mIncDequeueable > kMaxDequeueMax ? kMaxDequeueMax : mIncDequeueable;
-            int ret = ::write(mWritePipeFd.get(), buf, inc);
-            int written = ret <= 0 ? 0 : ret;
-            mIncDequeueable -= written;
-            if (mIncDequeueable > 0) {
-                l.unlock();
-                if (ret < 0) {
-                    ALOGE("write to writing end failed %d", errno);
-                } else {
-                    ALOGW("partial write %d(%d)", inc, written);
-                }
-                continue;
-            }
-        }
-        mEventCv.wait(l);
+    if (mStopped) {
+        return;
     }
+    int readFd = mReadPipeFd.get();
+    if (readFd < 0) {
+        // initializationf fail and not valid though.
+        return;
+    }
+    int ret = ::read(readFd, buf, dec);
+    // TODO: no dot abort here. (b/318717399)
+    CHECK(ret == dec);
 }
 
 c2_status_t GraphicsTracker::getWaitableFd(int *pipeFd) {
@@ -539,8 +567,7 @@ void GraphicsTracker::commitAllocate(c2_status_t res, const std::shared_ptr<Buff
             return;
         }
         mDequeueable++;
-        l.unlock();
-        writeIncDequeueable(1);
+        writeIncDequeueableLocked(1);
     }
 }
 
@@ -715,14 +742,13 @@ c2_status_t GraphicsTracker::requestDeallocate(uint64_t bid, const sp<Fence> &fe
             return C2_OK;
         }
         mDequeueable++;
-        l.unlock();
-        writeIncDequeueable(1);
+        writeIncDequeueableLocked(1);
     }
     return C2_OK;
 }
 
 void GraphicsTracker::commitDeallocate(
-        std::shared_ptr<BufferCache> &cache, int slotId, uint64_t bid) {
+        std::shared_ptr<BufferCache> &cache, int slotId, uint64_t bid, bool *updateDequeue) {
     std::unique_lock<std::mutex> l(mLock);
     size_t del1 = mDequeued.erase(bid);
     size_t del2 = mDeallocating.erase(bid);
@@ -730,9 +756,11 @@ void GraphicsTracker::commitDeallocate(
     if (cache) {
         cache->unblockSlot(slotId);
     }
+    if (adjustDequeueConfLocked(updateDequeue)) {
+        return;
+    }
     mDequeueable++;
-    l.unlock();
-    writeIncDequeueable(1);
+    writeIncDequeueableLocked(1);
 }
 
 
@@ -758,7 +786,10 @@ c2_status_t GraphicsTracker::deallocate(uint64_t bid, const sp<Fence> &fence) {
     // cache->mIgbp is not null, if completed is false.
     (void)cache->mIgbp->cancelBuffer(slotId, rFence);
 
-    commitDeallocate(cache, slotId, bid);
+    commitDeallocate(cache, slotId, bid, &updateDequeue);
+    if (updateDequeue) {
+        updateDequeueConf();
+    }
     return C2_OK;
 }
 
@@ -785,8 +816,7 @@ c2_status_t GraphicsTracker::requestRender(uint64_t bid, std::shared_ptr<BufferC
             return C2_BAD_STATE;
         }
         mDequeueable++;
-        l.unlock();
-        writeIncDequeueable(1);
+        writeIncDequeueableLocked(1);
         return C2_BAD_STATE;
     }
     std::shared_ptr<BufferItem> buffer = it->second;
@@ -828,8 +858,7 @@ void GraphicsTracker::commitRender(const std::shared_ptr<BufferCache> &cache,
             return;
         }
         mDequeueable++;
-        l.unlock();
-        writeIncDequeueable(1);
+        writeIncDequeueableLocked(1);
         return;
     }
 }
@@ -843,6 +872,9 @@ c2_status_t GraphicsTracker::render(const C2ConstGraphicBlock& blk,
         ALOGE("retrieving AHB-ID for GraphicBlock failed");
         return C2_CORRUPTED;
     }
+    std::shared_ptr<_C2BlockPoolData> poolData =
+            _C2BlockFactory::GetGraphicBlockPoolData(blk);
+    _C2BlockFactory::DisownIgbaBlock(poolData);
     std::shared_ptr<BufferCache> cache;
     std::shared_ptr<BufferItem> buffer;
     std::shared_ptr<BufferItem> oldBuffer;
@@ -870,13 +902,19 @@ c2_status_t GraphicsTracker::render(const C2ConstGraphicBlock& blk,
         if (!gb) {
             ALOGE("render: realloc-ing a new buffer for migration failed");
             std::shared_ptr<BufferCache> nullCache;
-            commitDeallocate(nullCache, -1, bid);
+            commitDeallocate(nullCache, -1, bid, &updateDequeue);
+            if (updateDequeue) {
+                updateDequeueConf();
+            }
             return C2_REFUSED;
         }
         if (cache->mIgbp->attachBuffer(&(newBuffer->mSlot), gb) != ::android::OK) {
             ALOGE("render: attaching a new buffer to IGBP failed");
             std::shared_ptr<BufferCache> nullCache;
-            commitDeallocate(nullCache, -1, bid);
+            commitDeallocate(nullCache, -1, bid, &updateDequeue);
+            if (updateDequeue) {
+                updateDequeueConf();
+            }
             return C2_REFUSED;
         }
         cache->waitOnSlot(newBuffer->mSlot);
@@ -890,11 +928,13 @@ c2_status_t GraphicsTracker::render(const C2ConstGraphicBlock& blk,
         CHECK(renderRes != ::android::BAD_VALUE);
         ALOGE("render: failed to queueBuffer() err = %d", renderRes);
         (void) cache->mIgbp->cancelBuffer(buffer->mSlot, input.fence);
-        commitDeallocate(cache, buffer->mSlot, bid);
+        commitDeallocate(cache, buffer->mSlot, bid, &updateDequeue);
+        if (updateDequeue) {
+            updateDequeueConf();
+        }
         return C2_REFUSED;
     }
 
-    updateDequeue = false;
     commitRender(cache, buffer, oldBuffer, output->bufferReplaced, &updateDequeue);
     if (updateDequeue) {
         updateDequeueConf();
@@ -909,8 +949,7 @@ void GraphicsTracker::onReleased(uint32_t generation) {
         if (mBufferCache->mGeneration == generation) {
             if (!adjustDequeueConfLocked(&updateDequeue)) {
                 mDequeueable++;
-                l.unlock();
-                writeIncDequeueable(1);
+                writeIncDequeueableLocked(1);
             }
         }
     }

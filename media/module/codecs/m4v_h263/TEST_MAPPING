@@ -1,18 +1,6 @@
-// mappings for frameworks/av/media/libstagefright/codecs/m4v_h263
 {
-  // tests which require dynamic content
-  // invoke with: atest -- --enable-module-dynamic-download=true
-  // TODO(b/148094059): unit tests not allowed to download content
-  "dynamic-presubmit": [
-
-    // the decoder reports something bad about an unexpected newline in the *config file
-    // and the config file looks like the AndroidTest.xml file that we put in there.
-    // I don't get this from the Encoder -- and I don't see any substantive difference
-    // between decode and encode AndroidTest.xml files -- except that encode does NOT
-    // finish with a newline.
-    // strange.
+  "postsubmit": [
     { "name": "Mpeg4H263DecoderTest"},
     { "name": "Mpeg4H263EncoderTest"}
-
   ]
 }

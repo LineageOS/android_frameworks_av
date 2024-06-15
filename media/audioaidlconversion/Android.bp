@@ -56,6 +56,19 @@ cc_library_headers {
 }
 
 cc_defaults {
+    name: "audio_aidl_conversion_common_default_cpp",
+    shared_libs: [
+        "libbinder",
+        "libshmemcompat",
+        "shared-file-region-aidl-cpp",
+        "framework-permission-aidl-cpp",
+    ],
+    export_shared_lib_headers: [
+        "shared-file-region-aidl-cpp",
+    ],
+}
+
+cc_defaults {
     name: "audio_aidl_conversion_common_default",
     export_include_dirs: ["include"],
     host_supported: true,
@@ -67,17 +80,12 @@ cc_defaults {
     ],
     shared_libs: [
         "libbase",
-        "libbinder",
         "liblog",
-        "libshmemcompat",
         "libstagefright_foundation",
         "libutils",
-        "shared-file-region-aidl-cpp",
-        "framework-permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
         "libbase",
-        "shared-file-region-aidl-cpp",
     ],
     cflags: [
         "-Wall",
@@ -113,6 +121,7 @@ cc_library {
     ],
     defaults: [
         "audio_aidl_conversion_common_default",
+        "audio_aidl_conversion_common_default_cpp",
         "latest_android_media_audio_common_types_cpp_export_shared",
     ],
     min_sdk_version: "29",
@@ -223,6 +232,7 @@ cc_library {
     ],
     defaults: [
         "audio_aidl_conversion_common_default",
+        "audio_aidl_conversion_common_default_cpp",
         "audio_aidl_conversion_common_util_default",
         "latest_android_media_audio_common_types_cpp_shared",
         "latest_android_media_audio_common_types_ndk_shared",

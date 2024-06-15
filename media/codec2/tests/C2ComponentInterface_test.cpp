@@ -235,7 +235,7 @@ void C2CompIntfTest::queryParamAsExpected(const T &expected) {
     // |*heapParams[0]| is a parameter value. The size of |heapParams| has to be one.
     ASSERT_EQ(1u, heapParams.size());
     EXPECT_TRUE(heapParams[0]);
-    EXPECT_EQ(*heapParams[0], expected);
+    EXPECT_EQ(*heapParams[0], (C2Param &)(expected));
 }
 
 template <typename T> void C2CompIntfTest::querySupportedParam() {

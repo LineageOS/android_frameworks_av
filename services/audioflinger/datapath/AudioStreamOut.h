@@ -1,27 +1,28 @@
 /*
-**
-** Copyright 2015, The Android Open Source Project
-**
-** Licensed under the Apache License, Version 2.0 (the "License");
-** you may not use this file except in compliance with the License.
-** You may obtain a copy of the License at
-**
-**     http://www.apache.org/licenses/LICENSE-2.0
-**
-** Unless required by applicable law or agreed to in writing, software
-** distributed under the License is distributed on an "AS IS" BASIS,
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-** See the License for the specific language governing permissions and
-** limitations under the License.
-*/
+ *
+ * Copyright 2015, The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-#ifndef ANDROID_AUDIO_STREAM_OUT_H
-#define ANDROID_AUDIO_STREAM_OUT_H
+#pragma once
 
 #include <stdint.h>
 #include <sys/types.h>
 
 #include <system/audio.h>
+#include <utils/Errors.h>
+#include <utils/RefBase.h>
 
 namespace android {
 
@@ -34,9 +35,6 @@ class StreamOutHalInterface;
  */
 class AudioStreamOut {
 public:
-// AudioStreamOut is immutable, so its fields are const.
-// For emphasis, we could also make all pointers to them be "const *",
-// but that would clutter the code unnecessarily.
     AudioHwDevice * const audioHwDev;
     sp<StreamOutHalInterface> stream;
     const audio_output_flags_t flags;
@@ -101,15 +99,13 @@ public:
     virtual void presentationComplete() { mExpectRetrograde = true; }
 
 protected:
-    uint64_t             mFramesWritten = 0; // reset by flush
-    uint64_t             mFramesWrittenAtStandby = 0;
-    uint64_t             mRenderPosition = 0; // reset by flush, standby, or presentation complete
-    int                  mRateMultiplier = 1;
-    bool                 mHalFormatHasProportionalFrames = false;
-    size_t               mHalFrameSize = 0;
-    bool                 mExpectRetrograde = false; // see presentationComplete
+    uint64_t mFramesWritten = 0; // reset by flush
+    uint64_t mFramesWrittenAtStandby = 0;
+    uint64_t mRenderPosition = 0; // reset by flush, standby, or presentation complete
+    int mRateMultiplier = 1;
+    bool mHalFormatHasProportionalFrames = false;
+    size_t mHalFrameSize = 0;
+    bool mExpectRetrograde = false; // see presentationComplete
 };
 
 } // namespace android
-
-#endif // ANDROID_AUDIO_STREAM_OUT_H

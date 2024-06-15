@@ -32,13 +32,17 @@
 
 #include <camera/CameraUtils.h>
 #include <camera_metadata_hidden.h>
+#include <com_android_internal_camera_flags.h>
 
 #include "device3/Camera3OutputUtils.h"
+#include "utils/SessionConfigurationUtils.h"
 
 #include "system/camera_metadata.h"
 
 using namespace android::camera3;
+using namespace android::camera3::SessionConfigurationUtils;
 using namespace android::hardware::camera;
+namespace flags = com::android::internal::camera::flags;
 
 namespace android {
 namespace camera3 {
@@ -207,7 +211,9 @@ void processOneCaptureResultLockedT(
 
         bool noBufferReturned = false;
         buffer_handle_t *buffer = nullptr;
-        if (states.useHalBufManager) {
+        if (states.useHalBufManager ||
+                (flags::session_hal_buf_manager() &&
+                        contains(states.halBufManagedStreamIds, bSrc.streamId))) {
             // This is suspicious most of the time but can be correct during flush where HAL
             // has to return capture result before a buffer is requested
             if (bSrc.bufferId == BUFFER_ID_NO_BUFFER) {
@@ -294,13 +300,15 @@ void processOneCaptureResultLockedT(
 template <class VecStreamBufferType>
 void returnStreamBuffersT(ReturnBufferStates& states,
         const VecStreamBufferType& buffers) {
-    if (!states.useHalBufManager) {
-        ALOGE("%s: Camera %s does not support HAL buffer managerment",
-                __FUNCTION__, states.cameraId.c_str());
-        return;
-    }
 
     for (const auto& buf : buffers) {
+        if (!states.useHalBufManager &&
+            !(flags::session_hal_buf_manager() &&
+             contains(states.halBufManagedStreamIds, buf.streamId))) {
+            ALOGE("%s: Camera %s does not support HAL buffer management for stream id %d",
+                  __FUNCTION__, states.cameraId.c_str(), buf.streamId);
+            return;
+        }
         if (buf.bufferId == BUFFER_ID_NO_BUFFER) {
             ALOGE("%s: cannot return a buffer without bufferId", __FUNCTION__);
             continue;
@@ -337,9 +345,15 @@ void returnStreamBuffersT(ReturnBufferStates& states,
             continue;
         }
         streamBuffer.stream = stream->asHalStream();
-        returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
-                &streamBuffer, /*size*/1, /*timestamp*/ 0, /*readoutTimestamp*/0,
-                /*requested*/false, /*requestTimeNs*/0, states.sessionStatsBuilder);
+        std::vector<BufferToReturn> returnableBuffers{};
+        collectReturnableOutputBuffers(states.useHalBufManager, states.halBufManagedStreamIds,
+                /*listener*/nullptr, &streamBuffer, /*size*/1, /*timestamp*/ 0,
+                /*readoutTimestamp*/0, /*requested*/false, /*requestTimeNs*/0,
+                states.sessionStatsBuilder,
+                /*out*/&returnableBuffers);
+        finishReturningOutputBuffers(returnableBuffers, /*listener*/ nullptr,
+                states.sessionStatsBuilder);
+
     }
 }
 

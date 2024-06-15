@@ -60,8 +60,6 @@ cc_library_shared {
     ],
     defaults: [
         "aidlaudioeffectservice_defaults",
-        "latest_android_hardware_audio_effect_ndk_shared",
-        "latest_android_media_audio_common_types_ndk_shared",
         "visualizer_defaults",
     ],
     cflags: [
@@ -72,6 +70,6 @@ cc_library_shared {
     ],
     relative_install_path: "soundfx",
     visibility: [
-        "//hardware/interfaces/audio/aidl/default",
+        "//hardware/interfaces/audio/aidl/default:__subpackages__",
     ],
 }

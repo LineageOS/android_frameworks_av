@@ -141,6 +141,9 @@ RetCode PreProcessingContext::disable() {
 }
 
 RetCode PreProcessingContext::setCommon(const Parameter::Common& common) {
+    if(auto ret = updateIOFrameSize(common); ret != RetCode::SUCCESS) {
+        return ret;
+    }
     mCommon = common;
     updateConfigs(common);
     return RetCode::SUCCESS;
@@ -265,7 +268,7 @@ NoiseSuppression::Level PreProcessingContext::getNoiseSuppressionLevel() const {
     return mLevel;
 }
 
-IEffect::Status PreProcessingContext::lvmProcess(float* in, float* out, int samples) {
+IEffect::Status PreProcessingContext::process(float* in, float* out, int samples) {
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!in, status, "nullInput");
     RETURN_VALUE_IF(!out, status, "nullOutput");

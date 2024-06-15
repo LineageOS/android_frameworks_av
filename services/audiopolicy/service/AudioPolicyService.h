@@ -20,6 +20,7 @@
 #include <android/media/BnAudioPolicyService.h>
 #include <android/media/GetSpatializerResponse.h>
 #include <android-base/thread_annotations.h>
+#include <audio_utils/mutex.h>
 #include <cutils/misc.h>
 #include <cutils/config_utils.h>
 #include <cutils/compiler.h>
@@ -310,6 +311,8 @@ public:
     binder::Status clearPreferredMixerAttributes(const media::audio::common::AudioAttributes& attr,
                                                  int32_t portId,
                                                  int32_t uid) override;
+    binder::Status getRegisteredPolicyMixes(
+            std::vector <::android::media::AudioMix>* mixes) override;
 
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 
@@ -318,6 +321,9 @@ public:
 
     // RefBase
     virtual     void        onFirstRef();
+
+    // Commence initialization when AudioSystem is ready.
+    void onAudioSystemReady();
 
     //
     // Helpers for the struct audio_policy_service_ops implementation.
@@ -387,10 +393,10 @@ public:
      * by audio policy manager and attach/detach the spatializer effect accordingly.
      */
     void onCheckSpatializer() override;
-    void onCheckSpatializer_l() REQUIRES(mLock);
+    void onCheckSpatializer_l() REQUIRES(mMutex);
     void doOnCheckSpatializer();
 
-    void onUpdateActiveSpatializerTracks_l() REQUIRES(mLock);
+    void onUpdateActiveSpatializerTracks_l() REQUIRES(mMutex);
     void doOnUpdateActiveSpatializerTracks();
 
 
@@ -402,14 +408,14 @@ private:
                         AudioPolicyService() ANDROID_API;
     virtual             ~AudioPolicyService();
 
-            status_t dumpInternals(int fd) REQUIRES(mLock);
+    status_t dumpInternals(int fd) REQUIRES(mMutex);
 
     // Handles binder shell commands
     virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
 
 
     // Sets whether the given UID records only silence
-    virtual void setAppState_l(sp<AudioRecordClient> client, app_state_t state) REQUIRES(mLock);
+    virtual void setAppState_l(sp<AudioRecordClient> client, app_state_t state) REQUIRES(mMutex);
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(Vector<String16>& args, int err);
@@ -435,9 +441,9 @@ private:
                            const AttributionSourceState& attributionSource);
 
     void updateUidStates();
-    void updateUidStates_l() REQUIRES(mLock);
+    void updateUidStates_l() REQUIRES(mMutex);
 
-    void silenceAllRecordings_l() REQUIRES(mLock);
+    void silenceAllRecordings_l() REQUIRES(mMutex);
 
     static bool isVirtualSource(audio_source_t source);
 
@@ -510,11 +516,11 @@ private:
         void checkRegistered();
 
         wp<AudioPolicyService> mService;
-        Mutex mLock;
+        audio_utils::mutex mMutex{audio_utils::MutexOrder::kUidPolicy_Mutex};
         ActivityManager mAm;
         bool mObserverRegistered = false;
-        std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids GUARDED_BY(mLock);
-        std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids GUARDED_BY(mLock);
+        std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids GUARDED_BY(mMutex);
+        std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids GUARDED_BY(mMutex);
         std::vector<uid_t> mAssistantUids;
         std::vector<uid_t> mActiveAssistantUids;
         std::vector<uid_t> mA11yUids;
@@ -538,6 +544,10 @@ private:
 
             binder::Status onSensorPrivacyChanged(int toggleType, int sensor,
                                                   bool enabled);
+
+            binder::Status onSensorPrivacyStateChanged(int, int, int) {
+                return binder::Status::ok();
+            }
 
         private:
             wp<AudioPolicyService> mService;
@@ -641,8 +651,8 @@ private:
 
             int mCommand;   // SET_VOLUME, SET_PARAMETERS...
             nsecs_t mTime;  // time stamp
-            Mutex mLock;    // mutex associated to mCond
-            Condition mCond; // condition for status return
+            audio_utils::mutex mMutex{audio_utils::MutexOrder::kAudioCommand_Mutex};
+            audio_utils::condition_variable mCond; // condition for status return
             status_t mStatus; // command status
             bool mWaitStatus; // true if caller is waiting for status
             sp<AudioCommandData> mParam;     // command specific parameter data
@@ -730,8 +740,8 @@ private:
             bool mSuspended;
         };
 
-        Mutex   mLock;
-        Condition mWaitWorkCV;
+        mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kCommandThread_Mutex};
+        audio_utils::condition_variable mWaitWorkCV;
         Vector < sp<AudioCommand> > mAudioCommands; // list of pending commands
         sp<AudioCommand> mLastCommand;      // last processed command (used by dump)
         String8 mName;                      // string used by wake lock fo delayed commands
@@ -996,12 +1006,12 @@ private:
      * @return the number of active tracks.
      */
     size_t countActiveClientsOnOutput_l(
-        audio_io_handle_t output, bool spatializedOnly = true) REQUIRES(mLock);
+            audio_io_handle_t output, bool spatializedOnly = true) REQUIRES(mMutex);
 
-    mutable Mutex mLock;    // prevents concurrent access to AudioPolicy manager functions changing
-                            // device connection state  or routing
-    // Note: lock acquisition order is always mLock > mEffectsLock:
-    // mLock protects AudioPolicyManager methods that can call into audio flinger
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAudioPolicyService_Mutex};
+    // prevents concurrent access to AudioPolicy manager functions changing
+    // device connection state or routing.
+    // mMutex protects AudioPolicyManager methods that can call into audio flinger
     // and possibly back in to audio policy service and acquire mEffectsLock.
     sp<AudioCommandThread> mAudioCommandThread;     // audio commands thread
     sp<AudioCommandThread> mOutputCommandThread;    // process stop and release output
@@ -1009,29 +1019,30 @@ private:
     AudioPolicyClient *mAudioPolicyClient;
     std::vector<audio_usage_t> mSupportedSystemUsages;
 
-    Mutex mNotificationClientsLock;
+    mutable audio_utils::mutex mNotificationClientsMutex{
+            audio_utils::MutexOrder::kAudioPolicyService_NotificationClientsMutex};
     DefaultKeyedVector<int64_t, sp<NotificationClient>> mNotificationClients
-        GUARDED_BY(mNotificationClientsLock);
+            GUARDED_BY(mNotificationClientsMutex);
     // Manage all effects configured in audio_effects.conf
-    // never hold AudioPolicyService::mLock when calling AudioPolicyEffects methods as
+    // never hold AudioPolicyService::mMutex when calling AudioPolicyEffects methods as
     // those can call back into AudioPolicyService methods and try to acquire the mutex
-    sp<AudioPolicyEffects> mAudioPolicyEffects GUARDED_BY(mLock);
-    audio_mode_t mPhoneState GUARDED_BY(mLock);
-    uid_t mPhoneStateOwnerUid GUARDED_BY(mLock);
+    sp<AudioPolicyEffects> mAudioPolicyEffects GUARDED_BY(mMutex);
+    audio_mode_t mPhoneState GUARDED_BY(mMutex);
+    uid_t mPhoneStateOwnerUid GUARDED_BY(mMutex);
 
-    sp<UidPolicy> mUidPolicy GUARDED_BY(mLock);
-    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy GUARDED_BY(mLock);
+    sp<UidPolicy> mUidPolicy GUARDED_BY(mMutex);
+    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy GUARDED_BY(mMutex);
 
     DefaultKeyedVector<audio_port_handle_t, sp<AudioRecordClient>> mAudioRecordClients
-        GUARDED_BY(mLock);
+            GUARDED_BY(mMutex);
     DefaultKeyedVector<audio_port_handle_t, sp<AudioPlaybackClient>> mAudioPlaybackClients
-        GUARDED_BY(mLock);
+            GUARDED_BY(mMutex);
 
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 
     CaptureStateNotifier mCaptureStateNotifier;
 
-    // created in onFirstRef() and never cleared: does not need to be guarded by mLock
+    // created in onFirstRef() and never cleared: does not need to be guarded by mMutex
     sp<Spatializer> mSpatializer;
 
     void *mLibraryHandle = nullptr;

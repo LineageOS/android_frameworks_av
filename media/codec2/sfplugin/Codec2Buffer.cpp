@@ -1036,6 +1036,37 @@ native_handle_t *EncryptedLinearBlockBuffer::handle() const {
     return const_cast<native_handle_t *>(mBlock->handle());
 }
 
+void EncryptedLinearBlockBuffer::getMappedBlock(
+        std::unique_ptr<MappedBlock> * const mappedBlock) const {
+    if (mappedBlock) {
+        mappedBlock->reset(new EncryptedLinearBlockBuffer::MappedBlock(mBlock));
+    }
+    return;
+}
+
+EncryptedLinearBlockBuffer::MappedBlock::MappedBlock(
+        const std::shared_ptr<C2LinearBlock> &block) : mView(block->map().get()) {
+}
+
+bool EncryptedLinearBlockBuffer::MappedBlock::copyDecryptedContent(
+        const sp<IMemory> &decrypted, size_t length) {
+    if (mView.error() != C2_OK) {
+        return false;
+    }
+    if (mView.size() < length) {
+        ALOGE("View size(%d) less than decrypted length(%zu)",
+                mView.size(), length);
+        return false;
+    }
+    memcpy(mView.data(), decrypted->unsecurePointer(), length);
+    mView.setOffset(mView.offset() + length);
+    return true;
+}
+
+EncryptedLinearBlockBuffer::MappedBlock::~MappedBlock() {
+    mView.setOffset(0);
+}
+
 using ::aidl::android::hardware::graphics::common::Cta861_3;
 using ::aidl::android::hardware::graphics::common::Smpte2086;
 
@@ -1049,6 +1080,7 @@ public:
         // Unwrap raw buffer handle from the C2Handle
         native_handle_t *nh = UnwrapNativeCodec2GrallocHandle(handle);
         if (!nh) {
+            ALOGE("handle is not compatible to any gralloc C2Handle types");
             return;
         }
         // Import the raw handle so IMapper can use the buffer. The imported

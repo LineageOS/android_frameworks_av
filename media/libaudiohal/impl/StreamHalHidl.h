@@ -194,7 +194,7 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) override;
 
     // Methods used by StreamCodecFormatCallback (HIDL).
-    void onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs);
+    void onCodecFormatChanged(const std::vector<uint8_t>& metadataBs);
 
     status_t setLatencyMode(audio_latency_mode_t mode) override;
     status_t getRecommendedLatencyModes(std::vector<audio_latency_mode_t> *modes) override;

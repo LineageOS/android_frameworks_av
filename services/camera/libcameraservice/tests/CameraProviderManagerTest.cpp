@@ -372,28 +372,22 @@ class TestAidlICameraProvider : public aidl::android::hardware::camera::provider
 };
 
 /**
- * Simple test version of the interaction proxy, to use to inject onRegistered calls to the
+ * Simple test version of HidlServiceInteractionProxy, to use to inject onRegistered calls to the
  * CameraProviderManager
  */
-struct TestInteractionProxy : public CameraProviderManager::HidlServiceInteractionProxy,
-                              public CameraProviderManager::AidlServiceInteractionProxy {
+struct TestHidlInteractionProxy : public CameraProviderManager::HidlServiceInteractionProxy {
     sp<hidl::manager::V1_0::IServiceNotification> mManagerNotificationInterface;
     sp<TestICameraProvider> mTestCameraProvider;
-    std::shared_ptr<TestAidlICameraProvider> mTestAidlCameraProvider;
 
-    TestInteractionProxy() {}
+    TestHidlInteractionProxy() {}
 
     void setProvider(sp<TestICameraProvider> provider) {
         mTestCameraProvider = provider;
     }
 
-    void setAidlProvider(std::shared_ptr<TestAidlICameraProvider> provider) {
-        mTestAidlCameraProvider = provider;
-    }
-
     std::vector<std::string> mLastRequestedServiceNames;
 
-    virtual ~TestInteractionProxy() {}
+    virtual ~TestHidlInteractionProxy() {}
 
     virtual bool registerForNotifications(
             [[maybe_unused]] const std::string &serviceName,
@@ -430,9 +424,47 @@ struct TestInteractionProxy : public CameraProviderManager::HidlServiceInteracti
         hardware::hidl_vec<hardware::hidl_string> ret = {"test/0"};
         return ret;
     }
+};
+
+/**
+ * Simple test version of AidlServiceInteractionProxy, to use to inject onRegistered calls to the
+ * CameraProviderManager
+ */
+struct TestAidlInteractionProxy : public CameraProviderManager::AidlServiceInteractionProxy {
+    std::shared_ptr<TestAidlICameraProvider> mTestAidlCameraProvider;
+
+    TestAidlInteractionProxy() {}
+
+    void setProvider(std::shared_ptr<TestAidlICameraProvider> provider) {
+        mTestAidlCameraProvider = provider;
+    }
+
+    std::vector<std::string> mLastRequestedServiceNames;
+
+    virtual ~TestAidlInteractionProxy() {}
 
     virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
-    getAidlService(const std::string&) {
+            getService(const std::string& serviceName) override {
+        if (!flags::delay_lazy_hal_instantiation()) {
+            return mTestAidlCameraProvider;
+        }
+
+        // If no provider has been given, fail; in reality, getService would
+        // block for HALs that don't start correctly, so we should never use
+        // getService when we don't have a valid HAL running
+        if (mTestAidlCameraProvider == nullptr) {
+            ADD_FAILURE() << __FUNCTION__ << "called with no valid provider;"
+                          << " would block indefinitely";
+            // Real getService would block, but that's bad in unit tests. So
+            // just record an error and return nullptr
+            return nullptr;
+        }
+        mLastRequestedServiceNames.push_back(serviceName);
+        return mTestAidlCameraProvider;
+    }
+
+    virtual std::shared_ptr<aidl::android::hardware::camera::provider::ICameraProvider>
+    tryGetService(const std::string&) override {
         return mTestAidlCameraProvider;
     }
 };
@@ -462,7 +494,7 @@ TEST(CameraProviderManagerTest, InitializeDynamicDepthTest) {
     status_t res;
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestHidlInteractionProxy serviceProxy;
 
     android::hardware::hidl_vec<uint8_t> chars;
     CameraMetadata meta;
@@ -510,7 +542,7 @@ TEST(CameraProviderManagerTest, InitializeTest) {
     status_t res;
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestHidlInteractionProxy serviceProxy;
     sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
             vendorSection);
     serviceProxy.setProvider(provider);
@@ -560,7 +592,7 @@ TEST(CameraProviderManagerTest, MultipleVendorTagTest) {
 
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestHidlInteractionProxy serviceProxy;
 
     sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
             vendorSection);
@@ -696,7 +728,7 @@ TEST(CameraProviderManagerTest, NotifyStateChangeTest) {
     status_t res;
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestHidlInteractionProxy serviceProxy;
     sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
             vendorSection);
     serviceProxy.setProvider(provider);
@@ -730,7 +762,7 @@ TEST(CameraProviderManagerTest, BadHalStartupTest) {
 
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestHidlInteractionProxy serviceProxy;
     sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
             vendorSection);
 
@@ -779,7 +811,7 @@ TEST(CameraProviderManagerTest, BinderDeathRegistrationRaceTest) {
 
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestHidlInteractionProxy serviceProxy;
     sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
             vendorSection);
 
@@ -821,7 +853,7 @@ TEST(CameraProviderManagerTest, PhysicalCameraAvailabilityCallbackRaceTest) {
 
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestHidlInteractionProxy serviceProxy;
 
     android::hardware::hidl_vec<uint8_t> chars;
     CameraMetadata meta;
@@ -857,9 +889,11 @@ TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscovered,
                 REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(vd_flags, virtual_camera_service_discovery))) {
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestAidlInteractionProxy aidlServiceProxy;
+    TestHidlInteractionProxy hidlServiceProxy;
 
-    status_t res = providerManager->initialize(statusListener, &serviceProxy, &serviceProxy);
+    status_t res = providerManager->initialize(statusListener,
+                                               &hidlServiceProxy, &aidlServiceProxy);
     ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
 
     std::vector<std::string> cameraList = {"device@1.1/virtual/123"};
@@ -868,7 +902,7 @@ TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscovered,
             ndk::SharedRefBase::make<TestAidlICameraProvider>(cameraList);
     ndk::SpAIBinder spBinder = aidlProvider->asBinder();
     AIBinder* aiBinder = spBinder.get();
-    serviceProxy.setAidlProvider(aidlProvider);
+    aidlServiceProxy.setProvider(aidlProvider);
     providerManager->onServiceRegistration(
             String16("android.hardware.camera.provider.ICameraProvider/virtual/0"),
             AIBinder_toPlatformBinder(aiBinder));
@@ -883,15 +917,17 @@ TEST_WITH_FLAGS(CameraProviderManagerTest, AidlVirtualCameraProviderDiscoveredOn
                 REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(vd_flags, virtual_camera_service_discovery))) {
     sp<CameraProviderManager> providerManager = new CameraProviderManager();
     sp<TestStatusListener> statusListener = new TestStatusListener();
-    TestInteractionProxy serviceProxy;
+    TestAidlInteractionProxy aidlServiceProxy;
+    TestHidlInteractionProxy hidlServiceProxy;
 
     std::vector<std::string> cameraList = {"device@1.1/virtual/123"};
 
     std::shared_ptr<TestAidlICameraProvider> aidlProvider =
             ndk::SharedRefBase::make<TestAidlICameraProvider>(cameraList);
-    serviceProxy.setAidlProvider(aidlProvider);
+    aidlServiceProxy.setProvider(aidlProvider);
 
-    status_t res = providerManager->initialize(statusListener, &serviceProxy, &serviceProxy);
+    status_t res = providerManager->initialize(statusListener,
+                                               &hidlServiceProxy, &aidlServiceProxy);
     ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
 
     std::unordered_map<std::string, std::set<std::string>> unavailableDeviceIds;

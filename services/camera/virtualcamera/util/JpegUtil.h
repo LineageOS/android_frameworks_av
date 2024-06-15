@@ -17,9 +17,8 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_JPEGUTIL_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_JPEGUTIL_H
 
-#include <memory>
+#include <optional>
 
-#include "android/hardware_buffer.h"
 #include "system/graphics.h"
 
 namespace android {
@@ -27,14 +26,20 @@ namespace companion {
 namespace virtualcamera {
 
 // Jpeg-compress image into the output buffer.
-// Returns true if the compression was successful, false otherwise.
-bool compressJpeg(int width, int height, const android_ycbcr& ycbcr,
-                  size_t outBufferSize, void* outBuffer);
-
-// Jpeg-compress all-black image into the output buffer.
-// Returns true if the compression was successful, false otherwise.
-bool compressBlackJpeg(int width, int height, size_t outBufferSize,
-                       void* outBuffer);
+// * width - width of the image
+// * heigh - height of the image
+// * quality - 0-100, higher number corresponds to higher quality.
+// * ycbr - android_ycbr structure describing layout of input YUV420 image.
+// * app1ExifData - vector containing data to be included in APP1
+//   segment. Can be empty.
+// * outBufferSize - capacity of the output buffer.
+// * outBuffer - output buffer to write compressed data into.
+// Returns size of compressed data if the compression was successful,
+// empty optional otherwise.
+std::optional<size_t> compressJpeg(int width, int height, int quality,
+                                   const android_ycbcr& ycbcr,
+                                   const std::vector<uint8_t>& app1ExifData,
+                                   size_t outBufferSize, void* outBuffer);
 
 }  // namespace virtualcamera
 }  // namespace companion

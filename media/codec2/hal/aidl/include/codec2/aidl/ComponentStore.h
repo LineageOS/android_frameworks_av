@@ -23,6 +23,7 @@
 
 #include <aidl/android/hardware/media/bufferpool2/IClientManager.h>
 #include <aidl/android/hardware/media/c2/BnComponentStore.h>
+#include <aidl/android/hardware/media/c2/IInputSurface.h>
 
 #include <C2Component.h>
 #include <C2Param.h>
@@ -74,6 +75,9 @@ struct ComponentStore : public BnComponentStore {
 
     static std::shared_ptr<::android::FilterWrapper> GetFilterWrapper();
 
+    std::shared_ptr<MultiAccessUnitInterface> tryCreateMultiAccessUnitInterface(
+            const std::shared_ptr<C2ComponentInterface> &c2interface);
+
     // Methods from ::aidl::android::hardware::media::c2::IComponentStore.
     virtual ::ndk::ScopedAStatus createComponent(
             const std::string& name,
@@ -85,6 +89,8 @@ struct ComponentStore : public BnComponentStore {
             std::shared_ptr<IComponentInterface> *intf) override;
     virtual ::ndk::ScopedAStatus listComponents(
             std::vector<IComponentStore::ComponentTraits>* traits) override;
+    virtual ::ndk::ScopedAStatus createInputSurface(
+            std::shared_ptr<IInputSurface> *inputSurface) override;
     virtual ::ndk::ScopedAStatus getStructDescriptors(
             const std::vector<int32_t>& indices,
             std::vector<StructDescriptor> *descs) override;

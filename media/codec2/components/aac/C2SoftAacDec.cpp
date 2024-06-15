@@ -35,14 +35,14 @@
 
 #define FILEREAD_MAX_LAYERS 2
 
-#define DRC_DEFAULT_MOBILE_REF_LEVEL -16.0  /* 64*-0.25dB = -16 dB below full scale for mobile conf */
-#define DRC_DEFAULT_MOBILE_DRC_CUT   1.0 /* maximum compression of dynamic range for mobile conf */
-#define DRC_DEFAULT_MOBILE_DRC_BOOST 1.0 /* maximum compression of dynamic range for mobile conf */
-#define DRC_DEFAULT_MOBILE_DRC_HEAVY C2Config::DRC_COMPRESSION_HEAVY   /* switch for heavy compression for mobile conf */
+#define DRC_DEFAULT_MOBILE_REF_LEVEL 64  /* 64*-0.25dB = -16 dB below full scale for mobile conf */
+#define DRC_DEFAULT_MOBILE_DRC_CUT   127 /* maximum compression of dynamic range for mobile conf */
+#define DRC_DEFAULT_MOBILE_DRC_BOOST 127 /* maximum compression of dynamic range for mobile conf */
+#define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
 #define DRC_DEFAULT_MOBILE_DRC_ALBUM  0  /* MPEG-D DRC album mode; 0 => album mode is disabled, 1 => album mode is enabled */
 #define DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS (0.25) /* decoder output loudness; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
-#define DRC_DEFAULT_MOBILE_ENC_LEVEL (0.25) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
+#define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define MAX_CHANNEL_COUNT            8  /* maximum number of audio channels that can be decoded */
 // names of properties that can be used to override the default DRC settings
 #define PROP_DRC_OVERRIDE_REF_LEVEL  "aac_drc_reference_level"
@@ -145,9 +145,13 @@ public:
                 .withSetter(ProfileLevelSetter)
                 .build());
 
+        C2Config::drc_compression_mode_t defaultCompressionMode =
+                property_get_int32(PROP_DRC_OVERRIDE_HEAVY, DRC_DEFAULT_MOBILE_DRC_HEAVY) == 1
+                        ? C2Config::DRC_COMPRESSION_HEAVY
+                        : C2Config::DRC_COMPRESSION_LIGHT;
         addParameter(
                 DefineParam(mDrcCompressMode, C2_PARAMKEY_DRC_COMPRESSION_MODE)
-                .withDefault(new C2StreamDrcCompressionModeTuning::input(0u, C2Config::DRC_COMPRESSION_HEAVY))
+                .withDefault(new C2StreamDrcCompressionModeTuning::input(0u, defaultCompressionMode))
                 .withFields({
                     C2F(mDrcCompressMode, value).oneOf({
                             C2Config::DRC_COMPRESSION_ODM_DEFAULT,
@@ -158,37 +162,48 @@ public:
                 .withSetter(Setter<decltype(*mDrcCompressMode)>::StrictValueWithNoDeps)
                 .build());
 
+
+        float defaultRefLevel = -0.25 * property_get_int32(PROP_DRC_OVERRIDE_REF_LEVEL,
+                                                           DRC_DEFAULT_MOBILE_REF_LEVEL);
         addParameter(
                 DefineParam(mDrcTargetRefLevel, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL)
-                .withDefault(new C2StreamDrcTargetReferenceLevelTuning::input(0u, DRC_DEFAULT_MOBILE_REF_LEVEL))
+                .withDefault(new C2StreamDrcTargetReferenceLevelTuning::input(0u, defaultRefLevel))
                 .withFields({C2F(mDrcTargetRefLevel, value).inRange(-31.75, 0.25)})
                 .withSetter(Setter<decltype(*mDrcTargetRefLevel)>::StrictValueWithNoDeps)
                 .build());
 
+        float defaultEncLevel = -0.25 * property_get_int32(PROP_DRC_OVERRIDE_ENC_LEVEL,
+                                                           DRC_DEFAULT_MOBILE_ENC_LEVEL);
         addParameter(
                 DefineParam(mDrcEncTargetLevel, C2_PARAMKEY_DRC_ENCODED_TARGET_LEVEL)
-                .withDefault(new C2StreamDrcEncodedTargetLevelTuning::input(0u, DRC_DEFAULT_MOBILE_ENC_LEVEL))
+                .withDefault(new C2StreamDrcEncodedTargetLevelTuning::input(0u, defaultEncLevel))
                 .withFields({C2F(mDrcEncTargetLevel, value).inRange(-31.75, 0.25)})
                 .withSetter(Setter<decltype(*mDrcEncTargetLevel)>::StrictValueWithNoDeps)
                 .build());
 
+        float defaultDrcBoost =
+                property_get_int32(PROP_DRC_OVERRIDE_BOOST, DRC_DEFAULT_MOBILE_DRC_BOOST) / 127.;
         addParameter(
                 DefineParam(mDrcBoostFactor, C2_PARAMKEY_DRC_BOOST_FACTOR)
-                .withDefault(new C2StreamDrcBoostFactorTuning::input(0u, DRC_DEFAULT_MOBILE_DRC_BOOST))
+                .withDefault(new C2StreamDrcBoostFactorTuning::input(0u, defaultDrcBoost))
                 .withFields({C2F(mDrcBoostFactor, value).inRange(0, 1.)})
                 .withSetter(Setter<decltype(*mDrcBoostFactor)>::StrictValueWithNoDeps)
                 .build());
 
+        float defaultDrcCut =
+                property_get_int32(PROP_DRC_OVERRIDE_CUT, DRC_DEFAULT_MOBILE_DRC_CUT) / 127.;
         addParameter(
                 DefineParam(mDrcAttenuationFactor, C2_PARAMKEY_DRC_ATTENUATION_FACTOR)
-                .withDefault(new C2StreamDrcAttenuationFactorTuning::input(0u, DRC_DEFAULT_MOBILE_DRC_CUT))
+                .withDefault(new C2StreamDrcAttenuationFactorTuning::input(0u, defaultDrcCut))
                 .withFields({C2F(mDrcAttenuationFactor, value).inRange(0, 1.)})
                 .withSetter(Setter<decltype(*mDrcAttenuationFactor)>::StrictValueWithNoDeps)
                 .build());
 
+        C2Config::drc_effect_type_t defaultDrcEffectType = (C2Config::drc_effect_type_t)
+                property_get_int32(PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
         addParameter(
                 DefineParam(mDrcEffectType, C2_PARAMKEY_DRC_EFFECT_TYPE)
-                .withDefault(new C2StreamDrcEffectTypeTuning::input(0u, C2Config::DRC_EFFECT_LIMITED_PLAYBACK_RANGE))
+                .withDefault(new C2StreamDrcEffectTypeTuning::input(0u, defaultDrcEffectType))
                 .withFields({
                     C2F(mDrcEffectType, value).oneOf({
                             C2Config::DRC_EFFECT_ODM_DEFAULT,

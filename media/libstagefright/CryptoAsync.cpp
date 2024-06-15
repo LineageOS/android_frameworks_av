@@ -30,6 +30,36 @@
 
 namespace android {
 
+CryptoAsync::CryptoAsyncInfo::CryptoAsyncInfo(const std::unique_ptr<CodecCryptoInfo> &info) {
+    if (info == nullptr) {
+        return;
+    }
+    size_t key_len = (info->mKey != nullptr)? 16 : 0;
+    size_t iv_len = (info->mIv != nullptr)? 16 : 0;
+    mNumSubSamples = info->mNumSubSamples;
+    mMode = info->mMode;
+    mPattern = info->mPattern;
+    if (key_len > 0) {
+        mKeyBuffer = ABuffer::CreateAsCopy((void*)info->mKey, key_len);
+        mKey = (uint8_t*)(mKeyBuffer.get() != nullptr ? mKeyBuffer.get()->data() : nullptr);
+    }
+    if (iv_len > 0) {
+        mIvBuffer = ABuffer::CreateAsCopy((void*)info->mIv, iv_len);
+        mIv = (uint8_t*)(mIvBuffer.get() != nullptr ? mIvBuffer.get()->data() : nullptr);
+    }
+    mSubSamplesBuffer =
+        new ABuffer(sizeof(CryptoPlugin::SubSample) * mNumSubSamples);
+    if (mSubSamplesBuffer.get()) {
+        CryptoPlugin::SubSample * samples =
+           (CryptoPlugin::SubSample *)(mSubSamplesBuffer.get()->data());
+        for (int s = 0 ; s < mNumSubSamples ; s++) {
+            samples[s].mNumBytesOfClearData = info->mSubSamples[s].mNumBytesOfClearData;
+            samples[s].mNumBytesOfEncryptedData = info->mSubSamples[s].mNumBytesOfEncryptedData;
+        }
+        mSubSamples = (CryptoPlugin::SubSample *)mSubSamplesBuffer.get()->data();
+    }
+}
+
 CryptoAsync::~CryptoAsync() {
 }
 
@@ -79,23 +109,27 @@ status_t CryptoAsync::decryptAndQueue(sp<AMessage> & msg) {
     sp<ABuffer> keyBuffer;
     sp<ABuffer> ivBuffer;
     sp<ABuffer> subSamplesBuffer;
-    msg->findInt32("encryptBlocks", (int32_t*)&pattern.mEncryptBlocks);
-    msg->findInt32("skipBlocks", (int32_t*)&pattern.mSkipBlocks);
-    msg->findBuffer("key", &keyBuffer);
-    msg->findBuffer("iv", &ivBuffer);
-    msg->findBuffer("subSamples", &subSamplesBuffer);
-    msg->findInt32("secure", &secure);
-    msg->findSize("numSubSamples", &numSubSamples);
-    msg->findObject("buffer", &obj);
-    msg->findInt32("mode", (int32_t*)&mode);
     AString errorDetailMsg;
-    const uint8_t * key = keyBuffer.get() != nullptr ? keyBuffer.get()->data() : nullptr;
-    const uint8_t * iv = ivBuffer.get() != nullptr ? ivBuffer.get()->data() : nullptr;
-    const CryptoPlugin::SubSample * subSamples =
-       (CryptoPlugin::SubSample *)(subSamplesBuffer.get()->data());
+    msg->findObject("buffer", &obj);
+    msg->findInt32("secure", &secure);
     sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
-    err = channel->queueSecureInputBuffer(buffer, secure, key, iv, mode,
-        pattern, subSamples, numSubSamples, &errorDetailMsg);
+    if (buffer->meta()->findObject("cryptoInfos", &obj)) {
+        err = channel->queueSecureInputBuffers(buffer, secure, &errorDetailMsg);
+    } else {
+        msg->findInt32("encryptBlocks", (int32_t*)&pattern.mEncryptBlocks);
+        msg->findInt32("skipBlocks", (int32_t*)&pattern.mSkipBlocks);
+        msg->findBuffer("key", &keyBuffer);
+        msg->findBuffer("iv", &ivBuffer);
+        msg->findBuffer("subSamples", &subSamplesBuffer);
+        msg->findSize("numSubSamples", &numSubSamples);
+        msg->findInt32("mode", (int32_t*)&mode);
+        const uint8_t * key = keyBuffer.get() != nullptr ? keyBuffer.get()->data() : nullptr;
+        const uint8_t * iv = ivBuffer.get() != nullptr ? ivBuffer.get()->data() : nullptr;
+        const CryptoPlugin::SubSample * subSamples =
+           (CryptoPlugin::SubSample *)(subSamplesBuffer.get()->data());
+        err = channel->queueSecureInputBuffer(buffer, secure, key, iv, mode,
+            pattern, subSamples, numSubSamples, &errorDetailMsg);
+    }
     if (err != OK) {
         std::list<sp<AMessage>> errorList;
         msg->removeEntryByName("buffer");

@@ -44,7 +44,15 @@
   ],
   "postsubmit": [
     {
-       "name": "audioeffect_analysis"
+      "name": "audioeffect_analysis"
+    },
+    {
+      "name": "CtsVirtualDevicesTestCases",
+      "options" : [
+        {
+          "include-filter": "android.virtualdevice.cts.VirtualAudioTest"
+        }
+      ]
     }
   ]
 }

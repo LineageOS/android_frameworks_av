@@ -53,23 +53,27 @@
 #include "effectsAidlConversion/AidlConversionVisualizer.h"
 
 using ::aidl::android::aidl_utils::statusTFromBinderStatus;
+using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::IEffect;
 using ::aidl::android::hardware::audio::effect::IFactory;
+using ::aidl::android::hardware::audio::effect::kEventFlagDataMqUpdate;
+using ::aidl::android::hardware::audio::effect::kReopenSupportedVersion;
 using ::aidl::android::hardware::audio::effect::State;
 
 namespace android {
 namespace effect {
 
 EffectHalAidl::EffectHalAidl(const std::shared_ptr<IFactory>& factory,
-                             const std::shared_ptr<IEffect>& effect,
-                             int32_t sessionId, int32_t ioId, const Descriptor& desc,
-                             bool isProxyEffect)
+                             const std::shared_ptr<IEffect>& effect, int32_t sessionId,
+                             int32_t ioId, const Descriptor& desc, bool isProxyEffect)
     : mFactory(factory),
       mEffect(effect),
       mSessionId(sessionId),
       mIoId(ioId),
       mIsProxyEffect(isProxyEffect) {
+    assert(mFactory != nullptr);
+    assert(mEffect != nullptr);
     createAidlConversion(effect, sessionId, ioId, desc);
 }
 
@@ -165,26 +169,45 @@ status_t EffectHalAidl::setOutBuffer(const sp<EffectBufferHalInterface>& buffer)
 
 // write to input FMQ here, wait for statusMQ STATUS_OK, and read from output FMQ
 status_t EffectHalAidl::process() {
+    const std::string effectName = mConversion->getDescriptor().common.name;
     State state = State::INIT;
     if (mConversion->isBypassing() || !mEffect->getState(&state).isOk() ||
         state != State::PROCESSING) {
-        ALOGI("%s skipping %s process because it's %s", __func__,
-              mConversion->getDescriptor().common.name.c_str(),
+        ALOGI("%s skipping %s process because it's %s", __func__, effectName.c_str(),
               mConversion->isBypassing()
                       ? "bypassing"
                       : aidl::android::hardware::audio::effect::toString(state).c_str());
         return -ENODATA;
     }
 
+    // check if the DataMq needs any update, timeout at 1ns to avoid being blocked
+    auto efGroup = mConversion->getEventFlagGroup();
+    if (!efGroup) {
+        ALOGE("%s invalid efGroup", __func__);
+        return INVALID_OPERATION;
+    }
+
+    // use IFactory HAL version because IEffect can be an EffectProxy instance
+    static const int halVersion = [&]() {
+        int version = 0;
+        return mFactory->getInterfaceVersion(&version).isOk() ? version : 0;
+    }();
+
+    if (uint32_t efState = 0; halVersion >= kReopenSupportedVersion &&
+                              ::android::OK == efGroup->wait(kEventFlagDataMqUpdate, &efState,
+                                                             1 /* ns */, true /* retry */) &&
+                              efState & kEventFlagDataMqUpdate) {
+        ALOGI("%s %s V%d receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str(),
+              halVersion);
+        mConversion->reopen();
+    }
     auto statusQ = mConversion->getStatusMQ();
     auto inputQ = mConversion->getInputMQ();
     auto outputQ = mConversion->getOutputMQ();
-    auto efGroup = mConversion->getEventFlagGroup();
     if (!statusQ || !statusQ->isValid() || !inputQ || !inputQ->isValid() || !outputQ ||
-        !outputQ->isValid() || !efGroup) {
-        ALOGE("%s invalid FMQ [Status %d I %d O %d] efGroup %p", __func__,
-              statusQ ? statusQ->isValid() : 0, inputQ ? inputQ->isValid() : 0,
-              outputQ ? outputQ->isValid() : 0, efGroup.get());
+        !outputQ->isValid()) {
+        ALOGE("%s invalid FMQ [Status %d I %d O %d]", __func__, statusQ ? statusQ->isValid() : 0,
+              inputQ ? inputQ->isValid() : 0, outputQ ? outputQ->isValid() : 0);
         return INVALID_OPERATION;
     }
 
@@ -225,8 +248,8 @@ status_t EffectHalAidl::process() {
         return INVALID_OPERATION;
     }
 
-    ALOGD("%s %s consumed %zu produced %zu", __func__,
-          mConversion->getDescriptor().common.name.c_str(), floatsToWrite, floatsToRead);
+    ALOGD("%s %s consumed %zu produced %zu", __func__, effectName.c_str(), floatsToWrite,
+          floatsToRead);
     return OK;
 }
 
@@ -263,6 +286,7 @@ status_t EffectHalAidl::getDescriptor(effect_descriptor_t* pDescriptor) {
 
 status_t EffectHalAidl::close() {
     TIME_CHECK();
+    mEffect->command(CommandId::STOP);
     return statusTFromBinderStatus(mEffect->close());
 }
 

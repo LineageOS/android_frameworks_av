@@ -192,7 +192,8 @@ void AudioPort::dump(std::string *dst, int spaces, const char* extraInfo, bool v
                 dst->append(
                         base::StringPrintf("%*s extra audio descriptor %zu:\n", eadSpaces, "", i));
                 dst->append(base::StringPrintf(
-                    "%*s- standard: %u\n", descSpaces, "", mExtraAudioDescriptors[i].standard));
+                        "%*s- standard: %u\n", descSpaces, "",
+                        static_cast<unsigned>(mExtraAudioDescriptors[i].standard)));
                 dst->append(base::StringPrintf("%*s- descriptor:", descSpaces, ""));
                 for (auto v : mExtraAudioDescriptors[i].audioDescriptor) {
                     dst->append(base::StringPrintf(" %02x", v));

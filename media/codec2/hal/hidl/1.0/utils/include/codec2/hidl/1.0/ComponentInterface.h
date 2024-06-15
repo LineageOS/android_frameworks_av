@@ -23,10 +23,15 @@
 #include <android/hardware/media/c2/1.0/IComponentInterface.h>
 #include <hidl/Status.h>
 
+#include <codec2/common/MultiAccessUnitHelper.h>
+
 #include <C2Component.h>
 #include <C2Buffer.h>
+#include <C2Config.h>
+#include <util/C2InterfaceHelper.h>
 #include <C2.h>
 
+#include <set>
 #include <memory>
 
 namespace android {
@@ -39,12 +44,18 @@ namespace utils {
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
+using ::android::MultiAccessUnitInterface;
 
 struct ComponentStore;
 
 struct ComponentInterface : public IComponentInterface {
     ComponentInterface(
             const std::shared_ptr<C2ComponentInterface>& interface,
+            const std::shared_ptr<ParameterCache>& cache);
+
+    ComponentInterface(
+            const std::shared_ptr<C2ComponentInterface>& interface,
+            const std::shared_ptr<MultiAccessUnitInterface>& largeBufferIntf,
             const std::shared_ptr<ParameterCache>& cache);
     c2_status_t status() const;
     virtual Return<sp<IConfigurable>> getConfigurable() override;

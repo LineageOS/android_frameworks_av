@@ -28,7 +28,6 @@
 
 #include "media/AidlConversionCppNdk.h"
 
-#include <media/ShmemCompat.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -905,7 +904,7 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
         case Tag::voiceMask:
             return convert(aidl, mVoice, __func__, "voice");
     }
-    ALOGE("%s: unexpected tag value %d", __func__, aidl.getTag());
+    ALOGE("%s: unexpected tag value %d", __func__, static_cast<int>(aidl.getTag()));
     return unexpected(BAD_VALUE);
 }
 

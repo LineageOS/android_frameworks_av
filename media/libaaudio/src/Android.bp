@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -128,7 +129,7 @@ cc_library {
     tidy_checks_as_errors: tidy_errors,
     tidy_flags: [
         "-format-style=file",
-    ]
+    ],
 }
 
 cc_library {
@@ -250,7 +251,7 @@ cc_library {
     tidy_checks_as_errors: tidy_errors,
     tidy_flags: [
         "-format-style=file",
-    ]
+    ],
 }
 
 aidl_interface {
@@ -274,8 +275,7 @@ aidl_interface {
         "shared-file-region-aidl",
         "framework-permission-aidl",
     ],
-    backend:
-    {
+    backend: {
         java: {
             sdk_version: "module_current",
         },

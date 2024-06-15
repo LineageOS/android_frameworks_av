@@ -101,7 +101,7 @@ cc_defaults {
         "android.frameworks.cameraservice.device-V2-ndk",
         "android.hardware.camera.common-V1-ndk",
         "android.hardware.camera.device-V3-ndk",
-        "android.hardware.camera.metadata-V2-ndk",
+        "android.hardware.camera.metadata-V3-ndk",
         "android.hardware.camera.provider@2.4",
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
@@ -112,6 +112,7 @@ cc_defaults {
         "libcameraservice_device_independent",
         "libdynamic_depth",
         "libprocessinfoservice_aidl",
+        "libvirtualdevicebuildflags",
         "media_permission-aidl-cpp",
     ],
 }
@@ -195,6 +196,7 @@ cc_library {
         "utils/SessionStatsBuilder.cpp",
         "utils/TagMonitor.cpp",
         "utils/LatencyHistogram.cpp",
+        "utils/Utils.cpp",
     ],
 
     header_libs: [

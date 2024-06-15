@@ -279,7 +279,7 @@ public:
     // integrity of the chains during the process.
     // Also sets the parameter 'effectChains' to current value of mEffectChains.
     virtual void lockEffectChains_l(Vector<sp<IAfEffectChain>>& effectChains)
-            REQUIRES(mutex()) = 0;
+            REQUIRES(mutex()) EXCLUDES_EffectChain_Mutex = 0;
     // unlock effect chains after process
     virtual void unlockEffectChains(const Vector<sp<IAfEffectChain>>& effectChains)
             EXCLUDES_ThreadBase_Mutex = 0;
@@ -386,6 +386,12 @@ public:
             const effect_uuid_t* type, bool suspend, audio_session_t sessionId)
             REQUIRES(mutex()) = 0;
 
+    // Wait while the Thread is busy.  This is done to ensure that
+    // the Thread is not busy releasing the Tracks, during which the Thread mutex
+    // may be temporarily unlocked.  Some Track methods will use this method to
+    // avoid races.
+    virtual void waitWhileThreadBusy_l(audio_utils::unique_lock& ul)
+            REQUIRES(mutex()) = 0;
     // Dynamic cast to derived interface
     virtual sp<IAfDirectOutputThread> asIAfDirectOutputThread() { return nullptr; }
     virtual sp<IAfDuplicatingThread> asIAfDuplicatingThread() { return nullptr; }

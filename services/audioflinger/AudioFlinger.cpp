@@ -286,9 +286,6 @@ AudioFlinger::AudioFlinger()
     BatteryNotifier::getInstance().noteResetAudio();
 
     mMediaLogNotifier->run("MediaLogNotifier");
-    std::vector<pid_t> halPids;
-    mDevicesFactoryHal->getHalPids(&halPids);
-    mediautils::TimeCheck::setAudioHalPids(halPids);
 
     // Notify that we have started (also called when audioserver service restarts)
     mediametrics::LogItem(mMetricsId)
@@ -314,7 +311,8 @@ void AudioFlinger::onFirstRef()
     }
 
     mPatchPanel = IAfPatchPanel::create(sp<IAfPatchPanelCallback>::fromExisting(this));
-    mMelReporter = sp<MelReporter>::make(sp<IAfMelReporterCallback>::fromExisting(this));
+    mMelReporter = sp<MelReporter>::make(sp<IAfMelReporterCallback>::fromExisting(this),
+                                         mPatchPanel);
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
@@ -875,12 +873,15 @@ NO_THREAD_SAFETY_ANALYSIS  // conditional try lock
             dprintf(fd, "\nIEffect binder call profile:\n");
             write(fd, timeCheckStats.c_str(), timeCheckStats.size());
 
-            // Automatically fetch HIDL statistics.
-            std::shared_ptr<std::vector<std::string>> hidlClassNames =
-                    mediautils::getStatisticsClassesForModule(
-                            METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL);
-            if (hidlClassNames) {
-                for (const auto& className : *hidlClassNames) {
+            // Automatically fetch HIDL or AIDL statistics.
+            const std::string_view halType = (mDevicesFactoryHal->getHalVersion().getType() ==
+                                      AudioHalVersionInfo::Type::HIDL)
+                                             ? METHOD_STATISTICS_MODULE_NAME_AUDIO_HIDL
+                                             : METHOD_STATISTICS_MODULE_NAME_AUDIO_AIDL;
+            const std::shared_ptr<std::vector<std::string>> halClassNames =
+                    mediautils::getStatisticsClassesForModule(halType);
+            if (halClassNames) {
+                for (const auto& className : *halClassNames) {
                     auto stats = mediautils::getStatisticsForClass(className);
                     if (stats) {
                         timeCheckStats = stats->dump();
@@ -1956,7 +1957,7 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     mHardwareStatus = AUDIO_HW_IDLE;
 
     // Change parameters of the configuration each iteration until we find a
-    // configuration that the device will support.
+    // configuration that the device will support, or HAL suggests what it supports.
     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
     for (auto testChannelMask : channelMasks) {
         config.channel_mask = testChannelMask;
@@ -1966,11 +1967,16 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
                 config.sample_rate = testSampleRate;
 
                 size_t bytes = 0;
+                audio_config_t loopConfig = config;
                 status_t result = dev->getInputBufferSize(&config, &bytes);
+                if (result == BAD_VALUE) {
+                    // Retry with the config suggested by the HAL.
+                    result = dev->getInputBufferSize(&config, &bytes);
+                }
                 if (result != OK || bytes == 0) {
+                    config = loopConfig;
                     continue;
                 }
-
                 if (config.sample_rate != sampleRate || config.channel_mask != channelMask ||
                     config.format != format) {
                     uint32_t dstChannelCount = audio_channel_count_from_in_mask(channelMask);
@@ -2170,30 +2176,24 @@ sp<IAfThreadBase> AudioFlinger::getEffectThread_l(audio_session_t sessionId,
     sp<IAfThreadBase> thread;
 
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        if (mPlaybackThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mPlaybackThreads.valueAt(i);
+        thread = mPlaybackThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
-    }
-    if (thread != nullptr) {
-        return thread;
     }
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        if (mRecordThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mRecordThreads.valueAt(i);
+        thread = mRecordThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
-    }
-    if (thread != nullptr) {
-        return thread;
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
-        if (mMmapThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
-            ALOG_ASSERT(thread == 0);
-            thread = mMmapThreads.valueAt(i);
+        thread = mMmapThreads.valueAt(i);
+        if (thread->getEffect(sessionId, effectId) != 0) {
+            return thread;
         }
     }
-    return thread;
+    return nullptr;
 }
 
 // ----------------------------------------------------------------------------
@@ -2546,6 +2546,7 @@ AudioHwDevice* AudioFlinger::loadHwModule_ll(const char *name)
         bool mm;
         if (OK == dev->getMasterMute(&mm)) {
             mMasterMute = mm;
+            ALOGI_IF(mMasterMute, "%s: applying mute from HAL %s", __func__, name);
         }
     }
 
@@ -3222,41 +3223,19 @@ sp<IAfThreadBase> AudioFlinger::openInput_l(audio_module_handle_t module,
         return 0;
     }
 
-    audio_config_t halconfig = *config;
-    sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice();
-    sp<StreamInHalInterface> inStream;
-    status_t status = inHwHal->openInputStream(
-            *input, devices, &halconfig, flags, address, source,
-            outputDevice, outputDeviceAddress, &inStream);
-    ALOGV("openInput_l() openInputStream returned input %p, devices %#x, SamplingRate %d"
-           ", Format %#x, Channels %#x, flags %#x, status %d addr %s",
-            inStream.get(),
+    AudioStreamIn *inputStream = nullptr;
+    status_t status = inHwDev->openInputStream(
+            &inputStream,
+            *input,
             devices,
-            halconfig.sample_rate,
-            halconfig.format,
-            halconfig.channel_mask,
             flags,
-            status, address);
+            config,
+            address,
+            source,
+            outputDevice,
+            outputDeviceAddress.c_str());
 
-    // If the input could not be opened with the requested parameters and we can handle the
-    // conversion internally, try to open again with the proposed parameters.
-    if (status == BAD_VALUE &&
-        audio_is_linear_pcm(config->format) &&
-        audio_is_linear_pcm(halconfig.format) &&
-        (halconfig.sample_rate <= AUDIO_RESAMPLER_DOWN_RATIO_MAX * config->sample_rate) &&
-        (audio_channel_count_from_in_mask(halconfig.channel_mask) <= FCC_LIMIT) &&
-        (audio_channel_count_from_in_mask(config->channel_mask) <= FCC_LIMIT)) {
-        // FIXME describe the change proposed by HAL (save old values so we can log them here)
-        ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
-        inStream.clear();
-        status = inHwHal->openInputStream(
-                *input, devices, &halconfig, flags, address, source,
-                outputDevice, outputDeviceAddress, &inStream);
-        // FIXME log this new status; HAL should not propose any further changes
-    }
-
-    if (status == NO_ERROR && inStream != 0) {
-        AudioStreamIn *inputStream = new AudioStreamIn(inHwDev, inStream, flags);
+    if (status == NO_ERROR) {
         if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             const sp<IAfMmapCaptureThread> thread =
                     IAfMmapCaptureThread::create(this, *input, inHwDev, inputStream, mSystemReady);
@@ -4166,7 +4145,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
         }
 
         // Only audio policy service can create a spatializer effect
-        if ((memcmp(&descOut.type, FX_IID_SPATIALIZER, sizeof(effect_uuid_t)) == 0) &&
+        if (IAfEffectModule::isSpatializer(&descOut.type) &&
             (callingUid != AID_AUDIOSERVER || currentPid != getpid())) {
             ALOGW("%s: attempt to create a spatializer effect from uid/pid %d/%d",
                     __func__, callingUid, currentPid);
@@ -4408,11 +4387,12 @@ void AudioFlinger::setEffectSuspended(int effectId,
 
     sp<IAfThreadBase> thread = getEffectThread_l(sessionId, effectId);
     if (thread == nullptr) {
-      return;
+        return;
     }
     audio_utils::lock_guard _sl(thread->mutex());
-    sp<IAfEffectModule> effect = thread->getEffect_l(sessionId, effectId);
-    thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
+    if (const auto& effect = thread->getEffect_l(sessionId, effectId)) {
+        thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
+    }
 }
 
 
@@ -4504,7 +4484,7 @@ status_t AudioFlinger::moveEffectChain_ll(audio_session_t sessionId,
             if (effect->state() == IAfEffectModule::ACTIVE ||
                     effect->state() == IAfEffectModule::STOPPING) {
                 ++started;
-                effect->start();
+                effect->start_l();
             }
         }
         dstChain->mutex().unlock();
@@ -4607,7 +4587,7 @@ Exit:
         // removeEffect_l() has stopped the effect if it was active so it must be restarted
         if (effect->state() == IAfEffectModule::ACTIVE ||
             effect->state() == IAfEffectModule::STOPPING) {
-            effect->start();
+            effect->start_l();
         }
     }
 
@@ -4805,7 +4785,7 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::GET_AUDIO_POLICY_CONFIG:
         case TransactionCode::GET_AUDIO_MIX_PORT:
             ALOGW("%s: transaction %d received from PID %d",
-                  __func__, code, IPCThreadState::self()->getCallingPid());
+                  __func__, static_cast<int>(code), IPCThreadState::self()->getCallingPid());
             // return status only for non void methods
             switch (code) {
                 case TransactionCode::SET_RECORD_SILENCED:
@@ -4838,7 +4818,8 @@ status_t AudioFlinger::onTransactWrapper(TransactionCode code,
         case TransactionCode::SUPPORTS_BLUETOOTH_VARIABLE_LATENCY: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
-                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      __func__, static_cast<int>(code),
+                      IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());
                 // return status only for non-void methods
                 switch (code) {

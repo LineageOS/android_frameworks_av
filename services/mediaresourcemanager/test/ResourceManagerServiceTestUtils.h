@@ -123,14 +123,16 @@ private:
 
 
 struct TestClient : public BnResourceManagerClient {
-    TestClient(int pid, int uid, const std::shared_ptr<ResourceManagerService> &service)
-        : mPid(pid), mUid(uid), mService(service) {}
+    TestClient(int pid, int uid, int32_t clientImportance,
+               const std::shared_ptr<ResourceManagerService> &service)
+        : mPid(pid), mUid(uid), mClientImportance(clientImportance), mService(service) {}
 
     Status reclaimResource(bool* _aidl_return) override {
         ClientInfoParcel clientInfo{.pid = static_cast<int32_t>(mPid),
                                     .uid = static_cast<int32_t>(mUid),
                                     .id = getId(ref<TestClient>()),
-                                    .name = "none"};
+                                    .name = "none",
+                                    .importance = mClientImportance};
         mService->removeClient(clientInfo);
         mWasReclaimResourceCalled = true;
         *_aidl_return = true;
@@ -150,14 +152,20 @@ struct TestClient : public BnResourceManagerClient {
 
     virtual ~TestClient() {}
 
+    inline int pid() const { return mPid; }
+    inline int uid() const { return mUid; }
+    inline int32_t clientImportance() const { return mClientImportance; }
+
 private:
     bool mWasReclaimResourceCalled = false;
     int mPid;
     int mUid;
+    int32_t mClientImportance = 0;
     std::shared_ptr<ResourceManagerService> mService;
     DISALLOW_EVIL_CONSTRUCTORS(TestClient);
 };
 
+// [pid, uid] used by the test.
 static const int kTestPid1 = 30;
 static const int kTestUid1 = 1010;
 
@@ -167,6 +175,16 @@ static const int kTestUid2 = 1011;
 static const int kLowPriorityPid = 40;
 static const int kMidPriorityPid = 25;
 static const int kHighPriorityPid = 10;
+
+// Client Ids used by the test.
+static const int kLowPriorityClientId = 1111;
+static const int kMidPriorityClientId = 2222;
+static const int kHighPriorityClientId = 3333;
+
+// Client importance used by the test.
+static const int32_t kHighestCodecImportance = 0;
+static const int32_t kLowestCodecImportance = 100;
+static const int32_t kMidCodecImportance = 50;
 
 using EventType = TestSystemCallback::EventType;
 using EventEntry = TestSystemCallback::EventEntry;
@@ -198,8 +216,8 @@ public:
         return static_cast<TestClient*>(testClient.get());
     }
 
-    ResourceManagerServiceTestBase() {
-        ALOGI("ResourceManagerServiceTestBase created");
+    ResourceManagerServiceTestBase(bool newRM = false) : mNewRM(newRM) {
+        ALOGI("ResourceManagerServiceTestBase created with %s RM", newRM ? "new" : "old");
     }
 
     void SetUp() override {
@@ -207,14 +225,19 @@ public:
         // silently ignored.
         ABinderProcess_startThreadPool();
         mSystemCB = new TestSystemCallback();
-        mService = ResourceManagerService::Create(new TestProcessInfo, mSystemCB);
-        mTestClient1 = ::ndk::SharedRefBase::make<TestClient>(kTestPid1, kTestUid1, mService);
-        mTestClient2 = ::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService);
-        mTestClient3 = ::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, mService);
+        if (mNewRM) {
+            mService = ResourceManagerService::CreateNew(new TestProcessInfo, mSystemCB);
+        } else {
+            mService = ResourceManagerService::Create(new TestProcessInfo, mSystemCB);
+        }
+        mTestClient1 = ::ndk::SharedRefBase::make<TestClient>(kTestPid1, kTestUid1, 0, mService);
+        mTestClient2 = ::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, 0, mService);
+        mTestClient3 = ::ndk::SharedRefBase::make<TestClient>(kTestPid2, kTestUid2, 0, mService);
     }
 
-    std::shared_ptr<IResourceManagerClient> createTestClient(int pid, int uid) {
-        return ::ndk::SharedRefBase::make<TestClient>(pid, uid, mService);
+    std::shared_ptr<IResourceManagerClient> createTestClient(int pid, int uid,
+                                                             int32_t importance = 0) {
+        return ::ndk::SharedRefBase::make<TestClient>(pid, uid, importance, mService);
     }
 
     sp<TestSystemCallback> mSystemCB;
@@ -229,9 +252,7 @@ protected:
         // convert resource1 to ResourceList
         ResourceList r1;
         for (size_t i = 0; i < resources1.size(); ++i) {
-            const auto &res = resources1[i];
-            const auto resType = std::tuple(res.type, res.subType, res.id);
-            r1[resType] = res;
+            r1.addOrUpdate(resources1[i]);
         }
         return r1 == resources2;
     }
@@ -244,6 +265,8 @@ protected:
         EXPECT_EQ(client, info.client);
         EXPECT_TRUE(isEqualResources(resources, info.resources));
     }
+
+    bool mNewRM = false;
 };
 
 } // namespace android

@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_license"
@@ -11,13 +12,16 @@ cc_test {
     name: "aaudio_loopback",
     gtest: false,
     srcs: ["src/loopback.cpp"],
-    cflags: ["-Wall", "-Werror"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
     static_libs: ["libsndfile"],
     include_dirs: ["external/oboe/apps/OboeTester/app/src/main/cpp"],
     shared_libs: [
         "libaaudio",
         "libaudioutils",
-        "liblog"
-        ],
+        "liblog",
+    ],
     header_libs: ["libaaudio_example_utils"],
 }

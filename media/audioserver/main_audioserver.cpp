@@ -169,6 +169,11 @@ int main(int argc __unused, char **argv)
                 "%s: AudioSystem already has an AudioFlinger instance!", __func__);
         const auto aps = sp<AudioPolicyService>::make();
         ALOGD("%s: AudioPolicy created", __func__);
+        ALOGW_IF(AudioSystem::setLocalAudioPolicyService(aps) != OK,
+                 "%s: AudioSystem already has an AudioPolicyService instance!", __func__);
+
+        // Start initialization of internally managed audio objects such as Device Effects.
+        aps->onAudioSystemReady();
 
         // Add AudioFlinger and AudioPolicy to ServiceManager.
         sp<IServiceManager> sm = defaultServiceManager();

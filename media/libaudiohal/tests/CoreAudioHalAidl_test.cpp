@@ -443,21 +443,6 @@ TEST_F(DeviceHalAidlTest, ScreenRotation) {
     EXPECT_EQ(ScreenRotation::DEG_0, mModule->getScreenRotation());
 }
 
-// Without a vendor extension, any unrecognized parameters must be ignored.
-TEST_F(DeviceHalAidlTest, VendorParameterIgnored) {
-    EXPECT_EQ(0UL, mModule->getAsyncParameters().size());
-    EXPECT_EQ(0UL, mModule->getSyncParameters().size());
-    EXPECT_EQ(OK, mDevice->setParameters(createParameterString("random_name", "random_value")));
-    EXPECT_EQ(0UL, mModule->getAsyncParameters().size());
-    EXPECT_EQ(0UL, mModule->getSyncParameters().size());
-
-    EXPECT_EQ(0UL, mModule->getRetrievedParameterIds().size());
-    String8 values;
-    EXPECT_EQ(OK, mDevice->getParameters(String8("random_name"), &values));
-    EXPECT_EQ(0UL, mModule->getRetrievedParameterIds().size());
-    EXPECT_EQ(0UL, values.length());
-}
-
 class DeviceHalAidlVendorParametersTest : public testing::Test {
   public:
     void SetUp() override {

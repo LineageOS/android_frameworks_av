@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIO_THREADMETRICS_H
-#define ANDROID_AUDIO_THREADMETRICS_H
+#pragma once
 
 #include <media/MediaMetricsItem.h>
 
@@ -210,5 +209,3 @@ private:
 };
 
 } // namespace android
-
-#endif // ANDROID_AUDIO_THREADMETRICS_H

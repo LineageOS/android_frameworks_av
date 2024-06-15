@@ -178,7 +178,7 @@ RetCode LoudnessEnhancerImpl::releaseContext() {
 IEffect::Status LoudnessEnhancerImpl::effectProcessImpl(float* in, float* out, int samples) {
     IEffect::Status status = {EX_NULL_POINTER, 0, 0};
     RETURN_VALUE_IF(!mContext, status, "nullContext");
-    return mContext->lvmProcess(in, out, samples);
+    return mContext->process(in, out, samples);
 }
 
 }  // namespace aidl::android::hardware::audio::effect

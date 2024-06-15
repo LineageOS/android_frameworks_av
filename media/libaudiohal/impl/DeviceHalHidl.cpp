@@ -236,7 +236,7 @@ status_t DeviceHalHidl::getParameters(const String8& keys, String8 *values) {
 }
 
 status_t DeviceHalHidl::getInputBufferSize(
-        const struct audio_config *config, size_t *size) {
+        struct audio_config *config, size_t *size) {
     TIME_CHECK();
     if (mDevice == 0) return NO_INIT;
     AudioConfig hidlConfig;

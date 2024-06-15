@@ -255,6 +255,7 @@ void CameraManagerGlobal::drainPendingCallbacksLocked() {
 template<class T>
 void CameraManagerGlobal::registerAvailCallback(const T *callback) {
     Mutex::Autolock _l(mLock);
+    getCameraServiceLocked();
     Callback cb(callback);
     auto pair = mCallbacks.insert(cb);
     // Send initial callbacks if callback is newly registered

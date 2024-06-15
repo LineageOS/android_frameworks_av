@@ -20,6 +20,7 @@
 #define LOG_TAG "VideoTrackTranscoderTests"
 
 #include <android-base/logging.h>
+#include <android/binder_process.h>
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <media/MediaSampleReaderNDK.h>
@@ -221,5 +222,6 @@ TEST_F(VideoTrackTranscoderTests, LingeringEncoder) {
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
+    ABinderProcess_startThreadPool();
     return RUN_ALL_TESTS();
 }

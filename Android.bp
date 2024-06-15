@@ -105,7 +105,6 @@ cc_library_headers {
 
 aidl_interface {
     name: "av-audio-types-aidl",
-    unstable: true,
     host_supported: true,
     vendor_available: true,
     double_loadable: true,
@@ -125,4 +124,12 @@ aidl_interface {
             sdk_version: "module_current",
         },
     },
+    versions_with_info: [
+        {
+            version: "1",
+            imports: ["android.hardware.audio.core-V2"],
+        },
+    ],
+    frozen: true,
+
 }

@@ -76,6 +76,7 @@ typedef enum acamera_metadata_section {
     ACAMERA_AUTOMOTIVE_LENS,
     ACAMERA_EXTENSION,
     ACAMERA_JPEGR,
+    ACAMERA_EFV,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -123,6 +124,7 @@ typedef enum acamera_metadata_section_start {
     ACAMERA_AUTOMOTIVE_LENS_START  = ACAMERA_AUTOMOTIVE_LENS   << 16,
     ACAMERA_EXTENSION_START        = ACAMERA_EXTENSION         << 16,
     ACAMERA_JPEGR_START            = ACAMERA_JPEGR             << 16,
+    ACAMERA_EFV_START              = ACAMERA_EFV               << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
 
@@ -4705,18 +4707,21 @@ typedef enum acamera_metadata_tag {
      * </ul>
      * <p>should be interpreted in the effective after raw crop field-of-view coordinate system.
      * In this coordinate system,
-     * {preCorrectionActiveArraySize.left, preCorrectionActiveArraySize.top} corresponds to the
+     * {ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.left,
+     *  ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.top} corresponds to the
      * the top left corner of the cropped RAW frame and
-     * {preCorrectionActiveArraySize.right, preCorrectionActiveArraySize.bottom} corresponds to
+     * {ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.right,
+     *  ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.bottom} corresponds to
      * the bottom right corner. Client applications must use the values of the keys
      * in the CaptureResult metadata if present.</p>
-     * <p>Crop regions (android.scaler.CropRegion), AE/AWB/AF regions and face coordinates still
+     * <p>Crop regions ACAMERA_SCALER_CROP_REGION, AE/AWB/AF regions and face coordinates still
      * use the ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE coordinate system as usual.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
+     * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_STATISTICS_HOT_PIXEL_MAP
@@ -11521,6 +11526,7 @@ typedef enum acamera_metadata_enum_acamera_jpegr_available_jpeg_r_stream_configu
                                                                       = 1,
 
 } acamera_metadata_enum_android_jpegr_available_jpeg_r_stream_configurations_maximum_resolution_t;
+
 
 
 

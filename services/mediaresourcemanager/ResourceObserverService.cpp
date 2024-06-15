@@ -286,9 +286,9 @@ void ResourceObserverService::notifyObservers(
     {
         std::scoped_lock lock{mObserverLock};
 
-        for (auto &res : resources) {
+        for (const MediaResourceParcel& res : resources.getResources()) {
             // Skip if this resource doesn't map to any observable type.
-            MediaObservableType observableType = getObservableType(res.second);
+            MediaObservableType observableType = getObservableType(res);
             if (observableType == MediaObservableType::kInvalid) {
                 continue;
             }
@@ -303,9 +303,9 @@ void ResourceObserverService::notifyObservers(
                 auto calleeIt = calleeList.find(subscriber.first);
                 if (calleeIt == calleeList.end()) {
                     calleeList.emplace(subscriber.first, CalleeInfo{
-                        subscriber.second, {{observableType, res.second.value}}});
+                        subscriber.second, {{observableType, res.value}}});
                 } else {
-                    calleeIt->second.monitors.push_back({observableType, res.second.value});
+                    calleeIt->second.monitors.push_back({observableType, res.value});
                 }
             }
         }

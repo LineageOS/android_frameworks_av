@@ -145,6 +145,7 @@ cc_defaults {
         "audioflinger-aidl-cpp",
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
+        "com.android.media.audio-aconfig-cc",
         "effect-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libactivitymanager_aidl",

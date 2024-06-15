@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_AUDIOPOLICYEFFECTS_H
-#define ANDROID_AUDIOPOLICYEFFECTS_H
+#pragma once
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,6 +22,7 @@
 #include <future>
 
 #include <android-base/thread_annotations.h>
+#include <audio_utils/mutex.h>
 #include <cutils/misc.h>
 #include <media/AudioEffect.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
@@ -56,44 +56,43 @@ public:
     // First it will look whether vendor specific file exists,
     // otherwise it will parse the system default file.
     explicit AudioPolicyEffects(const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
-    virtual ~AudioPolicyEffects();
 
     // NOTE: methods on AudioPolicyEffects should never be called with the AudioPolicyService
-    // main mutex (mLock) held as they will indirectly call back into AudioPolicyService when
+    // main mutex (mMutex) held as they will indirectly call back into AudioPolicyService when
     // managing audio effects.
 
     // Return a list of effect descriptors for default input effects
     // associated with audioSession
     status_t queryDefaultInputEffects(audio_session_t audioSession,
                              effect_descriptor_t *descriptors,
-                             uint32_t *count);
+                             uint32_t* count) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Add all input effects associated with this input
     // Effects are attached depending on the audio_source_t
     status_t addInputEffects(audio_io_handle_t input,
                              audio_source_t inputSource,
-                             audio_session_t audioSession);
+                             audio_session_t audioSession) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Add all input effects associated to this input
     status_t releaseInputEffects(audio_io_handle_t input,
-                                 audio_session_t audioSession);
+                                 audio_session_t audioSession) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Return a list of effect descriptors for default output effects
     // associated with audioSession
     status_t queryDefaultOutputSessionEffects(audio_session_t audioSession,
                              effect_descriptor_t *descriptors,
-                             uint32_t *count);
+                             uint32_t* count) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Add all output effects associated to this output
     // Effects are attached depending on the audio_stream_type_t
     status_t addOutputSessionEffects(audio_io_handle_t output,
                              audio_stream_type_t stream,
-                             audio_session_t audioSession);
+                             audio_session_t audioSession) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // release all output effects associated with this output stream and audiosession
     status_t releaseOutputSessionEffects(audio_io_handle_t output,
                              audio_stream_type_t stream,
-                             audio_session_t audioSession);
+                             audio_session_t audioSession) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Add the effect to the list of default effects for sources of type |source|.
     status_t addSourceDefaultEffect(const effect_uuid_t *type,
@@ -101,7 +100,7 @@ public:
                                     const effect_uuid_t *uuid,
                                     int32_t priority,
                                     audio_source_t source,
-                                    audio_unique_id_t* id);
+                                    audio_unique_id_t* id) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Add the effect to the list of default effects for streams of a given usage.
     status_t addStreamDefaultEffect(const effect_uuid_t *type,
@@ -109,36 +108,37 @@ public:
                                     const effect_uuid_t *uuid,
                                     int32_t priority,
                                     audio_usage_t usage,
-                                    audio_unique_id_t* id);
+                                    audio_unique_id_t* id) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Remove the default source effect from wherever it's attached.
-    status_t removeSourceDefaultEffect(audio_unique_id_t id);
+    status_t removeSourceDefaultEffect(audio_unique_id_t id) EXCLUDES_AudioPolicyEffects_Mutex;
 
     // Remove the default stream effect from wherever it's attached.
-    status_t removeStreamDefaultEffect(audio_unique_id_t id);
+    status_t removeStreamDefaultEffect(audio_unique_id_t id) EXCLUDES_AudioPolicyEffects_Mutex;
 
-    void setDefaultDeviceEffects();
+    // Initializes the Effects (AudioSystem must be ready as this creates audio client objects).
+    void initDefaultDeviceEffects() EXCLUDES(mDeviceEffectsMutex) EXCLUDES_EffectHandle_Mutex;
 
 private:
-    void initDefaultDeviceEffects();
 
     // class to store the description of an effects and its parameters
     // as defined in audio_effects.conf
     class EffectDesc {
     public:
-        EffectDesc(const char *name,
+        EffectDesc(std::string_view name,
                    const effect_uuid_t& typeUuid,
                    const String16& opPackageName,
                    const effect_uuid_t& uuid,
                    uint32_t priority,
                    audio_unique_id_t id) :
-                        mName(strdup(name)),
+                        mName(name),
                         mTypeUuid(typeUuid),
                         mOpPackageName(opPackageName),
                         mUuid(uuid),
                         mPriority(priority),
                         mId(id) { }
-        EffectDesc(const char *name, const effect_uuid_t& uuid) :
+        // Modern EffectDesc usage:
+        EffectDesc(std::string_view name, const effect_uuid_t& uuid) :
                         EffectDesc(name,
                                    *EFFECT_UUID_NULL,
                                    String16(""),
@@ -146,67 +146,36 @@ private:
                                    0,
                                    AUDIO_UNIQUE_ID_ALLOCATE) { }
         EffectDesc(const EffectDesc& orig) :
-                        mName(strdup(orig.mName)),
+                        mName(orig.mName),
                         mTypeUuid(orig.mTypeUuid),
                         mOpPackageName(orig.mOpPackageName),
                         mUuid(orig.mUuid),
                         mPriority(orig.mPriority),
-                        mId(orig.mId) {
-                            // deep copy mParams
-                            for (size_t k = 0; k < orig.mParams.size(); k++) {
-                                effect_param_t *origParam = orig.mParams[k];
-                                // psize and vsize are rounded up to an int boundary for allocation
-                                size_t origSize = sizeof(effect_param_t) +
-                                                  ((origParam->psize + 3) & ~3) +
-                                                  ((origParam->vsize + 3) & ~3);
-                                effect_param_t *dupParam = (effect_param_t *) malloc(origSize);
-                                memcpy(dupParam, origParam, origSize);
-                                // This works because the param buffer allocation is also done by
-                                // multiples of 4 bytes originally. In theory we should memcpy only
-                                // the actual param size, that is without rounding vsize.
-                                mParams.add(dupParam);
-                            }
-                        }
-        /*virtual*/ ~EffectDesc() {
-            free(mName);
-            for (size_t k = 0; k < mParams.size(); k++) {
-                free(mParams[k]);
-            }
-        }
-        char *mName;
-        effect_uuid_t mTypeUuid;
-        String16 mOpPackageName;
-        effect_uuid_t mUuid;
-        int32_t mPriority;
-        audio_unique_id_t mId;
-        Vector <effect_param_t *> mParams;
+                        mId(orig.mId),
+                        mParams(orig.mParams) { }
+
+        const std::string mName;
+        const effect_uuid_t mTypeUuid;
+        const String16 mOpPackageName;
+        const effect_uuid_t mUuid;
+        const int32_t mPriority;
+        const audio_unique_id_t mId;
+        std::vector<std::shared_ptr<const effect_param_t>> mParams;
     };
 
-    // class to store voctor of EffectDesc
-    class EffectDescVector {
-    public:
-        EffectDescVector() {}
-        /*virtual*/ ~EffectDescVector() {
-            for (size_t j = 0; j < mEffects.size(); j++) {
-                delete mEffects[j];
-            }
-        }
-        Vector <EffectDesc *> mEffects;
-    };
+    using EffectDescVector = std::vector<std::shared_ptr<EffectDesc>>;
 
-    // class to store voctor of AudioEffects
     class EffectVector {
     public:
-        explicit EffectVector(audio_session_t session) : mSessionId(session), mRefCount(0) {}
-        /*virtual*/ ~EffectVector() {}
+        explicit EffectVector(audio_session_t session) : mSessionId(session) {}
 
         // Enable or disable all effects in effect vector
         void setProcessorEnabled(bool enabled);
 
         const audio_session_t mSessionId;
-        // AudioPolicyManager keeps mLock, no need for lock on reference count here
-        int mRefCount;
-        Vector< sp<AudioEffect> >mEffects;
+        // AudioPolicyManager keeps mMutex, no need for lock on reference count here
+        int mRefCount = 0;
+        std::vector<sp<AudioEffect>> mEffects;
     };
 
     /**
@@ -215,12 +184,11 @@ private:
     class DeviceEffects {
     public:
         DeviceEffects(std::unique_ptr<EffectDescVector> effectDescriptors,
-                               audio_devices_t device, const std::string& address) :
+                               audio_devices_t device, std::string_view address) :
             mEffectDescriptors(std::move(effectDescriptors)),
             mDeviceType(device), mDeviceAddress(address) {}
-        /*virtual*/ ~DeviceEffects() = default;
 
-        std::vector< sp<AudioEffect> > mEffects;
+        std::vector<sp<AudioEffect>> mEffects;
         audio_devices_t getDeviceType() const { return mDeviceType; }
         std::string getDeviceAddress() const { return mDeviceAddress; }
         const std::unique_ptr<EffectDescVector> mEffectDescriptors;
@@ -231,65 +199,81 @@ private:
 
     };
 
-    static const char * const kInputSourceNames[AUDIO_SOURCE_CNT -1];
+    status_t loadAudioEffectConfig_ll(const sp<EffectsFactoryHalInterface>& effectsFactoryHal)
+            REQUIRES(mMutex, mDeviceEffectsMutex);
+
+    // Legacy: Begin methods below.
+    // Parse audio_effects.conf - called from constructor.
+    status_t loadAudioEffectConfigLegacy_l(const char* path) REQUIRES(mMutex);
+
+    // Legacy: Load all automatic effect configurations
+    status_t loadInputEffectConfigurations_l(cnode* root,
+            const EffectDescVector& effects) REQUIRES(mMutex);
+    status_t loadStreamEffectConfigurations_l(cnode* root,
+            const EffectDescVector& effects) REQUIRES(mMutex);
+
+    // Legacy: static methods below.
+
     static audio_source_t inputSourceNameToEnum(const char *name);
 
-    static const char *kStreamNames[AUDIO_STREAM_PUBLIC_CNT+1]; //+1 required as streams start from -1
-    audio_stream_type_t streamNameToEnum(const char *name);
-
-    // Parse audio_effects.conf
-    status_t loadAudioEffectConfigLegacy(const char *path);
-    status_t loadAudioEffectConfig(const sp<EffectsFactoryHalInterface>& effectsFactoryHal);
+    static audio_stream_type_t streamNameToEnum(const char* name);
 
     // Load all effects descriptors in configuration file
-    status_t loadEffects(cnode *root, Vector <EffectDesc *>& effects);
-    EffectDesc *loadEffect(cnode *root);
-
-    // Load all automatic effect configurations
-    status_t loadInputEffectConfigurations(cnode *root, const Vector <EffectDesc *>& effects);
-    status_t loadStreamEffectConfigurations(cnode *root, const Vector <EffectDesc *>& effects);
-    EffectDescVector *loadEffectConfig(cnode *root, const Vector <EffectDesc *>& effects);
+    static EffectDescVector loadEffects(cnode* root);
+    static std::shared_ptr<AudioPolicyEffects::EffectDesc> loadEffect(cnode* root);
+    static std::shared_ptr<EffectDescVector> loadEffectConfig(cnode* root,
+            const EffectDescVector& effects);
 
     // Load all automatic effect parameters
-    void loadEffectParameters(cnode *root, Vector <effect_param_t *>& params);
-    effect_param_t *loadEffectParameter(cnode *root);
-    size_t readParamValue(cnode *node,
+    static void loadEffectParameters(
+            cnode* root, std::vector<std::shared_ptr<const effect_param_t>>& params);
+
+    // loadEffectParameter returns a shared_ptr instead of a unique_ptr as there may
+    // be multiple references to the same effect parameter.
+    static std::shared_ptr<const effect_param_t> loadEffectParameter(cnode* root);
+    static size_t readParamValue(cnode* node,
                           char **param,
                           size_t *curSize,
                           size_t *totSize);
-    size_t growParamSize(char **param,
+    static size_t growParamSize(char** param,
                          size_t size,
                          size_t *curSize,
                          size_t *totSize);
 
+    // Legacy: End methods above.
+
+    // Note: The association of Effects to audio source, session, or stream
+    // is done through std::map instead of std::unordered_map.  This gives
+    // better reproducibility of issues, since map is ordered and more predictable
+    // in enumeration.
+
     // protects access to mInputSources, mInputSessions, mOutputStreams, mOutputSessions
-    // never hold AudioPolicyService::mLock when calling AudioPolicyEffects methods as
+    // never hold AudioPolicyService::mMutex when calling AudioPolicyEffects methods as
     // those can call back into AudioPolicyService methods and try to acquire the mutex
-    Mutex mLock;
+    mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kAudioPolicyEffects_Mutex};
     // Automatic input effects are configured per audio_source_t
-    KeyedVector< audio_source_t, EffectDescVector* > mInputSources;
-    // Automatic input effects are unique for audio_io_handle_t
-    KeyedVector< audio_session_t, EffectVector* > mInputSessions;
+    std::map<audio_source_t, std::shared_ptr<EffectDescVector>> mInputSources
+            GUARDED_BY(mMutex);
+    // Automatic input effects are unique for an audio_session_t.
+    std::map<audio_session_t, std::shared_ptr<EffectVector>> mInputSessions
+            GUARDED_BY(mMutex);
 
     // Automatic output effects are organized per audio_stream_type_t
-    KeyedVector< audio_stream_type_t, EffectDescVector* > mOutputStreams;
-    // Automatic output effects are unique for audiosession ID
-    KeyedVector< audio_session_t, EffectVector* > mOutputSessions;
+    std::map<audio_stream_type_t, std::shared_ptr<EffectDescVector>> mOutputStreams
+            GUARDED_BY(mMutex);
+    // Automatic output effects are unique for an audio_session_t.
+    std::map<audio_session_t, std::shared_ptr<EffectVector>> mOutputSessions
+            GUARDED_BY(mMutex);
 
     /**
      * @brief mDeviceEffects map of device effects indexed by the device address
      */
-    std::map<std::string, std::unique_ptr<DeviceEffects>> mDeviceEffects GUARDED_BY(mLock);
 
-    /**
-     * Device Effect initialization must be asynchronous: the audio_policy service parses and init
-     * effect on first reference. AudioFlinger will handle effect creation and register these
-     * effect on audio_policy service.
-     * We must store the reference of the furture garantee real asynchronous operation.
-     */
-    std::future<void> mDefaultDeviceEffectFuture;
+    // mDeviceEffects is never accessed through AudioPolicyEffects methods.
+    // We keep a separate mutex here to catch future methods attempting to access this variable.
+    std::mutex mDeviceEffectsMutex;
+    std::map<std::string, std::unique_ptr<DeviceEffects>> mDeviceEffects
+            GUARDED_BY(mDeviceEffectsMutex);
 };
 
 } // namespace android
-
-#endif // ANDROID_AUDIOPOLICYEFFECTS_H

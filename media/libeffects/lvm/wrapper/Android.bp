@@ -1,5 +1,6 @@
 // music bundle wrapper
 package {
+    default_team: "trendy_team_media_framework_audio",
     default_applicable_licenses: [
         "frameworks_av_media_libeffects_lvm_wrapper_license",
     ],
@@ -110,9 +111,7 @@ cc_library_shared {
     ],
     static_libs: ["libmusicbundle"],
     defaults: [
-        "aidlaudioservice_defaults",
-        "latest_android_hardware_audio_effect_ndk_shared",
-        "latest_android_media_audio_common_types_ndk_shared",
+        "aidlaudioeffectservice_defaults",
     ],
     local_include_dirs: ["Aidl"],
     header_libs: [
@@ -120,14 +119,18 @@ cc_library_shared {
         "libhardware_headers",
     ],
     shared_libs: [
+        "libaudio_aidl_conversion_common_ndk",
+        "libaudioutils",
         "liblog",
+        "libstagefright_foundation",
     ],
     cflags: [
         "-Wthread-safety",
+        "-DBACKEND_NDK",
     ],
     relative_install_path: "soundfx",
     visibility: [
-        "//hardware/interfaces/audio/aidl/default",
+        "//hardware/interfaces/audio/aidl/default:__subpackages__",
     ],
 }
 
@@ -140,9 +143,7 @@ cc_library_shared {
     ],
     static_libs: ["libreverb"],
     defaults: [
-        "aidlaudioservice_defaults",
-        "latest_android_hardware_audio_effect_ndk_shared",
-        "latest_android_media_audio_common_types_ndk_shared",
+        "aidlaudioeffectservice_defaults",
     ],
     local_include_dirs: ["Reverb/aidl"],
     header_libs: [
@@ -160,6 +161,6 @@ cc_library_shared {
     ],
     relative_install_path: "soundfx",
     visibility: [
-        "//hardware/interfaces/audio/aidl/default",
+        "//hardware/interfaces/audio/aidl/default:__subpackages__",
     ],
 }

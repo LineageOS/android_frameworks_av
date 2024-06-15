@@ -97,6 +97,7 @@ cc_defaults {
         "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "packagemanager_aidl-cpp",
+        "com.android.media.aaudio-aconfig-cc",
     ],
 
     static_libs: [

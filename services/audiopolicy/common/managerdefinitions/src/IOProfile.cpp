@@ -33,17 +33,17 @@ IOProfile::IOProfile(const std::string &name, audio_port_role_t role)
     }
 }
 
-bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
-                                    uint32_t samplingRate,
-                                    uint32_t *updatedSamplingRate,
-                                    audio_format_t format,
-                                    audio_format_t *updatedFormat,
-                                    audio_channel_mask_t channelMask,
-                                    audio_channel_mask_t *updatedChannelMask,
-                                    // FIXME type punning here
-                                    uint32_t flags,
-                                    bool exactMatchRequiredForInputFlags) const
-{
+IOProfile::CompatibilityScore IOProfile::getCompatibilityScore(
+        const android::DeviceVector &devices,
+        uint32_t samplingRate,
+        uint32_t *updatedSamplingRate,
+        audio_format_t format,
+        audio_format_t *updatedFormat,
+        audio_channel_mask_t channelMask,
+        audio_channel_mask_t *updatedChannelMask,
+        // FIXME type punning here
+        uint32_t flags,
+        bool exactMatchRequiredForInputFlags) const {
     const bool isPlaybackThread =
             getType() == AUDIO_PORT_TYPE_MIX && getRole() == AUDIO_PORT_ROLE_SOURCE;
     const bool isRecordThread =
@@ -51,13 +51,13 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
     ALOG_ASSERT(isPlaybackThread != isRecordThread);
     if (!areAllDevicesSupported(devices) ||
             !isCompatibleProfileForFlags(flags, exactMatchRequiredForInputFlags)) {
-        return false;
+        return NO_MATCH;
     }
 
     if (!audio_is_valid_format(format) ||
             (isPlaybackThread && (samplingRate == 0 || !audio_is_output_channel(channelMask))) ||
             (isRecordThread && (!audio_is_input_channel(channelMask)))) {
-         return false;
+         return NO_MATCH;
     }
 
     audio_format_t myUpdatedFormat = format;
@@ -69,32 +69,40 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
         .channel_mask = channelMask,
         .format = format,
     };
+    auto result = NO_MATCH;
     if (isRecordThread)
     {
         if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             if (checkExactAudioProfile(&config) != NO_ERROR) {
-                return false;
+                return result;
             }
-        } else if (checkExactAudioProfile(&config) != NO_ERROR && checkCompatibleAudioProfile(
-                myUpdatedSamplingRate, myUpdatedChannelMask, myUpdatedFormat) != NO_ERROR) {
-            return false;
+            result = EXACT_MATCH;
+        } else if (checkExactAudioProfile(&config) == NO_ERROR) {
+            result = EXACT_MATCH;
+        } else if (checkCompatibleAudioProfile(
+                myUpdatedSamplingRate, myUpdatedChannelMask, myUpdatedFormat) == NO_ERROR) {
+            result = PARTIAL_MATCH;
+        } else {
+            return result;
         }
     } else {
-        if (checkExactAudioProfile(&config) != NO_ERROR) {
-            return false;
+        if (checkExactAudioProfile(&config) == NO_ERROR) {
+            result = EXACT_MATCH;
+        } else {
+            return result;
         }
     }
 
-    if (updatedSamplingRate != NULL) {
+    if (updatedSamplingRate != nullptr) {
         *updatedSamplingRate = myUpdatedSamplingRate;
     }
-    if (updatedFormat != NULL) {
+    if (updatedFormat != nullptr) {
         *updatedFormat = myUpdatedFormat;
     }
-    if (updatedChannelMask != NULL) {
+    if (updatedChannelMask != nullptr) {
         *updatedChannelMask = myUpdatedChannelMask;
     }
-    return true;
+    return result;
 }
 
 bool IOProfile::areAllDevicesSupported(const DeviceVector &devices) const {
@@ -156,9 +164,9 @@ void IOProfile::toSupportedMixerAttributes(
         for (const auto sampleRate : profile->getSampleRates()) {
             for (const auto channelMask : profile->getChannels()) {
                 const audio_config_base_t config = {
-                        .format = profile->getFormat(),
                         .sample_rate = sampleRate,
-                        .channel_mask = channelMask
+                        .channel_mask = channelMask,
+                        .format = profile->getFormat(),
                 };
                 for (const auto mixerBehavior : mMixerBehaviors) {
                     mixerAttributes->push_back({

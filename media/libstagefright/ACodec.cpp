@@ -2188,7 +2188,7 @@ status_t ACodec::configureCodec(
                 int32_t colorFormat = OMX_COLOR_FormatUnused;
                 OMX_U32 flexibleEquivalent = OMX_COLOR_FormatUnused;
                 if (!outputFormat->findInt32("color-format", &colorFormat)) {
-                    ALOGE("ouptut port did not have a color format (wrong domain?)");
+                    ALOGE("output port did not have a color format (wrong domain?)");
                     return BAD_VALUE;
                 }
                 ALOGD("[%s] Requested output format %#x and got %#x.",

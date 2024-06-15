@@ -78,8 +78,9 @@ class DeviceHalInterface : public virtual RefBase
     virtual status_t getParameters(const String8& keys, String8 *values) = 0;
 
     // Returns audio input buffer size according to parameters passed.
-    virtual status_t getInputBufferSize(const struct audio_config *config,
-            size_t *size) = 0;
+    // If there is no possibility for the HAL to open an input with the provided
+    // parameters, the method will return BAD_VALUE and modify the provided `config`.
+    virtual status_t getInputBufferSize(struct audio_config *config, size_t *size) = 0;
 
     // Creates and opens the audio hardware output stream. The stream is closed
     // by releasing all references to the returned object.

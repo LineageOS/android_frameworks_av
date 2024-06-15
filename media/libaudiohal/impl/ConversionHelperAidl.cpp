@@ -37,10 +37,6 @@ status_t parseAndGetVendorParameters(
     using ParameterScope = IHalAdapterVendorExtension::ParameterScope;
     if (parameterKeys.size() == 0) return OK;
     const String8 rawKeys = parameterKeys.keysToString();
-    if (vendorExt == nullptr) {
-        ALOGW("%s: unknown parameters, ignored: \"%s\"", __func__, rawKeys.c_str());
-        return OK;
-    }
 
     std::vector<std::string> parameterIds;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(vendorExt->parseVendorParameterIds(
@@ -85,10 +81,6 @@ status_t parseAndSetVendorParameters(
     using ParameterScope = IHalAdapterVendorExtension::ParameterScope;
     if (parameters.size() == 0) return OK;
     const String8 rawKeysAndValues = parameters.toString();
-    if (vendorExt == nullptr) {
-        ALOGW("%s: unknown parameters, ignored: \"%s\"", __func__, rawKeysAndValues.c_str());
-        return OK;
-    }
 
     std::vector<VendorParameter> syncParameters, asyncParameters;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(vendorExt->parseVendorParameters(

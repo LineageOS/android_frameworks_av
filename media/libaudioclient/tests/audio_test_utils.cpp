@@ -565,12 +565,14 @@ status_t listAudioPorts(std::vector<audio_port_v7>& portsVec) {
     int attempts = 5;
     status_t status;
     unsigned int generation1, generation;
-    unsigned int numPorts = 0;
+    unsigned int numPorts;
     do {
         if (attempts-- < 0) {
             status = TIMED_OUT;
             break;
         }
+        // query for number of ports.
+        numPorts = 0;
         status = AudioSystem::listAudioPorts(AUDIO_PORT_ROLE_NONE, AUDIO_PORT_TYPE_NONE, &numPorts,
                                              nullptr, &generation1);
         if (status != NO_ERROR) {
@@ -622,12 +624,14 @@ status_t listAudioPatches(std::vector<struct audio_patch>& patchesVec) {
     int attempts = 5;
     status_t status;
     unsigned int generation1, generation;
-    unsigned int numPatches = 0;
+    unsigned int numPatches;
     do {
         if (attempts-- < 0) {
             status = TIMED_OUT;
             break;
         }
+        // query for number of patches.
+        numPatches = 0;
         status = AudioSystem::listAudioPatches(&numPatches, nullptr, &generation1);
         if (status != NO_ERROR) {
             ALOGE("AudioSystem::listAudioPatches returned error %d", status);

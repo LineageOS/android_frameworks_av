@@ -123,6 +123,10 @@ static void setLogLevel(int level) {
     android_atomic_write(level, &gLogLevel);
 }
 
+int32_t format_as(CameraService::StatusInternal s) {
+  return fmt::underlying(s);
+}
+
 // ----------------------------------------------------------------------------
 
 static const std::string sDumpPermission("android.permission.DUMP");
@@ -131,6 +135,8 @@ static const std::string sCameraPermission("android.permission.CAMERA");
 static const std::string sSystemCameraPermission("android.permission.SYSTEM_CAMERA");
 static const std::string sCameraHeadlessSystemUserPermission(
         "android.permission.CAMERA_HEADLESS_SYSTEM_USER");
+static const std::string sCameraPrivacyAllowlistPermission(
+        "android.permission.CAMERA_PRIVACY_ALLOWLIST");
 static const std::string
         sCameraSendSystemEventsPermission("android.permission.CAMERA_SEND_SYSTEM_EVENTS");
 static const std::string sCameraOpenCloseListenerPermission(
@@ -510,8 +516,8 @@ void CameraService::onDeviceStatusChanged(const std::string& cameraId,
     }
 
     if (newStatus == StatusInternal::NOT_PRESENT) {
-        logDeviceRemoved(cameraId, fmt::sprintf("Device status changed from %d to %d", oldStatus,
-                newStatus));
+        logDeviceRemoved(cameraId, fmt::format("Device status changed from {} to {}",
+                oldStatus, newStatus));
 
         // Set the device status to NOT_PRESENT, clients will no longer be able to connect
         // to this device until the status changes
@@ -537,8 +543,8 @@ void CameraService::onDeviceStatusChanged(const std::string& cameraId,
         removeStates(cameraId);
     } else {
         if (oldStatus == StatusInternal::NOT_PRESENT) {
-            logDeviceAdded(cameraId, fmt::sprintf("Device status changed from %d to %d", oldStatus,
-                    newStatus));
+            logDeviceAdded(cameraId, fmt::format("Device status changed from {} to {}",
+                    oldStatus, newStatus));
         }
         updateStatus(newStatus, cameraId);
     }
@@ -578,9 +584,9 @@ void CameraService::onDeviceStatusChanged(const std::string& id,
     if (updated) {
         std::string idCombo = id + " : " + physicalId;
         if (newStatus == StatusInternal::PRESENT) {
-            logDeviceAdded(idCombo, fmt::sprintf("Device status changed to %d", newStatus));
+            logDeviceAdded(idCombo, fmt::format("Device status changed to {}", newStatus));
         } else {
-            logDeviceRemoved(idCombo, fmt::sprintf("Device status changed to %d", newStatus));
+            logDeviceRemoved(idCombo, fmt::format("Device status changed to {}", newStatus));
         }
         // Avoid calling getSystemCameraKind() with mStatusListenerLock held (b/141756275)
         SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
@@ -816,6 +822,14 @@ bool CameraService::hasPermissionsForCameraHeadlessSystemUser(const std::string&
             std::string(), AppOpsManager::OP_NONE);
 }
 
+bool CameraService::hasPermissionsForCameraPrivacyAllowlist(int callingPid, int callingUid) const{
+    AttributionSourceState attributionSource{};
+    attributionSource.pid = callingPid;
+    attributionSource.uid = callingUid;
+    return checkPermission(std::string(), sCameraPrivacyAllowlistPermission, attributionSource,
+            std::string(), AppOpsManager::OP_NONE);
+}
+
 Status CameraService::getNumberOfCameras(int32_t type, int32_t* numCameras) {
     ATRACE_CALL();
     Mutex::Autolock l(mServiceLock);
@@ -902,13 +916,6 @@ Status CameraService::createDefaultRequest(const std::string& unresolvedCameraId
                 "request for system only device %s: ", cameraId.c_str());
     }
 
-    // Check for camera permissions
-    if (!hasCameraPermissions()) {
-        return STATUS_ERROR(ERROR_PERMISSION_DENIED,
-                "android.permission.CAMERA needed to call"
-                "createDefaultRequest");
-    }
-
     CameraMetadata metadata;
     status_t err = mCameraProviderManager->createDefaultRequest(cameraId, tempId, &metadata);
     if (err == OK) {
@@ -957,13 +964,6 @@ Status CameraService::isSessionConfigurationWithParametersSupported(
                 cameraId.c_str());
     }
 
-    // Check for camera permissions
-    if (!hasCameraPermissions()) {
-        return STATUS_ERROR(ERROR_PERMISSION_DENIED,
-                "android.permission.CAMERA needed to call"
-                "isSessionConfigurationWithParametersSupported");
-    }
-
     *supported = false;
     status_t ret = mCameraProviderManager->isSessionConfigurationSupported(cameraId.c_str(),
             sessionConfiguration, /*mOverrideForPerfClass*/false, /*checkSessionParams*/true,
@@ -988,6 +988,61 @@ Status CameraService::isSessionConfigurationWithParametersSupported(
                 ALOGE("%s: %s", __FUNCTION__, msg.c_str());
                 res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                         msg.c_str());
+            }
+    }
+
+    return res;
+}
+
+Status CameraService::getSessionCharacteristics(const std::string& unresolvedCameraId,
+                                                int targetSdkVersion, bool overrideToPortrait,
+                                                const SessionConfiguration& sessionConfiguration,
+                                                /*out*/ CameraMetadata* outMetadata) {
+    ATRACE_CALL();
+
+    if (!mInitialized) {
+        ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        logServiceError("Camera subsystem is not available", ERROR_DISCONNECTED);
+        return STATUS_ERROR(ERROR_DISCONNECTED, "Camera subsystem is not available");
+    }
+
+    const std::string cameraId =
+            resolveCameraId(unresolvedCameraId, CameraThreadState::getCallingUid());
+
+    if (outMetadata == nullptr) {
+        std::string msg =
+                fmt::sprintf("Camera %s: Invalid 'outMetadata' input!", unresolvedCameraId.c_str());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+
+    bool overrideForPerfClass = SessionConfigurationUtils::targetPerfClassPrimaryCamera(
+            mPerfClassPrimaryCameraIds, cameraId, targetSdkVersion);
+
+    status_t ret = mCameraProviderManager->getSessionCharacteristics(
+            cameraId, sessionConfiguration, overrideForPerfClass, overrideToPortrait, outMetadata);
+
+    // TODO(b/303645857): Remove fingerprintable metadata if the caller process does not have
+    //                    camera access permission.
+
+    Status res = Status::ok();
+    switch (ret) {
+        case OK:
+            // Expected, no handling needed.
+            break;
+        case INVALID_OPERATION: {
+                std::string msg = fmt::sprintf(
+                        "Camera %s: Session characteristics query not supported!",
+                        cameraId.c_str());
+                ALOGD("%s: %s", __FUNCTION__, msg.c_str());
+                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.c_str());
+            }
+            break;
+        default: {
+                std::string msg = fmt::sprintf("Camera %s: Error: %s (%d)", cameraId.c_str(),
+                                               strerror(-ret), ret);
+                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+                res = STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
             }
     }
 
@@ -2341,6 +2396,39 @@ Status CameraService::connectDevice(
     return ret;
 }
 
+bool CameraService::isCameraPrivacyEnabled(const String16& packageName, const std::string& cam_id,
+        int callingPid, int callingUid) {
+    if (!isAutomotiveDevice()) {
+        return mSensorPrivacyPolicy->isCameraPrivacyEnabled();
+    }
+
+    // Automotive privileged client AID_AUTOMOTIVE_EVS using exterior system camera for
+    // safety-critical use cases cannot be disabled and are exempt from camera privacy policy.
+    if ((isAutomotivePrivilegedClient(callingUid) && isAutomotiveExteriorSystemCamera(cam_id))) {
+        ALOGI("Camera privacy cannot be enabled for automotive privileged client %d "
+                "using camera %s", callingUid, cam_id.c_str());
+        return false;
+    }
+
+    if (mSensorPrivacyPolicy->isCameraPrivacyEnabled(packageName)) {
+        return true;
+    } else if (mSensorPrivacyPolicy->getCameraPrivacyState() == SensorPrivacyManager::DISABLED) {
+        return false;
+    } else if ((mSensorPrivacyPolicy->getCameraPrivacyState()
+            == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_HELPFUL_APPS) ||
+            (mSensorPrivacyPolicy->getCameraPrivacyState()
+            == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_REQUIRED_APPS) ||
+            (mSensorPrivacyPolicy->getCameraPrivacyState() ==
+            SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_APPS)) {
+        if (hasPermissionsForCameraPrivacyAllowlist(callingPid, callingUid)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string CameraService::getPackageNameFromUid(int clientUid) {
     std::string packageName("");
 
@@ -2552,73 +2640,100 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
         // Enable/disable camera service watchdog
         client->setCameraServiceWatchdog(mCameraServiceWatchdogEnabled);
 
-        // Set rotate-and-crop override behavior
-        if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
-            client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
-        } else if (overrideToPortrait && portraitRotation != 0) {
-            uint8_t rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
-            switch (portraitRotation) {
-                case 90:
-                    rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
-                    break;
-                case 180:
-                    rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_180;
-                    break;
-                case 270:
-                    rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_270;
-                    break;
-                default:
-                    ALOGE("Unexpected portrait rotation: %d", portraitRotation);
-                    break;
+        CameraMetadata chars;
+        bool rotateAndCropSupported = true;
+        err = mCameraProviderManager->getCameraCharacteristics(cameraId, overrideForPerfClass,
+                &chars, overrideToPortrait);
+        if (err == OK) {
+            auto availableRotateCropEntry = chars.find(
+                    ANDROID_SCALER_AVAILABLE_ROTATE_AND_CROP_MODES);
+            if (availableRotateCropEntry.count <= 1) {
+                rotateAndCropSupported = false;
             }
-            client->setRotateAndCropOverride(rotateAndCropMode);
         } else {
-            client->setRotateAndCropOverride(
-                mCameraServiceProxyWrapper->getRotateAndCropOverride(
-                    clientPackageName, facing, multiuser_get_user_id(clientUid)));
+            ALOGE("%s: Unable to query static metadata for camera %s: %s (%d)", __FUNCTION__,
+                    cameraId.c_str(), strerror(-err), err);
         }
 
-        // Set autoframing override behaviour
-        if (mOverrideAutoframingMode != ANDROID_CONTROL_AUTOFRAMING_AUTO) {
-            client->setAutoframingOverride(mOverrideAutoframingMode);
-        } else {
-            client->setAutoframingOverride(
-                mCameraServiceProxyWrapper->getAutoframingOverride(
-                    clientPackageName));
+        if (rotateAndCropSupported) {
+            // Set rotate-and-crop override behavior
+            if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
+                client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
+            } else if (overrideToPortrait && portraitRotation != 0) {
+                uint8_t rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
+                switch (portraitRotation) {
+                    case 90:
+                        rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
+                        break;
+                    case 180:
+                        rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_180;
+                        break;
+                    case 270:
+                        rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_270;
+                        break;
+                    default:
+                        ALOGE("Unexpected portrait rotation: %d", portraitRotation);
+                        break;
+                }
+                client->setRotateAndCropOverride(rotateAndCropMode);
+            } else {
+                client->setRotateAndCropOverride(
+                    mCameraServiceProxyWrapper->getRotateAndCropOverride(
+                        clientPackageName, facing, multiuser_get_user_id(clientUid)));
+            }
         }
 
-        // Automotive privileged client AID_AUTOMOTIVE_EVS using exterior system camera for use
-        // cases such as rear view and surround view cannot be disabled and are exempt from camera
-        // privacy policy.
-        if ((!isAutomotivePrivilegedClient(packageUid) ||
-                !isAutomotiveExteriorSystemCamera(cameraId))) {
+        bool autoframingSupported = true;
+        auto availableAutoframingEntry = chars.find(ANDROID_CONTROL_AUTOFRAMING_AVAILABLE);
+        if ((availableAutoframingEntry.count == 1) && (availableAutoframingEntry.data.u8[0] ==
+                    ANDROID_CONTROL_AUTOFRAMING_AVAILABLE_FALSE)) {
+            autoframingSupported = false;
+        }
+
+        if (autoframingSupported) {
+            // Set autoframing override behaviour
+            if (mOverrideAutoframingMode != ANDROID_CONTROL_AUTOFRAMING_AUTO) {
+                client->setAutoframingOverride(mOverrideAutoframingMode);
+            } else {
+                client->setAutoframingOverride(
+                    mCameraServiceProxyWrapper->getAutoframingOverride(
+                        clientPackageName));
+            }
+        }
+
+        bool isCameraPrivacyEnabled;
+        if (flags::camera_privacy_allowlist()) {
             // Set camera muting behavior.
-            bool isCameraPrivacyEnabled =
+            isCameraPrivacyEnabled = this->isCameraPrivacyEnabled(
+                    toString16(client->getPackageName()), cameraId, packagePid, packageUid);
+        } else {
+            isCameraPrivacyEnabled =
                     mSensorPrivacyPolicy->isCameraPrivacyEnabled();
-            if (client->supportsCameraMute()) {
-                client->setCameraMute(
-                        mOverrideCameraMuteMode || isCameraPrivacyEnabled);
-            } else if (isCameraPrivacyEnabled) {
-                // no camera mute supported, but privacy is on! => disconnect
-                ALOGI("Camera mute not supported for package: %s, camera id: %s",
-                        client->getPackageName().c_str(), cameraId.c_str());
-                // Do not hold mServiceLock while disconnecting clients, but
-                // retain the condition blocking other clients from connecting
-                // in mServiceLockWrapper if held.
-                mServiceLock.unlock();
-                // Clear caller identity temporarily so client disconnect PID
-                // checks work correctly
-                int64_t token = CameraThreadState::clearCallingIdentity();
-                // Note AppOp to trigger the "Unblock" dialog
-                client->noteAppOp();
-                client->disconnect();
-                CameraThreadState::restoreCallingIdentity(token);
-                // Reacquire mServiceLock
-                mServiceLock.lock();
+        }
 
-                return STATUS_ERROR_FMT(ERROR_DISABLED,
-                        "Camera \"%s\" disabled due to camera mute", cameraId.c_str());
-            }
+        if (client->supportsCameraMute()) {
+            client->setCameraMute(
+                    mOverrideCameraMuteMode || isCameraPrivacyEnabled);
+        } else if (isCameraPrivacyEnabled) {
+            // no camera mute supported, but privacy is on! => disconnect
+            ALOGI("Camera mute not supported for package: %s, camera id: %s",
+                    client->getPackageName().c_str(), cameraId.c_str());
+            // Do not hold mServiceLock while disconnecting clients, but
+            // retain the condition blocking other clients from connecting
+            // in mServiceLockWrapper if held.
+            mServiceLock.unlock();
+            // Clear caller identity temporarily so client disconnect PID
+            // checks work correctly
+            int64_t token = CameraThreadState::clearCallingIdentity();
+            // Note AppOp to trigger the "Unblock" dialog
+            client->noteAppOp();
+            client->disconnect();
+            CameraThreadState::restoreCallingIdentity(token);
+            // Reacquire mServiceLock
+            mServiceLock.lock();
+
+            return STATUS_ERROR_FMT(ERROR_DISABLED,
+                    "Camera \"%s\" disabled due to camera mute", cameraId.c_str());
         }
 
         if (shimUpdateOnly) {
@@ -4139,8 +4254,15 @@ status_t CameraService::BasicClient::handleAppOpMode(int32_t mode) {
         // return MODE_IGNORED. Do not treat such case as error.
         bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid,
                 mClientPackageName);
-        bool isCameraPrivacyEnabled =
+
+        bool isCameraPrivacyEnabled;
+        if (flags::camera_privacy_allowlist()) {
+            isCameraPrivacyEnabled = sCameraService->isCameraPrivacyEnabled(
+                    toString16(mClientPackageName), std::string(), mClientPid, mClientUid);
+        } else {
+            isCameraPrivacyEnabled =
                 sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled();
+        }
         // We don't want to return EACCESS if the CameraPrivacy is enabled.
         // We prefer to successfully open the camera and perform camera muting
         // or blocking in connectHelper as handleAppOpMode can be called before the
@@ -4166,8 +4288,15 @@ status_t CameraService::BasicClient::startCameraOps() {
     if (mAppOpsManager != nullptr) {
         // Notify app ops that the camera is not available
         mOpsCallback = new OpsCallback(this);
-        mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
+
+        if (flags::watch_foreground_changes()) {
+            mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
+                toString16(mClientPackageName),
+                AppOpsManager::WATCH_FOREGROUND_CHANGES, mOpsCallback);
+        } else {
+            mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
                 toString16(mClientPackageName), mOpsCallback);
+        }
 
         // Just check for camera acccess here on open - delay startOp until
         // camera frames start streaming in startCameraStreamingOps
@@ -4327,20 +4456,42 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
         block();
     } else if (res == AppOpsManager::MODE_IGNORED) {
         bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid, mClientPackageName);
-        bool isCameraPrivacyEnabled =
+
+        // Uid may be active, but not visible to the user (e.g. PROCESS_STATE_FOREGROUND_SERVICE).
+        // If not visible, but still active, then we want to block instead of muting the camera.
+        int32_t procState = sCameraService->mUidPolicy->getProcState(mClientUid);
+        bool isUidVisible = (procState <= ActivityManager::PROCESS_STATE_BOUND_TOP);
+
+        bool isCameraPrivacyEnabled;
+        if (flags::camera_privacy_allowlist()) {
+            isCameraPrivacyEnabled = sCameraService->isCameraPrivacyEnabled(
+                    toString16(mClientPackageName),std::string(),mClientPid,mClientUid);
+        } else {
+            isCameraPrivacyEnabled =
                 sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled();
-        ALOGI("Camera %s: Access for \"%s\" has been restricted, isUidTrusted %d, isUidActive %d",
-                mCameraIdStr.c_str(), mClientPackageName.c_str(),
-                mUidIsTrusted, isUidActive);
-        // If the calling Uid is trusted (a native service), or the client Uid is active (WAR for
-        // b/175320666), the AppOpsManager could return MODE_IGNORED. Do not treat such cases as
-        // error.
+        }
+
+        ALOGI("Camera %s: Access for \"%s\" has been restricted, isUidTrusted %d, isUidActive %d"
+                " isUidVisible %d, isCameraPrivacyEnabled %d", mCameraIdStr.c_str(),
+                mClientPackageName.c_str(), mUidIsTrusted, isUidActive, isUidVisible,
+                isCameraPrivacyEnabled);
+        // If the calling Uid is trusted (a native service), or the client Uid is active / visible
+        // (WAR for b/175320666)the AppOpsManager could return MODE_IGNORED. Do not treat such
+        // cases as error.
         if (!mUidIsTrusted) {
-            if (isUidActive && isCameraPrivacyEnabled && supportsCameraMute()) {
-                setCameraMute(true);
-            } else if (!isUidActive
-                || (isCameraPrivacyEnabled && !supportsCameraMute())) {
-                block();
+            if (flags::watch_foreground_changes()) {
+                if (isUidVisible && isCameraPrivacyEnabled && supportsCameraMute()) {
+                    setCameraMute(true);
+                } else {
+                    block();
+                }
+            } else {
+                if (isUidActive && isCameraPrivacyEnabled && supportsCameraMute()) {
+                    setCameraMute(true);
+                } else if (!isUidActive
+                    || (isCameraPrivacyEnabled && !supportsCameraMute())) {
+                    block();
+                }
             }
         }
     } else if (res == AppOpsManager::MODE_ALLOWED) {
@@ -4711,7 +4862,15 @@ void CameraService::SensorPrivacyPolicy::registerWithSensorPrivacyManager()
     }
     hasCameraPrivacyFeature(); // Called so the result is cached
     mSpm.addSensorPrivacyListener(this);
+    if (isAutomotiveDevice()) {
+        mSpm.addToggleSensorPrivacyListener(this);
+    }
     mSensorPrivacyEnabled = mSpm.isSensorPrivacyEnabled();
+    if (flags::camera_privacy_allowlist()) {
+        mCameraPrivacyState = mSpm.getToggleSensorPrivacyState(
+                SensorPrivacyManager::TOGGLE_TYPE_SOFTWARE,
+                SensorPrivacyManager::TOGGLE_SENSOR_CAMERA);
+    }
     status_t res = mSpm.linkToDeath(this);
     if (res == OK) {
         mRegistered = true;
@@ -4743,6 +4902,9 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
 void CameraService::SensorPrivacyPolicy::unregisterSelf() {
     Mutex::Autolock _l(mSensorPrivacyLock);
     mSpm.removeSensorPrivacyListener(this);
+    if (isAutomotiveDevice()) {
+        mSpm.removeToggleSensorPrivacyListener(this);
+    }
     mSpm.unlinkToDeath(this);
     mRegistered = false;
     ALOGV("SensorPrivacyPolicy: Unregistered with SensorPrivacyManager");
@@ -4757,6 +4919,15 @@ bool CameraService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
     return mSensorPrivacyEnabled;
 }
 
+int CameraService::SensorPrivacyPolicy::getCameraPrivacyState() {
+    if (!mRegistered) {
+        registerWithSensorPrivacyManager();
+    }
+
+    Mutex::Autolock _l(mSensorPrivacyLock);
+    return mCameraPrivacyState;
+}
+
 bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled() {
     if (!hasCameraPrivacyFeature()) {
         return false;
@@ -4764,18 +4935,53 @@ bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled() {
     return mSpm.isToggleSensorPrivacyEnabled(SensorPrivacyManager::TOGGLE_SENSOR_CAMERA);
 }
 
+bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled(const String16& packageName) {
+    if (!hasCameraPrivacyFeature()) {
+        return SensorPrivacyManager::DISABLED;
+    }
+    return mSpm.isCameraPrivacyEnabled(packageName);
+}
+
 binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyChanged(
-    int toggleType __unused, int sensor __unused, bool enabled) {
+    int toggleType, int sensor, bool enabled) {
+    if ((toggleType == SensorPrivacyManager::TOGGLE_TYPE_UNKNOWN)
+            && (sensor == SensorPrivacyManager::TOGGLE_SENSOR_UNKNOWN)) {
+        {
+            Mutex::Autolock _l(mSensorPrivacyLock);
+            mSensorPrivacyEnabled = enabled;
+        }
+        // if sensor privacy is enabled then block all clients from accessing the camera
+        if (enabled) {
+            sp<CameraService> service = mService.promote();
+            if (service != nullptr) {
+                service->blockAllClients();
+            }
+        }
+    }
+    return binder::Status::ok();
+}
+
+binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyStateChanged(
+    int, int sensor, int state) {
+    if (!flags::camera_privacy_allowlist()
+            || (sensor != SensorPrivacyManager::TOGGLE_SENSOR_CAMERA)) {
+        return binder::Status::ok();
+    }
     {
         Mutex::Autolock _l(mSensorPrivacyLock);
-        mSensorPrivacyEnabled = enabled;
+        mCameraPrivacyState = state;
+    }
+    sp<CameraService> service = mService.promote();
+    if (!service) {
+        return binder::Status::ok();
     }
     // if sensor privacy is enabled then block all clients from accessing the camera
-    if (enabled) {
-        sp<CameraService> service = mService.promote();
-        if (service != nullptr) {
-            service->blockAllClients();
-        }
+    if (state == SensorPrivacyManager::ENABLED) {
+        service->blockAllClients();
+    } else if ((state == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_APPS)
+            || (state == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_HELPFUL_APPS)
+            || (state == SensorPrivacyManager::AUTOMOTIVE_DRIVER_ASSISTANCE_REQUIRED_APPS)) {
+        service->blockPrivacyEnabledClients();
     }
     return binder::Status::ok();
 }
@@ -5453,8 +5659,7 @@ void CameraService::updateStatus(StatusInternal status, const std::string& camer
             for (auto& listener : mListenerList) {
                 bool isVendorListener = listener->isVendorListener();
                 if (shouldSkipStatusUpdates(deviceKind, isVendorListener,
-                        listener->getListenerPid(), listener->getListenerUid()) ||
-                        isVendorListener) {
+                        listener->getListenerPid(), listener->getListenerUid())) {
                     ALOGV("Skipping discovery callback for system-only camera device %s",
                             cameraId.c_str());
                     continue;
@@ -5643,6 +5848,23 @@ void CameraService::blockAllClients() {
             if (basicClient.get() != nullptr) {
                 basicClient->block();
             }
+        }
+    }
+}
+
+void CameraService::blockPrivacyEnabledClients() {
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                std::string pkgName = basicClient->getPackageName();
+                bool cameraPrivacyEnabled =
+                        mSensorPrivacyPolicy->isCameraPrivacyEnabled(toString16(pkgName));
+                if (cameraPrivacyEnabled) {
+                    basicClient->block();
+                }
+           }
         }
     }
 }

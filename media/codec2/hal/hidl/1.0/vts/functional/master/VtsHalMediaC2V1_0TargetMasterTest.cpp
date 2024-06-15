@@ -18,6 +18,7 @@
 #define LOG_TAG "codec2_hidl_hal_master_test"
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 #include <hidl/ServiceManagement.h>
@@ -80,6 +81,17 @@ TEST_P(Codec2MasterHalTest, ListComponents) {
                     << "Create component failed for " << listTraits[i].name.c_str();
         }
     }
+}
+
+TEST_P(Codec2MasterHalTest, MustUseAidlBeyond202404) {
+    static int sVendorApiLevel = android::base::GetIntProperty("ro.vendor.api_level", 0);
+    if (sVendorApiLevel < 202404) {
+        GTEST_SKIP() << "vendor api level less than 202404: " << sVendorApiLevel;
+    }
+    ALOGV("MustUseAidlBeyond202404 Test");
+
+    EXPECT_NE(mClient->getAidlBase(), nullptr) << "android.hardware.media.c2 MUST use AIDL "
+                                               << "for chipsets launching at 202404 or above";
 }
 
 }  // anonymous namespace

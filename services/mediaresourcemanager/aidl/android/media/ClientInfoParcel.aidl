@@ -41,4 +41,11 @@ parcelable ClientInfoParcel {
      * Name of the resource associated with the client.
      */
     @utf8InCpp String name;
+
+    /*
+     * Client importance, which ranges from 0 to int_max.
+     * The default importance is high (0)
+     * Based on the reclaim policy, this could be used during reclaim.
+     */
+    int importance = 0;
 }

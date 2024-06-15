@@ -185,11 +185,11 @@ LIBMEDIANDK {
     AMediaCodecCryptoInfo_setPattern; # introduced=24
     AMediaCodec_configure;
     AMediaCodec_createCodecByName;
-    AMediaCodec_createCodecByNameForClient; # systemapi # introduced=31
+    AMediaCodec_createCodecByNameForClient; # systemapi introduced=31
     AMediaCodec_createDecoderByType;
-    AMediaCodec_createDecoderByTypeForClient; # systemapi # introduced=31
+    AMediaCodec_createDecoderByTypeForClient; # systemapi introduced=31
     AMediaCodec_createEncoderByType;
-    AMediaCodec_createEncoderByTypeForClient; # systemapi # introduced=31
+    AMediaCodec_createEncoderByTypeForClient; # systemapi introduced=31
     AMediaCodec_delete;
     AMediaCodec_dequeueInputBuffer;
     AMediaCodec_dequeueOutputBuffer;

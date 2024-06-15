@@ -1,4 +1,5 @@
 package: "com.android.internal.camera.flags"
+container: "system"
 
 flag {
      namespace: "camera_platform"
@@ -19,6 +20,13 @@ flag {
      name: "feature_combination_query"
      description: "Query feature combination support and session specific characteristics"
      bug: "309627704"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "watch_foreground_changes"
+     description: "Request AppOps to notify changes in the foreground status of the client"
+     bug: "290086710"
 }
 
 flag {
@@ -75,4 +83,53 @@ flag {
      name: "multiresolution_imagereader_usage_config"
      description: "Enable creating MultiResolutionImageReader with usage flag configuration"
      bug: "301588215"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "use_ro_board_api_level_for_vndk_version"
+     description: "Enable using ro.board.api_level instead of ro.vndk.version to get VNDK version"
+     bug: "312315580"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_extensions_characteristics_get"
+     description: "Enable get extension specific camera characteristics API"
+     bug: "280649914"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "delay_lazy_hal_instantiation"
+     description: "Only trigger lazy HAL instantiation when the HAL is needed for an operation."
+     bug: "319735068"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "return_buffers_outside_locks"
+     description: "Enable returning graphics buffers to buffer queues without holding the in-flight mutex"
+     bug: "315526878"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_device_setup"
+     description: "Create an intermediate Camera Device class for limited CameraDevice access."
+     bug: "320741775"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "camera_privacy_allowlist"
+     description: "Allowlisting to exempt safety-relevant cameras from privacy control for automotive devices"
+     bug: "282814430"
+}
+
+flag {
+     namespace: "camera_platform"
+     name: "extension_10_bit"
+     description: "Enables 10-bit support in the camera extensions."
+     bug: "316375635"
 }

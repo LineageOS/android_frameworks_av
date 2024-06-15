@@ -18,6 +18,7 @@
 
 #include <android-base/thread_annotations.h>
 #include <audio_effects/effect_dynamicsprocessing.h>
+#include <system/audio_effects/effect_visualizer.h>
 
 #include "effect-impl/EffectContext.h"
 
@@ -25,8 +26,11 @@ namespace aidl::android::hardware::audio::effect {
 
 class VisualizerContext final : public EffectContext {
   public:
-    static const uint32_t kMaxCaptureBufSize = 65536;
-    static const uint32_t kMaxLatencyMs = 3000;  // 3 seconds of latency for audio pipeline
+    // need align the min/max capture size to VISUALIZER_CAPTURE_SIZE_MIN and
+    // VISUALIZER_CAPTURE_SIZE_MAX because of limitation in audio_utils fixedfft.
+    static constexpr int32_t kMinCaptureBufSize = VISUALIZER_CAPTURE_SIZE_MIN;
+    static constexpr int32_t kMaxCaptureBufSize = VISUALIZER_CAPTURE_SIZE_MAX;
+    static constexpr uint32_t kMaxLatencyMs = 3000;  // 3 seconds of latency for audio pipeline
 
     VisualizerContext(int statusDepth, const Parameter::Common& common);
     ~VisualizerContext();
@@ -38,8 +42,8 @@ class VisualizerContext final : public EffectContext {
     // keep all parameters and reset buffer.
     void reset();
 
-    RetCode setCaptureSamples(int captureSize);
-    int getCaptureSamples();
+    RetCode setCaptureSamples(int32_t captureSize);
+    int32_t getCaptureSamples();
     RetCode setMeasurementMode(Visualizer::MeasurementMode mode);
     Visualizer::MeasurementMode getMeasurementMode();
     RetCode setScalingMode(Visualizer::ScalingMode mode);
@@ -86,7 +90,7 @@ class VisualizerContext final : public EffectContext {
     // capture buf with 8 bits mono PCM samples
     std::array<uint8_t, kMaxCaptureBufSize> mCaptureBuf GUARDED_BY(mMutex);
     uint32_t mDownstreamLatency GUARDED_BY(mMutex) = 0;
-    uint32_t mCaptureSamples GUARDED_BY(mMutex) = kMaxCaptureBufSize;
+    int32_t mCaptureSamples GUARDED_BY(mMutex) = kMaxCaptureBufSize;
 
     // to avoid recomputing it every time a buffer is processed
     uint8_t mChannelCount GUARDED_BY(mMutex) = 0;

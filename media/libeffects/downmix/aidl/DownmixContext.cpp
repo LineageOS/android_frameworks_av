@@ -20,11 +20,59 @@
 
 #include "DownmixContext.h"
 
-using aidl::android::hardware::audio::effect::IEffect;
 using aidl::android::hardware::audio::common::getChannelCount;
+using aidl::android::hardware::audio::effect::IEffect;
 using aidl::android::media::audio::common::AudioChannelLayout;
+using aidl::android::media::audio::common::AudioConfig;
 
 namespace aidl::android::hardware::audio::effect {
+
+namespace {
+
+inline bool isChannelMaskValid(const AudioChannelLayout& channelMask) {
+    if (channelMask.getTag() != AudioChannelLayout::layoutMask) return false;
+    int chMask = channelMask.get<AudioChannelLayout::layoutMask>();
+    // check against unsupported channels (up to FCC_26)
+    constexpr uint32_t MAXIMUM_CHANNEL_MASK = AudioChannelLayout::LAYOUT_22POINT2 |
+                                              AudioChannelLayout::CHANNEL_FRONT_WIDE_LEFT |
+                                              AudioChannelLayout::CHANNEL_FRONT_WIDE_RIGHT;
+    if (chMask & ~MAXIMUM_CHANNEL_MASK) {
+        LOG(ERROR) << "Unsupported channels in " << (chMask & ~MAXIMUM_CHANNEL_MASK);
+        return false;
+    }
+    return true;
+}
+
+inline bool isStereoChannelMask(const AudioChannelLayout& channelMask) {
+    if (channelMask.getTag() != AudioChannelLayout::layoutMask) return false;
+
+    return channelMask.get<AudioChannelLayout::layoutMask>() == AudioChannelLayout::LAYOUT_STEREO;
+}
+
+}  // namespace
+
+bool DownmixContext::validateCommonConfig(const Parameter::Common& common) {
+    const AudioConfig& input = common.input;
+    const AudioConfig& output = common.output;
+    if (input.base.sampleRate != output.base.sampleRate) {
+        LOG(ERROR) << __func__ << ": SRC not supported, input: " << input.toString()
+                   << " output: " << output.toString();
+        return false;
+    }
+
+    if (!isStereoChannelMask(output.base.channelMask)) {
+        LOG(ERROR) << __func__ << ": output should be stereo, not "
+                   << output.base.channelMask.toString();
+        return false;
+    }
+
+    if (!isChannelMaskValid(input.base.channelMask)) {
+        LOG(ERROR) << __func__ << ": invalid input channel, " << input.base.channelMask.toString();
+        return false;
+    }
+
+    return true;
+}
 
 DownmixContext::DownmixContext(int statusDepth, const Parameter::Common& common)
     : EffectContext(statusDepth, common) {
@@ -62,8 +110,7 @@ void DownmixContext::reset() {
     resetBuffer();
 }
 
-IEffect::Status DownmixContext::lvmProcess(float* in, float* out, int samples) {
-    LOG(DEBUG) << __func__ << " in " << in << " out " << out << " sample " << samples;
+IEffect::Status DownmixContext::downmixProcess(float* in, float* out, int samples) {
     IEffect::Status status = {EX_ILLEGAL_ARGUMENT, 0, 0};
 
     if (in == nullptr || out == nullptr ||
@@ -84,7 +131,6 @@ IEffect::Status DownmixContext::lvmProcess(float* in, float* out, int samples) {
     bool accumulate = false;
     int frames = samples * sizeof(float) / getInputFrameSize();
     if (mType == Downmix::Type::STRIP) {
-        int inputChannelCount = getChannelCount(mChMask);
         while (frames) {
             if (accumulate) {
                 out[0] = std::clamp(out[0] + in[0], -1.f, 1.f);
@@ -93,7 +139,7 @@ IEffect::Status DownmixContext::lvmProcess(float* in, float* out, int samples) {
                 out[0] = in[0];
                 out[1] = in[1];
             }
-            in += inputChannelCount;
+            in += mInputChannelCount;
             out += 2;
             frames--;
         }
@@ -105,8 +151,11 @@ IEffect::Status DownmixContext::lvmProcess(float* in, float* out, int samples) {
             return status;
         }
     }
-    LOG(DEBUG) << __func__ << " done processing";
-    return {STATUS_OK, samples, samples};
+    int producedSamples = (samples / mInputChannelCount) << 1;
+    LOG(DEBUG) << __func__ << " done processing " << samples << " samples, generated "
+               << producedSamples << " frameSize: " << getInputFrameSize() << " - "
+               << getOutputFrameSize();
+    return {STATUS_OK, samples, producedSamples};
 }
 
 void DownmixContext::init_params(const Parameter::Common& common) {
@@ -120,20 +169,6 @@ void DownmixContext::init_params(const Parameter::Common& common) {
         mChMask = channelMask;
         mState = DOWNMIX_STATE_INITIALIZED;
     }
-}
-
-bool DownmixContext::isChannelMaskValid(AudioChannelLayout channelMask) {
-    if (channelMask.getTag() != AudioChannelLayout::layoutMask) return false;
-    int chMask = channelMask.get<AudioChannelLayout::layoutMask>();
-    // check against unsupported channels (up to FCC_26)
-    constexpr uint32_t MAXIMUM_CHANNEL_MASK = AudioChannelLayout::LAYOUT_22POINT2 |
-                                              AudioChannelLayout::CHANNEL_FRONT_WIDE_LEFT |
-                                              AudioChannelLayout::CHANNEL_FRONT_WIDE_RIGHT;
-    if (chMask & ~MAXIMUM_CHANNEL_MASK) {
-        LOG(ERROR) << "Unsupported channels in " << (chMask & ~MAXIMUM_CHANNEL_MASK);
-        return false;
-    }
-    return true;
 }
 
 }  // namespace aidl::android::hardware::audio::effect

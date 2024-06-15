@@ -66,7 +66,6 @@ using ::aidl::android::frameworks::cameraservice::device::SubmitInfo;
 using ::aidl::android::frameworks::cameraservice::service::CameraStatusAndId;
 using ::aidl::android::hardware::common::fmq::SynchronizedReadWrite;
 using ::android::AidlMessageQueue;
-using ::android::acam::utils::native_handle_ptr_wrapper;
 
 
 using ResultMetadataQueue = AidlMessageQueue<int8_t, SynchronizedReadWrite>;
@@ -197,7 +196,7 @@ class CameraDevice final : public std::enable_shared_from_this<CameraDevice> {
 
     camera_status_t updateOutputConfigurationLocked(ACaptureSessionOutput *output);
 
-    camera_status_t prepareLocked(ACameraWindowType *window);
+    camera_status_t prepareLocked(ANativeWindow *window);
 
     // Since this writes to ICameraDeviceUser's fmq, clients must take care that:
     //   a) This function is called serially.
@@ -236,7 +235,7 @@ class CameraDevice final : public std::enable_shared_from_this<CameraDevice> {
 
     // stream id -> pair of (ACameraWindowType* from application, OutputConfiguration used for
     // camera service)
-    std::map<int, std::pair<native_handle_ptr_wrapper, OutputConfiguration>> mConfiguredOutputs;
+    std::map<int, std::pair<ANativeWindow *, OutputConfiguration>> mConfiguredOutputs;
 
     // TODO: maybe a bool will suffice for synchronous implementation?
     std::atomic_bool mClosing;

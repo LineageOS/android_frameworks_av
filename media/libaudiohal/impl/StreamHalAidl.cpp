@@ -234,7 +234,9 @@ status_t StreamHalAidl::dump(int fd, const Vector<String16>& args) {
     ALOGD("%p %s::%s", this, getClassName().c_str(), __func__);
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return mStream->dump(fd, Args(args).args(), args.size());
+    status_t status = mStream->dump(fd, Args(args).args(), args.size());
+    mStreamPowerLog.dump(fd);
+    return status;
 }
 
 status_t StreamHalAidl::start() {
@@ -786,7 +788,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
     if (VALUE_OR_RETURN_STATUS(filterOutAndProcessParameter<int>(
                 parameters, String8(AudioParameter::keyOffloadCodecAverageBitRate),
                 [&](int value) {
-                    return value > 0 ?
+                    return value >= 0 ?
                             mOffloadMetadata.averageBitRatePerSecond = value, OK : BAD_VALUE;
                 }))) {
         updateMetadata = true;
@@ -808,6 +810,7 @@ status_t StreamOutHalAidl::filterAndUpdateOffloadMetadata(AudioParameter &parame
                         mOffloadMetadata.channelMask = VALUE_OR_RETURN_STATUS(
                                 ::aidl::android::legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
                                         channel_mask, false /*isInput*/));
+                        return OK;
                     }
                     return BAD_VALUE;
                 }))) {

@@ -72,6 +72,8 @@ class Hal2AidlMapper {
         return ::aidl::android::convertContainer(mRoutes, routes, converter);
     }
     status_t initialize();
+    status_t prepareToDisconnectExternalDevice(
+            const ::aidl::android::media::audio::common::AudioPort& devicePort);
     // If the resulting 'mixPortConfig->id' is 0, that means the stream was not created,
     // and 'config' is a suggested config.
     status_t prepareToOpenStream(
@@ -89,7 +91,7 @@ class Hal2AidlMapper {
         ::aidl::android::media::audio::common::AudioPortConfig* portConfig,
         Cleanups* cleanups = nullptr);
     status_t releaseAudioPatch(int32_t patchId);
-    void resetUnusedPatchesAndPortConfigs();
+    void resetUnusedPatchesPortConfigsAndPorts();
     status_t setDevicePortConnectedState(
             const ::aidl::android::media::audio::common::AudioPort& devicePort, bool connected);
 
@@ -122,6 +124,9 @@ class Hal2AidlMapper {
     // If the 'result->id' is 0, that means, the config was not created/updated,
     // and the 'result' is a suggestion from the HAL.
     status_t createOrUpdatePortConfig(
+            const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
+            ::aidl::android::media::audio::common::AudioPortConfig* result, bool *created);
+    status_t createOrUpdatePortConfigRetry(
             const ::aidl::android::media::audio::common::AudioPortConfig& requestedPortConfig,
             ::aidl::android::media::audio::common::AudioPortConfig* result, bool *created);
     void eraseConnectedPort(int32_t portId);
@@ -164,6 +169,14 @@ class Hal2AidlMapper {
             const std::optional<::aidl::android::media::audio::common::AudioIoFlags>& flags,
             int32_t ioHandle);
     bool isPortBeingHeld(int32_t portId);
+    status_t prepareToOpenStreamHelper(
+        int32_t ioHandle, int32_t devicePortId, int32_t devicePortConfigId,
+        const ::aidl::android::media::audio::common::AudioIoFlags& flags,
+        ::aidl::android::media::audio::common::AudioSource source,
+        const ::aidl::android::media::audio::common::AudioConfig& initialConfig,
+        Cleanups* cleanups, ::aidl::android::media::audio::common::AudioConfig* config,
+        ::aidl::android::media::audio::common::AudioPortConfig* mixPortConfig,
+        ::aidl::android::hardware::audio::core::AudioPatch* patch);
     bool portConfigBelongsToPort(int32_t portConfigId, int32_t portId) {
         auto it = mPortConfigs.find(portConfigId);
         return it != mPortConfigs.end() && it->second.portId == portId;
@@ -171,10 +184,11 @@ class Hal2AidlMapper {
     status_t releaseAudioPatches(const std::set<int32_t>& patchIds);
     void resetPatch(int32_t patchId) { (void)releaseAudioPatch(patchId); }
     void resetPortConfig(int32_t portConfigId);
-    void resetUnusedPortConfigs();
+    void resetUnusedPortConfigsAndPorts();
     status_t updateAudioPort(
             int32_t portId, ::aidl::android::media::audio::common::AudioPort* port);
     status_t updateRoutes();
+    void updateDynamicMixPorts();
 
     Ports mPorts;
     // Remote submix "template" ports (no address specified, no profiles).
@@ -192,6 +206,7 @@ class Hal2AidlMapper {
     ConnectedPorts mConnectedPorts;
     std::pair<int32_t, ::aidl::android::media::audio::common::AudioPort>
             mDisconnectedPortReplacement;
+    std::set<int32_t> mDynamicMixPortIds;
 };
 
 }  // namespace android

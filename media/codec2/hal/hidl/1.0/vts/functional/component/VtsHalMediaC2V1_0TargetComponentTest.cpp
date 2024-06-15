@@ -18,6 +18,7 @@
 #define LOG_TAG "codec2_hidl_hal_component_test"
 
 #include <android-base/logging.h>
+#include <android/binder_process.h>
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 
@@ -382,5 +383,6 @@ int main(int argc, char** argv) {
     }
 
     ::testing::InitGoogleTest(&argc, argv);
+    ABinderProcess_startThreadPool();
     return RUN_ALL_TESTS();
 }

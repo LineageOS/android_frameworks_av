@@ -106,8 +106,8 @@ ndk::ScopedAStatus EffectProxy::setOffloadParam(const effect_offload_param_t* of
 ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
                                      const std::optional<Parameter::Specific>& specific,
                                      IEffect::OpenEffectReturn* ret __unused) {
-    ndk::ScopedAStatus status = ndk::ScopedAStatus::fromExceptionCodeWithMessage(
-            EX_ILLEGAL_ARGUMENT, "nullEffectHandle");
+    ndk::ScopedAStatus status =
+            ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_STATE, "nullEffectHandle");
     for (auto& sub : mSubEffects) {
         IEffect::OpenEffectReturn openReturn;
         if (!sub.handle || !(status = sub.handle->open(common, specific, &openReturn)).isOk()) {
@@ -130,7 +130,33 @@ ndk::ScopedAStatus EffectProxy::open(const Parameter::Common& common,
     return status;
 }
 
+ndk::ScopedAStatus EffectProxy::reopen(OpenEffectReturn* ret __unused) {
+    ndk::ScopedAStatus status =
+            ndk::ScopedAStatus::fromExceptionCodeWithMessage(EX_ILLEGAL_STATE, "nullEffectHandle");
+    for (auto& sub : mSubEffects) {
+        IEffect::OpenEffectReturn openReturn;
+        if (!sub.handle || !(status = sub.handle->reopen(&openReturn)).isOk()) {
+            ALOGE("%s: failed to open %p UUID %s", __func__, sub.handle.get(),
+                  ::android::audio::utils::toString(sub.descriptor.common.id.uuid).c_str());
+            break;
+        }
+        sub.effectMq.statusQ = std::make_shared<StatusMQ>(openReturn.statusMQ);
+        sub.effectMq.inputQ = std::make_shared<DataMQ>(openReturn.inputDataMQ);
+        sub.effectMq.outputQ = std::make_shared<DataMQ>(openReturn.outputDataMQ);
+    }
+
+    // close all opened effects if failure
+    if (!status.isOk()) {
+        ALOGE("%s: closing all sub-effects with error %s", __func__,
+              status.getDescription().c_str());
+        close();
+    }
+
+    return status;
+}
+
 ndk::ScopedAStatus EffectProxy::close() {
+    command(CommandId::STOP);
     return runWithAllSubEffects([&](std::shared_ptr<IEffect>& effect) {
         return effect->close();
     });

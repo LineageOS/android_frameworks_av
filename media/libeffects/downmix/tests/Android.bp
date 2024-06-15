@@ -1,5 +1,6 @@
 // Build testbench for downmix module.
 package {
+    default_team: "trendy_team_media_framework_audio",
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
     // all of the 'license_kinds' from "frameworks_av_media_libeffects_downmix_license"
@@ -14,7 +15,7 @@ package {
 //
 // Use "atest downmix_tests" to run.
 cc_test {
-    name:"downmix_tests",
+    name: "downmix_tests",
     gtest: true,
     host_supported: true,
     vendor: true,
@@ -45,7 +46,7 @@ cc_test {
 // test application and outputs then compares files in a local directory
 // on device (/data/local/tmp/downmixtest/).
 cc_test {
-    name:"downmixtest",
+    name: "downmixtest",
     host_supported: false,
     proprietary: true,
 

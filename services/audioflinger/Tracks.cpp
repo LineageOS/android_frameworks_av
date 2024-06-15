@@ -890,12 +890,17 @@ void Track::destroy()
         bool wasActive = false;
         const sp<IAfThreadBase> thread = mThread.promote();
         if (thread != 0) {
-            audio_utils::lock_guard _l(thread->mutex());
+            audio_utils::unique_lock ul(thread->mutex());
+            thread->waitWhileThreadBusy_l(ul);
+
             auto* const playbackThread = thread->asIAfPlaybackThread().get();
             wasActive = playbackThread->destroyTrack_l(this);
             forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->destroy(); });
         }
         if (isExternalTrack() && !wasActive) {
+            // If the track is not active, the TrackHandle is responsible for
+            // releasing the port id, not the ThreadBase::threadLoop().
+            // At this point, there is no concurrency issue as the track is going away.
             AudioSystem::releaseOutput(mPortId);
         }
     }
@@ -1079,7 +1084,13 @@ void Track::interceptBuffer(
         // Additionally PatchProxyBufferProvider::obtainBuffer (called by PathTrack::getNextBuffer)
         // does not allow 0 frame size request contrary to getNextBuffer
     }
-    for (auto& teePatch : mTeePatches) {
+    TeePatches teePatches;
+    if (mTeePatchesRWLock.tryReadLock() == NO_ERROR) {
+        // Cache a copy of tee patches in case it is updated while using.
+        teePatches = mTeePatches;
+        mTeePatchesRWLock.unlock();
+    }
+    for (auto& teePatch : teePatches) {
         IAfPatchRecord* patchRecord = teePatch.patchRecord.get();
         const size_t framesWritten = patchRecord->writeFrames(
                 sourceBuffer.i8, frameCount, mFrameSize);
@@ -1092,7 +1103,7 @@ void Track::interceptBuffer(
     using namespace std::chrono_literals;
     // Average is ~20us per track, this should virtually never be logged (Logging takes >200us)
     ALOGD_IF(spent > 500us, "%s: took %lldus to intercept %zu tracks", __func__,
-             spent.count(), mTeePatches.size());
+             spent.count(), teePatches.size());
 }
 
 // ExtendedAudioBufferProvider interface
@@ -1181,7 +1192,9 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
                 return PERMISSION_DENIED;
             }
         }
-        audio_utils::lock_guard _lth(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         track_state state = mState;
         // here the track could be either new, or restarted
         // in both cases "unstop" the track
@@ -1220,7 +1233,7 @@ status_t Track::start(AudioSystem::sync_event_t event __unused,
                 && (state == IDLE || state == STOPPED || state == FLUSHED)) {
             mFrameMap.reset();
 
-            if (!isFastTrack() && (isDirect() || isOffloaded())) {
+            if (!isFastTrack()) {
                 // Start point of track -> sink frame map. If the HAL returns a
                 // frame position smaller than the first written frame in
                 // updateTrackFrameInfo, the timestamp can be interpolated
@@ -1306,7 +1319,9 @@ void Track::stop()
     ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        audio_utils::lock_guard _l(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         track_state state = mState;
         if (state == RESUMING || state == ACTIVE || state == PAUSING || state == PAUSED) {
             // If the track is not active (PAUSED and buffers full), flush buffers
@@ -1341,7 +1356,9 @@ void Track::pause()
     ALOGV("%s(%d): calling pid %d", __func__, mId, IPCThreadState::self()->getCallingPid());
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        audio_utils::lock_guard _l(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         auto* const playbackThread = thread->asIAfPlaybackThread().get();
         switch (mState) {
         case STOPPING_1:
@@ -1378,7 +1395,9 @@ void Track::flush()
     ALOGV("%s(%d)", __func__, mId);
     const sp<IAfThreadBase> thread = mThread.promote();
     if (thread != 0) {
-        audio_utils::lock_guard _l(thread->mutex());
+        audio_utils::unique_lock ul(thread->mutex());
+        thread->waitWhileThreadBusy_l(ul);
+
         auto* const playbackThread = thread->asIAfPlaybackThread().get();
 
         // Flush the ring buffer now if the track is not active in the PlaybackThread.
@@ -1616,7 +1635,10 @@ void Track::copyMetadataTo(MetadataInserter& backInserter) const
 void Track::updateTeePatches_l() {
     if (mTeePatchesToUpdate.has_value()) {
         forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->destroy(); });
-        mTeePatches = mTeePatchesToUpdate.value();
+        {
+            RWLock::AutoWLock writeLock(mTeePatchesRWLock);
+            mTeePatches = std::move(mTeePatchesToUpdate.value());
+        }
         if (mState == TrackBase::ACTIVE || mState == TrackBase::RESUMING ||
                 mState == TrackBase::STOPPING_1) {
             forEachTeePatchTrack_l([](const auto& patchTrack) { patchTrack->start(); });
@@ -1652,7 +1674,7 @@ void Track::processMuteEvent_l(const sp<
 
     if (result == OK) {
         ALOGI("%s(%d): processed mute state for port ID %d from %d to %d", __func__, id(), mPortId,
-              int(muteState), int(mMuteState));
+                static_cast<int>(mMuteState), static_cast<int>(muteState));
         mMuteState = muteState;
     } else {
         ALOGW("%s(%d): cannot process mute state for port ID %d, status error %d", __func__, id(),
@@ -3532,6 +3554,8 @@ void MmapTrack::processMuteEvent_l(const sp<IAudioManager>& audioManager, mute_s
     }
 
     if (result == OK) {
+        ALOGI("%s(%d): processed mute state for port ID %d from %d to %d", __func__, id(), mPortId,
+                static_cast<int>(mMuteState), static_cast<int>(muteState));
         mMuteState = muteState;
     } else {
         ALOGW("%s(%d): cannot process mute state for port ID %d, status error %d",

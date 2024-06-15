@@ -225,11 +225,14 @@ private:
         TONE_INDIA_CONGESTION,      // Congestion tone: 400 Hz, 250ms ON, 250ms OFF...
         TONE_INDIA_CALL_WAITING,    // Call waiting tone: 400 Hz, tone repeated in a 0.2s on, 0.1s off, 0.2s on, 7.5s off pattern.
         TONE_INDIA_RINGTONE,        // Ring tone: 400 Hz tone modulated with 25Hz, 0.4 on 0.2 off 0.4 on 2..0 off
-         // TAIWAN supervisory tones
+        // TAIWAN supervisory tones
         TONE_TW_RINGTONE,           // Ring Tone: 440 Hz + 480 Hz repeated with pattern 1s on, 3s off.
-         // NEW ZEALAND supervisory tones
+        // NEW ZEALAND supervisory tones
         TONE_NZ_CALL_WAITING,       // Call waiting tone: 400 Hz,  0.2s ON, 3s OFF,
                                     //        0.2s ON, 3s OFF, 0.2s ON, 3s OFF, 0.2s ON
+        // MALAYSIA supervisory tones
+        TONE_MY_CONGESTION,         // Congestion tone: 425 Hz, 500ms ON, 250ms OFF...
+        TONE_MY_RINGTONE,           // Ring tone: 425 Hz, 400ms ON 200ms OFF 400ms ON 2s OFF..
         NUM_ALTERNATE_TONES
     };
 
@@ -244,6 +247,7 @@ private:
         INDIA,
         TAIWAN,
         NZ,
+        MY,
         CEPT,
         NUM_REGIONS
     };

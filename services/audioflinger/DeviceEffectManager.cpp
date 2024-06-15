@@ -143,7 +143,7 @@ sp<IAfEffectHandle> DeviceEffectManager::createEffect_l(
         if (lStatus == NO_ERROR) {
             lStatus = effect->addHandle(handle.get());
             if (lStatus == NO_ERROR) {
-                lStatus = effect->init(patches);
+                lStatus = effect->init_l(patches);
                 if (lStatus == NAME_NOT_FOUND) {
                     lStatus = NO_ERROR;
                 }
