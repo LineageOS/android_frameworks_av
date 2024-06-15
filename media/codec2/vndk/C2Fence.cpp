@@ -28,16 +28,27 @@
 
 #include <utility>
 
-#define MAX_FENCE_FDS 1
+// support up to 32 sync fds (and an optional merged fd), and 1 int
+#define MAX_FENCE_FDS  33
+#define MAX_FENCE_INTS 1
 
 class C2Fence::Impl {
 public:
-    enum type_t : uint32_t {
-        INVALID_FENCE,
-        NULL_FENCE,
-        SURFACE_FENCE,
-        SYNC_FENCE,
-        PIPE_FENCE,
+    // These enums are not part of the ABI, so can be changed.
+    enum type_t : int32_t {
+        INVALID_FENCE     = -1,
+        NULL_FENCE        = 0,
+        SURFACE_FENCE     = 2,
+
+        SYNC_FENCE        = 3,
+        PIPE_FENCE        = 4,
+    };
+
+    // magic numbers for native handles
+    enum : int32_t {
+        SYNC_FENCE_DEPRECATED_MAGIC     = 3,
+        SYNC_FENCE_UNORDERED_MAGIC      = '\302fsu',
+        SYNC_FENCE_MAGIC                = '\302fso',
     };
 
     virtual c2_status_t wait(c2_nsecs_t timeoutNs) = 0;
@@ -54,7 +65,8 @@ public:
 
     /**
      * Create a native handle for the fence so it can be marshalled.
-     * The native handle must store fence type in the first integer.
+     * All native handles must store fence type in the last integer.
+     * The created native handle (if not null) must be closed by the caller.
      *
      * \return a valid native handle if the fence can be marshalled, otherwise return null.
      */
@@ -64,11 +76,29 @@ public:
 
     Impl() = default;
 
+    /**
+     * Get the type of the fence from the native handle.
+     *
+     * \param nh the native handle to get the type from.
+     * \return the type of the fence, or INVALID_FENCE if the native handle is
+     * invalid or malformed.
+     */
     static type_t GetTypeFromNativeHandle(const native_handle_t* nh) {
-        if (nh && nh->numFds >= 0 && nh->numFds <= MAX_FENCE_FDS && nh->numInts > 0) {
-            return static_cast<type_t>(nh->data[nh->numFds]);
+        if (!nh || nh->numFds < 0 || nh->numFds > MAX_FENCE_FDS
+                || nh->numInts < 1 || nh->numInts > MAX_FENCE_INTS) {
+            return INVALID_FENCE;
         }
-        return INVALID_FENCE;
+
+        // the magic number for Codec 2.0 native handles is the last integer
+        switch (nh->data[nh->numFds + nh->numInts - 1]) {
+            case SYNC_FENCE_MAGIC:
+            case SYNC_FENCE_UNORDERED_MAGIC:
+            case SYNC_FENCE_DEPRECATED_MAGIC:
+                return SYNC_FENCE;
+
+            default:
+                return INVALID_FENCE;
+        }
     }
 };
 
@@ -189,6 +219,53 @@ C2Fence _C2FenceFactory::CreateSurfaceFence(
 
 using namespace android;
 
+/**
+ * Implementation for a sync fence.
+ *
+ * A sync fence is fundamentally a fence that is created from an android sync
+ * fd (which represents a HW fence).
+ *
+ * The native handle layout for a single sync fence is:
+ *   fd[0]  - sync fd
+ *   int[0] - magic (SYNC_FENCE_MAGIC (=`\302fso'))
+ *
+ * Note: Between Android T and 24Q3, the magic number was erroneously
+ * SYNC_FENCE (=3).
+ *
+ * Multi(ple) Sync Fences
+ *
+ * Since Android 24Q3, this implementation also supports a sequence of
+ * sync fences. When this is the case, there is an expectation that the last
+ * sync fence being ready will guarantee that all other sync fences are
+ * also ready. (This guarantees backward compatibility to a single fd sync fence,
+ * and mFence will be that final fence.)
+ *
+ * It is furthermore recommended that the fences be in order - either by
+ * expected signaling time, or by the order in which they need to be ready. The
+ * specific ordering is not specified or enforced, but it could be an
+ * implementation requirement of the specific use case in the future.
+ *
+ * This implementation also supports an unordered set of sync fences. In this
+ * case, it will merge all the fences into a single merged fence, which will
+ * be the backward compatible singular fence (stored in mFence).
+ *
+ * The native handle layout for an unordered multi-fence sync fence (from Android
+ * 24Q3) is:
+ *
+ *   fd[0]   - sync fd 1
+ *   ...
+ *   fd[n-1] - sync fd N
+ *   fd[n]   - merged fence fd
+ *   int[0]  - magic (SYNC_FENCE_UNORDERED_MAGIC (='\302fsu'))
+ *
+ * The native handle layout for an ordered multi-fence sync fence (from Android
+ * 24Q3) is:
+ *
+ *   fd[0]   - sync fd 1
+ *   ...
+ *   fd[n-1] - sync fd N
+ *   int[0]  - magic (SYNC_FENCE_MAGIC (='\302fso'))
+ */
 class _C2FenceFactory::SyncFenceImpl : public C2Fence::Impl {
 public:
     virtual c2_status_t wait(c2_nsecs_t timeoutNs) {
@@ -218,10 +295,18 @@ public:
         return mFence->dup();
     }
 
+    /**
+     * Returns a duped list of fds used when creating this fence. It will
+     * not return the internally created merged fence fd.
+     */
     std::vector<int> fds() const {
         std::vector<int> retFds;
         for (int index = 0; index < mListFences.size(); index++) {
             retFds.push_back(mListFences[index]->dup());
+        }
+        // ensure that at least one fd is returned
+        if (mListFences.empty()) {
+            retFds.push_back(mFence->dup());
         }
         return retFds;
     }
@@ -236,7 +321,18 @@ public:
 
     virtual native_handle_t *createNativeHandle() const {
         std::vector<int> nativeFds = fds();
-        nativeFds.push_back(fd());
+        int32_t magic = SYNC_FENCE_MAGIC;
+
+        // Also parcel the singular fence if it is not already part of the list.
+        // If this was a single-fd fence, mListFences will be empty, but fds()
+        // already returned that a list with that single fd.
+        if (!mListFences.empty() && mListFences.back() != mFence) {
+            nativeFds.push_back(fd());
+            if (!mListFences.empty()) {
+                magic = SYNC_FENCE_UNORDERED_MAGIC;
+            }
+        }
+
         native_handle_t* nh = native_handle_create(nativeFds.size(), 1);
         if (!nh) {
             ALOGE("Failed to allocate native handle for sync fence");
@@ -249,71 +345,122 @@ public:
         for (int i = 0; i < nativeFds.size(); i++) {
             nh->data[i] = nativeFds[i];
         }
-        nh->data[nativeFds.size()] = type();
+        nh->data[nativeFds.size()] = magic;
         return nh;
     }
 
     virtual ~SyncFenceImpl() {};
 
+    /**
+     * Constructs a SyncFenceImpl from a single sync fd. No error checking is
+     * performed on the fd here as we cannot make this a null fence.
+     *
+     * \param fenceFd the fence fd to create the SyncFenceImpl from.
+     */
     SyncFenceImpl(int fenceFd) :
         mFence(sp<Fence>::make(fenceFd)) {
-        mListFences.clear();
-        if (mFence) {
-            mListFences.push_back(mFence);
-        }
     }
 
-    SyncFenceImpl(const std::vector<int>& fenceFds, int mergedFd) {
-        mListFences.clear();
-
-        for (int fenceFd : fenceFds) {
-            if (fenceFd < 0) {
-                continue;
-            } else {
-                mListFences.push_back(sp<Fence>::make(fenceFd));
-                if (!mListFences.back()) {
-                    mFence.clear();
-                    break;
-                }
-                if (mergedFd == -1) {
-                    mFence = (mFence == nullptr) ? (mListFences.back()) :
-                        (Fence::merge("syncFence", mFence, mListFences.back()));
-                }
-            }
-        }
-        if (mergedFd != -1)
-        {
-            mFence = sp<Fence>::make(mergedFd);
-        }
-        if (!mFence) {
-            mListFences.clear();
-        }
+    SyncFenceImpl(const sp<Fence> &fence) :
+        mFence(fence) {
     }
 
-    static std::shared_ptr<SyncFenceImpl> CreateFromNativeHandle(const native_handle_t* nh) {
-        if (!nh || nh->numFds < 1 || nh->numInts < 1) {
-            ALOGE("Invalid handle for sync fence");
+    /**
+     * Constructs a SyncFenceImpl from a list of sync fds.
+     *
+     * \param fenceFds the list of fence fds to create the SyncFenceImpl from.
+     * \param finalFence the singular fence for this multi-fd fence. This can
+     * be either the last fence in fences or a sepearate (merged) fence.
+     */
+    SyncFenceImpl(const std::vector<sp<Fence>>& fences, const sp<Fence> &finalFence) :
+        mListFences(fences),
+        mFence(finalFence) {
+    }
+
+    /**
+     * Creates a SyncFenceImpl from a native handle.
+     *
+     * \param nh the native handle to create the SyncFenceImpl from.
+     * \param takeOwnership if true, the SyncFenceImpl will take ownership of the
+     *                      file descriptors in the native handle. Otherwise,
+     *                      the SyncFenceImpl will dup the file descriptors.
+     *
+     * \return a shared_ptr to the SyncFenceImpl, or nullptr if the native
+     * handle is invalid or malformed.
+    */
+    static std::shared_ptr<SyncFenceImpl> CreateFromNativeHandle(
+            const native_handle_t* nh, bool takeOwnership) {
+        // we should only call this method if _C2FenceFactory::GetTypeFromNativeHandle
+        // returned SYNC_FENCE, but do these checks anyways to avoid overflows
+        // in case that does not happen.
+        if (!nh) {
+            ALOGE("Invalid handle for a sync fence (nullptr)");
+            return nullptr;
+        } else if (nh->numFds < 1 || nh->numInts < 1
+                || nh->numFds > MAX_FENCE_FDS || nh->numInts > MAX_FENCE_INTS) {
+            ALOGE("Invalid handle for a sync fence (%d fds, %d ints)", nh->numFds, nh->numInts);
             return nullptr;
         }
-        std::vector<int> fds;
-        for (int i = 0; i < nh->numFds-1; i++) {
-            fds.push_back(dup(nh->data[i]));
-        }
-        std::shared_ptr<SyncFenceImpl> p = (nh->numFds == 1)?
-                (std::make_shared<SyncFenceImpl>(fds.back())):
-                (std::make_shared<SyncFenceImpl>(fds, (dup(nh->data[nh->numFds-1]))));
-        if (!p) {
-            ALOGE("Failed to allocate sync fence impl");
-            for (int fd : fds) {
-                close(fd);
+        std::vector<sp<Fence>> fences;
+        for (int i = 0; i < nh->numFds; i++) {
+            int fd = nh->data[i];
+            if (!takeOwnership && fd >= 0) {
+                fd = dup(fd);
+            }
+            if (fd >= 0) {
+                sp<Fence> fence = sp<Fence>::make(fd);
+                if (fence) {
+                    fences.push_back(fence);
+                } else {
+                    ALOGW("Failed to create fence from fd %d", fd);
+                }
             }
         }
+
+        std::shared_ptr<SyncFenceImpl> p;
+        if (fences.size() == 0) {
+            ALOGE("No valid fences found in handle for a sync fence");
+            return nullptr;
+        } else if (fences.size() == 1) {
+            p = std::make_shared<SyncFenceImpl>(fences[0]);
+        } else {
+            int32_t magic = nh->data[nh->numFds + nh->numInts - 1];
+            if (magic != SYNC_FENCE_MAGIC) {
+                // The last fence is the merged fence. Separate it.
+                sp<Fence> finalFence = fences.back();
+                fences.pop_back();
+
+                // Special case: if we end up with only a single element list
+                // with another merged fence, that merged fence must be the
+                // same fence. This happened in an early version of multi fd
+                // support for single-fd sync fences.
+                if (fences.size() == 1) {
+                    // For single-fd fence the sp-s must be equal
+                    finalFence = fences.back();
+                }
+                p = std::make_shared<SyncFenceImpl>(fences, finalFence);
+            } else {
+                // Use the last fence as the standalone fence.
+                p = std::make_shared<SyncFenceImpl>(fences, fences.back());
+            }
+        }
+
+        ALOGE_IF(!p, "Failed to allocate sync fence impl");
         return p;
     }
 
 private:
+    /**
+     * The list of fences in case of a multi-fence sync fence. Otherwise, this
+     * list is empty.
+     */
     std::vector<sp<Fence>> mListFences;
-    sp<Fence> mFence;  //merged fence in case mListFences size > 0
+
+    /**
+     * The singular fence for this sync fence. For multi-fence sync fences,
+     * this could be a merged fence, or simply the final fence.
+     */
+    sp<Fence> mFence;
 };
 
 std::vector<int> ExtractFdsFromCodec2SyncFence(const C2Fence& fence) {
@@ -324,39 +471,155 @@ std::vector<int> ExtractFdsFromCodec2SyncFence(const C2Fence& fence) {
     return retFds;
 }
 
-C2Fence _C2FenceFactory::CreateSyncFence(int fenceFd) {
+C2Fence _C2FenceFactory::CreateSyncFence(int fenceFd, bool validate) {
     std::shared_ptr<C2Fence::Impl> p;
     if (fenceFd >= 0) {
         p = std::make_shared<_C2FenceFactory::SyncFenceImpl>(fenceFd);
         if (!p) {
             ALOGE("Failed to allocate sync fence impl");
             close(fenceFd);
-        } else if (!p->valid()) {
+        } else if (validate && (!p->valid() || p->ready())) {
+            // don't create a fence object if the sync fd already signaled or is invalid
             p.reset();
         }
     } else {
-        ALOGV("Create sync fence from invalid fd");
-        return C2Fence();
+        ALOGV("Won't create sync fence from invalid fd");
     }
     return C2Fence(p);
 }
 
-C2Fence _C2FenceFactory::CreateMultipleFdSyncFence(const std::vector<int>& fenceFds) {
-    std::shared_ptr<C2Fence::Impl> p;
-    if (fenceFds.size() > 0) {
-        p = std::make_shared<_C2FenceFactory::SyncFenceImpl>(fenceFds, -1);
-        if (!p) {
-            ALOGE("Failed to allocate sync fence impl closing FDs");
-            for (int fenceFd : fenceFds) {
-                close(fenceFd);
-            }
-        } else if (!p->valid()) {
-            ALOGE("Invalid sync fence created");
-            p.reset();
-        }
-    } else {
-        ALOGE("Create sync fence from invalid fd list of size 0");
+C2Fence _C2FenceFactory::CreateUnorderedMultiSyncFence(
+        const std::vector<int>& fenceFds, c2_status_t *status) {
+    if (status) {
+        *status = C2_OK;
     }
+
+    sp<Fence> finalFence;
+    std::vector<sp<Fence>> fences;
+
+    bool mergeFailed = false;
+    for (int fenceFd : fenceFds) {
+        if (fenceFd < 0) {
+            // ignore invalid fences
+            continue;
+        }
+        sp<Fence> fence = sp<Fence>::make(fenceFd);
+
+        // If we could not create an sp, further sp-s will also fail.
+        if (fence == nullptr) {
+            if (status) {
+                *status = C2_NO_MEMORY;
+            }
+            break;
+        }
+        fences.push_back(fence);
+
+        if (finalFence == nullptr) {
+            finalFence = fence;
+        } else {
+            sp<Fence> mergedFence = Fence::merge("syncFence", finalFence, fence);
+            if (mergedFence == nullptr || mergedFence == Fence::NO_FENCE) {
+                ALOGE_IF(!mergeFailed, "Could not merge fences for sync fence.");
+                mergeFailed = true;
+                if (status) {
+                    *status = (mergedFence == nullptr) ? C2_NO_MEMORY : C2_CORRUPTED;
+                }
+
+                if (mergedFence == nullptr) {
+                    break;
+                }
+                // If we cannot merge one of the fences, the best course of action
+                // is to keep going, as the alternative would be to clear all fences
+                // (making this a null fence) but that will always be ready.
+            } else {
+                finalFence = mergedFence;
+            }
+        }
+    }
+
+    // we may have ended up with a single or no fence due to merging failures or
+    // invalid fds.
+    if (fences.size() == 0) {
+        // we have no fds, we have a null fence.
+        return C2Fence();
+    }
+
+    std::shared_ptr<C2Fence::Impl> p;
+
+    if (fences.size() == 1) {
+        // We have a single sync fd. We don't need the merged fence, which is
+        // already simply that sole fence.
+        p = std::make_shared<_C2FenceFactory::SyncFenceImpl>(finalFence);
+    } else {
+        // if we couldn't merge any fences just use the last one
+        if (finalFence == fences[0]) {
+            finalFence = fences.back();
+        }
+
+        p = std::make_shared<_C2FenceFactory::SyncFenceImpl>(fences, finalFence);
+    }
+
+    if (!p) {
+        ALOGE("Failed to allocate sync fence impl closing FDs");
+        // all fds were moved into Fence objects which will close them.
+        if (status) {
+            *status = C2_NO_MEMORY;
+        }
+        return C2Fence();
+    }
+
+    return C2Fence(p);
+}
+
+C2Fence _C2FenceFactory::CreateMultiSyncFence(
+        const std::vector<int>& fenceFds, c2_status_t *status) {
+    if (status) {
+        *status = C2_OK;
+    }
+
+    std::vector<sp<Fence>> fences;
+
+    for (int fenceFd : fenceFds) {
+        if (fenceFd < 0) {
+            // ignore invalid fences
+            continue;
+        }
+        sp<Fence> fence = sp<Fence>::make(fenceFd);
+
+        // If we could not create an sp, keep going with the existing fences.
+        if (fence == nullptr) {
+            if (status) {
+                *status = C2_NO_MEMORY;
+            }
+            break;
+        }
+        fences.push_back(fence);
+    }
+
+    // we may have ended up with a single or no fence due to invalid fds.
+    if (fences.size() == 0) {
+        // we have no fds, we have a null fence.
+        return C2Fence();
+    }
+
+    std::shared_ptr<C2Fence::Impl> p;
+
+    if (fences.size() == 1) {
+        // We have a single sync fd, this is a simple sync fence.
+        p = std::make_shared<_C2FenceFactory::SyncFenceImpl>(fences[0]);
+    } else {
+        p = std::make_shared<_C2FenceFactory::SyncFenceImpl>(fences, fences.back());
+    }
+
+    if (!p) {
+        ALOGE("Failed to allocate sync fence impl closing FDs");
+        // all fds were moved into Fence objects which will close them.
+        if (status) {
+            *status = C2_NO_MEMORY;
+        }
+        return C2Fence();
+    }
+
     return C2Fence(p);
 }
 
@@ -521,7 +784,8 @@ native_handle_t* _C2FenceFactory::CreateNativeHandle(const C2Fence& fence) {
     return fence.mImpl? fence.mImpl->createNativeHandle() : nullptr;
 }
 
-C2Fence _C2FenceFactory::CreateFromNativeHandle(const native_handle_t* handle) {
+C2Fence _C2FenceFactory::CreateFromNativeHandle(
+        const native_handle_t* handle, bool takeOwnership) {
     if (!handle) {
         return C2Fence();
     }
@@ -529,11 +793,14 @@ C2Fence _C2FenceFactory::CreateFromNativeHandle(const native_handle_t* handle) {
     std::shared_ptr<C2Fence::Impl> p;
     switch (type) {
         case C2Fence::Impl::SYNC_FENCE:
-            p = SyncFenceImpl::CreateFromNativeHandle(handle);
+            p = SyncFenceImpl::CreateFromNativeHandle(handle, takeOwnership);
             break;
         default:
             ALOGV("Unsupported fence type %d", type);
-            // Nothing else to do. The handle is owned by the caller.
+            // Still close the handle here if taking ownership.
+            if (takeOwnership) {
+                (void) native_handle_close(handle);
+            }
             // return a null-fence in this case
             break;
     }
