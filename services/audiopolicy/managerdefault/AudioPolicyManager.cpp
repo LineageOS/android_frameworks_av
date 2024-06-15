@@ -8172,9 +8172,10 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
             }
             if (Volume::getDeviceForVolume(deviceTypes) != AUDIO_DEVICE_OUT_SPEAKER
                     &&  !Intersection(deviceTypes, {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
-                        AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES}).empty()) {
-                // on A2DP, also ensure notification volume is not too low compared to media when
-                // intended to be played
+                        AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
+                        AUDIO_DEVICE_OUT_BLE_HEADSET}).empty()) {
+                // on A2DP/BLE, also ensure notification volume is not too low compared to media
+                // when intended to be played.
                 if ((volumeDb > -96.0f) &&
                         (musicVolDb - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB > volumeDb)) {
                     ALOGV("%s increasing volume for volume source=%d device=%s from %f to %f",

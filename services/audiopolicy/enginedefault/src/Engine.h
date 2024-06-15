@@ -109,6 +109,9 @@ private:
     DeviceVector getDisabledDevicesForInputSource(
             const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
 
+    bool isBtScoActive(DeviceVector& availableOutputDevices,
+                       const SwAudioOutputCollection &outputs) const;
+
     std::map<product_strategy_t, legacy_strategy> mLegacyStrategyMap;
 };
 } // namespace audio_policy

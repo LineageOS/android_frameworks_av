@@ -882,7 +882,6 @@ inline constexpr int32_t CONFIGURE_FLAG_USE_BLOCK_MODEL = 2;
 inline constexpr int32_t CRYPTO_MODE_AES_CBC     = 2;
 inline constexpr int32_t CRYPTO_MODE_AES_CTR     = 1;
 inline constexpr int32_t CRYPTO_MODE_UNENCRYPTED = 0;
-inline constexpr int32_t INFO_OUTPUT_BUFFERS_CHANGED = -3;
 inline constexpr int32_t INFO_OUTPUT_FORMAT_CHANGED  = -2;
 inline constexpr int32_t INFO_TRY_AGAIN_LATER        = -1;
 inline constexpr int32_t VIDEO_SCALING_MODE_SCALE_TO_FIT               = 1;
