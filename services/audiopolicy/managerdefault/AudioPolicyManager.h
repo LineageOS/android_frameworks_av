@@ -345,8 +345,7 @@ public:
         virtual status_t startAudioSource(const struct audio_port_config *source,
                                           const audio_attributes_t *attributes,
                                           audio_port_handle_t *portId,
-                                          uid_t uid,
-                                          bool internal = false);
+                                          uid_t uid);
         virtual status_t stopAudioSource(audio_port_handle_t portId);
 
         virtual status_t setMasterMono(bool mono);
@@ -705,14 +704,6 @@ protected:
         void updateCallAndOutputRouting(bool forceVolumeReeval = true, uint32_t delayMs = 0,
                 bool skipDelays = false);
 
-        bool isCallRxAudioSource(const sp<SourceClientDescriptor> &source) {
-            return mCallRxSourceClient != nullptr && source == mCallRxSourceClient;
-        }
-
-        bool isCallTxAudioSource(const sp<SourceClientDescriptor> &source) {
-            return mCallTxSourceClient != nullptr && source == mCallTxSourceClient;
-        }
-
         void connectTelephonyRxAudioSource();
 
         void disconnectTelephonyAudioSource(sp<SourceClientDescriptor> &clientDesc);
@@ -976,6 +967,12 @@ protected:
         void checkLeBroadcastRoutes(bool wasUnicastActive,
                 sp<SwAudioOutputDescriptor> ignoredOutput, uint32_t delayMs);
 
+        status_t startAudioSourceInternal(const struct audio_port_config *source,
+                                          const audio_attributes_t *attributes,
+                                          audio_port_handle_t *portId,
+                                          uid_t uid,
+                                          bool internal,
+                                          bool isCallRx);
         const uid_t mUidCached;                         // AID_AUDIOSERVER
         sp<const AudioPolicyConfig> mConfig;
         EngineInstance mEngine;                         // Audio Policy Engine instance

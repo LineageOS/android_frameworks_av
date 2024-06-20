@@ -809,7 +809,8 @@ void AudioPolicyManager::connectTelephonyRxAudioSource()
     const auto aa = mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL);
 
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
-    status_t status = startAudioSource(&source, &aa, &portId, 0 /*uid*/, true /*internal*/);
+    status_t status = startAudioSourceInternal(&source, &aa, &portId, 0 /*uid*/,
+                                       true /*internal*/, true /*isCallRx*/);
     ALOGE_IF(status != OK, "%s: failed to start audio source (%d)", __func__, status);
     mCallRxSourceClient = mAudioSources.valueFor(portId);
     ALOGE_IF(mCallRxSourceClient == nullptr,
@@ -846,7 +847,8 @@ void AudioPolicyManager::connectTelephonyTxAudioSource(
     srcDevice->toAudioPortConfig(&source);
     mCallTxSourceClient = new SourceClientDescriptor(
                 callTxSourceClientPortId, mUidCached, aa, source, srcDevice, AUDIO_STREAM_PATCH,
-                mCommunnicationStrategy, toVolumeSource(aa), true);
+                mCommunnicationStrategy, toVolumeSource(aa), true,
+                false /*isCallRx*/, true /*isCallTx*/);
     mCallTxSourceClient->setPreferredDeviceId(sinkDevice->getId());
 
     audio_patch_handle_t patchHandle = AUDIO_PATCH_HANDLE_NONE;
@@ -5095,7 +5097,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
             new SourceClientDescriptor(
                 portId, uid, attributes, *source, srcDevice, AUDIO_STREAM_PATCH,
                 mEngine->getProductStrategyForAttributes(attributes), toVolumeSource(attributes),
-                true);
+                true, false /*isCallRx*/, false /*isCallTx*/);
     sourceDesc->setPreferredDeviceId(sinkDevice->getId());
 
     status_t status =
@@ -5427,7 +5429,7 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                         outputDesc->toAudioPortConfig(&srcMixPortConfig, nullptr);
                         // for volume control, we may need a valid stream
                         srcMixPortConfig.ext.mix.usecase.stream =
-                            (!sourceDesc->isInternal() || isCallTxAudioSource(sourceDesc)) ?
+                            (!sourceDesc->isInternal() || sourceDesc->isCallTx()) ?
                                     mEngine->getStreamTypeForAttributes(sourceDesc->attributes()) :
                                     AUDIO_STREAM_PATCH;
                         patchBuilder.addSource(srcMixPortConfig);
@@ -5765,7 +5767,15 @@ status_t AudioPolicyManager::acquireSoundTriggerSession(audio_session_t *session
 status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *source,
                                               const audio_attributes_t *attributes,
                                               audio_port_handle_t *portId,
-                                              uid_t uid, bool internal)
+                                              uid_t uid) {
+    return startAudioSourceInternal(source, attributes, portId, uid,
+                                    false /*internal*/, false /*isCallRx*/);
+}
+
+status_t AudioPolicyManager::startAudioSourceInternal(const struct audio_port_config *source,
+                                              const audio_attributes_t *attributes,
+                                              audio_port_handle_t *portId,
+                                              uid_t uid, bool internal, bool isCallRx)
 {
     ALOGV("%s", __FUNCTION__);
     *portId = AUDIO_PORT_HANDLE_NONE;
@@ -5798,7 +5808,7 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
         new SourceClientDescriptor(*portId, uid, *attributes, *source, srcDevice,
                                    mEngine->getStreamTypeForAttributes(*attributes),
                                    mEngine->getProductStrategyForAttributes(*attributes),
-                                   toVolumeSource(*attributes), internal);
+                                   toVolumeSource(*attributes), internal, isCallRx, false);
 
     status_t status = connectAudioSource(sourceDesc);
     if (status == NO_ERROR) {
@@ -7178,7 +7188,7 @@ void AudioPolicyManager::checkAudioSourceForAttributes(const audio_attributes_t 
         sp<SourceClientDescriptor> sourceDesc = mAudioSources.valueAt(i);
         if (sourceDesc != nullptr && followsSameRouting(attr, sourceDesc->attributes())
                 && sourceDesc->getPatchHandle() == AUDIO_PATCH_HANDLE_NONE
-                && !isCallRxAudioSource(sourceDesc) && !sourceDesc->isInternal()) {
+                && !sourceDesc->isCallRx() && !sourceDesc->isInternal()) {
             connectAudioSource(sourceDesc);
         }
     }
@@ -7285,7 +7295,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
                 }
             }
             sp<SourceClientDescriptor> source = getSourceForAttributesOnOutput(srcOut, attr);
-            if (source != nullptr && !isCallRxAudioSource(source) && !source->isInternal()) {
+            if (source != nullptr && !source->isCallRx() && !source->isInternal()) {
                 connectAudioSource(source);
             }
         }
@@ -8455,7 +8465,7 @@ void AudioPolicyManager::cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc
         sp<SourceClientDescriptor> sourceDesc = mAudioSources.valueAt(i);
         if (sourceDesc->isConnected() && (sourceDesc->srcDevice()->equals(deviceDesc) ||
                                           sourceDesc->sinkDevice()->equals(deviceDesc))
-                && !isCallRxAudioSource(sourceDesc)) {
+                && !sourceDesc->isCallRx()) {
             disconnectAudioSource(sourceDesc);
         }
     }

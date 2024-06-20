@@ -294,8 +294,7 @@ public:
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
                                       audio_port_handle_t *portId,
-                                      uid_t uid,
-                                      bool internal = false) = 0;
+                                      uid_t uid) = 0;
     virtual status_t stopAudioSource(audio_port_handle_t portId) = 0;
 
     virtual status_t setMasterMono(bool mono) = 0;
