@@ -53,7 +53,7 @@ sp<DeviceDescriptor> findPreferredDevice(
         // a preferred device in which case the first client drives the selection.
         if (desc->isMmap()) {
             auto matchingClients = desc->clientsList(
-                    false /*activeOnly*/, filter, true /*preferredDevice*/);
+                    false /*activeOnly*/, filter, false /*preferredDevice*/);
             if (matchingClients.empty()) {
                 return nullptr;
             }
