@@ -497,9 +497,10 @@ c2_status_t MultiAccessUnitHelper::gather(
                     // This is to take care of the last bytes and to decide to send with
                     // FLAG_INCOMPLETE or not.
                     if ((frame->mWview
-                            && (frame->mWview->offset() > frame->mLargeFrameTuning.thresholdSize))
+                            && (frame->mWview->offset() >= frame->mLargeFrameTuning.thresholdSize))
                             || frame->mComponentFrameIds.empty()) {
                         if (frame->mLargeWork) {
+                            frame->mLargeWork->result = C2_OK;
                             finalizeWork(*frame);
                             addOutWork(frame->mLargeWork);
                             frame->reset();
@@ -558,12 +559,15 @@ c2_status_t MultiAccessUnitHelper::processWorklets(MultiAccessUnitInfo &frame,
         c2_status_t ret = C2_OK;
         if (frame.mLargeWork == nullptr) {
             frame.mLargeWork.reset(new C2Work);
+            frame.mLargeWork->result = C2_OK;
+            frame.mLargeWork->input.flags = (C2FrameData::flags_t)0;
             frame.mLargeWork->input.ordinal = frame.inOrdinal;
             frame.mLargeWork->input.ordinal.frameIndex = frame.inOrdinal.frameIndex;
         }
         if (allocateWorket) {
             if (frame.mLargeWork->worklets.size() == 0) {
                 frame.mLargeWork->worklets.emplace_back(new C2Worklet);
+                frame.mLargeWork->worklets.back()->output.flags = (C2FrameData::flags_t)0;
             }
         }
         if (allocateBuffer) {
@@ -611,6 +615,9 @@ c2_status_t MultiAccessUnitHelper::processWorklets(MultiAccessUnitInfo &frame,
         if (c2ret != C2_OK) {
             return c2ret;
         }
+        uint32_t flags = work->input.flags;
+        flags |= frame.mLargeWork->input.flags;
+        frame.mLargeWork->input.flags = (C2FrameData::flags_t)flags;
         C2FrameData& outputFramedata = frame.mLargeWork->worklets.front()->output;
         if (!(*worklet)->output.configUpdate.empty()) {
             for (auto& configUpdate : (*worklet)->output.configUpdate) {
@@ -678,6 +685,9 @@ c2_status_t MultiAccessUnitHelper::processWorklets(MultiAccessUnitInfo &frame,
                         }
                     }
                     allocateWork(frame, true, true);
+                    uint32_t flags = work->input.flags;
+                    flags |= frame.mLargeWork->input.flags;
+                    frame.mLargeWork->input.flags = (C2FrameData::flags_t)flags;
                     C2ReadView rView = blocks.front().map().get();
                     if (rView.error()) {
                         LOG(ERROR) << "Buffer read view error";
@@ -744,7 +754,8 @@ c2_status_t MultiAccessUnitHelper::finalizeWork(
     }
     LOG(DEBUG) << "Finalizing work with input Idx "
             << frame.mLargeWork->input.ordinal.frameIndex.peekull()
-            << " timestamp " << timeStampUs;
+            << " timestamp " << timeStampUs
+            << " inFlags " << inFlags;
     uint32_t finalFlags = 0;
     if ((!forceComplete)
             && (frame.mLargeWork->result == C2_OK)
