@@ -764,7 +764,7 @@ status_t AudioPolicyManager::updateCallRoutingInternal(
         }
         muteWaitMs = setOutputDevices(__func__, mPrimaryOutput, rxDevices, true, delayMs);
     } else { // create RX path audio patch
-        connectTelephonyRxAudioSource();
+        connectTelephonyRxAudioSource(delayMs);
         // If the TX device is on the primary HW module but RX device is
         // on other HW module, SinkMetaData of telephony input should handle it
         // assuming the device uses audio HAL V5.0 and above
@@ -799,7 +799,7 @@ bool AudioPolicyManager::isDeviceOfModule(
     return false;
 }
 
-void AudioPolicyManager::connectTelephonyRxAudioSource()
+void AudioPolicyManager::connectTelephonyRxAudioSource(uint32_t delayMs)
 {
     disconnectTelephonyAudioSource(mCallRxSourceClient);
     const struct audio_port_config source = {
@@ -810,7 +810,7 @@ void AudioPolicyManager::connectTelephonyRxAudioSource()
 
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
     status_t status = startAudioSourceInternal(&source, &aa, &portId, 0 /*uid*/,
-                                       true /*internal*/, true /*isCallRx*/);
+                                       true /*internal*/, true /*isCallRx*/, delayMs);
     ALOGE_IF(status != OK, "%s: failed to start audio source (%d)", __func__, status);
     mCallRxSourceClient = mAudioSources.valueFor(portId);
     ALOGE_IF(mCallRxSourceClient == nullptr,
@@ -5769,13 +5769,14 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
                                               audio_port_handle_t *portId,
                                               uid_t uid) {
     return startAudioSourceInternal(source, attributes, portId, uid,
-                                    false /*internal*/, false /*isCallRx*/);
+                                    false /*internal*/, false /*isCallRx*/, 0 /*delayMs*/);
 }
 
 status_t AudioPolicyManager::startAudioSourceInternal(const struct audio_port_config *source,
                                               const audio_attributes_t *attributes,
                                               audio_port_handle_t *portId,
-                                              uid_t uid, bool internal, bool isCallRx)
+                                              uid_t uid, bool internal, bool isCallRx,
+                                              uint32_t delayMs)
 {
     ALOGV("%s", __FUNCTION__);
     *portId = AUDIO_PORT_HANDLE_NONE;
@@ -5810,14 +5811,15 @@ status_t AudioPolicyManager::startAudioSourceInternal(const struct audio_port_co
                                    mEngine->getProductStrategyForAttributes(*attributes),
                                    toVolumeSource(*attributes), internal, isCallRx, false);
 
-    status_t status = connectAudioSource(sourceDesc);
+    status_t status = connectAudioSource(sourceDesc, delayMs);
     if (status == NO_ERROR) {
         mAudioSources.add(*portId, sourceDesc);
     }
     return status;
 }
 
-status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
+status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>& sourceDesc,
+                                                uint32_t delayMs)
 {
     ALOGV("%s handle %d", __FUNCTION__, sourceDesc->portId());
 
@@ -5843,7 +5845,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
 
     return connectAudioSourceToSink(
-                sourceDesc, sinkDevice, patchBuilder.patch(), handle, mUidCached, 0 /*delayMs*/);
+                sourceDesc, sinkDevice, patchBuilder.patch(), handle, mUidCached, delayMs);
 }
 
 status_t AudioPolicyManager::stopAudioSource(audio_port_handle_t portId)
@@ -7189,7 +7191,7 @@ void AudioPolicyManager::checkAudioSourceForAttributes(const audio_attributes_t 
         if (sourceDesc != nullptr && followsSameRouting(attr, sourceDesc->attributes())
                 && sourceDesc->getPatchHandle() == AUDIO_PATCH_HANDLE_NONE
                 && !sourceDesc->isCallRx() && !sourceDesc->isInternal()) {
-            connectAudioSource(sourceDesc);
+            connectAudioSource(sourceDesc, 0 /*delayMs*/);
         }
     }
 }
@@ -7296,7 +7298,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             }
             sp<SourceClientDescriptor> source = getSourceForAttributesOnOutput(srcOut, attr);
             if (source != nullptr && !source->isCallRx() && !source->isInternal()) {
-                connectAudioSource(source);
+                connectAudioSource(source, 0 /*delayMs*/);
             }
         }
 
