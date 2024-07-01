@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "06dfb953_660a03fd",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 7118
+      },
+      "writtenOn": "2024-07-01T09:36:04Z",
+      "side": 1,
+      "message": "Fixes video playback issues on pixel 3.\nAnd probably 3a/4/4a too.\nhttps://gitlab.com/LineageOS/issues/android/-/issues/7177\nhttps://gitlab.com/LineageOS/issues/android/-/issues/6759",
+      "revId": "0d0d2758906221dd5ddb25ff4377dfa287b5f575",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
