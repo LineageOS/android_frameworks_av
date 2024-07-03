@@ -176,7 +176,10 @@ void DownmixImpl::process() {
      * in the life cycle of workerThread (threadLoop).
      */
     uint32_t efState = 0;
-    if (!mEventFlag || ::android::OK != mEventFlag->wait(kEventFlagNotEmpty, &efState)) {
+    if (!mEventFlag ||
+        ::android::OK != mEventFlag->wait(mDataMqNotEmptyEf, &efState, 0 /* no timeout */,
+                                          true /* retry */) ||
+        !(efState & mDataMqNotEmptyEf)) {
         LOG(ERROR) << getEffectName() << __func__ << ": StatusEventFlag invalid";
     }
 

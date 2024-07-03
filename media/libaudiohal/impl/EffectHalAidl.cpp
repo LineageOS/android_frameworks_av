@@ -57,7 +57,9 @@ using ::aidl::android::hardware::audio::effect::CommandId;
 using ::aidl::android::hardware::audio::effect::Descriptor;
 using ::aidl::android::hardware::audio::effect::IEffect;
 using ::aidl::android::hardware::audio::effect::IFactory;
+using ::aidl::android::hardware::audio::effect::kEventFlagDataMqNotEmpty;
 using ::aidl::android::hardware::audio::effect::kEventFlagDataMqUpdate;
+using ::aidl::android::hardware::audio::effect::kEventFlagNotEmpty;
 using ::aidl::android::hardware::audio::effect::kReopenSupportedVersion;
 using ::aidl::android::hardware::audio::effect::State;
 
@@ -199,6 +201,7 @@ status_t EffectHalAidl::process() {
                               efState & kEventFlagDataMqUpdate) {
         ALOGI("%s %s V%d receive dataMQUpdate eventFlag from HAL", __func__, effectName.c_str(),
               halVersion);
+
         mConversion->reopen();
     }
     auto statusQ = mConversion->getStatusMQ();
@@ -224,12 +227,22 @@ status_t EffectHalAidl::process() {
               floatsToWrite, mInBuffer->audioBuffer(), inputQ->availableToWrite());
         return INVALID_OPERATION;
     }
-    efGroup->wake(aidl::android::hardware::audio::effect::kEventFlagNotEmpty);
+
+    // for V2 audio effect HAL, expect different EventFlag to avoid bit conflict with FMQ_NOT_EMPTY
+    efGroup->wake(halVersion >= kReopenSupportedVersion ? kEventFlagDataMqNotEmpty
+                                                        : kEventFlagNotEmpty);
 
     IEffect::Status retStatus{};
-    if (!statusQ->readBlocking(&retStatus, 1) || retStatus.status != OK ||
-        (size_t)retStatus.fmqConsumed != floatsToWrite || retStatus.fmqProduced == 0) {
-        ALOGE("%s read status failed: %s", __func__, retStatus.toString().c_str());
+    if (!statusQ->readBlocking(&retStatus, 1)) {
+        ALOGE("%s %s V%d read status from status FMQ failed", __func__, effectName.c_str(),
+              halVersion);
+        return INVALID_OPERATION;
+    }
+    if (retStatus.status != OK || (size_t)retStatus.fmqConsumed != floatsToWrite ||
+        retStatus.fmqProduced == 0) {
+        ALOGE("%s read status failed: %s, consumed %d (of %zu) produced %d", __func__,
+              retStatus.toString().c_str(), retStatus.fmqConsumed, floatsToWrite,
+              retStatus.fmqProduced);
         return INVALID_OPERATION;
     }
 
