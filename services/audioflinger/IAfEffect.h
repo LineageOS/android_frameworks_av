@@ -189,11 +189,13 @@ public:
     virtual status_t sendMetadata_ll(const std::vector<playback_track_metadata_v7_t>& metadata)
             REQUIRES(audio_utils::ThreadBase_Mutex,
                      audio_utils::EffectChain_Mutex) EXCLUDES_EffectBase_Mutex = 0;
+    // return true if there was a state change from STARTING to ACTIVE, or STOPPED to IDLE, effect
+    // chain will do a volume reset in these two cases
+    virtual bool updateState_l()
+            REQUIRES(audio_utils::EffectChain_Mutex) EXCLUDES_EffectBase_Mutex = 0;
 
 private:
     virtual void process() = 0;
-    virtual bool updateState_l()
-            REQUIRES(audio_utils::EffectChain_Mutex) EXCLUDES_EffectBase_Mutex = 0;
     virtual void reset_l() REQUIRES(audio_utils::EffectChain_Mutex) = 0;
     virtual status_t configure_l() REQUIRES(audio_utils::EffectChain_Mutex) = 0;
     virtual status_t init_l()
