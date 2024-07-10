@@ -96,12 +96,14 @@ void RecordClientDescriptor::dump(String8 *dst, int spaces) const
 SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,
          audio_attributes_t attributes, const struct audio_port_config &config,
          const sp<DeviceDescriptor>& srcDevice, audio_stream_type_t stream,
-         product_strategy_t strategy, VolumeSource volumeSource, bool isInternal) :
+         product_strategy_t strategy, VolumeSource volumeSource,
+         bool isInternal, bool isCallRx, bool isCallTx) :
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
         {config.sample_rate, config.channel_mask, config.format}, AUDIO_PORT_HANDLE_NONE,
         stream, strategy, volumeSource, AUDIO_OUTPUT_FLAG_NONE, false,
         {} /* Sources do not support secondary outputs*/, nullptr),
-    mSrcDevice(srcDevice), mIsInternal(isInternal)
+    mSrcDevice(srcDevice), mIsInternal(isInternal),
+    mIsCallRx(isCallRx), mIsCallTx(isCallTx)
 {
 }
 
