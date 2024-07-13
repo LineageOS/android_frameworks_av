@@ -268,6 +268,12 @@ int64_t CameraServiceProxyWrapper::encodeSessionConfiguration(
             const auto& gbps = config.getGraphicBufferProducers();
             int32_t width = 0, height = 0;
             if (gbps.size() > 0) {
+                if (gbps[0] == nullptr) {
+                    ALOGE("%s: Failed to query size due to abandoned surface.",
+                            __FUNCTION__);
+                    return CameraFeatureCombinationStats::CAMERA_FEATURE_UNKNOWN;
+                }
+
                 sp<Surface> surface = new Surface(gbps[0], /*useAsync*/false);
                 ANativeWindow *anw = surface.get();
 
