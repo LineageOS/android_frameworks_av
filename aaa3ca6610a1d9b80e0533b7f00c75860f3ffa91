@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5166b36e_8531a129",
+        "filename": "services/audioflinger/Tracks.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 808,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2024-07-20T08:14:46Z",
+      "side": 1,
+      "message": "using package name is kinda scary as you can clearly see a single uid might have more packages associated with it, and that might not cover all the usecases?\n\nyou\u0027re currently using the package name all over the place for the checks etc, using the uid for those sounds easier?\nYou can get the uid of the package in the places where you know only the package name (via PackageManager.getPackageInfo(name))\nThat\u0027ll also take into account multi user probably as I\u0027m not entirely sure how it works on that side.\n\nIt\u0027s more of a rework, but it\u0027s likely better and cleaner. Let me know if you want to get into it, otherwise current impl is likely fine",
+      "range": {
+        "startLine": 796,
+        "startChar": 0,
+        "endLine": 808,
+        "endChar": 22
+      },
+      "revId": "aaa3ca6610a1d9b80e0533b7f00c75860f3ffa91",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
