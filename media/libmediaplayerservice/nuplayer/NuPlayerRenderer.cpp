@@ -102,6 +102,10 @@ static audio_format_t constexpr audioFormatFromEncoding(int32_t pcmEncoding) {
     switch (pcmEncoding) {
     case kAudioEncodingPcmFloat:
         return AUDIO_FORMAT_PCM_FLOAT;
+    case kAudioEncodingPcm32bit:
+        return AUDIO_FORMAT_PCM_32_BIT;
+    case kAudioEncodingPcm24bitPacked:
+        return AUDIO_FORMAT_PCM_24_BIT_PACKED;
     case kAudioEncodingPcm16bit:
         return AUDIO_FORMAT_PCM_16_BIT;
     case kAudioEncodingPcm8bit:
@@ -2025,7 +2029,12 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
     if (offloadingAudio()) {
         AString mime;
         CHECK(format->findString("mime", &mime));
-        status_t err = mapMimeToAudioFormat(audioFormat, mime.c_str());
+        status_t err = OK;
+        if (audioFormat == AUDIO_FORMAT_PCM_16_BIT) {
+            // If there is probably no pcm-encoding in the format message, try to get the format by
+            // its mimetype.
+            err = mapMimeToAudioFormat(audioFormat, mime.c_str());
+        }
 
         if (err != OK) {
             ALOGE("Couldn't map mime \"%s\" to a valid "
