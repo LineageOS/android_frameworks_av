@@ -224,9 +224,11 @@ std::shared_ptr<MultiAccessUnitInterface> ComponentStore::tryCreateMultiAccessUn
             }
 
             if (!isComponentSupportsLargeAudioFrame) {
+                std::shared_ptr<C2ReflectorHelper> multiAccessReflector(new C2ReflectorHelper());
                 multiAccessUnitIntf = std::make_shared<MultiAccessUnitInterface>(
                         c2interface,
-                        std::static_pointer_cast<C2ReflectorHelper>(mParamReflectors[0]));
+                        multiAccessReflector);
+                mParamReflectors.push_back(multiAccessReflector);
             }
         }
     }
