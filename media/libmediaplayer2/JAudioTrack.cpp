@@ -615,26 +615,26 @@ jobject JAudioTrack::createVolumeShaperOperationObj(
         jBuilderObj = env->CallObjectMethod(jBuilderCls, jReplace, operation->getReplaceId(), join);
     }
 
-    if (flags | media::VolumeShaper::Operation::FLAG_REVERSE) {
+    if (flags & media::VolumeShaper::Operation::FLAG_REVERSE) {
         jmethodID jReverse = env->GetMethodID(jBuilderCls, "reverse",
                 "()Landroid/media/VolumeShaper$Operation$Builder;");
         jBuilderObj = env->CallObjectMethod(jBuilderCls, jReverse);
     }
 
     // TODO: VolumeShaper Javadoc says "Do not call terminate() directly". Can we call this?
-    if (flags | media::VolumeShaper::Operation::FLAG_TERMINATE) {
+    if (flags & media::VolumeShaper::Operation::FLAG_TERMINATE) {
         jmethodID jTerminate = env->GetMethodID(jBuilderCls, "terminate",
                 "()Landroid/media/VolumeShaper$Operation$Builder;");
         jBuilderObj = env->CallObjectMethod(jBuilderCls, jTerminate);
     }
 
-    if (flags | media::VolumeShaper::Operation::FLAG_DELAY) {
+    if (flags & media::VolumeShaper::Operation::FLAG_DELAY) {
         jmethodID jDefer = env->GetMethodID(jBuilderCls, "defer",
                 "()Landroid/media/VolumeShaper$Operation$Builder;");
         jBuilderObj = env->CallObjectMethod(jBuilderCls, jDefer);
     }
 
-    if (flags | media::VolumeShaper::Operation::FLAG_CREATE_IF_NECESSARY) {
+    if (flags & media::VolumeShaper::Operation::FLAG_CREATE_IF_NECESSARY) {
         jmethodID jCreateIfNeeded = env->GetMethodID(jBuilderCls, "createIfNeeded",
                 "()Landroid/media/VolumeShaper$Operation$Builder;");
         jBuilderObj = env->CallObjectMethod(jBuilderCls, jCreateIfNeeded);
