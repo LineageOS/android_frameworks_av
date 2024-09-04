@@ -619,6 +619,13 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getConfig(
                 if (!isValidOMXParam(outParams)) {
                     return OMX_ErrorBadParameter;
                 }
+                if (offsetof(DescribeHDR10PlusInfoParams, nValue) + outParams->nParamSize >
+                    outParams->nSize) {
+                    ALOGE("b/329641908: too large param size; nParamSize=%u nSize=%u",
+                          outParams->nParamSize, outParams->nSize);
+                    android_errorWriteLog(0x534e4554, "329641908");
+                    return OMX_ErrorBadParameter;
+                }
 
                 outParams->nParamSizeUsed = info->size();
 
