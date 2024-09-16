@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1f315c53_b8382df7",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16624
+      },
+      "writtenOn": "2024-09-16T06:15:03Z",
+      "side": 1,
+      "message": "Not sure it\u0027s particularly interesting, but this is the linked commit: https://git.codelinaro.org/clo/la/platform/frameworks/av/-/commit/150662d",
+      "revId": "0c829f2f1f526a3a49a402603d5a7734ce59df82",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
