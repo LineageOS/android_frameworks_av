@@ -114,7 +114,8 @@ void AudioResampler::init_routine()
         if (*endptr == '\0') {
             defaultQuality = (src_quality) l;
             ALOGD("forcing AudioResampler quality to %d", defaultQuality);
-            if (defaultQuality < DEFAULT_QUALITY || defaultQuality > DYN_HIGH_QUALITY) {
+            if (!qualityIsSupported(defaultQuality)) {
+                ALOGW("%s: AudioResampler quality %d not supported", __func__, defaultQuality);
                 defaultQuality = DEFAULT_QUALITY;
             }
         }
