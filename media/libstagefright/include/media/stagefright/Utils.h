@@ -44,6 +44,9 @@ const uint8_t *findNextNalStartCode(const uint8_t *data, size_t length);
 // Convert a MIME type to a AudioSystem::audio_format
 status_t mapMimeToAudioFormat(audio_format_t& format, const char* mime);
 
+// Convert a pcm-encoding to a AudioSystem::audio_format
+audio_format_t audioFormatFromEncoding(int32_t pcmEncoding);
+
 // Convert a aac profile to a AudioSystem::audio_format
 void mapAACProfileToAudioFormat(audio_format_t& format, uint64_t eAacProfile);
 

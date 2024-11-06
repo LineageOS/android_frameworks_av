@@ -98,24 +98,6 @@ const NuPlayer::Renderer::PcmInfo NuPlayer::Renderer::AUDIO_PCMINFO_INITIALIZER 
 // static
 const int64_t NuPlayer::Renderer::kMinPositionUpdateDelayUs = 100000ll;
 
-static audio_format_t constexpr audioFormatFromEncoding(int32_t pcmEncoding) {
-    switch (pcmEncoding) {
-    case kAudioEncodingPcmFloat:
-        return AUDIO_FORMAT_PCM_FLOAT;
-    case kAudioEncodingPcm32bit:
-        return AUDIO_FORMAT_PCM_32_BIT;
-    case kAudioEncodingPcm24bitPacked:
-        return AUDIO_FORMAT_PCM_24_BIT_PACKED;
-    case kAudioEncodingPcm16bit:
-        return AUDIO_FORMAT_PCM_16_BIT;
-    case kAudioEncodingPcm8bit:
-        return AUDIO_FORMAT_PCM_8_BIT; // TODO: do we want to support this?
-    default:
-        ALOGE("%s: Invalid encoding: %d", __func__, pcmEncoding);
-        return AUDIO_FORMAT_INVALID;
-    }
-}
-
 NuPlayer::Renderer::Renderer(
         const sp<MediaPlayerBase::AudioSink> &sink,
         const sp<MediaClock> &mediaClock,
