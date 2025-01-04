@@ -16,6 +16,24 @@
       "message": "unecessary",
       "revId": "c8377da5dbb1c57f28edbf2b5e68d109f9f9f7d7",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4530b61b_7b488074",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 111,
+      "author": {
+        "id": 19252
+      },
+      "writtenOn": "2025-01-04T16:04:55Z",
+      "side": 0,
+      "message": "Done",
+      "parentUuid": "fa6e44e1_3cda5b73",
+      "revId": "c8377da5dbb1c57f28edbf2b5e68d109f9f9f7d7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
