@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "91932f09_aa07c34c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2025-01-04T16:12:14Z",
+      "side": 1,
+      "message": "This is adding device-specific changes to frameworks and changes default behaviour without any way to toggle it",
+      "revId": "3d766d5562ccc83c5c847569e4ad715c662625bb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
