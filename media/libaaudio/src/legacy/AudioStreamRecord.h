@@ -19,6 +19,7 @@
 
 #include <media/AudioRecord.h>
 #include <aaudio/AAudio.h>
+#include <android/os/BnPowerStateCallback.h>
 
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
@@ -32,11 +33,15 @@ namespace aaudio {
 /**
  * Internal stream that uses the legacy AudioRecord path.
  */
-class AudioStreamRecord : public AudioStreamLegacy {
+class AudioStreamRecord : public AudioStreamLegacy, public android::os::BnPowerStateCallback {
 public:
     AudioStreamRecord();
 
     virtual ~AudioStreamRecord();
+
+    void registerPowerStateCallback();
+    android::binder::Status onResume() override;
+    android::binder::Status onSuspend() override;
 
     aaudio_result_t open(const AudioStreamBuilder & builder) override;
     aaudio_result_t release_l() override;

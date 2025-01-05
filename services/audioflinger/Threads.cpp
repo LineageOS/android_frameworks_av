@@ -16,8 +16,8 @@
 */
 
 
-#define LOG_TAG "AudioFlinger"
-// #define LOG_NDEBUG 0
+#define LOG_TAG "AudioFlinger_Threads"
+#define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
 #include "Threads.h"
@@ -31,6 +31,7 @@
 #include <afutils/Permission.h>
 #include <afutils/TypedLogger.h>
 #include <afutils/Vibrator.h>
+#include <android/os/BnWakeLockCallback.h>
 #include <audio_utils/MelProcessor.h>
 #include <audio_utils/Metadata.h>
 #ifdef DEBUG_CPU_USAGE
@@ -7995,6 +7996,102 @@ void SpatializerThread::threadLoop_exit()
     PlaybackThread::threadLoop_exit();
 }
 
+class LocalWakeLockCallback : public android::os::BnWakeLockCallback {
+public:
+    using CallBackFuncType = std::function<void(bool)>;
+    CallBackFuncType mCallbackFunc;
+    // binder::Status onStateChanged(bool enabled) override {
+    binder::Status onSuspendResume(bool isResume) override {
+        ALOGI("enabled: %d", isResume);
+        if (mCallbackFunc) {
+            mCallbackFunc(isResume);
+        } else {
+            ALOGI("callback func is null, ignore.");
+        }
+        return binder::Status::ok();
+    }
+
+    binder::Status onStateChanged(bool) {
+        /* do nothing */
+        return binder::Status::ok();
+    }
+};
+
+void RecordThread::acquireWakeLock_l() {
+    // Mutex::Autolock _l(mLock);
+#if defined(MTK_AUDIO_FIX_DEFAULT_DEFECT)
+    /* Google issue : Only framework records the wakelock name
+    kernel use PowerManagerService.WakeLock as the unifying name
+    So do the modification on framewrok layer */
+    String16 Tag = getWakeLockTag();
+    if (Tag == String16("AudioOffload")) {
+        return;
+    }
+#endif
+
+    getPowerManager_l();
+    ALOGI("#### 1");
+    if (mPowerManager != 0) {
+        ALOGI("#### 2");
+        sp<IBinder> binder = new BBinder();
+        // Uses AID_AUDIOSERVER for wakelock.  updateWakeLockUids_l() updates with client uids.
+        binder::Status status = mPowerManager->acquireWakeLock(binder,
+                    POWERMANAGER_PARTIAL_WAKE_LOCK,
+                    getWakeLockTag(),
+                    String16("audioserver"),
+                    {} /* workSource */,
+                    {} /* historyTag */,
+                    -1 /* INVALID_DISPLAY_ID */,
+                    mWakeLockCallback);
+        ALOGI("#### 3");
+        if (status.isOk()) {
+            ALOGI("#### 4");
+            mWakeLockToken = binder;
+            mWakeLockEnabled = true;
+        }
+        ALOGI("RecordThread::acquireWakeLock_l() %s status %d", mThreadName, status.exceptionCode());
+    }
+
+    gBoottime.acquire(mWakeLockToken);
+    mTimestamp.mTimebaseOffset[ExtendedTimestamp::TIMEBASE_BOOTTIME] =
+            gBoottime.getBoottimeOffset();
+    mActiveTracks.updatePowerState_l(this, true /* force */);
+}
+
+void RecordThread::onWakeLockStateChanged(bool enabled) {
+    ALOGI("### WakeLock: state changed to %s while mWakeLockEnabled = ", enabled ? "true" : "false");
+    {
+        // Mutex::Autolock _l(mLock);
+        audio_utils::unique_lock _l(mutex());
+        if (mWakeLockEnabled == enabled) {
+            return;
+        }
+
+        mWakeLockEnabled = enabled;
+
+        if (!enabled) {
+            // suspend, backup active tracks
+            mActiveTracksBackup.clear();
+            for (sp<IAfRecordTrack> track: mActiveTracks) {
+                mActiveTracksBackup.add(track);
+            }
+        }
+    }
+
+    ALOGI("### mActiveTracksBackup.size() = %zu", mActiveTracksBackup.size());
+    for (size_t i = 0; i < mActiveTracksBackup.size(); i++) {
+        sp<IAfRecordTrack> track = mTracks[i];
+        if (enabled) {
+            ALOGI("### start track_state = %s", track->getTrackStateAsString());
+            start(track.get(), AudioSystem::SYNC_EVENT_NONE, AUDIO_SESSION_NONE);
+        } else {
+            // error using of stop
+            realStop(track.get());
+        }
+    }
+    ALOGI("### onWakeLockStateChanged: finished");
+}
+
 // ----------------------------------------------------------------------------
 //      Record
 // ----------------------------------------------------------------------------
@@ -8033,6 +8130,10 @@ RecordThread::RecordThread(const sp<IAfThreadCallback>& afThreadCallback,
 {
     snprintf(mThreadName, kThreadNameLength, "AudioIn_%X", id);
     mNBLogWriter = afThreadCallback->newWriter_l(kLogSize, mThreadName);
+
+    mWakeLockCallback = new LocalWakeLockCallback();
+    LocalWakeLockCallback *local = static_cast<LocalWakeLockCallback*>(mWakeLockCallback);
+    local->mCallbackFunc = std::bind(&RecordThread::onWakeLockStateChanged, this, std::placeholders::_1);
 
     if (mInput->audioHwDev != nullptr) {
         mIsMsdDevice = strcmp(
@@ -8268,6 +8369,7 @@ reacquire_wakelock:
                 standbyIfNotAlreadyInStandby();
                 // exitPending() can't become true here
                 releaseWakeLock_l();
+                mWakeLockEnabled = false;
                 ALOGV("RecordThread: loop stopping");
                 // go to sleep
                 mWaitWorkCV.wait(_l);
@@ -8776,6 +8878,7 @@ unlock:
     }
 
     releaseWakeLock();
+    mWakeLockEnabled = false;
 
     ALOGV("RecordThread %p exiting", this);
     return false;
@@ -8789,6 +8892,16 @@ void RecordThread::standbyIfNotAlreadyInStandby()
         mThreadSnapshot.onEnd();
         mStandby = true;
     }
+}
+
+bool RecordThread::realStop(IAfRecordTrack* recordTrack) {
+    if (stop(recordTrack)) {
+        AudioSystem::stopInput(recordTrack->portId());
+        // AudioSystem::releaseInput(recordTrack->portId());
+        return true;
+    }
+
+    return false;
 }
 
 void RecordThread::inputStandBy()

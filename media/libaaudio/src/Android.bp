@@ -170,6 +170,7 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
+        "libpowermanager",
         "framework-permission-aidl-cpp",
         "aaudio-aidl-cpp",
         "audioclient-types-aidl-cpp",

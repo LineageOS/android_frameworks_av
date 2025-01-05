@@ -15,12 +15,13 @@
  */
 
 #define LOG_TAG "AudioStreamRecord"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
 #include <stdint.h>
 
 #include <aaudio/AAudio.h>
+#include <android/os/IPowerManager.h>
 #include <audio_utils/primitives.h>
 #include <media/AidlConversion.h>
 #include <media/AudioRecord.h>
@@ -37,10 +38,37 @@ using android::content::AttributionSourceState;
 using namespace android;
 using namespace aaudio;
 
+void AudioStreamRecord::registerPowerStateCallback() {
+    sp<IBinder> binder = defaultServiceManager()->checkService(String16("power"));
+    if (binder == 0) {
+        ALOGW("(%s) cannot connect to the power manager service", __func__);
+    } else {
+        sp<os::IPowerManager> mPowerManager = interface_cast<os::IPowerManager>(binder);
+        mPowerManager->registerPowerStateCallback(this);
+
+        //FIXME: register death recipient
+        // binder->linkToDeath(mDeathRecipient);
+    }
+}
+
+binder::Status AudioStreamRecord::onResume() {
+    ALOGI("%s", __func__);
+    requestStart_l();
+    return binder::Status::ok();
+}
+
+binder::Status AudioStreamRecord::onSuspend() {
+    ALOGI("%s", __func__);
+    requestStop_l();
+    // close_l();
+    return binder::Status::ok();
+}
+
 AudioStreamRecord::AudioStreamRecord()
     : AudioStreamLegacy()
     , mFixedBlockWriter(*this)
 {
+    registerPowerStateCallback();
 }
 
 AudioStreamRecord::~AudioStreamRecord()

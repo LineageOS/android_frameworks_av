@@ -1949,10 +1949,18 @@ private:
 };
 
 // record thread
+#include <android/os/IWakeLockCallback.h>
 class RecordThread : public IAfRecordThread, public ThreadBase
 {
     friend class ResamplerBufferProvider;
 public:
+    android::os::IWakeLockCallback* mWakeLockCallback;
+    SortedVector<sp<IAfRecordTrack>>       mActiveTracksBackup;
+    bool                                mWakeLockEnabled;
+    void onWakeLockStateChanged(bool);
+    // stop thread and stopInput
+    bool        realStop(IAfRecordTrack* recordTrack);
+
     sp<IAfRecordThread> asIAfRecordThread() final {
         return sp<IAfRecordThread>::fromExisting(this);
     }
@@ -2058,10 +2066,7 @@ public:
     virtual status_t checkEffectCompatibility_l(const effect_descriptor_t *desc,
             audio_session_t sessionId) REQUIRES(mutex());
 
-    virtual void acquireWakeLock_l() REQUIRES(mutex()) {
-                            ThreadBase::acquireWakeLock_l();
-        mActiveTracks.updatePowerState_l(this, true /* force */);
-                        }
+    virtual void acquireWakeLock_l() REQUIRES(mutex()) override;
 
     void checkBtNrec() final EXCLUDES_ThreadBase_Mutex;
 
