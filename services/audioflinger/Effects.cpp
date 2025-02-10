@@ -2984,11 +2984,13 @@ bool EffectChain::isEffectEligibleForBtNrecSuspend_l(const effect_uuid_t* type) 
 bool EffectChain::isEffectEligibleForSuspend(const effect_descriptor_t& desc)
 {
     // auxiliary effects and visualizer are never suspended on output mix
-    if ((mSessionId == AUDIO_SESSION_OUTPUT_MIX) &&
-        (((desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) ||
-         (memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) ||
-         (memcmp(&desc.type, SL_IID_VOLUME, sizeof(effect_uuid_t)) == 0) ||
-         (memcmp(&desc.type, SL_IID_DYNAMICSPROCESSING, sizeof(effect_uuid_t)) == 0))) {
+    if ((desc.flags & EFFECT_FLAG_NOT_ELIGIBLE_SUSPEND) ||
+        ((mSessionId == AUDIO_SESSION_OUTPUT_MIX) &&
+         (((desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) ||
+          (desc.flags & EFFECT_FLAG_NOT_ELIGIBLE_SUSPEND) ||
+          (memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) ||
+          (memcmp(&desc.type, SL_IID_VOLUME, sizeof(effect_uuid_t)) == 0) ||
+          (memcmp(&desc.type, SL_IID_DYNAMICSPROCESSING, sizeof(effect_uuid_t)) == 0)))) {
         return false;
     }
     return true;
