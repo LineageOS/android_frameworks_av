@@ -16,6 +16,24 @@
       "message": "builds just fine on 100+ shopping devices.",
       "revId": "67a8580231f889a0b72a7ac6ce1927b71a008653",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d5bd3f8e_128f9049",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 34921
+      },
+      "writtenOn": "2025-02-26T14:16:25Z",
+      "side": 1,
+      "message": "must i may inform the device i am using and built for is a UMIDIGI A15C with UNSIOC T606 chipset.  May it be because of newer chipsets ?",
+      "parentUuid": "b5ef8aba_2e997ade",
+      "revId": "67a8580231f889a0b72a7ac6ce1927b71a008653",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
