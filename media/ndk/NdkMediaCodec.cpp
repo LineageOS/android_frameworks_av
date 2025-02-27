@@ -672,7 +672,13 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_
         if (out_size != NULL) {
             *out_size = abuf->capacity();
         }
-        return abuf->data();
+
+        // When an input buffer is provided to the application, it is essentially
+        // empty. Ignore its offset as we will set it upon queueInputBuffer.
+        // This actually works as expected as we do not provide visibility of
+        // a potential internal offset to the client, so it is equivalent to
+        // setting the offset to 0 prior to returning the buffer to the client.
+        return abuf->base();
     }
 
     android::Vector<android::sp<android::MediaCodecBuffer> > abufs;
@@ -689,7 +695,7 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec *mData, size_t idx, size_t *out_
         if (out_size != NULL) {
             *out_size = abufs[idx]->capacity();
         }
-        return abufs[idx]->data();
+        return abufs[idx]->base();
     }
     ALOGE("couldn't get input buffers");
     return NULL;
@@ -704,8 +710,12 @@ uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec *mData, size_t idx, size_t *out
             return NULL;
         }
 
+        // Note that we do not provide visibility of the internal offset to the
+        // client, but it also does not make sense to provide visibility of the
+        // buffer capacity vs the actual size.
+
         if (out_size != NULL) {
-            *out_size = abuf->capacity();
+            *out_size = abuf->size();
         }
         return abuf->data();
     }
@@ -718,7 +728,7 @@ uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec *mData, size_t idx, size_t *out
             return NULL;
         }
         if (out_size != NULL) {
-            *out_size = abufs[idx]->capacity();
+            *out_size = abufs[idx]->size();
         }
         return abufs[idx]->data();
     }
@@ -748,7 +758,8 @@ ssize_t AMediaCodec_dequeueOutputBuffer(AMediaCodec *mData,
     requestActivityNotification(mData);
     switch (ret) {
         case OK:
-            info->offset = offset;
+            // the output buffer address is already offset in AMediaCodec_getOutputBuffer()
+            info->offset = 0;
             info->size = size;
             info->flags = flags;
             info->presentationTimeUs = presentationTimeUs;
