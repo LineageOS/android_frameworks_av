@@ -121,6 +121,13 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec*, size_t idx, size_t *out_size);
 /**
  * Get an output buffer. The specified buffer index must have been previously obtained from
  * dequeueOutputBuffer, and not yet queued.
+ *
+ * Available since API level 21.
+ * <p>
+ * At or before API level 35, the out_size returned was invalid, and instead the
+ * size returned in the AMediaCodecBufferInfo struct from
+ * AMediaCodec_dequeueOutputBuffer() should be used. After API
+ * level 35, this API returns the correct output buffer size as well.
  */
 uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec*, size_t idx, size_t *out_size);
 
@@ -172,7 +179,16 @@ media_status_t AMediaCodec_queueSecureInputBuffer(AMediaCodec*, size_t idx,
 #undef _off_t_compat
 
 /**
- * Get the index of the next available buffer of processed data.
+ * Get the index of the next available buffer of processed data along with the
+ * metadata associated with it.
+ *
+ * Available since API level 21.
+ * <p>
+ * At or before API level 35, the offset in the AMediaCodecBufferInfo struct
+ * was invalid and should be ignored; however, at the same time
+ * the buffer size could only be obtained from this struct. After API
+ * level 35, the offset returned in the struct is always set to 0, and the
+ * buffer size can also be obtained from the AMediaCodec_getOutputBuffer() call.
  */
 ssize_t AMediaCodec_dequeueOutputBuffer(AMediaCodec*, AMediaCodecBufferInfo *info,
         int64_t timeoutUs);
