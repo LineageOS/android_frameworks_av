@@ -182,6 +182,11 @@ uint8_t* AMediaCodec_getInputBuffer(AMediaCodec*, size_t idx, size_t *out_size) 
 /**
  * Get an output buffer. The specified buffer index must have been previously obtained from
  * dequeueOutputBuffer, and not yet queued.
+ * <p>
+ * At or before API level 35, the out_size returned was invalid, and instead the
+ * size returned in the AMediaCodecBufferInfo struct from
+ * AMediaCodec_dequeueOutputBuffer() should be used. After API
+ * level 35, this API returns the correct output buffer size as well.
  */
 uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec*, size_t idx, size_t *out_size) __INTRODUCED_IN(21);
 
@@ -234,7 +239,14 @@ media_status_t AMediaCodec_queueSecureInputBuffer(AMediaCodec*, size_t idx,
 #undef _off_t_compat
 
 /**
- * Get the index of the next available buffer of processed data.
+ * Get the index of the next available buffer of processed data along with the
+ * metadata associated with it.
+ * <p>
+ * At or before API level 35, the offset in the AMediaCodecBufferInfo struct
+ * was invalid and should be ignored; however, at the same time
+ * the buffer size could only be obtained from this struct. After API
+ * level 35, the offset returned in the struct is always set to 0, and the
+ * buffer size can also be obtained from the AMediaCodec_getOutputBuffer() call.
  */
 ssize_t AMediaCodec_dequeueOutputBuffer(AMediaCodec*, AMediaCodecBufferInfo *info,
         int64_t timeoutUs) __INTRODUCED_IN(21);
@@ -367,7 +379,6 @@ void AMediaCodec_releaseName(AMediaCodec*, char* name) __INTRODUCED_IN(28);
 /**
  * Set an asynchronous callback for actionable AMediaCodec events.
  * When asynchronous callback is enabled, the client should not call
- * AMediaCodec_getInputBuffers(), AMediaCodec_getOutputBuffers(),
  * AMediaCodec_dequeueInputBuffer() or AMediaCodec_dequeueOutputBuffer().
  *
  * Also, AMediaCodec_flush() behaves differently in asynchronous mode.
