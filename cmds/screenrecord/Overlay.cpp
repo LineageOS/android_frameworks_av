@@ -29,6 +29,8 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <mutex>
+#include <thread>
 
 #include "screenrecord.h"
 #include "Overlay.h"
@@ -53,10 +55,17 @@ const char* Overlay::kPropertyNames[] = {
         //"this-never-appears!",
 };
 
+#define VERIFY_CALLED_ON_OVERLAY_THREAD()                                       \
+    {                                                                           \
+        LOG_ALWAYS_FATAL_IF(mOverlayThreadId != std::this_thread::get_id(),     \
+                            "%s: Called off of Overlay thread!", __FUNCTION__); \
+    }
 
 status_t Overlay::start(const sp<IGraphicBufferProducer>& outputSurface,
         sp<IGraphicBufferProducer>* pBufferProducer) {
     ALOGV("Overlay::start");
+    auto lock = std::unique_lock(mMutex);
+
     mOutputSurface = outputSurface;
 
     // Grab the current monotonic time and the current wall-clock time so we
@@ -67,15 +76,10 @@ status_t Overlay::start(const sp<IGraphicBufferProducer>& outputSurface,
     mStartMonotonicNsecs = systemTime(CLOCK_MONOTONIC);
     mStartRealtimeNsecs = systemTime(CLOCK_REALTIME);
 
-    Mutex::Autolock _l(mMutex);
-
-    // Start the thread.  Traffic begins immediately.
-    run("overlay");
-
+    // Start the thread, wait for it to notify us it's ready to go.
     mState = INIT;
-    while (mState == INIT) {
-        mStartCond.wait(mMutex);
-    }
+    run("overlay");
+    mStartCond.wait(lock, [&]() { return mState != INIT; });
 
     if (mThreadResult != NO_ERROR) {
         ALOGE("Failed to start overlay thread: err=%d", mThreadResult);
@@ -91,49 +95,62 @@ status_t Overlay::start(const sp<IGraphicBufferProducer>& outputSurface,
 status_t Overlay::stop() {
     ALOGV("Overlay::stop");
     {
-        Mutex::Autolock _l(mMutex);
+        auto lock = std::lock_guard(mMutex);
         mState = STOPPING;
-        mEventCond.signal();
+        mEventCond.notify_one();
     }
     join();
     return NO_ERROR;
 }
 
 bool Overlay::threadLoop() {
-    Mutex::Autolock _l(mMutex);
+    auto lock = std::unique_lock(mMutex);
 
-    mThreadResult = setup_l();
+    mOverlayThreadId = std::this_thread::get_id();
+
+    mThreadResult = setup();
 
     if (mThreadResult != NO_ERROR) {
         ALOGW("Aborting overlay thread");
         mState = STOPPED;
-        release_l();
-        mStartCond.broadcast();
+        release();
+        mStartCond.notify_one();
         return false;
     }
 
     ALOGV("Overlay thread running");
     mState = RUNNING;
-    mStartCond.broadcast();
+    mStartCond.notify_one();
 
     while (mState == RUNNING) {
-        mEventCond.wait(mMutex);
-        if (mFrameAvailable) {
-            ALOGV("Awake, frame available");
-            processFrame_l();
-            mFrameAvailable = false;
-        } else {
-            ALOGV("Awake, frame not available");
+        if (mAvailableFrames == 0) {
+            mEventCond.wait(lock);
+            if (mAvailableFrames == 0) {
+                ALOGV("Overlay thread awake, frame not available. State was %d and is now %d",
+                      RUNNING, mState);
+                continue;
+            }
         }
+
+        mAvailableFrames--;
+
+        lock.unlock();
+        ALOGD("Overlay thread awake, frame available");
+        processFrame();
+        lock.lock();
     }
 
     ALOGV("Overlay thread stopping");
-    release_l();
     mState = STOPPED;
+
+    lock.unlock();
+    release();
     return false;       // stop
 }
 
-status_t Overlay::setup_l() {
+status_t Overlay::setup() {
+    VERIFY_CALLED_ON_OVERLAY_THREAD();
+
     status_t err;
 
     err = mEglWindow.createWindow(mOutputSurface);
@@ -187,9 +204,11 @@ status_t Overlay::setup_l() {
     return NO_ERROR;
 }
 
-
-void Overlay::release_l() {
+void Overlay::release() {
     ALOGV("Overlay::release_l");
+
+    VERIFY_CALLED_ON_OVERLAY_THREAD();
+
     mOutputSurface.clear();
     mGlConsumer.clear();
     mProducer.clear();
@@ -199,7 +218,9 @@ void Overlay::release_l() {
     mEglWindow.release();
 }
 
-void Overlay::processFrame_l() {
+void Overlay::processFrame() {
+    VERIFY_CALLED_ON_OVERLAY_THREAD();
+
     float texMatrix[16];
 
     mGlConsumer->updateTexImage();
@@ -226,7 +247,7 @@ void Overlay::processFrame_l() {
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
     char textBuf[64];
-    getTimeString_l(monotonicNsec, textBuf, sizeof(textBuf));
+    getTimeString(monotonicNsec, textBuf, sizeof(textBuf));
     String8 timeStr(String8::format("%s f=%" PRId64 " (%zd)",
             textBuf, frameNumber, mTotalDroppedFrames));
     mTextRenderer.drawString(mTexProgram, Program::kIdentity, 0, 0, timeStr);
@@ -237,7 +258,9 @@ void Overlay::processFrame_l() {
     mEglWindow.swapBuffers();
 }
 
-void Overlay::getTimeString_l(nsecs_t monotonicNsec, char* buf, size_t bufLen) {
+void Overlay::getTimeString(nsecs_t monotonicNsec, char* buf, size_t bufLen) {
+    VERIFY_CALLED_ON_OVERLAY_THREAD();
+
     //const char* format = "%m-%d %T";    // matches log output
     const char* format = "%T";
     struct tm tm;
@@ -264,9 +287,9 @@ void Overlay::getTimeString_l(nsecs_t monotonicNsec, char* buf, size_t bufLen) {
 // Callback; executes on arbitrary thread.
 void Overlay::onFrameAvailable(const BufferItem& /* item */) {
     ALOGV("Overlay::onFrameAvailable");
-    Mutex::Autolock _l(mMutex);
-    mFrameAvailable = true;
-    mEventCond.signal();
+    auto lock = std::lock_guard(mMutex);
+    mAvailableFrames += 1;
+    mEventCond.notify_one();
 }
 
 
