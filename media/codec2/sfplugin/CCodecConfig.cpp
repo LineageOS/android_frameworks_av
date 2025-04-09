@@ -1266,8 +1266,7 @@ status_t CCodecConfig::queryConfiguration(
     std::vector<std::unique_ptr<C2Param>> queried;
     c2_status_t c2Err = configurable->query({}, indices, C2_MAY_BLOCK, &queried);
     if (c2Err != OK) {
-        ALOGI("query failed after returning %zu values (%s)", queried.size(), asString(c2Err));
-        // TODO: error
+        ALOGE("query failed after returning %zu values (%s)", queried.size(), asString(c2Err));
     }
 
     updateConfiguration(queried, ALL);
