@@ -189,8 +189,8 @@ void OpRecordAudioMonitor::checkOp(bool updateUidStates) {
     }
     // verbose logging only log when appOp changed
     ALOGI_IF(hasIt != mHasOp.load(),
-            "App op %d missing, %ssilencing record %s",
-            mAppOp, hasIt ? "un" : "", mAttributionSource.toString().c_str());
+            "App op %d missing, updateUidStates=%d, %ssilencing record %s",
+            mAppOp, updateUidStates, hasIt ? "un" : "", mAttributionSource.toString().c_str());
     mHasOp.store(hasIt);
 
     if (updateUidStates) {
