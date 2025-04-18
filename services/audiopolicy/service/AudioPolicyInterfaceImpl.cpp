@@ -1019,10 +1019,14 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
         setAppState_l(client, APP_STATE_IDLE);
     }
 
+    client->pendingFinishes++;
     client->active = true;
     client->startTimeNs = systemTime();
     // This call updates the silenced state, and since we are active, appropriately notifies appops
     // if we silence the track.
+    // 2025-04-19: No, it doesn't. The prior call to setAppState_l establishes the silenced state,
+    //             so when revisited below, it hasn't changed, so no notification to appops occurs.
+    // TODO: Fix all that or update comment.
     updateUidStates_l();
 
     status_t status;
@@ -1108,6 +1112,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
         client->startTimeNs = 0;
         updateUidStates_l();
         if (!client->silenced) {
+            client->pendingFinishes--;
             finishRecording(client->attributionSource, client->virtualDeviceId,
                     client->attributes.source);
         }
@@ -1139,7 +1144,10 @@ Status AudioPolicyService::stopInput(int32_t portIdAidl)
     updateUidStates_l();
 
     // finish the recording app op
-    if (!client->silenced) {
+    const int pendingFinishes = client->pendingFinishes;
+    client->pendingFinishes = 0;
+    for (int i = 0; i < pendingFinishes; i++) {
+        ALOGV("%s performing pending finish on client portId %d", __FUNCTION__, portId);
         finishRecording(client->attributionSource, client->virtualDeviceId,
                 client->attributes.source);
     }
@@ -1174,6 +1182,13 @@ Status AudioPolicyService::releaseInput(int32_t portIdAidl)
             updateUidStates_l();
         }
 
+        const int pendingFinishes = client->pendingFinishes;
+        client->pendingFinishes = 0;
+        for (int i = 0; i < pendingFinishes; i++) {
+            ALOGV("%s performing pending finish on client portId %d", __FUNCTION__, portId);
+            finishRecording(client->attributionSource, client->virtualDeviceId,
+                            client->attributes.source);
+        }
         mAudioRecordClients.removeItem(portId);
     }
     if (client == 0) {

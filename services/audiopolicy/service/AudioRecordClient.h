@@ -96,7 +96,7 @@ public:
                     session, portId, deviceIds), attributionSource(attributionSource),
                     virtualDeviceId(virtualDeviceId),
                     startTimeNs(0), canBypassConcurrentPolicy(canBypassConcurrentPolicy),
-                    silenced(false), mOpRecordAudioMonitor(
+                    silenced(false), pendingFinishes(0), mOpRecordAudioMonitor(
                             OpRecordAudioMonitor::createIfNeeded(attributionSource,
                                                                  virtualDeviceId,
                                                                  attributes, commandThread)) {
@@ -113,6 +113,7 @@ public:
     nsecs_t startTimeNs;
     const bool canBypassConcurrentPolicy;
     bool silenced;
+    int pendingFinishes;
 
 private:
     sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;

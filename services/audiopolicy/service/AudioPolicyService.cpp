@@ -63,6 +63,7 @@ static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AU
 
 namespace {
 constexpr auto PERMISSION_GRANTED = permission::PermissionChecker::PERMISSION_GRANTED;
+constexpr auto PERMISSION_HARD_DENIED = permission::PermissionChecker::PERMISSION_HARD_DENIED;
 }
 
 // Creates an association between Binder code to name for IAudioPolicyService.
@@ -1223,15 +1224,34 @@ void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t
         bool silenced = state == APP_STATE_IDLE;
         if (client->silenced != silenced) {
             if (client->active) {
+                std::stringstream msg;
                 if (silenced) {
-                    finishRecording(client->attributionSource, client->virtualDeviceId,
-                                    client->attributes.source);
+                    const int pendingFinishes = client->pendingFinishes;
+                    client->pendingFinishes = 0;
+                    msg << "Audio recording silenced on session " << client->session << "; "
+                        << "performing " << pendingFinishes << " pending finishes";
+                    ALOGV("%s", msg.str().c_str());
+                    for (int i = 0; i < pendingFinishes; i++) {
+                        finishRecording(client->attributionSource, client->virtualDeviceId,
+                                        client->attributes.source);
+                    }
                 } else {
-                    std::stringstream msg;
+                    const int permitted = startRecording(
+                            client->attributionSource, client->virtualDeviceId,
+                            String16(msg.str().c_str()), client->attributes.source);
                     msg << "Audio recording un-silenced on session " << client->session;
-                    if (startRecording(client->attributionSource, client->virtualDeviceId,
-                                String16(msg.str().c_str()), client->attributes.source)
-                                != PERMISSION_GRANTED) {
+                    if (permitted == PERMISSION_HARD_DENIED) {
+                        msg << "; hard denied with " << client->pendingFinishes
+                            << " pending finishes";
+                    } else {
+                        client->pendingFinishes++;
+                        msg << "; increased pending finishes to " << client->pendingFinishes;
+                        if (permitted != PERMISSION_GRANTED) {
+                            msg << " (soft denied)";
+                        }
+                    }
+                    ALOGV("%s", msg.str().c_str());
+                    if (permitted != PERMISSION_GRANTED) {
                         return;
                     }
                 }
