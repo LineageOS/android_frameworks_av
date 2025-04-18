@@ -965,6 +965,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
 {
     audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
+    ALOGW("startInput portId %d", portId);
 
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
@@ -982,6 +983,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
 
     std::stringstream msg;
     msg << "Audio recording on session " << client->session;
+    ALOGW("%s", msg.str().c_str());
 
     const auto permitted = startRecording(client->attributionSource, client->virtualDeviceId,
             String16(msg.str().c_str()), client->attributes.source);
@@ -1125,6 +1127,7 @@ Status AudioPolicyService::stopInput(int32_t portIdAidl)
 {
     audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
+    ALOGW("stopInput portId %d", portId);
 
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
@@ -1160,6 +1163,7 @@ Status AudioPolicyService::releaseInput(int32_t portIdAidl)
 {
     audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
+    ALOGW("releaseInput portId %d", portId);
 
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
