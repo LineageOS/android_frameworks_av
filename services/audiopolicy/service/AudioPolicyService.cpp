@@ -1223,11 +1223,13 @@ void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t
         bool silenced = state == APP_STATE_IDLE;
         if (client->silenced != silenced) {
             if (client->active) {
+                ALOGW("setAppState_l finishRecording");
                 finishRecording(client->attributionSource, client->virtualDeviceId,
                                 client->attributes.source);
                 if (!silenced) {
                     std::stringstream msg;
                     msg << "Audio recording un-silenced on session " << client->session;
+                    ALOGW("setAppState_l %s", msg.str().c_str());
                     if (startRecording(client->attributionSource, client->virtualDeviceId,
                                 String16(msg.str().c_str()), client->attributes.source)
                                 != PERMISSION_GRANTED) {
