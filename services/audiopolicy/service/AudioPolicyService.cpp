@@ -1223,10 +1223,9 @@ void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t
         bool silenced = state == APP_STATE_IDLE;
         if (client->silenced != silenced) {
             if (client->active) {
-                if (silenced) {
-                    finishRecording(client->attributionSource, client->virtualDeviceId,
-                                    client->attributes.source);
-                } else {
+                finishRecording(client->attributionSource, client->virtualDeviceId,
+                                client->attributes.source);
+                if (!silenced) {
                     std::stringstream msg;
                     msg << "Audio recording un-silenced on session " << client->session;
                     if (startRecording(client->attributionSource, client->virtualDeviceId,
