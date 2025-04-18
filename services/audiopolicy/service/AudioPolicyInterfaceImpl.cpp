@@ -1139,10 +1139,8 @@ Status AudioPolicyService::stopInput(int32_t portIdAidl)
     updateUidStates_l();
 
     // finish the recording app op
-    if (!client->silenced) {
-        finishRecording(client->attributionSource, client->virtualDeviceId,
-                client->attributes.source);
-    }
+    finishRecording(client->attributionSource, client->virtualDeviceId,
+            client->attributes.source);
 
     AutoCallerClear acc;
     return binderStatusFromStatusT(mAudioPolicyManager->stopInput(portId));
