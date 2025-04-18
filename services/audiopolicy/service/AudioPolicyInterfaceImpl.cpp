@@ -963,6 +963,7 @@ std::string AudioPolicyService::getDeviceTypeStrForPortIds(DeviceIdVector portId
 
 Status AudioPolicyService::startInput(int32_t portIdAidl)
 {
+    ALOGW("startInput");
     audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
 
@@ -982,6 +983,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
 
     std::stringstream msg;
     msg << "Audio recording on session " << client->session;
+    ALOGW("%s", msg.str().c_str());
 
     const auto permitted = startRecording(client->attributionSource, client->virtualDeviceId,
             String16(msg.str().c_str()), client->attributes.source);
@@ -1118,6 +1120,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
 
 Status AudioPolicyService::stopInput(int32_t portIdAidl)
 {
+    ALOGW("stopInput");
     audio_port_handle_t portId = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_port_handle_t(portIdAidl));
 
