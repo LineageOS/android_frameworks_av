@@ -1222,6 +1222,10 @@ void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
     if (af) {
         bool silenced = state == APP_STATE_IDLE;
+        std::stringstream log_msg;
+        log_msg << "silenced=" << silenced << " state=" << state << " session="
+                << client->session << " active=" << client->active;
+        ALOGW("setAppState_l %s", log_msg.str().c_str());
         if (client->silenced != silenced) {
             if (client->active) {
                 if (silenced) {
@@ -1230,6 +1234,7 @@ void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t
                     for (int i = 0; i < pendingFinishes; i++) {
                         finishRecording(client->attributionSource, client->virtualDeviceId,
                                         client->attributes.source);
+                        ALOGW("setAppState_l finishRecording %d", i);
                     }
                 } else {
                     std::stringstream msg;
