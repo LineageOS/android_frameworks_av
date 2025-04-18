@@ -63,6 +63,7 @@ static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AU
 
 namespace {
 constexpr auto PERMISSION_GRANTED = permission::PermissionChecker::PERMISSION_GRANTED;
+constexpr auto PERMISSION_HARD_DENIED = permission::PermissionChecker::PERMISSION_HARD_DENIED;
 }
 
 // Creates an association between Binder code to name for IAudioPolicyService.
@@ -1224,14 +1225,23 @@ void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t
         if (client->silenced != silenced) {
             if (client->active) {
                 if (silenced) {
-                    finishRecording(client->attributionSource, client->virtualDeviceId,
-                                    client->attributes.source);
+                    const int pendingFinishes = client->pendingFinishes;
+                    client->pendingFinishes = 0;
+                    for (int i = 0; i < pendingFinishes; i++) {
+                        finishRecording(client->attributionSource, client->virtualDeviceId,
+                                        client->attributes.source);
+                    }
                 } else {
                     std::stringstream msg;
                     msg << "Audio recording un-silenced on session " << client->session;
-                    if (startRecording(client->attributionSource, client->virtualDeviceId,
-                                String16(msg.str().c_str()), client->attributes.source)
-                                != PERMISSION_GRANTED) {
+                    ALOGW("setAppState_l %s", msg.str().c_str());
+                    const int permitted = startRecording(
+                            client->attributionSource, client->virtualDeviceId,
+                            String16(msg.str().c_str()), client->attributes.source);
+                    if (permitted != PERMISSION_HARD_DENIED) {
+                        client->pendingFinishes++;
+                    }
+                    if (permitted != PERMISSION_GRANTED) {
                         return;
                     }
                 }
