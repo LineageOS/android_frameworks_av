@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a8663dc8_57bb2e12",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31604
+      },
+      "writtenOn": "2025-04-19T10:45:36Z",
+      "side": 1,
+      "message": "With its Change-Id counterpart in fw/b, passes every test in CtsMediaAudioTests (not just CtsMediaAudioPermissionTests) with only 3 assumption failures - two for a flag being off for RingtoneManagerTest (android.media.audio.enable_ringtone_haptics_customization), one for apiLevel \u003c\u003d 35.\n\nAlso passes manual test from commit message.\n\nWill run on device a while.",
+      "revId": "93fc2430b126e4538a63aca1addf89966bc3c909",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
