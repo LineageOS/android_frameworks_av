@@ -16,6 +16,24 @@
       "message": "Requires physical device to complete atest properly, or else ASSUMPTION_FAILED.\n\nWith physical device, fails this test:\n```\nandroid.media.audio.cts.audiorecordpermissiontests.AudioRecordPermissionTests#testIfRecording_whenSecondRecordingSilencedStopped_OpNotFinished: FAILED (6.926s)\n\nSTACKTRACE:\njava.lang.AssertionError\n        at org.junit.Assert.fail(Assert.java:87)\n        at org.junit.Assert.assertTrue(Assert.java:42)\n        at org.junit.Assert.assertTrue(Assert.java:53)\n        at android.media.audio.cts.audiorecordpermissiontests.AudioRecordPermissionTests.testIfRecording_whenSecondRecordingSilencedStopped_OpNotFinished(AudioRecordPermi\nssionTests.java:442)\n```",
       "revId": "560c6d99c0c9b0b2fa56f4183c0fc191f2eace1b",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "132db971_17abbeb9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31604
+      },
+      "writtenOn": "2025-04-19T02:40:13Z",
+      "side": 1,
+      "message": "Resolved with this hack: https://review.lineageos.org/c/LineageOS/android_frameworks_base/+/428060\n\n🙄",
+      "parentUuid": "c7dc8106_949b2de4",
+      "revId": "560c6d99c0c9b0b2fa56f4183c0fc191f2eace1b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
