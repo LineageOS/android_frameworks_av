@@ -96,7 +96,7 @@ public:
                     session, portId, deviceIds), attributionSource(attributionSource),
                     virtualDeviceId(virtualDeviceId),
                     startTimeNs(0), canBypassConcurrentPolicy(canBypassConcurrentPolicy),
-                    silenced(false), mOpRecordAudioMonitor(
+                    silenced(false), pendingFinishes(0), mOpRecordAudioMonitor(
                             OpRecordAudioMonitor::createIfNeeded(attributionSource,
                                                                  virtualDeviceId,
                                                                  attributes, commandThread)) {
@@ -113,6 +113,16 @@ public:
     nsecs_t startTimeNs;
     const bool canBypassConcurrentPolicy;
     bool silenced;
+    // Used to aid in synchronizing our state with app ops.
+    // For every successful startRecording call, increment this counter.
+    // Some startRecording calls result in PERMISSION_SOFT_DENIED, which is treated as a "success"
+    // on our side but which results in a silenced recording. In this case, however, we simply can't
+    // know what the count looks like in app ops, absent further system improvements. This is why
+    // wait to process these pending finishes until an input is stopped or released and the
+    // attribution source no longer has any active recordings; by that point, if we finish too
+    // many times, it shouldn't be a problem, but if we don't finish enough times, then app ops
+    // will think recording is on-going forever.
+    int pendingFinishes;
 
 private:
     sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
