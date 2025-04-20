@@ -33,6 +33,24 @@
       "message": "Although this passes current tests and appears to work, it looks incorrect.\n\nImagine an app becomes idle, un-idle, idle, un-idle. As written, this finishes more often than it starts. One would think that would break the accounting.\n\nIs the only reason this *doesn\u0027t* break the accounting that we hack it in corresponding fw/b (meaning the \"oddity\" that change describes is of our own creation)? Is the change to this part of code perhaps unnecessary after all or otherwise an inappropriate solution?",
       "revId": "93fc2430b126e4538a63aca1addf89966bc3c909",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d832af4e_6757e516",
+        "filename": "services/audiopolicy/service/AudioPolicyService.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 1226,
+      "author": {
+        "id": 31604
+      },
+      "writtenOn": "2025-04-20T00:39:03Z",
+      "side": 1,
+      "message": "The return from startRecording can be PERMISSION_GRANTED, PERMISSION_HARD_DENIED, or PERMISSION_SOFT_DENIED. When it is PERMISSION_SOFT_DENIED, this is either because mic access is restricted (off) or because the app is in the background. If the app is in the background, startOperation \"rejects\" the operation and does not increase any counts; it\u0027s as if it is ignored, but this doesn\u0027t prevent it from receiving silenced audio. If it\u0027s because mic access is restricted, startOperation creates the op as paused, which does increase the count.\n\nFor SOFT_DENIED, it is impossible to tell for sure whether the count increased or not, so we can\u0027t reliably sync our start with appops. We could *guess* based on the uid state, but this would be subject to race conditions since we can\u0027t be certain what state factored into the soft denial decision process.\n\nAnyway, I adjusted this patch and the other one to make it make a bit more sense.",
+      "parentUuid": "e83fb276_30c5be79",
+      "revId": "93fc2430b126e4538a63aca1addf89966bc3c909",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
