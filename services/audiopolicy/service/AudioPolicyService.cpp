@@ -63,6 +63,7 @@ static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AU
 
 namespace {
 constexpr auto PERMISSION_GRANTED = permission::PermissionChecker::PERMISSION_GRANTED;
+constexpr auto PERMISSION_HARD_DENIED = permission::PermissionChecker::PERMISSION_HARD_DENIED;
 }
 
 // Creates an association between Binder code to name for IAudioPolicyService.
@@ -1223,17 +1224,25 @@ void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t
         bool silenced = state == APP_STATE_IDLE;
         if (client->silenced != silenced) {
             if (client->active) {
+                std::stringstream msg;
                 if (silenced) {
+                    if (client->pendingFinishes == 0) {
+                        msg << "pending finishes for client " << client->session << " already 0";
+                        ALOGE("%s %s", __FUNCTION__, msg.str().c_str());
+                    } else {
+                        client->pendingFinishes--;
+                    }
                     finishRecording(client->attributionSource, client->virtualDeviceId,
                                     client->attributes.source);
                 } else {
-                    std::stringstream msg;
                     msg << "Audio recording un-silenced on session " << client->session;
-                    if (startRecording(client->attributionSource, client->virtualDeviceId,
-                                String16(msg.str().c_str()), client->attributes.source)
-                                != PERMISSION_GRANTED) {
+                    const int permitted = startRecording(client->attributionSource,
+                            client->virtualDeviceId, String16(msg.str().c_str()),
+                            client->attributes.source);
+                    if (permitted == PERMISSION_HARD_DENIED) {
                         return;
                     }
+                    client->pendingFinishes++;
                 }
             }
             af->setRecordSilenced(client->portId, silenced);
