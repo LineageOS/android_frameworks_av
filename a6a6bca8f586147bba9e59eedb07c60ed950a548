@@ -16,6 +16,23 @@
       "message": "Passes CtsMediaAudioTestCases still, same 3 irrelevant ASSUMPTION_FAILED as before.",
       "revId": "a6a6bca8f586147bba9e59eedb07c60ed950a548",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "7bf6b3e1_7247df8f",
+        "filename": "services/audiopolicy/service/AudioPolicyService.cpp",
+        "patchSetId": 7
+      },
+      "lineNbr": 1247,
+      "author": {
+        "id": 31604
+      },
+      "writtenOn": "2025-04-20T09:24:18Z",
+      "side": 1,
+      "message": "We might not want to do it here.\n\nIf recording is started from bg, especially first time (see counterpart change\u0027s \"quirk\"), app ops may not be counting it at all. Prior to counterpart change, it never counts it; after, it counts non-first, as a quirk. But it\u0027s still an uncertainty. We already added a pending finish when the recording started either way.\n\nThen again, here, we can guarantee (I think) that such recordings get counted, so maybe we never want to count recordings that *start out* silenced after all, since we can count them here when unsilenced, which should reliably increase the app ops count - *should* never be soft-denied and uncounted if this is truly our app state, although perhaps races could occur. The problem - which is I suppose the entire issue - is if a recording is stopped (stopInput) and it was never unsilenced, how do we know reliably whether to finishRecording?!? It could have either been started from bg in which case we shouldn\u0027t finish, or started restricted (mic access off) in which case we should finish.\n\n**We need to be able to 100% reliably know whether startRecording started a recording, no exceptions or quirks.**\n\nThat or we need to be able to match up all client recordings based on attributionSource, or however exactly they are grouped (remember there could be different audio inputs), so that we only finish when they\u0027re all done.\n\nThis design is upsetting.",
+      "revId": "a6a6bca8f586147bba9e59eedb07c60ed950a548",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
