@@ -504,6 +504,9 @@ private:
                             const audio_output_flags_t flags);
     status_t unregisterOutput(audio_io_handle_t output);
 
+    void handlePendingFinishes(sp<AudioRecordClient>& client,
+                               audio_port_handle_t portId) REQUIRES(mMutex);
+
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
     // transitions to an active state we will start reporting buffers with data. This approach

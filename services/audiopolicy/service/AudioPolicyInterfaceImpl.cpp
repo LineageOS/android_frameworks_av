@@ -1021,6 +1021,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
 
     client->active = true;
     client->startTimeNs = systemTime();
+    client->pendingFinishes++;
     // This call updates the silenced state, and since we are active, appropriately notifies appops
     // if we silence the track.
     updateUidStates_l();
@@ -1108,6 +1109,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
         client->startTimeNs = 0;
         updateUidStates_l();
         if (!client->silenced) {
+            client->pendingFinishes--;
             finishRecording(client->attributionSource, client->virtualDeviceId,
                     client->attributes.source);
         }
@@ -1140,8 +1142,15 @@ Status AudioPolicyService::stopInput(int32_t portIdAidl)
 
     // finish the recording app op
     if (!client->silenced) {
+        if (client->pendingFinishes == 0) {
+            ALOGE("%s pending finishes for client portId %d already 0", __FUNCTION__, portId);
+        } else {
+            client->pendingFinishes--;
+        }
         finishRecording(client->attributionSource, client->virtualDeviceId,
                 client->attributes.source);
+    } else {
+        handlePendingFinishes(client, portId);
     }
 
     AutoCallerClear acc;
@@ -1174,6 +1183,7 @@ Status AudioPolicyService::releaseInput(int32_t portIdAidl)
             updateUidStates_l();
         }
 
+        handlePendingFinishes(client, portId);
         mAudioRecordClients.removeItem(portId);
     }
     if (client == 0) {
@@ -2915,6 +2925,46 @@ Status AudioPolicyService::getMmapPolicyForDevice(
     audio_utils::lock_guard _l(mMutex);
     return binderStatusFromStatusT(
             mAudioPolicyManager->getMmapPolicyForDevice(policyType, policyInfo));
+}
+
+void AudioPolicyService::handlePendingFinishes(sp<AudioRecordClient>& client,
+                                               audio_port_handle_t portId) {
+    const auto size = mAudioRecordClients.size();
+    sp<AudioRecordClient> candidateToOwnFinishes = client;
+    for (int i = 0; i < size; i++) {
+        if (portId == mAudioRecordClients.keyAt(i)) {
+            continue;
+        }
+        sp<AudioRecordClient> other = mAudioRecordClients.valueAt(i);
+        if (other->active
+                && other->attributionSource == client->attributionSource
+                && other->virtualDeviceId == client->virtualDeviceId
+                && other->attributes.source == client->attributes.source) {
+            candidateToOwnFinishes = other;
+            break;
+        }
+    }
+    const int pendingFinishes = client->pendingFinishes;
+    client->pendingFinishes = 0;
+    if (candidateToOwnFinishes != client) {
+        IF_ALOGD() {
+            ALOGD("%s shifting finish responsibility for client portId %d", __FUNCTION__, portId);
+        }
+        candidateToOwnFinishes->pendingFinishes += pendingFinishes;
+    } else {
+        // Because we cannot know which PERMISSION_SOFT_DENIED-returning startRecording calls
+        // had an influence on app ops' count, we have been counting them all. This may lead to
+        // us submitting excessive finish notifications from app ops' perspective, but as long
+        // as the excess happens when all clients are done, as we assure in our candidate search
+        // above, it's better than leaving some dangling and it shouldn't lead to any issues.
+        for (int i = 0; i < pendingFinishes; i++) {
+            IF_ALOGD() {
+                ALOGD("%s performing pending finish on client portId %d", __FUNCTION__, portId);
+            }
+            finishRecording(client->attributionSource, client->virtualDeviceId,
+                            client->attributes.source);
+        }
+    }
 }
 
 } // namespace android
