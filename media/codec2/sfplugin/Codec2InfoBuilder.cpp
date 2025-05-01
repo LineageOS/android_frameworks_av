@@ -774,20 +774,17 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 addSupportedColorFormats(
                         intf, caps.get(), trait, mediaType, it->second);
 
-                if (com::android::media::codec::flags::provider_->large_audio_frame()
-                        && android::media::codec::provider_->large_audio_frame_finish()) {
-                    // Adding feature-multiple-frames when C2LargeFrame param is present
-                    if (trait.domain == C2Component::DOMAIN_AUDIO) {
-                        std::vector<std::shared_ptr<C2ParamDescriptor>> params;
-                        c2_status_t err = intf->querySupportedParams(&params);
-                        if (err == C2_OK) {
-                            for (const auto &paramDesc : params) {
-                                if (C2LargeFrame::output::PARAM_TYPE == paramDesc->index()) {
-                                    std::string featureMultipleFrames =
-                                            std::string(KEY_FEATURE_) + FEATURE_MultipleFrames;
-                                    caps->addDetail(featureMultipleFrames.c_str(), 0);
-                                    break;
-                                }
+                // Adding feature-multiple-frames when C2LargeFrame param is present
+                if (trait.domain == C2Component::DOMAIN_AUDIO) {
+                    std::vector<std::shared_ptr<C2ParamDescriptor>> params;
+                    c2_status_t err = intf->querySupportedParams(&params);
+                    if (err == C2_OK) {
+                        for (const auto &paramDesc : params) {
+                            if (C2LargeFrame::output::PARAM_TYPE == paramDesc->index()) {
+                                std::string featureMultipleFrames =
+                                        std::string(KEY_FEATURE_) + FEATURE_MultipleFrames;
+                                caps->addDetail(featureMultipleFrames.c_str(), 0);
+                                break;
                             }
                         }
                     }
