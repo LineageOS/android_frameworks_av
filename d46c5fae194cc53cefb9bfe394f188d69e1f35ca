@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7f5b4a5d_9c988bcb",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 33372
+      },
+      "writtenOn": "2025-05-04T19:58:58Z",
+      "side": 1,
+      "message": "Tested on Xiaomi mt6895",
+      "revId": "d46c5fae194cc53cefb9bfe394f188d69e1f35ca",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
