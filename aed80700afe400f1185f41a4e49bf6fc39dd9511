@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c86c5277_d46d12ab",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 10
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31604
+      },
+      "writtenOn": "2025-05-05T15:34:41Z",
+      "side": 1,
+      "message": "Note that this is resolved in Android 16 Public Beta 4, though the code is not public. See: https://android-review.googlesource.com/c/platform/frameworks/av/+/3600113/comments/1d6dc981_8a8bd4ca",
+      "revId": "aed80700afe400f1185f41a4e49bf6fc39dd9511",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
