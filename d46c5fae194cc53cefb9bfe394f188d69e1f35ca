@@ -16,6 +16,23 @@
       "message": "Tested on Xiaomi mt6895",
       "revId": "d46c5fae194cc53cefb9bfe394f188d69e1f35ca",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c69e8e31_4ce2c055",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32253
+      },
+      "writtenOn": "2025-05-12T16:05:05Z",
+      "side": 1,
+      "message": "Been using it alongside my qcom devices since a while now, haven\u0027t noticed any regression so far.",
+      "revId": "d46c5fae194cc53cefb9bfe394f188d69e1f35ca",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
