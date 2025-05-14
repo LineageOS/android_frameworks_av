@@ -18,14 +18,16 @@
 
 #include "AudioRecordClient.h"
 #include "AudioPolicyService.h"
+#include "binder/AppOpsManager.h"
+
+#include <algorithm>
 
 namespace android::media::audiopolicy {
 
 using android::AudioPolicyService;
 
 namespace {
-bool isAppOpSource(audio_source_t source)
-{
+bool isAppOpSource(audio_source_t source) {
     switch (source) {
         case AUDIO_SOURCE_FM_TUNER:
         case AUDIO_SOURCE_ECHO_REFERENCE:
@@ -55,7 +57,46 @@ bool doesPackageTargetAtLeastU(std::string_view packageName) {
     constexpr int ANDROID_API_U = 34;
     return getTargetSdkForPackageName(packageName) >= ANDROID_API_U;
 }
-}
+
+class AttrSourceItr {
+  public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = AttributionSourceState;
+    using pointer = const value_type*;
+    using reference = const value_type&;
+
+    AttrSourceItr() : mAttr(nullptr) {}
+
+    AttrSourceItr(const AttributionSourceState& attr) : mAttr(&attr) {}
+
+    reference operator*() const { return *mAttr; }
+    pointer operator->() const { return mAttr; }
+
+    AttrSourceItr& operator++() {
+        mAttr = !mAttr->next.empty() ? mAttr->next.data() : nullptr;
+        return *this;
+    }
+
+    AttrSourceItr operator++(int) {
+        AttrSourceItr tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+
+    friend bool operator==(const AttrSourceItr& a, const AttrSourceItr& b) {
+        return a.mAttr == b.mAttr;
+    }
+
+    friend bool operator!=(const AttrSourceItr& a, const AttrSourceItr& b) {
+        return !operator==(a, b);
+    }
+
+    static AttrSourceItr end() { return AttrSourceItr{}; }
+private:
+    const AttributionSourceState * mAttr;
+};
+} // anonymous
 
 // static
 sp<OpRecordAudioMonitor>
@@ -104,15 +145,24 @@ void OpRecordAudioMonitor::onFirstRef()
     mOpCallback = new RecordAudioOpCallback(this);
     ALOGV("start watching op %d for %s", mAppOp, mAttributionSource.toString().c_str());
 
-    int flags = doesPackageTargetAtLeastU(
-            mAttributionSource.packageName.value_or("")) ?
-            AppOpsManager::WATCH_FOREGROUND_CHANGES : 0;
-    // TODO: We need to always watch AppOpsManager::OP_RECORD_AUDIO too
-    // since it controls the mic permission for legacy apps.
-    mAppOpsManager.startWatchingMode(mAppOp, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
-        mAttributionSource.packageName.value_or(""))),
-        flags,
-        mOpCallback);
+    int flags = doesPackageTargetAtLeastU(mAttributionSource.packageName.value_or(""))
+                        ? AppOpsManager::WATCH_FOREGROUND_CHANGES
+                        : 0;
+
+    const auto reg = [&](int32_t op) {
+        std::for_each(AttrSourceItr{mAttributionSource}, AttrSourceItr::end(),
+                      [&](const auto& attr) {
+                          mAppOpsManager.startWatchingMode(
+                                  op,
+                                  VALUE_OR_FATAL(aidl2legacy_string_view_String16(
+                                          attr.packageName.value_or(""))),
+                                  flags, mOpCallback);
+                      });
+    };
+    reg(mAppOp);
+    if (mAppOp != AppOpsManager::OP_RECORD_AUDIO) {
+        reg(AppOpsManager::OP_RECORD_AUDIO);
+    }
 }
 
 bool OpRecordAudioMonitor::hasOp() const {
@@ -125,14 +175,20 @@ bool OpRecordAudioMonitor::hasOp() const {
 // due to the UID in createIfNeeded(). As a result for those record track, it's:
 // - not called from constructor,
 // - not called from RecordAudioOpCallback because the callback is not installed in this case
-void OpRecordAudioMonitor::checkOp(bool updateUidStates)
-{
-    // TODO: We need to always check AppOpsManager::OP_RECORD_AUDIO too
-    // since it controls the mic permission for legacy apps.
-    const int32_t mode = mAppOpsManager.checkOp(mAppOp,
-            mAttributionSource.uid, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
-                mAttributionSource.packageName.value_or(""))));
-    const bool hasIt = (mode == AppOpsManager::MODE_ALLOWED);
+void OpRecordAudioMonitor::checkOp(bool updateUidStates) {
+    const auto check = [&](int32_t op) -> bool {
+        return std::all_of(
+                AttrSourceItr{mAttributionSource}, AttrSourceItr::end(), [&](const auto& x) {
+                    return mAppOpsManager.checkOp(op, x.uid,
+                                                  VALUE_OR_FATAL(aidl2legacy_string_view_String16(
+                                                          x.packageName.value_or("")))) ==
+                           AppOpsManager::MODE_ALLOWED;
+                });
+    };
+    bool hasIt = check(mAppOp);
+    if (mAppOp != AppOpsManager::OP_RECORD_AUDIO) {
+        hasIt = hasIt && check(AppOpsManager::OP_RECORD_AUDIO);
+    }
     // verbose logging only log when appOp changed
     ALOGI_IF(hasIt != mHasOp.load(),
             "App op %d missing, %ssilencing record %s",
@@ -162,4 +218,4 @@ void OpRecordAudioMonitor::RecordAudioOpCallback::opChanged(int32_t op,
     }
 }
 
-} // android::media::audiopolicy::internal
+}  // namespace android::media::audiopolicy
