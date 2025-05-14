@@ -11,6 +11,7 @@ cc_library_shared {
     name: "libaudiopolicyservice",
 
     srcs: [
+        "AudioRecordClient.cpp",
         "AudioPolicyClientImpl.cpp",
         "AudioPolicyEffects.cpp",
         "AudioPolicyInterfaceImpl.cpp",
