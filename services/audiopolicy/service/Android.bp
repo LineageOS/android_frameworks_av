@@ -15,6 +15,7 @@ cc_library_shared {
     ],
 
     srcs: [
+        "AudioRecordClient.cpp",
         "AudioPolicyClientImpl.cpp",
         "AudioPolicyEffects.cpp",
         "AudioPolicyInterfaceImpl.cpp",
