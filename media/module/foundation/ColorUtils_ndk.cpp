@@ -27,12 +27,9 @@ namespace android {
 // static
 void ColorUtils::setHDRStaticInfoIntoAMediaFormat(
         const HDRStaticInfo &info, AMediaFormat *format) {
-    uint8_t *data = (uint8_t *) malloc(25);
-    if (data != NULL) {
-        fillHdrStaticInfoBuffer(info, data);
-        AMediaFormat_setBuffer(format, "hdr-static-info", data, 25);
-        free(data);
-    }
+    uint8_t data[25];
+    fillHdrStaticInfoBuffer(info, data);
+    AMediaFormat_setBuffer(format, "hdr-static-info", data, 25);
 }
 
 }  // namespace android
