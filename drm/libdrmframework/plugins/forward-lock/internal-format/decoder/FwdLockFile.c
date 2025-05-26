@@ -174,40 +174,33 @@ static int FwdLockFile_DeriveKeys(FwdLockFile_Session_t * pSession) {
         AES_KEY sessionRoundKeys;
         unsigned char value[KEY_SIZE];
         unsigned char key[KEY_SIZE];
-    };
+    } data;
 
-    const size_t kSize = sizeof(struct FwdLockFile_DeriveKeys_Data);
-    struct FwdLockFile_DeriveKeys_Data *pData = malloc(kSize);
-    if (pData == NULL) {
-        result = FALSE;
-    } else {
-        result = FwdLockGlue_DecryptKey(pSession->pEncryptedSessionKey,
-                                        pSession->encryptedSessionKeyLength, pData->key, KEY_SIZE);
-        if (result) {
-            if (AES_set_encrypt_key(pData->key, KEY_SIZE_IN_BITS, &pData->sessionRoundKeys) != 0) {
+    result = FwdLockGlue_DecryptKey(pSession->pEncryptedSessionKey,
+                                    pSession->encryptedSessionKeyLength, data.key, KEY_SIZE);
+    if (result) {
+        if (AES_set_encrypt_key(data.key, KEY_SIZE_IN_BITS, &data.sessionRoundKeys) != 0) {
+            result = FALSE;
+        } else {
+            // Encrypt the 16-byte value {0, 0, ..., 0} to produce the encryption key.
+            memset(data.value, 0, KEY_SIZE);
+            AES_encrypt(data.value, data.key, &data.sessionRoundKeys);
+            if (AES_set_encrypt_key(data.key, KEY_SIZE_IN_BITS,
+                                    &pSession->encryptionRoundKeys) != 0) {
                 result = FALSE;
             } else {
-                // Encrypt the 16-byte value {0, 0, ..., 0} to produce the encryption key.
-                memset(pData->value, 0, KEY_SIZE);
-                AES_encrypt(pData->value, pData->key, &pData->sessionRoundKeys);
-                if (AES_set_encrypt_key(pData->key, KEY_SIZE_IN_BITS,
-                                        &pSession->encryptionRoundKeys) != 0) {
-                    result = FALSE;
-                } else {
-                    // Encrypt the 16-byte value {1, 0, ..., 0} to produce the signing key.
-                    ++pData->value[0];
-                    AES_encrypt(pData->value, pData->key, &pData->sessionRoundKeys);
-                    HMAC_CTX_init(&pSession->signingContext);
-                    HMAC_Init_ex(&pSession->signingContext, pData->key, KEY_SIZE, EVP_sha1(), NULL);
-                }
+                // Encrypt the 16-byte value {1, 0, ..., 0} to produce the signing key.
+                ++data.value[0];
+                AES_encrypt(data.value, data.key, &data.sessionRoundKeys);
+                HMAC_CTX_init(&pSession->signingContext);
+                HMAC_Init_ex(&pSession->signingContext, data.key, KEY_SIZE, EVP_sha1(), NULL);
             }
         }
-        if (!result) {
-            errno = ENOSYS;
-        }
-        memset(pData, 0, kSize); // Zero out key data.
-        free(pData);
     }
+    if (!result) {
+        errno = ENOSYS;
+    }
+    memset(&data, 0, sizeof(data)); // Zero out key data.
     return result;
 }
 
