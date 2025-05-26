@@ -1261,58 +1261,53 @@ FwdLockConv_Status_t FwdLockConv_ConvertOpenFile(int inputFileDesc,
         outputFileDesc < 0) {
         status = FwdLockConv_Status_InvalidArgument;
     } else {
-        char *pReadBuffer = malloc(READ_BUFFER_SIZE);
-        if (pReadBuffer == NULL) {
-            status = FwdLockConv_Status_OutOfMemory;
-        } else {
-            int sessionId;
-            FwdLockConv_Output_t output;
-            status = FwdLockConv_OpenSession(&sessionId, &output);
-            if (status == FwdLockConv_Status_OK) {
-                ssize_t numBytesRead;
-                FwdLockConv_Status_t closeStatus;
-                while ((numBytesRead =
-                        fpReadFunc(inputFileDesc, pReadBuffer, READ_BUFFER_SIZE)) > 0) {
-                    status = FwdLockConv_ConvertData(sessionId, pReadBuffer, (size_t)numBytesRead,
-                                                     &output);
-                    if (status == FwdLockConv_Status_OK) {
-                        if (output.fromConvertData.pBuffer != NULL &&
-                            output.fromConvertData.numBytes > 0) {
-                            ssize_t numBytesWritten = fpWriteFunc(outputFileDesc,
-                                                                  output.fromConvertData.pBuffer,
-                                                                  output.fromConvertData.numBytes);
-                            if (numBytesWritten != (ssize_t)output.fromConvertData.numBytes) {
-                                status = FwdLockConv_Status_FileWriteError;
-                                break;
-                            }
-                        }
-                    } else {
-                        if (status == FwdLockConv_Status_SyntaxError && pErrorPos != NULL) {
-                            *pErrorPos = output.fromConvertData.errorPos;
-                        }
-                        break;
-                    }
-                } // end while
-                if (numBytesRead < 0) {
-                    status = FwdLockConv_Status_FileReadError;
-                }
-                closeStatus = FwdLockConv_CloseSession(sessionId, &output);
+        char pReadBuffer[READ_BUFFER_SIZE];
+        int sessionId;
+        FwdLockConv_Output_t output;
+        status = FwdLockConv_OpenSession(&sessionId, &output);
+        if (status == FwdLockConv_Status_OK) {
+            ssize_t numBytesRead;
+            FwdLockConv_Status_t closeStatus;
+            while ((numBytesRead =
+                    fpReadFunc(inputFileDesc, pReadBuffer, sizeof(pReadBuffer))) > 0) {
+                status = FwdLockConv_ConvertData(sessionId, pReadBuffer, (size_t)numBytesRead,
+                                                 &output);
                 if (status == FwdLockConv_Status_OK) {
-                    if (closeStatus != FwdLockConv_Status_OK) {
-                        if (closeStatus == FwdLockConv_Status_SyntaxError && pErrorPos != NULL) {
-                            *pErrorPos = output.fromCloseSession.errorPos;
+                    if (output.fromConvertData.pBuffer != NULL &&
+                        output.fromConvertData.numBytes > 0) {
+                        ssize_t numBytesWritten = fpWriteFunc(outputFileDesc,
+                                                              output.fromConvertData.pBuffer,
+                                                              output.fromConvertData.numBytes);
+                        if (numBytesWritten != (ssize_t)output.fromConvertData.numBytes) {
+                            status = FwdLockConv_Status_FileWriteError;
+                            break;
                         }
-                        status = closeStatus;
-                    } else if (fpLSeekFunc(outputFileDesc, output.fromCloseSession.fileOffset,
-                                           SEEK_SET) < 0) {
-                        status = FwdLockConv_Status_FileSeekError;
-                    } else if (fpWriteFunc(outputFileDesc, output.fromCloseSession.signatures,
-                                           FWD_LOCK_SIGNATURES_SIZE) != FWD_LOCK_SIGNATURES_SIZE) {
-                        status = FwdLockConv_Status_FileWriteError;
                     }
+                } else {
+                    if (status == FwdLockConv_Status_SyntaxError && pErrorPos != NULL) {
+                        *pErrorPos = output.fromConvertData.errorPos;
+                    }
+                    break;
+                }
+            } // end while
+            if (numBytesRead < 0) {
+                status = FwdLockConv_Status_FileReadError;
+            }
+            closeStatus = FwdLockConv_CloseSession(sessionId, &output);
+            if (status == FwdLockConv_Status_OK) {
+                if (closeStatus != FwdLockConv_Status_OK) {
+                    if (closeStatus == FwdLockConv_Status_SyntaxError && pErrorPos != NULL) {
+                        *pErrorPos = output.fromCloseSession.errorPos;
+                    }
+                    status = closeStatus;
+                } else if (fpLSeekFunc(outputFileDesc, output.fromCloseSession.fileOffset,
+                                       SEEK_SET) < 0) {
+                    status = FwdLockConv_Status_FileSeekError;
+                } else if (fpWriteFunc(outputFileDesc, output.fromCloseSession.signatures,
+                                       FWD_LOCK_SIGNATURES_SIZE) != FWD_LOCK_SIGNATURES_SIZE) {
+                    status = FwdLockConv_Status_FileWriteError;
                 }
             }
-            free(pReadBuffer);
         }
     }
     return status;
