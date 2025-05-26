@@ -44,11 +44,12 @@ protected:
 
 private:
     /*for DRM*/
+    static const constexpr size_t DRM_CACHE_SIZE = 1024;
     sp<DecryptHandle> mDecryptHandle;
     DrmManagerClient *mDrmManagerClient;
     int64_t mDrmBufOffset;
     ssize_t mDrmBufSize;
-    unsigned char *mDrmBuf;
+    unsigned char mDrmBuf[DRM_CACHE_SIZE];
 
     sp<DecryptHandle> DrmInitialization(const char *mime);
     ssize_t readAtDRM_l(off64_t offset, void *data, size_t size);

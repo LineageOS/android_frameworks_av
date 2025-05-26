@@ -29,8 +29,7 @@ PlayerServiceFileSource::PlayerServiceFileSource(const char *filename)
       mDecryptHandle(NULL),
       mDrmManagerClient(NULL),
       mDrmBufOffset(0),
-      mDrmBufSize(0),
-      mDrmBuf(NULL){
+      mDrmBufSize(0) {
     (void) DrmInitialization(nullptr);
 }
 
@@ -39,17 +38,11 @@ PlayerServiceFileSource::PlayerServiceFileSource(int fd, int64_t offset, int64_t
       mDecryptHandle(NULL),
       mDrmManagerClient(NULL),
       mDrmBufOffset(0),
-      mDrmBufSize(0),
-      mDrmBuf(NULL) {
+      mDrmBufSize(0) {
     (void) DrmInitialization(nullptr);
 }
 
 PlayerServiceFileSource::~PlayerServiceFileSource() {
-    if (mDrmBuf != NULL) {
-        delete[] mDrmBuf;
-        mDrmBuf = NULL;
-    }
-
     if (mDecryptHandle != NULL) {
         // To release mDecryptHandle
         CHECK(mDrmManagerClient);
@@ -117,12 +110,7 @@ sp<DecryptHandle> PlayerServiceFileSource::DrmInitialization(const char *mime) {
 }
 
 ssize_t PlayerServiceFileSource::readAtDRM_l(off64_t offset, void *data, size_t size) {
-    size_t DRM_CACHE_SIZE = 1024;
-    if (mDrmBuf == NULL) {
-        mDrmBuf = new unsigned char[DRM_CACHE_SIZE];
-    }
-
-    if (mDrmBuf != NULL && mDrmBufSize > 0 && (offset + mOffset) >= mDrmBufOffset
+    if (mDrmBufSize > 0 && (offset + mOffset) >= mDrmBufOffset
             && (offset + mOffset + size) <= static_cast<size_t>(mDrmBufOffset + mDrmBufSize)) {
         /* Use buffered data */
         memcpy(data, (void*)(mDrmBuf+(offset+mOffset-mDrmBufOffset)), size);
@@ -133,8 +121,7 @@ ssize_t PlayerServiceFileSource::readAtDRM_l(off64_t offset, void *data, size_t 
         mDrmBufSize = mDrmManagerClient->pread(mDecryptHandle, mDrmBuf,
                 DRM_CACHE_SIZE, offset + mOffset);
         if (mDrmBufSize > 0) {
-            int64_t dataRead = 0;
-            dataRead = size > static_cast<size_t>(mDrmBufSize) ? mDrmBufSize : size;
+            int64_t dataRead = size > static_cast<size_t>(mDrmBufSize) ? mDrmBufSize : size;
             memcpy(data, (void*)mDrmBuf, dataRead);
             return dataRead;
         } else {
