@@ -200,7 +200,7 @@ static int FwdLockFile_DeriveKeys(FwdLockFile_Session_t * pSession) {
     if (!result) {
         errno = ENOSYS;
     }
-    memset(&data, 0, sizeof(data)); // Zero out key data.
+    memset_explicit(&data, 0, sizeof(data)); // Zero out key data.
     return result;
 }
 
