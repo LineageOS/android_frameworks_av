@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "30954757_4dc15463",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 34887
+      },
+      "writtenOn": "2025-05-26T18:06:09Z",
+      "side": 1,
+      "message": "Also, READ_BUFFER_SIZE is just 1k! This just seems like a pessimisation. Is there a reason for it to be so low?",
+      "revId": "4c4c403c364344653af79f2f764ca777d2682e6e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
