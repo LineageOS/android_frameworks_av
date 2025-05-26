@@ -74,10 +74,7 @@ MediaScanResult MediaScanner::processDirectory(
     if (pathLength >= PATH_MAX) {
         return MEDIA_SCAN_RESULT_SKIPPED;
     }
-    char* pathBuffer = (char *)malloc(PATH_MAX + 1);
-    if (!pathBuffer) {
-        return MEDIA_SCAN_RESULT_ERROR;
-    }
+    char pathBuffer[PATH_MAX];
 
     int pathRemaining = PATH_MAX - pathLength;
     strcpy(pathBuffer, path);
@@ -89,11 +86,7 @@ MediaScanResult MediaScanner::processDirectory(
 
     client.setLocale(locale());
 
-    MediaScanResult result = doProcessDirectory(pathBuffer, pathRemaining, client, false);
-
-    free(pathBuffer);
-
-    return result;
+    return doProcessDirectory(pathBuffer, pathRemaining, client, false);
 }
 
 bool MediaScanner::shouldSkipDirectory(char *path) {
