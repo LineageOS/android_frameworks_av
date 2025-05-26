@@ -22,6 +22,7 @@
 #include <utils/List.h>
 #include <utils/Errors.h>
 #include <utils/String8.h>
+#include <cutils/properties.h>
 #include <pthread.h>
 
 struct dirent;
@@ -88,8 +89,8 @@ protected:
 private:
     // current locale (like "ja_JP"), created/destroyed with strdup()/free()
     char *mLocale;
-    char *mSkipList;
-    int *mSkipIndex;
+    char mSkipList[PROPERTY_VALUE_MAX];
+    int mSkipIndex[PROPERTY_VALUE_MAX];
 
     MediaScanResult doProcessDirectory(
             char *path, int pathRemaining, MediaScannerClient &client, bool noMedia);

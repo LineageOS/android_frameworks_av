@@ -16,7 +16,6 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaScanner"
-#include <cutils/properties.h>
 #include <utils/Log.h>
 
 #include <media/mediascanner.h>
@@ -27,14 +26,12 @@
 namespace android {
 
 MediaScanner::MediaScanner()
-    : mLocale(NULL), mSkipList(NULL), mSkipIndex(NULL) {
+    : mLocale(NULL) {
     loadSkipList();
 }
 
 MediaScanner::~MediaScanner() {
     setLocale(NULL);
-    free(mSkipList);
-    free(mSkipIndex);
 }
 
 void MediaScanner::setLocale(const char *locale) {
@@ -52,30 +49,23 @@ const char *MediaScanner::locale() const {
 }
 
 void MediaScanner::loadSkipList() {
-    mSkipList = (char *)malloc(PROPERTY_VALUE_MAX * sizeof(char));
-    if (mSkipList) {
-        property_get("testing.mediascanner.skiplist", mSkipList, "");
-    }
-    if (!mSkipList || (strlen(mSkipList) == 0)) {
-        free(mSkipList);
-        mSkipList = NULL;
+    property_get("testing.mediascanner.skiplist", mSkipList, "");
+    if (strlen(mSkipList) == 0) {
+        mSkipIndex[0] = -1;
         return;
     }
-    mSkipIndex = (int *)malloc(PROPERTY_VALUE_MAX * sizeof(int));
-    if (mSkipIndex) {
-        // dup it because strtok will modify the string
-        char *skipList = strdup(mSkipList);
-        if (skipList) {
-            char * path = strtok(skipList, ",");
-            int i = 0;
-            while (path) {
-                mSkipIndex[i++] = strlen(path);
-                path = strtok(NULL, ",");
-            }
-            mSkipIndex[i] = -1;
-            free(skipList);
-        }
+
+    // dup it because strtok will modify the string
+    char skipList[PROPERTY_VALUE_MAX];
+    strcpy(skipList, mSkipList);
+
+    char * path = strtok(skipList, ",");
+    int i = 0;
+    while (path) {
+        mSkipIndex[i++] = strlen(path);
+        path = strtok(NULL, ",");
     }
+    mSkipIndex[i] = -1;
 }
 
 MediaScanResult MediaScanner::processDirectory(
@@ -107,7 +97,7 @@ MediaScanResult MediaScanner::processDirectory(
 }
 
 bool MediaScanner::shouldSkipDirectory(char *path) {
-    if (path && mSkipList && mSkipIndex) {
+    if (path && mSkipIndex[0] != -1) {
         int len = strlen(path);
         int idx = 0;
         // track the start position of next path in the comma
