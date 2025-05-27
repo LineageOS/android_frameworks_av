@@ -70,6 +70,23 @@
       "parentUuid": "ff456011_c56d789a",
       "revId": "84208509944311d0bb4ea9227711b7229c828bef",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c12fcbb8_7ded5371",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 29080
+      },
+      "writtenOn": "2025-05-27T20:44:51Z",
+      "side": 1,
+      "message": "You have to use your full name when you upload your changes to AOSP. Otherwise, they won\u0027t be accepted.",
+      "revId": "84208509944311d0bb4ea9227711b7229c828bef",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ],
   "submitRequirementResults": []
