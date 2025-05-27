@@ -52,6 +52,24 @@
       "parentUuid": "06ff5c20_cf5c92f1",
       "revId": "84208509944311d0bb4ea9227711b7229c828bef",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "929cc40f_ca946d5e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 34887
+      },
+      "writtenOn": "2025-05-27T17:23:46Z",
+      "side": 1,
+      "message": "I forwarded all of them except the  LineageOS/android_vendor_qcom_opensource_dataservices  ones since the upstream for this looks like Some Vendor Source Dump, unchanged since 2017 and not accepting PRs, rather than AOSP, so I hope those apply here.",
+      "parentUuid": "ff456011_c56d789a",
+      "revId": "84208509944311d0bb4ea9227711b7229c828bef",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ],
   "submitRequirementResults": []
