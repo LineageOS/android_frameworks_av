@@ -34,6 +34,24 @@
       "parentUuid": "6db1edb1_1c45c97e",
       "revId": "84208509944311d0bb4ea9227711b7229c828bef",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ff456011_c56d789a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2025-05-27T07:35:49Z",
+      "side": 1,
+      "message": "No worries, there\u0027s clearly some fucked up code you cleaned up, but it\u0027s not an improvement per sé that we would consider, especially since all these tiny bits may likely be changed every release...",
+      "parentUuid": "06ff5c20_cf5c92f1",
+      "revId": "84208509944311d0bb4ea9227711b7229c828bef",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ],
   "submitRequirementResults": []
