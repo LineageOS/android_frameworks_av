@@ -33,6 +33,23 @@
       "message": "Been using it alongside my qcom devices since a while now, haven\u0027t noticed any regression so far.",
       "revId": "d46c5fae194cc53cefb9bfe394f188d69e1f35ca",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9234b0ac_27dca153",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 33372
+      },
+      "writtenOn": "2025-06-13T18:45:08Z",
+      "side": 1,
+      "message": "bump",
+      "revId": "d46c5fae194cc53cefb9bfe394f188d69e1f35ca",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
