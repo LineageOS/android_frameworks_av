@@ -547,6 +547,7 @@ bool C2SoftDav1dDec::initDecoder() {
 
     Dav1dSettings lib_settings;
     dav1d_default_settings(&lib_settings);
+    lib_settings.all_layers = 0;
     int cpu_count = GetCPUCoreCount();
     lib_settings.n_threads = std::max(cpu_count / 2, 1);  // use up to half the cores by default.
 
