@@ -236,7 +236,8 @@ bool roundBufferDimensionNearest(int32_t width, int32_t height,
     // requirement. AIDE2 is vendor enhanced feature which requires special resolutions and
     // those are not populated in static capabilities.
     if (isPriviledgedClient == true &&
-            (format == HAL_PIXEL_FORMAT_YCbCr_420_888 || format == HAL_PIXEL_FORMAT_BLOB)) {
+            (format == HAL_PIXEL_FORMAT_YCbCr_420_888 || format == HAL_PIXEL_FORMAT_BLOB ||
+             format == HAL_PIXEL_FORMAT_Y8)) {
         ALOGI("Bypass roundBufferDimensionNearest for privilegedClient YUV streams "
                 "width %d height %d for format %d", width, height, format);
 
