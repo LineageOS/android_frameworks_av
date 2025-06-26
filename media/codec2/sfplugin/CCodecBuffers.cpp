@@ -527,13 +527,20 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     sp<AMessage> outputFormat = entry.format;
 
     if (entry.notify && mFormat != outputFormat) {
-        updateSkipCutBuffer(outputFormat);
-        // Trigger image data processing to the new format
-        mLastImageData.clear();
-        ALOGV("[%s] popFromStashAndRegister: output format reference changed: %p -> %p",
-                mName, mFormat.get(), outputFormat.get());
-        ALOGD("[%s] popFromStashAndRegister: at %lldus, output format changed to %s",
-                mName, (long long)entry.timestamp, outputFormat->debugString().c_str());
+        // TODO: refactor with CCodec::RevertOutputFormatIfNeeded to reduce code duplication
+        sp<AMessage> diff = outputFormat->changesFrom(mFormat);
+        diff->removeEntryByName(KEY_HDR10_PLUS_INFO);
+        diff->removeEntryByName(KEY_PICTURE_TYPE);
+        diff->removeEntryByName(KEY_VIDEO_QP_AVERAGE);
+        if (diff->countEntries() != 0) {
+            updateSkipCutBuffer(outputFormat);
+            // Trigger image data processing to the new format
+            mLastImageData.clear();
+            ALOGV("[%s] popFromStashAndRegister: output format reference changed: %p -> %p",
+                  mName, mFormat.get(), outputFormat.get());
+            ALOGD("[%s] popFromStashAndRegister: at %lldus, output format changed to %s",
+                  mName, (long long)entry.timestamp, outputFormat->debugString().c_str());
+        }
         setFormat(outputFormat);
     }
 
