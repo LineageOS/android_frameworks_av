@@ -75,6 +75,7 @@ cc_library_shared {
         "libgui",
         "libhidlallocatorutils",
         "libhidlbase",
+        "libhidlmemory",
         "liblog",
         "libmedia_codeclist",
         "libmedia_omx",
