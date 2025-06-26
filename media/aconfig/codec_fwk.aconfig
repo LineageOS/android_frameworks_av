@@ -78,6 +78,13 @@ flag {
 }
 
 flag {
+  name: "decrypt_and_decode_in_hal"
+  namespace: "codec_fwk"
+  description: "Feature flag for decrypting protected content in Codec2 HAL"
+  bug: "409171443"
+}
+
+flag {
   name: "dynamic_color_aspects"
   is_exported: true
   namespace: "codec_fwk"
