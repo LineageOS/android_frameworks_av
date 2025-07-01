@@ -47,6 +47,7 @@ private:
                          uint32_t virtualDeviceId,
                          const audio_attributes_t &attr,
                          int32_t appOp,
+                         bool shouldMonitorRecord,
                          wp<AudioPolicyService::AudioCommandThread> commandThread);
 
     void onFirstRef() override;
@@ -74,6 +75,7 @@ private:
     const uint32_t mVirtualDeviceId;
     const audio_attributes_t mAttr;
     const int32_t mAppOp;
+    const bool mShouldMonitorRecord;
     wp<AudioPolicyService::AudioCommandThread> mCommandThread;
 };
 
