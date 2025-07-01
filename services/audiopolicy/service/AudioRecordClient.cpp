@@ -19,6 +19,7 @@
 #include "AudioRecordClient.h"
 #include "AudioPolicyService.h"
 #include "binder/AppOpsManager.h"
+#include "mediautils/ServiceUtilities.h"
 
 #include <algorithm>
 
@@ -47,7 +48,7 @@ int getTargetSdkForPackageName(std::string_view packageName) {
         if (pm != nullptr) {
             const auto status = pm->getTargetSdkVersionForPackage(
                     String16{packageName.data(), packageName.size()}, &targetSdk);
-            return status.isOk() ? targetSdk : -1;
+            return status.isOk() ? targetSdk : __ANDROID_API_FUTURE__;
         }
     }
     return targetSdk;
@@ -120,16 +121,19 @@ OpRecordAudioMonitor::createIfNeeded(
             || attributionSource.packageName.value().size() == 0) {
         return nullptr;
     }
-    return new OpRecordAudioMonitor(attributionSource, getOpForSource(attr.source), commandThread);
+    return new OpRecordAudioMonitor(attributionSource, getOpForSource(attr.source),
+                                    isRecordOpRequired(attr.source),
+                                    commandThread);
 }
 
-OpRecordAudioMonitor::OpRecordAudioMonitor(
-        const AttributionSourceState& attributionSource, int32_t appOp,
-        wp<AudioPolicyService::AudioCommandThread> commandThread) :
-            mHasOp(true), mAttributionSource(attributionSource), mAppOp(appOp),
-            mCommandThread(commandThread)
-{
-}
+OpRecordAudioMonitor::OpRecordAudioMonitor(const AttributionSourceState& attributionSource,
+                                           int32_t appOp, bool shouldMonitorRecord,
+                                           wp<AudioPolicyService::AudioCommandThread> commandThread)
+    : mHasOp(true),
+      mAttributionSource(attributionSource),
+      mAppOp(appOp),
+      mShouldMonitorRecord(shouldMonitorRecord),
+      mCommandThread(commandThread) {}
 
 OpRecordAudioMonitor::~OpRecordAudioMonitor()
 {
@@ -160,7 +164,7 @@ void OpRecordAudioMonitor::onFirstRef()
                       });
     };
     reg(mAppOp);
-    if (mAppOp != AppOpsManager::OP_RECORD_AUDIO) {
+    if (mAppOp != AppOpsManager::OP_RECORD_AUDIO && mShouldMonitorRecord) {
         reg(AppOpsManager::OP_RECORD_AUDIO);
     }
 }
@@ -186,7 +190,7 @@ void OpRecordAudioMonitor::checkOp(bool updateUidStates) {
                 });
     };
     bool hasIt = check(mAppOp);
-    if (mAppOp != AppOpsManager::OP_RECORD_AUDIO) {
+    if (mAppOp != AppOpsManager::OP_RECORD_AUDIO && mShouldMonitorRecord) {
         hasIt = hasIt && check(AppOpsManager::OP_RECORD_AUDIO);
     }
     // verbose logging only log when appOp changed
