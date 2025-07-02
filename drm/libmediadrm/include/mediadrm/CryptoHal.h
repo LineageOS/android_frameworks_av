@@ -45,6 +45,10 @@ struct CryptoHal : public ICrypto {
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
             const drm::V1_0::DestinationBuffer &destination,
             AString *errorDetailMsg);
+    virtual DrmStatus getKeyHandle(const uint8_t key[16], CryptoPlugin::Mode mode,
+                                   size_t sourceSize, size_t offset,
+                                   const CryptoPlugin::SubSample* subSamples, size_t numSubSamples,
+                                   Vector<uint8_t>& keyHandle);
     virtual int32_t setHeap(const sp<HidlMemory>& heap);
     virtual void unsetHeap(int32_t seqNum);
     virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const;

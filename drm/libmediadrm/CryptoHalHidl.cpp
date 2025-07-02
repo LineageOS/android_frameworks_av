@@ -375,6 +375,14 @@ ssize_t CryptoHalHidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     return err;
 }
 
+DrmStatus CryptoHalHidl::getKeyHandle(const uint8_t /*key*/[16], CryptoPlugin::Mode /*mode*/,
+                                      size_t /*sourceSize*/, size_t /*offset*/,
+                                      const CryptoPlugin::SubSample* /*subSamples*/,
+                                      size_t /*numSubSamples*/, Vector<uint8_t>& /*keyHandle*/) {
+    // getKeyHandle() is not supported.
+    return DrmStatus(/*err=*/INVALID_OPERATION, /*msg=*/nullptr);
+}
+
 void CryptoHalHidl::notifyResolution(uint32_t width, uint32_t height) {
     Mutex::Autolock autoLock(mLock);
 

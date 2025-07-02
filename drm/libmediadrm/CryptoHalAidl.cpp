@@ -365,6 +365,14 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     return result;
 }
 
+DrmStatus CryptoHalAidl::getKeyHandle(const uint8_t /*key*/[16], CryptoPlugin::Mode /*mode*/,
+                                      size_t /*sourceSize*/, size_t /*offset*/,
+                                      const CryptoPlugin::SubSample* /*subSamples*/,
+                                      size_t /*numSubSamples*/, Vector<uint8_t>& /*keyHandle*/) {
+    // TODO(b/409171443): Implement
+    return DrmStatus(/*err=*/INVALID_OPERATION, /*msg=*/nullptr);
+}
+
 int32_t CryptoHalAidl::setHeap(const sp<HidlMemory>& heap) {
     if (heap == NULL || mHeapSeqNum < 0) {
         ALOGE("setHeap(): heap %p mHeapSeqNum %d", heap.get(), mHeapSeqNum);
