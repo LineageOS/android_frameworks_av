@@ -371,7 +371,10 @@ cc_library {
         "-Werror",
         "-Wno-error=deprecated-declarations",
         "-Wno-multichar",
-    ],
+    ] + select(soong_config_variable("stagefright", "target_disables_thumbnail_block_model"), {
+        any @ value: ["-DDISABLE_BLOCK_MODEL"],
+        default: [],
+    }),
 
     version_script: "exports.lds",
 
