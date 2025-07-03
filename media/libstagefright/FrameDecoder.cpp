@@ -872,7 +872,11 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
             || (mSeekMode == MediaSource::ReadOptions::SEEK_FRAME_INDEX);
     if (!isSeekingClosest) {
         if (mComponentName.startsWithIgnoreCase("c2.")) {
+#ifndef DISABLE_BLOCK_MODEL
             mUseBlockModel = android::media::codec::provider_->thumbnail_block_model();
+#else
+            mUseBlockModel = false;
+#endif
         } else {
             // OMX Codec
             videoFormat->setInt32("android._num-input-buffers", 1);
