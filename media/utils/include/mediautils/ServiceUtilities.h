@@ -87,7 +87,7 @@ static inline bool isAudioServerOrMediaServerUid(uid_t uid) {
 
 bool recordingAllowed(const AttributionSourceState& attributionSource,
         audio_source_t source = AUDIO_SOURCE_DEFAULT);
-bool startRecording(const AttributionSourceState& attributionSource,
+int startRecording(const AttributionSourceState& attributionSource,
     const String16& msg, audio_source_t source);
 void finishRecording(const AttributionSourceState& attributionSource, audio_source_t source);
 std::optional<AttributionSourceState> resolveAttributionSource(
@@ -109,6 +109,8 @@ bool bypassInterruptionPolicyAllowed(const AttributionSourceState& attributionSo
 bool callAudioInterceptionAllowed(const AttributionSourceState& attributionSource);
 void purgePermissionCache();
 int32_t getOpForSource(audio_source_t source);
+
+bool isRecordOpRequired(audio_source_t source);
 
 AttributionSourceState getCallingAttributionSource();
 
