@@ -249,11 +249,10 @@ struct CCodecConfig {
      * \param domain config/setParam bitmask
      * \param blocking blocking mode to use with the component
      */
-    status_t getConfigUpdateFromSdkParams(
-            std::shared_ptr<Codec2Client::Configurable> configurable,
-            const sp<AMessage> &sdkParams, Domain domain,
-            c2_blocking_t blocking,
-            std::vector<std::unique_ptr<C2Param>> *configUpdate) const;
+    status_t getConfigUpdateFromSdkParams(std::shared_ptr<Codec2Client::Configurable> configurable,
+                                          const sp<AMessage>& sdkParams, Domain domain,
+                                          c2_blocking_t blocking,
+                                          std::vector<std::unique_ptr<C2Param>>* configUpdate);
 
     /**
      * Applies a configuration update to the component.
@@ -379,9 +378,7 @@ private:
 
     /// Gets SDK format from codec 2.0 reflected configuration
     /// \param domain input/output bitmask
-    sp<AMessage> getFormatForDomain(
-            const ReflectedParamUpdater::Dict &reflected,
-            Domain domain) const;
+    sp<AMessage> getFormatForDomain(const ReflectedParamUpdater::Dict& reflected, Domain domain);
 
     /**
      * Converts a set of configuration parameters in an AMessage to a list of path-based Codec
@@ -389,8 +386,22 @@ private:
      *
      * \param domain config/setParam bitmask
      */
-    ReflectedParamUpdater::Dict getReflectedFormat(
-            const sp<AMessage> &config, Domain domain) const;
+    ReflectedParamUpdater::Dict getReflectedFormat(const sp<AMessage>& config, Domain domain) const;
+
+    /**
+     *  Sets C2_PARAMKEY_TEMPORAL_LAYERING to params from KEY_TEMPORAL_LAYERING and
+     * KEY_VIDEO_BITRATE_LAYERING. If KEY_TEMPORAL_LAYERING is not configured, the previously
+     * configured KEY_TEMPORAL_LAYERING, |mLastLayering|, is used and the bitrateRatios are
+     * updated by KEY_VIDEO_BITRATE_LAYERING.
+     */
+    void reflectTemporalLayeringConfig(const sp<AMessage>& params) const;
+
+    /**
+     * The last C2StreamtemporalLayeringTuning and C2StreamLayeringSchemeTuning values that are
+     * returned from Component as a result of the configuration. Updated in getFormatForDomain().
+     */
+    std::unique_ptr<C2StreamTemporalLayeringTuning::output> mLastLayering;
+    C2StreamLayeringSchemeTuning::output mLastLayeringScheme;
 };
 
 DEFINE_ENUM_OPERATORS(CCodecConfig::Domain)
