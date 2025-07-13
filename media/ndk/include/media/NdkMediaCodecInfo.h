@@ -670,6 +670,30 @@ int32_t ACodecEncoderCapabilities_isBitrateModeSupported(
         const ACodecEncoderCapabilities* _Nonnull encoderCaps, ABitrateMode mode)
         __INTRODUCED_IN(36);
 
+/**
+ * Get the array of layering schemas supported by the encoder.
+ *
+ * This API returns a pointer of the array of a const char pointers, where each pointer in the array
+ * points to a null-terminated sequence of ASCII characters. The meanings of each schemas are
+ * defined in {@link MediaFormat#KEY_TEMPORAL_LAYERING}.
+ * If the supported temporal schemas are unknown or there are no supported temporal schemas, the
+ * returned array pointer is null and this function returns AMEDIA_OK.
+ *
+ * @param encoderCaps  The ACodecEncoderCapabilities instance.
+ * @param outSupportedLayeringSchemaArrayPtr  A pointer of the array of layering schemas.
+ *                                            The array and elements are owned by the framework and
+ *                                            are valid for the lifetime of the process.
+ * @param outCount  The number of elements in @param outSupportedLayeringSchemaArrayPtr.
+ *
+ * @return AMEDIA_OK if successfully filled the supported temporal layer schemas.
+ * @return AMEDIA_ERROR_INVALID_PARAMETER if any of @param encoderCaps,
+ *         @param outSupportedLayeringSchemaArrayPtr and @param outCount is invalid.
+ */
+media_status_t ACodecEncoderCapabilities_getSupportedLayeringSchemas(
+        const ACodecEncoderCapabilities* _Nonnull encoderCaps,
+        const char* _Nonnull const* _Nullable* _Nonnull outSupportedLayeringSchemaArrayPtr,
+        size_t* _Nonnull outCount) __INTRODUCED_IN(37);
+
 // Feature Names
 
 /**
