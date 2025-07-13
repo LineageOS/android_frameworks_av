@@ -276,6 +276,13 @@ flag {
 }
 
 flag {
+  name: "temporal_layer_encoding"
+  namespace: "codec_fwk"
+  description: "Feature flag for temporal layer encoding"
+  bug: "379746567"
+}
+
+flag {
   name: "thumbnail_block_model"
   namespace: "codec_fwk"
   description: "Feature flag for using block model decoder in thumbnail generation"
