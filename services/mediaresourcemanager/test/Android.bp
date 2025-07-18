@@ -13,22 +13,21 @@ cc_test {
     srcs: ["ResourceManagerService_test.cpp"],
     test_suites: ["device-tests"],
     static_libs: [
-        "libresourcemanagerservice",
         "aconfig_mediacodec_flags_c_lib",
         "android.media.codec-aconfig-cc",
+        "libresourcemanagerservice",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
+        "libactivitymanager_aidl",
         "libbinder",
         "libbinder_ndk",
         "liblog",
         "libmedia",
         "libmediautils",
-        "libutils",
         "libstats_media_metrics",
-        "libstatspull",
         "libstatssocket",
-        "libactivitymanager_aidl",
-        "libaconfig_storage_read_api_cc",
+        "libutils",
         "server_configurable_flags",
     ],
     defaults: [
@@ -39,8 +38,8 @@ cc_test {
         "frameworks/av/services/mediaresourcemanager",
     ],
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 }
 
@@ -59,8 +58,8 @@ cc_test {
         "frameworks/av/services/mediaresourcemanager",
     ],
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 }
 
@@ -69,24 +68,26 @@ cc_test {
     srcs: ["ResourceObserverService_test.cpp"],
     test_suites: ["device-tests"],
     static_libs: [
-        "libresourcemanagerservice",
-        "resourceobserver_aidl_interface-V1-ndk",
         "aconfig_mediacodec_flags_c_lib",
         "android.media.codec-aconfig-cc",
+        "libresourcemanagerservice",
+        "resourceobserver_aidl_interface-V1-ndk",
     ],
     shared_libs: [
+        "libaconfig_storage_read_api_cc",
+        "libactivitymanager_aidl",
         "libbinder",
         "libbinder_ndk",
         "liblog",
         "libmedia",
         "libmediautils",
-        "libutils",
         "libstats_media_metrics",
-        "libstatspull",
         "libstatssocket",
-        "libactivitymanager_aidl",
-        "libaconfig_storage_read_api_cc",
+        "libutils",
         "server_configurable_flags",
+    ],
+    header_libs: [
+        "libstatspull_headers",
     ],
     defaults: [
         "aconfig_lib_cc_shared_link.defaults",
@@ -96,7 +97,7 @@ cc_test {
         "frameworks/av/services/mediaresourcemanager",
     ],
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 }
