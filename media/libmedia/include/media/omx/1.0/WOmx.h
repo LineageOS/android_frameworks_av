@@ -24,6 +24,7 @@
 
 #include <hidl/HybridInterface.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
+#include <gui/Flags.h> // Remove with MediaSurfaceType
 
 namespace android {
 namespace hardware {
@@ -66,7 +67,7 @@ struct LWOmx : public IOMX {
             sp<IOMXObserver> const& observer,
             sp<IOMXNode>* omxNode) override;
     status_t createInputSurface(
-            sp<::android::IGraphicBufferProducer>* bufferProducer,
+            sp<::android::MediaSurfaceType>* surface,
             sp<::android::hardware::media::omx::V1_0::IGraphicBufferSource>* bufferSource) override;
 };
 

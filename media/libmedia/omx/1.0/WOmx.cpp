@@ -19,6 +19,7 @@
 #include <media/omx/1.0/WOmxNode.h>
 #include <media/omx/1.0/WOmxObserver.h>
 #include <media/omx/1.0/Conversion.h>
+#include <gui/Surface.h>
 
 namespace android {
 namespace hardware {
@@ -68,16 +69,17 @@ status_t LWOmx::allocateNode(
 }
 
 status_t LWOmx::createInputSurface(
-        sp<::android::IGraphicBufferProducer>* bufferProducer,
+        sp<::android::MediaSurfaceType>* surface,
         sp<::android::hardware::media::omx::V1_0::IGraphicBufferSource>* bufferSource) {
     status_t fnStatus;
     status_t transStatus = toStatusT(mBase->createInputSurface(
-            [&fnStatus, bufferProducer, bufferSource] (
+            [&fnStatus, surface, bufferSource] (
                     Status status,
                     sp<HGraphicBufferProducer> const& tProducer,
                     sp<IGraphicBufferSource> const& tSource) {
                 fnStatus = toStatusT(status);
-                *bufferProducer = new H2BGraphicBufferProducer(tProducer);
+                sp<IGraphicBufferProducer> bufferProducer = new H2BGraphicBufferProducer(tProducer);
+                *surface = mediaflagtools::igbpToSurfaceType(bufferProducer, true);
                 *bufferSource = tSource;
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;
