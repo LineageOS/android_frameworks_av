@@ -16,6 +16,29 @@
       "message": "this and disable block model is required for video recording on sony devices.",
       "revId": "e95a99999f1662dfd5824b3b8fc006312aba0149",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d29e6271_62907ece",
+        "filename": "media/libstagefright/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 374,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2025-07-30T16:41:20Z",
+      "side": 1,
+      "message": "```suggestion\n    ] + select(soong_config_variable(\"stagefright\", \"target_disable_thumbnail_block_model\"), {\n```",
+      "range": {
+        "startLine": 374,
+        "startChar": 53,
+        "endLine": 374,
+        "endChar": 90
+      },
+      "revId": "e95a99999f1662dfd5824b3b8fc006312aba0149",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
