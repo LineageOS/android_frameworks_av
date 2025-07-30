@@ -39,6 +39,30 @@
       },
       "revId": "e95a99999f1662dfd5824b3b8fc006312aba0149",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "63e246f7_c5e61b09",
+        "filename": "media/libstagefright/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 374,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2025-07-30T16:41:44Z",
+      "side": 1,
+      "message": "Fix applied.",
+      "parentUuid": "d29e6271_62907ece",
+      "range": {
+        "startLine": 374,
+        "startChar": 53,
+        "endLine": 374,
+        "endChar": 90
+      },
+      "revId": "e95a99999f1662dfd5824b3b8fc006312aba0149",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
