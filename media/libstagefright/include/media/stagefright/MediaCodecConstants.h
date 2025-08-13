@@ -1156,6 +1156,7 @@ inline constexpr char KEY_CREATE_INPUT_SURFACE_SUSPENDED[] = "create-input-buffe
 inline constexpr char KEY_DURATION[] = "durationUs";
 inline constexpr char KEY_FEATURE_[] = "feature-";
 inline constexpr char KEY_FLAC_COMPRESSION_LEVEL[] = "flac-compression-level";
+inline constexpr char KEY_HORIZONTAL_FLIP[] = "horizontal-flip";
 inline constexpr char KEY_FRAME_RATE[] = "frame-rate";
 inline constexpr char KEY_GRID_COLUMNS[] = "grid-cols";
 inline constexpr char KEY_GRID_ROWS[] = "grid-rows";
