@@ -49,6 +49,14 @@ flag {
 }
 
 flag {
+    name: "optimize_call_routing"
+    namespace: "media_audio"
+    description:
+        "Optimize call route update sequence"
+    bug: "382818781"
+}
+
+flag {
     name: "remove_stream_suspend"
     namespace: "media_audio"
     description: "Remove the output stream suspend state and control mechanism"

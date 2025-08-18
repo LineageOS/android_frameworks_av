@@ -874,9 +874,20 @@ void AudioPolicyManager::connectTelephonyRxAudioSource(uint32_t delayMs)
         sp<DeviceDescriptor> rxDevice = rxDevices.itemAt(0);
         if (mCallRxSourceClient->isConnected()
                 && mCallRxSourceClient->sinkDevice()->equals(rxDevice)) {
+            ALOGV("%s same sink device %s", __func__, rxDevice->toString().c_str());
             return;
         }
-        disconnectTelephonyAudioSource(mCallRxSourceClient);
+        if (com::android::media::audioserver::optimize_call_routing()) {
+            rerouteTelephonyAudioSource(mCallRxSourceClient, mCallRxSourceClient->srcDevice(),
+                                        rxDevice, delayMs);
+            ALOGV("%s rerouted portd ID %d between source %s and sink %s", __func__,
+                  mCallRxSourceClient->portId(),
+                  mCallRxSourceClient->srcDevice()->toString().c_str(),
+                  mCallRxSourceClient->sinkDevice()->toString().c_str());
+            return;
+        } else {
+            disconnectTelephonyAudioSource(mCallRxSourceClient);
+        }
     }
 
     const struct audio_port_config source = {
@@ -889,7 +900,7 @@ void AudioPolicyManager::connectTelephonyRxAudioSource(uint32_t delayMs)
                                        true /*internal*/, true /*isCallRx*/, delayMs);
     ALOGE_IF(status != OK, "%s: failed to start audio source (%d)", __func__, status);
     mCallRxSourceClient = mAudioSources.valueFor(portId);
-    ALOGV_IF(mCallRxSourceClient != nullptr, "%s portdID %d between source %s and sink %s",
+    ALOGV_IF(mCallRxSourceClient != nullptr, "%s portd ID %d between source %s and sink %s",
         __func__, portId, mCallRxSourceClient->srcDevice()->toString().c_str(),
         mCallRxSourceClient->sinkDevice()->toString().c_str());
     ALOGE_IF(mCallRxSourceClient == nullptr,
@@ -918,9 +929,18 @@ void AudioPolicyManager::connectTelephonyTxAudioSource(
     if (mCallTxSourceClient != nullptr) {
         if (mCallTxSourceClient->isConnected()
                 && mCallTxSourceClient->srcDevice()->equals(srcDevice)) {
+            ALOGV("%s same source device %s", __func__, srcDevice->toString().c_str());
             return;
         }
-        disconnectTelephonyAudioSource(mCallTxSourceClient);
+        if (com::android::media::audioserver::optimize_call_routing()) {
+            rerouteTelephonyAudioSource(mCallTxSourceClient, srcDevice, sinkDevice, delayMs);
+            ALOGV("%s rerouted portdID %d between source %s and sink %s", __func__,
+                  mCallTxSourceClient->portId(),
+                  srcDevice->toString().c_str(), sinkDevice->toString().c_str());
+            return;
+        } else {
+            disconnectTelephonyAudioSource(mCallTxSourceClient);
+        }
     }
 
     PatchBuilder patchBuilder;
@@ -947,6 +967,41 @@ void AudioPolicyManager::connectTelephonyTxAudioSource(
     if (status == NO_ERROR) {
         mAudioSources.add(callTxSourceClientPortId, mCallTxSourceClient);
     }
+}
+
+void AudioPolicyManager::rerouteTelephonyAudioSource(const sp<SourceClientDescriptor> &source,
+        const sp<DeviceDescriptor> &srcDevice, const sp<DeviceDescriptor> &sinkDevice,
+        uint32_t delayMs) {
+    sp<SwAudioOutputDescriptor> swOutput = source->swOutput().promote();
+    swOutput->removeClient(source->portId(), false /*checkExists*/);
+    audio_patch_handle_t handle;
+    // createAudioPatchInternal() automatically handles same patch update only if the source
+    // device does not change. Otherwise the patch must be recreated.
+    if (srcDevice->equals(source->srcDevice())) {
+        handle = source->getPatchHandle();
+    } else {
+        handle = AUDIO_PATCH_HANDLE_NONE;
+        releaseAudioPatchInternal(source->getPatchHandle(), 0, source);
+        source->disconnect();
+        source->setSrcDevice(srcDevice);
+    }
+    PatchBuilder patchBuilder;
+    patchBuilder.addSink(sinkDevice).addSource(srcDevice);
+    status_t status = createAudioPatchInternal(
+            patchBuilder.patch(), &handle, mUidCached, delayMs, source);
+    // Note: the SW output associated with "source" can be updated by createAudioPatchInternal()
+
+    if (status != NO_ERROR || mAudioPatches.indexOfKey(handle) < 0) {
+        ALOGW("%s patch panel could not connect device patch, error %d", __func__, status);
+        return;
+    }
+
+    swOutput = source->swOutput().promote();
+    swOutput->addClient(source);
+    source->connect(handle, sinkDevice);
+    applyStreamVolumes(swOutput, {sinkDevice->type()}, delayMs);
+    ALOGV("%s portd ID %d between source %s and sink %s delayMs %u", __func__, source->portId(),
+        srcDevice->toString().c_str(), sinkDevice->toString().c_str(), delayMs);
 }
 
 void AudioPolicyManager::setPhoneState(audio_mode_t state)
@@ -4602,7 +4657,7 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
 {
     uint32_t waitMs = 0;
     bool wasLeUnicastActive = isLeUnicastActive();
-    if (updateCallRouting(true /*fromCache*/, delayMs, &waitMs) == NO_ERROR) {
+    if (updateCallRouting(true /*fromCache*/, 0 /*delayMs*/, &waitMs) == NO_ERROR) {
         // Only apply special touch sound delay once
         delayMs = 0;
     }
@@ -5606,6 +5661,7 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
         ALOGV("%s mUidCached %d patchDesc->mUid %d uid %d",
               __func__, mUidCached, patchDesc->getUid(), uid);
         if (patchDesc->getUid() != mUidCached && uid != patchDesc->getUid()) {
+            ALOGW("%s patch UID mismatch", __func__);
             return INVALID_OPERATION;
         }
     } else {
@@ -5732,6 +5788,7 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
             // device to device connection
             if (patchDesc != 0) {
                 if (patchDesc->mPatch.sources[0].id != patch->sources[0].id) {
+                    ALOGW("%s invalid patch update: different source devices", __func__);
                     return BAD_VALUE;
                 }
             }
@@ -6260,10 +6317,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
             mEngine->getOutputDevicesForAttributes(attributes, nullptr, false /*fromCache*/);
     ALOG_ASSERT(!sinkDevices.isEmpty(), "connectAudioSource(): no device found for attributes");
     sp<DeviceDescriptor> sinkDevice = sinkDevices.itemAt(0);
-    if (!mAvailableOutputDevices.contains(sinkDevice)) {
-        ALOGE("%s Device %s not available", __func__, sinkDevice->toString().c_str());
-        return INVALID_OPERATION;
-    }
+
     PatchBuilder patchBuilder;
     patchBuilder.addSink(sinkDevice).addSource(srcDevice);
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
