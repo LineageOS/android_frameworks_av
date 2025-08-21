@@ -319,6 +319,7 @@ C2SoftAacDec::C2SoftAacDec(
       mStreamInfo(nullptr),
       mSignalledError(false),
       mOutputPortDelay(kDefaultOutputPortDelay),
+      mOutputDelayCompensated(0),
       mOutputDelayRingBuffer(nullptr),
       mDeviceApiLevel(android_get_device_api_level()) {
 }
