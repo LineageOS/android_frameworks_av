@@ -3817,11 +3817,15 @@ status_t AudioPolicyManager::setVolumeIndexForGroup(volume_group_t group,
     }
     status_t status = NO_ERROR;
     IVolumeCurves &curves = getVolumeCurves(group);
-    // AUDIO_STREAM_BLUETOOTH_SCO is only used for volume control so we remap
-    // to AUDIO_STREAM_VOICE_CALL to match with relevant playback activity
-    VolumeSource activityVs = (vs == toVolumeSource(AUDIO_STREAM_BLUETOOTH_SCO, false)) ?
-            toVolumeSource(AUDIO_STREAM_VOICE_CALL, false) : vs;
-
+    VolumeSource activityVs;
+    if (com::android::media::audio::audio_stream_bt_sco_cleanup()) {
+        activityVs = vs;
+    } else {
+        // AUDIO_STREAM_BLUETOOTH_SCO is only used for volume control so we remap
+        // to AUDIO_STREAM_VOICE_CALL to match with relevant playback activity
+        activityVs = (vs == toVolumeSource(AUDIO_STREAM_BLUETOOTH_SCO, false)) ?
+                     toVolumeSource(AUDIO_STREAM_VOICE_CALL, false) : vs;
+    }
     status = setVolumeCurveIndex(index, muted, device, curves);
     if (status != NO_ERROR) {
         ALOGE("%s failed to set curve index for group %d device 0x%X", __func__, group, device);
@@ -8841,7 +8845,7 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
             invalidCurvesReported.insert(&curves);
             String8 dump;
             curves.dump(&dump);
-            ALOGE("invalid volume index range in the curve:\n%s", dump.c_str());
+            ALOGE("invalid volume index range in the curve %d:\n%s", volumeSource, dump.c_str());
         }
         return BAD_VALUE;
     }
