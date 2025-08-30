@@ -106,6 +106,9 @@ std::map<int, std::vector<camera_metadata_tag>> static_api_level_to_keys{
           ANDROID_SHARED_SESSION_COLOR_SPACE,
           ANDROID_SHARED_SESSION_OUTPUT_CONFIGURATIONS,
         } },
+      {37, {
+          ANDROID_INFO_DEVICE_TYPE,
+        } },
 };
 
 /**
@@ -146,6 +149,7 @@ std::map<int, std::vector<camera_metadata_tag>> dynamic_api_level_to_keys{
           ANDROID_EXTENSION_NIGHT_MODE_INDICATOR,
         }  },
       {37, {
+          ANDROID_INFO_DEVICE_TYPE,
           ANDROID_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS,
         }  },
 };

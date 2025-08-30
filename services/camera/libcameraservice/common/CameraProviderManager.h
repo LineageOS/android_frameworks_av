@@ -796,6 +796,9 @@ private:
                                             const std::vector<int64_t>& minFrameDurationEntries,
                                             const std::vector<int64_t>& stallDurationEntries,
                                             CameraMetadata* c /*out*/);
+
+            status_t addAvailableKeyIfMissing(CameraMetadata& ch,
+                    int32_t availableTag, int32_t keyToAdd);
             status_t addRotateCropTags();
             status_t addAutoframingTags();
             status_t addPreCorrectionActiveArraySize();
@@ -804,6 +807,7 @@ private:
             status_t addAePriorityModeTags();
             status_t addSessionConfigQueryVersionTag();
             status_t addSharedSessionConfigurationTags(const std::string &cameraId);
+            status_t addDeviceTypeTag(CameraMetadata& c);
             bool isAutomotiveDevice();
 
             static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
