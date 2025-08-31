@@ -6028,23 +6028,33 @@ void CameraService::updateStatus(StatusInternal status, const std::string& camer
 
 void CameraService::updateOpenCloseStatus(const std::string& cameraId, bool open,
         const std::string& clientPackageName, bool sharedMode) {
+    // Update the client package name in CameraStates. In case the state doesn't
+    // exist, continue to fire onCameraOpened/onCameraClosed callback:
+    //   - If onCameraOpened is called, we expect a subsequent
+    //     onCameraClosed() as part of the disconnect() call or error cleanups
+    //     during connect().
+    //   - If onCameraClosed is called, we shouldn't miss the onCameraClosed
+    //     callback.
     auto state = getCameraState(cameraId);
     if (state == nullptr) {
         ALOGW("%s: Could not update the status for %s, no such device exists", __FUNCTION__,
                 cameraId.c_str());
-        return;
-    }
-    if (open) {
-        if (flags::camera_multi_client() && sharedMode) {
-            state->addClientPackage(clientPackageName);
-        } else {
-            state->setClientPackage(clientPackageName);
+        if (!flags::on_camera_closed_at_hal_crash()) {
+            return;
         }
     } else {
-        if (flags::camera_multi_client() && sharedMode) {
-            state->removeClientPackage(clientPackageName);
+        if (open) {
+            if (flags::camera_multi_client() && sharedMode) {
+                state->addClientPackage(clientPackageName);
+            } else {
+                state->setClientPackage(clientPackageName);
+            }
         } else {
-            state->setClientPackage(std::string());
+            if (flags::camera_multi_client() && sharedMode) {
+                state->removeClientPackage(clientPackageName);
+            } else {
+                state->setClientPackage(std::string());
+            }
         }
     }
 
