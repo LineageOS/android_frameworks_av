@@ -17,6 +17,9 @@
 #ifndef ANDROID_SERVERS_CAMERA3_STREAM_H
 #define ANDROID_SERVERS_CAMERA3_STREAM_H
 
+#include <string>
+#include <vector>
+
 #include <gui/Flags.h>
 #include <gui/Surface.h>
 #include <utils/RefBase.h>
@@ -30,6 +33,8 @@
 namespace android {
 
 namespace camera3 {
+
+typedef ::aidl::android::hardware::graphics::common::ExtendableType GrallocExtendableType;
 
 /**
  * A class for managing a single stream of input or output data from the camera
@@ -171,6 +176,9 @@ class Camera3Stream :
     uint64_t           getUsage() const;
     void               setUsage(uint64_t usage);
     void               setFormatOverride(bool formatOverridden);
+    const std::vector<AHardwareBufferLongOptions>& getAdditionalOptions() const;
+    void               setAdditionalOptions(const std::vector<GrallocExtendableType>&
+                                            additionalOptions);
     bool               isFormatOverridden() const;
     int                getOriginalFormat() const;
     int64_t            getDynamicRangeProfile() const;
@@ -638,6 +646,17 @@ class Camera3Stream :
 
     bool mDeviceTimeBaseIsRealtime;
     int mTimestampBase;
+
+    // Keep track of the gralloc additionalOptions
+    struct AdditionalOptionsWrapper {
+        // Note: These 2 vectors must be kept in sync because mOptions
+        // keep raw const char pointers to mNames.
+        std::vector<std::string> mNames;
+        std::vector<AHardwareBufferLongOptions> mOptions;
+
+        void initialize(const std::vector<GrallocExtendableType>& options);
+    };
+    AdditionalOptionsWrapper mAdditionalOptions;
 }; // class Camera3Stream
 
 }; // namespace camera3

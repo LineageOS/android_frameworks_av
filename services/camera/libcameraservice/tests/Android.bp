@@ -113,7 +113,7 @@ cc_test {
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
         "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.provider-V3-ndk",
+        "android.hardware.camera.provider-V4-ndk",
         "libcameraservice",
         "libflagtest",
     ],
