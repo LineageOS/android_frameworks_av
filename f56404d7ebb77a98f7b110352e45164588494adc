@@ -16,6 +16,24 @@
       "message": "Why is this a thing only for 23.0?",
       "revId": "f56404d7ebb77a98f7b110352e45164588494adc",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ceb89053_9303bfe6",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 28223
+      },
+      "writtenOn": "2025-09-01T17:08:41Z",
+      "side": 1,
+      "message": "I moved it from 22 to 23 because I was building 23 at the time. Just picked it to 22.2 as well - 449716",
+      "parentUuid": "99c2e081_5e70ebc4",
+      "revId": "f56404d7ebb77a98f7b110352e45164588494adc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
