@@ -4269,12 +4269,15 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             }
             // signal actual start of output stream when the render position reported by
             // the kernel starts moving.
-            if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
+            {
+                audio_utils::unique_lock _whsl(mWaitHalStartMutex);
+                if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
                     && (mKernelPositionOnStandby
                             != mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL])))) {
-                mHalStarted = true;
-                mWaitHalStartCV.notify_all();
-            }
+                    mHalStarted = true;
+                    mWaitHalStartCV.notify_all();
+                }
+            } // mWaitHalStartMutex scope ends
 
             // prevent any changes in effect chain list and in each effect chain
             // during mixing and effect process as the audio buffers could be deleted

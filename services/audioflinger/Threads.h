@@ -1212,26 +1212,29 @@ public:
                     setStandby_l();
                 }
 
-    void setStandby_l() final REQUIRES(mutex()) {
-                    mStandby = true;
-                    mHalStarted = false;
-                    mKernelPositionOnStandby =
-                        mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
-                }
+    void setStandby_l() final REQUIRES(mutex()) EXCLUDES(mWaitHalStartMutex) {
+        mStandby = true;
+        {
+            audio_utils::unique_lock _l(mWaitHalStartMutex);
+            mHalStarted = false;
+            mKernelPositionOnStandby =
+                mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+        } // mWaitHalStartMutex scope ends
+    }
 
-    bool waitForHalStart(uint32_t timeoutMs) final EXCLUDES_ThreadBase_Mutex {
-                    audio_utils::unique_lock _l(mutex());
-                    nsecs_t endWaitTimetNs = systemTime() + milliseconds(timeoutMs);
-                    while (!mHalStarted) {
-                        nsecs_t timeNs = systemTime();
-                        if (timeNs >= endWaitTimetNs) {
-                            break;
-                        }
-                        nsecs_t waitTimeLeftNs = endWaitTimetNs - timeNs;
-                        mWaitHalStartCV.wait_for(_l, std::chrono::nanoseconds(waitTimeLeftNs));
-                    }
-                    return mHalStarted;
-                }
+    bool waitForHalStart(uint32_t timeoutMs) final EXCLUDES(mWaitHalStartMutex) {
+        audio_utils::unique_lock _l(mWaitHalStartMutex);
+        nsecs_t endWaitTimetNs = systemTime() + milliseconds(timeoutMs);
+        while (!mHalStarted) {
+            nsecs_t timeNs = systemTime();
+            if (timeNs >= endWaitTimetNs) {
+                break;
+            }
+            nsecs_t waitTimeLeftNs = endWaitTimetNs - timeNs;
+            mWaitHalStartCV.wait_for(_l, std::chrono::nanoseconds(waitTimeLeftNs));
+        }
+        return mHalStarted;
+    }
 
     void setTracksInternalMute(std::map<audio_port_handle_t, bool>* /* tracksInternalMute */)
             override EXCLUDES_ThreadBase_Mutex {
@@ -1556,11 +1559,12 @@ protected:
 
     // output stream start detection based on render position returned by the kernel
     // condition signalled when the output stream has started
+    mutable audio_utils::mutex mWaitHalStartMutex;
     audio_utils::condition_variable mWaitHalStartCV;
     // true when the output stream render position has moved, reset to false in standby
-    bool                     mHalStarted = false;
+    bool mHalStarted GUARDED_BY(mWaitHalStartMutex) = false;
     // last kernel render position saved when entering standby
-    int64_t                  mKernelPositionOnStandby = 0;
+    int64_t mKernelPositionOnStandby GUARDED_BY(mWaitHalStartMutex) = 0;
 
 public:
     FastTrackUnderruns getFastTrackUnderruns(size_t /* fastIndex */) const override
