@@ -172,9 +172,28 @@ static int checkRecordingInternal(const AttributionSourceState &attributionSourc
         permission::PermissionChecker permissionChecker;
         int permitted;
         if (start) {
-            permitted = permissionChecker.checkPermissionForStartDataDeliveryFromDatasource(
+            // Do a double-check, where we first check without actually starting in order to handle
+            // the behavior of AppOps where ops are sometimes started but paused for SOFT_DENIED.
+            // Since there is no way to maintain reference consensus due to this behavior, avoid
+            // starting an op when a restriction is in place by first checking. In the case where we
+            // startOp would fail, call a noteOp (which will also fail) instead. This preserves
+            // behavior that is reliant on listening to op rejected events (such as the hint
+            // dialogue to unmute the microphone). Technically racy, but very unlikely.
+            //
+            // TODO(b/294609684) To be removed when the pause state for an OP is removed.
+            permitted = permissionChecker.checkPermissionForPreflightFromDatasource(
                     sAndroidPermissionRecordAudio, resolvedAttributionSource.value(), msg,
                     attributedOpCode);
+            if (permitted == PERMISSION_GRANTED) {
+                permitted = permissionChecker.checkPermissionForStartDataDeliveryFromDatasource(
+                        sAndroidPermissionRecordAudio, resolvedAttributionSource.value(), msg,
+                        attributedOpCode);
+            } else {
+                // intentionally don't set permitted
+                permissionChecker.checkPermissionForDataDeliveryFromDatasource(
+                            sAndroidPermissionRecordAudio, resolvedAttributionSource.value(), msg,
+                            attributedOpCode);
+            }
         } else {
             permitted = permissionChecker.checkPermissionForPreflightFromDatasource(
                     sAndroidPermissionRecordAudio, resolvedAttributionSource.value(), msg,

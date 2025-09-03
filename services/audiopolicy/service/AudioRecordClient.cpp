@@ -50,7 +50,7 @@ int getTargetSdkForPackageName(std::string_view packageName) {
         if (pm != nullptr) {
             const auto status = pm->getTargetSdkVersionForPackage(
                     String16{packageName.data(), packageName.size()}, &targetSdk);
-            return status.isOk() ? targetSdk : -1;
+            return status.isOk() ? targetSdk : __ANDROID_API_FUTURE__;
         }
     }
     return targetSdk;
