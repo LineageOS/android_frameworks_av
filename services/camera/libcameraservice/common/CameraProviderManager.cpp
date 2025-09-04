@@ -3143,28 +3143,46 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraInfo(
         return NAME_NOT_FOUND;
     }
 
-    if (compatInfo.shouldRotateAndCrop() && compatInfo.shouldOverrideSensorOrientation()
-            && (info->orientation == 0 || info->orientation == 180)) {
-        *portraitRotation = 90;
-        if (info->facing == hardware::CAMERA_FACING_FRONT) {
-            info->orientation = (360 + info->orientation - 90) % 360;
-        } else {
-            info->orientation = (360 + info->orientation + 90) % 360;
+    *portraitRotation = 0;
+    if (wm_flags::camera_compat_landscape_camera_support()) {
+        if (compatInfo.shouldOverrideSensorOrientation()) {
+            if (info->facing == hardware::CAMERA_FACING_FRONT) {
+                info->orientation = (360 + info->orientation - 90) % 360;
+            } else {
+                info->orientation = (360 + info->orientation + 90) % 360;
+            }
         }
-    } else if (compatInfo.shouldRotateAndCrop() && !compatInfo.shouldOverrideSensorOrientation()
-            && (info->orientation == 90 || info->orientation == 270)) {
-        // Check device rotation: display rotation will be sandboxed, therefore rotate-and-crop
-        // needs to take display rotation into account.
-        int rotateAndCropDegrees = ui::toRotationInt(
-                compatInfo.getRotateAndCropRotation().value()) * 90;
-        *portraitRotation = info->facing == hardware::CAMERA_FACING_BACK ? rotateAndCropDegrees
-                : 360 - rotateAndCropDegrees;
+
+        if (compatInfo.shouldRotateAndCrop()) {
+            int rotateAndCropDegrees = ui::toRotationInt(compatInfo.getRotateAndCropRotation()
+                    .value()) * 90;
+            *portraitRotation = info->facing == hardware::CAMERA_FACING_BACK
+                    ? rotateAndCropDegrees
+                    : 360 - rotateAndCropDegrees;
+        }
     } else {
-        *portraitRotation = 0;
+        if (compatInfo.shouldRotateAndCrop() && compatInfo.shouldOverrideSensorOrientation()
+            && (info->orientation == 0 || info->orientation == 180)) {
+            *portraitRotation = 90;
+            if (info->facing == hardware::CAMERA_FACING_FRONT) {
+                info->orientation = (360 + info->orientation - 90) % 360;
+            } else {
+                info->orientation = (360 + info->orientation + 90) % 360;
+            }
+        } else if (compatInfo.shouldRotateAndCrop() && !compatInfo.shouldOverrideSensorOrientation()
+                && (info->orientation == 90 || info->orientation == 270)) {
+            // Check device rotation: display rotation will be sandboxed, therefore rotate-and-crop
+            // needs to take display rotation into account.
+            int rotateAndCropDegrees = ui::toRotationInt(
+                    compatInfo.getRotateAndCropRotation().value()) * 90;
+            *portraitRotation = info->facing == hardware::CAMERA_FACING_BACK ? rotateAndCropDegrees
+                    : 360 - rotateAndCropDegrees;
+        }
     }
 
     return OK;
 }
+
 bool CameraProviderManager::ProviderInfo::DeviceInfo3::isAPI1Compatible() const {
     // Do not advertise NIR cameras to API1 camera app.
     camera_metadata_ro_entry cfa = mCameraCharacteristics.find(
