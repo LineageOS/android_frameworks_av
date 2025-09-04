@@ -90,6 +90,8 @@ uint64_t ClientManagerCookieHolder::getCookie(
     return id;
 }
 
+struct AccessorDeathRecipient;
+
 class ClientManager::Impl {
 public:
     Impl();
@@ -160,10 +162,27 @@ private:
     sp<Observer> mObserver;
 
     ClientManagerCookieHolder mRemoteClientCookies;
+
+    sp<AccessorDeathRecipient> mAccessorDeathRecipient;
+
+    void removeClient(ConnectionId connectionId);
+
+    friend struct AccessorDeathRecipient;
+};
+
+struct AccessorDeathRecipient : public hardware::hidl_death_recipient {
+
+    AccessorDeathRecipient() = default;
+
+    virtual void serviceDied(
+            uint64_t cookie,
+            const wp<::android::hidl::base::V1_0::IBase>& /* who */) override {
+        ClientManager::getInstance()->mImpl->removeClient(cookie);
+    }
 };
 
 ClientManager::Impl::Impl()
-    : mObserver(new Observer()) {}
+    : mObserver(new Observer()), mAccessorDeathRecipient(new AccessorDeathRecipient()) {}
 
 ResultStatus ClientManager::Impl::registerSender(
         const sp<IAccessor> &accessor, ConnectionId *pConnectionId) {
@@ -189,6 +208,8 @@ ResultStatus ClientManager::Impl::registerSender(
         }
         if (!mCache.mConnecting) {
             mCache.mConnecting = true;
+            bool added = false;
+            ConnectionId conId;
             lock.unlock();
             ResultStatus result = ResultStatus::OK;
             const std::shared_ptr<BufferPoolClient> client =
@@ -203,18 +224,22 @@ ResultStatus ClientManager::Impl::registerSender(
                 // TODO: handle insert fail. (malloc fail)
                 const std::weak_ptr<BufferPoolClient> wclient = client;
                 mCache.mClients.push_back(std::make_pair(accessor, wclient));
-                ConnectionId conId = client->getConnectionId();
+                conId = client->getConnectionId();
                 mObserver->addClient(conId, wclient);
                 {
                     std::lock_guard<std::mutex> lock(mActive.mMutex);
                     mActive.mClients.insert(std::make_pair(conId, client));
                 }
                 *pConnectionId = conId;
+                added = true;
                 ALOGV("register new connection %lld", (long long)*pConnectionId);
             }
             mCache.mConnecting = false;
             lock.unlock();
             mCache.mConnectCv.notify_all();
+            if (added) {
+                accessor->linkToDeath(mAccessorDeathRecipient, conId);
+            }
             return result;
         }
         mCache.mConnectCv.wait_for(
@@ -460,6 +485,11 @@ void ClientManager::Impl::cleanUp(bool clearCache) {
         ALOGV("# of cleaned connections: %d", cleaned);
         mCache.mLastCleanUpUs = now;
     }
+}
+
+void ClientManager::Impl::removeClient(ConnectionId connectionId) {
+    std::lock_guard<std::mutex> lock(mActive.mMutex);
+    mActive.mClients.erase(connectionId);
 }
 
 // Methods from ::android::hardware::media::bufferpool::V2_0::IClientManager follow.
