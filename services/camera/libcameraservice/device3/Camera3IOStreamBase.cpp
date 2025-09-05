@@ -25,8 +25,11 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <camera/StringUtils.h>
+#include <com_android_internal_camera_flags.h>
 #include "device3/Camera3IOStreamBase.h"
 #include "device3/StatusTracker.h"
+
+namespace flags = com::android::internal::camera::flags;
 
 namespace android {
 
@@ -281,8 +284,12 @@ status_t Camera3IOStreamBase::returnAnyBufferLocked(
     }
 
     mHandoutTotalBufferCount--;
-    if (mHandoutTotalBufferCount == 0 && mState != STATE_IN_CONFIG &&
-            mState != STATE_IN_RECONFIG && mState != STATE_PREPARING) {
+    bool deferredConsumer = false;
+    if (flags::seamless_transitions() && (res == UNKNOWN_TRANSACTION)) {
+        deferredConsumer = true;
+    }
+    if (mHandoutTotalBufferCount == 0 && ((mState != STATE_IN_CONFIG &&
+            mState != STATE_IN_RECONFIG && mState != STATE_PREPARING) || deferredConsumer)) {
         /**
          * Avoid a spurious IDLE->ACTIVE->IDLE transition when using buffers
          * before/after register_stream_buffers during initial configuration

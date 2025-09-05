@@ -54,6 +54,7 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
     for (size_t i = 0; i < consumerCount; i++) {
         mSurfaceUniqueIds[i] = SurfaceHolderUniqueId{surfaces[i], mNextUniqueSurfaceId++};
     }
+    mIsShared = true;
 }
 
 Camera3SharedOutputStream::~Camera3SharedOutputStream() {

@@ -245,4 +245,14 @@ interface ICameraDeviceUser
      *         false if another higher priority client with primary access is also using the camera.
      */
     boolean isPrimaryClient();
+
+    /**
+     * Update the output surfaces in the currently configured stream
+     * configurations.
+     *
+     * @param streamIds the set of stream ids to be updated
+     * @param configurations the new output configuration per each stream
+     *
+     */
+    void updateOutputConfigurations(in int[] streamIds, in OutputConfiguration[] configurations);
 }

@@ -2132,7 +2132,10 @@ status_t Camera3Device::setConsumerSurfaces(int streamId,
 
 status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHolder> &newSurfaces,
         const std::vector<OutputStreamInfo> &outputInfo,
-        const std::vector<size_t> &removedSurfaceIds, KeyedVector<sp<Surface>, size_t> *outputMap) {
+        const std::vector<size_t> &removedSurfaceIds,
+        bool modifyRequests,
+        KeyedVector<sp<Surface>, size_t> *outputMap,
+        int64_t* lastFrameNumber) {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
@@ -2142,14 +2145,48 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHold
         return BAD_VALUE;
     }
 
-    for (const auto &it : removedSurfaceIds) {
-        if (mRequestThread->isOutputSurfacePending(streamId, it)) {
-            CLOGE("Shared surface still part of a pending request!");
-            return -EBUSY;
+    if (modifyRequests) {
+        int64_t lastRepeatingFrameNumber;
+        mRequestThread->clearOutputs(streamId, removedSurfaceIds, &lastRepeatingFrameNumber);
+        if (lastFrameNumber != nullptr) {
+            *lastFrameNumber = lastRepeatingFrameNumber;
+        }
+        mRequestThread->signalPipelineDrain({streamId});
+        mInterface->clearUnusedBufferCaches(streamId);
+        // Pause unlocked buffer requests
+        if (mUseHalBufManager) {
+            mRequestBufferInterfaceLock.lock();
+        } else {
+            mRequestThread->setPaused(true);
+        }
+    } else {
+        for (const auto &it : removedSurfaceIds) {
+            if (mRequestThread->isOutputSurfacePending(streamId, it)) {
+                CLOGE("Shared surface still part of a pending request!");
+                return -EBUSY;
+            }
         }
     }
 
-    status_t res = stream->updateStream(newSurfaces, outputInfo, removedSurfaceIds, outputMap);
+    status_t res;
+    {
+        // The internal stream 'mLock' doesn't guarantee exclusivity from inflight
+        // buffers returning during 'processCaptureResult' callbacks.
+        // However It is vital for 'updateStream' to execute without any buffers
+        // returning in parallel. To do this we need to hold on to
+        // 'mProcessCaptureResultLock'.
+        Mutex::Autolock r(mProcessCaptureResultLock);
+        res = stream->updateStream(newSurfaces, outputInfo, removedSurfaceIds, outputMap);
+    }
+    // Resume buffer requests
+    if (modifyRequests) {
+        if (mUseHalBufManager) {
+            mRequestBufferInterfaceLock.unlock();
+        } else {
+            mRequestThread->setPaused(false);
+        }
+    }
+
     if (res != OK) {
         CLOGE("Stream %d failed to update stream (error %d %s) ",
               streamId, res, strerror(-res));
@@ -3171,6 +3208,10 @@ void Camera3Device::HalInterface::onStreamReConfigured(int streamId) {
     }
 }
 
+void Camera3Device::HalInterface::clearUnusedBufferCaches(int streamId) {
+    mBufferRecords.clearUnusedBufferCaches(streamId);
+}
+
 /**
  * RequestThread inner class methods
  */
@@ -3377,6 +3418,98 @@ status_t Camera3Device::RequestThread::clearRepeatingRequestsLocked(
     mInterface->repeatingRequestEnd(mRepeatingLastFrameNumber, streamIds);
 
     mRepeatingLastFrameNumber = hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES;
+    return OK;
+}
+
+bool Camera3Device::RequestThread::containsSurfaceIds(int streamId,
+        const sp<CaptureRequest>& request, const std::vector<size_t>& surfaceIds) {
+    auto streamIt = request->mOutputSurfaces.find(streamId);
+    if (streamIt == request->mOutputSurfaces.end()) {
+        return false;
+    }
+
+    const auto& reqSurfacesIds = (*streamIt).second;
+    for (const auto& surfaceId : surfaceIds) {
+        if (std::find(reqSurfacesIds.begin(), reqSurfacesIds.end(), surfaceId) !=
+                reqSurfacesIds.end()) {
+            break;
+        }
+    }
+    return true;
+}
+
+bool Camera3Device::RequestThread::clearOutputList(int streamId,
+        const std::vector<size_t>& surfaceIds,
+        RequestList& requestList, sp<NotificationListener> listener) {
+    bool requestRemoved = false;
+    for (RequestList::iterator it = requestList.begin(); it != requestList.end();) {
+        if (!containsSurfaceIds(streamId, *it, surfaceIds)) {
+            it++;
+            continue;
+        }
+
+        // Abort the input buffers for reprocess requests.
+        if ((*it)->mInputStream != NULL) {
+            camera_stream_buffer_t inputBuffer;
+            camera3::Size inputBufferSize;
+            status_t res = (*it)->mInputStream->getInputBuffer(&inputBuffer,
+                    &inputBufferSize, /*respectHalLimit*/ false);
+            if (res != OK) {
+                ALOGW("%s: %d: couldn't get input buffer while clearing the request "
+                        "list: %s (%d)", __FUNCTION__, __LINE__, strerror(-res), res);
+            } else {
+                inputBuffer.status = CAMERA_BUFFER_STATUS_ERROR;
+                res = (*it)->mInputStream->returnInputBuffer(inputBuffer);
+                if (res != OK) {
+                    ALOGE("%s: %d: couldn't return input buffer while clearing the request "
+                            "list: %s (%d)", __FUNCTION__, __LINE__, strerror(-res), res);
+                }
+            }
+        }
+        // Set the frame number this request would have had, if it
+        // had been submitted; this frame number will not be reused.
+        // The requestId and burstId fields were set when the request was
+        // submitted originally (in convertMetadataListToRequestListLocked)
+        (*it)->mResultExtras.frameNumber = mFrameNumber++;
+        listener->notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST,
+                (*it)->mResultExtras);
+
+        it = requestList.erase(it);
+        requestRemoved = true;
+    }
+
+    return requestRemoved;
+}
+
+status_t Camera3Device::RequestThread::clearOutputs(int streamId,
+        const std::vector<size_t>& surfaceIds, /*out*/int64_t *lastFrameNumber) {
+    ATRACE_CALL();
+
+    if (surfaceIds.empty()) {
+        return OK;
+    }
+
+    Mutex::Autolock l(mRequestLock);
+    ALOGV("RequestThread::%s:", __FUNCTION__);
+
+    bool clearRepeatingRequests = false;
+    // Send errors for all requests pending in the request queue, including
+    // pending repeating requests
+    sp<NotificationListener> listener = mListener.promote();
+    if (listener != NULL) {
+        clearOutputList(streamId, surfaceIds, mRequestQueue, listener);
+        clearRepeatingRequests = clearOutputList(streamId, surfaceIds, mRepeatingRequests,
+                listener);
+    }
+
+    if (clearRepeatingRequests) {
+        Mutex::Autolock al(mTriggerMutex);
+        mTriggerMap.clear();
+        clearRepeatingRequestsLocked(lastFrameNumber);
+        listener->notifyRepeatingRequestError(*lastFrameNumber);
+    }
+    mRequestClearing = true;
+    mRequestSignal.signal();
     return OK;
 }
 
@@ -4209,7 +4342,12 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                             {outputStream->getSurfaceMirrorMode(surfaceId), -1}});
                 }
             } else {
-                transform.insert({0, {outputStream->getMirrorMode(), -1}});
+                if (flags::seamless_transitions()) {
+                    transform.insert({captureRequest->mOutputSurfaces[streamId][0],
+                            {outputStream->getMirrorMode(), -1}});
+                } else {
+                    transform.insert({0, {outputStream->getMirrorMode(), -1}});
+                }
             }
             transformMap.insert({streamId, transform});
 
@@ -4316,6 +4454,10 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         bool passSurfaceMap =
                 mUseHalBufManager || containsHalBufferManagedStream;
         auto expectedDurationInfo = calculateExpectedDurationRange(settings);
+        auto surfaceMap = passSurfaceMap ? uniqueSurfaceIdMap : SurfaceMap{};
+        if (surfaceMap.empty() && flags::seamless_transitions()) {
+            surfaceMap = captureRequest->mOutputSurfaces;
+        }
         res = parent->registerInFlight(halRequest->frame_number,
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
@@ -4326,8 +4468,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 requestedPhysicalCameras, isStillCapture, isZslCapture,
                 captureRequest->mRotateAndCropAuto, captureRequest->mAutoframingAuto,
                 mPrevCameraIdsWithZoom, useZoomRatio,
-                passSurfaceMap ? uniqueSurfaceIdMap :
-                                      SurfaceMap{}, captureRequest->mRequestTimeNs, transformMap);
+                surfaceMap, captureRequest->mRequestTimeNs, transformMap);
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
                 __FUNCTION__,
@@ -4497,7 +4638,12 @@ void Camera3Device::RequestThread::signalPipelineDrain(const std::vector<int>& s
     }
     // If request thread is still busy, wait until paused then notify HAL
     mNotifyPipelineDrain = true;
-    mStreamIdsToBeDrained = streamIds;
+    if (flags::seamless_transitions() && !mStreamIdsToBeDrained.empty()) {
+        mStreamIdsToBeDrained.insert(mStreamIdsToBeDrained.end(), streamIds.begin(),
+                streamIds.end());
+    } else {
+        mStreamIdsToBeDrained = streamIds;
+    }
 }
 
 void Camera3Device::RequestThread::resetPipelineDrain() {

@@ -309,7 +309,9 @@ class Camera3Device :
     status_t updateStream(int streamId, const std::vector<SurfaceHolder> &newSurfaces,
             const std::vector<OutputStreamInfo> &outputInfo,
             const std::vector<size_t> &removedSurfaceIds,
-            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
+            bool modifyRequests,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/,
+            int64_t* lastFrameNumber = nullptr) override;
 
     /**
      * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
@@ -560,6 +562,8 @@ class Camera3Device :
         void getInflightRequestBufferKeys(std::vector<uint64_t>* out);
 
         void onStreamReConfigured(int streamId);
+
+        void clearUnusedBufferCaches(int streamId);
 
       protected:
 
@@ -1032,6 +1036,18 @@ class Camera3Device :
          * Remove all queued and repeating requests, and pending triggers
          */
         status_t clear(/*out*/int64_t *lastFrameNumber = NULL);
+
+        /**
+         * Remove all queued and repeating requests, and pending triggers
+         * of a given list of surface Ids
+         */
+        status_t clearOutputs(int streamId, const std::vector<size_t>& surfaceIds,
+                /*out*/int64_t *lastFrameNumber = NULL);
+
+        static bool containsSurfaceIds(int streamId, const sp<CaptureRequest>& request,
+                const std::vector<size_t>& surfaceIds);
+        bool clearOutputList(int streamId, const std::vector<size_t>& surfaceIds,
+                RequestList& requestList, sp<NotificationListener> listener);
 
         /**
          * Flush all pending requests in HAL.

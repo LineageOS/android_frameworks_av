@@ -336,7 +336,8 @@ status_t AidlCamera3SharedDevice::addSharedSurfaces(int streamId,
         return BAD_VALUE;
     }
 
-    res = updateStream(streamId, surfaces, outputInfo, removedSurfaceIds, &outputMap);
+    res = updateStream(streamId, surfaces, outputInfo, removedSurfaceIds, false /*replaceEnabled*/,
+            &outputMap);
     if (res != OK) {
         CLOGE("Stream %d failed to update stream (error %d %s) ",
               streamId, res, strerror(-res));
@@ -363,7 +364,8 @@ status_t AidlCamera3SharedDevice::removeSharedSurfaces(int streamId,
         return BAD_VALUE;
     }
 
-    res = updateStream(streamId, surfaces, outputInfo, removedSurfaceIds, &outputMap);
+    res = updateStream(streamId, surfaces, outputInfo, removedSurfaceIds, false /*replaceEnabled*/,
+            &outputMap);
     if (res != OK) {
         CLOGE("Stream %d failed to update stream (error %d %s) ",
               streamId, res, strerror(-res));
