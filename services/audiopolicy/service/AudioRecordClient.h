@@ -43,7 +43,8 @@ public:
 
 private:
     OpRecordAudioMonitor(const AttributionSourceState& attributionSource, int32_t appOp,
-            wp<AudioPolicyService::AudioCommandThread> commandThread);
+                         bool shouldMonitorRecord,
+                         wp<AudioPolicyService::AudioCommandThread> commandThread);
 
     void onFirstRef() override;
 
@@ -68,6 +69,7 @@ private:
     std::atomic_bool mHasOp;
     const AttributionSourceState mAttributionSource;
     const int32_t mAppOp;
+    const bool mShouldMonitorRecord;
     wp<AudioPolicyService::AudioCommandThread> mCommandThread;
 };
 
