@@ -727,6 +727,7 @@ status_t AudioPolicyManager::getHwOffloadFormatsSupportedForBluetoothMedia(
         audioDeviceSet = getAudioDeviceOutAllA2dpSet();
         break;
     case AUDIO_DEVICE_OUT_BLE_HEADSET:
+    case AUDIO_DEVICE_OUT_BLE_HEARING_AID:
         audioDeviceSet = getAudioDeviceOutLeAudioUnicastSet();
         break;
     case AUDIO_DEVICE_OUT_BLE_BROADCAST:
@@ -8777,7 +8778,7 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
             {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP, AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
              AUDIO_DEVICE_OUT_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADPHONE,
              AUDIO_DEVICE_OUT_USB_HEADSET, AUDIO_DEVICE_OUT_HEARING_AID,
-             AUDIO_DEVICE_OUT_BLE_HEADSET}).empty() &&
+             AUDIO_DEVICE_OUT_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_HEARING_AID}).empty() &&
             ((volumeSource == alarmVolumeSrc ||
               volumeSource == ringVolumeSrc) ||
              (volumeSource == toVolumeSource(AUDIO_STREAM_NOTIFICATION, false)) ||
@@ -8811,7 +8812,7 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
             if (Volume::getDeviceForVolume(deviceTypes) != AUDIO_DEVICE_OUT_SPEAKER
                     &&  !Intersection(deviceTypes, {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
                         AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
-                        AUDIO_DEVICE_OUT_BLE_HEADSET}).empty()) {
+                        AUDIO_DEVICE_OUT_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_HEARING_AID}).empty()) {
                 // on A2DP/BLE, also ensure notification volume is not too low compared to media
                 // when intended to be played.
                 if ((volumeDb > -96.0f) &&

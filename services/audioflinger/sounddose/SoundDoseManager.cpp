@@ -556,6 +556,7 @@ bool SoundDoseManager::shouldComputeCsdForDeviceType(audio_devices_t device) {
         case AUDIO_DEVICE_OUT_USB_HEADSET:
         case AUDIO_DEVICE_OUT_BLE_HEADSET:
         case AUDIO_DEVICE_OUT_BLE_BROADCAST:
+        case AUDIO_DEVICE_OUT_BLE_HEARING_AID:
             return true;
         default:
             return false;
