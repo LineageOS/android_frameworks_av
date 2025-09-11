@@ -14,25 +14,34 @@
  * limitations under the License.
  */
 
-#include <android-base/no_destructor.h>
 #include <apex/ApexCodecsImpl.h>
 
 namespace android::apexcodecs {
 
-class ApexComponentImpl : public ApexComponentIntf {
-public:
-    ApexComponentImpl(const std::shared_ptr<C2Component> &comp) : mComponent(comp) {}
-    virtual ApexCodec_Status start() = 0;
-    virtual ApexCodec_Status flush() = 0;
-    virtual ApexCodec_Status reset() = 0;
-    virtual ApexCodec_Configurable *getConfigurable() = 0;
-    virtual ApexCodec_Status process(
-            const ApexCodec_Buffer *input,
-            ApexCodec_Buffer *output,
-            size_t *consumed,
-            size_t *produced) = 0;
-private:
-    std::shared_ptr<C2Component> mComponent;
-};
+ApexConfigurableImpl::ApexConfigurableImpl(
+        const std::shared_ptr<C2ComponentInterface> &intf) : mConfigurable(intf) {}
+
+ApexCodec_Status ApexConfigurableImpl::config(
+        const std::vector<C2Param *> &params,
+        std::vector<std::unique_ptr<C2SettingResult>> *results) const {
+    return (ApexCodec_Status)mConfigurable->config_vb(params, C2_MAY_BLOCK, results);
+}
+
+ApexCodec_Status ApexConfigurableImpl::query(
+        const std::vector<C2Param::Index> &heapParamIndices,
+        std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
+    return (ApexCodec_Status)mConfigurable->query_vb(
+            {}, heapParamIndices, C2_MAY_BLOCK, heapParams);
+}
+
+ApexCodec_Status ApexConfigurableImpl::querySupportedParams(
+        std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const {
+    return (ApexCodec_Status)mConfigurable->querySupportedParams_nb(params);
+}
+
+ApexCodec_Status ApexConfigurableImpl::querySupportedValues(
+        std::vector<C2FieldSupportedValuesQuery> &fields) const {
+    return (ApexCodec_Status)mConfigurable->querySupportedValues_vb(fields, C2_MAY_BLOCK);
+}
 
 }  // namespace android::apexcodecs
