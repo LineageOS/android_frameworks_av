@@ -49,14 +49,19 @@ cc_library_shared {
     name: "liberaser",
     srcs: [
         ":effectCommonFile",
+        "Classifier.cpp",
         "Eraser.cpp",
         "EraserContext.cpp",
         "EraserUtils.cpp",
         "LiteRTInstance.cpp",
+        "Remixer.cpp",
+        "Separator.cpp",
     ],
     defaults: [
         "aidlaudioeffectservice_defaults",
+        "latest_android_media_audio_eraser_types_ndk_shared",
     ],
+    local_include_dirs: ["."],
     cflags: [
         "-Wall",
         "-Werror",

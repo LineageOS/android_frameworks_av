@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-#include <cstring>
 #define LOG_TAG "AHAL_EraserContext"
+
+#include "EraserContext.h"
+#include "EraserUtils.h"
 
 #include <android-base/logging.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 
-#include "EraserContext.h"
-#include "EraserUtils.h"
-#include "LiteRTInstance.h"
+#include <algorithm>
+#include <cstring>
 
 using aidl::android::media::audio::common::AudioChannelLayout;
 using aidl::android::media::audio::eraser::Classification;
@@ -59,7 +60,7 @@ const EraserContext::EraserConfiguration EraserContext::kDefaultConfig = {.mode 
 
 const EraserContext::EraserCapability& EraserContext::getCapability() {
     static const EraserCapability cap({
-            .sampleRates = {EraserContext::kClassifierSampleRate},
+            .sampleRates = {EraserContext::kSampleRate},
             .channelLayouts = {AudioChannelLayout::make<AudioChannelLayout::layoutMask>(
                     AudioChannelLayout::LAYOUT_MONO)},
             .modes = {Mode::ERASER, Mode::CLASSIFIER},
@@ -74,58 +75,55 @@ const EraserContext::EraserCapability& EraserContext::getCapability() {
 EraserContext::EraserContext(int statusDepth, const Parameter::Common& common)
     : EffectContext(statusDepth, common), mCommon(common), mConfig(kDefaultConfig) {
     LOG(DEBUG) << __func__ << ": Creating EraserContext";
-    init();
 }
 
 EraserContext::~EraserContext() {
     LOG(DEBUG) << __func__ << ": Destroying EraserContext";
 }
 
-void EraserContext::init() {
-    mChannelCount = static_cast<int>(::aidl::android::hardware::audio::common::getChannelCount(
-            mCommon.input.base.channelMask));
-    if (mCommon.input.base.sampleRate != kClassifierSampleRate) {
-        LOG(FATAL) << "Mismatched sample rate! Expected " << kClassifierSampleRate << " but got "
-                   << mCommon.input.base.sampleRate;
-    }
-}
-
 RetCode EraserContext::enable() {
+    const size_t inputSamples = getInputFrameSize() * mCommon.input.frameCount / sizeof(float);
+    const size_t minOverlapSamples = inputSamples >> 1;
+    size_t numClassifier = 1;
     if (mConfig.mode == Mode::ERASER) {
-        if (!mSeparatorInstance) {
-            mSeparatorInstance = std::make_unique<LiteRTInstance>(kSeparatorModelPath);
+        if (!mSeparator) {
+            mSeparator = std::make_unique<Separator>(kSeparatorModelPath, kSeparatorMaxSoundNum);
         }
-        if (mSeparatorInstance && mSeparatorInstance->initialize()) {
-            mSeparatorInstance->warmup();
-        } else {
-            LOG(ERROR) << __func__ << ": failed to enable separator";
+        if (!mSeparator || !mSeparator->initialize(inputSamples, minOverlapSamples)) {
+            LOG(ERROR) << __func__ << "Failed to initialize separator";
             return RetCode::ERROR_EFFECT_LIB_ERROR;
         }
-    } else {
-        mSeparatorInstance.reset();
+        numClassifier = kSeparatorMaxSoundNum;
     }
 
-    if (!mClassifierInstance) {
-        mClassifierInstance = std::make_unique<LiteRTInstance>(kClassifierModelPath);
-    }
-    if (mClassifierInstance && mClassifierInstance->initialize()) {
-        mClassifierInstance->warmup();
-    } else {
-        LOG(ERROR) << __func__ << ": failed to enable classifier";
-        return RetCode::ERROR_EFFECT_LIB_ERROR;
-    }
+    numClassifier = numClassifier - mClassifiers.size();
+    for (size_t soundId = 0; soundId < numClassifier; soundId ++) {
+        auto classifierInstance = std::make_unique<Classifier>(kClassifierModelPath, soundId);
+        if (!classifierInstance ||
+            !classifierInstance->initialize(inputSamples, minOverlapSamples)) {
+            LOG(ERROR) << __func__ << "Failed to initialize classifier, cleanup all instances";
+            mClassifiers.clear();
+            mSeparator.reset();
+            return RetCode::ERROR_EFFECT_LIB_ERROR;
+        }
 
+        classifierInstance->setConfig(mConfig);
+        mClassifiers.emplace_back(std::move(classifierInstance));
+    }
     return RetCode::SUCCESS;
 }
 
 RetCode EraserContext::disable() {
-    mClassifierInstance.reset();
-    mSeparatorInstance.reset();
-    return RetCode::SUCCESS;
+    return reset();
 }
 
 RetCode EraserContext::reset() {
-    mWorkBuffer.clear();
+    std::for_each(mClassifiers.begin(), mClassifiers.end(),
+                  [](auto& classifier) { classifier->reset(); });
+
+    if (mSeparator) {
+        mSeparator->reset();
+    }
     return RetCode::SUCCESS;
 }
 
@@ -147,7 +145,11 @@ ndk::ScopedAStatus EraserContext::setParam(Eraser eraser) {
     switch (tag) {
         case Eraser::configuration: {
             mConfig = eraser.get<Eraser::configuration>();
-            mCallback = mConfig.callback;
+            LOG(DEBUG) << __func__ << " config: " << mConfig.toString();
+            std::for_each(mClassifiers.begin(), mClassifiers.end(), [&](auto& classifier) {
+                if (classifier) classifier->setConfig(mConfig);
+            });
+
             return ndk::ScopedAStatus::ok();
         }
         default: {
@@ -161,86 +163,62 @@ IEffect::Status EraserContext::process(float* in, float* out, int samples) {
     IEffect::Status procStatus = {EX_ILLEGAL_ARGUMENT, 0, 0};
     RETURN_VALUE_IF(!in, procStatus, "nullInput");
     RETURN_VALUE_IF(!out, procStatus, "nullOutput");
-    RETURN_VALUE_IF(!mClassifierInstance, procStatus, "nullClassifier");
 
     const auto inputChCount = common::getChannelCount(mCommon.input.base.channelMask);
     const auto outputChCount = common::getChannelCount(mCommon.output.base.channelMask);
-    if (inputChCount < outputChCount) {
+    if (inputChCount == 0 || outputChCount == 0) {
         LOG(ERROR) << __func__ << " invalid channel count, in: " << inputChCount
                    << " out: " << outputChCount;
         return procStatus;
     }
+    const int inputFrames = samples / inputChCount;
 
-    const size_t tensorSize = mClassifierInstance->inputTensorSize();
-    // Half of the Tensor size overlapping for more robust classification
-    const size_t hopSize = tensorSize >> 1;
-    // Add incoming samples to end of buffer
-    mWorkBuffer.insert(mWorkBuffer.end(), in, in + samples);
+    const std::span<float> inputData(in, in + samples);
+    std::span<float> outputData(out, out + samples);
 
-    while (mWorkBuffer.size() >= tensorSize) {
-        std::span<float> classifierInput = mClassifierInstance->typedInputTensor<float>();
-        // Copy Tensor size of data from buffer to the model's input
-        std::memcpy(classifierInput.data(), mWorkBuffer.data(), tensorSize * sizeof(float));
-
-        // Invoke the model
-        if (!mClassifierInstance->invoke()) {
-            LOG(ERROR) << __func__ << " classifier instance invoke failed, dropping data";
-            mWorkBuffer.clear();
-            break;
+    if (mConfig.mode == Mode::ERASER && mSeparator &&
+        mClassifiers.size() == kSeparatorMaxSoundNum) {
+        std::vector<std::vector<float>> separatedBuffer(kSeparatorMaxSoundNum,
+                                                        std::vector<float>(samples, 0.f));
+        // Separate the input into multiple channels.
+        if (!mSeparator->process(inputData, separatedBuffer)) {
+            return procStatus;
         }
 
-        // Read the result directly from the model's output tensor
-        const std::span<float> scores = mClassifierInstance->typedOutputTensor<float>();
-        if (scores.empty()) {
-            LOG(ERROR) << __func__ << " read classifier output with size "
-                       << mClassifierInstance->outputTensorSize() << " failed or size mismatch";
-            mWorkBuffer.clear();
-            break;
-        }
-
-        // Get max scores by category
-        std::unordered_map<SoundClassification, float> categoryScores;
-        const auto& categoryMap = getYamnetToCustomCategoryMap();
-        for (const auto& [category, indices] : categoryMap) {
-            float maxScore = 0;
-            for (int index : indices) {
-                maxScore = std::max(scores[index], maxScore);
+        // Classify each separated channel to determine the sound classification and confidence
+        // score, find the target gainFactor for the sound classification.
+        std::vector<std::pair<std::vector<float> /*audioSamples*/, float /*gainFactor*/>>
+                remixerInputs;
+        for (size_t i = 0; i < kSeparatorMaxSoundNum; i++) {
+            const std::span<float> inputSpan{separatedBuffer[i]};
+            mClassifiers[i]->process(inputSpan);
+            // Get the gainFactor for the classified sound classification.
+            const auto classificationScore = mClassifiers[i]->getTopClassification();
+            float gain = 1.f;
+            for (const auto& cfg : mConfig.classificationConfigs) {
+                if (std::find(cfg.classifications.begin(), cfg.classifications.end(),
+                              classificationScore.first /*Classification*/) !=
+                            cfg.classifications.end() &&
+                    classificationScore.second /*confidenceScore*/ >= cfg.confidenceThreshold) {
+                    gain = cfg.gainFactor;
+                    break;
+                }
             }
-
-            if (maxScore > 0) {
-                categoryScores.insert({category, maxScore});
-            }
+            remixerInputs.emplace_back(separatedBuffer[i], gain);
         }
 
-        // per-category thresholds
-        const auto& thresholds = getCategoryThresholds();
-        std::vector<ClassificationMetadata> activeCategories;
-        for (const auto& [category, score] : categoryScores) {
-            if (score >= thresholds.at(category)) {
-                activeCategories.push_back(ClassificationMetadata{
-                        .confidenceScore = score,
-                        .classification = Classification{.classification = category}});
-                LOG(DEBUG) << __func__ << " detected active category: " << toString(category)
-                           << ", score: " << score;
-            }
-        }
-
-        // TODO: update mSoundId with separator support
-        // TODO: update timeMs with the calculated timestamp within the audio stream
-        if (mCallback) {
-            mCallback->onClassifierUpdate(
-                    mSoundId,
-                    ClassificationMetadataList{.timeMs = 0, .metadatas = activeCategories});
-        }
-
-        // slide the window by erasing the hop data from the front of our buffer
-        mWorkBuffer.erase(mWorkBuffer.begin(), mWorkBuffer.begin() + hopSize);
+        // Remix with gainFactor for each channel based on the configuration.
+        if (!Remixer::process(remixerInputs, outputData)) return procStatus;
+    } else if (mConfig.mode == Mode::CLASSIFIER && mClassifiers.size() > 0) {
+        // For classifier-only mode, only the first classifier instance used, the original audio
+        // pass through to output.
+        mClassifiers[0]->process(inputData);
+        std::memcpy(out, in, samples * sizeof(float));
+    } else {
+        // Default pass-through if there are missing components.
+        std::memcpy(out, in, samples * sizeof(float));
     }
 
-    // TODO: for ERASER mode, copy separated audio to output channels
-    std::memcpy(out, in, samples * sizeof(float));
-
-    const int inputFrames = samples / inputChCount;
     return IEffect::Status{.status = STATUS_OK,
                            .fmqConsumed = static_cast<int32_t>(inputFrames * inputChCount),
                            .fmqProduced = static_cast<int32_t>(inputFrames * outputChCount)};
