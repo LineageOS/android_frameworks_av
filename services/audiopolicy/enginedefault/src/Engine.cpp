@@ -157,14 +157,12 @@ void Engine::filterOutputDevicesForStrategy(legacy_strategy strategy,
 {
     DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
 
-    if (com::android::media::audioserver::use_bt_sco_for_media()) {
-        // remove A2DP and LE Audio devices whenever BT SCO is in use
-        if (isBtScoActive(availableOutputDevices)) {
-            availableOutputDevices.remove(
-                availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllA2dpSet()));
-            availableOutputDevices.remove(
-                availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllBleSet()));
-        }
+    // remove A2DP and LE Audio devices whenever BT SCO is in use
+    if (isBtScoActive(availableOutputDevices)) {
+        availableOutputDevices.remove(
+            availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllA2dpSet()));
+        availableOutputDevices.remove(
+            availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllBleSet()));
     }
 
     switch (strategy) {
@@ -447,14 +445,13 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                 excludedDevices.push_back(AUDIO_DEVICE_OUT_AUX_DIGITAL);
             }
             if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
-                if (com::android::media::audioserver::use_bt_sco_for_media()) {
-                    if (isBtScoActive(availableOutputDevices)) {
-                        devices2 = availableOutputDevices.getFirstDevicesFromTypes(
-                                { AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT,
-                                AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,
-                                AUDIO_DEVICE_OUT_BLUETOOTH_SCO});
-                    }
+                if (isBtScoActive(availableOutputDevices)) {
+                    devices2 = availableOutputDevices.getFirstDevicesFromTypes(
+                            { AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT,
+                            AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,
+                            AUDIO_DEVICE_OUT_BLUETOOTH_SCO});
                 }
+
                 if (devices2.isEmpty()) {
                     // Get the last connected device of wired and bluetooth a2dp
                     devices2 = availableOutputDevices.getFirstDevicesFromTypes(

@@ -59,11 +59,3 @@ flag {
     description: "Remove the output stream suspend state and control mechanism"
     bug: "409706525"
 }
-
-flag {
-    name: "use_bt_sco_for_media"
-    namespace: "media_audio"
-    description:
-        "Play media strategy over Bluetooth SCO when active"
-    bug: "292037886"
-}
