@@ -110,6 +110,13 @@ flag {
 }
 
 flag {
+  name: "in_process_sw_codec_lfi"
+  namespace: "codec_fwk"
+  description: "Feature flag for supporting in-process software codec using LFI"
+  bug: "435023366"
+}
+
+flag {
   name: "input_surface_throttle"
   namespace: "codec_fwk"
   description: "Bugfix flag for input surface throttle"
