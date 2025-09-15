@@ -933,10 +933,10 @@ class Camera3Device :
      * error message to indicate why. Only the first call's message will be
      * used. The message is also sent to the log.
      */
-    void               setErrorState(const char *fmt, ...) override;
-    void               setErrorStateLocked(const char *fmt, ...) override;
-    void               setErrorStateV(const char *fmt, va_list args);
-    void               setErrorStateLockedV(const char *fmt, va_list args);
+    void               setErrorState(int32_t errorType, const char *fmt, ...) override;
+    void               setErrorStateLocked(int32_t errorType, const char *fmt, ...) override;
+    void               setErrorStateV(int32_t errorType, const char *fmt, va_list args);
+    void               setErrorStateLockedV(int32_t errorType, const char *fmt, va_list args);
 
     bool               isInErrorState();
 
@@ -1214,7 +1214,7 @@ class Camera3Device :
         void               unpauseForNewRequests();
 
         // Relay error to parent device object setErrorState
-        void               setErrorState(const char *fmt, ...);
+        void               setErrorState(int32_t errorType, const char *fmt, ...);
 
         // If the input request is in mRepeatingRequests. Must be called with mRequestLock hold
         bool isRepeatingRequestLocked(const sp<CaptureRequest>&);

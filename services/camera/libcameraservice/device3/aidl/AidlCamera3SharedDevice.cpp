@@ -32,10 +32,12 @@
             ##__VA_ARGS__)
 
 // Convenience macros for transitioning to the error state
-#define SET_ERR(fmt, ...) setErrorState(   \
+#define SET_ERR(errorState, fmt, ...) setErrorState(   \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,              \
     ##__VA_ARGS__)
-#define SET_ERR_L(fmt, ...) setErrorStateLocked( \
+#define SET_ERR_L(errorState, fmt, ...) setErrorStateLocked( \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,                    \
     ##__VA_ARGS__)
 #define DECODE_VALUE(decoder, type, var) \
@@ -49,6 +51,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <cstring>
+#include <statslog_framework.h>
 #include "../../common/aidl/AidlProviderInfo.h"
 #include "utils/SessionConfigurationUtils.h"
 
@@ -268,7 +271,8 @@ status_t AidlCamera3SharedDevice::beginConfigure() {
                 config.getColorSpace(), config.useReadoutTimestamp());
         int id = newStream->getSurfaceId(consumers[0].mSurface);
         if (id < 0) {
-            SET_ERR_L("Invalid surface id");
+            SET_ERR_L(CAMERA_SERVICE_INTERNAL_ERROR,
+             "Invalid surface id");
             return BAD_VALUE;
         }
         mSharedSurfaceIds.push_back(id);
@@ -277,7 +281,8 @@ status_t AidlCamera3SharedDevice::beginConfigure() {
         newStream->setImageDumpMask(mImageDumpMask);
         res = mOutputStreams.add(mNextStreamId, newStream);
         if (res < 0) {
-            SET_ERR_L("Can't add new stream to set: %s (%d)", strerror(-res), res);
+            SET_ERR_L(CAMERA_SERVICE_INTERNAL_ERROR,
+            "Can't add new stream to set: %s (%d)", strerror(-res), res);
             return res;
         }
         mSessionStatsBuilder.addStream(mNextStreamId);

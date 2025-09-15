@@ -254,8 +254,8 @@ class Camera3OfflineSession :
     bool mIsFixedFps = false;
 
     // SetErrorInterface
-    void setErrorState(const char *fmt, ...) override;
-    void setErrorStateLocked(const char *fmt, ...) override;
+    void setErrorState(int32_t errorType, const char *fmt, ...) override;
+    void setErrorStateLocked(int32_t errorType, const char *fmt, ...) override;
 
     // InflightRequestUpdateInterface
     void onInflightEntryRemovedLocked(nsecs_t duration) override;
@@ -272,7 +272,7 @@ class Camera3OfflineSession :
     void getInflightRequestBufferKeys(std::vector<uint64_t>* out) override;
     std::vector<sp<camera3::Camera3StreamInterface>> getAllStreams() override;
 
-    void setErrorStateLockedV(const char *fmt, va_list args);
+    void setErrorStateLockedV(int32_t errorType, const char *fmt, va_list args);
 
     status_t disconnectImpl();
 
