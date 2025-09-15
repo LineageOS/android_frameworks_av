@@ -221,3 +221,13 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "on_camera_closed_at_hal_crash"
+    description: "Fix the missing onCameraClosed callback if HAL crashes"
+    bug: "420864931"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
