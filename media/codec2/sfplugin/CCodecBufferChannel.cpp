@@ -1353,7 +1353,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     {
         Mutexed<OutputSurface>::Locked output(mOutputSurface);
         if (output->surface == nullptr) {
-            ALOGI("[%s] cannot render buffer without surface", mName);
+            ALOGV("[%s] cannot render buffer without surface", mName);
             return OK;
         }
         int64_t frameIndex;

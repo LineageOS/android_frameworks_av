@@ -1172,7 +1172,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
         status_t err = OK;
         sp<RefBase> obj;
         sp<Surface> surface;
-        if (msg->findObject("native-window", &obj)) {
+        bool usingSwRenderer = comp->getName().find("c2.android.") == 0;
+        if (!usingSwRenderer && msg->findObject("native-window", &obj)) {
             surface = static_cast<Surface *>(obj.get());
             int32_t generation;
             (void)msg->findInt32("native-window-generation", &generation);
@@ -1215,6 +1216,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
 
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
+        if (usingSwRenderer)
+            config->mOutputFormat->setInt32("using-sw-renderer", 1);
         config->mUsingSurface = surface != nullptr;
         config->mBuffersBoundToCodec = ((flags & CONFIGURE_FLAG_USE_BLOCK_MODEL) == 0);
         ALOGD("[%s] buffers are %sbound to CCodec for this session",
