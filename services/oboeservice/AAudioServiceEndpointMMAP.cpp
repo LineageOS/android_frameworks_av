@@ -361,13 +361,15 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
                         "%s() port handle not expected to change from %d to %d",
                         __func__, mPortHandle, tempHandle);
     ALOGV("%s() mPortHandle = %d", __func__, mPortHandle);
+    if (result == AAUDIO_OK) {
+        std::lock_guard _l(mMmapStreamLock);
+        mNeedToCatchUp = true;
+    }
     return result;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase> /*stream*/,
                                                       audio_port_handle_t clientHandle) {
-    mFramesTransferred.reset32();
-
     // Round 64-bit counter up to a multiple of the buffer capacity.
     // This is required because the 64-bit counter is used as an index
     // into a circular buffer and the actual HW position is reset to zero
@@ -500,8 +502,25 @@ aaudio_result_t AAudioServiceEndpointMMAP::getFreeRunningPosition(int64_t *posit
     } else if (result != AAUDIO_OK) {
         ALOGE("%s(): getMmapPosition() returned status %d", __func__, status);
     } else {
-        // Convert 32-bit position to 64-bit position.
-        mFramesTransferred.update32(position.position_frames);
+        if (mNeedToCatchUp) {
+            // This only happens for the first position report from HAL. The HAL is supposed to
+            // report the position increasing monotonically. But this may not always be true
+            // especially when the stream is in standby and release the mmap buffer. In that case,
+            // for the first position report, make sure the position is offset correctly as the
+            // hardware is reading from the returned position.
+            const int pos = position.position_frames % getBufferCapacity();
+            // The position reported from the HAL is the where the DSP read position is. The mmap
+            // buffer is a circular buffer. mFramesTransferred is rounded up to multiple times of
+            // buffer capacity when stopping the stream. mFramesTransferred is used to send as the
+            // read position to the client side. In that case, it is needed to increment `pos` so
+            // that it represents the right DSP reading position.
+            mFramesTransferred.increment(pos);
+            mFramesTransferred.set32(position.position_frames);
+            mNeedToCatchUp = false;
+        } else {
+            // Convert 32-bit position to 64-bit position.
+            mFramesTransferred.update32(position.position_frames);
+        }
         *positionFrames = mFramesTransferred.get();
         *timeNanos = position.time_nanoseconds;
     }
@@ -754,6 +773,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer_l()
     mMmapStream->getMmapPosition(&position);
 
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
+
+    mFramesTransferred.reset32();
 
     return AAUDIO_OK;
 }

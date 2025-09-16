@@ -53,7 +53,8 @@ public:
     void close() override EXCLUDES(mMmapStreamLock);
 
     aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
-                                audio_port_handle_t *clientHandle) override;
+                                audio_port_handle_t *clientHandle) override
+                                EXCLUDES(mMmapStreamLock);
 
     aaudio_result_t stopStream(android::sp<AAudioServiceStreamBase> stream,
                                audio_port_handle_t clientHandle) override;
@@ -153,6 +154,8 @@ private:
     int32_t                                   mFrozenPositionCount = 0;
     int32_t                                   mFrozenTimestampCount = 0;
     int64_t                                   mDataReportOffsetNanos = 0;
+
+    bool                                      mNeedToCatchUp GUARDED_BY(mMmapStreamLock) {false};
 
 };
 
