@@ -16,14 +16,6 @@ flag {
 }
 
 # shipped 24Q3
-flag {
-    name: "conditionally_ignore_preferred_input_device"
-    namespace: "media_audio"
-    description:
-        "Allows to ignore preferred device requests in getInputDeviceForAttributes() depending "
-        "on the calling context."
-    bug: "303079083"
-}
 
 flag {
     name: "effect_chain_callback_improve"
