@@ -1040,6 +1040,8 @@ protected:
             const effect_descriptor_t* desc, audio_session_t sessionId)
             final REQUIRES(mutex());
 
+    void boostThreadPriority(const int priority);
+
     private:
     void dumpBase_l(int fd, const Vector<String16>& args) REQUIRES(mutex());
     void dumpEffectChains_l(int fd, const Vector<String16>& args) REQUIRES(mutex());
