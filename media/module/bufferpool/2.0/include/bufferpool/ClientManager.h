@@ -184,6 +184,8 @@ private:
     const std::unique_ptr<Impl> mImpl;
 
     ClientManager();
+
+    friend struct AccessorDeathRecipient;
 };
 
 }  // namespace implementation
