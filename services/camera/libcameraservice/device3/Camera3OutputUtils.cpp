@@ -638,6 +638,29 @@ size_t getExpectedPhysicalMetadataCount(
     return expectedPhysicalIdsWithMetadata.size();
 }
 
+void recalculateTransform(const CameraMetadata& staticInfo,
+        SurfaceTransformMap *surfaceTransformMap/*out*/) {
+    if (surfaceTransformMap == nullptr) {
+        return;
+    }
+
+    auto it = surfaceTransformMap->begin();
+    while (it != surfaceTransformMap->end()) {
+        int32_t transform;
+        auto ret = CameraUtils::getRotationTransform(staticInfo,
+                it->second.mirrorMode, /*transformInverseDisplay*/true,
+                &transform);
+        if (ret == OK) {
+            it->second.transform = transform;
+        } else {
+            ALOGE("%s: Failed to calculate current stream "
+                    "transformation: %s (%d)", __FUNCTION__,
+                    strerror(-ret), ret);
+        }
+        it++;
+    }
+}
+
 void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result) {
     ATRACE_CALL();
 
@@ -725,17 +748,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                             if (r.requestTimeNs >= request.requestTimeNs) {
                                 auto it = r.transform.begin();
                                 while (it != r.transform.end()) {
-                                    int32_t transform;
-                                    auto ret = CameraUtils::getRotationTransform(deviceInfo->second,
-                                            it->second.mirrorMode, /*transformInverseDisplay*/true,
-                                            &transform);
-                                    if (ret == OK) {
-                                        it->second.transform = transform;
-                                    } else {
-                                        ALOGE("%s: Failed to calculate current stream "
-                                                "transformation: %s (%d)", __FUNCTION__,
-                                                strerror(-ret), ret);
-                                    }
+                                    recalculateTransform(deviceInfo->second, &it->second);
                                     it++;
                                 }
                             }
@@ -943,10 +956,6 @@ void collectReturnableOutputBuffers(
             continue;
         }
 
-        const auto& transformIt = transform.find(streamId);
-        int32_t transformValue = (transformIt != transform.end()) ?
-            transformIt->second.transform : -1;
-
         const auto& it = outputSurfaces.find(streamId);
 
         // Do not return the buffer if the buffer status is error, and the error
@@ -954,15 +963,31 @@ void collectReturnableOutputBuffers(
         if (outputBuffers[i].status != CAMERA_BUFFER_STATUS_ERROR ||
                 errorBufStrategy != ERROR_BUF_CACHE) {
             if (it != outputSurfaces.end()) {
+                const auto& transformSurfaceMap = transform.find(streamId);
+                std::vector<int32_t> transforms;
+                if (transformSurfaceMap != transform.end()) {
+                    for (size_t surfaceId : it->second) {
+                        const auto& transformValue = transformSurfaceMap->second.find(surfaceId);
+                        if (transformValue != transformSurfaceMap->second.end()) {
+                            transforms.push_back(transformValue->second.transform);
+                        } else {
+                            transforms.push_back(-1);
+                        }
+                    }
+                } else {
+                    transforms.push_back(-1);
+                }
+
                 returnableBuffers->emplace_back(stream,
                         outputBuffers[i], timestamp, readoutTimestamp, timestampIncreasing,
                         it->second, resultExtras,
-                        transformValue, requested ? requestTimeNs : 0);
+                        transforms, requested ? requestTimeNs : 0);
             } else {
+                std::vector<int32_t> transforms = {};
                 returnableBuffers->emplace_back(stream,
                         outputBuffers[i], timestamp, readoutTimestamp, timestampIncreasing,
                         std::vector<size_t> (), resultExtras,
-                        transformValue, requested ? requestTimeNs : 0 );
+                        transforms, requested ? requestTimeNs : 0 );
             }
         }
     }
@@ -981,7 +1006,7 @@ void finishReturningOutputBuffers(const std::vector<BufferToReturn> &returnableB
 
         status_t res = stream->returnBuffer(b.buffer, b.timestamp,
                 b.readoutTimestamp, b.timestampIncreasing,
-                b.surfaceIds, b.resultExtras.frameNumber, b.transform);
+                b.surfaceIds, b.resultExtras.frameNumber, b.transforms);
 
         // Note: stream may be deallocated at this point, if this buffer was
         // the last reference to it.
@@ -1012,7 +1037,7 @@ void finishReturningOutputBuffers(const std::vector<BufferToReturn> &returnableB
             sb.status = CAMERA_BUFFER_STATUS_ERROR;
             stream->returnBuffer(sb, /*timestamp*/0, /*readoutTimestamp*/0,
                     b.timestampIncreasing, std::vector<size_t> (),
-                    b.resultExtras.frameNumber, b.transform);
+                    b.resultExtras.frameNumber, b.transforms);
 
             if (listener != nullptr) {
                 CaptureResultExtras extras = b.resultExtras;

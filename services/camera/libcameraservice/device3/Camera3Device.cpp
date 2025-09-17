@@ -4154,8 +4154,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 }
             }
 
-            transformMap.insert({streamId, {outputStream->getMirrorMode(), -1}});
-
+            SurfaceTransformMap transform;
             std::vector<size_t> uniqueSurfaceIds;
             res = outputStream->getUniqueSurfaceIds(
                     captureRequest->mOutputSurfaces[streamId],
@@ -4168,7 +4167,14 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
             if (res == OK) {
                 uniqueSurfaceIdMap.insert({streamId, std::move(uniqueSurfaceIds)});
+                for (size_t surfaceId : captureRequest->mOutputSurfaces[streamId] ) {
+                    transform.insert({surfaceId,
+                            {outputStream->getSurfaceMirrorMode(surfaceId), -1}});
+                }
+            } else {
+                transform.insert({0, {outputStream->getMirrorMode(), -1}});
             }
+            transformMap.insert({streamId, transform});
 
             if (parent->isHalBufferManagedStream(streamId)) {
                 if (outputStream->isAbandoned()) {

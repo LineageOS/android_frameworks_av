@@ -110,7 +110,7 @@ status_t Camera3InputStream::returnBufferCheckedLocked(
             [[maybe_unused]] nsecs_t timestamp,
             [[maybe_unused]] nsecs_t readoutTimestamp,
             [[maybe_unused]] bool output,
-            int32_t /*transform*/,
+            const std::vector<int32_t>& /*transforms*/,
             const std::vector<size_t>&,
             /*out*/
             sp<Fence> *releaseFenceOut) {
@@ -179,7 +179,7 @@ status_t Camera3InputStream::returnInputBufferLocked(
     ATRACE_CALL();
 
     return returnAnyBufferLocked(buffer, /*timestamp*/0, /*readoutTimestamp*/0,
-                                 /*output*/false, /*transform*/ -1);
+                                 /*output*/false, /*transforms*/ {});
 }
 
 status_t Camera3InputStream::getInputSurfaceLocked(sp<Surface> *surface) {

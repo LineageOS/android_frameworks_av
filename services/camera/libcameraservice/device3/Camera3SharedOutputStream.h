@@ -85,6 +85,11 @@ public:
 
     virtual status_t  setTransform(int transform, int surfaceId);
 
+    /**
+     * Query the mirror mode of specific output surface id.
+     */
+    virtual int getSurfaceMirrorMode(size_t surfaceId) override;
+
 private:
 
     static const size_t kMaxOutputs = 4;
