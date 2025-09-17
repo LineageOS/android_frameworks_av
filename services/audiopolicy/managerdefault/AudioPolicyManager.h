@@ -777,7 +777,7 @@ protected:
         // if 'onOutputsChecked' callback is provided, it is executed after the outputs
         // check via 'checkOutputForAllStrategies'. If the callback returns 'true',
         // A2DP suspend status is rechecked.
-        void checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked = nullptr);
+        void checkForDeviceAndOutputChanges(std::function<void()> onOutputsChecked = nullptr);
 
         /**
          * @brief updates routing for all outputs (including call if call in progress).
@@ -838,9 +838,6 @@ protected:
         // Same as checkOutputForStrategy but for secondary outputs. Make sure if a secondary
         // output condition changes, the track is properly rerouted
         void checkSecondaryOutputs();
-
-        // manages A2DP output suspend/restore according to phone state and BT SCO usage
-        void checkA2dpSuspend();
 
         // selects the most appropriate device on output for current state
         // must be called every time a condition that affects the device choice for a given output is
@@ -1078,7 +1075,6 @@ protected:
         bool    mLimitRingtoneVolume;        // limit ringtone volume to music volume if headset connected
 
         float   mLastVoiceVolume;            // last voice volume value sent to audio HAL
-        bool    mA2dpSuspended;  // true if A2DP output is suspended
 
         EffectDescriptorCollection mEffects;  // list of registered audio effects
         HwModuleCollection mHwModules; // contains modules that have been loaded successfully
