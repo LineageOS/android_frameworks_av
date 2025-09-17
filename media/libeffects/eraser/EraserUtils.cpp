@@ -58,17 +58,4 @@ getYamnetToCustomCategoryMap() {
     return kYamnetToCustomMap;
 }
 
-// TODO: need tuning, replace this with ClassificationConfig.confidenceThreshold parameter
-const std::map<SoundClassification, float>& getCategoryThresholds() {
-    [[clang::no_destroy]] static const std::map<SoundClassification, float> kCategoryThresholds = {
-            {SoundClassification::HUMAN, 0.3f},
-            {SoundClassification::ANIMAL, 0.4f},
-            {SoundClassification::NATURE, 0.3f},
-            {SoundClassification::MUSIC, 0.5f},
-            {SoundClassification::THINGS, 0.5f},
-            {SoundClassification::AMBIGUOUS, 0.3f},
-            {SoundClassification::ENVIRONMENT, 0.2f}};
-    return kCategoryThresholds;
-}
-
 }  // namespace aidl::android::hardware::audio::effect

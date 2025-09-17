@@ -16,11 +16,6 @@
 
 #pragma once
 
-#include <memory>
-#include <span>
-#include <string>
-#include <string_view>
-
 #pragma clang diagnostic push
 
 #pragma clang diagnostic ignored "-Wsign-compare"
@@ -33,13 +28,20 @@
 
 #pragma clang diagnostic pop
 
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
 namespace aidl::android::hardware::audio::effect {
 
 /**
- * @brief A generic, stateless wrapper for a TensorFlow Lite model interpreter.
+ * @brief A generic wrapper for a TensorFlow Lite model interpreter.
  *
- * It is designed to be stateless, leaving buffer and stream management (such as creating
- * overlapping windows) to the client.
+ * It is designed to be stateless, leaving buffer and stream management (such as padding and
+ * creating overlapping windows) to the client.
+ *
  */
 class LiteRTInstance {
   public:
@@ -48,12 +50,17 @@ class LiteRTInstance {
     ~LiteRTInstance();
 
     /**
-     * @brief Initialization: Loads model, creates delegate, builds interpreter, allocate tensors.
+     * @brief Initialization: Loads model, creates delegate, builds interpreter, allocate tensors,
+     * and warmup with an model invoke with all zero data, calculate and allocate the work buffer.
+     * @param inputSamples Number of input audio samples for each processing cycle.
+     * @param overlapSamples The overlapping size in audio samples for model inferencing.
+     * The overlapping audio was introduced to enhance the robust of model inferencing result, make
+     * it more consistent and reliable.
      * @param numThreads Optional: Number of threads for the interpreter. Default set to `-1`, lets
      * TFLite decide.
      * @return true on success, false on failure.
      */
-    bool initialize(int numThreads = -1);
+    bool initialize(size_t inputSamples, size_t overlapSamples, int numThreads = -1);
 
     /**
      * @brief Checks if the instance has been successfully initialized.
@@ -64,10 +71,6 @@ class LiteRTInstance {
     // Releases TFLite resources (interpreter, model) in the correct order.
     // Safe to call multiple times or on a non-initialized instance
     void cleanup();
-
-    // Performs a warmup inference run, this can help optimize subsequent inference calls.
-    // Must be called after successful initialize().
-    bool warmup();
 
     // Gets a pointer to the underlying TFLite interpreter.
     tflite::Interpreter* interpreter() const { return mInterpreter.get(); }
@@ -92,14 +95,14 @@ class LiteRTInstance {
      * Determined by the product of its dimensions.
      * @return The size of the input tensor, or 0 if not initialized.
      */
-    size_t inputTensorSize() const { return mInputTensorSize; }
+    size_t inputTensorSize() const { return mInputTensorSamples; }
 
     /**
      * @brief Gets the total number of elements in the primary output tensor.
      * Determined by the product of its dimensions.
      * @return The size of the output tensor, or 0 if not initialized.
      */
-    size_t outputTensorSize() const { return mOutputTensorSize; }
+    size_t outputTensorSize() const { return mOutputTensorSamples; }
 
     /**
      * @brief Gets a non-owning view of the input tensor data.
@@ -110,7 +113,7 @@ class LiteRTInstance {
         if (!isInitialized()) {
             return std::span<T>();
         }
-        return {mInterpreter->typed_input_tensor<T>(0), mInputTensorSize};
+        return {mInterpreter->typed_input_tensor<T>(0), mInputTensorSamples};
     }
 
     /**
@@ -122,7 +125,7 @@ class LiteRTInstance {
         if (!isInitialized()) {
             return std::span<T>();
         }
-        return {mInterpreter->typed_output_tensor<T>(0), mOutputTensorSize};
+        return {mInterpreter->typed_output_tensor<T>(0), mOutputTensorSamples};
     }
 
     /**
@@ -132,20 +135,30 @@ class LiteRTInstance {
      */
     std::string dumpModelDetails() const;
 
-private:
+    /**
+     * @brief Resets the internal buffer.
+     */
+    void reset();
+
+  protected:
     const std::string mModelPath;
     // Resources (Managed internally)
     std::unique_ptr<tflite::FlatBufferModel> mModel;
     std::unique_ptr<tflite::Interpreter> mInterpreter;
     tflite::ops::builtin::BuiltinOpResolver mResolver;
 
-    size_t mInputTensorSize = 0;
+    size_t mInputTensorSamples = 0;
     TfLiteType mInputTensorType = kTfLiteNoType;
     std::vector<int> mInputTensorDims;
 
-    size_t mOutputTensorSize = 0;
+    size_t mOutputTensorSamples = 0;
     TfLiteType mOutputTensorType = kTfLiteNoType;
     std::vector<int> mOutputTensorDims;
+
+    // Internal buffer for managing input audio stream and window sliding.
+    std::vector<float> mWorkBuffer;
+    // The work buffer padding size.
+    size_t mWorkBufPadSize;
 
     /**
      * @brief Dumps shape information for a specific tensor.
@@ -159,6 +172,9 @@ private:
     LiteRTInstance& operator=(const LiteRTInstance&) = delete;
     LiteRTInstance(LiteRTInstance&&) = delete;
     LiteRTInstance& operator=(LiteRTInstance&&) = delete;
+
+    // Performs a warmup inference run, this can help optimize subsequent inference calls.
+    bool warmup() const;
 };
 
 }  // namespace aidl::android::hardware::audio::effect
