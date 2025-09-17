@@ -125,7 +125,7 @@ struct Range {
      * @param upper a non-{@code null} {@code T} reference
      * @return the intersection of this range and the other range
      */
-    Range<T> intersect(T lower, T upper) {
+    Range<T> intersect(T lower, T upper) const {
         Range<T> range = Range<T>(lower, upper);
         return this->intersect(range);
     }
@@ -147,16 +147,16 @@ struct Range {
      * @param range a non-null Range<T> reference
      * @return the extension of this range and the other range.
      */
-    Range<T> extend(Range<T> range) {
+    Range<T> extend(Range<T> range) const {
         return Range<T>(std::min(lower_, range.lower_), std::max(upper_, range.upper_));
     }
 
-    Range<T> align(T align) {
+    Range<T> align(T align) const {
         return this->intersect(
                 divUp(lower_, align) * align, (upper_ / align) * align);
     }
 
-    Range<T> factor(T factor) {
+    Range<T> factor(T factor) const {
         if (factor == 1) {
             return *this;
         }
@@ -258,6 +258,53 @@ std::vector<Range<T>> intersectSortedDistinctRanges(
             result.push_back(range.intersect(one[ix]));
         }
     }
+    return result;
+}
+
+/**
+ * Returns the union of two sets of non-intersecting ranges
+ * @param one a sorted set of non-intersecting ranges in ascending order
+ * @param another another sorted set of non-intersecting ranges in ascending order
+ * @return the union of the two sets, sorted in ascending order
+ */
+template<typename T>
+std::vector<Range<T>> unionSortedDistinctRanges(
+        const std::vector<Range<T>> &one, const std::vector<Range<T>> &another) {
+    std::vector<Range<T>> result;
+    Range<T> last;
+    int ix1 = 0;
+    int ix2 = 0;
+    while (ix1 < one.size() || ix2 < another.size()) {
+        Range<T> temp;
+        if (ix1 == one.size() || (ix2 < another.size()
+                && one[ix1].lower() > another[ix2].upper())) {
+            temp = another[ix2];
+            ix2++;
+        } else if (ix2 == another.size() || (ix1 < one.size()
+                && one[ix1].upper() < another[ix2].lower())) {
+            temp = one[ix1];
+            ix1++;
+        } else {  // not disjoint
+            temp = one[ix1].extend(another[ix2]);
+            ix1++;
+            ix2++;
+        }
+        if (last.empty()) { // first time
+            last = temp;
+            continue;
+        }
+        // update last
+        if (last.intersect(temp).empty()) {
+            result.push_back(last);
+            last = temp;
+        } else {
+            last = last.extend(temp);
+        }
+    }
+    if (!last.empty()) {
+        result.push_back(last);
+    }
+
     return result;
 }
 
