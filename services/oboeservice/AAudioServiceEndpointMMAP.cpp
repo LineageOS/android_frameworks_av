@@ -752,6 +752,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer_l()
             VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
         if ((mMmapClient.attributionSource.uid != audioServiceUid) &&
             getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+            ::close(mMmapBufferinfo.shared_memory_fd);  // must close the fd as no new owner.
             ALOGW("%s() - exclusive FD cannot be used by client", __func__);
             return AAUDIO_ERROR_UNAVAILABLE;
         }
