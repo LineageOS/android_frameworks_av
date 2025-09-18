@@ -158,7 +158,7 @@ class LiteRTInstance {
     // Internal buffer for managing input audio stream and window sliding.
     std::vector<float> mWorkBuffer;
     // The work buffer padding size.
-    size_t mWorkBufPadSize;
+    size_t mWorkBufPadSize = 0;
 
     /**
      * @brief Dumps shape information for a specific tensor.
