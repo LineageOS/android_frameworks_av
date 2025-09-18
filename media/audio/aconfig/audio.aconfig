@@ -175,6 +175,13 @@ flag {
 }
 
 flag {
+    name: "stream_assistant_not_aliased_to_music"
+    namespace: "media_audio"
+    description: "By default STREAM_ASSISTANT is not aliased to STREAM_MUSIC"
+    bug: "442485761"
+}
+
+flag {
     name: "update_preferred_devices_for_strategy"
     namespace: "media_audio"
     description: "Use AudioDeviceInventory cache for getPreferredDevicesForStrategy"
