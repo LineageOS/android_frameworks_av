@@ -83,6 +83,14 @@ public:
     int64_t convertPositionToTime(int64_t framePosition) const;
 
     /**
+     * Calculate an estimated boot time when the stream will be at that position.
+     *
+     * @param framePosition position of the stream in frames
+     * @return time in nanoseconds
+     */
+    int64_t convertPositionToBootTime(int64_t framePosition);
+
+    /**
      * Calculate the latest estimated time that the stream will be at that position.
      * The more jittery the clock is then the later this will be.
      *
@@ -139,6 +147,8 @@ private:
     int32_t getLateTimeOffsetNanos() const;
     void update();
 
+    void updateBoottimeOffset();
+
     enum clock_model_state_t {
         STATE_STOPPED,
         STATE_STARTING,
@@ -167,6 +177,8 @@ private:
 
     int64_t             mMarkerFramePosition{0}; // Estimated HW position.
     int64_t             mMarkerNanoTime{0};      // Estimated HW time.
+    int64_t             mBoottimeOffset{0};      // The HAL uses monotonic clock, which may not
+                                                 // run when the device suspends.
     int64_t             mBurstPeriodNanos{0};    // Time between HW bursts.
     // Includes mBurstPeriodNanos because we sample randomly over time.
     int64_t             mMaxMeasuredLatenessNanos{0};

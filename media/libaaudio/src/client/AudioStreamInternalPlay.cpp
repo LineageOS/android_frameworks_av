@@ -254,17 +254,19 @@ aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFr
         int32_t fullFrames = mAudioEndpoint->getFullFramesAvailable();
         if (fullFrames > getDeviceBufferSize() - mOffloadSafeMarginInFrames &&
             fullFrames > getDeviceSampleRate() * 1 + mOffloadSafeMarginInFrames) {
-            const int64_t drainNanos = mClockModel.convertDeltaPositionToTime(
-                    fullFrames - mOffloadSafeMarginInFrames);
-            const int64_t wakeUpNanos = android::elapsedRealtimeNano() + drainNanos;
+            // Use BootTime for wakeup time as the device may have be suspended.
+            const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
+                    getFramesWritten() - mOffloadSafeMarginInFrames);
             android::audio_utils::unique_lock ul(mStreamMutex);
-            if (aaudio_result_t ret = drainStream_l(wakeUpNanos, isDataCallbackSet());
+            if (aaudio_result_t ret = drainStream_l(wakeUpNanosBootTime, isDataCallbackSet());
                 ret != AAUDIO_OK) {
                 ALOGE("%s() failed to drain, error=%d", __func__, ret);
                 return ret;
             }
             mDraining = true;
             if (isDataCallbackSet()) {
+                const int64_t drainNanos = std::max(
+                        (int64_t)0, wakeUpNanosBootTime - android::elapsedRealtimeNano());
                 mCallbackCV.wait_for(ul, std::chrono::nanoseconds(drainNanos),
                                      [this]() REQUIRES(mStreamMutex) {
                     return !mDraining;
@@ -714,19 +716,21 @@ void *AudioStreamInternalPlay::callbackLoop() {
         if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
             android::audio_utils::unique_lock ul(mStreamMutex);
             if (mOffloadEosPending) {
-                const int64_t streamEndNanos = mClockModel.convertDeltaPositionToTime(std::max(0,
-                        mAudioEndpoint->getFullFramesAvailable() - getDeviceFramesPerBurst()));
-                const int64_t wakeUpNanos = android::elapsedRealtimeNano() + streamEndNanos;
-                if (result = drainStream_l(wakeUpNanos, false /*allowSoftWakeUp*/);
+                // Use BootTime for wakeup time as the device may have be suspended.
+                const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
+                        getFramesWritten() - getDeviceFramesPerBurst());
+                if (result = drainStream_l(wakeUpNanosBootTime, false /*allowSoftWakeUp*/);
                     result != AAUDIO_OK) {
                     ALOGE("%s() failed to drain, error=%d", __func__, result);
                     break;
                 }
+                const int64_t streamEndNanos = std::max(
+                        int64_t(0), wakeUpNanosBootTime - android::elapsedRealtimeNano());
                 mStreamEndCV.wait_for(ul, std::chrono::nanoseconds(streamEndNanos),
                                       [this]() REQUIRES(mStreamMutex) {
                     return !mOffloadEosPending;
                 });
-                if (mOffloadEosPending || android::elapsedRealtimeNano() >= wakeUpNanos) {
+                if (mOffloadEosPending || android::elapsedRealtimeNano() >= wakeUpNanosBootTime) {
                     maybeCallPresentationEndCallback();
                     mOffloadEosPending = false;
                 }
