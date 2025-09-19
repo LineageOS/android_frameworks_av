@@ -256,6 +256,14 @@ SCO audio activation."
 }
 
 flag {
+    name: "stream_assistant_public"
+    namespace: "media_audio"
+    description: "STREAM_ASSISTANT as part of the public API"
+    bug: "440316799"
+    is_exported: true
+}
+
+flag {
     name: "supported_device_types_api"
     is_exported: true
     namespace: "media_audio"
