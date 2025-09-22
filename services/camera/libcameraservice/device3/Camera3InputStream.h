@@ -21,6 +21,7 @@
 #include <gui/Flags.h>
 #include <gui/Surface.h>
 #include <gui/BufferItemConsumer.h>
+#include <vector>
 
 #include "Camera3IOStreamBase.h"
 
@@ -63,7 +64,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
             nsecs_t timestamp,
             nsecs_t readoutTimestamp,
             bool output,
-            int32_t transform,
+            const std::vector<int32_t>& transforms,
             const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut);

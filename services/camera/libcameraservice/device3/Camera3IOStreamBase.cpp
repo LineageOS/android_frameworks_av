@@ -248,7 +248,7 @@ status_t Camera3IOStreamBase::returnAnyBufferLocked(
         nsecs_t timestamp,
         nsecs_t readoutTimestamp,
         bool output,
-        int32_t transform,
+        const std::vector<int32_t>& transforms,
         const std::vector<size_t>& surface_ids) {
     status_t res;
 
@@ -266,7 +266,7 @@ status_t Camera3IOStreamBase::returnAnyBufferLocked(
 
     sp<Fence> releaseFence;
     res = returnBufferCheckedLocked(buffer, timestamp, readoutTimestamp,
-                                    output, transform, surface_ids,
+                                    output, transforms, surface_ids,
                                     &releaseFence);
     // Res may be an error, but we still want to decrement our owned count
     // to enable clean shutdown. So we'll just return the error but otherwise

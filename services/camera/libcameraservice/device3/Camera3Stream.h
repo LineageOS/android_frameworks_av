@@ -357,7 +357,8 @@ class Camera3Stream :
     status_t         returnBuffer(const camera_stream_buffer &buffer,
             nsecs_t timestamp, nsecs_t readoutTimestamp, bool timestampIncreasing,
             const std::vector<size_t>& surface_ids = std::vector<size_t>(),
-            uint64_t frameNumber = 0, int32_t transform = -1);
+            uint64_t frameNumber = 0,
+            const std::vector<int32_t>& transform = std::vector<int32_t>());
 
     /**
      * Fill in the camera_stream_buffer with the next valid buffer for this
@@ -525,7 +526,8 @@ class Camera3Stream :
     virtual status_t getBufferLocked(camera_stream_buffer *buffer,
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
     virtual status_t returnBufferLocked(const camera_stream_buffer &buffer,
-            nsecs_t timestamp, nsecs_t readoutTimestamp, int32_t transform,
+            nsecs_t timestamp, nsecs_t readoutTimestamp,
+            const std::vector<int32_t>& transform = std::vector<int32_t>(),
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
 
     virtual status_t getInputBufferLocked(camera_stream_buffer *buffer, Size* size);

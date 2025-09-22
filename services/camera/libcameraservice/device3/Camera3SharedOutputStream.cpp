@@ -358,6 +358,15 @@ ssize_t Camera3SharedOutputStream::getSurfaceId(const sp<Surface> &surface) {
     return id;
 }
 
+int Camera3SharedOutputStream::getSurfaceMirrorMode(size_t surfaceId) {
+    Mutex::Autolock l(mLock);
+    if (surfaceId >= kMaxOutputs) {
+        return getMirrorMode();
+    }
+
+    return mSurfaceUniqueIds[surfaceId].mSurfaceHolder.mMirrorMode;
+}
+
 status_t Camera3SharedOutputStream::getUniqueSurfaceIds(
         const std::vector<size_t>& surfaceIds,
         /*out*/std::vector<size_t>* outUniqueIds) {

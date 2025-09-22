@@ -301,7 +301,7 @@ class Camera3OutputStream :
             nsecs_t timestamp,
             nsecs_t readoutTimestamp,
             bool output,
-            int32_t transform,
+            const std::vector<int32_t>& transforms,
             const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut);
@@ -320,7 +320,6 @@ class Camera3OutputStream :
     static const nsecs_t       kDequeueBufferTimeout   = 1000000000; // 1 sec
 
     status_t getBufferLockedCommon(ANativeWindowBuffer** anb, int* fenceFd);
-
 
   private:
 
@@ -395,7 +394,7 @@ class Camera3OutputStream :
     virtual status_t returnBufferLocked(
             const camera_stream_buffer &buffer,
             nsecs_t timestamp, nsecs_t readoutTimestamp,
-            int32_t transform, const std::vector<size_t>& surface_ids);
+            const std::vector<int32_t>& transforms, const std::vector<size_t>& surface_ids);
 
     virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,
             ANativeWindowBuffer* buffer, int anwReleaseFence,

@@ -79,8 +79,10 @@ typedef struct TransformMapValue {
     int mirrorMode;
     int32_t transform;
 } TransfromMapValue_t;
-// Mapping of output stream index to mirror mode and transformation entry
-typedef std::unordered_map<int, TransformMapValue> TransformationMap;
+// Mapping of surface ids to transform values
+typedef std::unordered_map<size_t, TransformMapValue> SurfaceTransformMap;
+// Mapping of output stream index to surface transforms
+typedef std::unordered_map<int, SurfaceTransformMap> TransformationMap;
 
 /**
  * Base interface for version >= 2 camera device classes, which interface to

@@ -246,7 +246,7 @@ status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
 status_t Camera3OutputStream::returnBufferLocked(
         const camera_stream_buffer &buffer,
         nsecs_t timestamp, nsecs_t readoutTimestamp,
-        int32_t transform, const std::vector<size_t>& surface_ids) {
+        const std::vector<int32_t>& transforms, const std::vector<size_t>& surface_ids) {
     ATRACE_HFR_CALL();
 
     if (mHandoutTotalBufferCount == 1) {
@@ -254,7 +254,7 @@ status_t Camera3OutputStream::returnBufferLocked(
     }
 
     status_t res = returnAnyBufferLocked(buffer, timestamp, readoutTimestamp,
-                                         /*output*/true, transform, surface_ids);
+                                         /*output*/true, transforms, surface_ids);
 
     if (res != OK) {
         return res;
@@ -340,7 +340,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             nsecs_t timestamp,
             nsecs_t readoutTimestamp,
             [[maybe_unused]] bool output,
-            int32_t transform,
+            const std::vector<int32_t>& transforms,
             const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut) {
@@ -424,7 +424,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             nsecs_t readoutTime = (readoutTimestamp != 0 ? readoutTimestamp : timestamp)
                     - mTimestampOffset;
             res = mPreviewFrameSpacer->queuePreviewBuffer(captureTime, readoutTime,
-                    transform, anwBuffer, anwReleaseFence);
+                    transforms.empty() ? -1 : transforms[0], anwBuffer, anwReleaseFence);
             if (res != OK) {
                 ALOGE("%s: Stream %d: Error queuing buffer to preview buffer spacer: %s (%d)",
                         __FUNCTION__, mId, strerror(-res), res);
@@ -435,7 +435,17 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             nsecs_t presentTime = mSyncToDisplay ?
                     syncTimestampToDisplayLocked(captureTime, releaseFence) : captureTime;
 
-            setTransform(transform);
+            if (transforms.size() > 1 && (transforms.size() == surface_ids.size())) {
+                for (size_t i = 0; i < surface_ids.size(); i++) {
+                    setTransform(transforms[i], surface_ids[i]);;
+                }
+            } else if (!transforms.empty()){
+                setTransform(transforms[0]);
+            } else {
+                ALOGV("%s: Stream %d: Failed to set stream transform!"
+                        "Transforms size: %zu surface ids size %zu", __FUNCTION__, mId,
+                        transforms.size(), surface_ids.size());
+            }
             res = native_window_set_buffers_timestamp(mConsumer.get(), presentTime);
             if (res != OK) {
                 ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)",
