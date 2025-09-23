@@ -475,8 +475,11 @@ exit:
  * The processing code will then save the current offset
  * between client and server and apply that to any position given to the app.
  */
-aaudio_result_t AudioStreamInternal::requestStart_l()
-{
+aaudio_result_t AudioStreamInternal::requestStart_l() {
+    return requestStart_l(DEFAULT);
+}
+
+aaudio_result_t AudioStreamInternal::requestStart_l(StartType startType) {
     int64_t startTime;
     if (getServiceHandle() == AAUDIO_HANDLE_INVALID) {
         ALOGD("requestStart() mServiceStreamHandle invalid");
@@ -494,10 +497,12 @@ aaudio_result_t AudioStreamInternal::requestStart_l()
     const aaudio_stream_state_t originalState = getState();
     setState(AAUDIO_STREAM_STATE_STARTING);
 
-    // Clear any stale timestamps from the previous run.
-    drainTimestampsFromService();
+    if (startType == DEFAULT) {
+        // Clear any stale timestamps from the previous run.
+        drainTimestampsFromService();
 
-    prepareBuffersForStart(); // tell subclasses to get ready
+        prepareBuffersForStart_l(); // tell subclasses to get ready
+    }
 
     aaudio_result_t result = mServiceInterface.startStream(mServiceStreamHandleInfo);
     if (result == AAUDIO_ERROR_STANDBY) {
@@ -514,9 +519,12 @@ aaudio_result_t AudioStreamInternal::requestStart_l()
         setDisconnected();
     }
 
-    startTime = AudioClock::getNanoseconds();
-    mClockModel.start(startTime);
-    mNeedCatchUp.request();  // Ask data processing code to catch up when first timestamp received.
+    if (startType == DEFAULT) {
+        startTime = AudioClock::getNanoseconds();
+        mClockModel.start(startTime);
+        mNeedCatchUp.request();  // Ask data processing code to catch up
+                                 // when first timestamp received.
+    }
 
     // Start data callback thread.
     if (result == AAUDIO_OK && isDataCallbackSet()) {
@@ -594,9 +602,12 @@ aaudio_result_t AudioStreamInternal::requestStop_l() {
 
     // For playback, sleep until all the audio data has played.
     // Then clear the buffer to prevent noise.
-    prepareBuffersForStop();
-
-    mClockModel.stop(AudioClock::getNanoseconds());
+    if (aaudio_result_t ret = prepareBuffersForStop_l(); ret == AAUDIO_OK) {
+        mClockModel.stop(AudioClock::getNanoseconds());
+    } else if (ret != AAUDIO_ERROR_WOULD_BLOCK) {
+        // This should not happen, but adding a log for warning.
+        ALOGW("%s prepareBuffersForStop_l returned %d", __func__, ret);
+    }
     setState(AAUDIO_STREAM_STATE_STOPPING);
     mAtomicInternalTimestamp.clear();
 

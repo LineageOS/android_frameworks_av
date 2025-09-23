@@ -102,6 +102,15 @@ public:
 
 protected:
     aaudio_result_t requestStart_l() REQUIRES(mStreamMutex) override;
+
+    enum StartType : int32_t {
+        DEFAULT = 0,
+        // The stream is draining. Client has requested stop before but the stream is pending
+        // draining to fully stop.
+        RESUME_WHILE_DRAINING = 1,
+    };
+    aaudio_result_t requestStart_l(StartType startType = DEFAULT) REQUIRES(mStreamMutex);
+
     aaudio_result_t requestStop_l() REQUIRES(mStreamMutex) override;
 
     aaudio_result_t release_l() REQUIRES(mStreamMutex) override;
@@ -126,9 +135,11 @@ protected:
 
     aaudio_result_t stopCallback_l() REQUIRES(mStreamMutex);
 
-    virtual void prepareBuffersForStart() {}
+    virtual void prepareBuffersForStart_l() REQUIRES(mStreamMutex) {}
 
-    virtual void prepareBuffersForStop() {}
+    virtual aaudio_result_t prepareBuffersForStop_l() REQUIRES(mStreamMutex) {
+        return AAUDIO_OK;
+    }
 
     virtual void advanceClientToMatchServerPosition(int32_t serverMargin) = 0;
 

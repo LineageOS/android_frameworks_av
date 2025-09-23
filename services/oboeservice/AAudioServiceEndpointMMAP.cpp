@@ -422,6 +422,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t portHa
     }
 }
 
+void AAudioServiceEndpointMMAP::releaseClientWhenWakeUp(audio_port_handle_t /*clientHandle*/) {
+    // For MMAP endpoint, there should only be one client. Using a boolean value to record if
+    // the client should be released when wake up.
+    std::lock_guard _l(mLockStreams);
+    mShouldReleaseClientWhenWakeUp = true;
+}
+
 aaudio_result_t AAudioServiceEndpointMMAP::standby() {
     const std::lock_guard<std::mutex> lock(mMmapStreamLock);
     if (mMmapStream == nullptr) {
@@ -605,6 +612,17 @@ void AAudioServiceEndpointMMAP::onWakeUp(android::audio_utils::TimerQueue::handl
     const std::lock_guard<std::mutex> lock(mLockStreams);
     for (const auto& stream : mRegisteredStreams) {
         stream->onWakeUp(handle);
+    }
+    if (mShouldReleaseClientWhenWakeUp) {
+        // When the client is pending to wake up to release, it indicates the client side has
+        // called close and it has gone. It was previously pending to drain all written data.
+        // Here, a thread is spawned to release the stream to avoid dead lock.
+        const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+        std::thread asyncTask([holdEndpoint]() {
+            ALOGD("onWakeUp() asyncTask to release client");
+            holdEndpoint->releaseRegisteredStreams();
+        });
+        asyncTask.detach();
     }
 }
 
