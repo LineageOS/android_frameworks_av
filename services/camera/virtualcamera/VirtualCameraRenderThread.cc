@@ -54,7 +54,6 @@
 #include "ui/GraphicBuffer.h"
 #include "ui/Rect.h"
 #include "util/EglFramebuffer.h"
-#include "util/EglSurfaceTexture.h"
 #include "util/JpegUtil.h"
 #include "util/Util.h"
 #include "utils/Errors.h"
