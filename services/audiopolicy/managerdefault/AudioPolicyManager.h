@@ -795,6 +795,11 @@ protected:
                                            const sp<DeviceDescriptor> &sinkDevice,
                                            uint32_t delayMs);
 
+        void rerouteTelephonyAudioSource(const sp<SourceClientDescriptor> &source,
+                                         const sp<DeviceDescriptor> &srcDevice,
+                                         const sp<DeviceDescriptor> &sinkDevice,
+                                         uint32_t delayMs);
+
         bool isTelephonyRxOrTx(const sp<SwAudioOutputDescriptor>& desc) const {
             return (mCallRxSourceClient != nullptr && mCallRxSourceClient->belongsToOutput(desc))
                     || (mCallTxSourceClient != nullptr

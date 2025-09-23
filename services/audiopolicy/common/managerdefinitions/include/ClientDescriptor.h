@@ -265,6 +265,7 @@ public:
     bool canCloseOutput() const { return mCloseOutput; }
     bool isConnected() const { return mPatchHandle != AUDIO_PATCH_HANDLE_NONE; }
     audio_patch_handle_t getPatchHandle() const { return mPatchHandle; }
+    void setSrcDevice(const sp<DeviceDescriptor>& srcDevice)  { mSrcDevice = srcDevice; }
     sp<DeviceDescriptor> srcDevice() const { return mSrcDevice; }
     sp<DeviceDescriptor> sinkDevice() const { return mSinkDevice; }
     wp<SwAudioOutputDescriptor> swOutput() const { return mSwOutput; }
@@ -280,7 +281,7 @@ public:
 
  private:
     audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-    const sp<DeviceDescriptor> mSrcDevice;
+    sp<DeviceDescriptor> mSrcDevice;
     sp<DeviceDescriptor> mSinkDevice;
     wp<SwAudioOutputDescriptor> mSwOutput;
     wp<HwAudioOutputDescriptor> mHwOutput;
@@ -338,13 +339,18 @@ public:
         if (it == mClients.end()) return nullptr;
         return it->second;
     }
-    virtual void removeClient(audio_port_handle_t portId) {
+    virtual bool removeClient(audio_port_handle_t portId, bool checkExists = true) {
         auto it = mClients.find(portId);
-        LOG_ALWAYS_FATAL_IF(it == mClients.end(),
-                "%s(%d): client does not exist", __func__, portId);
-        LOG_ALWAYS_FATAL_IF(it->second->active(),
-                "%s(%d): removing client still active!", __func__, portId);
+        if (checkExists) {
+            LOG_ALWAYS_FATAL_IF(it == mClients.end(),
+                    "%s(%d): client does not exist", __func__, portId);
+            LOG_ALWAYS_FATAL_IF(it->second->active(),
+                    "%s(%d): removing client still active!", __func__, portId);
+        } else if (it == mClients.end()) {
+            return false;
+        }
         (void)mClients.erase(it);
+        return true;
     }
     size_t getClientCount() const {
         return mClients.size();
