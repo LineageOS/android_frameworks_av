@@ -228,6 +228,9 @@ static const int kPriorityFastMixer = 3;
 static const int kPriorityFastCapture = 3;
 // Request real-time priority for PlaybackThread in ARC
 static const int kPriorityPlaybackThreadArc = 1;
+// Priority is boosed on the watch on an as needed basis to this value which is overridable by
+// property af.watch.thread.priority:
+static const int kPriorityWatchThread = 3;
 
 // IAudioFlinger::createTrack() has an in/out parameter 'pFrameCount' for the total size of the
 // track buffer in shared memory.  Zero on input means to use a default value.  For fast tracks,
@@ -259,6 +262,17 @@ static nsecs_t getStandbyTimeInNanos() {
         return milliseconds(ms);
     }();
     return standbyTimeInNanos;
+}
+
+static bool isWatch() {
+    static bool watch = []() {
+        char characteristics[PROPERTY_VALUE_MAX];
+        if (property_get("ro.build.characteristics", characteristics, nullptr) > 0) {
+            return (strstr(characteristics, "watch") != nullptr);
+        }
+        return false;
+    }();
+    return watch;
 }
 
 // Set kEnableExtendedChannels to true to enable greater than stereo output
@@ -2252,6 +2266,33 @@ void ThreadBase::checkUpdateTrackMetadataForUid(uid_t uid) {
     }
 }
 
+void ThreadBase::boostThreadPriority(const int priority) {
+    const pid_t tid = getTid();
+    if (tid == -1) {
+        ALOGE("%s: Cannot update priority for %s, no tid", __func__, mThreadName);
+    } else {
+        const pid_t pid = getpid();
+        status_t status = requestPriority(pid,
+                                          tid,
+                                          priority,
+                                          false /* isForApp */,
+                                          true /* asynchronous */);
+        if (status != OK) {
+            ALOGE("%s: requestPriority for %s (pid=%d, tid=%d) with priority=%d failed with "
+                  "status %d", __func__, mThreadName, pid, tid, priority, status);
+        } else {
+            status = stream()->setHalThreadPriority(priority);
+            if (status != OK) {
+                ALOGE("%s: setHalThreadPriority for %s (pid=%d, tid=%d) with priority=%d failed "
+                      "with status %d" , __func__, mThreadName, pid, tid, priority, status);
+            } else {
+                ALOGI("%s: Priority of %s (pid=%d, tid=%d) boosted to %d",
+                      __func__, mThreadName, pid, tid, priority);
+            }
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 //      Playback
 // ----------------------------------------------------------------------------
@@ -3938,10 +3979,12 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
     // Check the flag and not the mixer type to also boost the duplicating thread priority
     // when one of the outputs is a spatializer thread.
     if (mOutput != nullptr && ((mOutput->flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0)) {
+        // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
         const pid_t tid = getTid();
         if (tid == -1) {  // odd: we are here, we must be a running thread.
             ALOGW("%s: Cannot update Spatializer mixer thread priority, no tid", __func__);
         } else {
+            // TODO(b/446232495): Fix the role / responsibility problem here:
             const int priorityBoost = requestSpatializerPriority(getpid(), tid);
             if (priorityBoost > 0) {
                 stream()->setHalThreadPriority(priorityBoost);
@@ -3952,6 +3995,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
         // is not enough for PlaybackThread to process audio data in time. We request the lowest
         // real-time priority, SCHED_FIFO=1, for PlaybackThread in ARC. ro.boot.container is true
         // only on ARC.
+        // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
         const pid_t tid = getTid();
         if (tid == -1) {
             ALOGW("%s: Cannot update PlaybackThread priority for ARC, no tid", __func__);
@@ -3968,6 +4012,18 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                 stream()->setHalThreadPriority(kPriorityPlaybackThreadArc);
             }
         }
+    } else if (isWatch()) {
+        // Testing on the watch has shown that boosting the priority of playback threads reduces the
+        // probability of speaker pops due to the AP dropping audio samples when running under heavy
+        // load.
+        int32_t priority = property_get_int32("af.watch.thread.priority",
+                kPriorityWatchThread);
+        if (priority < 1 || priority > 3) {
+            ALOGW("%s: Invalid priority %d for watch thread, clamping to [1, 3]",
+                  __func__, priority);
+            priority = std::clamp(priority, 1, 3);
+        }
+        boostThreadPriority(priority);
     }
 
     std::vector<sp<IAfTrackBase>> tracksToRemove;
