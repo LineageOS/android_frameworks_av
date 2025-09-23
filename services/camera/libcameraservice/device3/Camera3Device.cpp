@@ -2044,8 +2044,9 @@ void Camera3Device::notifyStatus(bool idle) {
             bool deviceError;
             std::pair<int32_t, int32_t> mostRequestedFpsRange;
             std::map<int, StreamStats> streamStatsMap;
+            int32_t errorState;
             mSessionStatsBuilder.buildAndReset(&requestCount, &resultErrorCount,
-                    &deviceError, &mostRequestedFpsRange, &streamStatsMap);
+                    &deviceError, &mostRequestedFpsRange, &streamStatsMap, &errorState);
             for (size_t i = 0; i < streamIds.size(); i++) {
                 int streamId = streamIds[i];
                 auto stats = streamStatsMap.find(streamId);
@@ -2064,7 +2065,7 @@ void Camera3Device::notifyStatus(bool idle) {
                 }
             }
             listener->notifyIdle(requestCount, resultErrorCount, deviceError,
-                mostRequestedFpsRange, streamStats);
+                mostRequestedFpsRange, streamStats, errorState);
         } else {
             res = listener->notifyActive(sessionMaxPreviewFps);
         }
@@ -2919,7 +2920,6 @@ void Camera3Device::setErrorStateLockedV(int32_t errorState, const char *fmt, va
     std::string errorCause;
     base::StringAppendV(&errorCause, fmt, args);
     ALOGE("Camera %s: %s", mId.c_str(), errorCause.c_str());
-    ALOGV("Camera get error state as %d", errorState);
 
     // But only do error state transition steps for the first error
     if (mStatus == STATUS_ERROR || mStatus == STATUS_UNINITIALIZED) return;
@@ -2936,7 +2936,7 @@ void Camera3Device::setErrorStateLockedV(int32_t errorState, const char *fmt, va
     if (listener != NULL) {
         listener->notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DEVICE,
                 CaptureResultExtras());
-        mSessionStatsBuilder.onDeviceError();
+        mSessionStatsBuilder.onDeviceError(errorState);
     }
 
     // Save stack trace. View by dumping it later.
@@ -4627,6 +4627,12 @@ bool Camera3Device::hasDeviceError() {
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
     return mStatus == STATUS_ERROR;
+}
+
+int32_t Camera3Device::getErrorState() {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+    return mSessionStatsBuilder.getErrorState();
 }
 
 void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) {

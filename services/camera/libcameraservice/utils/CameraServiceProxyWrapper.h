@@ -57,14 +57,14 @@ private:
 
         void onOpen(sp<hardware::ICameraServiceProxy>& proxyBinder);
         void onClose(sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs,
-                bool deviceError);
+                bool deviceError, int32_t errorState);
         void onStreamConfigured(int operatingMode, bool internalReconfig, int32_t latencyMs);
         void onActive(sp<hardware::ICameraServiceProxy>& proxyBinder, float maxPreviewFps);
         void onIdle(sp<hardware::ICameraServiceProxy>& proxyBinder,
                 int64_t requestCount, int64_t resultErrorCount, bool deviceError,
                 const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
                 bool usedZoomOverride, std::pair<int32_t, int32_t> mostRequestedFpsRange,
-                const std::vector<hardware::CameraStreamStats>& streamStats);
+                const std::vector<hardware::CameraStreamStats>& streamStats, int32_t errorState);
 
         std::string updateExtensionSessionStats(
                 const hardware::CameraExtensionSessionStats& extStats);
@@ -105,7 +105,7 @@ public:
             int32_t latencyMs);
 
     // Close
-    void logClose(const std::string& id, int32_t latencyMs, bool deviceError);
+    void logClose(const std::string& id, int32_t latencyMs, bool deviceError, int32_t errorState);
 
     // Stream configuration
     void logStreamConfigured(const std::string& id, int operatingMode, bool internalReconfig,
@@ -119,7 +119,7 @@ public:
             int64_t requestCount, int64_t resultErrorCount, bool deviceError,
             const std::string& userTag, int32_t videoStabilizationMode, bool usedUltraWide,
             bool usedZoomOverride, std::pair<int32_t, int32_t> mostRequestedFpsRange,
-            const std::vector<hardware::CameraStreamStats>& streamStats);
+            const std::vector<hardware::CameraStreamStats>& streamStats, int32_t errorState);
 
     // Feature combination query
     void logFeatureCombinationQuery(const std::string &id, int clientUid,

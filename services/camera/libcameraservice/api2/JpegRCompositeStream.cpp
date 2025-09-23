@@ -866,8 +866,9 @@ void JpegRCompositeStream::getStreamStats(hardware::CameraStreamStats* streamSta
     bool deviceError;
     std::map<int, StreamStats> stats;
     std::pair<int32_t, int32_t> mostRequestedFps;
+    int32_t errorState;
     mSessionStatsBuilder.buildAndReset(&streamStats->mRequestCount, &streamStats->mErrorCount,
-            &deviceError, &mostRequestedFps, &stats);
+            &deviceError, &mostRequestedFps, &stats, &errorState);
     if (stats.find(mP010StreamId) != stats.end()) {
         streamStats->mWidth = mBlobWidth;
         streamStats->mHeight = mBlobHeight;

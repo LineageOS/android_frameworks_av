@@ -282,6 +282,7 @@ CameraSessionStats::CameraSessionStats() :
         mDeviceError(false),
         mVideoStabilizationMode(-1),
         mSessionIndex(0),
+        mErrorState(0),
         mCameraExtensionSessionStats() {}
 
 CameraSessionStats::CameraSessionStats(const std::string& cameraId,
@@ -303,6 +304,7 @@ CameraSessionStats::CameraSessionStats(const std::string& cameraId,
                 mDeviceError(0),
                 mVideoStabilizationMode(-1),
                 mSessionIndex(0),
+                mErrorState(0),
                 mCameraExtensionSessionStats() {}
 
 status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
@@ -433,6 +435,12 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int32_t errorState = 0;
+    if ((err = parcel->readInt32(&errorState)) != OK) {
+        ALOGE("%s: Failed to read error state from parcel", __FUNCTION__);
+        return err;
+    }
+
     CameraExtensionSessionStats extStats{};
     if ((err = extStats.readFromParcel(parcel)) != OK) {
         ALOGE("%s: Failed to read extension session stats from parcel", __FUNCTION__);
@@ -469,6 +477,7 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
     mUsedUltraWide = usedUltraWide;
     mUsedZoomOverride = usedZoomOverride;
     mSessionIndex = sessionIdx;
+    mErrorState = errorState;
     mCameraExtensionSessionStats = extStats;
     mMostRequestedFpsRange = mostRequestedFpsRange;
 
@@ -580,6 +589,11 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = parcel->writeInt32(mSessionIndex)) != OK) {
         ALOGE("%s: Failed to write session index!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt32(mErrorState)) != OK) {
+        ALOGE("%s: Failed to write error state!", __FUNCTION__);
         return err;
     }
 

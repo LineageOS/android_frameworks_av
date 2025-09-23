@@ -81,7 +81,8 @@ public:
     virtual void          notifyIdle(int64_t /*requestCount*/, int64_t /*resultErrorCount*/,
                                      bool /*deviceError*/,
                                      std::pair<int32_t, int32_t> /*mostRequestedFpsRange*/,
-                                     const std::vector<hardware::CameraStreamStats>&) {}
+                                     const std::vector<hardware::CameraStreamStats>&,
+                                     int32_t) {}
     virtual void          notifyShutter(const CaptureResultExtras& resultExtras,
                                         nsecs_t timestamp);
     virtual void          notifyAutoFocus(uint8_t newState, int triggerId);
@@ -98,7 +99,7 @@ public:
                                      std::pair<int32_t, int32_t> mostRequestedFpsRange,
                                      const std::vector<hardware::CameraStreamStats>& streamStats,
                                      const std::string& userTag, int videoStabilizationMode,
-                                     bool usedUltraWide, bool usedZoomOverride);
+                                     bool usedUltraWide, bool usedZoomOverride, int32_t errorState);
 
     int                   getCameraId() const;
     const sp<CameraDeviceBase>&

@@ -32,6 +32,7 @@ TEST(SessionStatsBuilderTest, FpsHistogramTest) {
     bool deviceError;
     pair<int32_t, int32_t> mostRequestedFpsRange;
     map<int, StreamStats> streamStatsMap;
+    int32_t errorState;
 
     // Verify we get the most common FPS
     int64_t fc = 0;
@@ -41,18 +42,18 @@ TEST(SessionStatsBuilderTest, FpsHistogramTest) {
     for (size_t i = 0; i < 10; i++, fc++) b.incFpsRequestedCount(60, 60, fc);
 
     b.buildAndReset(&requestCount, &resultErrorCount,
-        &deviceError, &mostRequestedFpsRange, &streamStatsMap);
+        &deviceError, &mostRequestedFpsRange, &streamStatsMap, &errorState);
     ASSERT_EQ(mostRequestedFpsRange, make_pair(15, 15)) << "Incorrect most common FPS selected";
 
     // Verify empty stats behavior
     b.buildAndReset(&requestCount, &resultErrorCount,
-        &deviceError, &mostRequestedFpsRange, &streamStatsMap);
+        &deviceError, &mostRequestedFpsRange, &streamStatsMap, &errorState);
     ASSERT_EQ(mostRequestedFpsRange, make_pair(0, 0)) << "Incorrect empty stats FPS reported";
 
     // Verify one frame behavior
     b.incFpsRequestedCount(30, 30, 1);
     b.buildAndReset(&requestCount, &resultErrorCount,
-        &deviceError, &mostRequestedFpsRange, &streamStatsMap);
+        &deviceError, &mostRequestedFpsRange, &streamStatsMap, &errorState);
     ASSERT_EQ(mostRequestedFpsRange, make_pair(30, 30)) << "Incorrect single-frame FPS reported";
 
     // Verify overflow stats behavior
@@ -63,7 +64,7 @@ TEST(SessionStatsBuilderTest, FpsHistogramTest) {
     }
     // Should have the oldest bucket dropped, so second oldest should be most common
     b.buildAndReset(&requestCount, &resultErrorCount,
-        &deviceError, &mostRequestedFpsRange, &streamStatsMap);
+        &deviceError, &mostRequestedFpsRange, &streamStatsMap, &errorState);
     ASSERT_EQ(mostRequestedFpsRange, make_pair(2, 2)) << "Incorrect stats overflow behavior";
 
 }
