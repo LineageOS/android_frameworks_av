@@ -103,6 +103,8 @@ public:
         return (*this != other && !(*this < other));
     }
 
+    inline std::string toString() const { return "<SessionConfiguration>"; }
+
     bool outputsEqual(const SessionConfiguration& other) const;
     bool outputsLessThan(const SessionConfiguration& other) const;
     void addOutputConfiguration(const OutputConfiguration &config) {

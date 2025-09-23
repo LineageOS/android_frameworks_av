@@ -812,6 +812,11 @@ binder::Status CameraDeviceClient::beginConfigure() {
     if (!flags::camera_multi_client()) {
         return binder::Status::ok();
     }
+    Mutex::Autolock icl(mBinderSerializationLock);
+    return beginConfigureLocked();
+}
+
+binder::Status CameraDeviceClient::beginConfigureLocked() {
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
@@ -841,14 +846,20 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode,
         ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
     }
-
     Mutex::Autolock icl(mBinderSerializationLock);
+    return endConfigureLocked(operatingMode, sessionParams, startTimeMs, offlineStreamIds);
 
+}
+
+binder::Status CameraDeviceClient::endConfigureLocked(int operatingMode,
+        const hardware::camera2::impl::CameraMetadataNative& sessionParams, int64_t startTimeMs,
+        std::vector<int>* offlineStreamIds /*out*/) {
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
 
-    res = SessionConfigurationUtils::checkOperatingMode(operatingMode, mDevice->info(),
+    binder::Status res =
+            SessionConfigurationUtils::checkOperatingMode(operatingMode, mDevice->info(),
             mCameraIdStr);
     if (!res.isOk()) {
         return res;
@@ -968,6 +979,92 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
     return res;
 }
 
+binder::Status CameraDeviceClient::configureStreams(
+        const hardware::camera2::utils::SessionConfigurationAndStreamIds&
+                sessionConfigurationAndStreamIds,
+        /*out*/
+        hardware::camera2::utils::OutputAndInputStreamIds* outputAndInputStreamIds) {
+    ATRACE_CALL();
+    ALOGV("%s: configuring streams", __FUNCTION__);
+    binder::Status res;
+    if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
+
+    if (outputAndInputStreamIds == nullptr) {
+        std::string msg = fmt::sprintf("Camera %s: Invalid output and input stream ids",
+                mCameraIdStr.c_str());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+    Mutex::Autolock icl(mBinderSerializationLock);
+    // begin configure
+    if (!(res = beginConfigureLocked()).isOk()) {
+        return res;
+    }
+
+    // delete the input stream, if present
+    if (sessionConfigurationAndStreamIds.deletedInputStreamId != CAMERA3_STREAM_ID_INVALID) {
+        if (!(res = deleteStreamLocked(
+                sessionConfigurationAndStreamIds.deletedInputStreamId)).isOk()) {
+            return res;
+        }
+    }
+
+    // create an input stream, if present
+    int32_t newInputStreamId = CAMERA3_STREAM_ID_INVALID;
+    const SessionConfiguration &sessionConfigurationDelta =
+            sessionConfigurationAndStreamIds.sessionConfigurationDelta;
+    if ((sessionConfigurationDelta.getInputHeight() > 0) &&
+            (sessionConfigurationDelta.getInputWidth() > 0)) {
+        ALOGV("%s: Input stream width %d, height %d format %d", __FUNCTION__,
+                sessionConfigurationDelta.getInputWidth(),
+                sessionConfigurationDelta.getInputHeight(),
+                sessionConfigurationDelta.getInputFormat());
+        if (!(res = createInputStreamLocked(sessionConfigurationDelta.getInputWidth(),
+                sessionConfigurationDelta.getInputHeight(),
+                sessionConfigurationDelta.getInputFormat(),
+                sessionConfigurationDelta.inputIsMultiResolution(),
+                &newInputStreamId)).isOk()) {
+            return res;
+        }
+    }
+
+    // delete output streams
+    for (const auto& streamId : sessionConfigurationAndStreamIds.deletedStreamIds) {
+        if (!(res = deleteStreamLocked(streamId)).isOk()) {
+            return res;
+        }
+    }
+
+    // create new output streams
+    std::vector<int32_t> newStreamIds;
+    for (const auto& outputConfiguration : sessionConfigurationDelta.getOutputConfigurations()) {
+        int32_t newStreamId = CAMERA3_STREAM_ID_INVALID;
+        ALOGV("%s: Output stream width %d, height %d format %d", __FUNCTION__,
+                outputConfiguration.getWidth(), outputConfiguration.getHeight(),
+                outputConfiguration.getFormat());
+        if (!(res = createStreamLocked(outputConfiguration, &newStreamId)).isOk()) {
+            return res;
+        }
+        newStreamIds.push_back(newStreamId);
+    }
+
+    std::vector<int32_t> offlineStreamIds;
+    // end configure
+    if (!(res = endConfigureLocked(sessionConfigurationDelta.getOperatingMode(),
+            sessionConfigurationDelta.getSessionParameters(),
+            sessionConfigurationAndStreamIds.createSessionTime, &offlineStreamIds)).isOk()) {
+        return res;
+    }
+
+    outputAndInputStreamIds->outputStreamIds = std::move(newStreamIds);
+    if (newInputStreamId != CAMERA3_STREAM_ID_INVALID) {
+        outputAndInputStreamIds->inputStreamId = newInputStreamId;
+    }
+    outputAndInputStreamIds->offlineStreamIds = std::move(offlineStreamIds);
+
+    return binder::Status::ok();
+}
+
 binder::Status CameraDeviceClient::deleteStream(int streamId) {
     ATRACE_CALL();
     ALOGV("%s (streamId = 0x%x)", __FUNCTION__, streamId);
@@ -976,7 +1073,10 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
     if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
 
     Mutex::Autolock icl(mBinderSerializationLock);
+    return deleteStreamLocked(streamId);
+}
 
+binder::Status CameraDeviceClient::deleteStreamLocked(int streamId) {
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
@@ -1032,7 +1132,7 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
         // Also returns BAD_VALUE if stream ID was not valid
         err = mDevice->deleteStream(streamId);
     }
-
+    binder::Status res = binder::Status::ok();
     if (err != OK) {
         std::string msg = fmt::sprintf("Camera %s: Unexpected error %s (%d) when deleting stream "
                 "%d", mCameraIdStr.c_str(), strerror(-err), err, streamId);
@@ -1088,7 +1188,13 @@ binder::Status CameraDeviceClient::createStream(
     if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
 
     Mutex::Autolock icl(mBinderSerializationLock);
+    return createStreamLocked(outputConfiguration, newStreamId);
+}
 
+binder::Status CameraDeviceClient::createStreamLocked(
+        const hardware::camera2::params::OutputConfiguration &outputConfiguration,
+        /*out*/
+        int32_t* newStreamId) {
     if (!outputConfiguration.isComplete()) {
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                 "OutputConfiguration isn't valid!");
@@ -1107,7 +1213,7 @@ binder::Status CameraDeviceClient::createStream(
     int32_t colorSpace = outputConfiguration.getColorSpace();
     bool useReadoutTimestamp = outputConfiguration.useReadoutTimestamp();
 
-    res = SessionConfigurationUtils::checkSurfaceType(numSurfaces, deferredConsumer,
+    binder::Status res = SessionConfigurationUtils::checkSurfaceType(numSurfaces, deferredConsumer,
             outputConfiguration.getSurfaceType(), /*isConfigurationComplete*/true);
     if (!res.isOk()) {
         return res;
@@ -1385,7 +1491,6 @@ binder::Status CameraDeviceClient::createInputStream(
         int width, int height, int format, bool isMultiResolution,
         /*out*/
         int32_t* newStreamId) {
-
     ATRACE_CALL();
     ALOGV("%s (w = %d, h = %d, f = 0x%x, isMultiResolution %d)", __FUNCTION__,
             width, height, format, isMultiResolution);
@@ -1394,7 +1499,13 @@ binder::Status CameraDeviceClient::createInputStream(
     if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
 
     Mutex::Autolock icl(mBinderSerializationLock);
+    return createInputStreamLocked(width, height, format, isMultiResolution, newStreamId);
+}
 
+binder::Status CameraDeviceClient::createInputStreamLocked(
+        int width, int height, int format, bool isMultiResolution,
+        /*out*/
+        int32_t* newStreamId) {
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
@@ -1408,6 +1519,7 @@ binder::Status CameraDeviceClient::createInputStream(
 
     int streamId = -1;
     status_t err = mDevice->createInputStream(width, height, format, isMultiResolution, &streamId);
+    binder::Status res = binder::Status::ok();
     if (err == OK) {
         mInputStream.configured = true;
         mInputStream.width = width;

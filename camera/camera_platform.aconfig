@@ -241,3 +241,13 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "configure_streams_batch"
+    description: "Batch binder calls in createCaptureSession"
+    bug: "414526014"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
