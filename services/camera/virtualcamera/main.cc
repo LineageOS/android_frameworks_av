@@ -22,10 +22,8 @@
 
 #include "VirtualCameraProvider.h"
 #include "VirtualCameraService.h"
-#include "android-base/logging.h"
 #include "android/binder_manager.h"
 #include "android/binder_process.h"
-#include "log/log.h"
 
 using ::android::companion::virtualcamera::VirtualCameraProvider;
 using ::android::companion::virtualcamera::VirtualCameraService;
