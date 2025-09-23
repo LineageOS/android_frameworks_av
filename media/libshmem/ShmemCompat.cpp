@@ -75,9 +75,9 @@ bool convertIMemoryToSharedFileRegion(const sp<IMemory>& mem,
             return false;
         }
         // Make sure the offset and size do not overflow from int64 boundaries.
-        if (size > std::numeric_limits<int64_t>::max() ||
-                offset > std::numeric_limits<int64_t>::max() ||
-                heap->getOffset() > std::numeric_limits<int64_t>::max() ||
+        if (static_cast<uint64_t>(size) > std::numeric_limits<int64_t>::max() ||
+                static_cast<uint64_t>(offset) > std::numeric_limits<int64_t>::max() ||
+                static_cast<uint64_t>(heap->getOffset()) > std::numeric_limits<int64_t>::max() ||
                 static_cast<uint64_t>(heap->getOffset()) +
                 static_cast<uint64_t>(offset)
                         > std::numeric_limits<int64_t>::max()) {
