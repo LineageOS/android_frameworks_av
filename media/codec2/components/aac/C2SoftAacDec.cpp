@@ -1138,7 +1138,7 @@ uint32_t C2SoftAacDec::maskFromCount(uint32_t channelCount) {
         case 2: // stereo
             return (CHANNEL_OUT_FL | CHANNEL_OUT_FR);
         case 4: // 4.0 = stereo with backs
-            return (CHANNEL_OUT_FL | CHANNEL_OUT_FC
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FR
                     | CHANNEL_OUT_BL | CHANNEL_OUT_BR);
         case 5: // 5.0
             return (CHANNEL_OUT_FL | CHANNEL_OUT_FC | CHANNEL_OUT_FR
