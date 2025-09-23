@@ -185,6 +185,8 @@ status_t StreamHalAidl::close() {
         if (auto handler = mStreamCloseHandler.promote(); handler != nullptr) {
             handler->streamClosed(sp<StreamHalInterface>::fromExisting(this));
         }
+        std::lock_guard l(mLock);
+        mIsClosed = true;
     }
     AUGMENT_LOG_IF(E, !status.isOk(), "status %s", status.getDescription().c_str());
     return statusTFromBinderStatus(status);
@@ -874,6 +876,10 @@ status_t StreamHalAidl::sendCommand(
         const ::aidl::android::hardware::audio::core::StreamDescriptor::Command& command,
         ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply,
         bool safeFromNonWorkerThread, StatePositions* statePositions) {
+    {
+        std::lock_guard l(mLock);
+        if (mIsClosed) return DEAD_OBJECT;
+    }
 
     // Add timeCheck only for start command (pause, flush checked at caller).
     std::unique_ptr<mediautils::TimeCheck> timeCheck;
