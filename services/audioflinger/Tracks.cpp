@@ -3811,6 +3811,17 @@ void AfPlaybackCommon::processMuteEvent(media::IAudioManagerNative& am, mute_sta
     }
 }
 
+void AfPlaybackCommon::resetMuteEvent(media::IAudioManagerNative& am) {
+    const auto portId = mSelf.portId();
+    const auto result = portId != AUDIO_PORT_HANDLE_NONE
+                                ? am.portMuteEvent(portId, static_cast<int>(mMuteState.load()))
+                                : Status::fromExceptionCode(Status::EX_ILLEGAL_STATE);
+    if (!result.isOk()) {
+        ALOGW("%s(%d): cannot update mute state for port ID %d, status error %s", __func__,
+              mSelf.id(), portId, result.toString8().c_str());
+    }
+}
+
 void AfPlaybackCommon::startPlaybackDelivery() {
     if (mOpControlPartialSession) {
         mHasOpControlPartial.store(mOpControlPartialSession->beginDeliveryRequest(),

@@ -3084,6 +3084,12 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
     }
 
     onAddNewTrack_l();
+
+    const auto amn = mAfThreadCallback->getAudioManagerNative();
+    if (amn) {
+        track->resetMuteEvent(*amn);
+    }
+
     return status;
 }
 
