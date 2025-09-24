@@ -147,12 +147,9 @@ private:
     aaudio_result_t drainStream_l(int64_t wakeUpNanos, bool allowSoftWakeUp) REQUIRES(mStreamMutex);
     aaudio_result_t activateStream_l() REQUIRES(mStreamMutex);
 
-    android::sp<AudioStreamInternalPlay> getPtr() { return this; }
-
     bool mOffloadEosPending GUARDED_BY(mStreamMutex){false};
     std::condition_variable mStreamEndCV;
-    std::optional<android::mediautils::SingleThreadExecutor> mStreamEndExecutor
-            GUARDED_BY(mStreamMutex);
+    int64_t mOffloadEosNanosBoottime GUARDED_BY(mStreamMutex){0};
 
     AAudioStream_presentationEndCallback mPresentationEndCallbackProc = nullptr;
     void                                *mPresentationEndCallbackUserData = nullptr;

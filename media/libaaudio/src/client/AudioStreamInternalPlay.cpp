@@ -76,13 +76,6 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
         int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
         mFlowGraph.setRampLengthInFrames(numFrames);
     }
-    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED &&
-        !isDataCallbackSet() && mPresentationEndCallbackProc != nullptr) {
-        // Client is not using data callback but has presentation end callback for offload playback,
-        // initialize an executor for presentation end callback.
-        std::lock_guard _l(mStreamMutex);
-        mStreamEndExecutor.emplace();
-    }
     // Use 1s + burst size as a safe margin to wake up the callback thread for writing more
     // data to avoid glitch.
     mOffloadSafeMarginInFrames =
@@ -498,24 +491,20 @@ aaudio_result_t AudioStreamInternalPlay::setOffloadEndOfStream() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     mOffloadEosPending = true;
-    if (!isDataCallbackSet()) {
-        const int64_t streamEndNanos = mClockModel.convertDeltaPositionToTime(
-                std::max(0, mAudioEndpoint->getFullFramesAvailable() - getDeviceFramesPerBurst()));
-        auto streamPtr = getPtr();
-        mStreamEndExecutor->enqueue(android::mediautils::Runnable{
-            [streamPtr, streamEndNanos]() {
-                {
-                    android::audio_utils::unique_lock ul(streamPtr->mStreamMutex);
-                    streamPtr->mStreamEndCV.wait_for(
-                            ul, std::chrono::nanoseconds(streamEndNanos),
-                            [streamPtr]() REQUIRES(streamPtr->mStreamMutex) {
-                                return !streamPtr->mOffloadEosPending;
-                            });
-                    if (!streamPtr->mOffloadEosPending) return;
-                    streamPtr->mOffloadEosPending = false;
-                }
-                streamPtr->maybeCallPresentationEndCallback();
-            }});
+    if (!isDataCallbackSet() && mPresentationEndCallbackProc != nullptr) {
+        mOffloadEosNanosBoottime = mClockModel.convertPositionToBootTime(
+                getFramesWritten() - getDeviceFramesPerBurst());
+        if (android::elapsedRealtimeNano() >= mOffloadEosNanosBoottime) {
+            ALOGD("%s no need to drain, all data is played", __func__);
+            maybeCallPresentationEndCallback();
+            mOffloadEosPending = false;
+        } else {
+            // When clients set offload end of stream, they may not want to write more data
+            // before the presentation end callback is called. In that case, DO NOT allow
+            // soft wake up here so that it only wakes up after draining all data.
+            const bool allowSoftWakeUp = false;
+            return drainStream_l(mOffloadEosNanosBoottime, allowSoftWakeUp);
+        }
     }
     return AAUDIO_OK;
 }
@@ -533,7 +522,8 @@ void AudioStreamInternalPlay::maybeCallPresentationEndCallback() {
         pid_t expected = CALLBACK_THREAD_NONE;
         if (mPresentationEndCallbackThread.compare_exchange_strong(expected, gettid())) {
             (*mPresentationEndCallbackProc)(
-                    (AAudioStream *) this, mPresentationEndCallbackUserData);
+                    reinterpret_cast<AAudioStream*>(dynamic_cast<AudioStream*>(this)),
+                    mPresentationEndCallbackUserData);
             mPresentationEndCallbackThread.store(CALLBACK_THREAD_NONE);
         } else {
             ALOGW("%s() presentation end callback already running!", __func__);
@@ -555,6 +545,14 @@ aaudio_result_t AudioStreamInternalPlay::requestStop_l() {
 
 void AudioStreamInternalPlay::wakeupCallbackThread_l() {
     if (!isDataCallbackSet()) {
+        if (mOffloadEosPending) {
+            // Reset `mOffloadEosPending` as it doesn't allow soft wake up when draining for
+            // presentation end callback.
+            mOffloadEosPending = false;
+            if (android::elapsedRealtimeNano() >= mOffloadEosNanosBoottime) {
+                maybeCallPresentationEndCallback();
+            }
+        }
         return;
     }
     mOffloadEosPending = false;
