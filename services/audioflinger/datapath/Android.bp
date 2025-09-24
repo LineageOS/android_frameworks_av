@@ -59,6 +59,7 @@ cc_library {
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
         "libaudioflinger_utils", // NBAIO_Tee
+        "libaudiohal",
         "libaudioprocessing",
         "libaudiospdif",
         "libaudioutils",

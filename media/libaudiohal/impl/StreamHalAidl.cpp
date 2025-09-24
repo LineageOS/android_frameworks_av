@@ -1076,7 +1076,9 @@ status_t StreamOutHalAidl::getRenderPosition(uint64_t *dspFrames) {
     // Number of audio frames since the stream has exited standby.
     // See the table at the start of 'StreamHalInterface' on when it needs to reset.
     int64_t mostRecentResetPoint;
-    if (!mContext.isAsynchronous() && audio_has_proportional_frames(mConfig.format)) {
+    if (!mContext.isAsynchronous() &&
+        !mContext.isDirect() &&
+        audio_has_proportional_frames(mConfig.format)) {
         mostRecentResetPoint = statePositions.observable.framesAtStandby;
     } else {
         mostRecentResetPoint = std::max(statePositions.observable.framesAtStandby,
@@ -1153,7 +1155,9 @@ status_t StreamOutHalAidl::getPresentationPosition(uint64_t *frames, struct time
     StatePositions statePositions{};
     RETURN_STATUS_IF_ERROR(getObservablePosition(&aidlFrames, &aidlTimestamp, &statePositions));
     // See the table at the start of 'StreamHalInterface'.
-    if (!mContext.isAsynchronous() && audio_has_proportional_frames(mConfig.format)) {
+    if (!mContext.isAsynchronous() &&
+        !mContext.isDirect() &&
+        audio_has_proportional_frames(mConfig.format)) {
         *frames = aidlFrames;
     } else {
         const int64_t mostRecentResetPoint = std::max(statePositions.observable.framesAtStandby,
