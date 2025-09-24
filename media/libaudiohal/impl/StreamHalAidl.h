@@ -326,7 +326,7 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
             const ::aidl::android::hardware::audio::core::StreamDescriptor::Command& command,
             ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply = nullptr,
             bool safeFromNonWorkerThread = false,
-            StatePositions* statePositions = nullptr);
+            StatePositions* statePositions = nullptr) EXCLUDES(mLock);
     status_t updateCountersIfNeeded(
             ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply = nullptr,
             StatePositions* statePositions = nullptr);
@@ -350,6 +350,7 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     // Cached values of observable positions when the stream last entered certain state.
     // Updated for output streams only.
     StatePositions mStatePositions GUARDED_BY(mLock) = {};
+    bool mIsClosed GUARDED_BY(mLock) = false;
     // mStreamPowerLog is used for audio signal power logging.
     StreamPowerLog mStreamPowerLog;
     std::atomic<pid_t> mWorkerTid = -1;
