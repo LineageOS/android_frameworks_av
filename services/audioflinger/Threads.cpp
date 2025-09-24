@@ -404,6 +404,15 @@ static void sFastTrackMultiplierInit()
     }
 }
 
+static bool shouldTrackRunRealtimePriority() {
+    static const bool value = []() {
+        bool defaultValue = false;
+        return property_get_bool("ro.boot.container", defaultValue)
+            || property_get_bool("ro.audio.track_realtime_priority", defaultValue);
+    }();
+    return value;
+}
+
 // ----------------------------------------------------------------------------
 
 #ifdef ADD_BATTERY_DATA
@@ -3990,7 +3999,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                 stream()->setHalThreadPriority(priorityBoost);
             }
         }
-    } else if (property_get_bool("ro.boot.container", false /* default_value */)) {
+    } else if (shouldTrackRunRealtimePriority()) {
         // In ARC experiments (b/73091832), the latency under using CFS scheduler with any priority
         // is not enough for PlaybackThread to process audio data in time. We request the lowest
         // real-time priority, SCHED_FIFO=1, for PlaybackThread in ARC. ro.boot.container is true
@@ -3998,7 +4007,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
         // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
         const pid_t tid = getTid();
         if (tid == -1) {
-            ALOGW("%s: Cannot update PlaybackThread priority for ARC, no tid", __func__);
+            ALOGW("%s: Cannot update PlaybackThread priority, no tid", __func__);
         } else {
             const status_t status = requestPriority(getpid(),
                                                     tid,
