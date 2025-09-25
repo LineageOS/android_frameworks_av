@@ -21,56 +21,38 @@
 #include <android_companion_virtualdevice_flags.h>
 
 #include <algorithm>
-#include <atomic>
-#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <numeric>
 #include <optional>
-#include <tuple>
-#include <unordered_set>
-#include <utility>
 #include <vector>
 
-#include "CameraMetadata.h"
-#include "EGL/egl.h"
 #include "VirtualCameraCaptureResultConsumer.h"
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraRenderThread.h"
-#include "VirtualCameraStream.h"
 #include "aidl/android/companion/virtualcamera/ICaptureResultConsumer.h"
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/companion/virtualcamera/VirtualCameraMetadata.h"
 #include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferCache.h"
-#include "aidl/android/hardware/camera/device/BufferStatus.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureRequest.h"
 #include "aidl/android/hardware/camera/device/HalStream.h"
-#include "aidl/android/hardware/camera/device/NotifyMsg.h"
 #include "aidl/android/hardware/camera/device/RequestTemplate.h"
-#include "aidl/android/hardware/camera/device/ShutterMsg.h"
 #include "aidl/android/hardware/camera/device/Stream.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "aidl/android/hardware/camera/device/StreamConfiguration.h"
-#include "aidl/android/hardware/camera/device/StreamRotation.h"
 #include "aidl/android/hardware/graphics/common/BufferUsage.h"
 #include "aidl/android/hardware/graphics/common/PixelFormat.h"
-#include "android/hardware_buffer.h"
 #include "android/native_window_aidl.h"
 #include "fmq/AidlMessageQueue.h"
 #include "system/camera_metadata.h"
 #include "ui/GraphicBuffer.h"
 #include "util/AidlUtil.h"
-#include "util/EglDisplayContext.h"
-#include "util/EglFramebuffer.h"
-#include "util/EglProgram.h"
-#include "util/JpegUtil.h"
 #include "util/MetadataUtil.h"
 #include "util/Util.h"
 
@@ -78,7 +60,6 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
-using ::aidl::android::companion::virtualcamera::ICaptureResultConsumer;
 using ::aidl::android::companion::virtualcamera::IVirtualCameraCallback;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraMetadata;
@@ -447,7 +428,9 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
     mRenderThread->start();
     inputSurface = mRenderThread->getInputSurface();
     inputStreamId = mCurrentInputStreamId =
-        virtualCamera->allocateInputStreamId();
+        flags::virtual_camera_stable_stream_id()
+            ? inputConfig->index
+            : virtualCamera->allocateInputStreamId();
   }
 
   // The onConfigureSession is oneway async, just informs the VD owner of

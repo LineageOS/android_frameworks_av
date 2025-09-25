@@ -364,9 +364,8 @@ TEST_F(VirtualCameraDeviceTest, thumbnailSizeWithCompatibleAspectRatio) {
 TEST_F(VirtualCameraDeviceTest, dump) {
   std::string expected = R"(  virtual_camera 42 belongs to virtual device 0
   SupportedStreamConfiguration:
-    SupportedStreamConfiguration{width: 640, height: 480, pixelFormat: YUV_420_888, maxFps: 30})";
+    SupportedStreamConfiguration{width: 640, height: 480, pixelFormat: YUV_420_888, maxFps: 30, index: 0})";
   int expectedSize = expected.size() * sizeof(char);
-  char buffer[expectedSize];
 
   // Create an in memory fd
   int fd = memfd_create("tmpFile", 0);
@@ -375,13 +374,14 @@ TEST_F(VirtualCameraDeviceTest, dump) {
   // Check that we wrote the expected size
   int dumpSize = lseek(fd, 0, SEEK_END);
 
+  char buffer[dumpSize];
   // Rewind and read from the fd
   lseek(fd, 0, SEEK_SET);
-  read(fd, buffer, expectedSize);
+  read(fd, buffer, dumpSize);
   close(fd);
 
   // Check the content of the dump
-  std::string name = std::string(buffer, expectedSize);
+  std::string name = std::string(buffer, dumpSize);
   ASSERT_EQ(expected, name);
   // Check the size after the content to display the string mismatch when a
   // failure occurs
