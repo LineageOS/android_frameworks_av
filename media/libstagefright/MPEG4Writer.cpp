@@ -2640,7 +2640,7 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size, bool 
 
     if (mProperties.empty()) {
         // Min length of hvcC CSD is 23. (ISO/IEC 14496-15:2014 Chapter 8.4.1.1.2)
-        if (mIsHeif && mCodecSpecificDataSize < 23) {
+        if (mIsHeic && mCodecSpecificDataSize < 23) {
             ALOGE("hvcC csd size is less than 23 bytes");
             return;
         }
