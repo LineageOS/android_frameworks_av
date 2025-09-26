@@ -20,6 +20,8 @@
 
 #include "AudioStreamOut.h"
 
+#include "EffectConfiguration.h"
+
 #include <media/audiohal/DeviceHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <system/audio.h>
@@ -73,7 +75,8 @@ status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timesp
         return status;
     }
 
-    if (mHalFormatHasProportionalFrames &&
+    if (audioflinger::EffectConfiguration::isHidl() &&
+        mHalFormatHasProportionalFrames &&
             (flags & AUDIO_OUTPUT_FLAG_DIRECT) == AUDIO_OUTPUT_FLAG_DIRECT) {
         // For DirectTrack reset position to 0 on standby.
         const uint64_t adjustedPosition = (halPosition <= mFramesWrittenAtStandby) ?
