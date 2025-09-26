@@ -249,7 +249,7 @@ aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFr
             fullFrames > getDeviceSampleRate() * 1 + mOffloadSafeMarginInFrames) {
             // Use BootTime for wakeup time as the device may have be suspended.
             const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
-                    getFramesWritten() - mOffloadSafeMarginInFrames);
+                    mAudioEndpoint->getDataWriteCounter() - mOffloadSafeMarginInFrames);
             android::audio_utils::unique_lock ul(mStreamMutex);
             if (aaudio_result_t ret = drainStream_l(wakeUpNanosBootTime, isDataCallbackSet());
                 ret != AAUDIO_OK) {
@@ -493,7 +493,7 @@ aaudio_result_t AudioStreamInternalPlay::setOffloadEndOfStream() {
     mOffloadEosPending = true;
     if (!isDataCallbackSet() && mPresentationEndCallbackProc != nullptr) {
         mOffloadEosNanosBoottime = mClockModel.convertPositionToBootTime(
-                getFramesWritten() - getDeviceFramesPerBurst());
+                mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
         if (android::elapsedRealtimeNano() >= mOffloadEosNanosBoottime) {
             ALOGD("%s no need to drain, all data is played", __func__);
             maybeCallPresentationEndCallback();
@@ -716,7 +716,7 @@ void *AudioStreamInternalPlay::callbackLoop() {
             if (mOffloadEosPending) {
                 // Use BootTime for wakeup time as the device may have be suspended.
                 const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
-                        getFramesWritten() - getDeviceFramesPerBurst());
+                        mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
                 if (result = drainStream_l(wakeUpNanosBootTime, false /*allowSoftWakeUp*/);
                     result != AAUDIO_OK) {
                     ALOGE("%s() failed to drain, error=%d", __func__, result);
