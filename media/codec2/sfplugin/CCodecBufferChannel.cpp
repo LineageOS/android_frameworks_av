@@ -1751,7 +1751,8 @@ status_t CCodecBufferChannel::start(
 
     if (inputFormat != nullptr) {
         bool graphic = (iStreamFormat.value == C2BufferData::GRAPHIC);
-        bool audioEncoder = !graphic && (kind.value == C2Component::KIND_ENCODER);
+        bool encoder = (kind.value == C2Component::KIND_ENCODER);
+        bool audioEncoder = !graphic && encoder;
         C2Config::api_feature_t apiFeatures = C2Config::api_feature_t(
                 API_REFLECTION |
                 API_VALUES |
@@ -1860,9 +1861,11 @@ status_t CCodecBufferChannel::start(
         bool conforming = (apiFeatures & API_SAME_INPUT_BUFFER);
         // For encrypted content, framework decrypts source buffer (ashmem) into
         // C2Buffers. Thus non-conforming codecs can process these.
+        // For graphic buffer, framework uses graphic buffers directly.
+        // Thus non-conforming codecs can process these.
         if (!buffersBoundToCodec
                 && !input->frameReassembler
-                && (hasCryptoOrDescrambler() || conforming)) {
+                && (hasCryptoOrDescrambler() || (graphic && encoder) || conforming)) {
             input->buffers.reset(new SlotInputBuffers(mName));
         } else if (graphic) {
             if (mHasInputSurface) {
