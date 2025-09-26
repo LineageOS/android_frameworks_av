@@ -8085,7 +8085,7 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
                 attributes, false /*ignorePreferredDevice*/, uid, session);
     }
 
-    if (com::android::media::audioserver::enable_strict_port_routing_checks()
+    if (device && com::android::media::audioserver::enable_strict_port_routing_checks()
             && com::android::media::audio::check_route_in_get_audio_mix_port()
             && !inputDesc->mProfile->routesToDevice(device)) {
         ALOGW("%s: profile %s is not routable to device %s", __func__,
