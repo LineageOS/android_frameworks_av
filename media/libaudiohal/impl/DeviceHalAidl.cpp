@@ -46,7 +46,6 @@ using aidl::android::media::audio::common::Boolean;
 using aidl::android::media::audio::common::AudioConfig;
 using aidl::android::media::audio::common::AudioDevice;
 using aidl::android::media::audio::common::AudioDeviceType;
-using aidl::android::media::audio::common::AudioInputFlags;
 using aidl::android::media::audio::common::AudioIoFlags;
 using aidl::android::media::audio::common::AudioLatencyMode;
 using aidl::android::media::audio::common::AudioMMapPolicy;
@@ -580,8 +579,6 @@ status_t DeviceHalAidl::openOutputStream(
             aidlOutputFlags, AudioOutputFlags::NON_BLOCKING);
     const bool isHwAvSync = isBitPositionFlagSet(
             aidlOutputFlags, AudioOutputFlags::HW_AV_SYNC);
-    const bool isDirect = isBitPositionFlagSet(
-            aidlOutputFlags, AudioOutputFlags::DIRECT);
     std::shared_ptr<OutputStreamCallbackAidl> streamCb;
     if (isAsynchronous) {
         streamCb = ndk::SharedRefBase::make<OutputStreamCallbackAidl>(this);
@@ -606,8 +603,7 @@ status_t DeviceHalAidl::openOutputStream(
         std::lock_guard l(mLock);
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openOutputStream(args, &ret)));
     }
-    StreamContextAidl context(ret.desc, isAsynchronous, isDirect, aidlHandle,
-            mHasClipTransitionSupport);
+    StreamContextAidl context(ret.desc, isAsynchronous, aidlHandle, mHasClipTransitionSupport);
     if (!context.isValid()) {
         AUGMENT_LOG(E, "Failed to created a valid stream context from the descriptor: %s",
                     ret.desc.toString().c_str());
@@ -677,7 +673,6 @@ status_t DeviceHalAidl::openInputStream(
     if (mixPortConfig.id == 0) return BAD_VALUE;  // HAL suggests a different config.
     ::aidl::android::hardware::audio::core::IModule::OpenInputStreamArguments args;
     args.portConfigId = mixPortConfig.id;
-    const bool isDirect = isBitPositionFlagSet(aidlInputFlags, AudioInputFlags::DIRECT);
     RecordTrackMetadata aidlTrackMetadata{
         .source = aidlSource, .gain = 1, .channelMask = aidlConfig.base.channelMask };
     if (outputDevice != AUDIO_DEVICE_NONE) {
@@ -693,8 +688,7 @@ status_t DeviceHalAidl::openInputStream(
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mModule->openInputStream(args, &ret)));
     }
     StreamContextAidl context(
-            ret.desc, false /*isAsynchronous*/, isDirect, aidlHandle,
-            mHasClipTransitionSupport);
+            ret.desc, false /*isAsynchronous*/, aidlHandle, mHasClipTransitionSupport);
     if (!context.isValid()) {
         AUGMENT_LOG(E, "Failed to created a valid stream context from the descriptor: %s",
                     ret.desc.toString().c_str());

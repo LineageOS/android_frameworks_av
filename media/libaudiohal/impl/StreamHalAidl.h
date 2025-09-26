@@ -50,15 +50,13 @@ class StreamContextAidl {
             ::aidl::android::hardware::common::fmq::SynchronizedReadWrite> DataMQ;
 
     StreamContextAidl(::aidl::android::hardware::audio::core::StreamDescriptor& descriptor,
-                      bool isAsynchronous, bool isDirect, int ioHandle,
-                      bool hasClipTransitionSupport)
+                      bool isAsynchronous, int ioHandle, bool hasClipTransitionSupport)
         : mFrameSizeBytes(descriptor.frameSizeBytes),
           mCommandMQ(new CommandMQ(descriptor.command)),
           mReplyMQ(new ReplyMQ(descriptor.reply)),
           mBufferSizeFrames(descriptor.bufferSizeFrames),
           mDataMQ(maybeCreateDataMQ(descriptor)),
           mIsAsynchronous(isAsynchronous),
-          mIsDirect(isDirect),
           mIsMmapped(isMmapped(descriptor)),
           mMmapBufferDescriptor(maybeGetMmapBuffer(descriptor)),
           mIoHandle(ioHandle),
@@ -86,7 +84,6 @@ class StreamContextAidl {
     size_t getFrameSizeBytes() const { return mFrameSizeBytes; }
     ReplyMQ* getReplyMQ() const { return mReplyMQ.get(); }
     bool isAsynchronous() const { return mIsAsynchronous; }
-    bool isDirect() const { return mIsDirect; }
     bool isMmapped() const { return mIsMmapped; }
     const ::aidl::android::hardware::audio::core::MmapBufferDescriptor&
             getMmapBufferDescriptor() const { return mMmapBufferDescriptor; }
@@ -126,7 +123,6 @@ class StreamContextAidl {
     size_t mBufferSizeFrames;
     std::unique_ptr<DataMQ> mDataMQ;
     bool mIsAsynchronous;
-    bool mIsDirect;
     bool mIsMmapped;
     ::aidl::android::hardware::audio::core::MmapBufferDescriptor mMmapBufferDescriptor;
     int mIoHandle;
