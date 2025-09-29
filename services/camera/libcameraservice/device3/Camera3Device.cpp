@@ -1076,18 +1076,6 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             streamUseCase, timestampBase, colorSpace, useReadoutTimestamp);
 }
 
-static bool isRawFormat(int format) {
-    switch (format) {
-        case HAL_PIXEL_FORMAT_RAW16:
-        case HAL_PIXEL_FORMAT_RAW12:
-        case HAL_PIXEL_FORMAT_RAW10:
-        case HAL_PIXEL_FORMAT_RAW_OPAQUE:
-            return true;
-        default:
-            return false;
-    }
-}
-
 status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers,
         bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
@@ -1152,12 +1140,6 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
         return BAD_VALUE;
     }
 
-    if (isRawFormat(format) && sensorPixelModesUsed.size() > 1) {
-        // We can't use one stream with a raw format in both sensor pixel modes since its going to
-        // be found in only one sensor pixel mode.
-        ALOGE("%s: RAW opaque stream cannot be used with > 1 sensor pixel modes", __FUNCTION__);
-        return BAD_VALUE;
-    }
     IPCTransport transport = getTransportType();
     if (format == HAL_PIXEL_FORMAT_BLOB) {
         ssize_t blobBufferSize;
