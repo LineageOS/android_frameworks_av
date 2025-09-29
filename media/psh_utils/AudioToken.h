@@ -16,16 +16,31 @@
 
 #pragma once
 
+// go/keep-sorted start
 #include <psh_utils/PowerClientStats.h>
 #include <psh_utils/Token.h>
+// go/keep-sorted end
 
+// go/keep-sorted start
 #include <atomic>
+#include <audio_utils/Time.h>
+#include <binder/Binder.h>
 #include <memory>
 #include <string>
+// go/keep-sorted end
 
 namespace android::media::psh_utils {
 
-class AudioClientToken : public Token {
+class BaseToken : public Token {
+public:
+    BaseToken();
+    int64_t getStartElapsedTime() const override { return mStartElapsedTime; }
+
+protected:
+    const int64_t mStartElapsedTime;  // boot time
+};
+
+class AudioClientToken : public BaseToken {
 public:
     AudioClientToken(std::shared_ptr<PowerClientStats> powerClientStats, pid_t pid, uid_t uid,
              const std::string& additional);
@@ -43,7 +58,7 @@ private:
     static constinit std::atomic<size_t> sIdCounter;
 };
 
-class AudioThreadToken : public Token {
+class AudioThreadToken : public BaseToken {
 public:
     AudioThreadToken(
             pid_t tid, const std::string& wakeLockName,
@@ -63,7 +78,7 @@ private:
     static constinit std::atomic<size_t> sIdCounter;
 };
 
-class AudioTrackToken : public Token {
+class AudioTrackToken : public BaseToken {
 public:
     AudioTrackToken(
             std::shared_ptr<PowerClientStats> powerClientStats, const std::string& additional);

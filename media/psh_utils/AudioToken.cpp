@@ -15,12 +15,21 @@
  */
 
 #define LOG_TAG "AudioToken"
-#include <android-base/logging.h>
-#include <utils/Log.h>
+
 #include "AudioToken.h"
+
+// go/keep-sorted start
+#include <android-base/logging.h>
+#include <powermanager/PowerManager.h>
 #include <psh_utils/AudioPowerManager.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
 namespace android::media::psh_utils {
+
+ BaseToken::BaseToken()
+     : mStartElapsedTime(systemTime(SYSTEM_TIME_BOOTTIME))
+ {}
 
 /* static */
 constinit std::atomic<size_t> AudioClientToken::sIdCounter{};
@@ -55,6 +64,7 @@ AudioClientToken::~AudioClientToken() {
 std::string AudioClientToken::toString() const {
     std::string result("Client-");
     result.append(std::to_string(mId)).append(": ")
+            .append(" start: ").append(audio_utils::formatBootTime(mStartElapsedTime))
             .append(" pid: ").append(std::to_string(mPid));
     if (!mAdditional.empty()) {
         result.append(" ").append(mAdditional);
@@ -91,6 +101,7 @@ AudioThreadToken::~AudioThreadToken() {
 std::string AudioThreadToken::toString() const {
     std::string result("Thread-");
     result.append(std::to_string(mId)).append(": ")
+            .append(" start: ").append(audio_utils::formatBootTime(mStartElapsedTime))
             .append(" ThreadBase-tid: ").append(std::to_string(mTid))
             .append(" wakeLockName: ").append(mWakeLockName)
             .append(" wakeFlag: ").append(::android::media::psh_utils::toString(mWakeFlag));
@@ -118,7 +129,7 @@ AudioTrackToken::AudioTrackToken(
         if (mPowerClientStats){
             mPowerClientStats->getCommandThread().add(
                     "start",
-                    [pas = mPowerClientStats, actualNs = systemTime(SYSTEM_TIME_BOOTTIME)]() {
+                    [pas = mPowerClientStats, actualNs = mStartElapsedTime]() {
                         pas->start(actualNs);
                     });
         }
@@ -140,7 +151,11 @@ AudioTrackToken::~AudioTrackToken() {
 std::string AudioTrackToken::toString() const {
     std::string result("Track-");
     result.append(std::to_string(mId)).append(": ")
-            .append(mPowerClientStats ? mPowerClientStats->toString() : std::string("null"));
+            .append(" start: ").append(audio_utils::formatBootTime(mStartElapsedTime)).append(" ")
+            .append(mPowerClientStats ? mPowerClientStats->toString(
+                    false /* statistics */, {} /* prefix */,
+                    PowerClientStats::LogType::kLogForTrack)
+                    : std::string("null"));
     if (!mAdditional.empty()) {
         result.append(" ").append(mAdditional);
     }
