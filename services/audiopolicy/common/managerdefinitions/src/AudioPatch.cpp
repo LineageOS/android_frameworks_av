@@ -53,7 +53,7 @@ static void dumpPatchEndpoints(
 
 void AudioPatch::dump(String8 *dst, int spaces) const
 {
-    dst->appendFormat("owner uid %4d; handle %2d; af handle %2d\n", mUid, mHandle, mAfPatchHandle);
+    dst->appendFormat("owner uid %4d; handle %2d; HAL handle %2d\n", mUid, mHandle, mAfPatchHandle);
     dumpPatchEndpoints(dst, spaces, "src ", mPatch.num_sources, mPatch.sources);
     dumpPatchEndpoints(dst, spaces, "sink", mPatch.num_sinks, mPatch.sinks);
 }
