@@ -42,9 +42,14 @@ struct ReclaimRequestInfo;
  *        (for example hevc) independently? OR are they sharing the common
  *        resource pool?
  *  2. Provide a list of clients that hold requesting resources.
+ *  3. Given Total system resources, check whether system has enough of queried resources.
  */
 class IResourceModel {
 public:
+
+    // Alias for the long type name
+    using MediaResourceParcel = aidl::android::media::MediaResourceParcel;
+
     IResourceModel() {}
 
     virtual ~IResourceModel() {}
@@ -60,6 +65,33 @@ public:
      */
     virtual bool getAllClients(const ReclaimRequestInfo& reclaimRequestInfo,
                                std::vector<ClientInfo>& clients) = 0;
+
+    /**
+     * Register the globally available system resources (for this resource model).
+     *
+     * @param[in] resources an array of resources to be registered.
+     */
+    virtual void registerSystemResource(
+            const std::vector<MediaResourceParcel>& resources) = 0;
+
+    /**
+     * Checks if the system has enough of the specified list of resources.
+     *
+     * @param[in] resourcesNeeded The list of resources required.
+     *
+     * @return true if resources are likely available, false otherwise.
+     */
+    virtual bool checkResourceAvailability(
+            const std::vector<MediaResourceParcel>& resourcesNeeded) const = 0;
+
+    /**
+     * Get a list of currently available resources.
+     *
+     * A given resource model implementation may choose to return an empty list if it doesn't
+     * track the available resources.
+     *
+     */
+    virtual std::vector<MediaResourceParcel> getAvailableResources() const = 0;
 };
 
 } // namespace android
