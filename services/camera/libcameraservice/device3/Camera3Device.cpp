@@ -5155,6 +5155,9 @@ bool Camera3Device::RequestThread::overrideAutoframing(const sp<CaptureRequest> 
 void Camera3Device::RequestThread::injectSessionParams(
     const sp<CaptureRequest> &request,
     const CameraMetadata& injectedSessionParams) {
+    if (injectedSessionParams.isEmpty()) {
+        return; // nothing to inject
+    }
     CameraMetadata &requestMetadata = request->mSettingsList.begin()->metadata;
     uint32_t tag_section;
     camera_metadata_ro_entry entry;
