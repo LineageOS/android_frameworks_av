@@ -3334,6 +3334,41 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes(
         return BAD_VALUE;
     }
 
+    // Make sure RECOMMENDED stream configurations do not contain small JPEG
+    // sizes
+    camera_metadata_entry recommendedStreams =
+            mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS);
+    if (recommendedStreams.count > 0) {
+        std::vector<int32_t> newRecommendedStreams;
+        largeJpegCount = 0;
+        for (size_t i = 0; i < recommendedStreams.count; i += 5) {
+            int32_t width = recommendedStreams.data.i32[i];
+            int32_t height = recommendedStreams.data.i32[i+1];
+            int32_t format = recommendedStreams.data.i32[i+2];
+            if (format == HAL_PIXEL_FORMAT_BLOB) {
+                if (width * height < thresholdW * thresholdH) {
+                    continue;
+                } else {
+                    largeJpegCount++;
+                }
+            }
+            newRecommendedStreams.insert(newRecommendedStreams.end(),
+                                         recommendedStreams.data.i32 + i,
+                                         recommendedStreams.data.i32 + i + 5);
+        }
+        if (largeJpegCount == 0) {
+            ALOGE("%s: AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS do not contain large JPEG size."
+                  " Removing!", __FUNCTION__);
+            mCameraCharacteristics.erase(
+                    ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS);
+        } else {
+            mCameraCharacteristics.update(
+                    ANDROID_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS,
+                    newRecommendedStreams.data(),
+                    newRecommendedStreams.size());
+        }
+    }
+
     mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
             newStreamConfigs.data(), newStreamConfigs.size());
     mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
