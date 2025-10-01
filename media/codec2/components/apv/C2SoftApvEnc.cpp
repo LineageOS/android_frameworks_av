@@ -47,7 +47,6 @@ constexpr uint32_t kMinOutBufferSize = 524288;
 constexpr uint32_t kMaxBitstreamBufSize = 16 * 1024 * 1024;
 constexpr int32_t kApvQpMin = 0;
 constexpr int32_t kApvQpMax = 51;
-constexpr int32_t kApvDefaultQP = 32;
 
 #define PROFILE_APV_DEFAULT 0
 #define LEVEL_APV_DEFAULT 0
@@ -91,6 +90,16 @@ class C2SoftApvEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
                              .withFields({C2F(mBitrate, value).inRange(512000, 240000000)})
                              .withSetter(BitrateSetter)
                              .build());
+        if (android::media::swcodec::flags::apv_software_codec_cq()) {
+            addParameter(DefineParam(mBitrateMode, C2_PARAMKEY_BITRATE_MODE)
+                             .withDefault(new C2StreamBitrateModeTuning::output(
+                                     0u, C2Config::BITRATE_VARIABLE))
+                             .withFields({C2F(mBitrateMode, value).oneOf({
+                                     C2Config::BITRATE_VARIABLE,
+                                     C2Config::BITRATE_IGNORE})})
+                             .withSetter(Setter<decltype(*mBitrateMode)>::StrictValueWithNoDeps)
+                             .build());
+        }
 
         addParameter(DefineParam(mFrameRate, C2_PARAMKEY_FRAME_RATE)
                              .withDefault(new C2StreamFrameRateInfo::output(0u, 15.))
@@ -99,7 +108,7 @@ class C2SoftApvEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
                              .build());
 
         addParameter(DefineParam(mQuality, C2_PARAMKEY_QUALITY)
-                             .withDefault(new C2StreamQualityTuning::output(0u, 40))
+                             .withDefault(new C2StreamQualityTuning::output(0u, 0))
                              .withFields({C2F(mQuality, value).inRange(0, 100)})
                              .withSetter(Setter<decltype(*mQuality)>::NonStrictValueWithNoDeps)
                              .build());
@@ -234,8 +243,8 @@ class C2SoftApvEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     static C2R BitrateSetter(bool mayBlock, C2P<C2StreamBitrateInfo::output>& me) {
         (void)mayBlock;
         C2R res = C2R::Ok();
-        if (me.v.value < 1000000) {
-            me.set().value = 1000000;
+        if (me.v.value < 512000) {
+            me.set().value = 512000;
         }
         return res;
     }
@@ -714,6 +723,9 @@ class C2SoftApvEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamPictureSizeInfo::input> getSize_l() const { return mSize; }
     std::shared_ptr<C2StreamFrameRateInfo::output> getFrameRate_l() const { return mFrameRate; }
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const { return mBitrate; }
+    std::shared_ptr<C2StreamBitrateModeTuning::output> getBitrateMode_l() const {
+        return mBitrateMode;
+    }
     std::shared_ptr<C2StreamQualityTuning::output> getQuality_l() const { return mQuality; }
     std::shared_ptr<C2StreamColorAspectsInfo::input> getColorAspects_l() const {
         return mColorAspects;
@@ -737,6 +749,7 @@ class C2SoftApvEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamQualityTuning::output> mQuality;
     std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mCodedColorAspects;
@@ -799,13 +812,6 @@ static void fillEmptyWork(const std::unique_ptr<C2Work>& work) {
     work->workletsProcessed = 1u;
 }
 
-int32_t C2SoftApvEnc::getQpFromQuality(int32_t quality) {
-    int32_t qp = ((kApvQpMin - kApvQpMax) * quality / 100) + kApvQpMax;
-    qp = std::min(qp, (int)kApvQpMax);
-    qp = std::max(qp, (int)kApvQpMin);
-    return qp;
-}
-
 c2_status_t C2SoftApvEnc::resetEncoder() {
     ALOGV("reset");
     mInitEncoder = false;
@@ -847,6 +853,11 @@ void C2SoftApvEnc::showEncoderParams(oapve_cdesc_t* cdsc) {
     ALOGD("%s FrameRate = %f", title.c_str(),
           (double)cdsc->param[0].fps_num / cdsc->param[0].fps_den);
     ALOGD("%s BitRate = %d Kbps", title.c_str(), cdsc->param[0].bitrate);
+    if (mQuality > 0) {
+        ALOGD("%s Quality = %s", title.c_str(),
+            mQuality->value <= 70 ? "LQ" : mQuality->value <= 80 ? "SQ"
+                : mQuality->value <= 90 ? "HQ" : "UQ");
+    }
     ALOGD("%s QP = %d", title.c_str(), cdsc->param[0].qp);
     ALOGD("%s profile_idc = %d, level_idc = %d, band_idc = %d", title.c_str(),
           cdsc->param[0].profile_idc, cdsc->param[0].level_idc / 3, cdsc->param[0].band_idc);
@@ -871,12 +882,12 @@ c2_status_t C2SoftApvEnc::initEncoder() {
     mSize = mIntf->getSize_l();
     mFrameRate = mIntf->getFrameRate_l();
     mBitrate = mIntf->getBitrate_l();
+    mBitrateMode = mIntf->getBitrateMode_l();
     mQuality = mIntf->getQuality_l();
     mColorAspects = mIntf->getColorAspects_l();
     mCodedColorAspects = mIntf->getCodedColorAspects_l();
     mProfileLevel = mIntf->getProfileLevel_l();
     mPixelFormat = mIntf->getPixelFormat_l();
-
     mCodecDesc = std::make_unique<oapve_cdesc_t>();
     if (mCodecDesc == nullptr) {
         ALOGE("Allocate ctx failed");
@@ -911,7 +922,7 @@ c2_status_t C2SoftApvEnc::initEncoder() {
     /* create metadata */
     mMetaId = oapvm_create(&ret);
     if (mMetaId == NULL) {
-        ALOGE("cannot create APV encoder");
+        ALOGE("cannot create APV metadata");
         return C2_NO_MEMORY;
     }
 
@@ -948,10 +959,31 @@ void C2SoftApvEnc::setParams(oapve_param_t& param) {
     param.bitrate = (int)(mBitrate->value / 1000);
     param.rc_type = OAPV_RC_ABR;
 
-    param.qp = kApvDefaultQP;
+    param.qp = OAPVE_PARAM_QP_AUTO;
     param.band_idc = mIntf->getBandIdc_l();
     param.profile_idc = mIntf->getProfile_l();
     param.level_idc = mIntf->getLevel_l();
+
+    if (android::media::swcodec::flags::apv_software_codec_cq()) {
+        if (mBitrateMode->value == C2Config::BITRATE_VARIABLE &&
+            mQuality->value == 0 && mBitrate->value == 512000) {
+            mQuality->value = 90;
+        }
+
+        if (mQuality->value > 0) {
+            int32_t family = mQuality->value <= 70 ? OAPV_FAMILY_422_LQ :
+                        mQuality->value <= 80 ? OAPV_FAMILY_422_SQ :
+                        mQuality->value <= 90 ? OAPV_FAMILY_422_HQ :
+                        OAPV_FAMILY_444_UQ;
+            int32_t familyBitrate;
+            oapve_family_bitrate(family, param.w, param.h,
+                        param.fps_num, param.fps_den, &familyBitrate);
+            param.bitrate = familyBitrate;
+            param.band_idc = family - 1;
+            param.level_idc = OAPVE_PARAM_LEVEL_IDC_AUTO;
+        }
+    }
+
     mColorAspects = mIntf->getColorAspects_l();
     ColorAspects sfAspects;
     if (!C2Mapper::map(mColorAspects->primaries, &sfAspects.mPrimaries)) {
