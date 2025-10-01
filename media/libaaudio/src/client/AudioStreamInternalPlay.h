@@ -24,7 +24,6 @@
 
 #include <aaudio/AAudio.h>
 #include <audio_utils/TimerQueue.h>
-#include <mediautils/SingleThreadExecutor.h>
 
 #include "binding/AAudioServiceInterface.h"
 #include "client/AudioStreamInternal.h"
