@@ -526,14 +526,15 @@ status_t StreamHalAidl::getHardwarePosition(int64_t *frames, int64_t *timestamp)
         return NOT_ENOUGH_DATA;
     }
     if (mSupportsCreateMmapBuffer) {
-        // HAL is required to report continuous position. Reset for compatibility.
         int64_t mostRecentResetPoint = std::max(statePositions.hardware.framesAtStandby,
                 statePositions.hardware.framesAtFlushOrDrain);
-        int64_t aidlFrames = reply.hardware.frames;
-        *frames = aidlFrames <= mostRecentResetPoint ? 0 : aidlFrames - mostRecentResetPoint;
-    } else {
-        *frames = reply.hardware.frames;
+        // This should not happen as HAL is required to report monotonically increasing position.
+        // Add a warning log for future debugging in case it happens.
+        ALOGW_IF(reply.hardware.frames < mostRecentResetPoint,
+                 "The position is not monotonic increasing, mostRecentResetPoint=%jd, "
+                 "reportedPosition=%jd", mostRecentResetPoint, reply.hardware.frames);
     }
+    *frames = reply.hardware.frames;
     *timestamp = reply.hardware.timeNs;
     return OK;
 }
