@@ -28,6 +28,7 @@
 #include <hidl/HybridInterface.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <gui/Flags.h> // Remove with MediaSurfaceType
 
 #include <media/openmax/OMX_Core.h>
 #include <media/openmax/OMX_Video.h>
@@ -89,7 +90,7 @@ public:
             sp<IOMXNode> *omxNode) = 0;
 
     virtual status_t createInputSurface(
-            sp<IGraphicBufferProducer> *bufferProducer,
+            sp<MediaSurfaceType> *surface,
             sp<hardware::media::omx::V1_0::IGraphicBufferSource> *bufferSource) = 0;
 };
 

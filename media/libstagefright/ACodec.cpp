@@ -7396,10 +7396,9 @@ void ACodec::LoadedState::onCreateInputSurface(
         const sp<AMessage> & /* msg */) {
     ALOGV("onCreateInputSurface");
 
-    sp<IGraphicBufferProducer> bufferProducer;
+    sp<MediaSurfaceType> surface;
     sp<HGraphicBufferSource> bufferSource;
-    status_t err = mCodec->mOMX->createInputSurface(
-            &bufferProducer, &bufferSource);
+    status_t err = mCodec->mOMX->createInputSurface(&surface, &bufferSource);
     mCodec->mGraphicBufferSource = bufferSource;
 
     if (err == OK) {
@@ -7411,12 +7410,12 @@ void ACodec::LoadedState::onCreateInputSurface(
         mCodec->mCallback->onInputSurfaceCreated(
                 mCodec->mInputFormat,
                 mCodec->mOutputFormat,
-                sp<Surface>::make(bufferProducer, true));
+                surface);
 #else
         mCodec->mCallback->onInputSurfaceCreated(
                 mCodec->mInputFormat,
                 mCodec->mOutputFormat,
-                new BufferProducerWrapper(bufferProducer));
+                new BufferProducerWrapper(surface));
 #endif
     } else {
         // Can't use mCodec->signalError() here -- MediaCodec won't forward
