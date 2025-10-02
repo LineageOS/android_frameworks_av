@@ -307,6 +307,17 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
         // We add a one burst margin in case the DSP advances before we can write the data.
         // This can help prevent the beginning of the stream from being skipped.
         advanceClientToMatchServerPosition(getDeviceFramesPerBurst());
+        // Write data from previous data buffer to new endpoint.
+        if (mUnprocessedFrames != 0 && mUnprocessedBuffer != nullptr) {
+            if (const android::fifo_frames_t framesWritten =
+                        mAudioEndpoint->write(mUnprocessedBuffer.get(), mUnprocessedFrames);
+                    framesWritten != mUnprocessedFrames) {
+                ALOGW("Some data lost after exiting standby, frames written: %d, "
+                      "frames to write: %d", framesWritten, mUnprocessedFrames);
+            }
+        }
+        mUnprocessedFrames = 0;
+        mUnprocessedBuffer.reset();
         mNeedCatchUp.acknowledge();
     }
 

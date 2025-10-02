@@ -410,10 +410,11 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     // Cache the buffer size which may be from client.
     const int32_t previousBufferSize = mBufferSizeInFrames;
     // Copy all available data from current data queue.
-    android::fifo_frames_t fullFramesAvailable = mAudioEndpoint->getFullFramesAvailable();
-    std::unique_ptr<uint8_t[]> buffer =
-            std::make_unique<uint8_t[]>(fullFramesAvailable * getBytesPerFrame());
-    fullFramesAvailable = mAudioEndpoint->read(buffer.get(), fullFramesAvailable);
+    if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
+        mUnprocessedFrames = mAudioEndpoint->getFullFramesAvailable();
+        mUnprocessedBuffer = std::make_unique<uint8_t[]>(mUnprocessedFrames * getBytesPerFrame());
+        mUnprocessedFrames = mAudioEndpoint->read(mUnprocessedBuffer.get(), mUnprocessedFrames);
+    }
     // Before releasing the data queue, update the frames read and written.
     getFramesRead();
     getFramesWritten();
@@ -441,21 +442,10 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     // Reconfigure audio endpoint with new data queue descriptor.
     mAudioEndpoint->configureDataQueue(
             mEndpointDescriptor.dataQueueDescriptor, getDirection());
-    // Set read and write counters with previous read counter, the later write action
-    // will make the counter at the correct place.
-    mAudioEndpoint->setDataReadCounter(readCounter);
-    mAudioEndpoint->setDataWriteCounter(readCounter);
     result = configureDataInformation(mCallbackFrames);
     if (result != AAUDIO_OK) {
         ALOGE("Failed to configure data information after exiting standby, error=%d", result);
         goto exit;
-    }
-    // Write data from previous data buffer to new endpoint.
-    if (const android::fifo_frames_t framesWritten =
-                mAudioEndpoint->write(buffer.get(), fullFramesAvailable);
-            framesWritten != fullFramesAvailable) {
-        ALOGW("Some data lost after exiting standby, frames written: %d, "
-              "frames to write: %d", framesWritten, fullFramesAvailable);
     }
     // Reset previous buffer size as it may be requested by the client.
     setBufferSize(previousBufferSize);

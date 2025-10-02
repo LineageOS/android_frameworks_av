@@ -198,6 +198,9 @@ protected:
 
     AAudioFlowGraph          mFlowGraph;
 
+    std::unique_ptr<uint8_t[]> mUnprocessedBuffer;
+    android::fifo_frames_t     mUnprocessedFrames = 0;
+
 private:
     /*
      * Asynchronous write with data conversion.
