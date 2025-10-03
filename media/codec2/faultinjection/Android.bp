@@ -18,7 +18,7 @@ cc_library_shared {
 
     shared_libs: [
         "libcodec2",
-        "libcodec2_vndk",
+        "libcodec2_impl_base",
         "libcutils",
         "liblog",
         "libstagefright_foundation",
