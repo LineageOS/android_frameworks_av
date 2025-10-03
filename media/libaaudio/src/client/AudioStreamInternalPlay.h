@@ -87,9 +87,9 @@ public:
 
 protected:
 
-    void prepareBuffersForStart() override;
+    void prepareBuffersForStart_l() REQUIRES(mStreamMutex) final;
 
-    void prepareBuffersForStop() override;
+    aaudio_result_t prepareBuffersForStop_l() REQUIRES(mStreamMutex) final;
 
     void advanceClientToMatchServerPosition(int32_t serverMargin) override;
 
@@ -109,6 +109,7 @@ protected:
                              int64_t currentTimeNanos,
                              int64_t *wakeTimePtr) override;
 
+    aaudio_result_t requestStart_l() REQUIRES(mStreamMutex) final;
     aaudio_result_t requestStop_l() REQUIRES(mStreamMutex) final;
 
     void wakeupCallbackThread_l() REQUIRES(mStreamMutex) final;
@@ -166,6 +167,8 @@ private:
     std::mutex mEndpointMutex;
 
     AAudioPlaybackParameters mPlaybackParameters = AAUDIO_PLAYBACK_PARAMETERS_DEFAULT;
+
+    bool mPendingStop GUARDED_BY(mStreamMutex){false};
 };
 
 } /* namespace aaudio */

@@ -81,6 +81,11 @@ public:
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
+    // This is used for deferring close. Currently, it is only used by offload playback.
+    // Offload playback is only in exclusive mode. But consider that it may extend to shared
+    // in the future, adding a client handle here as an input parameters.
+    virtual void releaseClientWhenWakeUp(audio_port_handle_t /*clientHandle*/) { }
+
     virtual aaudio_result_t standby() {
         ALOGD("AAudioServiceEndpoint::standby() AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;

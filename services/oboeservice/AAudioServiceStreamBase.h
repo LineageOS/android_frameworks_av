@@ -251,7 +251,7 @@ protected:
                          aaudio_sharing_mode_t sharingMode);
 
     aaudio_result_t start_l() REQUIRES(mLock);
-    virtual aaudio_result_t close_l() REQUIRES(mLock);
+    virtual aaudio_result_t close_l(bool shouldDeferClose = false) REQUIRES(mLock);
     virtual aaudio_result_t pause_l() REQUIRES(mLock);
     virtual aaudio_result_t stop_l() REQUIRES(mLock);
     void disconnect_l() REQUIRES(mLock);
@@ -561,6 +561,10 @@ private:
      */
     bool isUpMessageQueueBusy() EXCLUDES(mUpMessageQueueLock);
 
+    bool isCommandAllowed_l(int32_t command) const REQUIRES(mLock);
+
+    bool needToWakeUpBeforeCommand_l(int32_t command) const REQUIRES(mLock);
+
     aaudio_handle_t         mHandle = -1;
     bool                    mFlowing = false;
 
@@ -584,6 +588,9 @@ protected:
     // The lock will be held by the command thread. All operations needing the lock must run from
     // the command thread.
     std::mutex              mLock; // Prevent start/stop/close etcetera from colliding
+
+    bool                    mPendingStop GUARDED_BY(mLock) {false};
+    bool                    mPendingClose GUARDED_BY(mLock) {false};
 };
 
 } /* namespace aaudio */

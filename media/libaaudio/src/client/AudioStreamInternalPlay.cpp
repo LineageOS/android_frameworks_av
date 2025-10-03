@@ -126,7 +126,7 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush_l() {
     return mServiceInterface.flushStream(mServiceStreamHandleInfo);
 }
 
-void AudioStreamInternalPlay::prepareBuffersForStart() {
+void AudioStreamInternalPlay::prepareBuffersForStart_l() {
     // Reset volume ramps to avoid a starting noise.
     // This was called here instead of AudioStreamInternal so that
     // it will be easier to backport.
@@ -139,11 +139,26 @@ void AudioStreamInternalPlay::prepareBuffersForStart() {
     advanceClientToMatchServerPosition(0 /*serverMargin*/);
 }
 
-void AudioStreamInternalPlay::prepareBuffersForStop() {
+aaudio_result_t AudioStreamInternalPlay::prepareBuffersForStop_l() {
     // If this is a shared stream and the FIFO is being read by the mixer then
     // we don't have to worry about the DSP reading past the valid data. We can skip all this.
     if(!mAudioEndpoint->isFreeRunning()) {
-        return;
+        return AAUDIO_OK;
+    }
+    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        if (mWakeUpHandle != TimerQueue::INVALID_HANDLE) {
+            // The stream is draining. For offload stream, it should drain all data and then stop.
+            ALOGD("%s, the stream is already draining", __func__);
+            return AAUDIO_ERROR_WOULD_BLOCK;
+        }
+        const int64_t streamEndNanosBootTime = mClockModel.convertPositionToBootTime(
+                mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
+        if (android::elapsedRealtimeNano() >= streamEndNanosBootTime) {
+            ALOGD("No need to drain as it is closed to play all data");
+            return AAUDIO_OK;
+        }
+        drainStream_l(streamEndNanosBootTime, false /*allowSoftWakeUp*/);
+        return AAUDIO_ERROR_WOULD_BLOCK;
     }
     // Sleep until the DSP has read all of the data written.
     int64_t validFramesInBuffer =
@@ -194,6 +209,7 @@ void AudioStreamInternalPlay::prepareBuffersForStop() {
                                         hardwareLatencyNanos);
         AudioClock::sleepForNanos(hardwareLatencyNanos);
     }
+    return AAUDIO_OK;
 }
 
 void AudioStreamInternalPlay::advanceClientToMatchServerPosition(int32_t serverMargin) {
@@ -547,7 +563,20 @@ void AudioStreamInternalPlay::dropPresentationEndCallback_l() {
     mStreamEndCV.notify_one();
 }
 
+aaudio_result_t AudioStreamInternalPlay::requestStart_l() {
+    StartType startType = DEFAULT;
+    if (mPendingStop) {
+        // Receive start while the stream is draining but not yet stopped. Restart the stream
+        startType = RESUME_WHILE_DRAINING;
+        mPendingStop = false;
+    }
+    return AudioStreamInternal::requestStart_l(startType);
+}
+
 aaudio_result_t AudioStreamInternalPlay::requestStop_l() {
+    if (mDraining) {
+        mPendingStop = true;
+    }
     // When stop is called, the service will notify the HAL so that no more data will be consumed.
     // In that case, it is no longer needed to wait for stream end.
     dropPresentationEndCallback_l();
@@ -797,5 +826,21 @@ void AudioStreamInternalPlay::onWakeUp_l(android::audio_utils::TimerQueue::handl
         ALOGW("%s the wake up handle does not match %jd %jd", __func__, handle, mWakeUpHandle);
     }
     mWakeUpHandle = TimerQueue::INVALID_HANDLE;
+    if (mPendingStop) {
+        // When onWakeUp is called, it indicates drain completion. `mPendingStop` indicates the
+        // client has called stop before. In that case, update state and positions to stopped state.
+        setState(AAUDIO_STREAM_STATE_STOPPED);
+        if (mAudioEndpoint != nullptr) {
+            const int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
+            const int64_t nowNanos = AudioClock::getNanoseconds();
+            // Read counter should be the same as write counter when all data is drained.
+            mAudioEndpoint->setDataReadCounter(writeCounter);
+            // There will not be any more mmap position update in this case. Force a position
+            // update with write counter and time to reflect the truth that all data is played.
+            mClockModel.setPositionAndTime(writeCounter, nowNanos);
+            mClockModel.stop(nowNanos);
+        }
+    }
+    processCommands();
     wakeupCallbackThread_l();
 }

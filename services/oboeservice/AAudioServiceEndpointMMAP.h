@@ -67,6 +67,8 @@ public:
     aaudio_result_t stopClient(audio_port_handle_t clientHandle)  override
             EXCLUDES(mMmapStreamLock);
 
+    void releaseClientWhenWakeUp(audio_port_handle_t clientHandle) final EXCLUDES(mLockStreams);
+
     aaudio_result_t standby() override EXCLUDES(mMmapStreamLock);
 
     aaudio_result_t exitStandby(AudioEndpointParcelable* parcelable) override
@@ -156,6 +158,8 @@ private:
     int64_t                                   mDataReportOffsetNanos = 0;
 
     bool                                      mNeedToCatchUp GUARDED_BY(mMmapStreamLock) {false};
+
+    bool mShouldReleaseClientWhenWakeUp GUARDED_BY(mLockStreams){false};
 
 };
 
