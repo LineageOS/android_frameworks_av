@@ -16,21 +16,24 @@
 
 #define LOG_TAG "AudioStreamRecord"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <stdint.h>
+#include "AudioStreamRecord.h"
 
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <audio_utils/primitives.h>
 #include <media/AidlConversion.h>
 #include <media/AudioRecord.h>
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utility/FixedBlockWriter.h>
+#include <utils/Log.h>
 #include <utils/String16.h>
+// go/keep-sorted end
 
-#include "core/AudioGlobal.h"
-#include "legacy/AudioStreamLegacy.h"
-#include "legacy/AudioStreamRecord.h"
-#include "utility/AudioClock.h"
-#include "utility/FixedBlockWriter.h"
+#include <stdint.h>
+
+#include "AudioStreamLegacy.h"
 
 using android::content::AttributionSourceState;
 

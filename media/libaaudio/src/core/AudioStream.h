@@ -17,25 +17,27 @@
 #ifndef AAUDIO_AUDIOSTREAM_H
 #define AAUDIO_AUDIOSTREAM_H
 
-#include <atomic>
-#include <mutex>
-#include <set>
-#include <stdint.h>
-
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
 #include <android-base/thread_annotations.h>
 #include <binder/IServiceManager.h>
 #include <binder/Status.h>
-#include <utils/StrongPointer.h>
-
-#include <aaudio/AAudio.h>
 #include <media/AudioContainers.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/PlayerBase.h>
 #include <media/VolumeShaper.h>
+#include <utility/AAudioUtilities.h>
+#include <utility/MonotonicCounter.h>
+#include <utils/StrongPointer.h>
+// go/keep-sorted end
 
-#include "utility/AAudioUtilities.h"
-#include "utility/MonotonicCounter.h"
+// go/keep-sorted start
+#include <atomic>
+#include <mutex>
+#include <set>
+#include <stdint.h>
+// go/keep-sorted end
 
 // Cannot get android::media::VolumeShaper to compile!
 #define AAUDIO_USE_VOLUME_SHAPER  0

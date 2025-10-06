@@ -16,10 +16,10 @@
 
 #define LOG_TAG "AAudioFlowGraph"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
 #include "AAudioFlowGraph.h"
 
+// go/keep-sorted start
 #include <flowgraph/Limiter.h>
 #include <flowgraph/ManyToMultiConverter.h>
 #include <flowgraph/MonoBlend.h>
@@ -36,6 +36,8 @@
 #include <flowgraph/SourceI24.h>
 #include <flowgraph/SourceI32.h>
 #include <flowgraph/SourceI8_24.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
 using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 

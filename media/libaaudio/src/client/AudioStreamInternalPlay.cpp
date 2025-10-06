@@ -15,22 +15,26 @@
  */
 
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
-#include <algorithm>
-#include <chrono>
-#include <thread>
+#include "AudioStreamInternalPlay.h"
 
+// go/keep-sorted start
 #include <audio_utils/mutex.h>
 #include <media/MediaMetricsItem.h>
 #include <mediautils/Runnable.h>
+#include <utility/AudioClock.h>
+#include <utils/Log.h>
 #include <utils/SystemClock.h>
 #include <utils/Trace.h>
+// go/keep-sorted end
 
-#include "client/AudioStreamInternalPlay.h"
-#include "utility/AudioClock.h"
+// go/keep-sorted start
+#include <algorithm>
+#include <chrono>
+#include <thread>
+// go/keep-sorted end
 
 // We do this after the #includes because if a header uses ALOG.
 // it would fail on the reference to mInService.

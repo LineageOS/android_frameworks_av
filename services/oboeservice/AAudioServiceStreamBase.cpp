@@ -16,25 +16,31 @@
 
 #define LOG_TAG "AAudioServiceStreamBase"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <iomanip>
-#include <iostream>
-#include <mutex>
+#include "AAudioServiceStreamBase.h"
 
+// go/keep-sorted start
+#include <binding/AAudioServiceMessage.h>
 #include <com_android_media_aaudio.h>
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/AAudioServiceMessage.h"
-#include "core/AudioGlobal.h"
-#include "utility/AudioClock.h"
+// go/keep-sorted start
+#include <iomanip>
+#include <iostream>
+#include <mutex>
+// go/keep-sorted end
 
+// go/keep-sorted start
 #include "AAudioEndpointManager.h"
 #include "AAudioService.h"
 #include "AAudioServiceEndpoint.h"
-#include "AAudioServiceStreamBase.h"
+// go/keep-sorted end
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed

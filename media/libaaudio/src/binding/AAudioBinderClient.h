@@ -17,21 +17,24 @@
 #ifndef ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 #define ANDROID_AAUDIO_AAUDIO_BINDER_CLIENT_H
 
-#include <mutex>
-
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
+#include <aaudio/BnAAudioClient.h>
+#include <aaudio/IAAudioService.h>
+#include <binder/IInterface.h>
+#include <core/AAudioStreamParameters.h>
 #include <utils/RefBase.h>
 #include <utils/Singleton.h>
+// go/keep-sorted end
 
-#include <aaudio/AAudio.h>
-#include <binder/IInterface.h>
+#include <mutex>
 
-#include "aaudio/BnAAudioClient.h"
-#include "aaudio/IAAudioService.h"
+// go/keep-sorted start
+#include "AAudioBinderAdapter.h"
 #include "AAudioServiceInterface.h"
-#include "binding/AAudioBinderAdapter.h"
-#include "binding/AAudioStreamRequest.h"
-#include "binding/AudioEndpointParcelable.h"
-#include "core/AAudioStreamParameters.h"
+#include "AAudioStreamRequest.h"
+#include "AudioEndpointParcelable.h"
+// go/keep-sorted end
 
 /**
  * Implements the AAudioServiceInterface by talking to the service through Binder.

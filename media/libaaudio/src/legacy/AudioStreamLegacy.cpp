@@ -16,19 +16,21 @@
 
 #define LOG_TAG "AudioStreamLegacy"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <stdint.h>
+#include "AudioStreamLegacy.h"
 
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <audio_utils/primitives.h>
-#include <media/AudioTrack.h>
+#include <core/AudioStream.h>
 #include <media/AudioTimestamp.h>
+#include <media/AudioTrack.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
 #include <utils/String16.h>
+// go/keep-sorted end
 
-#include "core/AudioGlobal.h"
-#include "core/AudioStream.h"
-#include "legacy/AudioStreamLegacy.h"
+#include <stdint.h>
 
 using namespace android;
 using namespace aaudio;

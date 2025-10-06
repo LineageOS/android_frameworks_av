@@ -17,20 +17,23 @@
 #ifndef UTILITY_AAUDIO_UTILITIES_H
 #define UTILITY_AAUDIO_UTILITIES_H
 
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
+#include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <media/AudioResamplerPublic.h>
+#include <system/audio.h>
+#include <utils/Errors.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
 #include <algorithm>
 #include <functional>
-#include <vector>
 #include <stdint.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include <android/media/audio/common/AudioMMapPolicyInfo.h>
-#include <media/AudioResamplerPublic.h>
-#include <utils/Errors.h>
-#include <system/audio.h>
-
-#include "aaudio/AAudio.h"
-#include "aaudio/AAudioTesting.h"
+#include <vector>
+// go/keep-sorted end
 
 /**
  * Convert an AAudio result into the closest matching Android status.

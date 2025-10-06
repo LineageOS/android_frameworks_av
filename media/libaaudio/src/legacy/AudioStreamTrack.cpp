@@ -16,21 +16,24 @@
 
 #define LOG_TAG "AudioStreamTrack"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <stdint.h>
-#include <media/AudioTrack.h>
+#include "AudioStreamTrack.h"
 
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <com_android_media_aaudio.h>
-#include <system/audio.h>
+#include <media/AudioTrack.h>
 #include <system/aaudio/AAudio.h>
+#include <system/audio.h>
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utility/FixedBlockReader.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "core/AudioGlobal.h"
-#include "legacy/AudioStreamLegacy.h"
-#include "legacy/AudioStreamTrack.h"
-#include "utility/AudioClock.h"
-#include "utility/FixedBlockReader.h"
+#include <stdint.h>
+
+#include "AudioStreamLegacy.h"
 
 using namespace android;
 using namespace aaudio;

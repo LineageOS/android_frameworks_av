@@ -17,17 +17,22 @@
 #ifndef ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
 #define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_H
 
-#include <stdint.h>
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/BnAAudioClientCallback.h>
+#include <core/AudioStream.h>
+#include <utility/AudioClock.h>
+// go/keep-sorted end
 
-#include "binding/AudioEndpointParcelable.h"
+#include <stdint.h>
+
+// go/keep-sorted start
+#include "AAudioFlowGraph.h"
+#include "AudioEndpoint.h"
+#include "IsochronousClockModel.h"
 #include "binding/AAudioServiceInterface.h"
-#include "client/AAudioFlowGraph.h"
-#include "client/AudioEndpoint.h"
-#include "client/IsochronousClockModel.h"
-#include "core/AudioStream.h"
-#include "utility/AudioClock.h"
+#include "binding/AudioEndpointParcelable.h"
+// go/keep-sorted end
 
 using android::sp;
 

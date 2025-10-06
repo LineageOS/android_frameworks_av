@@ -17,13 +17,15 @@
 #ifndef ANDROID_BINDING_AAUDIO_STREAM_CONFIGURATION_H
 #define ANDROID_BINDING_AAUDIO_STREAM_CONFIGURATION_H
 
-#include <stdint.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/StreamParameters.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-#include "core/AAudioStreamParameters.h"
+#include <core/AAudioStreamParameters.h>
+// go/keep-sorted end
+
+#include <stdint.h>
 
 namespace aaudio {
 

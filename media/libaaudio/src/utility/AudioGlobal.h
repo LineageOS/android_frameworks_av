@@ -16,9 +16,10 @@
 #ifndef AAUDIO_AUDIOGLOBAL_H
 #define AAUDIO_AUDIOGLOBAL_H
 
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-
+// go/keep-sorted end
 
 namespace aaudio {
 

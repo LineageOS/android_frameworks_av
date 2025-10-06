@@ -10,6 +10,9 @@ package {
 
 cc_defaults {
     name: "libaaudio_tests_defaults",
+    defaults: [
+        "libaaudio_internal_defaults",
+    ],
     cflags: [
         "-Wall",
         "-Werror",

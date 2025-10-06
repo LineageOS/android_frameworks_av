@@ -17,8 +17,9 @@
 #ifndef AAUDIO_LEGACY_H
 #define AAUDIO_LEGACY_H
 
-#include <stdint.h>
 #include <aaudio/AAudio.h>
+
+#include <stdint.h>
 
 /**
  * Common code for legacy classes.

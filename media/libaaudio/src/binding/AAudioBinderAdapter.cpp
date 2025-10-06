@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
+#include "AAudioBinderAdapter.h"
+
+// go/keep-sorted start
 #include <android/media/audio/common/AudioPlaybackRate.h>
-#include <binding/AAudioBinderAdapter.h>
 #include <media/AidlConversion.h>
 #include <media/AidlConversionCppNdk.h>
 #include <media/AidlConversionUtil.h>
 #include <utility/AAudioUtilities.h>
+// go/keep-sorted end
 
 namespace aaudio {
 

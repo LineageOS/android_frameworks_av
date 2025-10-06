@@ -17,10 +17,10 @@
 #define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
 
-#include <assert.h>
-#include <math.h>
-#include <stdint.h>
+#include "AAudioUtilities.h"
 
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 #include <android/media/audio/common/AudioMMapPolicy.h>
 #include <cutils/properties.h>
@@ -28,10 +28,15 @@
 #include <system/audio.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
+// go/keep-sorted end
 
-#include "aaudio/AAudio.h"
-#include "core/AudioGlobal.h"
-#include "utility/AAudioUtilities.h"
+// go/keep-sorted start
+#include <assert.h>
+#include <math.h>
+#include <stdint.h>
+// go/keep-sorted end
+
+#include "AudioGlobal.h"
 
 using namespace android;
 

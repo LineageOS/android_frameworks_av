@@ -67,8 +67,71 @@ tidy_errors = [
     "-performance-no-int-to-ptr", // found in SharedMemoryParcelable.h
 ]
 
+cc_defaults {
+    name: "libaaudio_defaults",
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
+    export_include_dirs: ["."],
+    header_libs: [
+        "libaaudio_headers",
+        "libmedia_headers",
+        "libmediametrics_headers",
+    ],
+    shared_libs: [
+        "com.android.media.aaudio-aconfig-cc",
+        "com.android.media.audioserver-aconfig-cc",
+        "libaudioclient",
+        "libaudiofoundation",
+        "libcutils",
+        "liblog",
+        "libutils",
+    ],
+    export_header_lib_headers: ["libaaudio_headers"],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-Wthread-safety",
+    ],
+    sanitize: {
+        integer_overflow: true,
+        misc_undefined: ["bounds"],
+    },
+    tidy: true,
+    tidy_checks: tidy_errors,
+    tidy_checks_as_errors: tidy_errors,
+    tidy_flags: [
+        "-format-style=file",
+    ],
+}
+
+cc_defaults {
+    name: "libaaudio_internal_defaults",
+    shared_libs: [
+        "libaaudio_internal_builder",
+        "libaaudio_internal_core",
+        "libaaudio_internal_fifo",
+        "libaaudio_internal_legacy",
+        "libaaudio_internal_mmap",
+        "libaaudio_internal_utils",
+    ],
+    export_shared_lib_headers: [
+        "libaaudio_internal_builder",
+        "libaaudio_internal_core",
+        "libaaudio_internal_fifo",
+        "libaaudio_internal_legacy",
+        "libaaudio_internal_mmap",
+        "libaaudio_internal_utils",
+    ],
+}
+
 cc_library {
     name: "libaaudio",
+    defaults: [
+        "libaaudio_defaults",
+        "libaaudio_internal_defaults",
+    ],
 
     local_include_dirs: [
         "binding",
@@ -90,103 +153,130 @@ cc_library {
     ],
 
     cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wno-unused-parameter",
-        "-Wthread-safety",
-
         // AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
         "-DAAUDIO_API=__attribute__((visibility(\"default\")))",
     ],
 
     shared_libs: [
-        "com.android.media.aaudio-aconfig-cc",
         "framework-permission-aidl-cpp",
-        "libaaudio_internal",
-        "libaudioclient",
-        "libaudiofoundation",
         "libaudioutils",
         "libbinder",
-        "libcutils",
-        "liblog",
         "libmedia_helper",
         "libmediametrics",
         "libmediautils",
-        "libutils",
     ],
-
-    sanitize: {
-        integer_overflow: true,
-        misc_undefined: ["bounds"],
-    },
 
     stubs: {
         symbol_file: "libaaudio.map.txt",
         versions: ["28"],
     },
-
-    tidy: true,
-    tidy_checks: tidy_errors,
-    tidy_checks_as_errors: tidy_errors,
-    tidy_flags: [
-        "-format-style=file",
-    ],
 }
 
 cc_library {
     name: "libaaudio_internal",
-
     defaults: [
-        "latest_android_media_audio_common_types_cpp_shared",
+        "libaaudio_defaults",
+        "libaaudio_internal_defaults",
     ],
+}
 
+cc_library {
+    name: "libaaudio_internal_builder",
+    defaults: ["libaaudio_defaults"],
+    shared_libs: [
+        "libaaudio_internal_core",
+        "libaaudio_internal_legacy",
+        "libaaudio_internal_mmap",
+        "libaaudio_internal_utils",
+    ],
+    srcs: [
+        "core/AudioStreamBuilder.cpp",
+    ],
+}
+
+cc_library {
+    name: "libaaudio_internal_core",
+    defaults: ["libaaudio_defaults"],
+    local_include_dirs: [
+        "core",
+    ],
+    export_include_dirs: ["."],
+    shared_libs: [
+        "libaaudio_internal_utils",
+        "libaudioclient",
+        "libbinder",
+        "libmediametrics",
+    ],
+    srcs: [
+        "core/AAudioStreamParameters.cpp",
+        "core/AudioStream.cpp",
+    ],
+}
+
+cc_library {
+    name: "libaaudio_internal_fifo",
+    defaults: ["libaaudio_defaults"],
+    local_include_dirs: [
+        "fifo",
+    ],
+    export_include_dirs: ["."],
+    srcs: [
+        "fifo/FifoBuffer.cpp",
+        "fifo/FifoControllerBase.cpp",
+    ],
+}
+
+cc_library {
+    name: "libaaudio_internal_legacy",
+    defaults: ["libaaudio_defaults"],
+    local_include_dirs: [
+        "legacy",
+    ],
+    export_include_dirs: ["."],
+    shared_libs: [
+        "framework-permission-aidl-cpp",
+        "libaaudio_internal_core",
+        "libaaudio_internal_fifo",
+        "libaaudio_internal_utils",
+        "libaudio_aidl_conversion_common_cpp",
+        "libaudioclient",
+        "libaudiofoundation",
+        "libaudioutils",
+        "libbinder",
+        "libmedia_helper",
+        "libmediametrics",
+    ],
+    srcs: [
+        "legacy/AudioStreamLegacy.cpp",
+        "legacy/AudioStreamRecord.cpp",
+        "legacy/AudioStreamTrack.cpp",
+    ],
+}
+
+cc_library {
+    name: "libaaudio_internal_mmap",
+    defaults: ["libaaudio_defaults"],
     local_include_dirs: [
         "binding",
         "client",
-        "core",
-        "fifo",
-        "legacy",
-        "utility",
+        "flowgraph",
     ],
-
     export_include_dirs: ["."],
-    header_libs: [
-        "libaaudio_headers",
-        "libmedia_headers",
-        "libmediametrics_headers",
-    ],
-    export_header_lib_headers: ["libaaudio_headers"],
-
-    export_shared_lib_headers: [
-        "framework-permission-aidl-cpp",
-    ],
-
     shared_libs: [
         "aaudio-aidl-cpp",
         "audioclient-types-aidl-cpp",
-        "com.android.media.aaudio-aconfig-cc",
         "framework-permission-aidl-cpp",
-        "libaudioclient",
+        "libaaudio_internal_core",
+        "libaaudio_internal_fifo",
+        "libaaudio_internal_utils",
         "libaudioclient_aidl_conversion",
-        "libaudiofoundation",
         "libaudioutils",
         "libbase",
         "libbinder",
-        "libcutils",
-        "liblog",
         "libmedia_helper",
         "libmediametrics",
         "libmediautils",
-        "libutils",
     ],
-
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wno-unused-parameter",
-        "-Wthread-safety",
-    ],
-
     srcs: [
         "binding/AAudioBinderAdapter.cpp",
         "binding/AAudioBinderClient.cpp",
@@ -202,12 +292,6 @@ cc_library {
         "client/AudioStreamInternalCapture.cpp",
         "client/AudioStreamInternalPlay.cpp",
         "client/IsochronousClockModel.cpp",
-        "core/AAudioStreamParameters.cpp",
-        "core/AudioGlobal.cpp",
-        "core/AudioStream.cpp",
-        "core/AudioStreamBuilder.cpp",
-        "fifo/FifoBuffer.cpp",
-        "fifo/FifoControllerBase.cpp",
         "flowgraph/ChannelCountConverter.cpp",
         "flowgraph/ClipToRange.cpp",
         "flowgraph/FlowGraphNode.cpp",
@@ -237,24 +321,22 @@ cc_library {
         "flowgraph/resampler/PolyphaseResamplerStereo.cpp",
         "flowgraph/resampler/SincResampler.cpp",
         "flowgraph/resampler/SincResamplerStereo.cpp",
-        "legacy/AudioStreamLegacy.cpp",
-        "legacy/AudioStreamRecord.cpp",
-        "legacy/AudioStreamTrack.cpp",
+    ],
+}
+
+cc_library {
+    name: "libaaudio_internal_utils",
+    defaults: ["libaaudio_defaults"],
+    local_include_dirs: [
+        "utility",
+    ],
+    export_include_dirs: ["."],
+    srcs: [
         "utility/AAudioUtilities.cpp",
+        "utility/AudioGlobal.cpp",
         "utility/FixedBlockAdapter.cpp",
         "utility/FixedBlockReader.cpp",
         "utility/FixedBlockWriter.cpp",
-    ],
-    sanitize: {
-        integer_overflow: true,
-        misc_undefined: ["bounds"],
-    },
-
-    tidy: true,
-    tidy_checks: tidy_errors,
-    tidy_checks_as_errors: tidy_errors,
-    tidy_flags: [
-        "-format-style=file",
     ],
 }
 

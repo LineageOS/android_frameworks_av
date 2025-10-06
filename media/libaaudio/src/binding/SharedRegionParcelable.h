@@ -17,14 +17,17 @@
 #ifndef ANDROID_AAUDIO_SHARED_REGION_PARCELABLE_H
 #define ANDROID_AAUDIO_SHARED_REGION_PARCELABLE_H
 
-#include <stdint.h>
-
-#include <sys/mman.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/SharedRegion.h>
+// go/keep-sorted end
 
-#include "binding/SharedMemoryParcelable.h"
+// go/keep-sorted start
+#include <stdint.h>
+#include <sys/mman.h>
+// go/keep-sorted end
+
+#include "SharedMemoryParcelable.h"
 
 using android::status_t;
 

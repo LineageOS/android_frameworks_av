@@ -17,11 +17,10 @@
 #ifndef ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
 #define ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
 
-#include <stdint.h>
-
 #include <audio_utils/Histogram.h>
+#include <utility/AudioClock.h>
 
-#include "utility/AudioClock.h"
+#include <stdint.h>
 
 namespace aaudio {
 

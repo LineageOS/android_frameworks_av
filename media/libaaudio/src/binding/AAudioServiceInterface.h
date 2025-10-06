@@ -17,16 +17,20 @@
 #ifndef ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 #define ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 
+// go/keep-sorted start
+#include <aaudio/IAAudioClient.h>
 #include <audio_utils/TimerQueue.h>
 #include <media/AudioClient.h>
 #include <media/AudioResamplerPublic.h>
 #include <utils/StrongPointer.h>
+// go/keep-sorted end
 
-#include "aaudio/IAAudioClient.h"
-#include "binding/AAudioServiceDefinitions.h"
-#include "binding/AAudioStreamRequest.h"
-#include "binding/AAudioStreamConfiguration.h"
-#include "binding/AudioEndpointParcelable.h"
+// go/keep-sorted start
+#include "AAudioServiceDefinitions.h"
+#include "AAudioStreamConfiguration.h"
+#include "AAudioStreamRequest.h"
+#include "AudioEndpointParcelable.h"
+// go/keep-sorted end
 
 /**
  * This has the same methods as IAAudioService but without the Binder features.

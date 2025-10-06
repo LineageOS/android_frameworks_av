@@ -17,16 +17,22 @@
 #ifndef ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_PLAY_H
 #define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_PLAY_H
 
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
+#include <audio_utils/TimerQueue.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
 #include <condition_variable>
 #include <mutex>
 #include <stdint.h>
 #include <thread>
+// go/keep-sorted end
 
-#include <aaudio/AAudio.h>
-#include <audio_utils/TimerQueue.h>
-
+// go/keep-sorted start
+#include "AudioStreamInternal.h"
 #include "binding/AAudioServiceInterface.h"
-#include "client/AudioStreamInternal.h"
+// go/keep-sorted end
 
 using android::sp;
 

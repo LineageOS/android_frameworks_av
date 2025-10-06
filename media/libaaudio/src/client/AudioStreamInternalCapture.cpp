@@ -15,15 +15,16 @@
  */
 
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <algorithm>
+#include "AudioStreamInternalCapture.h"
+
 #include <audio_utils/format.h>
 #include <aaudio/AAudio.h>
 #include <media/MediaMetricsItem.h>
+#include <utility/AudioClock.h>
+#include <utils/Log.h>
 
-#include "client/AudioStreamInternalCapture.h"
-#include "utility/AudioClock.h"
+#include <algorithm>
 
 #undef ATRACE_TAG
 #define ATRACE_TAG ATRACE_TAG_AUDIO

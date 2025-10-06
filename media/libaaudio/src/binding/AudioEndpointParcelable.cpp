@@ -16,18 +16,20 @@
 
 #define LOG_TAG "AudioEndpointParcelable"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <map>
-#include <stdint.h>
+#include "AudioEndpointParcelable.h"
 
+// go/keep-sorted start
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <utility/AAudioUtilities.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/AAudioServiceDefinitions.h"
-#include "binding/RingBufferParcelable.h"
-#include "binding/AudioEndpointParcelable.h"
+// go/keep-sorted start
+#include <map>
+#include <stdint.h>
+// go/keep-sorted end
 
 using android::base::unique_fd;
 using android::status_t;

@@ -17,8 +17,10 @@
 #ifndef FIFO_FIFO_BUFFER_H
 #define FIFO_FIFO_BUFFER_H
 
+// go/keep-sorted start
 #include <memory>
 #include <stdint.h>
+// go/keep-sorted end
 
 #include "FifoControllerBase.h"
 

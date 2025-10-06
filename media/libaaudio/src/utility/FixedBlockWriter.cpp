@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-#include <stdint.h>
-#include <memory.h>
-
-#include "FixedBlockAdapter.h"
 #include "FixedBlockWriter.h"
+
+// go/keep-sorted start
+#include <memory.h>
+#include <stdint.h>
+// go/keep-sorted end
 
 FixedBlockWriter::FixedBlockWriter(FixedBlockProcessor &fixedBlockProcessor)
         : FixedBlockAdapter(fixedBlockProcessor) {}
