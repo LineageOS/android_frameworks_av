@@ -116,6 +116,9 @@ Status ResourceManagerServiceNew::addResource(
     mServiceLog->add(log);
 
     std::scoped_lock lock{mLock};
+    // log resource availability status
+    logResourceAvailability(clientInfo, true /* codec has been started */, resources);
+
     mResourceTracker->addResource(clientInfo, client, resources);
     notifyResourceGranted(pid, resources);
 
@@ -277,12 +280,17 @@ Status ResourceManagerServiceNew::registerSystemResource(
     return Status::ok();
 }
 
+inline bool ResourceManagerServiceNew::checkResourceAvailability_l(
+    const std::vector<MediaResourceParcel>& resourcesNeeded) const {
+    return mResourceModel->checkResourceAvailability(resourcesNeeded);
+}
+
 Status ResourceManagerServiceNew::checkResourceAvailability(
         const std::vector<MediaResourceParcel>& resourcesNeeded,
         bool* _aidl_return) {
     if (IsCodecAvailabilityMetricsFeatureOn() && _aidl_return) {
         std::scoped_lock lock{mLock};
-        *_aidl_return = mResourceModel->checkResourceAvailability(resourcesNeeded);
+        *_aidl_return = checkResourceAvailability_l(resourcesNeeded);
     }
     return Status::ok();
 }
@@ -301,6 +309,28 @@ Status ResourceManagerServiceNew::updateResource(
     mResourceTracker->updateResource(clientInfo, resources);
 
     return Status::ok();
+}
+
+void ResourceManagerServiceNew::logResourceAvailability(
+        const ClientInfoParcel& clientInfo,
+        bool isCodecStarted,
+        const std::vector<MediaResourceParcel>& resources) {
+    if (IsCodecAvailabilityMetricsFeatureOn()) {
+        std::vector<MediaResourceParcel> systemResources;
+        systemResources.reserve(resources.size());
+        for (const MediaResourceParcel& res : resources) {
+            // Ignore the other resource types.
+            if (res.type >= MediaResourceType::kHwResourceTypeMin) {
+                systemResources.push_back(res);
+            }
+        }
+        if (systemResources.empty()) {
+            // No system resources. So nothing to do.
+            return;
+        }
+        bool available = checkResourceAvailability_l(systemResources);
+        mResourceManagerMetrics->pushResourceStatusAtom(clientInfo, isCodecStarted, available);
+    }
 }
 
 void ResourceManagerServiceNew::getResourceDump(std::string& resourceLog) const {

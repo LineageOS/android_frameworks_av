@@ -605,6 +605,9 @@ Status ResourceManagerService::reclaimResource(const ClientInfoParcel& clientInf
         return Status::ok();
     }
 
+    // log resource availability status
+    logResourceAvailability(clientInfo, false /* codec not started yet */, resources);
+
     std::vector<ClientInfo> targetClients;
     if (getTargetClients(clientInfo, resources, targetClients)) {
         // Reclaim all the target clients.
