@@ -179,6 +179,11 @@ private:
 
     // enable/disable process priority based reclaim and client importance based reclaim
     void setReclaimPolicy(bool processPriority, bool clientImportance) override;
+
+    // Get Available resources.
+    std::vector<MediaResourceParcel> getAvailableResource() const override;
+
+    void getResourceTrackingDetails(int* events, int* matches) const override;
     // END: TEST only functions
 
 private:

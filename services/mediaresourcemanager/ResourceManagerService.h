@@ -256,6 +256,19 @@ private:
         (void)processPriority;
         (void)clientImportance;
     }
+
+    // Get Available resources.
+    virtual std::vector<MediaResourceParcel> getAvailableResource() const {
+        // Implemented by the refactored/new RMService
+        return {};
+    }
+
+    // Get the details on resource tracking events.
+    virtual void getResourceTrackingDetails(int* events, int* matches) const {
+        (void)events;
+        (void)matches;
+        // Implemented by the refactored/new RMService
+    }
     // END: TEST only functions
 
 protected:

@@ -333,6 +333,16 @@ void ResourceManagerServiceNew::logResourceAvailability(
     }
 }
 
+std::vector<MediaResourceParcel> ResourceManagerServiceNew::getAvailableResource() const {
+    std::scoped_lock lock{mLock};
+    return mResourceModel->getAvailableResources();
+}
+
+void ResourceManagerServiceNew::getResourceTrackingDetails(int* events, int* matches) const {
+    std::scoped_lock lock{mLock};
+    return mResourceManagerMetrics->getResourceTrackingDetails(events, matches);
+}
+
 void ResourceManagerServiceNew::getResourceDump(std::string& resourceLog) const {
     std::scoped_lock lock{mLock};
     mResourceTracker->dump(resourceLog);
