@@ -280,10 +280,9 @@ Status ResourceManagerServiceNew::registerSystemResource(
 Status ResourceManagerServiceNew::checkResourceAvailability(
         const std::vector<MediaResourceParcel>& resourcesNeeded,
         bool* _aidl_return) {
-    (void)resourcesNeeded;
-    // Not implemented
-    if (_aidl_return) {
-        *_aidl_return = false;
+    if (IsCodecAvailabilityMetricsFeatureOn() && _aidl_return) {
+        std::scoped_lock lock{mLock};
+        *_aidl_return = mResourceModel->checkResourceAvailability(resourcesNeeded);
     }
     return Status::ok();
 }

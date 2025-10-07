@@ -19,6 +19,8 @@
 #define LOG_TAG "DefaultResourceModel"
 #include <utils/Log.h>
 
+#include <algorithm>
+
 #include "ResourceManagerServiceUtils.h"
 #include "DefaultResourceModel.h"
 #include "ResourceTracker.h"
@@ -169,6 +171,21 @@ std::vector<MediaResourceParcel> DefaultResourceModel::getAvailableResources() c
     // Current available resources = {Globally available resources} - {current resource usage}
     return calculateResourceDifference(
             mGlobalResourceList.getResources(), currentSystemResourceUsage);
+}
+
+bool DefaultResourceModel::checkResourceAvailability(
+        const std::vector<MediaResourceParcel>& resourcesNeeded) const {
+    // Step#1: Get available resources.
+    std::vector<MediaResourceParcel> availableResources = getAvailableResources();
+
+    // Step#2: Check whether {Current available resources} >= {resources needed}
+    std::vector<MediaResourceParcel> diffResources = calculateResourceDifference(
+            availableResources, resourcesNeeded);
+
+    // Step#3: If any of the resource has negative value, that means we don't have enough
+    // resources.
+    return std::none_of(diffResources.begin(), diffResources.end(),
+                        [](const MediaResourceParcel& res) { return res.value < 0; });
 }
 
 } // namespace android

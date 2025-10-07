@@ -73,11 +73,7 @@ public:
      * @return true if resources are likely available, false otherwise.
      */
     bool checkResourceAvailability(
-            const std::vector<MediaResourceParcel>& resourcesNeeded) const override {
-        (void)resourcesNeeded;
-        // default implementation.
-        return false;
-    }
+            const std::vector<MediaResourceParcel>& resourcesNeeded) const override;
 
     /**
      * Get a list of currently available resources.
