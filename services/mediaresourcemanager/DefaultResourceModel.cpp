@@ -146,4 +146,10 @@ bool DefaultResourceModel::getCodecClients(
     return !clients.empty();
 }
 
+void DefaultResourceModel::registerSystemResource(
+        const std::vector<MediaResourceParcel>& resources) {
+    // Set Globally available resources.
+    mGlobalResourceList.set(resources);
+}
+
 } // namespace android

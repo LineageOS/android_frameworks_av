@@ -19,6 +19,7 @@
 #define ANDROID_MEDIA_DEFAULTRESOURCEMODEL_H_
 
 #include "IResourceModel.h"
+#include "ResourceManagerServiceUtils.h"
 
 namespace android {
 
@@ -62,10 +63,7 @@ public:
      * @param[in] resources an array of resources to be registered.
      */
     void registerSystemResource(
-            const std::vector<MediaResourceParcel>& resources) override {
-        (void)resources;
-        // default implementation.
-    }
+            const std::vector<MediaResourceParcel>& resources) override;
 
     /**
      * Checks if the system has enough of the specified list of resources.
@@ -103,6 +101,8 @@ protected:
     bool mSupportsMultipleSecureCodecs;
     bool mSupportsSecureWithNonSecureCodec;
     std::shared_ptr<ResourceTracker> mResourceTracker;
+    // Global resource list.
+    ResourceList mGlobalResourceList;
 };
 
 } // namespace android

@@ -48,6 +48,26 @@ void ResourceManagerServiceNew::init() {
     setUpReclaimPolicies();
 }
 
+// Check whether the codec availability feature is on or off.
+inline bool IsCodecAvailabilityFeatureOn() {
+    if (android::media::codec::codec_availability() &&
+        android::media::codec::codec_availability_support()) {
+        return true;
+    }
+
+    return false;
+}
+
+// Check whether the codec availability metrics is on or off.
+inline bool IsCodecAvailabilityMetricsFeatureOn() {
+    if (IsCodecAvailabilityFeatureOn() &&
+        android::media::codec::codec_availability_metrics()) {
+        return true;
+    }
+
+    return false;
+}
+
 void ResourceManagerServiceNew::setUpResourceModels() {
     std::scoped_lock lock{mLock};
     // Create/Configure the default resource model.
@@ -250,8 +270,10 @@ Status ResourceManagerServiceNew::getMediaResourceUsageReport(
 
 Status ResourceManagerServiceNew::registerSystemResource(
         const std::vector<MediaResourceParcel>& resources) {
-    (void)resources;
-    // Not implemented
+    if (IsCodecAvailabilityMetricsFeatureOn()) {
+        std::scoped_lock lock{mLock};
+        mResourceModel->registerSystemResource(resources);
+    }
     return Status::ok();
 }
 

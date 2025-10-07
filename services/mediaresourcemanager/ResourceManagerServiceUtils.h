@@ -140,6 +140,12 @@ struct ResourceList {
     // Converts resource list into string format
     std::string toString() const;
 
+    // Assign/Set a new values for ResourceList.
+    // This will overwrite the earlier values, if there were any.
+    void set(const std::vector<::aidl::android::media::MediaResourceParcel>& resourceList) {
+        mResourceList = resourceList;
+    }
+
     // BEGIN: Test only function
     // Check if two resource lists are the same.
     bool operator==(const ResourceList& rhs) const;
