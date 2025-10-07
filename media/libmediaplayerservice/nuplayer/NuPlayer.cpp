@@ -1332,6 +1332,12 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                           mPaused, mOffloadAudio);
                     break;
                 }
+
+                if (mOffloadAudio && reason == Renderer::kDueToError) {
+                    reason = Renderer::kForceNonOffload;
+                    ALOGI("%s force non offload on error ", __func__);
+                }
+
                 int64_t positionUs;
                 if (!msg->findInt64("positionUs", &positionUs)) {
                     positionUs = mPreviousSeekTimeUs;
