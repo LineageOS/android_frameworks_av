@@ -26,10 +26,7 @@ cc_defaults {
         "libcodec2_internal",
     ],
 
-    srcs: [
-        "ApexCodecs.cpp",
-        "ApexCodecsImpl.cpp",
-    ],
+    srcs: ["ApexCodecs.cpp"],
 
     shared_libs: [
         "libbase",
@@ -49,6 +46,7 @@ cc_defaults {
         "libbase",
         "libnativewindow",
     ],
+
 }
 
 cc_library_headers {
@@ -64,13 +62,7 @@ cc_library {
     name: "libcom.android.media.swcodec.apexcodecs-testing",
     defaults: ["libcom.android.media.swcodec.apexcodecs-defaults"],
 
-    srcs: [
-        "ApexCodecsStoreImpl.cpp",
-    ],
-
-    shared_libs: [
-        "libcodec2_vndk",
-    ],
+    srcs: ["tests/ApexCodecsStoreTestImpl.cpp"],
 
     visibility: [
         ":__subpackages__",
@@ -79,22 +71,14 @@ cc_library {
 
 cc_library {
     name: "libcom.android.media.swcodec.apexcodecs",
-    defaults: [
-        "libcom.android.media.swcodec.apexcodecs-defaults",
-    ],
+    defaults: ["libcom.android.media.swcodec.apexcodecs-defaults"],
 
     visibility: [
         "//frameworks/av/apex:__subpackages__",
         "//frameworks/av/media/codec2/hal/client",
     ],
 
-    srcs: [
-        "ApexCodecsStoreImpl.cpp",
-    ],
-
-    shared_libs: [
-        "libcodec2_vndk",
-    ],
+    srcs: ["ApexCodecsStoreImpl.cpp"],
 
     min_sdk_version: "apex_inherit",
     version_script: "libcom.android.media.swcodec.apexcodecs.map.txt",
