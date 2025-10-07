@@ -208,26 +208,6 @@ public:
             size_t *produced) = 0;
 };
 
-class ApexConfigurableImpl : public ApexConfigurableIntf {
-public:
-    ApexConfigurableImpl(const std::shared_ptr<C2ComponentInterface> &intf);
-    virtual ~ApexConfigurableImpl() = default;
-
-    ApexCodec_Status config(
-            const std::vector<C2Param *> &params,
-            std::vector<std::unique_ptr<C2SettingResult>> *results) const override;
-    ApexCodec_Status query(
-            const std::vector<C2Param::Index> &heapParamIndices,
-            std::vector<std::unique_ptr<C2Param>>* const heapParams) const override;
-    ApexCodec_Status querySupportedParams(
-            std::vector<std::shared_ptr<C2ParamDescriptor>> * const params) const override;
-    ApexCodec_Status querySupportedValues(
-            std::vector<C2FieldSupportedValuesQuery> &fields) const override;
-
-private:
-    std::shared_ptr<C2ComponentInterface> mConfigurable;
-};
-
 class ApexComponentStoreIntf {
 public:
     virtual ~ApexComponentStoreIntf() = default;
