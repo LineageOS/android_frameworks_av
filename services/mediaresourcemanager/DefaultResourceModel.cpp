@@ -152,4 +152,23 @@ void DefaultResourceModel::registerSystemResource(
     mGlobalResourceList.set(resources);
 }
 
+std::vector<MediaResourceParcel> DefaultResourceModel::getAvailableResources() const {
+    // Step#1: Get current resource usage = Sum{resources used by the active codecs}
+    std::vector<MediaResourceParcel> currentResourceUsage;
+    mResourceTracker->getMediaResourceUsageReport(&currentResourceUsage);
+
+    std::vector<MediaResourceParcel> currentSystemResourceUsage;
+    currentSystemResourceUsage.reserve(currentResourceUsage.size());
+    for (const auto& res : currentResourceUsage) {
+        // Tracking only the hardware resource types for system resource availability.
+        if (res.type >= MediaResourceType::kHwResourceTypeMin) {
+            currentSystemResourceUsage.push_back(res);
+        }
+    }
+    // Step#2: See how much of the resources are available
+    // Current available resources = {Globally available resources} - {current resource usage}
+    return calculateResourceDifference(
+            mGlobalResourceList.getResources(), currentSystemResourceUsage);
+}
+
 } // namespace android

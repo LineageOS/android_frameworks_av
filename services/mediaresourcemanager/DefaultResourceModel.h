@@ -86,10 +86,7 @@ public:
      * track the available resources.
      *
      */
-    std::vector<MediaResourceParcel> getAvailableResources() const override {
-        // default implementation.
-        return {};
-    }
+    std::vector<MediaResourceParcel> getAvailableResources() const override;
 
 protected:
     bool getCodecClients(const ReclaimRequestInfo& reclaimRequestInfo,
