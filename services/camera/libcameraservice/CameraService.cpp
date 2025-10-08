@@ -4455,6 +4455,20 @@ status_t CameraService::BasicClient::handleAppOpMode(int32_t mode) {
 status_t CameraService::BasicClient::notifyCameraOpening() {
     ATRACE_CALL();
 
+    // Check for camera access when creating the client. startCameraStreamingOps()
+    // marks the camera as streaming through checkPermissionsForCameraForStartDataDelivery().
+    // startCameraStreamingOps() itself is called after the StatusTracker thread notifies the
+    // BasicClient that the camera device is active. While that does do a check on the op status,
+    // it is asynchronous and frames may leak, so we do a check here as well, in case the client is
+    // already disallowed from using the camera at client initialization time.
+    if (mAppOpsManager != nullptr) {
+        int32_t mode = mAppOpsManager->checkOp(AppOpsManager::OP_CAMERA, getClientUid(),
+                                               toString16(getPackageName()));
+        status_t res = handleAppOpMode(mode);
+        if (res != OK) {
+            return res;
+        }
+    }
     mCameraOpen = true;
 
     // Transition device availability listeners from PRESENT -> NOT_AVAILABLE
