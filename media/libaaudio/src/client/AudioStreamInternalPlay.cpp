@@ -108,6 +108,31 @@ aaudio_result_t AudioStreamInternalPlay::requestPause_l()
     // In that case, it is no longer needed to wait for stream end.
     dropPresentationEndCallback_l();
 
+    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        if (result = mServiceInterface.updateTimestamp(mServiceStreamHandleInfo);
+            result != AAUDIO_OK) {
+            ALOGE("%s, failed to update timestamp, error=%d", __func__, result);
+            return result;
+        } else {
+            // After successfully updating the timestamp, the service side is not draining any more.
+            // In that case, always clear the mWakeUpHandle here to indicate that wakeup callback
+            // is not expected.
+            mWakeUpHandle = TimerQueue::INVALID_HANDLE;
+        }
+        if (result = processCommands(); result != AAUDIO_OK) {
+            ALOGE("%s, failed to process commands, error=%d", __func__, result);
+            return result;
+        }
+        // Setting a most accurate read counter so that when resuming, we know if we need to copy
+        // unprocessed data or not. For the most accurate read counter, it is the minimum value
+        // between write counter and estimated read counter plus one burst size. Adding one extra
+        // burst size as the DSP may read to next burst after reporting the position.
+        int64_t readPosition = std::min(mAudioEndpoint->getDataWriteCounter(),
+                mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
+                        + getDeviceFramesPerBurst());
+        mAudioEndpoint->setDataReadCounter(readPosition);
+    }
+
     return mServiceInterface.pauseStream(mServiceStreamHandleInfo);
 }
 
@@ -126,11 +151,18 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush_l() {
     return mServiceInterface.flushStream(mServiceStreamHandleInfo);
 }
 
-void AudioStreamInternalPlay::prepareBuffersForStart_l() {
+void AudioStreamInternalPlay::prepareBuffersForStart_l(StartType startType) {
     // Reset volume ramps to avoid a starting noise.
     // This was called here instead of AudioStreamInternal so that
     // it will be easier to backport.
     mFlowGraph.reset();
+    if (startType == RESUME_WITH_UNPROCESSED_DATA_TO_COPY) {
+        // There are stale data that needs to be played. Copy them to a temporary buffer and
+        // rewrite them to mmap buffer when there is position reported from the HAL.
+        mUnprocessedFrames = mAudioEndpoint->getFullFramesAvailable();
+        mUnprocessedBuffer = std::make_unique<uint8_t[]>(mUnprocessedFrames * getBytesPerFrame());
+        mUnprocessedFrames = mAudioEndpoint->read(mUnprocessedBuffer.get(), mUnprocessedFrames);
+    }
     // Prevent stale data from being played.
     mAudioEndpoint->eraseDataMemory();
     // All data has been erased. To avoid mixer for the shared stream use stale
@@ -569,6 +601,11 @@ aaudio_result_t AudioStreamInternalPlay::requestStart_l() {
         // Receive start while the stream is draining but not yet stopped. Restart the stream
         startType = RESUME_WHILE_DRAINING;
         mPendingStop = false;
+    } else if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        if (mAudioEndpoint != nullptr &&
+            mAudioEndpoint->getFullFramesAvailable() > getDeviceFramesPerBurst()) {
+            startType = RESUME_WITH_UNPROCESSED_DATA_TO_COPY;
+        }
     }
     return AudioStreamInternal::requestStart_l(startType);
 }
