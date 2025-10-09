@@ -22,11 +22,12 @@
 #include <cutils/native_handle.h>
 
 #include <utils/Timers.h>
+#include <statslog_framework.h>
 
 #include "device3/Camera3StreamInterface.h"
 
-namespace android {
 
+namespace android {
 namespace camera3 {
 
     /**
@@ -36,9 +37,9 @@ namespace camera3 {
     class SetErrorInterface {
     public:
         // Switch device into error state and send a ERROR_DEVICE notification
-        virtual void setErrorState(const char *fmt, ...) = 0;
+        virtual void setErrorState(int32_t errorType, const char *fmt, ...) = 0;
         // Same as setErrorState except this method assumes callers holds the main object lock
-        virtual void setErrorStateLocked(const char *fmt, ...) = 0;
+        virtual void setErrorStateLocked(int32_t errorType, const char *fmt, ...) = 0;
 
         virtual ~SetErrorInterface() {}
     };

@@ -18,9 +18,6 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 // Convenience macros for transitioning to the error state
-#define SET_ERR(fmt, ...) states.setErrIntf.setErrorState(   \
-    "%s: " fmt, __FUNCTION__,                         \
-    ##__VA_ARGS__)
 
 #include <inttypes.h>
 
