@@ -21,27 +21,28 @@
  * sometimes that have caused compiler bugs.
  */
 
-#include <iostream>
-
-#include <gtest/gtest.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
-#include "client/AAudioFlowGraph.h"
-#include "flowgraph/ClipToRange.h"
-#include "flowgraph/Limiter.h"
-#include "flowgraph/MonoBlend.h"
-#include "flowgraph/MonoToMultiConverter.h"
-#include "flowgraph/RampLinear.h"
-#include "flowgraph/SinkFloat.h"
-#include "flowgraph/SinkI16.h"
-#include "flowgraph/SinkI24.h"
-#include "flowgraph/SinkI32.h"
-#include "flowgraph/SinkI8_24.h"
-#include "flowgraph/SourceFloat.h"
-#include "flowgraph/SourceI16.h"
-#include "flowgraph/SourceI24.h"
-#include "flowgraph/SourceI8_24.h"
-#include "flowgraph/resampler/IntegerRatio.h"
+#include <client/AAudioFlowGraph.h>
+#include <flowgraph/ClipToRange.h>
+#include <flowgraph/Limiter.h>
+#include <flowgraph/MonoBlend.h>
+#include <flowgraph/MonoToMultiConverter.h>
+#include <flowgraph/RampLinear.h>
+#include <flowgraph/SinkFloat.h>
+#include <flowgraph/SinkI16.h>
+#include <flowgraph/SinkI24.h>
+#include <flowgraph/SinkI32.h>
+#include <flowgraph/SinkI8_24.h>
+#include <flowgraph/SourceFloat.h>
+#include <flowgraph/SourceI16.h>
+#include <flowgraph/SourceI24.h>
+#include <flowgraph/SourceI8_24.h>
+#include <flowgraph/resampler/IntegerRatio.h>
+#include <gtest/gtest.h>
+// go/keep-sorted end
+
+#include <iostream>
 
 using namespace FLOWGRAPH_OUTER_NAMESPACE::flowgraph;
 using namespace RESAMPLER_OUTER_NAMESPACE::resampler;

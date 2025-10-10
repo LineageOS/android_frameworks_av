@@ -16,24 +16,27 @@
 
 #define LOG_TAG "AAudioStream"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <atomic>
-#include <functional>
-#include <stdint.h>
+#include "AudioStream.h"
 
-#include <linux/futex.h>
-#include <media/MediaMetricsItem.h>
-#include <sys/syscall.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <android-base/strings.h>
 #include <com_android_media_audioserver.h>
+#include <core/AudioStreamBuilder.h>
+#include <media/MediaMetricsItem.h>
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "AudioStreamBuilder.h"
-#include "AudioStream.h"
-#include "AudioClock.h"
-#include "AudioGlobal.h"
+// go/keep-sorted start
+#include <atomic>
+#include <functional>
+#include <linux/futex.h>
+#include <stdint.h>
+#include <sys/syscall.h>
+// go/keep-sorted end
 
 namespace aaudio {
 

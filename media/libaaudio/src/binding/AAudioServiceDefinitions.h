@@ -17,12 +17,14 @@
 #ifndef BINDING_AAUDIOSERVICEDEFINITIONS_H
 #define BINDING_AAUDIOSERVICEDEFINITIONS_H
 
-#include <stdint.h>
-#include <utils/RefBase.h>
-#include <binder/TextOutput.h>
-#include <binder/IInterface.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
+#include <binder/IInterface.h>
+#include <binder/TextOutput.h>
+#include <utils/RefBase.h>
+// go/keep-sorted end
+
+#include <stdint.h>
 
 using android::NO_ERROR;
 using android::IBinder;

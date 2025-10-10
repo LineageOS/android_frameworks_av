@@ -16,11 +16,14 @@
 #ifndef ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_CAPTURE_H
 #define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_CAPTURE_H
 
-#include <stdint.h>
 #include <aaudio/AAudio.h>
 
+#include <stdint.h>
+
+// go/keep-sorted start
+#include "AudioStreamInternal.h"
 #include "binding/AAudioServiceInterface.h"
-#include "client/AudioStreamInternal.h"
+// go/keep-sorted end
 
 using android::sp;
 

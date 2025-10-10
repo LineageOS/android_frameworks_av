@@ -16,35 +16,37 @@
 
 #define LOG_TAG "AudioStreamInternal"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
-#include <stdint.h>
+#include "AudioStreamInternal.h"
 
-#include <binder/IServiceManager.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/IAAudioClientCallback.h>
+#include <binder/IServiceManager.h>
+#include <core/AudioStreamBuilder.h>
 #include <cutils/properties.h>
+#include <fifo/FifoBuffer.h>
+#include <media/AidlConversion.h>
 #include <media/AudioParameter.h>
 #include <media/AudioSystem.h>
 #include <media/MediaMetricsItem.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
 #include <utils/Trace.h>
+// go/keep-sorted end
 
-#include "AudioEndpointParcelable.h"
+#include <stdint.h>
+
+// go/keep-sorted start
 #include "binding/AAudioBinderClient.h"
-#include "binding/AAudioStreamRequest.h"
-#include "binding/AAudioStreamConfiguration.h"
 #include "binding/AAudioServiceMessage.h"
-#include "core/AudioGlobal.h"
-#include "core/AudioStreamBuilder.h"
-#include "fifo/FifoBuffer.h"
-#include "utility/AudioClock.h"
-#include <media/AidlConversion.h>
-
-#include "AudioStreamInternal.h"
+#include "binding/AAudioStreamConfiguration.h"
+#include "binding/AAudioStreamRequest.h"
+// go/keep-sorted end
 
 // We do this after the #includes because if a header uses ALOG.
 // it would fail on the reference to mInService.

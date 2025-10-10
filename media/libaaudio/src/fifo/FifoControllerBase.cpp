@@ -16,10 +16,12 @@
 
 #define LOG_TAG "FifoControllerBase"
 //#define LOG_NDEBUG 0
+
+#include "FifoControllerBase.h"
+
 #include <utils/Log.h>
 
 #include <stdint.h>
-#include "FifoControllerBase.h"
 
 using android::FifoControllerBase;
 using android::fifo_frames_t;

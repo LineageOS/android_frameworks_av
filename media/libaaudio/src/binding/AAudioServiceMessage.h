@@ -17,9 +17,9 @@
 #ifndef ANDROID_AAUDIO_AAUDIO_SERVICE_MESSAGE_H
 #define ANDROID_AAUDIO_AAUDIO_SERVICE_MESSAGE_H
 
-#include <stdint.h>
-
 #include <aaudio/AAudio.h>
+
+#include <stdint.h>
 
 namespace aaudio {
 

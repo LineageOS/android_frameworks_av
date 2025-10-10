@@ -17,11 +17,16 @@
 #ifndef ANDROID_AAUDIO_SHARED_MEMORY_PARCELABLE_H
 #define ANDROID_AAUDIO_SHARED_MEMORY_PARCELABLE_H
 
-#include <stdint.h>
-#include <sys/mman.h>
-
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
 #include <android-base/unique_fd.h>
 #include <android/media/SharedFileRegion.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
+#include <stdint.h>
+#include <sys/mman.h>
+// go/keep-sorted end
 
 namespace aaudio {
 

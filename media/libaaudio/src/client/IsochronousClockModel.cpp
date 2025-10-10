@@ -16,15 +16,20 @@
 
 #define LOG_TAG "IsochronousClockModel"
 //#define LOG_NDEBUG 0
-#include <log/log.h>
 
+#include "IsochronousClockModel.h"
+
+// go/keep-sorted start
+#include <log/log.h>
+#include <utility/AAudioUtilities.h>
+#include <utility/AudioClock.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
+#include <algorithm>
 #include <inttypes.h>
 #include <stdint.h>
-#include <algorithm>
-
-#include "utility/AudioClock.h"
-#include "utility/AAudioUtilities.h"
-#include "IsochronousClockModel.h"
+// go/keep-sorted end
 
 using namespace aaudio;
 

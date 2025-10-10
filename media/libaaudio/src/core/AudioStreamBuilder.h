@@ -17,13 +17,16 @@
 #ifndef AAUDIO_AUDIO_STREAM_BUILDER_H
 #define AAUDIO_AUDIO_STREAM_BUILDER_H
 
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
+#include <core/AAudioStreamParameters.h>
+#include <core/AudioStream.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
 #include <set>
 #include <stdint.h>
-
-#include <aaudio/AAudio.h>
-
-#include "AAudioStreamParameters.h"
-#include "AudioStream.h"
+// go/keep-sorted end
 
 namespace aaudio {
 

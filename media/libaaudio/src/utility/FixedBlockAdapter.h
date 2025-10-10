@@ -17,11 +17,13 @@
 #ifndef AAUDIO_FIXED_BLOCK_ADAPTER_H
 #define AAUDIO_FIXED_BLOCK_ADAPTER_H
 
+#include <aaudio/AAudio.h>
+
+// go/keep-sorted start
 #include <memory>
 #include <stdio.h>
 #include <utility>
-
-#include "aaudio/AAudio.h"
+// go/keep-sorted end
 
 /**
  * Interface for a class that needs fixed-size blocks.

@@ -13,22 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#include <cstring>
-#include <unistd.h>
-
-
 #define LOG_TAG "FifoBuffer"
 //#define LOG_NDEBUG 0
+
+#include "FifoBuffer.h"
+
 #include <utils/Log.h>
 
+// go/keep-sorted start
 #include <algorithm>
+#include <cstring>
 #include <memory>
+#include <unistd.h>
+// go/keep-sorted end
 
-#include "FifoControllerBase.h"
-#include "FifoController.h"
-#include "FifoControllerIndirect.h"
+// go/keep-sorted start
 #include "FifoBuffer.h"
+#include "FifoController.h"
+#include "FifoControllerBase.h"
+#include "FifoControllerIndirect.h"
+// go/keep-sorted end
 
 using android::FifoBuffer;
 using android::FifoBufferAllocated;
