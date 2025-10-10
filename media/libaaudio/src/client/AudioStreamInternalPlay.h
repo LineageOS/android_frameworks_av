@@ -87,7 +87,7 @@ public:
 
 protected:
 
-    void prepareBuffersForStart_l() REQUIRES(mStreamMutex) final;
+    void prepareBuffersForStart_l(StartType startType = DEFAULT) REQUIRES(mStreamMutex) final;
 
     aaudio_result_t prepareBuffersForStop_l() REQUIRES(mStreamMutex) final;
 

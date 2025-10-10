@@ -487,12 +487,8 @@ aaudio_result_t AudioStreamInternal::requestStart_l(StartType startType) {
     const aaudio_stream_state_t originalState = getState();
     setState(AAUDIO_STREAM_STATE_STARTING);
 
-    if (startType == DEFAULT) {
-        // Clear any stale timestamps from the previous run.
-        drainTimestampsFromService();
-
-        prepareBuffersForStart_l(); // tell subclasses to get ready
-    }
+    // Clear any stale timestamps from the previous run.
+    drainTimestampsFromService();
 
     aaudio_result_t result = mServiceInterface.startStream(mServiceStreamHandleInfo);
     if (result == AAUDIO_ERROR_STANDBY) {
@@ -501,26 +497,33 @@ aaudio_result_t AudioStreamInternal::requestStart_l(StartType startType) {
         if (result == AAUDIO_OK) {
             result = mServiceInterface.startStream(mServiceStreamHandleInfo);
         }
+        if (result == AAUDIO_OK) {
+            // If the stream is started from standby, the shared mmap buffer is reallocated.
+            // The start request should perform as DEFAULT in this case.
+            startType = DEFAULT;
+        }
     }
-    if (result != AAUDIO_OK) {
+
+    if (result == AAUDIO_OK) {
+        prepareBuffersForStart_l(startType);
+        if (startType != RESUME_WHILE_DRAINING) {
+            startTime = AudioClock::getNanoseconds();
+            mClockModel.start(startTime);
+            mNeedCatchUp.request();  // Ask data processing code to catch up
+                                     // when first timestamp received.
+        }
+        // Start data callback thread.
+        if (isDataCallbackSet()) {
+            // Launch the callback loop thread.
+            result = startCallback_l();
+        }
+    } else {
         ALOGD("%s() error = %d, stream was probably stolen", __func__, result);
         // Stealing was added in R. Coerce result to improve backward compatibility.
         result = AAUDIO_ERROR_DISCONNECTED;
         setDisconnected();
     }
 
-    if (startType == DEFAULT) {
-        startTime = AudioClock::getNanoseconds();
-        mClockModel.start(startTime);
-        mNeedCatchUp.request();  // Ask data processing code to catch up
-                                 // when first timestamp received.
-    }
-
-    // Start data callback thread.
-    if (result == AAUDIO_OK && isDataCallbackSet()) {
-        // Launch the callback loop thread.
-        result = startCallback_l();
-    }
     if (result != AAUDIO_OK) {
         setState(originalState);
     }
