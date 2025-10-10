@@ -72,64 +72,64 @@ AudioStream::~AudioStream() {
                         AudioGlobal_convertStreamStateToText(getState()), isDisconnected());
 }
 
-aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
+aaudio_result_t AudioStream::open(const AAudioStreamOpenRequest& openRequest)
 {
     // Call here as well because the AAudioService will call this without calling build().
-    aaudio_result_t result = builder.validate();
+    aaudio_result_t result = openRequest.validate();
     if (result != AAUDIO_OK) {
         return result;
     }
 
     // Copy parameters from the Builder because the Builder may be deleted after this call.
     // TODO AudioStream should be a subclass of AudioStreamParameters
-    mSamplesPerFrame = builder.getSamplesPerFrame();
-    mChannelMask = builder.getChannelMask();
-    mSampleRate = builder.getSampleRate();
-    mDeviceIds = builder.getDeviceIds();
-    mFormat = builder.getFormat();
-    mSharingMode = builder.getSharingMode();
-    mSharingModeMatchRequired = builder.isSharingModeMatchRequired();
-    mPerformanceMode = builder.getPerformanceMode();
+    mSamplesPerFrame = openRequest.getSamplesPerFrame();
+    mChannelMask = openRequest.getChannelMask();
+    mSampleRate = openRequest.getSampleRate();
+    mDeviceIds = openRequest.getDeviceIds();
+    mFormat = openRequest.getFormat();
+    mSharingMode = openRequest.getSharingMode();
+    mSharingModeMatchRequired = openRequest.isSharingModeMatchRequired();
+    mPerformanceMode = openRequest.getPerformanceMode();
 
-    mUsage = builder.getUsage();
+    mUsage = openRequest.getUsage();
     if (mUsage == AAUDIO_UNSPECIFIED) {
         mUsage = AAUDIO_USAGE_MEDIA;
     }
-    mContentType = builder.getContentType();
+    mContentType = openRequest.getContentType();
     if (mContentType == AAUDIO_UNSPECIFIED) {
         mContentType = AAUDIO_CONTENT_TYPE_MUSIC;
     }
-    mTags = builder.getTags();
-    mSpatializationBehavior = builder.getSpatializationBehavior();
+    mTags = openRequest.getTags();
+    mSpatializationBehavior = openRequest.getSpatializationBehavior();
     // for consistency with other properties, note UNSPECIFIED is the same as AUTO
     if (mSpatializationBehavior == AAUDIO_UNSPECIFIED) {
         mSpatializationBehavior = AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO;
     }
-    mIsContentSpatialized = builder.isContentSpatialized();
-    mInputPreset = builder.getInputPreset();
+    mIsContentSpatialized = openRequest.isContentSpatialized();
+    mInputPreset = openRequest.getInputPreset();
     if (mInputPreset == AAUDIO_UNSPECIFIED) {
         mInputPreset = AAUDIO_INPUT_PRESET_VOICE_RECOGNITION;
     }
-    mAllowedCapturePolicy = builder.getAllowedCapturePolicy();
+    mAllowedCapturePolicy = openRequest.getAllowedCapturePolicy();
     if (mAllowedCapturePolicy == AAUDIO_UNSPECIFIED) {
         mAllowedCapturePolicy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
     }
-    mIsPrivacySensitive = builder.isPrivacySensitive();
+    mIsPrivacySensitive = openRequest.isPrivacySensitive();
 
     // callbacks
-    mFramesPerDataCallback = builder.getFramesPerDataCallback();
-    mDataCallbackProc = builder.getDataCallbackProc();
-    mPartialDataCallbackProc = builder.getPartialDataCallbackProc();
+    mFramesPerDataCallback = openRequest.getFramesPerDataCallback();
+    mDataCallbackProc = openRequest.getDataCallbackProc();
+    mPartialDataCallbackProc = openRequest.getPartialDataCallbackProc();
     if (mPartialDataCallbackProc != nullptr) {
         mDataCallbackWrapper = &AudioStream::partialDataCallbackInternal;
     } else if (mDataCallbackProc != nullptr) {
         mDataCallbackWrapper = &AudioStream::dataCallbackInternal;
     }
-    mErrorCallbackProc = builder.getErrorCallbackProc();
-    mDataCallbackUserData = builder.getDataCallbackUserData();
-    mErrorCallbackUserData = builder.getErrorCallbackUserData();
-    setPresentationEndCallbackUserData(builder.getPresentationEndCallbackUserData());
-    setPresentationEndCallbackProc(builder.getPresentationEndCallbackProc());
+    mErrorCallbackProc = openRequest.getErrorCallbackProc();
+    mDataCallbackUserData = openRequest.getDataCallbackUserData();
+    mErrorCallbackUserData = openRequest.getErrorCallbackUserData();
+    setPresentationEndCallbackUserData(openRequest.getPresentationEndCallbackUserData());
+    setPresentationEndCallbackProc(openRequest.getPresentationEndCallbackProc());
 
     return AAUDIO_OK;
 }

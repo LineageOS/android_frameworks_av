@@ -53,7 +53,7 @@ public:
                                      bool inService = false);
     virtual ~AudioStreamInternalPlay() = default;
 
-    aaudio_result_t open(const AudioStreamBuilder &builder) override;
+    aaudio_result_t open(const AAudioStreamOpenRequest& openRequest) override;
 
     aaudio_result_t requestPause_l() REQUIRES(mStreamMutex) override;
 

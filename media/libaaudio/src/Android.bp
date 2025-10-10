@@ -208,6 +208,7 @@ cc_library {
         "libmediametrics",
     ],
     srcs: [
+        "core/AAudioStreamOpenRequest.cpp",
         "core/AAudioStreamParameters.cpp",
         "core/AudioStream.cpp",
     ],

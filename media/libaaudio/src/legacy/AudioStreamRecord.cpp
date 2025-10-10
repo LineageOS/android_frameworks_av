@@ -53,26 +53,26 @@ AudioStreamRecord::~AudioStreamRecord()
     ALOGE_IF(bad, "stream not closed, in state %d", state);
 }
 
-aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
+aaudio_result_t AudioStreamRecord::open(const AAudioStreamOpenRequest& openRequest)
 {
     aaudio_result_t result = AAUDIO_OK;
 
-    result = AudioStream::open(builder);
+    result = AudioStream::open(openRequest);
     if (result != AAUDIO_OK) {
         return result;
     }
 
     // Try to create an AudioRecord
 
-    const aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    const aaudio_session_id_t requestedSessionId = openRequest.getSessionId();
     const audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     // TODO Support UNSPECIFIED in AudioRecord. For now, use stereo if unspecified.
     audio_channel_mask_t channelMask =
             AAudio_getChannelMaskForOpen(getChannelMask(), getSamplesPerFrame(), true /*isInput*/);
 
-    size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
-                        : builder.getBufferCapacity();
+    size_t frameCount = (openRequest.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
+                        : openRequest.getBufferCapacity();
 
 
     audio_input_flags_t flags;
@@ -108,22 +108,22 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     // Setup the callback if there is one.
     sp<AudioRecord::IAudioRecordCallback> callback;
     AudioRecord::transfer_type streamTransferType = AudioRecord::transfer_type::TRANSFER_SYNC;
-    if (builder.isDataCallbackSet()) {
+    if (openRequest.isDataCallbackSet()) {
         streamTransferType = AudioRecord::transfer_type::TRANSFER_CALLBACK;
         callback = sp<AudioRecord::IAudioRecordCallback>::fromExisting(this);
     }
-    mCallbackBufferSize = builder.getFramesPerDataCallback();
+    mCallbackBufferSize = openRequest.getFramesPerDataCallback();
 
     // Don't call mAudioRecord->setInputDevice() because it will be overwritten by set()!
     audio_port_handle_t selectedDeviceId = getFirstDeviceId(getDeviceIds());
 
     const audio_content_type_t contentType =
-            AAudioConvert_contentTypeToInternal(builder.getContentType());
+            AAudioConvert_contentTypeToInternal(openRequest.getContentType());
     const audio_source_t source =
-            AAudioConvert_inputPresetToAudioSource(builder.getInputPreset());
+            AAudioConvert_inputPresetToAudioSource(openRequest.getInputPreset());
 
     const audio_flags_mask_t attrFlags =
-            AAudioConvert_privacySensitiveToAudioFlagsMask(builder.isPrivacySensitive());
+            AAudioConvert_privacySensitiveToAudioFlagsMask(openRequest.isPrivacySensitive());
     const audio_attributes_t attributes = {
             .content_type = contentType,
             .usage = AUDIO_USAGE_UNKNOWN, // only used for output
@@ -136,8 +136,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     AttributionSourceState attributionSource;
     attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
     attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
-    attributionSource.packageName = builder.getOpPackageName();
-    attributionSource.attributionTag = builder.getAttributionTag();
+    attributionSource.packageName = openRequest.getOpPackageName();
+    attributionSource.attributionTag = openRequest.getAttributionTag();
     attributionSource.token = sp<BBinder>::make();
 
     // ----------- open the AudioRecord ---------------------
@@ -196,9 +196,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             + std::to_string(mAudioRecord->getPortId());
     android::mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
-                 AudioGlobal_convertPerformanceModeToText(builder.getPerformanceMode()))
+                 AudioGlobal_convertPerformanceModeToText(openRequest.getPerformanceMode()))
             .set(AMEDIAMETRICS_PROP_SHARINGMODE,
-                 AudioGlobal_convertSharingModeToText(builder.getSharingMode()))
+                 AudioGlobal_convertSharingModeToText(openRequest.getSharingMode()))
             .set(AMEDIAMETRICS_PROP_ENCODINGCLIENT,
                  android::toString(requestedFormat).c_str()).record();
 
@@ -236,7 +236,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     if (getDeviceFormat() == AUDIO_FORMAT_PCM_16_BIT
         && getFormat() == AUDIO_FORMAT_PCM_FLOAT) {
 
-        if (builder.isDataCallbackSet()) {
+        if (openRequest.isDataCallbackSet()) {
             // If we have a callback then we need to convert the data into an internal float
             // array and then pass that entire array to the app.
             mFormatConversionBufferSizeInFrames =

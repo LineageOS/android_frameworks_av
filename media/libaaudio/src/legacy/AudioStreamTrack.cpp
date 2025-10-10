@@ -59,20 +59,20 @@ AudioStreamTrack::~AudioStreamTrack()
     ALOGE_IF(bad, "stream not closed, in state %d", state);
 }
 
-aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
+aaudio_result_t AudioStreamTrack::open(const AAudioStreamOpenRequest& openRequest)
 {
     if (!com::android::media::aaudio::offload_support() &&
-        builder.getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        openRequest.getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
     aaudio_result_t result = AAUDIO_OK;
 
-    result = AudioStream::open(builder);
+    result = AudioStream::open(openRequest);
     if (result != OK) {
         return result;
     }
 
-    const aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    const aaudio_session_id_t requestedSessionId = openRequest.getSessionId();
     const audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     audio_channel_mask_t channelMask =
@@ -110,7 +110,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             break;
     }
 
-    size_t frameCount = (size_t)builder.getBufferCapacity();
+    size_t frameCount = (size_t)openRequest.getBufferCapacity();
 
     // To avoid glitching, let AudioFlinger pick the optimal burst size.
     int32_t notificationFrames = 0;
@@ -123,7 +123,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     wp<AudioTrack::IAudioTrackCallback> callback;
     // Note that TRANSFER_SYNC does not allow FAST track
     AudioTrack::transfer_type streamTransferType = AudioTrack::transfer_type::TRANSFER_SYNC;
-    if (builder.isDataCallbackSet()) {
+    if (openRequest.isDataCallbackSet()) {
         streamTransferType = AudioTrack::transfer_type::TRANSFER_CALLBACK;
         callback = wp<AudioTrack::IAudioTrackCallback>::fromExisting(this);
 
@@ -138,7 +138,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         streamTransferType = AudioTrack::transfer_type::TRANSFER_SYNC_NOTIF_CALLBACK;
         callback = wp<AudioTrack::IAudioTrackCallback>::fromExisting(this);
     }
-    mCallbackBufferSize = builder.getFramesPerDataCallback();
+    mCallbackBufferSize = openRequest.getFramesPerDataCallback();
 
     ALOGD("open(), request notificationFrames = %d, frameCount = %u",
           notificationFrames, (uint)frameCount);
@@ -147,14 +147,14 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     audio_port_handle_t selectedDeviceId = getFirstDeviceId(getDeviceIds());
 
     const audio_content_type_t contentType =
-            AAudioConvert_contentTypeToInternal(builder.getContentType());
+            AAudioConvert_contentTypeToInternal(openRequest.getContentType());
     const audio_usage_t usage =
-            AAudioConvert_usageToInternal(builder.getUsage());
+            AAudioConvert_usageToInternal(openRequest.getUsage());
     const audio_flags_mask_t attributesFlags = AAudio_computeAudioFlagsMask(
-                                                            builder.getAllowedCapturePolicy(),
-                                                            builder.getSpatializationBehavior(),
-                                                            builder.isContentSpatialized(),
-                                                            flags);
+            openRequest.getAllowedCapturePolicy(),
+            openRequest.getSpatializationBehavior(),
+            openRequest.isContentSpatialized(),
+            flags);
 
     const std::string tags = getTagsAsString();
     audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
@@ -234,9 +234,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             + std::to_string(mAudioTrack->getPortId());
     android::mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
-                 AudioGlobal_convertPerformanceModeToText(builder.getPerformanceMode()))
+                 AudioGlobal_convertPerformanceModeToText(openRequest.getPerformanceMode()))
             .set(AMEDIAMETRICS_PROP_SHARINGMODE,
-                 AudioGlobal_convertSharingModeToText(builder.getSharingMode()))
+                 AudioGlobal_convertSharingModeToText(openRequest.getSharingMode()))
             .set(AMEDIAMETRICS_PROP_ENCODINGCLIENT,
                  android::toString(getFormat()).c_str()).record();
 

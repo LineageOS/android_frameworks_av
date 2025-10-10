@@ -21,7 +21,6 @@
 #include <aaudio/AAudio.h>
 #include <android/content/AttributionSourceState.h>
 #include <core/AudioStream.h>
-#include <core/AudioStreamBuilder.h>
 #include <media/AudioRecord.h>
 #include <utility/FixedBlockWriter.h>
 // go/keep-sorted end
@@ -42,7 +41,7 @@ public:
 
     virtual ~AudioStreamRecord();
 
-    aaudio_result_t open(const AudioStreamBuilder & builder) override;
+    aaudio_result_t open(const AAudioStreamOpenRequest& openRequest) override;
     aaudio_result_t release_l() REQUIRES(mStreamMutex) override;
     void close_l() REQUIRES(mStreamMutex) override;
 

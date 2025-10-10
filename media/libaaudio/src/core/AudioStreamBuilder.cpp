@@ -56,9 +56,6 @@ using android::media::audio::common::AudioMMapPolicyType;
 #define AAUDIO_MMAP_POLICY_DEFAULT_AIDL        AudioMMapPolicy::NEVER
 #define AAUDIO_MMAP_EXCLUSIVE_POLICY_DEFAULT_AIDL AudioMMapPolicy::NEVER
 
-#define FRAMES_PER_DATA_CALLBACK_MIN 1
-#define FRAMES_PER_DATA_CALLBACK_MAX (1024 * 1024)
-
 /*
  * AudioStreamBuilder
  */
@@ -259,27 +256,6 @@ void AudioStreamBuilder::stopUsingStream(AudioStream *stream) {
     android::sp<AudioStream> spAudioStream(stream);
     ALOGV("%s() strongCount = %d", __func__, spAudioStream->getStrongCount());
     spAudioStream->decStrong(nullptr);
-}
-
-aaudio_result_t AudioStreamBuilder::validate() const {
-
-    // Check for values that are ridiculously out of range to prevent math overflow exploits.
-    // The service will do a better check.
-    aaudio_result_t result = AAudioStreamParameters::validate();
-    if (result != AAUDIO_OK) {
-        return result;
-    }
-
-    // Prevent ridiculous values from causing problems.
-    if (mFramesPerDataCallback != AAUDIO_UNSPECIFIED
-        && (mFramesPerDataCallback < FRAMES_PER_DATA_CALLBACK_MIN
-            || mFramesPerDataCallback > FRAMES_PER_DATA_CALLBACK_MAX)) {
-        ALOGE("framesPerDataCallback out of range = %d",
-              mFramesPerDataCallback);
-        return AAUDIO_ERROR_OUT_OF_RANGE;
-    }
-
-    return AAUDIO_OK;
 }
 
 aaudio_result_t AudioStreamBuilder::addTag(const char* tag) {
