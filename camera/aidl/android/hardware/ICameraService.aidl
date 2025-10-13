@@ -36,7 +36,7 @@ import android.hardware.CameraStatus;
 import android.hardware.CameraExtensionSessionStats;
 
 /**
- * Binder interface for the native camera service running in mediaserver.
+ * Binder interface for the native camera service running in cameraserver.
  *
  * @hide
  */
