@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b60a7158_116a6d29",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32253
+      },
+      "writtenOn": "2025-10-14T10:19:03Z",
+      "side": 1,
+      "message": "Fine on lineage-23.0 as well (tested on both NubiaCamera and MiuiCamera)",
+      "revId": "5e79d5ed00d3acc765a9a678a7affa18e483b317",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
