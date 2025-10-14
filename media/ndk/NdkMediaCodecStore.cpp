@@ -108,10 +108,27 @@ static void initCodecInfoMap() {
                 continue;
             }
 
+            // add alias and skip (omx) codecs with names that has been used by other codecs alias.
+            if (sNameToInfoMap.count(codecInfo->getCodecName()) > 0) {
+                if (strncasecmp(codecInfo->getCodecName(), "omx.", strlen("omx.")) != 0) {
+                    ALOGW("skipping a non-omx codec: %s, as it has been overridden by codec: %s",
+                            codecInfo->getCodecName(),
+                            sNameToInfoMap.find(codecInfo->getCodecName())->second.mName.c_str());
+                }
+                continue;
+            }
+
             AMediaCodecInfo info
                     = AMediaCodecInfo(codecInfo->getCodecName(), codecInfo, codecCaps, mediaType);
             sCodecInfos.push_back(info);
-            sNameToInfoMap.emplace(codecInfo->getCodecName(), info);
+
+            Vector<AString> namesAndAliases;
+            codecInfo->getAliases(&namesAndAliases);
+            namesAndAliases.insertAt(0);
+            namesAndAliases.editItemAt(0) = codecInfo->getCodecName();
+            for (const AString &nameOrAlias : namesAndAliases) {
+                sNameToInfoMap.emplace(std::string(nameOrAlias.c_str()), info);
+            }
 
             auto it = sTypeToInfoList.find(mediaType);
             if (it == sTypeToInfoList.end()) {
