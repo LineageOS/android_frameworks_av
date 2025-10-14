@@ -28,3 +28,10 @@ flag {
     description: "Enable IAMF in mp4 extractor."
     bug: "411204259"
 }
+
+flag {
+    name: "extractor_mp4_enable_vvc"
+    namespace: "media_solutions"
+    description: "Enable VVC support in mp4 extractor."
+    bug: "450572989"
+}
