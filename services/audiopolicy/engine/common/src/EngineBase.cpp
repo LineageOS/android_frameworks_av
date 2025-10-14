@@ -90,8 +90,10 @@ status_t EngineBase::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc
 product_strategy_t EngineBase::getProductStrategyForAttributes(
         const audio_attributes_t &attr, uid_t uid, bool fallbackOnDefault) const
 {
-    return mProductStrategies.getProductStrategyForAttributes(attr,
-            getZoneIdForUserId(multiuser_get_user_id(uid)), fallbackOnDefault);
+    int zone = getZoneIdForUserId(multiuser_get_user_id(uid));
+    product_strategy_t strategy = mProductStrategies.getProductStrategyForAttributes(attr,
+        zone, fallbackOnDefault);
+    return strategy;
 }
 
 audio_stream_type_t EngineBase::getStreamTypeForAttributes(const audio_attributes_t &attr) const
@@ -435,6 +437,25 @@ status_t EngineBase::resetProductStrategiesZoneIdForUserId(userid_t userId)
     return NO_ERROR;
 }
 
+userid_t EngineBase::getUserIdForProductStrategy(product_strategy_t strategy) const {
+    int zoneId = AudioProductStrategy::DEFAULT_ZONE_ID;
+    for (const auto& strategyPair : mProductStrategies) {
+        if (strategyPair.second->getId() == strategy) {
+            zoneId = strategyPair.second->getZoneId();
+            break;
+        }
+    }
+    if (zoneId == AudioProductStrategy::DEFAULT_ZONE_ID) {
+        return 0;
+    }
+    for (auto userIdPair : mUserIdZoneCriteria) {
+        if (userIdPair.second == zoneId) {
+            return userIdPair.first;
+        }
+    }
+    return 0;
+}
+
 int EngineBase::getZoneIdForUserId(userid_t userId) const
 {
     if (userId > 0 && !mUserIdZoneCriteria.empty()) {
@@ -496,9 +517,10 @@ VolumeGroupVector EngineBase::getVolumeGroups() const
 }
 
 volume_group_t EngineBase::getVolumeGroupForAttributes(
-        const audio_attributes_t &attr, bool fallbackOnDefault) const
+        const audio_attributes_t &attr, uid_t uid, bool fallbackOnDefault) const
 {
-    return mProductStrategies.getVolumeGroupForAttributes(attr, fallbackOnDefault);
+    int zoneId = getZoneIdForUserId(multiuser_get_user_id(uid));
+    return mProductStrategies.getVolumeGroupForAttributes(attr, zoneId, fallbackOnDefault);
 }
 
 audio_attributes_t EngineBase::getAttributesForVolumeGroup(

@@ -140,7 +140,7 @@ public:
      * @FlaggedApi("android.media.audiopolicy.multi_zone_audio")
      */
     virtual product_strategy_t getProductStrategyForAttributes(
-            const audio_attributes_t &attr, uid_t uid = 0, bool fallbackOnDefault = true) const = 0;
+            const audio_attributes_t &attr, uid_t uid, bool fallbackOnDefault = true) const = 0;
 
     /**
      * Gets the devices to be used for given audio attributes and uid/user id
@@ -321,6 +321,14 @@ public:
     virtual status_t resetProductStrategiesZoneIdForUserId(userid_t userId) = 0;
 
     /**
+     * Return the user id for the product strategy as set by
+     * {@link #setProductStrategiesZoneIdForUserId}
+     *
+     * @param strategy strategy to query
+     */
+    virtual userid_t getUserIdForProductStrategy(product_strategy_t strategy) const = 0;
+
+    /**
      * @brief getVolumeCurvesForAttributes retrieves the Volume Curves interface for the
      *        requested Audio Attributes.
      * @param attr to be considered
@@ -359,12 +367,14 @@ public:
      * Audio Attributes.
      * @param attr to be considered
      * @param fallbackOnDefault if true, will return the fallback volume group if the attributes
+     * @param uid to consider. If UID is 0, the legacy behavior considering only one default zone is
+     * implemented.
      * are not associated to any volume group.
      * @return volume group associated to the given audio attributes, default group if none
      * applicable, VOLUME_GROUP_NONE if no default group defined.
      */
     virtual volume_group_t getVolumeGroupForAttributes(
-            const audio_attributes_t &attr, bool fallbackOnDefault = true) const = 0;
+            const audio_attributes_t &attr, uid_t uid = 0, bool fallbackOnDefault = true) const = 0;
 
     /**
      * Gets the audio attributes matching the given volume group id, if none, returns the default

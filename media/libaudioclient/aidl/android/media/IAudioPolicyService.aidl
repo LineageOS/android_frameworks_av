@@ -174,7 +174,7 @@ interface IAudioPolicyService {
     int getVolumeIndexForGroup(int /* volume_group_id */ groupId,
                                in AudioDeviceDescription device);
 
-    int /* product_strategy_t */ getStrategyForStream(AudioStreamType stream);
+    int /* product_strategy_t */ getStrategyForStream(AudioStreamType stream, int uid);
 
     /**
      * Requests the devices that would be used for routing (if forVolume is false) or for volume
@@ -504,7 +504,8 @@ interface IAudioPolicyService {
      */
     @nullable AudioMixerAttributesInternal getPreferredMixerAttributes(
             in AudioAttributes attr,
-            int /* audio_port_handle_t */ portId);
+            int /* audio_port_handle_t */ portId,
+            int /* uid_t */ uid);
 
     /**
      * Clear preferred mixer attributes for a given device on a given audio attributes that
@@ -551,6 +552,6 @@ interface IAudioPolicyService {
      * audio config and audio attributes.
      */
     FlushFromFrameSupport getFlushFromFrameSupport(
-            in AudioConfigBase config, in AudioAttributes attributes,
+            in AudioConfigBase config, in AudioAttributes attributes, int uid,
             int /* Bitmask, indexed by AudioOutputFlags */ flags);
 }
