@@ -14,24 +14,41 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
+#define LOG_TAG "ApexCodecsStoreImpl"
+#include <utils/Log.h>
+
 #include <android-base/no_destructor.h>
 #include <apex/ApexCodecsImpl.h>
+
+#ifdef ENABLE_APEX_CODECS
+#include <util/C2InterfaceHelper.h>
+#endif
 
 namespace android::apexcodecs {
 
 class ApexComponentStoreImpl : public ApexComponentStoreIntf {
 public:
+#ifdef ENABLE_APEX_CODECS
+    ApexComponentStoreImpl() : mReflector(std::make_shared<C2ReflectorHelper>()) {
+    }
+#else
     ApexComponentStoreImpl() = default;
+#endif
 
     std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() const override {
-        return {};
+        return std::vector(mTraits);
     }
     std::unique_ptr<ApexComponentIntf> createComponent(const char *name [[maybe_unused]]) override {
         return nullptr;
     }
     std::shared_ptr<C2ParamReflector> getParamReflector() const override {
-        return nullptr;
+        return mReflector;
     }
+
+private:
+    std::vector<std::shared_ptr<const C2Component::Traits>> mTraits;
+    std::shared_ptr<C2ParamReflector> mReflector;
 };
 
 }  // namespace android::apexcodecs
