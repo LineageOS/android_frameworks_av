@@ -16,6 +16,7 @@
 
 package aaudio;
 
+import aaudio.DrainType;
 import aaudio.Endpoint;
 import aaudio.IAAudioClient;
 import aaudio.StreamParameters;
@@ -91,7 +92,7 @@ interface IAAudioService {
      * Notify the service that there are enough data in the mmap buffer. The client is suspended
      * to wait for draining written data.
      */
-    int drainStream(int streamHandle, long wakeUpNanos, boolean allowSoftWakeUp,
+    int drainStream(int streamHandle, long wakeUpNanos, DrainType drainType,
                     out TimerQueueHandle handle);
 
     /**

@@ -123,7 +123,7 @@ public:
 
     aaudio_result_t drainStream(const AAudioHandleInfo& streamHandleInfo,
                                 int64_t wakeupNanos,
-                                bool allowSoftWakeUp,
+                                DrainType drainType,
                                 android::audio_utils::TimerQueue::handle_t* handle) override;
 
     aaudio_result_t activateStream(const AAudioHandleInfo& streamHandleInfo,
