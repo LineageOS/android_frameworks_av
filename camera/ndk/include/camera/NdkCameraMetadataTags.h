@@ -9817,15 +9817,11 @@ typedef enum acamera_metadata_enum_acamera_control_ae_priority_mode {
     /**
      * <p>The camera device's auto-exposure routine is active and
      * prioritizes the application-selected exposure time
-     * (ACAMERA_SENSOR_EXPOSURE_TIME). The exposure time may be clamped
-     * to the maximum duration allowed by the requested target frame rate in
-     * ACAMERA_CONTROL_AE_TARGET_FPS_RANGE to ensure the frame rate does not
-     * fall below the requested minimum.</p>
+     * (ACAMERA_SENSOR_EXPOSURE_TIME).</p>
      * <p>The application has control over ACAMERA_SENSOR_EXPOSURE_TIME while
      * the application's values for ACAMERA_SENSOR_SENSITIVITY and
      * ACAMERA_SENSOR_FRAME_DURATION are ignored.</p>
      *
-     * @see ACAMERA_CONTROL_AE_TARGET_FPS_RANGE
      * @see ACAMERA_SENSOR_EXPOSURE_TIME
      * @see ACAMERA_SENSOR_FRAME_DURATION
      * @see ACAMERA_SENSOR_SENSITIVITY
