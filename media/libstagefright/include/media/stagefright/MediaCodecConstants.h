@@ -721,78 +721,6 @@ inline static const char *asString_APVBandLevel(int32_t i, const char *def = "??
     }
 }
 
-// VVC ProfileLevel
-inline constexpr int32_t VVCProfileMain8                = 0x01;
-inline constexpr int32_t VVCProfileMain10               = 0x02;
-inline constexpr int32_t VVCProfileMain10Still          = 0x04;
-inline constexpr int32_t VVCProfileMain10HDR10          = 0x1000;
-inline constexpr int32_t VVCProfileMain10HDR10Plus      = 0x2000;
-
-inline static const char *asString_VVCProfile(int32_t i, const char *def = "??") {
-    switch (i) {
-        case VVCProfileMain8:                   return "Main8";
-        case VVCProfileMain10:                  return "Main10";
-        case VVCProfileMain10Still:             return "Main10Still";
-        case VVCProfileMain10HDR10:             return "Main10HDR10";
-        case VVCProfileMain10HDR10Plus:         return "Main10HDR10Plus";
-        default:                                return def;
-    }
-}
-
-inline constexpr int32_t VVCMainTierLevel10 = 0x1;
-inline constexpr int32_t VVCMainTierLevel20 = 0x2;
-inline constexpr int32_t VVCMainTierLevel21 = 0x4;
-inline constexpr int32_t VVCMainTierLevel30 = 0x8;
-inline constexpr int32_t VVCMainTierLevel31 = 0x10;
-inline constexpr int32_t VVCMainTierLevel40 = 0x20;
-inline constexpr int32_t VVCHighTierLevel40 = 0x40;
-inline constexpr int32_t VVCMainTierLevel41 = 0x80;
-inline constexpr int32_t VVCHighTierLevel41 = 0x100;
-inline constexpr int32_t VVCMainTierLevel50 = 0x200;
-inline constexpr int32_t VVCHighTierLevel50 = 0x400;
-inline constexpr int32_t VVCMainTierLevel51 = 0x800;
-inline constexpr int32_t VVCHighTierLevel51 = 0x1000;
-inline constexpr int32_t VVCMainTierLevel52 = 0x2000;
-inline constexpr int32_t VVCHighTierLevel52 = 0x4000;
-inline constexpr int32_t VVCMainTierLevel60 = 0x8000;
-inline constexpr int32_t VVCHighTierLevel60 = 0x10000;
-inline constexpr int32_t VVCMainTierLevel61 = 0x20000;
-inline constexpr int32_t VVCHighTierLevel61 = 0x40000;
-inline constexpr int32_t VVCMainTierLevel62 = 0x80000;
-inline constexpr int32_t VVCHighTierLevel62 = 0x100000;
-inline constexpr int32_t VVCMainTierLevel63 = 0x200000;
-inline constexpr int32_t VVCHighTierLevel63 = 0x400000;
-
-inline static const char *asString_VVCTierLevel(int32_t i, const char *def = "??") {
-    switch (i) {
-        case VVCMainTierLevel10:   return "Main 1.0";
-        case VVCMainTierLevel20:   return "Main 2.0";
-        case VVCMainTierLevel21:   return "Main 2.1";
-        case VVCMainTierLevel30:   return "Main 3.0";
-        case VVCMainTierLevel31:   return "Main 3.1";
-        case VVCMainTierLevel40:   return "Main 4.0";
-        case VVCHighTierLevel40:   return "High 4.0";
-        case VVCMainTierLevel41:   return "Main 4.1";
-        case VVCHighTierLevel41:   return "High 4.1";
-        case VVCMainTierLevel50:   return "Main 5.0";
-        case VVCHighTierLevel50:   return "High 5.0";
-        case VVCMainTierLevel51:   return "Main 5.1";
-        case VVCHighTierLevel51:   return "High 5.1";
-        case VVCMainTierLevel52:   return "Main 5.2";
-        case VVCHighTierLevel52:   return "High 5.2";
-        case VVCMainTierLevel60:   return "Main 6.0";
-        case VVCHighTierLevel60:   return "High 6.0";
-        case VVCMainTierLevel61:   return "Main 6.1";
-        case VVCHighTierLevel61:   return "High 6.1";
-        case VVCMainTierLevel62:   return "Main 6.2";
-        case VVCHighTierLevel62:   return "High 6.2";
-        case VVCMainTierLevel63:   return "Main 6.3";
-        case VVCHighTierLevel63:   return "High 6.3";
-        default:                   return def;
-    }
-}
-
-
 // IAMF ProfileLevel
 inline constexpr int32_t IAMF_CODEC_OPUS            = 0x1;
 inline constexpr int32_t IAMF_CODEC_AAC             = 0x1 << 1;
@@ -1075,7 +1003,6 @@ inline constexpr char MIMETYPE_VIDEO_MPEG2[] = "video/mpeg2";
 inline constexpr char MIMETYPE_VIDEO_RAW[] = "video/raw";
 inline constexpr char MIMETYPE_VIDEO_DOLBY_VISION[] = "video/dolby-vision";
 inline constexpr char MIMETYPE_VIDEO_SCRAMBLED[] = "video/scrambled";
-inline constexpr char MIMETYPE_VIDEO_VVC[] = "video/vvc";
 
 inline constexpr char MIMETYPE_AUDIO_AMR_NB[] = "audio/3gpp";
 inline constexpr char MIMETYPE_AUDIO_AMR_WB[] = "audio/amr-wb";
