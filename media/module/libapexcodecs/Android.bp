@@ -66,11 +66,21 @@ cc_library {
 
     srcs: [
         "ApexCodecsStoreImpl.cpp",
-    ],
+    ] + select(release_flag("RELEASE_APEX_CODECS"), {
+        true: [
+            "C2ApexOpusDec.cpp",
+        ],
+        default: [],
+    }),
 
     shared_libs: select(release_flag("RELEASE_APEX_CODECS"), {
         true: [
+            "libaconfig_storage_read_api_cc",
+            "libcodec2_soft_common",
             "libcodec2_vndk",
+            "liblog", // for ALOG
+            "libopus",
+            "libstagefright_foundation", // for ColorUtils and MIME
         ],
         default: [],
     }),
@@ -79,6 +89,10 @@ cc_library {
         true: ["-DENABLE_APEX_CODECS"],
         default: [],
     }),
+
+    static_libs: [
+        "android.media.codec-aconfig-cc",
+    ],
 
     visibility: [
         ":__subpackages__",
@@ -98,11 +112,21 @@ cc_library {
 
     srcs: [
         "ApexCodecsStoreImpl.cpp",
-    ],
+    ] + select(release_flag("RELEASE_APEX_CODECS"), {
+        true: [
+            "C2ApexOpusDec.cpp",
+        ],
+        default: [],
+    }),
 
     shared_libs: select(release_flag("RELEASE_APEX_CODECS"), {
         true: [
+            "libaconfig_storage_read_api_cc",
+            "libcodec2_soft_common",
             "libcodec2_vndk",
+            "liblog", // for ALOG
+            "libopus",
+            "libstagefright_foundation", // for ColorUtils and MIME
         ],
         default: [],
     }),
@@ -111,6 +135,10 @@ cc_library {
         true: ["-DENABLE_APEX_CODECS"],
         default: [],
     }),
+
+    static_libs: [
+        "android.media.codec-aconfig-cc",
+    ],
 
     min_sdk_version: "apex_inherit",
     version_script: "libcom.android.media.swcodec.apexcodecs.map.txt",
