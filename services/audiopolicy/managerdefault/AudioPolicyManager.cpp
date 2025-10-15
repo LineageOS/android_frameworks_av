@@ -3811,7 +3811,8 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
 {
     if (audio_flags::volume_group_management_update()) {
         auto group = mEngine->getVolumeGroupForStreamType(stream);
-        ALOGV("%s: stream %s group=%d", __func__, toString(stream).c_str(), group);
+        ALOGV("%s: stream %s group=%d device %s",
+              __func__, toString(stream).c_str(), group, toString(device).c_str());
         return setVolumeIndexForGroup(group, index, muted, device);
     }
     auto attributes = mEngine->getAttributesForStreamType(stream);
@@ -3880,77 +3881,80 @@ status_t AudioPolicyManager::setVolumeIndexForGroup(volume_group_t group,
         return status;
     }
 
-    DeviceTypeSet curSrcDevices;
-    auto curCurvAttrs = curves.getAttributes();
-    if (!curCurvAttrs.empty() && curCurvAttrs.front() != defaultAttr) {
-        auto attr = curCurvAttrs.front();
-        curSrcDevices = mEngine->getOutputDevicesForAttributes(attr, nullptr, false).types();
+    DeviceTypeSet attrDevices;
+    auto attrs = curves.getAttributes();
+    if (!attrs.empty() && attrs.front() != defaultAttr) {
+        auto attr = attrs.front();
+        attrDevices = mEngine->getOutputDevicesForAttributes(attr, nullptr, false).types();
     } else if (!curves.getStreamTypes().empty()) {
         auto stream = curves.getStreamTypes().front();
-        curSrcDevices = mEngine->getOutputDevicesForStream(stream, false).types();
+        attrDevices = mEngine->getOutputDevicesForStream(stream, false).types();
     } else {
         ALOGE("%s: Invalid src %d: no valid attributes nor stream",__func__, vs);
         return BAD_VALUE;
     }
-    audio_devices_t curSrcDevice = Volume::getDeviceForVolume(curSrcDevices);
-    resetDeviceTypes(curSrcDevices, curSrcDevice);
+    audio_devices_t attrDevice = Volume::getDeviceForVolume(attrDevices);
+    resetDeviceTypes(attrDevices, attrDevice);
+    if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
+        attrDevices.insert(device);
+    }
 
-    // update volume on all outputs and streams matching the following:
-    // - The requested volume source (or a volume source for volume control) is active on the output
-    // - The device (or devices) selected by the engine for this stream includes
-    // the requested device
-    // - For non default requested device, currently selected device on the output is either the
-    // requested device or one of the devices selected by the engine for this stream
-    // - For default requested device (AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME), apply volume only if
-    // no specific device volume value exists for currently selected device.
-    // - Only apply the volume if the requested device is the desired device for volume control.
-    for (size_t i = 0; i < mOutputs.size(); i++) {
-        sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-        DeviceTypeSet curDevices = desc->devices().types();
+    // Update volume on all outputs matching the following:
+    // - The requested volume source is active on the output or we are in a call
+    // - A specific device was requested and:
+    //     - The requested device is included in the device set selected for the audio attributes
+    //     - And the requested device is part of current output devices
+    //     - And current output device for volume is included in the device set selected for
+    //     the audio attributes
+    // - No specific device was requested and:
+    //     - The volume curve does not currently have an index set for the volume device from
+    //     the device set selected for the audio attributes
 
-        if (curDevices.erase(AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
-            curDevices.insert(AUDIO_DEVICE_OUT_SPEAKER);
-        }
+    if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME
+                && attrDevices.find(device) != attrDevices.end())
+            || (device == AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME
+                && !curves.hasVolumeIndexForDevice(attrDevice))) {
+        for (size_t i = 0; i < mOutputs.size(); i++) {
+            sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
 
-        if (!(desc->isActive(activityVs) || isInCallOrScreening())) {
-            continue;
-        }
-        if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME &&
-                curDevices.find(device) == curDevices.end()) {
-            continue;
-        }
-        bool applyVolume = false;
-        if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
-            curSrcDevices.insert(device);
-            applyVolume = (curSrcDevices.find(
-                    Volume::getDeviceForVolume(curDevices)) != curSrcDevices.end())
-                    && Volume::getDeviceForVolume(curSrcDevices) == device;
-        } else {
-            applyVolume = !curves.hasVolumeIndexForDevice(curSrcDevice);
-        }
-        if (!applyVolume) {
-            continue; // next output
-        }
-        // Inter / intra volume group priority management: Loop on strategies arranged by priority
-        // If a higher priority strategy is active, and the output is routed to a device with a
-        // HW Gain management, do not change the volume
-        if (desc->useHwGain()) {
-            bool swMute = com_android_media_audio_ring_my_car() ? curves.isMuted() : (index == 0);
-            // If the volume source is active with higher priority source, ensure at least Sw Muted
-            desc->setSwMute(swMute, vs, curDevices, 0 /*delayMs*/);
-            if (!desc->canSetVolumeForVolumeSource(activityVs)) {
+            if (!(desc->isActive(activityVs) || isInCallOrScreening())) {
                 continue; // next output
             }
-        }
-        //FIXME: workaround for truncated touch sounds
-        // delayed volume change for system stream to be removed when the problem is
-        // handled by system UI
-        status_t volStatus = checkAndSetVolume(curves, vs, index, desc,
-                                               curDevices, /*adjustAttenuation*/true,
-                                               ((vs == toVolumeSource(AUDIO_STREAM_SYSTEM, false)) ?
-                                                TOUCH_SOUND_FIXED_DELAY_MS : 0));
-        if (volStatus != NO_ERROR) {
-            status = volStatus;
+
+            DeviceTypeSet outputDevices = desc->devices().types();
+            if (outputDevices.erase(AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
+                outputDevices.insert(AUDIO_DEVICE_OUT_SPEAKER);
+            }
+            if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
+                if (outputDevices.find(device) == outputDevices.end()
+                        || attrDevices.find(Volume::getDeviceForVolume(outputDevices))
+                            == attrDevices.end()) {
+                    continue; // next output
+                }
+            }
+            // Inter / intra volume group priority management:
+            // Loop on strategies arranged by priority; if a higher priority strategy is active,
+            // and the output is routed to a device with a HW Gain management,
+            // do not change the volume
+            if (desc->useHwGain()) {
+                bool swMute =
+                        com_android_media_audio_ring_my_car() ? curves.isMuted() : (index == 0);
+                // If the volume source is active with higher priority source,
+                // ensure at least Sw Muted
+                desc->setSwMute(swMute, vs, outputDevices, 0 /*delayMs*/);
+                if (!desc->canSetVolumeForVolumeSource(activityVs)) {
+                    continue; // next output
+                }
+            }
+            //FIXME: workaround for truncated touch sounds
+            // delayed volume change for system stream to be removed when the problem is
+            // handled by system UI
+            status_t volStatus = checkAndSetVolume(curves, vs, index, desc, outputDevices,
+                    /*adjustAttenuation*/true, (vs == toVolumeSource(AUDIO_STREAM_SYSTEM, false)) ?
+                    TOUCH_SOUND_FIXED_DELAY_MS : 0);
+            if (volStatus != NO_ERROR) {
+                status = volStatus;
+            }
         }
     }
 
@@ -3959,7 +3963,7 @@ status_t AudioPolicyManager::setVolumeIndexForGroup(volume_group_t group,
         audio_devices_t rxSinkDevice = mCallRxSourceClient->sinkDevice()->type();
         audio_devices_t curVoiceDevice = Volume::getDeviceForVolume({rxSinkDevice});
         if (curVoiceDevice == device
-                && curSrcDevices.find(curVoiceDevice) != curSrcDevices.end()) {
+                && attrDevices.find(curVoiceDevice) != attrDevices.end()) {
             bool isVoiceVolSrc;
             bool isBtScoVolSrc;
             updateVoiceBtScoVolumeSrcForCalls(vs, isVoiceVolSrc, isBtScoVolSrc);
