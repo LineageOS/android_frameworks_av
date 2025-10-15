@@ -8864,7 +8864,9 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     if (!com_android_media_audio_ring_my_car()) {
         muted = (index == 0) && (volumeDb != 0.0f);
     } else {
-        muted = curves.isMuted() && !outputDesc->isFixedVolume(deviceTypes);
+        const bool isBleBroadcast =
+                Volume::getDeviceForVolume(deviceTypes) == AUDIO_DEVICE_OUT_BLE_BROADCAST;
+        muted = curves.isMuted() && !outputDesc->isFixedVolume(deviceTypes) && !isBleBroadcast;
     }
     outputDesc->setVolume(volumeDb, muted, volumeSource, curves.getStreamTypes(),
             deviceTypes, delayMs, force, isVoiceVolSrc);
