@@ -268,11 +268,3 @@ flag {
   description: "traces for logging codec activity"
   bug: "380898418"
 }
-
-flag {
-  name: "vvc_support"
-  namespace: "codec_fwk"
-  description: "Feature flag for Android support for VVC Content"
-  bug: "426238242"
-  is_exported: true
-}
