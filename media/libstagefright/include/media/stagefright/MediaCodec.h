@@ -798,6 +798,15 @@ private:
 
     sp<BatteryChecker> mBatteryChecker;
 
+    // HDCP tuple<currentRetryCounter, retrySuccessCounter, retryFailureCounter>
+    std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> mRetryHdcpFailure;
+    std::list<sp<AMessage>> mInputBufferRetryQueue;
+    // Handles errors encountered during queueInputBuffer. This is to manage
+    // retries, particularly for HDCP-related failures.
+    // Returns true if the error was handled (e.g. by queuing for retry),
+    // false otherwise, if error cannot be handled (e.g. retry exhausted).
+    bool handleQueueInputBufferError(const sp<AMessage> &msg, status_t &err);
+
     void statsBufferSent(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer);
     void statsBufferReceived(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer);
     bool discardDecodeOnlyOutputBuffer(size_t index);
