@@ -390,7 +390,7 @@ static status_t prepareVirtualDisplay(
     if (err != NO_ERROR) {
         return err;
     }
-    *mirrorRoot = SurfaceComposerClient::getDefault()->mirrorDisplay(displayId);
+    *mirrorRoot = SurfaceComposerClient::getDefault()->mirrorLayerStack(displayId);
     if (*mirrorRoot == nullptr) {
         ALOGE("Failed to create a mirror for screenrecord");
         return UNKNOWN_ERROR;
