@@ -188,4 +188,25 @@ interface IResourceManagerService {
      * @param resources List of resources being used when this call is made.
      */
     void getMediaResourceUsageReport(out MediaResourceParcel[] resources);
+
+    /**
+     * Registers the globally available system resources from the hal resource pool.
+     *
+     * The resource manager service uses this as the global resource pool and
+     * tracks the available resources based on the current resource consumption.
+     * Current resource consumption is notified through addResource, removeResource,
+     * and updateResource.
+     *
+     * @param resources an array of resources to be registered.
+     */
+    void registerSystemResource(in MediaResourceParcel[] resources);
+
+    /**
+     * Checks if the system has enough of the specified list of resources.
+     *
+     * @param resourcesNeeded The list of resources required.
+     *
+     * @return true if resources are likely available, false otherwise.
+     */
+    boolean checkResourceAvailability(in MediaResourceParcel[] resourcesNeeded);
 }

@@ -1114,6 +1114,24 @@ Status ResourceManagerService::getMediaResourceUsageReport(
     return Status::ok();
 }
 
+Status ResourceManagerService::registerSystemResource(
+        const std::vector<MediaResourceParcel>& resources) {
+    (void)resources;
+    // Not implemented
+    return Status::ok();
+}
+
+Status ResourceManagerService::checkResourceAvailability(
+        const std::vector<MediaResourceParcel>& resourcesNeeded,
+        bool* _aidl_return) {
+    (void)resourcesNeeded;
+    // Not implemented
+    if (_aidl_return) {
+        *_aidl_return = false;
+    }
+    return Status::ok();
+}
+
 Status ResourceManagerService::updateResource(const ClientInfoParcel& clientInfo,
                                               const std::vector<MediaResourceParcel>& resources) {
     (void)clientInfo;
