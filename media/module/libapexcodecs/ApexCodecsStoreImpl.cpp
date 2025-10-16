@@ -20,6 +20,8 @@
 
 #include <ranges>
 
+#include <sys/mman.h>
+
 #include <android-base/no_destructor.h>
 #include <apex/ApexCodecsImpl.h>
 
@@ -38,6 +40,8 @@ struct ComponentDesc {
     std::shared_ptr<const C2Component::Traits> traits;
     std::function<std::unique_ptr<ApexComponentIntf>(
             const std::shared_ptr<C2ReflectorHelper>&)> createComponentFn;
+    ApexCodec_MapFn mapFn;
+    ApexCodec_UnmapFn unmapFn;
 };
 
 template <typename... Codecs>
@@ -59,12 +63,29 @@ public:
         return mCodecs.at(name).createComponentFn(reflector);
     }
 
+    ApexCodec_MapFn getMapFn(const char *name) const {
+        if (mCodecs.count(name) == 0) {
+            return ::mmap;
+        }
+        return mCodecs.at(name).mapFn;
+    }
+
+
+    ApexCodec_UnmapFn getUnmapFn(const char *name) const {
+        if (mCodecs.count(name) == 0) {
+            return ::munmap;
+        }
+        return mCodecs.at(name).unmapFn;
+    }
+
 private:
     static std::map<std::string, ComponentDesc> BuildCodecs() {
         std::map<std::string, ComponentDesc> codecs;
         ((codecs[Codecs::COMPONENT_NAME] = ComponentDesc{
             Codecs::MakeTraits(),
             Codecs::Create,
+            Codecs::Map,
+            Codecs::Unmap,
         }), ...);
         std::erase_if(codecs, [](const auto &pair) {
             return pair.second.traits == nullptr;
@@ -91,6 +112,12 @@ public:
     std::shared_ptr<C2ParamReflector> getParamReflector() const override {
         return mReflector;
     }
+    ApexCodec_MapFn getMapFn(const char *name) const override {
+        return mImpl.getMapFn(name);
+    }
+    ApexCodec_UnmapFn getUnmapFn(const char *name) const override {
+        return mImpl.getUnmapFn(name);
+    }
 
 private:
     StoreImpl<
@@ -113,6 +140,12 @@ public:
     }
     std::shared_ptr<C2ParamReflector> getParamReflector() const override {
         return nullptr;
+    }
+    ApexCodec_MapFn getMapFn(const char *) const override {
+        return ::mmap;
+    }
+    ApexCodec_UnmapFn getUnmapFn(const char *) const override {
+        return ::munmap;
     }
 };
 

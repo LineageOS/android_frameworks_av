@@ -17,6 +17,7 @@
 #ifndef ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 #define ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 
+#include <C2AllocatorCommon.h>
 #include <C2Buffer.h>
 
 #include <utils/RefBase.h>
@@ -31,19 +32,20 @@ namespace android::hardware::media::bufferpool {
 // BuffePool Data for HIDL-BufferPool
 struct BufferPoolData;
 
-}
+} // namespace android::hardware::media::bufferpool
 namespace aidl::android::hardware::media::bufferpool2 {
 
 // BuffePool Data for AIDL-BufferPool
 struct BufferPoolData;
 
-}
+} // namespace aidl::android::hardware::media::bufferpool2
 
 namespace aidl::android::hardware::media::c2 {
 
 // IGraphicBufferAllocator for media.c2 aidl
 class IGraphicBufferAllocator;
-}
+
+} // namespace aidl::android::hardware::media::c2
 
 typedef struct AHardwareBuffer AHardwareBuffer;
 
@@ -235,6 +237,28 @@ struct _C2BlockFactory {
             const std::shared_ptr<bufferpool2_BufferPoolData> &data);
 
     /**
+     * Get the linear allocation from the linear block.
+     *
+     * \param block  linear block
+     *
+     * \return shared pointer to the linear allocation.
+     */
+    static
+    std::shared_ptr<C2LinearAllocation> GetLinearAllocation(
+            const std::shared_ptr<C2LinearBlock>& block);
+
+    /**
+     * Get the linear allocation from the linear block.
+     *
+     * \param block  linear block
+     *
+     * \return shared pointer to the linear allocation.
+     */
+    static
+    std::shared_ptr<C2LinearAllocation> GetLinearAllocation(
+            C2ConstLinearBlock& block);
+
+    /**
      * Get bufferpool data from the blockpool data.
      *
      * \param poolData          blockpool data
@@ -247,6 +271,34 @@ struct _C2BlockFactory {
     bool GetBufferPoolData(
             const std::shared_ptr<const _C2BlockPoolData> &poolData,
             std::shared_ptr<bufferpool2_BufferPoolData> *bufferPoolData);
+
+    /**
+     * Map a linear block with specific mapper functions.
+     *
+     * \param block     linear block to map
+     * \param mapFn     mmap-like function
+     * \param unmapFn   munmap-like function
+     *
+     * return an acquirable write view for the mapped block.
+     */
+    static C2Acquirable<C2WriteView> MapLinearWithMapper(
+            const std::shared_ptr<C2LinearBlock> &block,
+            C2LinearMapFn mapFn,
+            C2LinearUnmapFn unmapFn);
+
+    /**
+     * Map a const linear block with specific mapper functions.
+     *
+     * \param block     const linear block to map
+     * \param mapFn     mmap-like function
+     * \param unmapFn   munmap-like function
+     *
+     * \return an acquirable read view for the mapped block.
+     */
+    static C2Acquirable<C2ReadView> MapConstLinearWithMapper(
+            const C2ConstLinearBlock &block,
+            C2LinearMapFn mapFn,
+            C2LinearUnmapFn unmapFn);
 
     /*
      * Life Cycle Management of BufferQueue-Based Blocks
@@ -491,4 +543,3 @@ struct _C2BlockFactory {
 };
 
 #endif // ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
-
