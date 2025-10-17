@@ -406,9 +406,6 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     // The stream is in standby mode, copy all available data and then close the duplicated
     // shared file descriptor so that it won't cause issue when the HAL try to reallocate new
     // shared file descriptor when exiting from standby.
-    // Cache current read counter, which will be reset to new read and write counter
-    // when the new data queue and endpoint are reconfigured.
-    const android::fifo_counter_t readCounter = mAudioEndpoint->getDataReadCounter();
     // Cache the buffer size which may be from client.
     const int32_t previousBufferSize = mBufferSizeInFrames;
     // Copy all available data from current data queue.
