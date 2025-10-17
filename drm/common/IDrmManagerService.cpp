@@ -1001,10 +1001,8 @@ status_t BnDrmManagerService::onTransact(
             }
             const String8 key(data.readString8());
             if (key == String8("FileDescriptorKey")) {
-                char buffer[16];
                 int fd = data.readFileDescriptor();
-                sprintf(buffer, "%lu", (unsigned long)fd);
-                drmInfoRequest->put(key, String8(buffer));
+                drmInfoRequest->put(key, String8::format("%d", fd));
             } else {
                 const String8 value(data.readString8());
                 drmInfoRequest->put(key, (value == String8("NULL")) ? String8("") : value);
