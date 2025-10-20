@@ -102,9 +102,10 @@ static constexpr size_t kJpegThumbnailBufferSize = 32 * 1024;  // 32 KiB
 
 static constexpr UpdateTextureTask kUpdateTextureTask;
 
-// The number of nanosecond to wait for the first frame to be drawn on the input surface
-static constexpr std::chrono::nanoseconds kMaxWaitFirstFrame = 3s;
-// The number of nanosecond to wait for a frame for use cases where frame
+// The number of nanoseconds to wait for the first frame to be drawn on the
+// input surface
+static constexpr std::chrono::nanoseconds kMaxWaitFirstFrame = 15s;
+// The number of nanoseconds to wait for a frame for use cases where frame
 // duplication is not an option.
 static constexpr std::chrono::nanoseconds kMaxWaitNoDuplication = 60s;
 
