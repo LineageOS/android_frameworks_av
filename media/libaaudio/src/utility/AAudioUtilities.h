@@ -29,6 +29,7 @@
 // go/keep-sorted start
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <stdint.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -37,13 +38,21 @@
 
 /**
  * Convert an AAudio result into the closest matching Android status.
+ * The conversion will first find the value from customizedMap and then fallback to standard
+ * conversion.
  */
-android::status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result);
+android::status_t AAudioConvert_aaudioToAndroidStatus(
+        aaudio_result_t result,
+        const std::map<aaudio_result_t, android::status_t>& customizedMap = {});
 
 /**
  * Convert an Android status into the closest matching AAudio result.
+ * The conversion will first find the value from customizedMap and then fallback to standard
+ * conversion.
  */
-aaudio_result_t AAudioConvert_androidToAAudioResult(android::status_t status);
+aaudio_result_t AAudioConvert_androidToAAudioResult(
+        android::status_t status,
+        const std::map<android::status_t, aaudio_result_t>& customizedMap = {});
 
 /**
  * Convert an aaudio_session_id_t to a value that is safe to pass to AudioFlinger.
