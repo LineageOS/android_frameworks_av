@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
-#include "AudioToken.h"
 #define LOG_TAG "AudioPowerManager"
+
+#include <psh_utils/AudioPowerManager.h>
+
+// go/keep-sorted start
+#include "AudioToken.h"
+#include <audio_utils/Time.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
-#include <psh_utils/AudioPowerManager.h>
+#include <utils/Timers.h>
+// go/keep-sorted end
 
 namespace android::media::psh_utils {
 
