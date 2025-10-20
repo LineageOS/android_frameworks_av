@@ -357,3 +357,11 @@ flag {
     bug: "402502314"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "support_per_phone_account_ringtone"
+    namespace: "telecom"
+    description: "Support setting ringtone separately for each PhoneAccountHandle"
+    bug: "118735436"
+    is_exported: true
+}
