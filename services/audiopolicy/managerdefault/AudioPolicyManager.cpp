@@ -1880,11 +1880,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
     // was specified and offload or direct playback is not explicitly requested, and there is no
     // haptic channel included in playback
     *isSpatialized = false;
-    if (mSpatializerOutput != nullptr &&
-        canBeSpatializedInt(attr, config, devices.toTypeAddrVector()) &&
-        prefMixerConfigInfo == nullptr &&
-        ((*flags & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT)) == 0) &&
-        checkHapticCompatibilityOnSpatializerOutput(config, session)) {
+    if (shouldBeSpatialized(attr, config, devices.toTypeAddrVector(),
+                            *flags, session, prefMixerConfigInfo)) {
         *isSpatialized = true;
         return mSpatializerOutput->mIoHandle;
     }
@@ -8408,9 +8405,11 @@ void AudioPolicyManager::checkSpatializedClientsReroute(
         audio_attributes_t attr = client->attributes();
         audio_config_base_t clientConfig = client->config();
         audio_config_t config = audio_config_initializer(&clientConfig);
-        AudioDeviceTypeAddrVector devicesTypeAddress = devices.toTypeAddrVector();
-        if (client->isSpatialized() !=
-                canBeSpatializedInt(&attr, &config, devicesTypeAddress)) {
+
+        if (client->isSpatialized() != shouldBeSpatialized(&attr, &config,
+                devices.toTypeAddrVector(), client->flags(), client->session(),
+                getPreferredMixerAttributesInfo(outputDesc->devices()[0]->getId(),
+                                                client->strategy()))) {
             clientsToInvalidate.push_back(client->portId());
         }
     }
@@ -8420,6 +8419,23 @@ void AudioPolicyManager::checkSpatializedClientsReroute(
         mpClientInterface->invalidateTracks(clientsToInvalidate);
     }
 }
+
+bool AudioPolicyManager::shouldBeSpatialized(const audio_attributes_t *attr,
+                                             const audio_config_t *config,
+                                             const AudioDeviceTypeAddrVector &devices,
+                                             const audio_output_flags_t flags,
+                                             audio_session_t session,
+                                             const sp<PreferredMixerAttributesInfo>& mixConfInfo) {
+    if (mSpatializerOutput != nullptr && canBeSpatializedInt(attr, config, devices)
+            && ((flags & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT)) == 0)
+            && checkHapticCompatibilityOnSpatializerOutput(config, session)
+            && mixConfInfo == nullptr) {
+        return true;
+    }
+
+    return false;
+}
+
 status_t AudioPolicyManager::resetOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
                                                int delayMs,
                                                audio_patch_handle_t *patchHandle)
