@@ -1862,6 +1862,91 @@ void VideoCapabilities::applyLevelLimits() {
             maxBlocks, maxBlocksPerSecond,
             blockSize, blockSize,
             2 /* widthAlignment */, 1 /* heightAlignment */);
+    } else if (android::media::codec::vvc_support()
+            && base::EqualsIgnoreCase(mMediaType, MIMETYPE_VIDEO_VVC)) {
+        // CTBs are at least 4x4 so use 4x4 block size
+        maxBlocks = 36864 >> 4; // 192x192 pixels == 2304 4x4 blocks
+        maxBlocksPerSecond = maxBlocks * 15;
+        maxBps = 128000;
+        for (ProfileLevel profileLevel: mProfileLevels) {
+            double FR = 0;
+            int32_t FS = 0, BR = 0;
+            switch (profileLevel.mLevel) {
+                case VVCMainTierLevel10:
+                    FR =    15; FS =    36864; BR =     128; break;
+                case VVCMainTierLevel20:
+                    FR =    30; FS =   122880; BR =    1500; break;
+                case VVCMainTierLevel21:
+                    FR =    30; FS =   245760; BR =    3000; break;
+                case VVCMainTierLevel30:
+                    FR =    30; FS =   552960; BR =    6000; break;
+                case VVCMainTierLevel31:
+                    FR = 33.75; FS =   983040; BR =   10000; break;
+                case VVCMainTierLevel40:
+                    FR =    30; FS =  2228224; BR =   12000; break;
+                case VVCHighTierLevel40:
+                    FR =    30; FS =  2228224; BR =   30000; break;
+                case VVCMainTierLevel41:
+                    FR =    60; FS =  2228224; BR =   20000; break;
+                case VVCHighTierLevel41:
+                    FR =    60; FS =  2228224; BR =   50000; break;
+                case VVCMainTierLevel50:
+                    FR =    30; FS =  8912896; BR =   25000; break;
+                case VVCHighTierLevel50:
+                    FR =    30; FS =  8912896; BR =  100000; break;
+                case VVCMainTierLevel51:
+                    FR =    60; FS =  8912896; BR =   40000; break;
+                case VVCHighTierLevel51:
+                    FR =    60; FS =  8912896; BR =  160000; break;
+                case VVCMainTierLevel52:
+                    FR =   120; FS =  8912896; BR =   60000; break;
+                case VVCHighTierLevel52:
+                    FR =   120; FS =  8912896; BR =  240000; break;
+                case VVCMainTierLevel60:
+                    FR =    30; FS = 35651584; BR =   60000; break;
+                case VVCHighTierLevel60:
+                    FR =    30; FS = 35651584; BR =  240000; break;
+                case VVCMainTierLevel61:
+                    FR =    60; FS = 35651584; BR =  120000; break;
+                case VVCHighTierLevel61:
+                    FR =    60; FS = 35651584; BR =  480000; break;
+                case VVCMainTierLevel62:
+                    FR =   120; FS = 35651584; BR =  240000; break;
+                case VVCHighTierLevel62:
+                    FR =   120; FS = 35651584; BR =  800000; break;
+                case VVCMainTierLevel63:
+                    FR =    60; FS = 80216064; BR =  320000; break;
+                case VVCHighTierLevel63:
+                    FR =    60; FS = 80216064; BR = 1600000; break;
+                default:
+                    ALOGW("Unrecognized level %d for %s", profileLevel.mLevel, mediaType);
+                    errors |= ERROR_CAPABILITIES_UNRECOGNIZED;
+            }
+            switch (profileLevel.mProfile) {
+                case VVCProfileMain8:
+                case VVCProfileMain10:
+                case VVCProfileMain10Still:
+                case VVCProfileMain10HDR10:
+                case VVCProfileMain10HDR10Plus:
+                    break;
+                default:
+                    ALOGW("Unrecognized profile %d for %s", profileLevel.mProfile, mediaType);
+                    errors |= ERROR_CAPABILITIES_UNRECOGNIZED;
+            }
+
+            FS >>= 4; // convert pixels to blocks
+            errors &= ~ERROR_CAPABILITIES_NONE_SUPPORTED;
+            maxBlocksPerSecond = std::max((int64_t)(FR * FS), maxBlocksPerSecond);
+            maxBlocks = std::max(FS, maxBlocks);
+            maxBps = std::max(1000 * BR, maxBps);
+        }
+
+        int32_t maxLengthInBlocks = (int32_t)(std::sqrt(8 * maxBlocks));
+        applyMacroBlockLimits(
+                maxLengthInBlocks, maxLengthInBlocks,
+                maxBlocks, maxBlocksPerSecond,
+                4 /* blockWidth */, 4 /* blockHeight */,
+                1 /* widthAlignment */, 1 /* heightAlignment */);
     } else {
         ALOGW("Unsupported mime %s", mediaType);
         // using minimal bitrate here.  should be overridden by
