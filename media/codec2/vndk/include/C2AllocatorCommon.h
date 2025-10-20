@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package android.media;
 
-/**
- * Polynomial spline interpolators.
- *
- * {@hide}
- */
-@Backing(type="int")
-enum InterpolatorType {
-    /** Not continuous. */
-    STEP,
-    /** C0. */
-    LINEAR,
-    /** C1. */
-    CUBIC,
-    /** C1 (to provide locally monotonic curves). */
-    CUBIC_MONOTONIC,
-    // CUBIC_C2, // TODO - requires global computation / cache
-}
+#pragma once
+
+#include <cstddef>
+#include <functional>
+#include <sys/types.h>
+
+// mmap / munmap function used by the allocation
+typedef std::function<void *(void *, size_t, int, int, int, off_t)> C2LinearMapFn;
+typedef std::function<int(void *, size_t)> C2LinearUnmapFn;

@@ -21,6 +21,7 @@
 #include <utils/Log.h>
 
 #include <OMX_Component.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <binder/IPCThreadState.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
@@ -158,10 +159,9 @@ status_t CameraSource::isCameraAvailable(
         clientAttribution.deviceId = kDefaultDeviceId;
         clientAttribution.packageName = clientName;
         clientAttribution.token = sp<BBinder>::make();
-
         mCamera = Camera::connect(cameraId, /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                /*rotationOverride*/hardware::ICameraService::ROTATION_OVERRIDE_NONE,
-                /*forceSlowJpegMode*/false, clientAttribution);
+                content::res::CameraCompatibilityInfo(), /*forceSlowJpegMode*/false,
+                clientAttribution);
         if (mCamera == 0) return -EBUSY;
         mCameraFlags &= ~FLAGS_HOT_CAMERA;
     } else {

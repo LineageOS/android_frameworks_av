@@ -20,7 +20,7 @@ import android.media.audio.common.AudioAttributes;
 import android.media.audio.common.AudioConfigBase;
 import android.media.audio.common.AudioStreamType;
 /**
- * {@hide}
+ * @hide
  */
 parcelable GetOutputForAttrResponse {
     /** Interpreted as audio_io_handle_t. */

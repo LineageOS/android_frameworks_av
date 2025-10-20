@@ -17,14 +17,18 @@
 #ifndef ANDROID_BINDING_AUDIO_ENDPOINT_PARCELABLE_H
 #define ANDROID_BINDING_AUDIO_ENDPOINT_PARCELABLE_H
 
-#include <stdint.h>
-
-//#include <sys/mman.h>
+// go/keep-sorted start
 #include <aaudio/Endpoint.h>
 #include <android-base/unique_fd.h>
+// go/keep-sorted end
 
-#include "binding/AAudioServiceDefinitions.h"
-#include "binding/RingBufferParcelable.h"
+#include <stdint.h>
+//#include <sys/mman.h>
+
+// go/keep-sorted start
+#include "AAudioServiceDefinitions.h"
+#include "RingBufferParcelable.h"
+// go/keep-sorted end
 
 using android::status_t;
 

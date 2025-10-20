@@ -79,8 +79,8 @@ public:
                 DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
                 .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
                 .withFields({
-                    C2F(mSize, width).inRange(2, 4080, 2),
-                    C2F(mSize, height).inRange(2, 4080, 2),
+                    C2F(mSize, width).inRange(2, 4096, 2),
+                    C2F(mSize, height).inRange(2, 4096, 2),
                 })
                 .withSetter(SizeSetter)
                 .build());
@@ -89,8 +89,8 @@ public:
                 DefineParam(mMaxSize, C2_PARAMKEY_MAX_PICTURE_SIZE)
                 .withDefault(new C2StreamMaxPictureSizeTuning::output(0u, 320, 240))
                 .withFields({
-                    C2F(mSize, width).inRange(2, 4080, 2),
-                    C2F(mSize, height).inRange(2, 4080, 2),
+                    C2F(mSize, width).inRange(2, 4096, 2),
+                    C2F(mSize, height).inRange(2, 4096, 2),
                 })
                 .withSetter(MaxPictureSizeSetter, mSize)
                 .build());
@@ -225,8 +225,8 @@ public:
                                     const C2P<C2StreamPictureSizeInfo::output> &size) {
         (void)mayBlock;
         // TODO: get max width/height from the size's field helpers vs. hardcoding
-        me.set().width = c2_min(c2_max(me.v.width, size.v.width), 4080u);
-        me.set().height = c2_min(c2_max(me.v.height, size.v.height), 4080u);
+        me.set().width = c2_min(c2_max(me.v.width, size.v.width), 4096u);
+        me.set().height = c2_min(c2_max(me.v.height, size.v.height), 4096u);
         return C2R::Ok();
     }
 

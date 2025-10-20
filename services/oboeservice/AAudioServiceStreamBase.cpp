@@ -16,25 +16,31 @@
 
 #define LOG_TAG "AAudioServiceStreamBase"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <iomanip>
-#include <iostream>
-#include <mutex>
+#include "AAudioServiceStreamBase.h"
 
+// go/keep-sorted start
+#include <binding/AAudioServiceMessage.h>
 #include <com_android_media_aaudio.h>
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/AAudioServiceMessage.h"
-#include "core/AudioGlobal.h"
-#include "utility/AudioClock.h"
+// go/keep-sorted start
+#include <iomanip>
+#include <iostream>
+#include <mutex>
+// go/keep-sorted end
 
+// go/keep-sorted start
 #include "AAudioEndpointManager.h"
 #include "AAudioService.h"
 #include "AAudioServiceEndpoint.h"
-#include "AAudioServiceStreamBase.h"
+// go/keep-sorted end
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
@@ -203,8 +209,11 @@ aaudio_result_t AAudioServiceStreamBase::close() {
     if (result == AAUDIO_ERROR_ALREADY_CLOSED) {
         // AAUDIO_ERROR_ALREADY_CLOSED is not a really error but just indicate the stream has
         // already been closed. In that case, there is no need to close the stream once more.
-        ALOGD("The stream(%d) is already closed", mHandle);
+        ALOGD("%s, the stream(%d) is already closed", __func__, mHandle);
         return AAUDIO_OK;
+    } else if (result == AAUDIO_ERROR_WOULD_BLOCK) {
+        ALOGD("%s, defer close because the stream is draining", __func__);
+        return result;
     }
 
     stopCommandThread();
@@ -212,15 +221,23 @@ aaudio_result_t AAudioServiceStreamBase::close() {
     return result;
 }
 
-aaudio_result_t AAudioServiceStreamBase::close_l() {
+aaudio_result_t AAudioServiceStreamBase::close_l(bool shouldDeferClose) {
     if (getState() == AAUDIO_STREAM_STATE_CLOSED) {
         return AAUDIO_ERROR_ALREADY_CLOSED;
     }
 
-    // This will stop the stream, just in case it was not already stopped.
-    stop_l();
-
-    return closeAndClear();
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (shouldDeferClose && endpoint != nullptr) {
+        mPendingClose = true;
+        endpoint->releaseClientWhenWakeUp(mClientHandle);
+        return AAUDIO_ERROR_WOULD_BLOCK;
+    } else {
+        ALOGW_IF(endpoint == nullptr,
+                 "%s, close the stream when requesting defer as the endpoint is gone", __func__);
+        // This will stop the stream, just in case it was not already stopped.
+        stop_l();
+        return closeAndClear();
+    }
 }
 
 aaudio_result_t AAudioServiceStreamBase::startDevice_l() {
@@ -486,6 +503,65 @@ aaudio_result_t AAudioServiceStreamBase::onGetPlaybackParameters_l(
     return endpoint->getPlaybackParameters(rate);
 }
 
+bool AAudioServiceStreamBase::isCommandAllowed_l(int32_t command) const {
+    if (mPendingClose) {
+        // When it is pending close, allows WAKE_UP, DISCONNECT and CLOSE.
+        switch (command) {
+            case WAKE_UP:
+            case DISCONNECT:
+            case CLOSE:
+                return true;
+            default:
+                return false;
+        }
+    }
+    if (mPendingStop) {
+        // When it is pending stop, allows START, WAKE_UP, DISCONNECT and CLOSE.
+        switch (command) {
+            case START:
+            case DISCONNECT:
+            case WAKE_UP:
+            case CLOSE:
+                return true;
+            default:
+                return false;
+        }
+    }
+    return true;
+}
+
+bool AAudioServiceStreamBase::needToWakeUpBeforeCommand_l(int32_t command) const {
+    if (!mIsDraining) {
+        return false;
+    }
+    switch (command) {
+        case START:
+        case PAUSE:
+        case DISCONNECT:
+        case STOP_CLIENT:
+        case UPDATE_TIMESTAMP:
+        case DRAIN:
+        case SET_PLAYBACK_PARAMETERS:
+        case GET_PLAYBACK_PARAMETERS:
+            return true;
+        // Beginning of commands will not be sent by client when draining
+        case FLUSH:
+        case REGISTER_AUDIO_THREAD:
+        case GET_DESCRIPTION:
+        case EXIT_STANDBY:
+        case START_CLIENT:
+        // End of commands will not be fired when draining
+        case UNREGISTER_AUDIO_THREAD:
+        case STOP:
+        case CLOSE:
+        case ACTIVATE:
+        case WAKE_UP:
+        case SOUND_DOSE_CHANGED:
+        default:
+            return false;
+    }
+}
+
 // implement Runnable, periodically send timestamps to client and process commands from queue.
 // Enter standby mode if idle for a while.
 __attribute__((no_sanitize("integer")))
@@ -580,8 +656,17 @@ void AAudioServiceStreamBase::run() {
                 }
                 continue;
             }
-            if (mIsDraining && command->operationCode != WAKE_UP &&
-                command->operationCode != ACTIVATE) {
+            if (!isCommandAllowed_l(command->operationCode)) {
+                ALOGI("Reject command %d as mPendingStop(%d), mPendingClose(%d)",
+                      command->operationCode, mPendingStop, mPendingClose);
+                command->result = AAUDIO_ERROR_INVALID_STATE;
+                if (command->isWaitingForReply) {
+                    command->isWaitingForReply = false;
+                    command->conditionVariable.notify_one();
+                }
+                continue;
+            }
+            if (needToWakeUpBeforeCommand_l(command->operationCode)) {
                 // After receiving a new command from draining, the client is not longer
                 // suspended for draining. If the command is WAKE_UP or ACTIVATE, it is handled
                 // from the following logic.
@@ -591,7 +676,14 @@ void AAudioServiceStreamBase::run() {
             }
             switch (command->operationCode) {
                 case START: {
-                    command->result = start_l();
+                    if (mPendingStop) {
+                        mPendingStop = false;
+                        sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED,
+                                         static_cast<int64_t>(mClientHandle));
+                        command->result = AAUDIO_OK;
+                    } else {
+                        command->result = start_l();
+                    }
                     // If the burst size is too large, the timestamp scheduler will be too
                     // slow for the first couple timestamp report and result in the client side
                     // timeout to process data. In that case, setting the burst no greater than
@@ -604,20 +696,31 @@ void AAudioServiceStreamBase::run() {
                     nextDataReportTime = nextDataReportTime_l();
                     ALOGV("%s: SoundDose nextDataReportTime: %lld",
                             __func__, (long long)nextDataReportTime);
+                    standbyTime = std::numeric_limits<int64_t>::max();
                 } break;
                 case PAUSE: {
                     command->result = pause_l();
                     standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
                 } break;
                 case STOP: {
-                    command->result = stop_l();
-                    standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
+                    if (mIsDraining && !isDisconnected_l()) {
+                        // When the stream is draining and not disconnected, stop the stream when
+                        // all data is drained and waken up by audio flinger.
+                        mPendingStop = true;
+                        command->result = AAUDIO_OK;
+                    } else {
+                        command->result = stop_l();
+                        standbyTime = AudioClock::getNanoseconds() + IDLE_TIMEOUT_NANOS;
+                    }
                 } break;
                 case FLUSH: {
                     command->result = flush_l();
                 } break;
                 case CLOSE: {
-                    command->result = close_l();
+                    // When the stream is draining and not disconnected, close the stream when
+                    // all data is drained and waken up by audio flinger.
+                    bool shouldDeferClose = (mIsDraining && !isDisconnected_l());
+                    command->result = close_l(shouldDeferClose);
                 } break;
                 case DISCONNECT: {
                     disconnect_l();
@@ -1001,6 +1104,14 @@ void AAudioServiceStreamBase::wakeUp_l(
         android::audio_utils::TimerQueue::handle_t handle) {
     updateReportTime_l(scheduler, nextTimestampReportTime, nextDataReportTime);
     sendCurrentTimestamp_l();
+    if (mPendingStop) {
+        stop_l();
+        mPendingStop = false;
+        // The client stops a while back, it should be safe for us to standby the stream for
+        // power saving.
+        ALOGD("%s, standby the stream as the client has stopped for a while", __func__);
+        standby_l();
+    }
     if (mClientCallback == nullptr) {
         ALOGD("%s, no client callback is set", __func__);
         return;

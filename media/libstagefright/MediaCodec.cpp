@@ -1279,10 +1279,7 @@ sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
     sp<MediaSurfaceType> surface;
     sp<hardware::media::omx::V1_0::IGraphicBufferSource> bufferSource;
 
-    // Change IOMX to use Surface too in a follow up CL.
-    sp<IGraphicBufferProducer> igbp = mediaflagtools::surfaceTypeToIGBP(surface);
-    status_t err = omx->createInputSurface(&igbp, &bufferSource);
-
+    status_t err = omx->createInputSurface(&surface, &bufferSource);
     if (err != OK) {
         ALOGE("Failed to create persistent input surface.");
         return NULL;

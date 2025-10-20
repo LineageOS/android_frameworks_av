@@ -29,6 +29,7 @@
 #include <gui/Surface.h>
 
 #include <android/hardware/ICameraService.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <camera/CameraSessionStats.h>
 #include <camera/StringUtils.h>
 #include <com_android_window_flags.h>
@@ -59,11 +60,11 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
         const AttributionSourceState& clientAttribution, int callingPid, bool systemNativeClient,
         const std::string& cameraId, int api1CameraId, int cameraFacing, int sensorOrientation,
-        int servicePid, bool overrideForPerfClass, int rotationOverride, bool sharedMode,
-        bool isVendorClient, bool legacyClient)
+        int servicePid, bool overrideForPerfClass, const CameraCompatibilityInfo& compatInfo,
+        bool sharedMode, bool isVendorClient, bool legacyClient)
     : TClientBase(cameraService, remoteCallback, attributionAndPermissionUtils, clientAttribution,
                   callingPid, systemNativeClient, cameraId, api1CameraId, cameraFacing,
-                  sensorOrientation, servicePid, rotationOverride, sharedMode),
+                  sensorOrientation, servicePid, compatInfo, sharedMode),
       mSharedCameraCallbacks(remoteCallback),
       mCameraServiceProxyWrapper(cameraServiceProxyWrapper),
       mDeviceActive(false),
@@ -117,7 +118,7 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
                     new HidlCamera3Device(mCameraServiceProxyWrapper,
                             TClientBase::mAttributionAndPermissionUtils,
                             TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            TClientBase::mRotationOverride, mIsVendorClient,
+                            TClientBase::mCompatInfo, mIsVendorClient,
                             mLegacyClient);
             break;
         case IPCTransport::AIDL:
@@ -125,14 +126,14 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
                 mDevice = AidlCamera3SharedDevice::getInstance(mCameraServiceProxyWrapper,
                             TClientBase::mAttributionAndPermissionUtils,
                             TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            TClientBase::mRotationOverride, mIsVendorClient,
+                            TClientBase::mCompatInfo, mIsVendorClient,
                             mLegacyClient);
             } else {
                 mDevice =
                     new AidlCamera3Device(mCameraServiceProxyWrapper,
                             TClientBase::mAttributionAndPermissionUtils,
                             TClientBase::mCameraIdStr, mOverrideForPerfClass,
-                            TClientBase::mRotationOverride, mIsVendorClient,
+                            TClientBase::mCompatInfo, mIsVendorClient,
                             mLegacyClient);
             }
             break;
@@ -189,7 +190,8 @@ Camera2ClientBase<TClientBase>::~Camera2ClientBase() {
 
 template <typename TClientBase>
 status_t Camera2ClientBase<TClientBase>::dumpClient(int fd,
-                                              const Vector<String16>& args) {
+                                              const Vector<String16>& args,
+                                              bool /*ignoreResult*/) {
     std::string result;
     result += fmt::sprintf("Camera2ClientBase[%s] (%p) PID: %d, dump:\n",
             TClientBase::mCameraIdStr.c_str(),
@@ -363,8 +365,9 @@ void Camera2ClientBase<TClientBase>::notifyClientSharedAccessPriorityChanged(boo
 template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyPhysicalCameraChange(const std::string &physicalId) {
     using android::hardware::ICameraService;
-    // We're only interested in this notification if rotationOverride is turned on.
-    if (TClientBase::mRotationOverride == ICameraService::ROTATION_OVERRIDE_NONE) {
+    // We're only interested in this notification if compatInfo is turned on.
+    if (!TClientBase::mCompatInfo.shouldRotateAndCrop()
+        && !TClientBase::mCompatInfo.shouldOverrideSensorOrientation()) {
         return;
     }
 
@@ -372,24 +375,13 @@ void Camera2ClientBase<TClientBase>::notifyPhysicalCameraChange(const std::strin
     auto orientationEntry = physicalCameraMetadata.find(ANDROID_SENSOR_ORIENTATION);
 
     if (orientationEntry.count == 1) {
-        int orientation = orientationEntry.data.i32[0];
         int rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_NONE;
-        bool landscapeSensor =  (orientation == 0 || orientation == 180);
-        bool rotationAndSensorOverride = TClientBase::mRotationOverride ==
-                ICameraService::ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT;
-        bool rotationOnlyOverride = TClientBase::mRotationOverride ==
-                ICameraService::ROTATION_OVERRIDE_ROTATION_ONLY;
-        bool reverseRotationOnlyOverride =
-                wm_flags::enable_camera_compat_check_device_rotation_bugfix() &&
-                        TClientBase::mRotationOverride ==
-                        ICameraService::ROTATION_OVERRIDE_ROTATION_ONLY_REVERSE;
-        if ((rotationAndSensorOverride && landscapeSensor) ||
-                (wm_flags::enable_camera_compat_for_desktop_windowing() && rotationOnlyOverride &&
-                        !landscapeSensor)) {
+        std::optional<ui::Rotation> rotateAndCropRotation = TClientBase::mCompatInfo
+                .getRotateAndCropRotation();
+        if (rotateAndCropRotation.has_value() && rotateAndCropRotation.value() == ui::ROTATION_90) {
             rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
-        } else if (wm_flags::enable_camera_compat_for_desktop_windowing()
-                && !landscapeSensor
-                && reverseRotationOnlyOverride) {
+        } else if (rotateAndCropRotation.has_value() && rotateAndCropRotation.value() ==
+                ui::ROTATION_270) {
             rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_270;
         }
 

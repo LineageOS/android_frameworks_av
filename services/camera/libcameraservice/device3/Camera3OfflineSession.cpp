@@ -196,34 +196,35 @@ status_t Camera3OfflineSession::getNextResult(CaptureResult* frame) {
     return OK;
 }
 
-void Camera3OfflineSession::setErrorState(const char *fmt, ...) {
+void Camera3OfflineSession::setErrorState(int32_t errorState, const char *fmt, ...) {
     ATRACE_CALL();
     std::lock_guard<std::mutex> lock(mLock);
     va_list args;
     va_start(args, fmt);
 
-    setErrorStateLockedV(fmt, args);
+    setErrorStateLockedV(errorState, fmt, args);
 
     va_end(args);
 
     //FIXME: automatically disconnect here?
 }
 
-void Camera3OfflineSession::setErrorStateLocked(const char *fmt, ...) {
+void Camera3OfflineSession::setErrorStateLocked(int32_t errorState, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    setErrorStateLockedV(fmt, args);
+    setErrorStateLockedV(errorState, fmt, args);
 
     va_end(args);
 }
 
-void Camera3OfflineSession::setErrorStateLockedV(const char *fmt, va_list args) {
+void Camera3OfflineSession::setErrorStateLockedV(int32_t errorState,
+    const char *fmt, va_list args) {
     // Print out all error messages to log
     std::string errorCause;
     base::StringAppendV(&errorCause, fmt, args);
     ALOGE("Camera %s: %s", mId.c_str(), errorCause.c_str());
-
+    ALOGV("Camera error state is %d", errorState);
     // But only do error state transition steps for the first error
     if (mStatus == STATUS_ERROR || mStatus == STATUS_UNINITIALIZED) return;
 

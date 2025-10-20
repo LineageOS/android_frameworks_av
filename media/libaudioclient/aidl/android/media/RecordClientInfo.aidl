@@ -19,7 +19,7 @@ package android.media;
 import android.media.audio.common.AudioSource;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable RecordClientInfo {
     /** Interpreted as audio_unique_id_t. */

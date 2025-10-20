@@ -20,7 +20,7 @@ import android.media.ISpatializer;
 
 /**
  * Used as a return value for IAudioPolicyService.getSpatializer() method
- * {@hide}
+ * @hide
  */
  parcelable GetSpatializerResponse {
     /* The ISpatializer interface if successful, null if not */

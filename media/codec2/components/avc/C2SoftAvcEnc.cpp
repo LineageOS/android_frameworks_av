@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2SoftAvcEnc"
+#include <android_media_swcodec_flags.h>
 #include <log/log.h>
 #include <utils/misc.h>
 
@@ -679,6 +680,7 @@ void  C2SoftAvcEnc::initEncParams() {
     mReconEnable = DEFAULT_RECON_ENABLE;
     mEntropyMode = DEFAULT_ENTROPY_MODE;
     mBframes = DEFAULT_B_FRAMES;
+    mKeepThreadsActive = false;
 
     mTimeStart = mTimeEnd = systemTime();
 }
@@ -1169,6 +1171,7 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
     CHECK(!mStarted);
 
     c2_status_t errType = C2_OK;
+    mKeepThreadsActive = android::media::swcodec::flags::avc_keep_threads_active();
 
     std::shared_ptr<C2StreamGopTuning::output> gop;
     {
@@ -1285,6 +1288,7 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         ps_fill_mem_rec_ip->u4_max_reorder_cnt = DEFAULT_MAX_REORDER_FRM;
         ps_fill_mem_rec_ip->u4_max_srch_rng_x = DEFAULT_MAX_SRCH_RANGE_X;
         ps_fill_mem_rec_ip->u4_max_srch_rng_y = DEFAULT_MAX_SRCH_RANGE_Y;
+        ps_fill_mem_rec_ip->u4_keep_threads_active = mKeepThreadsActive;
 
         status = ive_api_function(nullptr, &s_ih264e_mem_rec_ip, &s_ih264e_mem_rec_op);
 
@@ -1371,6 +1375,7 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         ps_init_ip->u4_slice_param = mSliceParam;
         ps_init_ip->e_arch = mArch;
         ps_init_ip->e_soc = DEFAULT_SOC;
+        ps_init_ip->u4_keep_threads_active = mKeepThreadsActive;
 
         status = ive_api_function(mCodecCtx, &s_enc_ip, &s_enc_op);
 

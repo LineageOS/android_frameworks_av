@@ -21,7 +21,7 @@ import android.media.AudioMixMatchCriterion;
 
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioMixUpdate {
     // Audio mix to update.

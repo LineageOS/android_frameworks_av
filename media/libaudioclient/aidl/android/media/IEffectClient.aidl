@@ -19,7 +19,7 @@ package android.media;
 /**
  * A callback interface for getting effect-related notifications.
  *
- * {@hide}
+ * @hide
  */
 interface IEffectClient {
     /**

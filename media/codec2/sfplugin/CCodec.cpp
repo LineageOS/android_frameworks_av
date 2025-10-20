@@ -168,7 +168,8 @@ public:
             uint32_t width,
             uint32_t height,
             uint64_t usage)
-        : mSurface(surface), mWidth(width), mHeight(height), mInputDoneCount(0) {
+        : mSurface(surface), mWidth(width), mHeight(height),
+        mInputDoneCount(0), mInputEmptyCount(0) {
         // Configurations are not passed until connect().
         mDataSpace = HAL_DATASPACE_BT709;
         mConfig.mUsage = usage;
@@ -177,6 +178,7 @@ public:
     ~C2InputSurfaceWrapper() override = default;
 
     status_t connect(const std::shared_ptr<Codec2Client::Component> &comp) override {
+        ALOGV("C2IS connect");
         if (mConnection != nullptr) {
             return ALREADY_EXISTS;
         }
@@ -196,6 +198,7 @@ public:
     }
 
     void disconnect() override {
+        ALOGV("C2IS disconnect");
         if (mConnection) {
             mConnection->disconnect();
             mConnection.reset();
@@ -205,12 +208,23 @@ public:
     }
 
     status_t start() override {
-        // InputSurface starts when connect().
-        // no-op here.
+        ALOGV("C2IS start");
+        if (mConnection == nullptr) {
+            ALOGE("InputSurface start requested without connection");
+            return UNKNOWN_ERROR;
+        }
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        C2InputSurfaceStartTuning start{C2_TRUE};
+        c2_status_t err = mSurface->config({&start}, C2_MAY_BLOCK, &failures);
+        if (err != C2_OK) {
+            ALOGE("InputSurface start error from HAL %d", err);
+            return UNKNOWN_ERROR;
+        }
         return OK;
     }
 
     status_t signalEndOfInputStream() override {
+        ALOGV("C2IS signalEoS");
         if (mConnection) {
             if (mConnection->signalEos() != C2_OK) {
                 return UNKNOWN_ERROR;
@@ -222,6 +236,7 @@ public:
     status_t configure(Config &config) {
         std::vector<C2Param*> params;
         std::vector<std::unique_ptr<C2SettingResult>> failures;
+        std::stringstream status;
 
         std::shared_ptr<C2PortMinFrameRateTuning::output> minFps;
         std::shared_ptr<C2PortMaxFrameRateTuning::output> maxFps;
@@ -235,6 +250,7 @@ public:
         std::shared_ptr<C2PortTimestampGapTuning::output> gap;
 
         if (config.mMinFps > 0 && config.mMinFps != mConfig.mMinFps) {
+            status << " minFps=" << config.mMinFps;
             minFps = std::make_shared<C2PortMinFrameRateTuning::output>(config.mMinFps);
             params.push_back(minFps.get());
             mConfig.mMinFps = config.mMinFps;
@@ -260,16 +276,19 @@ public:
         }
         if ((config.mMaxFps > 0 || (fixedFpsMode && config.mMaxFps == -1))
                 && config.mMaxFps != mConfig.mMaxFps) {
+            status << " maxFps=" << config.mMaxFps;
             maxFps = std::make_shared<C2PortMaxFrameRateTuning::output>(config.mMaxFps);
             params.push_back(maxFps.get());
             mConfig.mMaxFps = config.mMaxFps;
         }
         if (config.mTimeOffsetUs != mConfig.mTimeOffsetUs) {
+            status << " timeOffset " << config.mTimeOffsetUs << "us";
             timeOffset = std::make_shared<C2ComponentTimeOffsetTuning>(config.mTimeOffsetUs);
             params.push_back(timeOffset.get());
             mConfig.mTimeOffsetUs = config.mTimeOffsetUs;
         }
         if (config.mCaptureFps != mConfig.mCaptureFps || config.mCodedFps != mConfig.mCodedFps) {
+            status << " timeLapse " << config.mCaptureFps << "fps as " << config.mCodedFps << "fps";
             captureFps = std::make_shared<C2PortCaptureFrameRateTuning::output>(
                     config.mCaptureFps);
             codedFps = std::make_shared<C2StreamFrameRateInfo::output>(0u, config.mCodedFps);
@@ -281,6 +300,7 @@ public:
 
         if (config.mStartAtUs != mConfig.mStartAtUs
                 || (config.mStopped != mConfig.mStopped && !config.mStopped)) {
+            status << " start at " << config.mStartAtUs << "us";
             started = std::make_shared<C2PortStartTimestampTuning::output>(config.mStartAtUs);
             stopped = std::make_shared<C2PortStopTimestampTuning::output>();
             params.push_back(started.get());
@@ -289,9 +309,11 @@ public:
             mConfig.mStopped = config.mStopped;
         }
         if (config.mSuspended != mConfig.mSuspended) {
+            status << " " << (config.mSuspended ? "suspend" : "resume")
+                    << " at " << config.mSuspendAtUs << "us";
             if (config.mSuspended) {
                 suspended = std::make_shared<C2PortSuspendTimestampTuning::output>(
-                        mConfig.mSuspendAtUs);
+                        config.mSuspendAtUs);
                 resumed = std::make_shared<C2PortResumeTimestampTuning::output>();
             } else {
                 suspended = std::make_shared<C2PortSuspendTimestampTuning::output>();
@@ -303,18 +325,32 @@ public:
             mConfig.mSuspended = config.mSuspended;
             mConfig.mSuspendAtUs = config.mSuspendAtUs;
         }
+        bool stopRequested = false;
         if (config.mStopped != mConfig.mStopped && config.mStopped) {
+            status << " stop at " << config.mStopAtUs << "us";
             started = std::make_shared<C2PortStartTimestampTuning::output>();
             stopped = std::make_shared<C2PortStopTimestampTuning::output>(config.mStopAtUs);
             params.push_back(started.get());
             params.push_back(stopped.get());
             mConfig.mStopAtUs = config.mStopAtUs;
             mConfig.mStopped = config.mStopped;
+            stopRequested = true;
         }
         c2_status_t err = mSurface->config(params, C2_MAY_BLOCK, &failures);
         if (err != C2_OK) {
             ALOGE("C2InputSurfaceWrapper::config err(%d)", err);
             return UNKNOWN_ERROR;
+        }
+        if (stopRequested) {
+            C2PortStopTimeOffset::output offsetDelay(0);
+            c2_status_t err = mSurface->query({&offsetDelay}, {}, C2_DONT_BLOCK, nullptr);
+            if (err == C2_OK) {
+                status << " delaUs = " << offsetDelay.value << "us";
+                mConfig.mInputDelayUs = offsetDelay.value;
+            }
+        }
+        if (!status.str().empty()) {
+            ALOGV("C2IS config:%s", status.str().c_str());
         }
         return OK;
     }

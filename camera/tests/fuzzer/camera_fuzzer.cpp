@@ -133,7 +133,8 @@ bool CameraFuzzer::initCamera() {
         clientAttribution.packageName = "CAMERAFUZZ";
         cameraService->connect(this, mFDP->ConsumeIntegral<int32_t>() /* cameraId */,
                                /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
-                               /*overrideToPortrait*/ false, /*forceSlowJpegMode*/ false,
+                               /*compatInfo*/ CameraCompatibilityInfo(),
+                               /*forceSlowJpegMode*/ false,
                                clientAttribution, /*devicePolicy*/0, &cameraDevice);
     } else {
         clientAttribution.uid = mFDP->ConsumeIntegral<int8_t>();
@@ -141,7 +142,7 @@ bool CameraFuzzer::initCamera() {
         clientAttribution.packageName = mFDP->ConsumeRandomLengthString(kMaxBytes).c_str();
         cameraService->connect(this, mFDP->ConsumeIntegral<int32_t>() /* cameraId */,
                                /*targetSdkVersion*/ mFDP->ConsumeIntegral<int32_t>(),
-                               /*overrideToPortrait*/ mFDP->ConsumeBool(),
+                               /*compatInfo*/ CameraCompatibilityInfo(),
                                /*forceSlowJpegMode*/ mFDP->ConsumeBool(), clientAttribution,
                                /*devicePolicy*/0, &cameraDevice);
     }
@@ -178,7 +179,7 @@ void CameraFuzzer::invokeCamera() {
                                             : mFDP->ConsumeIntegral<int32_t>();
     cameraInfo.orientation = mFDP->ConsumeBool() ? mFDP->PickValueInArray(kValidOrientation)
                                                  : mFDP->ConsumeIntegral<int32_t>();
-    Camera::getCameraInfo(cameraId, /*overrideToPortrait*/false, clientAttribution,
+    Camera::getCameraInfo(cameraId, CameraCompatibilityInfo(), clientAttribution,
                           /*devicePolicy*/0, &cameraInfo);
     mCamera->reconnect();
 

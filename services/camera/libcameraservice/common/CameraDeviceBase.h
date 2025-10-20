@@ -79,8 +79,10 @@ typedef struct TransformMapValue {
     int mirrorMode;
     int32_t transform;
 } TransfromMapValue_t;
-// Mapping of output stream index to mirror mode and transformation entry
-typedef std::unordered_map<int, TransformMapValue> TransformationMap;
+// Mapping of surface ids to transform values
+typedef std::unordered_map<size_t, TransformMapValue> SurfaceTransformMap;
+// Mapping of output stream index to surface transforms
+typedef std::unordered_map<int, SurfaceTransformMap> TransformationMap;
 
 /**
  * Base interface for version >= 2 camera device classes, which interface to
@@ -306,11 +308,11 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t beginConfigure() = 0;
 
     /**
-     * In shared session mode, this function retrieves the stream ID associated with a specific
+     * In shared session mode, this function retrieves the stream IDs associated with a specific
      * output configuration.
      */
-    virtual status_t getSharedStreamId(const android::camera3::OutputStreamInfo &config,
-            int *streamId) = 0;
+    virtual status_t getSharedStreamIds(const android::camera3::OutputStreamInfo &config,
+            std::vector<int>& streamIds) = 0;
 
     /**
      * In shared session mode, this function add surfaces to an existing shared stream ID.

@@ -199,7 +199,6 @@ camera_status_t CameraDevice::startStreamingLocked(ACameraCaptureSession* sessio
     std::vector<int> surfaceIds(req->mSurfaceIdxList.begin(), req->mSurfaceIdxList.end());
     remoteRet = mRemote->startStreaming(streamIds, surfaceIds, &info);
     int sequenceId = info.mRequestId;
-    int64_t lastFrameNumber = info.mLastFrameNumber;
     if (sequenceId < 0) {
         ALOGE("Camera %s start streaming remote failure: ret %d", getId(), sequenceId);
         return ACAMERA_ERROR_UNKNOWN;

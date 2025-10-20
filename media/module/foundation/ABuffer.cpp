@@ -73,6 +73,18 @@ void ABuffer::setRange(size_t offset, size_t size) {
     mRangeLength = size;
 }
 
+status_t ABuffer::setRangeWithStatus(size_t offset, size_t size) {
+    if (mData == nullptr) {
+        return NO_MEMORY;
+    }
+    if (offset > mCapacity || size > mCapacity - offset) {
+        return BAD_VALUE;
+    }
+
+    setRange(offset, size);
+    return OK;
+}
+
 sp<AMessage> ABuffer::meta() {
     if (mMeta == NULL) {
         mMeta = new AMessage;

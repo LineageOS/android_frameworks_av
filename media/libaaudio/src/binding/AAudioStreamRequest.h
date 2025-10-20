@@ -17,14 +17,16 @@
 #ifndef ANDROID_BINDING_AAUDIO_STREAM_REQUEST_H
 #define ANDROID_BINDING_AAUDIO_STREAM_REQUEST_H
 
-#include <stdint.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/IAAudioClientCallback.h>
 #include <aaudio/StreamRequest.h>
-
-#include "binding/AAudioStreamConfiguration.h"
 #include <android/content/AttributionSourceState.h>
+// go/keep-sorted end
+
+#include <stdint.h>
+
+#include "AAudioStreamConfiguration.h"
 
 namespace aaudio {
 

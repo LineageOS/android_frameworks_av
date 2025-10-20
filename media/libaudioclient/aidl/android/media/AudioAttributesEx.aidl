@@ -21,7 +21,7 @@ import android.media.audio.common.AudioStreamType;
 
 /**
  * This is the equivalent of the android::AudioAttributes C++ type.
- * {@hide}
+ * @hide
  */
 parcelable AudioAttributesEx {
     AudioAttributes attributes;

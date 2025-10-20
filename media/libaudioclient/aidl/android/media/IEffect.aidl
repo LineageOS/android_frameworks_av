@@ -22,7 +22,7 @@ import android.media.SharedFileRegion;
 /**
  * The IEffect interface enables control of the effect module activity and parameters.
  *
- * {@hide}
+ * @hide
  */
 interface IEffect {
     /**

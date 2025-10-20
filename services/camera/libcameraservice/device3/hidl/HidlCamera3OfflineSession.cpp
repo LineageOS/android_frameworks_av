@@ -109,7 +109,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult_3_4(
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
         mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        hardware::ICameraService::ROTATION_OVERRIDE_NONE, activePhysicalId}, mResultMetadataQueue
+        CameraCompatibilityInfo(), activePhysicalId}, mResultMetadataQueue
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -151,7 +151,7 @@ hardware::Return<void> HidlCamera3OfflineSession::processCaptureResult(
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
         mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        hardware::ICameraService::ROTATION_OVERRIDE_NONE, activePhysicalId}, mResultMetadataQueue
+        CameraCompatibilityInfo(), activePhysicalId}, mResultMetadataQueue
     };
 
     std::lock_guard<std::mutex> lock(mProcessCaptureResultLock);
@@ -188,7 +188,7 @@ hardware::Return<void> HidlCamera3OfflineSession::notify(
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
         mBufferRecords, /*legacyClient*/ false, mMinExpectedDuration, mIsFixedFps,
-        hardware::ICameraService::ROTATION_OVERRIDE_NONE, activePhysicalId}, mResultMetadataQueue
+        CameraCompatibilityInfo(), activePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);

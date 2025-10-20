@@ -30,6 +30,7 @@
 #include <binder/IMemory.h>
 
 #include <camera/CameraBase.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <camera/CameraUtils.h>
 #include <camera/StringUtils.h>
 
@@ -161,7 +162,8 @@ const sp<::android::hardware::ICameraService> CameraBase<TCam, TCamTraits>::getC
 
 template <typename TCam, typename TCamTraits>
 sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
-                                               int targetSdkVersion, int rotationOverride,
+                                               int targetSdkVersion,
+                                               const CameraCompatibilityInfo& compatInfo,
                                                bool forceSlowJpegMode,
                                                const AttributionSourceState& clientAttribution,
                                                int32_t devicePolicy)
@@ -174,10 +176,15 @@ sp<TCam> CameraBase<TCam, TCamTraits>::connect(int cameraId,
     binder::Status ret;
     if (cs != nullptr) {
         TCamConnectService fnConnectService = TCamTraits::fnConnectService;
-        ALOGI("Connect camera (legacy API) - rotationOverride %d, forceSlowJpegMode %d",
-                rotationOverride, forceSlowJpegMode);
+        ALOGI("Connect camera (legacy API) - rotateAndCrop %s, sensorOverride: %d, "
+              "forceSlowJpegMode %d",
+              compatInfo.getRotateAndCropRotation().has_value()
+                    ? ui::toCString(compatInfo.getRotateAndCropRotation().value())
+                    : "NONE",
+              compatInfo.shouldOverrideSensorOrientation(),
+              forceSlowJpegMode);
         ret = (cs.get()->*fnConnectService)(cl, cameraId, targetSdkVersion,
-                rotationOverride, forceSlowJpegMode, clientAttribution, devicePolicy,
+                compatInfo, forceSlowJpegMode, clientAttribution, devicePolicy,
                 /*out*/ &c->mCamera);
     }
     if (ret.isOk() && c->mCamera != nullptr) {
@@ -280,11 +287,12 @@ int CameraBase<TCam, TCamTraits>::getNumberOfCameras(
 // this can be in BaseCamera but it should be an instance method
 template <typename TCam, typename TCamTraits>
 status_t CameraBase<TCam, TCamTraits>::getCameraInfo(int cameraId,
-        int rotationOverride, const AttributionSourceState& clientAttribution, int32_t devicePolicy,
-        struct hardware::CameraInfo* cameraInfo) {
+        const content::res::CameraCompatibilityInfo& compatInfo,
+        const AttributionSourceState& clientAttribution,
+        int32_t devicePolicy, struct hardware::CameraInfo* cameraInfo) {
     const sp<::android::hardware::ICameraService> cs = getCameraService();
     if (cs == 0) return UNKNOWN_ERROR;
-    binder::Status res = cs->getCameraInfo(cameraId, rotationOverride, clientAttribution,
+    binder::Status res = cs->getCameraInfo(cameraId, compatInfo, clientAttribution,
             devicePolicy, cameraInfo);
     return res.isOk() ? OK : res.serviceSpecificErrorCode();
 }

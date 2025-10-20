@@ -16,24 +16,21 @@
 
 #define LOG_TAG "TimerThread"
 
-#include <optional>
-#include <sstream>
-#include <unistd.h>
-#include <vector>
+#include <mediautils/TimerThread.h>
 
+// go/keep-sorted start
+#include <audio_utils/Time.h>
 #include <audio_utils/mutex.h>
 #include <mediautils/MediaUtilsDelayed.h>
 #include <mediautils/TidWrapper.h>
-#include <mediautils/TimerThread.h>
+#include <unistd.h>
 #include <utils/Log.h>
 #include <utils/ThreadDefs.h>
+// go/keep-sorted end
 
 using namespace std::chrono_literals;
 
 namespace android::mediautils {
-
-extern std::string formatTime(std::chrono::system_clock::time_point t);
-extern std::string_view timeSuffix(std::string_view time1, std::string_view time2);
 
 TimerThread::Handle TimerThread::scheduleTask(
         std::string_view tag, TimerCallback&& func,
@@ -103,7 +100,7 @@ std::string TimerThread::SnapshotAnalysis::toString(bool showTimeoutStack) const
     }
 
     return std::string("now ")
-            .append(formatTime(std::chrono::system_clock::now()))
+            .append(audio_utils::formatTime(std::chrono::system_clock::now()))
             .append("\nsecondChanceCount ")
             .append(std::to_string(secondChanceCount))
             .append(analysisSummary)
@@ -267,11 +264,12 @@ std::string TimerThread::timeoutToString(size_t n) const {
 }
 
 std::string TimerThread::Request::toString() const {
-    const auto scheduledString = formatTime(scheduled);
-    const auto deadlineString = formatTime(deadline);
+    const auto scheduledString = audio_utils::formatTime(scheduled);
+    const auto deadlineString = audio_utils::formatTime(deadline);
     return std::string(tag)
         .append(" scheduled ").append(scheduledString)
-        .append(" deadline ").append(timeSuffix(scheduledString, deadlineString))
+        .append(" deadline ")
+        .append(audio_utils::uniqueTimeSuffix(scheduledString, deadlineString))
         .append(" tid ").append(std::to_string(tid));
 }
 

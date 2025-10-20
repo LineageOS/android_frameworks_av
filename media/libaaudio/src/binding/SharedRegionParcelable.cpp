@@ -16,18 +16,20 @@
 
 #define LOG_TAG "SharedRegionParcelable"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <stdint.h>
+#include "SharedRegionParcelable.h"
 
-#include <sys/mman.h>
-#include <binder/Parcelable.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
+#include <binder/Parcelable.h>
 #include <utility/AAudioUtilities.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/SharedMemoryParcelable.h"
-#include "binding/SharedRegionParcelable.h"
+// go/keep-sorted start
+#include <stdint.h>
+#include <sys/mman.h>
+// go/keep-sorted end
 
 using android::status_t;
 

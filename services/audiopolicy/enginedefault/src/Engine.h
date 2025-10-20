@@ -89,9 +89,7 @@ private:
     sp<DeviceDescriptor> getDeviceForInputSource(audio_source_t inputSource) const;
 
     audio_devices_t getPreferredDeviceTypeForLegacyStrategy(
-        const DeviceVector& availableOutputDevices, legacy_strategy legacyStrategy) const;
-    DeviceVector getPreferredAvailableDevicesForInputSource(
-            const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
+            const DeviceVector& availableOutputDevices, legacy_strategy legacyStrategy) const;
     DeviceVector getDisabledDevicesForInputSource(
             const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
 

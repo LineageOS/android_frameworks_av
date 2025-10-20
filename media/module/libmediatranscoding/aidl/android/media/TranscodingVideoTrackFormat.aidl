@@ -33,7 +33,7 @@ import android.media.TranscodingVideoCodecType;
  * When used as output in TranscodingSessionParcel, all the configs will be populated to indicate
  * the final encoder configs used for transcoding.
  *
- * {@hide}
+ * @hide
  */
 parcelable TranscodingVideoTrackFormat {
     /**

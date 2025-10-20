@@ -16,14 +16,15 @@
 
 #define LOG_TAG "AudioEndpoint"
 //#define LOG_NDEBUG 0
+
+#include "AudioEndpoint.h"
+
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
 #include <utils/Log.h>
+// go/keep-sorted end
 
 #include <cassert>
-#include <aaudio/AAudio.h>
-
-#include "AudioEndpointParcelable.h"
-#include "AudioEndpoint.h"
-#include "AAudioServiceMessage.h"
 
 using namespace android;
 using namespace aaudio;

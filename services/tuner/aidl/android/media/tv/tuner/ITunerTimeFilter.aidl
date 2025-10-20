@@ -19,7 +19,7 @@ package android.media.tv.tuner;
 /**
  * Tuner Time Filter interface handles time filter related operations.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerTimeFilter {
     /**

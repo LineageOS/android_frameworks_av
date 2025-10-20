@@ -62,7 +62,6 @@ struct C2SoftApvEnc final : public SimpleC2Component {
     c2_status_t drainInternal(uint32_t drainMode, const std::shared_ptr<C2BlockPool>& pool,
                               const std::unique_ptr<C2Work>& work);
     void setParams(oapve_param_t& param);
-    int32_t getQpFromQuality(int quality);
 
     void showEncoderParams(oapve_cdesc_t* cdsc);
 
@@ -80,6 +79,7 @@ struct C2SoftApvEnc final : public SimpleC2Component {
     bool mSignalledError;
 
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;

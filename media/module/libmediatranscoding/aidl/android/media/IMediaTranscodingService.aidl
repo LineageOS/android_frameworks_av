@@ -24,7 +24,7 @@ import android.media.TranscodingRequestParcel;
 /**
  * Binder interface for MediaTranscodingService.
  *
- * {@hide}
+ * @hide
  */
 interface IMediaTranscodingService {
     /**

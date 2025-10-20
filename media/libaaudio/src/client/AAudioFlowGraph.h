@@ -17,11 +17,7 @@
 #ifndef ANDROID_AAUDIO_FLOW_GRAPH_H
 #define ANDROID_AAUDIO_FLOW_GRAPH_H
 
-#include <memory>
-#include <stdint.h>
-#include <sys/types.h>
-#include <system/audio.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <audio_utils/Balance.h>
 #include <flowgraph/Limiter.h>
@@ -31,6 +27,14 @@
 #include <flowgraph/MultiToManyConverter.h>
 #include <flowgraph/RampLinear.h>
 #include <flowgraph/SampleRateConverter.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
+#include <memory>
+#include <stdint.h>
+#include <sys/types.h>
+#include <system/audio.h>
+// go/keep-sorted end
 
 class AAudioFlowGraph {
 public:

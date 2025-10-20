@@ -64,7 +64,8 @@ struct CameraTraits<Camera>
     typedef ::android::hardware::ICameraClient TCamCallbacks;
     typedef ::android::binder::Status (::android::hardware::ICameraService::*TCamConnectService)
         (const sp<::android::hardware::ICameraClient>&,
-        int, int, int, bool, const AttributionSourceState&, int32_t,
+        int, int, const ::android::content::res::CameraCompatibilityInfo&, bool,
+        const AttributionSourceState&, int32_t,
         /*out*/
         sp<::android::hardware::ICamera>*);
     static TCamConnectService     fnConnectService;
@@ -85,8 +86,9 @@ public:
 
             // construct a camera client from an existing remote
     static  sp<Camera>  create(const sp<::android::hardware::ICamera>& camera);
-    static  sp<Camera>  connect(int cameraId,
-                                int targetSdkVersion, int rotationOverride, bool forceSlowJpegMode,
+    static  sp<Camera>  connect(int cameraId, int targetSdkVersion,
+                                const content::res::CameraCompatibilityInfo& compatInfo,
+                                bool forceSlowJpegMode,
                                 const AttributionSourceState& clientAttribution,
                                 int32_t devicePolicy = 0);
 

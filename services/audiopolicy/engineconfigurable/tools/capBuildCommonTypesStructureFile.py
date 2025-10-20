@@ -144,15 +144,10 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
 
             component_type_name = component_type_mapping_table[match.groupdict()['type']]
             component_type_literal = match.groupdict()['literal'].lower()
-
             component_type_numerical_value = match.groupdict()['values']
 
             # for AUDIO_DEVICE_IN: rename default to stub
             if component_type_name == "InputDevicesMask":
-                component_type_numerical_value = str(int(component_type_numerical_value, 0))
-                if component_type_literal == "default":
-                    component_type_literal = "stub"
-
                 # Remove ambient and in_communication since they were deprecated
                 if component_type_literal == "ambient" or component_type_literal == "communication":
                     logging.info("Remove deprecated device {}".format(component_type_literal))
@@ -162,9 +157,6 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
                 input_device_shift += 1
 
             if component_type_name == "OutputDevicesMask":
-                if component_type_literal == "default":
-                    component_type_literal = "stub"
-
                 component_type_numerical_value = str(2**output_device_shift)
                 output_device_shift += 1
 
@@ -177,12 +169,13 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
 
             logging.debug("type:{}, literal:{}, values:{}.".format(component_type_name, component_type_literal, component_type_numerical_value))
 
+    # Stub is aliased on default without numerical value, add it last
     if "stub" not in all_component_types["OutputDevicesMask"]:
-        all_component_types["OutputDevicesMask"]["stub"] = 0x40000000
-        logging.info("added stub output device mask")
+        all_component_types["OutputDevicesMask"]["stub"] = 2**output_device_shift
+        logging.info("MISSING STUB, added stub output device mask")
     if "stub" not in all_component_types["InputDevicesMask"]:
-        all_component_types["InputDevicesMask"]["stub"] = 0x40000000
-        logging.info("added stub input device mask")
+        all_component_types["InputDevicesMask"]["stub"] = 2**input_device_shift
+        logging.info("MISSING STUB, added stub input device mask")
 
     # Transform input source in inclusive criterion
     for component_types in all_component_types:

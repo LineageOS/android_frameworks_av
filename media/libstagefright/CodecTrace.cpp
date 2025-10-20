@@ -29,12 +29,12 @@ static const char *const kCodecTraceObjectKeyEvent = "event";
 static const char *const kCodecTraceObjectKeyMetadata = "metadata";
 
 // buffers
-static const uint32_t kCodecTraceValueBufferCountIntervalMs = 500;
+static const uint32_t kCodecTraceValueBufferCountIntervalMs = 5000;
 
 // reserved keys for traces
 static const char *const kCodecTraceObjectKeyPid = "pid";
 static const char *const kCodecTraceObjectKeyUid = "uid";
-static const char *const kCodecTraceObjectKeyBufferCount = "count";
+static const char *const kCodecTraceObjectKeyBufferCount = "ctr";
 static const char *const kCodecTraceObjectKeyBufferCountIntervalMs = "intervalMs";
 namespace android {
 // CodecEvent base class
@@ -176,9 +176,8 @@ StateEvent::StateEvent(const std::string name):
 }
 
 //BufferEvent
-BufferEvent::BufferEvent(const std::string name, const pid_t pid, const uid_t uid):
-        CodecEvent(name, kCodecTracePrefixTrackAction),
-        mPid(pid), mUid(uid) {
+BufferEvent::BufferEvent(const std::string name):
+        CodecEvent(name, kCodecTracePrefixTrackAction) {
 }
 
 void BufferEvent::getInfos(std::vector<audio_utils::trace::Object> &infos) const {
@@ -186,12 +185,7 @@ void BufferEvent::getInfos(std::vector<audio_utils::trace::Object> &infos) const
         audio_utils::trace::Object info;
         auto fillBufferInfo = [&info, this]() {
             CodecEvent::getBaseInfo(info);
-            info
-                    .set(kCodecTraceObjectKeyPid, mPid)
-                    .set(kCodecTraceObjectKeyUid, mUid)
-                    .set(kCodecTraceObjectKeyBufferCount, mEventCtr)
-                    .set(kCodecTraceObjectKeyBufferCountIntervalMs,
-                            kCodecTraceValueBufferCountIntervalMs);
+            info.set(kCodecTraceObjectKeyBufferCount, mEventCtr);
         };
         if (mMessageInfos.empty()) {
             info.clear();
@@ -214,14 +208,11 @@ Tracer::Tracer(const uid_t uid, const pid_t pid)
          mUid(uid == Tracer::kNoUid ? AIBinder_getCallingUid() : uid) {
     ALOGI("Constructing Tracer with uid : %u", mUid);
     std::string bufferEvents[] = {
-        kCodecTraceActionQueueInputBuffer,
-        kCodecTraceActionOnInputBufferAvailable,
-        kCodecTraceActionQueueOutputBuffer,
         kCodecTraceActionOnOutputBufferAvailable
     };
     if (ATRACE_ENABLED()) [[unlikely]] {
         for (std::string &bufferEvent : bufferEvents) {
-            std::shared_ptr<BufferEvent> e(new BufferEvent(bufferEvent, mPid, mUid));
+            std::shared_ptr<BufferEvent> e(new BufferEvent(bufferEvent));
             mBufferEvents.push_back(e);
         }
     }
@@ -276,7 +267,10 @@ void Tracer::traceInternal(const CodecEvent * const event) {
     for (auto &info : eventInfo) {
         if (eName.find(kCodecTraceStateAllocated) != eName.npos) {
             info.set(kCodecTraceObjectKeyPid, mPid)
-                    .set(kCodecTraceObjectKeyUid, mUid);
+                    .set(kCodecTraceObjectKeyUid, mUid)
+                    .set(kCodecTraceObjectKeyBufferCountIntervalMs,
+                            kCodecTraceValueBufferCountIntervalMs);
+
         }
         ATRACE_INSTANT_FOR_TRACK(trackName.c_str(), info.toTrace().c_str());
     }

@@ -21,7 +21,7 @@ import android.media.audio.common.AudioChannelLayout;
 import android.media.audio.common.AudioFormatDescription;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioIoDescriptor {
     /** Interpreted as audio_io_handle_t. */

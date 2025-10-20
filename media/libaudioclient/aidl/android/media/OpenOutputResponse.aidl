@@ -19,7 +19,7 @@ package android.media;
 import android.media.audio.common.AudioConfig;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable OpenOutputResponse {
     /** Interpreted as audio_io_handle_t. */

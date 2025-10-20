@@ -26,7 +26,7 @@ import android.media.ISpatializerHeadTrackingCallback;
  * It is intended for exclusive use by the java AudioService running in system_server.
  * It provides APIs to discover the feature availability and options as well as control and report
  * the active state and modes of the spatializer and head tracking effect.
- * {@hide}
+ * @hide
  */
 interface ISpatializer {
     /** Releases a ISpatializer interface previously acquired. */

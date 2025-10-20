@@ -36,6 +36,7 @@
 #include "CameraServiceWatchdog.h"
 #include <aidl/android/hardware/camera/device/CameraBlob.h>
 
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include "common/CameraDeviceBase.h"
 #include "common/DepthPhotoProcessor.h"
 #include "common/FrameProcessorBase.h"
@@ -65,6 +66,7 @@ using android::camera3::camera_stream_configuration_mode_t;
 using android::camera3::CAMERA_TEMPLATE_COUNT;
 using android::camera3::OutputStreamInfo;
 using android::camera3::SurfaceHolder;
+using android::content::res::CameraCompatibilityInfo;
 
 namespace android {
 
@@ -92,7 +94,8 @@ class Camera3Device :
 
     explicit Camera3Device(std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
             std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
-            const std::string& id, bool overrideForPerfClass, int rotationOverride,
+            const std::string& id, bool overrideForPerfClass,
+            const CameraCompatibilityInfo& compatInfo,
             bool isVendorClient, bool legacyClient = false);
 
     virtual ~Camera3Device();
@@ -220,8 +223,8 @@ class Camera3Device :
 
     virtual status_t beginConfigure() override {return OK;};
 
-    virtual status_t getSharedStreamId(const OutputStreamInfo& /*config*/,
-            int* /*streamId*/) override {return INVALID_OPERATION;};
+    virtual status_t getSharedStreamIds(const OutputStreamInfo& /*config*/,
+           std::vector< int>& /*streamIds*/) override {return INVALID_OPERATION;};
 
     virtual status_t addSharedSurfaces(int /*streamId*/,
             const std::vector<android::camera3::OutputStreamInfo>& /*outputInfo*/,
@@ -930,10 +933,10 @@ class Camera3Device :
      * error message to indicate why. Only the first call's message will be
      * used. The message is also sent to the log.
      */
-    void               setErrorState(const char *fmt, ...) override;
-    void               setErrorStateLocked(const char *fmt, ...) override;
-    void               setErrorStateV(const char *fmt, va_list args);
-    void               setErrorStateLockedV(const char *fmt, va_list args);
+    void               setErrorState(int32_t errorType, const char *fmt, ...) override;
+    void               setErrorStateLocked(int32_t errorType, const char *fmt, ...) override;
+    void               setErrorStateV(int32_t errorType, const char *fmt, va_list args);
+    void               setErrorStateLockedV(int32_t errorType, const char *fmt, va_list args);
 
     bool               isInErrorState();
 
@@ -960,7 +963,7 @@ class Camera3Device :
 
     // Override rotate_and_crop control if needed
     static bool    overrideAutoRotateAndCrop(const sp<CaptureRequest> &request /*out*/,
-            int rotationOverride,
+            const CameraCompatibilityInfo& compatInfo,
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropOverride);
 
     // Override auto framing control if needed
@@ -997,7 +1000,7 @@ class Camera3Device :
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                int rotationOverride,
+                const CameraCompatibilityInfo& compatInfo,
                 bool supportSettingsOverride);
         ~RequestThread();
 
@@ -1211,7 +1214,7 @@ class Camera3Device :
         void               unpauseForNewRequests();
 
         // Relay error to parent device object setErrorState
-        void               setErrorState(const char *fmt, ...);
+        void               setErrorState(int32_t errorType, const char *fmt, ...);
 
         // If the input request is in mRepeatingRequests. Must be called with mRequestLock hold
         bool isRepeatingRequestLocked(const sp<CaptureRequest>&);
@@ -1325,7 +1328,7 @@ class Camera3Device :
         bool               mUseHalBufManager = false;
         std::set<int32_t > mHalBufManagedStreamIds;
         const bool         mSupportCameraMute;
-        const bool         mRotationOverride;
+        const CameraCompatibilityInfo& mCompatInfo;
         const bool         mSupportSettingsOverride;
         int32_t            mVndkVersion = -1;
     };
@@ -1336,7 +1339,7 @@ class Camera3Device :
                 const Vector<int32_t>& /*sessionParamKeys*/,
                 bool /*useHalBufManager*/,
                 bool /*supportCameraMute*/,
-                int /*rotationOverride*/,
+                const CameraCompatibilityInfo& /*compatInfo*/,
                 bool /*supportSettingsOverride*/) = 0;
 
     sp<RequestThread> mRequestThread;
@@ -1622,7 +1625,7 @@ class Camera3Device :
 
     // Whether the camera framework overrides the device characteristics for
     // app compatibility reasons.
-    int mRotationOverride;
+    CameraCompatibilityInfo mCompatInfo;
     camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
     bool mComposerOutput;
 

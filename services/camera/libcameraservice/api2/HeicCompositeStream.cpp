@@ -1096,7 +1096,8 @@ status_t HeicCompositeStream::processInputFrame(int64_t frameNumber,
     bool hasOutputBuffer = inputFrame.muxer != nullptr ||
             (mDequeuedOutputBufferCnt < kMaxOutputSurfaceProducerCount);
     bool hasGainmapMetadata = !inputFrame.isoGainmapMetadata.empty();
-    bool hdrGainmapFormatReady = mHDRGainmapEnabled ? (mGainmapFormat != nullptr) : true;
+    bool hdrGainmapFormatReady = mHDRGainmapEnabled ?
+            (inputFrame.gainmapFormat.get() != nullptr) : true;
 
     ALOGV("%s: [%" PRId64 "]: appSegmentReady %d, codecOutputReady %d, codecInputReady %d,"
             " dequeuedOutputBuffer %d, timestamp %" PRId64, __FUNCTION__, frameNumber,

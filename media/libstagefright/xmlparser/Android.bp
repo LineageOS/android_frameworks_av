@@ -29,6 +29,7 @@ cc_library_shared {
     shared_libs: [
         "libbase",
         "libexpat",
+        "libgui",
         "liblog",
         "libstagefright_omx_utils",
     ],

@@ -22,6 +22,7 @@
 #include <stdint.h>
 
 #include <media/stagefright/foundation/ABase.h>
+#include <utils/Errors.h>
 #include <utils/RefBase.h>
 
 namespace android {
@@ -39,6 +40,13 @@ struct ABuffer : public RefBase {
     size_t offset() const { return mRangeOffset; }
 
     void setRange(size_t offset, size_t size);
+
+    // Works same as setRange, but without any asserts.
+    // Additionally it returns:
+    // - OK upon success.
+    // - NO_MEMORY if ABuffer doesn't have a valid placeholder.
+    // - BAD_VALUE if input arguments are invalid.
+    status_t setRangeWithStatus(size_t offset, size_t size);
 
     // create buffer from dup of some memory block
     static sp<ABuffer> CreateAsCopy(const void *data, size_t capacity);

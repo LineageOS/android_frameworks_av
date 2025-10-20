@@ -46,6 +46,8 @@ struct InputSurface : public BnInputSurface {
             const std::shared_ptr<IInputSink>& sink,
             std::shared_ptr<IInputSurfaceConnection>* connection) override;
 
+    c2_status_t start();
+
     // Constant definitions.
     // Default image size for AImageReader
     constexpr static uint32_t kDefaultImageWidth = 1280;

@@ -76,3 +76,8 @@ TEST_F(ExecutorTests, ShutdownTwice) {
     executor_.shutdown();
     executor_.shutdown();
 }
+
+TEST_F(ExecutorTests, Submit) {
+    auto future = submit(executor_, [&]() { return 5; });
+    EXPECT_EQ(future.get(), 5);
+}

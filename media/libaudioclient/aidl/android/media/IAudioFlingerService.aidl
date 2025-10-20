@@ -58,7 +58,7 @@ import android.media.audio.common.AudioStreamType;
 import android.media.audio.common.AudioUuid;
 
 /**
- * {@hide}
+ * @hide
  */
 interface IAudioFlingerService {
     /**

@@ -228,7 +228,9 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
 
     std::atomic_bool running(true);
     std::thread surfaceThread([this, &running]() {
+#if !COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
         const sp<IGraphicBufferProducer> &igbp = mSurface->getIGraphicBufferProducer();
+#endif
         while (running) {
             std::unique_ptr<C2Work> work;
             {
@@ -260,6 +262,21 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
                         block.width()));
                 native_handle_delete(grallocHandle);
 
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+                (void)mSurface->attachBuffer(&slot, buffer);
+
+                Surface::QueueBufferInput qbi(
+                        (work->worklets.front()->output.ordinal.timestamp * 1000ll).peekll(),
+                        false,
+                        HAL_DATASPACE_UNKNOWN,
+                        Rect(block.width(), block.height()),
+                        NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW,
+                        0,
+                        Fence::NO_FENCE,
+                        0);
+                Surface::QueueBufferOutput qbo;
+                (void)mSurface->queueBuffer(slot, qbi, &qbo);
+#else
                 (void)igbp->attachBuffer(&slot, buffer);
 
                 IGraphicBufferProducer::QueueBufferInput qbi(
@@ -273,6 +290,7 @@ void SimplePlayer::play(const sp<IMediaSource> &source) {
                         0);
                 IGraphicBufferProducer::QueueBufferOutput qbo;
                 (void)igbp->queueBuffer(slot, qbi, &qbo);
+#endif
             }
 
             work->input.buffers.clear();

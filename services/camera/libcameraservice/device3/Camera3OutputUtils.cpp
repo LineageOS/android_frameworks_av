@@ -26,7 +26,8 @@
 #endif
 
 // Convenience macros for transitioning to the error state
-#define SET_ERR(fmt, ...) states.setErrIntf.setErrorState(   \
+#define SET_ERR(errorState, fmt, ...) states.setErrIntf.setErrorState(   \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,                         \
     ##__VA_ARGS__)
 
@@ -43,10 +44,12 @@
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
 
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <camera/CameraUtils.h>
 #include <camera/StringUtils.h>
 #include <camera_metadata_hidden.h>
 #include <com_android_internal_camera_flags.h>
+#include <statslog_framework.h>
 
 #include "device3/Camera3OutputUtils.h"
 #include "utils/SessionConfigurationUtils.h"
@@ -221,12 +224,14 @@ void insertResultLocked(CaptureOutputStates& states, CaptureResult *result, uint
 
     if (result->mMetadata.update(ANDROID_REQUEST_FRAME_COUNT,
             (int32_t*)&frameNumber, 1) != OK) {
-        SET_ERR("Failed to set frame number %d in metadata", frameNumber);
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Failed to set frame number %d in metadata", frameNumber);
         return;
     }
 
     if (result->mMetadata.update(ANDROID_REQUEST_ID, &result->mResultExtras.requestId, 1) != OK) {
-        SET_ERR("Failed to set request ID in metadata for frame %d", frameNumber);
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+           "Failed to set request ID in metadata for frame %d", frameNumber);
         return;
     }
 
@@ -266,7 +271,8 @@ void sendPartialCaptureResult(CaptureOutputStates& states,
     // Fix up result metadata for monochrome camera.
     status_t res = fixupMonochromeTags(states, states.deviceInfo, captureResult.mMetadata);
     if (res != OK) {
-        SET_ERR("Failed to override result metadata: %s (%d)", strerror(-res), res);
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Failed to override result metadata: %s (%d)", strerror(-res), res);
         return;
     }
 
@@ -317,23 +323,26 @@ void sendCaptureResult(
     // TODO: need to track errors for tighter bounds on expected frame number
     if (reprocess) {
         if (frameNumber < states.nextReprocResultFrameNum) {
-            SET_ERR("Out-of-order reprocess capture result metadata submitted! "
-                "(got frame number %d, expecting %d)",
-                frameNumber, states.nextReprocResultFrameNum);
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Out-of-order reprocess capture result metadata submitted! "
+                    "(got frame number %d, expecting %d)",
+                    frameNumber, states.nextReprocResultFrameNum);
             return;
         }
         states.nextReprocResultFrameNum = frameNumber + 1;
     } else if (zslStillCapture) {
         if (frameNumber < states.nextZslResultFrameNum) {
-            SET_ERR("Out-of-order ZSL still capture result metadata submitted! "
-                "(got frame number %d, expecting %d)",
-                frameNumber, states.nextZslResultFrameNum);
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+              "Out-of-order ZSL still capture result metadata submitted! "
+                    "(got frame number %d, expecting %d)",
+                    frameNumber, states.nextZslResultFrameNum);
             return;
         }
         states.nextZslResultFrameNum = frameNumber + 1;
     } else {
         if (frameNumber < states.nextResultFrameNum) {
-            SET_ERR("Out-of-order capture result metadata submitted! "
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+             "Out-of-order capture result metadata submitted! "
                     "(got frame number %d, expecting %d)",
                     frameNumber, states.nextResultFrameNum);
             return;
@@ -356,7 +365,8 @@ void sendCaptureResult(
     // Check that there's a timestamp in the result metadata
     camera_metadata_entry timestamp = captureResult.mMetadata.find(ANDROID_SENSOR_TIMESTAMP);
     if (timestamp.count == 0) {
-        SET_ERR("No timestamp provided by HAL for frame %d!",
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "No timestamp provided by HAL for frame %d!",
                 frameNumber);
         return;
     }
@@ -367,7 +377,8 @@ void sendCaptureResult(
                 physicalMetadata.mCameraMetadataInfo.get<CameraMetadataInfo::metadata>().
                         find(ANDROID_SENSOR_TIMESTAMP);
         if (timestamp.count == 0) {
-            SET_ERR("No timestamp provided by HAL for physical camera %s frame %d!",
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "No timestamp provided by HAL for physical camera %s frame %d!",
                     physicalMetadata.mPhysicalCameraId.c_str(), frameNumber);
             return;
         }
@@ -379,7 +390,8 @@ void sendCaptureResult(
     if (iter != states.distortionMappers.end()) {
         res = iter->second.correctCaptureResult(&captureResult.mMetadata);
         if (res != OK) {
-            SET_ERR("Unable to correct capture result metadata for frame %d: %s (%d)",
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Unable to correct capture result metadata for frame %d: %s (%d)",
                     frameNumber, strerror(-res), res);
             return;
         }
@@ -391,7 +403,8 @@ void sendCaptureResult(
     res = states.zoomRatioMappers[states.cameraId].updateCaptureResult(
             &captureResult.mMetadata, useZoomRatio, zoomRatioIs1);
     if (res != OK) {
-        SET_ERR("Failed to update capture result zoom ratio metadata for frame %d: %s (%d)",
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Failed to update capture result zoom ratio metadata for frame %d: %s (%d)",
                 frameNumber, strerror(-res), res);
         return;
     }
@@ -403,7 +416,8 @@ void sendCaptureResult(
             res = mapper->second.updateCaptureResult(
                     &captureResult.mMetadata);
             if (res != OK) {
-                SET_ERR("Unable to correct capture result rotate-and-crop for frame %d: %s (%d)",
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "Unable to correct capture result rotate-and-crop for frame %d: %s (%d)",
                         frameNumber, strerror(-res), res);
                 return;
             }
@@ -413,7 +427,8 @@ void sendCaptureResult(
     // Fix up manual flash strength control metadata
     res = fixupManualFlashStrengthControlTags(captureResult.mMetadata);
     if (res != OK) {
-        SET_ERR("Failed to set flash strength level defaults in result metadata: %s (%d)",
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Failed to set flash strength level defaults in result metadata: %s (%d)",
                 strerror(-res), res);
         return;
     }
@@ -421,7 +436,8 @@ void sendCaptureResult(
         res = fixupManualFlashStrengthControlTags(physicalMetadata.mCameraMetadataInfo.
                 get<CameraMetadataInfo::metadata>());
         if (res != OK) {
-            SET_ERR("Failed to set flash strength level defaults in physical result"
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Failed to set flash strength level defaults in physical result"
                     " metadata: %s (%d)", strerror(-res), res);
             return;
         }
@@ -430,7 +446,8 @@ void sendCaptureResult(
     // Fix up autoframing metadata
     res = fixupAutoframingTags(captureResult.mMetadata);
     if (res != OK) {
-        SET_ERR("Failed to set autoframing defaults in result metadata: %s (%d)",
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Failed to set autoframing defaults in result metadata: %s (%d)",
                 strerror(-res), res);
         return;
     }
@@ -438,7 +455,8 @@ void sendCaptureResult(
         res = fixupAutoframingTags(physicalMetadata.mCameraMetadataInfo.
                 get<CameraMetadataInfo::metadata>());
         if (res != OK) {
-            SET_ERR("Failed to set autoframing defaults in physical result metadata: %s (%d)",
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Failed to set autoframing defaults in physical result metadata: %s (%d)",
                     strerror(-res), res);
             return;
         }
@@ -451,7 +469,8 @@ void sendCaptureResult(
             res = mapper->second.correctCaptureResult(
                     &physicalMetadata.mCameraMetadataInfo.get<CameraMetadataInfo::metadata>());
             if (res != OK) {
-                SET_ERR("Unable to correct physical capture result metadata for frame %d: %s (%d)",
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "Unable to correct physical capture result metadata for frame %d: %s (%d)",
                         frameNumber, strerror(-res), res);
                 return;
             }
@@ -464,7 +483,8 @@ void sendCaptureResult(
                 /*zoomMethodIsRatio*/false,
                 /*zoomRatioIs1*/true);
         if (res != OK) {
-            SET_ERR("Failed to update camera %s's physical zoom ratio metadata for "
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Failed to update camera %s's physical zoom ratio metadata for "
                     "frame %d: %s(%d)", cameraId.c_str(), frameNumber, strerror(-res), res);
             return;
         }
@@ -473,7 +493,8 @@ void sendCaptureResult(
     // Fix up result metadata for monochrome camera.
     res = fixupMonochromeTags(states, states.deviceInfo, captureResult.mMetadata);
     if (res != OK) {
-        SET_ERR("Failed to override result metadata: %s (%d)", strerror(-res), res);
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Failed to override result metadata: %s (%d)", strerror(-res), res);
         return;
     }
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
@@ -482,7 +503,8 @@ void sendCaptureResult(
                 states.physicalDeviceInfoMap.at(cameraId),
                 physicalMetadata.mCameraMetadataInfo.get<CameraMetadataInfo::metadata>());
         if (res != OK) {
-            SET_ERR("Failed to override result metadata: %s (%d)", strerror(-res), res);
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Failed to override result metadata: %s (%d)", strerror(-res), res);
             return;
         }
     }
@@ -537,9 +559,10 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx,
         // case of request having callback.
         if (request.hasCallback && request.requestStatus == OK &&
                 sensorTimestamp != shutterTimestamp) {
-            SET_ERR("sensor timestamp (%" PRId64
-                ") for frame %d doesn't match shutter timestamp (%" PRId64 ")",
-                sensorTimestamp, frameNumber, shutterTimestamp);
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "sensor timestamp (%" PRId64
+                    ") for frame %d doesn't match shutter timestamp (%" PRId64 ")",
+                    sensorTimestamp, frameNumber, shutterTimestamp);
         }
 
         // for an unsuccessful request, it may have pending output buffers to
@@ -637,6 +660,29 @@ size_t getExpectedPhysicalMetadataCount(
     return expectedPhysicalIdsWithMetadata.size();
 }
 
+void recalculateTransform(const CameraMetadata& staticInfo,
+        SurfaceTransformMap *surfaceTransformMap/*out*/) {
+    if (surfaceTransformMap == nullptr) {
+        return;
+    }
+
+    auto it = surfaceTransformMap->begin();
+    while (it != surfaceTransformMap->end()) {
+        int32_t transform;
+        auto ret = CameraUtils::getRotationTransform(staticInfo,
+                it->second.mirrorMode, /*transformInverseDisplay*/true,
+                &transform);
+        if (ret == OK) {
+            it->second.transform = transform;
+        } else {
+            ALOGE("%s: Failed to calculate current stream "
+                    "transformation: %s (%d)", __FUNCTION__,
+                    strerror(-ret), ret);
+        }
+        it++;
+    }
+}
+
 void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result) {
     ATRACE_CALL();
 
@@ -645,7 +691,8 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
     uint32_t frameNumber = result->frame_number;
     if (result->result == NULL && result->num_output_buffers == 0 &&
             result->input_buffer == NULL) {
-        SET_ERR("No result data provided by HAL for frame %d",
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "No result data provided by HAL for frame %d",
                 frameNumber);
         return;
     }
@@ -653,7 +700,8 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
     if (!states.usePartialResult &&
             result->result != NULL &&
             result->partial_result != 1) {
-        SET_ERR("Result is malformed for frame %d: partial_result %u must be 1"
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Result is malformed for frame %d: partial_result %u must be 1"
                 " if partial result is not supported",
                 frameNumber, result->partial_result);
         return;
@@ -675,7 +723,8 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         std::lock_guard<std::mutex> l(states.inflightLock);
         ssize_t idx = states.inflightMap.indexOfKey(frameNumber);
         if (idx == NAME_NOT_FOUND) {
-            SET_ERR("Unknown frame number for capture result: %d",
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Unknown frame number for capture result: %d",
                     frameNumber);
             return;
         }
@@ -705,9 +754,9 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                     states.listener->notifyPhysicalCameraChange(physicalId);
                 }
                 states.activePhysicalId = physicalId;
-                using hardware::ICameraService::ROTATION_OVERRIDE_NONE;
                 if (!states.legacyClient &&
-                        states.rotationOverride == ROTATION_OVERRIDE_NONE) {
+                    !states.compatInfo.shouldRotateAndCrop() &&
+                    !states.compatInfo.shouldOverrideSensorOrientation()) {
                     auto deviceInfo = states.physicalDeviceInfoMap.find(physicalId);
                     if (deviceInfo != states.physicalDeviceInfoMap.end()) {
                         auto orientation = deviceInfo->second.find(ANDROID_SENSOR_ORIENTATION);
@@ -724,17 +773,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                             if (r.requestTimeNs >= request.requestTimeNs) {
                                 auto it = r.transform.begin();
                                 while (it != r.transform.end()) {
-                                    int32_t transform;
-                                    auto ret = CameraUtils::getRotationTransform(deviceInfo->second,
-                                            it->second.mirrorMode, /*transformInverseDisplay*/true,
-                                            &transform);
-                                    if (ret == OK) {
-                                        it->second.transform = transform;
-                                    } else {
-                                        ALOGE("%s: Failed to calculate current stream "
-                                                "transformation: %s (%d)", __FUNCTION__,
-                                                strerror(-ret), ret);
-                                    }
+                                    recalculateTransform(deviceInfo->second, &it->second);
                                     it++;
                                 }
                             }
@@ -750,14 +789,16 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         // Check if this result carries only partial metadata
         if (states.usePartialResult && result->result != NULL) {
             if (result->partial_result > states.numPartialResults || result->partial_result < 1) {
-                SET_ERR("Result is malformed for frame %d: partial_result %u must be  in"
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "Result is malformed for frame %d: partial_result %u must be  in"
                         " the range of [1, %d] when metadata is included in the result",
                         frameNumber, result->partial_result, states.numPartialResults);
                 return;
             }
             isPartialResult = (result->partial_result < states.numPartialResults);
             if (isPartialResult && result->num_physcam_metadata) {
-                SET_ERR("Result is malformed for frame %d: partial_result not allowed for"
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "Result is malformed for frame %d: partial_result not allowed for"
                         " physical camera result", frameNumber);
                 return;
             }
@@ -781,12 +822,14 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                     getExpectedPhysicalMetadataCount(request.physicalCameraIds,
                                                      states.activePhysicalId);
             if (expectedPhysicalCameraMetadataCount != result->num_physcam_metadata) {
-                SET_ERR("Expected physical Camera metadata count %d not equal to actual count %d",
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "Expected physical Camera metadata count %d not equal to actual count %d",
                         expectedPhysicalCameraMetadataCount, result->num_physcam_metadata);
                 return;
             }
             if (request.haveResultMetadata) {
-                SET_ERR("Called multiple times with metadata for frame %d",
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "Called multiple times with metadata for frame %d",
                         frameNumber);
                 return;
             }
@@ -795,7 +838,8 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                 bool validPhysicalCameraMetadata =
                         erasePhysicalCameraIdSet(request.physicalCameraIds, physicalId);
                 if (!validPhysicalCameraMetadata) {
-                    SET_ERR("Unexpected total result for frame %d camera %s",
+                    SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                        "Unexpected total result for frame %d camera %s",
                             frameNumber, physicalId.c_str());
                     return;
                 }
@@ -821,7 +865,8 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
         }
         request.numBuffersLeft -= numBuffersReturned;
         if (request.numBuffersLeft < 0) {
-            SET_ERR("Too many buffers returned for frame %d",
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Too many buffers returned for frame %d",
                     frameNumber);
             return;
         }
@@ -942,10 +987,6 @@ void collectReturnableOutputBuffers(
             continue;
         }
 
-        const auto& transformIt = transform.find(streamId);
-        int32_t transformValue = (transformIt != transform.end()) ?
-            transformIt->second.transform : -1;
-
         const auto& it = outputSurfaces.find(streamId);
 
         // Do not return the buffer if the buffer status is error, and the error
@@ -953,15 +994,31 @@ void collectReturnableOutputBuffers(
         if (outputBuffers[i].status != CAMERA_BUFFER_STATUS_ERROR ||
                 errorBufStrategy != ERROR_BUF_CACHE) {
             if (it != outputSurfaces.end()) {
+                const auto& transformSurfaceMap = transform.find(streamId);
+                std::vector<int32_t> transforms;
+                if (transformSurfaceMap != transform.end()) {
+                    for (size_t surfaceId : it->second) {
+                        const auto& transformValue = transformSurfaceMap->second.find(surfaceId);
+                        if (transformValue != transformSurfaceMap->second.end()) {
+                            transforms.push_back(transformValue->second.transform);
+                        } else {
+                            transforms.push_back(-1);
+                        }
+                    }
+                } else {
+                    transforms.push_back(-1);
+                }
+
                 returnableBuffers->emplace_back(stream,
                         outputBuffers[i], timestamp, readoutTimestamp, timestampIncreasing,
                         it->second, resultExtras,
-                        transformValue, requested ? requestTimeNs : 0);
+                        transforms, requested ? requestTimeNs : 0);
             } else {
+                std::vector<int32_t> transforms = {};
                 returnableBuffers->emplace_back(stream,
                         outputBuffers[i], timestamp, readoutTimestamp, timestampIncreasing,
                         std::vector<size_t> (), resultExtras,
-                        transformValue, requested ? requestTimeNs : 0 );
+                        transforms, requested ? requestTimeNs : 0 );
             }
         }
     }
@@ -980,7 +1037,7 @@ void finishReturningOutputBuffers(const std::vector<BufferToReturn> &returnableB
 
         status_t res = stream->returnBuffer(b.buffer, b.timestamp,
                 b.readoutTimestamp, b.timestampIncreasing,
-                b.surfaceIds, b.resultExtras.frameNumber, b.transform);
+                b.surfaceIds, b.resultExtras.frameNumber, b.transforms);
 
         // Note: stream may be deallocated at this point, if this buffer was
         // the last reference to it.
@@ -1011,7 +1068,7 @@ void finishReturningOutputBuffers(const std::vector<BufferToReturn> &returnableB
             sb.status = CAMERA_BUFFER_STATUS_ERROR;
             stream->returnBuffer(sb, /*timestamp*/0, /*readoutTimestamp*/0,
                     b.timestampIncreasing, std::vector<size_t> (),
-                    b.resultExtras.frameNumber, b.transform);
+                    b.resultExtras.frameNumber, b.transforms);
 
             if (listener != nullptr) {
                 CaptureResultExtras extras = b.resultExtras;
@@ -1078,7 +1135,8 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                 // TODO: need to track errors for tighter bounds on expected frame number.
                 if (r.hasInputBuffer) {
                     if (msg.frame_number < states.nextReprocShutterFrameNum) {
-                        SET_ERR("Reprocess shutter notification out-of-order. Expected "
+                        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                            "Reprocess shutter notification out-of-order. Expected "
                                 "notification for frame %d, got frame %d",
                                 states.nextReprocShutterFrameNum, msg.frame_number);
                         return;
@@ -1086,7 +1144,8 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                     states.nextReprocShutterFrameNum = msg.frame_number + 1;
                 } else if (r.zslCapture && r.stillCapture) {
                     if (msg.frame_number < states.nextZslShutterFrameNum) {
-                        SET_ERR("ZSL still capture shutter notification out-of-order. Expected "
+                        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                            "ZSL still capture shutter notification out-of-order. Expected "
                                 "notification for frame %d, got frame %d",
                                 states.nextZslShutterFrameNum, msg.frame_number);
                         return;
@@ -1094,7 +1153,8 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                     states.nextZslShutterFrameNum = msg.frame_number + 1;
                 } else {
                     if (msg.frame_number < states.nextShutterFrameNum) {
-                        SET_ERR("Shutter notification out-of-order. Expected "
+                        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                            "Shutter notification out-of-order. Expected "
                                 "notification for frame %d, got frame %d",
                                 states.nextShutterFrameNum, msg.frame_number);
                         return;
@@ -1159,7 +1219,8 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
         }
     }
     if (idx < 0) {
-        SET_ERR("Shutter notification for non-existent frame number %d",
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Shutter notification for non-existent frame number %d",
                 msg.frame_number);
     }
     // Call notifyShutter outside of in-flight mutex
@@ -1215,7 +1276,8 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
     switch (errorCode) {
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DEVICE:
             // SET_ERR calls into listener to notify application
-            SET_ERR("Camera HAL reported serious device error");
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Camera HAL reported serious device error");
             break;
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST:
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT:
@@ -1292,7 +1354,8 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
             break;
         default:
             // SET_ERR calls notifyError
-            SET_ERR("Unknown error message from HAL: %d", msg.error_code);
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Unknown error message from HAL: %d", msg.error_code);
             break;
     }
 }
@@ -1308,7 +1371,8 @@ void notify(CaptureOutputStates& states, const camera_notify_msg *msg) {
             break;
         }
         default:
-            SET_ERR("Unknown notify message from HAL: %d",
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Unknown notify message from HAL: %d",
                     msg->type);
     }
 }

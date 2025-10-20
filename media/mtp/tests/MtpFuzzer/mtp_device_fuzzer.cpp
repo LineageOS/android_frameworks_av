@@ -37,7 +37,6 @@ constexpr int32_t kMaxBytes = 200;
 constexpr int32_t kMaxDataSize = 20;
 constexpr uint16_t kWMaxPacketSize = 64;
 constexpr uint16_t kEndpointsCount = 3;
-const std::string kInputFile = "/dev/null";
 const std::string kConfigFilePath = "/data/local/tmp/config";
 
 static bool readCallback(void* data, uint32_t offset, uint32_t length, void* clientData) {

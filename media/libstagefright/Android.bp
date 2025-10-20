@@ -311,6 +311,7 @@ cc_library {
         "libmedia_omx",
         "libmedia_omx_client",
         "libmediametrics",
+        "libcameracompatbilityinfo",
         "libsfplugin_ccodec",
         "libsfplugin_ccodec_utils",
         "libstagefright_codecbase",

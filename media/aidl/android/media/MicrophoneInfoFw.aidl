@@ -20,7 +20,7 @@ import android.media.audio.common.MicrophoneDynamicInfo;
 import android.media.audio.common.MicrophoneInfo;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable MicrophoneInfoFw {
     MicrophoneInfo info;

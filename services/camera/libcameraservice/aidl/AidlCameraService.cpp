@@ -42,7 +42,6 @@ using ::android::hardware::cameraservice::utils::conversion::aidl::areBindersEqu
 using ::android::hardware::cameraservice::utils::conversion::aidl::cloneToAidl;
 using ::android::hardware::cameraservice::utils::conversion::aidl::convertToAidl;
 using ::android::hardware::cameraservice::utils::conversion::aidl::filterVndkKeys;
-using hardware::BnCameraService::ROTATION_OVERRIDE_NONE;
 using ::ndk::ScopedAStatus;
 
 // VNDK classes
@@ -100,7 +99,7 @@ ScopedAStatus AidlCameraService::getCameraCharacteristics(const std::string& in_
                     kDefaultDeviceId);
     UStatus ret = mCameraService->getCameraCharacteristics(in_cameraId,
                                                            mVndkVersion,
-                                                           ROTATION_OVERRIDE_NONE,
+                                                           CameraCompatibilityInfo(),
                                                            clientAttribution,
                                                            /* devicePolicy= */ 0,
                                                            &cameraMetadata);
@@ -182,7 +181,7 @@ ndk::ScopedAStatus AidlCameraService::connectDeviceImpl(
             in_cameraId,
             /* scoreOffset= */ 0,
             /* targetSdkVersion= */ __ANDROID_API_FUTURE__,
-            ROTATION_OVERRIDE_NONE,
+            CameraCompatibilityInfo(),
             clientAttribution,
             /* devicePolicy= */ 0,
             sharedMode,

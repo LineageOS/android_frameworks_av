@@ -403,11 +403,17 @@ aaudio_result_t AAudioService::closeStream(const sp<AAudioServiceStreamBase>& se
     // It is safe to unregister the same stream twice.
     const pid_t pid = serviceStream->getOwnerProcessId();
     AAudioClientTracker::getInstance().unregisterClientStream(pid, serviceStream);
-    // This is protected by a lock in mStreamTracker.
-    // It is safe to remove the same stream twice.
-    mStreamTracker.removeStreamByHandle(serviceStream->getHandle());
+    aaudio_result_t result = serviceStream->close();
+    if (result == AAUDIO_ERROR_WOULD_BLOCK) {
+        ALOGD("%s defer removing stream", __func__);
+        result = AAUDIO_OK;
+    } else {
+        // This is protected by a lock in mStreamTracker.
+        // It is safe to remove the same stream twice.
+        mStreamTracker.removeStreamByHandle(serviceStream->getHandle());
+    }
 
-    return serviceStream->close();
+    return result;
 }
 
 sp<AAudioServiceStreamBase> AAudioService::convertHandleToServiceStream(

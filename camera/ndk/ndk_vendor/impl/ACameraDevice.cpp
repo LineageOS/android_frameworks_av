@@ -1572,7 +1572,9 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
 }
 
 void CameraDevice::stopLooperAndDisconnect() {
-    Mutex::Autolock _l(mDeviceLock);
+    // This method must only be called from ~ACameraDevice()
+    // For details see b/135641415.
+    mDeviceLock.lock();
     sp<ACameraCaptureSession> session = mCurrentSession.promote();
     if (!isClosed()) {
         disconnectLocked(session);
@@ -1580,10 +1582,19 @@ void CameraDevice::stopLooperAndDisconnect() {
     mCurrentSession = nullptr;
     if (mCbLooper != nullptr) {
       mCbLooper->unregisterHandler(mHandler->id());
+      // Unlock device lock before stopping looper
+      // since its possible that ~ACameraCaptureSession()
+      // or other such methods run on the Looper thread which need
+      // the device lock. This would result in a deadlock.
+      // The Looper thread methods don't (and shouldn't) assume they
+      // already have the device lock.
+      mDeviceLock.unlock();
       mCbLooper->stop();
+      mDeviceLock.lock();
     }
     mCbLooper.clear();
     mHandler.clear();
+    mDeviceLock.unlock();
 }
 
 /**

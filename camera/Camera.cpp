@@ -23,6 +23,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/IMemory.h>
 
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <Camera.h>
 #include <android/hardware/ICameraService.h>
 #include <android/hardware/ICamera.h>
@@ -67,11 +68,12 @@ Camera::~Camera()
     // deadlock if we call any method of ICamera here.
 }
 
-sp<Camera> Camera::connect(int cameraId, int targetSdkVersion, int rotationOverride,
+sp<Camera> Camera::connect(int cameraId, int targetSdkVersion,
+        const CameraCompatibilityInfo& compatInfo,
         bool forceSlowJpegMode, const AttributionSourceState& clientAttribution,
         int32_t devicePolicy)
 {
-    return CameraBaseT::connect(cameraId, targetSdkVersion, rotationOverride,
+    return CameraBaseT::connect(cameraId, targetSdkVersion, compatInfo,
             forceSlowJpegMode, clientAttribution, devicePolicy);
 }
 

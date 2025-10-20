@@ -20,7 +20,7 @@ package android.media;
  * IResourceManagerClient interface for the ResourceManagerService to
  * call the client.
  *
- * {@hide}
+ * @hide
  */
 interface IResourceManagerClient {
     /**

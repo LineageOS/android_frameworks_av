@@ -19,7 +19,7 @@ package android.media;
 /**
  * The audio HAL version definition.
  *
- * {@hide}
+ * @hide
  */
 parcelable AudioHalVersion {
 

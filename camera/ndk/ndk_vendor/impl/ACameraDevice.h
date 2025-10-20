@@ -154,6 +154,8 @@ class CameraDevice final : public std::enable_shared_from_this<CameraDevice> {
     inline ACameraDevice* getWrapper() const { return mWrapper; };
 
     // Stop the looper thread and unregister the handler
+    // Must only be called from ~ACameraDevice()
+    // For details see b/135641415.
     void stopLooperAndDisconnect();
     void setPrimaryClient(bool isPrimary) {mIsPrimaryClient = isPrimary;};
     bool isPrimaryClient() {return mIsPrimaryClient;};

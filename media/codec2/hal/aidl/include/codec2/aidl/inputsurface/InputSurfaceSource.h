@@ -70,10 +70,7 @@ class InputSurfaceSource : public ::android::RefBase {
 // TODO: remove RefBase dependency and AHanderReflector.
 
 private:
-    void initLocked();
-
-    void initWithParams(int32_t width, int32_t height, int32_t format,
-                       int32_t maxImages, uint64_t usage);
+    void initImageReaderLocked();
 
 public:
     // creates an InputSurfaceSource.
@@ -383,17 +380,6 @@ private:
     // buffers queued by the producer.
     AImageReader *mImageReader;
     ANativeWindow *mImageWindow;
-    uint64_t mCurrentUsage;
-
-    // AImageReader creation parameters
-    // maxImages cannot be changed after AImageReader is created.
-    struct ImageReaderConfig {
-        int32_t width;
-        int32_t height;
-        int32_t format;
-        int32_t maxImages;
-        uint64_t usage;
-    } mImageReaderConfig;
 
     // The time to stop sending buffers.
     int64_t mStopTimeUs;

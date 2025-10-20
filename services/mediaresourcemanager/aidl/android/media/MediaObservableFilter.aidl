@@ -23,7 +23,7 @@ import android.media.MediaObservableEvent;
  * Description of an observable resource and its associated events that the
  * observer is interested in.
  *
- * {@hide}
+ * @hide
  */
 parcelable MediaObservableFilter {
     /**

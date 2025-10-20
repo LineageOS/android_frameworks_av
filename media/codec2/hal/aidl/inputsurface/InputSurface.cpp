@@ -309,6 +309,12 @@ public:
             return C2_CORRUPTED;
         }
 
+        if (params.size() == 1 &&
+                params[0]->index() == C2InputSurfaceStartTuning::PARAM_TYPE) {
+            c2_status_t res = surface->start();
+            ALOGD("InputSurface started: res(%d)", res);
+            return res;
+        }
         c2_status_t err;
         {
             ImageConfig imageConfig;
@@ -433,12 +439,16 @@ void InputSurface::init() {
     for (size_t i = 0; i < numSlots; ++i) {
         mSource->onInputBufferAdded(i);
     }
-    c2Res = mSource->start();
+    return ::ndk::ScopedAStatus::ok();
+}
+
+c2_status_t InputSurface::start() {
+    std::unique_lock<std::mutex> l(mLock);
+    c2_status_t c2Res = mSource->start();
     if (c2Res != C2_OK) {
         ALOGE("InputSurface connect: starting source failed(%d)", c2Res);
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(c2Res);
     }
-    return ::ndk::ScopedAStatus::ok();
+    return c2Res;
 }
 
 void InputSurface::updateImageConfig(ImageConfig &config) {
@@ -526,8 +536,9 @@ bool InputSurface::updateStreamConfig(
         mStreamConfig.mCaptureFps = config.mCaptureFps;
         mStreamConfig.mCodedFps = config.mCodedFps;
     }
-    if (config.mStartAtUs != mStreamConfig.mStartAtUs ||
-            (config.mStopped != mStreamConfig.mStopped && !config.mStopped)) {
+    if ((config.mStartAtUs != mStreamConfig.mStartAtUs ||
+            config.mStopped != mStreamConfig.mStopped) &&
+                !config.mStopped) {
         c2_status_t res = mSource->setStartTimeUs(config.mStartAtUs);
         status << " start at " << config.mStartAtUs << "us";
         if (res != C2_OK) {
@@ -538,15 +549,20 @@ bool InputSurface::updateStreamConfig(
         mStreamConfig.mStopped = config.mStopped;
     }
     if (config.mSuspended != mStreamConfig.mSuspended) {
-        c2_status_t res = mSource->setSuspend(config.mSuspended, config.mSuspendAtUs);
+        int64_t atUs = config.mSuspended ? config.mSuspendAtUs : config.mResumeAtUs;
+        c2_status_t res = mSource->setSuspend(config.mSuspended, atUs);
         status << " " << (config.mSuspended ? "suspend" : "resume")
-                << " at " << config.mSuspendAtUs << "us";
+                << " at " << atUs << "us";
         if (res != C2_OK) {
             status << " (=> " << asString(res) << ")";
             err = res;
         }
         mStreamConfig.mSuspended = config.mSuspended;
-        mStreamConfig.mSuspendAtUs = config.mSuspendAtUs;
+        if (config.mSuspended) {
+            mStreamConfig.mSuspendAtUs = atUs;
+        } else {
+            mStreamConfig.mResumeAtUs = atUs;
+        }
     }
     if (config.mStopped != mStreamConfig.mStopped && config.mStopped) {
         // start time has changed or started from stop.

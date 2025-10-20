@@ -22,7 +22,7 @@ import android.hardware.tv.tuner.RecordStatus;
 /**
  * TunerDvrCallback interface handles tuner dvr related callbacks.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerDvrCallback {
     /**

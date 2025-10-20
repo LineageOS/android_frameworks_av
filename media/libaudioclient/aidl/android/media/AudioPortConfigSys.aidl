@@ -21,7 +21,7 @@ import android.media.AudioPortRole;
 import android.media.AudioPortType;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioPortConfigSys {
     /** Sink or source. */

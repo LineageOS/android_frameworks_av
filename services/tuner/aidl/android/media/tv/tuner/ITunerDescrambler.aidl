@@ -23,7 +23,7 @@ import android.media.tv.tuner.ITunerFilter;
 /**
  * Tuner Demux interface handles tuner related operations.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerDescrambler {
     /**

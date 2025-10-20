@@ -17,7 +17,7 @@
 package android.hardware;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable CameraFeatureCombinationStats {
     /**

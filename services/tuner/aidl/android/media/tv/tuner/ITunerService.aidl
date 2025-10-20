@@ -30,7 +30,7 @@ import android.media.tv.tuner.ITunerLnb;
 /**
  * TunerService interface handles tuner related operations.
  *
- * {@hide}
+ * @hide
  */
 //@VintfStability
 @SuppressWarnings(value={"out-array"})

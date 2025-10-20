@@ -186,6 +186,8 @@ public:
 protected:
     DeviceVector getPreferredAvailableDevicesForProductStrategy(
         const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
+    DeviceVector getPreferredAvailableDevicesForInputSource(
+            const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
     DeviceVector getDisabledDevicesForProductStrategy(
         const DeviceVector& availableOutputDevices, product_strategy_t strategy) const;
 

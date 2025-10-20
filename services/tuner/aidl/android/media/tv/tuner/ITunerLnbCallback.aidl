@@ -21,7 +21,7 @@ import android.hardware.tv.tuner.LnbEventType;
 /**
  * TuneLnbCallback interface handles tuner lnb related callbacks.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerLnbCallback {
     /**

@@ -18,7 +18,7 @@ package android.media;
 
 /**
  * Description of a policy to be adopted by ResourceManagerService.
- * {@hide}
+ * @hide
  */
 parcelable MediaResourcePolicyParcel {
     /**

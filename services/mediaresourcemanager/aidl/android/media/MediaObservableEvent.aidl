@@ -23,7 +23,7 @@ package android.media;
  * observer is interested in in the MediaObservableFilter objects passed to
  * IResourceObserverService::registerObserver().
  *
- * {@hide}
+ * @hide
  */
 @Backing(type="long")
 enum MediaObservableEvent {

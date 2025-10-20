@@ -73,6 +73,7 @@ class Hal2AidlMapper : public ConversionHelperAidl {
         return ::aidl::android::convertContainer(mRoutes, routes, converter);
     }
     status_t initialize();
+    void onStreamClosed(const sp<StreamHalInterface>& stream);
     status_t prepareToDisconnectExternalDevice(
             const ::aidl::android::media::audio::common::AudioPort& devicePort);
     // If the resulting 'mixPortConfig->id' is 0, that means the stream was not created,

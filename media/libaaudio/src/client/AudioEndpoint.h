@@ -17,13 +17,17 @@
 #ifndef ANDROID_AAUDIO_AUDIO_ENDPOINT_H
 #define ANDROID_AAUDIO_AUDIO_ENDPOINT_H
 
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
+#include <fifo/FifoBuffer.h>
+// go/keep-sorted end
+
 #include <mutex>
 
-#include <aaudio/AAudio.h>
-
+// go/keep-sorted start
 #include "binding/AAudioServiceMessage.h"
 #include "binding/AudioEndpointParcelable.h"
-#include "fifo/FifoBuffer.h"
+// go/keep-sorted end
 
 namespace aaudio {
 

@@ -181,7 +181,7 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
         AttributionSourceState clientAttribution;
         clientAttribution.deviceId = kDefaultDeviceId;
         rc = mCameraService->getCameraCharacteristics(cameraIdStr,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, CameraCompatibilityInfo(),
                 clientAttribution, /*devicePolicy*/0, &metadata);
         if (!rc.isOk()) {
             // The test is relevant only for cameras with Hal 3.x
@@ -211,7 +211,7 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
         clientAttribution.packageName = "ZSLTest";
         rc = mCameraService->connect(this, cameraId,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                /*overrideToPortrait*/false, /*forceSlowJpegMode*/false, clientAttribution,
+                CameraCompatibilityInfo(), /*forceSlowJpegMode*/false, clientAttribution,
                 /*devicePolicy*/0, &cameraDevice);
         EXPECT_TRUE(rc.isOk());
 

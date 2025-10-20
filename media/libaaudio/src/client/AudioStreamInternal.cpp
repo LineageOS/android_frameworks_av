@@ -16,35 +16,37 @@
 
 #define LOG_TAG "AudioStreamInternal"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
-#include <stdint.h>
+#include "AudioStreamInternal.h"
 
-#include <binder/IServiceManager.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/IAAudioClientCallback.h>
+#include <binder/IServiceManager.h>
+#include <core/AudioStreamBuilder.h>
 #include <cutils/properties.h>
+#include <fifo/FifoBuffer.h>
+#include <media/AidlConversion.h>
 #include <media/AudioParameter.h>
 #include <media/AudioSystem.h>
 #include <media/MediaMetricsItem.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
 #include <utils/Trace.h>
+// go/keep-sorted end
 
-#include "AudioEndpointParcelable.h"
+#include <stdint.h>
+
+// go/keep-sorted start
 #include "binding/AAudioBinderClient.h"
-#include "binding/AAudioStreamRequest.h"
-#include "binding/AAudioStreamConfiguration.h"
 #include "binding/AAudioServiceMessage.h"
-#include "core/AudioGlobal.h"
-#include "core/AudioStreamBuilder.h"
-#include "fifo/FifoBuffer.h"
-#include "utility/AudioClock.h"
-#include <media/AidlConversion.h>
-
-#include "AudioStreamInternal.h"
+#include "binding/AAudioStreamConfiguration.h"
+#include "binding/AAudioStreamRequest.h"
+// go/keep-sorted end
 
 // We do this after the #includes because if a header uses ALOG.
 // it would fail on the reference to mInService.
@@ -404,16 +406,14 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     // The stream is in standby mode, copy all available data and then close the duplicated
     // shared file descriptor so that it won't cause issue when the HAL try to reallocate new
     // shared file descriptor when exiting from standby.
-    // Cache current read counter, which will be reset to new read and write counter
-    // when the new data queue and endpoint are reconfigured.
-    const android::fifo_counter_t readCounter = mAudioEndpoint->getDataReadCounter();
     // Cache the buffer size which may be from client.
     const int32_t previousBufferSize = mBufferSizeInFrames;
     // Copy all available data from current data queue.
-    android::fifo_frames_t fullFramesAvailable = mAudioEndpoint->getFullFramesAvailable();
-    std::unique_ptr<uint8_t[]> buffer =
-            std::make_unique<uint8_t[]>(fullFramesAvailable * getBytesPerFrame());
-    fullFramesAvailable = mAudioEndpoint->read(buffer.get(), fullFramesAvailable);
+    if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
+        mUnprocessedFrames = mAudioEndpoint->getFullFramesAvailable();
+        mUnprocessedBuffer = std::make_unique<uint8_t[]>(mUnprocessedFrames * getBytesPerFrame());
+        mUnprocessedFrames = mAudioEndpoint->read(mUnprocessedBuffer.get(), mUnprocessedFrames);
+    }
     // Before releasing the data queue, update the frames read and written.
     getFramesRead();
     getFramesWritten();
@@ -441,21 +441,10 @@ aaudio_result_t AudioStreamInternal::exitStandby_l() {
     // Reconfigure audio endpoint with new data queue descriptor.
     mAudioEndpoint->configureDataQueue(
             mEndpointDescriptor.dataQueueDescriptor, getDirection());
-    // Set read and write counters with previous read counter, the later write action
-    // will make the counter at the correct place.
-    mAudioEndpoint->setDataReadCounter(readCounter);
-    mAudioEndpoint->setDataWriteCounter(readCounter);
     result = configureDataInformation(mCallbackFrames);
     if (result != AAUDIO_OK) {
         ALOGE("Failed to configure data information after exiting standby, error=%d", result);
         goto exit;
-    }
-    // Write data from previous data buffer to new endpoint.
-    if (const android::fifo_frames_t framesWritten =
-                mAudioEndpoint->write(buffer.get(), fullFramesAvailable);
-            framesWritten != fullFramesAvailable) {
-        ALOGW("Some data lost after exiting standby, frames written: %d, "
-              "frames to write: %d", framesWritten, fullFramesAvailable);
     }
     // Reset previous buffer size as it may be requested by the client.
     setBufferSize(previousBufferSize);
@@ -475,8 +464,11 @@ exit:
  * The processing code will then save the current offset
  * between client and server and apply that to any position given to the app.
  */
-aaudio_result_t AudioStreamInternal::requestStart_l()
-{
+aaudio_result_t AudioStreamInternal::requestStart_l() {
+    return requestStart_l(DEFAULT);
+}
+
+aaudio_result_t AudioStreamInternal::requestStart_l(StartType startType) {
     int64_t startTime;
     if (getServiceHandle() == AAUDIO_HANDLE_INVALID) {
         ALOGD("requestStart() mServiceStreamHandle invalid");
@@ -497,8 +489,6 @@ aaudio_result_t AudioStreamInternal::requestStart_l()
     // Clear any stale timestamps from the previous run.
     drainTimestampsFromService();
 
-    prepareBuffersForStart(); // tell subclasses to get ready
-
     aaudio_result_t result = mServiceInterface.startStream(mServiceStreamHandleInfo);
     if (result == AAUDIO_ERROR_STANDBY) {
         // The stream is at standby mode. Need to exit standby before starting the stream.
@@ -506,23 +496,33 @@ aaudio_result_t AudioStreamInternal::requestStart_l()
         if (result == AAUDIO_OK) {
             result = mServiceInterface.startStream(mServiceStreamHandleInfo);
         }
+        if (result == AAUDIO_OK) {
+            // If the stream is started from standby, the shared mmap buffer is reallocated.
+            // The start request should perform as DEFAULT in this case.
+            startType = DEFAULT;
+        }
     }
-    if (result != AAUDIO_OK) {
+
+    if (result == AAUDIO_OK) {
+        prepareBuffersForStart_l(startType);
+        if (startType != RESUME_WHILE_DRAINING) {
+            startTime = AudioClock::getNanoseconds();
+            mClockModel.start(startTime);
+            mNeedCatchUp.request();  // Ask data processing code to catch up
+                                     // when first timestamp received.
+        }
+        // Start data callback thread.
+        if (isDataCallbackSet()) {
+            // Launch the callback loop thread.
+            result = startCallback_l();
+        }
+    } else {
         ALOGD("%s() error = %d, stream was probably stolen", __func__, result);
         // Stealing was added in R. Coerce result to improve backward compatibility.
         result = AAUDIO_ERROR_DISCONNECTED;
         setDisconnected();
     }
 
-    startTime = AudioClock::getNanoseconds();
-    mClockModel.start(startTime);
-    mNeedCatchUp.request();  // Ask data processing code to catch up when first timestamp received.
-
-    // Start data callback thread.
-    if (result == AAUDIO_OK && isDataCallbackSet()) {
-        // Launch the callback loop thread.
-        result = startCallback_l();
-    }
     if (result != AAUDIO_OK) {
         setState(originalState);
     }
@@ -594,9 +594,12 @@ aaudio_result_t AudioStreamInternal::requestStop_l() {
 
     // For playback, sleep until all the audio data has played.
     // Then clear the buffer to prevent noise.
-    prepareBuffersForStop();
-
-    mClockModel.stop(AudioClock::getNanoseconds());
+    if (aaudio_result_t ret = prepareBuffersForStop_l(); ret == AAUDIO_OK) {
+        mClockModel.stop(AudioClock::getNanoseconds());
+    } else if (ret != AAUDIO_ERROR_WOULD_BLOCK) {
+        // This should not happen, but adding a log for warning.
+        ALOGW("%s prepareBuffersForStop_l returned %d", __func__, ret);
+    }
     setState(AAUDIO_STREAM_STATE_STOPPING);
     mAtomicInternalTimestamp.clear();
 

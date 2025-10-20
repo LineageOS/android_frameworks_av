@@ -20,7 +20,7 @@ import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioUsage;
 
 /**
- * {@hide}
+ * @hide
  */
 union AudioMixMatchCriterionValue {
     AudioUsage usage = AudioUsage.UNKNOWN;

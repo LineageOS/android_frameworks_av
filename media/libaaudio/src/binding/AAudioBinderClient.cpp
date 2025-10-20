@@ -17,18 +17,18 @@
 
 #define LOG_TAG "AAudioBinderClient"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
+#include "AAudioBinderClient.h"
+
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <utils/Log.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
 #include <utils/Singleton.h>
-#include <aaudio/AAudio.h>
-
-#include "AudioEndpointParcelable.h"
-
-#include "binding/AAudioBinderClient.h"
+// go/keep-sorted end
 
 #define AAUDIO_SERVICE_NAME  "media.aaudio"
 

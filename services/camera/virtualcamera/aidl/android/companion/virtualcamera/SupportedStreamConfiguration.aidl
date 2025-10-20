@@ -28,4 +28,5 @@ parcelable SupportedStreamConfiguration {
     int height;
     Format pixelFormat = Format.UNKNOWN;
     int maxFps;
+    int index;
 }

@@ -21,7 +21,7 @@ package android.media;
  * AudioPort are dynamic. Each instance of AudioProfileSys corresponds
  * to an instance of AudioProfile.
  *
- * {@hide}
+ * @hide
  */
 parcelable AudioProfileSys {
     boolean isDynamicFormat;

@@ -38,6 +38,7 @@ namespace {
 
 using testing::Eq;
 using testing::Gt;
+using testing::Ne;
 using testing::Optional;
 using testing::VariantWith;
 
@@ -159,6 +160,7 @@ TEST_F(JpegUtilTest, compressImageSizeAlignedWithDctSucceeds) {
 
   std::optional<size_t> compressedSize = compress(640, 480, inBuffer);
 
+  EXPECT_THAT(compressedSize, Ne(std::nullopt));
   EXPECT_THAT(compressedSize, Optional(Gt(0)));
   EXPECT_THAT(verifyHeaderAndGetResolution(mOutputBuffer.data(),
                                            compressedSize.value()),

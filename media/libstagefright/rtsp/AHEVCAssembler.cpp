@@ -351,14 +351,15 @@ void AHEVCAssembler::addSingleNALUnit(const sp<ABuffer> &buffer) {
     uint32_t rtpTime;
     CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
 
-    if (dropFramesUntilIframe(buffer)) {
+    bool hasNoSps = mWidth * mHeight == 0;
+    if (hasNoSps || dropFramesUntilIframe(buffer)) {
         sp<ARTPSource> source = nullptr;
         buffer->meta()->findObject("source", (sp<android::RefBase>*)&source);
         if (source != nullptr) {
             ALOGD("Issued FIR to get the I-frame");
             source->onIssueFIRByAssembler();
         }
-        ALOGD("drop P-frames till an I-frame provided. rtpTime %u", rtpTime);
+        ALOGV("Dropping frame till SPS & I-frame provided. rtpTime %u", rtpTime);
         return;
     }
 

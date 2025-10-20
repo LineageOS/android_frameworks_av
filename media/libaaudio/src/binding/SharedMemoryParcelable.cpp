@@ -16,20 +16,23 @@
 
 #define LOG_TAG "SharedMemoryParcelable"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <inttypes.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "SharedMemoryParcelable.h"
 
-#include <sys/mman.h>
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
-
 #include <android-base/unique_fd.h>
 #include <binder/Parcelable.h>
 #include <utility/AAudioUtilities.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/SharedMemoryParcelable.h"
+// go/keep-sorted start
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/mman.h>
+// go/keep-sorted end
 
 using android::base::unique_fd;
 using android::status_t;

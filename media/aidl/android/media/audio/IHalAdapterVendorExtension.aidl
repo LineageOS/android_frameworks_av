@@ -26,7 +26,7 @@ import android.hardware.audio.core.VendorParameter;
  * Vendors need to set the system property `ro.audio.ihaladaptervendorextension_enabled`
  * to `true` for the framework to bind to this service.
  *
- * {@hide}
+ * @hide
  */
 interface IHalAdapterVendorExtension {
     enum ParameterScope {

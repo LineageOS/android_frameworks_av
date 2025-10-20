@@ -15,22 +15,26 @@
  */
 
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
-#include <algorithm>
-#include <chrono>
-#include <thread>
+#include "AudioStreamInternalPlay.h"
 
+// go/keep-sorted start
 #include <audio_utils/mutex.h>
 #include <media/MediaMetricsItem.h>
 #include <mediautils/Runnable.h>
+#include <utility/AudioClock.h>
+#include <utils/Log.h>
 #include <utils/SystemClock.h>
 #include <utils/Trace.h>
+// go/keep-sorted end
 
-#include "client/AudioStreamInternalPlay.h"
-#include "utility/AudioClock.h"
+// go/keep-sorted start
+#include <algorithm>
+#include <chrono>
+#include <thread>
+// go/keep-sorted end
 
 // We do this after the #includes because if a header uses ALOG.
 // it would fail on the reference to mInService.
@@ -76,13 +80,6 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
         int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
         mFlowGraph.setRampLengthInFrames(numFrames);
     }
-    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED &&
-        !isDataCallbackSet() && mPresentationEndCallbackProc != nullptr) {
-        // Client is not using data callback but has presentation end callback for offload playback,
-        // initialize an executor for presentation end callback.
-        std::lock_guard _l(mStreamMutex);
-        mStreamEndExecutor.emplace();
-    }
     // Use 1s + burst size as a safe margin to wake up the callback thread for writing more
     // data to avoid glitch.
     mOffloadSafeMarginInFrames =
@@ -115,6 +112,31 @@ aaudio_result_t AudioStreamInternalPlay::requestPause_l()
     // In that case, it is no longer needed to wait for stream end.
     dropPresentationEndCallback_l();
 
+    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        if (result = mServiceInterface.updateTimestamp(mServiceStreamHandleInfo);
+            result != AAUDIO_OK) {
+            ALOGE("%s, failed to update timestamp, error=%d", __func__, result);
+            return result;
+        } else {
+            // After successfully updating the timestamp, the service side is not draining any more.
+            // In that case, always clear the mWakeUpHandle here to indicate that wakeup callback
+            // is not expected.
+            mWakeUpHandle = TimerQueue::INVALID_HANDLE;
+        }
+        if (result = processCommands(); result != AAUDIO_OK) {
+            ALOGE("%s, failed to process commands, error=%d", __func__, result);
+            return result;
+        }
+        // Setting a most accurate read counter so that when resuming, we know if we need to copy
+        // unprocessed data or not. For the most accurate read counter, it is the minimum value
+        // between write counter and estimated read counter plus one burst size. Adding one extra
+        // burst size as the DSP may read to next burst after reporting the position.
+        int64_t readPosition = std::min(mAudioEndpoint->getDataWriteCounter(),
+                mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
+                        + getDeviceFramesPerBurst());
+        mAudioEndpoint->setDataReadCounter(readPosition);
+    }
+
     return mServiceInterface.pauseStream(mServiceStreamHandleInfo);
 }
 
@@ -133,11 +155,18 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush_l() {
     return mServiceInterface.flushStream(mServiceStreamHandleInfo);
 }
 
-void AudioStreamInternalPlay::prepareBuffersForStart() {
+void AudioStreamInternalPlay::prepareBuffersForStart_l(StartType startType) {
     // Reset volume ramps to avoid a starting noise.
     // This was called here instead of AudioStreamInternal so that
     // it will be easier to backport.
     mFlowGraph.reset();
+    if (startType == RESUME_WITH_UNPROCESSED_DATA_TO_COPY) {
+        // There are stale data that needs to be played. Copy them to a temporary buffer and
+        // rewrite them to mmap buffer when there is position reported from the HAL.
+        mUnprocessedFrames = mAudioEndpoint->getFullFramesAvailable();
+        mUnprocessedBuffer = std::make_unique<uint8_t[]>(mUnprocessedFrames * getBytesPerFrame());
+        mUnprocessedFrames = mAudioEndpoint->read(mUnprocessedBuffer.get(), mUnprocessedFrames);
+    }
     // Prevent stale data from being played.
     mAudioEndpoint->eraseDataMemory();
     // All data has been erased. To avoid mixer for the shared stream use stale
@@ -146,11 +175,26 @@ void AudioStreamInternalPlay::prepareBuffersForStart() {
     advanceClientToMatchServerPosition(0 /*serverMargin*/);
 }
 
-void AudioStreamInternalPlay::prepareBuffersForStop() {
+aaudio_result_t AudioStreamInternalPlay::prepareBuffersForStop_l() {
     // If this is a shared stream and the FIFO is being read by the mixer then
     // we don't have to worry about the DSP reading past the valid data. We can skip all this.
     if(!mAudioEndpoint->isFreeRunning()) {
-        return;
+        return AAUDIO_OK;
+    }
+    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        if (mWakeUpHandle != TimerQueue::INVALID_HANDLE) {
+            // The stream is draining. For offload stream, it should drain all data and then stop.
+            ALOGD("%s, the stream is already draining", __func__);
+            return AAUDIO_ERROR_WOULD_BLOCK;
+        }
+        const int64_t streamEndNanosBootTime = mClockModel.convertPositionToBootTime(
+                mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
+        if (android::elapsedRealtimeNano() >= streamEndNanosBootTime) {
+            ALOGD("No need to drain as it is closed to play all data");
+            return AAUDIO_OK;
+        }
+        drainStream_l(streamEndNanosBootTime, false /*allowSoftWakeUp*/);
+        return AAUDIO_ERROR_WOULD_BLOCK;
     }
     // Sleep until the DSP has read all of the data written.
     int64_t validFramesInBuffer =
@@ -201,6 +245,7 @@ void AudioStreamInternalPlay::prepareBuffersForStop() {
                                         hardwareLatencyNanos);
         AudioClock::sleepForNanos(hardwareLatencyNanos);
     }
+    return AAUDIO_OK;
 }
 
 void AudioStreamInternalPlay::advanceClientToMatchServerPosition(int32_t serverMargin) {
@@ -254,17 +299,19 @@ aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFr
         int32_t fullFrames = mAudioEndpoint->getFullFramesAvailable();
         if (fullFrames > getDeviceBufferSize() - mOffloadSafeMarginInFrames &&
             fullFrames > getDeviceSampleRate() * 1 + mOffloadSafeMarginInFrames) {
-            const int64_t drainNanos = mClockModel.convertDeltaPositionToTime(
-                    fullFrames - mOffloadSafeMarginInFrames);
-            const int64_t wakeUpNanos = android::elapsedRealtimeNano() + drainNanos;
+            // Use BootTime for wakeup time as the device may have be suspended.
+            const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
+                    mAudioEndpoint->getDataWriteCounter() - mOffloadSafeMarginInFrames);
             android::audio_utils::unique_lock ul(mStreamMutex);
-            if (aaudio_result_t ret = drainStream_l(wakeUpNanos, isDataCallbackSet());
+            if (aaudio_result_t ret = drainStream_l(wakeUpNanosBootTime, isDataCallbackSet());
                 ret != AAUDIO_OK) {
                 ALOGE("%s() failed to drain, error=%d", __func__, ret);
                 return ret;
             }
             mDraining = true;
             if (isDataCallbackSet()) {
+                const int64_t drainNanos = std::max(
+                        (int64_t)0, wakeUpNanosBootTime - android::elapsedRealtimeNano());
                 mCallbackCV.wait_for(ul, std::chrono::nanoseconds(drainNanos),
                                      [this]() REQUIRES(mStreamMutex) {
                     return !mDraining;
@@ -312,6 +359,17 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
         // We add a one burst margin in case the DSP advances before we can write the data.
         // This can help prevent the beginning of the stream from being skipped.
         advanceClientToMatchServerPosition(getDeviceFramesPerBurst());
+        // Write data from previous data buffer to new endpoint.
+        if (mUnprocessedFrames != 0 && mUnprocessedBuffer != nullptr) {
+            if (const android::fifo_frames_t framesWritten =
+                        mAudioEndpoint->write(mUnprocessedBuffer.get(), mUnprocessedFrames);
+                    framesWritten != mUnprocessedFrames) {
+                ALOGW("Some data lost after exiting standby, frames written: %d, "
+                      "frames to write: %d", framesWritten, mUnprocessedFrames);
+            }
+        }
+        mUnprocessedFrames = 0;
+        mUnprocessedBuffer.reset();
         mNeedCatchUp.acknowledge();
     }
 
@@ -496,24 +554,20 @@ aaudio_result_t AudioStreamInternalPlay::setOffloadEndOfStream() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     mOffloadEosPending = true;
-    if (!isDataCallbackSet()) {
-        const int64_t streamEndNanos = mClockModel.convertDeltaPositionToTime(
-                std::max(0, mAudioEndpoint->getFullFramesAvailable() - getDeviceFramesPerBurst()));
-        auto streamPtr = getPtr();
-        mStreamEndExecutor->enqueue(android::mediautils::Runnable{
-            [streamPtr, streamEndNanos]() {
-                {
-                    android::audio_utils::unique_lock ul(streamPtr->mStreamMutex);
-                    streamPtr->mStreamEndCV.wait_for(
-                            ul, std::chrono::nanoseconds(streamEndNanos),
-                            [streamPtr]() REQUIRES(streamPtr->mStreamMutex) {
-                                return !streamPtr->mOffloadEosPending;
-                            });
-                    if (!streamPtr->mOffloadEosPending) return;
-                    streamPtr->mOffloadEosPending = false;
-                }
-                streamPtr->maybeCallPresentationEndCallback();
-            }});
+    if (!isDataCallbackSet() && mPresentationEndCallbackProc != nullptr) {
+        mOffloadEosNanosBoottime = mClockModel.convertPositionToBootTime(
+                mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
+        if (android::elapsedRealtimeNano() >= mOffloadEosNanosBoottime) {
+            ALOGD("%s no need to drain, all data is played", __func__);
+            maybeCallPresentationEndCallback();
+            mOffloadEosPending = false;
+        } else {
+            // When clients set offload end of stream, they may not want to write more data
+            // before the presentation end callback is called. In that case, DO NOT allow
+            // soft wake up here so that it only wakes up after draining all data.
+            const bool allowSoftWakeUp = false;
+            return drainStream_l(mOffloadEosNanosBoottime, allowSoftWakeUp);
+        }
     }
     return AAUDIO_OK;
 }
@@ -531,7 +585,8 @@ void AudioStreamInternalPlay::maybeCallPresentationEndCallback() {
         pid_t expected = CALLBACK_THREAD_NONE;
         if (mPresentationEndCallbackThread.compare_exchange_strong(expected, gettid())) {
             (*mPresentationEndCallbackProc)(
-                    (AAudioStream *) this, mPresentationEndCallbackUserData);
+                    reinterpret_cast<AAudioStream*>(dynamic_cast<AudioStream*>(this)),
+                    mPresentationEndCallbackUserData);
             mPresentationEndCallbackThread.store(CALLBACK_THREAD_NONE);
         } else {
             ALOGW("%s() presentation end callback already running!", __func__);
@@ -544,7 +599,25 @@ void AudioStreamInternalPlay::dropPresentationEndCallback_l() {
     mStreamEndCV.notify_one();
 }
 
+aaudio_result_t AudioStreamInternalPlay::requestStart_l() {
+    StartType startType = DEFAULT;
+    if (mPendingStop) {
+        // Receive start while the stream is draining but not yet stopped. Restart the stream
+        startType = RESUME_WHILE_DRAINING;
+        mPendingStop = false;
+    } else if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        if (mAudioEndpoint != nullptr &&
+            mAudioEndpoint->getFullFramesAvailable() > getDeviceFramesPerBurst()) {
+            startType = RESUME_WITH_UNPROCESSED_DATA_TO_COPY;
+        }
+    }
+    return AudioStreamInternal::requestStart_l(startType);
+}
+
 aaudio_result_t AudioStreamInternalPlay::requestStop_l() {
+    if (mDraining) {
+        mPendingStop = true;
+    }
     // When stop is called, the service will notify the HAL so that no more data will be consumed.
     // In that case, it is no longer needed to wait for stream end.
     dropPresentationEndCallback_l();
@@ -553,6 +626,14 @@ aaudio_result_t AudioStreamInternalPlay::requestStop_l() {
 
 void AudioStreamInternalPlay::wakeupCallbackThread_l() {
     if (!isDataCallbackSet()) {
+        if (mOffloadEosPending) {
+            // Reset `mOffloadEosPending` as it doesn't allow soft wake up when draining for
+            // presentation end callback.
+            mOffloadEosPending = false;
+            if (android::elapsedRealtimeNano() >= mOffloadEosNanosBoottime) {
+                maybeCallPresentationEndCallback();
+            }
+        }
         return;
     }
     mOffloadEosPending = false;
@@ -714,19 +795,21 @@ void *AudioStreamInternalPlay::callbackLoop() {
         if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
             android::audio_utils::unique_lock ul(mStreamMutex);
             if (mOffloadEosPending) {
-                const int64_t streamEndNanos = mClockModel.convertDeltaPositionToTime(std::max(0,
-                        mAudioEndpoint->getFullFramesAvailable() - getDeviceFramesPerBurst()));
-                const int64_t wakeUpNanos = android::elapsedRealtimeNano() + streamEndNanos;
-                if (result = drainStream_l(wakeUpNanos, false /*allowSoftWakeUp*/);
+                // Use BootTime for wakeup time as the device may have be suspended.
+                const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
+                        mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
+                if (result = drainStream_l(wakeUpNanosBootTime, false /*allowSoftWakeUp*/);
                     result != AAUDIO_OK) {
                     ALOGE("%s() failed to drain, error=%d", __func__, result);
                     break;
                 }
+                const int64_t streamEndNanos = std::max(
+                        int64_t(0), wakeUpNanosBootTime - android::elapsedRealtimeNano());
                 mStreamEndCV.wait_for(ul, std::chrono::nanoseconds(streamEndNanos),
                                       [this]() REQUIRES(mStreamMutex) {
                     return !mOffloadEosPending;
                 });
-                if (mOffloadEosPending || android::elapsedRealtimeNano() >= wakeUpNanos) {
+                if (mOffloadEosPending || android::elapsedRealtimeNano() >= wakeUpNanosBootTime) {
                     maybeCallPresentationEndCallback();
                     mOffloadEosPending = false;
                 }
@@ -784,5 +867,21 @@ void AudioStreamInternalPlay::onWakeUp_l(android::audio_utils::TimerQueue::handl
         ALOGW("%s the wake up handle does not match %jd %jd", __func__, handle, mWakeUpHandle);
     }
     mWakeUpHandle = TimerQueue::INVALID_HANDLE;
+    if (mPendingStop) {
+        // When onWakeUp is called, it indicates drain completion. `mPendingStop` indicates the
+        // client has called stop before. In that case, update state and positions to stopped state.
+        setState(AAUDIO_STREAM_STATE_STOPPED);
+        if (mAudioEndpoint != nullptr) {
+            const int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
+            const int64_t nowNanos = AudioClock::getNanoseconds();
+            // Read counter should be the same as write counter when all data is drained.
+            mAudioEndpoint->setDataReadCounter(writeCounter);
+            // There will not be any more mmap position update in this case. Force a position
+            // update with write counter and time to reflect the truth that all data is played.
+            mClockModel.setPositionAndTime(writeCounter, nowNanos);
+            mClockModel.stop(nowNanos);
+        }
+    }
+    processCommands();
     wakeupCallbackThread_l();
 }

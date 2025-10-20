@@ -228,6 +228,9 @@ static const int kPriorityFastMixer = 3;
 static const int kPriorityFastCapture = 3;
 // Request real-time priority for PlaybackThread in ARC
 static const int kPriorityPlaybackThreadArc = 1;
+// Priority is boosed on the watch on an as needed basis to this value which is overridable by
+// property af.watch.thread.priority:
+static const int kPriorityWatchThread = 3;
 
 // IAudioFlinger::createTrack() has an in/out parameter 'pFrameCount' for the total size of the
 // track buffer in shared memory.  Zero on input means to use a default value.  For fast tracks,
@@ -259,6 +262,17 @@ static nsecs_t getStandbyTimeInNanos() {
         return milliseconds(ms);
     }();
     return standbyTimeInNanos;
+}
+
+static bool isWatch() {
+    static bool watch = []() {
+        char characteristics[PROPERTY_VALUE_MAX];
+        if (property_get("ro.build.characteristics", characteristics, nullptr) > 0) {
+            return (strstr(characteristics, "watch") != nullptr);
+        }
+        return false;
+    }();
+    return watch;
 }
 
 // Set kEnableExtendedChannels to true to enable greater than stereo output
@@ -388,6 +402,15 @@ static void sFastTrackMultiplierInit()
             sFastTrackMultiplier = (int) ul;
         }
     }
+}
+
+static bool shouldTrackRunRealtimePriority() {
+    static const bool value = []() {
+        bool defaultValue = false;
+        return property_get_bool("ro.boot.container", defaultValue)
+            || property_get_bool("ro.audio.track_realtime_priority", defaultValue);
+    }();
+    return value;
 }
 
 // ----------------------------------------------------------------------------
@@ -2252,6 +2275,33 @@ void ThreadBase::checkUpdateTrackMetadataForUid(uid_t uid) {
     }
 }
 
+void ThreadBase::boostThreadPriority(const int priority) {
+    const pid_t tid = getTid();
+    if (tid == -1) {
+        ALOGE("%s: Cannot update priority for %s, no tid", __func__, mThreadName);
+    } else {
+        const pid_t pid = getpid();
+        status_t status = requestPriority(pid,
+                                          tid,
+                                          priority,
+                                          false /* isForApp */,
+                                          true /* asynchronous */);
+        if (status != OK) {
+            ALOGE("%s: requestPriority for %s (pid=%d, tid=%d) with priority=%d failed with "
+                  "status %d", __func__, mThreadName, pid, tid, priority, status);
+        } else {
+            status = stream()->setHalThreadPriority(priority);
+            if (status != OK) {
+                ALOGE("%s: setHalThreadPriority for %s (pid=%d, tid=%d) with priority=%d failed "
+                      "with status %d" , __func__, mThreadName, pid, tid, priority, status);
+            } else {
+                ALOGI("%s: Priority of %s (pid=%d, tid=%d) boosted to %d",
+                      __func__, mThreadName, pid, tid, priority);
+            }
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------
 //      Playback
 // ----------------------------------------------------------------------------
@@ -3034,6 +3084,12 @@ status_t PlaybackThread::addTrack_l(const sp<IAfTrack>& track)
     }
 
     onAddNewTrack_l();
+
+    const auto amn = mAfThreadCallback->getAudioManagerNative();
+    if (amn) {
+        track->resetMuteEvent(*amn);
+    }
+
     return status;
 }
 
@@ -3938,23 +3994,26 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
     // Check the flag and not the mixer type to also boost the duplicating thread priority
     // when one of the outputs is a spatializer thread.
     if (mOutput != nullptr && ((mOutput->flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0)) {
+        // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
         const pid_t tid = getTid();
         if (tid == -1) {  // odd: we are here, we must be a running thread.
             ALOGW("%s: Cannot update Spatializer mixer thread priority, no tid", __func__);
         } else {
+            // TODO(b/446232495): Fix the role / responsibility problem here:
             const int priorityBoost = requestSpatializerPriority(getpid(), tid);
             if (priorityBoost > 0) {
                 stream()->setHalThreadPriority(priorityBoost);
             }
         }
-    } else if (property_get_bool("ro.boot.container", false /* default_value */)) {
+    } else if (shouldTrackRunRealtimePriority()) {
         // In ARC experiments (b/73091832), the latency under using CFS scheduler with any priority
         // is not enough for PlaybackThread to process audio data in time. We request the lowest
         // real-time priority, SCHED_FIFO=1, for PlaybackThread in ARC. ro.boot.container is true
         // only on ARC.
+        // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
         const pid_t tid = getTid();
         if (tid == -1) {
-            ALOGW("%s: Cannot update PlaybackThread priority for ARC, no tid", __func__);
+            ALOGW("%s: Cannot update PlaybackThread priority, no tid", __func__);
         } else {
             const status_t status = requestPriority(getpid(),
                                                     tid,
@@ -3968,6 +4027,18 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
                 stream()->setHalThreadPriority(kPriorityPlaybackThreadArc);
             }
         }
+    } else if (isWatch()) {
+        // Testing on the watch has shown that boosting the priority of playback threads reduces the
+        // probability of speaker pops due to the AP dropping audio samples when running under heavy
+        // load.
+        int32_t priority = property_get_int32("af.watch.thread.priority",
+                kPriorityWatchThread);
+        if (priority < 1 || priority > 3) {
+            ALOGW("%s: Invalid priority %d for watch thread, clamping to [1, 3]",
+                  __func__, priority);
+            priority = std::clamp(priority, 1, 3);
+        }
+        boostThreadPriority(priority);
     }
 
     std::vector<sp<IAfTrackBase>> tracksToRemove;
@@ -4189,12 +4260,15 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
             }
             // signal actual start of output stream when the render position reported by
             // the kernel starts moving.
-            if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
+            {
+                audio_utils::unique_lock _whsl(mWaitHalStartMutex);
+                if (!mHalStarted && ((isSuspended() && (mBytesWritten != 0)) || (!mStandby
                     && (mKernelPositionOnStandby
                             != mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL])))) {
-                mHalStarted = true;
-                mWaitHalStartCV.notify_all();
-            }
+                    mHalStarted = true;
+                    mWaitHalStartCV.notify_all();
+                }
+            } // mWaitHalStartMutex scope ends
 
             // prevent any changes in effect chain list and in each effect chain
             // during mixing and effect process as the audio buffers could be deleted
@@ -8058,7 +8132,7 @@ void SpatializerThread::setHalLatencyMode_l() {
 }
 
 status_t SpatializerThread::setRequestedLatencyMode(audio_latency_mode_t mode) {
-    if (mode < 0 || mode >= AUDIO_LATENCY_MODE_CNT) {
+    if (mode < 0 || static_cast<int>(mode) >= AUDIO_LATENCY_MODE_CNT) {
         return BAD_VALUE;
     }
     audio_utils::lock_guard _l(mutex());
@@ -11202,18 +11276,26 @@ void MmapThread::checkInvalidTracks_l()
     }
 }
 
-void MmapThread::dumpInternals_l(int fd, const Vector<String16>& /* args */)
+void MmapThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     if (isOutput()) {
         AudioStreamOut *output = mOutput;
         audio_output_flags_t flags = output != NULL ? output->flags : AUDIO_OUTPUT_FLAG_NONE;
         dprintf(fd, "  AudioStreamOut: %p flags %#x (%s)\n",
                 output, flags, toString(flags).c_str());
+        if (output != nullptr && output->stream) {
+            dprintf(fd, "  Hal stream dump:\n");
+            (void)output->stream->dump(fd, args);
+        }
     } else {
         AudioStreamIn *input = mInput;
         audio_input_flags_t flags = input != NULL ? input->flags : AUDIO_INPUT_FLAG_NONE;
         dprintf(fd, "  AudioStreamIn: %p flags %#x (%s)\n",
                 input, flags, toString(flags).c_str());
+        if (input != nullptr && input->stream) {
+            dprintf(fd, "  Hal stream dump:\n");
+            (void)input->stream->dump(fd);
+        }
     }
     dprintf(fd, "  Attributes: content type %d usage %d source %d\n",
             mAttr.content_type, mAttr.usage, mAttr.source);
@@ -11252,16 +11334,20 @@ std::string MmapThread::getLocalLogHeader() const {
 /* static */
 sp<IAfMmapThread> IAfMmapThread::create(
         const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
-        AudioHwDevice* hwDev,  AudioStreamOut* output, bool systemReady) {
-    return sp<MmapPlaybackThread>::make(afThreadCallback, id, hwDev, output, systemReady);
+        AudioHwDevice* hwDev,  AudioStreamOut* output, bool systemReady,
+        const std::shared_ptr<audio_utils::TimerQueue>& timerQueue) {
+    return sp<MmapPlaybackThread>::make(
+            afThreadCallback, id, hwDev, output, systemReady, timerQueue);
 }
 
 MmapPlaybackThread::MmapPlaybackThread(
         const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
-        AudioHwDevice *hwDev,  AudioStreamOut *output, bool systemReady)
+        AudioHwDevice *hwDev,  AudioStreamOut *output, bool systemReady,
+        const std::shared_ptr<audio_utils::TimerQueue>& timerQueue)
     : MmapThread(afThreadCallback, id, hwDev, output->stream, systemReady, true /* isOut */,
             nullptr /* input */, output),
-      mStreamType(AUDIO_STREAM_MUSIC)
+      mStreamType(AUDIO_STREAM_MUSIC),
+      mTimerQueue(timerQueue)
 {
     snprintf(mThreadName, kThreadNameLength, "AudioMmapOut_%X", id);
     mFlagsAsString = toString(output->flags);
@@ -11412,7 +11498,7 @@ ThreadBase::MetadataUpdate MmapPlaybackThread::updateMetadata_l()
         };
         trackMetadata.channel_mask = track->channelMask();
         std::string tagStr(track->attributes().tags);
-        if (audioserver_flags::enable_gmap_mode() && track->attributes().usage == AUDIO_USAGE_GAME
+        if (track->attributes().usage == AUDIO_USAGE_GAME
                 && afThreadCallback()->hasAlreadyCaptured(track->uid())
                 && (tagStr.size() + strlen(AUDIO_ATTRIBUTES_TAG_GMAP_BIDIRECTIONAL)
                     + (tagStr.size() ? 1 : 0))
@@ -11489,18 +11575,38 @@ status_t MmapPlaybackThread::drain(int64_t wakeUpNanos, bool /*allowSoftWakeUp*/
                                    audio_utils::TimerQueue::handle_t* handle) {
     {
         audio_utils::lock_guard _l(mutex());
-        if (mTq == nullptr) {
-            mTq = std::make_unique<audio_utils::TimerQueue>(true /*alarm*/);
-        }
-        if (!mTq->ready()) {
+        if (!mTimerQueue->ready()) {
             ALOGW("%s timer queue is not ready", __func__);
             *handle = audio_utils::TimerQueue::INVALID_HANDLE;
             return NO_ERROR;
         }
         auto weakPtr = wp<MmapPlaybackThread>::fromExisting(this);
-        *handle = mTq->add([weakPtr]() {
-            auto strongPtr = weakPtr.promote();
-            strongPtr->onWakeUp();
+
+        *handle = mTimerQueue->add([weakPtr, this]() {
+            constexpr bool kAcquireWakelock = true;
+            constexpr bool kCheckDisplay = true;
+            const auto strongPtr = weakPtr.promote();
+            if (strongPtr) {  // if strongPr exists, "this" is valid
+                const auto startTime = systemTime(SYSTEM_TIME_BOOTTIME);
+
+                if constexpr (kAcquireWakelock) {
+                    // check screenstate and only acquire the wakelock if the display is off
+                    // as the device will not suspend with an active display.
+                    const bool displayOff = !kCheckDisplay ||
+                            (mAfThreadCallback->getScreenState() & 1);
+                    if (displayOff) {
+                        // acquire the wakelock here, the next drain call or stop
+                        // will release it.
+                        audio_utils::lock_guard _l(mutex());
+                        if (!mWakeLockToken) acquireWakeLock_l();
+                        ALOGV("MmapCallback: acquiring wakelock");
+                    }
+                }
+                onWakeUp();
+                // handle statistics
+                ++mTimerQueueCallbacks;
+                mTimerQueueCallbackNs += systemTime(SYSTEM_TIME_BOOTTIME) - startTime;
+            }
         }, wakeUpNanos);
         mWakeUpHandle = *handle;
     }
@@ -11511,11 +11617,9 @@ status_t MmapPlaybackThread::drain(int64_t wakeUpNanos, bool /*allowSoftWakeUp*/
 status_t MmapPlaybackThread::activate(audio_utils::TimerQueue::handle_t handle) {
     {
         audio_utils::lock_guard _l(mutex());
-        if (mTq != nullptr) {
-            if (!mTq->remove(handle)) {
-                ALOGW("%s(%jd), the handle does not exist", __func__, handle);
-                return BAD_VALUE;
-            }
+        if (!mTimerQueue->remove(handle)) {
+            ALOGW("%s(%jd), the handle does not exist", __func__, handle);
+            return BAD_VALUE;
         }
         if (mWakeUpHandle != handle) {
             // This should not happen.
@@ -11595,6 +11699,8 @@ void MmapPlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
     dprintf(fd, "  HAL volume: %f", mHalVolFloat);
     dprintf(fd, "\n");
     dprintf(fd, "  Master volume: %f Master mute %d\n", mMasterVolume, mMasterMute);
+    dprintf(fd, "  TimerQueueCallbacks: %d\n", mTimerQueueCallbacks.load());
+    dprintf(fd, "  TimerQueueCallback Ms: %lf\n", mTimerQueueCallbackNs.load() * 1e-6);
 }
 
 /* static */

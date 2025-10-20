@@ -29,6 +29,7 @@ cc_test {
     ],
 
     srcs: [
+        "ABuffer_test.cpp",
         "AData_test.cpp",
         "AMessage_test.cpp",
         "Base64_test.cpp",

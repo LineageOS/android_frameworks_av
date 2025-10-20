@@ -20,7 +20,7 @@ import android.media.VolumeShaperConfiguration;
 import android.media.VolumeShaperOperation;
 
 /**
- * {@hide}
+ * @hide
  */
 interface IPlayer {
     oneway void start();

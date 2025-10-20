@@ -16,16 +16,16 @@
 
 #define LOG_TAG "RingBufferParcelable"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <stdint.h>
+#include "binding/RingBufferParcelable.h"
 
+// go/keep-sorted start
 #include <binder/Parcelable.h>
 #include <utility/AAudioUtilities.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/AAudioServiceDefinitions.h"
-#include "binding/SharedRegionParcelable.h"
-#include "binding/RingBufferParcelable.h"
+#include <stdint.h>
 
 using namespace aaudio;
 

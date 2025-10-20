@@ -23,7 +23,7 @@ import android.media.MediaObservableParcel;
  * IResourceObserver interface for receiving observable resource updates
  * from IResourceObserverService.
  *
- * {@hide}
+ * @hide
  */
 interface IResourceObserver {
     /**

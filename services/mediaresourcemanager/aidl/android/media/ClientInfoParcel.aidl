@@ -19,7 +19,7 @@ package android.media;
 /**
  * Description of a Client(codec) information.
  *
- * {@hide}
+ * @hide
  */
 parcelable ClientInfoParcel {
     /**

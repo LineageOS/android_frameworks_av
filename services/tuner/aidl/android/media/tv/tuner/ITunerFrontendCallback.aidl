@@ -23,7 +23,7 @@ import android.hardware.tv.tuner.FrontendScanMessageType;
 /**
  * TunerFrontendCallback interface handles tuner frontend related callbacks.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerFrontendCallback {
     /**

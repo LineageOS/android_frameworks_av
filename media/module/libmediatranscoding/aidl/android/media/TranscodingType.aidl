@@ -19,7 +19,7 @@ package android.media;
 /**
  * Type of transcoding.
  *
- * {@hide}
+ * @hide
  */
 @Backing(type = "int")
 enum TranscodingType {

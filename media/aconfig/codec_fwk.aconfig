@@ -87,6 +87,13 @@ flag {
 }
 
 flag {
+  name: "flip_support"
+  namespace: "codec_fwk"
+  description: "Support flip for MediaCodec"
+  bug: "395095742"
+}
+
+flag {
   name: "hlg_editing"
   is_exported: true
   namespace: "codec_fwk"
@@ -107,6 +114,13 @@ flag {
   namespace: "codec_fwk"
   description: "Feature flag for in-process software audio codec support"
   bug: "325520135"
+}
+
+flag {
+  name: "in_process_sw_codec_lfi"
+  namespace: "codec_fwk"
+  description: "Feature flag for supporting in-process software codec using LFI"
+  bug: "435023366"
 }
 
 flag {
@@ -260,4 +274,12 @@ flag {
   namespace: "codec_fwk"
   description: "traces for logging codec activity"
   bug: "380898418"
+}
+
+flag {
+  name: "vvc_support"
+  namespace: "codec_fwk"
+  description: "Feature flag for Android support for VVC Content"
+  bug: "426238242"
+  is_exported: true
 }

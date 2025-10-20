@@ -16,12 +16,16 @@
 
 package android.media;
 
+import android.media.InterpolatorType;
+
 /**
- * {@hide}
+ * @hide
  */
-parcelable VolumeShaperState {
-    /** Linear volume in the range MIN_LINEAR_VOLUME to MAX_LINEAR_VOLUME. */
-    float volume;
-    /** Position on curve expressed from MIN_CURVE_TIME to MAX_CURVE_TIME. */
-    float xOffset;
+parcelable InterpolatorConfig {
+    InterpolatorType type = InterpolatorType.CUBIC;
+    /** For cubic interpolation, the boundary conditions in slope. */
+    float firstSlope;
+    float lastSlope;
+    /** A flattened list of <x, y> pairs, monotonically increasing in x. */
+    float[] xy;
 }

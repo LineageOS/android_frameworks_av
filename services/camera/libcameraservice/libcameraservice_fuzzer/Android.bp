@@ -75,6 +75,7 @@ cc_defaults {
         "libpermission",
         "libpowermanager",
         "libsensorprivacy",
+        "libcameracompatbilityinfo",
         "libui",
         "libutils",
         "libvibrator",

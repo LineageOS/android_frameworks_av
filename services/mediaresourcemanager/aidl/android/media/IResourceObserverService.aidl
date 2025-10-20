@@ -23,7 +23,7 @@ import android.media.MediaObservableFilter;
  * IResourceObserverService interface for registering an IResourceObserver
  * callback to receive status updates about observable media resources.
  *
- * {@hide}
+ * @hide
  */
 interface IResourceObserverService {
 

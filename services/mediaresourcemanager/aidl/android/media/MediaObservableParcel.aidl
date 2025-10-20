@@ -21,7 +21,7 @@ import android.media.MediaObservableType;
 /**
  * Description of an observable resource whose status has changed.
  *
- * {@hide}
+ * @hide
  */
 parcelable MediaObservableParcel {
     /**

@@ -55,6 +55,7 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
     startProviderInterface();
 
     virtual status_t setUpVendorTags() override;
+    virtual status_t dumpInterface(int fd, const Vector<String16>& args) override;
     virtual status_t notifyDeviceStateChange(int64_t newDeviceState) override;
 
     virtual bool successfullyStartedProviderInterface() override;

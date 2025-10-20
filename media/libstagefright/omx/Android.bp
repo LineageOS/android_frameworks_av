@@ -60,6 +60,8 @@ cc_library_shared {
         "libstagefright_bufferqueue_helper",
         "libstagefright_xmlparser",
         "libdl",
+        "libgui",
+        "aconfig_libgui_flags_c_lib",
         "libhidlbase",
         "libhidlmemory",
         "libvndksupport",
@@ -194,6 +196,7 @@ cc_library_shared {
         "media_plugin_headers",
     ],
     shared_libs: [
+        "libgui",
         "libmedia_omx",
         "libstagefright_foundation",
         "liblog",

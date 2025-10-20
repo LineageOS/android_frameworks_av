@@ -19,7 +19,7 @@ package android.media;
 /**
  * Provides additional runtime information for AudioGain, used by the framework.
  *
- * {@hide}
+ * @hide
  */
 parcelable AudioGainSys {
     int index;

@@ -109,6 +109,10 @@ public:
         }
     }
 
+    void set32(int32_t counter32) {
+        mCounter32 = counter32;
+    }
+
 private:
     int64_t mCounter64 = 0;
     int32_t mCounter32 = 0;

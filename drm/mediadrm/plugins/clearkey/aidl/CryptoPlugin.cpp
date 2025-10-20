@@ -172,6 +172,15 @@ using ::aidl::android::hardware::drm::Status;
     }
 }
 
+::ndk::ScopedAStatus CryptoPlugin::getKeyHandle(const std::vector<uint8_t>& in_keyId,
+        Mode in_mode, KeyHandleResult* _aidl_return) {
+    UNUSED(in_keyId);
+    UNUSED(in_mode);
+    UNUSED(_aidl_return);
+    // Clearkey plugin does not have key handle
+    return toNdkScopedAStatus(Status::ERROR_DRM_CANNOT_HANDLE);
+}
+
 ::ndk::ScopedAStatus CryptoPlugin::getLogMessages(
         std::vector<::aidl::android::hardware::drm::LogMessage>* _aidl_return) {
     using std::chrono::duration_cast;

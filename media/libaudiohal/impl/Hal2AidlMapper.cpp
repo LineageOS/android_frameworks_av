@@ -849,6 +849,25 @@ void Hal2AidlMapper::insertConnectedPort(
     updateDynamicMixPorts();
 }
 
+void Hal2AidlMapper::onStreamClosed(const sp<StreamHalInterface>& stream) {
+    // Note that at this point the stream object is still alive thus its port config can not be
+    // reset. However we can already release the patch in the case when it is not owned by the
+    // framework. To avoid requesting the HAL to reset the port config on patch reset, leave the
+    // `mStreams` entry.
+    auto it = mStreams.find(stream);
+    if (it == mStreams.end()) return;
+    const int32_t patchId = it->second.second;
+    if (patchId == -1) return;
+    for (auto it = mFwkPatches.begin(); it != mFwkPatches.end(); ++it) {
+        if (it->second == patchId) {
+            AUGMENT_LOG(D, "patch %d is managed by the framework", patchId);
+            return;
+        }
+    }
+    it->second.second = -1;
+    releaseAudioPatches({patchId});
+}
+
 status_t Hal2AidlMapper::prepareToDisconnectExternalDevice(const AudioPort& devicePort) {
     auto portsIt = findPort(devicePort.ext.get<AudioPortExt::device>().device);
     if (portsIt == mPorts.end()) {

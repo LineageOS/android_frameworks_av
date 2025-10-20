@@ -35,6 +35,12 @@
 
 namespace android {
 
+class StreamCloseHandler : public virtual RefBase {
+  public:
+    virtual ~StreamCloseHandler() = default;
+    virtual void streamClosed(const sp<StreamHalInterface>& stream) = 0;
+};
+
 class StreamOutHalInterfaceCallback;
 class StreamOutHalInterfaceEventCallback;
 class StreamOutHalInterfaceLatencyModeCallback;
@@ -43,7 +49,7 @@ class StreamOutHalInterfaceLatencyModeCallback;
 // with StreamOut callback implementations. Since AIDL requires all callbacks
 // to be provided upfront, while libaudiohal interfaces allow late registration,
 // there is a need to coordinate the matching process.
-class CallbackBroker : public virtual RefBase {
+class CallbackBroker : public StreamCloseHandler {
   public:
     virtual ~CallbackBroker() = default;
     // The cookie is always the stream instance pointer. We don't use weak pointers to avoid extra
@@ -62,7 +68,7 @@ class CallbackBroker : public virtual RefBase {
             void* cookie, const sp<StreamOutHalInterfaceLatencyModeCallback>&) = 0;
 };
 
-class MicrophoneInfoProvider : public virtual RefBase {
+class MicrophoneInfoProvider : public StreamCloseHandler {
   public:
     using Info = std::vector<::aidl::android::media::audio::common::MicrophoneInfo>;
     virtual ~MicrophoneInfoProvider() = default;
@@ -221,6 +227,9 @@ class DeviceHalAidl : public DeviceHalInterface, public ConversionHelperAidl,
     status_t filterAndUpdateTelephonyParameters(AudioParameter &parameters);
     status_t parseAndGetVendorParameters(const AudioParameter& parameterKeys, String8* values);
     status_t parseAndSetVendorParameters(const AudioParameter& parameters);
+
+    // StreamCloseHandler implementation
+    void streamClosed(const sp<StreamHalInterface>& stream);
 
     // CallbackBroker implementation
     void clearCallbacks(void* cookie) override;

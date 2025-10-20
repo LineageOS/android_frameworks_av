@@ -24,7 +24,7 @@ import android.media.audio.common.AudioConfigBase;
  * The "Internal" suffix of this type name is to disambiguate it from the
  * android.media.AudioMixerAttributes SDK type.
  *
- * {@hide}
+ * @hide
  */
 parcelable AudioMixerAttributesInternal {
     AudioConfigBase config;

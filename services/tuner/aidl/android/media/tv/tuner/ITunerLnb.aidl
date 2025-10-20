@@ -24,7 +24,7 @@ import android.media.tv.tuner.ITunerLnbCallback;
 /**
  * Tuner Lnb interface handles Lnb related operations.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerLnb {
     /**

@@ -118,7 +118,8 @@ status_t CameraOfflineSessionClient::dump(int fd, const Vector<String16>& args) 
     return BasicClient::dump(fd, args);
 }
 
-status_t CameraOfflineSessionClient::dumpClient(int fd, const Vector<String16>& args) {
+status_t CameraOfflineSessionClient::dumpClient(int fd, const Vector<String16>& args,
+                                                bool ignoreResult) {
     std::string result;
 
     result = "  Offline session dump:\n";
@@ -130,7 +131,9 @@ status_t CameraOfflineSessionClient::dumpClient(int fd, const Vector<String16>& 
         return NO_ERROR;
     }
 
-    mFrameProcessor->dump(fd, args);
+    if (!ignoreResult) {
+        mFrameProcessor->dump(fd, args);
+    }
 
     auto res = mOfflineSession->dump(fd);
     if (res != OK) {

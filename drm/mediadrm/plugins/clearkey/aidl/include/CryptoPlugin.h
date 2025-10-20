@@ -41,6 +41,8 @@ namespace clearkey {
 
 using namespace clearkeydrm;
 using ::aidl::android::hardware::drm::DecryptArgs;
+using ::aidl::android::hardware::drm::KeyHandleResult;
+using ::aidl::android::hardware::drm::Mode;
 using ::aidl::android::hardware::drm::Status;
 
 struct SharedBufferBase {
@@ -74,6 +76,9 @@ struct CryptoPlugin : public BnCryptoPlugin {
 
     ::ndk::ScopedAStatus setSharedBufferBase(
             const ::aidl::android::hardware::drm::SharedBuffer& in_base) override;
+
+    ::ndk::ScopedAStatus getKeyHandle(const std::vector<uint8_t>& in_keyId,
+        Mode in_mode, KeyHandleResult* _aidl_return) override;
 
     ::aidl::android::hardware::drm::Status getInitStatus() const { return mInitStatus; }
 

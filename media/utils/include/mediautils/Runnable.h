@@ -25,7 +25,6 @@
 #include <utility>
 
 namespace android::mediautils {
-
 // Essentially std::function <void()>, but supports moveable types (and binds to any return type).
 // The lack of moveable is fixed in C++23, but we don't yet have it.
 // Also, SBO for std::packaged_task size, which is what we are using this for
@@ -112,4 +111,15 @@ class Runnable {
     VTable v = empty_vtable;
     alignas(alignof(std::max_align_t)) std::byte storage_[STORAGE_SIZE];
 };
+
+// Wraps executor submission in a std::packaged_task to generate a future on the result of the
+// runnable
+template <typename Executor, typename F> requires requires (F f) { f(); }
+auto submit(Executor& e, F&& f) {
+    std::packaged_task task{ f };
+    auto future = task.get_future();
+    e.enqueue(Runnable{std::move(task)});
+    return future;
+}
+
 }  // namespace android::mediautils

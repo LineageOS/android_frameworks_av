@@ -349,7 +349,7 @@ void AudioFlinger::onFirstRef()
     mMelReporter = sp<MelReporter>::make(sp<IAfMelReporterCallback>::fromExisting(this),
                                          mPatchPanel);
 
-    ALOGD("%s: TimerQueue %s", __func__, mTimerQueue.ready() ? "ready" : "uninitialized");
+    ALOGD("%s: TimerQueue %s", __func__, mTimerQueue->ready() ? "ready" : "uninitialized");
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
@@ -617,8 +617,7 @@ status_t AudioFlinger::openMmapStreamImpl(bool isOutput,
         }
     }
     if (ret != NO_ERROR) {
-        if (audioserver_flags::enable_gmap_mode()
-                && !isOutput) {
+        if (!isOutput) {
             audio_utils::lock_guard _l(mutex());
             setHasAlreadyCaptured_l(adjAttributionSource.uid);
         }
@@ -1002,6 +1001,9 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
     if (parsedArgs.shouldDumpStats) {
         dprintf(fd, "\n ## BEGIN stats dump \n");
         dumpStats(fd);
+
+        dprintf(fd, "\n ## BEGIN TimerQueue dump\n");
+        dprintf(fd, "%s\n", mTimerQueue->toString().c_str());
     }
 
     if (parsedArgs.shouldDumpMem) {
@@ -2369,9 +2371,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
             audio_utils::lock_guard _l2(thread->mutex());
             thread->addEffectChain_l(chain);
         }
-        if (audioserver_flags::enable_gmap_mode()) {
-            setHasAlreadyCaptured_l(adjAttributionSource.uid);
-        }
+        setHasAlreadyCaptured_l(adjAttributionSource.uid);
         break;
     }
     // End of retry loop.
@@ -2913,7 +2913,7 @@ sp<IAfThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t module,
     if (status == NO_ERROR) {
         if (*flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             const sp<IAfMmapThread> thread = IAfMmapThread::create(
-                    this, *output, outHwDev, outputStream, mSystemReady);
+                    this, *output, outHwDev, outputStream, mSystemReady, mTimerQueue);
             mMmapThreads[*output] = thread;
             ALOGV("openOutput_l() created mmap playback thread: ID %d thread %p",
                   *output, thread.get());
@@ -3505,7 +3505,7 @@ void AudioFlinger::releaseAudioSessionId(audio_session_t audioSession, pid_t pid
         if (pid != (pid_t)-1 && isAudioServerOrMediaServerUid(callerUid)) {
             caller = pid;  // check must match acquireAudioSessionId()
         }
-        for (auto it = mAudioSessionRefs.begin(); it != mAudioSessionRefs.end();) {
+        for (auto it = mAudioSessionRefs.begin(); it != mAudioSessionRefs.end(); ++it) {
             AudioSessionRef* const ref = *it;
             if (ref->mSessionid == audioSession && ref->mPid == caller) {
                 ref->mCnt--;

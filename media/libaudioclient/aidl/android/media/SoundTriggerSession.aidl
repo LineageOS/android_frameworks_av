@@ -19,7 +19,7 @@ package android.media;
 import android.media.audio.common.AudioDeviceDescription;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable SoundTriggerSession {
     /** Interpreted as audio_session_t. */

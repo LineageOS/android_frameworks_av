@@ -2097,11 +2097,11 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             *offset += 1;
             uint32_t csdSize = 0;
             uint8_t data[kMaxIamfLeb128SizesBytes] = {0};
-            size_t bytesRead = mDataSource->readAt(*offset, data, kMaxIamfLeb128SizesBytes);
+            ssize_t bytesRead = mDataSource->readAt(*offset, data, kMaxIamfLeb128SizesBytes);
             if (bytesRead <= 0) {
                 return ERROR_IO;
             }
-            int32_t numBytesConsumed = readIamfUnsignedLeb128(data, bytesRead, csdSize);
+            int32_t numBytesConsumed = readIamfUnsignedLeb128(data, (uint32_t)bytesRead, csdSize);
             if (numBytesConsumed <= 0) {
                 return ERROR_MALFORMED;
             }

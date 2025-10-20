@@ -16,25 +16,29 @@
 
 #define LOG_TAG "AAudio"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <inttypes.h>
-#include <mutex>
-#include <time.h>
-#include <pthread.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
+#include <binding/AAudioCommon.h>
+#include <client/AudioStreamInternal.h>
 #include <com_android_media_aaudio.h>
 #include <com_android_media_audioserver.h>
+#include <core/AudioStream.h>
+#include <core/AudioStreamBuilder.h>
 #include <system/aaudio/AAudio.h>
 #include <system/audio.h>
-#include "AudioClock.h"
-#include "AudioGlobal.h"
-#include "AudioStreamBuilder.h"
-#include "AudioStream.h"
-#include "binding/AAudioCommon.h"
-#include "client/AudioStreamInternal.h"
+#include <utility/AudioClock.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
+#include <inttypes.h>
+#include <mutex>
+#include <pthread.h>
+#include <time.h>
+// go/keep-sorted end
 
 using namespace aaudio;
 

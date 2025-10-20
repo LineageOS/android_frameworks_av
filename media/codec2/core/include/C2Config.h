@@ -265,7 +265,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexSurfaceScaling, // u32
 
     // input surface
-    kParamIndexInputSurfaceEos, // input-surface, eos
+    kParamIndexInputSurfaceStart, // input-surface, start
     kParamIndexTimedControl, // struct
     kParamIndexStartAt, // input-surface, struct
     kParamIndexSuspendAt, // input-surface, struct
@@ -450,6 +450,7 @@ enum : uint32_t {
     _C2_PL_APV_BASE = 0xC000,     // APV
     _C2_PL_AC4_BASE  = 0xD000,
     _C2_PL_IAMF_START = 0xE000,
+    _C2_PL_VVC_BASE = 0xF000,     // VVC
     C2_PROFILE_LEVEL_VENDOR_START = 0x70000000,
 };
 
@@ -649,6 +650,24 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_IAMF_BASE_ENHANCED_FLAC,             ///< IAMF Base Enhanced with FLAC
     PROFILE_IAMF_BASE_ENHANCED_OPUS,             ///< IAMF Base Enhanced with Opus
     PROFILE_IAMF_BASE_ENHANCED_PCM,              ///< IAMF Base Enhanced with PCM
+
+    // VVC profiles
+    PROFILE_VVC_MAIN_10 = _C2_PL_VVC_BASE,       ///< VVC (H.266) Main 10
+    PROFILE_VVC_MAIN_10_STILL,                   ///< VVC (H.266) Main 10 Still Picture
+    PROFILE_VVC_MAIN_10_444,                     ///< VVC (H.266) Main 10 4:4:4
+    PROFILE_VVC_MAIN_10_444_STILL,               ///< VVC (H.266) Main 10 4:4:4 Still Picture
+    PROFILE_VVC_MULTILAYER_MAIN_10,              ///< VVC (H.266) Multilayer Main 10
+    PROFILE_VVC_MULTILAYER_MAIN_10_444,          ///< VVC (H.266) Multilayer Main 10 4:4:4
+    PROFILE_VVC_MAIN_12,                         ///< VVC (H.266) Main 12
+    PROFILE_VVC_MAIN_12_444,                     ///< VVC (H.266) Main 12 4:4:4
+    PROFILE_VVC_MAIN_16_444,                     ///< VVC (H.266) Main 16 4:4:4
+    PROFILE_VVC_MAIN_12_INTRA,                   ///< VVC (H.266) Main 12 Intra
+    PROFILE_VVC_MAIN_12_444_INTRA,               ///< VVC (H.266) Main 12 4:4:4 Intra
+    PROFILE_VVC_MAIN_16_444_INTRA,               ///< VVC (H.266) Main 16 4:4:4 Intra
+    PROFILE_VVC_MAIN_12_STILL,                   ///< VVC (H.266) Main 12 Still Picture
+    PROFILE_VVC_MAIN_12_444_STILL,               ///< VVC (H.266) Main 12 4:4:4 Still Picture
+    PROFILE_VVC_MAIN_16_444_STILL,               ///< VVC (H.266) Main 16 4:4:4 Still Picture
+
 };
 
 enum C2Config::level_t : uint32_t {
@@ -875,6 +894,33 @@ enum C2Config::level_t : uint32_t {
     LEVEL_AC4_2,                                ///< AC-4 Level 02
     LEVEL_AC4_3,                                ///< AC-4 Level 03
     LEVEL_AC4_4,                                ///< AC-4 Level 04
+
+    // VVC (H.266) tiers and levels
+    LEVEL_VVC_MAIN_1_0 = _C2_PL_VVC_BASE,           ///< VVC (H.266) Main Tier Level 1.0
+    LEVEL_VVC_MAIN_2_0,                             ///< VVC (H.266) Main Tier Level 2.0
+    LEVEL_VVC_MAIN_2_1,                             ///< VVC (H.266) Main Tier Level 2.1
+    LEVEL_VVC_MAIN_3_0,                             ///< VVC (H.266) Main Tier Level 3.0
+    LEVEL_VVC_MAIN_3_1,                             ///< VVC (H.266) Main Tier Level 3.1
+    LEVEL_VVC_MAIN_4_0,                             ///< VVC (H.266) Main Tier Level 4.0
+    LEVEL_VVC_MAIN_4_1,                             ///< VVC (H.266) Main Tier Level 4.1
+    LEVEL_VVC_MAIN_5_0,                             ///< VVC (H.266) Main Tier Level 5.0
+    LEVEL_VVC_MAIN_5_1,                             ///< VVC (H.266) Main Tier Level 5.1
+    LEVEL_VVC_MAIN_5_2,                             ///< VVC (H.266) Main Tier Level 5.2
+    LEVEL_VVC_MAIN_6_0,                             ///< VVC (H.266) Main Tier Level 6.0
+    LEVEL_VVC_MAIN_6_1,                             ///< VVC (H.266) Main Tier Level 6.1
+    LEVEL_VVC_MAIN_6_2,                             ///< VVC (H.266) Main Tier Level 6.2
+    LEVEL_VVC_MAIN_6_3,                             ///< VVC (H.266) Main Tier Level 6.3
+
+    LEVEL_VVC_HIGH_4_0 = _C2_PL_VVC_BASE + 0x100,   ///< VVC (H.266) High Tier Level 4.0
+    LEVEL_VVC_HIGH_4_1,                             ///< VVC (H.266) High Tier Level 4.1
+    LEVEL_VVC_HIGH_5_0,                             ///< VVC (H.266) High Tier Level 5.0
+    LEVEL_VVC_HIGH_5_1,                             ///< VVC (H.266) High Tier Level 5.1
+    LEVEL_VVC_HIGH_5_2,                             ///< VVC (H.266) High Tier Level 5.2
+    LEVEL_VVC_HIGH_6_0,                             ///< VVC (H.266) High Tier Level 6.0
+    LEVEL_VVC_HIGH_6_1,                             ///< VVC (H.266) High Tier Level 6.1
+    LEVEL_VVC_HIGH_6_2,                             ///< VVC (H.266) High Tier Level 6.2
+    LEVEL_VVC_HIGH_6_3,                             ///< VVC (H.266) High Tier Level 6.3
+
 };
 
 struct C2ProfileLevelStruct {
@@ -2662,11 +2708,11 @@ constexpr char C2_PARAMKEY_SURFACE_SCALING_MODE[] = "raw.surface-scaling";
 /* ======================================= INPUT SURFACE ======================================= */
 
 /**
- * Input surface EOS
+ * Input surface Start
  */
-typedef C2GlobalParam<C2Tuning, C2EasyBoolValue, kParamIndexInputSurfaceEos>
-        C2InputSurfaceEosTuning;
-constexpr char C2_PARAMKEY_INPUT_SURFACE_EOS[] = "input-surface.eos";
+typedef C2GlobalParam<C2Tuning, C2EasyBoolValue, kParamIndexInputSurfaceStart>
+        C2InputSurfaceStartTuning;
+constexpr char C2_PARAMKEY_INPUT_SURFACE_START[] = "input-surface.start";
 
 /**
  * Start/suspend/resume/stop controls and timestamps for input surface.

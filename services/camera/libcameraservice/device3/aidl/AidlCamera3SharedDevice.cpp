@@ -32,10 +32,12 @@
             ##__VA_ARGS__)
 
 // Convenience macros for transitioning to the error state
-#define SET_ERR(fmt, ...) setErrorState(   \
+#define SET_ERR(errorState, fmt, ...) setErrorState(   \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,              \
     ##__VA_ARGS__)
-#define SET_ERR_L(fmt, ...) setErrorStateLocked( \
+#define SET_ERR_L(errorState, fmt, ...) setErrorStateLocked( \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,                    \
     ##__VA_ARGS__)
 #define DECODE_VALUE(decoder, type, var) \
@@ -49,6 +51,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include <cstring>
+#include <statslog_framework.h>
 #include "../../common/aidl/AidlProviderInfo.h"
 #include "utils/SessionConfigurationUtils.h"
 
@@ -91,13 +94,14 @@ Mutex AidlCamera3SharedDevice::sSharedClientsLock;
 sp<AidlCamera3SharedDevice> AidlCamera3SharedDevice::getInstance(
         std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
         std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
-        const std::string& id, bool overrideForPerfClass, int rotationOverride,
+        const std::string& id, bool overrideForPerfClass,
+        const CameraCompatibilityInfo& compatInfo,
         bool isVendorClient, bool legacyClient) {
     Mutex::Autolock l(sSharedClientsLock);
     if (sClientsPid[id].empty()) {
         AidlCamera3SharedDevice* sharedDevice = new AidlCamera3SharedDevice(
                 cameraServiceProxyWrapper, attributionAndPermissionUtils, id, overrideForPerfClass,
-                rotationOverride, isVendorClient, legacyClient);
+                compatInfo, isVendorClient, legacyClient);
         sSharedDevices[id] = sharedDevice;
     }
     if (attributionAndPermissionUtils != nullptr) {
@@ -267,7 +271,8 @@ status_t AidlCamera3SharedDevice::beginConfigure() {
                 config.getColorSpace(), config.useReadoutTimestamp());
         int id = newStream->getSurfaceId(consumers[0].mSurface);
         if (id < 0) {
-            SET_ERR_L("Invalid surface id");
+            SET_ERR_L(CAMERA_SERVICE_INTERNAL_ERROR,
+             "Invalid surface id");
             return BAD_VALUE;
         }
         mSharedSurfaceIds.push_back(id);
@@ -276,7 +281,8 @@ status_t AidlCamera3SharedDevice::beginConfigure() {
         newStream->setImageDumpMask(mImageDumpMask);
         res = mOutputStreams.add(mNextStreamId, newStream);
         if (res < 0) {
-            SET_ERR_L("Can't add new stream to set: %s (%d)", strerror(-res), res);
+            SET_ERR_L(CAMERA_SERVICE_INTERNAL_ERROR,
+            "Can't add new stream to set: %s (%d)", strerror(-res), res);
             return res;
         }
         mSessionStatsBuilder.addStream(mNextStreamId);
@@ -298,21 +304,23 @@ status_t AidlCamera3SharedDevice::beginConfigure() {
     return OK;
 }
 
-status_t AidlCamera3SharedDevice::getSharedStreamId(const OutputStreamInfo &config,
-        int *streamId) {
+status_t AidlCamera3SharedDevice::getSharedStreamIds(const OutputStreamInfo &config,
+        std::vector<int>& streamIds) {
     Mutex::Autolock l(mSharedDeviceLock);
-    if (streamId ==  nullptr) {
-        return BAD_VALUE;
-    }
+    streamIds.clear();
 
     for (const auto& streamInfo : mStreamInfoMap) {
         OutputStreamInfo info = streamInfo.second;
         if (info == config) {
-            *streamId = streamInfo.first;
-            return OK;
+            streamIds.push_back(streamInfo.first);
         }
     }
-    return INVALID_OPERATION;
+
+    if (streamIds.empty()) {
+        return NAME_NOT_FOUND;
+    } else  {
+        return OK;
+    }
 }
 
 status_t AidlCamera3SharedDevice::addSharedSurfaces(int streamId,

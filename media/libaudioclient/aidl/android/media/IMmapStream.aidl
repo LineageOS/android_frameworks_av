@@ -25,7 +25,7 @@ import android.media.MmapBufferInfo;
 /**
  * The IMmapStream interface is the binder interface to control a stream in MMAP mode.
  *
- * {@hide}
+ * @hide
  */
 interface IMmapStream {
     /**

@@ -20,7 +20,7 @@ package android.media;
  * The MmapBufferInfo parcelable is used to return the mmap buffer information from
  * IMmapStream.createMmapBuffer().
  *
- * {@hide}
+ * @hide
  */
 parcelable MmapBufferInfo {
     /** A parcel file descriptor associated with the shared memory region for

@@ -19,13 +19,13 @@ package com.android.media.permission;
 /**
  * Entity representing the packages associated with a particular app-id. Multiple packages can be
  * assigned a specific app-id.
- * {@hide}
+ * @hide
  */
 @JavaDerive(equals = true, toString = true)
 parcelable UidPackageState {
     /**
      * State we retain for an individual package
-     * {@hide}
+     * @hide
      */
     @JavaDerive(equals = true, toString = true)
     parcelable PackageState {

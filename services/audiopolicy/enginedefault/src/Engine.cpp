@@ -157,14 +157,12 @@ void Engine::filterOutputDevicesForStrategy(legacy_strategy strategy,
 {
     DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
 
-    if (com::android::media::audioserver::use_bt_sco_for_media()) {
-        // remove A2DP and LE Audio devices whenever BT SCO is in use
-        if (isBtScoActive(availableOutputDevices)) {
-            availableOutputDevices.remove(
-                availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllA2dpSet()));
-            availableOutputDevices.remove(
-                availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllBleSet()));
-        }
+    // remove A2DP and LE Audio devices whenever BT SCO is in use
+    if (isBtScoActive(availableOutputDevices)) {
+        availableOutputDevices.remove(
+            availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllA2dpSet()));
+        availableOutputDevices.remove(
+            availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllBleSet()));
     }
 
     switch (strategy) {
@@ -248,11 +246,6 @@ void Engine::filterOutputDevicesForStrategy(legacy_strategy strategy,
 product_strategy_t Engine::remapStrategyFromContext(product_strategy_t strategy,
                                                  const SwAudioOutputCollection &outputs) const {
     auto legacyStrategy = getLegacyStrategyFromProduct(strategy);
-
-    // TODO: b/429390420 remove when ASSISTANT strategy is in use
-    if (legacyStrategy == STRATEGY_ASSISTANT) {
-        legacyStrategy = STRATEGY_MEDIA;
-    }
 
     if (isInCall()) {
         switch (legacyStrategy) {
@@ -447,14 +440,13 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                 excludedDevices.push_back(AUDIO_DEVICE_OUT_AUX_DIGITAL);
             }
             if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
-                if (com::android::media::audioserver::use_bt_sco_for_media()) {
-                    if (isBtScoActive(availableOutputDevices)) {
-                        devices2 = availableOutputDevices.getFirstDevicesFromTypes(
-                                { AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT,
-                                AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,
-                                AUDIO_DEVICE_OUT_BLUETOOTH_SCO});
-                    }
+                if (isBtScoActive(availableOutputDevices)) {
+                    devices2 = availableOutputDevices.getFirstDevicesFromTypes(
+                            { AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT,
+                            AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,
+                            AUDIO_DEVICE_OUT_BLUETOOTH_SCO});
                 }
+
                 if (devices2.isEmpty()) {
                     // Get the last connected device of wired and bluetooth a2dp
                     devices2 = availableOutputDevices.getFirstDevicesFromTypes(
@@ -479,7 +471,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         }
 
         DeviceVector devices3;
-        if (strategy == STRATEGY_MEDIA) {
+        if (strategy == STRATEGY_MEDIA || strategy == STRATEGY_ASSISTANT) {
             // ARC, SPDIF and AUX_LINE can co-exist with others.
             devices3 = availableOutputDevices.getDevicesFromTypes({
                     AUDIO_DEVICE_OUT_HDMI_ARC, AUDIO_DEVICE_OUT_HDMI_EARC,
@@ -493,7 +485,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         devices.add(devices2);
 
         // If hdmi system audio mode is on, remove speaker out of output list.
-        if ((strategy == STRATEGY_MEDIA) &&
+        if ((strategy == STRATEGY_MEDIA || strategy == STRATEGY_ASSISTANT) &&
             (getForceUse(AUDIO_POLICY_FORCE_FOR_HDMI_SYSTEM_AUDIO) ==
                 AUDIO_POLICY_FORCE_HDMI_SYSTEM_AUDIO_ENFORCED)) {
             devices.remove(devices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER));
@@ -548,25 +540,6 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
     ALOGVV("%s strategy %d, device %s", __func__,
            strategy, dumpDeviceTypes(devices.types()).c_str());
     return devices;
-}
-
-DeviceVector Engine::getPreferredAvailableDevicesForInputSource(
-            const DeviceVector& availableInputDevices, audio_source_t inputSource) const {
-    DeviceVector preferredAvailableDevVec = {};
-    AudioDeviceTypeAddrVector preferredDevices;
-    const status_t status = getDevicesForRoleAndCapturePreset(
-            inputSource, DEVICE_ROLE_PREFERRED, preferredDevices);
-    if (status == NO_ERROR) {
-        // Only use preferred devices when they are all available.
-        preferredAvailableDevVec =
-                availableInputDevices.getDevicesFromDeviceTypeAddrVec(preferredDevices);
-        if (preferredAvailableDevVec.size() == preferredDevices.size()) {
-            ALOGVV("%s using pref device %s for source %u",
-                   __func__, preferredAvailableDevVec.toString().c_str(), inputSource);
-            return preferredAvailableDevVec;
-        }
-    }
-    return preferredAvailableDevVec;
 }
 
 DeviceVector Engine::getDisabledDevicesForInputSource(
@@ -874,8 +847,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
     // Honor explicit routing requests only if all active clients have a preferred route in which
     // case the last active client route is used
     sp<DeviceDescriptor> device;
-    if (!com::android::media::audioserver::conditionally_ignore_preferred_input_device()
-            || !ignorePreferredDevice) {
+    if (!ignorePreferredDevice) {
         device = findPreferredDevice(inputs, attr.source, availableInputDevices);
         if (device != nullptr) {
             return device;

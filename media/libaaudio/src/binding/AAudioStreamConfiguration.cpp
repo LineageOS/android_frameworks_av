@@ -16,16 +16,19 @@
 
 #define LOG_TAG "AAudioStreamConfiguration"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <stdint.h>
+#include "AAudioStreamConfiguration.h"
 
-#include <sys/mman.h>
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
-
 #include <media/AidlConversion.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/AAudioStreamConfiguration.h"
+// go/keep-sorted start
+#include <stdint.h>
+#include <sys/mman.h>
+// go/keep-sorted end
 
 using namespace aaudio;
 

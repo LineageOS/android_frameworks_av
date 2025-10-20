@@ -40,6 +40,7 @@ cc_defaults {
         "libgui",
         "libcamera_metadata",
         "libnativewindow",
+        "libcameracompatbilityinfo",
     ],
     header_libs: [
         "libbinder_headers",

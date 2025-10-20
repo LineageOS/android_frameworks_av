@@ -378,7 +378,7 @@ class libAudioHalEffectParamTest : public ::testing::TestWithParam<EffectParamTe
     }
 
     void setAndGetParameter(const sp<EffectHalInterface>& interface) {
-        for (const auto combination : mCombinations) {
+        for (const auto& combination : mCombinations) {
             uint32_t replySize = kSetParamReplySize;
             uint8_t reply[replySize];
             const auto type = combination->mType;

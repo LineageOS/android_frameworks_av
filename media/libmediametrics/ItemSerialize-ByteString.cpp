@@ -32,10 +32,6 @@
 #include <media/MediaMetricsItem.h>
 #include <private/android_filesystem_config.h>
 
-// Max per-property string size before truncation in toString().
-// Do not make too large, as this is used for dumpsys purposes.
-static constexpr size_t kMaxPropertyStringSize = 4096;
-
 namespace android::mediametrics {
 
 status_t mediametrics::Item::writeToByteString(char **pbuffer, size_t *plength) const

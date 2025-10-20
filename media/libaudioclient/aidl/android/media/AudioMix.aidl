@@ -24,7 +24,7 @@ import android.media.audio.common.AudioConfig;
 import android.media.audio.common.AudioDevice;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioMix {
     AudioMixMatchCriterion[] criteria;

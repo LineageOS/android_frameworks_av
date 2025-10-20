@@ -168,6 +168,9 @@ ConversionResult<uint32_t> aidl2legacy_Flags_uint32(Flags aidl) {
     if (aidl.bypass) {
         legacy |= EFFECT_FLAG_NO_PROCESS;
     }
+    if (aidl.notEligibleForSuspend) {
+        legacy |= EFFECT_FLAG_NOT_ELIGIBLE_SUSPEND;
+    }
     return legacy;
 }
 
@@ -183,6 +186,7 @@ ConversionResult<Flags> legacy2aidl_uint32_Flags(uint32_t legacy) {
     aidl.audioModeIndication = (legacy & EFFECT_FLAG_AUDIO_MODE_IND);
     aidl.audioSourceIndication = (legacy & EFFECT_FLAG_AUDIO_SOURCE_IND);
     aidl.bypass = (legacy & EFFECT_FLAG_NO_PROCESS);
+    aidl.notEligibleForSuspend = (legacy & EFFECT_FLAG_NOT_ELIGIBLE_SUSPEND);
     return aidl;
 }
 

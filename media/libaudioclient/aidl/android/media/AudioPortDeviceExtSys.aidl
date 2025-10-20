@@ -17,7 +17,7 @@
 package android.media;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioPortDeviceExtSys {
     /** Module the device is attached to. Interpreted as audio_module_handle_t. */

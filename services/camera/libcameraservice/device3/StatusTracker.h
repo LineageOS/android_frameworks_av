@@ -132,7 +132,7 @@ class StatusTracker: public Thread {
 
     Vector<ComponentState> mStateTransitions;
 
-    static const nsecs_t kWaitDuration = 250000000LL; // 250 ms
+    static const nsecs_t kWaitDurationNS = 250000000LL; // 250 ms
 };
 
 } // namespace camera3

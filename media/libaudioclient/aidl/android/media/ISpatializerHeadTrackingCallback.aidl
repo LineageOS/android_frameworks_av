@@ -22,7 +22,7 @@ import android.media.audio.common.HeadTracking;
  * The ISpatializerHeadTrackingCallback interface is a callback associated to the
  * Spatializer head tracking function. It can be registered via the ISpatializer
  * interface to monitor head tracking related states.
- * {@hide}
+ * @hide
  */
 oneway interface ISpatializerHeadTrackingCallback {
     /** Called when the head tracking mode has changed

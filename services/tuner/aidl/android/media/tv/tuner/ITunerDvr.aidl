@@ -24,7 +24,7 @@ import android.media.tv.tuner.ITunerFilter;
 /**
  * Tuner Dvr interface handles tuner related operations.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerDvr {
     /**

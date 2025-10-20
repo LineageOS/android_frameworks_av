@@ -26,7 +26,7 @@ import android.os.ParcelFileDescriptor;
  *
  * Interface for the MediaTranscodingService to communicate with the client.
  *
- * {@hide}
+ * @hide
  */
 interface ITranscodingClientCallback {
     /**

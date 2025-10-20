@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
-package android.hardware;
+package android.media;
+
+import android.media.InterpolatorConfig;
+import android.media.VolumeShaperConfigurationOptionFlag;
+import android.media.VolumeShaperConfigurationType;
 
 /**
-* Data class for passing camera compat setup information.
-* @hide
-*/
-parcelable CameraCompatMode {
-  // By how much camera feed should be rotated for compatibility. Possible values: [0, 90, 180, 270]
-  int rotateAndCropDegrees;
-
-  // Whether camera sensor orientation should be sandboxed (usually to portrait).
-  boolean shouldOverrideSensorOrientation;
+ * @hide
+ */
+parcelable VolumeShaperConfiguration {
+    VolumeShaperConfigurationType type = VolumeShaperConfigurationType.ID;
+    int id;
+    /** Bitmask, indexed by VolumeShaperConfigurationOptionFlag. */
+    int optionFlags;
+    double durationMs;
+    @nullable InterpolatorConfig interpolatorConfig; // null if type == ID
 }

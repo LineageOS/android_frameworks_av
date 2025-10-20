@@ -23,9 +23,7 @@
 #include "fuzzer/FuzzedDataProvider.h"
 #include "mediautils/ServiceUtilities.h"
 
-static constexpr int kMaxOperations = 50;
 static constexpr int kMaxStringLen = 256;
-static constexpr int kMaxSpaces = 1000;
 
 using android::content::AttributionSourceState;
 

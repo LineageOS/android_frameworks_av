@@ -22,7 +22,7 @@ import android.media.MediaResourceSubType;
 /**
  * Description of a media resource to be tracked by MediaResourceManager.
  *
- * {@hide}
+ * @hide
  */
 parcelable MediaResourceParcel {
     /**

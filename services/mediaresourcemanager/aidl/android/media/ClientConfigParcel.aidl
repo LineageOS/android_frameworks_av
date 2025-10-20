@@ -22,7 +22,7 @@ import android.media.MediaResourceSubType;
 /**
  * Description of a Client(codec) configuration.
  *
- * {@hide}
+ * @hide
  */
 parcelable ClientConfigParcel {
     /**

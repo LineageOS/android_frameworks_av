@@ -800,9 +800,8 @@ camera_status_t ACameraManager::getCameraCharacteristics(
     clientAttribution.uid = hardware::ICameraService::USE_CALLING_UID;
     clientAttribution.pid = hardware::ICameraService::USE_CALLING_PID;
     clientAttribution.deviceId = mDeviceContext.deviceId;
-
     binder::Status serviceRet = cs->getCameraCharacteristics(cameraIdStr,
-            targetSdkVersion, /*rotationOverride*/hardware::ICameraService::ROTATION_OVERRIDE_NONE,
+            targetSdkVersion, CameraCompatibilityInfo(),
             clientAttribution, static_cast<int32_t>(mDeviceContext.policy),
             &rawMetadata);
     if (!serviceRet.isOk()) {
@@ -893,8 +892,8 @@ ACameraManager::openCamera(
     // Send a zero length package name and let camera service figure it out from UID
     binder::Status serviceRet = cs->connectDevice(
             callbacks, cameraId, /*oomScoreOffset*/0,
-            targetSdkVersion, /*rotationOverride*/hardware::ICameraService::ROTATION_OVERRIDE_NONE,
-            clientAttribution, static_cast<int32_t>(mDeviceContext.policy), sharedMode,
+            targetSdkVersion, CameraCompatibilityInfo(), clientAttribution,
+            static_cast<int32_t>(mDeviceContext.policy), sharedMode,
             /*out*/&deviceRemote);
 
     if (!serviceRet.isOk()) {

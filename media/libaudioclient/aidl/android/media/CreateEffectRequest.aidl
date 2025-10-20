@@ -24,7 +24,7 @@ import android.media.audio.common.AudioDevice;
 /**
  * Input arguments of the createEffect() method.
  *
- * {@hide}
+ * @hide
  */
 parcelable CreateEffectRequest {
     EffectDescriptor desc;

@@ -79,9 +79,11 @@ using HalCommand = StreamDescriptor::Command;
 
 namespace {
 
-static constexpr int32_t kAidlVersion1 = 1;
-static constexpr int32_t kAidlVersion2 = 2;
-static constexpr int32_t kAidlVersion3 = 3;
+enum AidlVersion : int32_t {
+    kAidlVersion1 = 1,
+    kAidlVersion2 = 2,
+    kAidlVersion3 = 3,
+};
 
 static constexpr const char* kCreateMmapBuffer = "aosp.createMmapBuffer";
 
@@ -120,11 +122,13 @@ std::shared_ptr<IStreamCommon> StreamHalAidl::getStreamCommon(const std::shared_
 StreamHalAidl::StreamHalAidl(std::string_view className, bool isInput, const audio_config& config,
                              int32_t nominalLatency, StreamContextAidl&& context,
                              const std::shared_ptr<IStreamCommon>& stream,
-                             const std::shared_ptr<IHalAdapterVendorExtension>& vext)
+                             const std::shared_ptr<IHalAdapterVendorExtension>& vext,
+                             const sp<StreamCloseHandler>& streamCloseHandler)
     : ConversionHelperAidl(className, std::string(isInput ? "in" : "out") + "|ioHandle:" +
             std::to_string(context.getIoHandle())),
           mIsInput(isInput),
           mConfig(configToBase(config)),
+          mStreamCloseHandler(streamCloseHandler),
           mContext(std::move(context)),
           mStream(stream),
           mVendorExt(vext),
@@ -177,6 +181,13 @@ status_t StreamHalAidl::close() {
     AUGMENT_LOG(D);
     if (!mStream) return NO_INIT;
     ndk::ScopedAStatus status = serializeCall(mStream, &Stream::close);
+    if (status.isOk()) {
+        if (auto handler = mStreamCloseHandler.promote(); handler != nullptr) {
+            handler->streamClosed(sp<StreamHalInterface>::fromExisting(this));
+        }
+        std::lock_guard l(mLock);
+        mIsClosed = true;
+    }
     AUGMENT_LOG_IF(E, !status.isOk(), "status %s", status.getDescription().c_str());
     return statusTFromBinderStatus(status);
 }
@@ -401,6 +412,24 @@ status_t StreamHalAidl::start() {
                 return INVALID_OPERATION;
             }
             return OK;
+        case StreamDescriptor::State::PAUSED:
+            if (mIsInput) {
+                RETURN_STATUS_IF_ERROR(
+                        sendCommand(makeHalCommand<HalCommand::Tag::burst>(0), &reply, true));
+                if (reply.state != StreamDescriptor::State::ACTIVE) {
+                    AUGMENT_LOG(E, "unexpected stream state: %s (expected ACTIVE)",
+                                toString(reply.state).c_str());
+                    return INVALID_OPERATION;
+                }
+                if (reply.xrunFrames != 0) {
+                    // The framework does not expect any input to be happening when the stream
+                    // is stopped. So if the HAL reports any lost frames--ignore them.
+                    std::lock_guard l(mLock);
+                    mLastReply.xrunFrames = 0;
+                }
+                return OK;
+            }
+            FALLTHROUGH_INTENDED;
         default:
             AUGMENT_LOG(E, "not supported from %s stream state %s", mIsInput ? "input" : "output",
                         toString(reply.state).c_str());
@@ -419,10 +448,11 @@ status_t StreamHalAidl::stop() {
     RETURN_STATUS_IF_ERROR(updateCountersIfNeeded(&reply));
     const auto state = reply.state;
     if (mIsInput) {
-        // For input, does not make sense to drain since the framework does not need that data.
+        // For input, just pause. This avoids entering the standby state at the HAL side
+        // which can cause releasing of the shared buffer. The MMAP stream interface only
+        // expects buffer invalidation when the client calls 'standby' explicitly.
         if (state == StreamDescriptor::State::ACTIVE) {
-            RETURN_STATUS_IF_ERROR(pause());
-            return flush();
+            return pause();
         } else if (state == StreamDescriptor::State::DRAINING) {
             // Drain until the stream enters standby due to empty buffer.
             do {
@@ -496,14 +526,15 @@ status_t StreamHalAidl::getHardwarePosition(int64_t *frames, int64_t *timestamp)
         return NOT_ENOUGH_DATA;
     }
     if (mSupportsCreateMmapBuffer) {
-        // HAL is required to report continuous position. Reset for compatibility.
         int64_t mostRecentResetPoint = std::max(statePositions.hardware.framesAtStandby,
                 statePositions.hardware.framesAtFlushOrDrain);
-        int64_t aidlFrames = reply.hardware.frames;
-        *frames = aidlFrames <= mostRecentResetPoint ? 0 : aidlFrames - mostRecentResetPoint;
-    } else {
-        *frames = reply.hardware.frames;
+        // This should not happen as HAL is required to report monotonically increasing position.
+        // Add a warning log for future debugging in case it happens.
+        ALOGW_IF(reply.hardware.frames < mostRecentResetPoint,
+                 "The position is not monotonic increasing, mostRecentResetPoint=%jd, "
+                 "reportedPosition=%jd", mostRecentResetPoint, reply.hardware.frames);
     }
+    *frames = reply.hardware.frames;
     *timestamp = reply.hardware.timeNs;
     return OK;
 }
@@ -766,6 +797,10 @@ status_t StreamHalAidl::createMmapBuffer(int32_t minSizeFrames __unused,
                         internal::ToString(parameters).c_str());
             return INVALID_OPERATION;
         }
+    } else if (mSupportsCreateMmapBuffer && (mAidlInterfaceVersion > kAidlVersion3)) {
+        MmapBufferDescriptor result;
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mStream->createMmapBuffer(&result)));
+        mContext.updateMmapBufferDescriptor(std::move(result));
     }
     const MmapBufferDescriptor& bufferDescriptor = mContext.getMmapBufferDescriptor();
     info->shared_memory_fd = bufferDescriptor.sharedMemory.fd.get();
@@ -842,6 +877,10 @@ status_t StreamHalAidl::sendCommand(
         const ::aidl::android::hardware::audio::core::StreamDescriptor::Command& command,
         ::aidl::android::hardware::audio::core::StreamDescriptor::Reply* reply,
         bool safeFromNonWorkerThread, StatePositions* statePositions) {
+    {
+        std::lock_guard l(mLock);
+        if (mIsClosed) return DEAD_OBJECT;
+    }
 
     // Add timeCheck only for start command (pause, flush checked at caller).
     std::unique_ptr<mediautils::TimeCheck> timeCheck;
@@ -966,7 +1005,7 @@ StreamOutHalAidl::StreamOutHalAidl(
         const std::shared_ptr<IHalAdapterVendorExtension>& vext,
         const sp<CallbackBroker>& callbackBroker)
         : StreamHalAidl("StreamOutHalAidl", false /*isInput*/, config, nominalLatency,
-                std::move(context), getStreamCommon(stream), vext),
+                std::move(context), getStreamCommon(stream), vext, callbackBroker),
           mStream(stream), mCallbackBroker(callbackBroker) {
     // Initialize the offload metadata
     mOffloadMetadata.sampleRate = static_cast<int32_t>(config.sample_rate);
@@ -1044,7 +1083,9 @@ status_t StreamOutHalAidl::getRenderPosition(uint64_t *dspFrames) {
     // Number of audio frames since the stream has exited standby.
     // See the table at the start of 'StreamHalInterface' on when it needs to reset.
     int64_t mostRecentResetPoint;
-    if (!mContext.isAsynchronous() && audio_has_proportional_frames(mConfig.format)) {
+    if (!mContext.isAsynchronous() &&
+        !mContext.isDirect() &&
+        audio_has_proportional_frames(mConfig.format)) {
         mostRecentResetPoint = statePositions.observable.framesAtStandby;
     } else {
         mostRecentResetPoint = std::max(statePositions.observable.framesAtStandby,
@@ -1121,7 +1162,9 @@ status_t StreamOutHalAidl::getPresentationPosition(uint64_t *frames, struct time
     StatePositions statePositions{};
     RETURN_STATUS_IF_ERROR(getObservablePosition(&aidlFrames, &aidlTimestamp, &statePositions));
     // See the table at the start of 'StreamHalInterface'.
-    if (!mContext.isAsynchronous() && audio_has_proportional_frames(mConfig.format)) {
+    if (!mContext.isAsynchronous() &&
+        !mContext.isDirect() &&
+        audio_has_proportional_frames(mConfig.format)) {
         *frames = aidlFrames;
     } else {
         const int64_t mostRecentResetPoint = std::max(statePositions.observable.framesAtStandby,
@@ -1366,7 +1409,7 @@ StreamInHalAidl::StreamInHalAidl(
         const std::shared_ptr<IHalAdapterVendorExtension>& vext,
         const sp<MicrophoneInfoProvider>& micInfoProvider)
         : StreamHalAidl("StreamInHalAidl", true /*isInput*/, config, nominalLatency,
-                std::move(context), getStreamCommon(stream), vext),
+                std::move(context), getStreamCommon(stream), vext, micInfoProvider),
           mStream(stream), mMicInfoProvider(micInfoProvider) {}
 
 status_t StreamInHalAidl::setGain(float gain) {

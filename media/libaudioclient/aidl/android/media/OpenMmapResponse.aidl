@@ -19,7 +19,7 @@ package android.media;
 import android.media.audio.common.AudioConfigBase;
 import android.media.IMmapStream;
 
-/** {@hide} */
+/** @hide */
 parcelable OpenMmapResponse {
     AudioConfigBase config;
     int[] deviceIds;

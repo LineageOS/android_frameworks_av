@@ -387,6 +387,11 @@ class AfPlaybackCommon : public virtual RefBase {
      */
     void processMuteEvent(media::IAudioManagerNative& am, mute_state_t muteState);
 
+    /**
+     * Notifies the audio service of the current mute state.
+     */
+    void resetMuteEvent(media::IAudioManagerNative& am);
+
     void maybeLogPlaybackHardening(media::IAudioManagerNative& am) const;
 
     // Restricted due to OP_AUDIO_CONTROL_PARTIAL

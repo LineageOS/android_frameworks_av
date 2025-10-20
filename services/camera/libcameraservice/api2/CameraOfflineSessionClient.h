@@ -62,7 +62,7 @@ public:
                                      // (v)ndk doesn't have offline session support
                                      clientAttribution, callingPid, /*overridePackageName*/ false,
                                      cameraIdStr, cameraFacing, sensorOrientation, servicePid,
-                                     hardware::ICameraService::ROTATION_OVERRIDE_NONE, sharedMode),
+                                     CameraCompatibilityInfo(), sharedMode),
         mRemoteCallback(remoteCallback),
         mOfflineSession(session),
         mCompositeStreamMap(offlineCompositeStreamMap) {}
@@ -77,7 +77,8 @@ public:
 
     status_t dump(int /*fd*/, const Vector<String16>& /*args*/) override;
 
-    status_t dumpClient(int /*fd*/, const Vector<String16>& /*args*/) override;
+    status_t dumpClient(int /*fd*/, const Vector<String16>& /*args*/,
+                        bool /*ignoreResult*/) override;
 
     status_t startWatchingTags(const std::string &tags, int outFd) override;
     status_t stopWatchingTags(int outFd) override;

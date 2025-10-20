@@ -19,7 +19,7 @@ package android.media;
 /**
  * Type enums of video transcoding errors.
  *
- * {@hide}
+ * @hide
  */
 @Backing(type = "int")
 enum TranscodingErrorCode {

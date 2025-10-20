@@ -24,7 +24,7 @@ import android.media.audio.common.AudioFormatDescription;
  * Interfaces from the Core API do not support the CPP backend. This copy will
  * be removed either by moving the AudioRoute from core to a.m.a.common or by
  * switching the framework internal interfaces to the NDK backend.
- * {@hide}
+ * @hide
  */
 parcelable SurroundSoundConfig {
     parcelable SurroundFormatFamily {

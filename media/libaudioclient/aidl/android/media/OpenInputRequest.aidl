@@ -21,7 +21,7 @@ import android.media.audio.common.AudioDevice;
 import android.media.audio.common.AudioSource;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable OpenInputRequest {
     /** Interpreted as audio_module_handle_t. */

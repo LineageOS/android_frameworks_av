@@ -21,7 +21,9 @@ import android.hardware.camera2.ICameraDeviceCallbacks;
 import android.hardware.camera2.ICameraOfflineSession;
 import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.camera2.params.OutputConfiguration;
+import android.hardware.camera2.utils.OutputAndInputStreamIds;
 import android.hardware.camera2.params.SessionConfiguration;
+import android.hardware.camera2.utils.SessionConfigurationAndStreamIds;
 import android.hardware.camera2.utils.SubmitInfo;
 import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
@@ -127,6 +129,19 @@ interface ICameraDeviceUser
     boolean isSessionConfigurationSupported(in SessionConfiguration sessionConfiguration);
 
     void deleteStream(int streamId);
+
+    /**
+     * Configure the given set of streams, while deleting the streams which
+     * have been removed from the previous session
+     *
+     * @param sessionConfigurationAndStreamIds The session configuration to configure and
+     *                                         the stream ids to be deleted.
+     * @return OutputAndInputStreamIds data structure containing the stream ids of the
+     *                                 newly created output streams and the input streams.
+     *
+     */
+    OutputAndInputStreamIds configureStreams(
+            in SessionConfigurationAndStreamIds sessionConfigurationAndStreamIds);
 
     /**
      * Create an output stream

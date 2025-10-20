@@ -13,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package android.media;
 
-import android.media.InterpolatorConfig;
-import android.media.VolumeShaperConfigurationOptionFlag;
-import android.media.VolumeShaperConfigurationType;
-
 /**
- * {@hide}
+ * Polynomial spline interpolators.
+ *
+ * @hide
  */
-parcelable VolumeShaperConfiguration {
-    VolumeShaperConfigurationType type = VolumeShaperConfigurationType.ID;
-    int id;
-    /** Bitmask, indexed by VolumeShaperConfigurationOptionFlag. */
-    int optionFlags;
-    double durationMs;
-    @nullable InterpolatorConfig interpolatorConfig; // null if type == ID
+@Backing(type="int")
+enum InterpolatorType {
+    /** Not continuous. */
+    STEP,
+    /** C0. */
+    LINEAR,
+    /** C1. */
+    CUBIC,
+    /** C1 (to provide locally monotonic curves). */
+    CUBIC_MONOTONIC,
+    // CUBIC_C2, // TODO - requires global computation / cache
 }

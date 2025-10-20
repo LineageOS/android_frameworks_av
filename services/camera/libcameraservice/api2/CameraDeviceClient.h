@@ -29,6 +29,7 @@
 
 #include "CameraOfflineSessionClient.h"
 #include "CameraService.h"
+#include "binder/Status.h"
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
 #include "CompositeStream.h"
@@ -63,8 +64,8 @@ protected:
             std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
             const AttributionSourceState& clientAttribution, int callingPid,
             bool systemNativeClient, const std::string& cameraId, int api1CameraId,
-            int cameraFacing, int sensorOrientation, int servicePid, int rotationOverride,
-            bool sharedMode);
+            int cameraFacing, int sensorOrientation, int servicePid,
+            const CameraCompatibilityInfo& compatInfo, bool sharedMode);
 
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
 };
@@ -120,6 +121,13 @@ public:
 
     // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;
+
+    virtual binder::Status configureStreams(
+            const hardware::camera2::utils::SessionConfigurationAndStreamIds&
+                    sessionConfigurationAndStreamIds,
+            /*out*/
+            hardware::camera2::utils::OutputAndInputStreamIds*
+                    outputAndInputStreamIds) override;
 
     virtual binder::Status createStream(
             const hardware::camera2::params::OutputConfiguration &outputConfiguration,
@@ -190,6 +198,28 @@ public:
 
     virtual binder::Status isPrimaryClient(/*out*/bool* isPrimary) override;
 
+    // Locked versions of beginConfigure(), createStreams(), deleteStreams() and endConfigure().
+    // These methods expect mBinderSerializationLock lock to be held by the caller.
+    binder::Status beginConfigureLocked() ;
+
+    binder::Status createStreamLocked(
+            const hardware::camera2::params::OutputConfiguration &outputConfiguration,
+            /*out*/
+            int32_t* newStreamId);
+
+    binder::Status createInputStreamLocked(int width, int height, int format,
+            bool isMultiResolution,
+            /*out*/
+            int32_t* newStreamId);
+
+    binder::Status deleteStreamLocked(int streamId);
+
+    binder::Status endConfigureLocked(int operatingMode,
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams,
+            int64_t startTimeMs,
+            /*out*/
+            std::vector<int>* offlineStreamIds);
+
     /**
      * Interface used by CameraService
      */
@@ -201,8 +231,8 @@ public:
                        const AttributionSourceState& clientAttribution, int callingPid,
                        bool clientPackageOverride, const std::string& cameraId, int cameraFacing,
                        int sensorOrientation, int servicePid, bool overrideForPerfClass,
-                       int rotationOverride, const std::string& originalCameraId, bool sharedMode,
-                       bool isVendorClient);
+                       const CameraCompatibilityInfo& compatInfo,
+                       const std::string& originalCameraId, bool sharedMode, bool isVendorClient);
     virtual ~CameraDeviceClient();
 
     virtual status_t      initialize(sp<CameraProviderManager> manager,
@@ -221,7 +251,7 @@ public:
 
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
-    virtual status_t      dumpClient(int fd, const Vector<String16>& args);
+    virtual status_t      dumpClient(int fd, const Vector<String16>& args, bool ignoreResult);
 
     virtual status_t      startWatchingTags(const std::string &tags, int out);
     virtual status_t      stopWatchingTags(int out);

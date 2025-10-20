@@ -28,7 +28,7 @@ import android.hardware.tv.tuner.FilterDelayHint;
 /**
  * Tuner Filter interface handles tuner related operations.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerFilter {
     /**

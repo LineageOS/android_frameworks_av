@@ -18,6 +18,7 @@
 #define LOG_TAG "codec2_hidl_hal_component_test"
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
 #include <android/binder_process.h>
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
@@ -64,6 +65,7 @@ class Codec2ComponentHidlTestBase : public ::testing::Test {
         getParams();
         mDisableTest = false;
         mEos = false;
+        mSdkLevel = ::android::base::GetIntProperty("ro.build.version.sdk", -1);
         mClient = android::Codec2Client::CreateFromService(mInstanceName.c_str());
         ASSERT_NE(mClient, nullptr);
         mListener.reset(new CodecListener([this](std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -133,6 +135,7 @@ class Codec2ComponentHidlTestBase : public ::testing::Test {
     std::string mComponentName;
     bool mEos;
     bool mDisableTest;
+    int mSdkLevel;
     std::mutex mQueueLock;
     std::condition_variable mQueueCondition;
     std::list<std::unique_ptr<C2Work>> mWorkQueue;
@@ -216,6 +219,7 @@ TEST_P(Codec2ComponentHidlTest, Config) {
 
 // Test create -> reset -> config
 TEST_P(Codec2ComponentHidlTest, CreateResetConfig) {
+    if (mSdkLevel <= 36) GTEST_SKIP() << "Test is disabled";
     ALOGV("Create reset config Test");
     mComponent->reset();
     ASSERT_NO_FATAL_FAILURE(configureComponent());
@@ -223,6 +227,7 @@ TEST_P(Codec2ComponentHidlTest, CreateResetConfig) {
 
 // Test create -> stop -> config
 TEST_P(Codec2ComponentHidlTest, CreateStopConfig) {
+    if (mSdkLevel <= 36) GTEST_SKIP() << "Test is disabled";
     ALOGV("Create stop config Test");
     mComponent->stop();
     ASSERT_NO_FATAL_FAILURE(configureComponent());

@@ -20,6 +20,7 @@
 #include <gtest/gtest.h>
 
 #include <android/content/AttributionSourceState.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <binder/ProcessState.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
@@ -73,7 +74,8 @@ TEST_F(CameraCharacteristicsPermission, TestCameraPermission) {
         clientAttribution.deviceId = kDefaultDeviceId;
         auto rc = mCameraService->getCameraCharacteristics(cameraIdStr,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                /*overrideToPortrait*/false, clientAttribution, /*devicePolicy*/0, &metadata);
+                content::res::CameraCompatibilityInfo(), clientAttribution, /*devicePolicy*/0,
+                &metadata);
         ASSERT_TRUE(rc.isOk());
         EXPECT_FALSE(metadata.isEmpty());
         EXPECT_EQ(metadata.removePermissionEntries(CAMERA_METADATA_INVALID_VENDOR_ID,

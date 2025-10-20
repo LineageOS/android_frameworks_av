@@ -22,7 +22,7 @@ import android.media.IEffect;
 /**
  * Output arguments of the createEffect() method.
  *
- * {@hide}
+ * @hide
  */
 parcelable CreateEffectResponse {
     int id;

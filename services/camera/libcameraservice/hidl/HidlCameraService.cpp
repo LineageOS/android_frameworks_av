@@ -38,7 +38,6 @@ namespace implementation {
 
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::hidl_vec;
-using hardware::BnCameraService::ROTATION_OVERRIDE_NONE;
 using hardware::cameraservice::utils::conversion::convertToHidl;
 using hardware::cameraservice::utils::conversion::B2HStatus;
 using hardware::Void;
@@ -76,7 +75,7 @@ HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
                     kDefaultDeviceId);
     binder::Status serviceRet =
         mAidlICameraService->getCameraCharacteristics(cameraId,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, ROTATION_OVERRIDE_NONE,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, CameraCompatibilityInfo(),
                 clientAttribution, 0, &cameraMetadata);
     HCameraMetadata hidlMetadata;
     if (!serviceRet.isOk()) {
@@ -134,7 +133,7 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
     clientAttribution.attributionTag = std::nullopt;
     binder::Status serviceRet = mAidlICameraService->connectDeviceVendor(
             callbacks, cameraId, 0/*oomScoreOffset*/,
-            /*targetSdkVersion*/__ANDROID_API_FUTURE__, ROTATION_OVERRIDE_NONE,
+            /*targetSdkVersion*/__ANDROID_API_FUTURE__, CameraCompatibilityInfo(),
             clientAttribution, /*devicePolicy*/0, /*sharedMode*/false, /*out*/&deviceRemote);
     HStatus status = HStatus::NO_ERROR;
     if (!serviceRet.isOk()) {

@@ -23,7 +23,7 @@ import android.media.audio.common.AudioMode;
 
 /*
  * Audio policy configuration. Functionally replaces the APM XML file.
- * {@hide}
+ * @hide
  */
 parcelable AudioPolicyConfig {
     AudioHwModule[] modules;

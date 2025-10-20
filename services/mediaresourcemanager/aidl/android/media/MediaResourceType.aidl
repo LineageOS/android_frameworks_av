@@ -19,7 +19,7 @@ package android.media;
 /**
  * Type enums of media resources.
  *
- * {@hide}
+ * @hide
  */
 @Backing(type="int")
 enum MediaResourceType {

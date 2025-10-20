@@ -17,14 +17,20 @@
 #ifndef ANDROID_AAUDIO_RINGBUFFER_PARCELABLE_H
 #define ANDROID_AAUDIO_RINGBUFFER_PARCELABLE_H
 
-#include <map>
-#include <stdint.h>
-
+// go/keep-sorted start
 #include <aaudio/RingBuffer.h>
 #include <binder/Parcelable.h>
+// go/keep-sorted end
 
-#include "binding/AAudioServiceDefinitions.h"
-#include "binding/SharedRegionParcelable.h"
+// go/keep-sorted start
+#include <map>
+#include <stdint.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
+#include "AAudioServiceDefinitions.h"
+#include "SharedRegionParcelable.h"
+// go/keep-sorted end
 
 namespace aaudio {
 

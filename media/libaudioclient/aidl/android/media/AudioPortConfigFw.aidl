@@ -20,7 +20,7 @@ import android.media.AudioPortConfigSys;
 import android.media.audio.common.AudioPortConfig;
 
 /**
- * {@hide}
+ * @hide
  * Suffixed with Fw to avoid name conflict with SDK class.
  */
 parcelable AudioPortConfigFw {

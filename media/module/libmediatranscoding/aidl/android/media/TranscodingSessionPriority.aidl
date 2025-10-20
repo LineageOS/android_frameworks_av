@@ -19,7 +19,7 @@ package android.media;
 /**
  * Priority of a transcoding session.
  *
- * {@hide}
+ * @hide
  */
 @Backing(type="int")
 enum TranscodingSessionPriority {

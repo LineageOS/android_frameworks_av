@@ -1211,9 +1211,14 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
         return NO_ERROR;
     }
     if (isAfTrackOffloadedOrDirect_l()) {
+        AudioPlaybackRate servicePlaybackRate = playbackRate;
+        if (servicePlaybackRate.mFallbackMode == AUDIO_TIMESTRETCH_FALLBACK_DEFAULT) {
+            // unspecified by client, system determines behavior, set to `FAIL`.
+            servicePlaybackRate.mFallbackMode = AUDIO_TIMESTRETCH_FALLBACK_FAIL;
+        }
         const status_t status = statusTFromBinderStatus(mAudioTrack->setPlaybackRateParameters(
-                VALUE_OR_RETURN_STATUS(
-                        legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(playbackRate))));
+                VALUE_OR_RETURN_STATUS(legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(
+                        servicePlaybackRate))));
         if (status == NO_ERROR) {
             mPlaybackRate = playbackRate;
         } else if (status == INVALID_OPERATION
@@ -1294,8 +1299,19 @@ const AudioPlaybackRate& AudioTrack::getPlaybackRate()
         const status_t status = statusTFromBinderStatus(
                 mAudioTrack->getPlaybackRateParameters(&playbackRateTemp));
         if (status == NO_ERROR) { // update local version if changed.
-            mPlaybackRate =
+            AudioPlaybackRate servicePlaybackRate =
                     aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(playbackRateTemp).value();
+            if (servicePlaybackRate.mFallbackMode == AUDIO_TIMESTRETCH_FALLBACK_DEFAULT) {
+                // This is not expected, may be an issue with HAL.
+                ALOGW("%s(%d) got 'FALLBACK_DEFAULT' from service", __func__, mPortId);
+                servicePlaybackRate.mFallbackMode = AUDIO_TIMESTRETCH_FALLBACK_FAIL;
+            }
+            if (mPlaybackRate.mFallbackMode == AUDIO_TIMESTRETCH_FALLBACK_DEFAULT &&
+                    servicePlaybackRate.mFallbackMode == AUDIO_TIMESTRETCH_FALLBACK_FAIL) {
+                // Leave the client view as 'DEFAULT'.
+                servicePlaybackRate.mFallbackMode = AUDIO_TIMESTRETCH_FALLBACK_DEFAULT;
+            }
+            mPlaybackRate = servicePlaybackRate;
         }
     }
     return mPlaybackRate;

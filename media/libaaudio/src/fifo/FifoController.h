@@ -17,8 +17,10 @@
 #ifndef FIFO_FIFO_CONTROLLER_H
 #define FIFO_FIFO_CONTROLLER_H
 
-#include <stdint.h>
+// go/keep-sorted start
 #include <atomic>
+#include <stdint.h>
+// go/keep-sorted end
 
 #include "FifoControllerBase.h"
 

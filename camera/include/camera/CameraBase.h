@@ -18,6 +18,7 @@
 #define ANDROID_HARDWARE_CAMERA_BASE_H
 
 #include <android/content/AttributionSourceState.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <android/hardware/ICameraServiceListener.h>
 
 #include <utils/Mutex.h>
@@ -109,6 +110,7 @@ struct CameraStatus : public android::Parcelable {
 } // namespace hardware
 
 using content::AttributionSourceState;
+using content::res::CameraCompatibilityInfo;
 using hardware::CameraInfo;
 
 template <typename TCam>
@@ -124,8 +126,8 @@ public:
     typedef typename TCamTraits::TCamCallbacks      TCamCallbacks;
     typedef typename TCamTraits::TCamConnectService TCamConnectService;
 
-    static sp<TCam>      connect(int cameraId,
-                                 int targetSdkVersion, int rotationOverride, bool forceSlowJpegMode,
+    static sp<TCam>      connect(int cameraId, int targetSdkVersion,
+                                 const CameraCompatibilityInfo& compatInfo, bool forceSlowJpegMode,
                                  const AttributionSourceState &clientAttribution,
                                  int32_t devicePolicy);
     virtual void         disconnect();
@@ -136,7 +138,7 @@ public:
                                             int32_t devicePolicy);
 
     static status_t      getCameraInfo(int cameraId,
-                                       int rotationOverride,
+                                       const CameraCompatibilityInfo& compatInfo,
                                        const AttributionSourceState& clientAttribution,
                                        int32_t devicePolicy,
                                        /*out*/

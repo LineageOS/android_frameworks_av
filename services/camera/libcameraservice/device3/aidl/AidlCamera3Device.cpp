@@ -33,10 +33,12 @@
             ##__VA_ARGS__)
 
 // Convenience macros for transitioning to the error state
-#define SET_ERR(fmt, ...) setErrorState(   \
+#define SET_ERR(errorState, fmt, ...) setErrorState(   \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,              \
     ##__VA_ARGS__)
-#define SET_ERR_L(fmt, ...) setErrorStateLocked( \
+#define SET_ERR_L(errorState, fmt, ...) setErrorStateLocked( \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,                    \
     ##__VA_ARGS__)
 
@@ -53,10 +55,12 @@
 #include <aidl/android/hardware/camera/device/ICameraInjectionSession.h>
 #include <aidlcommonsupport/NativeHandle.h>
 #include <android-base/properties.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <android/binder_ibinder_platform.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 #include <camera/StringUtils.h>
 #include <com_android_internal_camera_flags.h>
+#include <statslog_framework.h>
 
 #include "utils/CameraTraces.h"
 #include "utils/SessionConfigurationUtils.h"
@@ -173,10 +177,11 @@ uint64_t AidlCamera3Device::mapProducerToFrameworkUsage(
 AidlCamera3Device::AidlCamera3Device(
         std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
         std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
-        const std::string& id, bool overrideForPerfClass, int rotationOverride,
+        const std::string& id, bool overrideForPerfClass,
+        const CameraCompatibilityInfo& compatInfo,
         bool isVendorClient, bool legacyClient) :
         Camera3Device(cameraServiceProxyWrapper, attributionAndPermissionUtils, id,
-                overrideForPerfClass, rotationOverride, isVendorClient, legacyClient) {
+                overrideForPerfClass, compatInfo, isVendorClient, legacyClient) {
     mCallbacks = ndk::SharedRefBase::make<AidlCameraDeviceCallbacks>(this);
 }
 
@@ -199,17 +204,19 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
             /*out*/ &session);
     ATRACE_END();
     if (res != OK) {
-        SET_ERR_L("Could not open camera session: %s (%d)", strerror(-res), res);
+        SET_ERR_L(CAMERA_HAL_DEVICE_ERROR,
+        "Could not open camera session: %s (%d)", strerror(-res), res);
         return res;
     }
     if (session == nullptr) {
-      SET_ERR_L("Session iface returned is null");
+      SET_ERR_L(CAMERA_HAL_DEVICE_ERROR, "Session iface returned is null");
       return INVALID_OPERATION;
     }
     res = manager->getCameraCharacteristics(mId, mOverrideForPerfClass, &mDeviceInfo,
-            mRotationOverride);
+            mCompatInfo);
     if (res != OK) {
-        SET_ERR_L("Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
+        SET_ERR_L(CAMERA_HAL_DEVICE_ERROR,
+        "Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
         return res;
     }
@@ -225,9 +232,10 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
             // Do not override characteristics for physical cameras
             res = manager->getCameraCharacteristics(
                     physicalId, /*overrideForPerfClass*/false, &mPhysicalDeviceInfoMap[physicalId],
-                    mRotationOverride);
+                    mCompatInfo);
             if (res != OK) {
-                SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
+                SET_ERR_L(CAMERA_HAL_DEVICE_ERROR,
+                "Could not retrieve camera %s characteristics: %s (%d)",
                         physicalId.c_str(), strerror(-res), res);
                 session->close();
                 return res;
@@ -239,7 +247,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
                 res = mDistortionMappers[physicalId].setupStaticInfo(
                         mPhysicalDeviceInfoMap[physicalId]);
                 if (res != OK) {
-                    SET_ERR_L("Unable to read camera %s's calibration fields for distortion "
+                    SET_ERR_L(CAMERA_HAL_DEVICE_ERROR,
+                    "Unable to read camera %s's calibration fields for distortion "
                             "correction", physicalId.c_str());
                     session->close();
                     return res;
@@ -423,7 +432,7 @@ int32_t AidlCamera3Device::getCaptureResultFMQSize() {
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mRotationOverride, mActivePhysicalId}, mResultMetadataQueue
+        mCompatInfo, mActivePhysicalId}, mResultMetadataQueue
     };
 
     for (const auto& result : results) {
@@ -465,7 +474,7 @@ int32_t AidlCamera3Device::getCaptureResultFMQSize() {
         mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
         mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this,
         *this, *(mInterface), mLegacyClient, mMinExpectedDuration, mIsFixedFps,
-        mRotationOverride, mActivePhysicalId}, mResultMetadataQueue
+        mCompatInfo, mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg, mSensorReadoutTimestampSupported);
@@ -526,13 +535,15 @@ status_t AidlCamera3Device::switchToOffline(
             streamsToKeep, &offlineSessionInfo, &offlineSession, &bufferRecords);
 
     if (ret != OK) {
-        SET_ERR("Switch to offline failed: %s (%d)", strerror(-ret), ret);
+        SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+        "Switch to offline failed: %s (%d)", strerror(-ret), ret);
         return ret;
     }
 
     bool succ = mRequestBufferSM.onSwitchToOfflineSuccess();
     if (!succ) {
-        SET_ERR("HAL must not be calling requestStreamBuffers call");
+        SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+        "HAL must not be calling requestStreamBuffers call");
         // TODO: block ALL callbacks from HAL till app configured new streams?
         return UNKNOWN_ERROR;
     }
@@ -544,14 +555,16 @@ status_t AidlCamera3Device::switchToOffline(
         // verify stream IDs
         int32_t id = offlineStream.id;
         if (std::find(streamIds.begin(), streamIds.end(), id) == streamIds.end()) {
-            SET_ERR("stream ID %d not found!", id);
+            SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+            "stream ID %d not found!", id);
             return UNKNOWN_ERROR;
         }
 
         // When not using HAL buf manager, only allow streams requested by app to be preserved
         if (!isHalBufferManagedStream(id)) {
             if (std::find(streamsToKeep.begin(), streamsToKeep.end(), id) == streamsToKeep.end()) {
-                SET_ERR("stream ID %d must not be switched to offline!", id);
+                SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+                "stream ID %d must not be switched to offline!", id);
                 return UNKNOWN_ERROR;
             }
         }
@@ -562,7 +575,8 @@ status_t AidlCamera3Device::switchToOffline(
                 static_cast<sp<Camera3StreamInterface>>(mOutputStreams.get(id));
         // Verify number of outstanding buffers
         if (stream->getOutstandingBuffersCount() != (uint32_t)offlineStream.numOutstandingBuffers) {
-            SET_ERR("Offline stream %d # of remaining buffer mismatch: (%zu,%d) (service/HAL)",
+            SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+            "Offline stream %d # of remaining buffer mismatch: (%zu,%d) (service/HAL)",
                     id, stream->getOutstandingBuffersCount(), offlineStream.numOutstandingBuffers);
             return UNKNOWN_ERROR;
         }
@@ -572,7 +586,8 @@ status_t AidlCamera3Device::switchToOffline(
     if (hasInputStream && std::find(offlineStreamIds.begin(), offlineStreamIds.end(),
                 inputStreamId) == offlineStreamIds.end()) {
         if (mInputStream->hasOutstandingBuffers()) {
-            SET_ERR("Input stream %d still has %zu outstanding buffer!",
+            SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+            "Input stream %d still has %zu outstanding buffer!",
                     inputStreamId, mInputStream->getOutstandingBuffersCount());
             return UNKNOWN_ERROR;
         }
@@ -583,7 +598,8 @@ status_t AidlCamera3Device::switchToOffline(
                 outStreamId) == offlineStreamIds.end()) {
             auto outStream = mOutputStreams.get(outStreamId);
             if (outStream->hasOutstandingBuffers()) {
-                SET_ERR("Output stream %d still has %zu outstanding buffer!",
+                SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+                "Output stream %d still has %zu outstanding buffer!",
                         outStreamId, outStream->getOutstandingBuffersCount());
                 return UNKNOWN_ERROR;
             }
@@ -597,7 +613,8 @@ status_t AidlCamera3Device::switchToOffline(
         for (auto offlineReq : offlineSessionInfo.offlineRequests) {
             int idx = mInFlightMap.indexOfKey(offlineReq.frameNumber);
             if (idx == NAME_NOT_FOUND) {
-                SET_ERR("Offline request frame number %d not found!", offlineReq.frameNumber);
+                SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+                "Offline request frame number %d not found!", offlineReq.frameNumber);
                 return UNKNOWN_ERROR;
             }
 
@@ -605,7 +622,8 @@ status_t AidlCamera3Device::switchToOffline(
             // TODO: check specific stream IDs
             size_t numBuffersLeft = static_cast<size_t>(inflightReq.numBuffersLeft);
             if (numBuffersLeft != offlineReq.pendingStreams.size()) {
-                SET_ERR("Offline request # of remaining buffer mismatch: (%d,%d) (service/HAL)",
+                SET_ERR(CAMERA_HAL_DEVICE_ERROR,
+                "Offline request # of remaining buffer mismatch: (%d,%d) (service/HAL)",
                         inflightReq.numBuffersLeft, offlineReq.pendingStreams.size());
                 return UNKNOWN_ERROR;
             }
@@ -657,7 +675,8 @@ status_t AidlCamera3Device::switchToOffline(
     if (mInputStream != nullptr) {
         ret = mInputStream->disconnect();
         if (ret != OK) {
-            SET_ERR_L("disconnect input stream failed!");
+            SET_ERR_L(CAMERA_SERVICE_INTERNAL_ERROR,
+            "disconnect input stream failed!");
             return UNKNOWN_ERROR;
         }
     }
@@ -666,7 +685,8 @@ status_t AidlCamera3Device::switchToOffline(
         sp<Camera3StreamInterface> stream = mOutputStreams.get(streamId);
         ret = stream->disconnect();
         if (ret != OK) {
-            SET_ERR_L("disconnect output stream %d failed!", streamId);
+            SET_ERR_L(CAMERA_SERVICE_INTERNAL_ERROR,
+            "disconnect output stream %d failed!", streamId);
             return UNKNOWN_ERROR;
         }
     }
@@ -1475,10 +1495,10 @@ AidlCamera3Device::AidlRequestThread::AidlRequestThread(wp<Camera3Device> parent
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                int rotationOverride,
+                const CameraCompatibilityInfo& compatInfo,
                 bool supportSettingsOverride) :
           RequestThread(parent, statusTracker, interface, sessionParamKeys,
-                  useHalBufManager, supportCameraMute, rotationOverride,
+                  useHalBufManager, supportCameraMute, compatInfo,
                   supportSettingsOverride) {}
 
 status_t AidlCamera3Device::AidlRequestThread::switchToOffline(
@@ -1709,10 +1729,10 @@ sp<Camera3Device::RequestThread> AidlCamera3Device::createNewRequestThread(
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                int rotationOverride,
+                const CameraCompatibilityInfo& compatInfo,
                 bool supportSettingsOverride) {
     return new AidlRequestThread(parent, statusTracker, interface, sessionParamKeys,
-            useHalBufManager, supportCameraMute, rotationOverride,
+            useHalBufManager, supportCameraMute, compatInfo,
             supportSettingsOverride);
 };
 

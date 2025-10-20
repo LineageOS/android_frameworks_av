@@ -19,7 +19,7 @@ package android.media;
 /**
  * Type enums of video codec type.
  *
- * {@hide}
+ * @hide
  */
 @Backing(type = "int")
 enum TranscodingVideoCodecType {

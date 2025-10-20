@@ -27,7 +27,7 @@ import android.media.tv.tuner.ITunerLnb;
 /**
  * Tuner Frontend interface handles frontend related operations.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerFrontend {
     /**

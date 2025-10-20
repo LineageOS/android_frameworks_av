@@ -127,6 +127,12 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
      * Modify the stream use case for this output.
      */
     virtual void setStreamUseCase(int64_t streamUseCase) = 0;
+
+    /**
+     * Query the mirror mode of specific output surface id.
+     */
+    virtual int getSurfaceMirrorMode(size_t /*surfaceId*/) { return getMirrorMode(); }
+
 };
 
 // Helper class to organize a synchronized mapping of stream IDs to stream instances

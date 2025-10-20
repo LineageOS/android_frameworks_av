@@ -28,6 +28,7 @@ cc_fuzz {
     name: "libaaudio_fuzzer",
     defaults: [
         "latest_android_media_audio_common_types_cpp_static",
+        "libaaudio_internal_defaults",
     ],
     srcs: [
         "libaaudio_fuzzer.cpp",
@@ -58,7 +59,6 @@ cc_fuzz {
         "av-types-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libaaudio",
-        "libaaudio_internal",
         "libaudioclient",
         "libaudiofoundation",
         "libaudioutils",

@@ -319,6 +319,7 @@ C2SoftAacDec::C2SoftAacDec(
       mStreamInfo(nullptr),
       mSignalledError(false),
       mOutputPortDelay(kDefaultOutputPortDelay),
+      mOutputDelayCompensated(0),
       mOutputDelayRingBuffer(nullptr),
       mDeviceApiLevel(android_get_device_api_level()) {
 }
@@ -1137,7 +1138,7 @@ uint32_t C2SoftAacDec::maskFromCount(uint32_t channelCount) {
         case 2: // stereo
             return (CHANNEL_OUT_FL | CHANNEL_OUT_FR);
         case 4: // 4.0 = stereo with backs
-            return (CHANNEL_OUT_FL | CHANNEL_OUT_FC
+            return (CHANNEL_OUT_FL | CHANNEL_OUT_FR
                     | CHANNEL_OUT_BL | CHANNEL_OUT_BR);
         case 5: // 5.0
             return (CHANNEL_OUT_FL | CHANNEL_OUT_FC | CHANNEL_OUT_FR

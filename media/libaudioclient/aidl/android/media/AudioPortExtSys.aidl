@@ -20,7 +20,7 @@ import android.media.AudioPortDeviceExtSys;
 import android.media.AudioPortMixExtSys;
 
 /**
- * {@hide}
+ * @hide
  */
 union AudioPortExtSys {
     /**

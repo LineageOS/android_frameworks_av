@@ -19,7 +19,7 @@ package android.media;
 /**
  * The "Internal" timestamp is intended to disambiguate from the android.media.AudioTimestamp type.
  *
- * {@hide}
+ * @hide
  */
 parcelable AudioTimestampInternal {
     /**

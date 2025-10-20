@@ -34,6 +34,7 @@
 
 #include <camera/CameraMetadata.h>
 #include <android/content/AttributionSourceState.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <android/hardware/ICameraService.h>
 #include <android/hardware/ICameraServiceListener.h>
 #include <android/hardware/BnCameraServiceListener.h>
@@ -60,6 +61,7 @@
 #include <algorithm>
 
 using namespace android;
+using ::android::content::res::CameraCompatibilityInfo;
 using ::android::hardware::ICameraService;
 using ::android::hardware::camera2::ICameraDeviceUser;
 using ::android::hardware::camera2::CameraMetadataInfo;
@@ -390,7 +392,7 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
         // Check metadata binder call
         CameraMetadata metadata;
         res = service->getCameraCharacteristics(cameraId,
-                /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*overrideToPortrait*/false,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, CameraCompatibilityInfo(),
                 clientAttribution, /*devicePolicy*/0, &metadata);
         EXPECT_TRUE(res.isOk()) << res;
         EXPECT_FALSE(metadata.isEmpty());
@@ -408,7 +410,7 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
         res = service->connectDevice(callbacks, cameraId,
                 /*oomScoreOffset*/ 0,
                 /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                /*overrideToPortrait*/false, clientAttribution, /*devicePolicy*/0,
+                CameraCompatibilityInfo(), clientAttribution, /*devicePolicy*/0,
                 /*sharedMode*/false, /*out*/&device);
         EXPECT_TRUE(res.isOk()) << res;
         ASSERT_NE(nullptr, device.get());
@@ -457,7 +459,7 @@ protected:
             binder::Status res = service->connectDevice(callbacks, deviceId,
                     /*oomScoreOffset*/ 0,
                     /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                    /*overrideToPortrait*/false, clientAttribution, /*devicePolicy*/0,
+                    CameraCompatibilityInfo(), clientAttribution, /*devicePolicy*/0,
                     /*sharedMode*/false, /*out*/&device);
             EXPECT_TRUE(res.isOk()) << res;
         }

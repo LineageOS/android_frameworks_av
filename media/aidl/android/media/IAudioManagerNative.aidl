@@ -19,7 +19,7 @@ package android.media;
  * Native accessible interface for AudioService.
  * Note this interface has a mix of oneway and non-oneway methods. This is intentional for certain
  * calls intended to come from audioserver.
- * {@hide}
+ * @hide
  */
 interface IAudioManagerNative {
     enum HardeningType {

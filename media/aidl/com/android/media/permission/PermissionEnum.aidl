@@ -18,7 +18,7 @@ package com.android.media.permission;
 
 /**
  * Enumerates permissions which are tracked/pushed by NativePermissionController
- * {@hide}
+ * @hide
  */
 enum PermissionEnum {
     // This is a runtime + WIU permission, which means data delivery should be protected by AppOps

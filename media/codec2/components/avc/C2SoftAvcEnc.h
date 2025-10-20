@@ -179,6 +179,7 @@ private:
     bool     mPSNREnable;
     bool     mEntropyMode;
     bool     mConstrainedIntraFlag;
+    bool     mKeepThreadsActive;
     IVE_SPEED_CONFIG     mEncSpeed;
 
     iv_obj_t *mCodecCtx;         // Codec context

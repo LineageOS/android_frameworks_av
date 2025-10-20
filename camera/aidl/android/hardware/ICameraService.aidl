@@ -17,6 +17,7 @@
 package android.hardware;
 
 import android.content.AttributionSourceState;
+import android.content.res.CameraCompatibilityInfo;
 import android.hardware.ICamera;
 import android.hardware.ICameraClient;
 import android.hardware.camera2.ICameraDeviceUser;
@@ -35,7 +36,7 @@ import android.hardware.CameraStatus;
 import android.hardware.CameraExtensionSessionStats;
 
 /**
- * Binder interface for the native camera service running in mediaserver.
+ * Binder interface for the native camera service running in cameraserver.
  *
  * @hide
  */
@@ -75,31 +76,13 @@ interface ICameraService
      */
     int getNumberOfCameras(int type, in AttributionSourceState clientAttribution, int devicePolicy);
 
-    // TODO(b/414347702): Revisit data structure.
-    /**
-     * If changed, reflect in
-     * frameworks/base/core/java/android/hardware/camera2/CameraManager.java.
-     * We have an enum here since the decision to override to portrait mode / fetch the
-     * rotationOverride as it exists in CameraManager right now is based on a static system
-     * property and not something that changes based dynamically, say on fold state. As a result,
-     * we can't use just a boolean to differentiate between the case where cameraserver should
-     * override to portrait (sensor orientation is 0, 180) or just rotate the sensor feed (sensor
-     * orientation is 90, 270)
-     */
-    const int ROTATION_OVERRIDE_NONE = 0;
-    const int ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT = 1;
-    const int ROTATION_OVERRIDE_ROTATION_ONLY = 2;
-    const int ROTATION_OVERRIDE_ROTATION_ONLY_REVERSE = 3;
-
     /**
      * Fetch basic camera information for a camera.
      *
      * @param cameraId The ID of the camera to fetch information for.
-     * @param rotationOverride Whether to override the sensor orientation information to
-     *        correspond to portrait: {@link ICameraService#ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT}
-     *        will override the sensor orientation and rotate and crop, while {@link
-     *        ICameraService#ROTATION_OVERRIDE_ROTATION_ONLY} will rotate and crop the camera feed
-     *        without changing the sensor orientation.
+     * @param compatInfo Whether to override the sensor orientation information to
+     *        correspond to portrait: by how much to rotate and crop, and whether to change the
+     *        sensor orientation.
      * @param clientAttribution The AttributionSource of the client.
      * @param devicePolicy The camera policy of the device of the associated context (default
      *                     policy for default device context). Only virtual cameras would be exposed
@@ -107,7 +90,7 @@ interface ICameraService
      *                     policy.
      * @return CameraInfo for the camera.
      */
-    CameraInfo getCameraInfo(int cameraId, int rotationOverride,
+    CameraInfo getCameraInfo(int cameraId, in CameraCompatibilityInfo compatInfo,
             in AttributionSourceState clientAttribution, int devicePolicy);
 
     /**
@@ -123,11 +106,9 @@ interface ICameraService
      *
      * @param cameraId The ID of the camera to open.
      * @param targetSdkVersion the target sdk level of the application calling this function.
-     * @param rotationOverride Whether to override the sensor orientation information to
-     *        correspond to portrait: {@link ICameraService#ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT}
-     *        will override the sensor orientation and rotate and crop, while {@link
-     *        ICameraService#ROTATION_OVERRIDE_ROTATION_ONLY} will rotate and crop the camera feed
-     *        without changing the sensor orientation.
+     * @param compatInfo Whether to override the sensor orientation information to
+     *        correspond to portrait: by how much to rotate and crop, and whether to change the
+     *        sensor orientation.
      * @param forceSlowJpegMode Whether to force slow jpeg mode.
      * @param clientAttribution The AttributionSource of the client.
      * @param devicePolicy The camera policy of the device of the associated context (default
@@ -138,7 +119,7 @@ interface ICameraService
     ICamera connect(ICameraClient client,
             int cameraId,
             int targetSdkVersion,
-            int rotationOverride,
+            in CameraCompatibilityInfo compatInfo,
             boolean forceSlowJpegMode,
             in AttributionSourceState clientAttribution,
             int devicePolicy);
@@ -149,11 +130,9 @@ interface ICameraService
      *
      * @param cameraId The ID of the camera to open.
      * @param targetSdkVersion the target sdk level of the application calling this function.
-     * @param rotationOverride Whether to override the sensor orientation information to
-     *        correspond to portrait: {@link ICameraService#ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT}
-     *        will override the sensor orientation and rotate and crop, while {@link
-     *        ICameraService#ROTATION_OVERRIDE_ROTATION_ONLY} will rotate and crop the camera feed
-     *        without changing the sensor orientation.
+     * @param compatMode Whether to override the sensor orientation information to
+     *        correspond to portrait: by how much to rotate and crop, and whether to change the
+     *        sensor orientation.
      * @param clientAttribution The AttributionSource of the client.
      * @param devicePolicy The camera policy of the device of the associated context (default
      *                     policy for default device context). Only virtual cameras would be exposed
@@ -165,7 +144,7 @@ interface ICameraService
             @utf8InCpp String cameraId,
             int oomScoreOffset,
             int targetSdkVersion,
-            int rotationOverride,
+            in CameraCompatibilityInfo compatInfo,
             in AttributionSourceState clientAttribution,
             int devicePolicy,
             boolean sharedMode);
@@ -228,11 +207,9 @@ interface ICameraService
      *
      * @param cameraId The ID of the camera to fetch metadata for.
      * @param targetSdkVersion the target sdk level of the application calling this function.
-     * @param rotationOverride Whether to override the sensor orientation information to
-     *        correspond to portrait: {@link ICameraService#ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT}
-     *        will override the sensor orientation and rotate and crop, while {@link
-     *        ICameraService#ROTATION_OVERRIDE_ROTATION_ONLY} will rotate and crop the camera feed
-     *        without changing the sensor orientation.
+     * @param compatMode Whether to override the sensor orientation information to
+     *        correspond to portrait: by how much to rotate and crop, and whether to change the
+     *        sensor orientation.
      * @param clientAttribution The AttributionSource of the client.
      * @param devicePolicy The camera policy of the device of the associated context (default
      *                     policy for default device context). Only virtual cameras would be exposed
@@ -241,7 +218,8 @@ interface ICameraService
      * @return Characteristics for the given camera.
      */
     CameraMetadataNative getCameraCharacteristics(@utf8InCpp String cameraId, int targetSdkVersion,
-            int rotationOverride, in AttributionSourceState clientAttribution, int devicePolicy);
+            in CameraCompatibilityInfo compatInfo, in AttributionSourceState clientAttribution,
+            int devicePolicy);
 
     /**
      * Read in the vendor tag descriptors from the camera module HAL.
@@ -410,11 +388,9 @@ interface ICameraService
      *
      * @param cameraId ID of the device for which the session characteristics must be fetched.
      * @param targetSdkVersion the target sdk level of the application calling this function.
-     * @param rotationOverride Whether to override the sensor orientation information to
-     *        correspond to portrait: {@link ICameraService#ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT}
-     *        will override the sensor orientation and rotate and crop, while {@link
-     *        ICameraService#ROTATION_OVERRIDE_ROTATION_ONLY} will rotate and crop the camera feed
-     *        without changing the sensor orientation.
+     * @param compatMode Whether to override the sensor orientation information to
+     *        correspond to portrait: by how much to rotate and crop, and whether to change the
+     *        sensor orientation.
      * @param sessionConfiguration Session configuration for which the characteristics
      *                             must be fetched.
      * @param clientAttribution The AttributionSource of the client.
@@ -426,7 +402,7 @@ interface ICameraService
      */
     CameraMetadataNative getSessionCharacteristics(@utf8InCpp String cameraId,
             int targetSdkVersion,
-            int rotationOverride,
+            in CameraCompatibilityInfo compatInfo,
             in SessionConfiguration sessionConfiguration,
             in AttributionSourceState clientAttribution,
             int devicePolicy);

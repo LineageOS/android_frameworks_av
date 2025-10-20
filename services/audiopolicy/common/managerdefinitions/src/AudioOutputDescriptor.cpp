@@ -22,12 +22,12 @@
 #include <AudioPolicyInterface.h>
 #include "AudioOutputDescriptor.h"
 #include "AudioPolicyMix.h"
-#include <com_android_media_audio.h>
 #include "IOProfile.h"
 #include "Volume.h"
 #include "HwModule.h"
 #include "TypeConverter.h"
 #include "policy.h"
+#include <com_android_media_audio.h>
 #include <com_android_media_audioserver.h>
 #include <media/AudioGain.h>
 #include <media/AudioParameter.h>
@@ -612,20 +612,6 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb, bool mutedByGroup,
     StreamTypeVector streams = streamTypes;
     if (!AudioOutputDescriptor::setVolume(
             volumeDb, mutedByGroup, vs, streamTypes, deviceTypes, delayMs, force, isVoiceVolSrc)) {
-        if (hasStream(streamTypes, AUDIO_STREAM_BLUETOOTH_SCO) &&
-                !com_android_media_audio_replace_stream_bt_sco()) {
-            VolumeSource callVolSrc = getVoiceSource();
-            const bool mutedChanged =
-                    com_android_media_audio_ring_my_car() && hasVolumeSource(callVolSrc) &&
-                    (isMutedByGroup(callVolSrc) != mutedByGroup);
-            if (callVolSrc != VOLUME_SOURCE_NONE &&
-                (volumeDb != getCurVolume(callVolSrc) || mutedChanged)) {
-                setCurVolume(callVolSrc, volumeDb, mutedByGroup, true);
-                float volumeAmpl = Volume::DbToAmpl(volumeDb);
-                mClientInterface->setPortsVolume(getPortsForVolumeSource(callVolSrc),
-                        volumeAmpl, mutedByGroup, mIoHandle, delayMs);
-            }
-        }
         return false;
     }
     if (streams.empty()) {
@@ -662,18 +648,8 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb, bool mutedByGroup,
             return mClientInterface->setAudioPortConfig(&config, 0) == NO_ERROR;
         }
     }
-    // Force VOICE_CALL to track BLUETOOTH_SCO stream volume when bluetooth audio is enabled
-    float volumeAmpl = Volume::DbToAmpl(getCurVolume(vs));
-    if (hasStream(streams, AUDIO_STREAM_BLUETOOTH_SCO) &&
-            !com_android_media_audio_replace_stream_bt_sco()) {
-        VolumeSource callVolSrc = getVoiceSource();
-        if (callVolSrc != VOLUME_SOURCE_NONE) {
-            mClientInterface->setPortsVolume(getPortsForVolumeSource(callVolSrc), volumeAmpl,
-                                             mutedByGroup, mIoHandle, delayMs);
 
-            setCurVolume(callVolSrc, getCurVolume(vs), mutedByGroup, true);
-        }
-    }
+    float volumeAmpl = Volume::DbToAmpl(getCurVolume(vs));
     ALOGV("%s output %d for volumeSource %d, volume %f, mutedByGroup %d, delay %d active=%d",
           __func__, mIoHandle, vs, volumeDb, mutedByGroup, delayMs, isActive(vs));
     mClientInterface->setPortsVolume(getPortsForVolumeSource(vs), volumeAmpl, mutedByGroup,

@@ -21,6 +21,13 @@ flag {
 }
 
 flag {
+    name: "abs_volume_stream_always_max"
+    namespace: "media_audio"
+    description: "The stream that drives the absolute volume should always have the highest index"
+    bug: "439668753"
+}
+
+flag {
     name: "as_device_connection_failure"
     namespace: "media_audio"
     description: "AudioService handles device connection failures."
@@ -28,10 +35,10 @@ flag {
 }
 
 flag {
-    name: "audioserver_permissions"
+    name: "audio_stream_bt_sco_cleanup"
     namespace: "media_audio"
-    description: "Refactoring permission management in audioserver"
-    bug: "338089555"
+    description: "Remove any usages of AUDIO_STREAM_BLUETOOTH_SCO from the audioserver."
+    bug: "441152611"
 }
 
 flag {
@@ -39,16 +46,6 @@ flag {
     namespace: "media_audio"
     description: "Enable audio eraser effect"
     bug: "367667349"
-}
-
-# unused
-flag {
-    name: "bluetooth_mac_address_anonymization"
-    namespace: "media_audio"
-    description:
-        "Enable Bluetooth MAC address anonymization when reporting "
-        "audio device descriptors to non privileged apps."
-    bug: "285588444"
 }
 
 flag {
@@ -93,14 +90,6 @@ flag {
         "Introduce the same index range for voice calls over SCO and "
         "hearing aids"
     bug: "416418971"
-}
-
-flag {
-    name: "hardening_impl"
-    is_exported: true
-    namespace: "media_audio"
-    description: "Flag for overall implementation of hardening"
-    bug: "376480814"
 }
 
 flag {
@@ -183,6 +172,13 @@ flag {
     namespace: "media_audio"
     description: "Allows selective stereo spatialization enablement for binaural or transaural"
     bug: "417494541"
+}
+
+flag {
+    name: "stream_assistant_not_aliased_to_music"
+    namespace: "media_audio"
+    description: "By default STREAM_ASSISTANT is not aliased to STREAM_MUSIC"
+    bug: "442485761"
 }
 
 flag {

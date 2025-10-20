@@ -17,7 +17,7 @@
 package android.media;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable VolumeShaperOperation {
     /** Operations to do. Bitmask of VolumeShaperOperationFlag. */

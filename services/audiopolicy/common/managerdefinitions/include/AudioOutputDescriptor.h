@@ -314,18 +314,17 @@ public:
                                   bool preferredDeviceOnly = false) const;
 
     // override ClientMapHandler to abort when removing a client when active.
-    void removeClient(audio_port_handle_t portId) override {
-        auto client = getClient(portId);
-        LOG_ALWAYS_FATAL_IF(client.get() == nullptr,
-                "%s(%d): nonexistent client portId %d", __func__, mId, portId);
-        // it is possible that when a client is removed, we could remove its
-        // associated active count by calling changeStreamActiveCount(),
-        // but that would be hiding a problem, so we log fatal instead.
-        auto clientIter = std::find(begin(mActiveClients), end(mActiveClients), client);
-        LOG_ALWAYS_FATAL_IF(clientIter != mActiveClients.end(),
-                            "%s(%d) removing client portId %d which is active (count %d)",
-                            __func__, mId, portId, client->getActivityCount());
-        ClientMapHandler<TrackClientDescriptor>::removeClient(portId);
+    bool removeClient(audio_port_handle_t portId, bool checkExists = true) override {
+        if (checkExists) {
+            auto client = getClient(portId);
+            LOG_ALWAYS_FATAL_IF(client.get() == nullptr,
+                    "%s(%d): nonexistent client portId %d", __func__, mId, portId);
+            auto clientIter = std::find(begin(mActiveClients), end(mActiveClients), client);
+            LOG_ALWAYS_FATAL_IF(clientIter != mActiveClients.end(),
+                    "%s(%d) removing client portId %d which is active (count %d)",
+                    __func__, mId, portId, client->getActivityCount());
+        }
+        return ClientMapHandler<TrackClientDescriptor>::removeClient(portId, checkExists);
     }
 
     const TrackClientVector& getActiveClients() const {

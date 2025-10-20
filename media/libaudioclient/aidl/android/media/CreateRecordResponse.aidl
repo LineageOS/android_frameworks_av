@@ -25,7 +25,7 @@ import android.media.audio.common.AudioConfigBase;
  * when calling createRecord() including arguments that were passed as I/O for update by
  * CreateRecordRequest.
  *
- * {@hide}
+ * @hide
  */
 parcelable CreateRecordResponse {
     /** Bitmask, indexed by AudioInputFlags. */

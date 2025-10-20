@@ -98,7 +98,6 @@ static void initCodecInfoMap() {
 
         Vector<AString> codecMediaTypes;
         codecInfo->getSupportedMediaTypes(&codecMediaTypes);
-        bool useTypeSuffix = codecMediaTypes.size() > 1;
         for (AString codecMediaType : codecMediaTypes) {
             std::string mediaType = std::string(codecMediaType.c_str());
 
@@ -109,38 +108,27 @@ static void initCodecInfoMap() {
                 continue;
             }
 
-            // get the type name after the slash. e.g. video/x.on2.vp8
-            size_t slashIx = mediaType.find_last_of('/');
-            if (slashIx == std::string::npos) {
-                slashIx = 0;
-            } else {
-                slashIx++;
-            }
-            std::string ndkBaseName = std::string(codecInfo->getCodecName());
-            if (useTypeSuffix) {
-                // If there are multiple supported media types,
-                // add the type to the end of the name to disambiguate names.
-                ndkBaseName += "." + mediaType.substr(slashIx);
+            // add alias and skip (omx) codecs with names that has been used by other codecs alias.
+            if (sNameToInfoMap.count(codecInfo->getCodecName()) > 0) {
+                if (strncasecmp(codecInfo->getCodecName(), "omx.", strlen("omx.")) != 0) {
+                    ALOGW("skipping a non-omx codec: %s, as it has been overridden by codec: %s",
+                            codecInfo->getCodecName(),
+                            sNameToInfoMap.find(codecInfo->getCodecName())->second.mName.c_str());
+                }
+                continue;
             }
 
-            int32_t copyIx = 0;
-            std::string ndkName;
-            // if a name is already registered,
-            // add ".1", ".2", ... at the end to disambiguate names.
-            while (true) {
-                ndkName = ndkBaseName;
-                if (copyIx > 0) {
-                    ndkName += "." + std::to_string(copyIx);
-                }
-                if (!sNameToInfoMap.contains(ndkName)) {
-                    break;
-                }
-                copyIx++;
-            }
-
-            AMediaCodecInfo info = AMediaCodecInfo(ndkName, codecInfo, codecCaps, mediaType);
+            AMediaCodecInfo info
+                    = AMediaCodecInfo(codecInfo->getCodecName(), codecInfo, codecCaps, mediaType);
             sCodecInfos.push_back(info);
-            sNameToInfoMap.emplace(ndkName, info);
+
+            Vector<AString> namesAndAliases;
+            codecInfo->getAliases(&namesAndAliases);
+            namesAndAliases.insertAt(0);
+            namesAndAliases.editItemAt(0) = codecInfo->getCodecName();
+            for (const AString &nameOrAlias : namesAndAliases) {
+                sNameToInfoMap.emplace(std::string(nameOrAlias.c_str()), info);
+            }
 
             auto it = sTypeToInfoList.find(mediaType);
             if (it == sTypeToInfoList.end()) {

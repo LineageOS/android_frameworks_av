@@ -21,7 +21,7 @@ import android.media.MicrophoneInfoFw;
 /**
  * Native code must specify namespace media (media::IAudioRecord) when referring to this class.
  *
- * {@hide}
+ * @hide
  */
 interface IAudioRecord {
 

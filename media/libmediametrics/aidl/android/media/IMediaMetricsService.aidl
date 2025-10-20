@@ -19,7 +19,7 @@ package android.media;
 /**
  * MediaMetrics service interface
  *
- * {@hide}
+ * @hide
  */
 interface IMediaMetricsService {
     oneway void submitBuffer(in byte[] buffer);

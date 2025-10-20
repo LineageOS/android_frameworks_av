@@ -20,6 +20,7 @@
 #include <functional>
 #include <string>
 #include <sys/stat.h>
+#include <unordered_set>
 
 #include "EngineBase.h"
 #include "EngineDefaultConfig.h"
@@ -242,6 +243,55 @@ engineConfig::ParsingResult EngineBase::processParsingResult(
     };
 
     auto result = std::move(rawResult);
+
+    if (com::android::media::audio::audio_stream_bt_sco_cleanup()) {
+        auto filterOutBtScoStreamType = [](auto &productStrategies, auto &volumeGroups) {
+            std::unordered_set <std::string> volumeGroupsToRemove;
+            std::unordered_set <std::string> volumeGroupsToRetain;
+            // remove from all product strategies and attribute groups the attributes for volume
+            // group AUDIO_STREAM_BLUETOOTH_SCO
+            for (auto &productStrategy: productStrategies) {
+                std::erase_if(productStrategy.attributesGroups,
+                              [&volumeGroupsToRemove, &volumeGroupsToRetain](
+                                      auto &attributesGroup) {
+                                  if (attributesGroup.stream == AUDIO_STREAM_BLUETOOTH_SCO) {
+                                      volumeGroupsToRemove.insert(attributesGroup.volumeGroup);
+                                      ALOGW("%s: AUDIO_STREAM_BLUETOOTH_SCO attributes are "
+                                            "deprecated, removing AttributesGroup %s", __func__,
+                                            attributesGroup.volumeGroup.c_str());
+                                      return true;
+                                  }
+                                  volumeGroupsToRetain.insert(attributesGroup.volumeGroup);
+                                  return false;
+                              });
+            }
+
+            // by default remove any groups with the literal AUDIO_STREAM_BLUETOOTH_SCO
+            volumeGroupsToRemove.insert(audio_stream_type_to_string(AUDIO_STREAM_BLUETOOTH_SCO));
+            if (volumeGroupsToRetain.erase(
+                    audio_stream_type_to_string(AUDIO_STREAM_BLUETOOTH_SCO)) > 0) {
+                ALOGW("%s: AUDIO_STREAM_BLUETOOTH_SCO is retained by an AttributeGroup which does "
+                      "not have the stream type BLUETOOTH_SCO", __func__);
+            }
+
+            // remove from all volume groups that belonged to an attribute group that was removed
+            // and do not belong to any other attribute group
+            std::erase_if(volumeGroups,
+                          [&volumeGroupsToRemove, &volumeGroupsToRetain](auto &volumeGroup) {
+                              if (volumeGroupsToRemove.contains(volumeGroup.name) &&
+                                   !volumeGroupsToRetain.contains(volumeGroup.name)) {
+                                  ALOGW("%s: AUDIO_STREAM_BLUETOOTH_SCO attributes are deprecated,"
+                                        " removing volume group %s", __func__,
+                                        volumeGroup.name.c_str());
+                                  return true;
+                              }
+                              return false;
+                          });
+        };
+        filterOutBtScoStreamType(result.parsedConfig->productStrategies,
+                                 result.parsedConfig->volumeGroups);
+    }
+
     // Append for internal use only strategies (e.g. rerouting/patch)
     result.parsedConfig->productStrategies.insert(
                 std::end(result.parsedConfig->productStrategies),
@@ -313,23 +363,25 @@ StrategyVector EngineBase::getOrderedProductStrategies() const
         });
     };
 
-    auto strategies = mOrderedStrategyMap;
+    const auto& strategies = mOrderedStrategyMap;
 
     auto enforcedAudibleStrategyIter = findByFlag(strategies, AUDIO_FLAG_AUDIBILITY_ENFORCED);
-
-    if (getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED &&
-            enforcedAudibleStrategyIter != strategies.end()) {
-        auto enforcedAudibleStrategy = *enforcedAudibleStrategyIter;
-        strategies.erase(enforcedAudibleStrategyIter);
-        strategies.insert(begin(strategies), enforcedAudibleStrategy);
-    }
+    const bool isSystemEnforced =
+            (getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED &&
+             enforcedAudibleStrategyIter != strategies.end());
 
     StrategyVector orderedStrategies;
-    for (const auto &iter : strategies) {
-        if (iter.second->isPatchStrategy()) {
+    if (isSystemEnforced) {
+        orderedStrategies.push_back(enforcedAudibleStrategyIter->second->getId());
+    }
+    for (auto iter = strategies.begin(); iter != strategies.end(); ++iter) {
+        if (iter->second->isPatchStrategy() ||
+            (isSystemEnforced && iter == enforcedAudibleStrategyIter)) {
+            // Skip patch strategies.
+            // Skip the enforced strategy if it is already added at the beginning of the list.
             continue;
         }
-        orderedStrategies.push_back(iter.second->getId());
+        orderedStrategies.push_back(iter->second->getId());
     }
 
     return orderedStrategies;
@@ -808,6 +860,25 @@ DeviceVector EngineBase::getPreferredAvailableDevicesForProductStrategy(
         if (preferredAvailableDevVec.size() == preferredStrategyDevices.size()) {
             ALOGV("%s using pref device %s for strategy %u",
                    __func__, preferredAvailableDevVec.toString().c_str(), strategy);
+            return preferredAvailableDevVec;
+        }
+    }
+    return preferredAvailableDevVec;
+}
+
+DeviceVector EngineBase::getPreferredAvailableDevicesForInputSource(
+        const DeviceVector& availableInputDevices, audio_source_t inputSource) const {
+    DeviceVector preferredAvailableDevVec = {};
+    AudioDeviceTypeAddrVector preferredDevices;
+    const status_t status =
+            getDevicesForRoleAndCapturePreset(inputSource, DEVICE_ROLE_PREFERRED, preferredDevices);
+    if (status == NO_ERROR) {
+        // Only use preferred devices when they are all available.
+        preferredAvailableDevVec =
+                availableInputDevices.getDevicesFromDeviceTypeAddrVec(preferredDevices);
+        if (preferredAvailableDevVec.size() == preferredDevices.size()) {
+            ALOGV("%s using pref device %s for source %u", __func__,
+                  preferredAvailableDevVec.toString().c_str(), inputSource);
             return preferredAvailableDevVec;
         }
     }

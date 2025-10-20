@@ -338,6 +338,11 @@ private:
                               std::shared_ptr<BufferItem> *pBuffer,
                               bool *fromCache,
                               bool *updateDequeue);
+    c2_status_t requestAttachForRender(const C2ConstGraphicBlock& blk,
+                                const sp<Fence> &fence,
+                                std::shared_ptr<BufferCache> *cache,
+                                std::shared_ptr<BufferItem> *pBuffer,
+                                bool *updateDequeue);
 
     void commitAllocate(c2_status_t res,
                         const std::shared_ptr<BufferCache> &cache,

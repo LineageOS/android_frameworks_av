@@ -27,7 +27,4 @@ using aidl::android::media::audio::eraser::SoundClassification;
 // Defines the mapping from YAMNet class indices to our custom SoundClassification categories.
 const std::map<SoundClassification, std::vector<int>>& getYamnetToCustomCategoryMap();
 
-// Defines the activation thresholds for each SoundClassification category.
-const std::map<SoundClassification, float>& getCategoryThresholds();
-
 }  // namespace aidl::android::hardware::audio::effect

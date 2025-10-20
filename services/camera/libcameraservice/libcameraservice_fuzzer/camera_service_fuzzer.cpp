@@ -28,6 +28,7 @@
 #include <android-base/logging.h>
 #include <android/binder_manager.h>
 #include <android/content/AttributionSourceState.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <android/hardware/BnCameraServiceListener.h>
 #include <android/hardware/ICameraServiceListener.h>
 #include <android/hardware/camera2/BnCameraDeviceCallbacks.h>
@@ -55,8 +56,6 @@ using namespace android;
 using namespace hardware;
 using namespace std;
 
-using ICameraService::ROTATION_OVERRIDE_NONE;
-using ICameraService::ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT;
 using android::hardware::camera2::CameraMetadataInfo;
 
 const int32_t kPreviewThreshold = 8;
@@ -456,12 +455,12 @@ void CameraFuzzer::getCameraInformation(int32_t cameraId) {
     clientAttribution.deviceId = kDefaultDeviceId;
 
     CameraInfo cameraInfo;
-    mCameraService->getCameraInfo(cameraId, ROTATION_OVERRIDE_NONE, clientAttribution,
+    mCameraService->getCameraInfo(cameraId, CameraCompatibilityInfo(), clientAttribution,
             /*devicePolicy*/0, &cameraInfo);
 
     CameraMetadata metadata;
     mCameraService->getCameraCharacteristics(cameraIdStr,
-            /*targetSdkVersion*/__ANDROID_API_FUTURE__, ROTATION_OVERRIDE_NONE,
+            /*targetSdkVersion*/__ANDROID_API_FUTURE__, CameraCompatibilityInfo(),
             clientAttribution, /*devicePolicy*/0, &metadata);
 }
 
@@ -572,9 +571,12 @@ void CameraFuzzer::invokeCameraAPIs() {
     clientAttribution.deviceId = kDefaultDeviceId;
     clientAttribution.uid = android::CameraService::USE_CALLING_UID;
     clientAttribution.pid = android::CameraService::USE_CALLING_PID;
+    CameraCompatibilityInfo compatInfo;
+    compatInfo.setRotateAndCropRotation(ui::ROTATION_90);
+    compatInfo.setShouldOverrideSensorOrientation(true);
     rc = mCameraService->connect(this, cameraId,
                                  /*targetSdkVersion*/ __ANDROID_API_FUTURE__,
-                                 ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT,
+                                 compatInfo,
                                  /*forceSlowJpegMode*/false,
                                  clientAttribution, /*devicePolicy*/0, &cameraDevice);
     if (!rc.isOk()) {
@@ -836,9 +838,11 @@ void Camera2Fuzzer::process() {
         clientAttribution.deviceId = kDefaultDeviceId;
         clientAttribution.uid = android::CameraService::USE_CALLING_UID;
         clientAttribution.pid = android::CameraService::USE_CALLING_PID;
+        CameraCompatibilityInfo compatInfo;
+        compatInfo.setRotateAndCropRotation(ui::ROTATION_90);
+        compatInfo.setShouldOverrideSensorOrientation(true);
         mCameraService->connectDevice(callbacks, s.cameraId,
-                0/*oomScoreDiff*/, /*targetSdkVersion*/__ANDROID_API_FUTURE__,
-                ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT,
+                0/*oomScoreDiff*/, /*targetSdkVersion*/__ANDROID_API_FUTURE__, compatInfo,
                 clientAttribution, /*devicePolicy*/0, /*sharedMode*/false, &device);
         if (device == nullptr) {
             continue;

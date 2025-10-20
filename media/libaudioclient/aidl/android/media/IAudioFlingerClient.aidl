@@ -23,7 +23,7 @@ import android.media.audio.common.AudioLatencyMode;
 /**
  * A callback interface for AudioFlinger.
  *
- * {@hide}
+ * @hide
  */
 interface IAudioFlingerClient {
     oneway void ioConfigChanged(AudioIoConfigEvent event,

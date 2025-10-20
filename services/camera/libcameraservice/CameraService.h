@@ -18,6 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERASERVICE_H
 
 #include <android/content/AttributionSourceState.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 #include <android/hardware/BnCameraService.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
@@ -157,11 +158,12 @@ public:
             const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, int32_t* numCameras);
 
-    virtual binder::Status     getCameraInfo(int cameraId, int rotationOverride,
+    virtual binder::Status     getCameraInfo(int cameraId,
+            const CameraCompatibilityInfo& compatInfo,
             const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, hardware::CameraInfo* cameraInfo) override;
     virtual binder::Status     getCameraCharacteristics(const std::string& cameraId,
-            int targetSdkVersion, int rotationOverride,
+            int targetSdkVersion, const CameraCompatibilityInfo& compatInfo,
             const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, CameraMetadata* cameraInfo) override;
     virtual binder::Status     getCameraVendorTagDescriptor(
@@ -172,14 +174,15 @@ public:
             hardware::camera2::params::VendorTagDescriptorCache* cache);
 
     virtual binder::Status     connect(const sp<hardware::ICameraClient>& cameraClient,
-            int32_t cameraId, int targetSdkVersion, int rotationOverride, bool forceSlowJpegMode,
-            const AttributionSourceState& clientAttribution,
+            int32_t cameraId, int targetSdkVersion, const CameraCompatibilityInfo& compatInfo,
+            bool forceSlowJpegMode, const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, /*out*/ sp<hardware::ICamera>* device) override;
 
     virtual binder::Status     connectDevice(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
             const std::string& cameraId, int scoreOffset, int targetSdkVersion,
-            int rotationOverride, const AttributionSourceState& clientAttribution,
+            const CameraCompatibilityInfo& compatInfo,
+            const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, bool sharedMode,
             /*out*/
             sp<hardware::camera2::ICameraDeviceUser>* device);
@@ -255,7 +258,8 @@ public:
             /*out*/ bool* supported);
 
     virtual binder::Status getSessionCharacteristics(
-            const std::string& cameraId, int targetSdkVersion, int rotationOverride,
+            const std::string& cameraId, int targetSdkVersion,
+            const CameraCompatibilityInfo& compatInfo,
             const SessionConfiguration& sessionConfiguration,
             const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, /*out*/ CameraMetadata* outMetadata);
@@ -276,7 +280,8 @@ public:
     binder::Status  connectDeviceVendor(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
             const std::string& cameraId, int scoreOffset, int targetSdkVersion,
-            int rotationOverride, const AttributionSourceState& clientAttribution,
+            const CameraCompatibilityInfo& compatInfo,
+            const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, bool sharedMode,
             /*out*/
             sp<hardware::camera2::ICameraDeviceUser>* device);
@@ -311,7 +316,7 @@ public:
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
     std::pair<int, IPCTransport>    getDeviceVersion(const std::string& cameraId,
-            int rotationOverride,
+            const CameraCompatibilityInfo& compatInfo,
             int* portraitRotation,
             int* facing = nullptr, int* orientation = nullptr);
 
@@ -362,13 +367,13 @@ public:
         }
 
         bool getOverrideToPortrait() const {
-            return mRotationOverride == ICameraService::ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT;
+            return mCompatInfo.shouldOverrideSensorOrientation();
         }
 
         // Disallows dumping over binder interface
         virtual status_t dump(int fd, const Vector<String16>& args);
         // Internal dump method to be called by CameraService
-        virtual status_t dumpClient(int fd, const Vector<String16>& args) = 0;
+        virtual status_t dumpClient(int fd, const Vector<String16>& args, bool ignoreResult) = 0;
 
         virtual status_t startWatchingTags(const std::string &tags, int outFd);
         virtual status_t stopWatchingTags(int outFd);
@@ -467,7 +472,8 @@ public:
                     std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
                     const AttributionSourceState& clientAttribution, int callingPid,
                     bool nativeClient, const std::string& cameraIdStr, int cameraFacing,
-                    int sensorOrientation, int servicePid, int rotationOverride, bool sharedMode);
+                    int sensorOrientation, int servicePid,
+                    const CameraCompatibilityInfo& compatInfo, bool sharedMode);
 
         virtual ~BasicClient();
 
@@ -488,7 +494,7 @@ public:
         const pid_t                     mServicePid;
         bool                            mDisconnected;
         bool                            mUidIsTrusted;
-        int                             mRotationOverride;
+        CameraCompatibilityInfo         mCompatInfo;
         bool                            mSharedMode;
         bool                            mIsPrimaryClient;
 
@@ -574,8 +580,8 @@ public:
                std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
                const AttributionSourceState& clientAttribution, int callingPid,
                bool systemNativeClient, const std::string& cameraIdStr, int api1CameraId,
-               int cameraFacing, int sensorOrientation, int servicePid, int rotationOverride,
-               bool sharedMode);
+               int cameraFacing, int sensorOrientation, int servicePid,
+               const CameraCompatibilityInfo& compatInfo, bool sharedMode);
         ~Client();
 
         // return our camera client
@@ -1010,7 +1016,7 @@ private:
                                  int api1CameraId, const AttributionSourceState& clientAttribution,
                                  bool systemNativeClient, apiLevel effectiveApiLevel,
                                  bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
-                                 int rotationOverride, bool forceSlowJpegMode,
+                                 const CameraCompatibilityInfo& compatInfo, bool forceSlowJpegMode,
                                  const std::string& originalCameraId, bool isNonSystemNdk,
                                  bool sharedMode, bool isVendorClient,
                                  /*out*/ sp<CLIENT>& device);
@@ -1018,7 +1024,8 @@ private:
     binder::Status connectDeviceImpl(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
             const std::string& cameraId, int scoreOffset, int targetSdkVersion,
-            int rotationOverride, const AttributionSourceState& clientAttribution,
+            const CameraCompatibilityInfo& compatInfo,
+            const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, bool sharedMode, bool isVendorClient,
             /*out*/
             sp<hardware::camera2::ICameraDeviceUser>* device);
@@ -1037,7 +1044,7 @@ private:
 
     // Adds client logs during open session to the file pointed by fd.
     void dumpOpenSessionClientLogs(int fd, const Vector<String16>& args,
-            const std::string& cameraId);
+            const std::string& cameraId, bool ignoreResult);
 
     // Adds client logs during closed session to the file pointed by fd.
     void dumpClosedSessionClientLogs(int fd, const std::string& cameraId);
@@ -1529,7 +1536,8 @@ private:
                                      int sensorOrientation, int servicePid,
                                      std::pair<int, IPCTransport> deviceVersionAndIPCTransport,
                                      apiLevel effectiveApiLevel, bool overrideForPerfClass,
-                                     int rotationOverride, bool forceSlowJpegMode,
+                                     const CameraCompatibilityInfo& compatInfo,
+                                     bool forceSlowJpegMode,
                                      const std::string& originalCameraId, bool sharedMode,
                                      bool isVendorClient,
                                      /*out*/ sp<BasicClient>* client);

@@ -21,7 +21,7 @@ import android.media.AudioRoute;
 
 /*
  * A representation of a HAL module configuration.
- * {@hide}
+ * @hide
  */
 parcelable AudioHwModule {
     int /* audio_module_handle_t */ handle;

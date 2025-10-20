@@ -92,7 +92,7 @@ LiteRTInstance::~LiteRTInstance() {
     LOG(DEBUG) << "LiteRTInstance destructor called for model: " << mModelPath;
 }
 
-bool LiteRTInstance::initialize(int numThreads) {
+bool LiteRTInstance::initialize(size_t inputSamples, size_t overlapSamples, int numThreads) {
     if (isInitialized()) {
         LOG(WARNING) << "Instance already initialized for model " << mModelPath;
         return true;
@@ -140,7 +140,8 @@ bool LiteRTInstance::initialize(int numThreads) {
         return false;
     }
     mInputTensorType = inputTensor->type;
-    mInputTensorSize = getTensorSize(inputTensor);
+    mInputTensorSamples = getTensorSize(inputTensor);
+    assert(mInputTensorSamples != 0);
 
     const auto outputTensorIndex = mInterpreter->outputs()[0];
     TfLiteTensor* outputTensor = mInterpreter->tensor(outputTensorIndex);
@@ -150,10 +151,16 @@ bool LiteRTInstance::initialize(int numThreads) {
         return false;
     }
     mOutputTensorType = outputTensor->type;
-    mOutputTensorSize = getTensorSize(outputTensor);
+    mOutputTensorSamples = getTensorSize(outputTensor);
+    assert(mOutputTensorSamples != 0);
 
-    LOG(DEBUG) << "Model " << mModelPath << " successfully loaded: " << dumpModelDetails();
-    return true;
+    // prepad the beginning of work buffer
+    mWorkBufPadSize = std::max(overlapSamples, mInputTensorSamples - inputSamples);
+    mWorkBuffer.assign(mWorkBufPadSize, 0.f);
+
+    LOG(DEBUG) << "Model " << mModelPath << " instance successfully inited: " << dumpModelDetails()
+               << " work buffer padding size: " << mWorkBufPadSize;
+    return warmup();
 }
 
 bool LiteRTInstance::invoke() const {
@@ -166,6 +173,7 @@ bool LiteRTInstance::invoke() const {
         LOG(ERROR) << " Model " << mModelPath << " invoke failed: " <<  invokeStatus;
         return false;
     }
+
     return true;
 }
 
@@ -177,8 +185,12 @@ void LiteRTInstance::cleanup() {
     LOG(DEBUG) << "Instance cleaned up " << mModelPath;
 }
 
+void LiteRTInstance::reset() {
+    mWorkBuffer.assign(mWorkBufPadSize, 0.f);
+}
+
 // warmup inference once with all zero data
-bool LiteRTInstance::warmup() {
+bool LiteRTInstance::warmup() const {
     if (!isInitialized()) {
         LOG(DEBUG) << "Warmup called on non-initialized instance: " << mModelPath;
         return false;

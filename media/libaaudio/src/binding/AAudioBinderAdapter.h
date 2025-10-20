@@ -16,8 +16,10 @@
 
 #pragma once
 
+// go/keep-sorted start
 #include <aaudio/IAAudioService.h>
 #include <binding/AAudioServiceInterface.h>
+// go/keep-sorted end
 
 namespace aaudio {
 

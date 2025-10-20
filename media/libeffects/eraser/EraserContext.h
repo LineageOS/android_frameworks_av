@@ -16,17 +16,19 @@
 
 #pragma once
 
-#include <memory>
-#include <optional>
-#include <string>
+#include "effect-impl/EffectContext.h"
+#include "Classifier.h"
+#include "Remixer.h"
+#include "Separator.h"
 
 #include <aidl/android/hardware/audio/effect/Eraser.h>
 #include <aidl/android/media/audio/eraser/Capability.h>
 #include <aidl/android/media/audio/eraser/Configuration.h>
 #include <aidl/android/media/audio/eraser/IEraserCallback.h>
 
-#include "effect-impl/EffectContext.h"
-#include "LiteRTInstance.h"
+#include <memory>
+#include <optional>
+#include <string>
 
 namespace aidl::android::hardware::audio::effect {
 
@@ -49,9 +51,8 @@ class EraserContext final : public EffectContext {
     static const EraserCapability& getCapability();
 
   private:
-
     // supported default configurations for the eraser implementation
-    static constexpr int kClassifierSampleRate = 16000;
+    static constexpr int kSampleRate = 16000;
     // 1 second classifier window
     static constexpr int kClassifierWindowSizeMs = 1000;
     // max number of sounds can be separated
@@ -76,17 +77,11 @@ class EraserContext final : public EffectContext {
     const std::string kSeparatorModelPath =
             "/apex/com.android.hardware.audio/etc/models/separator.tflite";
 
-    int mChannelCount = 0;
     Parameter::Common mCommon;
     EraserConfiguration mConfig;
-    int mSoundId = 0;
-    std::shared_ptr<android::media::audio::eraser::IEraserCallback> mCallback;
 
-    std::unique_ptr<LiteRTInstance> mClassifierInstance;
-    std::unique_ptr<LiteRTInstance> mSeparatorInstance;
-    std::vector<float> mWorkBuffer;
-
-    void init();
+    std::unique_ptr<Separator> mSeparator;
+    std::vector<std::unique_ptr<Classifier>> mClassifiers;
 };
 
 }  // namespace aidl::android::hardware::audio::effect

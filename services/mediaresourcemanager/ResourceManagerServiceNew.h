@@ -83,6 +83,11 @@ public:
 
     Status getMediaResourceUsageReport(std::vector<MediaResourceParcel>* resources) override;
 
+    Status registerSystemResource(const std::vector<MediaResourceParcel>& resources) override;
+
+    Status checkResourceAvailability(const std::vector<MediaResourceParcel>& resourcesNeeded,
+                                     bool* _aidl_return) override;
+
     binder_status_t dump(int fd, const char** args, uint32_t numArgs) override;
 
     friend class ResourceTracker;

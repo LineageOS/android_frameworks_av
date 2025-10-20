@@ -17,7 +17,7 @@
 package android.media;
 
 /**
- * {@hide}
+ * @hide
  * A class for vibrator information. The information will be used in HapticGenerator effect.
  */
 parcelable AudioVibratorInfo {

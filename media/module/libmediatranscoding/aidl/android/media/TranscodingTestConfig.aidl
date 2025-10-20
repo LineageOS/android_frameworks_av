@@ -19,7 +19,7 @@
  /**
   * TranscodingTestConfig contains the test configureation used in testing.
   *
-  * {@hide}
+  * @hide
   */
 parcelable TranscodingTestConfig {
     /**

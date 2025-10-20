@@ -245,6 +245,45 @@ status_t AidlProviderInfo::setUpVendorTags() {
     return OK;
 }
 
+struct CArgsManager {
+    CArgsManager(const Vector<String16> &args) {
+        // Allocate array of char* pointers
+        if (args.size() == 0) {
+            return;
+        }
+        mNumArgs = args.size();
+        mString8Args.reserve(mNumArgs);
+        mArgs.reserve(mNumArgs);
+        for (const auto &string16 : args) {
+            mString8Args.push_back(String8(string16));
+            mArgs.push_back(mString8Args.back().c_str());
+        }
+    }
+    const char** getCArgs() { return mArgs.data();}
+    uint32_t getNumArgs() { return mNumArgs; }
+private:
+    std::vector<const char*> mArgs;
+    std::vector<String8> mString8Args;
+    uint32_t mNumArgs = 0;
+};
+
+status_t AidlProviderInfo::dumpInterface(int fd, const Vector<String16>& argsP) {
+    const std::shared_ptr<ICameraProvider> interface = startProviderInterface();
+    if (interface == nullptr) {
+        return DEAD_OBJECT;
+    }
+    CArgsManager cArgsManager(argsP);
+    const char **args = cArgsManager.getCArgs();
+    auto ret = interface->dump(fd, args, /*numArgs*/cArgsManager.getNumArgs());
+    if (ret != OK) {
+        ALOGE("%s: Transaction error calling dump() on provider '%s'",
+                __FUNCTION__, mProviderName.c_str());
+        return ret;
+    }
+
+    return OK;
+}
+
 status_t AidlProviderInfo::notifyDeviceStateChange(int64_t newDeviceState) {
 
     mDeviceState = newDeviceState;
@@ -1060,7 +1099,7 @@ status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
                 SessionConfigurationUtils::targetPerfClassPrimaryCamera(
                         perfClassPrimaryCameraIds, cameraId, targetSdkVersion);
         res = mManager->getCameraCharacteristicsLocked(cameraId, overrideForPerfClass, &deviceInfo,
-                hardware::ICameraService::ROTATION_OVERRIDE_NONE);
+                CameraCompatibilityInfo());
         if (res != OK) {
             return res;
         }
@@ -1069,7 +1108,7 @@ status_t AidlProviderInfo::convertToAidlHALStreamCombinationAndCameraIdsLocked(
                     CameraMetadata physicalDeviceInfo;
                     mManager->getCameraCharacteristicsLocked(
                             id, overrideForPerfClass, &physicalDeviceInfo,
-                            hardware::ICameraService::ROTATION_OVERRIDE_NONE);
+                            CameraCompatibilityInfo());
                     return physicalDeviceInfo;
                 };
         std::vector<std::string> physicalCameraIds;

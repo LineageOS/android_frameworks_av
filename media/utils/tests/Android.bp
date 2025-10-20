@@ -281,11 +281,31 @@ cc_test {
 }
 
 cc_test {
-    name: "jthread_tests",
-    defaults: ["libmediautils_tests_defaults"],
+    name: "concurrency_tests",
+
+    defaults: ["libmediautils_tests_config"],
+
+    host_supported: true,
+    header_libs: [
+        "libmediautils_headers",
+    ],
+
+    shared_libs: [
+        "liblog",
+    ],
+
     srcs: [
         "executor_tests.cpp",
         "jthread_tests.cpp",
         "runnable_tests.cpp",
+        "stop_token_tests.cpp",
     ],
+
+    target: {
+        host: {
+            sanitize: {
+                thread: true,
+            },
+        },
+    },
 }

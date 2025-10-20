@@ -20,7 +20,7 @@ import android.media.audio.common.AudioAttributes;
 import android.media.audio.common.AudioStreamType;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioVolumeGroup {
     /** Interpreted as volume_group_t. */

@@ -19,7 +19,7 @@ package android.media;
 /**
  * TranscodingSessionStats encapsulated the stats of the a TranscodingSession.
  *
- * {@hide}
+ * @hide
  */
 parcelable TranscodingSessionStats {
     /**

@@ -17,7 +17,7 @@
 package android.media;
 
 /**
- * {@hide}
+ * @hide
  */
 oneway interface ICaptureStateListener {
     void setCaptureState(boolean active);

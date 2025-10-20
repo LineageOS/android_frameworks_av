@@ -18,7 +18,7 @@ package android.media;
 
 /**
  * A handle to identify the task in TimerQueue.
- * {@hide}
+ * @hide
  */
 parcelable TimerQueueHandle {
     long handle;

@@ -19,7 +19,7 @@ package android.media;
 import android.media.AudioPortConfigFw;
 
 /**
- * {@hide}
+ * @hide
  * The Fw suffix is used to break a namespace collision with an SDK API.
  * It contains the framework version of AudioPortConfig.
  */

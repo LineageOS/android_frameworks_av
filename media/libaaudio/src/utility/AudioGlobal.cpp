@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include "AudioGlobal.h"
+
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 #include <android/media/audio/common/AudioDevice.h>
@@ -22,8 +26,7 @@
 #include <media/AudioSystem.h>
 #include <system/audio-hal-enums.h>
 #include <utility/AAudioUtilities.h>
-
-#include "AudioGlobal.h"
+// go/keep-sorted end
 
 /******************************************
  * Static globals.

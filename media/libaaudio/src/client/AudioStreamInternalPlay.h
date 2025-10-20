@@ -17,17 +17,22 @@
 #ifndef ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_PLAY_H
 #define ANDROID_AAUDIO_AUDIO_STREAM_INTERNAL_PLAY_H
 
+// go/keep-sorted start
+#include <aaudio/AAudio.h>
+#include <audio_utils/TimerQueue.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
 #include <condition_variable>
 #include <mutex>
 #include <stdint.h>
 #include <thread>
+// go/keep-sorted end
 
-#include <aaudio/AAudio.h>
-#include <audio_utils/TimerQueue.h>
-#include <mediautils/SingleThreadExecutor.h>
-
+// go/keep-sorted start
+#include "AudioStreamInternal.h"
 #include "binding/AAudioServiceInterface.h"
-#include "client/AudioStreamInternal.h"
+// go/keep-sorted end
 
 using android::sp;
 
@@ -88,9 +93,9 @@ public:
 
 protected:
 
-    void prepareBuffersForStart() override;
+    void prepareBuffersForStart_l(StartType startType = DEFAULT) REQUIRES(mStreamMutex) final;
 
-    void prepareBuffersForStop() override;
+    aaudio_result_t prepareBuffersForStop_l() REQUIRES(mStreamMutex) final;
 
     void advanceClientToMatchServerPosition(int32_t serverMargin) override;
 
@@ -110,6 +115,7 @@ protected:
                              int64_t currentTimeNanos,
                              int64_t *wakeTimePtr) override;
 
+    aaudio_result_t requestStart_l() REQUIRES(mStreamMutex) final;
     aaudio_result_t requestStop_l() REQUIRES(mStreamMutex) final;
 
     void wakeupCallbackThread_l() REQUIRES(mStreamMutex) final;
@@ -147,12 +153,9 @@ private:
     aaudio_result_t drainStream_l(int64_t wakeUpNanos, bool allowSoftWakeUp) REQUIRES(mStreamMutex);
     aaudio_result_t activateStream_l() REQUIRES(mStreamMutex);
 
-    android::sp<AudioStreamInternalPlay> getPtr() { return this; }
-
     bool mOffloadEosPending GUARDED_BY(mStreamMutex){false};
     std::condition_variable mStreamEndCV;
-    std::optional<android::mediautils::SingleThreadExecutor> mStreamEndExecutor
-            GUARDED_BY(mStreamMutex);
+    int64_t mOffloadEosNanosBoottime GUARDED_BY(mStreamMutex){0};
 
     AAudioStream_presentationEndCallback mPresentationEndCallbackProc = nullptr;
     void                                *mPresentationEndCallbackUserData = nullptr;
@@ -170,6 +173,8 @@ private:
     std::mutex mEndpointMutex;
 
     AAudioPlaybackParameters mPlaybackParameters = AAUDIO_PLAYBACK_PARAMETERS_DEFAULT;
+
+    bool mPendingStop GUARDED_BY(mStreamMutex){false};
 };
 
 } /* namespace aaudio */

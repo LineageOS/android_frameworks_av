@@ -729,14 +729,19 @@ MetadataBuilder& MetadataBuilder::setCustomMetadata(
   std::lock_guard<std::mutex> lock(mLock);
   if (mCustomMetadata != nullptr) {
     free_camera_metadata(mCustomMetadata);
+    mCustomMetadata = nullptr;
   }
 
-  int ret = validate_camera_metadata_structure(customMetadata, /*size*/ NULL);
-  if (ret == OK) {
-    mCustomMetadata = clone_camera_metadata(customMetadata);
-  } else {
-    ALOGE("%s: Validate custom metadata failed with status: %d", __func__, ret);
-    mCustomMetadata = nullptr;
+  // only validate and add custom metadata if not null
+  if (customMetadata != nullptr) {
+    int ret = validate_camera_metadata_structure(customMetadata, /*size*/ NULL);
+    if (ret == OK) {
+      mCustomMetadata = clone_camera_metadata(customMetadata);
+    } else {
+      ALOGE("%s: Validate custom metadata failed with status: %d", __func__,
+            ret);
+      mCustomMetadata = nullptr;
+    }
   }
   return *this;
 }

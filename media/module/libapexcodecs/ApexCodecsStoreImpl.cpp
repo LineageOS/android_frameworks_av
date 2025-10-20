@@ -14,10 +14,119 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
+#define LOG_TAG "ApexCodecsStoreImpl"
+#include <utils/Log.h>
+
+#include <ranges>
+
+#include <sys/mman.h>
+
 #include <android-base/no_destructor.h>
 #include <apex/ApexCodecsImpl.h>
 
+#ifdef ENABLE_APEX_CODECS
+#include <util/C2InterfaceHelper.h>
+#include "C2ApexOpusDec.h"
+#endif
+
 namespace android::apexcodecs {
+
+#ifdef ENABLE_APEX_CODECS
+
+namespace {
+
+struct ComponentDesc {
+    std::shared_ptr<const C2Component::Traits> traits;
+    std::function<std::unique_ptr<ApexComponentIntf>(
+            const std::shared_ptr<C2ReflectorHelper>&)> createComponentFn;
+    ApexCodec_MapFn mapFn;
+    ApexCodec_UnmapFn unmapFn;
+};
+
+template <typename... Codecs>
+class StoreImpl {
+public:
+    StoreImpl() : mCodecs(BuildCodecs()) {}
+
+    std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() const {
+        auto view = std::views::values(mCodecs)
+                  | std::views::transform([](const ComponentDesc &desc) { return desc.traits; });
+        return std::vector(view.begin(), view.end());
+    }
+
+    std::unique_ptr<ApexComponentIntf> createComponent(
+            const char *name, const std::shared_ptr<C2ReflectorHelper> &reflector) {
+        if (mCodecs.count(name) == 0) {
+            return nullptr;
+        }
+        return mCodecs.at(name).createComponentFn(reflector);
+    }
+
+    ApexCodec_MapFn getMapFn(const char *name) const {
+        if (mCodecs.count(name) == 0) {
+            return ::mmap;
+        }
+        return mCodecs.at(name).mapFn;
+    }
+
+
+    ApexCodec_UnmapFn getUnmapFn(const char *name) const {
+        if (mCodecs.count(name) == 0) {
+            return ::munmap;
+        }
+        return mCodecs.at(name).unmapFn;
+    }
+
+private:
+    static std::map<std::string, ComponentDesc> BuildCodecs() {
+        std::map<std::string, ComponentDesc> codecs;
+        ((codecs[Codecs::COMPONENT_NAME] = ComponentDesc{
+            Codecs::MakeTraits(),
+            Codecs::Create,
+            Codecs::Map,
+            Codecs::Unmap,
+        }), ...);
+        std::erase_if(codecs, [](const auto &pair) {
+            return pair.second.traits == nullptr;
+        });
+        return codecs;
+    }
+
+    const std::map<std::string, ComponentDesc> mCodecs;
+};
+
+}  // namespace
+
+class ApexComponentStoreImpl : public ApexComponentStoreIntf {
+public:
+    ApexComponentStoreImpl() : mReflector(std::make_shared<C2ReflectorHelper>()) {
+    }
+
+    std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() const override {
+        return mImpl.listComponents();
+    }
+    std::unique_ptr<ApexComponentIntf> createComponent(const char *name) override {
+        return mImpl.createComponent(name, mReflector);
+    }
+    std::shared_ptr<C2ParamReflector> getParamReflector() const override {
+        return mReflector;
+    }
+    ApexCodec_MapFn getMapFn(const char *name) const override {
+        return mImpl.getMapFn(name);
+    }
+    ApexCodec_UnmapFn getUnmapFn(const char *name) const override {
+        return mImpl.getUnmapFn(name);
+    }
+
+private:
+    StoreImpl<
+        C2ApexOpusDec
+    > mImpl;
+    std::shared_ptr<C2ReflectorHelper> mReflector;
+};
+
+#else
 
 class ApexComponentStoreImpl : public ApexComponentStoreIntf {
 public:
@@ -26,13 +135,21 @@ public:
     std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() const override {
         return {};
     }
-    std::unique_ptr<ApexComponentIntf> createComponent(const char *name [[maybe_unused]]) override {
+    std::unique_ptr<ApexComponentIntf> createComponent(const char *) override {
         return nullptr;
     }
     std::shared_ptr<C2ParamReflector> getParamReflector() const override {
         return nullptr;
     }
+    ApexCodec_MapFn getMapFn(const char *) const override {
+        return ::mmap;
+    }
+    ApexCodec_UnmapFn getUnmapFn(const char *) const override {
+        return ::munmap;
+    }
 };
+
+#endif
 
 }  // namespace android::apexcodecs
 

@@ -25,7 +25,7 @@ import android.media.audio.common.AudioConfigBase;
  * when calling createRecord() including arguments that will be updated by AudioFlinger
  * and returned in CreateRecordResponse object.
  *
- * {@hide}
+ * @hide
  */
 parcelable CreateRecordRequest {
     AudioAttributes attr;

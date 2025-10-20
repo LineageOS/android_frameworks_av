@@ -35,8 +35,6 @@ namespace {
 
 using android::content::AttributionSourceState;
 
-static const std::string kPermissionServiceName = "permission";
-
 static std::string getAttributionString(const AttributionSourceState& attributionSource) {
     std::ostringstream ret;
     const AttributionSourceState* current = &attributionSource;

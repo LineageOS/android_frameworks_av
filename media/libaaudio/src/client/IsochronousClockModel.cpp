@@ -16,15 +16,20 @@
 
 #define LOG_TAG "IsochronousClockModel"
 //#define LOG_NDEBUG 0
-#include <log/log.h>
 
+#include "IsochronousClockModel.h"
+
+// go/keep-sorted start
+#include <log/log.h>
+#include <utility/AAudioUtilities.h>
+#include <utility/AudioClock.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
+#include <algorithm>
 #include <inttypes.h>
 #include <stdint.h>
-#include <algorithm>
-
-#include "utility/AudioClock.h"
-#include "utility/AAudioUtilities.h"
-#include "IsochronousClockModel.h"
+// go/keep-sorted end
 
 using namespace aaudio;
 
@@ -274,6 +279,37 @@ int64_t IsochronousClockModel::convertPositionToTime(int64_t framePosition) cons
     return time;
 }
 
+void IsochronousClockModel::updateBoottimeOffset() {
+    const int tries = 3;
+    int64_t bestGap = 0, measured = 0;
+    for (int i = 0; i < tries; ++i) {
+        const int64_t tmono = AudioClock::getNanoseconds();
+        const int64_t tbase = AudioClock::getNanoseconds(CLOCK_BOOTTIME);
+        const int64_t tmono2 = AudioClock::getNanoseconds();
+        const int64_t gap = tmono2 - tmono;
+        if (i == 0 || gap < bestGap) {
+            bestGap = gap;
+            measured = tbase - ((tmono + tmono2) >> 1);
+        }
+    }
+
+    // to avoid micro-adjusting, we don't change the timebase
+    // unless it is significantly different.
+    //
+    // Assumption: It probably takes more than toleranceNs to
+    // suspend and resume the device.
+    static int64_t toleranceNs = 10000; // 10 us
+    if (llabs(mBoottimeOffset - measured) > toleranceNs) {
+        ALOGV("Adjusting timebase offset old: %jd  new: %jd", mBoottimeOffset, measured);
+        mBoottimeOffset = measured;
+    }
+}
+
+int64_t IsochronousClockModel::convertPositionToBootTime(int64_t framePosition) {
+    updateBoottimeOffset();
+    return convertPositionToTime(framePosition) + mBoottimeOffset;
+}
+
 int64_t IsochronousClockModel::convertTimeToPosition(int64_t nanoTime) const {
     if (mState == STATE_STOPPED) {
         return mMarkerFramePosition;
@@ -306,6 +342,7 @@ int64_t IsochronousClockModel::convertLatestTimeToPosition(int64_t nanoTime) con
 void IsochronousClockModel::dump() const {
     ALOGD("mMarkerFramePosition = %" PRId64, mMarkerFramePosition);
     ALOGD("mMarkerNanoTime      = %" PRId64, mMarkerNanoTime);
+    ALOGD("mBoottimeOffset      = %jd", mBoottimeOffset);
     ALOGD("mSampleRate          = %6d", mSampleRate);
     ALOGD("mFramesPerBurst      = %6d", mFramesPerBurst);
     ALOGD("mMaxMeasuredLatenessNanos = %6" PRId64, mMaxMeasuredLatenessNanos);

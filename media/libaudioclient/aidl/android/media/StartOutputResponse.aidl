@@ -17,7 +17,7 @@
 package android.media;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable StartOutputResponse {
     /** port volume for the audio track */

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "audioserver"
+#define LOG_TAG "audioserver_main"
 //#define LOG_NDEBUG 0
 
 #include <algorithm>
@@ -49,7 +49,7 @@ using android::media::audio::common::AudioMMapPolicyType;
 
 int main(int argc __unused, char **argv __unused)
 {
-    ALOGD("%s: starting", __func__);
+    SLOGI("%s: starting", __func__);
     const auto startTime = std::chrono::steady_clock::now();
     // TODO: update with refined parameters
     limitProcessMemory(
@@ -78,17 +78,19 @@ int main(int argc __unused, char **argv __unused)
     //
     const auto af = sp<AudioFlinger>::make();
     const auto afAdapter = sp<AudioFlingerServerAdapter>::make(af);
-    ALOGD("%s: AudioFlinger created", __func__);
-    ALOGW_IF(AudioSystem::setLocalAudioFlinger(af) != OK,
+    SLOGI("%s: AudioFlinger created", __func__);
+    SLOGW_IF(AudioSystem::setLocalAudioFlinger(af) != OK,
             "%s: AudioSystem already has an AudioFlinger instance!", __func__);
     const auto aps = sp<AudioPolicyService>::make();
     af->initAudioPolicyLocal(aps);
-    ALOGD("%s: AudioPolicy created", __func__);
-    ALOGW_IF(AudioSystem::setLocalAudioPolicyService(aps) != OK,
+    SLOGI("%s: AudioPolicy created", __func__);
+    SLOGW_IF(AudioSystem::setLocalAudioPolicyService(aps) != OK,
              "%s: AudioSystem already has an AudioPolicyService instance!", __func__);
 
     // Start initialization of internally managed audio objects such as Device Effects.
     aps->onAudioSystemReady();
+
+    SLOGI("%s: AudioSystem ready", __func__);
 
     // Add AudioFlinger and AudioPolicy to ServiceManager.
     sp<IServiceManager> sm = defaultServiceManager();
@@ -115,7 +117,7 @@ int main(int argc __unused, char **argv __unused)
         })) {
         AAudioService::instantiate();
     } else {
-        ALOGD("%s: Do not init aaudio service, status %d, policy info size %zu",
+        SLOGI("%s: Do not init aaudio service, status %d, policy info size %zu",
               __func__, status, policyInfos.size());
     }
     const auto endTime = std::chrono::steady_clock::now();
@@ -123,6 +125,6 @@ int main(int argc __unused, char **argv __unused)
     using FloatMillis = std::chrono::duration<float, std::milli>;
     const float timeTaken = std::chrono::duration_cast<FloatMillis>(
             endTime - startTime).count();
-    ALOGI("%s: initialization done in %.3f ms, joining thread pool", __func__, timeTaken);
+    SLOGI("%s: initialization done in %.3f ms, joining thread pool", __func__, timeTaken);
     IPCThreadState::self()->joinThreadPool();
 }

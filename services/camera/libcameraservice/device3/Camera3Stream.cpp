@@ -595,7 +595,7 @@ status_t Camera3Stream::cancelPrepareLocked() {
         mPreparedBuffers.editItemAt(i).release_fence = -1;
         mPreparedBuffers.editItemAt(i).status = CAMERA_BUFFER_STATUS_ERROR;
         returnBufferLocked(mPreparedBuffers[i], /*timestamp*/0, /*readoutTimestamp*/0,
-                /*transform*/ -1);
+                /*transforms*/{});
     }
     mPreparedBuffers.clear();
     mPreparedBufferIdx = 0;
@@ -764,7 +764,8 @@ void Camera3Stream::removeOutstandingBuffer(const camera_stream_buffer &buffer) 
 
 status_t Camera3Stream::returnBuffer(const camera_stream_buffer &buffer,
         nsecs_t timestamp, nsecs_t readoutTimestamp, bool timestampIncreasing,
-         const std::vector<size_t>& surface_ids, uint64_t frameNumber, int32_t transform) {
+         const std::vector<size_t>& surface_ids, uint64_t frameNumber,
+         const std::vector<int32_t>& transforms) {
     ATRACE_HFR_CALL();
     Mutex::Autolock l(mLock);
 
@@ -794,7 +795,7 @@ status_t Camera3Stream::returnBuffer(const camera_stream_buffer &buffer,
      *
      * Do this for getBuffer as well.
      */
-    status_t res = returnBufferLocked(b, timestamp, readoutTimestamp, transform, surface_ids);
+    status_t res = returnBufferLocked(b, timestamp, readoutTimestamp, transforms, surface_ids);
     if (res == OK) {
         fireBufferListenersLocked(b, /*acquired*/false, /*output*/true, timestamp, frameNumber);
     }
@@ -976,7 +977,8 @@ status_t Camera3Stream::getBufferLocked(camera_stream_buffer *,
 }
 
 status_t Camera3Stream::returnBufferLocked(const camera_stream_buffer &,
-                                           nsecs_t, nsecs_t, int32_t, const std::vector<size_t>&) {
+                                           nsecs_t, nsecs_t, const std::vector<int32_t>&,
+                                           const std::vector<size_t>&) {
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }

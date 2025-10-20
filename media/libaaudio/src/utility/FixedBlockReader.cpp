@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-#include <stdint.h>
-#include <memory.h>
-
-#include "FixedBlockAdapter.h"
-
 #include "FixedBlockReader.h"
 
+// go/keep-sorted start
+#include <memory.h>
+#include <stdint.h>
+// go/keep-sorted end
+
+#include "FixedBlockAdapter.h"
 
 FixedBlockReader::FixedBlockReader(FixedBlockProcessor &fixedBlockProcessor)
     : FixedBlockAdapter(fixedBlockProcessor) {

@@ -99,7 +99,6 @@ void TestPatternRenderer::renderThreadLoop(
       static_cast<uint64_t>(1e9 / mFps));
 
   std::chrono::nanoseconds lastFrameTs(0);
-  int frameNumber = 0;
   while (mRunning) {
     // Wait for appropriate amount of time to meet configured FPS.
     std::chrono::nanoseconds ts = getCurrentTimestamp();

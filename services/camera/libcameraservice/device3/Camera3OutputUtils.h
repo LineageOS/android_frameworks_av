@@ -25,6 +25,7 @@
 #include <fmq/MessageQueue.h>
 
 #include <common/CameraDeviceBase.h>
+#include <android/content/res/CameraCompatibilityInfo.h>
 
 #include "device3/BufferUtils.h"
 #include "device3/DistortionMapper.h"
@@ -52,7 +53,7 @@ namespace camera3 {
         bool timestampIncreasing;
         std::vector<size_t> surfaceIds;
         const CaptureResultExtras resultExtras;
-        int32_t transform;
+        std::vector<int32_t> transforms;
         nsecs_t requestTimeNs;
 
         BufferToReturn(Camera3StreamInterface *stream,
@@ -60,7 +61,7 @@ namespace camera3 {
                 nsecs_t timestamp, nsecs_t readoutTimestamp,
                 bool timestampIncreasing, std::vector<size_t> surfaceIds,
                 const CaptureResultExtras &resultExtras,
-                int32_t transform, nsecs_t requestTimeNs):
+                std::vector<int32_t>& transforms, nsecs_t requestTimeNs):
             stream(stream),
             buffer(buffer),
             timestamp(timestamp),
@@ -68,7 +69,7 @@ namespace camera3 {
             timestampIncreasing(timestampIncreasing),
             surfaceIds(surfaceIds),
             resultExtras(resultExtras),
-            transform(transform),
+            transforms(transforms),
             requestTimeNs(requestTimeNs) {}
     };
 
@@ -154,7 +155,7 @@ namespace camera3 {
         bool legacyClient;
         nsecs_t& minFrameDuration;
         bool& isFixedFps;
-        int rotationOverride;
+        const content::res::CameraCompatibilityInfo& compatInfo;
         std::string &activePhysicalId;
     };
 

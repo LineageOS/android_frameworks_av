@@ -16,46 +16,12 @@
 
 #pragma once
 
-#include <atomic>
+#include "stop_token.h"
+
 #include <thread>
-#include <utility>
 
 namespace android::mediautils {
 
-namespace impl {
-class stop_source;
-/**
- * Const view on stop source, which the running thread uses and an interface
- * for cancellation.
- */
-class stop_token {
-  public:
-    stop_token(const stop_source& source) : stop_source_(source) {}
-    bool stop_requested() const;
-
-  private:
-    const stop_source& stop_source_;
-};
-
-class stop_source {
-  public:
-    stop_token get_token() { return stop_token{*this}; }
-    bool stop_requested() const { return cancellation_signal_.load(); }
-    bool request_stop() {
-        bool f = false;
-        return cancellation_signal_.compare_exchange_strong(f, true);
-    }
-
-  private:
-    std::atomic_bool cancellation_signal_ = false;
-};
-
-inline bool stop_token::stop_requested() const {
-    return stop_source_.stop_requested();
-}
-}  // namespace impl
-
-using stop_token = impl::stop_token;
 /**
  * Just a jthread, since std::jthread is still experimental in our toolchain.
  * Implements a subset of essential functionality (co-op cancellation and join on dtor).
@@ -88,7 +54,7 @@ class jthread {
 
   private:
     // order matters
-    impl::stop_source stop_source_;
+    stop_source stop_source_;
     std::thread thread_;
 };
 }  // namespace android::mediautils

@@ -25,7 +25,7 @@ import android.media.TranscodingVideoTrackFormat;
 /**
  * TranscodingRequest contains the desired configuration for the transcoding.
  *
- * {@hide}
+ * @hide
  */
 //TODO(hkuang): Implement the parcelable.
 parcelable TranscodingRequestParcel {

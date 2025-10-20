@@ -23,7 +23,7 @@ import android.media.audio.common.AudioConfigBase;
  * audio configurations are described separately because the effect
  * can perform transformations on channel layouts, for example.
  *
- * {@hide}
+ * @hide
  */
 parcelable EffectConfig {
     /** Configuration of the audio input of the effect. */

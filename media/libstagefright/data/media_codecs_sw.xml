@@ -138,10 +138,10 @@
             <Limit name="alignment" value="2x2" />
             <Limit name="block-size" value="16x16" />
             <Variant name="!slow-cpu">
-                <Limit name="size" min="2x2" max="4080x4080" />
+                <Limit name="size" min="2x2" max="4096x4096" />
                 <!-- profiles and levels:  ProfileHigh : Level52 -->
-                <Limit name="block-count" range="1-32768" /> <!-- max 4096x2048 equivalent -->
-                <Limit name="blocks-per-second" range="1-1966080" />
+                <Limit name="block-count" range="1-34560" /> <!-- max 4096x2160 equivalent -->
+                <Limit name="blocks-per-second" range="1-2073600" />
                 <Limit name="bitrate" range="1-48000000" />
             </Variant>
             <Variant name="slow-cpu">
@@ -438,7 +438,8 @@
             <Limit name="block-size" value="16x16" />
             <Limit name="block-count" range="1-32768" /> <!-- max 4096x2048 equivalent -->
             <Limit name="bitrate" range="1-240000000" />
-            <Feature name="bitrate-modes" value="VBR" />
+            <Limit name="quality" range="0-100"  default="90" />
+            <Feature name="bitrate-modes" value="VBR,CQ" />
             <Attribute name="software-codec" />
         </MediaCodec>
     </Encoders>

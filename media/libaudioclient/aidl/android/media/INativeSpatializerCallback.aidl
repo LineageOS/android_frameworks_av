@@ -23,7 +23,7 @@ import android.media.audio.common.Spatialization;
  * ISpatializer interface. The callback is used by the spatializer
  * implementation in native audio server to communicate state changes to the
  * client controlling the spatializer with the ISpatializer interface.
- * {@hide}
+ * @hide
  */
 oneway interface INativeSpatializerCallback {
     /** Called when the spatialization level applied by the spatializer changes

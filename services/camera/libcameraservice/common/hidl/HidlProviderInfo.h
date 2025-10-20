@@ -54,6 +54,7 @@ struct HidlProviderInfo : public CameraProviderManager::ProviderInfo,
     virtual int64_t getDeviceState() override {return mDeviceState;};
 
     virtual status_t setUpVendorTags() override;
+    virtual status_t dumpInterface(int fd, const Vector<String16>& args) override;
     virtual status_t notifyDeviceStateChange(int64_t) override;
 
     /**

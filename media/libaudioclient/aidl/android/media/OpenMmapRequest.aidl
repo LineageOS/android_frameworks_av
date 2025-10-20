@@ -22,7 +22,7 @@ import android.media.audio.common.AudioOffloadInfo;
 import android.media.AudioClient;
 import android.media.IMmapStreamCallback;
 
-/** {@hide} */
+/** @hide */
 parcelable OpenMmapRequest {
     boolean isOutput;
     AudioAttributes attr;

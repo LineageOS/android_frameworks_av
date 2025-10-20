@@ -288,9 +288,9 @@ TEST_F(VirtualCameraSessionTest, ConfigureTriggersClientConfigureCallback) {
   std::vector<HalStream> halStreams;
 
   // Expect highest resolution to be picked for the client input.
-  EXPECT_CALL(*mMockVirtualCameraClientCallback,
-              onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight,
-                                 Format::YUV_420_888));
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(0, _, kSvgaWidth, kSvgaHeight, Format::YUV_420_888));
 
   ASSERT_TRUE(
       mVirtualCameraSession->configureStreams(streamConfiguration, &halStreams)

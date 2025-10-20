@@ -93,7 +93,7 @@ const char * const AudioParameter::keyOffloadCodecPaddingSamples =
         AUDIO_OFFLOAD_CODEC_PADDING_SAMPLES;
 const char * const AudioParameter::keyClipTransitionSupport =
         AUDIO_PARAMETER_CLIP_TRANSITION_SUPPORT;
-const char * const keyCreateMmapBuffer = AUDIO_PARAMETER_CREATE_MMAP_BUFFER;
+const char * const AudioParameter::keyCreateMmapBuffer = AUDIO_PARAMETER_CREATE_MMAP_BUFFER;
 
 AudioParameter::AudioParameter(const String8& keyValuePairs)
 {

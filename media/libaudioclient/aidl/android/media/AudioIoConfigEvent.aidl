@@ -17,7 +17,7 @@
 package android.media;
 
 /**
- * {@hide}
+ * @hide
  */
 @Backing(type="int")
 enum AudioIoConfigEvent {

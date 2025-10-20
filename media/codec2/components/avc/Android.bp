@@ -36,6 +36,8 @@ cc_library {
 
     static_libs: ["libavcenc"],
 
+    shared_libs: ["android.media.swcodec.flags-aconfig-cc"],
+
     srcs: ["C2SoftAvcEnc.cpp"],
 
     export_include_dirs: ["."],

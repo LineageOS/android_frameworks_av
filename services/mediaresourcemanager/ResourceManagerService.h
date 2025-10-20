@@ -117,6 +117,11 @@ public:
 
     Status getMediaResourceUsageReport(std::vector<MediaResourceParcel>* resources) override;
 
+    Status registerSystemResource(const std::vector<MediaResourceParcel>& resources) override;
+
+    Status checkResourceAvailability(const std::vector<MediaResourceParcel>& resourcesNeeded,
+                                     bool* _aidl_return) override;
+
 protected:
     // To get notifications when a resource is added for the first time.
     void onFirstAdded(const MediaResourceParcel& res, uid_t uid);

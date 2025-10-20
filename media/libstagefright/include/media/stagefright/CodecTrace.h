@@ -50,13 +50,17 @@ const char *const kCodecTraceStateFlushed = "flushed";
 const char *const kCodecTraceStateReleased = "released";
 //buffer events
 // For input buffers into mediacodec from client
-const char *const kCodecTraceActionQueueInputBuffer = "queueInputBuffer";
+// qib - queueInputBuffer
+const char *const kCodecTraceActionQueueInputBuffer = "qib";
 // For input buffers going out from mediacodec to client
-const char *const kCodecTraceActionOnInputBufferAvailable = "onInputBufferAvailable";
+// oiba - onInputBufferAvailable
+const char *const kCodecTraceActionOnInputBufferAvailable = "oiba";
 // For output buffers into mediacodec from client
-const char *const kCodecTraceActionQueueOutputBuffer = "queueOutputBuffer";
+// qob - queueOutputBuffer
+const char *const kCodecTraceActionQueueOutputBuffer = "qob";
 // For output buffers going out from mediacodec to client
-const char *const kCodecTraceActionOnOutputBufferAvailable = "onOutputBufferAvailable";
+// ooba - onOutputBufferAvailable
+const char *const kCodecTraceActionOnOutputBufferAvailable = "ooba";
 // metadata keys for buffer events
 const char *const kCodecTracerMetaKeyRender = "render";
 const char *const kCodecTraceMetaKeyInputFormat = "inputFormat";
@@ -125,7 +129,7 @@ public:
 struct BufferEvent : public CodecEvent {
 
 public:
-    BufferEvent(const std::string name, const pid_t pid, const uid_t uid);
+    BufferEvent(const std::string name);
     virtual ~BufferEvent() {}
 
 protected:
@@ -134,8 +138,6 @@ protected:
 
     void getInfos(std::vector<audio_utils::trace::Object> &infos) const override;
 private:
-    pid_t mPid;
-    uid_t mUid;
 
     friend struct Tracer;
 };

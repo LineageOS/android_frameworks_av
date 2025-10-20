@@ -88,6 +88,7 @@ public:
             REQUIRES(mutex()) = 0;
     virtual const sp<IAfPatchPanel>& getPatchPanel() const = 0;
     virtual const sp<MelReporter>& getMelReporter() const = 0;
+    virtual const std::shared_ptr<audio_utils::TimerQueue>& getTimerQueue() const = 0;
     virtual const sp<EffectsFactoryHalInterface>& getEffectsFactoryHal() const = 0;
     // AudioService interfaces
     virtual sp<IAudioManager> getOrCreateAudioManager() = 0;
@@ -672,7 +673,8 @@ public:
     // Creates a Mmap playback thread from an AudioStreamOut ptr.
     static sp<IAfMmapThread> create(
             const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
-            AudioHwDevice* hwDev, AudioStreamOut* output, bool systemReady);
+            AudioHwDevice* hwDev, AudioStreamOut* output, bool systemReady,
+            const std::shared_ptr<audio_utils::TimerQueue>& timerQueue);
 
     // Creates a Mmap capture thread from an AudioStreamIn ptr.
     static sp<IAfMmapThread> create(

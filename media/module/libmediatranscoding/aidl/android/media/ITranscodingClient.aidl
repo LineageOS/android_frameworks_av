@@ -24,7 +24,7 @@ import android.media.TranscodingRequestParcel;
  *
  * Interface for a client to communicate with MediaTranscodingService.
  *
- * {@hide}
+ * @hide
  */
 interface ITranscodingClient {
     /**

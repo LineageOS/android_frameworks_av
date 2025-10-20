@@ -156,11 +156,16 @@ private:
     /// from EngineBase
     ///
     DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const override;
+    product_strategy_t mCommunicationStrategyId;
 
     /**
      * Policy Parameter Manager hidden through a wrapper.
      */
     std::unique_ptr<ParameterManagerWrapper> mPolicyParameterMgr;
+
+    audio_devices_t getPreferredDeviceTypeForProductStrategy(
+            const DeviceVector& availableOutputDevices, product_strategy_t legacyStrategy) const;
+    bool isBtScoActive(const DeviceVector& availableOutputDevices) const;
 };
 
 } // namespace audio_policy

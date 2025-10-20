@@ -71,6 +71,7 @@ struct FrameDecoder : public RefBase {
     status_t handleInputBufferAsync(int32_t index);
     status_t handleOutputBufferAsync(int32_t index, int64_t timeUs);
     status_t handleOutputFormatChangeAsync(sp<AMessage> format);
+    void onDecoderError(status_t err);
 
     enum {
         kWhatCallbackNotify,
@@ -126,6 +127,8 @@ private:
     std::mutex mMutex;
     std::condition_variable mOutputFramePending;
     InputBufferIndexQueue mInputBufferIndexQueue;
+    bool mDecoderError;
+    status_t mDecoderErrorCode;
 
     status_t extractInternal();
     status_t extractInternalUsingBlockModel();

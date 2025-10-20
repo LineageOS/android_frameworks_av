@@ -1040,6 +1040,8 @@ protected:
             const effect_descriptor_t* desc, audio_session_t sessionId)
             final REQUIRES(mutex());
 
+    void boostThreadPriority(const int priority);
+
     private:
     void dumpBase_l(int fd, const Vector<String16>& args) REQUIRES(mutex());
     void dumpEffectChains_l(int fd, const Vector<String16>& args) REQUIRES(mutex());
@@ -1332,26 +1334,29 @@ public:
                     setStandby_l();
                 }
 
-    void setStandby_l() final REQUIRES(mutex()) {
-                    mStandby = true;
-                    mHalStarted = false;
-                    mKernelPositionOnStandby =
-                        mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
-                }
+    void setStandby_l() final REQUIRES(mutex()) EXCLUDES(mWaitHalStartMutex) {
+        mStandby = true;
+        {
+            audio_utils::unique_lock _l(mWaitHalStartMutex);
+            mHalStarted = false;
+            mKernelPositionOnStandby =
+                mTimestamp.mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+        } // mWaitHalStartMutex scope ends
+    }
 
-    bool waitForHalStart(uint32_t timeoutMs) final EXCLUDES_ThreadBase_Mutex {
-                    audio_utils::unique_lock _l(mutex());
-                    nsecs_t endWaitTimetNs = systemTime() + milliseconds(timeoutMs);
-                    while (!mHalStarted) {
-                        nsecs_t timeNs = systemTime();
-                        if (timeNs >= endWaitTimetNs) {
-                            break;
-                        }
-                        nsecs_t waitTimeLeftNs = endWaitTimetNs - timeNs;
-                        mWaitHalStartCV.wait_for(_l, std::chrono::nanoseconds(waitTimeLeftNs));
-                    }
-                    return mHalStarted;
-                }
+    bool waitForHalStart(uint32_t timeoutMs) final EXCLUDES(mWaitHalStartMutex) {
+        audio_utils::unique_lock _l(mWaitHalStartMutex);
+        nsecs_t endWaitTimetNs = systemTime() + milliseconds(timeoutMs);
+        while (!mHalStarted) {
+            nsecs_t timeNs = systemTime();
+            if (timeNs >= endWaitTimetNs) {
+                break;
+            }
+            nsecs_t waitTimeLeftNs = endWaitTimetNs - timeNs;
+            mWaitHalStartCV.wait_for(_l, std::chrono::nanoseconds(waitTimeLeftNs));
+        }
+        return mHalStarted;
+    }
 
     void setTracksInternalMute(std::map<audio_port_handle_t, bool>* /* tracksInternalMute */)
             override EXCLUDES_ThreadBase_Mutex {
@@ -1610,11 +1615,12 @@ protected:
 
     // output stream start detection based on render position returned by the kernel
     // condition signalled when the output stream has started
+    mutable audio_utils::mutex mWaitHalStartMutex;
     audio_utils::condition_variable mWaitHalStartCV;
     // true when the output stream render position has moved, reset to false in standby
-    bool                     mHalStarted = false;
+    bool mHalStarted GUARDED_BY(mWaitHalStartMutex) = false;
     // last kernel render position saved when entering standby
-    int64_t                  mKernelPositionOnStandby = 0;
+    int64_t mKernelPositionOnStandby GUARDED_BY(mWaitHalStartMutex) = 0;
 
 public:
     FastTrackUnderruns getFastTrackUnderruns(size_t /* fastIndex */) const override
@@ -2442,7 +2448,8 @@ class MmapPlaybackThread : public MmapThread,
         public virtual VolumeInterface {
 public:
     MmapPlaybackThread(const sp<IAfThreadCallback>& afThreadCallback, audio_io_handle_t id,
-                       AudioHwDevice *hwDev, AudioStreamOut *output, bool systemReady);
+                       AudioHwDevice *hwDev, AudioStreamOut *output, bool systemReady,
+                       const std::shared_ptr<audio_utils::TimerQueue>& timerQueue);
 
     void configure(const audio_attributes_t* attr,
                    audio_stream_type_t streamType,
@@ -2502,9 +2509,11 @@ protected:
     bool mMasterMute GUARDED_BY(mutex());
     mediautils::atomic_sp<audio_utils::MelProcessor> mMelProcessor;  // locked internally
 
-    std::unique_ptr<audio_utils::TimerQueue> mTq GUARDED_BY(mutex());
+    const std::shared_ptr<audio_utils::TimerQueue> mTimerQueue;  // (non-null) locked internally
     audio_utils::TimerQueue::handle_t mWakeUpHandle GUARDED_BY(mutex())
             {audio_utils::TimerQueue::INVALID_HANDLE};
+    atomic_int mTimerQueueCallbacks = 0;
+    atomic_int64_t mTimerQueueCallbackNs = 0;
 };
 
 class MmapCaptureThread : public MmapThread

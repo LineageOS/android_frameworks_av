@@ -18,18 +18,19 @@
 #include "mediautils/TimerThread.h"
 #define LOG_TAG "TimeCheck"
 
-#include <optional>
-
+// go/keep-sorted start
 #include <android-base/logging.h>
 #include <android-base/strings.h>
-#include <audio_utils/clock.h>
+#include <audio_utils/Time.h>
 #include <cutils/properties.h>
 #include <mediautils/EventLog.h>
 #include <mediautils/FixedString.h>
 #include <mediautils/MethodStatistics.h>
-#include <mediautils/TimeCheck.h>
 #include <mediautils/TidWrapper.h>
+#include <mediautils/TimeCheck.h>
+#include <optional>
 #include <utils/Log.h>
+//go/keep-sorted end
 
 #if defined(__ANDROID__)
 #include "debuggerd/handler.h"
@@ -84,69 +85,6 @@ static inline void signalAudioHAL([[maybe_unused]] pid_t pid) {
 #if defined(__ANDROID__)
     sigqueue(pid, DEBUGGER_SIGNAL, {.sival_int = 0});
 #endif
-}
-
-/**
- * Returns the std::string "HH:MM:SS.MSc" from a system_clock time_point.
- */
-std::string formatTime(std::chrono::system_clock::time_point t) {
-    auto time_string = audio_utils_time_string_from_ns(
-            std::chrono::nanoseconds(t.time_since_epoch()).count());
-
-    // The time string is 19 characters (including null termination).
-    // Example: "03-27 16:47:06.187"
-    //           MM DD HH MM SS MS
-    // We offset by 6 to get HH:MM:SS.MSc
-    //
-    return time_string.time + 6; // offset to remove month/day.
-}
-
-/**
- * Finds the end of the common time prefix.
- *
- * This is as an option to remove the common time prefix to avoid
- * unnecessary duplicated strings.
- *
- * \param time1 a time string
- * \param time2 a time string
- * \return      the position where the common time prefix ends. For abbreviated
- *              printing of time2, offset the character pointer by this position.
- */
-static size_t commonTimePrefixPosition(std::string_view time1, std::string_view time2) {
-    const size_t endPos = std::min(time1.size(), time2.size());
-    size_t i;
-
-    // Find location of the first mismatch between strings
-    for (i = 0; ; ++i) {
-        if (i == endPos) {
-            return i; // strings match completely to the length of one of the strings.
-        }
-        if (time1[i] != time2[i]) {
-            break;
-        }
-        if (time1[i] == '\0') {
-            return i; // "printed" strings match completely.  No need to check further.
-        }
-    }
-
-    // Go backwards until we find a delimiter or space.
-    for (; i > 0
-           && isdigit(time1[i]) // still a number
-           && time1[i - 1] != ' '
-         ; --i) {
-    }
-    return i;
-}
-
-/**
- * Returns the unique suffix of time2 that isn't present in time1.
- *
- * If time2 is identical to time1, then an empty string_view is returned.
- * This method is used to elide the common prefix when printing times.
- */
-std::string_view timeSuffix(std::string_view time1, std::string_view time2) {
-    const size_t pos = commonTimePrefixPosition(time1, time2);
-    return time2.substr(pos);
 }
 
 // Audio HAL server pids vector used to generate audio HAL processes tombstone
@@ -332,7 +270,7 @@ void TimeCheck::TimeCheckHandler::onTimeout(TimerThread::Handle timerHandle) con
     // Create abort message string - caution: this can be very large.
     const std::string abortMessage = std::string("TimeCheck timeout for ")
             .append(tag)
-            .append(" scheduled ").append(formatTime(startSystemTime))
+            .append(" scheduled ").append(audio_utils::formatTime(startSystemTime))
             .append(" on thread ").append(std::to_string(tid)).append("\n")
             .append(analyzeTimeouts(requestedTimeoutMs, secondChanceMs,
                     elapsedSteadyMs, elapsedSystemMs)).append("\n")

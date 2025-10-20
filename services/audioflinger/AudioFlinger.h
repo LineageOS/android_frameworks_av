@@ -378,6 +378,9 @@ private:
             REQUIRES(mutex());
     const sp<IAfPatchPanel>& getPatchPanel() const final { return mPatchPanel; }
     const sp<MelReporter>& getMelReporter() const final { return mMelReporter; }
+    const std::shared_ptr<audio_utils::TimerQueue>& getTimerQueue() const final {
+        return mTimerQueue;
+    }
     const sp<EffectsFactoryHalInterface>& getEffectsFactoryHal() const final {
         return mEffectsFactoryHal;
     }
@@ -488,7 +491,8 @@ private:
     void dumpToThreadLog_l(const sp<IAfThreadBase>& thread) REQUIRES(mutex());
 
     // Internally locked timer queue for suspend / wakeup activity.
-    audio_utils::TimerQueue mTimerQueue{true /* alarm */};
+    const std::shared_ptr<audio_utils::TimerQueue> mTimerQueue{
+        std::make_shared<audio_utils::TimerQueue>(true /* alarm */)};
 
     // --- Notification Client ---
     class NotificationClient : public IBinder::DeathRecipient {

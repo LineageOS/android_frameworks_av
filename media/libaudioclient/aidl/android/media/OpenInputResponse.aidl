@@ -20,7 +20,7 @@ import android.media.audio.common.AudioConfig;
 import android.media.audio.common.AudioDevice;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable OpenInputResponse {
     /** Interpreted as audio_io_handle_t. */

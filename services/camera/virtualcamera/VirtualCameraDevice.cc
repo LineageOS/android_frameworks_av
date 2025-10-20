@@ -79,7 +79,7 @@ namespace flags = ::android::companion::virtualdevice::flags;
 // Prefix of camera name - "device@1.1/virtual/{camera_id}"
 const char* kDevicePathPrefix = "device@1.1/virtual/";
 
-constexpr int32_t kMaxJpegSize = 3 * 1024 * 1024 /*3MiB*/;
+constexpr int32_t kMaxJpegSize = 13 * 1024 * 1024 /* 13MiB */;
 
 constexpr std::chrono::nanoseconds kMaxFrameDuration =
     std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -517,6 +517,15 @@ std::optional<AidlCameraMetadata> initCameraCharacteristics(
       ALOGE(
           "Failed to update ANDROID_INFO_DEVICE_ID for camera "
           "characteristics!");
+    }
+
+    // internal values that can't be configured from external metadata
+    auto jpegMaxSizeVec = std::vector<int32_t>({kMaxJpegSize});
+    ret = metadataHelper.update(ANDROID_JPEG_MAX_SIZE, jpegMaxSizeVec.data(),
+                                jpegMaxSizeVec.size());
+    if (ret != OK) {
+      ALOGE(
+          "Failed to update ANDROID_JPEG_MAX_SIZE for camera characteristics!");
     }
 
     ret = updateStreamConfigurations(metadataHelper, supportedInputConfig);

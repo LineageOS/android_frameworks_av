@@ -22,7 +22,7 @@ import android.media.audio.common.AudioConfigBase;
 import android.media.audio.common.AudioSource;
 
 /**
- * {@hide}
+ * @hide
  */
 oneway interface IAudioPolicyServiceClient {
     /** Notifies a change of volume group. */

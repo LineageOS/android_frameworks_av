@@ -137,7 +137,7 @@ void StatusTracker::markComponent(int id, ComponentState state,
 void StatusTracker::flushPendingStates()  {
     Mutex::Autolock l(mFlushLock);
     while (!mFlushed && isRunning()) {
-        mFlushCondition.waitRelative(mFlushLock, kWaitDuration);
+        mFlushCondition.waitRelative(mFlushLock, kWaitDurationNS);
     }
 }
 
@@ -178,7 +178,7 @@ bool StatusTracker::threadLoop() {
         Mutex::Autolock pl(mPendingLock);
         while (mPendingChangeQueue.size() == 0 && !mComponentsChanged) {
             res = mPendingChangeSignal.waitRelative(mPendingLock,
-                    kWaitDuration);
+                    kWaitDurationNS);
             if (exitPending()) return false;
             if (res != OK) {
                 if (res != TIMED_OUT) {
@@ -262,7 +262,7 @@ bool StatusTracker::threadLoop() {
     }
 
     if (waitForIdleFence) {
-        auto ret = mIdleFence->wait(kWaitDuration);
+        auto ret = mIdleFence->wait(ns2ms(kWaitDurationNS));
         if (ret == NO_ERROR) {
             mComponentsChanged = true;
         }

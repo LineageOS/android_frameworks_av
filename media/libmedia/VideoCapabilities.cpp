@@ -1720,8 +1720,7 @@ void VideoCapabilities::applyLevelLimits() {
                 maxBlocks, maxBlocksPerSecond,
                 blockSize, blockSize,
                 1 /* widthAlignment */, 1 /* heightAlignment */);
-    } else if (android::media::codec::apv_support()
-            && base::EqualsIgnoreCase(mMediaType, MIMETYPE_VIDEO_APV)) {
+    } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_VIDEO_APV)) {
         maxBlocksPerSecond = 11880;
         maxBps = 7000000;
 

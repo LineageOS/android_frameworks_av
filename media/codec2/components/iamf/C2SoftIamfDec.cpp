@@ -19,12 +19,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 #include <C2PlatformSupport.h>
 #include <SimpleC2Interface.h>
 #include <android-base/properties.h>
 #include <android_media_swcodec_flags.h>
-#include <iamf_tools/iamf_decoder.h>
+#include <iamf_tools/iamf_decoder_factory.h>
+#include <iamf_tools/iamf_decoder_interface.h>
 #include <iamf_tools/iamf_tools_api_types.h>
 #include <log/log.h>
 #include <media/stagefright/foundation/MediaDefs.h>  // For MEDIA_MIMETYPE_AUDIO_IAMF
@@ -35,11 +37,10 @@ namespace android {
 namespace {
 constexpr char COMPONENT_NAME[] = "c2.android.iamf.decoder";
 
-uint32_t UNSET_OUTPUT_CHANNEL_MASK = 0;
-uint32_t UNSET_MAX_OUTPUT_CHANNELS = 0;
 }  // namespace
 
-using ::iamf_tools::api::IamfDecoder;
+using ::iamf_tools::api::IamfDecoderFactory;
+using ::iamf_tools::api::IamfDecoderInterface;
 using ::iamf_tools::api::IamfStatus;
 using ::std::shared_ptr;
 
@@ -100,7 +101,7 @@ class C2SoftIamfDec::IntfImpl : public SimpleInterface<void>::BaseParams {
                 DefineParam(mMaxOutputChannelCount, C2_PARAMKEY_MAX_CHANNEL_COUNT)
                         .withDefault(new C2StreamMaxChannelCountInfo::output(
                                 0u, UNSET_MAX_OUTPUT_CHANNELS))
-                        .withFields({C2F(mMaxOutputChannelCount, value).inRange(2, 8)})
+                        .withFields({C2F(mMaxOutputChannelCount, value).any()})
                         .withSetter(
                                 Setter<decltype(*mMaxOutputChannelCount)>::StrictValueWithNoDeps)
                         .build());
@@ -142,6 +143,7 @@ class C2SoftIamfDec::IntfImpl : public SimpleInterface<void>::BaseParams {
                              .build());
 
         // Only output audio in 16-bit ints are supported by this decoder.
+        // N.B.: Calculation of output buffer size below in this file assumes int16_t samples.
         addParameter(
                 DefineParam(mPcmEncodingInfo, C2_PARAMKEY_PCM_ENCODING)
                         .withDefault(new C2StreamPcmEncodingInfo::output(0u, C2Config::PCM_16))
@@ -167,6 +169,7 @@ class C2SoftIamfDec::IntfImpl : public SimpleInterface<void>::BaseParams {
     // Params relating to the output audio.
     shared_ptr<C2StreamChannelMaskInfo::output> mRenderedChannelMask;
     std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
+    std::shared_ptr<C2AudioPresentationIdTuning> mMixPresentationId;
     std::shared_ptr<C2StreamMaxChannelCountInfo::output> mMaxOutputChannelCount;
     shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
     shared_ptr<C2StreamPcmEncodingInfo::output> mPcmEncodingInfo;
@@ -181,103 +184,111 @@ C2SoftIamfDec::~C2SoftIamfDec() {
     onRelease();
 }
 
-iamf_tools::api::OutputLayout C2SoftIamfDec::getTargetOutputLayout() {
-    mCachedOutputChannelMask = mIntf->getOutputChannelMask();
-    mCachedMaxOutputChannelCount = mIntf->getMaxOutputChannelCount();
-    if (mCachedOutputChannelMask != UNSET_OUTPUT_CHANNEL_MASK) {
-        ALOGI("channel mask set, trying to use value %d", mCachedOutputChannelMask);
+std::optional<iamf_tools::api::OutputLayout> C2SoftIamfDec::getTargetOutputLayout() {
+    // The channel count or channel mask may be used to set the output layout since channel mask was
+    // not available to configure the decoder prior to 25Q2.  The second time the layout is changed,
+    // both of them will be set based on what is reported by the decoder, so we must be careful that
+    // we're using the actual new layout, as opposed to just reusing a value from a previous config.
+    auto currentChannelMask = mIntf->getOutputChannelMask();
+    auto currentChannelCount = mIntf->getMaxOutputChannelCount();
+    const bool channelMaskChanged = mCachedOutputChannelMask != currentChannelMask;
+
+    if (currentChannelMask != UNSET_OUTPUT_CHANNEL_MASK && channelMaskChanged) {
+        ALOGI("Channel mask set, trying to use value %d", currentChannelMask);
         // If the channel mask has been set, we'll use that.
-        return c2_soft_iamf_internal::GetIamfLayout(mCachedOutputChannelMask);
+        return c2_soft_iamf_internal::GetIamfLayout(currentChannelMask);
     }
     // Fall back to using the max output channels.
-    ALOGI("channel mask not set, checking max channel count: %d", mCachedMaxOutputChannelCount);
-    if (mCachedMaxOutputChannelCount == UNSET_MAX_OUTPUT_CHANNELS) {
-        // Stereo default, if not set.
-        ALOGI("max output channels not set, defaulting to stereo.");
-        return iamf_tools::api::OutputLayout::kItu2051_SoundSystemA_0_2_0;
+    ALOGI("Channel mask not set or unchanged, checking max channel count: %d", currentChannelCount);
+
+    if (currentChannelCount == UNSET_MAX_OUTPUT_CHANNELS) {
+        ALOGI("Max output channels not set. We will allow the decoder to pick a default from the "
+              "content.");
+        return std::nullopt;
     }
-    if (mCachedMaxOutputChannelCount <= 1) {
-        ALOGI("max output channels set to %d, using mono.", mCachedMaxOutputChannelCount);
+    if (currentChannelCount <= 1) {
+        ALOGI("max output channels set to %d, using mono.", currentChannelCount);
         return iamf_tools::api::OutputLayout::kIAMF_SoundSystemExtension_0_1_0;
     }
-    if (mCachedMaxOutputChannelCount <= 5) {  // 2 to 5 channels, use stereo.
-        ALOGI("max output channels set to %d, using stereo.", mCachedMaxOutputChannelCount);
+    if (currentChannelCount <= 5) {  // 2 to 5 channels, use stereo.
+        ALOGI("max output channels set to %d, using stereo.", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemA_0_2_0;
     }
-    if (mCachedMaxOutputChannelCount <= 7) {  // 6 or 7 channels, use 5.1.
-        ALOGI("max output channels set to %d, using 5.1.", mCachedMaxOutputChannelCount);
+    if (currentChannelCount <= 7) {  // 6 or 7 channels, use 5.1.
+        ALOGI("max output channels set to %d, using 5.1.", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemB_0_5_0;
     }
-    if (mCachedMaxOutputChannelCount <= 9) {  // 8 or 9 channels, use 7.1.
-        ALOGI("max output channels set to %d, using 7.1.", mCachedMaxOutputChannelCount);
+    if (currentChannelCount <= 9) {  // 8 or 9 channels, use 7.1.
+        ALOGI("max output channels set to %d, using 7.1.", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemI_0_7_0;
     }
-    if (mCachedMaxOutputChannelCount == 10) {  // 10 channels, use Sound System D, 5.1.4.
-        ALOGI("max output channels set to %d, using Sound System D, (5.1.4)",
-              mCachedMaxOutputChannelCount);
+    if (currentChannelCount == 10) {  // 10 channels, use Sound System D, 5.1.4.
+        ALOGI("max output channels set to %d, using Sound System D, (5.1.4)", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemD_4_5_0;
     }
-    if (mCachedMaxOutputChannelCount == 11) {  // Exactly 11 channels, use Sound System E.
-        ALOGI("max output channels set to %d, using Sound System E (4+5+1)",
-              mCachedMaxOutputChannelCount);
+    if (currentChannelCount == 11) {  // Exactly 11 channels, use Sound System E.
+        ALOGI("max output channels set to %d, using Sound System E (4+5+1)", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemE_4_5_1;
     }
-    if (mCachedMaxOutputChannelCount == 12) {  // Exactly 12 channels, use Sound System J, 7.1.4.
-        ALOGI("max output channels set to %d, using Sound System J (7.1.4)",
-              mCachedMaxOutputChannelCount);
+    if (currentChannelCount == 12) {  // Exactly 12 channels, use Sound System J, 7.1.4.
+        ALOGI("max output channels set to %d, using Sound System J (7.1.4)", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemJ_4_7_0;
     }
-    if (mCachedMaxOutputChannelCount <= 15) {  // 13 to 15 channels, use Sound System G (4+9+0)
-        ALOGI("max output channels set to %d, using Sound System G (4+9+0)",
-              mCachedMaxOutputChannelCount);
+    if (currentChannelCount <= 15) {  // 13 to 15 channels, use Sound System G (4+9+0)
+        ALOGI("max output channels set to %d, using Sound System G (4+9+0)", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemG_4_9_0;
     }
-    if (mCachedMaxOutputChannelCount < 24) {  // 16 to 23 channels, use 9.1.6
-        ALOGI("max output channels set to %d, using 9.1.6", mCachedMaxOutputChannelCount);
+    if (currentChannelCount < 24) {  // 16 to 23 channels, use 9.1.6
+        ALOGI("max output channels set to %d, using 9.1.6", currentChannelCount);
         return iamf_tools::api::OutputLayout::kIAMF_SoundSystemExtension_6_9_0;
     }
-    if (mCachedMaxOutputChannelCount == 24) {  // 24 channels use Sound System H (22.2)
-        ALOGI("max output channels set to %d, using Sound System H (22.2)",
-              mCachedMaxOutputChannelCount);
+    if (currentChannelCount == 24) {  // 24 channels use Sound System H (22.2)
+        ALOGI("max output channels set to %d, using Sound System H (22.2)", currentChannelCount);
         return iamf_tools::api::OutputLayout::kItu2051_SoundSystemH_9_10_3;
     }
     // Any other value.
-    ALOGI("max output channels set to %d, defaulting to stereo.", mCachedMaxOutputChannelCount);
-    return iamf_tools::api::OutputLayout::kItu2051_SoundSystemA_0_2_0;
+    ALOGW("Max output channels set to %d, but that does not correspond to a valid IAMF layout.  "
+          " We will allow the decoder to pick a default from the content.",
+          currentChannelCount);
+    return std::nullopt;
 }
 
-::iamf_tools::api::IamfDecoder::Settings C2SoftIamfDec::getIamfDecoderSettings() {
-    mOutputLayout = getTargetOutputLayout();
-    ALOGV("Creating decoder with IAMF OutputLayout %d.", mOutputLayout);
-    return {.requested_layout = mOutputLayout,
-            // Here we ask for default, IAMF ordering in favor of reordering for Android in this
-            // file.
+IamfDecoderFactory::Settings C2SoftIamfDec::getIamfDecoderSettings() {
+    auto requested_layout = getTargetOutputLayout();
+    return {
+            .requested_mix = {.output_layout = requested_layout},
             .channel_ordering = ::iamf_tools::api::ChannelOrdering::kOrderingForAndroid,
-            .requested_profile_versions = {
-                    // Explicitly only request simple and base.
-                    ::iamf_tools::api::ProfileVersion::kIamfSimpleProfile,
-                    ::iamf_tools::api::ProfileVersion::kIamfBaseProfile,
-            }};
+            .requested_profile_versions =
+                    {
+                            // Explicitly only request simple and base.
+                            ::iamf_tools::api::ProfileVersion::kIamfSimpleProfile,
+                            ::iamf_tools::api::ProfileVersion::kIamfBaseProfile,
+                    },
+            .requested_output_sample_type = ::iamf_tools::api::OutputSampleType::kInt16LittleEndian,
+    };
 }
 
-c2_status_t C2SoftIamfDec::initializeDecoder() {
-    ALOGV("Creating new decoder.");
+void C2SoftIamfDec::resetDecodingState() {
     mIamfDecoder = nullptr;
     mOutputBufferSizeBytes = 0;
-    mDescriptorProcessingComplete = false;
+    mCreatedWithDescriptorObus = false;
+    mFetchedAndUpdatedParameters = false;
     mSignalledError = false;
     mSignalledEos = false;
+}
+
+c2_status_t C2SoftIamfDec::createDecoder() {
+    ALOGV("Creating new decoder.");
+    resetDecodingState();
 
     const auto settings = getIamfDecoderSettings();
-    const IamfStatus status = IamfDecoder::Create(settings, mIamfDecoder);
-    if (!status.ok()) {
+    mIamfDecoder = IamfDecoderFactory::Create(settings);
+    if (mIamfDecoder == nullptr) {
         // IamfDecoder::Create fails if it cannot create the ReadBitBuffer.
         mSignalledError = true;
         return C2_NO_MEMORY;
     }
-    // Set to request only LE int16 samples as specified in the above params.
-    mIamfDecoder->ConfigureOutputSampleType(iamf_tools::api::OutputSampleType::kInt16LittleEndian);
-
+    mCreatedWithDescriptorObus = false;
     ALOGV("Decoder created.");
     return C2_OK;
 }
@@ -285,83 +296,69 @@ c2_status_t C2SoftIamfDec::initializeDecoder() {
 c2_status_t C2SoftIamfDec::createNewDecoderWithDescriptorObus(const uint8_t* data,
                                                               size_t dataSize) {
     ALOGV("Creating new decoder from Descriptor OBUs.");
-    mIamfDecoder = nullptr;
-    mOutputBufferSizeBytes = 0;
-    mDescriptorProcessingComplete = false;
-    mSignalledError = false;
-    mSignalledEos = false;
+    resetDecodingState();
     const auto settings = getIamfDecoderSettings();
-    const IamfStatus status =
-            IamfDecoder::CreateFromDescriptors(settings, data, dataSize, mIamfDecoder);
-    if (!status.ok()) {
+    mIamfDecoder = IamfDecoderFactory::CreateFromDescriptors(settings, data, dataSize);
+    if (mIamfDecoder == nullptr) {
         ALOGW("Failed to create decoder.");
         // IamfDecoder::Create fails if it cannot create the ReadBitBuffer.
         mSignalledError = true;
         return C2_NO_MEMORY;
     }
-    // Set to request only LE int16 samples as specified in the above params.
-    mIamfDecoder->ConfigureOutputSampleType(iamf_tools::api::OutputSampleType::kInt16LittleEndian);
-
+    mCreatedWithDescriptorObus = true;
     ALOGV("Decoder created with Descriptor OBUs");
-    // We do NOT set mDescriptorProcessingComplete true here because we need to
-    // get all the frame size, sample rate, etc values in `process`.
     return C2_OK;
 }
 
 c2_status_t C2SoftIamfDec::onInit() {
     ALOGV("onInit.");
-    return initializeDecoder();
+    // We don't create an underlying decoder here because we don't know if we'll be given
+    // Descriptor OBUs or not.  We'll create depending on what we get the first time process
+    // receives data.
+    resetDecodingState();
+    return C2_OK;
 }
 
 c2_status_t C2SoftIamfDec::onStop() {
     ALOGV("onStop.");
     // onStop should preserve the mIntf state, but not the underlying decoder.
-    if (mIamfDecoder) {
-        // We're destroying the decoder, nothing we want to do with an error.
-        (void)mIamfDecoder->Close();
-        mIamfDecoder = nullptr;
-    }
-    mOutputBufferSizeBytes = 0;
-    mDescriptorProcessingComplete = false;
-    mSignalledError = false;
-    mSignalledEos = false;
-    return initializeDecoder();
+    resetDecodingState();
+    return C2_OK;
 }
 
 void C2SoftIamfDec::onReset() {
     ALOGV("onReset.");
-    // Reset should re-initialize.
-    (void)onStop();
+    resetDecodingState();
 }
 
 void C2SoftIamfDec::onRelease() {
     ALOGV("onRelease.");
-    // onRelease, the decoder is guaranteed not to be used again, so we release
-    // the decoder without worrying about resetting state.
-    if (mIamfDecoder) {
-        // We're destroying the decoder, nothing we want to do with an error.
-        (void)mIamfDecoder->Close();
-        mIamfDecoder = nullptr;
-    }
+    // onRelease, the decoder is guaranteed not to be used again, so we release the decoder.
+    resetDecodingState();
 }
 
 c2_status_t C2SoftIamfDec::onFlush_sm() {
     ALOGV("onFlush_sm.");
-    IamfStatus status = mIamfDecoder->Reset();  // Throw away any pending work.
-    // The decoder may fail to reset if it was not created with DescriptorOBUs.
-    if (status.ok()) {
-        // We may be jumping back in time.
-        mSignalledEos = false;
-        return C2_OK;
+    if (mIamfDecoder != nullptr) {
+        IamfStatus status = mIamfDecoder->Reset();  // Throw away any pending work.
+        // The decoder may fail to reset if it was not created with DescriptorOBUs.
+        if (!status.ok()) {
+            ALOGE("Failed to reset. Error: %s", status.error_message.c_str());
+            // We failed to Reset.  We'll just get rid of the decoder.
+            mIamfDecoder = nullptr;
+        }
     }
-    ALOGE("Failed to reset. Error: %s", status.error_message.c_str());
-    // We failed to Reset.  We'll just get rid of the decoder.
-    mIamfDecoder = nullptr;
+    // We may be jumping back in time, so we should clear the EOS flag.
+    mSignalledEos = false;
     return C2_OK;
 }
 
 void C2SoftIamfDec::getAnyTemporalUnits(const std::unique_ptr<C2Work>& work,
                                         const std::shared_ptr<C2BlockPool>& pool) {
+    if (mIamfDecoder == nullptr) {
+        ALOGV("mIamfDecoder is null, no temporal units to fetch.");
+        return;
+    }
     while (mIamfDecoder->IsTemporalUnitAvailable()) {
         // Get writing block into a Span for writing by the |mIamfDecoder|.
         shared_ptr<C2LinearBlock> block;
@@ -397,14 +394,112 @@ void C2SoftIamfDec::getAnyTemporalUnits(const std::unique_ptr<C2Work>& work,
     }
 }
 
+c2_status_t C2SoftIamfDec::fetchValuesAndUpdateParameters(const std::unique_ptr<C2Work>& work) {
+    if (mIamfDecoder == nullptr) {
+        ALOGE("mIamfDecoder is null, cannot fetch values.");
+        mSignalledError = true;
+        work->result = C2_BAD_VALUE;
+        return C2_BAD_VALUE;
+    }
+
+    // Here we should get the sample rate info and Layout and update.
+    uint32_t sampleRate;
+    IamfStatus sampleRateStatus = mIamfDecoder->GetSampleRate(sampleRate);
+    if (!sampleRateStatus.ok()) {
+        ALOGE("Failed to get sample rate. Error message: %s",
+              sampleRateStatus.error_message.c_str());
+        mSignalledError = true;
+        work->result = C2_CORRUPTED;
+        return C2_CORRUPTED;
+    }
+    ALOGV("successfully got sample rate: %d", sampleRate);
+    C2StreamSampleRateInfo::output sampleRateInfo(0u, sampleRate);
+
+    // The Layout used may be different than what was requested in IamfDecoder::Create
+    // because of the content of the stream.  Here we get the actual Layout that will be
+    // used and convert to a ChannelMask.
+    ::iamf_tools::api::SelectedMix actualMix;
+    IamfStatus outputMixStatus = mIamfDecoder->GetOutputMix(actualMix);
+    mActualOutputMix = actualMix;
+    if (!outputMixStatus.ok()) {
+        ALOGE("Failed to get output layout. Error message: %s",
+              outputMixStatus.error_message.c_str());
+        mSignalledError = true;
+        work->result = C2_CORRUPTED;
+        return C2_CORRUPTED;
+    }
+    ALOGV("successfully got actual output layout: %d", actualMix.output_layout);
+    uint32_t actualChannelMask =
+            c2_soft_iamf_internal::GetAndroidChannelMask(actualMix.output_layout);
+    C2StreamChannelMaskInfo::output channelMaskInfo(0u, actualChannelMask);
+
+    // Get the number of output channels.
+    int numOutputChannels;
+    IamfStatus numOutputChannelsStatus = mIamfDecoder->GetNumberOfOutputChannels(numOutputChannels);
+    if (!numOutputChannelsStatus.ok()) {
+        ALOGE("Failed to get number of output channels. Error message: %s",
+              numOutputChannelsStatus.error_message.c_str());
+        mSignalledError = true;
+        work->result = C2_CORRUPTED;
+        return C2_CORRUPTED;
+    }
+    ALOGV("successfully got number of output channels: %d", numOutputChannels);
+    C2StreamChannelCountInfo::output channelCountInfo(0u, numOutputChannels);
+
+    // We collect the failures but do not use them.
+    std::vector<std::unique_ptr<C2SettingResult>> failures;
+    // Update the config in the params.
+    const c2_status_t configStatus = mIntf->config(
+            {&sampleRateInfo, &channelMaskInfo, &channelCountInfo}, C2_MAY_BLOCK, &failures);
+    if (configStatus != C2_OK) {
+        ALOGE("Config Update failed");
+        mSignalledError = true;
+        work->result = C2_CORRUPTED;
+        return C2_CORRUPTED;
+    }
+    // Include the config update in the work for the caller to see.
+    work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(sampleRateInfo));
+    work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(channelMaskInfo));
+    work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(channelCountInfo));
+    ALOGV("successfully updated config.");
+
+    mCachedOutputChannelMask = mIntf->getOutputChannelMask();
+    mCachedMaxOutputChannelCount = mIntf->getMaxOutputChannelCount();
+
+    // We want to calculate the max size we need for the write buffer for output and for
+    // that, we need the frame size.
+    uint32_t frameSize;
+    IamfStatus frameSizeStatus = mIamfDecoder->GetFrameSize(frameSize);
+    if (!frameSizeStatus.ok()) {
+        ALOGE("Failed to get frame size. Error message: %s", frameSizeStatus.error_message.c_str());
+        mSignalledError = true;
+        work->result = C2_CORRUPTED;
+        return C2_CORRUPTED;
+    }
+    ALOGV("successfully got frame size: %d", frameSize);
+
+    // N.B.: Calculation of this number assumes int16_t samples.
+    mOutputBufferSizeBytes = (size_t)frameSize * sizeof(int16_t) * (size_t)numOutputChannels;
+    ALOGV("calculated frame size bytes: %zu", mOutputBufferSizeBytes);
+
+    mFetchedAndUpdatedParameters = true;
+    return C2_OK;
+}
+
 void C2SoftIamfDec::process(const std::unique_ptr<C2Work>& work,
                             const shared_ptr<C2BlockPool>& pool) {
-    if (!mIamfDecoder) {
-        ALOGE("Decoder instance is null.");
+    // Since the decoder is often created with Descriptor OBUs (i.e. a codec config), we don't
+    // necessarily have a mIamfDecoder instance yet.
+
+    if (mSignalledError || mSignalledEos) {
+        // We already had an error or EOS signalled previously, we should not have
+        // had `process` called again.
+        ALOGW("process called after error or EOS, ignoring.");
+        work->result = C2_BAD_VALUE;
         return;
     }
-    // N.B.: Android only supports single input buffer and single worklet.
 
+    // N.B.: Android only supports single input buffer and single worklet.
     // Initialize output work to assume OK and that we will process one worklet.
     work->result = C2_OK;
     work->workletsProcessed = 1u;
@@ -414,35 +509,6 @@ void C2SoftIamfDec::process(const std::unique_ptr<C2Work>& work,
     work->worklets.front()->output.flags = work->input.flags;
     // Clear output buffers
     work->worklets.front()->output.buffers.clear();
-
-    if (mSignalledError || mSignalledEos) {
-        // We already had an error or EOS signalled previously, we should not have
-        // had `process` called again.
-        work->result = C2_BAD_VALUE;
-        return;
-    }
-
-    // If channel mask or max output channel count has changed, we reset the decoder if and only if
-    // the new values result in a different layout.
-    const bool outputMaskOrMaxCountChanged =
-            mCachedOutputChannelMask != mIntf->getOutputChannelMask() ||
-            mCachedMaxOutputChannelCount != mIntf->getMaxOutputChannelCount();
-    if (outputMaskOrMaxCountChanged) {
-        // Since resetting to a different layout is disruptive, only do it if we're sure it results
-        // in a different output IAMF Layout.
-        if (auto newLayout = getTargetOutputLayout(); newLayout != mOutputLayout) {
-            mOutputLayout = newLayout;
-            IamfStatus status = mIamfDecoder->ResetWithNewLayout(mOutputLayout);
-            if (!status.ok()) {
-                // Layout cannot be changed if decoder was not created with DescriptorOBUs.
-                ALOGE("Failed to reset with new layout. Error message: %s",
-                      status.error_message.c_str());
-                mSignalledError = true;
-                work->result = C2_CORRUPTED;
-                return;
-            }
-        }
-    }
 
     // mDummyReadView provided by SimpleC2Component just returns C2_NO_INIT.
     // It is here as a placeholder.
@@ -461,15 +527,102 @@ void C2SoftIamfDec::process(const std::unique_ptr<C2Work>& work,
             return;
         }
     }
-    if (inSize == 0) {
+
+    // If channel mask or max output channel count has changed, we reset the decoder if and only if
+    // the new values result in a different layout.
+    // We want to do this before decoding so that if there is a change, the latest buffers can be
+    // decoded with the new layout.
+    const bool layoutChangesWaitingToBeApplied =
+            mCachedOutputChannelMask != mIntf->getOutputChannelMask() ||
+            mCachedMaxOutputChannelCount != mIntf->getMaxOutputChannelCount();
+    if (mIamfDecoder != nullptr && layoutChangesWaitingToBeApplied) {
+        if (!mCreatedWithDescriptorObus) {
+            ALOGW("The decoder was not created by first providing the IAMF Descriptor OBUs as a "
+                  "whole (and signalling that with the FLAG_CODEC_CONFIG flag), so the layout "
+                  "cannot be changed dynamically during playback. We will continue decoding with "
+                  "the existing layout.");
+        } else if (auto newLayout = getTargetOutputLayout();
+                   !newLayout.has_value() || newLayout == mActualOutputMix->output_layout) {
+            ALOGI("The layout has not changed, we will continue decoding with the existing "
+                  "layout.");
+        } else {
+            // Since resetting to a different layout is disruptive, only do it if we're sure it
+            // results in a different output IAMF Layout.  At this point we know we both can and
+            // need to reset the decoder.
+            ALOGV("Output layout has actually changed, we will reset decoder.  Channel Mask: %d,"
+                  "channel count: %d, layout: %d",
+                  mCachedOutputChannelMask, mCachedMaxOutputChannelCount, *newLayout);
+            ::iamf_tools::api::SelectedMix unusedSelectedMix;  // We fetch all config below.
+            IamfStatus status =
+                    mIamfDecoder->ResetWithNewMix({.output_layout = newLayout}, unusedSelectedMix);
+            if (!status.ok()) {
+                // Layout cannot be changed if decoder was not created with Descriptor OBUs.
+                ALOGE("Failed to reset with new layout. Error message: %s",
+                      status.error_message.c_str());
+                mSignalledError = true;
+                work->result = C2_CORRUPTED;
+                return;
+            }
+            ALOGV("Reset IAMF decoder.  New output parameters: ");
+            c2_status_t updateStatus = fetchValuesAndUpdateParameters(work);
+            if (updateStatus != C2_OK) {
+                // Specific error logged in `fetchValuesAndUpdateParameters`.
+                return;
+            }
+        }
+    }
+
+    if (inSize > 0) {
+        // There is work to do.
+        const bool isCodecConfig = work->input.flags & C2FrameData::FLAG_CODEC_CONFIG;
+        if (isCodecConfig) {
+            ALOGV("Got Codec2 FLAG_CODEC_CONFIG, meaning IAMF Descriptor OBUs are in the buffer.");
+            // If the CodecConfig flag is set, then we're assuming the buffer contains
+            // exactly and only the DescriptorObus.  We can re-create the IamfDecoder with the
+            // DescriptorObus (Codec Config) for more efficient decoding of all subsequent Temporal
+            // Units.
+            c2_status_t createStatus = createNewDecoderWithDescriptorObus(readView.data(), inSize);
+            if (createStatus != C2_OK) {
+                ALOGE("Failed to initialize decoder with descriptor OBUs. Error code: %d",
+                      createStatus);
+                mSignalledError = true;
+                work->result = C2_CORRUPTED;
+                return;
+            }
+        } else {
+            if (mIamfDecoder == nullptr) {
+                c2_status_t createStatus = createDecoder();
+                if (createStatus != C2_OK) {
+                    ALOGE("Failed to create decoder. Error code: %d", createStatus);
+                    mSignalledError = true;
+                    work->result = C2_CORRUPTED;
+                    return;
+                }
+            }
+            // Since we did not get a CodecConfig, we just try to Decode.
+            IamfStatus decodeStatus = mIamfDecoder->Decode(readView.data(), inSize);
+            if (!decodeStatus.ok()) {
+                ALOGE("Failed to decode. Error message: %s", decodeStatus.error_message.c_str());
+                mSignalledError = true;
+                work->result = C2_CORRUPTED;
+                return;
+            }
+        }
+    } else {
         // If inSize is still zero at this point, then there is no input to process.
         work->worklets.front()->output.ordinal = work->input.ordinal;
         work->workletsProcessed = 1u;
         // No more data to send to decode if inSize is 0 and EOS signalled.
-        if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) {
-            mIamfDecoder->SignalEndOfDecoding();
+        if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM && mIamfDecoder != nullptr) {
+            IamfStatus status = mIamfDecoder->SignalEndOfDecoding();
+            if (!status.ok()) {
+                ALOGE("Failed to signal EOS. Error message: %s", status.error_message.c_str());
+                mSignalledError = true;
+                work->result = C2_CORRUPTED;
+                return;
+            }
             mSignalledEos = true;
-            ALOGV("signalled EOS");
+            ALOGI("signalled EOS");
         }
         // For IAMF, we will still try to fetch a temporal unit at EOS.
         getAnyTemporalUnits(work, pool);
@@ -479,115 +632,17 @@ void C2SoftIamfDec::process(const std::unique_ptr<C2Work>& work,
     ALOGV("in buffer attr. size %zu timestamp %d frameindex %d", inSize,
           (int)work->input.ordinal.timestamp.peeku(), (int)work->input.ordinal.frameIndex.peeku());
 
-    const bool isCodecConfig = work->input.flags & C2FrameData::FLAG_CODEC_CONFIG;
-    if (isCodecConfig) {
-        ALOGV("Got codec config.");
-        // If the CodecConfig flag is set, then we're assuming the buffer contains
-        // exactly and only the DescriptorObus.  We can re-create the IamfDecoder with the
-        // DescriptorObus (Codec Config) for more efficient decoding of all subsequent Temporal
-        // Units.
-        c2_status_t initializeStatus = createNewDecoderWithDescriptorObus(readView.data(), inSize);
-        if (initializeStatus != C2_OK) {
-            ALOGE("Failed to initialize decoder with descriptor OBUs. Error code: %d",
-                  initializeStatus);
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
-            return;
-        }
-    } else {
-        // If not a CodecConfig, we just try to Decode.
-        IamfStatus decodeStatus = mIamfDecoder->Decode(readView.data(), inSize);
-        if (!decodeStatus.ok()) {
-            ALOGE("Failed to decode. Error message: %s", decodeStatus.error_message.c_str());
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
+    // The first time that IsDescriptorProcessingComplete returns true, we update config.
+    if (!mFetchedAndUpdatedParameters && mIamfDecoder != nullptr &&
+        mIamfDecoder->IsDescriptorProcessingComplete()) {
+        // First time we are seeing descriptor processing as complete.
+        ALOGV("Decoder signaled descriptor processing complete.");
+        c2_status_t configStatus = fetchValuesAndUpdateParameters(work);
+        if (configStatus != C2_OK) {
+            // Specific error logged in `fetchValuesAndUpdateParameters`.
             return;
         }
     }
-
-    // The first time that IsDescriptorProcessingComplete returns true, we update config.
-    if (!mDescriptorProcessingComplete && mIamfDecoder->IsDescriptorProcessingComplete()) {
-        // First time we are seeing descriptor processing as complete.
-        ALOGV("Decoder signaled descriptor processing complete.");
-        mDescriptorProcessingComplete = true;
-
-        // Here we should get the sample rate info and Layout and update.
-        uint32_t sampleRate;
-        IamfStatus sampleRateStatus = mIamfDecoder->GetSampleRate(sampleRate);
-        if (!sampleRateStatus.ok()) {
-            ALOGE("Failed to get sample rate. Error message: %s",
-                  sampleRateStatus.error_message.c_str());
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
-            return;
-        }
-        ALOGV("successfully got sample rate: %d", sampleRate);
-        C2StreamSampleRateInfo::output sampleRateInfo(0u, sampleRate);
-
-        // The Layout used may be different than what was requested in IamfDecoder::Create
-        // because of the content of the stream.  Here we get the actual Layout that will be
-        // used and convert to a ChannelMask.
-        iamf_tools::api::OutputLayout actualLayout;
-        IamfStatus layoutStatus = mIamfDecoder->GetOutputLayout(actualLayout);
-        if (!layoutStatus.ok()) {
-            ALOGE("Failed to get output layout. Error message: %s",
-                  layoutStatus.error_message.c_str());
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
-            return;
-        }
-        ALOGV("successfully got actual output layout: %d", actualLayout);
-        uint32_t actualChannelMask = c2_soft_iamf_internal::GetAndroidChannelMask(actualLayout);
-        C2StreamChannelMaskInfo::output channelMaskInfo(0u, actualChannelMask);
-
-        // Get the number of output channels.
-        int numOutputChannels;
-        IamfStatus numOutputChannelsStatus =
-                mIamfDecoder->GetNumberOfOutputChannels(numOutputChannels);
-        if (!numOutputChannelsStatus.ok()) {
-            ALOGE("Failed to get number of output channels. Error message: %s",
-                  numOutputChannelsStatus.error_message.c_str());
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
-            return;
-        }
-        ALOGV("successfully got number of output channels: %d", numOutputChannels);
-        C2StreamChannelCountInfo::output channelCountInfo(0u, numOutputChannels);
-
-        // We collect the failures but do not use them.
-        std::vector<std::unique_ptr<C2SettingResult>> failures;
-        // Update the config in the params.
-        const c2_status_t configStatus = mIntf->config(
-                {&sampleRateInfo, &channelMaskInfo, &channelCountInfo}, C2_MAY_BLOCK, &failures);
-        if (configStatus == C2_OK) {
-            // Include the config update in the work for the caller to see.
-            work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(sampleRateInfo));
-            work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(channelMaskInfo));
-            work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(channelCountInfo));
-            ALOGV("successfully updated config.");
-        } else {
-            ALOGE("Config Update failed");
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
-            return;
-        }
-
-        // We want to calculate the max size we need for the write buffer for output and for
-        // that, we need the frame size.
-        uint32_t frameSize;
-        IamfStatus frameSizeStatus = mIamfDecoder->GetFrameSize(frameSize);
-        if (!frameSizeStatus.ok()) {
-            ALOGE("Failed to get frame size. Error message: %s",
-                  frameSizeStatus.error_message.c_str());
-            mSignalledError = true;
-            work->result = C2_CORRUPTED;
-            return;
-        }
-        ALOGV("successfully got frame size: %d", frameSize);
-
-        mOutputBufferSizeBytes = (size_t)frameSize * sizeof(int16_t) * (size_t)numOutputChannels;
-        ALOGV("calculated frame size bytes: %zu", mOutputBufferSizeBytes);
-    }  // Done updating config.
 
     // In any case, check for finished temporal units to return.
     getAnyTemporalUnits(work, pool);
@@ -654,9 +709,9 @@ static bool SufficientSdkVersion() {
 }
 
 __attribute__((cfi_canonical_jump_table)) extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
-    ALOGV("in %s", __func__);
+    ALOGI("in %s", __func__);
     if (!android::media::swcodec::flags::iamf_software_decoder()) {
-        ALOGV("IAMF SW decoder is disabled by flag.");
+        ALOGI("IAMF SW decoder is disabled by flag.");
         return nullptr;
     }
 
@@ -669,6 +724,6 @@ __attribute__((cfi_canonical_jump_table)) extern "C" ::C2ComponentFactory* Creat
 
 __attribute__((cfi_canonical_jump_table)) extern "C" void DestroyCodec2Factory(
         ::C2ComponentFactory* factory) {
-    ALOGV("in %s", __func__);
+    ALOGI("in %s", __func__);
     delete factory;
 }

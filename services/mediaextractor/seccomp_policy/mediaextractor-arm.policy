@@ -60,6 +60,17 @@ fsetxattr: 1
 ftruncate64: 1
 fcntl64: 1
 
+# Android profiler (heapprofd, traced_perf) additions, where not already
+# covered by the rest of the file, or by builtin minijail allow-listing of
+# logging-related syscalls.
+# TODO(b/197184220): this is a targeted addition for a specific investigation,
+# and addresses just the arm64 framework av service policies. In the future, we
+# should make this more general (e.g. a central file that can be @included in
+# other policy files).
+setsockopt: 1
+sendmsg: 1
+set_tid_address: 1
+
 # mremap: Ensure |flags| are (MREMAP_MAYMOVE | MREMAP_FIXED) TODO: Once minijail
 # parser support for '<' is in this needs to be modified to also prevent
 # |old_address| and |new_address| from touching the exception vector page, which

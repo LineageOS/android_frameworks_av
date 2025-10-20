@@ -9,9 +9,9 @@ package {
 
 cc_defaults {
     name: "aidl_clearkey_service_defaults-use-shared-deps",
+    defaults: ["android.hardware.drm-media_drm-ndk-shared"],
 
     shared_libs: [
-        "android.hardware.drm-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcrypto",
@@ -29,6 +29,7 @@ cc_defaults {
 
 cc_defaults {
     name: "aidl_clearkey_service_defaults-use-static-deps",
+    defaults: ["android.hardware.drm-media_drm-ndk-shared"],
 
     stl: "c++_static",
 
@@ -41,7 +42,6 @@ cc_defaults {
     static_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.drm.common-V1-ndk",
-        "android.hardware.drm-V1-ndk",
         "libbase",
         "libclearkeybase",
         "libjsoncpp",
@@ -139,6 +139,7 @@ phony {
 
 cc_defaults {
     name: "fuzz_aidl_clearkey_service_defaults",
+    defaults: ["android.hardware.drm-media_drm-ndk-shared"],
 
     srcs: [
         "CreatePluginFactories.cpp",
@@ -158,7 +159,6 @@ cc_defaults {
     include_dirs: ["frameworks/av/include"],
 
     shared_libs: [
-        "android.hardware.drm-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcrypto",

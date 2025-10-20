@@ -38,6 +38,9 @@ class StreamCommonMock : public BnStreamCommon {
     ndk::ScopedAStatus removeEffect(const std::shared_ptr<IEffect>&) override {
         return ndk::ScopedAStatus::ok();
     }
+    ndk::ScopedAStatus createMmapBuffer(MmapBufferDescriptor*) override {
+        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    }
 };
 
 }  // namespace aidl::android::hardware::audio::core

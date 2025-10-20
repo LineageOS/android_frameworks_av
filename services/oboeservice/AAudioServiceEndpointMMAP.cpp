@@ -361,13 +361,15 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
                         "%s() port handle not expected to change from %d to %d",
                         __func__, mPortHandle, tempHandle);
     ALOGV("%s() mPortHandle = %d", __func__, mPortHandle);
+    if (result == AAUDIO_OK) {
+        std::lock_guard _l(mMmapStreamLock);
+        mNeedToCatchUp = true;
+    }
     return result;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase> /*stream*/,
                                                       audio_port_handle_t clientHandle) {
-    mFramesTransferred.reset32();
-
     // Round 64-bit counter up to a multiple of the buffer capacity.
     // This is required because the 64-bit counter is used as an index
     // into a circular buffer and the actual HW position is reset to zero
@@ -418,6 +420,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t portHa
         ALOGD("%s(%d): returning %d", __func__, (int)portHandle, result);
         return result;
     }
+}
+
+void AAudioServiceEndpointMMAP::releaseClientWhenWakeUp(audio_port_handle_t /*clientHandle*/) {
+    // For MMAP endpoint, there should only be one client. Using a boolean value to record if
+    // the client should be released when wake up.
+    std::lock_guard _l(mLockStreams);
+    mShouldReleaseClientWhenWakeUp = true;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::standby() {
@@ -500,8 +509,25 @@ aaudio_result_t AAudioServiceEndpointMMAP::getFreeRunningPosition(int64_t *posit
     } else if (result != AAUDIO_OK) {
         ALOGE("%s(): getMmapPosition() returned status %d", __func__, status);
     } else {
-        // Convert 32-bit position to 64-bit position.
-        mFramesTransferred.update32(position.position_frames);
+        if (mNeedToCatchUp) {
+            // This only happens for the first position report from HAL. The HAL is supposed to
+            // report the position increasing monotonically. But this may not always be true
+            // especially when the stream is in standby and release the mmap buffer. In that case,
+            // for the first position report, make sure the position is offset correctly as the
+            // hardware is reading from the returned position.
+            const int pos = position.position_frames % getBufferCapacity();
+            // The position reported from the HAL is the where the DSP read position is. The mmap
+            // buffer is a circular buffer. mFramesTransferred is rounded up to multiple times of
+            // buffer capacity when stopping the stream. mFramesTransferred is used to send as the
+            // read position to the client side. In that case, it is needed to increment `pos` so
+            // that it represents the right DSP reading position.
+            mFramesTransferred.increment(pos);
+            mFramesTransferred.set32(position.position_frames);
+            mNeedToCatchUp = false;
+        } else {
+            // Convert 32-bit position to 64-bit position.
+            mFramesTransferred.update32(position.position_frames);
+        }
         *positionFrames = mFramesTransferred.get();
         *timeNanos = position.time_nanoseconds;
     }
@@ -586,6 +612,17 @@ void AAudioServiceEndpointMMAP::onWakeUp(android::audio_utils::TimerQueue::handl
     const std::lock_guard<std::mutex> lock(mLockStreams);
     for (const auto& stream : mRegisteredStreams) {
         stream->onWakeUp(handle);
+    }
+    if (mShouldReleaseClientWhenWakeUp) {
+        // When the client is pending to wake up to release, it indicates the client side has
+        // called close and it has gone. It was previously pending to drain all written data.
+        // Here, a thread is spawned to release the stream to avoid dead lock.
+        const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+        std::thread asyncTask([holdEndpoint]() {
+            ALOGD("onWakeUp() asyncTask to release client");
+            holdEndpoint->releaseRegisteredStreams();
+        });
+        asyncTask.detach();
     }
 }
 
@@ -733,6 +770,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer_l()
             VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
         if ((mMmapClient.attributionSource.uid != audioServiceUid) &&
             getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+            ::close(mMmapBufferinfo.shared_memory_fd);  // must close the fd as no new owner.
             ALOGW("%s() - exclusive FD cannot be used by client", __func__);
             return AAUDIO_ERROR_UNAVAILABLE;
         }
@@ -754,6 +792,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::createMmapBuffer_l()
     mMmapStream->getMmapPosition(&position);
 
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
+
+    mFramesTransferred.reset32();
 
     return AAUDIO_OK;
 }

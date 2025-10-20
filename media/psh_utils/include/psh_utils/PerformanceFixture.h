@@ -62,8 +62,6 @@ public:
         auto& collector = android::media::psh_utils::PowerStatsCollector::getCollector();
         mStartStats = collector.getStats();
 
-        const pid_t tid = gettid(); // us.
-
         // Possibly change priority to improve benchmarking
         // android::audio_utils::set_thread_priority(gettid(), 98);
 

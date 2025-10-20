@@ -303,6 +303,11 @@ status_t HidlProviderInfo::setUpVendorTags() {
     return OK;
 }
 
+status_t HidlProviderInfo::dumpInterface(int, const Vector<String16>&) {
+    // Unsupported in HIDL interfaces
+    return OK;
+}
+
 status_t HidlProviderInfo::notifyDeviceStateChange(int64_t newDeviceState) {
     mDeviceState = mapToHidlDeviceState(newDeviceState);
     if (mMinorVersion >= 5) {
@@ -976,7 +981,7 @@ status_t HidlProviderInfo::convertToHALStreamCombinationAndCameraIdsLocked(
                 SessionConfigurationUtils::targetPerfClassPrimaryCamera(
                         perfClassPrimaryCameraIds, cameraId, targetSdkVersion);
         res = mManager->getCameraCharacteristicsLocked(cameraId, overrideForPerfClass, &deviceInfo,
-                 hardware::ICameraService::ROTATION_OVERRIDE_NONE);
+                CameraCompatibilityInfo());
         if (res != OK) {
             return res;
         }
@@ -984,7 +989,7 @@ status_t HidlProviderInfo::convertToHALStreamCombinationAndCameraIdsLocked(
                 [this](const std::string &id, bool overrideForPerfClass) {
                     CameraMetadata physicalDeviceInfo;
                     mManager->getCameraCharacteristicsLocked(id, overrideForPerfClass,
-                            &physicalDeviceInfo, hardware::ICameraService::ROTATION_OVERRIDE_NONE);
+                            &physicalDeviceInfo, CameraCompatibilityInfo());
                     return physicalDeviceInfo;
                 };
         std::vector<std::string> physicalCameraIds;

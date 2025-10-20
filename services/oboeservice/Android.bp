@@ -81,12 +81,16 @@ tidy_errors = [
 cc_defaults {
     name: "libaaudioservice_dependencies",
 
+    defaults: [
+        "libaaudio_defaults",
+        "libaaudio_internal_defaults",
+    ],
+
     shared_libs: [
         "aaudio-aidl-cpp",
         "com.android.media.aaudio-aconfig-cc",
         "com.android.media.aaudio-aconfig-cc",
         "framework-permission-aidl-cpp",
-        "libaaudio_internal",
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
@@ -143,7 +147,6 @@ cc_library_static {
 
     export_shared_lib_headers: [
         "framework-permission-aidl-cpp",
-        "libaaudio_internal",
     ],
 
     header_libs: [

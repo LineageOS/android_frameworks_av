@@ -149,6 +149,9 @@ status_t Engine::loadWithFallback(const T& configSource) {
 
     initializeLegacyStrategyMaps();
 
+    mCommunicationStrategyId =
+            getProductStrategyForAttributes(getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL));
+
     return result.nbSkippedElement == 0? NO_ERROR : BAD_VALUE;
 }
 
@@ -384,6 +387,29 @@ status_t Engine::disableDevicesForStrategy(product_strategy_t strategy,
     return NO_ERROR;
 }
 
+audio_devices_t Engine::getPreferredDeviceTypeForProductStrategy(
+        const DeviceVector& availableOutputDevices, product_strategy_t ps) const {
+    DeviceVector devices =
+            getPreferredAvailableDevicesForProductStrategy(availableOutputDevices, ps);
+    if (devices.size() > 0) {
+        return devices[0]->type();
+    }
+    return AUDIO_DEVICE_NONE;
+}
+
+bool Engine::isBtScoActive(const DeviceVector& availableOutputDevices) const {
+    // SCO is considered active if:
+    // 1) a SCO device is connected
+    // 2) the preferred device for PHONE strategy is BT SCO: this is controlled only by java
+    // AudioService and is only true if the SCO audio link as been confirmed active by BT.
+    if (availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllScoSet()).isEmpty()) {
+        return false;
+    }
+
+    return audio_is_bluetooth_out_sco_device(getPreferredDeviceTypeForProductStrategy(
+            availableOutputDevices, mCommunicationStrategyId));
+}
+
 DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
 {
     DeviceVector selectedDevices = {};
@@ -402,70 +428,87 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
     DeviceVector preferredAvailableDevVec =
             getPreferredAvailableDevicesForProductStrategy(availableOutputDevices, ps);
     if (!preferredAvailableDevVec.isEmpty()) {
-        return preferredAvailableDevVec;
-    }
-
-    /** This is the only case handled programmatically because the PFW is unable to know the
-     * activity of streams.
-     *
-     * -While media is playing on a remote device, use the the sonification behavior.
-     * Note that we test this usecase before testing if media is playing because
-     * the isStreamActive() method only informs about the activity of a stream, not
-     * if it's for local playback. Note also that we use the same delay between both tests
-     *
-     * -When media is not playing anymore, fall back on the sonification behavior
-     */
-    DeviceTypeSet deviceTypes;
-    product_strategy_t psOrFallback = ps;
-    if (ps == getProductStrategyForStream(AUDIO_STREAM_NOTIFICATION) &&
-            !is_state_in_call(getPhoneState()) &&
-            !outputs.isActiveRemotely(toVolumeSource(AUDIO_STREAM_MUSIC),
-                                      SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY) &&
-            outputs.isActive(toVolumeSource(AUDIO_STREAM_MUSIC),
-                             SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
-        psOrFallback = getProductStrategyForStream(AUDIO_STREAM_MUSIC);
-    } else if (ps == getProductStrategyForStream(AUDIO_STREAM_ACCESSIBILITY) &&
-        (outputs.isActive(toVolumeSource(AUDIO_STREAM_RING)) ||
-         outputs.isActive(toVolumeSource(AUDIO_STREAM_ALARM)))) {
-            // do not route accessibility prompts to a digital output currently configured with a
-            // compressed format as they would likely not be mixed and dropped.
-            // Device For Sonification conf file has HDMI, SPDIF and HDMI ARC unreacheable.
-        psOrFallback = getProductStrategyForStream(AUDIO_STREAM_RING);
-    }
-    disabledDevices = getDisabledDevicesForProductStrategy(availableOutputDevices, psOrFallback);
-    deviceTypes = productStrategies.getDeviceTypesForProductStrategy(psOrFallback);
-    // In case a fallback is decided on other strategy, prevent from selecting this device if
-    // disabled for current strategy.
-    availableOutputDevices.remove(disabledDevices);
-
-    if (deviceTypes.empty() ||
-            Intersection(deviceTypes, availableOutputDevicesTypes).empty()) {
-        auto defaultDevice = getApmObserver()->getDefaultOutputDevice();
-        ALOG_ASSERT(defaultDevice != nullptr, "no valid default device defined");
-        selectedDevices = DeviceVector(defaultDevice);
-    } else if (/*device_distinguishes_on_address(*deviceTypes.begin())*/
-            isSingleDeviceType(deviceTypes, AUDIO_DEVICE_OUT_BUS) ||
-            isSingleDeviceType(deviceTypes, AUDIO_DEVICE_OUT_SPEAKER)) {
-        // We do expect only one device for these types of devices
-        // Criterion device address garantee this one is available
-        // If this criterion is not wished, need to ensure this device is available
-        const String8 address(productStrategies.getDeviceAddressForProductStrategy(ps).c_str());
-        ALOGV("%s:device %s %s %d",
-                __FUNCTION__, dumpDeviceTypes(deviceTypes).c_str(), address.c_str(), ps);
-        auto busDevice = availableOutputDevices.getDevice(
-                *deviceTypes.begin(), address, AUDIO_FORMAT_DEFAULT);
-        if (busDevice == nullptr) {
-            ALOGE("%s:unavailable device %s %s, fallback on default", __func__,
-                  dumpDeviceTypes(deviceTypes).c_str(), address.c_str());
-            auto defaultDevice = getApmObserver()->getDefaultOutputDevice();
-            ALOG_ASSERT(defaultDevice != nullptr, "Default Output Device NOT available");
-            selectedDevices = DeviceVector(defaultDevice);
-        } else {
-            selectedDevices = DeviceVector(busDevice);
-        }
+        selectedDevices = preferredAvailableDevVec;
     } else {
-        ALOGV("%s:device %s %d", __FUNCTION__, dumpDeviceTypes(deviceTypes).c_str(), ps);
-        selectedDevices = availableOutputDevices.getDevicesFromTypes(deviceTypes);
+        /** This is the only case handled programmatically because the PFW is unable to know the
+         * activity of streams.
+         *
+         * -While media is playing on a remote device, use the sonification behavior.
+         * Note that we test this usecase before testing if media is playing because
+         * the isStreamActive() method only informs about the activity of a stream, not
+         * if it's for local playback. Note also that we use the same delay between both tests
+         *
+         * -When media is not playing anymore, fall back on the sonification behavior
+         */
+        DeviceTypeSet deviceTypes;
+        product_strategy_t psOrFallback = ps;
+        if (ps == getProductStrategyForStream(AUDIO_STREAM_NOTIFICATION) &&
+                !is_state_in_call(getPhoneState()) &&
+                !outputs.isActiveRemotely(toVolumeSource(AUDIO_STREAM_MUSIC),
+                                          SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY) &&
+                outputs.isActive(toVolumeSource(AUDIO_STREAM_MUSIC),
+                                 SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
+            psOrFallback = getProductStrategyForStream(AUDIO_STREAM_MUSIC);
+        } else if (ps == getProductStrategyForStream(AUDIO_STREAM_ACCESSIBILITY) &&
+            (outputs.isActive(toVolumeSource(AUDIO_STREAM_RING)) ||
+             outputs.isActive(toVolumeSource(AUDIO_STREAM_ALARM)))) {
+                // do not route accessibility prompts to a digital output currently configured
+                // with a compressed format as they would likely not be mixed and dropped.
+                // Device For Sonification conf file has HDMI, SPDIF and HDMI ARC unreacheable.
+            psOrFallback = getProductStrategyForStream(AUDIO_STREAM_RING);
+        }
+        disabledDevices =
+                getDisabledDevicesForProductStrategy(availableOutputDevices, psOrFallback);
+        deviceTypes = productStrategies.getDeviceTypesForProductStrategy(psOrFallback);
+        // In case a fallback is decided on other strategy, prevent from selecting this device if
+        // disabled for current strategy.
+        availableOutputDevices.remove(disabledDevices);
+
+        if (deviceTypes.empty() ||
+                Intersection(deviceTypes, availableOutputDevicesTypes).empty()) {
+            auto defaultDevice = getApmObserver()->getDefaultOutputDevice();
+            ALOG_ASSERT(defaultDevice != nullptr, "no valid default device defined");
+            selectedDevices = DeviceVector(defaultDevice);
+        } else if (/*device_distinguishes_on_address(*deviceTypes.begin())*/
+                isSingleDeviceType(deviceTypes, AUDIO_DEVICE_OUT_BUS) ||
+                isSingleDeviceType(deviceTypes, AUDIO_DEVICE_OUT_SPEAKER)) {
+            // We do expect only one device for these types of devices
+            // Criterion device address guarantee this one is available
+            // If this criterion is not wished, need to ensure this device is available
+            const String8 address(productStrategies.getDeviceAddressForProductStrategy(ps).c_str());
+            ALOGV("%s:device %s %s %d",
+                    __FUNCTION__, dumpDeviceTypes(deviceTypes).c_str(), address.c_str(), ps);
+            auto busDevice = availableOutputDevices.getDevice(
+                    *deviceTypes.begin(), address, AUDIO_FORMAT_DEFAULT);
+            if (busDevice == nullptr) {
+                ALOGE("%s:unavailable device %s %s, fallback on default", __func__,
+                      dumpDeviceTypes(deviceTypes).c_str(), address.c_str());
+                auto defaultDevice = getApmObserver()->getDefaultOutputDevice();
+                ALOG_ASSERT(defaultDevice != nullptr, "Default Output Device NOT available");
+                selectedDevices = DeviceVector(defaultDevice);
+            } else {
+                selectedDevices = DeviceVector(busDevice);
+            }
+        } else {
+            ALOGV("%s:device %s %d", __FUNCTION__, dumpDeviceTypes(deviceTypes).c_str(), ps);
+            selectedDevices = availableOutputDevices.getDevicesFromTypes(deviceTypes);
+        }
+    }
+
+    if (com::android::media::audioserver::cap_engine_preferred_device_improvement()) {
+        // If the devices contains Bluetooth type(i.e A2DP or BLE) and SCO is active
+        // then replace them by SCO output.
+        auto selectedA2dpDevices =
+                selectedDevices.getDevicesFromTypes(getAudioDeviceOutAllA2dpSet());
+        auto selectedBleDevices = selectedDevices.getDevicesFromTypes(getAudioDeviceOutAllBleSet());
+        if (isBtScoActive(availableOutputDevices) &&
+            (!selectedA2dpDevices.isEmpty() || !selectedBleDevices.isEmpty())) {
+            selectedDevices.remove(selectedA2dpDevices);
+            selectedDevices.remove(selectedBleDevices);
+            // This won't be empty because isBtScoActive() made sure SCO exists.
+            selectedDevices.add(
+                availableOutputDevices.getDevicesFromTypes(getAudioDeviceOutAllScoSet()));
+        }
     }
     return selectedDevices;
 }
@@ -524,8 +567,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
     // Honor explicit routing requests only if all active clients have a preferred route in which
     // case the last active client route is used
     sp<DeviceDescriptor> device;
-    if (!com::android::media::audioserver::conditionally_ignore_preferred_input_device()
-            || !ignorePreferredDevice) {
+    if (!ignorePreferredDevice) {
         device = findPreferredDevice(inputs, attr.source, availableInputDevices);
         if (device != nullptr) {
             return device;
@@ -539,6 +581,18 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
                                                        mix);
     if (device != nullptr) {
         return device;
+    }
+
+    if (com::android::media::audioserver::cap_engine_preferred_device_improvement()) {
+        // Use the preferred device for the input source if it is available.
+        DeviceVector preferredInputDevices =
+                getPreferredAvailableDevicesForInputSource(availableInputDevices, attr.source);
+        if (!preferredInputDevices.isEmpty()) {
+            // Currently, only support single device for input. The public JAVA API also only
+            // support setting single device as preferred device. In that case, returning the
+            // first device is OK here.
+            return preferredInputDevices[0];
+        }
     }
 
     audio_devices_t deviceType = getPropertyForKey<audio_devices_t, audio_source_t>(attr.source);

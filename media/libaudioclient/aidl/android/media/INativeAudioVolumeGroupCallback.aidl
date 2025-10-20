@@ -22,7 +22,7 @@ import android.media.audio.common.AudioVolumeGroupChangeEvent;
  * The INativeAudioVolumeGroupCallback interface is a callback associated to the
  * setVolumeGroupVolumeIndex API. The callback is used by the AudioPolicyManager
  * implementation in native audio server to communicate volume changes.
- * {@hide}
+ * @hide
  */
 oneway interface INativeAudioVolumeGroupCallback {
     /**

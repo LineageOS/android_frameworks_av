@@ -22,7 +22,7 @@ import com.android.media.permission.UidPackageState;
 /**
  * This interface is used by system_server to communicate permission information
  * downwards towards native services.
- * {@hide}
+ * @hide
  */
 interface INativePermissionController {
     /**

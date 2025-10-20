@@ -26,7 +26,7 @@ import android.media.IAudioTrack;
  * when calling createTrack() including arguments that were passed as I/O for update by
  * CreateTrackRequest.
  *
- * {@hide}
+ * @hide
  */
 parcelable CreateTrackResponse {
     /** Bitmask, indexed by AudioOutputFlags. */

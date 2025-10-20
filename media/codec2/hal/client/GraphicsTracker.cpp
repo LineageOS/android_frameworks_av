@@ -25,6 +25,7 @@
 #include <private/android/AHardwareBufferHelpers.h>
 #include <vndk/hardware_buffer.h>
 
+#include <C2AllocatorGralloc.h>
 #include <C2BlockInternal.h>
 #include <codec2/aidl/GraphicsTracker.h>
 
@@ -56,6 +57,38 @@ c2_status_t retrieveAHardwareBufferId(const C2ConstGraphicBlock &blk, uint64_t *
     } else {
         return C2_OMITTED;
     }
+}
+
+// Create a GraphicBuffer object from a graphic block.
+sp<GraphicBuffer> createGraphicBuffer(
+        const C2ConstGraphicBlock& block, uint32_t toGeneration, uint64_t toUsage) {
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint64_t usage;
+    uint32_t stride;
+    uint32_t generation;
+    uint64_t bqId;
+    int32_t bqSlot;
+    ::android::_UnwrapNativeCodec2GrallocMetadata(
+            block.handle(), &width, &height, &format, &usage,
+            &stride, &generation, &bqId, reinterpret_cast<uint32_t*>(&bqSlot));
+
+    // android::UnwrapNativCodec2GrallocHandle() returns
+    // a new native_handle_t with undup'ed fds.
+    native_handle_t *grallocHandle =
+            ::android::UnwrapNativeCodec2GrallocHandle(block.handle());
+    if (grallocHandle == nullptr) {
+        return nullptr;
+    }
+    sp<GraphicBuffer> graphicBuffer =
+            new GraphicBuffer(grallocHandle,
+                              GraphicBuffer::CLONE_HANDLE,
+                              width, height, format,
+                              1, (usage | toUsage), stride);
+    graphicBuffer->setGenerationNumber(toGeneration);
+    native_handle_delete(grallocHandle);
+    return graphicBuffer;
 }
 
 } // anonymous namespace
@@ -1019,6 +1052,75 @@ c2_status_t GraphicsTracker::deallocate(uint64_t bid, const sp<Fence> &fence) {
     return C2_OK;
 }
 
+c2_status_t GraphicsTracker::requestAttachForRender(const C2ConstGraphicBlock& blk,
+        const sp<Fence> &fence,
+        std::shared_ptr<BufferCache> *pCache,
+        std::shared_ptr<BufferItem> *pBuffer,
+        bool *updateDequeue) {
+    if (mStopped.load() == true) {
+        ALOGE("cannot requestAttachForRender due to being stopped");
+        return C2_BAD_STATE;
+    }
+    // allocate for attach
+    c2_status_t res = C2_OK;
+    std::shared_ptr<BufferCache> cache;
+    {
+        std::unique_lock<std::mutex> l(mLock);
+        if (mStopRequested) {
+            return C2_BAD_STATE;
+        }
+        if (!mBufferCache || !(mBufferCache->mIgbp)) {
+            return C2_OMITTED;
+        }
+        res = requestAllocateLocked(&cache);
+        if (res != C2_OK) {
+            ALOGV("cannot allocate for requestAttachForRender: %d", res);
+            return res;
+        }
+    }
+    // attach to the surface
+    ::android::sp<IGraphicBufferProducer> igbp = cache->mIgbp;
+    uint32_t generation = cache->mGeneration;
+    uint64_t usage = 0ULL;
+    int slotId = -1;
+    (void)igbp->getConsumerUsage(&usage);
+    sp<GraphicBuffer> grBuf = createGraphicBuffer(blk, generation, usage);
+    std::shared_ptr<BufferItem> buffer;
+    if (grBuf) {
+        ::android::status_t status = igbp->attachBuffer(&slotId, grBuf);
+        if (status != ::android::OK) {
+            res = C2_REFUSED;
+        } else {
+            buffer = std::make_shared<BufferItem>(generation, slotId, grBuf, fence);
+            if (buffer->mInit) {
+                cache->waitOnSlot(slotId);
+                *pCache = cache;
+                *pBuffer = buffer;
+                res = C2_OK;
+            } else {
+                (void)igbp->cancelBuffer(slotId, Fence::NO_FENCE);
+                buffer.reset();
+                res = C2_BAD_VALUE;
+            }
+        }
+    } else {
+        res = C2_BAD_VALUE;
+    }
+    // Do commitAllocate() regardless of the return value, since commitAllocate()
+    // also handle rollback from requestAllocateLocked()(removing the pre allocated
+    // room).
+    commitAllocate(res, cache, false, slotId, fence, &buffer, updateDequeue);
+    if (res == C2_OK) {
+        // since attach/allocate was successful, prepare for render here.
+        {
+            std::unique_lock<std::mutex> l(mLock);
+            mDeallocating.emplace(buffer->mId);
+        }
+        cache->blockSlot(buffer->mSlot);
+    }
+    return res;
+}
+
 c2_status_t GraphicsTracker::requestRender(uint64_t bid, std::shared_ptr<BufferCache> *cache,
                                           std::shared_ptr<BufferItem> *pBuffer,
                                           bool *fromCache,
@@ -1095,28 +1197,46 @@ void GraphicsTracker::commitRender(const std::shared_ptr<BufferCache> &cache,
 c2_status_t GraphicsTracker::render(const C2ConstGraphicBlock& blk,
                                    const IGraphicBufferProducer::QueueBufferInput &input,
                                    IGraphicBufferProducer::QueueBufferOutput *output) {
-    uint64_t bid;
-    c2_status_t res = retrieveAHardwareBufferId(blk, &bid);
-    if (res != C2_OK) {
-        ALOGE("retrieving AHB-ID for GraphicBlock failed");
-        return C2_CORRUPTED;
-    }
-    std::shared_ptr<_C2BlockPoolData> poolData =
-            _C2BlockFactory::GetGraphicBlockPoolData(blk);
-    _C2BlockFactory::DisownIgbaBlock(poolData);
     std::shared_ptr<BufferCache> cache;
     std::shared_ptr<BufferItem> buffer;
-    std::shared_ptr<BufferItem> oldBuffer;
+    uint64_t bid;
     bool updateDequeue = false;
     bool fromCache = false;
-    res = requestRender(bid, &cache, &buffer, &fromCache, &updateDequeue);
-    if (res != C2_OK) {
-        if (updateDequeue) {
-            updateDequeueConf();
+    std::shared_ptr<_C2BlockPoolData> poolData = _C2BlockFactory::GetGraphicBlockPoolData(blk);
+    if (!poolData) {
+        if (!blk.handle()) {
+            ALOGE("block does not have native_handle for render");
+            return C2_CORRUPTED;
         }
-        return res;
+        // This might be a block directly created by gralloc allocator.
+        // So we need to attach the block to the surface before render.
+        fromCache = true;
+        c2_status_t res = requestAttachForRender(
+                blk, input.fence, &cache, &buffer, &updateDequeue);
+        if (res != C2_OK) {
+            if (updateDequeue) {
+                updateDequeueConf();
+            }
+            ALOGE("attaching external buffer for render failed: %d", res);
+            return res;
+        }
+    } else {
+        c2_status_t res = retrieveAHardwareBufferId(blk, &bid);
+        if (res != C2_OK) {
+            ALOGE("retrieving AHB-ID for GraphicBlock failed");
+            return C2_CORRUPTED;
+        }
+        _C2BlockFactory::DisownIgbaBlock(poolData);
+        res = requestRender(bid, &cache, &buffer, &fromCache, &updateDequeue);
+        if (res != C2_OK) {
+            if (updateDequeue) {
+                updateDequeueConf();
+            }
+            return res;
+        }
     }
     int cacheSlotId = fromCache ? buffer->mSlot : -1;
+    std::shared_ptr<BufferItem> oldBuffer;
     ALOGV("render prepared: igbp(%d) slot(%d)", bool(cache->mIgbp), cacheSlotId);
     if (!fromCache) {
         // The buffer does not come from the current cache.

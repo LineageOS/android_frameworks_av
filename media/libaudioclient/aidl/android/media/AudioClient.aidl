@@ -19,7 +19,7 @@ package android.media;
 import android.content.AttributionSourceState;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioClient {
     /** Interpreted as pid_t. */

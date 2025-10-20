@@ -15,11 +15,14 @@
  */
 
 #ifndef BUFFER_PRODUCER_WRAPPER_H_
-
 #define BUFFER_PRODUCER_WRAPPER_H_
 
 #include <gui/IGraphicBufferProducer.h>
 #include <media/stagefright/foundation/ABase.h>
+
+// Surface inherits from ANativeObjectBase, which in turn inherits from RefBase.
+// Once we move to Surface we won't need this wrapper.
+#if not COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
 
 namespace android {
 
@@ -44,4 +47,5 @@ private:
 
 }  // namespace android
 
+#endif  // not WB_MEDIA_MIGRATION
 #endif  // BUFFER_PRODUCER_WRAPPER_H_

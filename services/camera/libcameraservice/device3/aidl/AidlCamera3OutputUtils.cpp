@@ -26,7 +26,8 @@
 #endif
 
 // Convenience macros for transitioning to the error state
-#define SET_ERR(fmt, ...) states.setErrIntf.setErrorState(   \
+#define SET_ERR(errorState, fmt, ...) states.setErrIntf.setErrorState(   \
+    android::framework::stats::CAMERA_ACTION_EVENT__ERROR_STATE__##errorState, \
     "%s: " fmt, __FUNCTION__,                         \
     ##__VA_ARGS__)
 
@@ -41,6 +42,7 @@
 
 #include <camera/CameraUtils.h>
 #include <camera_metadata_hidden.h>
+#include <statslog_framework.h>
 
 #include "device3/aidl/AidlCamera3OutputUtils.h"
 #include "device3/Camera3OutputUtilsTemplated.h"
@@ -310,7 +312,8 @@ void requestStreamBuffers(RequestBufferStates& states,
                 status_t res = states.bufferRecordsIntf.popInflightRequestBuffer(
                         hBuf.bufferId, &buffer);
                 if (res != OK) {
-                    SET_ERR("%s: popInflightRequestBuffer failed for stream %d: %s (%d)",
+                    SET_ERR(CAMERA_SERVICE_INTERNAL_ERROR,
+                    "%s: popInflightRequestBuffer failed for stream %d: %s (%d)",
                             __FUNCTION__, streamId, strerror(-res), res);
                 }
             }

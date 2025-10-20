@@ -29,10 +29,13 @@
 #include <C2AllocatorIon.h>
 #include <C2BufferPriv.h>
 #include <C2Debug.h>
+#include <C2DmaBufAllocator.h>
 #include <C2BlockInternal.h>
 #include <C2PlatformSupport.h>
 #include <bufferpool/ClientManager.h>
 #include <bufferpool2/ClientManager.h>
+
+class C2_HIDE _C2Block1DImpl;
 
 namespace {
 
@@ -56,11 +59,13 @@ using ResultStatus2 = aidl::android::hardware::media::bufferpool2::ResultStatus;
 class ReadViewBuddy : public C2ReadView {
     using C2ReadView::C2ReadView;
     friend class ::C2ConstLinearBlock;
+    friend class ::_C2Block1DImpl;
 };
 
 class WriteViewBuddy : public C2WriteView {
     using C2WriteView::C2WriteView;
     friend class ::C2LinearBlock;
+    friend class ::_C2Block1DImpl;
 };
 
 class ConstLinearBlockBuddy : public C2ConstLinearBlock {
@@ -76,11 +81,14 @@ class LinearBlockBuddy : public C2LinearBlock {
 class AcquirableReadViewBuddy : public C2Acquirable<C2ReadView> {
     using C2Acquirable::C2Acquirable;
     friend class ::C2ConstLinearBlock;
+    friend class ::_C2Block1DImpl;
 };
 
 class AcquirableWriteViewBuddy : public C2Acquirable<C2WriteView> {
     using C2Acquirable::C2Acquirable;
     friend class ::C2LinearBlock;
+    friend class ::_C2Block1DImpl;
+    friend struct ::_C2BlockFactory;
 };
 
 class GraphicViewBuddy : public C2GraphicView {
@@ -184,6 +192,18 @@ public:
     std::shared_ptr<C2LinearAllocation> getAllocation() const {
         return mAllocation;
     }
+
+    C2Acquirable<C2ReadView> mapReadView(
+            uint32_t offset,
+            uint32_t len,
+            C2LinearMapFn mapFn = ::mmap,
+            C2LinearUnmapFn unmapFn = ::munmap) const;
+
+    C2Acquirable<C2WriteView> mapWriteView(
+            uint32_t offset,
+            uint32_t len,
+            C2LinearMapFn mapFn = ::mmap,
+            C2LinearUnmapFn unmapFn = ::munmap) const;
 
 private:
     std::shared_ptr<C2LinearAllocation> mAllocation;
@@ -306,23 +326,9 @@ c2_status_t C2WriteView::error() const { return mImpl->error(); }
 C2ConstLinearBlock::C2ConstLinearBlock(std::shared_ptr<Impl> impl, const _C2LinearRangeAspect &range, C2Fence fence)
     : C2Block1D(impl, range), mFence(fence) { }
 
+
 C2Acquirable<C2ReadView> C2ConstLinearBlock::map() const {
-    void *base = nullptr;
-    uint32_t len = size();
-    c2_status_t error = mImpl->getAllocation()->map(
-            offset(), len, { C2MemoryUsage::CPU_READ, 0 }, nullptr, &base);
-    // TODO: wait on fence
-    if (error == C2_OK) {
-        std::shared_ptr<ReadViewBuddy::Impl> rvi = std::shared_ptr<ReadViewBuddy::Impl>(
-                new ReadViewBuddy::Impl(*mImpl, (uint8_t *)base, offset(), len),
-                [base, len](ReadViewBuddy::Impl *i) {
-                    (void)i->getAllocation()->unmap(base, len, nullptr);
-                    delete i;
-        });
-        return AcquirableReadViewBuddy(error, C2Fence(), ReadViewBuddy(rvi, 0, len));
-    } else {
-        return AcquirableReadViewBuddy(error, C2Fence(), ReadViewBuddy(error));
-    }
+    return mImpl->mapReadView(offset(), size());
 }
 
 C2ConstLinearBlock C2ConstLinearBlock::subBlock(size_t offset_, size_t size_) const {
@@ -546,6 +552,19 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
     }
     return nullptr;
 };
+
+std::shared_ptr<C2LinearAllocation> _C2BlockFactory::GetLinearAllocation(
+        const std::shared_ptr<C2LinearBlock>& block) {
+    if (block) {
+        return block->mImpl->getAllocation();
+    }
+    return nullptr;
+}
+
+std::shared_ptr<C2LinearAllocation> _C2BlockFactory::GetLinearAllocation(
+        C2ConstLinearBlock& block) {
+    return block.mImpl->getAllocation();
+}
 
 /**
  * Wrapped C2Allocator which is injected to buffer pool on behalf of
@@ -1225,6 +1244,64 @@ int64_t C2PooledBlockPool::getConnectionId() {
     return 0;
 }
 
+C2Acquirable<C2ReadView> _C2Block1DImpl::mapReadView(
+        uint32_t offset,
+        uint32_t len,
+        C2LinearMapFn mapFn,
+        C2LinearUnmapFn unmapFn) const {
+    void *base = nullptr;
+    c2_status_t error = C2_OK;
+    C2MemoryUsage usage{C2MemoryUsage::CPU_READ, 0};
+    if (android::C2DmaBufAllocator::CheckHandle(handle())) {
+        error = android::C2DmaBufAllocator::Map(
+                mAllocation, offset, len, usage, nullptr, &base, mapFn, unmapFn);
+    } else {
+        error = mAllocation->map(
+                offset, len, usage, nullptr, &base);
+    }
+    // TODO: wait on fence
+    if (error == C2_OK) {
+        std::shared_ptr<ReadViewBuddy::Impl> rvi = std::shared_ptr<ReadViewBuddy::Impl>(
+                new ReadViewBuddy::Impl(*this, (uint8_t *)base, offset, len),
+                [base, len](ReadViewBuddy::Impl *i) {
+                    (void)i->getAllocation()->unmap(base, len, nullptr);
+                    delete i;
+                });
+        return AcquirableReadViewBuddy(error, C2Fence(), ReadViewBuddy(rvi, 0, len));
+    } else {
+        return AcquirableReadViewBuddy(error, C2Fence(), ReadViewBuddy(error));
+    }
+}
+
+C2Acquirable<C2WriteView> _C2Block1DImpl::mapWriteView(
+        uint32_t offset,
+        uint32_t len,
+        C2LinearMapFn mapFn,
+        C2LinearUnmapFn unmapFn) const {
+    void *base = nullptr;
+    c2_status_t error = C2_OK;
+    C2MemoryUsage usage{C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+    if (android::C2DmaBufAllocator::CheckHandle(handle())) {
+        error = android::C2DmaBufAllocator::Map(
+                mAllocation, offset, len, usage, nullptr, &base, mapFn, unmapFn);
+    } else {
+        error = mAllocation->map(
+                offset, len, usage, nullptr, &base);
+    }
+    // TODO: wait on fence
+    if (error == C2_OK) {
+        std::shared_ptr<WriteViewBuddy::Impl> wvi = std::shared_ptr<WriteViewBuddy::Impl>(
+                new WriteViewBuddy::Impl(*this, (uint8_t *)base, 0, len),
+                [base, len](WriteViewBuddy::Impl *i) {
+                    (void)i->getAllocation()->unmap(base, len, nullptr);
+                    delete i;
+                });
+        return AcquirableWriteViewBuddy(error, C2Fence(), WriteViewBuddy(wvi));
+    } else {
+        return AcquirableWriteViewBuddy(error, C2Fence(), WriteViewBuddy(error));
+    }
+}
+
 /* ========================================== 2D BLOCK ========================================= */
 
 /**
@@ -1594,6 +1671,19 @@ std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
     }
     return nullptr;
 };
+
+C2Acquirable<C2WriteView> _C2BlockFactory::MapLinearWithMapper(
+        const std::shared_ptr<C2LinearBlock> &block, C2LinearMapFn mapFn, C2LinearUnmapFn unmapFn) {
+    if (!block) {
+        return AcquirableWriteViewBuddy(C2_BAD_VALUE, C2Fence(), WriteViewBuddy(C2_BAD_VALUE));
+    }
+    return block->mImpl->mapWriteView(block->offset(), block->size(), mapFn, unmapFn);
+}
+
+C2Acquirable<C2ReadView> _C2BlockFactory::MapConstLinearWithMapper(
+        const C2ConstLinearBlock &block, C2LinearMapFn mapFn, C2LinearUnmapFn unmapFn) {
+    return block.mImpl->mapReadView(block.offset(), block.size(), mapFn, unmapFn);
+}
 
 /* ========================================== BUFFER ========================================= */
 

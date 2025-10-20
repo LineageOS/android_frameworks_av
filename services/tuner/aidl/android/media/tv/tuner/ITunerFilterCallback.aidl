@@ -22,7 +22,7 @@ import android.hardware.tv.tuner.DemuxFilterStatus;
 /**
  * TunerFilterCallback interface handles tuner filter related callbacks.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerFilterCallback {
     /**

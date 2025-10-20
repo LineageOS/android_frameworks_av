@@ -27,7 +27,7 @@ import android.media.audio.common.AudioConfig;
  * when calling createTrack() including arguments that will be updated by AudioFlinger
  * and returned in CreateTrackResponse object.
  *
- * {@hide}
+ * @hide
  */
 parcelable CreateTrackRequest {
     AudioAttributes attr;

@@ -702,18 +702,11 @@ protected:
 
         void setVoiceVolume(int index, IVolumeCurves &curves, bool isVoiceVolSrc, int delayMs);
 
-        // returns true if the supplied set of volume source and devices are consistent with
-        // call volume rules:
-        // if Bluetooth SCO and voice call use different volume curves:
-        // - do not apply voice call volume if Bluetooth SCO is used for call
-        // - do not apply Bluetooth SCO volume if SCO or Hearing Aid is not used for call.
-        // Also updates the booleans isVoiceVolSrc and isBtScoVolSrc according to the
+        // Updates the booleans isVoiceVolSrc and isBtScoVolSrc according to the
         // volume source supplied.
-        bool isVolumeConsistentForCalls(VolumeSource volumeSource,
-                                       const DeviceTypeSet& deviceTypes,
-                                       bool& isVoiceVolSrc,
-                                       bool& isBtScoVolSrc,
-                                       const char* caller);
+        void updateVoiceBtScoVolumeSrcForCalls(VolumeSource volumeSource,
+                                              bool& isVoiceVolSrc,
+                                              bool& isBtScoVolSrc);
         // apply all stream volumes to the specified output and device
         void applyStreamVolumes(const sp<AudioOutputDescriptor>& outputDesc,
                                 const DeviceTypeSet& deviceTypes,
@@ -784,7 +777,7 @@ protected:
         // if 'onOutputsChecked' callback is provided, it is executed after the outputs
         // check via 'checkOutputForAllStrategies'. If the callback returns 'true',
         // A2DP suspend status is rechecked.
-        void checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked = nullptr);
+        void checkForDeviceAndOutputChanges(std::function<void()> onOutputsChecked = nullptr);
 
         /**
          * @brief updates routing for all outputs (including call if call in progress).
@@ -801,6 +794,11 @@ protected:
         void connectTelephonyTxAudioSource(const sp<DeviceDescriptor> &srcdevice,
                                            const sp<DeviceDescriptor> &sinkDevice,
                                            uint32_t delayMs);
+
+        void rerouteTelephonyAudioSource(const sp<SourceClientDescriptor> &source,
+                                         const sp<DeviceDescriptor> &srcDevice,
+                                         const sp<DeviceDescriptor> &sinkDevice,
+                                         uint32_t delayMs);
 
         bool isTelephonyRxOrTx(const sp<SwAudioOutputDescriptor>& desc) const {
             return (mCallRxSourceClient != nullptr && mCallRxSourceClient->belongsToOutput(desc))
@@ -845,9 +843,6 @@ protected:
         // Same as checkOutputForStrategy but for secondary outputs. Make sure if a secondary
         // output condition changes, the track is properly rerouted
         void checkSecondaryOutputs();
-
-        // manages A2DP output suspend/restore according to phone state and BT SCO usage
-        void checkA2dpSuspend();
 
         // selects the most appropriate device on output for current state
         // must be called every time a condition that affects the device choice for a given output is
@@ -996,7 +991,8 @@ protected:
                              const sp<TrackClientDescriptor>& client,
                              uint32_t *delayMs);
         status_t stopSource(const sp<SwAudioOutputDescriptor>& outputDesc,
-                            const sp<TrackClientDescriptor>& client);
+                            const sp<TrackClientDescriptor>& client,
+                            uint32_t delayMs);
 
         void clearAudioPatches(uid_t uid);
         void clearSessionRoutes(uid_t uid);
@@ -1084,7 +1080,6 @@ protected:
         bool    mLimitRingtoneVolume;        // limit ringtone volume to music volume if headset connected
 
         float   mLastVoiceVolume;            // last voice volume value sent to audio HAL
-        bool    mA2dpSuspended;  // true if A2DP output is suspended
 
         EffectDescriptorCollection mEffects;  // list of registered audio effects
         HwModuleCollection mHwModules; // contains modules that have been loaded successfully

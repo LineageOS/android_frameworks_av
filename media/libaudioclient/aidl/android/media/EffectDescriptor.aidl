@@ -19,7 +19,7 @@ package android.media;
 import android.media.audio.common.AudioUuid;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable EffectDescriptor {
     /** UUID of to the OpenSL ES interface implemented by this effect. */

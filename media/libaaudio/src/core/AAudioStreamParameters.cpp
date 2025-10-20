@@ -17,12 +17,14 @@
 
 #define LOG_TAG "AAudioStreamParameters"
 
-#include <android-base/strings.h>
-#include <utils/Log.h>
-#include <system/audio.h>
-#include <system/aaudio/AAudio.h>
-
 #include "AAudioStreamParameters.h"
+
+// go/keep-sorted start
+#include <android-base/strings.h>
+#include <system/aaudio/AAudio.h>
+#include <system/audio.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
 using namespace aaudio;
 

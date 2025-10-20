@@ -81,6 +81,9 @@ cc_library {
         local_include_dirs: ["aidl"],
         include_dirs: [
             "frameworks/native/aidl/gui",
+            "frameworks/base/native/android",
+            "frameworks/base/native/android/aidl",
+            "frameworks/base/native/android/aidl/android/content/res",
             "frameworks/native/libs/permission/aidl",
             "hardware/interfaces/common/fmq/aidl",
             "hardware/interfaces/common/aidl",
@@ -128,6 +131,8 @@ cc_library {
         "libnativewindow",
         "libpermission",
         "libutils",
+        "libcameracompatbilityinfo",
+        "lib-camera-compatibility-info-api",
     ],
 
     include_dirs: [
@@ -145,6 +150,7 @@ cc_library {
         "libcamera_metadata",
         "libgui",
         "libnativewindow",
+        "libcameracompatbilityinfo",
     ],
 
     cflags: [
@@ -152,7 +158,6 @@ cc_library {
         "-Werror",
         "-Wextra",
     ],
-
 }
 
 cc_library_host_static {
@@ -194,6 +199,8 @@ filegroup {
         "aidl/android/hardware/camera2/ICameraInjectionSession.aidl",
         "aidl/android/hardware/camera2/ICameraOfflineSession.aidl",
         "aidl/android/hardware/camera2/CameraMetadataInfo.aidl",
+        "aidl/android/hardware/camera2/utils/OutputAndInputStreamIds.aidl",
+        "aidl/android/hardware/camera2/utils/SessionConfigurationAndStreamIds.aidl",
     ],
     path: "aidl",
 }

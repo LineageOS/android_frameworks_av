@@ -16,30 +16,34 @@
 
 #define LOG_TAG "AudioStreamBuilder"
 //#define LOG_NDEBUG 0
-#include <utils/Log.h>
 
-#include <new>
-#include <numeric>
-#include <stdint.h>
-#include <vector>
+#include "AudioStreamBuilder.h"
 
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 #include <android/media/audio/common/AudioMMapPolicy.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <binding/AAudioBinderClient.h>
+#include <client/AudioStreamInternalCapture.h>
+#include <client/AudioStreamInternalPlay.h>
+#include <core/AudioStream.h>
+#include <legacy/AudioStreamRecord.h>
+#include <legacy/AudioStreamTrack.h>
 #include <media/AudioSystem.h>
 #include <system/aaudio/AAudio.h>
+#include <utility/AAudioUtilities.h>
+#include <utility/AudioGlobal.h>
+#include <utils/Log.h>
+// go/keep-sorted end
 
-#include "binding/AAudioBinderClient.h"
-#include "client/AudioStreamInternalCapture.h"
-#include "client/AudioStreamInternalPlay.h"
-#include "core/AudioGlobal.h"
-#include "core/AudioStream.h"
-#include "core/AudioStreamBuilder.h"
-#include "legacy/AudioStreamRecord.h"
-#include "legacy/AudioStreamTrack.h"
-#include "utility/AAudioUtilities.h"
+// go/keep-sorted start
+#include <new>
+#include <numeric>
+#include <stdint.h>
+#include <vector>
+// go/keep-sorted end
 
 using namespace aaudio;
 

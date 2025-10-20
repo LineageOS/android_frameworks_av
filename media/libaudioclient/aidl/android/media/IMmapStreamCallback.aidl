@@ -22,7 +22,7 @@ import android.media.TimerQueueHandle;
  * The IMmapStreamCallback interface is the binder interface for AudioFlinger to notify
  * condition changes affecting the stream operation.
  *
- * {@hide}
+ * @hide
  */
 oneway interface IMmapStreamCallback {
     /**

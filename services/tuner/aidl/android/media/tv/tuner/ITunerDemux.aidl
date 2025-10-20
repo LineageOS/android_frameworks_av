@@ -28,7 +28,7 @@ import android.media.tv.tuner.ITunerTimeFilter;
 /**
  * Tuner Demux interface handles tuner related operations.
  *
- * {@hide}
+ * @hide
  */
 interface ITunerDemux {
 

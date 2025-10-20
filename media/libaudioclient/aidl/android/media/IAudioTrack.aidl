@@ -27,7 +27,7 @@ import android.media.audio.common.AudioPlaybackRate;
 /**
  * Unless otherwise noted, methods returning int expect it to be interpreted as a status_t.
  *
- * {@hide}
+ * @hide
  */
 interface IAudioTrack {
     /** Get this track's control block */

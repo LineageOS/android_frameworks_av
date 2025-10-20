@@ -66,7 +66,7 @@ import com.android.media.permission.INativePermissionController;
 /**
  * IAudioPolicyService interface (see AudioPolicyInterface for method descriptions).
  *
- * {@hide}
+ * @hide
  */
 interface IAudioPolicyService {
     oneway void onNewAudioModulesAvailable();

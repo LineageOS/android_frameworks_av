@@ -42,7 +42,8 @@ class AidlCamera3Device :
     explicit AidlCamera3Device(
             std::shared_ptr<CameraServiceProxyWrapper>& cameraServiceProxyWrapper,
             std::shared_ptr<AttributionAndPermissionUtils> attributionAndPermissionUtils,
-            const std::string& id, bool overrideForPerfClass, int rotationOverride,
+            const std::string& id, bool overrideForPerfClass,
+            const CameraCompatibilityInfo& compatInfo,
             bool isVendorClient, bool legacyClient = false);
 
     virtual ~AidlCamera3Device() { }
@@ -186,7 +187,7 @@ class AidlCamera3Device :
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                int rotationOverride,
+                const CameraCompatibilityInfo& compatInfo,
                 bool supportSettingsOverride);
 
         status_t switchToOffline(
@@ -277,7 +278,7 @@ class AidlCamera3Device :
                 const Vector<int32_t>& sessionParamKeys,
                 bool useHalBufManager,
                 bool supportCameraMute,
-                int rotationOverride,
+                const CameraCompatibilityInfo& compatInfo,
                 bool supportSettingsOverride) override;
 
     virtual sp<Camera3DeviceInjectionMethods>

@@ -38,9 +38,11 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
                 {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_VOICE_COMMUNICATION,
                     AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}},
              },
+             // TODO(b/441152611): this will be filtered out with audio_stream_bt_sco_cleanup,
+             //   remove once the flag is rolled out
              {AUDIO_STREAM_BLUETOOTH_SCO, "AUDIO_STREAM_BLUETOOTH_SCO",
-                {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
-                  AUDIO_FLAG_SCO,""}},
+                     {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
+                              AUDIO_FLAG_SCO,""}},
              }
          },
     },

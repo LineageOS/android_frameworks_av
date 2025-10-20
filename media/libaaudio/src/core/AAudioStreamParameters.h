@@ -17,11 +17,13 @@
 #ifndef AAUDIO_STREAM_PARAMETERS_H
 #define AAUDIO_STREAM_PARAMETERS_H
 
-#include <stdint.h>
-
+// go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <media/AudioContainers.h>
 #include <utility/AAudioUtilities.h>
+// go/keep-sorted end
+
+#include <stdint.h>
 
 namespace aaudio {
 

@@ -1,0 +1,110 @@
+// Copyright (C) 2025 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package {
+    default_team: "trendy_team_android_media_audio_framework",
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+aidl_interface_defaults {
+    name: "audio-aidl-defaults",
+    unstable: true,
+    host_supported: true,
+    backend: {
+        cpp: {
+            enabled: true,
+        },
+        java: {
+            enabled: true,
+        },
+        rust: {
+            enabled: true,
+        },
+    },
+
+}
+
+aidl_interface {
+    name: "av-types-aidl",
+    unstable: true,
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    local_include_dir: ".",
+    srcs: [
+        "android/media/IAudioManagerNative.aidl",
+        "android/media/InterpolatorConfig.aidl",
+        "android/media/InterpolatorType.aidl",
+        "android/media/MicrophoneInfoFw.aidl",
+        "android/media/VolumeShaperConfiguration.aidl",
+        "android/media/VolumeShaperConfigurationOptionFlag.aidl",
+        "android/media/VolumeShaperConfigurationType.aidl",
+        "android/media/VolumeShaperOperation.aidl",
+        "android/media/VolumeShaperOperationFlag.aidl",
+        "android/media/VolumeShaperState.aidl",
+    ],
+    defaults: [
+        "latest_android_media_audio_common_types_import_interface",
+    ],
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.bt",
+                "com.android.media",
+                "com.android.media.swcodec",
+            ],
+        },
+        java: {
+            sdk_version: "module_current",
+        },
+    },
+}
+
+aidl_interface {
+    name: "audio-permission-aidl",
+    // TODO remove
+    vendor_available: true,
+    double_loadable: true,
+    defaults: ["audio-aidl-defaults"],
+    local_include_dir: ".",
+    srcs: [
+        "com/android/media/permission/*",
+    ],
+}
+
+aidl_interface {
+    name: "av-audio-types-aidl",
+    unstable: true,
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    local_include_dir: ".",
+    srcs: [
+        "android/media/audio/IHalAdapterVendorExtension.aidl",
+    ],
+    defaults: [
+        "latest_android_hardware_audio_core_import_interface",
+    ],
+    backend: {
+        // The C++ backend is disabled transitively due to use of FMQ by the audio core HAL.
+        cpp: {
+            enabled: false,
+        },
+        java: {
+            sdk_version: "module_current",
+        },
+    },
+}

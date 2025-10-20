@@ -1262,7 +1262,7 @@ public:
     float                   mSendLevel;
     mutable uint32_t        mSampleRate;            // mutable because getSampleRate() can update it
     uint32_t                mOriginalSampleRate;
-    AudioPlaybackRate       mPlaybackRate;
+    AudioPlaybackRate       mPlaybackRate;          // what is requested by the client
     float                   mMaxRequiredSpeed;      // use PCM buffer size to allow this speed
 
     // Corresponds to current IAudioTrack, value is reported back by AudioFlinger to the client.

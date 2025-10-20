@@ -19,7 +19,7 @@ package android.media;
 import android.media.AudioMixMatchCriterionValue;
 
 /**
- * {@hide}
+ * @hide
  */
 parcelable AudioMixMatchCriterion {
     /** When true, rule becomes "exclude" instead of "include". */

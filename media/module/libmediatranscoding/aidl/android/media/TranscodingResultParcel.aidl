@@ -21,7 +21,7 @@ import android.media.TranscodingSessionStats;
 /**
  * Result of the transcoding.
  *
- * {@hide}
+ * @hide
  */
 //TODO(hkuang): Implement the parcelable.
 parcelable TranscodingResultParcel {

@@ -3134,7 +3134,7 @@ typedef enum acamera_metadata_tag {
     ACAMERA_LENS_FILTER_DENSITY =                               // float
             ACAMERA_LENS_START + 1,
     /**
-     * <p>The desired lens focal length; used for optical zoom.</p>
+     * <p>The desired lens focal length</p>
      *
      * <p>Type: float</p>
      *
@@ -3144,22 +3144,30 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
-     * <p>This setting controls the physical focal length of the camera
-     * device's lens. Changing the focal length changes the field of
-     * view of the camera device, and is usually used for optical zoom.</p>
-     * <p>Like ACAMERA_LENS_FOCUS_DISTANCE and ACAMERA_LENS_APERTURE, this
-     * setting won't be applied instantaneously, and it may take several
-     * frames before the lens can change to the requested focal length.
-     * While the focal length is still changing, ACAMERA_LENS_STATE will
-     * be set to MOVING.</p>
-     * <p>Optical zoom via this control will not be supported on most devices. Starting from API
-     * level 30, the camera device may combine optical and digital zoom through the
-     * ACAMERA_CONTROL_ZOOM_RATIO control.</p>
+     * <p>Focal length is the distance from the optical center of the lens to the
+     * focal point for a thin lens approximation of the camera optical system.
+     * The definition assumes the lens is focused at infinity.</p>
+     * <p>The horizontal field-of-view of the processed full frame camera outputs
+     * can be derived as:</p>
+     * <pre><code>fov = 2 * atan2(sw / 2, fl)
+     * </code></pre>
+     * <p>where:</p>
+     * <ul>
+     * <li><code>sw</code> is the ACAMERA_SENSOR_INFO_PHYSICAL_SIZE width,</li>
+     * <li><code>fl</code> is ACAMERA_LENS_FOCAL_LENGTH.</li>
+     * </ul>
+     * <p>Using this control to switch between lenses is not supported on most
+     * devices. Starting from API level 30, the application is strongly recommended
+     * to use ACAMERA_CONTROL_ZOOM_RATIO for combined optical and digital zoom. To
+     * exclusively use a particular focal length lens in a logical multi-camera,
+     * applications can iterate over the physical cameras exposed by the logical
+     * multi-camera device via
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#getPhysicalCameraIds">CameraCharacteristics#getPhysicalCameraIds</a>
+     * and select the one with the desired focal length.</p>
      *
      * @see ACAMERA_CONTROL_ZOOM_RATIO
-     * @see ACAMERA_LENS_APERTURE
-     * @see ACAMERA_LENS_FOCUS_DISTANCE
-     * @see ACAMERA_LENS_STATE
+     * @see ACAMERA_LENS_FOCAL_LENGTH
+     * @see ACAMERA_SENSOR_INFO_PHYSICAL_SIZE
      */
     ACAMERA_LENS_FOCAL_LENGTH =                                 // float
             ACAMERA_LENS_START + 2,
@@ -3367,8 +3375,7 @@ typedef enum acamera_metadata_tag {
      * <ul>
      * <li>Fixed focus (<code>ACAMERA_LENS_INFO_MINIMUM_FOCUS_DISTANCE == 0</code>), which means
      * ACAMERA_LENS_FOCUS_DISTANCE parameter will always be 0.</li>
-     * <li>Fixed focal length (ACAMERA_LENS_INFO_AVAILABLE_FOCAL_LENGTHS contains single value),
-     * which means the optical zoom is not supported.</li>
+     * <li>Fixed focal length (ACAMERA_LENS_INFO_AVAILABLE_FOCAL_LENGTHS contains single value).</li>
      * <li>No ND filter (ACAMERA_LENS_INFO_AVAILABLE_FILTER_DENSITIES contains only 0).</li>
      * <li>Fixed aperture (ACAMERA_LENS_INFO_AVAILABLE_APERTURES contains single value).</li>
      * </ul>
@@ -3626,10 +3633,9 @@ typedef enum acamera_metadata_tag {
      *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
      * </ul></p>
      *
-     * <p>If optical zoom is not supported, this list will only contain
-     * a single value corresponding to the fixed focal length of the
-     * device. Otherwise, this list will include every focal length supported
-     * by the camera device, in ascending order.</p>
+     * <p>In most cases this list will only contain a single value corresponding
+     * to the fixed focal length of the device. Otherwise, this list will include
+     * every focal length supported by the camera device, in ascending order.</p>
      */
     ACAMERA_LENS_INFO_AVAILABLE_FOCAL_LENGTHS =                 // float[n]
             ACAMERA_LENS_INFO_START + 2,
@@ -10538,15 +10544,10 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <p>The field of view of non-RAW physical streams must not be smaller than that of the
      * non-RAW logical streams, or the maximum field-of-view of the physical camera,
      * whichever is smaller. The application should check the physical capture result
-     * metadata for how the physical streams are cropped or zoomed. More specifically, given
-     * the physical camera result metadata, the effective horizontal field-of-view of the
-     * physical camera is:</p>
-     * <pre><code>fov = 2 * atan2(cropW * sensorW / (2 * zoomRatio * activeArrayW), focalLength)
-     * </code></pre>
-     * <p>where the equation parameters are the physical camera's crop region width, physical
-     * sensor width, zoom ratio, active array width, and focal length respectively. Typically
-     * the physical stream of active physical camera has the same field-of-view as the
-     * logical streams. However, the same may not be true for physical streams from
+     * metadata and physical camera characteristics for how the physical streams are cropped
+     * or zoomed. See ACAMERA_LENS_FOCAL_LENGTH on how field-of-view is calculated.</p>
+     * <p>Typically the physical stream of active physical camera has the same field-of-view as
+     * the logical streams. However, the same may not be true for physical streams from
      * non-active physical cameras. For example, if the logical camera has a wide-ultrawide
      * configuration where the wide lens is the default, when the crop region is set to the
      * logical camera's active array size, (and the zoom ratio set to 1.0 starting from
@@ -10594,6 +10595,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * physical camera to the other.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
+     * @see ACAMERA_LENS_FOCAL_LENGTH
      * @see ACAMERA_LENS_INFO_FOCUS_DISTANCE_CALIBRATION
      * @see ACAMERA_LENS_INFO_HYPERFOCAL_DISTANCE
      * @see ACAMERA_LENS_INFO_MINIMUM_FOCUS_DISTANCE
