@@ -43,6 +43,14 @@ flag {
 
 flag {
     namespace: "camera_platform"
+    name: "vendor_defined_camera_extensions"
+    is_exported: true
+    description: "Enable vendors to define and implement device specific camera extension modes"
+    bug: "419869310"
+}
+
+flag {
+    namespace: "camera_platform"
     name: "camera_ae_mode_low_light_boost"
     is_exported: true
     description: "An AE mode that enables increased brightening in low light scenes"
