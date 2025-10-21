@@ -290,3 +290,11 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    is_exported: true
+    name: "logical_multi_camera_additional_results"
+    description: "Add additional metadata info to the logical camera result"
+    bug: "359944765"
+}

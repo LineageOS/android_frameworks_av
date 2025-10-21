@@ -7853,6 +7853,34 @@ typedef enum acamera_metadata_tag {
     ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_SENSOR_CROP_REGION = 
                                                                 // int32[4]
             ACAMERA_LOGICAL_MULTI_CAMERA_START + 3,
+    /**
+     * <p>Controls whether the camera device could also return additional
+     * physical cameras' metadata in the results.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_logical_multi_camera_additional_results_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>This control must only be turned on when device is using logical camera,
+     * which are devices that have
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraMetadata.html#REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA">CameraMetadata#REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA</a>
+     * capability and the key is supported in the device's
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#getAvailableCaptureRequestKeys">CameraCharacteristics#getAvailableCaptureRequestKeys</a>.
+     * Once this key is set to ON, if the camera device has
+     * multiple physical cameras active, the TotalCaptureResult will contain
+     * additional physical camera metadata in the result. One of such
+     * scenario is at the time of lens switch during zoom, where in addition
+     * to the active physical camera, a secondary physical camera runs as a
+     * "follower" and produces an additional physical camera CaptureResult.
+     * The application can call <a href="https://developer.android.com/reference/android/hardware/camera2/TotalCaptureResult.html#getPhysicalCameraTotalResults">TotalCaptureResult#getPhysicalCameraTotalResults</a>
+     * to get the additional results.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS =           // byte (acamera_metadata_enum_android_logical_multi_camera_additional_results_t)
+            ACAMERA_LOGICAL_MULTI_CAMERA_START + 4,
     ACAMERA_LOGICAL_MULTI_CAMERA_END,
 
     /**
@@ -11823,6 +11851,14 @@ typedef enum acamera_metadata_enum_acamera_logical_multi_camera_sensor_sync_type
     ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE_CALIBRATED         = 1,
 
 } acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t;
+
+// ACAMERA_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS
+typedef enum acamera_metadata_enum_acamera_logical_multi_camera_additional_results {
+    ACAMERA_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS_OFF              = 0,
+
+    ACAMERA_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS_ON               = 1,
+
+} acamera_metadata_enum_android_logical_multi_camera_additional_results_t;
 
 
 // ACAMERA_DISTORTION_CORRECTION_MODE
