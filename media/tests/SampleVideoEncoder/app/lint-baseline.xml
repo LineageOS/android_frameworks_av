@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.4.0-alpha08" type="baseline" client="" dependencies="true" name="" variant="all" version="8.4.0-alpha08">
+
+    <issue
+        id="NewApi"
+        message="`&lt;androidx.core.app.CoreComponentFactory&gt;` requires API level 28 (current min is 24)"
+        errorLine1="    &lt;application"
+        errorLine2="    ^">
+        <location
+            file="./out/soong/.intermediates/frameworks/av/media/tests/SampleVideoEncoder/app/SampleVideoEncoder/android_common/manifest_merger/AndroidManifest.xml"
+            line="45"
+            column="5"/>
+    </issue>
+
+</issues>

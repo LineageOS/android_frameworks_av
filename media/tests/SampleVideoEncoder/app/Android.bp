@@ -51,4 +51,7 @@ android_test {
         "-Xlint:deprecation",
         "-Xlint:unchecked",
     ],
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
