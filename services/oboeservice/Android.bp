@@ -83,7 +83,6 @@ cc_defaults {
 
     defaults: [
         "libaaudio_defaults",
-        "libaaudio_internal_defaults",
     ],
 
     shared_libs: [
@@ -91,6 +90,10 @@ cc_defaults {
         "com.android.media.aaudio-aconfig-cc",
         "com.android.media.aaudio-aconfig-cc",
         "framework-permission-aidl-cpp",
+        "libaaudio_internal_core",
+        "libaaudio_internal_fifo",
+        "libaaudio_internal_mmap",
+        "libaaudio_internal_utils",
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",

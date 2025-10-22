@@ -216,11 +216,13 @@ cc_library {
 
 cc_library {
     name: "libaaudio_internal_fifo",
-    defaults: ["libaaudio_defaults"],
     local_include_dirs: [
         "fifo",
     ],
     export_include_dirs: ["."],
+    shared_libs: [
+        "libutils",
+    ],
     srcs: [
         "fifo/FifoBuffer.cpp",
         "fifo/FifoControllerBase.cpp",
