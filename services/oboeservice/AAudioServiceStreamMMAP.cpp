@@ -141,6 +141,7 @@ aaudio_result_t AAudioServiceStreamMMAP::exitStandby_l(AudioEndpointParcelable* 
     aaudio_result_t result = endpoint->exitStandby(parcelable);
     if (result == AAUDIO_OK) {
         setStandby_l(false);
+        setState(AAUDIO_STREAM_STATE_OPEN);
     } else {
         ALOGE("%s failed, result %d, disconnecting stream.", __func__, result);
         disconnect_l();
