@@ -217,6 +217,24 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                                                          audio_policy_dev_state_t state,
                                                          bool deviceSwitch)
 {
+    auto skipCheckingConnect = [&] (auto type) {
+        // For ARC/eARC devices, a device connection can be received for an already
+        // connected device when the SAD(Sink Audio Capabilities) changes.
+        // Old flow:
+        // 1. Connect ARC/eARC with empty SAD.
+        // 2. Disconnect ARC/eARC.
+        // 3. Reconnect ARC/eARC with SAD.
+        //
+        // New flow:
+        // 1. Connect ARC/eARC with empty SAD.
+        // 2. connect ARC/eARC with SAD.
+        bool skip = ((type & AUDIO_DEVICE_OUT_HDMI_ARC || type & AUDIO_DEVICE_OUT_HDMI_EARC) &&
+                    state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+
+        ALOGV("%s: skip %d, device 0x%x", __FUNCTION__, skip, type);
+        return skip;
+    };
+
     // handle output devices
     if (audio_is_output_device(device->type())) {
         std::set<audio_io_handle_t> outputs;
@@ -228,14 +246,28 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
         mPreviousOutputs = mOutputs;
 
         bool wasLeUnicastActive = isLeUnicastActive();
+        bool skipCheckConnect = skipCheckingConnect(device->type());
 
         switch (state)
         {
         // handle output device connection
         case AUDIO_POLICY_DEVICE_STATE_AVAILABLE: {
             if (index >= 0) {
-                ALOGW("%s() device already connected: %s", __func__, device->toString().c_str());
-                return INVALID_OPERATION;
+                if (!skipCheckConnect) {
+                    ALOGW("%s() device already connected: %s",
+                        __func__, device->toString().c_str());
+                    return INVALID_OPERATION;
+                } else {
+                    ALOGI("%s: device already connected (skipped check for ARC/eARC): %s",
+                            __FUNCTION__, device->toString().c_str());
+                    // Notify the HAL to prepare to disconnect device
+                    broadcastDeviceConnectionState(
+                            device, media::DeviceConnectedState::PREPARE_TO_DISCONNECT);
+                    mAvailableOutputDevices.remove(device);
+                    // Send Disconnect to HALs
+                    broadcastDeviceConnectionState(device,
+                            media::DeviceConnectedState::DISCONNECTED);
+                }
             }
             ALOGV("%s() connecting device %s format %x",
                     __func__, device->toString().c_str(), device->getEncodedFormat());
@@ -366,8 +398,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
             std::map<audio_io_handle_t, DeviceVector> outputsToReopenWithDevices;
             for (size_t i = 0; i < mOutputs.size(); i++) {
                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-                if (desc->isActive() && ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) ||
-                    (desc != mPrimaryOutput))) {
+                if ((desc->isActive() || skipCheckConnect) &&
+                    ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) ||
+                     (desc != mPrimaryOutput))) {
                     DeviceVector newDevices = getNewOutputDevices(desc, true /*fromCache*/);
                     // do not force device change on duplicated output because if device is 0,
                     // it will also force a device 0 for the two outputs it is duplicated to
@@ -376,7 +409,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                             && !desc->isDuplicated()
                             && (!device_distinguishes_on_address(device->type())
                                     // always force when disconnecting (a non-duplicated device)
-                                    || (state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE));
+                                    || (state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE)
+                                    // alwyas force when skipping ARC/EARC duplicate connect
+                                    || skipCheckConnect);
                     if (desc->mPreferredAttrInfo != nullptr && newDevices != desc->devices()) {
                         // If the device is using preferred mixer attributes, the output need to
                         // reopen with default configuration when the new selected devices are
