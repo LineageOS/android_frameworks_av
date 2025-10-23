@@ -51,14 +51,14 @@ void ResourceManagerServiceNew::init() {
 void ResourceManagerServiceNew::setUpResourceModels() {
     std::scoped_lock lock{mLock};
     // Create/Configure the default resource model.
-    if (mDefaultResourceModel == nullptr) {
-        mDefaultResourceModel = std::make_unique<DefaultResourceModel>(
+    if (mResourceModel == nullptr) {
+        mResourceModel = std::make_unique<DefaultResourceModel>(
                 mResourceTracker,
                 mSupportsMultipleSecureCodecs,
                 mSupportsSecureWithNonSecureCodec);
     } else {
         DefaultResourceModel* resourceModel =
-            static_cast<DefaultResourceModel*>(mDefaultResourceModel.get());
+            static_cast<DefaultResourceModel*>(mResourceModel.get());
         resourceModel->config(mSupportsMultipleSecureCodecs, mSupportsSecureWithNonSecureCodec);
     }
 }
@@ -309,7 +309,7 @@ bool ResourceManagerServiceNew::getTargetClients(
     uint32_t callingImportance = std::max(0, clientInfo.importance);
     ReclaimRequestInfo reclaimRequestInfo{callingPid, clientInfo.id, callingImportance, resources};
     std::vector<ClientInfo> clients;
-    if (!mDefaultResourceModel->getAllClients(reclaimRequestInfo, clients)) {
+    if (!mResourceModel->getAllClients(reclaimRequestInfo, clients)) {
         if (clients.empty()) {
             ALOGI("%s: There aren't any clients with given resources. Nothing to reclaim",
                   __func__);
@@ -364,7 +364,7 @@ bool ResourceManagerServiceNew::getLowestPriorityBiggestClient_l(
                                           0, // default importance
                                           resources};
     std::vector<ClientInfo> clients;
-    mDefaultResourceModel->getAllClients(reclaimRequestInfo, clients);
+    mResourceModel->getAllClients(reclaimRequestInfo, clients);
 
     // Use the ProcessPriorityReclaimPolicy to select a client to reclaim from.
     std::unique_ptr<IReclaimPolicy> reclaimPolicy
