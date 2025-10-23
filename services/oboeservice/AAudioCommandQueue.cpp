@@ -18,7 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <chrono>
-
+#include <audio_utils/safe_chrono.h>
 #include <utils/Log.h>
 
 #include "AAudioCommandQueue.h"
@@ -61,7 +61,8 @@ std::shared_ptr<AAudioCommand> AAudioCommandQueue::waitForCommand(int64_t timeou
     {
         std::unique_lock _l(mLock);
         android::base::ScopedLockAssertion lockAssertion(mLock);
-        if (timeoutNanos >= 0) {
+        if (timeoutNanos >= 0 && !android::audio_utils::add_would_overflow(
+                std::chrono::steady_clock::now(), std::chrono::nanoseconds(timeoutNanos))) {
             mWaitWorkCond.wait_for(_l, std::chrono::nanoseconds(timeoutNanos), [this]() {
                 android::base::ScopedLockAssertion lockAssertion(mLock);
                 return !mRunning || !mCommands.empty();
