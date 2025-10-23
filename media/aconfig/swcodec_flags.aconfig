@@ -1,9 +1,9 @@
 # Media SW Codec Flags.
-#
-# !!! Please add flags in alphabetical order. !!!
+
 package: "android.media.swcodec.flags"
 container: "com.android.media.swcodec"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
   name: "apexcodecs_base"
   # ApexCodecs API is getting called early in the boot process, so we need to make
@@ -77,3 +77,4 @@ flag {
   description: "Enable keep_threads_active in mpeg2 decoder"
   bug: "343793479"
 }
+# go/keep-sorted end
