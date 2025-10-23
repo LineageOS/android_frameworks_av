@@ -87,6 +87,13 @@ flag {
 }
 
 flag {
+  name: "dynamic_operating_mode_switch"
+  namespace: "codec_fwk"
+  description: "Feature flag for supporting dynamic operating mode switch"
+  bug: "448167144"
+}
+
+flag {
   name: "flip_support"
   namespace: "codec_fwk"
   description: "Support flip for MediaCodec"
