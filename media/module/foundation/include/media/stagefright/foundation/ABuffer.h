@@ -18,6 +18,8 @@
 
 #define A_BUFFER_H_
 
+#include <memory>
+
 #include <sys/types.h>
 #include <stdint.h>
 
@@ -51,10 +53,15 @@ struct ABuffer : public RefBase {
     // create buffer from dup of some memory block
     static sp<ABuffer> CreateAsCopy(const void *data, size_t capacity);
 
+    // create buffer from dup of some memory block return unique_ptr
+    static std::unique_ptr<ABuffer> CreateAsUniqueCopy(const void *data, size_t capacity);
+
     void setInt32Data(int32_t data) { mInt32Data = data; }
     int32_t int32Data() const { return mInt32Data; }
 
     sp<AMessage> meta();
+
+    friend std::default_delete<ABuffer>;
 
 protected:
     virtual ~ABuffer();

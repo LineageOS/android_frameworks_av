@@ -64,6 +64,7 @@ enum {
     kKeyDVWC              = 'dvwc',  // raw data
     kKeyAV1C              = 'av1c',  // raw data
     kKeyAPVC              = 'apvc',  // raw data
+    kKeyVVCC              = 'vvcc',  // raw data
     kKeyThumbnailHVCC     = 'thvc',  // raw data
     kKeyThumbnailAV1C     = 'tav1',  // raw data
     kKeyD263              = 'd263',  // raw data
@@ -305,6 +306,7 @@ enum {
     kTypeAVCC        = 'avcc',
     kTypeHVCC        = 'hvcc',
     kTypeAV1C        = 'av1c',
+    kTypeVVCC        = 'vvcc',
     kTypeDVCC        = 'dvcc',
     kTypeDVVC        = 'dvvc',
     kTypeDVWC        = 'dvwc',

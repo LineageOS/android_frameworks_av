@@ -26,9 +26,11 @@
 
 #include <media/esds/ESDS.h>
 #include "include/HevcUtils.h"
+#include "include/VvcUtils.h"
 
 #include <cutils/properties.h>
 #include <media/stagefright/CodecBase.h>
+#include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALookup.h>
@@ -969,6 +971,50 @@ status_t convertMetaDataToMessage(
     return convertMetaDataToMessage(meta.get(), format);
 }
 
+void setColorFormatToMessage(const MetaDataBase *meta, uint32_t isoPrimaries, uint32_t isoTransfer,
+        uint32_t isoMatrix, uint32_t isoRange, sp<AMessage>& msg) {
+    ColorAspects aspects;
+    ColorUtils::convertIsoColorAspectsToCodecAspects(isoPrimaries, isoTransfer, isoMatrix, isoRange,
+                                                     aspects);
+
+    if (aspects.mPrimaries == ColorAspects::PrimariesUnspecified) {
+        int32_t primaries;
+        if (meta->findInt32(kKeyColorPrimaries, &primaries)) {
+            ALOGV("unspecified primaries found, replaced to %d", primaries);
+            aspects.mPrimaries = static_cast<ColorAspects::Primaries>(primaries);
+        }
+    }
+    if (aspects.mTransfer == ColorAspects::TransferUnspecified) {
+        int32_t transferFunction;
+        if (meta->findInt32(kKeyTransferFunction, &transferFunction)) {
+            ALOGV("unspecified transfer found, replaced to %d", transferFunction);
+            aspects.mTransfer = static_cast<ColorAspects::Transfer>(transferFunction);
+        }
+    }
+    if (aspects.mMatrixCoeffs == ColorAspects::MatrixUnspecified) {
+        int32_t colorMatrix;
+        if (meta->findInt32(kKeyColorMatrix, &colorMatrix)) {
+            ALOGV("unspecified matrix found, replaced to %d", colorMatrix);
+            aspects.mMatrixCoeffs = static_cast<ColorAspects::MatrixCoeffs>(colorMatrix);
+        }
+    }
+    if (aspects.mRange == ColorAspects::RangeUnspecified) {
+        int32_t range;
+        if (meta->findInt32(kKeyColorRange, &range)) {
+            ALOGV("unspecified range found, replaced to %d", range);
+            aspects.mRange = static_cast<ColorAspects::Range>(range);
+        }
+    }
+
+    int32_t standard, transfer, range;
+    if (ColorUtils::convertCodecColorAspectsToPlatformAspects(aspects, &range, &standard,
+                                                              &transfer) == OK) {
+        msg->setInt32("color-range", range);
+        msg->setInt32("color-standard", standard);
+        msg->setInt32("color-transfer", transfer);
+    }
+}
+
 status_t convertMetaDataToMessage(
         const MetaDataBase *meta, sp<AMessage> *format) {
 
@@ -1426,48 +1472,8 @@ status_t convertMetaDataToMessage(
             ALOGV("found iso color aspects : primaris=%d, transfer=%d, matrix=%d, range=%d",
                     isoPrimaries, isoTransfer, isoMatrix, isoRange);
 
-            ColorAspects aspects;
-            ColorUtils::convertIsoColorAspectsToCodecAspects(
-                    isoPrimaries, isoTransfer, isoMatrix, isoRange, aspects);
-
-            if (aspects.mPrimaries == ColorAspects::PrimariesUnspecified) {
-                int32_t primaries;
-                if (meta->findInt32(kKeyColorPrimaries, &primaries)) {
-                    ALOGV("unspecified primaries found, replaced to %d", primaries);
-                    aspects.mPrimaries = static_cast<ColorAspects::Primaries>(primaries);
-                }
-            }
-            if (aspects.mTransfer == ColorAspects::TransferUnspecified) {
-                int32_t transferFunction;
-                if (meta->findInt32(kKeyTransferFunction, &transferFunction)) {
-                    ALOGV("unspecified transfer found, replaced to %d", transferFunction);
-                    aspects.mTransfer = static_cast<ColorAspects::Transfer>(transferFunction);
-                }
-            }
-            if (aspects.mMatrixCoeffs == ColorAspects::MatrixUnspecified) {
-                int32_t colorMatrix;
-                if (meta->findInt32(kKeyColorMatrix, &colorMatrix)) {
-                    ALOGV("unspecified matrix found, replaced to %d", colorMatrix);
-                    aspects.mMatrixCoeffs = static_cast<ColorAspects::MatrixCoeffs>(colorMatrix);
-                }
-            }
-            if (aspects.mRange == ColorAspects::RangeUnspecified) {
-                int32_t range;
-                if (meta->findInt32(kKeyColorRange, &range)) {
-                    ALOGV("unspecified range found, replaced to %d", range);
-                    aspects.mRange = static_cast<ColorAspects::Range>(range);
-                }
-            }
-
-            int32_t standard, transfer, range;
-            if (ColorUtils::convertCodecColorAspectsToPlatformAspects(
-                    aspects, &range, &standard, &transfer) == OK) {
-                msg->setInt32("color-standard", standard);
-                msg->setInt32("color-transfer", transfer);
-                msg->setInt32("color-range", range);
-            }
+            setColorFormatToMessage(meta, isoPrimaries, isoTransfer, isoMatrix, isoRange, msg);
         }
-
         parseHevcProfileLevelFromHvcc((const uint8_t *)data, dataSize, msg);
     } else if (meta->findData(kKeyAV1C, &type, &data, &size)) {
         sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
@@ -1492,6 +1498,206 @@ status_t convertMetaDataToMessage(
         buffer->meta()->setInt64("timeUs", 0);
         msg->setBuffer("csd-0", buffer);
         parseAPVProfileLevelFromCsd(buffer, msg);
+    } else if (com::android::media::extractor::flags::extractor_mp4_enable_vvc() &&
+               meta->findData(kKeyVVCC, &type, &data, &size)) {
+        const uint8_t *ptr = (const uint8_t *)data;
+        ABitReader br(ptr, size);
+
+        /*
+        * VvcConfigurationBox
+        * Please see ISO/IEC 14496-15:2024 section 11.2.4.3.2
+        */
+        if (size < 5 || br.getBits(32) != 0) {
+            // configurationVersion == 0, flags == 0
+            ALOGE("b/23680780");
+            return BAD_VALUE;
+        }
+        uint32_t totalBits = size * 8;
+        int32_t codecProfile = -1;
+
+        /*
+        * VvcDecoderConfigurationRecord
+        * Please see ISO/IEC 14496-15:2024 section 11.2.4.2.2
+        */
+        br.skipBits(5); // bit(5) reserved = '11111'b;
+        br.skipBits(2); // unsigned int(2) LengthSizeMinusOne;
+        const uint8_t ptl_present_flag = br.getBits(1);
+
+        if (ptl_present_flag) {
+            if (size < 12) {
+                // At least 7 more bytes is needed to parse Profile/Tier/Level info
+                return BAD_VALUE;
+            }
+            br.skipBits(8 + 1); // unsigned int(9) ols_idx;
+            const uint8_t  num_sublayers = br.getBits(3);
+            br.skipBits(2); // unsigned int(2) constant_frame_rate;
+            br.skipBits(2); // unsigned int(2) chroma_format_idc;
+            const uint8_t bit_depth_minus8 = br.getBits(3);
+
+            br.skipBits(5); // bit(5) reserved = '11111'b;
+            /* VvcPTLRecord(num_sublayers) native_ptl */
+            br.skipBits(2); // bit(2) reserved = 0;
+            // unsigned int(6) num_bytes_constraint_info;
+            const uint8_t  num_bytes_constraint_info = br.getBits(6);
+            const uint8_t profile_idc = br.getBits(7); // unsigned int(7) general_profile_idc;
+            const uint8_t tier_flag = br.getBits(1); // unsigned int(1) general_tier_flag;
+            const uint8_t level_idc = br.getBits(8); // unsigned int(8) general_level_idc;
+            ALOGV("VVC profile_idc:%u, tier_flag:%u, level_idc:%u, bit_depth_minus8:%u",
+                profile_idc, tier_flag, level_idc, bit_depth_minus8);
+
+            // Rec. ITU-T H.266 Table A.2 - General tier and level limits
+            // Define the VVC levels with their corresponding tier flag and level idc values.
+            const static ALookup<std::pair<uint8_t, uint8_t>, int32_t>  levels {
+                { { 0, 16 }, VVCMainTierLevel10  },
+                { { 0, 32 }, VVCMainTierLevel20  },
+                { { 0, 35 }, VVCMainTierLevel21  },
+                { { 0, 48 }, VVCMainTierLevel30  },
+                { { 0, 51 }, VVCMainTierLevel31  },
+                { { 0, 64 }, VVCMainTierLevel40  },
+                { { 1, 64 }, VVCHighTierLevel40  },
+                { { 0, 67 }, VVCMainTierLevel41  },
+                { { 1, 67 }, VVCHighTierLevel41  },
+                { { 0, 80 }, VVCMainTierLevel50  },
+                { { 1, 80 }, VVCHighTierLevel50  },
+                { { 0, 83 }, VVCMainTierLevel51  },
+                { { 1, 83 }, VVCHighTierLevel51  },
+                { { 0, 86 }, VVCMainTierLevel52  },
+                { { 1, 86 }, VVCHighTierLevel52  },
+                { { 0, 96 }, VVCMainTierLevel60  },
+                { { 1, 96 }, VVCHighTierLevel60  },
+                { { 0, 99 }, VVCMainTierLevel61  },
+                { { 1, 99 }, VVCHighTierLevel61  },
+                { { 0, 102 }, VVCMainTierLevel62 },
+                { { 1, 102 }, VVCHighTierLevel62 },
+                { { 0, 105 }, VVCMainTierLevel63 },
+                { { 1, 105 }, VVCHighTierLevel63 },
+            };
+
+            // Define the VVC profiles with their corresponding profile idc values.
+            // Rec. ITU-T H.266 Table A.3.1 Main 10 and Main 10 Still Picture profiles
+            // Only Main10, Main10Still are supported
+            const static ALookup<uint8_t, int32_t> profiles {
+                { 1,  VVCProfileMain10              },
+                { 65, VVCProfileMain10Still         },
+            };
+
+            // set profile & level if they are recognized
+            int32_t codecLevel;
+            if (!profiles.map(profile_idc, &codecProfile)) {
+                // infer profile from bitDepth
+                if (bit_depth_minus8 == 0) {
+                    codecProfile = VVCProfileMain8;
+                } else if (bit_depth_minus8 == 2) {
+                    codecProfile = VVCProfileMain10;
+                }
+            }
+
+            if (codecProfile != -1) {
+                // Set Main8 profile if the content is 8-bit
+                if (bit_depth_minus8 == 0 && codecProfile == VVCProfileMain10) {
+                    codecProfile = VVCProfileMain8;
+                }
+
+                if (levels.map(std::make_pair(tier_flag, level_idc), &codecLevel)) {
+                    msg->setInt32("level", codecLevel);
+                    ALOGV("VVC codecLevel:%d", codecLevel);
+                }
+            }
+
+            br.skipBits(1); // unsigned int(1) ptl_frame_only_constraint_flag;
+            br.skipBits(1); // unsigned int(1) ptl_multi_layer_enabled_flag;
+
+            if (num_bytes_constraint_info) {
+                // unsigned int(8*num_bytes_constraint_info - 2) general_constraint_info;
+                br.skipBits(8*num_bytes_constraint_info - 2);
+            }
+
+            uint8_t  ptl_sublayer_level_present_flag[8] = {0};
+            for (int8_t j = num_sublayers - 2; j >= 0; j--) {
+                // unsigned int(1) ptl_sublayer_level_present_flag[i];
+                ptl_sublayer_level_present_flag[j] = br.getBitsWithFallback(1, 0);
+            }
+
+            for (uint8_t k = num_sublayers; k <= 8 && num_sublayers > 1; k++) {
+                br.skipBits(1); // bit(1) ptl_reserved_zero_bit = 0;
+            }
+
+            for (int8_t n = num_sublayers - 2; n >= 0; n--) {
+                if (ptl_sublayer_level_present_flag[n]) {
+                    br.skipBits(8); // unsigned int(8) sublayer_level_idc[i];
+                }
+            }
+
+            // unsigned int(8) ptl_num_sub_profiles;
+            const uint16_t ptl_num_sub_profiles = br.getBitsWithFallback(8, 0);
+            for (uint16_t m = 0; m < ptl_num_sub_profiles; m++) {
+                br.skipBits(32); // unsigned int(32) general_sub_profile_idc[j];
+            }
+            br.skipBits(16); // unsigned_int(16) max_picture_width;
+            br.skipBits(16); // unsigned_int(16) max_picture_height;
+            br.skipBits(16); // unsigned int(16) avg_frame_rate;
+        }
+
+        VvcParameterSets vvcc;
+        const uint8_t num_of_arrays = br.getBitsWithFallback(8, 0);
+        sp<ABuffer> buffer = new (std::nothrow) ABuffer(1024);
+        if (buffer.get() == NULL || buffer->base() == NULL) {
+            return NO_MEMORY;
+        }
+        buffer->setRange(0, 0);
+
+        for (uint8_t i = 0; i < num_of_arrays; i++) {
+            br.skipBits(1); // unsigned int(1) array_completeness;
+            br.skipBits(2); // bit(2) reserved = 0;
+            uint8_t NAL_unit_type = br.getBitsWithFallback(5, 0);
+            uint16_t num_nalus = 0;
+            if (NAL_unit_type != 13/*DCI_NUT*/ && NAL_unit_type != 12/*OPI_NUT*/) {
+                num_nalus = br.getBitsWithFallback(16, 0); // unsigned int(16) num_nalus;
+            }
+            ALOGV("Num_NALUs %d", num_nalus);
+            for (int j = 0; j < num_nalus; j++) {
+                uint16_t nal_unit_length = br.getBitsWithFallback(16, 0);
+                status_t err = copyNALUToABuffer(&buffer,
+                        ptr + (totalBits - br.numBitsLeft())/8, nal_unit_length);
+                if (err != OK) {
+                    return err;
+                }
+                (void)vvcc.addNalUnit(ptr + (totalBits - br.numBitsLeft())/8, nal_unit_length);
+                br.skipBits(8 * nal_unit_length); // bit(8*nal_unit_length) nal_unit;
+            }
+        }
+
+        buffer->meta()->setInt32("csd", true);
+        buffer->meta()->setInt64("timeUs", 0);
+        msg->setBuffer("csd-0", buffer);
+
+        VvcParameterSets::Info info = vvcc.getInfo();
+        if (info & vvcc.kInfoHasColorDescription) {
+            msg->setInt32("android._is-hdr", (info & vvcc.kInfoIsHdr) != 0);
+        }
+
+        uint32_t isoPrimaries, isoTransfer, isoMatrix, isoRange;
+        if (vvcc.findParam32(kColourPrimaries, isoPrimaries)
+                && vvcc.findParam32(kTransferCharacteristics, isoTransfer)
+                && vvcc.findParam32(kMatrixCoeffs, isoMatrix)
+                && vvcc.findParam32(kVideoFullRangeFlag, isoRange)) {
+            ALOGV("found iso color aspects : primaris=%d, transfer=%d, matrix=%d, range=%d",
+                    isoPrimaries, isoTransfer, isoMatrix, isoRange);
+
+            setColorFormatToMessage(meta, isoPrimaries, isoTransfer, isoMatrix, isoRange, msg);
+        }
+        if (codecProfile != -1) {
+            // bump to HDR profile
+            if (isHdr10or10Plus(msg) && codecProfile == VVCProfileMain10) {
+                if (msg->contains("hdr10-plus-info")) {
+                    codecProfile = VVCProfileMain10HDR10Plus;
+                } else {
+                    codecProfile = VVCProfileMain10HDR10;
+                }
+            }
+            ALOGV("VVC codecProfile:%d", codecProfile);
+            msg->setInt32("profile", codecProfile);
+        }
     } else if (meta->findData(kKeyESDS, &type, &data, &size)) {
         ESDS esds((const char *)data, size);
         if (esds.InitCheck() != (status_t)OK) {
@@ -1767,6 +1973,44 @@ static size_t reassembleHVCC(const sp<ABuffer> &csd0, uint8_t *hvcc, size_t hvcc
     }
     size_t size = hvccSize;
     err = paramSets.makeHvcc(hvcc, &size, nalSizeLength);
+    if (err != OK) {
+        return 0;
+    }
+    return size;
+}
+
+static size_t reassembleVVCC(
+        const sp<ABuffer> &csd0, uint8_t *vvcc, size_t vvccSize, size_t nalSizeLength) {
+    VvcParameterSets paramSets;
+    uint8_t* data = csd0->data();
+    if (csd0->size() < 4) {
+        ALOGE("csd0 too small");
+        return 0;
+    }
+    ALOGV("csd size %zu", csd0->size());
+
+    if (memcmp(data, "\x00\x00\x00\x01", 4) != 0) {
+        ALOGE("csd0 doesn't start with a start code");
+        return 0;
+    }
+    size_t prevNalOffset = 4;
+    status_t err = OK;
+    for (size_t i = 1; i < csd0->size() - 4; ++i) {
+        if (memcmp(&data[i], "\x00\x00\x00\x01", 4) != 0) {
+            continue;
+        }
+        err = paramSets.addNalUnit(&data[prevNalOffset], i - prevNalOffset);
+        if (err != OK) {
+            return 0;
+        }
+        prevNalOffset = i + 4;
+    }
+    err = paramSets.addNalUnit(&data[prevNalOffset], csd0->size() - prevNalOffset);
+    if (err != OK) {
+        return 0;
+    }
+    size_t size = vvccSize;
+    err = paramSets.makeVvcc(vvcc, size, nalSizeLength);
     if (err != OK) {
         return 0;
     }
@@ -2148,6 +2392,11 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         } else if (com::android::media::extractor::flags::extractor_mp4_enable_apv() &&
                    mime == MEDIA_MIMETYPE_VIDEO_APV) {
             meta->setData(kKeyAPVC, 0, csd0->data(), csd0->size());
+        } else if (com::android::media::extractor::flags::extractor_mp4_enable_vvc() &&
+                   mime == MEDIA_MIMETYPE_VIDEO_VVC) {
+            std::vector<uint8_t> vvcc(csd0size + 1024);
+            size_t outsize = reassembleVVCC(csd0, vvcc.data(), vvcc.size(), 4);
+            meta->setData(kKeyVVCC, 0, vvcc.data(), outsize);
         } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION) {
             int32_t profile = -1;
             uint8_t blCompatibilityId = -1;
@@ -2331,6 +2580,9 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     } else if ((mime == MEDIA_MIMETYPE_VIDEO_HEVC || mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)
             && msg->findBuffer("csd-hevc", &csd0)) {
         meta->setData(kKeyHVCC, kTypeHVCC, csd0->data(), csd0->size());
+    } else if ((mime == MEDIA_MIMETYPE_VIDEO_VVC)
+            && msg->findBuffer("csd-vvc", &csd0)) {
+        meta->setData(kKeyVVCC, kTypeVVCC, csd0->data(), csd0->size());
     } else if (msg->findBuffer("esds", &csd0)) {
         meta->setData(kKeyESDS, kTypeESDS, csd0->data(), csd0->size());
     } else if (msg->findBuffer("mpeg2-stream-header", &csd0)) {
