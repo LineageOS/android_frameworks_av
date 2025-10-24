@@ -144,7 +144,8 @@ protected:
 
     aaudio_result_t stopCallback_l() REQUIRES(mStreamMutex);
 
-    virtual void prepareBuffersForStart_l(StartType startType = DEFAULT) REQUIRES(mStreamMutex) {}
+    virtual void prepareBuffersForStart_l(
+            StartType startType [[maybe_unused]] = DEFAULT ) REQUIRES(mStreamMutex) {}
 
     virtual aaudio_result_t prepareBuffersForStop_l() REQUIRES(mStreamMutex) {
         return AAUDIO_OK;
@@ -184,7 +185,7 @@ protected:
 
     virtual bool mayNeedToDrain() const { return false; }
 
-    virtual void onWakeUp_l(android::audio_utils::TimerQueue::handle_t handle)
+    virtual void onWakeUp_l(android::audio_utils::TimerQueue::handle_t handle [[maybe_unused]])
             REQUIRES(mStreamMutex) {}
 
     IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
