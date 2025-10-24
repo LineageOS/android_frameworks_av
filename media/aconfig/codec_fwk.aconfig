@@ -215,6 +215,13 @@ flag {
 }
 
 flag {
+  name: "retry_decrypt_for_hdcp_failure"
+  namespace: "codec_fwk"
+  description: "Feature flag retrying decryption upon HDCP failure"
+  bug: "338440115"
+}
+
+flag {
   name: "secure_codecs_require_crypto"
   namespace: "codec_fwk"
   description: "Bugfix flag for requiring setting crypto for secure codecs"
