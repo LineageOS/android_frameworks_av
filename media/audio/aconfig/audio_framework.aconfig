@@ -231,6 +231,13 @@ flag {
 }
 
 flag {
+    name: "partial_flush_for_pcm_offload"
+    namespace: "media_audio"
+    description: "Partial flush support for classical PCM offload"
+    bug: "428981741"
+}
+
+flag {
     name: "ringtone_user_uri_check"
     is_exported: true
     namespace: "media_audio"
