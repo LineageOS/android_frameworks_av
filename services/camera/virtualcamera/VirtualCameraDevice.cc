@@ -163,7 +163,7 @@ std::optional<Resolution> getMaxResolution(
   auto itMax = std::max_element(configs.begin(), configs.end(),
                                 [](const SupportedStreamConfiguration& a,
                                    const SupportedStreamConfiguration& b) {
-                                  return a.width * b.height < a.width * b.height;
+                                  return a.width * a.height < b.width * b.height;
                                 });
   if (itMax == configs.end()) {
     ALOGE(
@@ -424,23 +424,28 @@ status_t updateStreamConfigurations(
     return ret;
   }
 
-  auto activeArraySizeVec =
-      std::vector<int32_t>({0, 0, maxResolution.width, maxResolution.height});
-  ret = metadataHelper.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
-                              activeArraySizeVec.data(),
-                              activeArraySizeVec.size());
-  if (ret != OK) {
-    ALOGE("Can not set SENSOR_INFO_ACTIVE_ARRAY_SIZE!");
-    return ret;
+  if (!metadataHelper.exists(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE)) {
+    auto activeArraySizeVec =
+        std::vector<int32_t>({0, 0, maxResolution.width, maxResolution.height});
+    ret = metadataHelper.update(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
+                                activeArraySizeVec.data(),
+                                activeArraySizeVec.size());
+    if (ret != OK) {
+      ALOGE("Can not set ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE!");
+      return ret;
+    }
   }
-  auto pixelArraySizeVec =
-      std::vector<int32_t>({maxResolution.width, maxResolution.height});
-  ret =
-      metadataHelper.update(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE,
-                            pixelArraySizeVec.data(), pixelArraySizeVec.size());
-  if (ret != OK) {
-    ALOGE("Can not set ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE!");
-    return ret;
+
+  if (!metadataHelper.exists(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE)) {
+    auto pixelArraySizeVec =
+        std::vector<int32_t>({maxResolution.width, maxResolution.height});
+    ret = metadataHelper.update(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE,
+                                pixelArraySizeVec.data(),
+                                pixelArraySizeVec.size());
+    if (ret != OK) {
+      ALOGE("Can not set ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE!");
+      return ret;
+    }
   }
 
   ALOGV("Adding %zu output configurations to configured CameraCharacteristics.",
