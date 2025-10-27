@@ -1,10 +1,9 @@
 # Media Recorder feature flags.
-#
-# !!! Please add flags in alphabetical order. !!!
 
 package: "android.media.mediarecorder"
 container: "system"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
   name: "apv_recording_support"
   is_exported: true
@@ -12,3 +11,4 @@ flag {
   description: "Feature flag for APV Support in MediaRecorder"
   bug: "418815095"
 }
+# go/keep-sorted end
