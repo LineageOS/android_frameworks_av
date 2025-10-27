@@ -1057,6 +1057,13 @@ protected:
         void checkSpatializedClientsReroute(const sp<SwAudioOutputDescriptor>& outputDesc,
                                             const DeviceVector &devices);
 
+        bool shouldBeSpatialized(const audio_attributes_t *attr,
+                                 const audio_config_t *config,
+                                 const AudioDeviceTypeAddrVector &devices,
+                                 const audio_output_flags_t flags,
+                                 audio_session_t session,
+                                 const sp<PreferredMixerAttributesInfo>& prefMixerConfigInfo);
+
         const uid_t mUidCached;                         // AID_AUDIOSERVER
         sp<const AudioPolicyConfig> mConfig;
         EngineInstance mEngine;                         // Audio Policy Engine instance

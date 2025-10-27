@@ -472,13 +472,28 @@ aaudio_result_t AAudioServiceEndpointMMAP::activate(
     return AAudioConvert_androidToAAudioResult(mMmapStream->activate(handle));
 }
 
+namespace {
+
+[[clang::no_destroy]] static const std::map<android::status_t, aaudio_result_t>
+        kPlaybackParametersResultMap = {
+        {android::INVALID_OPERATION, AAUDIO_ERROR_UNIMPLEMENTED},
+};
+
+} // namespace
+
 aaudio_result_t AAudioServiceEndpointMMAP::setPlaybackParameters(
         const android::media::audio::common::AudioPlaybackRate& rate) {
     const std::lock_guard lock(mMmapStreamLock);
     if (mMmapStream == nullptr) {
         return AAUDIO_ERROR_NULL;
     }
-    return AAudioConvert_androidToAAudioResult(mMmapStream->setPlaybackParameters(rate));
+    const status_t status = mMmapStream->setPlaybackParameters(rate);
+    ALOGW_IF(status != NO_ERROR, "%s, returned status=%d", __func__, status);
+    // The internal conversion will convert INVALID_OPERATION to AAUDIO_ERROR_INVALID_STATE.
+    // When INVALID_OPERATION is returned, it indicates the HAL doesn't support playback parameters.
+    // In that case, use a customized map to convert INVALID_OPERATION to
+    // AAUDIO_ERROR_UNIMPLEMENTED.
+    return AAudioConvert_androidToAAudioResult(status, kPlaybackParametersResultMap);
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::getPlaybackParameters(
@@ -487,7 +502,13 @@ aaudio_result_t AAudioServiceEndpointMMAP::getPlaybackParameters(
     if (mMmapStream == nullptr) {
         return AAUDIO_ERROR_NULL;
     }
-    return AAudioConvert_androidToAAudioResult(mMmapStream->getPlaybackParameters(rate));
+    const status_t status = mMmapStream->getPlaybackParameters(rate);
+    ALOGW_IF(status != NO_ERROR, "%s, returned status=%d", __func__, status);
+    // The internal conversion will convert INVALID_OPERATION to AAUDIO_ERROR_INVALID_STATE.
+    // When INVALID_OPERATION is returned, it indicates the HAL doesn't support playback parameters.
+    // In that case, use a customized map to convert INVALID_OPERATION to
+    // AAUDIO_ERROR_UNIMPLEMENTED.
+    return AAudioConvert_androidToAAudioResult(status, kPlaybackParametersResultMap);
 }
 
 // Get free-running DSP or DMA hardware position from the HAL.

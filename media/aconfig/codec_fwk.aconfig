@@ -87,6 +87,13 @@ flag {
 }
 
 flag {
+  name: "dynamic_operating_mode_switch"
+  namespace: "codec_fwk"
+  description: "Feature flag for supporting dynamic operating mode switch"
+  bug: "448167144"
+}
+
+flag {
   name: "flip_support"
   namespace: "codec_fwk"
   description: "Support flip for MediaCodec"
@@ -205,6 +212,13 @@ flag {
   namespace: "codec_fwk"
   description: "Feature flag for removing rendering depth"
   bug: "275527219"
+}
+
+flag {
+  name: "retry_decrypt_for_hdcp_failure"
+  namespace: "codec_fwk"
+  description: "Feature flag retrying decryption upon HDCP failure"
+  bug: "338440115"
 }
 
 flag {

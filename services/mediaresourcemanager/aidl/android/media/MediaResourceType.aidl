@@ -35,10 +35,12 @@ enum MediaResourceType {
     kDrmSession = 6,
 
     // Resources reserved for SW component store
-    kSwResourceTypeMin = 0x1000,
-    kSwResourceTypeMax = 0x1FFF,
+    kSwResourceTypeMin = 0x0500,
+    kSwResourceTypeMax = 0x0FFF,
 
-    // Resources reserved for HW component store
-    kHwResourceTypeMin = 0x2000,
+    // Resources reserved for HW/Vendor component store
+    // This should match C2PlatformConfig::resource_id_t::VENDOR_START
+    // defined in media/codec2/core/include/C2Config.h
+    kHwResourceTypeMin = 0x1000,
     kHwResourceTypeMax = 0x2FFF,
 }

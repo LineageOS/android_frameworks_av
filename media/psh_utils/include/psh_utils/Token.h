@@ -17,16 +17,27 @@
 
 #pragma once
 
+// go/keep-sorted start
 #include <initializer_list>
 #include <memory>
 #include <string>
 #include <utility>
+// go/keep-sorted end
 
 namespace android::media::psh_utils {
 
 class Token {
 public:
     virtual ~Token() = default;
+
+    /**
+     * Return start time in boottime nanos.
+     */
+    virtual int64_t getStartElapsedTime() const = 0;
+
+    /**
+     * Print a string.
+     */
     virtual std::string toString() const = 0;
 };
 

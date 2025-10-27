@@ -43,7 +43,14 @@ using namespace android;
 using android::media::audio::common::AudioMMapPolicy;
 using android::media::audio::common::AudioMMapPolicyInfo;
 
-status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
+status_t AAudioConvert_aaudioToAndroidStatus(
+        aaudio_result_t result,
+        const std::map<aaudio_result_t, android::status_t>& customizedMap) {
+    // First check if `result` is in the customized map.
+    if (const auto it = customizedMap.find(result); it != customizedMap.end()) {
+        return it->second;
+    }
+
     // This covers the case for AAUDIO_OK and for positive results.
     if (result >= 0) {
         return result;
@@ -89,7 +96,14 @@ status_t AAudioConvert_aaudioToAndroidStatus(aaudio_result_t result) {
     return status;
 }
 
-aaudio_result_t AAudioConvert_androidToAAudioResult(status_t status) {
+aaudio_result_t AAudioConvert_androidToAAudioResult(
+        status_t status,
+        const std::map<android::status_t, aaudio_result_t>& customizedMap) {
+    // First check if `status` is in the customized map.
+    if (const auto it = customizedMap.find(status); it != customizedMap.end()) {
+        return it->second;
+    }
+
     // This covers the case for OK and for positive result.
     if (status >= 0) {
         return status;

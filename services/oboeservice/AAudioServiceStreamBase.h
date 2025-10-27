@@ -351,7 +351,10 @@ protected:
 
     virtual aaudio_result_t getAudioDataDescription_l(AudioEndpointParcelable* parcelable) = 0;
 
-
+    // `mState` will only be accessed when opening the stream or from the command thread. The
+    // command thread will only run after the stream is successfully opened. In that case, it
+    // is not accessed from multiple threads simultaneously. It should be safe to access without
+    // locking.
     aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
     bool isDisconnected_l() const REQUIRES(mLock) {
@@ -388,7 +391,7 @@ protected:
         mStandby = standby;
     }
 
-    bool isIdle_l() const REQUIRES(mLock) {
+    bool isIdle() const {
         return mState == AAUDIO_STREAM_STATE_OPEN || mState == AAUDIO_STREAM_STATE_PAUSED
                 || mState == AAUDIO_STREAM_STATE_STOPPED;
     }
@@ -575,6 +578,11 @@ private:
     bool                    mDisconnected GUARDED_BY(mLock) {false};
 
     bool                    mStandby GUARDED_BY(mLock) = false;
+    // `mStandbyTime` will only be accessed when opening the stream or from the command thread.
+    // The command thread will only run after the stream is successfully opened. In that case,
+    // it is not accessed from multiple threads simultaneously. It should be safe to access
+    // without locking.
+    int64_t                 mStandbyTime = 0;
 
     bool                    mIsDraining GUARDED_BY(mLock) = false;
 

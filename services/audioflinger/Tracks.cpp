@@ -3702,7 +3702,7 @@ static AfPlaybackCommon::EnforcementLevel getOpControlEnforcementLevel(audio_usa
     }
     if (hardening_strict()) {
         // TODO (b/407607395)
-        if (usage == AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY) {
+        if (usage == AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY || usage == AUDIO_USAGE_ALARM) {
             return PARTIAL;
         }
         return FULL;

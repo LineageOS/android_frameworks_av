@@ -174,7 +174,7 @@ private:
 
 private:
     std::shared_ptr<ResourceTracker> mResourceTracker;
-    std::unique_ptr<IResourceModel> mDefaultResourceModel;
+    std::unique_ptr<IResourceModel> mResourceModel;
     std::vector<std::unique_ptr<IReclaimPolicy>> mReclaimPolicies;
 };
 
