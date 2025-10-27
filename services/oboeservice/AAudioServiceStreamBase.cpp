@@ -130,16 +130,16 @@ void AAudioServiceStreamBase::logOpen(aaudio_handle_t streamHandle) {
         .set(AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, (int32_t)getBufferCapacity())
         .set(AMEDIAMETRICS_PROP_BURSTFRAMES, (int32_t)getFramesPerBurst())
         .set(AMEDIAMETRICS_PROP_CHANNELCOUNT, (int32_t)getSamplesPerFrame())
-        .set(AMEDIAMETRICS_PROP_CONTENTTYPE, toString(attributes.content_type).c_str())
+        .set(AMEDIAMETRICS_PROP_CONTENTTYPE, android::toString(attributes.content_type).c_str())
         .set(AMEDIAMETRICS_PROP_DIRECTION,
                 AudioGlobal_convertDirectionToText(getDirection()))
-        .set(AMEDIAMETRICS_PROP_ENCODING, toString(getFormat()).c_str())
+        .set(AMEDIAMETRICS_PROP_ENCODING, android::toString(getFormat()).c_str())
         .set(AMEDIAMETRICS_PROP_ROUTEDDEVICEID, android::getFirstDeviceId(getDeviceIds()))
         .set(AMEDIAMETRICS_PROP_ROUTEDDEVICEIDS, android::toString(getDeviceIds()).c_str())
         .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)getSampleRate())
         .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)getSessionId())
-        .set(AMEDIAMETRICS_PROP_SOURCE, toString(attributes.source).c_str())
-        .set(AMEDIAMETRICS_PROP_USAGE, toString(attributes.usage).c_str())
+        .set(AMEDIAMETRICS_PROP_SOURCE, android::toString(attributes.source).c_str())
+        .set(AMEDIAMETRICS_PROP_USAGE, android::toString(attributes.usage).c_str())
         .record();
 }
 
@@ -426,10 +426,10 @@ aaudio_result_t AAudioServiceStreamBase::updateTimestamp() {
     return sendCommand(UPDATE_TIMESTAMP, nullptr /*param*/, true /*waitForReply*/, TIMEOUT_NANOS);
 }
 
-aaudio_result_t AAudioServiceStreamBase::drain(int64_t wakeUpNanos, bool allowSoftWakeUp,
+aaudio_result_t AAudioServiceStreamBase::drain(int64_t wakeUpNanos, DrainType drainType,
                                                TimerQueue::handle_t* handle) {
     return sendCommand(DRAIN,
-                       std::make_shared<DrainParam>(wakeUpNanos, allowSoftWakeUp, handle),
+                       std::make_shared<DrainParam>(wakeUpNanos, drainType, handle),
                        true /*waitForReply*/,
                        TIMEOUT_NANOS);
 }
@@ -772,14 +772,32 @@ void AAudioServiceStreamBase::run() {
                     }
                     ALOGV("%s: DRAIN SoundDose report data", __func__);
                     reportData_l();
+                    auto param = (DrainParam *) command->parameter.get();
+                    if (param->mDrainType == DrainType::DRAIN_ALL_WITHOUT_WAKEUP_CALLBACK) {
+                        // DRAIN_ALL_WITHOUT_WAKEUP_CALLBACK indicates this is a short period of
+                        // drain. This doesn't require to setup an alarm to wakeup on the scheduled
+                        // time. In this case, the device is not expected to suspend. Deferring the
+                        // timestamp and data report time to wakeup time since there is not new
+                        // data written when this is called and the client is not going to consume
+                        // and timestamp.
+                        const int64_t currentNanos = AudioClock::getNanoseconds();
+                        const int64_t diffNanos =
+                                param->mWakeUpNanos - AudioClock::getNanoseconds(CLOCK_BOOTTIME);
+                        nextDataReportTime = currentNanos + diffNanos;
+                        nextTimestampReportTime = currentNanos + diffNanos;
+                        command->result = AAUDIO_OK;
+                        break;
+                    }
                     timestampScheduler.stop();
                     nextDataReportTime = std::numeric_limits<int64_t>::max();
                     mIsDraining = true;
                     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
                     if (endpoint != nullptr) {
-                        auto param = (DrainParam *) command->parameter.get();
                         command->result = endpoint->drain(
-                                param->mWakeUpNanos, param->mAllowSoftWakeUp, param->mHandle);
+                                param->mWakeUpNanos,
+                                // Do not allow soft wake up when it is needed to drain all data.
+                                param->mDrainType != DrainType::DRAIN_ALL_DATA /*allowSoftWakeUp*/,
+                                param->mHandle);
                         if (command->result == AAUDIO_OK) {
                             mTQWakeUpHandle = *param->mHandle;
                         }
