@@ -33,6 +33,7 @@
 #include <android/media/BnMmapStream.h>
 #include <audio_utils/MelProcessor.h>
 #include <audio_utils/Metadata.h>
+#include <audio_utils/Time.h>
 #include <audio_utils/Trace.h>
 #ifdef DEBUG_CPU_USAGE
 #include <audio_utils/Statistics.h>
@@ -434,10 +435,12 @@ struct {
     void acquire(const sp<IBinder> &wakeLockToken) {
         pthread_mutex_lock(&mLock);
         if (wakeLockToken.get() == nullptr) {
-            adjustTimebaseOffset(&mBoottimeOffset, ExtendedTimestamp::TIMEBASE_BOOTTIME);
+            android::audio_utils::adjustTimeOffset(
+                    SYSTEM_TIME_MONOTONIC, SYSTEM_TIME_BOOTTIME, &mBoottimeOffset);
         } else {
             if (mCount == 0) {
-                adjustTimebaseOffset(&mBoottimeOffset, ExtendedTimestamp::TIMEBASE_BOOTTIME);
+                android::audio_utils::adjustTimeOffset(
+                        SYSTEM_TIME_MONOTONIC, SYSTEM_TIME_BOOTTIME, &mBoottimeOffset);
             }
             ++mCount;
         }
@@ -463,53 +466,6 @@ struct {
         int64_t boottimeOffset = mBoottimeOffset;
         pthread_mutex_unlock(&mLock);
         return boottimeOffset;
-    }
-
-    // Adjusts the timebase offset between TIMEBASE_MONOTONIC
-    // and the selected timebase.
-    // Currently only TIMEBASE_BOOTTIME is allowed.
-    //
-    // This only needs to be called upon acquiring the first partial wakelock
-    // after all other partial wakelocks are released.
-    //
-    // We do an empirical measurement of the offset rather than parsing
-    // /proc/timer_list since the latter is not a formal kernel ABI.
-    static void adjustTimebaseOffset(int64_t *offset, ExtendedTimestamp::Timebase timebase) {
-        int clockbase;
-        switch (timebase) {
-        case ExtendedTimestamp::TIMEBASE_BOOTTIME:
-            clockbase = SYSTEM_TIME_BOOTTIME;
-            break;
-        default:
-            LOG_ALWAYS_FATAL("invalid timebase %d", timebase);
-            break;
-        }
-        // try three times to get the clock offset, choose the one
-        // with the minimum gap in measurements.
-        const int tries = 3;
-        nsecs_t bestGap = 0, measured = 0; // not required, initialized for clang-tidy
-        for (int i = 0; i < tries; ++i) {
-            const nsecs_t tmono = systemTime(SYSTEM_TIME_MONOTONIC);
-            const nsecs_t tbase = systemTime(clockbase);
-            const nsecs_t tmono2 = systemTime(SYSTEM_TIME_MONOTONIC);
-            const nsecs_t gap = tmono2 - tmono;
-            if (i == 0 || gap < bestGap) {
-                bestGap = gap;
-                measured = tbase - ((tmono + tmono2) >> 1);
-            }
-        }
-
-        // to avoid micro-adjusting, we don't change the timebase
-        // unless it is significantly different.
-        //
-        // Assumption: It probably takes more than toleranceNs to
-        // suspend and resume the device.
-        static int64_t toleranceNs = 10000; // 10 us
-        if (llabs(*offset - measured) > toleranceNs) {
-            ALOGV("Adjusting timebase offset old: %lld  new: %lld",
-                    (long long)*offset, (long long)measured);
-            *offset = measured;
-        }
     }
 
     pthread_mutex_t mLock;
