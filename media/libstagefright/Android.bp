@@ -307,6 +307,7 @@ cc_library {
         "liblog",
         "libmedia",
         "libmedia_codeclist",
+        "libmedia_codeclist_capabilities",
         "libmedia_helper",
         "libmedia_omx",
         "libmedia_omx_client",
@@ -331,6 +332,7 @@ cc_library {
     static_libs: [
         "android.media.codec-aconfig-cc",
         "android.media.extractor.flags-aconfig-cc",
+        "android.media.mediarecorder-aconfig-cc",
         "android.media.tv.flags-aconfig-cc",
         "com.android.media.flags.editing-aconfig-cc",
         "framework-permission-aidl-cpp",
