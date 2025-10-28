@@ -216,6 +216,14 @@ support."
 }
 
 flag {
+    name: "manage_assistant_audio_permission"
+    namespace: "media_audio"
+    description: "Add new permission for managing the assistant audio experience"
+    bug: "442485756"
+    is_exported: true
+}
+
+flag {
     name: "mute_background_audio"
     namespace: "media_audio"
     description: "mute audio playing in background"
