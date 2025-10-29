@@ -200,7 +200,7 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
     }
 }
 
-Status AAudioService::closeStream(int32_t streamHandle, int32_t *_aidl_return) {
+Status AAudioService::closeStream(int32_t streamHandle, bool force, int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
     // Check permission and ownership first.
@@ -209,7 +209,7 @@ Status AAudioService::closeStream(int32_t streamHandle, int32_t *_aidl_return) {
         ALOGE("closeStream(0x%0x), illegal stream handle", streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
     }
-    AIDL_RETURN(closeStream(serviceStream));
+    AIDL_RETURN(closeStream(serviceStream, force));
 }
 
 Status AAudioService::getStreamDescription(int32_t streamHandle, Endpoint* endpoint,
@@ -398,12 +398,13 @@ bool AAudioService::isCallerInService() {
         clientUid == IPCThreadState::self()->getCallingUid();
 }
 
-aaudio_result_t AAudioService::closeStream(const sp<AAudioServiceStreamBase>& serviceStream) {
+aaudio_result_t AAudioService::closeStream(const sp<AAudioServiceStreamBase>& serviceStream,
+                                           bool force) {
     // This is protected by a lock in AAudioClientTracker.
     // It is safe to unregister the same stream twice.
     const pid_t pid = serviceStream->getOwnerProcessId();
     AAudioClientTracker::getInstance().unregisterClientStream(pid, serviceStream);
-    aaudio_result_t result = serviceStream->close();
+    aaudio_result_t result = serviceStream->close(force);
     if (result == AAUDIO_ERROR_WOULD_BLOCK) {
         ALOGD("%s defer removing stream", __func__);
         result = AAUDIO_OK;

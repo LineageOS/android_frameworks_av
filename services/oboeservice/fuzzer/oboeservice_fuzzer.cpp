@@ -160,7 +160,7 @@ class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
     AAudioHandleInfo openStream(const AAudioStreamRequest &request,
                                 AAudioStreamConfiguration &configurationOutput) override;
 
-    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo, bool force) override;
 
     aaudio_result_t getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                          AudioEndpointParcelable &parcelable) override;
@@ -294,12 +294,13 @@ AAudioHandleInfo FuzzAAudioClient::openStream(const AAudioStreamRequest &request
     return {-1, AAUDIO_ERROR_NO_SERVICE};
 }
 
-aaudio_result_t FuzzAAudioClient::closeStream(const AAudioHandleInfo& streamHandleInfo) {
+aaudio_result_t FuzzAAudioClient::closeStream(const AAudioHandleInfo& streamHandleInfo,
+                                              bool force) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->closeStream(streamHandleInfo);
+    return service->closeStream(streamHandleInfo, force);
 }
 
 aaudio_result_t FuzzAAudioClient::getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
@@ -480,6 +481,7 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
         // invalid request, stream not opened.
         return;
     }
+    const bool forceCloseStream = fdp.ConsumeBool();
     while (fdp.remaining_bytes()) {
         AudioEndpointParcelable audioEndpointParcelable;
         AudioPlaybackRate rate = AUDIO_PLAYBACK_RATE_DEFAULT;
@@ -522,7 +524,7 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
                 break;
         }
     }
-    mClient->closeStream(streamHandleInfo);
+    mClient->closeStream(streamHandleInfo, forceCloseStream);
     assert(mClient->getDeathCount() == 0);
 }
 

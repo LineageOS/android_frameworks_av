@@ -209,7 +209,7 @@ void AAudioClientTracker::NotificationClient::binderDied(const wp<IBinder>& who 
             const aaudio_handle_t handle = serviceStream->getHandle();
             ALOGW("binderDied() close abandoned stream 0x%08X\n", handle);
             AAudioHandleInfo handleInfo(DEFAULT_AAUDIO_SERVICE_ID, handle);
-            aaudioService->asAAudioServiceInterface().closeStream(handleInfo);
+            aaudioService->asAAudioServiceInterface().closeStream(handleInfo, true /*force*/);
         }
         // mStreams should be empty now
     }

@@ -375,7 +375,7 @@ aaudio_result_t AudioStreamInternal::release_l() {
         auto serviceStreamHandleInfo = mServiceStreamHandleInfo;
         mServiceStreamHandleInfo = AAudioHandleInfo();
 
-        mServiceInterface.closeStream(serviceStreamHandleInfo);
+        mServiceInterface.closeStream(serviceStreamHandleInfo, false /*false*/);
         mCallbackBuffer.reset();
 
         // Update local frame counters so we can query them after releasing the endpoint.
