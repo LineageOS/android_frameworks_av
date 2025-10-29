@@ -41,103 +41,6 @@ cc_library_headers {
 
 // !!!DO NOT DEPEND ON THIS SHARED LIBRARY DIRECTLY!!!
 // use libcodec2-impl-defaults instead
-// this replaces libcodec2_vndk
-cc_library {
-    name: "libcodec2_impl_base",
-    vendor_available: true,
-    min_sdk_version: "29",
-    // TODO: b/147147883
-    double_loadable: true,
-    apex_available: [
-        "//apex_available:platform",
-        "com.android.media.swcodec",
-    ],
-
-    defaults: [
-        "aconfig_lib_cc_static_link.defaults",
-        "libcodec2_hal_selection",
-        "latest_android_hardware_media_c2_ndk_shared",
-    ],
-
-    srcs: [
-        "C2AllocatorBlob.cpp",
-        "C2AllocatorIon.cpp",
-        "C2AllocatorGralloc.cpp",
-        "C2Buffer.cpp",
-        "C2Config.cpp",
-        "C2DmaBufAllocator.cpp",
-        "C2Fence.cpp",
-        "C2PlatformStorePluginLoader.cpp",
-        "C2Store.cpp",
-        "platform/C2BqBuffer.cpp",
-        "platform/C2BqPoolInvalidator.cpp",
-        "platform/C2SurfaceSyncObj.cpp",
-        "platform/C2IgbaBuffer.cpp",
-        "types.cpp",
-        "util/C2Debug.cpp",
-        "util/C2InterfaceHelper.cpp",
-        "util/C2InterfaceUtils.cpp",
-        "util/C2ParamUtils.cpp",
-    ],
-
-    export_include_dirs: [
-        "include",
-    ],
-
-    export_shared_lib_headers: [
-        "libbase",
-        "libdmabufheap",
-        "android.hardware.media.bufferpool@2.0",
-        "android.hardware.media.bufferpool2-V2-ndk",
-    ],
-
-    local_include_dirs: [
-        "internal",
-    ],
-
-    header_libs: [
-        "media_plugin_headers",
-        "libcodec2_headers",
-    ],
-
-    shared_libs: [
-        "android.hardware.graphics.bufferqueue@2.0",
-        "android.hardware.graphics.common@1.2",
-        "android.hardware.common-V2-ndk",
-        "android.hardware.common.fmq-V1-ndk",
-        "android.hardware.media.bufferpool@2.0",
-        "android.hardware.media.bufferpool2-V2-ndk",
-        "libbase",
-        "libbinder_ndk",
-        "libcutils",
-        "libdl",
-        "libdmabufheap",
-        "libfmq",
-        "libgralloctypes",
-        "libhidlbase",
-        "libion",
-        "liblog",
-        "libnativewindow",
-        "libstagefright_foundation",
-        "libstagefright_bufferpool@2.0.1",
-        "libstagefright_aidl_bufferpool2",
-        "libui",
-        "libutils",
-    ],
-
-    static_libs: [
-        "android.media.swcodec.flags-aconfig-cc",
-    ],
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-    ],
-}
-
-// !!!DO NOT DEPEND ON THIS SHARED LIBRARY DIRECTLY!!!
-// use libcodec2-impl-defaults instead.
-// this is deprecated by libcodec2_impl_base
 cc_library {
     name: "libcodec2_vndk",
     vendor_available: true,
@@ -237,7 +140,6 @@ cc_defaults {
 
     defaults: [
         "libcodec2_hal_selection",
-        "latest_android_hardware_media_c2_ndk_static",
     ],
 
     static_libs: [
@@ -250,7 +152,7 @@ cc_defaults {
         "libcodec2",
         "libhidlbase",
         "libdmabufheap",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libnativewindow",
         "libcodec2_soft_common",
         "libsfplugin_ccodec_utils",
@@ -267,6 +169,7 @@ cc_defaults {
         "android.hardware.common-V2-ndk",
         "android.hardware.common.fmq-V1-ndk",
         "android.hardware.media.bufferpool2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
     ],
 
     shared_libs: [
@@ -291,7 +194,7 @@ cc_defaults {
         "liblog", // for ALOG
         "libcodec2",
         "libcodec2_hal_common",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libutils",
     ],
 

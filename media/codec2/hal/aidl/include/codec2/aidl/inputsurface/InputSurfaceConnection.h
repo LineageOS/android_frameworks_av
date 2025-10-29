@@ -45,8 +45,6 @@ struct InputSurfaceConnection : public BnInputSurfaceConnection {
     // Methods from IInputSurfaceConnection follow.
     ::ndk::ScopedAStatus disconnect() override;
     ::ndk::ScopedAStatus signalEndOfStream() override;
-    // IInputSurfaceConnection V2
-    virtual ::ndk::ScopedAStatus notifiesInputBufferDoneToClient(bool *_aidl_return);
 
     // implementation specific interface.
 

@@ -658,10 +658,6 @@ struct Codec2Client::InputSurfaceConnection {
     // signal Eos to the connected video encoder.
     c2_status_t signalEos();
 
-    // IInputSurfaceConnection V2
-    // InputBufferDone will be notified to client
-    c2_status_t notifiesInputBufferDoneToClient(bool* inputBufferDone);
-
     // base cannot be null.
     InputSurfaceConnection(const std::shared_ptr<Base>& base);
 

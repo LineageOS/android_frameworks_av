@@ -10,8 +10,6 @@ cc_library {
     defaults: [
         "aconfig_lib_cc_static_link.defaults",
         "libcodec2_hal_selection",
-        "latest_android_hardware_media_c2_ndk_shared",
-        "latest_android_hardware_media_c2_ndk_export_headers",
     ],
 
     srcs: [
@@ -28,11 +26,12 @@ cc_library {
         "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool@2.0",
         "android.hardware.media.bufferpool2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbinder_ndk",
         "libbase",
         "libcodec2",
         "libcodec2_hal_common",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libcutils",
         "liblog",
         "libnativewindow",
@@ -49,6 +48,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2",
         "libcodec2_hal_common",
     ],
@@ -68,8 +68,6 @@ cc_library {
     defaults: [
         "aconfig_lib_cc_static_link.defaults",
         "libcodec2_hal_selection",
-        "latest_android_hardware_media_c2_ndk_shared",
-        "latest_android_hardware_media_c2_ndk_export_headers",
     ],
 
     srcs: [
@@ -90,12 +88,13 @@ cc_library {
     shared_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcodec2",
         "libcodec2_hal_common",
         "libcodec2_hidl_plugin_stub",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libcutils",
         "libhidlbase",
         "liblog",
@@ -132,6 +131,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2",
         "libstagefright_bufferpool@2.0.1",
         "libui",
@@ -156,8 +156,6 @@ cc_library {
     defaults: [
         "aconfig_lib_cc_static_link.defaults",
         "libcodec2_hal_selection",
-        "latest_android_hardware_media_c2_ndk_shared",
-        "latest_android_hardware_media_c2_ndk_export_headers",
     ],
 
     srcs: [
@@ -183,12 +181,13 @@ cc_library {
     shared_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcodec2",
         "libcodec2_hal_common",
         "libcodec2_hidl_plugin_stub",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libcutils",
         "libhidlbase",
         "liblog",
@@ -228,6 +227,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2",
         "libstagefright_bufferpool@2.0.1",
         "libui",
@@ -238,12 +238,10 @@ cc_library {
 cc_defaults {
     name: "libcodec2-aidl-noisurface-defaults",
     min_sdk_version: "30",
-    defaults: [
-        "libcodec2-impl-defaults",
-        "latest_android_hardware_media_c2_ndk_shared",
-    ],
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
         "libbinder_ndk",
         "libcodec2_aidl_noisurface",
     ],
@@ -253,12 +251,10 @@ cc_defaults {
 cc_defaults {
     name: "libcodec2-aidl-defaults",
     min_sdk_version: "30",
-    defaults: [
-        "libcodec2-impl-defaults",
-        "latest_android_hardware_media_c2_ndk_shared",
-    ],
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
         "libbinder_ndk",
         "libcodec2_aidl",
     ],
@@ -267,12 +263,10 @@ cc_defaults {
 // public dependency for Codec 2.0 HAL client
 cc_defaults {
     name: "libcodec2-aidl-client-defaults",
-    defaults: [
-        "libcodec2-impl-defaults",
-        "latest_android_hardware_media_c2_ndk_shared",
-    ],
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2_aidl_client",
     ],
 }
@@ -289,7 +283,7 @@ cc_fuzz {
         "libcodec2-runtime-libs",
     ],
     shared_libs: [
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
     ],
     fuzz_config: {
         cc: [

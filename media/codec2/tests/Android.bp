@@ -54,7 +54,7 @@ cc_test {
 
     shared_libs: [
         "libcodec2",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libcutils",
         "liblog",
         "libui",
@@ -82,7 +82,7 @@ cc_test {
         "libcutils",
         "liblog",
         "libcodec2",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libutils",
     ],
 
