@@ -69,7 +69,7 @@ cc_library_shared {
         "libbinder_ndk",
         "libcodec2",
         "libcodec2_client",
-        "libcodec2_impl_base",
+        "libcodec2_vndk",
         "libcutils",
         "libgralloctypes",
         "libgui",

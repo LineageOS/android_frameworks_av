@@ -74,11 +74,6 @@ c2_status_t InputSurfaceConnection::status() const {
     return ::ndk::ScopedAStatus::ok();
 }
 
-::ndk::ScopedAStatus InputSurfaceConnection::notifiesInputBufferDoneToClient(bool *_aidl_return) {
-    *_aidl_return = true;
-    return ::ndk::ScopedAStatus::ok();
-}
-
 c2_status_t InputSurfaceConnection::submitBuffer(
         int32_t bufferId, const AImage *buffer, int64_t timestamp, int fenceFd) {
     return submitBufferInternal(bufferId, buffer, timestamp, fenceFd, false);
