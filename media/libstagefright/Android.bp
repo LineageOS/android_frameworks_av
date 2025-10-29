@@ -295,7 +295,7 @@ cc_library {
         "libbinder_ndk",
         "libcamera_client",
         "libcodec2",
-        "libcodec2_vndk",
+        "libcodec2_impl_base",
         "libcutils",
         "libdatasource",
         "libdl",

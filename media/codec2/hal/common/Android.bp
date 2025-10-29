@@ -24,7 +24,7 @@ cc_library {
     shared_libs: [
         "libbase",
         "libcodec2",
-        "libcodec2_vndk",
+        "libcodec2_impl_base",
         "liblog",
         "libstagefright_foundation",
         "server_configurable_flags",
