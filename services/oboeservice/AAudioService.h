@@ -90,7 +90,7 @@ public:
 
     binder::Status drainStream(int32_t streamHandle,
                                int64_t wakeUpNanos,
-                               aaudio::DrainType drainType,
+                               bool allowSoftWakeUp,
                                android::media::TimerQueueHandle* handle,
                                int32_t* _aidl_return) override;
 

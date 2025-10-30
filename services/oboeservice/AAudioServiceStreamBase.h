@@ -20,7 +20,6 @@
 #include <assert.h>
 #include <mutex>
 
-#include <aaudio/DrainType.h>
 #include <aaudio/IAAudioClientCallback.h>
 #include <android-base/thread_annotations.h>
 #include <android/media/audio/common/AudioPlaybackRate.h>
@@ -128,7 +127,7 @@ public:
 
     aaudio_result_t updateTimestamp() EXCLUDES(mLock);
 
-    aaudio_result_t drain(int64_t wakeUpNanos, DrainType drainType,
+    aaudio_result_t drain(int64_t wakeUpNanos, bool allowSoftWakeUp,
                           android::audio_utils::TimerQueue::handle_t* handle) EXCLUDES(mLock);
 
     aaudio_result_t activate(android::audio_utils::TimerQueue::handle_t handle) EXCLUDES(mLock);
@@ -413,14 +412,14 @@ protected:
 
     class DrainParam : public AAudioCommandParam {
     public:
-        DrainParam(int64_t wakeUpNanos, DrainType drainType,
+        DrainParam(int64_t wakeUpNanos, bool allowSoftWakeUp,
                    android::audio_utils::TimerQueue::handle_t* handle)
                 : AAudioCommandParam(), mWakeUpNanos(wakeUpNanos),
-                  mDrainType(drainType), mHandle(handle) { }
+                  mAllowSoftWakeUp(allowSoftWakeUp), mHandle(handle) { }
         ~DrainParam() override = default;
 
         int64_t mWakeUpNanos;
-        DrainType mDrainType;
+        bool mAllowSoftWakeUp;
         android::audio_utils::TimerQueue::handle_t* mHandle;
     };
 

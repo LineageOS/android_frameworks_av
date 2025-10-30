@@ -18,7 +18,6 @@
 #define ANDROID_AAUDIO_BINDING_AAUDIO_SERVICE_INTERFACE_H
 
 // go/keep-sorted start
-#include <aaudio/DrainType.h>
 #include <aaudio/IAAudioClient.h>
 #include <audio_utils/TimerQueue.h>
 #include <media/AudioClient.h>
@@ -135,14 +134,16 @@ public:
      *
      * @param streamHandleInfo stream handle to identify the stream.
      * @param wakeUpNanos the timestamp in boottime nanoseconds that the client must be waken up.
-     * @param drainType the type of draining operation.
+     * @param allowSoftWakeUp allow the service side to wake up the client even if it is not the
+     *                        requested time. This allows service side to smartly select wake up
+     *                        time instead of waiting for the exact wake up time.
      * @param handle the handle to identify the task in TimerQueue at service side. Use this handle
      *               to remove the wake up task if the wake up task is no longer needed.
      * @return AAUDIO_OK if the service side successfully receives the drain command.
      */
     virtual aaudio_result_t drainStream(const AAudioHandleInfo& streamHandleInfo,
                                         int64_t wakeUpNanos,
-                                        DrainType drainType,
+                                        bool allowSoftWakeUp,
                                         android::audio_utils::TimerQueue::handle_t* handle) = 0;
 
     /**

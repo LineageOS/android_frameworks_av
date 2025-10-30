@@ -193,7 +193,7 @@ aaudio_result_t AudioStreamInternalPlay::prepareBuffersForStop_l() {
             ALOGD("No need to drain as it is closed to play all data");
             return AAUDIO_OK;
         }
-        drainStream_l(streamEndNanosBootTime, DrainType::DRAIN_ALL_DATA);
+        drainStream_l(streamEndNanosBootTime, false /*allowSoftWakeUp*/);
         return AAUDIO_ERROR_WOULD_BLOCK;
     }
     // Sleep until the DSP has read all of the data written.
@@ -299,11 +299,23 @@ aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFr
         int32_t fullFrames = mAudioEndpoint->getFullFramesAvailable();
         if (fullFrames > getDeviceBufferSize() - mOffloadSafeMarginInFrames &&
             fullFrames > getDeviceSampleRate() * 1 + mOffloadSafeMarginInFrames) {
-            if (result = drainStream(isDataCallbackSet() ? DrainType::DRAIN_ALL_ALLOW_SOFT_WAKEUP
-                                                         : DrainType::DRAIN_ALL_DATA);
-                result != AAUDIO_OK) {
-                ALOGE("%s() failed to drain, error=%d", __func__, result);
-                return result;
+            // Use BootTime for wakeup time as the device may have be suspended.
+            const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
+                    mAudioEndpoint->getDataWriteCounter() - mOffloadSafeMarginInFrames);
+            android::audio_utils::unique_lock ul(mStreamMutex);
+            if (aaudio_result_t ret = drainStream_l(wakeUpNanosBootTime, isDataCallbackSet());
+                ret != AAUDIO_OK) {
+                ALOGE("%s() failed to drain, error=%d", __func__, ret);
+                return ret;
+            }
+            mDraining = true;
+            if (isDataCallbackSet()) {
+                const int64_t drainNanos = std::max(
+                        (int64_t)0, wakeUpNanosBootTime - android::elapsedRealtimeNano());
+                mCallbackCV.wait_for(ul, std::chrono::nanoseconds(drainNanos),
+                                     [this]() REQUIRES(mStreamMutex) {
+                    return !mDraining;
+                });
             }
         }
     }
@@ -553,7 +565,8 @@ aaudio_result_t AudioStreamInternalPlay::setOffloadEndOfStream() {
             // When clients set offload end of stream, they may not want to write more data
             // before the presentation end callback is called. In that case, DO NOT allow
             // soft wake up here so that it only wakes up after draining all data.
-            return drainStream_l(mOffloadEosNanosBoottime, DrainType::DRAIN_ALL_DATA);
+            const bool allowSoftWakeUp = false;
+            return drainStream_l(mOffloadEosNanosBoottime, allowSoftWakeUp);
         }
     }
     return AAUDIO_OK;
@@ -681,36 +694,10 @@ aaudio_result_t AudioStreamInternalPlay::flushFromFrame_l(
     return result;
 }
 
-aaudio_result_t AudioStreamInternalPlay::drainStream(DrainType drainType) {
-    int64_t offloadSafeMarginInFrames =
-            drainType == DrainType::DRAIN_ALL_WITHOUT_WAKEUP_CALLBACK ? getDeviceFramesPerBurst()
-                                                                      : mOffloadSafeMarginInFrames;
-    // Use BootTime for wakeup time as the device may have be suspended.
-    const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
-            mAudioEndpoint->getDataWriteCounter() - offloadSafeMarginInFrames);
-    android::audio_utils::unique_lock ul(mStreamMutex);
-    if (aaudio_result_t ret = drainStream_l(wakeUpNanosBootTime, drainType);
-        ret != AAUDIO_OK) {
-        ALOGE("%s() failed to drain, error=%d", __func__, ret);
-        return ret;
-    }
-    mDraining = true;
-    if (isDataCallbackSet()) {
-        const int64_t drainNanos = std::max(
-                (int64_t)0, wakeUpNanosBootTime - android::elapsedRealtimeNano());
-        mCallbackCV.wait_for(ul, std::chrono::nanoseconds(drainNanos),
-                             [this]() REQUIRES(mStreamMutex) {
-            return !mDraining;
-        });
-        mDraining = false;
-    }
-    return AAUDIO_OK;
-}
-
 aaudio_result_t AudioStreamInternalPlay::drainStream_l(int64_t wakeUpNanos,
-                                                       DrainType drainType) {
+                                                       bool allowSoftWakeUp) {
     aaudio_result_t result = mServiceInterface.drainStream(
-            mServiceStreamHandleInfo, wakeUpNanos, drainType, &mWakeUpHandle);
+            mServiceStreamHandleInfo, wakeUpNanos, allowSoftWakeUp, &mWakeUpHandle);
     if (result == AAUDIO_OK) {
         return result;
     }
@@ -811,7 +798,7 @@ void *AudioStreamInternalPlay::callbackLoop() {
                 // Use BootTime for wakeup time as the device may have be suspended.
                 const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
                         mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
-                if (result = drainStream_l(wakeUpNanosBootTime, DrainType::DRAIN_ALL_DATA);
+                if (result = drainStream_l(wakeUpNanosBootTime, false /*allowSoftWakeUp*/);
                     result != AAUDIO_OK) {
                     ALOGE("%s() failed to drain, error=%d", __func__, result);
                     break;
@@ -843,30 +830,6 @@ void *AudioStreamInternalPlay::callbackLoop() {
             ALOGD("%s(): callback request to stop", __func__);
             result = systemStopInternal();
             break;
-        } else if (callbackResult == 0 &&
-                getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
-            // This is offload playback and the client uses a partial data callback. Returning
-            // 0 indicates the client may not be able to feed any data now. In that case, drain
-            // most of the data before firing another data callback. If there are enough data,
-            // it is better to drain with a wakeup callback so that the device can go into deep
-            // suspend for power saving. Otherwise, it is simpler to just suspend the data callback
-            // thread and timestamp report at the service side. There's not an easy way to
-            // determine when the device can go into deep suspend. Use double the safe margin(2s)
-            // as a boundary check to decide if a wakeup callback is required or not.
-            const int32_t fullFramesAvailable = mAudioEndpoint->getFullFramesAvailable();
-            DrainType drainType = fullFramesAvailable > mOffloadSafeMarginInFrames * 2
-                    ? DrainType::DRAIN_ALL_ALLOW_SOFT_WAKEUP
-                    : DrainType::DRAIN_ALL_WITHOUT_WAKEUP_CALLBACK;
-            if (result = drainStream(drainType); result != AAUDIO_OK) {
-                ALOGE("%s failed to drain data(drainType=%d), stopping the data callback thread",
-                      __func__, drainType);
-                break;
-            }
-            if (result = mServiceInterface.updateTimestamp(mServiceStreamHandleInfo);
-                result != AAUDIO_OK) {
-                ALOGE("%s, failed to update timestamp, error=%d", __func__, result);
-                break;
-            }
         }
 
         // Write audio data to stream. This is a BLOCKING WRITE!

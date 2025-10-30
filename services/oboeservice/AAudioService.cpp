@@ -327,7 +327,7 @@ Status AAudioService::updateTimestamp(int32_t streamHandle, int32_t *_aidl_retur
 }
 
 Status AAudioService::drainStream(
-        int32_t streamHandle, int64_t wakeUpNanos, aaudio::DrainType drainType,
+        int32_t streamHandle, int64_t wakeUpNanos, bool allowSoftWakeUp,
         android::media::TimerQueueHandle* handle, int32_t* _aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
     if (handle == nullptr) {
@@ -340,7 +340,7 @@ Status AAudioService::drainStream(
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         AIDL_RETURN(AAUDIO_ERROR_INVALID_HANDLE);
     }
-    aaudio_result_t result = serviceStream->drain(wakeUpNanos, drainType, &legacyHandle);
+    aaudio_result_t result = serviceStream->drain(wakeUpNanos, allowSoftWakeUp, &legacyHandle);
     if (result == AAUDIO_OK) {
         *handle = VALUE_OR_RETURN_BINDER_STATUS(
                 legacy2aidl_timer_queue_handle_t_TimerQueueHandle(legacyHandle));
