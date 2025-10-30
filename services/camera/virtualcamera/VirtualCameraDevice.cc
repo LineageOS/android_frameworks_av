@@ -492,7 +492,7 @@ std::optional<AidlCameraMetadata> initCameraCharacteristics(
   if (!std::all_of(supportedInputConfig.begin(), supportedInputConfig.end(),
                    [](const SupportedStreamConfiguration& config) {
                      return isFormatSupportedForInput(
-                         config.width, config.height, config.pixelFormat,
+                         config.width, config.height, config.imageFormat,
                          config.maxFps);
                    })) {
     ALOGE("%s: input configuration contains unsupported format", __func__);

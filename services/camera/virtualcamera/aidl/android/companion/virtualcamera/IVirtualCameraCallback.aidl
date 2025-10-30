@@ -62,10 +62,10 @@ oneway interface IVirtualCameraCallback {
      * @param surface - Surface representing the virtual camera sensor.
      * @param width - width of the surface.
      * @param height - height of the surface.
-     * @param pixelFormat - pixel format of the surface.
+     * @param imageFormat - image format of the surface.
      */
     void onStreamConfigured(int streamId, in Surface surface, int width, int height,
-        in Format pixelFormat);
+        in Format imageFormat);
 
     /**
      * Called when framework requests capture. This can be used by the client as a hint

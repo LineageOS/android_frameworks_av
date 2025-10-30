@@ -111,9 +111,9 @@ ndk::ScopedAStatus validateConfiguration(
   for (const SupportedStreamConfiguration& config :
        configuration.supportedStreamConfigs) {
     if (!isFormatSupportedForInput(config.width, config.height,
-                                   config.pixelFormat, config.maxFps)) {
+                                   config.imageFormat, config.maxFps)) {
       ALOGE("%s: Requested unsupported input format: %d x %d (%d)", __func__,
-            config.width, config.height, static_cast<int>(config.pixelFormat));
+            config.width, config.height, static_cast<int>(config.imageFormat));
       return ndk::ScopedAStatus::fromServiceSpecificError(
           Status::EX_ILLEGAL_ARGUMENT);
     }

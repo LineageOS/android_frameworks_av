@@ -89,7 +89,7 @@ class MockVirtualCameraCallback : public BnVirtualCameraCallback {
       (override));
   MOCK_METHOD(ndk::ScopedAStatus, onStreamConfigured,
               (int32_t, const ::aidl::android::view::Surface&, int, int,
-               ::aidl::android::companion::virtualcamera::Format pixelFormat),
+               ::aidl::android::companion::virtualcamera::Format imageFormat),
               (override));
   MOCK_METHOD(ndk::ScopedAStatus, onProcessCaptureRequest,
               (int32_t, int32_t, const std::optional<VirtualCameraMetadata>&),
@@ -103,7 +103,7 @@ VirtualCameraConfiguration createConfiguration(const int width, const int height
   VirtualCameraConfiguration configuration;
   configuration.supportedStreamConfigs.push_back({.width = width,
                                                   .height = height,
-                                                  .pixelFormat = format,
+                                                  .imageFormat = format,
                                                   .maxFps = maxFps});
   configuration.sensorOrientation = kSensorOrientation;
   configuration.lensFacing = kLensFacing;

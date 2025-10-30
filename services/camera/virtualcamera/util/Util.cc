@@ -127,7 +127,7 @@ sp<Fence> importFence(const NativeHandle& aidlHandle) {
   return sp<Fence>::make(::dup(aidlHandle.fds[0].get()));
 }
 
-bool isPixelFormatSupportedForInput(const Format format) {
+bool isImageFormatSupportedForInput(const Format format) {
   return std::find(kSupportedFormats.begin(), kSupportedFormats.end(),
                    format) != kSupportedFormats.end();
 }
@@ -135,7 +135,7 @@ bool isPixelFormatSupportedForInput(const Format format) {
 // Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(const int width, const int height,
                                const Format format, const int maxFps) {
-  if (!isPixelFormatSupportedForInput(format)) {
+  if (!isImageFormatSupportedForInput(format)) {
     return false;
   }
 

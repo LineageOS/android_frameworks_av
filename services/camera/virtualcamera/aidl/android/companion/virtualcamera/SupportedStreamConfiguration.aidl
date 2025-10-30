@@ -26,7 +26,7 @@ import android.companion.virtualcamera.Format;
 parcelable SupportedStreamConfiguration {
     int width;
     int height;
-    Format pixelFormat = Format.UNKNOWN;
+    Format imageFormat = Format.UNKNOWN;
     int maxFps;
     int index;
 }

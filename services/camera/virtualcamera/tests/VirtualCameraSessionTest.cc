@@ -175,12 +175,12 @@ class VirtualCameraSessionTest : public VirtualCameraSessionTestBase {
             .supportedStreamConfigs = {SupportedStreamConfiguration{
                                            .width = kVgaWidth,
                                            .height = kVgaHeight,
-                                           .pixelFormat = Format::YUV_420_888,
+                                           .imageFormat = Format::YUV_420_888,
                                            .maxFps = kMaxFps},
                                        SupportedStreamConfiguration{
                                            .width = kSvgaWidth,
                                            .height = kSvgaHeight,
-                                           .pixelFormat = Format::YUV_420_888,
+                                           .imageFormat = Format::YUV_420_888,
                                            .maxFps = kMaxFps}},
             .virtualCameraCallback = mMockVirtualCameraClientCallback,
             .sensorOrientation = SensorOrientation::ORIENTATION_0,
@@ -227,7 +227,7 @@ class VirtualCameraSessionWithMetadata : public VirtualCameraSessionTestBase {
             .supportedStreamConfigs = {SupportedStreamConfiguration{
                 .width = kVgaWidth,
                 .height = kVgaHeight,
-                .pixelFormat = Format::YUV_420_888,
+                .imageFormat = Format::YUV_420_888,
                 .maxFps = kMaxFps}},
             .virtualCameraCallback = mMockVirtualCameraClientCallback,
             .sensorOrientation = SensorOrientation::ORIENTATION_0,
@@ -262,7 +262,7 @@ class VirtualCameraSessionWithMetadata : public VirtualCameraSessionTestBase {
             .supportedStreamConfigs = {SupportedStreamConfiguration{
                 .width = kVgaWidth,
                 .height = kVgaHeight,
-                .pixelFormat = Format::YUV_420_888,
+                .imageFormat = Format::YUV_420_888,
                 .maxFps = kMaxFps}},
             .virtualCameraCallback = mMockVirtualCameraClientCallback,
             .perFrameCameraMetadataEnabled = perFrameMetadataEnabled,
@@ -427,11 +427,11 @@ TEST_F(VirtualCameraSessionInputChoiceTest,
   auto virtualCameraSession = createSession(
       {SupportedStreamConfiguration{.width = kSvgaWidth,
                                     .height = kSvgaHeight,
-                                    .pixelFormat = Format::YUV_420_888,
+                                    .imageFormat = Format::YUV_420_888,
                                     .maxFps = kMaxFps},
        SupportedStreamConfiguration{.width = kQvgaWidth,
                                     .height = kQvgaHeight,
-                                    .pixelFormat = Format::RGBA_8888,
+                                    .imageFormat = Format::RGBA_8888,
                                     .maxFps = kMaxFps}});
 
   // Configure VGA stream. Expect SVGA input to be chosen to downscale from.
@@ -455,11 +455,11 @@ TEST_F(VirtualCameraSessionInputChoiceTest,
   auto virtualCameraSession = createSession(
       {SupportedStreamConfiguration{.width = kSvgaWidth,
                                     .height = kSvgaHeight,
-                                    .pixelFormat = Format::YUV_420_888,
+                                    .imageFormat = Format::YUV_420_888,
                                     .maxFps = kMaxFps},
        SupportedStreamConfiguration{.width = kQvgaWidth,
                                     .height = kQvgaHeight,
-                                    .pixelFormat = Format::RGBA_8888,
+                                    .imageFormat = Format::RGBA_8888,
                                     .maxFps = kMaxFps}});
 
   // Configure VGA stream. Expect SVGA input to be chosen to downscale from.
@@ -482,11 +482,11 @@ TEST_F(VirtualCameraSessionInputChoiceTest, reconfigureSwitchesInputStream) {
   auto virtualCameraSession = createSession(
       {SupportedStreamConfiguration{.width = kSvgaWidth,
                                     .height = kSvgaHeight,
-                                    .pixelFormat = Format::YUV_420_888,
+                                    .imageFormat = Format::YUV_420_888,
                                     .maxFps = kMaxFps},
        SupportedStreamConfiguration{.width = kQvgaWidth,
                                     .height = kQvgaHeight,
-                                    .pixelFormat = Format::RGBA_8888,
+                                    .imageFormat = Format::RGBA_8888,
                                     .maxFps = kMaxFps}});
 
   // First configure QVGA stream.
@@ -526,11 +526,11 @@ TEST_F(VirtualCameraSessionInputChoiceTest,
   auto virtualCameraSession = createSession(
       {SupportedStreamConfiguration{.width = kSvgaWidth,
                                     .height = kSvgaHeight,
-                                    .pixelFormat = Format::YUV_420_888,
+                                    .imageFormat = Format::YUV_420_888,
                                     .maxFps = kMaxFps},
        SupportedStreamConfiguration{.width = kQvgaWidth,
                                     .height = kQvgaHeight,
-                                    .pixelFormat = Format::RGBA_8888,
+                                    .imageFormat = Format::RGBA_8888,
                                     .maxFps = kMaxFps}});
 
   // First configure SVGA stream.

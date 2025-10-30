@@ -170,7 +170,7 @@ INSTANTIATE_TEST_SUITE_P(
                     .supportedStreamConfigs = {SupportedStreamConfiguration{
                         .width = kVgaWidth,
                         .height = kVgaHeight,
-                        .pixelFormat = Format::YUV_420_888,
+                        .imageFormat = Format::YUV_420_888,
                         .maxFps = kMaxFps}},
                     .virtualCameraCallback = nullptr,
                     .sensorOrientation = SensorOrientation::ORIENTATION_0,
@@ -211,12 +211,12 @@ INSTANTIATE_TEST_SUITE_P(
                         {SupportedStreamConfiguration{
                              .width = kVgaWidth,
                              .height = kVgaHeight,
-                             .pixelFormat = Format::YUV_420_888,
+                             .imageFormat = Format::YUV_420_888,
                              .maxFps = kMaxFps},
                          SupportedStreamConfiguration{
                              .width = kHdWidth,
                              .height = kHdHeight,
-                             .pixelFormat = Format::YUV_420_888,
+                             .imageFormat = Format::YUV_420_888,
                              .maxFps = kMaxFps}},
                     .virtualCameraCallback = nullptr,
                     .sensorOrientation = SensorOrientation::ORIENTATION_0,
@@ -297,7 +297,7 @@ class VirtualCameraDeviceTest : public ::testing::Test {
             .supportedStreamConfigs = {SupportedStreamConfiguration{
                 .width = kVgaWidth,
                 .height = kVgaHeight,
-                .pixelFormat = Format::YUV_420_888,
+                .imageFormat = Format::YUV_420_888,
                 .maxFps = kMaxFps}},
             .virtualCameraCallback = nullptr,
             .sensorOrientation = SensorOrientation::ORIENTATION_0,
@@ -364,7 +364,7 @@ TEST_F(VirtualCameraDeviceTest, thumbnailSizeWithCompatibleAspectRatio) {
 TEST_F(VirtualCameraDeviceTest, dump) {
   std::string expected = R"(  virtual_camera 42 belongs to virtual device 0
   SupportedStreamConfiguration:
-    SupportedStreamConfiguration{width: 640, height: 480, pixelFormat: YUV_420_888, maxFps: 30, index: 0})";
+    SupportedStreamConfiguration{width: 640, height: 480, imageFormat: YUV_420_888, maxFps: 30, index: 0})";
   int expectedSize = expected.size() * sizeof(char);
 
   // Create an in memory fd
