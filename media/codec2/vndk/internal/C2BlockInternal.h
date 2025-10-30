@@ -40,12 +40,7 @@ struct BufferPoolData;
 
 } // namespace aidl::android::hardware::media::bufferpool2
 
-namespace aidl::android::hardware::media::c2 {
-
-// IGraphicBufferAllocator for media.c2 aidl
-class IGraphicBufferAllocator;
-
-} // namespace aidl::android::hardware::media::c2
+class C2IgbaInterface;
 
 typedef struct AHardwareBuffer AHardwareBuffer;
 
@@ -539,7 +534,7 @@ struct _C2BlockFactory {
      */
     static void RegisterIgba(
             const std::shared_ptr<_C2BlockPoolData>& poolData,
-            std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> &igba);
+            std::shared_ptr<C2IgbaInterface> &igba);
 };
 
 #endif // ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_

@@ -89,11 +89,22 @@ public:
             std::shared_ptr<const C2Component> component,
             std::shared_ptr<C2BlockPool> *pool);
 
+#ifdef USE_IGBA_HAL_INTERFACE
+    /**
+     * Create a C2BlockPool object with |allocatorParam| for |component|.
+     */
+    [[deprecated("Use createBlockPool using C2PlatformAllocatorDescV2 as a parameter instead.")]]
+    c2_status_t createBlockPool(
+            C2PlatformAllocatorDesc &allocatorParam,
+            std::shared_ptr<const C2Component> component,
+            std::shared_ptr<C2BlockPool> *pool);
+#endif
+
     /**
      * Create a C2BlockPool object with |allocatorParam| for |component|.
      */
     c2_status_t createBlockPool(
-            C2PlatformAllocatorDesc &allocatorParam,
+            C2PlatformAllocatorDescV2 &allocatorParam,
             std::shared_ptr<const C2Component> component,
             std::shared_ptr<C2BlockPool> *pool);
 
