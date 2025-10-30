@@ -348,7 +348,6 @@ aidl_interface {
         "latest_android_media_audio_common_types_import_interface",
     ],
     srcs: [
-        "binding/aidl/aaudio/DrainType.aidl",
         "binding/aidl/aaudio/Endpoint.aidl",
         "binding/aidl/aaudio/IAAudioClient.aidl",
         "binding/aidl/aaudio/IAAudioClientCallback.aidl",

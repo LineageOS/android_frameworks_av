@@ -188,7 +188,7 @@ aaudio_result_t AAudioBinderAdapter::updateTimestamp(
 
 aaudio_result_t AAudioBinderAdapter::drainStream(const aaudio::AAudioHandleInfo &streamHandleInfo,
                                                  int64_t wakeUpNanos,
-                                                 DrainType drainType,
+                                                 bool allowSoftWakeUp,
                                                  TimerQueue::handle_t* handle) {
     if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
         return AAUDIO_ERROR_DISCONNECTED;
@@ -196,7 +196,7 @@ aaudio_result_t AAudioBinderAdapter::drainStream(const aaudio::AAudioHandleInfo 
     aaudio_result_t result;
     android::media::TimerQueueHandle aidlHandle;
     Status status = mDelegate->drainStream(
-            streamHandleInfo.getHandle(), wakeUpNanos, drainType, &aidlHandle, &result);
+            streamHandleInfo.getHandle(), wakeUpNanos, allowSoftWakeUp, &aidlHandle, &result);
     if (!status.isOk()) {
         return AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
