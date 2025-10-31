@@ -2,3 +2,5 @@ jmtrivi@google.com
 elaurent@google.com
 essick@google.com
 lajos@google.com
+
+per-file screenrecord/* = file:platform/frameworks/native:/services/surfaceflinger/OWNERS
