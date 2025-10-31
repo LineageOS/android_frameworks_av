@@ -91,6 +91,12 @@ adb shell settings put system screen_off_timeout 5000
 # Set media volume to 1
 adb shell cmd media_session volume --set 1
 
+# Enable Airplane mode, disable WiFi and Bluetooth
+adb shell settings put global airplane_mode_on 1
+adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez "state" true
+adb shell svc wifi disable
+adb shell cmd bluetooth_manager disable
+
 # Enable AudioFlinger power stats
 adb shell setenforce 0
 adb shell setprop persist.audio.power_stats.enabled true
