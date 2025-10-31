@@ -4461,13 +4461,11 @@ status_t CameraService::BasicClient::notifyCameraOpening() {
     // BasicClient that the camera device is active. While that does do a check on the op status,
     // it is asynchronous and frames may leak, so we do a check here as well, in case the client is
     // already disallowed from using the camera at client initialization time.
-    if (mAppOpsManager != nullptr) {
-        int32_t mode = mAppOpsManager->checkOp(AppOpsManager::OP_CAMERA, getClientUid(),
-                                               toString16(getPackageName()));
-        status_t res = handleAppOpMode(mode);
-        if (res != OK) {
-            return res;
-        }
+    const PermissionChecker::PermissionResult result =
+        checkPermissionsForCameraForPreflight(mCameraIdStr, mClientAttribution);
+    status_t res = handlePermissionResult(result);
+    if (res != OK) {
+      return res;
     }
     mCameraOpen = true;
 
