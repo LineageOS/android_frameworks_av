@@ -24,7 +24,9 @@
 #include <string>
 
 #include "aidl/android/companion/virtualcamera/Format.h"
+#include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/hardware/camera/common/Status.h"
+#include "aidl/android/hardware/camera/device/Stream.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "android/binder_auto_utils.h"
 #include "android/hardware_buffer.h"
@@ -122,6 +124,27 @@ bool isImageFormatSupportedForInput(
 bool isFormatSupportedForInput(
     int width, int height,
     ::aidl::android::companion::virtualcamera::Format format, int maxFps);
+
+// Returns true if specified format represents a BLOB type
+bool isBlobFormat(::aidl::android::companion::virtualcamera::Format format);
+
+// Returns true if the HAL stream and the internal stream config represent
+// matching BLOB types
+bool areMatchingBlobTypes(
+    const ::aidl::android::hardware::camera::device::Stream& halStream,
+    const ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration&
+        internalStreamConfig);
+
+// Returns true if the HAL stream and the internal stream config represent
+// matching BLOB types
+bool areMatchingBlobTypes(
+    const ::aidl::android::companion::virtualcamera::Format a,
+    const ::aidl::android::companion::virtualcamera::Format b);
+
+// Returns true if both formats represent BLOB types and they match
+bool areDifferentBlobTypes(
+    const ::aidl::android::companion::virtualcamera::Format a,
+    const ::aidl::android::companion::virtualcamera::Format b);
 
 // Representation of resolution / size.
 struct Resolution {

@@ -37,7 +37,11 @@ namespace virtualcamera {
 namespace flags = ::android::companion::virtualdevice::flags;
 
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::hardware::camera::device::Stream;
 using ::aidl::android::hardware::common::NativeHandle;
+using ::aidl::android::hardware::graphics::common::Dataspace;
+using ::aidl::android::hardware::graphics::common::PixelFormat;
 
 constexpr int kMaxFpsUpperLimit = 60;
 
@@ -167,6 +171,28 @@ bool isFormatSupportedForInput(const int width, const int height,
   }
 
   return true;
+}
+
+bool isBlobFormat(Format format) {
+  return format == Format::HEIC || format == Format::JPEG;
+}
+
+bool areMatchingBlobTypes(
+    const Stream& halStream,
+    const SupportedStreamConfiguration& internalStreamConfig) {
+  return (halStream.format == PixelFormat::BLOB) &&
+         ((halStream.dataSpace == Dataspace::HEIF &&
+           internalStreamConfig.imageFormat == Format::HEIC) ||
+          (halStream.dataSpace == Dataspace::JFIF &&
+           internalStreamConfig.imageFormat == Format::JPEG));
+}
+
+bool areMatchingBlobTypes(Format a, Format b) {
+  return isBlobFormat(a) && isBlobFormat(b) && a == b;
+}
+
+bool areDifferentBlobTypes(Format a, Format b) {
+  return isBlobFormat(a) && isBlobFormat(b) && a != b;
 }
 
 std::ostream& operator<<(std::ostream& os, const Resolution& resolution) {
