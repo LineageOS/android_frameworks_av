@@ -62,6 +62,9 @@ std::vector<To> asVectorOf(const From from) {
   return std::vector<To>({static_cast<To>(from)});
 }
 
+// Each HAL stream configuration has 4 entries, see metadata_definitions.xml
+constexpr size_t kNumEntriesPerStreamConfiguration = 4;
+
 }  // namespace
 
 MetadataBuilder& MetadataBuilder::setSupportedHardwareLevel(
@@ -525,12 +528,11 @@ MetadataBuilder& MetadataBuilder::setAvailableRequestCapabilities(
   return *this;
 }
 
-MetadataBuilder& MetadataBuilder::setAvailableOutputStreamConfigurations(
+MetadataBuilder& MetadataBuilder::setAvailableScalerOutputStreamConfigurations(
     const std::vector<StreamConfiguration>& streamConfigurations) {
   std::vector<int32_t> metadataStreamConfigs;
   std::vector<int64_t> metadataMinFrameDurations;
   std::vector<int64_t> metadataStallDurations;
-
   convertStreamConfigurationsToMetadataValues(
       streamConfigurations, metadataStreamConfigs, metadataMinFrameDurations,
       metadataStallDurations);
@@ -540,6 +542,25 @@ MetadataBuilder& MetadataBuilder::setAvailableOutputStreamConfigurations(
   mEntryMap[ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS] =
       std::move(metadataMinFrameDurations);
   mEntryMap[ANDROID_SCALER_AVAILABLE_STALL_DURATIONS] =
+      std::move(metadataStallDurations);
+
+  return *this;
+}
+
+MetadataBuilder& MetadataBuilder::setAvailableHeicOutputStreamConfigurations(
+    const std::vector<StreamConfiguration>& streamConfigurations) {
+  std::vector<int32_t> metadataStreamConfigs;
+  std::vector<int64_t> metadataMinFrameDurations;
+  std::vector<int64_t> metadataStallDurations;
+  convertStreamConfigurationsToMetadataValues(
+      streamConfigurations, metadataStreamConfigs, metadataMinFrameDurations,
+      metadataStallDurations);
+
+  mEntryMap[ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS] =
+      std::move(metadataStreamConfigs);
+  mEntryMap[ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS] =
+      std::move(metadataMinFrameDurations);
+  mEntryMap[ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS] =
       std::move(metadataStallDurations);
 
   return *this;
@@ -1005,16 +1026,17 @@ void convertStreamConfigurationsToMetadataValues(
     std::vector<int32_t>& metadataStreamConfigs,
     std::vector<int64_t>& metadataMinFrameDurations,
     std::vector<int64_t>& metadataStallDurations) {
-  metadataStreamConfigs.reserve(streamConfigurations.size());
-  metadataMinFrameDurations.reserve(streamConfigurations.size());
-  metadataStallDurations.reserve(streamConfigurations.size());
+  size_t numEntries =
+      streamConfigurations.size() * kNumEntriesPerStreamConfiguration;
+  metadataStreamConfigs.reserve(numEntries);
+  metadataMinFrameDurations.reserve(numEntries);
+  metadataStallDurations.reserve(numEntries);
 
   for (const auto& config : streamConfigurations) {
     metadataStreamConfigs.push_back(config.format);
     metadataStreamConfigs.push_back(config.width);
     metadataStreamConfigs.push_back(config.height);
-    metadataStreamConfigs.push_back(
-        ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT);
+    metadataStreamConfigs.push_back(config.isInput);
 
     metadataMinFrameDurations.push_back(config.format);
     metadataMinFrameDurations.push_back(config.width);

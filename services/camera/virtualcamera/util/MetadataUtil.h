@@ -45,7 +45,11 @@ class MetadataBuilder {
   struct StreamConfiguration {
     int32_t width = 0;
     int32_t height = 0;
+    // AIMAGE_FORMAT value of the format. See Format.aidl.
     int32_t format = 0;
+    // See ScalerAvailableStreamConfigurations.aidl and
+    // HeicAvailableHeicStreamConfigurations.aidl
+    int isInput = 0;
     // Minimal frame duration - corresponds to maximal FPS for given format.
     // See ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS in CameraMetadataTag.aidl.
     std::chrono::nanoseconds minFrameDuration{0};
@@ -153,7 +157,13 @@ class MetadataBuilder {
   // See ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
   // ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS and
   // ANDROID_SCALER_AVAILABLE_STALL_DURATIONS in CameraMetadataTag.aidl.
-  MetadataBuilder& setAvailableOutputStreamConfigurations(
+  MetadataBuilder& setAvailableScalerOutputStreamConfigurations(
+      const std::vector<StreamConfiguration>& streamConfigurations);
+
+  // See ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS,
+  // ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS and
+  // ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS in CameraMetadataTag.aidl.
+  MetadataBuilder& setAvailableHeicOutputStreamConfigurations(
       const std::vector<StreamConfiguration>& streamConfigurations);
 
   // See COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES in CameraCharacteristics.java.
@@ -455,6 +465,12 @@ class MetadataBuilder {
   build();
 
  private:
+  void setAvailableOutputStreamConfigurations(
+      const std::vector<StreamConfiguration>& streamConfigurations,
+      int androidAvailableStreamConfigurationsKey,
+      int androidAvailableMinFrameDurationsKey,
+      int androidAvailableStallDurationsKey);
+
   // Maps metadata tags to vectors of values for the given tag.
   std::map<
       camera_metadata_tag_t,
