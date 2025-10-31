@@ -1117,6 +1117,45 @@ Status CameraService::getSessionCharacteristics(const std::string& unresolvedCam
     return res;
 }
 
+Status CameraService::warmUp(const std::string &unresolvedCameraId,
+            const AttributionSourceState& clientAttribution,
+            int32_t devicePolicy) {
+    ATRACE_CALL();
+
+    if (!callerHasSystemUid()) {
+        ALOGE("%s: Caller uid %d not system uid, permission denied", __FUNCTION__, getCallingUid());
+        return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
+                "%s: Caller with uid %d not system uid, permission denied",
+                __FUNCTION__, getCallingUid());
+    }
+    Mutex::Autolock l(mServiceLock);
+    std::optional<std::string> cameraIdOptional =
+            resolveCameraId(unresolvedCameraId, clientAttribution.deviceId, devicePolicy);
+    if (!cameraIdOptional.has_value()) {
+        std::string msg = fmt::sprintf("Camera %s: Invalid camera id for device id %d",
+                unresolvedCameraId.c_str(), clientAttribution.deviceId);
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+    std::string cameraId = cameraIdOptional.value();
+
+    ALOGV("%s", __FUNCTION__);
+    if (!mInitialized) {
+        ALOGE("%s: Camera HAL not initialized", __FUNCTION__);
+        logServiceError("Camera subsystem is not available", ERROR_DISCONNECTED);
+        return STATUS_ERROR(ERROR_DISCONNECTED,
+                "Camera subsystem is not available");
+    }
+    // Call into camera provider to deliver power hint.
+    status_t ret = mCameraProviderManager->warmUp(cameraId);
+    if (ret != OK) {
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
+                "Error delivering power hint: %s (%d)", strerror(-ret), ret);
+    }
+
+    return Status::ok();
+}
+
 Status CameraService::filterSensitiveMetadataIfNeeded(
         const std::string& cameraId, CameraMetadata* metadata) {
     int callingPid = getCallingPid();

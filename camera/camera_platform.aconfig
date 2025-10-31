@@ -306,3 +306,13 @@ flag {
     description: "Add additional metadata info to the logical camera result"
     bug: "359944765"
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "camera_warm_up"
+    description: "Send hint to camera HAL to warm up pipelines"
+    bug: "382543313"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}

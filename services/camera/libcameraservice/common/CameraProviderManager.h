@@ -324,6 +324,8 @@ public:
 
     std::vector<std::unordered_set<std::string>> getConcurrentCameraIds() const;
 
+    status_t warmUp(const std::string &cameraId);
+
     /**
      * Create a default capture request metadata for a camera and a specific
      * template.
@@ -651,6 +653,7 @@ private:
             bool isCompositeHeicUltraHDRDisabled() const { return mCompositeHeicUltraHDRDisabled; }
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) = 0;
+            virtual status_t warmUp() = 0;
             virtual status_t getTorchStrengthLevel(int32_t *torchStrength) = 0;
             virtual status_t getCameraInfo(
                     const CameraCompatibilityInfo& compatInfo,
@@ -734,6 +737,7 @@ private:
 
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) = 0;
+            virtual status_t warmUp() = 0;
             virtual status_t getTorchStrengthLevel(int32_t *torchStrength) = 0;
             virtual status_t getCameraInfo(
                     const CameraCompatibilityInfo& compatInfo,
