@@ -56,6 +56,7 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
+using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BufferStatus;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
@@ -180,10 +181,11 @@ double nanosToFps(std::chrono::nanoseconds frameDuration) {
 }  // namespace
 
 VirtualCameraRenderThread::VirtualCameraRenderThread(
-    VirtualCameraSessionContext& sessionContext,
+    VirtualCameraSessionContext& sessionContext, Format imageFormat,
     const Resolution inputSurfaceSize, const Resolution reportedSensorSize,
     std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback)
     : mCameraDeviceCallback(cameraDeviceCallback),
+      mImageFormat{imageFormat},
       mInputSurfaceSize(inputSurfaceSize),
       mReportedSensorSize(reportedSensorSize),
       mSessionContext(sessionContext),
@@ -265,6 +267,10 @@ void VirtualCameraRenderThread::stop() {
 
 sp<Surface> VirtualCameraRenderThread::getInputSurface() {
   return mInputSurfaceFuture.get();
+}
+
+Format VirtualCameraRenderThread::getImageFormat() const {
+  return mImageFormat;
 }
 
 RenderThreadTask VirtualCameraRenderThread::dequeueTask() {

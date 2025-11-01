@@ -806,6 +806,22 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
     ALOGE("%s: Querying empty configuration", __func__);
     return false;
   }
+  if (!flags::virtual_camera_direct_blob_transfer()) {
+    bool containsBlobInput =
+        std::any_of(mSupportedInputConfigurations.begin(),
+                    mSupportedInputConfigurations.end(),
+                    [](const SupportedStreamConfiguration& inputConfig) {
+                      return isBlobFormat(inputConfig.imageFormat);
+                    });
+    if (containsBlobInput) {
+      ALOGE(
+          "%s: input configurations contains BLOB format. This is "
+          "not allowed since flags::virtual_camera_direct_blob_transfer "
+          "is disabled",
+          __func__);
+      return false;
+    }
+  }
 
   const std::vector<Stream>& streams = streamConfiguration.streams;
 
@@ -847,8 +863,26 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
 
     Resolution requestedResolution(stream.width, stream.height);
     auto matchesSupportedInputConfig =
-        [requestedResolution](const SupportedStreamConfiguration& config) {
+        [requestedResolution,
+         &stream](const SupportedStreamConfiguration& config) {
           Resolution supportedInputResolution(config.width, config.height);
+
+          // Check for matching input that enables direct blob transfer
+          //
+          // Note: skip isJpegStreamConfig(stream) here because a JPEG output
+          // stream can be generated from a bitmap input, e.g. YUV
+          if (isBlobFormat(config.imageFormat) || isHeicStreamConfig(stream)) {
+            if (!areMatchingBlobTypes(stream, config)) {
+              return false;
+            }
+
+            // If a direct blob transfer is possible, then the resolutions must
+            // match exactly
+            return requestedResolution == supportedInputResolution;
+          }
+
+          // Direct blob transfer not possible here, so resolutions need not
+          // perfectly match
           return requestedResolution <= supportedInputResolution &&
                  isApproximatellySameAspectRatio(requestedResolution,
                                                  supportedInputResolution);

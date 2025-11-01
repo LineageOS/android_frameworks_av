@@ -31,6 +31,7 @@
 #include "VirtualCameraCaptureRequest.h"
 #include "VirtualCameraImageHandler.h"
 #include "VirtualCameraSessionContext.h"
+#include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/ICameraDeviceCallback.h"
 #include "android/binder_auto_utils.h"
@@ -90,14 +91,16 @@ class VirtualCameraRenderThread {
   // Create VirtualCameraRenderThread instance:
   // * sessionContext - VirtualCameraSessionContext reference for shared access
   // to mapped buffers.
+  // * imageFormat - image format of the input surface
   // * inputSurfaceSize - requested size of input surface.
   // * reportedSensorSize - reported static sensor size of virtual camera.
   // * cameraDeviceCallback - callback for corresponding camera instance
   // * testMode - when set to true, test pattern is rendered to input surface
   // before each capture request is processed to simulate client input.
   VirtualCameraRenderThread(
-      VirtualCameraSessionContext& sessionContext, Resolution inputSurfaceSize,
-      Resolution reportedSensorSize,
+      VirtualCameraSessionContext& sessionContext,
+      ::aidl::android::companion::virtualcamera::Format imageFormat,
+      Resolution inputSurfaceSize, Resolution reportedSensorSize,
       std::shared_ptr<
           ::aidl::android::hardware::camera::device::ICameraDeviceCallback>
           cameraDeviceCallback);
@@ -124,6 +127,9 @@ class VirtualCameraRenderThread {
 
   // Returns input surface corresponding to "virtual camera sensor".
   sp<Surface> getInputSurface();
+
+  // Returns image format of the input surface
+  ::aidl::android::companion::virtualcamera::Format getImageFormat() const;
 
  private:
   RenderThreadTask dequeueTask() EXCLUDES(mLock);
@@ -184,6 +190,7 @@ class VirtualCameraRenderThread {
       ::aidl::android::hardware::camera::device::ICameraDeviceCallback>
       mCameraDeviceCallback;
 
+  const ::aidl::android::companion::virtualcamera::Format mImageFormat;
   const Resolution mInputSurfaceSize;
   const Resolution mReportedSensorSize;
 

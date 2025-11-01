@@ -153,7 +153,6 @@ bool isImageFormatSupportedForInput(const Format format) {
   }
 }
 
-// Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(const int width, const int height,
                                const Format format, const int maxFps) {
   if (!isImageFormatSupportedForInput(format)) {
@@ -177,6 +176,18 @@ bool isBlobFormat(Format format) {
   return format == Format::HEIC || format == Format::JPEG;
 }
 
+bool isHeicStreamConfig(
+    const ::aidl::android::hardware::camera::device::Stream& stream) {
+  return stream.format == PixelFormat::BLOB &&
+         stream.dataSpace == Dataspace::HEIF;
+}
+
+bool isBlobStreamConfig(const Stream& stream) {
+  return stream.format == PixelFormat::BLOB &&
+         (stream.dataSpace == Dataspace::HEIF ||
+          stream.dataSpace == Dataspace::JFIF);
+}
+
 bool areMatchingBlobTypes(
     const Stream& halStream,
     const SupportedStreamConfiguration& internalStreamConfig) {
@@ -185,6 +196,13 @@ bool areMatchingBlobTypes(
            internalStreamConfig.imageFormat == Format::HEIC) ||
           (halStream.dataSpace == Dataspace::JFIF &&
            internalStreamConfig.imageFormat == Format::JPEG));
+}
+
+bool areMatchingBlobTypes(
+    const ::aidl::android::hardware::camera::device::Stream& a,
+    const ::aidl::android::hardware::camera::device::Stream& b) {
+  return a.dataSpace == b.dataSpace && isBlobStreamConfig(a) &&
+         isBlobStreamConfig(b);
 }
 
 bool areMatchingBlobTypes(Format a, Format b) {

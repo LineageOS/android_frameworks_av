@@ -128,12 +128,26 @@ bool isFormatSupportedForInput(
 // Returns true if specified format represents a BLOB type
 bool isBlobFormat(::aidl::android::companion::virtualcamera::Format format);
 
+// Returns true if specified HAL stream is HEIC
+bool isHeicStreamConfig(
+    const ::aidl::android::hardware::camera::device::Stream& stream);
+
+// Returns true if specified HAL stream a supported BLOB type
+bool isBlobStreamConfig(
+    const ::aidl::android::hardware::camera::device::Stream& stream);
+
 // Returns true if the HAL stream and the internal stream config represent
 // matching BLOB types
 bool areMatchingBlobTypes(
     const ::aidl::android::hardware::camera::device::Stream& halStream,
     const ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration&
         internalStreamConfig);
+
+// Returns true if the HAL stream and the internal stream config represent
+// matching BLOB types
+bool areMatchingBlobTypes(
+    const ::aidl::android::hardware::camera::device::Stream& a,
+    const ::aidl::android::hardware::camera::device::Stream& b);
 
 // Returns true if the HAL stream and the internal stream config represent
 // matching BLOB types

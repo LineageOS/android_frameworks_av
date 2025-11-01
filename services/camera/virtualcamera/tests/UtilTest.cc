@@ -93,6 +93,37 @@ TEST(UtilTests, isBlobFormatTest) {
   }
 }
 
+TEST(UtilTests, isBlobStreamConfigTest) {
+  Stream stream;
+
+  // Check supported BLOB types
+  stream.format = PixelFormat::BLOB;
+  stream.dataSpace = Dataspace::HEIF;
+  EXPECT_TRUE(isBlobStreamConfig(stream));
+
+  stream.dataSpace = Dataspace::JFIF;
+  EXPECT_TRUE(isBlobStreamConfig(stream));
+
+  // Check unsupported BLOB types
+  stream.dataSpace = Dataspace::JPEG_R;
+  EXPECT_FALSE(isBlobStreamConfig(stream));
+
+  // Check malformed streams
+  stream.dataSpace = Dataspace::JFIF;
+  stream.format = PixelFormat::YCBCR_420_888;
+  EXPECT_FALSE(isBlobStreamConfig(stream));
+
+  stream.format = PixelFormat::RGBA_8888;
+  EXPECT_FALSE(isBlobStreamConfig(stream));
+
+  // Check legal uncompressed streams
+  stream.dataSpace = Dataspace::UNKNOWN;
+  EXPECT_FALSE(isBlobStreamConfig(stream));
+
+  stream.format = PixelFormat::YCBCR_420_888;
+  EXPECT_FALSE(isBlobStreamConfig(stream));
+}
+
 TEST(UtilTests, areMatchingBlobTypesTest) {
   Stream halStream;
   SupportedStreamConfiguration inputConfig;
