@@ -62,7 +62,7 @@ class EglSurfaceTexture {
   void setFrameAvailableListener(const std::function<void()>& listener);
 
   // Update the texture with the most recent submitted buffer.
-  // Most be called on thread with EGL context.
+  // Must be called on thread with EGL context.
   //
   // Returns EGL texture id of the texture.
   GLuint updateTexture();
