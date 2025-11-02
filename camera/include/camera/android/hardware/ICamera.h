@@ -17,6 +17,7 @@
 #ifndef ANDROID_HARDWARE_ICAMERA_H
 #define ANDROID_HARDWARE_ICAMERA_H
 
+#include <android/hardware/camera2/BnCameraDeviceUser.h>
 #include <utils/RefBase.h>
 #include <binder/IInterface.h>
 #include <binder/Parcel.h>
@@ -145,10 +146,12 @@ public:
     virtual status_t        setVideoTarget(const sp<SurfaceType>& bufferProducer) = 0;
 
     // Set the audio restriction mode
-    virtual status_t        setAudioRestriction(int32_t mode) = 0;
+    virtual status_t        setAudioRestriction(
+        android::hardware::camera2::ICameraDeviceUser::AudioRestriction mode) = 0;
 
     // Get the global audio restriction mode
-    virtual int32_t         getGlobalAudioRestriction() = 0;
+    virtual android::hardware::camera2::ICameraDeviceUser::AudioRestriction
+                            getGlobalAudioRestriction() = 0;
 };
 
 // ----------------------------------------------------------------------------

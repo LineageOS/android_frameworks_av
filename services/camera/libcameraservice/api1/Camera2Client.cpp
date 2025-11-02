@@ -53,6 +53,7 @@
 
 namespace android {
 using namespace camera2;
+using namespace hardware::camera2;
 
 namespace flags = com::android::internal::camera::flags;
 namespace wm_flags = com::android::window::flags;
@@ -2415,16 +2416,16 @@ status_t Camera2Client::setVideoTarget(const sp<SurfaceType>& target) {
     return OK;
 }
 
-status_t Camera2Client::setAudioRestriction(int /*mode*/) {
+status_t Camera2Client::setAudioRestriction(ICameraDeviceUser::AudioRestriction /*mode*/) {
     // Empty implementation. setAudioRestriction is hidden interface and not
     // supported by android.hardware.Camera API
     return INVALID_OPERATION;
 }
 
-int32_t Camera2Client::getGlobalAudioRestriction() {
+ICameraDeviceUser::AudioRestriction Camera2Client::getGlobalAudioRestriction() {
     // Empty implementation. getAudioRestriction is hidden interface and not
     // supported by android.hardware.Camera API
-    return INVALID_OPERATION;
+    return hardware::camera2::ICameraDeviceUser::AudioRestriction::NONE;
 }
 
 status_t Camera2Client::setCameraServiceWatchdog(bool enabled) {
