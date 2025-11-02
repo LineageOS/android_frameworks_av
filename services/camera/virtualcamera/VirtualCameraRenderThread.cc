@@ -269,23 +269,6 @@ double nanosToFps(std::chrono::nanoseconds frameDuration) {
 
 }  // namespace
 
-CaptureRequestBuffer::CaptureRequestBuffer(int streamId, int bufferId,
-                                           sp<Fence> fence)
-    : mStreamId(streamId), mBufferId(bufferId), mFence(fence) {
-}
-
-int CaptureRequestBuffer::getStreamId() const {
-  return mStreamId;
-}
-
-int CaptureRequestBuffer::getBufferId() const {
-  return mBufferId;
-}
-
-sp<Fence> CaptureRequestBuffer::getFence() const {
-  return mFence;
-}
-
 VirtualCameraRenderThread::VirtualCameraRenderThread(
     VirtualCameraSessionContext& sessionContext,
     const Resolution inputSurfaceSize, const Resolution reportedSensorSize,

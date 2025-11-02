@@ -43,21 +43,6 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
-// Represents single output buffer of capture request.
-class CaptureRequestBuffer {
- public:
-  CaptureRequestBuffer(int streamId, int bufferId, sp<Fence> fence = nullptr);
-
-  int getStreamId() const;
-  int getBufferId() const;
-  sp<Fence> getFence() const;
-
- private:
-  const int mStreamId;
-  const int mBufferId;
-  const sp<Fence> mFence;
-};
-
 // Represents single capture request to fill set of buffers.
 class ProcessCaptureRequestTask {
  public:
@@ -254,7 +239,7 @@ class VirtualCameraRenderThread {
   std::atomic<uint64_t> mLastAcquisitionTimestampNanoseconds;
   std::atomic<uint64_t> mLastSurfaceTimestampNanoseconds;
 
-  // EGL helpers - constructed and accessed only from rendering thread.
+  // EGL helpers - constructed and accessed only from render thread.
   std::unique_ptr<EglDisplayContext> mEglDisplayContext;
   std::unique_ptr<EglTextureProgram> mEglTextureYuvProgram;
   std::unique_ptr<EglTextureProgram> mEglTextureRgbProgram;
