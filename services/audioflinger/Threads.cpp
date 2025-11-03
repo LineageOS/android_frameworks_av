@@ -3966,23 +3966,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
         // is not enough for PlaybackThread to process audio data in time. We request the lowest
         // real-time priority, SCHED_FIFO=1, for PlaybackThread in ARC. ro.boot.container is true
         // only on ARC.
-        // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
-        const pid_t tid = getTid();
-        if (tid == -1) {
-            ALOGW("%s: Cannot update PlaybackThread priority, no tid", __func__);
-        } else {
-            const status_t status = requestPriority(getpid(),
-                                                    tid,
-                                                    kPriorityPlaybackThreadArc,
-                                                    false /* isForApp */,
-                                                    true /* asynchronous */);
-            if (status != OK) {
-                ALOGW("%s: Cannot update PlaybackThread priority for ARC, status %d", __func__,
-                        status);
-            } else {
-                stream()->setHalThreadPriority(kPriorityPlaybackThreadArc);
-            }
-        }
+        boostThreadPriority(kPriorityPlaybackThreadArc);
     } else if (isWatch()) {
         // Testing on the watch has shown that boosting the priority of playback threads reduces the
         // probability of speaker pops due to the AP dropping audio samples when running under heavy
