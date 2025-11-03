@@ -102,6 +102,17 @@ class PlanesLockGuard {
   status_t mLockStatus = DEAD_OBJECT;
 };
 
+// Template for easily making simple deleters. Used to make the right deleter
+// type for the unique_ptr aliases, e.g. ScopedAImageReader
+template <typename T, void (*Deleter)(T*)>
+struct CustomDeleter {
+  void operator()(T* ptr) const {
+    if (ptr != nullptr) {
+      (*Deleter)(ptr);
+    }
+  }
+};
+
 // Converts camera AIDL status to ndk::ScopedAStatus
 inline ndk::ScopedAStatus cameraStatus(
     const ::aidl::android::hardware::camera::common::Status status) {

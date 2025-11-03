@@ -530,6 +530,10 @@ MetadataBuilder& MetadataBuilder::setAvailableRequestCapabilities(
 
 MetadataBuilder& MetadataBuilder::setAvailableScalerOutputStreamConfigurations(
     const std::vector<StreamConfiguration>& streamConfigurations) {
+  if (streamConfigurations.empty()) {
+    return *this;
+  }
+
   std::vector<int32_t> metadataStreamConfigs;
   std::vector<int64_t> metadataMinFrameDurations;
   std::vector<int64_t> metadataStallDurations;
@@ -549,6 +553,10 @@ MetadataBuilder& MetadataBuilder::setAvailableScalerOutputStreamConfigurations(
 
 MetadataBuilder& MetadataBuilder::setAvailableHeicOutputStreamConfigurations(
     const std::vector<StreamConfiguration>& streamConfigurations) {
+  if (streamConfigurations.empty()) {
+    return *this;
+  }
+
   std::vector<int32_t> metadataStreamConfigs;
   std::vector<int64_t> metadataMinFrameDurations;
   std::vector<int64_t> metadataStallDurations;

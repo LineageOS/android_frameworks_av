@@ -41,6 +41,7 @@
 #include "android/binder_status.h"
 #include "system/camera_metadata.h"
 #include "util/AidlUtil.h"
+#include "util/JpegUtil.h"
 #include "util/MetadataUtil.h"
 #include "util/Util.h"
 
@@ -78,8 +79,6 @@ namespace flags = ::android::companion::virtualdevice::flags;
 
 // Prefix of camera name - "device@1.1/virtual/{camera_id}"
 const char* kDevicePathPrefix = "device@1.1/virtual/";
-
-constexpr int32_t kMaxJpegSize = 13 * 1024 * 1024 /* 13MiB */;
 
 constexpr std::chrono::nanoseconds kMaxFrameDuration =
     std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -246,6 +245,10 @@ status_t convertSupportedScalerStreams(
     const std::vector<SupportedStreamConfiguration>& supportedInputConfig,
     Resolution& maxResolution,
     std::vector<MetadataBuilder::StreamConfiguration>& outputConfigurations) {
+  if (supportedInputConfig.empty()) {
+    return OK;
+  }
+
   std::optional<Resolution> resolution = getMaxResolution(supportedInputConfig);
   if (!resolution.has_value()) {
     return BAD_VALUE;
@@ -315,7 +318,7 @@ status_t convertSupportedHeicStreams(
     outputConfigurations.emplace_back(MetadataBuilder::StreamConfiguration{
         .width = inputConfig.width,
         .height = inputConfig.height,
-        .format = static_cast<int>(inputConfig.imageFormat),
+        .format = static_cast<int>(PixelFormat::BLOB),
         .isInput = ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS_OUTPUT,
         .minFrameDuration = std::chrono::nanoseconds(1s) / inputConfig.maxFps,
         .minStallDuration = 0s});
@@ -373,6 +376,10 @@ status_t updateScalerStreamConfigurationMetadata(
     HelperCameraMetadata& metadataHelper,
     const std::vector<MetadataBuilder::StreamConfiguration>&
         scalerOutputConfigurations) {
+  if (scalerOutputConfigurations.empty()) {
+    return OK;
+  }
+
   ALOGV(
       "%s: Adding %zu output scaler configurations to configured "
       "CameraCharacteristics.",
@@ -389,6 +396,10 @@ status_t updateHeicStreamConfigurationMetadata(
     HelperCameraMetadata& metadataHelper,
     const std::vector<MetadataBuilder::StreamConfiguration>&
         heicOutputConfigurations) {
+  if (heicOutputConfigurations.empty()) {
+    return OK;
+  }
+
   ALOGV(
       "%s: Adding %zu output HEIC configurations to configured "
       "CameraCharacteristics.",

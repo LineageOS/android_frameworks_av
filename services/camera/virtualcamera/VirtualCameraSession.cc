@@ -510,7 +510,12 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
         mSessionContext, inputConfig->imageFormat,
         resolutionFromInputConfig(*inputConfig),
         virtualCamera->getMaxInputResolution(), mCameraDeviceCallback);
-    mRenderThread->start();
+
+    if (!mRenderThread->start()) {
+      ALOGE("%s: failed to start render thread", __func__);
+      return cameraStatus(Status::ILLEGAL_ARGUMENT);
+    }
+
     inputSurface = mRenderThread->getInputSurface();
     inputStreamId = mCurrentInputStreamId =
         flags::virtual_camera_stable_stream_id()

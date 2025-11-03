@@ -108,7 +108,7 @@ class VirtualCameraRenderThread {
   ~VirtualCameraRenderThread();
 
   // Start rendering thread.
-  void start();
+  bool start();
   // Stop rendering thread.
   void stop();
 
@@ -184,6 +184,9 @@ class VirtualCameraRenderThread {
   ::ndk::ScopedAStatus submitCaptureResult(
       std::unique_ptr<::aidl::android::hardware::camera::device::CaptureResult>
           captureResult);
+
+  // Returns true if mImageHandler initialized successfully. False otherwise
+  bool initializeImageHandler();
 
   // Camera callback
   const std::shared_ptr<
