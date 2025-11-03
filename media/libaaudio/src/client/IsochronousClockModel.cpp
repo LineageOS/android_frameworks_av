@@ -20,6 +20,7 @@
 #include "IsochronousClockModel.h"
 
 // go/keep-sorted start
+#include <audio_utils/Time.h>
 #include <log/log.h>
 #include <utility/AAudioUtilities.h>
 #include <utility/AudioClock.h>
@@ -279,34 +280,10 @@ int64_t IsochronousClockModel::convertPositionToTime(int64_t framePosition) cons
     return time;
 }
 
-void IsochronousClockModel::updateBoottimeOffset() {
-    const int tries = 3;
-    int64_t bestGap = 0, measured = 0;
-    for (int i = 0; i < tries; ++i) {
-        const int64_t tmono = AudioClock::getNanoseconds();
-        const int64_t tbase = AudioClock::getNanoseconds(CLOCK_BOOTTIME);
-        const int64_t tmono2 = AudioClock::getNanoseconds();
-        const int64_t gap = tmono2 - tmono;
-        if (i == 0 || gap < bestGap) {
-            bestGap = gap;
-            measured = tbase - ((tmono + tmono2) >> 1);
-        }
-    }
-
-    // to avoid micro-adjusting, we don't change the timebase
-    // unless it is significantly different.
-    //
-    // Assumption: It probably takes more than toleranceNs to
-    // suspend and resume the device.
-    static int64_t toleranceNs = 10000; // 10 us
-    if (llabs(mBoottimeOffset - measured) > toleranceNs) {
-        ALOGV("Adjusting timebase offset old: %jd  new: %jd", mBoottimeOffset, measured);
-        mBoottimeOffset = measured;
-    }
-}
-
 int64_t IsochronousClockModel::convertPositionToBootTime(int64_t framePosition) {
-    updateBoottimeOffset();
+    // Computes the offset to convert montonic time to boottime.
+    android::audio_utils::adjustTimeOffset(
+            SYSTEM_TIME_MONOTONIC, SYSTEM_TIME_BOOTTIME, &mBoottimeOffset);
     return convertPositionToTime(framePosition) + mBoottimeOffset;
 }
 

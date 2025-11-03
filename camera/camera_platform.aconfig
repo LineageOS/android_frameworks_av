@@ -251,3 +251,13 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "gralloc_additional_options"
+    description: "Add additionalOptions gralloc flag for camera buffers"
+    bug: "410091316"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}

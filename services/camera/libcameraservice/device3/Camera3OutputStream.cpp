@@ -614,6 +614,18 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
         return res;
     }
 
+    const auto& additionalOptions = getAdditionalOptions();
+    if (additionalOptions.size() > 0) {
+        res = native_window_set_buffers_additional_options(
+                mConsumer.get(), additionalOptions.data(),
+                additionalOptions.size());
+        if (res != OK) {
+            ALOGE("%s: Unable to configure stream additional options for stream %d",
+                  __FUNCTION__, mId);
+            return res;
+        }
+    }
+
     int maxConsumerBuffers = 0;
     res = static_cast<ANativeWindow*>(mConsumer.get())->query(
             mConsumer.get(),

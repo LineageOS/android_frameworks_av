@@ -61,6 +61,7 @@
 #include <camera/StringUtils.h>
 #include <com_android_internal_camera_flags.h>
 #include <statslog_framework.h>
+#include <ui/GraphicBufferAllocator.h>
 
 #include "utils/CameraTraces.h"
 #include "utils/SessionConfigurationUtils.h"
@@ -92,6 +93,7 @@ using aidl::android::hardware::camera::metadata::ScalerAvailableStreamUseCases;
 namespace flags = com::android::internal::camera::flags;
 
 const int32_t AIDL_DEVICE_SESSION_V3 = 3;
+const int32_t AIDL_DEVICE_SESSION_V4 = 4;
 namespace android {
 
 RequestAvailableDynamicRangeProfilesMap
@@ -1115,6 +1117,22 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
                     mapProducerToFrameworkUsage(src.producerUsage));
             dstStream->setHalBufferManager(
                     contains(config->hal_buffer_managed_streams, streamId));
+        }
+
+        if (flags::gralloc_additional_options()) {
+            bool supportsAdditionalOptions =
+                    GraphicBufferAllocator::get().supportsAdditionalOptions();
+            if (interfaceVersion >= AIDL_DEVICE_SESSION_V4
+                    && src.additionalOptions.has_value()
+                    && supportsAdditionalOptions) {
+                std::vector<GrallocExtendableType> additionalOptions;
+                for (const auto& option : src.additionalOptions.value()) {
+                    if (option.has_value()) {
+                        additionalOptions.push_back(option.value());
+                    }
+                }
+                dstStream->setAdditionalOptions(additionalOptions);
+            }
         }
         dst->max_buffers = src.maxBuffers;
     }

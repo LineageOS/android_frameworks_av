@@ -1,10 +1,9 @@
 # Codec framework feature flags.
-#
-# !!! Please add flags in alphabetical order. !!!
 
 package: "android.media.codec"
 container: "system"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
   name: "aidl_hal_input_surface"
   is_exported: true
@@ -297,3 +296,4 @@ flag {
   bug: "426238242"
   is_exported: true
 }
+# go/keep-sorted end

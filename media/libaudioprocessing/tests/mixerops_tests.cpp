@@ -169,7 +169,7 @@ TEST(mixerops, stereovolume_24) {
 }
 TEST(mixerops, channel_equivalence) {
     // we must match the constexpr function with the system determined channel mask from count.
-    for (size_t i = 0; i < FCC_LIMIT; ++i) {
+    for (size_t i = 1; i <= FCC_LIMIT; ++i) {
         const audio_channel_mask_t actual = canonicalChannelMaskFromCount(i);
         const audio_channel_mask_t system = audio_channel_out_mask_from_count(i);
         if (system == AUDIO_CHANNEL_INVALID) continue;

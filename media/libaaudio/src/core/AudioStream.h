@@ -416,7 +416,8 @@ public:
         mDeviceSamplesPerFrame = deviceSamplesPerFrame;
     }
 
-    virtual aaudio_result_t setOffloadDelayPadding(int32_t delayInFrames, int32_t paddingInFrames) {
+    virtual aaudio_result_t setOffloadDelayPadding(int32_t delayInFrames [[maybe_unused]],
+                                                   int32_t paddingInFrames [[maybe_unused]]) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
@@ -432,8 +433,9 @@ public:
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual void setPresentationEndCallbackProc(AAudioStream_presentationEndCallback proc) { }
-    virtual void setPresentationEndCallbackUserData(void* userData) { }
+    virtual void setPresentationEndCallbackProc(
+            AAudioStream_presentationEndCallback proc [[maybe_unused]]) { }
+    virtual void setPresentationEndCallbackUserData(void* userData [[maybe_unused]]) { }
 
     /**
      * @return true if data callback has been specified
@@ -455,8 +457,8 @@ public:
     virtual bool collidesWithCallback() const;
 
     // Implement AudioDeviceCallback
-    void onAudioDeviceUpdate(audio_io_handle_t audioIo,
-            const android::DeviceIdVector& deviceIds) override {};
+    void onAudioDeviceUpdate(audio_io_handle_t audioIo [[maybe_unused]],
+            const android::DeviceIdVector& deviceIds [[maybe_unused]]) override {};
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
