@@ -37,11 +37,16 @@ int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool isForApp, bool asyn
 // 'client' is ignored in this case.
 int requestCpusetBoost(bool enable, const sp<IBinder> &client);
 
-// Audio: Request Spatializer RT priority for thread tid, whose thread group leader must be pid.
-// returns positive value if successful, the RT priority used
-//         zero, if no RT priority selected
-//         negative status code if RT priority unable to be set.
-int requestSpatializerPriority(pid_t pid, pid_t tid);
+/**
+ * @brief Get Spatializer thread priority.
+ *
+ * This function retrieves the real-time priority for Spatializer threads.
+ * The priority is determined by the system property "audio.spatializer.priority".
+ *
+ * @return A positive integer representing the (increasing) real-time priority (1 to 3).
+ *         Zero if no real-time priority is selected.
+ */
+int getSpatializerThreadPriority();
 
 }   // namespace android
 
