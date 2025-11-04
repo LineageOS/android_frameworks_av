@@ -39,7 +39,7 @@ public:
     AAudioHandleInfo openStream(const AAudioStreamRequest& request,
                                 AAudioStreamConfiguration& configuration) override;
 
-    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo, bool force) override;
 
     aaudio_result_t getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                          AudioEndpointParcelable& endpoint) override;

@@ -52,12 +52,13 @@ AAudioHandleInfo AAudioBinderAdapter::openStream(const AAudioStreamRequest& requ
     return {mServiceLifetimeId, result};
 }
 
-aaudio_result_t AAudioBinderAdapter::closeStream(const AAudioHandleInfo& streamHandleInfo) {
+aaudio_result_t AAudioBinderAdapter::closeStream(const AAudioHandleInfo& streamHandleInfo,
+                                                 bool force) {
     if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
         return AAUDIO_ERROR_DISCONNECTED;
     }
     aaudio_result_t result;
-    Status status = mDelegate->closeStream(streamHandleInfo.getHandle(), &result);
+    Status status = mDelegate->closeStream(streamHandleInfo.getHandle(), force, &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }

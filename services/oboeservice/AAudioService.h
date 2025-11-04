@@ -62,7 +62,7 @@ public:
                               ::aaudio::StreamParameters* paramsOut,
                               int32_t* _aidl_return) override;
 
-    binder::Status closeStream(int32_t streamHandle, int32_t* _aidl_return) override;
+    binder::Status closeStream(int32_t streamHandle, bool force, int32_t* _aidl_return) override;
 
     binder::Status
     getStreamDescription(int32_t streamHandle, ::aaudio::Endpoint* endpoint,
@@ -127,7 +127,8 @@ public:
      * This is only called from within the Service.
      * It bypasses the permission checks in closeStream(handle).
      */
-    aaudio_result_t closeStream(const sp<aaudio::AAudioServiceStreamBase>& serviceStream);
+    aaudio_result_t closeStream(const sp<aaudio::AAudioServiceStreamBase>& serviceStream,
+                                bool force);
 
 private:
     class Adapter : public aaudio::AAudioBinderAdapter {

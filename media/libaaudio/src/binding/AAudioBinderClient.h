@@ -65,7 +65,7 @@ public:
     AAudioHandleInfo openStream(const AAudioStreamRequest &request,
                                 AAudioStreamConfiguration &configurationOutput) override;
 
-    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo, bool force) override;
 
     /* Get an immutable description of the in-memory queues
     * used to communicate with the underlying HAL or Service.

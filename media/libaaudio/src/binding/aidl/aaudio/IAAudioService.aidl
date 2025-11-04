@@ -39,7 +39,13 @@ interface IAAudioService {
     int openStream(in StreamRequest request,
                    out StreamParameters paramsOut);
 
-    int closeStream(int streamHandle);
+    /**
+     * Close the stream.
+     * @param streamHandle a unique value to identify the stream.
+     * @param force if true, close the stream immediately. Otherwise, drain all data
+     *              and then close the stream.
+     */
+    int closeStream(int streamHandle, boolean force);
 
     /*
      * Get an immutable description of the in-memory queues

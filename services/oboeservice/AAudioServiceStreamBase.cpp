@@ -204,8 +204,9 @@ error:
     return result;
 }
 
-aaudio_result_t AAudioServiceStreamBase::close() {
-    aaudio_result_t result = sendCommand(CLOSE, nullptr, true /*waitForReply*/, TIMEOUT_NANOS);
+aaudio_result_t AAudioServiceStreamBase::close(bool force) {
+    aaudio_result_t result = sendCommand(
+            CLOSE, std::make_shared<CloseParam>(force), true /*waitForReply*/, TIMEOUT_NANOS);
     if (result == AAUDIO_ERROR_ALREADY_CLOSED) {
         // AAUDIO_ERROR_ALREADY_CLOSED is not a really error but just indicate the stream has
         // already been closed. In that case, there is no need to close the stream once more.
@@ -714,9 +715,10 @@ void AAudioServiceStreamBase::run() {
                     command->result = flush_l();
                 } break;
                 case CLOSE: {
-                    // When the stream is draining and not disconnected, close the stream when
-                    // all data is drained and waken up by audio flinger.
-                    bool shouldDeferClose = (mIsDraining && !isDisconnected_l());
+                    // When the stream is draining and not disconnected and it is not a force close,
+                    // close the stream when all data is drained and waken up by audio flinger.
+                    const auto param = (CloseParam *) command->parameter.get();
+                    bool shouldDeferClose = (!param->mForce && mIsDraining && !isDisconnected_l());
                     command->result = close_l(shouldDeferClose);
                 } break;
                 case DISCONNECT: {

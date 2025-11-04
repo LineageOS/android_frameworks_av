@@ -118,7 +118,7 @@ void openAndMultipleClose(const sp<IAAudioService>& aaudioService) {
                     startWork.cv.wait(_l, [&startWork] { return startWork.value.load() == 1; });
                 }
                 int32_t result;
-                aaudioService->closeStream(handle, &result);
+                aaudioService->closeStream(handle, false /*force*/, &result);
                 isCompleted.value++;
                 isCompleted.cv.notify_one();
             });

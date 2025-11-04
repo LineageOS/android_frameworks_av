@@ -86,7 +86,12 @@ public:
     // because we had to wait until we generated the handle.
     void logOpen(aaudio_handle_t streamHandle);
 
-    aaudio_result_t close() EXCLUDES(mLock);
+    /**
+     * Close the stream.
+     * @param force If true, close the stream immediately. Otherwise, drain all data and then
+     *              close the stream.
+     */
+    aaudio_result_t close(bool force) EXCLUDES(mLock);
 
     /**
      * Start the flow of audio data.
@@ -316,6 +321,14 @@ protected:
                 : AAudioCommandParam(), mRate(rate) { }
 
         android::media::audio::common::AudioPlaybackRate* mRate;
+    };
+
+    class CloseParam : public AAudioCommandParam {
+    public:
+        explicit CloseParam(bool force)
+                : AAudioCommandParam(), mForce(force) { }
+
+        const bool mForce;
     };
 
     void setState(aaudio_stream_state_t state);

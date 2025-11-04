@@ -59,7 +59,7 @@ public:
     virtual AAudioHandleInfo openStream(const AAudioStreamRequest &request,
                                         AAudioStreamConfiguration &configuration) = 0;
 
-    virtual aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) = 0;
+    virtual aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo, bool force) = 0;
 
     /* Get an immutable description of the in-memory queues
     * used to communicate with the underlying HAL or Service.
