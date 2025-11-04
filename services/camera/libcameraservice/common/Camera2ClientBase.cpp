@@ -413,7 +413,7 @@ void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         std::pair<int32_t, int32_t> mostRequestedFpsRange,
         const std::vector<hardware::CameraStreamStats>& streamStats,
         const std::string& userTag, int videoStabilizationMode, bool usedUltraWide,
-        bool usedZoomOverride) {
+        bool usedZoomOverride, int32_t errorState) {
     if (mDeviceActive) {
         status_t res = TClientBase::finishCameraStreamingOps();
         if (res != OK) {
@@ -422,7 +422,7 @@ void Camera2ClientBase<TClientBase>::notifyIdleWithUserTag(
         }
         mCameraServiceProxyWrapper->logIdle(TClientBase::mCameraIdStr,
                 requestCount, resultErrorCount, deviceError, userTag, videoStabilizationMode,
-                usedUltraWide, usedZoomOverride, mostRequestedFpsRange, streamStats);
+                usedUltraWide, usedZoomOverride, mostRequestedFpsRange, streamStats, errorState);
     }
     mDeviceActive = false;
 

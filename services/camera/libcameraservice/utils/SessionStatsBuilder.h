@@ -67,7 +67,8 @@ public:
             /*out*/int64_t* errorResultCount,
             /*out*/bool* deviceError,
             /*out*/std::pair<int32_t, int32_t>* mostRequestedFpsRange,
-            /*out*/std::map<int, StreamStats>* statsMap);
+            /*out*/std::map<int, StreamStats>* statsMap,
+            /*out*/int32_t* errorState);
 
     // Stream specific counter
     void startCounter(int streamId);
@@ -77,7 +78,8 @@ public:
     // Session specific counter
     void stopCounter();
     void incResultCounter(bool dropped);
-    void onDeviceError();
+    void onDeviceError(int32_t errorState);
+    int32_t getErrorState();
 
     // Session specific statistics
 
@@ -87,7 +89,7 @@ public:
     void incFpsRequestedCount(int32_t minFps, int32_t maxFps, int64_t frameNumber);
 
     SessionStatsBuilder() : mRequestCount(0), mErrorResultCount(0),
-             mCounterStopped(false), mDeviceError(false) {}
+             mCounterStopped(false), mDeviceError(false), mErrorState(0) {}
 private:
     std::mutex mLock;
     int64_t mRequestCount;
@@ -102,6 +104,7 @@ private:
 
     // Map from stream id to stream statistics
     std::map<int, StreamStats> mStatsMap;
+    int32_t mErrorState;
 };
 
 }; // namespace android

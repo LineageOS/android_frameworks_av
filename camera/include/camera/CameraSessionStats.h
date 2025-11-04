@@ -164,6 +164,7 @@ public:
     bool mUsedUltraWide;
     bool mUsedZoomOverride;
     int mSessionIndex;
+    int32_t mErrorState;
 
     CameraExtensionSessionStats mCameraExtensionSessionStats;
 

@@ -268,7 +268,8 @@ public:
 
     virtual void notifyIdle(int64_t requestCount, int64_t resultErrorCount, bool deviceError,
                             std::pair<int32_t, int32_t> mostRequestedFpsRange,
-                            const std::vector<hardware::CameraStreamStats>& streamStats);
+                            const std::vector<hardware::CameraStreamStats>& streamStats,
+                            int32_t errorState);
     virtual void notifyError(int32_t errorCode,
                              const CaptureResultExtras& resultExtras);
     virtual void notifyShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp);

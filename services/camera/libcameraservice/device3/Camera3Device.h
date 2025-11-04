@@ -401,6 +401,9 @@ class Camera3Device :
     // Whether the device is in error state
     bool hasDeviceError();
 
+    // Get Error State
+    int32_t getErrorState();
+
     /**
      * The injection camera session to replace the internal camera
      * session.

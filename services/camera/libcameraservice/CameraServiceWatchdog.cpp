@@ -20,6 +20,7 @@
 #include "com_android_internal_camera_flags.h"
 #include "android/set_abort_message.h"
 #include "utils/CameraServiceProxyWrapper.h"
+#include <statslog_framework.h>
 
 namespace android {
 
@@ -57,7 +58,9 @@ bool CameraServiceWatchdog::threadLoop()
                 ALOGW("CameraServiceWatchdog triggering abort for pid: %d tid: %d", getpid(),
                         currentThreadId);
                 mCameraServiceProxyWrapper->logClose(mCameraId, 0 /*latencyMs*/,
-                        true /*deviceError*/);
+                        true /*deviceError*/,
+                        android::framework::stats
+                            ::CAMERA_ACTION_EVENT__ERROR_STATE__CAMERA_WATCHDOG_ERROR);
                 // We use abort here so we can get a tombstone for better
                 // debugging.
                 for (pid_t pid : mProviderPids) {

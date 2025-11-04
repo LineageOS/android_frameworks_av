@@ -118,7 +118,8 @@ public:
     status_t notifyActive(float maxPreviewFps) override;
     void notifyIdle(int64_t requestCount, int64_t resultErrorCount, bool deviceError,
             std::pair<int32_t, int32_t> mostRequestedFpsRange,
-            const std::vector<hardware::CameraStreamStats>& streamStats) override;
+            const std::vector<hardware::CameraStreamStats>& streamStats,
+            int32_t errorState) override;
     void notifyAutoFocus(uint8_t newState, int triggerId) override;
     void notifyAutoExposure(uint8_t newState, int triggerId) override;
     void notifyAutoWhitebalance(uint8_t newState, int triggerId) override;
