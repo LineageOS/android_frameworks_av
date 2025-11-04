@@ -420,11 +420,10 @@ Status AudioPolicyService::getOutputForAttr(const media::audio::common::AudioAtt
         }
     }
 
-    //TODO this permission check should extend to all system usages
-    if (attr.usage == AUDIO_USAGE_SPEAKER_CLEANUP) {
+    if (audio_is_system_usage(attr.usage)) {
         if (!CHECK_PERM(MODIFY_AUDIO_ROUTING, attributionSource.uid)) {
-            ALOGE("%s: permission denied: SPEAKER_CLEANUP not allowed for uid %d pid %d",
-                    __func__, attributionSource.uid, attributionSource.pid);
+            ALOGE("%s: permission denied: Attribute %d not allowed for uid %d pid %d",
+                    __func__, attr.usage, attributionSource.uid, attributionSource.pid);
             return binderStatusFromStatusT(PERMISSION_DENIED);
         }
     }

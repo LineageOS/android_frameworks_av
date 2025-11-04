@@ -47,7 +47,9 @@ inline bool skipOpsForUid(uid_t uid) {
 inline bool isSystemUsage(audio_usage_t usage) {
     const std::array SYSTEM_USAGES{AUDIO_USAGE_CALL_ASSISTANT, AUDIO_USAGE_EMERGENCY,
                                    AUDIO_USAGE_SAFETY, AUDIO_USAGE_VEHICLE_STATUS,
-                                   AUDIO_USAGE_ANNOUNCEMENT, AUDIO_USAGE_SPEAKER_CLEANUP};
+                                   AUDIO_USAGE_ANNOUNCEMENT, AUDIO_USAGE_SPEAKER_CLEANUP,
+                                   AUDIO_USAGE_NOTIFICATION_VIBRATION,
+                                   AUDIO_USAGE_RINGTONE_VIBRATION};
     return std::find(std::begin(SYSTEM_USAGES), std::end(SYSTEM_USAGES), usage) !=
            std::end(SYSTEM_USAGES);
 }

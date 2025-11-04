@@ -1844,6 +1844,10 @@ aidl2legacy_AudioUsage_audio_usage_t(AudioUsage aidl) {
             return AUDIO_USAGE_ANNOUNCEMENT;
         case AudioUsage::SPEAKER_CLEANUP:
             return AUDIO_USAGE_SPEAKER_CLEANUP;
+        case AudioUsage::NOTIFICATION_VIBRATION:
+            return AUDIO_USAGE_NOTIFICATION_VIBRATION;
+        case AudioUsage::RINGTONE_VIBRATION:
+            return AUDIO_USAGE_RINGTONE_VIBRATION;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1897,6 +1901,10 @@ legacy2aidl_audio_usage_t_AudioUsage(audio_usage_t legacy) {
             return AudioUsage::ANNOUNCEMENT;
         case AUDIO_USAGE_SPEAKER_CLEANUP:
             return AudioUsage::SPEAKER_CLEANUP;
+        case AUDIO_USAGE_NOTIFICATION_VIBRATION:
+            return AudioUsage::NOTIFICATION_VIBRATION;
+        case AUDIO_USAGE_RINGTONE_VIBRATION:
+            return AudioUsage::RINGTONE_VIBRATION;
     }
     return unexpected(BAD_VALUE);
 }
