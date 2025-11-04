@@ -4462,8 +4462,11 @@ status_t CameraService::BasicClient::notifyCameraOpening() {
     // it is asynchronous and frames may leak, so we do a check here as well, in case the client is
     // already disallowed from using the camera at client initialization time.
     if (mAppOpsManager != nullptr) {
-        int32_t mode = mAppOpsManager->checkOp(AppOpsManager::OP_CAMERA, getClientUid(),
-                                               toString16(getPackageName()));
+        int32_t mode = mAppOpsManager->checkOperationForDevice(AppOpsManager::OP_CAMERA,
+                                                             getClientUid(),
+                                                             toString16(getPackageName()),
+                                                             toString16(getClientAttributionTag()),
+                                                             mClientAttribution.deviceId);
         status_t res = handleAppOpMode(mode);
         if (res != OK) {
             return res;
