@@ -54,3 +54,10 @@ cc_test {
     test_config: "VtsHalMediaC2V1_0TargetVideoEncTest.xml",
     test_suites: ["device-tests"],
 }
+
+cc_test {
+    name: "VtsHalMediaC2V1_0TargetVideoEncSurfaceTest",
+    defaults: ["VtsHalMediaC2V1_0Defaults"],
+    srcs: ["VtsHalMediaC2V1_0TargetVideoEncSurfaceTest.cpp"],
+    test_suites: ["device-tests"],
+}
