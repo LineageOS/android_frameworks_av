@@ -141,9 +141,16 @@ public:
         // No ALooper method to get the tid so update
         // Spatializer priority on the first message received.
         std::call_once(mPrioritySetFlag, [](){
-            const pid_t pid = getpid();
-            const pid_t tid = gettid();
-            (void)requestSpatializerPriority(pid, tid);
+            const int priority = getSpatializerThreadPriority();
+            if (priority > 0) {
+                const pid_t pid = getpid();
+                const pid_t tid = gettid();
+                const status_t status = requestPriority(pid, tid, priority, false /* isForApp */,
+                        true /*asynchronous*/);
+                ALOGW_IF(status != OK,
+                        "%s: requestPriority (pid=%d, tid=%d) with priority=%d failed "
+                        "with status %d", __func__, pid, tid, priority, status);
+            }
         });
 
         sp<Spatializer> spatializer = mSpatializer.promote();
