@@ -66,19 +66,18 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     copyFrom(configuration);
     mRequestedDeviceId = android::getFirstDeviceId(configuration.getDeviceIds());
 
-    AudioStreamBuilder builder;
-    builder.copyFrom(configuration);
+    AAudioStreamOpenRequest openRequest(&configuration,
+            // Don't fall back to SHARED because that would cause recursion.
+            true /*isSharingModeMatchRequired*/);
 
-    builder.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
-    // Don't fall back to SHARED because that would cause recursion.
-    builder.setSharingModeMatchRequired(true);
+    openRequest.setSharingMode(AAUDIO_SHARING_MODE_EXCLUSIVE);
 
-    builder.setBufferCapacity(DEFAULT_BUFFER_CAPACITY);
+    openRequest.setBufferCapacity(DEFAULT_BUFFER_CAPACITY);
 
     // Each shared stream will use its own SRC.
-    builder.setSampleRate(AAUDIO_UNSPECIFIED);
+    openRequest.setSampleRate(AAUDIO_UNSPECIFIED);
 
-    result = mStreamInternal->open(builder);
+    result = mStreamInternal->open(openRequest);
 
     setSampleRate(mStreamInternal->getSampleRate());
     setChannelMask(mStreamInternal->getChannelMask());

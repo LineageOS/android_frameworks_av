@@ -20,7 +20,6 @@
 // go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <core/AudioStream.h>
-#include <core/AudioStreamBuilder.h>
 #include <media/AudioTrack.h>
 #include <media/TrackPlayerBase.h>
 #include <utility/FixedBlockReader.h>
@@ -45,7 +44,7 @@ public:
     virtual ~AudioStreamTrack();
 
 
-    aaudio_result_t open(const AudioStreamBuilder & builder) override;
+    aaudio_result_t open(const AAudioStreamOpenRequest& openRequest) override;
     aaudio_result_t release_l() REQUIRES(mStreamMutex) override;
     void close_l() REQUIRES(mStreamMutex) override;
 

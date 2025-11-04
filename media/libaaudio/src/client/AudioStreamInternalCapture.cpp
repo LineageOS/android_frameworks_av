@@ -48,8 +48,8 @@ AudioStreamInternalCapture::AudioStreamInternalCapture(AAudioServiceInterface  &
 
 }
 
-aaudio_result_t AudioStreamInternalCapture::open(const AudioStreamBuilder &builder) {
-    aaudio_result_t result = AudioStreamInternal::open(builder);
+aaudio_result_t AudioStreamInternalCapture::open(const AAudioStreamOpenRequest& openRequest) {
+    aaudio_result_t result = AudioStreamInternal::open(openRequest);
     if (result == AAUDIO_OK) {
         result = mFlowGraph.configure(getDeviceFormat(),
                              getDeviceSamplesPerFrame(),
