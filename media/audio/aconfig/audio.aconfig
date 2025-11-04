@@ -117,14 +117,6 @@ flag {
 }
 
 flag {
-    name: "replace_stream_bt_sco"
-    namespace: "media_audio"
-    description:
-        "Replace internally STREAM_BLUETOOTH_SCO with STREAM_VOICE_CALL"
-    bug: "345024266"
-}
-
-flag {
     name: "ring_my_car"
     namespace: "media_audio"
     description:
