@@ -256,7 +256,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithConfig(
     setSessionId(actualSessionId);
 
     ALOGD("%s(format = 0x%X) deviceIds = %s, sessionId = %d",
-          __func__, config->format, toString(getDeviceIds()).c_str(), getSessionId());
+          __func__, config->format, android::toString(getDeviceIds()).c_str(), getSessionId());
 
     ALOGD("%s bufferCapacity = %d, deviceSampleRate = %d, requestedSampleRate = %d",
           __func__, getBufferCapacity(), config->sample_rate, getSampleRate());
