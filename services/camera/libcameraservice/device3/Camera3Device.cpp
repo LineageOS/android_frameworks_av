@@ -1738,14 +1738,23 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout,
 
 status_t Camera3Device::setNotifyCallback(wp<NotificationListener> listener) {
     ATRACE_CALL();
-    std::lock_guard<std::mutex> l(mOutputLock);
+    {
+        std::lock_guard<std::mutex> l(mOutputLock);
 
-    if (listener != NULL && mListener != NULL) {
-        ALOGW("%s: Replacing old callback listener", __FUNCTION__);
+        if (listener != NULL && mListener != NULL) {
+            ALOGW("%s: Replacing old callback listener", __FUNCTION__);
+        }
+        mListener = listener;
     }
-    mListener = listener;
-    mRequestThread->setNotificationListener(listener);
-    mPreparerThread->setNotificationListener(listener);
+    {
+        Mutex::Autolock l(mLock);
+        if (mRequestThread) {
+            mRequestThread->setNotificationListener(listener);
+        }
+        if (mPreparerThread) {
+            mPreparerThread->setNotificationListener(listener);
+        }
+    }
 
     return OK;
 }
