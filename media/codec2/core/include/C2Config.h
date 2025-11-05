@@ -59,6 +59,7 @@ struct C2Config {
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
     enum drc_album_mode_t : int32_t;        ///< DRC album mode
+    enum encryption_scheme_t : uint32_t;    ///< encryption scheme
     enum hdr_dynamic_metadata_type_t : uint32_t;  ///< HDR dynamic metadata type
     enum hdr_format_t : uint32_t;           ///< HDR format
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
@@ -105,6 +106,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexChromaOffset,
     kParamIndexGopLayer,
     kParamIndexSystemResource,
+    kParamIndexEncryptionPattern,    // encryption pattern struct
+    kParamIndexEncryptionSubsample,  // encryption subsample struct
+    kParamIndexEncryptionVector,     // encryption vector struct
 
     /* =================================== parameter indices =================================== */
 
@@ -174,6 +178,11 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     /* resource capacity and resources excluded */
     kParamIndexResourcesCapacity,
     kParamIndexResourcesExcluded,
+
+    /* encryption info */
+    kParamIndexEncryptionInfo,  // encryption info struct
+    kParamIndexEncryptionIv,    // initialization vector struct
+    kParamIndexEncryptionKey,   // key handle struct
 
     // deprecated
     kParamIndexDelayRequest = kParamIndexDelay | C2Param::CoreIndex::IS_REQUEST_FLAG,
@@ -1507,15 +1516,117 @@ constexpr char C2_PARAMKEY_PRIORITY[] = "algo.priority";
  * Secure mode.
  */
 C2ENUM(C2Config::secure_mode_t, uint32_t,
-    SM_UNPROTECTED,    ///< no content protection
-    SM_READ_PROTECTED, ///< input and output buffers shall be protected from reading
+    SM_UNPROTECTED,     ///< no content protection
+    SM_READ_PROTECTED,  ///< input and output buffers shall be protected from reading
     /// both read protected and readable encrypted buffers are used
     SM_READ_PROTECTED_WITH_ENCRYPTED,
+    /// the decryption is executed in Codec2 HAL. C2Work::input::buffers are readable encrypted
+    /// buffers.
+    SM_ENCRYPTED_WITH_KEY,
 )
 
 typedef C2GlobalParam<C2Tuning, C2SimpleValueStruct<C2Config::secure_mode_t>, kParamIndexSecureMode>
         C2SecureModeTuning;
 constexpr char C2_PARAMKEY_SECURE_MODE[] = "algo.secure-mode";
+
+C2ENUM(C2Config::encryption_scheme_t, uint32_t,
+       UNENCRYPTED,  ///< unencrypted.
+       AES_CTR,      ///< Advanced Encryption Standard (AES) with Counter (CTR) mode.
+       AES_CBC,      ///< Advanced Encryption Standard (AES) with Cipher Block Chaining (CBC) mode.
+)
+
+/**
+ * Encryption pattern.
+ *
+ * This structure describes the pattern encryption scheme per ISO/IEC 23001-7 section 9.6.
+ * If skip is zero, pattern encryption is inoperative. Otherwise, the encryption pattern is crypt
+ * encrypted blocks followed by skip clear (skipped) blocks.
+ */
+struct C2EncryptionPatternStruct {
+    uint16_t skip;   ///< the number of blocks to skip in a sample encryption pattern.
+    uint16_t crypt;  ///< the number of blocks to encrypt in a sample encryption pattern.
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(EncryptionPattern)
+    C2FIELD(skip, "skip")
+    C2FIELD(crypt, "crypt")
+};
+
+/**
+ * Encryption subsample.
+ *
+ * This structure describes a subsample as specified by ISO/IEC 23001-7 section 9.5.
+ */
+struct C2EncryptionSubsampleStruct {
+    /// The index of the initialization vector and opaque key handle to use for this subsample.
+    /// If this index is larger than the number of whole initialization vectors or the keys
+    /// provided, all bytes are unencrypted in this subsample.
+    uint16_t vector;
+    uint16_t clear;     ///< The number of leading unencrypted bytes in a subsample.
+    uint32_t ciphered;  ///< The number of trailing encrypted bytes in a subsample.
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(EncryptionSubsample)
+    C2FIELD(vector, "vector")
+    C2FIELD(clear, "clear")
+    C2FIELD(ciphered, "ciphered")
+};
+
+/**
+ * Encryption information for the access unit.
+ *
+ * This structure describes the sample encryption scheme as specified in ISO/IEC 23001-7.
+ */
+struct C2EncryptionInfoStruct {
+    C2Config::encryption_scheme_t scheme;      ///< the encryption scheme.
+    C2EncryptionPatternStruct pattern;         ///< the encryption pattern.
+    C2EncryptionSubsampleStruct subsamples[];  ///< the encryption subsamples.
+
+    C2EncryptionInfoStruct() : scheme(C2Config::UNENCRYPTED) {}
+
+    C2EncryptionInfoStruct(size_t flexCount, C2Config::encryption_scheme_t scheme_,
+                           C2EncryptionPatternStruct pattern_,
+                           const std::vector<C2EncryptionSubsampleStruct>& subsamples_)
+        : scheme(scheme_), pattern(pattern_) {
+        for (size_t i = 0; i < c2_min(subsamples_.size(), flexCount); ++i) {
+            subsamples[i] = subsamples_[i];
+        }
+    }
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(EncryptionInfo, subsamples)
+    C2FIELD(scheme, "scheme")
+    C2FIELD(pattern, "pattern")
+    C2FIELD(subsamples, "subsamples")
+};
+
+typedef C2StreamParam<C2Info, C2EncryptionInfoStruct, kParamIndexEncryptionInfo>
+        C2StreamEncryptionInfo;
+constexpr char C2_PARAMKEY_ENCRYPTION_INFO[] = "input.encryption-info";
+
+/**
+ * Variable length vector structure used for IV(s) and key handle(s).
+ */
+struct C2EncryptionVectorStruct {
+    uint32_t length;    ///< The length of a single vector.
+    uint8_t vectors[];  ///< The vector(s).
+
+    C2EncryptionVectorStruct() : length(0) {}
+    C2EncryptionVectorStruct(size_t flexCount, uint32_t length_,
+                             const std::vector<uint8_t>& vectors_)
+        : length(length_) {
+        memcpy(vectors, vectors_.data(), c2_min(vectors_.size(), flexCount));
+    }
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(EncryptionVector, vectors)
+    C2FIELD(length, "length")
+    C2FIELD(vectors, "vectors")
+};
+
+typedef C2StreamParam<C2Info, C2EncryptionVectorStruct, kParamIndexEncryptionIv>
+        C2StreamEncryptionIvInfo;
+constexpr char C2_PARAMKEY_ENCRYPTION_IV[] = "input.encryption-iv";
+
+typedef C2StreamParam<C2Info, C2EncryptionVectorStruct, kParamIndexEncryptionKey>
+        C2StreamEncryptionKeyInfo;
+constexpr char C2_PARAMKEY_ENCRYPTION_KEY[] = "input.encryption-key";
 
 /* ===================================== ENCODER COMPONENTS ===================================== */
 
