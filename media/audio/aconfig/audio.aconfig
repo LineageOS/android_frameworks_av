@@ -161,6 +161,13 @@ flag {
 }
 
 flag {
+    name: "standard_volume_range_apm"
+    namespace: "media_audio"
+    description: "APM uses a standard volume range of 0/1 - 100."
+    bug: "439681541"
+}
+
+flag {
     name: "stereo_spatialization"
     namespace: "media_audio"
     description: "Enable stereo channel mask for spatialization."
