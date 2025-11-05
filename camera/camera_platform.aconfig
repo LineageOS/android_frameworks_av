@@ -19,6 +19,14 @@ flag {
 
 flag {
     namespace: "camera_platform"
+    name: "device_removed_callback"
+    is_exported: true
+    description: "Notify clients when camera devices are no longer present"
+    bug: "442831091"
+}
+
+flag {
+    namespace: "camera_platform"
     name: "concert_mode"
     is_exported: true
     description: "Introduces a new concert mode camera extension type"
