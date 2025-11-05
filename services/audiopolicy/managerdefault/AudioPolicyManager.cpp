@@ -905,7 +905,8 @@ void AudioPolicyManager::connectTelephonyRxAudioSource(uint32_t delayMs)
             ALOGV("%s same sink device %s", __func__, rxDevice->toString().c_str());
             return;
         }
-        if (com::android::media::audioserver::optimize_call_routing()) {
+        if (com::android::media::audioserver::optimize_call_routing()
+                && mCallRxSourceClient->isConnected()) {
             rerouteTelephonyAudioSource(mCallRxSourceClient, mCallRxSourceClient->srcDevice(),
                                         rxDevice, delayMs);
             ALOGV("%s rerouted portd ID %d between source %s and sink %s", __func__,
@@ -960,9 +961,10 @@ void AudioPolicyManager::connectTelephonyTxAudioSource(
             ALOGV("%s same source device %s", __func__, srcDevice->toString().c_str());
             return;
         }
-        if (com::android::media::audioserver::optimize_call_routing()) {
+        if (com::android::media::audioserver::optimize_call_routing()
+                && mCallTxSourceClient->isConnected()) {
             rerouteTelephonyAudioSource(mCallTxSourceClient, srcDevice, sinkDevice, delayMs);
-            ALOGV("%s rerouted portdID %d between source %s and sink %s", __func__,
+            ALOGV("%s rerouted portd ID %d between source %s and sink %s", __func__,
                   mCallTxSourceClient->portId(),
                   srcDevice->toString().c_str(), sinkDevice->toString().c_str());
             return;
@@ -1001,6 +1003,9 @@ void AudioPolicyManager::rerouteTelephonyAudioSource(const sp<SourceClientDescri
         const sp<DeviceDescriptor> &srcDevice, const sp<DeviceDescriptor> &sinkDevice,
         uint32_t delayMs) {
     sp<SwAudioOutputDescriptor> swOutput = source->swOutput().promote();
+
+    swOutput->setClientActive(source, false);
+    swOutput->stop();
     swOutput->removeClient(source->portId(), false /*checkExists*/);
     audio_patch_handle_t handle;
     // createAudioPatchInternal() automatically handles same patch update only if the source
@@ -1027,6 +1032,9 @@ void AudioPolicyManager::rerouteTelephonyAudioSource(const sp<SourceClientDescri
     swOutput = source->swOutput().promote();
     swOutput->addClient(source);
     source->connect(handle, sinkDevice);
+    swOutput->start();
+    swOutput->setClientActive(source, true);
+
     applyStreamVolumes(swOutput, {sinkDevice->type()}, delayMs);
     ALOGV("%s portd ID %d between source %s and sink %s delayMs %u", __func__, source->portId(),
         srcDevice->toString().c_str(), sinkDevice->toString().c_str(), delayMs);
@@ -7769,6 +7777,7 @@ void AudioPolicyManager::clearAudioSourcesForOutput(audio_io_handle_t output)
         if (sourceDesc != nullptr && sourceDesc->swOutput().promote() != nullptr
                 && sourceDesc->swOutput().promote()->mIoHandle == output) {
             disconnectAudioSource(sourceDesc);
+            sourceDesc->setSwOutput(nullptr);
         }
     }
 }
