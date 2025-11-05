@@ -17,7 +17,9 @@
 package android.companion.virtualcamera;
 
 /**
- * Pixel format supported by a virtual camera stream.
+ * Image format supported by a virtual camera stream.
+ *
+ * Must be in sync with the values in AIMAGE_FORMATS, see {@link AImage}.
  *
  * @hide
  */

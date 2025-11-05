@@ -77,7 +77,7 @@ class VirtualCameraTestInstance
   ::ndk::ScopedAStatus onStreamConfigured(
       int32_t streamId, const ::aidl::android::view::Surface& surface,
       int32_t width, int32_t height,
-      ::aidl::android::companion::virtualcamera::Format pixelFormat) override
+      ::aidl::android::companion::virtualcamera::Format imageFormat) override
       EXCLUDES(mLock);
 
   ::ndk::ScopedAStatus onProcessCaptureRequest(

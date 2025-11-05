@@ -16,7 +16,11 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERACAPTUREREQUEST_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERACAPTUREREQUEST_H
 
+#include <optional>
+
 #include "VirtualCameraDevice.h"
+#include "ui/Fence.h"
+#include "util/Util.h"
 
 namespace android {
 namespace companion {
@@ -50,6 +54,29 @@ struct RequestSettings {
   // CONTROL_AE_PRECAPTURE_TRIGGER metadata
   std::optional<camera_metadata_enum_android_control_ae_precapture_trigger>
       aePrecaptureTrigger;
+};
+
+// Represents single output buffer of capture request.
+class CaptureRequestBuffer {
+ public:
+  CaptureRequestBuffer(int streamId, int bufferId, sp<Fence> fence = nullptr)
+      : mStreamId(streamId), mBufferId(bufferId), mFence(fence) {
+  }
+
+  int getStreamId() const {
+    return mStreamId;
+  }
+  int getBufferId() const {
+    return mBufferId;
+  }
+  sp<Fence> getFence() const {
+    return mFence;
+  }
+
+ private:
+  const int mStreamId;
+  const int mBufferId;
+  const sp<Fence> mFence;
 };
 
 }  // namespace virtualcamera

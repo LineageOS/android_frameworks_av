@@ -454,7 +454,7 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
     // create single texture.
     mVirtualCameraClientCallback->onStreamConfigured(
         inputStreamId, aidl::android::view::Surface(inputSurface.get()),
-        inputConfig->width, inputConfig->height, inputConfig->pixelFormat);
+        inputConfig->width, inputConfig->height, inputConfig->imageFormat);
   }
 
   return ndk::ScopedAStatus::ok();

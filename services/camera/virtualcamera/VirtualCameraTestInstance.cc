@@ -135,9 +135,9 @@ ScopedAStatus VirtualCameraTestInstance::onOpenCamera() {
 
 ScopedAStatus VirtualCameraTestInstance::onStreamConfigured(
     const int32_t streamId, const Surface& surface, const int32_t width,
-    const int32_t height, const Format pixelFormat) {
-  ALOGV("%s: streamId %d, %dx%d pixFmt=%s", __func__, streamId, width, height,
-        toString(pixelFormat).c_str());
+    const int32_t height, const Format imageFormat) {
+  ALOGV("%s: streamId %d, %dx%d imgFmt=%s", __func__, streamId, width, height,
+        toString(imageFormat).c_str());
 
   auto renderer = std::make_shared<TestPatternRenderer>(
       nativeWindowFromSurface(surface), mFps);
