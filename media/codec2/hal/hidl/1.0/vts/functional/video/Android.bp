@@ -60,3 +60,10 @@ cc_test {
         "dts",
     ],
 }
+
+cc_test {
+    name: "VtsHalMediaC2V1_0TargetVideoEncSurfaceTest",
+    defaults: ["VtsHalMediaC2V1_0Defaults"],
+    srcs: ["VtsHalMediaC2V1_0TargetVideoEncSurfaceTest.cpp"],
+    test_suites: ["device-tests"],
+}
