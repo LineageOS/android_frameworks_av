@@ -638,7 +638,7 @@ void Component::initListener(const sp<Component>& self) {
         std::shared_ptr<C2BlockPool> linearPool;
         std::shared_ptr<C2AllocatorStore> store = ::android::GetCodec2PlatformAllocatorStore();
         if(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator) == C2_OK) {
-            ::android::C2PlatformAllocatorDesc desc;
+            ::android::C2PlatformAllocatorDescV2 desc;
             desc.allocatorId = allocator->getId();
             if (C2_OK == CreateCodec2BlockPool(desc, mComponent, &linearPool)) {
                 if (linearPool) {

@@ -16,29 +16,27 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2IgbaBuffer"
 #include <android-base/logging.h>
-#include <aidl/android/hardware/media/c2/IGraphicBufferAllocator.h>
 #include <vndk/hardware_buffer.h>
 #include <utils/Log.h>
+#include <utils/Errors.h>
 
 #include <C2AllocatorGralloc.h>
 #include <C2BlockInternal.h>
 #include <C2FenceFactory.h>
 #include <C2IgbaBufferPriv.h>
+#include <C2IgbaInterface.h>
 #include <C2PlatformSupport.h>
 
 using ::android::C2AllocatorAhwb;
-using C2IGBA = ::aidl::android::hardware::media::c2::IGraphicBufferAllocator;
 
 namespace {
-int32_t static inline ToAidl(uint32_t u) {return static_cast<int32_t>(u);}
-int64_t static inline ToAidl(uint64_t u) {return static_cast<int64_t>(u);}
 
 c2_nsecs_t static constexpr kBlockingFetchTimeoutNs = 5000000000LL; // 5 secs
 c2_nsecs_t static constexpr kSyncFenceWaitNs = (1000000000LL / 60LL); // 60 fps frame secs
 
 c2_status_t static CreateGraphicBlockFromAhwb(AHardwareBuffer *ahwb,
                                             const std::shared_ptr<C2Allocator> &allocator,
-                                            const std::shared_ptr<C2IGBA> &igba,
+                                            const std::shared_ptr<C2IgbaInterface> &igba,
                                             std::shared_ptr<C2GraphicBlock> *block) {
     if (__builtin_available(android __ANDROID_API_T__, *)) {
         uint64_t origId = 0;
@@ -68,7 +66,7 @@ c2_status_t static CreateGraphicBlockFromAhwb(AHardwareBuffer *ahwb,
         }
         std::shared_ptr<C2IgbaBlockPoolData> poolData =
                 std::make_shared<C2IgbaBlockPoolData>(
-                        ahwb, const_cast<std::shared_ptr<C2IGBA>&>(igba));
+                        ahwb, const_cast<std::shared_ptr<C2IgbaInterface>&>(igba));
         *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
         return C2_OK;
     } else {
@@ -80,7 +78,7 @@ c2_status_t static CreateGraphicBlockFromAhwb(AHardwareBuffer *ahwb,
 
 C2IgbaBlockPoolData::C2IgbaBlockPoolData(
         const AHardwareBuffer *buffer,
-        std::shared_ptr<C2IGBA> &igba) : mOwned(true), mBuffer(buffer), mIgba(igba) {
+        std::shared_ptr<C2IgbaInterface> &igba) : mOwned(true), mBuffer(buffer), mIgba(igba) {
     CHECK(mBuffer);
     AHardwareBuffer_acquire(const_cast<AHardwareBuffer *>(mBuffer));
 }
@@ -94,9 +92,9 @@ C2IgbaBlockPoolData::~C2IgbaBlockPoolData() {
                 uint64_t origId;
                 CHECK(AHardwareBuffer_getId(mBuffer, &origId) == ::android::OK);
                 bool aidlRet = true;
-                ::ndk::ScopedAStatus status = igba->deallocate(origId, &aidlRet);
-                if (!status.isOk() || !aidlRet) {
-                    ALOGW("AHwb destruction notifying failure %d(%d)", status.isOk(), aidlRet);
+                c2_status_t status = igba->deallocate(origId, &aidlRet);
+                if (status != C2_OK || !aidlRet) {
+                    ALOGW("AHwb destruction notifying failure %d(%d)", status, aidlRet);
                 }
             }
         }
@@ -116,7 +114,7 @@ void C2IgbaBlockPoolData::disown() {
     mOwned = false;
 }
 
-void C2IgbaBlockPoolData::registerIgba(std::shared_ptr<C2IGBA> &igba) {
+void C2IgbaBlockPoolData::registerIgba(std::shared_ptr<C2IgbaInterface> &igba) {
     mIgba = igba;
 }
 
@@ -155,7 +153,7 @@ void _C2BlockFactory::DisownIgbaBlock(
 
 void _C2BlockFactory::RegisterIgba(
         const std::shared_ptr<_C2BlockPoolData>& data,
-        std::shared_ptr<C2IGBA> &igba) {
+        std::shared_ptr<C2IgbaInterface> &igba) {
     if (data && data->getType() == _C2BlockPoolData::TYPE_AHWBUFFER) {
         const std::shared_ptr<C2IgbaBlockPoolData> poolData =
                 std::static_pointer_cast<C2IgbaBlockPoolData>(data);
@@ -165,7 +163,7 @@ void _C2BlockFactory::RegisterIgba(
 
 C2IgbaBlockPool::C2IgbaBlockPool(
         const std::shared_ptr<C2Allocator> &allocator,
-        const std::shared_ptr<C2IGBA> &igba,
+        const std::shared_ptr<C2IgbaInterface> &igba,
         ::android::base::unique_fd &&ufd,
         const bool blockFence,
         const local_id_t localId) :
@@ -248,26 +246,20 @@ c2_status_t C2IgbaBlockPool::_fetchGraphicBlock(
         }
 
         ::android::C2AndroidMemoryUsage memUsage{usage};
-        C2IGBA::Description desc{
-            ToAidl(width), ToAidl(height), ToAidl(format), ToAidl(memUsage.asGrallocUsage())};
-        C2IGBA::Allocation allocation;
-        ::ndk::ScopedAStatus status = mIgba->allocate(desc, &allocation);
-        if (!status.isOk()) {
-            binder_exception_t ex = status.getExceptionCode();
-            if (ex == EX_SERVICE_SPECIFIC) {
-                c2_status_t err = static_cast<c2_status_t>(status.getServiceSpecificError());
-                if (err == C2_BLOCKING) {
-                    *fence = mWaitFence;
-                }
-                return err;
+        AHardwareBuffer *ahwb; // should be acquired when set.
+        int syncFenceFd = -1;
+        c2_status_t err = mIgba->allocate(
+                width, height, format, memUsage.asGrallocUsage(), &ahwb, &syncFenceFd);
+        if (err != C2_OK) {
+            if (err == C2_BLOCKING) {
+                *fence = mWaitFence;
             } else {
-                ALOGW("igba::allocate transaction failed: %d", ex);
-                return C2_CORRUPTED;
+                ALOGW("igba::allocate transaction failed");
             }
+            return err;
         }
 
-        C2Fence syncFence  = _C2FenceFactory::CreateSyncFence(allocation.fence.release());
-        AHardwareBuffer *ahwb = allocation.buffer.release(); // This is acquired.
+        C2Fence syncFence  = _C2FenceFactory::CreateSyncFence(syncFenceFd);
         CHECK(AHardwareBuffer_getId(ahwb, origId) == ::android::OK);
         bool syncFenceSignaled = false;
 
@@ -278,9 +270,9 @@ c2_status_t C2IgbaBlockPool::_fetchGraphicBlock(
             if (res != C2_OK) {
                 AHardwareBuffer_release(ahwb);
                 bool aidlRet = true;
-                ::ndk::ScopedAStatus status = mIgba->deallocate(*origId, &aidlRet);
+                c2_status_t status = mIgba->deallocate(*origId, &aidlRet);
                 ALOGE("Waiting a sync fence failed %d aidl(%d: %d)",
-                      res, status.isOk(), aidlRet);
+                      res, status, aidlRet);
                 return C2_TIMED_OUT;
             }
             syncFenceSignaled = true;
@@ -290,9 +282,9 @@ c2_status_t C2IgbaBlockPool::_fetchGraphicBlock(
         AHardwareBuffer_release(ahwb);
         if (res != C2_OK) {
             bool aidlRet = true;
-            ::ndk::ScopedAStatus status = mIgba->deallocate(*origId, &aidlRet);
+            c2_status_t status = mIgba->deallocate(*origId, &aidlRet);
             ALOGE("We got AHWB via AIDL but failed to created C2GraphicBlock err(%d) aidl(%d, %d)",
-                  res, status.isOk(), aidlRet);
+                  res, status, aidlRet);
             return res;
         }
         if (!syncFenceSignaled) {

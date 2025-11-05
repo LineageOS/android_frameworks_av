@@ -21,21 +21,20 @@
 
 #include <memory>
 
-namespace aidl::android::hardware::media::c2 {
-    class IGraphicBufferAllocator;
-}
+class C2IgbaInterface;
 
 /**
  * Codec2-AIDL IGraphicBufferAllocator backed C2BlockPool
  *
  * Graphic Blocks are created using IGraphicBufferAllocator C2AIDL interface.
+ * IGraphicBufferAllocator is wrapped as C2IgbaInterface in order not to
+ * introduce unwanted dependency to HAL interface.
  */
 class C2IgbaBlockPool : public C2BlockPool {
 public:
     explicit C2IgbaBlockPool(
             const std::shared_ptr<C2Allocator> &allocator,
-            const std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator>
-                    &igba,
+            const std::shared_ptr<C2IgbaInterface> &igba,
             ::android::base::unique_fd &&ufd,
             const bool blockFence,
             const local_id_t localId);
@@ -82,7 +81,7 @@ private:
         C2Fence *fence /* nonnull */);
 
     const std::shared_ptr<C2Allocator> mAllocator;
-    const std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> mIgba;
+    const std::shared_ptr<C2IgbaInterface> mIgba;
     const bool mBlockFence;
     const local_id_t mLocalId;
     std::atomic<bool> mValid;
@@ -95,7 +94,7 @@ struct C2IgbaBlockPoolData : public _C2BlockPoolData {
 
     C2IgbaBlockPoolData(
             const AHardwareBuffer *buffer,
-            std::shared_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> &igba);
+            std::shared_ptr<C2IgbaInterface> &igba);
 
     virtual ~C2IgbaBlockPoolData() override;
 
@@ -108,10 +107,9 @@ private:
 
     void disown();
 
-    void registerIgba(std::shared_ptr<
-            ::aidl::android::hardware::media::c2::IGraphicBufferAllocator> &igba);
+    void registerIgba(std::shared_ptr<C2IgbaInterface> &igba);
 
     bool mOwned;
     const AHardwareBuffer *mBuffer;
-    std::weak_ptr<::aidl::android::hardware::media::c2::IGraphicBufferAllocator> mIgba;
+    std::weak_ptr<C2IgbaInterface> mIgba;
 };

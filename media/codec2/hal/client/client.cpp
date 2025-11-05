@@ -31,6 +31,7 @@
 #include <C2Config.h> // for C2StreamUsageTuning
 #include <C2Debug.h>
 #include <C2DmaBufAllocator.h>
+#include <C2IgbaInterfaceImpl.h>
 #include <C2PlatformSupport.h>
 #include <util/C2InterfaceHelper.h>
 
@@ -2097,6 +2098,7 @@ struct Codec2Client::Component::GraphicBufferAllocators {
 private:
     std::optional<C2BlockPool::local_id_t> mCurrentId;
     std::shared_ptr<AidlGraphicBufferAllocator> mCurrent;
+    std::shared_ptr<C2IgbaInterface> mCurrentInterface;
 
     // A new BlockPool is created before the old BlockPool is destroyed.
     // This holds the reference of the old BlockPool when a new BlockPool is
@@ -2118,10 +2120,13 @@ public:
             }
             mCurrentId.reset();
             mCurrent.reset();
+            mCurrentInterface.reset();
         }
         // TODO: integrate initial value with CCodec/CCodecBufferChannel
         mCurrent =
                 AidlGraphicBufferAllocator::CreateGraphicBufferAllocator(3 /* maxDequeueCount */);
+        mCurrentInterface = std::make_shared<C2IgbaInterfaceImpl>(
+                c2_aidl::IGraphicBufferAllocator::fromBinder(mCurrent->asBinder()));
         ALOGD("GraphicBufferAllocator created");
         return mCurrent;
     }
@@ -2138,6 +2143,12 @@ public:
     std::shared_ptr<AidlGraphicBufferAllocator> current() {
         std::unique_lock<std::mutex> l(mMutex);
         return mCurrent;
+    }
+
+    // Returns C2IgbaInterface of the current GraphicBufferAllocator.
+    std::shared_ptr<C2IgbaInterface> currentInterface() {
+        std::unique_lock<std::mutex> l(mMutex);
+        return mCurrentInterface;
     }
 
     // Removes the GraphicBufferAllocator associated with given \p id.
@@ -3849,13 +3860,10 @@ void Codec2Client::Component::holdIgbaBlocks(
     if (!mAidlBase) {
         return;
     }
-    std::shared_ptr<AidlGraphicBufferAllocator> gba =
-            mGraphicBufferAllocators->current();
-    if (!gba) {
+    std::shared_ptr<C2IgbaInterface> igbaIntf = mGraphicBufferAllocators->currentInterface();
+    if (!igbaIntf) {
         return;
     }
-    std::shared_ptr<c2_aidl::IGraphicBufferAllocator> igba =
-            c2_aidl::IGraphicBufferAllocator::fromBinder(gba->asBinder());
     for (const std::unique_ptr<C2Work>& work : workList) {
         if (!work) [[unlikely]] {
             continue;
@@ -3869,7 +3877,7 @@ void Codec2Client::Component::holdIgbaBlocks(
                     for (const C2ConstGraphicBlock& block : buffer->data().graphicBlocks()) {
                         std::shared_ptr<_C2BlockPoolData> poolData =
                               _C2BlockFactory::GetGraphicBlockPoolData(block);
-                        _C2BlockFactory::RegisterIgba(poolData, igba);
+                        _C2BlockFactory::RegisterIgba(poolData, igbaIntf);
                     }
                 }
             }
