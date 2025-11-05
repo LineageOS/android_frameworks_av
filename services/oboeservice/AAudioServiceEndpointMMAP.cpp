@@ -129,12 +129,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
     std::set<audio_config_base_t, configComp> configsTried;
     int32_t numberOfAttempts = 0;
-    // If the performance mode is offload, it requires the stream to be opened with
-    // requested configuration. The framework do not provide conversion for offload use case.
-    const int maxOpenAttempts =
-            getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED
-                    ? 1 : AAUDIO_MAX_OPEN_ATTEMPTS;
-    while (numberOfAttempts < maxOpenAttempts) {
+    while (numberOfAttempts < AAUDIO_MAX_OPEN_ATTEMPTS) {
         if (configsTried.find(config) != configsTried.end()) {
             // APM returning something that has already tried.
             ALOGW("Have already tried to open with format=%#x and sr=%d, but failed before",
