@@ -57,6 +57,7 @@ status_t CaptureResultExtras::readFromParcel(const android::Parcel *parcel) {
     if (hasReadoutTimestamp) {
         parcel->readInt64(&readoutTimestamp);
     }
+    parcel->readParcelableVector(&multiResConcurrentReadersStart);
     return OK;
 }
 
@@ -90,6 +91,7 @@ status_t CaptureResultExtras::writeToParcel(android::Parcel *parcel) const {
     if (hasReadoutTimestamp) {
         parcel->writeInt64(readoutTimestamp);
     }
+    parcel->writeParcelableVector(multiResConcurrentReadersStart);
 
     return OK;
 }

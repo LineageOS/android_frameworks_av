@@ -584,9 +584,10 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<SurfaceHo
     auto ret = device->createStream(mP010Surface, width, height, kP010PixelFormat,
             static_cast<android_dataspace>(mP010DataSpace), rotation,
             id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
-            camera3::CAMERA3_STREAM_SET_ID_INVALID, false /*isShared*/, false /*isMultiResolution*/,
-            GRALLOC_USAGE_SW_READ_OFTEN, mP010DynamicRange, streamUseCase,
-            OutputConfiguration::TIMESTAMP_BASE_DEFAULT, OutputConfiguration::MIRROR_MODE_AUTO,
+            camera3::CAMERA3_STREAM_SET_ID_INVALID, false /*isShared*/,
+            OutputConfiguration::MULTI_RES_OFF, GRALLOC_USAGE_SW_READ_OFTEN, mP010DynamicRange,
+            streamUseCase, OutputConfiguration::TIMESTAMP_BASE_DEFAULT,
+            OutputConfiguration::MIRROR_MODE_AUTO,
             ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED, useReadoutTimestamp);
     if (ret == OK) {
         mP010StreamId = *id;
@@ -608,7 +609,7 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<SurfaceHo
                 &blobSurfaceId,
                 /*streamSetI*/ camera3::CAMERA3_STREAM_SET_ID_INVALID,
                 /*isShared*/  false,
-                /*isMultiResolution*/ false,
+                OutputConfiguration::MULTI_RES_OFF,
                 /*consumerUsage*/ GRALLOC_USAGE_SW_READ_OFTEN,
                 /*dynamicProfile*/ ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
                 streamUseCase,

@@ -43,7 +43,7 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         Camera3OutputStream(id, CAMERA_STREAM_OUTPUT, width, height,
                             format, dataSpace, rotation, physicalCameraId, sensorPixelModesUsed,
                             transport, consumerUsage, timestampOffset, setId,
-                            /*isMultiResolution*/false, dynamicProfile, streamUseCase,
+                            OutputConfiguration::MULTI_RES_OFF, dynamicProfile, streamUseCase,
                             deviceTimeBaseIsRealtime, timestampBase, colorSpace,
                             useReadoutTimestamp),
         mUseHalBufManager(useHalBufManager) {

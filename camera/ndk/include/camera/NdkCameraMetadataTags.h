@@ -4971,6 +4971,21 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_SCALER_RAW_CROP_REGION =                            // int32[4]
             ACAMERA_SCALER_START + 27,
+    /**
+     * <p>The MultiResolutionImageReader formats supporting concurrent readers.</p>
+     *
+     * <p>Type: int32[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Among all of the MultiResolutionImageReader formats this camera device supports,
+     * this list contains the formats that support concurrent reader outputs.</p>
+     */
+    ACAMERA_SCALER_CONCURRENT_MULTI_RESOLUTION_FORMATS =        // int32[n]
+            ACAMERA_SCALER_START + 28,
     ACAMERA_SCALER_END,
 
     /**

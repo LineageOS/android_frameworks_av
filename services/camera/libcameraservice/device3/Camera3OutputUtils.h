@@ -160,7 +160,7 @@ namespace camera3 {
     };
 
     void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result);
-    void notify(CaptureOutputStates& states, const camera_notify_msg *msg);
+    void notify(CaptureOutputStates& states, const camera_notify_msg_t *msg);
 
     struct RequestBufferStates {
         const std::string& cameraId;

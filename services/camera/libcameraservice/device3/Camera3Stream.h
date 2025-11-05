@@ -160,6 +160,7 @@ class Camera3Stream :
      * Is this stream part of a multi-resolution stream set
      */
     bool             isMultiResolution() const;
+    int              getMultiResMode() const;
     /**
      * Get the HAL stream group id for a multi-resolution stream set
      */
@@ -515,7 +516,7 @@ class Camera3Stream :
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
+            int setId, int multiResMode, int64_t dynamicRangeProfile,
             int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
             int32_t colorSpace);
 
@@ -641,7 +642,7 @@ class Camera3Stream :
     std::string mPhysicalCameraId;
     nsecs_t mLastTimestamp;
 
-    bool mIsMultiResolution = false;
+    int mMultiResMode = OutputConfiguration::MULTI_RES_OFF;
     bool mSupportOfflineProcessing = false;
 
     bool mDeviceTimeBaseIsRealtime;

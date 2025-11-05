@@ -184,7 +184,7 @@ class Camera3Device :
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, bool isMultiResolution = false,
+            bool isShared = false, int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             uint64_t consumerUsage = 0,
             int64_t dynamicRangeProfile =
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
@@ -202,7 +202,7 @@ class Camera3Device :
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, bool isMultiResolution = false,
+            bool isShared = false, int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             uint64_t consumerUsage = 0,
             int64_t dynamicRangeProfile =
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,

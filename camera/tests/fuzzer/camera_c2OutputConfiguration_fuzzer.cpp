@@ -122,7 +122,7 @@ void C2OutputConfigurationFuzzer::invokeC2OutputConfigFuzzer() {
                         flagtools::convertSurfaceTypeToParcelable(surface);
                     outputConfiguration->addSurface(pSurface);
                 },
-                [&]() { outputConfiguration->isMultiResolution(); },
+                [&]() { outputConfiguration->getMultiResMode(); },
                 [&]() { outputConfiguration->getColorSpace(); },
                 [&]() { outputConfiguration->getStreamUseCase(); },
                 [&]() { outputConfiguration->getTimestampBase(); },

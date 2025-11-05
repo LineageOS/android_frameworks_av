@@ -18,6 +18,9 @@
 #define ANDROID_SERVERS_CAMERA3_INFLIGHT_REQUEST_H
 
 #include <set>
+#include <variant>
+
+#include <android/hardware/camera2/impl/MultiResConcurrentReadersStartInfo.h>
 
 #include <camera/CaptureResult.h>
 #include <camera/CameraMetadata.h>
@@ -68,6 +71,8 @@ typedef struct camera_shutter_msg {
     uint64_t timestamp;
     bool readout_timestamp_valid;
     uint64_t readout_timestamp;
+    std::vector<hardware::camera2::impl::MultiResConcurrentReadersStartInfo>
+            multi_res_concurrent_readers_msg;
 } camera_shutter_msg_t;
 
 typedef struct camera_error_msg {
@@ -84,14 +89,7 @@ typedef enum camera_error_msg_code {
     CAMERA_MSG_NUM_ERRORS
 } camera_error_msg_code_t;
 
-typedef struct camera_notify_msg {
-    int type;
-
-    union {
-        camera_error_msg_t error;
-        camera_shutter_msg_t shutter;
-    } message;
-} camera_notify_msg_t;
+typedef std::variant<camera_error_msg_t, camera_shutter_msg_t> camera_notify_msg_t;
 
 typedef enum {
     // Cache the buffers with STATUS_ERROR within InFlightRequest

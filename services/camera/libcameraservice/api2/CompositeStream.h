@@ -46,7 +46,7 @@ public:
             camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
-            int streamSetId, bool isShared, bool isMultiResolution, int32_t colorSpace,
+            int streamSetId, bool isShared, int multiResMode, int32_t colorSpace,
             int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp);
 
     status_t deleteStream();
