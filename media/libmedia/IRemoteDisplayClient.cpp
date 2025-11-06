@@ -19,6 +19,8 @@
 
 #include <media/IRemoteDisplayClient.h>
 #include <gui/IGraphicBufferProducer.h>
+#include <gui/Flags.h> // Remove with MediaSurfaceType
+#include <gui/view/Surface.h>
 #include <utils/String8.h>
 
 namespace android {
@@ -27,6 +29,7 @@ enum {
     ON_DISPLAY_CONNECTED = IBinder::FIRST_CALL_TRANSACTION,
     ON_DISPLAY_DISCONNECTED,
     ON_DISPLAY_ERROR,
+    ON_DISPLAY_CONNECTED_SURFACE,
 };
 
 class BpRemoteDisplayClient: public BpInterface<IRemoteDisplayClient>
@@ -37,17 +40,25 @@ public:
     {
     }
 
-    void onDisplayConnected(const sp<IGraphicBufferProducer>& bufferProducer,
+    void onDisplayConnected(const sp<MediaSurfaceType>& surface,
             uint32_t width, uint32_t height, uint32_t flags, uint32_t session)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IRemoteDisplayClient::getInterfaceDescriptor());
-        data.writeStrongBinder(IInterface::asBinder(bufferProducer));
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+        data.writeParcelable(view::Surface::fromSurface(surface));
+#else
+        data.writeStrongBinder(IInterface::asBinder(surface));
+#endif
         data.writeInt32(width);
         data.writeInt32(height);
         data.writeInt32(flags);
         data.writeInt32(session);
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+        remote()->transact(ON_DISPLAY_CONNECTED_SURFACE, data, &reply, IBinder::FLAG_ONEWAY);
+#else
         remote()->transact(ON_DISPLAY_CONNECTED, data, &reply, IBinder::FLAG_ONEWAY);
+#endif
     }
 
     void onDisplayDisconnected()
@@ -82,7 +93,20 @@ status_t BnRemoteDisplayClient::onTransact(
             uint32_t height = data.readInt32();
             uint32_t flags = data.readInt32();
             uint32_t session = data.readInt32();
-            onDisplayConnected(surfaceTexture, width, height, flags, session);
+            onDisplayConnected(mediaflagtools::igbpToSurfaceType(surfaceTexture),
+                               width, height, flags, session);
+            return NO_ERROR;
+        }
+        case ON_DISPLAY_CONNECTED_SURFACE: {
+            CHECK_INTERFACE(IRemoteDisplayClient, data, reply);
+            view::Surface viewSurface;
+            data.readParcelable(&viewSurface);
+            uint32_t width = data.readInt32();
+            uint32_t height = data.readInt32();
+            uint32_t flags = data.readInt32();
+            uint32_t session = data.readInt32();
+            onDisplayConnected(mediaflagtools::surfaceToSurfaceType(viewSurface.toSurface()),
+                               width, height, flags, session);
             return NO_ERROR;
         }
         case ON_DISPLAY_DISCONNECTED: {
