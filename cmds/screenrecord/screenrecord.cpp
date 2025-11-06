@@ -202,7 +202,7 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
     format->setInt32(KEY_COLOR_FORMAT, OMX_COLOR_FormatAndroidOpaque);
     format->setInt32(KEY_BIT_RATE, gBitRate);
     format->setFloat(KEY_FRAME_RATE, displayFps);
-    format->setInt32(KEY_I_FRAME_INTERVAL, 10);
+    format->setInt32(KEY_I_FRAME_INTERVAL, 2);
     format->setInt32(KEY_MAX_B_FRAMES, gBframes);
     if (gBframes > 0) {
         format->setInt32(KEY_PROFILE, AVCProfileMain);
