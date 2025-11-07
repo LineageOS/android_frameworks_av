@@ -156,21 +156,22 @@ void OpRecordAudioMonitor::checkOp(bool updateUidStates) {
 
     const auto check = [&](int32_t op) -> bool {
         return std::all_of(cbegin(mAttributionSource), cend(), [&](const auto& x) {
-                    return mAppOpsManager.checkOp(op, x.uid,
-                                                  VALUE_OR_FATAL(aidl2legacy_string_view_String16(
-                                                          x.packageName.value_or("")))) ==
-                           AppOpsManager::MODE_ALLOWED;
-                });
+            return mAppOpsManager.checkOperationForDevice(
+                           op, x.uid,
+                           VALUE_OR_FATAL(
+                                   aidl2legacy_string_view_String16(x.packageName.value_or(""))),
+                           VALUE_OR_FATAL(aidl2legacy_optional_string_view_optional_String16(
+                                   x.attributionTag)),
+                           mVirtualDeviceId) == AppOpsManager::MODE_ALLOWED;
+        });
     };
     bool hasIt = check(mAppOp);
     if (mAppOp != AppOpsManager::OP_RECORD_AUDIO && mShouldMonitorRecord) {
         hasIt = hasIt && check(AppOpsManager::OP_RECORD_AUDIO);
     }
+    // temporary unused suppression for rebasing
+    (void) mAttr;
 
-    if (audiopolicy_flags::record_audio_device_aware_permission()) {
-        const bool canRecord = recordingAllowed(mAttributionSource, mVirtualDeviceId, mAttr.source);
-        hasIt = hasIt && canRecord;
-    }
     // verbose logging only log when appOp changed
     ALOGI_IF(hasIt != mHasOp.load(),
             "App op %d missing, %ssilencing record %s",
