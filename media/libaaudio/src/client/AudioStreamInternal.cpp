@@ -487,6 +487,14 @@ aaudio_result_t AudioStreamInternal::requestStart_l(StartType startType) {
 
     // Clear any stale timestamps from the previous run.
     drainTimestampsFromService();
+    if (getSharingMode() == AAUDIO_SHARING_MODE_SHARED) {
+        // For shared streams, the shared buffer is only allocated once, it doesn't affect by
+        // entering standby mode. In that case, it is safe to prepare buffer for start here.
+        // For shared streams, it is important to call `prepareBuffersForStart_l` before calling
+        // startStream to service to avoid service side wrongly assume client starts flowing
+        // before client actually feeding data.
+        prepareBuffersForStart_l(startType);
+    }
 
     aaudio_result_t result = mServiceInterface.startStream(mServiceStreamHandleInfo);
     if (result == AAUDIO_ERROR_STANDBY) {
@@ -503,7 +511,10 @@ aaudio_result_t AudioStreamInternal::requestStart_l(StartType startType) {
     }
 
     if (result == AAUDIO_OK) {
-        prepareBuffersForStart_l(startType);
+        if (getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+            // Shared streams has been handled before calling the service.
+            prepareBuffersForStart_l(startType);
+        }
         if (startType != RESUME_WHILE_DRAINING) {
             startTime = AudioClock::getNanoseconds();
             mClockModel.start(startTime);
