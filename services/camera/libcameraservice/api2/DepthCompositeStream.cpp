@@ -23,6 +23,7 @@
 #include <camera/StringUtils.h>
 
 #include <com_android_graphics_libgui_flags.h>
+#include <com_android_internal_camera_flags.h>
 #include <gui/Surface.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
@@ -32,6 +33,8 @@
 #include "utils/SessionConfigurationUtils.h"
 
 #include "DepthCompositeStream.h"
+
+namespace flags = com::android::internal::camera::flags;
 
 namespace android {
 namespace camera3 {
@@ -528,6 +531,15 @@ bool DepthCompositeStream::isDepthCompositeStreamInfo(const OutputStreamInfo& st
     return false;
 }
 
+bool DepthCompositeStream::isDepthCompositeStreamOutput(const OutputConfiguration& output) {
+    if ((output.getDataspace() == static_cast<android_dataspace_t>(HAL_DATASPACE_DYNAMIC_DEPTH)) &&
+            (output.getFormat() == HAL_PIXEL_FORMAT_BLOB)) {
+        return true;
+    }
+
+    return false;
+}
+
 static bool setContains(std::unordered_set<int32_t> containerSet, int32_t value) {
     return containerSet.find(value) != containerSet.end();
 }
@@ -587,14 +599,13 @@ status_t DepthCompositeStream::checkAndGetMatchingDepthSize(size_t width, size_t
     return OK;
 }
 
-
-status_t DepthCompositeStream::createInternalStreams(const std::vector<SurfaceHolder>& consumers,
-        bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
-        camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
-        const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        std::vector<int> *surfaceIds,
-        int /*streamSetId*/, bool /*isShared*/, int32_t /*colorSpace*/,
-        int64_t /*dynamicProfile*/, int64_t /*streamUseCase*/, bool useReadoutTimestamp) {
+status_t DepthCompositeStream::createInternalStreams(
+        const std::vector<SurfaceHolder>& consumers, bool hasDeferredConsumer, uint32_t width,
+        uint32_t height, int format, camera_stream_rotation_t rotation, int* id,
+        const std::string& physicalCameraId,
+        const std::unordered_set<int32_t>& sensorPixelModesUsed, std::vector<int>* surfaceIds,
+        int /*streamSetId*/, bool /*isShared*/, int32_t /*colorSpace*/, int64_t /*dynamicProfile*/,
+        int64_t /*streamUseCase*/, bool useReadoutTimestamp, int /*dataspace*/) {
     if (mSupportedDepthSizes.empty()) {
         ALOGE("%s: This camera device doesn't support any depth map streams!", __FUNCTION__);
         return INVALID_OPERATION;
@@ -634,7 +645,9 @@ status_t DepthCompositeStream::createInternalStreams(const std::vector<SurfaceHo
     if (ret == OK) {
         mBlobStreamId = *id;
         mBlobSurfaceId = (*surfaceIds)[0];
-        mOutputSurface = consumers[0].mSurface;
+        if (!hasDeferredConsumer) {
+            mOutputSurface = consumers[0].mSurface;
+        }
     } else {
         return ret;
     }
@@ -679,6 +692,38 @@ status_t DepthCompositeStream::createInternalStreams(const std::vector<SurfaceHo
     return ret;
 }
 
+status_t DepthCompositeStream::setConsumerSurfaces(int streamId,
+                                                   const std::vector<SurfaceHolder>& consumers,
+                                                   std::vector<int>* surfaceIds /*out*/) {
+    if ((surfaceIds == nullptr) || consumers.empty()) {
+        return BAD_VALUE;
+    }
+
+    if (consumers.size() > 1) {
+        ALOGE("%s: Multiple output surfaces are not supported!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (streamId != getStreamId()) {
+        ALOGE("%s: Unexpected streamId: %d vs. expected: %d", __FUNCTION__, streamId,
+              getStreamId());
+        return BAD_VALUE;
+    }
+
+    if (mOutputSurface.get() != nullptr) {
+        ALOGE("%s: Composite stream is not deferred!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    mOutputSurface = consumers[0].mSurface;
+    auto ret = configureStream();
+    if (ret == OK) {
+        surfaceIds->push_back(mBlobSurfaceId);
+    }
+
+    return OK;
+}
+
 status_t DepthCompositeStream::configureStream() {
     if (isRunning()) {
         // Processing thread is already running, nothing more to do.
@@ -686,8 +731,12 @@ status_t DepthCompositeStream::configureStream() {
     }
 
     if (mOutputSurface.get() == nullptr) {
-        ALOGE("%s: No valid output surface set!", __FUNCTION__);
-        return NO_INIT;
+        if (flags::seamless_transitions()) {
+            return OK;
+        } else {
+            ALOGE("%s: No valid output surface set!", __FUNCTION__);
+            return NO_INIT;
+        }
     }
 
     auto res = mOutputSurface->connect(NATIVE_WINDOW_API_CAMERA, mStreamSurfaceListener);

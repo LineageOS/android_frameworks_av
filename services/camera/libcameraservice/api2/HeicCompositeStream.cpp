@@ -132,6 +132,16 @@ bool HeicCompositeStream::isHeicCompositeStreamInfo(const OutputStreamInfo& stre
             (streamInfo.format == HAL_PIXEL_FORMAT_BLOB));
 }
 
+bool HeicCompositeStream::isHeicCompositeStreamOutput(const OutputConfiguration& output,
+                                                    bool isCompositeHeicDisabled,
+                                                    bool isCompositeHeicUltraHDRDisabled) {
+    return (((output.getDataspace() == static_cast<android_dataspace_t>(HAL_DATASPACE_HEIF) &&
+              !isCompositeHeicDisabled) ||
+             (output.getDataspace() == static_cast<android_dataspace_t>(kUltraHDRDataSpace) &&
+              !isCompositeHeicUltraHDRDisabled)) &&
+            (output.getFormat() == HAL_PIXEL_FORMAT_BLOB));
+}
+
 bool HeicCompositeStream::isHeicCompositeStream(const sp<Surface>& surface,
                                                 bool isCompositeHeicDisabled,
                                                 bool isCompositeHeicUltraHDRDisabled) {
@@ -159,28 +169,19 @@ bool HeicCompositeStream::isHeicCompositeStream(const sp<Surface>& surface,
               !isCompositeHeicUltraHDRDisabled)));
 }
 
-status_t HeicCompositeStream::createInternalStreams(const std::vector<SurfaceHolder>& consumers,
-        bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
-        camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
-        const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        std::vector<int> *surfaceIds,
-        int /*streamSetId*/, bool /*isShared*/, int32_t colorSpace,
-        int64_t /*dynamicProfile*/, int64_t /*streamUseCase*/, bool useReadoutTimestamp) {
-
+status_t HeicCompositeStream::createInternalStreams(
+        const std::vector<SurfaceHolder>& consumers, bool hasDeferredConsumer, uint32_t width,
+        uint32_t height, int format, camera_stream_rotation_t rotation, int* id,
+        const std::string& physicalCameraId,
+        const std::unordered_set<int32_t>& sensorPixelModesUsed, std::vector<int>* surfaceIds,
+        int /*streamSetId*/, bool /*isShared*/, int32_t colorSpace, int64_t /*dynamicProfile*/,
+        int64_t /*streamUseCase*/, bool useReadoutTimestamp, int dataspace) {
     sp<CameraDeviceBase> device = mDevice.promote();
     if (!device.get()) {
         ALOGE("%s: Invalid camera device!", __FUNCTION__);
         return NO_INIT;
     }
 
-    ANativeWindow* anw = consumers[0].mSurface.get();
-    int dataspace;
-    status_t res;
-    if ((res = anw->query(anw, NATIVE_WINDOW_DEFAULT_DATASPACE, &dataspace)) != OK) {
-        ALOGE("%s: Failed to query Surface dataspace: %s (%d)", __FUNCTION__, strerror(-res),
-                res);
-        return res;
-    }
     if ((dataspace == static_cast<int>(kUltraHDRDataSpace)) && flags::camera_heif_gainmap()) {
         mHDRGainmapEnabled = true;
         mInternalDataSpace = static_cast<android_dataspace_t>(HAL_DATASPACE_BT2020_HLG);
@@ -188,7 +189,7 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<SurfaceHol
         mAppSegmentSupported = false;
     }
 
-    res = initializeCodec(width, height, device);
+    status_t res = initializeCodec(width, height, device);
     if (res != OK) {
         ALOGE("%s: Failed to initialize HEIC/HEVC codec: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
@@ -283,7 +284,9 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<SurfaceHol
         return res;
     }
 
-    mOutputSurface = consumers[0].mSurface;
+    if (!hasDeferredConsumer) {
+        mOutputSurface = consumers[0].mSurface;
+    }
     res = registerCompositeStreamListener(mMainImageStreamId);
     if (res != OK) {
         ALOGE("%s: Failed to register HAL main image stream: %s (%d)", __FUNCTION__,
@@ -654,6 +657,38 @@ void HeicCompositeStream::onHeicCodecError() {
     mErrorState = true;
 }
 
+status_t HeicCompositeStream::setConsumerSurfaces(int streamId,
+                                                  const std::vector<SurfaceHolder>& consumers,
+                                                  std::vector<int>* surfaceIds /*out*/) {
+    if ((surfaceIds == nullptr) || consumers.empty()) {
+        return BAD_VALUE;
+    }
+
+    if (consumers.size() > 1) {
+        ALOGE("%s: Multiple output surfaces are not supported!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (streamId != getStreamId()) {
+        ALOGE("%s: Unexpected streamId: %d vs. expected: %d", __FUNCTION__, streamId,
+              getStreamId());
+        return BAD_VALUE;
+    }
+
+    if (mOutputSurface.get() != nullptr) {
+        ALOGE("%s: Composite stream is not deferred!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    mOutputSurface = consumers[0].mSurface;
+    auto ret = configureStream();
+    if (ret == OK) {
+        surfaceIds->push_back(mMainImageSurfaceId);
+    }
+
+    return OK;
+}
+
 status_t HeicCompositeStream::configureStream() {
     if (isRunning()) {
         // Processing thread is already running, nothing more to do.
@@ -661,8 +696,12 @@ status_t HeicCompositeStream::configureStream() {
     }
 
     if (mOutputSurface.get() == nullptr) {
-        ALOGE("%s: No valid output surface set!", __FUNCTION__);
-        return NO_INIT;
+        if (flags::seamless_transitions()) {
+            return OK;
+        } else {
+            ALOGE("%s: No valid output surface set!", __FUNCTION__);
+            return NO_INIT;
+        }
     }
 
     auto res = mOutputSurface->connect(NATIVE_WINDOW_API_CAMERA, mStreamSurfaceListener);

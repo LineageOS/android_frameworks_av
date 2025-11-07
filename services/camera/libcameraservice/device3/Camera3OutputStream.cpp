@@ -164,12 +164,14 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mState = STATE_ERROR;
     }
 
-    // Validation check for the consumer usage flag.
-    if ((consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) == 0 &&
-            (consumerUsage & GraphicBuffer::USAGE_HW_COMPOSER) == 0) {
-        ALOGE("%s: Deferred consumer usage flag is illegal %" PRIu64 "!",
-              __FUNCTION__, consumerUsage);
-        mState = STATE_ERROR;
+    if (!flags::seamless_transitions()) {
+        // Validation check for the consumer usage flag.
+        if ((consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) == 0 &&
+                (consumerUsage & GraphicBuffer::USAGE_HW_COMPOSER) == 0) {
+            ALOGE("%s: Deferred consumer usage flag is illegal %" PRIu64 "!",
+                  __FUNCTION__, consumerUsage);
+            mState = STATE_ERROR;
+        }
     }
 
     bool needsReleaseNotify = setId > CAMERA3_STREAM_SET_ID_INVALID;

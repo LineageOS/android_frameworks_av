@@ -50,13 +50,22 @@ public:
     static bool isHeicCompositeStreamInfo(const OutputStreamInfo& streamInfo,
                                           bool isCompositeHeicDisabled,
                                           bool isCompositeHeicUltraHDRDisabled);
+    static bool isHeicCompositeStreamOutput(const OutputConfiguration& output,
+                                      bool isCompositeHeicDisabled,
+                                      bool isCompositeHeicUltraHDRDisabled);
 
     status_t createInternalStreams(const std::vector<SurfaceHolder>& consumers,
-            bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            std::vector<int> *surfaceIds, int streamSetId, bool isShared, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) override;
+                                   bool hasDeferredConsumer, uint32_t width, uint32_t height,
+                                   int format, camera_stream_rotation_t rotation, int* id,
+                                   const std::string& physicalCameraId,
+                                   const std::unordered_set<int32_t>& sensorPixelModesUsed,
+                                   std::vector<int>* surfaceIds, int streamSetId, bool isShared,
+                                   int32_t colorSpace, int64_t dynamicProfile,
+                                   int64_t streamUseCase, bool useReadoutTimestamp,
+                                   int dataspace) override;
+
+    status_t setConsumerSurfaces(int streamId, const std::vector<SurfaceHolder>& consumers,
+                                 std::vector<int>* surfaceIds /*out*/) override;
 
     status_t deleteInternalStreams() override;
 

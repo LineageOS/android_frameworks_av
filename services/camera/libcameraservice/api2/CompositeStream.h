@@ -47,27 +47,34 @@ public:
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds,
             int streamSetId, bool isShared, int multiResMode, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp);
-
+            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp, int dataspace);
     status_t deleteStream();
 
     // Switch to offline mode and release any online resources.
     void switchToOffline();
 
     // Create and register all internal camera streams.
-    virtual status_t createInternalStreams(const std::vector<SurfaceHolder>& consumers,
-            bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            std::vector<int> *surfaceIds,
-            int streamSetId, bool isShared, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) = 0;
+    virtual status_t createInternalStreams(
+            const std::vector<SurfaceHolder>& consumers, bool hasDeferredConsumer, uint32_t width,
+            uint32_t height, int format, camera_stream_rotation_t rotation, int* id,
+            const std::string& physicalCameraId,
+            const std::unordered_set<int32_t>& sensorPixelModesUsed, std::vector<int>* surfaceIds,
+            int streamSetId, bool isShared, int32_t colorSpace, int64_t dynamicProfile,
+            int64_t streamUseCase, bool useReadoutTimestamp, int dataspace) = 0;
 
     // Release all internal streams and corresponding resources.
     virtual status_t deleteInternalStreams() = 0;
 
     // Stream configuration completed.
     virtual status_t configureStream() = 0;
+
+    // Finalize deferred composite stream
+    virtual status_t setConsumerSurfaces(int /*streamId*/,
+                                         const std::vector<SurfaceHolder>& /*consumers*/,
+                                         std::vector<int>* /*surfaceIds out*/) {
+        // subclasses should implement this method
+        return INVALID_OPERATION;
+    }
 
     // Insert the internal composite stream id in the user capture request.
     virtual status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap,

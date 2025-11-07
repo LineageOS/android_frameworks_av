@@ -25,6 +25,7 @@
 #include "utils/SessionConfigurationUtils.h"
 
 #include <com_android_graphics_libgui_flags.h>
+#include <com_android_internal_camera_flags.h>
 #include <gui/CpuConsumer.h>
 #include <gui/Surface.h>
 #include <hardware/gralloc.h>
@@ -39,6 +40,8 @@
 
 namespace android {
 namespace camera3 {
+
+namespace flags = com::android::internal::camera::flags;
 
 using aidl::android::hardware::camera::device::CameraBlob;
 using aidl::android::hardware::camera::device::CameraBlobId;
@@ -532,6 +535,15 @@ bool JpegRCompositeStream::isJpegRCompositeStreamInfo(const OutputStreamInfo& st
     return false;
 }
 
+bool JpegRCompositeStream::isJpegRCompositeStreamOutput(const OutputConfiguration& output) {
+    if ((output.getFormat() == HAL_PIXEL_FORMAT_BLOB) &&
+            (output.getDataspace() == static_cast<int>(kJpegRDataSpace))) {
+        return true;
+    }
+
+    return false;
+}
+
 void JpegRCompositeStream::deriveDynamicRangeAndDataspace(int64_t dynamicProfile,
         int64_t* /*out*/dynamicRange, int64_t* /*out*/dataSpace) {
     if ((dynamicRange == nullptr) || (dataSpace == nullptr)) {
@@ -558,13 +570,13 @@ void JpegRCompositeStream::deriveDynamicRangeAndDataspace(int64_t dynamicProfile
 
 }
 
-status_t JpegRCompositeStream::createInternalStreams(const std::vector<SurfaceHolder>& consumers,
-        bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
-        camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
-        const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        std::vector<int> *surfaceIds,
-        int /*streamSetId*/, bool /*isShared*/, int32_t colorSpace,
-        int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) {
+status_t JpegRCompositeStream::createInternalStreams(
+        const std::vector<SurfaceHolder>& consumers, bool hasDeferredConsumer, uint32_t width,
+        uint32_t height, int format, camera_stream_rotation_t rotation, int* id,
+        const std::string& physicalCameraId,
+        const std::unordered_set<int32_t>& sensorPixelModesUsed, std::vector<int>* surfaceIds,
+        int /*streamSetId*/, bool /*isShared*/, int32_t colorSpace, int64_t dynamicProfile,
+        int64_t streamUseCase, bool useReadoutTimestamp, int /*dataspace*/) {
     sp<CameraDeviceBase> device = mDevice.promote();
     if (!device.get()) {
         ALOGE("%s: Invalid camera device!", __FUNCTION__);
@@ -592,7 +604,9 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<SurfaceHo
     if (ret == OK) {
         mP010StreamId = *id;
         mP010SurfaceId = (*surfaceIds)[0];
-        mOutputSurface = consumers[0].mSurface;
+        if (!hasDeferredConsumer) {
+            mOutputSurface = consumers[0].mSurface;
+        }
     } else {
         return ret;
     }
@@ -643,6 +657,38 @@ status_t JpegRCompositeStream::createInternalStreams(const std::vector<SurfaceHo
     return ret;
 }
 
+status_t JpegRCompositeStream::setConsumerSurfaces(int streamId,
+                                                   const std::vector<SurfaceHolder>& consumers,
+                                                   std::vector<int>* surfaceIds /*out*/) {
+    if ((surfaceIds == nullptr) || consumers.empty()) {
+        return BAD_VALUE;
+    }
+
+    if (consumers.size() > 1) {
+        ALOGE("%s: Multiple output surfaces are not supported!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (streamId != getStreamId()) {
+        ALOGE("%s: Unexpected streamId: %d vs. expected: %d", __FUNCTION__, streamId,
+              getStreamId());
+        return BAD_VALUE;
+    }
+
+    if (mOutputSurface.get() != nullptr) {
+        ALOGE("%s: Composite stream is not deferred!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    mOutputSurface = consumers[0].mSurface;
+    auto ret = configureStream();
+    if (ret == OK) {
+        surfaceIds->push_back(mP010SurfaceId);
+    }
+
+    return OK;
+}
+
 status_t JpegRCompositeStream::configureStream() {
     if (isRunning()) {
         // Processing thread is already running, nothing more to do.
@@ -650,8 +696,12 @@ status_t JpegRCompositeStream::configureStream() {
     }
 
     if (mOutputSurface.get() == nullptr) {
-        ALOGE("%s: No valid output surface set!", __FUNCTION__);
-        return NO_INIT;
+        if (flags::seamless_transitions()) {
+            return OK;
+        } else {
+            ALOGE("%s: No valid output surface set!", __FUNCTION__);
+            return NO_INIT;
+        }
     }
 
     auto res = mOutputSurface->connect(NATIVE_WINDOW_API_CAMERA, mStreamSurfaceListener);
