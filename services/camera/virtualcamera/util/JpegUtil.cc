@@ -300,6 +300,8 @@ int roundTo2DCTMultiple(const int n) {
 
 }  // namespace
 
+const int32_t kMaxJpegSize = 13 * 1024 * 1024 /* 13MiB */;
+
 std::optional<size_t> compressJpeg(const int width, const int height,
                                    const int quality,
                                    std::shared_ptr<AHardwareBuffer> inBuffer,

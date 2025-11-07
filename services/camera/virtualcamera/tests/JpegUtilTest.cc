@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// #define LOG_NDEBUG 0
+#define LOG_TAG "JpegUtilTest"
 
 #include <sys/types.h>
-
-#include "system/graphics.h"
-#define LOG_TAG "JpegUtilTest"
 
 #include <array>
 #include <cstdint>
@@ -27,6 +26,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "jpeglib.h"
+#include "system/graphics.h"
 #include "util/JpegUtil.h"
 #include "util/Util.h"
 #include "utils/Errors.h"

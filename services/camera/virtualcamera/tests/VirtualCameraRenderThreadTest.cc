@@ -20,6 +20,7 @@
 
 #include "VirtualCameraRenderThread.h"
 #include "VirtualCameraSessionContext.h"
+#include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/hardware/camera/common/CameraDeviceStatus.h"
 #include "aidl/android/hardware/camera/common/TorchModeStatus.h"
 #include "aidl/android/hardware/camera/device/BnCameraDeviceCallback.h"
@@ -40,6 +41,7 @@ namespace companion {
 namespace virtualcamera {
 namespace {
 
+using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::hardware::camera::common::CameraDeviceStatus;
 using ::aidl::android::hardware::camera::common::TorchModeStatus;
 using ::aidl::android::hardware::camera::device::BnCameraDeviceCallback;
@@ -61,6 +63,7 @@ using ::testing::Property;
 using ::testing::Return;
 using ::testing::SizeIs;
 
+constexpr Format kImageFormat = Format::YUV_420_888;
 constexpr int kInputWidth = 640;
 constexpr int kInputHeight = 480;
 const Resolution kInputResolution(kInputWidth, kInputHeight);
@@ -104,7 +107,7 @@ class VirtualCameraRenderThreadTest : public ::testing::Test {
     mMockCameraDeviceCallback =
         ndk::SharedRefBase::make<MockCameraDeviceCallback>();
     mRenderThread = std::make_unique<VirtualCameraRenderThread>(
-        *mSessionContext, kInputResolution,
+        *mSessionContext, kImageFormat, kInputResolution,
         /*reportedSensorSize*/ kInputResolution, mMockCameraDeviceCallback);
   }
 

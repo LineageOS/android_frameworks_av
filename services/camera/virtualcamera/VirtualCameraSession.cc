@@ -223,9 +223,82 @@ std::optional<Resolution> resolutionFromSurface(const sp<Surface> surface) {
   return res;
 }
 
+// Search stream configurations from Camera2 and Virtual Camera Owner for a
+// matching pair that enables a direct blob transfer.
+//
+// Return configuration if a direct blob transfer is possible. Otherwise return
+// nullopt if no direct blob transfer is possible
+std::optional<SupportedStreamConfiguration> getExactMatchingBlobStreamConfiguration(
+    const std::vector<Stream>& requestedStreams,
+    const std::vector<SupportedStreamConfiguration>& supportedInputConfigs) {
+  if (requestedStreams.empty()) {
+    ALOGE("%s: requested streams is empty!", __func__);
+    return std::nullopt;
+  }
+  if (supportedInputConfigs.empty()) {
+    ALOGE("%s: supported input configs is empty!", __func__);
+    return std::nullopt;
+  }
+  if (!flags::virtual_camera_direct_blob_transfer()) {
+    return std::nullopt;
+  }
+
+  // Multiple output streams are only possible with direct blob transfer if the
+  // ImageFormat and resolutions are the same
+  const Stream& firstStream = requestedStreams.front();
+  if (!isBlobStreamConfig(firstStream)) {
+    return std::nullopt;
+  }
+
+  bool heterogeneousRequestedStreams = std::any_of(
+      requestedStreams.begin() + 1, requestedStreams.end(),
+      [&firstStream](const Stream& s) {
+        return !areMatchingBlobTypes(firstStream, s) ||
+               firstStream.width != s.width || firstStream.height != s.height;
+      });
+
+  if (heterogeneousRequestedStreams) {
+    return std::nullopt;
+  }
+
+  auto availableBlobInputStreamConfig = std::find_if(
+      supportedInputConfigs.begin(), supportedInputConfigs.end(),
+      [&firstStream](const SupportedStreamConfiguration& c) {
+        return areMatchingBlobTypes(firstStream, c) &&
+               firstStream.width == c.width && firstStream.height == c.height;
+      });
+
+  if (availableBlobInputStreamConfig == supportedInputConfigs.end()) {
+    return std::nullopt;
+  }
+
+  return *availableBlobInputStreamConfig;
+}
+
 std::optional<SupportedStreamConfiguration> pickInputConfigurationForStreams(
     const std::vector<Stream>& requestedStreams,
     const std::vector<SupportedStreamConfiguration>& supportedInputConfigs) {
+  if (requestedStreams.empty()) {
+    ALOGE("%s: requested streams is empty!", __func__);
+    return std::nullopt;
+  }
+  if (supportedInputConfigs.empty()) {
+    ALOGE("%s: supported input configs is empty!", __func__);
+    return std::nullopt;
+  }
+
+  std::optional<SupportedStreamConfiguration> bestConfig =
+      getExactMatchingBlobStreamConfiguration(requestedStreams,
+                                              supportedInputConfigs);
+
+  if (bestConfig.has_value()) {
+    ALOGI(
+        "%s: direct blob transfer available for requested stream config. "
+        "Attempting to set up direct transfer...",
+        __func__);
+    return bestConfig;
+  }
+
   Stream maxResolutionStream = getHighestResolutionStream(requestedStreams);
   Resolution maxResolution = resolutionFromStream(maxResolutionStream);
 
@@ -244,7 +317,6 @@ std::optional<SupportedStreamConfiguration> pickInputConfigurationForStreams(
     return pixelCountDiffA < pixelCountDiffB;
   };
 
-  std::optional<SupportedStreamConfiguration> bestConfig;
   for (const SupportedStreamConfiguration& inputConfig : supportedInputConfigs) {
     Resolution inputConfigResolution = resolutionFromInputConfig(inputConfig);
     if (inputConfigResolution < maxResolution ||
@@ -399,12 +471,24 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
           resolutionFromSurface(mRenderThread->getInputSurface());
       if (currentInputResolution.has_value() &&
           *currentInputResolution == resolutionFromInputConfig(*inputConfig)) {
-        ALOGI(
-            "%s: Newly configured set of streams matches existing client "
-            "surface (%dx%d)",
-            __func__, currentInputResolution->width,
-            currentInputResolution->height);
-        return ndk::ScopedAStatus::ok();
+        // BLOB types must match (if applicable), otherwise the existing surface
+        // cannot be reused and must be regenerated
+        if ((isBlobFormat(mRenderThread->getImageFormat()) ||
+             isBlobFormat(inputConfig->imageFormat)) &&
+            mRenderThread->getImageFormat() != inputConfig->imageFormat) {
+          ALOGI(
+              "%s: render thread currently configured for BLOB (format=0x%x) "
+              "but input configuration has format=0x%x",
+              __func__, mRenderThread->getImageFormat(),
+              inputConfig->imageFormat);
+        } else {
+          ALOGI(
+              "%s: Newly configured set of streams matches existing client "
+              "surface (%dx%d)",
+              __func__, currentInputResolution->width,
+              currentInputResolution->height);
+          return ndk::ScopedAStatus::ok();
+        }
       }
 
       if (mVirtualCameraClientCallback != nullptr) {
@@ -423,9 +507,15 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
     }
 
     mRenderThread = std::make_unique<VirtualCameraRenderThread>(
-        mSessionContext, resolutionFromInputConfig(*inputConfig),
+        mSessionContext, inputConfig->imageFormat,
+        resolutionFromInputConfig(*inputConfig),
         virtualCamera->getMaxInputResolution(), mCameraDeviceCallback);
-    mRenderThread->start();
+
+    if (!mRenderThread->start()) {
+      ALOGE("%s: failed to start render thread", __func__);
+      return cameraStatus(Status::ILLEGAL_ARGUMENT);
+    }
+
     inputSurface = mRenderThread->getInputSurface();
     inputStreamId = mCurrentInputStreamId =
         flags::virtual_camera_stable_stream_id()

@@ -28,4 +28,6 @@ enum Format {
     UNKNOWN = 0,
     RGBA_8888 = 1,
     YUV_420_888 = 0x23,
+    JPEG = 0x100,
+    HEIC = 0x48454946,
 }

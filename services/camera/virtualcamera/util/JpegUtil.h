@@ -17,6 +17,7 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_JPEGUTIL_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_JPEGUTIL_H
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -26,6 +27,8 @@
 namespace android {
 namespace companion {
 namespace virtualcamera {
+
+extern const int32_t kMaxJpegSize;
 
 // Jpeg-compress image into the output buffer.
 // * width - width of the image, can be less than width of inBuffer.

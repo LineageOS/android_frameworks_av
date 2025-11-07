@@ -33,6 +33,7 @@
 #include "VirtualCameraCaptureResult.h"
 #include "VirtualCameraDevice.h"
 #include "VirtualCameraImageHandler.h"
+#include "VirtualCameraImagePassthroughHandler.h"
 #include "VirtualCameraImageTransformingHandler.h"
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/hardware/camera/common/Status.h"
@@ -56,6 +57,7 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
+using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BufferStatus;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
@@ -180,10 +182,11 @@ double nanosToFps(std::chrono::nanoseconds frameDuration) {
 }  // namespace
 
 VirtualCameraRenderThread::VirtualCameraRenderThread(
-    VirtualCameraSessionContext& sessionContext,
+    VirtualCameraSessionContext& sessionContext, Format imageFormat,
     const Resolution inputSurfaceSize, const Resolution reportedSensorSize,
     std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback)
     : mCameraDeviceCallback(cameraDeviceCallback),
+      mImageFormat{imageFormat},
       mInputSurfaceSize(inputSurfaceSize),
       mReportedSensorSize(reportedSensorSize),
       mSessionContext(sessionContext),
@@ -251,8 +254,14 @@ void VirtualCameraRenderThread::flush() {
   }
 }
 
-void VirtualCameraRenderThread::start() {
+bool VirtualCameraRenderThread::start() {
+  if (!initializeImageHandler()) {
+    ALOGE("%s: Failed to initialize frame consumer", __func__);
+    return false;
+  }
+
   mThread = std::thread(&VirtualCameraRenderThread::threadLoop, this);
+  return true;
 }
 
 void VirtualCameraRenderThread::stop() {
@@ -265,6 +274,10 @@ void VirtualCameraRenderThread::stop() {
 
 sp<Surface> VirtualCameraRenderThread::getInputSurface() {
   return mInputSurfaceFuture.get();
+}
+
+Format VirtualCameraRenderThread::getImageFormat() const {
+  return mImageFormat;
 }
 
 RenderThreadTask VirtualCameraRenderThread::dequeueTask() {
@@ -298,11 +311,6 @@ RenderThreadTask VirtualCameraRenderThread::dequeueTask() {
 
 void VirtualCameraRenderThread::threadLoop() {
   ALOGV("Render thread starting");
-
-  mImageHandler = std::make_unique<VirtualCameraImageTransformingHandler>(
-      mSessionContext, mInputSurfaceSize, [this] { requestTextureUpdate(); });
-
-  mInputSurfacePromise.set_value(mImageHandler->getInputSurface());
 
   while (RenderThreadTask task = dequeueTask()) {
     std::visit(
@@ -644,6 +652,30 @@ void VirtualCameraRenderThread::flushCaptureRequest(
     ALOGE("%s: processCaptureResult call failed: %s", __func__,
           status.getDescription().c_str());
   }
+}
+
+bool VirtualCameraRenderThread::initializeImageHandler() {
+  // TODO(b/458613942): Currently a BLOB input can only be used for direct
+  // passthrough. Add the ability to decode the BLOB format, which will enable
+  // the ability to satisfy bitmap stream requests as well from the same input.
+  if (isBlobFormat(mImageFormat)) {
+    auto imagePassthroughHandler = VirtualCameraImagePassthroughHandler::create(
+        mSessionContext, mImageFormat, [this] { requestTextureUpdate(); });
+
+    if (!imagePassthroughHandler) {
+      ALOGE("%s: failed to initialize VirtualCameraImagePassthroughHandler",
+            __func__);
+      return false;
+    }
+    mImageHandler = std::move(imagePassthroughHandler);
+
+  } else {
+    mImageHandler = std::make_unique<VirtualCameraImageTransformingHandler>(
+        mSessionContext, mInputSurfaceSize, [this] { requestTextureUpdate(); });
+  }
+
+  mInputSurfacePromise.set_value(mImageHandler->getInputSurface());
+  return true;
 }
 
 }  // namespace virtualcamera

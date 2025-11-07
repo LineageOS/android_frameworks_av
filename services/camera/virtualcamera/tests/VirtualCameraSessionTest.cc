@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <android_companion_virtualdevice_flags.h>
 #include <flag_macros.h>
 
@@ -95,6 +96,18 @@ Stream createStream(int streamId, int width, int height, PixelFormat format) {
   s.width = width;
   s.height = height;
   s.format = format;
+  return s;
+}
+
+Stream createHeicStream(int streamId, int width, int height) {
+  Stream s = createStream(streamId, width, height, PixelFormat::BLOB);
+  s.dataSpace = ::aidl::android::hardware::graphics::common::Dataspace::HEIF;
+  return s;
+}
+
+Stream createJpegStream(int streamId, int width, int height) {
+  Stream s = createStream(streamId, width, height, PixelFormat::BLOB);
+  s.dataSpace = ::aidl::android::hardware::graphics::common::Dataspace::JFIF;
   return s;
 }
 
@@ -472,6 +485,376 @@ TEST_F(VirtualCameraSessionInputChoiceTest,
   EXPECT_CALL(*mMockVirtualCameraClientCallback,
               onStreamConfigured(kStreamId, _, kQvgaWidth, kQvgaHeight,
                                  Format::RGBA_8888));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, heicBasicSingleInputSelection,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight, Format::HEIC));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraSessionInputChoiceTest,
+                  heicBasicSingleInputSelectionFailWithoutFlagEnabled,
+                  REQUIRES_FLAGS_DISABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, heicMultipleInputSelectionSuccess,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession = createSession(
+      {SupportedStreamConfiguration{.width = kSvgaWidth,
+                                    .height = kSvgaHeight,
+                                    .imageFormat = Format::HEIC,
+                                    .maxFps = kMaxFps},
+       SupportedStreamConfiguration{.width = kVgaWidth,
+                                    .height = kVgaHeight,
+                                    .imageFormat = Format::YUV_420_888,
+                                    .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight, Format::HEIC));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, heicMultipleHeicInputSelectionFailure,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession = createSession(
+      {SupportedStreamConfiguration{.width = kSvgaWidth,
+                                    .height = kSvgaHeight,
+                                    .imageFormat = Format::HEIC,
+                                    .maxFps = kMaxFps},
+       SupportedStreamConfiguration{.width = kVgaWidth,
+                                    .height = kVgaHeight,
+                                    .imageFormat = Format::YUV_420_888,
+                                    .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kVgaWidth, kVgaHeight)};
+
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, heicMultipleHeicInputSelection,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps},
+                     SupportedStreamConfiguration{.width = kVgaWidth,
+                                                  .height = kVgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight, Format::HEIC));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId + 1, kVgaWidth, kVgaHeight)};
+  EXPECT_CALL(*mMockVirtualCameraClientCallback,
+              onStreamConfigured(kStreamId + 1, _, kVgaWidth, kVgaHeight,
+                                 Format::HEIC));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraSessionInputChoiceTest,
+                  heicResolutionMismatchInputSelectionFail,
+                  REQUIRES_FLAGS_ENABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kQvgaWidth, kQvgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kVgaWidth, kVgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, heicFormatMismatchInputSelectionFail,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createJpegStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+
+  streamConfiguration.streams = {createStream(
+      kStreamId, kSvgaWidth, kSvgaHeight, PixelFormat::YCBCR_420_888)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, jpegBasicSingleInputSelection,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::JPEG,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createJpegStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight, Format::JPEG));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraSessionInputChoiceTest,
+                  jpegBasicSingleInputSelectionFailWithoutFlagEnabled,
+                  REQUIRES_FLAGS_DISABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::JPEG,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createJpegStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, jpegMultipleInputSelectionSuccess,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession = createSession(
+      {SupportedStreamConfiguration{.width = kSvgaWidth,
+                                    .height = kSvgaHeight,
+                                    .imageFormat = Format::JPEG,
+                                    .maxFps = kMaxFps},
+       SupportedStreamConfiguration{.width = kVgaWidth,
+                                    .height = kVgaHeight,
+                                    .imageFormat = Format::YUV_420_888,
+                                    .maxFps = kMaxFps}});
+
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createJpegStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight, Format::JPEG));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, jpegMultipleJpegInputSelection,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::JPEG,
+                                                  .maxFps = kMaxFps},
+                     SupportedStreamConfiguration{.width = kVgaWidth,
+                                                  .height = kVgaHeight,
+                                                  .imageFormat = Format::JPEG,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createJpegStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(kStreamId, _, kSvgaWidth, kSvgaHeight, Format::JPEG));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+
+  streamConfiguration.streams = {
+      createJpegStream(kStreamId + 1, kVgaWidth, kVgaHeight)};
+  EXPECT_CALL(*mMockVirtualCameraClientCallback,
+              onStreamConfigured(kStreamId + 1, _, kVgaWidth, kVgaHeight,
+                                 Format::JPEG));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraSessionInputChoiceTest,
+                  jpegResolutionMismatchInputSelectionFail,
+                  REQUIRES_FLAGS_ENABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kQvgaWidth, kQvgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kVgaWidth, kVgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, jpegFormatMismatchInputSelectionFail,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kSvgaWidth,
+                                                  .height = kSvgaHeight,
+                                                  .imageFormat = Format::JPEG,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kSvgaWidth, kSvgaHeight)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+
+  streamConfiguration.streams = {createStream(
+      kStreamId, kSvgaWidth, kSvgaHeight, PixelFormat::YCBCR_420_888)};
+  EXPECT_THAT(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .getServiceSpecificError(),
+      Eq(static_cast<int32_t>(Status::ILLEGAL_ARGUMENT)));
+}
+
+TEST_F_WITH_FLAGS(
+    VirtualCameraSessionInputChoiceTest, blobHeterogeneousInputSelection,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                        virtual_camera_direct_blob_transfer))) {
+  auto virtualCameraSession =
+      createSession({SupportedStreamConfiguration{.width = kVgaWidth,
+                                                  .height = kVgaHeight,
+                                                  .imageFormat = Format::HEIC,
+                                                  .maxFps = kMaxFps},
+                     SupportedStreamConfiguration{.width = kVgaWidth,
+                                                  .height = kVgaHeight,
+                                                  .imageFormat = Format::JPEG,
+                                                  .maxFps = kMaxFps}});
+  std::vector<HalStream> halStreams;
+  StreamConfiguration streamConfiguration;
+  streamConfiguration.streams = {
+      createHeicStream(kStreamId, kVgaWidth, kVgaHeight)};
+  EXPECT_CALL(
+      *mMockVirtualCameraClientCallback,
+      onStreamConfigured(kStreamId, _, kVgaWidth, kVgaHeight, Format::HEIC));
+  EXPECT_TRUE(
+      virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
+          .isOk());
+
+  streamConfiguration.streams = {
+      createJpegStream(kStreamId + 1, kVgaWidth, kVgaHeight)};
+  EXPECT_CALL(*mMockVirtualCameraClientCallback,
+              onStreamConfigured(kStreamId + 1, _, kVgaWidth, kVgaHeight,
+                                 Format::JPEG));
+
+  EXPECT_CALL(*mMockVirtualCameraClientCallback, onStreamClosed(kStreamId));
+
   EXPECT_TRUE(
       virtualCameraSession->configureStreams(streamConfiguration, &halStreams)
           .isOk());
