@@ -34,6 +34,7 @@ namespace android {
 using stats::media_metrics::stats_write;
 using stats::media_metrics::MEDIA_CODEC_STARTED;
 using stats::media_metrics::MEDIA_CODEC_STOPPED;
+using stats::media_metrics::MEDIA_CODEC_RESOURCE_TRACKED;
 using stats::media_metrics::APP_MEDIA_CODEC_USAGE_REPORTED;
 using stats::media_metrics::MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED;
 using stats::media_metrics::MEDIA_CODEC_RECLAIM_REQUEST_COMPLETED__RECLAIM_STATUS__RECLAIM_SUCCESS;
@@ -589,6 +590,48 @@ void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
                          targetPriority);
         targetIndex++;
     }
+}
+
+void ResourceManagerMetrics::pushResourceStatusAtom(
+        const ClientInfoParcel& clientInfo,
+        bool isCodecStarted,
+        bool isResourcesAvailable) {
+    bool isResourceTrackingMatches = false;
+    if (isCodecStarted) {
+        // If the codec has started, we expect resource to be available.
+        if (isResourcesAvailable) {
+            isResourceTrackingMatches = true;
+        }
+    } else {
+        // If the codec failed to start, we expect resource to be unavailable.
+        if (!isResourcesAvailable) {
+            isResourceTrackingMatches = true;
+        }
+    }
+
+    // Track these metrics.
+    ++mTotalResourceTrackedEvents;
+    if (isResourceTrackingMatches) {
+        ++mTotalSuccessfulResourceTracking;
+    }
+
+    int result = stats_write(
+        MEDIA_CODEC_RESOURCE_TRACKED,
+        clientInfo.id,
+        isCodecStarted,
+        isResourcesAvailable,
+        mTotalResourceTrackedEvents,
+        mTotalSuccessfulResourceTracking);
+
+    ALOGI("%s: Client ID: %lld isCodecStarted: %s isResourcesAvailable: %s "
+          "Does Resource Availability Matches: %s "
+          "Total Codecs started: %d TotalSuccessfulResourceTracking: %d "
+          "result: %d", __func__, (long long) clientInfo.id,
+          isCodecStarted ? "Yes" : "No",
+          isResourcesAvailable ? "Yes" : "No",
+          isResourceTrackingMatches ? "Yes" : "No",
+          mTotalResourceTrackedEvents, mTotalSuccessfulResourceTracking, result);
+
 }
 
 void ResourceManagerMetrics::increaseConcurrentCodecs(int32_t pid,

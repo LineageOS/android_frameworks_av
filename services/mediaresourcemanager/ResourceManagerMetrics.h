@@ -171,6 +171,11 @@ public:
                          const std::vector<ClientInfo>& targetClients,
                          bool reclaimed);
 
+    // Construct and push Resource Status Atom.
+    void pushResourceStatusAtom(const ClientInfoParcel& clientInfo,
+                                bool isCodecStarted,
+                                bool isResourcesAvailable);
+
     // Add this pid/uid set to monitor for the process termination state.
     void addPid(int pid, uid_t uid = 0);
 
@@ -178,6 +183,15 @@ public:
     long getPeakConcurrentPixelCount(int pid) const;
     // Get the current concurrent pixel count (associated with the video codecs) for the process.
     long getCurrentConcurrentPixelCount(int pid) const;
+
+    void getResourceTrackingDetails(int* events, int* matches) const {
+        if (events) {
+            *events = mTotalResourceTrackedEvents;
+        }
+        if (matches) {
+            *matches = mTotalSuccessfulResourceTracking;
+        }
+    }
 
     // retrieves metrics log.
     std::string dump() const;
@@ -211,6 +225,12 @@ private:
 
     // Total number of clients killed.
     uint32_t mTotalClientsKilled = 0;
+
+    // Total number of resource tracked event.
+    uint32_t mTotalResourceTrackedEvents = 0;
+
+    // Total successful resource tracking.
+    uint32_t mTotalSuccessfulResourceTracking = 0;
 
     // Map of client id and the configuration.
     ClientConfigMap mClientConfigMap;

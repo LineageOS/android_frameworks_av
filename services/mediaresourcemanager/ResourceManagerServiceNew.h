@@ -143,6 +143,15 @@ private:
     // Get all the resource status for dump
     void getResourceDump(std::string& resourceLog) const override;
 
+    // Check whether there are enough resources.
+    inline bool checkResourceAvailability_l(
+        const std::vector<MediaResourceParcel>& resourcesNeeded) const;
+
+    // log OEM/HAL resource availability status in comparison with the required resources.
+    void logResourceAvailability(const ClientInfoParcel& clientInfo,
+                                 bool isCodecStarted,
+                                 const std::vector<MediaResourceParcel>& resources) override;
+
     // Returns a unmodifiable reference to the internal resource state as a map
     const std::map<int, ResourceInfos>& getResourceMap() const override;
 
@@ -170,6 +179,11 @@ private:
 
     // enable/disable process priority based reclaim and client importance based reclaim
     void setReclaimPolicy(bool processPriority, bool clientImportance) override;
+
+    // Get Available resources.
+    std::vector<MediaResourceParcel> getAvailableResource() const override;
+
+    void getResourceTrackingDetails(int* events, int* matches) const override;
     // END: TEST only functions
 
 private:
