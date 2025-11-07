@@ -1168,7 +1168,7 @@ void C2SoftApvDec::getHDR10PlusInfoData(const struct ApvHdrInfo *buffer,
     size_t payloadSize = buffer->itut_t35.payload_size;
     if (payloadSize > 0) {
         payload.push_back(buffer->itut_t35.country_code);
-        if (buffer->itut_t35.country_code == 0xFF) {
+        if ((unsigned char)buffer->itut_t35.country_code == 0xFF) {
             payload.push_back(buffer->itut_t35.country_code_extension_byte);
         }
         payload.insert(payload.end(), buffer->itut_t35.payload_bytes,
@@ -1245,7 +1245,7 @@ void C2SoftApvDec::getHdrInfo(struct ApvHdrInfo *hdrInfo, int groupId) {
         int readSize = size;
         hdrInfo->itut_t35.country_code = *data++;
         readSize--;
-        if(hdrInfo->itut_t35.country_code == 0xFF) {
+        if((unsigned char)hdrInfo->itut_t35.country_code == 0xFF) {
             hdrInfo->itut_t35.country_code_extension_byte = *data++;
             readSize--;
         }
