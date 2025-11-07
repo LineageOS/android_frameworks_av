@@ -62,6 +62,7 @@ struct C2Config {
     enum hdr_dynamic_metadata_type_t : uint32_t;  ///< HDR dynamic metadata type
     enum hdr_format_t : uint32_t;           ///< HDR format
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
+    enum layering_scheme_t : uint32_t;      ///< layering scheme.
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
     enum pcm_encoding_t : uint32_t;         ///< PCM encoding
@@ -227,6 +228,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexLayerIndex,
     kParamIndexLayerCount,
     kParamIndexIntraRefresh,
+    kParamIndexLayeringScheme,
 
     /* ------------------------------------ image components ------------------------------------ */
 
@@ -2268,6 +2270,16 @@ struct C2TemporalLayeringStruct {
 typedef C2StreamParam<C2Tuning, C2TemporalLayeringStruct, kParamIndexTemporalLayering>
         C2StreamTemporalLayeringTuning;
 constexpr char C2_PARAMKEY_TEMPORAL_LAYERING[] = "coding.temporal-layering";
+
+C2ENUM(C2Config::layering_scheme_t, uint32_t,
+    LS_UNSPECIFIED = 0, // No restriction on the layering structure.
+    LS_WEBRTC = 1, // The layering structure must conform https://www.w3.org/TR/webrtc-svc/.
+);
+
+typedef C2StreamParam<C2Tuning, C2SimpleValueStruct<C2Config::layering_scheme_t>,
+                      kParamIndexLayeringScheme>
+        C2StreamLayeringSchemeTuning;
+constexpr char C2_PARAMKEY_LAYERING_SCHEME[] = "coding.svc-scheme";
 
 /**
  * Intra-refresh.
