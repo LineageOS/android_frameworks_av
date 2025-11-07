@@ -69,7 +69,7 @@ cc_library {
     ],
 
     defaults: [
-        "libcodec2-aidl-defaults",
+        "libcodec2-aidl-V2-defaults",
         "libcodec2-hidl-defaults",
         "libcodec2-runtime-libs",
     ],
