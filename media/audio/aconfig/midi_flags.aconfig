@@ -6,6 +6,7 @@
 package: "android.media.midi"
 container: "system"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
     name: "virtual_ump"
     is_exported: true
@@ -13,3 +14,4 @@ flag {
     description: "Enable virtual UMP MIDI."
     bug: "291115176"
 }
+# go/keep-sorted end
