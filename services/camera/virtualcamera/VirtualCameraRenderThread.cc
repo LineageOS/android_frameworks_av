@@ -255,13 +255,9 @@ void VirtualCameraRenderThread::flush() {
 }
 
 bool VirtualCameraRenderThread::start() {
-  if (!initializeImageHandler()) {
-    ALOGE("%s: Failed to initialize frame consumer", __func__);
-    return false;
-  }
-
+  mImageHandlerInitialized = std::promise<bool>{};
   mThread = std::thread(&VirtualCameraRenderThread::threadLoop, this);
-  return true;
+  return mImageHandlerInitialized.get_future().get();
 }
 
 void VirtualCameraRenderThread::stop() {
@@ -311,6 +307,14 @@ RenderThreadTask VirtualCameraRenderThread::dequeueTask() {
 
 void VirtualCameraRenderThread::threadLoop() {
   ALOGV("Render thread starting");
+
+  if (!initializeImageHandler()) {
+    ALOGE("%s: Failed to initialize frame consumer", __func__);
+    mImageHandlerInitialized.set_value(false);
+    return;
+  }
+
+  mImageHandlerInitialized.set_value(true);
 
   while (RenderThreadTask task = dequeueTask()) {
     std::visit(
