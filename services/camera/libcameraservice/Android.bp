@@ -126,6 +126,7 @@ cc_defaults {
         "libvirtualdevicebuildflags",
         "media_permission-aidl-cpp",
         "libstatslog_framework",
+        "libperfetto_client_experimental",
     ],
 }
 

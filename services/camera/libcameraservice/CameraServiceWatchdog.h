@@ -45,6 +45,7 @@
 // Default cycles and cycle length values used to calculate permitted elapsed time
 const static size_t   kMaxCycles     = 650;
 const static uint32_t kCycleLengthMs = 100;
+const static int64_t kSecondsToTriggerAgain = 300;
 
 namespace android {
 
@@ -89,7 +90,6 @@ public:
 
         return res;
     }
-
 private:
 
     /**
@@ -106,6 +106,10 @@ private:
 
     std::string getAbortMessage(const std::string& functionName);
 
+    int64_t getPerfettoTriggerElapsedTimeMs(time_t now);
+
+    void setPerfettoTriggerTimeMs(time_t now);
+
     virtual bool    threadLoop();
 
     Mutex           mWatchdogLock;      // Lock for condition variable
@@ -119,6 +123,8 @@ private:
     uint32_t        mMaxCycles;         // Max cycles
     uint32_t        mCycleLengthMs;     // Length of time elapsed per cycle
     bool            mEnabled;           // True if watchdog is enabled
+    static Mutex    mLastPerfettoTriggerLock; // Lock for last perfetto trigger time
+    static time_t   mLastPerfettoTriggerMs; // Last time a perfetto trigger was sent
 
     std::shared_ptr<CameraServiceProxyWrapper> mCameraServiceProxyWrapper;
 
