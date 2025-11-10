@@ -121,6 +121,8 @@ private:
     bool reachedEOS();
     status_t postSynchronouslyAndReturnError(const sp<AMessage> &msg);
 
+    void adjustMediaFormatForConstantQuality(sp<AMessage> &format);
+
     sp<ALooper> mLooper;
     sp<ALooper> mCodecLooper;
     sp<AHandlerReflector<MediaCodecSource> > mReflector;

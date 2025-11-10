@@ -11,4 +11,12 @@ flag {
   description: "Feature flag for APV Support in MediaRecorder"
   bug: "418815095"
 }
+
+flag {
+  name: "quality_setting_support"
+  is_exported: true
+  namespace: "codec_fwk"
+  description: "Feature flag for setting Video Quality in MediaRecorder"
+  bug: "444502772"
+}
 # go/keep-sorted end

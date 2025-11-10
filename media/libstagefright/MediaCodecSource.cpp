@@ -40,6 +40,8 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
 
+#include <android_media_mediarecorder.h>
+
 namespace android {
 
 const int32_t kDefaultSwVideoEncoderFormat = HAL_PIXEL_FORMAT_YCbCr_420_888;
@@ -497,6 +499,35 @@ status_t MediaCodecSource::init() {
     return err;
 }
 
+void MediaCodecSource::adjustMediaFormatForConstantQuality(sp<AMessage>& format) {
+    bool isCQSupported = false;
+    sp<MediaCodecInfo> codecInfo;
+
+    AString outputMIME;
+    CHECK(format->findString("mime", &outputMIME));
+
+    if (mEncoder->getCodecInfo(&codecInfo) == OK && codecInfo != nullptr) {
+        const std::shared_ptr<CodecCapabilities>& caps =
+                codecInfo->getCodecCapsFor(outputMIME.c_str());
+        if (caps != nullptr) {
+            std::shared_ptr<EncoderCapabilities> encoderCaps = caps->getEncoderCapabilities();
+            if (encoderCaps != nullptr && encoderCaps->isBitrateModeSupported(BITRATE_MODE_CQ)) {
+                isCQSupported = true;
+            }
+        }
+    }
+
+    int32_t videoEncodingQuality = -1;
+    if (format->findInt32(KEY_QUALITY, &videoEncodingQuality) && videoEncodingQuality != -1) {
+        if (!isCQSupported) {
+            ALOGW("Selected encoder does not support CQ mode, falling back to bitrate control.");
+            format->removeEntryByName(KEY_QUALITY);
+        } else {
+            format->setInt32(KEY_BITRATE_MODE, BITRATE_MODE_CQ);
+        }
+    }
+}
+
 status_t MediaCodecSource::initEncoder() {
 
     mReflector = new AHandlerReflector<MediaCodecSource>(this);
@@ -519,8 +550,17 @@ status_t MediaCodecSource::initEncoder() {
     if (mOutputFormat->findString("testing-name", &name)) {
         mEncoder = MediaCodec::CreateByComponentName(mCodecLooper, name);
 
+        if (mEncoder == NULL) {
+            return NO_INIT;
+        }
+
         mEncoderActivityNotify = new AMessage(kWhatEncoderActivity, mReflector);
         mEncoder->setCallback(mEncoderActivityNotify);
+
+        if (android::media::mediarecorder::quality_setting_support()) {
+            adjustMediaFormatForConstantQuality(mOutputFormat);
+        }
+        ALOGV("output format is '%s'", mOutputFormat->debugString(0).c_str());
 
         err = mEncoder->configure(
                     mOutputFormat,
@@ -542,6 +582,9 @@ status_t MediaCodecSource::initEncoder() {
                 continue;
             }
 
+            if (android::media::mediarecorder::quality_setting_support()) {
+                adjustMediaFormatForConstantQuality(mOutputFormat);
+            }
             ALOGV("output format is '%s'", mOutputFormat->debugString(0).c_str());
 
             mEncoderActivityNotify = new AMessage(kWhatEncoderActivity, mReflector);
