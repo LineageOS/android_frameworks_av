@@ -148,11 +148,9 @@ ComponentStore::ComponentStore(const std::shared_ptr<C2ComponentStore>& store)
 
     // MultiAccessUnit reflector helper is allocated once per store.
     // All components in this store can reuse this reflector helper.
-    if (MultiAccessUnitHelper::isEnabledOnPlatform()) {
-        std::shared_ptr<C2ReflectorHelper> helper = std::make_shared<C2ReflectorHelper>();
-        mParamReflectors.push_back(helper);
-        mMultiAccessUnitReflector = helper;
-    }
+    std::shared_ptr<C2ReflectorHelper> helper = std::make_shared<C2ReflectorHelper>();
+    mParamReflectors.push_back(helper);
+    mMultiAccessUnitReflector = helper;
 
     // Retrieve supported parameters from store
     using namespace std::placeholders;
@@ -213,33 +211,30 @@ std::shared_ptr<MultiAccessUnitInterface> ComponentStore::tryCreateMultiAccessUn
         return nullptr;
     }
     // Framework support for Large audio frame feature depends on:
-    // 1. All feature flags enabled on platform
-    // 2. The capability of the implementation to use the same input buffer
+    // 1. The capability of the implementation to use the same input buffer
     //    for different C2Work (C2Config::api_feature_t::API_SAME_INPUT_BUFFER)
-    // 3. Implementation does not inherently support C2LargeFrame::output::PARAM_TYPE param.
-    if (MultiAccessUnitHelper::isEnabledOnPlatform()) {
-        c2_status_t err = C2_OK;
-        C2ComponentDomainSetting domain;
-        std::vector<std::unique_ptr<C2Param>> heapParams;
-        C2ApiFeaturesSetting features = (C2Config::api_feature_t)0;
-        err = c2interface->query_vb({&domain, &features}, {}, C2_MAY_BLOCK, &heapParams);
-        if (err == C2_OK
-                && (domain.value == C2Component::DOMAIN_AUDIO)
-                && ((features.value & C2Config::api_feature_t::API_SAME_INPUT_BUFFER) != 0)) {
-            std::vector<std::shared_ptr<C2ParamDescriptor>> params;
-            bool isComponentSupportsLargeAudioFrame = false;
-            c2interface->querySupportedParams_nb(&params);
-            for (const auto &paramDesc : params) {
-                if (paramDesc->name().compare(C2_PARAMKEY_OUTPUT_LARGE_FRAME) == 0) {
-                    isComponentSupportsLargeAudioFrame = true;
-                    break;
-                }
+    // 2. Implementation does not inherently support C2LargeFrame::output::PARAM_TYPE param.
+    c2_status_t err = C2_OK;
+    C2ComponentDomainSetting domain;
+    std::vector<std::unique_ptr<C2Param>> heapParams;
+    C2ApiFeaturesSetting features = (C2Config::api_feature_t)0;
+    err = c2interface->query_vb({&domain, &features}, {}, C2_MAY_BLOCK, &heapParams);
+    if (err == C2_OK
+            && (domain.value == C2Component::DOMAIN_AUDIO)
+            && ((features.value & C2Config::api_feature_t::API_SAME_INPUT_BUFFER) != 0)) {
+        std::vector<std::shared_ptr<C2ParamDescriptor>> params;
+        bool isComponentSupportsLargeAudioFrame = false;
+        c2interface->querySupportedParams_nb(&params);
+        for (const auto &paramDesc : params) {
+            if (paramDesc->name().compare(C2_PARAMKEY_OUTPUT_LARGE_FRAME) == 0) {
+                isComponentSupportsLargeAudioFrame = true;
+                break;
             }
-            if (!isComponentSupportsLargeAudioFrame) {
-                multiAccessUnitIntf = std::make_shared<MultiAccessUnitInterface>(
-                        c2interface,
-                        mMultiAccessUnitReflector);
-            }
+        }
+        if (!isComponentSupportsLargeAudioFrame) {
+            multiAccessUnitIntf = std::make_shared<MultiAccessUnitInterface>(
+                    c2interface,
+                    mMultiAccessUnitReflector);
         }
     }
     return multiAccessUnitIntf;

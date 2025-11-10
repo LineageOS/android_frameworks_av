@@ -140,13 +140,6 @@ flag {
 }
 
 flag {
-  name: "large_audio_frame_finish"
-  namespace: "codec_fwk"
-  description: "Implementation flag for large audio frame finishing tasks"
-  bug: "325512893"
-}
-
-flag {
   name: "native_capabilites"
   namespace: "codec_fwk"
   description: "Feature flag for native codec capabilities"
