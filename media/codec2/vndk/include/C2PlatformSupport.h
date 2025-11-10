@@ -28,6 +28,8 @@ namespace aidl::android::hardware::media::c2 {
 class IGraphicBufferAllocator;
 }
 
+class C2IgbaInterface;
+
 namespace android {
 
 /**
@@ -169,11 +171,14 @@ c2_status_t CreateCodec2BlockPool(
         const std::vector<std::shared_ptr<const C2Component>> &components,
         std::shared_ptr<C2BlockPool> *pool);
 
+#ifdef USE_IGBA_HAL_INTERFACE
 /**
  * BlockPool creation parameters regarding allocator.
  *
  * igba, waitableFd are required only when allocatorId is
  * C2PlatformAllocatorStore::IGBA.
+ *
+ * Note: This is deprecated, use C2PlatformAllocatorDescV2 instead.
  */
 struct C2PlatformAllocatorDesc {
     C2PlatformAllocatorStore::id_t allocatorId;
@@ -185,7 +190,26 @@ struct C2PlatformAllocatorDesc {
     C2PlatformAllocatorDesc()
             : allocatorId(C2AllocatorStore::DEFAULT_LINEAR), blockFenceSupport(false) {}
 };
+#endif
 
+/**
+ * BlockPool creation parameters regarding allocator.
+ *
+ * igba, waitableFd are required only when allocatorId is
+ * C2PlatformAllocatorStore::IGBA.
+ */
+struct C2PlatformAllocatorDescV2 {
+    C2PlatformAllocatorStore::id_t allocatorId;
+    std::shared_ptr<C2IgbaInterface> igba;
+    ::android::base::unique_fd waitableFd; // This will be passed and moved to C2Fence
+                                           // implementation.
+    bool blockFenceSupport;
+
+    C2PlatformAllocatorDescV2()
+            : allocatorId(C2AllocatorStore::DEFAULT_LINEAR), blockFenceSupport(false) {}
+};
+
+#ifdef USE_IGBA_HAL_INTERFACE
 /**
  * Creates a block pool.
  * \param allocator     allocator ID and parameters which are used to allocate blocks
@@ -198,6 +222,7 @@ struct C2PlatformAllocatorDesc {
  * \retval C2_NOT_FOUND if the allocator does not exist
  * \retval C2_NO_MEMORY not enough memory to create a block pool
  */
+[[deprecated("Use CreateCodec2BlockPool using C2PlatformAllocatorDescV2 as a parameter instead.")]]
 c2_status_t CreateCodec2BlockPool(
         C2PlatformAllocatorDesc &allocator,
         std::shared_ptr<const C2Component> component,
@@ -215,10 +240,47 @@ c2_status_t CreateCodec2BlockPool(
  * \retval C2_NOT_FOUND if the allocator does not exist
  * \retval C2_NO_MEMORY not enough memory to create a block pool
  */
+[[deprecated("Use CreateCodec2BlockPool using C2PlatformAllocatorDescV2 as a parameter instead.")]]
 c2_status_t CreateCodec2BlockPool(
         C2PlatformAllocatorDesc &allocator,
         const std::vector<std::shared_ptr<const C2Component>> &components,
         std::shared_ptr<C2BlockPool> *pool);
+#endif
+
+/**
+ * Creates a block pool.
+ * \param allocator     allocator ID and parameters which are used to allocate blocks
+ * \param component     the component using the block pool (must be non-null)
+ * \param pool          pointer to where the created block pool shall be store on success.
+ *                      nullptr will be stored here on failure
+ *
+ * \retval C2_OK        the operation was successful
+ * \retval C2_BAD_VALUE the component is null
+ * \retval C2_NOT_FOUND if the allocator does not exist
+ * \retval C2_NO_MEMORY not enough memory to create a block pool
+ */
+c2_status_t CreateCodec2BlockPool(
+        C2PlatformAllocatorDescV2 &allocator,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool);
+
+/**
+ * Creates a block pool.
+ * \param allocator     allocator ID and parameters which are used to allocate blocks
+ * \param components    the components using the block pool
+ * \param pool          pointer to where the created block pool shall be store on success.
+ *                      nullptr will be stored here on failure
+ *
+ * \retval C2_OK        the operation was successful
+ * \retval C2_BAD_VALUE the component is null
+ * \retval C2_NOT_FOUND if the allocator does not exist
+ * \retval C2_NO_MEMORY not enough memory to create a block pool
+ */
+c2_status_t CreateCodec2BlockPool(
+        C2PlatformAllocatorDescV2 &allocator,
+        const std::vector<std::shared_ptr<const C2Component>> &components,
+        std::shared_ptr<C2BlockPool> *pool);
+
 
 /**
  * Returns the platform component store.

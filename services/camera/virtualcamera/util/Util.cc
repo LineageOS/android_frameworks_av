@@ -16,6 +16,7 @@
 
 #include "Util.h"
 
+#include <android_companion_virtualdevice_flags.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -33,13 +34,16 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
+namespace flags = ::android::companion::virtualdevice::flags;
+
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
+using ::aidl::android::hardware::camera::device::Stream;
 using ::aidl::android::hardware::common::NativeHandle;
+using ::aidl::android::hardware::graphics::common::Dataspace;
+using ::aidl::android::hardware::graphics::common::PixelFormat;
 
 constexpr int kMaxFpsUpperLimit = 60;
-
-constexpr std::array<Format, 2> kSupportedFormats{Format::YUV_420_888,
-                                                  Format::RGBA_8888};
 
 YCbCrLockGuard::YCbCrLockGuard(std::shared_ptr<AHardwareBuffer> hwBuffer,
                                const uint32_t usageFlags)
@@ -127,15 +131,31 @@ sp<Fence> importFence(const NativeHandle& aidlHandle) {
   return sp<Fence>::make(::dup(aidlHandle.fds[0].get()));
 }
 
-bool isPixelFormatSupportedForInput(const Format format) {
-  return std::find(kSupportedFormats.begin(), kSupportedFormats.end(),
-                   format) != kSupportedFormats.end();
+bool isImageFormatSupportedForInput(const Format format) {
+  switch (format) {
+    case Format::JPEG:
+      [[fallthrough]];
+    case Format::HEIC:
+      if (!flags::virtual_camera_direct_blob_transfer()) {
+        ALOGV(
+            "%s: Rejecting blob type 0x%x since direct transfer feature is "
+            "disabled",
+            __func__, static_cast<int>(format));
+        return false;
+      }
+      [[fallthrough]];
+    case Format::YUV_420_888:
+      [[fallthrough]];
+    case Format::RGBA_8888:
+      return true;
+    case Format::UNKNOWN:
+      return false;
+  }
 }
 
-// Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(const int width, const int height,
                                const Format format, const int maxFps) {
-  if (!isPixelFormatSupportedForInput(format)) {
+  if (!isImageFormatSupportedForInput(format)) {
     return false;
   }
 
@@ -150,6 +170,47 @@ bool isFormatSupportedForInput(const int width, const int height,
   }
 
   return true;
+}
+
+bool isBlobFormat(Format format) {
+  return format == Format::HEIC || format == Format::JPEG;
+}
+
+bool isHeicStreamConfig(
+    const ::aidl::android::hardware::camera::device::Stream& stream) {
+  return stream.format == PixelFormat::BLOB &&
+         stream.dataSpace == Dataspace::HEIF;
+}
+
+bool isBlobStreamConfig(const Stream& stream) {
+  return stream.format == PixelFormat::BLOB &&
+         (stream.dataSpace == Dataspace::HEIF ||
+          stream.dataSpace == Dataspace::JFIF);
+}
+
+bool areMatchingBlobTypes(
+    const Stream& halStream,
+    const SupportedStreamConfiguration& internalStreamConfig) {
+  return (halStream.format == PixelFormat::BLOB) &&
+         ((halStream.dataSpace == Dataspace::HEIF &&
+           internalStreamConfig.imageFormat == Format::HEIC) ||
+          (halStream.dataSpace == Dataspace::JFIF &&
+           internalStreamConfig.imageFormat == Format::JPEG));
+}
+
+bool areMatchingBlobTypes(
+    const ::aidl::android::hardware::camera::device::Stream& a,
+    const ::aidl::android::hardware::camera::device::Stream& b) {
+  return a.dataSpace == b.dataSpace && isBlobStreamConfig(a) &&
+         isBlobStreamConfig(b);
+}
+
+bool areMatchingBlobTypes(Format a, Format b) {
+  return isBlobFormat(a) && isBlobFormat(b) && a == b;
+}
+
+bool areDifferentBlobTypes(Format a, Format b) {
+  return isBlobFormat(a) && isBlobFormat(b) && a != b;
 }
 
 std::ostream& operator<<(std::ostream& os, const Resolution& resolution) {

@@ -94,6 +94,7 @@ bool AudioPowerUsage::deviceFromString(const std::string& device_string, int32_t
             {"AUDIO_DEVICE_OUT_BLE_HEADSET", OUTPUT_BLE_HEADSET},
             {"AUDIO_DEVICE_OUT_BLE_SPEAKER", OUTPUT_BLE_SPEAKER},
             {"AUDIO_DEVICE_OUT_BLE_BROADCAST", OUTPUT_BLE_BROADCAST},
+            {"AUDIO_DEVICE_OUT_BLE_HEARING_AID", OUTPUT_BLE_HEARING_AID},
 
             {"AUDIO_DEVICE_IN_COMMUNICATION", INPUT_COMMUNICATION},
             {"AUDIO_DEVICE_IN_AMBIENT", INPUT_AMBIENT},
@@ -123,6 +124,7 @@ bool AudioPowerUsage::deviceFromString(const std::string& device_string, int32_t
             {"AUDIO_DEVICE_IN_HDMI_EARC", INPUT_HDMI_EARC},
             {"AUDIO_DEVICE_IN_ECHO_REFERENCE", INPUT_ECHO_REFERENCE},
             {"AUDIO_DEVICE_IN_BLE_HEADSET", INPUT_BLE_HEADSET},
+            {"AUDIO_DEVICE_IN_BLE_HEARING_AID", INPUT_BLE_HEARING_AID},
     };
 
     auto it = deviceTable.find(device_string);

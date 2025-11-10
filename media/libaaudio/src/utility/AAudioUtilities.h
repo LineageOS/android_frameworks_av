@@ -402,4 +402,24 @@ static inline bool isAAudioPlaybackParametersEqual(
             p1.fallbackMode == p2.fallbackMode;
 }
 
+/**
+ * Constants to describe if the capture is privacy sensitive.
+ */
+enum {
+    /**
+     * Let the framework decide the privacy sensitivity. By default, communication and
+     * camcorder captures are considered privacy sensitive
+     */
+    PRIVACY_SENSITIVE_DEFAULT = -1,
+    /**
+     * The capture is not privacy sensitive.
+     */
+    PRIVACY_SENSITIVE_DISABLED = 0,
+    /**
+     * The capture is privacy sensitive.
+     */
+    PRIVACY_SENSITIVE_ENABLED = 1,
+};
+typedef int32_t privacy_sensitive_t;
+
 #endif //UTILITY_AAUDIO_UTILITIES_H

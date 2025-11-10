@@ -20,6 +20,7 @@ cc_test {
         "AidlUtilTest.cc",
         "EglUtilTest.cc",
         "JpegUtilTest.cc",
+        "UtilTest.cc",
         "VirtualCameraDeviceTest.cc",
         "VirtualCameraProviderTest.cc",
         "VirtualCameraRenderThreadTest.cc",

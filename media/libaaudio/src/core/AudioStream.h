@@ -39,6 +39,8 @@
 #include <stdint.h>
 // go/keep-sorted end
 
+#include "AAudioStreamOpenRequest.h"
+
 // Cannot get android::media::VolumeShaper to compile!
 #define AAUDIO_USE_VOLUME_SHAPER  0
 
@@ -46,8 +48,6 @@ namespace aaudio {
 
 typedef void *(*aaudio_audio_thread_proc_t)(void *);
 typedef uint32_t aaudio_stream_id_t;
-
-class AudioStreamBuilder;
 
 constexpr pid_t        CALLBACK_THREAD_NONE = 0;
 
@@ -141,10 +141,10 @@ public:
                                                int64_t timeoutNanoseconds);
 
     /**
-     * Open the stream using the parameters in the builder.
+     * Open the stream using the parameters in the openRequest.
      * Allocate the necessary resources.
      */
-    virtual aaudio_result_t open(const AudioStreamBuilder& builder);
+    virtual aaudio_result_t open(const AAudioStreamOpenRequest& openRequest);
 
     // log to MediaMetrics
     virtual void logOpenActual();

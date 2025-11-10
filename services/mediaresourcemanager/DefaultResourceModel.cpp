@@ -19,6 +19,8 @@
 #define LOG_TAG "DefaultResourceModel"
 #include <utils/Log.h>
 
+#include <algorithm>
+
 #include "ResourceManagerServiceUtils.h"
 #include "DefaultResourceModel.h"
 #include "ResourceTracker.h"
@@ -144,6 +146,46 @@ bool DefaultResourceModel::getCodecClients(
     mResourceTracker->getAllClients(resourceRequestInfo, clients);
 
     return !clients.empty();
+}
+
+void DefaultResourceModel::registerSystemResource(
+        const std::vector<MediaResourceParcel>& resources) {
+    // Set Globally available resources.
+    mGlobalResourceList.set(resources);
+}
+
+std::vector<MediaResourceParcel> DefaultResourceModel::getAvailableResources() const {
+    // Step#1: Get current resource usage = Sum{resources used by the active codecs}
+    std::vector<MediaResourceParcel> currentResourceUsage;
+    mResourceTracker->getMediaResourceUsageReport(&currentResourceUsage);
+
+    std::vector<MediaResourceParcel> currentSystemResourceUsage;
+    currentSystemResourceUsage.reserve(currentResourceUsage.size());
+    for (const auto& res : currentResourceUsage) {
+        // Tracking only the hardware resource types for system resource availability.
+        if (res.type >= MediaResourceType::kHwResourceTypeMin) {
+            currentSystemResourceUsage.push_back(res);
+        }
+    }
+    // Step#2: See how much of the resources are available
+    // Current available resources = {Globally available resources} - {current resource usage}
+    return calculateResourceDifference(
+            mGlobalResourceList.getResources(), currentSystemResourceUsage);
+}
+
+bool DefaultResourceModel::checkResourceAvailability(
+        const std::vector<MediaResourceParcel>& resourcesNeeded) const {
+    // Step#1: Get available resources.
+    std::vector<MediaResourceParcel> availableResources = getAvailableResources();
+
+    // Step#2: Check whether {Current available resources} >= {resources needed}
+    std::vector<MediaResourceParcel> diffResources = calculateResourceDifference(
+            availableResources, resourcesNeeded);
+
+    // Step#3: If any of the resource has negative value, that means we don't have enough
+    // resources.
+    return std::none_of(diffResources.begin(), diffResources.end(),
+                        [](const MediaResourceParcel& res) { return res.value < 0; });
 }
 
 } // namespace android

@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#include <android_companion_virtualdevice_flags.h>
+#include <flag_macros.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -89,7 +92,7 @@ class MockVirtualCameraCallback : public BnVirtualCameraCallback {
       (override));
   MOCK_METHOD(ndk::ScopedAStatus, onStreamConfigured,
               (int32_t, const ::aidl::android::view::Surface&, int, int,
-               ::aidl::android::companion::virtualcamera::Format pixelFormat),
+               ::aidl::android::companion::virtualcamera::Format imageFormat),
               (override));
   MOCK_METHOD(ndk::ScopedAStatus, onProcessCaptureRequest,
               (int32_t, int32_t, const std::optional<VirtualCameraMetadata>&),
@@ -103,7 +106,7 @@ VirtualCameraConfiguration createConfiguration(const int width, const int height
   VirtualCameraConfiguration configuration;
   configuration.supportedStreamConfigs.push_back({.width = width,
                                                   .height = height,
-                                                  .pixelFormat = format,
+                                                  .imageFormat = format,
                                                   .maxFps = maxFps});
   configuration.sensorOrientation = kSensorOrientation;
   configuration.lensFacing = kLensFacing;
@@ -255,6 +258,82 @@ TEST_F(VirtualCameraServiceTest, RegisterCameraWithRgbaInputSucceeds) {
 
   EXPECT_TRUE(aidlRet);
   EXPECT_THAT(getCameraIds(), SizeIs(1));
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraServiceTest, RegisterCameraWithHeicInputSucceeds,
+                  REQUIRES_FLAGS_ENABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  sp<BBinder> token = sp<BBinder>::make();
+  ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
+  bool aidlRet;
+
+  VirtualCameraConfiguration config =
+      createConfiguration(kVgaWidth, kVgaHeight, Format::HEIC, kMaxFps);
+
+  ASSERT_TRUE(mCameraService
+                  ->registerCamera(ndkToken, config, kDefaultDeviceId, &aidlRet)
+                  .isOk());
+
+  EXPECT_TRUE(aidlRet);
+  EXPECT_THAT(getCameraIds(), SizeIs(1));
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraServiceTest,
+                  RegisterCameraWithHeicInputFailsWhenFlagDisabled,
+                  REQUIRES_FLAGS_DISABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  sp<BBinder> token = sp<BBinder>::make();
+  ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
+  bool aidlRet;
+
+  VirtualCameraConfiguration config =
+      createConfiguration(kVgaWidth, kVgaHeight, Format::HEIC, kMaxFps);
+
+  ASSERT_FALSE(mCameraService
+                   ->registerCamera(ndkToken, config, kDefaultDeviceId, &aidlRet)
+                   .isOk());
+
+  EXPECT_FALSE(aidlRet);
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraServiceTest, RegisterCameraWithJpegInputSucceeds,
+                  REQUIRES_FLAGS_ENABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  sp<BBinder> token = sp<BBinder>::make();
+  ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
+  bool aidlRet;
+
+  VirtualCameraConfiguration config =
+      createConfiguration(kVgaWidth, kVgaHeight, Format::JPEG, kMaxFps);
+
+  ASSERT_TRUE(mCameraService
+                  ->registerCamera(ndkToken, config, kDefaultDeviceId, &aidlRet)
+                  .isOk());
+
+  EXPECT_TRUE(aidlRet);
+  EXPECT_THAT(getCameraIds(), SizeIs(1));
+}
+
+TEST_F_WITH_FLAGS(VirtualCameraServiceTest,
+                  RegisterCameraWithJpegInputFailsWhenFlagDisabled,
+                  REQUIRES_FLAGS_DISABLED(
+                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
+                                   virtual_camera_direct_blob_transfer))) {
+  sp<BBinder> token = sp<BBinder>::make();
+  ndk::SpAIBinder ndkToken(AIBinder_fromPlatformBinder(token));
+  bool aidlRet;
+
+  VirtualCameraConfiguration config =
+      createConfiguration(kVgaWidth, kVgaHeight, Format::JPEG, kMaxFps);
+
+  ASSERT_FALSE(mCameraService
+                   ->registerCamera(ndkToken, config, kDefaultDeviceId, &aidlRet)
+                   .isOk());
+
+  EXPECT_FALSE(aidlRet);
 }
 
 TEST_F(VirtualCameraServiceTest, RegisterCameraTwiceSecondReturnsFalse) {

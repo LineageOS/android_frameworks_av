@@ -310,6 +310,13 @@ class FuzzAppOpsService : public BnAppOpsService {
     void setCameraAudioRestriction(int32_t /*mode*/) override { return; }
 
     bool shouldCollectNotes(int32_t /*opCode*/) override { return true; }
+
+    int32_t checkOperationForDevice(int32_t /* code */, int32_t /* uid */,
+                                    const String16& /* packageName */,
+                                    const std::optional<String16>& /* attributionTag */,
+                                    int32_t /* virtualDeviceId */) override {
+        return 0;
+    }
 };
 
 class CameraFuzzer : public ::android::hardware::BnCameraClient {

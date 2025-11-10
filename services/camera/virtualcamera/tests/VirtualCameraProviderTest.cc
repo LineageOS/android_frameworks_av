@@ -88,7 +88,7 @@ class VirtualCameraProviderTest : public ::testing::Test {
       .supportedStreamConfigs = {SupportedStreamConfiguration{
           .width = kVgaWidth,
           .height = kVgaHeight,
-          .pixelFormat = Format::YUV_420_888,
+          .imageFormat = Format::YUV_420_888,
           .maxFps = kMaxFps}},
       .virtualCameraCallback = nullptr,
       .sensorOrientation = SensorOrientation::ORIENTATION_0,

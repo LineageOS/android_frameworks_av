@@ -588,6 +588,10 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 AudioDeviceType::IN_HEADSET, AudioDeviceType::OUT_HEADSET,
                 GET_DEVICE_DESC_CONNECTION(BT_LE));
         append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_BLE_HEARING_AID, AUDIO_DEVICE_OUT_BLE_HEARING_AID,
+                AudioDeviceType::IN_HEARING_AID, AudioDeviceType::OUT_HEARING_AID,
+                GET_DEVICE_DESC_CONNECTION(BT_LE));
+        append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
                 AudioDeviceType::IN_SUBMIX, AudioDeviceType::OUT_SUBMIX,
                 GET_DEVICE_DESC_CONNECTION(VIRTUAL));

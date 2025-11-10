@@ -130,7 +130,7 @@ void AAudioServiceEndpoint::releaseRegisteredStreams() {
     AAudioService *aaudioService = AAudioClientTracker::getInstance().getAAudioService();
     for (const auto& serviceStream : streamsToClose) {
         ALOGD("%s() - close stream 0x%08X", __func__, serviceStream->getHandle());
-        aaudioService->closeStream(serviceStream);
+        aaudioService->closeStream(serviceStream, true /*force*/);
     }
 }
 

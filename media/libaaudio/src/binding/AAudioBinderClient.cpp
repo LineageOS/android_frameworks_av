@@ -134,11 +134,12 @@ AAudioHandleInfo AAudioBinderClient::openStream(const AAudioStreamRequest &reque
     return {};
 }
 
-aaudio_result_t AAudioBinderClient::closeStream(const AAudioHandleInfo& streamHandleInfo) {
+aaudio_result_t AAudioBinderClient::closeStream(const AAudioHandleInfo& streamHandleInfo,
+                                                bool force) {
     std::shared_ptr<AAudioServiceInterface> service = getAAudioService();
     if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
 
-    return service->closeStream(streamHandleInfo);
+    return service->closeStream(streamHandleInfo, force);
 }
 
 /* Get an immutable description of the in-memory queues
@@ -217,12 +218,12 @@ aaudio_result_t AAudioBinderClient::updateTimestamp(const AAudioHandleInfo& stre
 
 aaudio_result_t AAudioBinderClient::drainStream(const AAudioHandleInfo& streamHandleInfo,
                                                 int64_t wakeUpNanos,
-                                                bool allowSoftWakeUp,
+                                                DrainType drainType,
                                                 TimerQueue::handle_t* handle) {
     std::shared_ptr<AAudioServiceInterface> service = getAAudioService();
     if (service.get() == nullptr) return AAUDIO_ERROR_NO_SERVICE;
 
-    return service->drainStream(streamHandleInfo, wakeUpNanos, allowSoftWakeUp, handle);
+    return service->drainStream(streamHandleInfo, wakeUpNanos, drainType, handle);
 }
 
 aaudio_result_t AAudioBinderClient::activateStream(

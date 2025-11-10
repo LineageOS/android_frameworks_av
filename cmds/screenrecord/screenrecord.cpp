@@ -956,12 +956,13 @@ static status_t recordScreen(const char* fileName) {
         // SurfaceFlinger will just feed directly to us.
         frameOutput = new FrameOutput();
         // Change FrameOutput to use Surface too in a follow up CL.
-        sp<IGraphicBufferProducer> igbp =
-                android::mediaflagtools::surfaceTypeToIGBP(encoderInputSurface);
+        sp<IGraphicBufferProducer> igbp;
         err = frameOutput->createInputSurface(gVideoWidth, gVideoHeight, &igbp);
         if (err != NO_ERROR) {
             return err;
         }
+
+        encoderInputSurface = android::mediaflagtools::igbpToSurfaceType(igbp);
     }
 
     // Draw the "info" page by rendering a frame with GLES and sending

@@ -24,6 +24,8 @@
 #include <GLES2/gl2ext.h>
 #include <utils/Log.h>
 
+#include <chrono>
+
 #include "FrameOutput.h"
 
 using namespace android;
@@ -91,30 +93,28 @@ status_t FrameOutput::createInputSurface(int width, int height,
 }
 
 status_t FrameOutput::copyFrame(FILE* fp, long timeoutUsec, bool rawFrames) {
-    Mutex::Autolock _l(mMutex);
-    ALOGV("copyFrame %ld\n", timeoutUsec);
+    {
+        std::unique_lock lock(mMutex);
+        ALOGV("copyFrame %ld\n", timeoutUsec);
 
-    if (!mFrameAvailable) {
-        nsecs_t timeoutNsec = (nsecs_t)timeoutUsec * 1000;
-        int cc = mEventCond.waitRelative(mMutex, timeoutNsec);
-        if (cc == -ETIMEDOUT) {
-            ALOGV("cond wait timed out");
-            return ETIMEDOUT;
-        } else if (cc != 0) {
-            ALOGW("cond wait returned error %d", cc);
-            return cc;
+        if (mNumFramesAvailable == 0) {
+            std::cv_status cc = mEventCond.wait_for(lock, std::chrono::microseconds(timeoutUsec));
+            if (cc == std::cv_status::timeout) {
+                ALOGV("cond wait timed out");
+                return ETIMEDOUT;
+            }
         }
-    }
-    if (!mFrameAvailable) {
-        // This happens when Ctrl-C is hit.  Apparently POSIX says that the
-        // pthread wait call doesn't return EINTR, treating this instead as
-        // an instance of a "spurious wakeup".  We didn't get a frame, so
-        // we just treat it as a timeout.
-        return ETIMEDOUT;
-    }
+        if (mNumFramesAvailable == 0) {
+            // This happens when Ctrl-C is hit.  Apparently POSIX says that the
+            // pthread wait call doesn't return EINTR, treating this instead as
+            // an instance of a "spurious wakeup".  We didn't get a frame, so
+            // we just treat it as a timeout.
+            return ETIMEDOUT;
+        }
 
-    // A frame is available.  Clear the flag for the next round.
-    mFrameAvailable = false;
+        // A frame is available.  Clear the flag for the next round.
+        mNumFramesAvailable -= 1;
+    }
 
     float texMatrix[16];
     mGlConsumer->updateTexImage();
@@ -210,7 +210,7 @@ void FrameOutput::reduceRgbaToRgb(uint8_t* buf, unsigned int pixelCount) {
 
 // Callback; executes on arbitrary thread.
 void FrameOutput::onFrameAvailable(const BufferItem& /* item */) {
-    Mutex::Autolock _l(mMutex);
-    mFrameAvailable = true;
-    mEventCond.signal();
+    std::scoped_lock _l(mMutex);
+    mNumFramesAvailable += 1;
+    mEventCond.notify_one();
 }

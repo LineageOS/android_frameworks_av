@@ -27,13 +27,17 @@
 #include <C2Component.h>
 #include <C2Config.h>
 #include <C2IgbaBufferPriv.h>
+#include <C2IgbaInterface.h>
 #include <C2PlatformStorePluginLoader.h>
 #include <C2PlatformSupport.h>
 #include <codec2/common/HalSelection.h>
 #include <cutils/properties.h>
 #include <util/C2InterfaceHelper.h>
 
+#ifdef USE_IGBA_HAL_INTERFACE
+#include <vndk/hardware_buffer.h>
 #include <aidl/android/hardware/media/c2/IGraphicBufferAllocator.h>
+#endif
 
 #include <dlfcn.h>
 #include <unistd.h> // getpagesize
@@ -184,6 +188,61 @@ c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(
 }
 
 namespace {
+#ifdef USE_IGBA_HAL_INTERFACE
+using C2IGBA = ::aidl::android::hardware::media::c2::IGraphicBufferAllocator;
+
+int32_t static inline ToAidl(uint32_t u) {return static_cast<int32_t>(u);}
+int64_t static inline ToAidl(uint64_t u) {return static_cast<int64_t>(u);}
+
+constexpr c2_status_t C2_TRANSACTION_FAILED = C2_CORRUPTED;
+
+/**
+ * This wrapper class is for deprecated API.
+ * This will be removed eventually.
+ */
+class C2IgbaInterfaceStoreImpl : public C2IgbaInterface {
+public:
+    C2IgbaInterfaceStoreImpl(std::shared_ptr<C2IGBA> igba) : mIgba(igba) {}
+
+    virtual ~C2IgbaInterfaceStoreImpl() = default;
+
+    virtual c2_status_t allocate(
+            uint32_t width, uint32_t height, uint32_t format, uint64_t usage,
+            AHardwareBuffer **pBuf, int *syncFenceFd) override {
+
+        C2IGBA::Description desc{
+            ToAidl(width), ToAidl(height), ToAidl(format), ToAidl(usage)};
+        C2IGBA::Allocation allocation;
+        ::ndk::ScopedAStatus status = mIgba->allocate(desc, &allocation);
+        if (!status.isOk()) {
+            binder_exception_t ex = status.getExceptionCode();
+            if (ex == EX_SERVICE_SPECIFIC) {
+                c2_status_t err = static_cast<c2_status_t>(status.getServiceSpecificError());
+                return err;
+            } else {
+                ALOGW("igba::allocate transaction failed: %d", ex);
+                return C2_TRANSACTION_FAILED;
+            }
+        }
+        *pBuf = allocation.buffer.release();
+        *syncFenceFd = allocation.fence.release();
+        return C2_OK;
+    }
+
+    virtual c2_status_t deallocate(uint64_t ahwbId, bool *deallocated) override {
+        bool aidlRet = true;
+        ::ndk::ScopedAStatus status = mIgba->deallocate(ToAidl(ahwbId), &aidlRet);
+        if (!status.isOk()) {
+            return C2_TRANSACTION_FAILED;
+        }
+        *deallocated = aidlRet;
+        return C2_OK;
+    };
+private:
+
+    std::shared_ptr<C2IGBA> mIgba;
+};
+#endif
 
 std::mutex gIonAllocatorMutex;
 std::mutex gDmaBufAllocatorMutex;
@@ -493,7 +552,7 @@ public:
 
 private:
     c2_status_t _createBlockPool(
-            C2PlatformAllocatorDesc &allocatorParam,
+            C2PlatformAllocatorDescV2 &allocatorParam,
             std::vector<std::shared_ptr<const C2Component>> components,
             C2BlockPool::local_id_t poolId,
             bool deferDeallocAfterStop,
@@ -612,13 +671,13 @@ public:
             C2PlatformAllocatorStore::id_t allocatorId,
             std::vector<std::shared_ptr<const C2Component>> components,
             std::shared_ptr<C2BlockPool> *pool) {
-        C2PlatformAllocatorDesc allocator;
+        C2PlatformAllocatorDescV2 allocator;
         allocator.allocatorId = allocatorId;
         return createBlockPool(allocator, components, pool);
     }
 
     c2_status_t createBlockPool(
-            C2PlatformAllocatorDesc &allocator,
+            C2PlatformAllocatorDescV2 &allocator,
             std::vector<std::shared_ptr<const C2Component>> components,
             std::shared_ptr<C2BlockPool> *pool) {
         std::unique_lock lock(mMutex);
@@ -655,7 +714,7 @@ public:
         }
         // TODO: remove this. this is temporary
         if (blockPoolId == C2BlockPool::PLATFORM_START) {
-            C2PlatformAllocatorDesc allocator;
+            C2PlatformAllocatorDescV2 allocator;
             allocator.allocatorId = C2PlatformAllocatorStore::BUFFERQUEUE;
             return _createBlockPool(
                     allocator, {component}, blockPoolId, mBqPoolDeferDeallocAfterStop, pool);
@@ -717,7 +776,7 @@ c2_status_t CreateCodec2BlockPool(
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
 
-    C2PlatformAllocatorDesc allocator;
+    C2PlatformAllocatorDescV2 allocator;
     allocator.allocatorId = allocatorId;
     return sBlockPoolCache->createBlockPool(allocator, components, pool);
 }
@@ -728,13 +787,49 @@ c2_status_t CreateCodec2BlockPool(
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
 
-    C2PlatformAllocatorDesc allocator;
+    C2PlatformAllocatorDescV2 allocator;
     allocator.allocatorId = allocatorId;
     return sBlockPoolCache->createBlockPool(allocator, {component}, pool);
 }
 
+#ifdef USE_IGBA_HAL_INTERFACE
+// This is deprecated.
 c2_status_t CreateCodec2BlockPool(
         C2PlatformAllocatorDesc &allocator,
+        const std::vector<std::shared_ptr<const C2Component>> &components,
+        std::shared_ptr<C2BlockPool> *pool) {
+    pool->reset();
+
+    C2PlatformAllocatorDescV2 allocatorV2;
+    allocatorV2.allocatorId = allocator.allocatorId;
+    if (allocator.igba) {
+        allocatorV2.igba = std::make_shared<C2IgbaInterfaceStoreImpl>(allocator.igba);
+        allocatorV2.waitableFd = std::move(allocator.waitableFd);
+    }
+
+    return sBlockPoolCache->createBlockPool(allocatorV2, components, pool);
+}
+
+// This is deprecated.
+c2_status_t CreateCodec2BlockPool(
+        C2PlatformAllocatorDesc &allocator,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
+    pool->reset();
+
+    C2PlatformAllocatorDescV2 allocatorV2;
+    allocatorV2.allocatorId = allocator.allocatorId;
+    if (allocator.igba) {
+        allocatorV2.igba = std::make_shared<C2IgbaInterfaceStoreImpl>(allocator.igba);
+        allocatorV2.waitableFd = std::move(allocator.waitableFd);
+    }
+
+    return sBlockPoolCache->createBlockPool(allocatorV2, {component}, pool);
+}
+#endif
+
+c2_status_t CreateCodec2BlockPool(
+        C2PlatformAllocatorDescV2 &allocator,
         const std::vector<std::shared_ptr<const C2Component>> &components,
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
@@ -743,13 +838,14 @@ c2_status_t CreateCodec2BlockPool(
 }
 
 c2_status_t CreateCodec2BlockPool(
-        C2PlatformAllocatorDesc &allocator,
+        C2PlatformAllocatorDescV2 &allocator,
         std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
     pool->reset();
 
     return sBlockPoolCache->createBlockPool(allocator, {component}, pool);
 }
+
 
 class C2PlatformComponentStore : public C2ComponentStore {
 public:

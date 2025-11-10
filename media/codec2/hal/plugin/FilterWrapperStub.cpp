@@ -45,13 +45,23 @@ c2_status_t FilterWrapper::createBlockPool(
         C2PlatformAllocatorStore::id_t allocatorId,
         std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
-    C2PlatformAllocatorDesc allocatorParam;
+    C2PlatformAllocatorDescV2 allocatorParam;
     allocatorParam.allocatorId = allocatorId;
     return createBlockPool(allocatorParam, component, pool);
 }
 
+#ifdef USE_IGBA_HAL_INTERFACE
+// This isdeprecated
 c2_status_t FilterWrapper::createBlockPool(
         C2PlatformAllocatorDesc &allocatorParam,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
+    return CreateCodec2BlockPool(allocatorParam, component, pool);
+}
+#endif
+
+c2_status_t FilterWrapper::createBlockPool(
+        C2PlatformAllocatorDescV2 &allocatorParam,
         std::shared_ptr<const C2Component> component,
         std::shared_ptr<C2BlockPool> *pool) {
     return CreateCodec2BlockPool(allocatorParam, component, pool);

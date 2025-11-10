@@ -33,6 +33,7 @@
 
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
+#include <C2IgbaInterfaceImpl.h>
 
 #include <chrono>
 #include <thread>
@@ -374,11 +375,12 @@ ScopedAStatus Component::createBlockPool(
         IComponent::BlockPool *blockPool) {
     std::shared_ptr<C2BlockPool> c2BlockPool;
     c2_status_t status = C2_OK;
-    ::android::C2PlatformAllocatorDesc allocatorParam;
+    ::android::C2PlatformAllocatorDescV2 allocatorParam;
     allocatorParam.allocatorId = allocator.allocatorId;
     switch (allocator.allocatorId) {
         case ::android::C2PlatformAllocatorStore::IGBA: {
-            allocatorParam.igba = allocator.gbAllocator->igba;
+            allocatorParam.igba = std::make_shared<::android::C2IgbaInterfaceImpl>(
+                    allocator.gbAllocator->igba);
             allocatorParam.waitableFd.reset(
                     allocator.gbAllocator->waitableFd.dup().release());
             allocatorParam.blockFenceSupport = mBlockFenceSupport;
@@ -511,7 +513,7 @@ void Component::initListener(const std::shared_ptr<Component>& self) {
             std::shared_ptr<C2BlockPool> linearPool;
             std::shared_ptr<C2AllocatorStore> store = ::android::GetCodec2PlatformAllocatorStore();
             if(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator) == C2_OK) {
-                ::android::C2PlatformAllocatorDesc desc;
+                ::android::C2PlatformAllocatorDescV2 desc;
                 desc.allocatorId = allocator->getId();
                 if (C2_OK == CreateCodec2BlockPool(desc, mComponent, &linearPool)) {
                     if (linearPool) {

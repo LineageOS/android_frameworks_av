@@ -727,6 +727,7 @@ status_t AudioPolicyManager::getHwOffloadFormatsSupportedForBluetoothMedia(
         audioDeviceSet = getAudioDeviceOutAllA2dpSet();
         break;
     case AUDIO_DEVICE_OUT_BLE_HEADSET:
+    case AUDIO_DEVICE_OUT_BLE_HEARING_AID:
         audioDeviceSet = getAudioDeviceOutLeAudioUnicastSet();
         break;
     case AUDIO_DEVICE_OUT_BLE_BROADCAST:
@@ -905,7 +906,8 @@ void AudioPolicyManager::connectTelephonyRxAudioSource(uint32_t delayMs)
             ALOGV("%s same sink device %s", __func__, rxDevice->toString().c_str());
             return;
         }
-        if (com::android::media::audioserver::optimize_call_routing()) {
+        if (com::android::media::audioserver::optimize_call_routing()
+                && mCallRxSourceClient->isConnected()) {
             rerouteTelephonyAudioSource(mCallRxSourceClient, mCallRxSourceClient->srcDevice(),
                                         rxDevice, delayMs);
             ALOGV("%s rerouted portd ID %d between source %s and sink %s", __func__,
@@ -960,9 +962,10 @@ void AudioPolicyManager::connectTelephonyTxAudioSource(
             ALOGV("%s same source device %s", __func__, srcDevice->toString().c_str());
             return;
         }
-        if (com::android::media::audioserver::optimize_call_routing()) {
+        if (com::android::media::audioserver::optimize_call_routing()
+                && mCallTxSourceClient->isConnected()) {
             rerouteTelephonyAudioSource(mCallTxSourceClient, srcDevice, sinkDevice, delayMs);
-            ALOGV("%s rerouted portdID %d between source %s and sink %s", __func__,
+            ALOGV("%s rerouted portd ID %d between source %s and sink %s", __func__,
                   mCallTxSourceClient->portId(),
                   srcDevice->toString().c_str(), sinkDevice->toString().c_str());
             return;
@@ -1001,6 +1004,9 @@ void AudioPolicyManager::rerouteTelephonyAudioSource(const sp<SourceClientDescri
         const sp<DeviceDescriptor> &srcDevice, const sp<DeviceDescriptor> &sinkDevice,
         uint32_t delayMs) {
     sp<SwAudioOutputDescriptor> swOutput = source->swOutput().promote();
+
+    swOutput->setClientActive(source, false);
+    swOutput->stop();
     swOutput->removeClient(source->portId(), false /*checkExists*/);
     audio_patch_handle_t handle;
     // createAudioPatchInternal() automatically handles same patch update only if the source
@@ -1027,6 +1033,9 @@ void AudioPolicyManager::rerouteTelephonyAudioSource(const sp<SourceClientDescri
     swOutput = source->swOutput().promote();
     swOutput->addClient(source);
     source->connect(handle, sinkDevice);
+    swOutput->start();
+    swOutput->setClientActive(source, true);
+
     applyStreamVolumes(swOutput, {sinkDevice->type()}, delayMs);
     ALOGV("%s portd ID %d between source %s and sink %s delayMs %u", __func__, source->portId(),
         srcDevice->toString().c_str(), sinkDevice->toString().c_str(), delayMs);
@@ -7769,6 +7778,7 @@ void AudioPolicyManager::clearAudioSourcesForOutput(audio_io_handle_t output)
         if (sourceDesc != nullptr && sourceDesc->swOutput().promote() != nullptr
                 && sourceDesc->swOutput().promote()->mIoHandle == output) {
             disconnectAudioSource(sourceDesc);
+            sourceDesc->setSwOutput(nullptr);
         }
     }
 }
@@ -8777,7 +8787,7 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
             {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP, AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
              AUDIO_DEVICE_OUT_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADPHONE,
              AUDIO_DEVICE_OUT_USB_HEADSET, AUDIO_DEVICE_OUT_HEARING_AID,
-             AUDIO_DEVICE_OUT_BLE_HEADSET}).empty() &&
+             AUDIO_DEVICE_OUT_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_HEARING_AID}).empty() &&
             ((volumeSource == alarmVolumeSrc ||
               volumeSource == ringVolumeSrc) ||
              (volumeSource == toVolumeSource(AUDIO_STREAM_NOTIFICATION, false)) ||
@@ -8811,7 +8821,7 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
             if (Volume::getDeviceForVolume(deviceTypes) != AUDIO_DEVICE_OUT_SPEAKER
                     &&  !Intersection(deviceTypes, {AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
                         AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
-                        AUDIO_DEVICE_OUT_BLE_HEADSET}).empty()) {
+                        AUDIO_DEVICE_OUT_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_HEARING_AID}).empty()) {
                 // on A2DP/BLE, also ensure notification volume is not too low compared to media
                 // when intended to be played.
                 if ((volumeDb > -96.0f) &&

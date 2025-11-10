@@ -66,7 +66,8 @@ class AidlCamera3SharedDevice :
     virtual status_t notifyActive(float maxPreviewFps) override;
     virtual void notifyIdle(int64_t requestCount, int64_t resultError, bool deviceError,
             std::pair<int32_t, int32_t> mostRequestedFpsRange,
-            const std::vector<hardware::CameraStreamStats>& streamStats) override;
+            const std::vector<hardware::CameraStreamStats>& streamStats,
+            int32_t errorState) override;
     virtual void notifyShutter(const CaptureResultExtras &resultExtras,
             nsecs_t timestamp) override;
     virtual void notifyRequestQueueEmpty() {};

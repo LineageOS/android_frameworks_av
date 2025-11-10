@@ -77,4 +77,20 @@ flag {
   description: "Enable keep_threads_active in mpeg2 decoder"
   bug: "343793479"
 }
+
+flag {
+  name: "rust_aac_software_decoder"
+  is_exported: false
+  namespace: "codec_fwk"
+  description: "Enable rust AAC software decoder"
+  bug: "192065335"
+}
+
+flag {
+  name: "xhe_aac_software_encoder"
+  is_exported: false
+  namespace: "codec_fwk"
+  description: "Enable xHE-AAC software encoder"
+  bug: "449005879"
+}
 # go/keep-sorted end

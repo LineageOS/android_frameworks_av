@@ -226,6 +226,16 @@ private:
     // Get all the resource status for dump
     virtual void getResourceDump(std::string& resourceLog) const;
 
+    // log OEM/HAL resource availability status in comparison with the required resources.
+    // NOTE: this is implemented only for ResourceManagerServiceNew.
+    virtual void logResourceAvailability(const ClientInfoParcel& clientInfo,
+                                         bool isCodecStarted,
+                                         const std::vector<MediaResourceParcel>& resources) {
+        (void)clientInfo;
+        (void)isCodecStarted;
+        (void)resources;
+    }
+
     // The following utility functions are used only for testing by ResourceManagerServiceTest
     // START: TEST only functions
     // Get the peak concurrent pixel count (associated with the video codecs) for the process.
@@ -245,6 +255,19 @@ private:
         // Implemented by the refactored/new RMService
         (void)processPriority;
         (void)clientImportance;
+    }
+
+    // Get Available resources.
+    virtual std::vector<MediaResourceParcel> getAvailableResource() const {
+        // Implemented by the refactored/new RMService
+        return {};
+    }
+
+    // Get the details on resource tracking events.
+    virtual void getResourceTrackingDetails(int* events, int* matches) const {
+        (void)events;
+        (void)matches;
+        // Implemented by the refactored/new RMService
     }
     // END: TEST only functions
 

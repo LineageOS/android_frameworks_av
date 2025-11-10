@@ -24,7 +24,9 @@
 #include <string>
 
 #include "aidl/android/companion/virtualcamera/Format.h"
+#include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/hardware/camera/common/Status.h"
+#include "aidl/android/hardware/camera/device/Stream.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "android/binder_auto_utils.h"
 #include "android/hardware_buffer.h"
@@ -100,6 +102,17 @@ class PlanesLockGuard {
   status_t mLockStatus = DEAD_OBJECT;
 };
 
+// Template for easily making simple deleters. Used to make the right deleter
+// type for the unique_ptr aliases, e.g. ScopedAImageReader
+template <typename T, void (*Deleter)(T*)>
+struct CustomDeleter {
+  void operator()(T* ptr) const {
+    if (ptr != nullptr) {
+      (*Deleter)(ptr);
+    }
+  }
+};
+
 // Converts camera AIDL status to ndk::ScopedAStatus
 inline ndk::ScopedAStatus cameraStatus(
     const ::aidl::android::hardware::camera::common::Status status) {
@@ -115,13 +128,48 @@ sp<Fence> importFence(
     const ::aidl::android::hardware::common::NativeHandle& handle);
 
 // Returns true if specified pixel format is supported for virtual camera input.
-bool isPixelFormatSupportedForInput(
+bool isImageFormatSupportedForInput(
     ::aidl::android::companion::virtualcamera::Format format);
 
 // Returns true if specified format is supported for virtual camera input.
 bool isFormatSupportedForInput(
     int width, int height,
     ::aidl::android::companion::virtualcamera::Format format, int maxFps);
+
+// Returns true if specified format represents a BLOB type
+bool isBlobFormat(::aidl::android::companion::virtualcamera::Format format);
+
+// Returns true if specified HAL stream is HEIC
+bool isHeicStreamConfig(
+    const ::aidl::android::hardware::camera::device::Stream& stream);
+
+// Returns true if specified HAL stream a supported BLOB type
+bool isBlobStreamConfig(
+    const ::aidl::android::hardware::camera::device::Stream& stream);
+
+// Returns true if the HAL stream and the internal stream config represent
+// matching BLOB types
+bool areMatchingBlobTypes(
+    const ::aidl::android::hardware::camera::device::Stream& halStream,
+    const ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration&
+        internalStreamConfig);
+
+// Returns true if the HAL stream and the internal stream config represent
+// matching BLOB types
+bool areMatchingBlobTypes(
+    const ::aidl::android::hardware::camera::device::Stream& a,
+    const ::aidl::android::hardware::camera::device::Stream& b);
+
+// Returns true if the HAL stream and the internal stream config represent
+// matching BLOB types
+bool areMatchingBlobTypes(
+    const ::aidl::android::companion::virtualcamera::Format a,
+    const ::aidl::android::companion::virtualcamera::Format b);
+
+// Returns true if both formats represent BLOB types and they match
+bool areDifferentBlobTypes(
+    const ::aidl::android::companion::virtualcamera::Format a,
+    const ::aidl::android::companion::virtualcamera::Format b);
 
 // Representation of resolution / size.
 struct Resolution {

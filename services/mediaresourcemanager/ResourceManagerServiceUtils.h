@@ -140,6 +140,12 @@ struct ResourceList {
     // Converts resource list into string format
     std::string toString() const;
 
+    // Assign/Set a new values for ResourceList.
+    // This will overwrite the earlier values, if there were any.
+    void set(const std::vector<::aidl::android::media::MediaResourceParcel>& resourceList) {
+        mResourceList = resourceList;
+    }
+
     // BEGIN: Test only function
     // Check if two resource lists are the same.
     bool operator==(const ResourceList& rhs) const;
@@ -263,6 +269,22 @@ ResourceInfo& getResourceInfoForEdit(
 // Merge resources from r2 into r1.
 void mergeResources(::aidl::android::media::MediaResourceParcel& r1,
                     const ::aidl::android::media::MediaResourceParcel& r2);
+
+/**
+ * @brief Calculates the difference (delta) between two vectors of resources.
+ *
+ * This function subtracts the amount of each resource in resourcesWhat from the amount
+ * of the matching resource in resourcesFrom.
+ * Resources unique to resourcesFrom retain their amount.
+ * Resources unique to resourcesWhat are included with a negated amount.
+ *
+ * @param resourcesFrom The base vector (Minuend).
+ * @param resourcesWhat The vector to subtract (Subtrahend).
+ * @return std::vector<MediaResourceParcel> The resultant vector containing the difference (Delta).
+ */
+std::vector<::aidl::android::media::MediaResourceParcel> calculateResourceDifference(
+        const std::vector<::aidl::android::media::MediaResourceParcel>& resourcesFrom,
+        const std::vector<::aidl::android::media::MediaResourceParcel>& resourcesWhat);
 
 // To notify the media_resource_monitor about the resource being granted.
 void notifyResourceGranted(

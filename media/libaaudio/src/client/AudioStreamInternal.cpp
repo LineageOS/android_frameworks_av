@@ -25,7 +25,6 @@
 #include <aaudio/AAudio.h>
 #include <aaudio/IAAudioClientCallback.h>
 #include <binder/IServiceManager.h>
-#include <core/AudioStreamBuilder.h>
 #include <cutils/properties.h>
 #include <fifo/FifoBuffer.h>
 #include <media/AidlConversion.h>
@@ -88,7 +87,7 @@ AudioStreamInternal::~AudioStreamInternal() {
     ALOGD("%s() %p called", __func__, this);
 }
 
-aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
+aaudio_result_t AudioStreamInternal::open(const AAudioStreamOpenRequest& openRequest) {
 
     aaudio_result_t result = AAUDIO_OK;
     AAudioStreamRequest request;
@@ -100,7 +99,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     }
 
     // Copy requested parameters to the stream.
-    result = AudioStream::open(builder);
+    result = AudioStream::open(openRequest);
     if (result < 0) {
         return result;
     }
@@ -125,8 +124,8 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     AttributionSourceState attributionSource;
     attributionSource.uid = VALUE_OR_FATAL(android::legacy2aidl_uid_t_int32_t(getuid()));
     attributionSource.pid = VALUE_OR_FATAL(android::legacy2aidl_pid_t_int32_t(getpid()));
-    attributionSource.packageName = builder.getOpPackageName();
-    attributionSource.attributionTag = builder.getAttributionTag();
+    attributionSource.packageName = openRequest.getOpPackageName();
+    attributionSource.attributionTag = openRequest.getAttributionTag();
     attributionSource.token = sp<android::BBinder>::make();
 
     // Build the request to send to the server.
@@ -149,10 +148,10 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     request.getConfiguration().setInputPreset(getInputPreset());
     request.getConfiguration().setPrivacySensitive(isPrivacySensitive());
 
-    request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
+    request.getConfiguration().setBufferCapacity(openRequest.getBufferCapacity());
 
     request.getConfiguration().setPerformanceMode(getPerformanceMode());
-    request.getConfiguration().setSessionId(builder.getSessionId());
+    request.getConfiguration().setSessionId(openRequest.getSessionId());
 
     mServiceStreamHandleInfo = mServiceInterface.openStream(request, configurationOutput);
     if (getServiceHandle() < 0
@@ -182,9 +181,9 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     android::mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
-                 AudioGlobal_convertPerformanceModeToText(builder.getPerformanceMode()))
+                 AudioGlobal_convertPerformanceModeToText(openRequest.getPerformanceMode()))
             .set(AMEDIAMETRICS_PROP_SHARINGMODE,
-                 AudioGlobal_convertSharingModeToText(builder.getSharingMode()))
+                 AudioGlobal_convertSharingModeToText(openRequest.getSharingMode()))
             .set(AMEDIAMETRICS_PROP_ENCODINGCLIENT,
                  android::toString(requestedFormat).c_str()).record();
 
@@ -240,7 +239,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         goto error;
     }
 
-    if ((result = configureDataInformation(builder.getFramesPerDataCallback())) != AAUDIO_OK) {
+    if ((result = configureDataInformation(openRequest.getFramesPerDataCallback())) != AAUDIO_OK) {
         goto error;
     }
 
@@ -375,7 +374,7 @@ aaudio_result_t AudioStreamInternal::release_l() {
         auto serviceStreamHandleInfo = mServiceStreamHandleInfo;
         mServiceStreamHandleInfo = AAudioHandleInfo();
 
-        mServiceInterface.closeStream(serviceStreamHandleInfo);
+        mServiceInterface.closeStream(serviceStreamHandleInfo, false /*false*/);
         mCallbackBuffer.reset();
 
         // Update local frame counters so we can query them after releasing the endpoint.

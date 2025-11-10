@@ -304,6 +304,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                             // excluding HEARING_AID and BLE_HEADSET because Dialer uses
                             // setCommunicationDevice to select them explicitly
                             AUDIO_DEVICE_OUT_HEARING_AID,
+                            AUDIO_DEVICE_OUT_BLE_HEARING_AID,
                             AUDIO_DEVICE_OUT_BLE_HEADSET,
                             AUDIO_DEVICE_OUT_AUX_DIGITAL
                             }));
@@ -362,7 +363,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                                        availableOutputDevices, STRATEGY_PHONE))) {
             DeviceVector devices2;
             devices2 = availableOutputDevices.getFirstDevicesFromTypes({
-                    AUDIO_DEVICE_OUT_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_SPEAKER});
+                    AUDIO_DEVICE_OUT_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_SPEAKER,
+                    AUDIO_DEVICE_OUT_BLE_HEARING_AID});
             // devices2 cannot be empty at this point
             // Use ONLY Bluetooth LEA output when ringing in vibration mode
             if (!((getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED)
@@ -645,6 +647,10 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             device = availableDevices.getFirstExistingDevice({
                     AUDIO_DEVICE_IN_BACK_MIC, AUDIO_DEVICE_IN_BUILTIN_MIC,
                     AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_USB_HEADSET});
+            break;
+        case AUDIO_DEVICE_OUT_BLE_HEARING_AID:
+            device = availableDevices.getDevice(
+                    AUDIO_DEVICE_IN_BLE_HEARING_AID, String8(""), AUDIO_FORMAT_DEFAULT);
             break;
         case AUDIO_DEVICE_OUT_BLE_HEADSET:
             device = availableDevices.getDevice(

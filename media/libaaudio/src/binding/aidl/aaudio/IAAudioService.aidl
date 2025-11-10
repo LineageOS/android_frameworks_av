@@ -16,6 +16,7 @@
 
 package aaudio;
 
+import aaudio.DrainType;
 import aaudio.Endpoint;
 import aaudio.IAAudioClient;
 import aaudio.StreamParameters;
@@ -39,7 +40,13 @@ interface IAAudioService {
     int openStream(in StreamRequest request,
                    out StreamParameters paramsOut);
 
-    int closeStream(int streamHandle);
+    /**
+     * Close the stream.
+     * @param streamHandle a unique value to identify the stream.
+     * @param force if true, close the stream immediately. Otherwise, drain all data
+     *              and then close the stream.
+     */
+    int closeStream(int streamHandle, boolean force);
 
     /*
      * Get an immutable description of the in-memory queues
@@ -91,7 +98,7 @@ interface IAAudioService {
      * Notify the service that there are enough data in the mmap buffer. The client is suspended
      * to wait for draining written data.
      */
-    int drainStream(int streamHandle, long wakeUpNanos, boolean allowSoftWakeUp,
+    int drainStream(int streamHandle, long wakeUpNanos, DrainType drainType,
                     out TimerQueueHandle handle);
 
     /**

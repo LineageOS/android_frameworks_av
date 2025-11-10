@@ -27,7 +27,7 @@ package {
 cc_test {
     name: "vts_mediaCodecs_validate_test",
     srcs: [
-        "ValidateMediaCodecs.cpp"
+        "ValidateMediaCodecs.cpp",
     ],
     static_libs: [
         "android.hardware.audio.common.test.utility",
@@ -45,7 +45,8 @@ cc_test {
     ],
     test_suites: [
         "general-tests",
-        "vts"
+        "vts",
+        "dts",
     ],
     test_config: "vts_mediaCodecs_validate_test.xml",
 }

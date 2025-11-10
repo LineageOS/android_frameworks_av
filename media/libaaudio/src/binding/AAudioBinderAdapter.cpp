@@ -52,12 +52,13 @@ AAudioHandleInfo AAudioBinderAdapter::openStream(const AAudioStreamRequest& requ
     return {mServiceLifetimeId, result};
 }
 
-aaudio_result_t AAudioBinderAdapter::closeStream(const AAudioHandleInfo& streamHandleInfo) {
+aaudio_result_t AAudioBinderAdapter::closeStream(const AAudioHandleInfo& streamHandleInfo,
+                                                 bool force) {
     if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
         return AAUDIO_ERROR_DISCONNECTED;
     }
     aaudio_result_t result;
-    Status status = mDelegate->closeStream(streamHandleInfo.getHandle(), &result);
+    Status status = mDelegate->closeStream(streamHandleInfo.getHandle(), force, &result);
     if (!status.isOk()) {
         result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
@@ -188,7 +189,7 @@ aaudio_result_t AAudioBinderAdapter::updateTimestamp(
 
 aaudio_result_t AAudioBinderAdapter::drainStream(const aaudio::AAudioHandleInfo &streamHandleInfo,
                                                  int64_t wakeUpNanos,
-                                                 bool allowSoftWakeUp,
+                                                 DrainType drainType,
                                                  TimerQueue::handle_t* handle) {
     if (streamHandleInfo.getServiceLifetimeId() != mServiceLifetimeId) {
         return AAUDIO_ERROR_DISCONNECTED;
@@ -196,7 +197,7 @@ aaudio_result_t AAudioBinderAdapter::drainStream(const aaudio::AAudioHandleInfo 
     aaudio_result_t result;
     android::media::TimerQueueHandle aidlHandle;
     Status status = mDelegate->drainStream(
-            streamHandleInfo.getHandle(), wakeUpNanos, allowSoftWakeUp, &aidlHandle, &result);
+            streamHandleInfo.getHandle(), wakeUpNanos, drainType, &aidlHandle, &result);
     if (!status.isOk()) {
         return AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }

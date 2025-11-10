@@ -2497,7 +2497,8 @@ void CameraDeviceClient::notifyRepeatingRequestError(long lastFrameNumber) {
 void CameraDeviceClient::notifyIdle(
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         std::pair<int32_t, int32_t> mostRequestedFpsRange,
-        const std::vector<hardware::CameraStreamStats>& streamStats) {
+        const std::vector<hardware::CameraStreamStats>& streamStats,
+        int32_t errorState) {
     // Thread safe. Don't bother locking.
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
 
@@ -2522,7 +2523,7 @@ void CameraDeviceClient::notifyIdle(
             mRunningSessionStats.mUserTag,
             mRunningSessionStats.mVideoStabilizationMode,
             mRunningSessionStats.mUsedUltraWide,
-            mRunningSessionStats.mUsedSettingsOverrideZoom);
+            mRunningSessionStats.mUsedSettingsOverrideZoom, errorState);
 }
 
 void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
@@ -2657,10 +2658,12 @@ void CameraDeviceClient::detachDevice() {
     }
 
     bool hasDeviceError = mDevice->hasDeviceError();
+    int32_t deviceErrorState = mDevice->getErrorState();
     Camera2ClientBase::detachDevice();
 
     int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
-    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs, hasDeviceError);
+    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs, hasDeviceError,
+        deviceErrorState);
 }
 
 size_t CameraDeviceClient::writeResultMetadataIntoResultQueue(

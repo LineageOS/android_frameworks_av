@@ -19,6 +19,7 @@
 
 // go/keep-sorted start
 #include <aaudio/AAudio.h>
+#include <aaudio/DrainType.h>
 #include <audio_utils/TimerQueue.h>
 // go/keep-sorted end
 
@@ -52,7 +53,7 @@ public:
                                      bool inService = false);
     virtual ~AudioStreamInternalPlay() = default;
 
-    aaudio_result_t open(const AudioStreamBuilder &builder) override;
+    aaudio_result_t open(const AAudioStreamOpenRequest& openRequest) override;
 
     aaudio_result_t requestPause_l() REQUIRES(mStreamMutex) override;
 
@@ -150,8 +151,9 @@ private:
 
     void dropPresentationEndCallback_l() REQUIRES(mStreamMutex);
 
-    aaudio_result_t drainStream_l(int64_t wakeUpNanos, bool allowSoftWakeUp) REQUIRES(mStreamMutex);
+    aaudio_result_t drainStream_l(int64_t wakeUpNanos, DrainType drainType) REQUIRES(mStreamMutex);
     aaudio_result_t activateStream_l() REQUIRES(mStreamMutex);
+    aaudio_result_t drainStream(DrainType drainType) EXCLUDES(mStreamMutex);
 
     bool mOffloadEosPending GUARDED_BY(mStreamMutex){false};
     std::condition_variable mStreamEndCV;

@@ -48,6 +48,26 @@ void ResourceManagerServiceNew::init() {
     setUpReclaimPolicies();
 }
 
+// Check whether the codec availability feature is on or off.
+inline bool IsCodecAvailabilityFeatureOn() {
+    if (android::media::codec::codec_availability() &&
+        android::media::codec::codec_availability_support()) {
+        return true;
+    }
+
+    return false;
+}
+
+// Check whether the codec availability metrics is on or off.
+inline bool IsCodecAvailabilityMetricsFeatureOn() {
+    if (IsCodecAvailabilityFeatureOn() &&
+        android::media::codec::codec_availability_metrics()) {
+        return true;
+    }
+
+    return false;
+}
+
 void ResourceManagerServiceNew::setUpResourceModels() {
     std::scoped_lock lock{mLock};
     // Create/Configure the default resource model.
@@ -96,6 +116,9 @@ Status ResourceManagerServiceNew::addResource(
     mServiceLog->add(log);
 
     std::scoped_lock lock{mLock};
+    // log resource availability status
+    logResourceAvailability(clientInfo, true /* codec has been started */, resources);
+
     mResourceTracker->addResource(clientInfo, client, resources);
     notifyResourceGranted(pid, resources);
 
@@ -250,18 +273,24 @@ Status ResourceManagerServiceNew::getMediaResourceUsageReport(
 
 Status ResourceManagerServiceNew::registerSystemResource(
         const std::vector<MediaResourceParcel>& resources) {
-    (void)resources;
-    // Not implemented
+    if (IsCodecAvailabilityMetricsFeatureOn()) {
+        std::scoped_lock lock{mLock};
+        mResourceModel->registerSystemResource(resources);
+    }
     return Status::ok();
+}
+
+inline bool ResourceManagerServiceNew::checkResourceAvailability_l(
+    const std::vector<MediaResourceParcel>& resourcesNeeded) const {
+    return mResourceModel->checkResourceAvailability(resourcesNeeded);
 }
 
 Status ResourceManagerServiceNew::checkResourceAvailability(
         const std::vector<MediaResourceParcel>& resourcesNeeded,
         bool* _aidl_return) {
-    (void)resourcesNeeded;
-    // Not implemented
-    if (_aidl_return) {
-        *_aidl_return = false;
+    if (IsCodecAvailabilityMetricsFeatureOn() && _aidl_return) {
+        std::scoped_lock lock{mLock};
+        *_aidl_return = checkResourceAvailability_l(resourcesNeeded);
     }
     return Status::ok();
 }
@@ -280,6 +309,38 @@ Status ResourceManagerServiceNew::updateResource(
     mResourceTracker->updateResource(clientInfo, resources);
 
     return Status::ok();
+}
+
+void ResourceManagerServiceNew::logResourceAvailability(
+        const ClientInfoParcel& clientInfo,
+        bool isCodecStarted,
+        const std::vector<MediaResourceParcel>& resources) {
+    if (IsCodecAvailabilityMetricsFeatureOn()) {
+        std::vector<MediaResourceParcel> systemResources;
+        systemResources.reserve(resources.size());
+        for (const MediaResourceParcel& res : resources) {
+            // Ignore the other resource types.
+            if (res.type >= MediaResourceType::kHwResourceTypeMin) {
+                systemResources.push_back(res);
+            }
+        }
+        if (systemResources.empty()) {
+            // No system resources. So nothing to do.
+            return;
+        }
+        bool available = checkResourceAvailability_l(systemResources);
+        mResourceManagerMetrics->pushResourceStatusAtom(clientInfo, isCodecStarted, available);
+    }
+}
+
+std::vector<MediaResourceParcel> ResourceManagerServiceNew::getAvailableResource() const {
+    std::scoped_lock lock{mLock};
+    return mResourceModel->getAvailableResources();
+}
+
+void ResourceManagerServiceNew::getResourceTrackingDetails(int* events, int* matches) const {
+    std::scoped_lock lock{mLock};
+    return mResourceManagerMetrics->getResourceTrackingDetails(events, matches);
 }
 
 void ResourceManagerServiceNew::getResourceDump(std::string& resourceLog) const {

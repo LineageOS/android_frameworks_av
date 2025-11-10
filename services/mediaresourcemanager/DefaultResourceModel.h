@@ -19,6 +19,7 @@
 #define ANDROID_MEDIA_DEFAULTRESOURCEMODEL_H_
 
 #include "IResourceModel.h"
+#include "ResourceManagerServiceUtils.h"
 
 namespace android {
 
@@ -56,6 +57,33 @@ public:
     bool getAllClients(const ReclaimRequestInfo& reclaimRequestInfo,
                        std::vector<ClientInfo>& clients) override;
 
+    /**
+     * Register the globally available system resources (for this resource model).
+     *
+     * @param[in] resources an array of resources to be registered.
+     */
+    void registerSystemResource(
+            const std::vector<MediaResourceParcel>& resources) override;
+
+    /**
+     * Checks if the system has enough of the specified list of resources.
+     *
+     * @param[in] resourcesNeeded The list of resources required.
+     *
+     * @return true if resources are likely available, false otherwise.
+     */
+    bool checkResourceAvailability(
+            const std::vector<MediaResourceParcel>& resourcesNeeded) const override;
+
+    /**
+     * Get a list of currently available resources.
+     *
+     * A given resource model implementation may choose to return an empty list if it doesn't
+     * track the available resources.
+     *
+     */
+    std::vector<MediaResourceParcel> getAvailableResources() const override;
+
 protected:
     bool getCodecClients(const ReclaimRequestInfo& reclaimRequestInfo,
                          std::vector<ClientInfo>& clients);
@@ -66,6 +94,8 @@ protected:
     bool mSupportsMultipleSecureCodecs;
     bool mSupportsSecureWithNonSecureCodec;
     std::shared_ptr<ResourceTracker> mResourceTracker;
+    // Global resource list.
+    ResourceList mGlobalResourceList;
 };
 
 } // namespace android

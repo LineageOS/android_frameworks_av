@@ -132,11 +132,18 @@ aaudio_channel_mask_t kAAudioChannelMasks[] = {
     AAUDIO_CHANNEL_9POINT1POINT6,
 };
 
+DrainType kDrainTypes[] = {
+    aaudio::DrainType::DRAIN_ALL_DATA,
+    aaudio::DrainType::DRAIN_ALL_ALLOW_SOFT_WAKEUP,
+    aaudio::DrainType::DRAIN_ALL_WITHOUT_WAKEUP_CALLBACK,
+};
+
 const size_t kNumAAudioFormats = std::size(kAAudioFormats);
 const size_t kNumAAudioUsages = std::size(kAAudioUsages);
 const size_t kNumAAudioContentTypes = std::size(kAAudioContentTypes);
 const size_t kNumAAudioInputPresets = std::size(kAAudioInputPresets);
 const size_t kNumAAudioChannelMasks = std::size(kAAudioChannelMasks);
+const size_t kNumDrainTypes = std::size(kDrainTypes);
 
 class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
    public:
@@ -153,7 +160,7 @@ class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
     AAudioHandleInfo openStream(const AAudioStreamRequest &request,
                                 AAudioStreamConfiguration &configurationOutput) override;
 
-    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo, bool force) override;
 
     aaudio_result_t getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
                                          AudioEndpointParcelable &parcelable) override;
@@ -194,7 +201,7 @@ class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
 
     aaudio_result_t drainStream(const AAudioHandleInfo& streamHandleInfo,
                                 int64_t wakeUpNanos,
-                                bool allowSoftWakeUp,
+                                DrainType drainType,
                                 android::audio_utils::TimerQueue::handle_t* handle) final;
 
     aaudio_result_t activateStream(const AAudioHandleInfo& streamHandleInfo,
@@ -287,12 +294,13 @@ AAudioHandleInfo FuzzAAudioClient::openStream(const AAudioStreamRequest &request
     return {-1, AAUDIO_ERROR_NO_SERVICE};
 }
 
-aaudio_result_t FuzzAAudioClient::closeStream(const AAudioHandleInfo& streamHandleInfo) {
+aaudio_result_t FuzzAAudioClient::closeStream(const AAudioHandleInfo& streamHandleInfo,
+                                              bool force) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->closeStream(streamHandleInfo);
+    return service->closeStream(streamHandleInfo, force);
 }
 
 aaudio_result_t FuzzAAudioClient::getStreamDescription(const AAudioHandleInfo& streamHandleInfo,
@@ -365,13 +373,13 @@ aaudio_result_t FuzzAAudioClient::updateTimestamp(const AAudioHandleInfo& stream
 
 aaudio_result_t FuzzAAudioClient::drainStream(const aaudio::AAudioHandleInfo &streamHandleInfo,
                                               int64_t wakeUpNanos,
-                                              bool allowSoftWakeUp,
+                                              DrainType drainType,
                                               android::audio_utils::TimerQueue::handle_t* handle) {
     AAudioServiceInterface *service = getAAudioService();
     if (!service) {
         return AAUDIO_ERROR_NO_SERVICE;
     }
-    return service->drainStream(streamHandleInfo, wakeUpNanos, allowSoftWakeUp, handle);
+    return service->drainStream(streamHandleInfo, wakeUpNanos, drainType, handle);
 }
 
 aaudio_result_t FuzzAAudioClient::activateStream(
@@ -473,6 +481,7 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
         // invalid request, stream not opened.
         return;
     }
+    const bool forceCloseStream = fdp.ConsumeBool();
     while (fdp.remaining_bytes()) {
         AudioEndpointParcelable audioEndpointParcelable;
         AudioPlaybackRate rate = AUDIO_PLAYBACK_RATE_DEFAULT;
@@ -498,9 +507,10 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
                 break;
             case 6: {
                 const int64_t wakeUpNanos = fdp.ConsumeIntegral<int64_t>();
-                const bool allowSoftWakeUp = fdp.ConsumeBool();
+                const int drainTypeIdx = fdp.ConsumeIntegralInRange<int32_t >(0, kNumDrainTypes);
                 audio_utils::TimerQueue::handle_t handle;
-                mClient->drainStream(streamHandleInfo, wakeUpNanos, allowSoftWakeUp, &handle);
+                mClient->drainStream(
+                        streamHandleInfo, wakeUpNanos, kDrainTypes[drainTypeIdx], &handle);
             } break;
             case 7: {
                 audio_utils::TimerQueue::handle_t handle = fdp.ConsumeIntegral<int64_t>();
@@ -514,7 +524,7 @@ void OboeserviceFuzzer::process(const uint8_t *data, size_t size) {
                 break;
         }
     }
-    mClient->closeStream(streamHandleInfo);
+    mClient->closeStream(streamHandleInfo, forceCloseStream);
     assert(mClient->getDeathCount() == 0);
 }
 

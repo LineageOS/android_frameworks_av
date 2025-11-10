@@ -3950,39 +3950,16 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
     // Check the flag and not the mixer type to also boost the duplicating thread priority
     // when one of the outputs is a spatializer thread.
     if (mOutput != nullptr && ((mOutput->flags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0)) {
-        // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
-        const pid_t tid = getTid();
-        if (tid == -1) {  // odd: we are here, we must be a running thread.
-            ALOGW("%s: Cannot update Spatializer mixer thread priority, no tid", __func__);
-        } else {
-            // TODO(b/446232495): Fix the role / responsibility problem here:
-            const int priorityBoost = requestSpatializerPriority(getpid(), tid);
-            if (priorityBoost > 0) {
-                stream()->setHalThreadPriority(priorityBoost);
-            }
+        const int priority = getSpatializerThreadPriority();
+        if (priority > 0) {
+            boostThreadPriority(priority);
         }
     } else if (shouldTrackRunRealtimePriority()) {
         // In ARC experiments (b/73091832), the latency under using CFS scheduler with any priority
         // is not enough for PlaybackThread to process audio data in time. We request the lowest
         // real-time priority, SCHED_FIFO=1, for PlaybackThread in ARC. ro.boot.container is true
         // only on ARC.
-        // TODO(b/446232495): Refactor to use ThreadBase::boostThreadPriority.
-        const pid_t tid = getTid();
-        if (tid == -1) {
-            ALOGW("%s: Cannot update PlaybackThread priority, no tid", __func__);
-        } else {
-            const status_t status = requestPriority(getpid(),
-                                                    tid,
-                                                    kPriorityPlaybackThreadArc,
-                                                    false /* isForApp */,
-                                                    true /* asynchronous */);
-            if (status != OK) {
-                ALOGW("%s: Cannot update PlaybackThread priority for ARC, status %d", __func__,
-                        status);
-            } else {
-                stream()->setHalThreadPriority(kPriorityPlaybackThreadArc);
-            }
-        }
+        boostThreadPriority(kPriorityPlaybackThreadArc);
     } else if (isWatch()) {
         // Testing on the watch has shown that boosting the priority of playback threads reduces the
         // probability of speaker pops due to the AP dropping audio samples when running under heavy

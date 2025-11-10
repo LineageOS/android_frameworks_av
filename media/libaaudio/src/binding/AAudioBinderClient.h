@@ -65,7 +65,7 @@ public:
     AAudioHandleInfo openStream(const AAudioStreamRequest &request,
                                 AAudioStreamConfiguration &configurationOutput) override;
 
-    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo) override;
+    aaudio_result_t closeStream(const AAudioHandleInfo& streamHandleInfo, bool force) override;
 
     /* Get an immutable description of the in-memory queues
     * used to communicate with the underlying HAL or Service.
@@ -123,7 +123,7 @@ public:
 
     aaudio_result_t drainStream(const AAudioHandleInfo& streamHandleInfo,
                                 int64_t wakeupNanos,
-                                bool allowSoftWakeUp,
+                                DrainType drainType,
                                 android::audio_utils::TimerQueue::handle_t* handle) override;
 
     aaudio_result_t activateStream(const AAudioHandleInfo& streamHandleInfo,

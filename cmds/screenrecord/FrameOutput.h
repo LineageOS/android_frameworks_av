@@ -22,6 +22,10 @@
 
 #include <gui/BufferQueue.h>
 #include <gui/GLConsumer.h>
+#include <utils/Mutex.h>
+
+#include <condition_variable>
+#include <mutex>
 
 namespace android {
 
@@ -30,27 +34,21 @@ namespace android {
  */
 class FrameOutput : public GLConsumer::FrameAvailableListener {
 public:
-    FrameOutput() : mFrameAvailable(false),
-        mExtTextureName(0),
-        mPixelBuf(NULL)
-        {}
+  FrameOutput() : mNumFramesAvailable(0), mExtTextureName(0), mPixelBuf(NULL) {}
 
-    // Create an "input surface", similar in purpose to a MediaCodec input
-    // surface, that the virtual display can send buffers to.  Also configures
-    // EGL with a pbuffer surface on the current thread.
-    status_t createInputSurface(int width, int height,
-            sp<IGraphicBufferProducer>* pBufferProducer);
+  // Create an "input surface", similar in purpose to a MediaCodec input
+  // surface, that the virtual display can send buffers to.  Also configures
+  // EGL with a pbuffer surface on the current thread.
+  status_t createInputSurface(int width, int height, sp<IGraphicBufferProducer>* pBufferProducer);
 
-    // Copy one from input to output.  If no frame is available, this will wait up to the
-    // specified number of microseconds.
-    //
-    // Returns ETIMEDOUT if the timeout expired before we found a frame.
-    status_t copyFrame(FILE* fp, long timeoutUsec, bool rawFrames);
+  // Copy one from input to output.  If no frame is available, this will wait up to the
+  // specified number of microseconds.
+  //
+  // Returns ETIMEDOUT if the timeout expired before we found a frame.
+  status_t copyFrame(FILE* fp, long timeoutUsec, bool rawFrames);
 
-    // Prepare to copy frames.  Makes the EGL context used by this object current.
-    void prepareToCopy() {
-        mEglWindow.makeCurrent();
-    }
+  // Prepare to copy frames.  Makes the EGL context used by this object current.
+  void prepareToCopy() { mEglWindow.makeCurrent(); }
 
 private:
     FrameOutput(const FrameOutput&);
@@ -70,12 +68,13 @@ private:
     // Put a 32-bit value into a buffer, in little-endian byte order.
     static void setValueLE(uint8_t* buf, uint32_t value);
 
-    // Used to wait for the FrameAvailableListener callback.
-    Mutex mMutex;
-    Condition mEventCond;
+    // Used to wait for the FrameAvailableListener callback. Guards mNumFramesAvailable, nothing
+    // else.
+    std::mutex mMutex;
+    std::condition_variable mEventCond;
 
-    // Set by the FrameAvailableListener callback.
-    bool mFrameAvailable;
+    // Incremented by the FrameAvailableListener callback, decremented by copyFrame.
+    size_t mNumFramesAvailable GUARDED_BY(mMutex);
 
     // This receives frames from the virtual display and makes them available
     // as an external texture.

@@ -20,6 +20,7 @@
 #include <assert.h>
 #include <mutex>
 
+#include <aaudio/DrainType.h>
 #include <aaudio/IAAudioClientCallback.h>
 #include <android-base/thread_annotations.h>
 #include <android/media/audio/common/AudioPlaybackRate.h>
@@ -86,7 +87,12 @@ public:
     // because we had to wait until we generated the handle.
     void logOpen(aaudio_handle_t streamHandle);
 
-    aaudio_result_t close() EXCLUDES(mLock);
+    /**
+     * Close the stream.
+     * @param force If true, close the stream immediately. Otherwise, drain all data and then
+     *              close the stream.
+     */
+    aaudio_result_t close(bool force) EXCLUDES(mLock);
 
     /**
      * Start the flow of audio data.
@@ -127,7 +133,7 @@ public:
 
     aaudio_result_t updateTimestamp() EXCLUDES(mLock);
 
-    aaudio_result_t drain(int64_t wakeUpNanos, bool allowSoftWakeUp,
+    aaudio_result_t drain(int64_t wakeUpNanos, DrainType drainType,
                           android::audio_utils::TimerQueue::handle_t* handle) EXCLUDES(mLock);
 
     aaudio_result_t activate(android::audio_utils::TimerQueue::handle_t handle) EXCLUDES(mLock);
@@ -318,6 +324,14 @@ protected:
         android::media::audio::common::AudioPlaybackRate* mRate;
     };
 
+    class CloseParam : public AAudioCommandParam {
+    public:
+        explicit CloseParam(bool force)
+                : AAudioCommandParam(), mForce(force) { }
+
+        const bool mForce;
+    };
+
     void setState(aaudio_stream_state_t state);
 
     /**
@@ -412,14 +426,14 @@ protected:
 
     class DrainParam : public AAudioCommandParam {
     public:
-        DrainParam(int64_t wakeUpNanos, bool allowSoftWakeUp,
+        DrainParam(int64_t wakeUpNanos, DrainType drainType,
                    android::audio_utils::TimerQueue::handle_t* handle)
                 : AAudioCommandParam(), mWakeUpNanos(wakeUpNanos),
-                  mAllowSoftWakeUp(allowSoftWakeUp), mHandle(handle) { }
+                  mDrainType(drainType), mHandle(handle) { }
         ~DrainParam() override = default;
 
         int64_t mWakeUpNanos;
-        bool mAllowSoftWakeUp;
+        DrainType mDrainType;
         android::audio_utils::TimerQueue::handle_t* mHandle;
     };
 

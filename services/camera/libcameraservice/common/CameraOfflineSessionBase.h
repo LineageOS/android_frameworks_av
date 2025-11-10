@@ -47,7 +47,7 @@ class NotificationListener : public virtual RefBase {
     virtual status_t notifyActive(float maxPreviewFps) = 0;
     virtual void notifyIdle(int64_t requestCount, int64_t resultError, bool deviceError,
             std::pair<int32_t, int32_t> mostRequestedFpsRange,
-            const std::vector<hardware::CameraStreamStats>& streamStats) = 0;
+            const std::vector<hardware::CameraStreamStats>& streamStats, int32_t errorState) = 0;
 
     // Required only for API2
     virtual void notifyShutter(const CaptureResultExtras &resultExtras,

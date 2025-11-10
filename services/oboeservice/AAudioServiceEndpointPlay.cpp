@@ -30,7 +30,6 @@
 #include <mutex>
 #include <vector>
 
-#include "core/AudioStreamBuilder.h"
 #include "AAudioServiceEndpoint.h"
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceEndpointPlay.h"

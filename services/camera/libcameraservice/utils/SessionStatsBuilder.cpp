@@ -50,12 +50,14 @@ status_t SessionStatsBuilder::removeStream(int id) {
 void SessionStatsBuilder::buildAndReset(int64_t* requestCount,
         int64_t* errorResultCount, bool* deviceError,
         std::pair<int32_t, int32_t>* mostRequestedFpsRange,
-        std::map<int, StreamStats>* statsMap) {
+        std::map<int, StreamStats>* statsMap,
+        int32_t* errorState) {
     std::lock_guard<std::mutex> l(mLock);
     *requestCount = mRequestCount;
     *errorResultCount = mErrorResultCount;
     *deviceError = mDeviceError;
     *statsMap = mStatsMap;
+    *errorState = mErrorState;
 
     int32_t minFps = 0, maxFps = 0;
     if (mRequestedFpsRangeHistogram.size() > 0) {
@@ -77,6 +79,7 @@ void SessionStatsBuilder::buildAndReset(int64_t* requestCount,
     mDeviceError = false;
     mUserTag.clear();
     mRequestedFpsRangeHistogram.clear();
+    mErrorState = 0;
 
     for (auto& streamStats : mStatsMap) {
         StreamStats& streamStat = streamStats.second;
@@ -137,9 +140,15 @@ void SessionStatsBuilder::incResultCounter(bool dropped) {
     if (dropped) mErrorResultCount++;
 }
 
-void SessionStatsBuilder::onDeviceError() {
+void SessionStatsBuilder::onDeviceError(int32_t errorState) {
     std::lock_guard<std::mutex> l(mLock);
     mDeviceError = true;
+    mErrorState = errorState;
+}
+
+int32_t SessionStatsBuilder::getErrorState() {
+    std::lock_guard<std::mutex> l(mLock);
+    return mErrorState;
 }
 
 void SessionStatsBuilder::incFpsRequestedCount(int32_t minFps, int32_t maxFps,

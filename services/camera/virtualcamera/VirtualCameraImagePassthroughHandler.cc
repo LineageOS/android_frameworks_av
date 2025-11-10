@@ -1,0 +1,297 @@
+/*
+ * Copyright (C) 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+// #define LOG_NDEBUG 0
+#define LOG_TAG "VirtualCameraImagePassthroughHandler"
+
+#include "VirtualCameraImagePassthroughHandler.h"
+
+#include <aidl/android/hardware/camera/device/CameraBlob.h>
+#include <aidl/android/hardware/camera/device/CameraBlobId.h>
+#include <android/hardware_buffer.h>
+#include <gui/Surface.h>
+#include <media/NdkImageReader.h>
+#include <media/NdkMediaError.h>
+#include <sys/select.h>
+#include <unistd.h>
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include "VirtualCameraCaptureRequest.h"
+#include "VirtualCameraImageHandler.h"
+#include "VirtualCameraSessionContext.h"
+#include "aidl/android/companion/virtualcamera/Format.h"
+#include "aidl/android/hardware/camera/device/CameraMetadata.h"
+#include "aidl/android/hardware/camera/device/CaptureResult.h"
+#include "aidl/android/hardware/camera/device/Stream.h"
+#include "aidl/android/hardware/camera/device/StreamBuffer.h"
+#include "android/binder_auto_utils.h"
+#include "util/JpegUtil.h"
+#include "util/Util.h"
+#include "utils/Errors.h"
+
+namespace android {
+namespace companion {
+namespace virtualcamera {
+namespace {
+
+using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::hardware::camera::common::Status;
+using ::aidl::android::hardware::camera::device::CameraBlob;
+using ::aidl::android::hardware::camera::device::Stream;
+
+using ScopedAImageReader =
+    std::unique_ptr<AImageReader,
+                    CustomDeleter<AImageReader, AImageReader_delete>>;
+using ScopedAImage =
+    std::unique_ptr<AImage, CustomDeleter<AImage, AImage_delete>>;
+
+constexpr int kHardwareBufferUsageFlags = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
+                                          AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
+constexpr int kImageFrameCount = 10;
+
+constexpr int kErrorMessageSize = 256;
+
+const int kSurfaceSizeWidth = kMaxJpegSize + sizeof(CameraBlob);
+constexpr int kSurfaceSizeHeight = 1;
+
+void onImageReceived(void* context, AImageReader* /*reader*/) {
+  if (!context) {
+    ALOGE("%s: null context in onImageReceived() callback", __func__);
+    return;
+  }
+
+  VirtualCameraImagePassthroughHandler* imageConsumer =
+      reinterpret_cast<VirtualCameraImagePassthroughHandler*>(context);
+  imageConsumer->onFrameAvailable();
+}
+}  // namespace
+
+std::unique_ptr<VirtualCameraImagePassthroughHandler>
+VirtualCameraImagePassthroughHandler::create(
+    VirtualCameraSessionContext& sessionContext, Format imageFormat,
+    std::function<void(void)> frameReadyCallback) {
+  ALOGV("%s: allocating ImageReader, width=%d, height=%d, frame_count=%d",
+        __func__, kSurfaceSizeWidth, kSurfaceSizeHeight, kImageFrameCount);
+
+  AImageReader* reader = nullptr;
+  media_status_t ret = AImageReader_newWithUsage(
+      kSurfaceSizeWidth, kSurfaceSizeHeight,
+      static_cast<AIMAGE_FORMATS>(imageFormat), kHardwareBufferUsageFlags,
+      kImageFrameCount, &reader);
+
+  if (ret != AMEDIA_OK || !reader) {
+    ALOGE("%s: Fail to start RenderThread because cannot create an ImageReader",
+          __func__);
+    return nullptr;
+  }
+
+  ScopedAImageReader scopedImageReader{reader};
+
+  ANativeWindow* window = nullptr;
+  if (AImageReader_getWindow(reader, &window) != AMEDIA_OK) {
+    ALOGE("%s: Fail to get the native window of the ImageReader", __func__);
+    return nullptr;
+  }
+
+  sp<Surface> inputSurface = Surface::from(window);
+
+  auto imageConsumer = std::make_unique<VirtualCameraImagePassthroughHandler>(
+      sessionContext, imageFormat, std::move(frameReadyCallback),
+      std::move(inputSurface), std::move(scopedImageReader));
+
+  AImageReader_ImageListener imagelistener{
+      .context = imageConsumer.get(),
+      .onImageAvailable = onImageReceived,
+  };
+
+  if (AImageReader_setImageListener(reader, &imagelistener) != AMEDIA_OK) {
+    ALOGE("%s: Failed to set the image listener", __func__);
+    return nullptr;
+  }
+
+  return imageConsumer;
+}
+
+VirtualCameraImagePassthroughHandler::VirtualCameraImagePassthroughHandler(
+    VirtualCameraSessionContext& sessionContext, Format imageFormat,
+    std::function<void(void)> frameReadyCallback, sp<Surface> inputSurface,
+    std::unique_ptr<AImageReader, CustomDeleter<AImageReader, AImageReader_delete>>
+        imageReader)
+    : mSessionContext{sessionContext},
+      mImageFormat{imageFormat},
+      mOnFrameAvailable{std::move(frameReadyCallback)},
+      mIsFirstFrameDrawn{false},
+      mInputSurface{std::move(inputSurface)},
+      mImageReader{std::move(imageReader)} {
+}
+
+VirtualCameraImagePassthroughHandler::~VirtualCameraImagePassthroughHandler() {
+}
+
+bool VirtualCameraImagePassthroughHandler::waitForInputFrame(
+    const std::chrono::nanoseconds timeoutNs) {
+  AImage* image = nullptr;
+  int syncFence = 0;
+  media_status_t result = AImageReader_acquireLatestImageAsync(
+      mImageReader.get(), &image, &syncFence);
+
+  if (result != AMEDIA_OK) {
+    if (result != AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE) {
+      ALOGE(
+          "%s: failure in AImageReader_acquireLatestImageAsync(): error=%d, "
+          "syncFence=%d",
+          __func__, (int)result, syncFence);
+    }
+    return false;
+  }
+
+  // A sync fence of -1 indicates that an Image is available to be consumed
+  // immediately. Otherwise, it is necessary to wait on the fence for the next
+  // Image to arrive
+  if (syncFence != -1) {
+    fd_set fileDescriptors;
+    struct timeval timeout;
+    FD_ZERO(&fileDescriptors);
+    FD_SET(syncFence, &fileDescriptors);
+    timeout.tv_sec =
+        std::chrono::duration_cast<std::chrono::seconds>(timeoutNs).count();
+    timeout.tv_usec =
+        std::chrono::duration_cast<std::chrono::microseconds>(timeoutNs).count() -
+        std::chrono::microseconds{timeout.tv_sec}.count();
+    int fileDescriptorCeiling = syncFence + 1;
+    int result = select(fileDescriptorCeiling, &fileDescriptors, nullptr,
+                        nullptr, &timeout);
+
+    if (result == 0) {
+      ALOGD("%s: Timed out waiting for new frame", __func__);
+      return false;
+    } else if (result < 0) {
+      char errorStr[kErrorMessageSize];
+      if (strerror_r(errno, errorStr, kErrorMessageSize) == 0) {
+        ALOGE("%s: Error when waiting for sync fence to be ready: %s", __func__,
+              errorStr);
+      } else {
+        ALOGE("%s: Error when waiting for sync fence to be ready: unknown",
+              __func__);
+      }
+      return false;
+    }
+  }
+
+  ALOGV("%s: Received new image", __func__);
+  mCurrentImage = ScopedAImage{image};
+  mIsFirstFrameDrawn = true;
+  return true;
+}
+
+void VirtualCameraImagePassthroughHandler::updateTexture() {
+  // This function is generally called after the surface "on frame" callback has
+  // been triggered, so we consume the new frame immediately
+  waitForInputFrame(std::chrono::nanoseconds{0});
+}
+
+std::chrono::nanoseconds VirtualCameraImagePassthroughHandler::getTimestamp() {
+  int64_t timestampNs;
+  if (AImage_getTimestamp(mCurrentImage.get(), &timestampNs) != AMEDIA_OK) {
+    ALOGE("%s: failure during AImage_getTimestamp()", __func__);
+    return std::chrono::nanoseconds{0};
+  }
+
+  return std::chrono::nanoseconds{timestampNs};
+}
+
+bool VirtualCameraImagePassthroughHandler::isFirstFrameDrawn() {
+  return mIsFirstFrameDrawn;
+}
+
+sp<Surface> VirtualCameraImagePassthroughHandler::getInputSurface() {
+  return mInputSurface;
+}
+
+ndk::ScopedAStatus VirtualCameraImagePassthroughHandler::fillOutputBuffer(
+    const RequestSettings& /*requestSettings*/,
+    const CaptureRequestBuffer& requestBuffer, const Stream& halStreamConfig,
+    ::aidl::android::hardware::camera::device::CaptureResult& /*captureResult*/) {
+  const int streamId = requestBuffer.getStreamId();
+  const int bufferId = requestBuffer.getBufferId();
+
+  std::shared_ptr<AHardwareBuffer> hwBuffer =
+      mSessionContext.fetchHardwareBuffer(streamId, bufferId);
+  if (hwBuffer == nullptr) {
+    ALOGE("%s: Failed to fetch hardware buffer %d for streamId %d", __func__,
+          bufferId, streamId);
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  PlanesLockGuard planesLock(hwBuffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
+                             requestBuffer.getFence());
+  if (planesLock.getStatus() != OK) {
+    ALOGE("%s: Failed to lock hwBuffer planes", __func__);
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  // Avoid overwriting the CameraBlob footer, which may be placed at the very
+  // end of the BLOB buffer.
+  //
+  // See
+  // hardware/interfaces/camera/device/aidl/android/hardware/camera/device/CameraBlobId.aidl
+  int32_t outBufferSize = halStreamConfig.bufferSize - sizeof(CameraBlob);
+  uint8_t* outBuffer = reinterpret_cast<uint8_t*>((*planesLock).planes[0].data);
+
+  int planeIndex = 0;
+  uint8_t* inputBuffer = nullptr;
+  int32_t inputBufferSize = 0;
+  if (AImage_getPlaneData(mCurrentImage.get(), planeIndex, &inputBuffer,
+                          &inputBufferSize) != AMEDIA_OK) {
+    ALOGE("%s: Failure during AImage_getPlaneData()", __func__);
+    return cameraStatus(Status::INTERNAL_ERROR);
+  }
+
+  if (outBufferSize < inputBufferSize) {
+    ALOGW(
+        "%s: BLOB input consumed from surface is larger (%d bytes) than output "
+        "buffer size (%d bytes)",
+        __func__, inputBufferSize, outBufferSize);
+  }
+
+  size_t bufferSize =
+      (outBufferSize < inputBufferSize) ? outBufferSize : inputBufferSize;
+
+  // Write BLOB payload to beginning of output buffer
+  memcpy(outBuffer, inputBuffer, bufferSize);
+
+  // TODO(b/457285222): add BLOB footer to output buffer once ByteBuffer bug is
+  // resolved. Note that the footer is an optional optimization so it is
+  // acceptable to omit.
+
+  ALOGV("%s: Successfully transferred BLOB payload, format=0x%x, size=%d",
+        __func__, mImageFormat, inputBufferSize);
+
+  return ndk::ScopedAStatus::ok();
+}
+
+void VirtualCameraImagePassthroughHandler::onFrameAvailable() {
+  mOnFrameAvailable();
+}
+
+}  // namespace virtualcamera
+}  // namespace companion
+}  // namespace android

@@ -507,6 +507,7 @@ binder::Status Camera2Client::disconnect() {
     ALOGV("Camera %d: Disconnecting device", mCameraId);
 
     bool hasDeviceError = mDevice->hasDeviceError();
+    int32_t deviceErrorState = mDevice->getErrorState();
     mDevice->disconnect();
 
     {
@@ -519,7 +520,8 @@ binder::Status Camera2Client::disconnect() {
     }
 
     int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
-    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs, hasDeviceError);
+    mCameraServiceProxyWrapper->logClose(mCameraIdStr, closeLatencyMs, hasDeviceError,
+        deviceErrorState);
 
     return res;
 }

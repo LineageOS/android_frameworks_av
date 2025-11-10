@@ -213,7 +213,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     return AAUDIO_OK;
 
 error:
-    close();
+    close(true /*force*/);
     return result;
 }
 
