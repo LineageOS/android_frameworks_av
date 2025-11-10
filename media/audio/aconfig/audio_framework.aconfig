@@ -243,6 +243,7 @@ flag {
     namespace: "media_audio"
     description: "Partial flush support for classical PCM offload"
     bug: "428981741"
+    is_exported: true
 }
 
 flag {
