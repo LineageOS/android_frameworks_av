@@ -214,6 +214,7 @@ class VirtualCameraRenderThread {
 
   std::unique_ptr<VirtualCameraImageHandler> mImageHandler;
 
+  std::promise<bool> mImageHandlerInitialized;
   std::promise<sp<Surface>> mInputSurfacePromise;
   std::shared_future<sp<Surface>> mInputSurfaceFuture;
 };
