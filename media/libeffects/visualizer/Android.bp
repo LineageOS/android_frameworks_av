@@ -1,5 +1,6 @@
 // Visualizer library
 package {
+    default_team: "trendy_team_media_framework_audio",
     default_applicable_licenses: [
         "frameworks_av_media_libeffects_visualizer_license",
     ],
@@ -72,4 +73,29 @@ cc_library_shared {
     visibility: [
         "//hardware/interfaces/audio/aidl/default:__subpackages__",
     ],
+}
+
+cc_test {
+    name: "effect_visualizer_tests",
+    srcs: [
+        "EffectVisualizer.cpp",
+        "tests/effect_visualizer_tests.cpp",
+    ],
+    header_libs: [
+        "libaudioeffects",
+        "libaudioutils_headers",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    static_libs: [
+        "libgmock",
+    ],
+    cflags: [
+        "-DBUILD_FLOAT", // TODO: remove BUILD_FLOAT and SUPPORT_MC in lvm libs
+        "-DSUPPORT_MC",
+        "-Wall",
+        "-Werror",
+    ],
+    host_supported: false,
 }
