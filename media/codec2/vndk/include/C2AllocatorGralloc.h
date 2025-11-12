@@ -123,7 +123,7 @@ c2_status_t SetMetadataToGralloc4Handle(
         const android_dataspace_t dataSpace,
         const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
         const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
-        const C2Handle *const handle);
+        const C2ConstGraphicBlock &block);
 
 class C2AllocatorGralloc : public C2Allocator {
 public:
