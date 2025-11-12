@@ -269,3 +269,13 @@ flag {
         purpose: PURPOSE_FEATURE
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "cap_mandatory_preview_size_to_all_displays"
+    description: "Adjust mandatory stream combination preview size limit"
+    bug: "420675242"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
