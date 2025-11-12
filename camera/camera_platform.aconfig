@@ -222,6 +222,17 @@ flag {
 
 flag {
     namespace: "camera_platform"
+    name: "seamless_transitions"
+    is_exported: true
+    description: "Enable clients to add and remove deferred surfaces during capture sessions"
+    bug: "329909911"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}
+
+flag {
+    namespace: "camera_platform"
     name: "surface_format_fix"
     description: "Consider format overrides for RGB output formats"
     bug: "424865503"

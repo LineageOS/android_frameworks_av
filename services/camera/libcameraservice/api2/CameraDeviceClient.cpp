@@ -1195,9 +1195,11 @@ binder::Status CameraDeviceClient::createStreamLocked(
         const hardware::camera2::params::OutputConfiguration &outputConfiguration,
         /*out*/
         int32_t* newStreamId) {
-    if (!outputConfiguration.isComplete()) {
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "OutputConfiguration isn't valid!");
+    if (!flags::seamless_transitions()) {
+        if (!outputConfiguration.isComplete()) {
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "OutputConfiguration isn't valid!");
+        }
     }
 
     const std::vector<ParcelableSurfaceType>& surfaces = outputConfiguration.getSurfaces();
@@ -1408,9 +1410,11 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
-    if (!outputConfiguration.isComplete()) {
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "OutputConfiguration isn't valid!");
+    if (!flags::seamless_transitions()) {
+        if (!outputConfiguration.isComplete()) {
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "OutputConfiguration isn't valid!");
+        }
     }
 
     // Infer the surface info for deferred surface stream creation.
@@ -1575,43 +1579,60 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
 
     Mutex::Autolock icl(mBinderSerializationLock);
 
+    return updateOutputConfigurationLocked(streamId, outputConfiguration);
+}
+
+binder::Status CameraDeviceClient::updateOutputConfigurationLocked(int streamId,
+        const hardware::camera2::params::OutputConfiguration &outputConfiguration,
+        bool replaceSurface, int64_t* lastFrameNumber) {
+    ATRACE_CALL();
+    binder::Status res;
     if (!mDevice.get()) {
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
-    if (!outputConfiguration.isComplete()) {
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "OutputConfiguration isn't valid!");
+    if (!flags::seamless_transitions()) {
+        if (!outputConfiguration.isComplete()) {
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "OutputConfiguration isn't valid!");
+        }
     }
 
+    bool replaceEnabled = replaceSurface && flags::seamless_transitions();
     const std::vector<ParcelableSurfaceType>& surfaces = outputConfiguration.getSurfaces();
     const std::string& physicalCameraId = outputConfiguration.getPhysicalCameraId();
 
-    auto producerCount = surfaces.size();
-    if (producerCount == 0) {
-        ALOGE("%s: surfaces must not be empty", __FUNCTION__);
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                            "surfaces must not be empty");
+    if (!replaceEnabled) {
+        auto producerCount = surfaces.size();
+        if (producerCount == 0) {
+            ALOGE("%s: surfaces must not be empty", __FUNCTION__);
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                                "surfaces must not be empty");
+        }
     }
 
-    // The first output is the one associated with the output configuration.
-    // It should always be present, valid and the corresponding stream id should match.
-    SurfaceKey surfaceKey;
-    status_t ret = getSurfaceKey(surfaces[0], &surfaceKey);
-    if(ret != OK) {
-        ALOGE("%s: Camera %s: Could not get the SurfaceKey", __FUNCTION__, mCameraIdStr.c_str());
-        return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, "Could not get the SurfaceKey");
-    }
-    ssize_t index = mStreamMap.indexOfKey(surfaceKey);
-    if (index == NAME_NOT_FOUND) {
-        ALOGE("%s: Outputconfiguration is invalid", __FUNCTION__);
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "OutputConfiguration is invalid");
-    }
-    if (mStreamMap.valueFor(surfaceKey).streamId() != streamId) {
-        ALOGE("%s: Stream Id: %d provided doesn't match the id: %d in the stream map",
-                __FUNCTION__, streamId, mStreamMap.valueFor(surfaceKey).streamId());
-        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
-                "Stream id is invalid");
+    if (!replaceEnabled) {
+        // The first output is the one associated with the output configuration.
+        // It should always be present, valid and the corresponding stream id should match.
+        SurfaceKey surfaceKey;
+        status_t ret = getSurfaceKey(surfaces[0], &surfaceKey);
+        if(ret != OK) {
+            ALOGE("%s: Camera %s: Could not get the SurfaceKey", __FUNCTION__,
+                    mCameraIdStr.c_str());
+            return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION,
+                    "Could not get the SurfaceKey");
+        }
+        ssize_t index = mStreamMap.indexOfKey(surfaceKey);
+        if (index == NAME_NOT_FOUND) {
+            ALOGE("%s: Outputconfiguration is invalid", __FUNCTION__);
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "OutputConfiguration is invalid");
+        }
+        if (mStreamMap.valueFor(surfaceKey).streamId() != streamId) {
+            ALOGE("%s: Stream Id: %d provided doesn't match the id: %d in the stream map",
+                    __FUNCTION__, streamId, mStreamMap.valueFor(surfaceKey).streamId());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "Stream id is invalid");
+        }
     }
 
     std::vector<size_t> removedSurfaceIds;
@@ -1647,6 +1668,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
             newOutputsMap.removeItemsAt(idx);
         }
     }
+
     const std::vector<int32_t> &sensorPixelModesUsed =
             outputConfiguration.getSensorPixelModesUsed();
     int64_t streamUseCase = outputConfiguration.getStreamUseCase();
@@ -1676,7 +1698,8 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
     }
 
     KeyedVector<sp<Surface>, size_t> outputMap;
-    ret = mDevice->updateStream(streamId, newOutputs, streamInfos, removedSurfaceIds, &outputMap);
+    auto ret = mDevice->updateStream(streamId, newOutputs, streamInfos, removedSurfaceIds,
+            replaceEnabled, &outputMap, lastFrameNumber);
     if (ret != OK) {
         switch (ret) {
             case NAME_NOT_FOUND:
@@ -2955,6 +2978,75 @@ bool CameraDeviceClient::isSensorPixelModeConsistent(
     }
 
     return consistent;
+}
+
+binder::Status CameraDeviceClient::updateOutputConfigurations(
+        const std::vector<int32_t>& streamIds,
+        const std::vector<OutputConfiguration>& configurations) {
+    ATRACE_CALL();
+    binder::Status ret;
+    if (!flags::seamless_transitions()) {
+        ret = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, "Unsupported operation!");
+        return ret;
+    }
+    Mutex::Autolock icl(mBinderSerializationLock);
+
+    if (!mDevice.get()) {
+        return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
+    }
+
+    if (configurations.empty()) {
+        std::string msg = fmt::sprintf("Camera %s: Empty output configurations!",
+                mCameraIdStr.c_str());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+
+    if (streamIds.size() != configurations.size()) {
+        std::string msg = fmt::sprintf("Camera %s: Stream ids size: %zu doesn't match"
+                " configurations size: %zu!", mCameraIdStr.c_str(), streamIds.size(),
+                configurations.size());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+
+    // The current implementation doesn't support composite and shared stream updates
+    for (size_t i = 0; i < streamIds.size(); i++) {
+        if (configurations[i].isShared()) {
+            std::string msg = fmt::sprintf("Camera %s: Shared stream updates are"
+                    " not supported!", mCameraIdStr.c_str());
+            ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+        }
+
+        size_t compositeIdx = 0;
+        for (; compositeIdx < mCompositeStreamMap.size(); compositeIdx++) {
+            if (streamIds[i] == mCompositeStreamMap.valueAt(compositeIdx)->getStreamId()) {
+                std::string msg = fmt::sprintf("Camera %s: Composite stream updates are"
+                        " not supported!", mCameraIdStr.c_str());
+                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+            }
+        }
+    }
+
+    for (size_t i = 0; i < streamIds.size(); i++) {
+        int64_t lastRepeatingFrameNumber = -1;
+        ret = updateOutputConfigurationLocked(streamIds[i], configurations[i],
+                true/*replaceSurface*/, &lastRepeatingFrameNumber);
+        if (!ret.isOk()) {
+            return ret;
+        }
+
+        if (lastRepeatingFrameNumber >= 0) {
+            Mutex::Autolock idLock(mStreamingRequestIdLock);
+            if (mStreamingRequestId != REQUEST_ID_NONE) {
+                mStreamingRequestId = REQUEST_ID_NONE;
+            }
+        }
+    }
+
+    return ret;
 }
 
 } // namespace android

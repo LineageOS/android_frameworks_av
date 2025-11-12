@@ -230,7 +230,7 @@ class Camera3OutputStream :
     /**
      * Query the ouput surface id.
      */
-    virtual ssize_t getSurfaceId(const sp<Surface> &/*surface*/) { return 0; }
+    virtual ssize_t getSurfaceId(const sp<Surface> &surface);
 
     virtual int getMirrorMode() const override { return  mMirrorMode; };
 
@@ -321,6 +321,8 @@ class Camera3OutputStream :
 
     status_t getBufferLockedCommon(ANativeWindowBuffer** anb, int* fenceFd);
 
+    bool mIsShared = false;
+
   private:
 
     int               mTransform;
@@ -372,8 +374,6 @@ class Camera3OutputStream :
     // Whether to drop valid buffers.
     bool mDropBuffers;
 
-
-
     // The batch size for buffer operation
     std::atomic_size_t mBatchSize = 1;
 
@@ -384,6 +384,13 @@ class Camera3OutputStream :
     // ---- End of mBatchLock protected scope ----
 
     int mMirrorMode;
+
+    uint8_t mCurrentSurfaceId = 0;
+    typedef struct RemovedConsumer_t {
+        size_t mHandoutTotalBufferCount;
+        sp<Surface> mConsumer;
+    } RemovedConsumer;
+    std::unordered_map<size_t, RemovedConsumer> mRemovedConsumers;
 
     /**
      * Internal Camera3Stream interface
@@ -409,6 +416,12 @@ class Camera3OutputStream :
      */
     void onBuffersRemovedLocked(const std::vector<sp<GraphicBuffer>>&);
     status_t detachBufferLocked(sp<GraphicBuffer>* buffer, int* fenceFd);
+    status_t setConsumersLocked(const std::vector<SurfaceHolder>& consumers);
+    bool cancelOldBuffer(const std::vector<size_t>& surface_ids, ANativeWindowBuffer *anwBuffer,
+            int anwReleaseFence);
+    bool processRemovedConsumerLocked(
+            std::unordered_map<size_t, RemovedConsumer>::iterator& removedConsumer,
+            ANativeWindowBuffer *anwBuffer, int anwReleaseFence);
 
     // If the status indicates abandonded stream, only log when state hasn't been updated to
     // STATE_ABANDONED

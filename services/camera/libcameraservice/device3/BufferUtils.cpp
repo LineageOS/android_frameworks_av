@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <unordered_set>
 #define LOG_TAG "Camera3-BufUtils"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
@@ -119,6 +120,30 @@ uint64_t BufferRecords::removeOneBufferCache(int streamId, const native_handle_t
                 __FUNCTION__, streamId, bIdMap.size(), handle);
     }
     return bufferId;
+}
+
+void BufferRecords::clearUnusedBufferCaches(int streamId) {
+    std::lock_guard<std::mutex> lock(mBufferIdMapLock);
+    std::lock_guard<std::mutex> lockInflight(mInflightLock);
+    auto mapIt = mBufferIdMaps.find(streamId);
+    if (mapIt == mBufferIdMaps.end()) {
+        ALOGE("%s: streamId %d not found!", __FUNCTION__, streamId);
+        return;
+    }
+    std::unordered_set<const native_handle_t*> inflightHandles;
+    for (const auto& inflightIt : mInflightBufferMap) {
+        inflightHandles.emplace(*inflightIt.second);
+    }
+
+    BufferIdMap& bIdMap = mapIt->second;
+    auto it = bIdMap.begin();
+    while (it != bIdMap.end()) {
+        if (inflightHandles.find(it->first) == inflightHandles.end()) {
+            it = bIdMap.erase(it);
+        } else {
+            it++;
+        }
+    }
 }
 
 std::vector<uint64_t> BufferRecords::clearBufferCaches(int streamId) {

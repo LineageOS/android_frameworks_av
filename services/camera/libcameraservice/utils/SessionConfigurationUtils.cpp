@@ -978,9 +978,18 @@ binder::Status checkSurfaceType(size_t numBufferProducers,
     }
 
     if (deferredConsumer) {
+        bool extraValidDeferredTypes = false;
+        if (flags::seamless_transitions()) {
+            // TODO: Remove the validSurfaceType check altogether when cleaning up the flag logic.
+            extraValidDeferredTypes =
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_IMAGE_READER) ||
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_MEDIA_CODEC) ||
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_MEDIA_RECORDER);
+        }
         bool validSurfaceType = (
                 (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) ||
-                (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_TEXTURE));
+                (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_TEXTURE) ||
+                extraValidDeferredTypes);
         if (!validSurfaceType) {
             std::string msg = fmt::sprintf("Deferred target surface has invalid "
                     "surfaceType = %d.", surfaceType);

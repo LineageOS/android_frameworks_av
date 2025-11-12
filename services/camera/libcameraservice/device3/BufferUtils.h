@@ -110,6 +110,9 @@ namespace camera3 {
         // Removed buffers' ID are returned
         std::vector<uint64_t> clearBufferCaches(int streamId);
 
+        // Clear all caches that are not inflight for the given stream.
+        void clearUnusedBufferCaches(int streamId);
+
         bool isStreamCached(int streamId);
 
         // Return true if the input caches match what we have; otherwise false

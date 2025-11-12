@@ -49,7 +49,8 @@ class Camera3OutputStream;
  */
 class PreviewFrameSpacer : public Thread {
   public:
-    explicit PreviewFrameSpacer(wp<Camera3OutputStream> parent, sp<Surface> consumer);
+    explicit PreviewFrameSpacer(wp<Camera3OutputStream> parent, sp<Surface> consumer,
+            ssize_t surfaceId);
     virtual ~PreviewFrameSpacer();
 
     // Queue preview buffer locally
@@ -78,6 +79,7 @@ class PreviewFrameSpacer : public Thread {
 
     wp<Camera3OutputStream> mParent;
     sp<ANativeWindow> mConsumer;
+    ssize_t mSurfaceId;
     mutable Mutex mLock;
     Condition mBufferCond;
 

@@ -1045,6 +1045,18 @@ void finishReturningOutputBuffers(const std::vector<BufferToReturn> &returnableB
         if (res == NO_INIT || res == DEAD_OBJECT) {
             ALOGV("Can't return buffer to its stream: %s (%d)", strerror(-res), res);
             sessionStatsBuilder.stopCounter(streamId);
+        } else if (flags::seamless_transitions() && (res == UNKNOWN_TRANSACTION)) {
+            ALOGE("Buffer cancelled on non-registered surface: %s (%d)", strerror(-res), res);
+            dropped = true;
+            camera_stream_buffer_t sb = b.buffer;
+            sb.status = CAMERA_BUFFER_STATUS_ERROR;
+            if (listener != nullptr) {
+                CaptureResultExtras extras = b.resultExtras;
+                extras.errorStreamId = streamId;
+                listener->notifyError(
+                        hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER,
+                        extras);
+            }
         } else if (res != OK) {
             ALOGE("Can't return buffer to its stream: %s (%d)", strerror(-res), res);
             dropped = true;
