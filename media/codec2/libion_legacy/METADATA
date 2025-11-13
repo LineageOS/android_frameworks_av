@@ -1,0 +1,4 @@
+third_party {
+  license_note: "would be NOTICE save for GPL in original-kernel-headers/linux/*"
+  license_type: RESTRICTED
+}
