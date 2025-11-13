@@ -18,9 +18,7 @@
 #define LOG_TAG "C2AllocatorGralloc"
 #include <utils/Log.h>
 
-#include <memory>
 #include <mutex>
-#include <optional>
 
 #include <android_media_codec.h>
 #ifdef __ANDROID_APEX__
@@ -36,13 +34,11 @@
 #include <gralloctypes/Gralloc4.h>
 #include <hardware/gralloc.h>
 #include <media/stagefright/foundation/ColorUtils.h>
-#include <vndk/hardware_buffer.h>
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/GraphicBufferMapper.h>
 #include <ui/Rect.h>
 
 #include <C2AllocatorGralloc.h>
-#include <C2BlockInternal.h>
 #include <C2Buffer.h>
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
@@ -988,43 +984,7 @@ namespace {
 
 class GrallocBuffer {
 public:
-    GrallocBuffer(const C2ConstGraphicBlock &block)
-            : mOwnedBuffer(nullptr), mUnownedBuffer(nullptr) {
-        AHardwareBuffer *ahwb = nullptr;
-        std::shared_ptr<const _C2BlockPoolData> poolData =
-                _C2BlockFactory::GetGraphicBlockPoolData(block);
-        if (_C2BlockFactory::GetAHardwareBuffer(poolData, &ahwb) && ahwb) {
-            mUnownedBuffer = const_cast<native_handle_t*>(AHardwareBuffer_getNativeHandle(ahwb));
-            return;
-        }
-        // Fallback to old path
-        initFromC2Handle(block.handle());
-    }
-
-    // Old constructor
-    GrallocBuffer(const C2Handle *const handle) : mOwnedBuffer(nullptr), mUnownedBuffer(nullptr) {
-        initFromC2Handle(handle);
-    }
-
-    ~GrallocBuffer() {
-        if (mOwnedBuffer) {
-            // Free the imported buffer handle. This does not release the
-            // underlying buffer itself.
-            GraphicBufferMapper::get().freeBuffer(mOwnedBuffer);
-        }
-    }
-
-    buffer_handle_t get() const {
-        return mUnownedBuffer ? mUnownedBuffer : mOwnedBuffer;
-    }
-
-    operator bool() const { return (get() != nullptr); }
-
-private:
-    void initFromC2Handle(const C2Handle *const handle) {
-        if (!handle) {
-            return;
-        }
+    GrallocBuffer(const C2Handle *const handle) : mBuffer(nullptr) {
         GraphicBufferMapper& mapper = GraphicBufferMapper::get();
 
         // Unwrap raw buffer handle from the C2Handle
@@ -1037,11 +997,11 @@ private:
         // handle must be freed when the client is done with the buffer.
         status_t status = mapper.importBufferNoValidate(
                 nh,
-                &mOwnedBuffer);
+                &mBuffer);
 
         if (status != OK) {
             ALOGE("Failed to import buffer. Status: %d.", status);
-            // mOwnedBuffer is already nullptr
+            return;
         }
 
         // TRICKY: UnwrapNativeCodec2GrallocHandle creates a new handle but
@@ -1050,8 +1010,19 @@ private:
         native_handle_delete(nh);
     }
 
-    buffer_handle_t mOwnedBuffer;
-    buffer_handle_t mUnownedBuffer;
+    ~GrallocBuffer() {
+        GraphicBufferMapper& mapper = GraphicBufferMapper::get();
+        if (mBuffer) {
+            // Free the imported buffer handle. This does not release the
+            // underlying buffer itself.
+            mapper.freeBuffer(mBuffer);
+        }
+    }
+
+    buffer_handle_t get() const { return mBuffer; }
+    operator bool() const { return (mBuffer != nullptr); }
+private:
+    buffer_handle_t mBuffer;
 };
 
 }  // namspace
@@ -1134,23 +1105,14 @@ c2_status_t SetMetadataToGralloc4Handle(
         android_dataspace_t dataSpace,
         const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
         const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
-        const C2ConstGraphicBlock &block) {
+        const C2Handle *const handle) {
     c2_status_t err = C2_OK;
     GraphicBufferMapper& mapper = GraphicBufferMapper::get();
-
-    std::optional<GrallocBuffer> buffer_opt;
-    if (android::media::codec::provider_->ahardware_buffer_fetch_flag()) {
-        buffer_opt.emplace(block);
-    } else {
-        buffer_opt.emplace(block.handle());
-    }
-
-    if (!*buffer_opt) {
-        // Gralloc4 not supported
+    GrallocBuffer buffer(handle);
+    if (!buffer) {
+        // Gralloc4 not supported; nothing to do
         return err;
     }
-    buffer_handle_t bufferHandle = buffer_opt->get();
-
     // Use V0 dataspaces for Gralloc4+
 #ifdef __ANDROID_APEX__
     if (android::media::swcodec::flags::provider_->dataspace_v0_gralloc4()) {
@@ -1161,7 +1123,7 @@ c2_status_t SetMetadataToGralloc4Handle(
         ColorUtils::convertDataSpaceToV0(dataSpace);
     }
 #endif
-    status_t status = mapper.setDataspace(bufferHandle, static_cast<ui::Dataspace>(dataSpace));
+    status_t status = mapper.setDataspace(buffer.get(), static_cast<ui::Dataspace>(dataSpace));
     if (status != OK) {
        err = C2_CORRUPTED;
     }
@@ -1184,7 +1146,7 @@ c2_status_t SetMetadataToGralloc4Handle(
                 && 0.0 <= smpte2086->whitePoint.x && smpte2086->whitePoint.x <= 1.0
                 && 0.0 <= smpte2086->whitePoint.y && smpte2086->whitePoint.y <= 1.0
                 && 0.0 <= smpte2086->maxLuminance && 0.0 <= smpte2086->minLuminance) {
-            status = mapper.setSmpte2086(bufferHandle, smpte2086);
+            status = mapper.setSmpte2086(buffer.get(), smpte2086);
             if (status != OK) {
                 err = C2_CORRUPTED;
             }
@@ -1194,7 +1156,7 @@ c2_status_t SetMetadataToGralloc4Handle(
             staticInfo->maxFall,
         };
         if (0.0 <= cta861_3->maxContentLightLevel && 0.0 <= cta861_3->maxFrameAverageLightLevel) {
-            status = mapper.setCta861_3(bufferHandle, cta861_3);
+            status = mapper.setCta861_3(buffer.get(), cta861_3);
             if (status != OK) {
                 err = C2_CORRUPTED;
             }
@@ -1207,7 +1169,7 @@ c2_status_t SetMetadataToGralloc4Handle(
             smpte2094_40->resize(dynamicInfo->flexCount());
             memcpy(smpte2094_40->data(), dynamicInfo->m.data, dynamicInfo->flexCount());
 
-            status = mapper.setSmpte2094_40(bufferHandle, smpte2094_40);
+            status = mapper.setSmpte2094_40(buffer.get(), smpte2094_40);
             if (status != OK) {
                 err = C2_CORRUPTED;
             }
