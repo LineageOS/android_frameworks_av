@@ -282,7 +282,8 @@ static const char *kJudderEventDetailsContentDurationUs =
         "android.media.mediacodec.judder.details-content-duration-us";
 static const char *kJudderEventDetailsDistanceMs =
         "android.media.mediacodec.judder.details-distance-ms";
-
+static const char *kHdcpRetrySuccess = "android.media.mediacodec.retry-hdcp-success-count";
+static const char *kHdcpRetryFailure = "android.media.mediacodec.retry-hdcp-failure-count";
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
 
@@ -1660,6 +1661,12 @@ MediaCodec::MediaCodec(
             mTracer.reset(new Tracer(uid, pid));
         }
     }
+    if(android::media::codec::provider_->retry_decrypt_for_hdcp_failure()
+            && property_get_bool("ro.media.codec.retry_decrypt_for_hdcp_failure", false)) {
+        mRetryHdcpFailure.emplace(0, 0, 0);
+        ALOGI("Retry enabled for HDCP failure");
+    }
+
 }
 
 MediaCodec::~MediaCodec() {
@@ -1707,7 +1714,10 @@ void MediaCodec::initMediametrics() {
         mIndexOfFirstFrameWhenLowLatencyOn = -1;
         mInputBufferCounter = 0;
     }
-
+    if (mRetryHdcpFailure) {
+        std::get<1>(mRetryHdcpFailure.value()) = 0;
+        std::get<2>(mRetryHdcpFailure.value()) = 0;
+    }
     mSubsessionCount = 0;
     mLifetimeStartNs = systemTime(SYSTEM_TIME_MONOTONIC);
     resetMetricsFields();
@@ -1718,6 +1728,10 @@ void MediaCodec::resetMetricsFields() {
 
     mApiUsageMetrics = ApiUsageMetrics();
     mReliabilityContextMetrics = ReliabilityContextMetrics();
+    if (mRetryHdcpFailure) {
+        std::get<1>(mRetryHdcpFailure.value()) = 0;
+        std::get<2>(mRetryHdcpFailure.value()) = 0;
+    }
 }
 
 // always called from the looper thread (and therefore not mutexed)
@@ -1760,6 +1774,25 @@ void MediaCodec::updateMediametrics() {
             mReliabilityContextMetrics.setOutputSurfaceCount);
     mediametrics_setInt32(mMetricsHandle, kCodecResolutionChangeCount,
             mReliabilityContextMetrics.resolutionChangeCount);
+
+    if (mRetryHdcpFailure) {
+        std::tuple<uint32_t, uint32_t, uint32_t> retryHdcpMetric(0, 0, 0);
+        if (mCryptoAsync) {
+            sp<AMessage> metrics = mCryptoAsync->getMetrics();
+            sp<RefBase> obj;
+            if(metrics->findObject("retryHdcpMetric", &obj)) {
+                retryHdcpMetric = static_cast<MediaCodec::WrapperObject<
+                        std::tuple<uint32_t, uint32_t, uint32_t>>*>(obj.get())->value;
+            }
+        }
+        auto [cntr, success, failure] = retryHdcpMetric;
+        mediametrics_setInt32(
+                mMetricsHandle,
+                kHdcpRetrySuccess, std::get<1>(mRetryHdcpFailure.value()) + success);
+        mediametrics_setInt32(
+                mMetricsHandle,
+                kHdcpRetryFailure, std::get<2>(mRetryHdcpFailure.value()) + failure);
+    }
 
     // Video rendering quality metrics
     {
@@ -4532,8 +4565,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK(msg->findInt32("actionCode", &actionCode));
 
                     ALOGE("Codec reported err %#x/%s, actionCode %d, while in state %d/%s",
-                                              err, StrMediaError(err).c_str(), actionCode,
-                                              mState, stateString(mState).c_str());
+                            err,
+                            isCryptoError(err) ?
+                                    StrCryptoError(err).c_str() : StrMediaError(err).c_str(),
+                            actionCode,
+                            mState,
+                            stateString(mState).c_str());
                     if (err == DEAD_OBJECT) {
                         mFlags |= kFlagSawMediaServerDie;
                         mFlags &= ~kFlagIsComponentAllocated;
@@ -5659,7 +5696,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 // TODO (b/274628160): Enable Use of CONFIG_FLAG_USE_CRYPTO_ASYNC
                 //                     with CONFIGURE_FLAG_USE_BLOCK_MODEL)
                 if (!(mFlags & kFlagUseBlockModel)) {
-                    mCryptoAsync = new CryptoAsync(mBufferChannel);
+                    mCryptoAsync = new CryptoAsync(mBufferChannel, mRetryHdcpFailure.has_value());
                     mCryptoAsync->setCallback(
                     std::make_unique<CryptoAsyncCallback>(new AMessage(kWhatCodecNotify, this)));
                     mCryptoLooper = new ALooper();
@@ -5881,6 +5918,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
+            mInputBufferRetryQueue.clear();
+            if (mRetryHdcpFailure) {
+                std::get<0>(mRetryHdcpFailure.value()) = 0;
+            }
             stopCryptoAsync();
             sp<AMessage> asyncNotify;
             (void)msg->findMessage("async", &asyncNotify);
@@ -6128,22 +6169,50 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatQueueInputBuffer:
         {
-            sp<AReplyToken> replyID;
-            CHECK(msg->senderAwaitsResponse(&replyID));
+            auto sendReplyIfPossible = [&](status_t err) -> bool {
+                sp<AReplyToken> replyID;
+                msg->senderAwaitsResponse(&replyID);
+                if (!mRetryHdcpFailure) {
+                    CHECK(replyID != nullptr);
+                }
+                if (replyID != nullptr) {
+                    PostReplyWithError(replyID, err);
+                    return true;
+                }
+                return false;
+            };
 
             if (!isExecuting()) {
                 mErrorLog.log(LOG_TAG, base::StringPrintf(
                         "queueInputBuffer() is valid only at Executing states; currently %s",
                         apiStateString().c_str()));
-                PostReplyWithError(replyID, INVALID_OPERATION);
+                if (!sendReplyIfPossible(INVALID_OPERATION)) {
+                    setStickyError(INVALID_OPERATION);
+                    postActivityNotificationIfPossible();
+                    cancelPendingDequeueOperations();
+                }
                 break;
             } else if (mFlags & kFlagStickyError) {
-                PostReplyWithError(replyID, getStickyError());
+                mErrorLog.log(LOG_TAG, base::StringPrintf(
+                        "queueInputBuffer() failed as MediaCodec already in error; currently %s",
+                        apiStateString().c_str()));
+                sendReplyIfPossible(INVALID_OPERATION);
                 break;
+            }
+            bool isThisRetryMsg = false;
+            if (mRetryHdcpFailure) {
+                isThisRetryMsg =
+                        find(mInputBufferRetryQueue.begin(),
+                                mInputBufferRetryQueue.end(), msg) != mInputBufferRetryQueue.end();
+
+                if (!mInputBufferRetryQueue.empty() && !isThisRetryMsg) {
+                    mInputBufferRetryQueue.push_back(msg);
+                    break;
+                }
             }
 
             status_t err = UNKNOWN_ERROR;
-            if (!mLeftover.empty()) {
+            if (!mLeftover.empty() && !isThisRetryMsg) {
                 mLeftover.push_back(msg);
                 size_t index;
                 msg->findSize("index", &index);
@@ -6152,7 +6221,29 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 err = onQueueInputBuffer(msg);
             }
 
-            PostReplyWithError(replyID, err);
+            if (mRetryHdcpFailure && handleQueueInputBufferError(msg, err)) {
+                // we are retrying this message
+                msg->post(CryptoAsync::kRetryHdcpDecryptDelayUs);
+                break;
+            }
+
+            if (!sendReplyIfPossible(err) && err != OK) {
+                // for CSD or similar buffers
+                mErrorLog.log(LOG_TAG, base::StringPrintf(
+                    "queueInputBuffer() failed, with no replyID (may be CSD); currently %s",
+                    apiStateString().c_str()));
+                setStickyError(err);
+                postActivityNotificationIfPossible();
+                cancelPendingDequeueOperations();
+            }
+            if (mRetryHdcpFailure) {
+                if (err != OK) {
+                    mInputBufferRetryQueue.clear();
+                } else if (!mInputBufferRetryQueue.empty()){
+                    sp<AMessage> nextMsg = mInputBufferRetryQueue.front();
+                    nextMsg->post();
+                }
+            }
             break;
         }
 
@@ -6352,6 +6443,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             stopCryptoAsync();
             mCodec->signalFlush();
             returnBuffersToCodec();
+            mInputBufferRetryQueue.clear();
+            if (mRetryHdcpFailure) {
+                std::get<0>(mRetryHdcpFailure.value()) = 0;
+            }
             TunnelPeekState previousState = mTunnelPeekState;
             if (previousState != TunnelPeekState::kLegacyMode) {
                 mTunnelPeekState = mTunnelPeekEnabled ? TunnelPeekState::kEnabledNoBuffer :
@@ -6691,7 +6786,6 @@ void MediaCodec::extractCSD(const sp<AMessage> &format) {
 
 status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     CHECK(!mCSD.empty());
-
     sp<ABuffer> csd = *mCSD.begin();
     mCSD.erase(mCSD.begin());
     std::shared_ptr<C2Buffer> c2Buffer;
@@ -6777,7 +6871,24 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
         msg->setObject("memory", obj);
     }
 
-    return onQueueInputBuffer(msg);
+    if (mRetryHdcpFailure) {
+        if(!mInputBufferRetryQueue.empty()) {
+            mInputBufferRetryQueue.push_back(msg);
+            return OK;
+        }
+    }
+
+    status_t err = onQueueInputBuffer(msg);
+
+    if (mRetryHdcpFailure) {
+        if (handleQueueInputBufferError(msg, err)) {
+            msg->post(CryptoAsync::kRetryHdcpDecryptDelayUs);
+        } else if (err != OK) {
+            mInputBufferRetryQueue.clear();
+        }
+    }
+
+    return err;
 }
 
 void MediaCodec::setState(State newState) {
@@ -7103,6 +7214,13 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                         memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
                         offset, subSamples, numSubSamples, buffer, &errorDetailMsg);
             }
+            if (mRetryHdcpFailure
+                    && err == ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION
+                    && std::get<0>(
+                            mRetryHdcpFailure.value()) <= CryptoAsync::kMaxHdcpDecryptRetryCount) {
+                    // we need to retry
+                    return err;
+            }
             if (err != OK && hasCryptoOrDescrambler()
                     && (mFlags & kFlagUseCryptoAsync)) {
                 // create error detail
@@ -7216,6 +7334,14 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     }
 
     if (err == OK) {
+        if (mRetryHdcpFailure) {
+            auto& [cntr, success, failure] = mRetryHdcpFailure.value();
+            if (cntr > 0) {
+                // update success metric
+                success++;
+            }
+            cntr = 0;
+        }
         if (mTunneled && (flags & (BUFFER_FLAG_DECODE_ONLY | BUFFER_FLAG_END_OF_STREAM)) == 0) {
             mVideoRenderQualityTracker.onTunnelFrameQueued(timeUs);
         }
@@ -7247,6 +7373,10 @@ status_t MediaCodec::handleLeftover(size_t index) {
     mLeftover.pop_front();
     msg->setSize("index", index);
     ALOGV("handleLeftover(%zu)", index);
+    if (mRetryHdcpFailure && !mInputBufferRetryQueue.empty()) {
+        mInputBufferRetryQueue.push_back(msg);
+        return OK;
+    }
     return onQueueInputBuffer(msg);
 }
 
@@ -7895,6 +8025,35 @@ std::string MediaCodec::stateString(State state) {
             break;
     }
     return rval;
+}
+
+// Always called from the looper, henced not mutexed
+bool MediaCodec::handleQueueInputBufferError(const sp<AMessage> &msg, status_t &err) {
+    if (!mRetryHdcpFailure) {
+        return false;
+    }
+    auto retryMsgIter = find(mInputBufferRetryQueue.begin(), mInputBufferRetryQueue.end(), msg);
+    if (err != ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION) {
+        if (retryMsgIter != mInputBufferRetryQueue.end()) {
+            mInputBufferRetryQueue.erase(retryMsgIter);
+        }
+        return false;
+    }
+    auto& [cntr, success, failure] = mRetryHdcpFailure.value();
+    if (++cntr > CryptoAsync::kMaxHdcpDecryptRetryCount) {
+        mInputBufferRetryQueue.clear();
+        failure++;
+        mErrorLog.log(LOG_TAG, base::StringPrintf(
+                "HDCP retry failed due to HDCP error after(%d) max(%d) retries.",
+                cntr, CryptoAsync::kMaxHdcpDecryptRetryCount));
+        return false;
+    }
+
+    if (retryMsgIter == mInputBufferRetryQueue.end()) {
+        mInputBufferRetryQueue.push_back(msg);
+    }
+    err = OK;
+    return true;
 }
 
 // static

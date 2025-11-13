@@ -28,6 +28,9 @@
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/CryptoAsync.h>
 
+#include <thread>
+#include <chrono>
+
 namespace android {
 
 CryptoAsync::CryptoAsyncInfo::CryptoAsyncInfo(const std::unique_ptr<CodecCryptoInfo> &info) {
@@ -86,6 +89,16 @@ status_t CryptoAsync::decrypt(sp<AMessage> &msg) {
     return OK;
 }
 
+const sp<AMessage> CryptoAsync:: getMetrics() const {
+    sp<AMessage>  metricsMsg = new AMessage(kWhatGetMetrics, this);
+    sp<AMessage> metrics;
+    status_t err = metricsMsg->postAndAwaitResponse(&metrics);
+    if (err == OK && metrics != NULL) {
+        CHECK(metrics->findInt32("err", &err));
+    }
+    return metrics;
+}
+
 void CryptoAsync::stop(std::list<sp<AMessage>> * const buffers) {
     sp<AMessage>  stopMsg = new AMessage(kWhatStop, this);
     stopMsg->setPointer("remaining", static_cast<void*>(buffers));
@@ -131,7 +144,38 @@ status_t CryptoAsync::decryptAndQueue(sp<AMessage> & msg) {
         err = channel->queueSecureInputBuffer(buffer, secure, key, iv, mode,
             pattern, subSamples, numSubSamples, &errorDetailMsg);
     }
+    if (mRetryHdcpFailure) {
+        if (err == ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION) {
+            std::get<0>(mRetryHdcpFailure.value())++;
+            bool shouldPost = false;
+            if (std::get<0>(mRetryHdcpFailure.value()) <= CryptoAsync::kMaxHdcpDecryptRetryCount) {
+                err = OK;
+                // always called from the looper.
+                {
+                    Mutexed<std::list<sp<AMessage>>>::Locked pendingBuffers(mPendingBuffers);
+                    shouldPost = pendingBuffers->empty();
+                    pendingBuffers->push_front(msg);
+                }
+                std::this_thread::sleep_for(
+                        std::chrono::microseconds(CryptoAsync::kRetryHdcpDecryptDelayUs));
+            }
+            if (shouldPost) {
+                sp<AMessage> decryptMsg = new AMessage(kWhatDecrypt, this);
+                // post msg after delay in this thread, not in the message
+                decryptMsg->post();
+            }
+        } else {
+            if (err == OK && std::get<0>(mRetryHdcpFailure.value()) > 0) {
+               std::get<1>(mRetryHdcpFailure.value())++;
+            }
+            std::get<0>(mRetryHdcpFailure.value()) = 0;
+        }
+    }
+
     if (err != OK) {
+        if (mRetryHdcpFailure && err == ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION) {
+            std::get<2>(mRetryHdcpFailure.value())++;
+        }
         std::list<sp<AMessage>> errorList;
         if (buffer->meta()->findObject("cryptoInfos", &obj)) {
             msg->setObject("cryptoInfos", obj);
@@ -303,6 +347,26 @@ void CryptoAsync::onMessageReceived(const sp<AMessage> & msg) {
             mState = kCryptoAsyncActive;
             response->setInt32("err", OK);
             response->postReply(replyID);
+            if (mRetryHdcpFailure) {
+                std::get<0>(mRetryHdcpFailure.value()) = 0;
+            }
+            break;
+        }
+
+        case kWhatGetMetrics:
+        {
+            sp<AReplyToken> replyID;
+            typedef MediaCodec::WrapperObject<std::tuple<uint32_t, uint32_t, uint32_t>> hdcpTuple;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+            sp<AMessage> metrics = new AMessage();
+            if (mRetryHdcpFailure) {
+                sp<hdcpTuple> obj(new hdcpTuple(mRetryHdcpFailure.value()));
+                metrics->setObject("retryHdcpMetric", obj);
+                std::get<1>(mRetryHdcpFailure.value()) = 0;
+                std::get<2>(mRetryHdcpFailure.value()) = 0;
+            }
+            metrics->setInt32("err", OK);
+            metrics->postReply(replyID);
             break;
         }
 
