@@ -9,6 +9,14 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
+    name: "amsco_available_api"
+    namespace: "media_audio"
+    description: "Reflag API checking AMSCO availability to separate from implementation"
+    bug: "460462656"
+    # is_exported: true
+}
+
+flag {
     name: "assistant_volume_control"
     namespace: "media_audio"
     description: "Implement the logic for having STREAM_ASSISTANT lead the volume control"
@@ -49,6 +57,14 @@ flag {
     namespace: "media_audio"
     description: "Add API to notify audio for SCO disconnection under AMSCO."
     bug: "454472259"
+    # is_exported: true
+}
+
+flag {
+    name: "bt_device_category_api"
+    namespace: "media_audio"
+    description: "Expose BT device categories to mainline modules"
+    bug: "460462975"
     # is_exported: true
 }
 
@@ -163,6 +179,14 @@ flag {
         "take effect"
     bug: "296232417"
     is_fixed_read_only: true
+}
+
+flag {
+    name: "fused_telecom_route_api"
+    namespace: "media_audio"
+    description: "Flag for fusing telecom route/mode changes into a single api surface"
+    bug: "458830736"
+    # is_exported: true
 }
 
 flag {
