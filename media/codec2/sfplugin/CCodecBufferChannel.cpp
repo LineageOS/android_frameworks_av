@@ -1462,7 +1462,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
         }
         qbi.setHdrMetadata(hdr);
     }
-    SetMetadataToGralloc4Handle(dataSpace, hdrStaticInfo, hdrDynamicInfo, block);
+    SetMetadataToGralloc4Handle(dataSpace, hdrStaticInfo, hdrDynamicInfo, block.handle());
 
     qbi.setSurfaceDamage(Region::INVALID_REGION); // we don't have dirty regions
     qbi.getFrameTimestamps = true; // we need to know when a frame is rendered
