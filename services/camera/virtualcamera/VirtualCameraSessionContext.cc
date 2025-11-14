@@ -185,11 +185,13 @@ void VirtualCameraSessionContext::setCaptureResultConsumer(
 const camera_metadata_t*
 VirtualCameraSessionContext::getCaptureResultMetadataForTimestamp(
     int64_t timestamp) {
-  std::lock_guard<std::mutex> lock(mLock);
-  if (mCaptureResultConsumer == nullptr) {
+  std::shared_ptr<VirtualCameraCaptureResultConsumer> consumer =
+      getCaptureResultConsumer();
+  if (consumer == nullptr) {
     return nullptr;
   }
-  return mCaptureResultConsumer->getCaptureResultMetadataForTimestamp(timestamp);
+  // don't lock when getting the capture result metadata for timestamp
+  return consumer->getCaptureResultMetadataForTimestamp(timestamp);
 }
 
 }  // namespace virtualcamera

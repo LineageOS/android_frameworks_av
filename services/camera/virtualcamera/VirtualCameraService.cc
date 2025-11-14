@@ -306,15 +306,16 @@ ndk::ScopedAStatus VirtualCameraService::registerCameraNoCheck(
     return status;
   }
 
-  std::lock_guard lock(mLock);
-  if (mTokenToCameraName.find(token) != mTokenToCameraName.end()) {
-    ALOGE(
-        "Attempt to register camera corresponding to already registered binder "
-        "token: "
-        "0x%" PRIxPTR,
-        reinterpret_cast<uintptr_t>(token.get()));
-    *_aidl_return = false;
-    return ndk::ScopedAStatus::ok();
+  {
+    std::lock_guard lock(mLock);
+    if (mTokenToCameraName.find(token) != mTokenToCameraName.end()) {
+      ALOGE(
+          "Attempt to register camera corresponding to already registered "
+          "binder token: 0x%" PRIxPTR,
+          reinterpret_cast<uintptr_t>(token.get()));
+      *_aidl_return = false;
+      return ndk::ScopedAStatus::ok();
+    }
   }
 
   std::shared_ptr<VirtualCameraDevice> camera =
@@ -327,9 +328,12 @@ ndk::ScopedAStatus VirtualCameraService::registerCameraNoCheck(
         Status::EX_SERVICE_SPECIFIC);
   }
 
-  mTokenToCameraName[token] = camera->getCameraName();
-  *_aidl_return = true;
-  return ndk::ScopedAStatus::ok();
+  {
+    std::lock_guard lock(mLock);
+    mTokenToCameraName[token] = camera->getCameraName();
+    *_aidl_return = true;
+    return ndk::ScopedAStatus::ok();
+  }
 }
 
 ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
@@ -340,20 +344,25 @@ ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
     return ndk::ScopedAStatus::fromExceptionCode(EX_SECURITY);
   }
 
-  std::lock_guard lock(mLock);
-
-  auto it = mTokenToCameraName.find(token);
-  if (it == mTokenToCameraName.end()) {
-    ALOGE(
-        "Attempt to unregister camera corresponding to unknown binder token: "
-        "0x%" PRIxPTR,
-        reinterpret_cast<uintptr_t>(token.get()));
-    return ndk::ScopedAStatus::ok();
+  std::optional<std::string> cameraName;
+  {
+    std::lock_guard lock(mLock);
+    auto it = mTokenToCameraName.find(token);
+    if (it == mTokenToCameraName.end()) {
+      ALOGE(
+          "Attempt to unregister camera corresponding to unknown binder"
+          " token: 0x%" PRIxPTR,
+          reinterpret_cast<uintptr_t>(token.get()));
+      return ndk::ScopedAStatus::ok();
+    }
+    cameraName = it->second;
+    mTokenToCameraName.erase(it);
   }
 
-  mVirtualCameraProvider->removeCamera(it->second);
+  if (cameraName.has_value()) {
+    mVirtualCameraProvider->removeCamera(cameraName.value());
+  }
 
-  mTokenToCameraName.erase(it);
   return ndk::ScopedAStatus::ok();
 }
 
@@ -390,13 +399,21 @@ std::shared_ptr<VirtualCameraDevice> VirtualCameraService::getCamera(
     return nullptr;
   }
 
-  std::lock_guard lock(mLock);
-  auto it = mTokenToCameraName.find(token);
-  if (it == mTokenToCameraName.end()) {
+  std::optional<std::string> cameraName;
+  {
+    std::lock_guard lock(mLock);
+    auto it = mTokenToCameraName.find(token);
+    if (it == mTokenToCameraName.end()) {
+      return nullptr;
+    }
+    cameraName = it->second;
+  }
+
+  if (!cameraName.has_value()) {
     return nullptr;
   }
 
-  return mVirtualCameraProvider->getCamera(it->second);
+  return mVirtualCameraProvider->getCamera(cameraName.value());
 }
 
 binder_status_t VirtualCameraService::handleShellCommand(int, int out, int err,

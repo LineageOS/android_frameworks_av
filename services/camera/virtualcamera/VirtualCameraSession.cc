@@ -385,12 +385,14 @@ VirtualCameraSession::VirtualCameraSession(
 
 ndk::ScopedAStatus VirtualCameraSession::close() {
   ALOGV("%s", __func__);
+  std::unique_ptr<VirtualCameraRenderThread> renderThread;
   {
     std::lock_guard<std::mutex> lock(mLock);
 
     if (mRenderThread != nullptr) {
       mRenderThread->flush();
-      mRenderThread->stop();
+      // defer the stop of the render thread outside of the lock
+      renderThread = std::move(mRenderThread);
       mRenderThread = nullptr;
 
       if (mVirtualCameraClientCallback != nullptr) {
@@ -398,6 +400,11 @@ ndk::ScopedAStatus VirtualCameraSession::close() {
       }
       mCurrentInputStreamId = kInvalidStreamId;
     }
+  }
+
+  // stop the render thread outside of the lock
+  if (renderThread != nullptr) {
+    renderThread->stop();  // this does a blocking join() in destructor
   }
 
   mSessionContext.closeAllStreams();
@@ -440,6 +447,7 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
   sp<Surface> inputSurface = nullptr;
   int inputStreamId = -1;
   std::optional<SupportedStreamConfiguration> inputConfig;
+  std::unique_ptr<VirtualCameraRenderThread> renderThread;
   {
     std::lock_guard<std::mutex> lock(mLock);
     for (int i = 0; i < in_requestedConfiguration.streams.size(); ++i) {
@@ -503,7 +511,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
           inputConfig->height);
 
       mRenderThread->flush();
-      mRenderThread->stop();
+      // defer the stop of the render thread outside of the lock
+      renderThread = std::move(mRenderThread);
     }
 
     mRenderThread = std::make_unique<VirtualCameraRenderThread>(
@@ -545,6 +554,11 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
     mVirtualCameraClientCallback->onStreamConfigured(
         inputStreamId, aidl::android::view::Surface(inputSurface.get()),
         inputConfig->width, inputConfig->height, inputConfig->imageFormat);
+  }
+
+  // stop the render thread outside of the lock since it does a join() in its destructor
+  if (renderThread != nullptr) {
+    renderThread->stop();
   }
 
   return ndk::ScopedAStatus::ok();

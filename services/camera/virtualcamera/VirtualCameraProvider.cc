@@ -50,19 +50,27 @@ ndk::ScopedAStatus VirtualCameraProvider::setCallback(
     return cameraStatus(Status::ILLEGAL_ARGUMENT);
   }
 
+  // store a local copy of camera names to be notified of the status change to
+  // avoid holding the mLock while doing IPC calls
+  std::vector<std::string> cameraNames;
   {
     const std::lock_guard<std::mutex> lock(mLock);
     mCameraProviderCallback = in_callback;
 
     for (const auto& [cameraName, _] : mCameras) {
-      auto ret = mCameraProviderCallback->cameraDeviceStatusChange(
-          cameraName, CameraDeviceStatus::PRESENT);
-      if (!ret.isOk()) {
-        ALOGE("Failed to announce camera status change: %s",
-              ret.getDescription().c_str());
-      }
+      cameraNames.push_back(cameraName);
     }
   }
+
+  for (const auto& cameraName : cameraNames) {
+    auto ret = in_callback->cameraDeviceStatusChange(
+        cameraName, CameraDeviceStatus::PRESENT);
+    if (!ret.isOk()) {
+      ALOGE("Failed to announce camera status change: %s",
+            ret.getDescription().c_str());
+    }
+  }
+
   return ndk::ScopedAStatus::ok();
 }
 
