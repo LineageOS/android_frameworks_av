@@ -1,0 +1,60 @@
+package {
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+cc_defaults {
+    name: "libion_legacy_defaults",
+    vendor_available: true,
+    product_available: true,
+    recovery_available: true,
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+        "test_com.android.media.swcodec",
+    ],
+
+    // we're only including this for media's mainline needs,
+    // do not allow other libion users to migrate to using this copy.
+    visibility: [
+        // "//frameworks/av/media/codec2/libion_legacy/tests",
+        // "//frameworks/av/media/codec2/vndk",
+        // "//frameworks/av/media/module/bufferpool/1.0/vts",
+        "//frameworks/av/media/codec2:__subpackages__",
+        "//frameworks/av/media/module:__subpackages__",
+    ],
+}
+
+cc_library_headers {
+    name: "libion_legacy_headers",
+    defaults: ["libion_legacy_defaults"],
+    host_supported: true,
+    export_include_dirs: [
+        "include",
+        "kernel-headers",
+    ],
+}
+
+// we use this legacy library as a static library:
+// -- smaller footprint (it's only about 4k of code)
+// -- there's no on-device library that others could sneak in to use
+cc_library_static {
+    name: "libion_legacy",
+    defaults: ["libion_legacy_defaults"],
+    double_loadable: true,
+    srcs: ["ion.c"],
+    header_libs: ["libion_legacy_headers"],
+    export_header_lib_headers: ["libion_legacy_headers"],
+    shared_libs: ["liblog"],
+    cflags: ["-Werror"],
+}
+
+cc_binary {
+    name: "legacy_iontest",
+    srcs: ["ion_test.c"],
+    static_libs: ["libion_legacy"],
+    shared_libs: ["liblog"],
+    cflags: ["-Werror"],
+}
+
+subdirs = ["tests"]

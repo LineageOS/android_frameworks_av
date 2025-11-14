@@ -33,7 +33,7 @@ cc_test {
     ],
     static_libs: [
         "android.hardware.media.bufferpool@1.0",
-        "libion",
+        "libion_legacy",
         "libstagefright_bufferpool@1.0",
     ],
     shared_libs: [
@@ -52,7 +52,7 @@ cc_test {
     ],
     static_libs: [
         "android.hardware.media.bufferpool@1.0",
-        "libion",
+        "libion_legacy",
         "libstagefright_bufferpool@1.0",
     ],
     shared_libs: [
