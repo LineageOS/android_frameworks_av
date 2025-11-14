@@ -23,6 +23,7 @@
 #include <sys/mman.h>
 
 #include <android-base/no_destructor.h>
+#include <android_media_swcodec_flags.h>
 #include <apex/ApexCodecsImpl.h>
 
 #ifdef ENABLE_APEX_CODECS
@@ -44,7 +45,6 @@ struct ComponentDesc {
     ApexCodec_UnmapFn unmapFn;
 };
 
-template <typename... Codecs>
 class StoreImpl {
 public:
     StoreImpl() : mCodecs(BuildCodecs()) {}
@@ -79,14 +79,24 @@ public:
     }
 
 private:
+    template <typename Codec>
+    static void AddCodec(std::map<std::string, ComponentDesc> *codecs) {
+        if (!codecs) {
+            return;
+        }
+        (*codecs)[Codec::COMPONENT_NAME] = ComponentDesc{
+            Codec::MakeTraits(),
+            Codec::Create,
+            Codec::Map,
+            Codec::Unmap,
+        };
+    }
+
     static std::map<std::string, ComponentDesc> BuildCodecs() {
         std::map<std::string, ComponentDesc> codecs;
-        ((codecs[Codecs::COMPONENT_NAME] = ComponentDesc{
-            Codecs::MakeTraits(),
-            Codecs::Create,
-            Codecs::Map,
-            Codecs::Unmap,
-        }), ...);
+        if (android::media::swcodec::flags::opus_inproc_software_decoder()) {
+            AddCodec<C2ApexOpusDec>(&codecs);
+        }
         std::erase_if(codecs, [](const auto &pair) {
             return pair.second.traits == nullptr;
         });
@@ -120,9 +130,7 @@ public:
     }
 
 private:
-    StoreImpl<
-        C2ApexOpusDec
-    > mImpl;
+    StoreImpl mImpl;
     std::shared_ptr<C2ReflectorHelper> mReflector;
 };
 
