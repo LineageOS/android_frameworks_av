@@ -57,7 +57,7 @@ flag {
     namespace: "media_audio"
     description: "Add API to notify audio for SCO disconnection under AMSCO."
     bug: "454472259"
-    # is_exported: true
+    is_exported: true
 }
 
 flag {
