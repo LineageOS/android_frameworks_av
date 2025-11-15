@@ -821,7 +821,21 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
             size_t expectedPhysicalCameraMetadataCount =
                     getExpectedPhysicalMetadataCount(request.physicalCameraIds,
                                                      states.activePhysicalId);
-            if (expectedPhysicalCameraMetadataCount != result->num_physcam_metadata) {
+            bool logicalMultiCameraAdditionalResults = false;
+            camera_metadata_ro_entry entry;
+            if (flags::logical_multi_camera_additional_results()) {
+                if (find_camera_metadata_ro_entry(result->result,
+                    ANDROID_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS, &entry) == OK &&
+                    entry.count > 0) {
+                    if (entry.data.u8[0] == ANDROID_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS_ON) {
+                            logicalMultiCameraAdditionalResults = true;
+                    }
+                    ALOGV("logical camera additional results value %d",
+                        logicalMultiCameraAdditionalResults);
+                }
+            }
+            if (!logicalMultiCameraAdditionalResults
+                && expectedPhysicalCameraMetadataCount != result->num_physcam_metadata) {
                 SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
                     "Expected physical Camera metadata count %d not equal to actual count %d",
                         expectedPhysicalCameraMetadataCount, result->num_physcam_metadata);
@@ -833,15 +847,17 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                         frameNumber);
                 return;
             }
-            for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
-                const std::string physicalId = result->physcam_ids[i];
-                bool validPhysicalCameraMetadata =
-                        erasePhysicalCameraIdSet(request.physicalCameraIds, physicalId);
-                if (!validPhysicalCameraMetadata) {
-                    SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
-                        "Unexpected total result for frame %d camera %s",
-                            frameNumber, physicalId.c_str());
-                    return;
+            if (!logicalMultiCameraAdditionalResults) {
+                for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
+                    const std::string physicalId = result->physcam_ids[i];
+                    bool validPhysicalCameraMetadata =
+                            erasePhysicalCameraIdSet(request.physicalCameraIds, physicalId);
+                    if (!validPhysicalCameraMetadata) {
+                        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                            "Unexpected total result for frame %d camera %s",
+                                frameNumber, physicalId.c_str());
+                        return;
+                    }
                 }
             }
             if (states.usePartialResult &&
