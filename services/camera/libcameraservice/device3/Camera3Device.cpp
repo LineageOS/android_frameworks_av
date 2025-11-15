@@ -2156,11 +2156,7 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHold
     }
 
     if (modifyRequests) {
-        int64_t lastRepeatingFrameNumber;
-        mRequestThread->clearOutputs(streamId, removedSurfaceIds, &lastRepeatingFrameNumber);
-        if (lastFrameNumber != nullptr) {
-            *lastFrameNumber = lastRepeatingFrameNumber;
-        }
+        mRequestThread->clearOutputs(streamId, removedSurfaceIds, lastFrameNumber);
         mRequestThread->signalPipelineDrain({streamId});
         mInterface->clearUnusedBufferCaches(streamId);
         // Pause unlocked buffer requests
