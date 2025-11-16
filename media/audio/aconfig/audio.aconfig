@@ -50,6 +50,13 @@ flag {
 }
 
 flag {
+    name: "camera_shutter_sound"
+    namespace: "media_audio"
+    description: "Manage camera sound depending on locale and sim"
+    bug: "440483480"
+}
+
+flag {
     name: "check_route_in_get_audio_mix_port"
     namespace: "media_audio"
     description: "Checks routing in the API getAudioMixPort to respect"
