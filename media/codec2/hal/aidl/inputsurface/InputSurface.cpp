@@ -424,6 +424,13 @@ void InputSurface::init() {
     std::unique_lock<std::mutex> l(mLock);
     mConnection = SharedRefBase::make<InputSurfaceConnection>(sink, mSource);
     *connection = mConnection;
+    int32_t connectionVer = 0;
+    ::ndk::ScopedAStatus status = mConnection->getInterfaceVersion(&connectionVer);
+    if (!status.isOk()) {
+        ALOGE("IInputSurfaceConnection creation failure");
+        return status;
+    }
+    ALOGD("InputSurfaceConnection created ver:%d", connectionVer);
     c2_status_t c2Res = mSource->configure(
             mConnection,
             mImageConfig.mDataspace,
