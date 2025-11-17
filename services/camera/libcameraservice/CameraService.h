@@ -47,6 +47,7 @@
 
 #include "CameraFlashlight.h"
 
+#include "binder/Status.h"
 #include "common/CameraProviderManager.h"
 #include "media/RingBuffer.h"
 #include "utils/AutoConditionLock.h"
@@ -263,6 +264,10 @@ public:
             const SessionConfiguration& sessionConfiguration,
             const AttributionSourceState& clientAttribution,
             int32_t devicePolicy, /*out*/ CameraMetadata* outMetadata);
+
+    virtual binder::Status warmUp(const std::string &unresolvedCameraId,
+            const AttributionSourceState& clientAttribution,
+            int32_t devicePolicy);
 
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,

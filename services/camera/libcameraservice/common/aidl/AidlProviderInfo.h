@@ -122,6 +122,7 @@ struct AidlProviderInfo : public CameraProviderManager::ProviderInfo {
 
         virtual status_t setTorchMode(bool enabled) override;
         virtual status_t turnOnTorchWithStrengthLevel(int32_t torchStrength) override;
+        virtual status_t warmUp() override;
         virtual status_t getTorchStrengthLevel(int32_t *torchStrength) override;
 
         virtual status_t dumpState(int fd) override;
