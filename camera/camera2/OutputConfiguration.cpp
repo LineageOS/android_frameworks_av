@@ -243,10 +243,12 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
-    if (isDeferred && surfaceType != SURFACE_TYPE_SURFACE_VIEW &&
-            surfaceType != SURFACE_TYPE_SURFACE_TEXTURE) {
-        ALOGE("%s: Invalid surface type for deferred configuration", __FUNCTION__);
-        return BAD_VALUE;
+    if (!flags::seamless_transitions()) {
+        if (isDeferred && surfaceType != SURFACE_TYPE_SURFACE_VIEW &&
+                surfaceType != SURFACE_TYPE_SURFACE_TEXTURE) {
+            ALOGE("%s: Invalid surface type for deferred configuration", __FUNCTION__);
+            return BAD_VALUE;
+        }
     }
 
     std::vector<view::Surface> surfaceShims;

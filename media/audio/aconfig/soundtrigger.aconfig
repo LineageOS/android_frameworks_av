@@ -5,6 +5,7 @@
 package: "android.media.soundtrigger"
 container: "system"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
     name: "detection_service_paused_resumed_api"
     is_exported: true
@@ -28,4 +29,4 @@ flag {
     description: "Feature flag for adding SoundTriggerManager API to SystemApi"
     bug: "339267254"
 }
-
+# go/keep-sorted end

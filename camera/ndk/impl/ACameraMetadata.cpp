@@ -601,6 +601,7 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_TONEMAP_GAMMA:
         case ACAMERA_TONEMAP_PRESET_CURVE:
         case ACAMERA_BLACK_LEVEL_LOCK:
+        case ACAMERA_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS:
         case ACAMERA_DISTORTION_CORRECTION_MODE:
             return true;
         default:

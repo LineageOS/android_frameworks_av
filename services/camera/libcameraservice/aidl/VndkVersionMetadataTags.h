@@ -145,4 +145,7 @@ std::map<int, std::vector<camera_metadata_tag>> dynamic_api_level_to_keys{
           ANDROID_CONTROL_ZOOM_METHOD,
           ANDROID_EXTENSION_NIGHT_MODE_INDICATOR,
         }  },
+      {37, {
+          ANDROID_LOGICAL_MULTI_CAMERA_ADDITIONAL_RESULTS,
+        }  },
 };

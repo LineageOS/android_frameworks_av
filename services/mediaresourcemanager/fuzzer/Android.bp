@@ -44,8 +44,10 @@ cc_defaults {
         "libmedia",
         "libmediautils",
         "libstats_media_metrics",
-        "libstatspull",
         "libstatssocket",
+    ],
+    header_libs: [
+        "libstatspull_headers",
     ],
     fuzz_config: {
         cc: [

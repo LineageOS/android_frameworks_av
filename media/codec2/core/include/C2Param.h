@@ -840,6 +840,7 @@ public:
         int32_t     i32;   ///< int32_t value
         c2_cntr32_t c32;   ///< c2_cntr32_t value
         float       fp;    ///< float value
+        uint16_t    u16;   ///< uint16_t value
 
         // constructors - implicit
         Primitive(uint64_t value)    : u64(value) { }
@@ -851,6 +852,7 @@ public:
         Primitive(uint8_t value)     : u32(value) { }
         Primitive(char value)        : i32(value) { }
         Primitive(float value)       : fp(value)  { }
+        Primitive(uint16_t value)    : u16(value) { }
 
         // allow construction from enum type
         template<typename E, typename = typename std::enable_if<std::is_enum<E>::value>::type>
@@ -883,6 +885,7 @@ public:
         UINT64,
         CNTR64,
         FLOAT,
+        UINT16,
     };
 
     template<typename T, bool = std::is_enum<T>::value>
@@ -933,6 +936,7 @@ public:
             case UINT64:
             case CNTR64: return sizeof(_mValue.i64);
             case FLOAT: return sizeof(_mValue.fp);
+            case UINT16: return sizeof(_mValue.u16);
             default: return 0;
         }
     }
@@ -949,6 +953,7 @@ template<> inline const uint64_t &C2Value::Primitive::ref<uint64_t>() const { re
 template<> inline const c2_cntr32_t &C2Value::Primitive::ref<c2_cntr32_t>() const { return c32; }
 template<> inline const c2_cntr64_t &C2Value::Primitive::ref<c2_cntr64_t>() const { return c64; }
 template<> inline const float &C2Value::Primitive::ref<float>() const { return fp; }
+template<> inline const uint16_t &C2Value::Primitive::ref<uint16_t>() const { return u16; }
 
 // provide types for enums and uint8_t, char even though we don't provide reading as them
 template<> constexpr C2Value::type_t C2Value::TypeFor<char, false>() { return INT32; }
@@ -960,6 +965,7 @@ template<> constexpr C2Value::type_t C2Value::TypeFor<uint64_t, false>() { retur
 template<> constexpr C2Value::type_t C2Value::TypeFor<c2_cntr32_t, false>() { return CNTR32; }
 template<> constexpr C2Value::type_t C2Value::TypeFor<c2_cntr64_t, false>() { return CNTR64; }
 template<> constexpr C2Value::type_t C2Value::TypeFor<float, false>() { return FLOAT; }
+template<> constexpr C2Value::type_t C2Value::TypeFor<uint16_t, false>() { return UINT16; }
 
 // forward declare easy enum template
 template<typename E> struct C2EasyEnum;
@@ -986,6 +992,7 @@ struct C2FieldDescriptor {
         UINT64  = C2Value::UINT64, ///< 64-bit signed integer
         CNTR64  = C2Value::CNTR64, ///< 64-bit counter
         FLOAT   = C2Value::FLOAT,  ///< 32-bit floating point
+        UINT16  = C2Value::UINT16, ///< 16-bit unsigned integer
 
         // array types
         STRING = 0x100, ///< fixed-size string (POD)
@@ -1093,6 +1100,7 @@ private:
     inline static type_t GetType(float*)       { return FLOAT; }
     inline static type_t GetType(char*)        { return STRING; }
     inline static type_t GetType(uint8_t*)     { return BLOB; }
+    inline static type_t GetType(uint16_t*)    { return UINT16; }
 
     template<typename T,
              class=typename std::enable_if<std::is_enum<T>::value>::type>
@@ -1146,6 +1154,7 @@ DEFINE_NO_NAMED_VALUES_FOR(c2_cntr64_t)
 DEFINE_NO_NAMED_VALUES_FOR(uint8_t)
 DEFINE_NO_NAMED_VALUES_FOR(char)
 DEFINE_NO_NAMED_VALUES_FOR(float)
+DEFINE_NO_NAMED_VALUES_FOR(uint16_t)
 
 /**
  * Describes the fields of a structure.

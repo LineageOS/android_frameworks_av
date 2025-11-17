@@ -7,6 +7,15 @@
 package: "android.media.audio"
 container: "system"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
+flag {
+    name: "amsco_available_api"
+    namespace: "media_audio"
+    description: "Reflag API checking AMSCO availability to separate from implementation"
+    bug: "460462656"
+    # is_exported: true
+}
+
 flag {
     name: "assistant_volume_control"
     namespace: "media_audio"
@@ -44,6 +53,22 @@ flag {
 }
 
 flag {
+    name: "bt_audio_disconnect_api"
+    namespace: "media_audio"
+    description: "Add API to notify audio for SCO disconnection under AMSCO."
+    bug: "454472259"
+    is_exported: true
+}
+
+flag {
+    name: "bt_device_category_api"
+    namespace: "media_audio"
+    description: "Expose BT device categories to mainline modules"
+    bug: "460462975"
+    # is_exported: true
+}
+
+flag {
     name: "concurrent_audio_record_bypass_permission"
     namespace: "media_audio"
     description:
@@ -75,6 +100,15 @@ flag {
     description: "Add APIs to set/adjust volume for a specific device."
     is_exported: true
     bug: "404313846"
+}
+
+flag {
+    name: "dolby_ac4_level4_encoding_api"
+    namespace: "media_audio"
+    description: "Feature flag for Dolby AC-4 level 4 AudioFormat encoding."
+    is_fixed_read_only: true
+    bug: "266537650"
+    is_exported: true
 }
 
 flag {
@@ -120,21 +154,19 @@ flag {
     bug: "316414750"
 }
 
+# TODO remove
 flag {
-    name: "dolby_ac4_level4_encoding_api"
-    namespace: "media_audio"
-    description: "Feature flag for Dolby AC-4 level 4 AudioFormat encoding."
-    is_fixed_read_only: true
-    bug: "266537650"
+    name: "focus_freeze_test_api"
     is_exported: true
-}
-
-flag {
-    name: "sony_360ra_mpegh_3d_format"
     namespace: "media_audio"
-    description: "360 Reality Audio MPEG-H 3D Format"
-    is_fixed_read_only: true
-    bug: "238402306"
+    description: "\
+ AudioManager audio focus test APIs:\
+ AudioManager.enterAudioFocusFreezeForTest(java.util.List)\
+ AudioManager.exitAudioFocusFreezeForTest()\
+ AudioManager.getFocusDuckedUidsForTest()\
+ AudioManager.getFocusFadeOutDurationForTest()\
+ AudioManager.getFocusUnmuteDelayAfterFadeOutForTest()"
+    bug: "301713440"
 }
 
 # TODO remove
@@ -149,19 +181,12 @@ flag {
     is_fixed_read_only: true
 }
 
-# TODO remove
 flag {
-    name: "focus_freeze_test_api"
-    is_exported: true
+    name: "fused_telecom_route_api"
     namespace: "media_audio"
-    description: "\
- AudioManager audio focus test APIs:\
- AudioManager.enterAudioFocusFreezeForTest(java.util.List)\
- AudioManager.exitAudioFocusFreezeForTest()\
- AudioManager.getFocusDuckedUidsForTest()\
- AudioManager.getFocusFadeOutDurationForTest()\
- AudioManager.getFocusUnmuteDelayAfterFadeOutForTest()"
-    bug: "301713440"
+    description: "Flag for fusing telecom route/mode changes into a single api surface"
+    bug: "458830736"
+    # is_exported: true
 }
 
 flag {
@@ -243,6 +268,17 @@ flag {
     namespace: "media_audio"
     description: "Partial flush support for classical PCM offload"
     bug: "428981741"
+    is_exported: true
+}
+
+flag {
+    name: "register_volume_callback_api_hardening"
+    namespace: "media_audio"
+    description:
+            "Add modify audio settings privilege permission to un/register volume group "
+            "callback APIs"
+    bug: "402502314"
+    is_fixed_read_only: true
 }
 
 flag {
@@ -258,32 +294,6 @@ flag{
     namespace: "media_audio"
     description: "System APIs for ringtone vibration utils."
     bug: "399265235"
-}
-
-flag {
-    name: "sco_managed_by_audio"
-    is_exported: true
-    namespace: "media_audio"
-    description: "\
-Enable new implementation of headset profile device connection and\
-SCO audio activation."
-    bug: "265057196"
-}
-
-flag {
-    name: "stream_assistant_public"
-    namespace: "media_audio"
-    description: "STREAM_ASSISTANT as part of the public API"
-    bug: "440316799"
-    is_exported: true
-}
-
-flag {
-    name: "supported_device_types_api"
-    is_exported: true
-    namespace: "media_audio"
-    description: "Surface new API method AudioManager.getSupportedDeviceTypes()"
-    bug: "307537538"
 }
 
 flag {
@@ -313,6 +323,24 @@ flag {
         "multiple routed device ids"
     bug: "367816690"
     is_exported: true
+}
+
+flag {
+    name: "sco_managed_by_audio"
+    is_exported: true
+    namespace: "media_audio"
+    description: "\
+Enable new implementation of headset profile device connection and\
+SCO audio activation."
+    bug: "265057196"
+}
+
+flag {
+    name: "sony_360ra_mpegh_3d_format"
+    namespace: "media_audio"
+    description: "360 Reality Audio MPEG-H 3D Format"
+    is_fixed_read_only: true
+    bug: "238402306"
 }
 
 flag {
@@ -347,6 +375,30 @@ flag {
 }
 
 flag {
+    name: "stream_assistant_public"
+    namespace: "media_audio"
+    description: "STREAM_ASSISTANT as part of the public API"
+    bug: "440316799"
+    is_exported: true
+}
+
+flag {
+    name: "support_per_phone_account_ringtone"
+    namespace: "telecom"
+    description: "Support setting ringtone separately for each PhoneAccountHandle"
+    bug: "118735436"
+    is_exported: true
+}
+
+flag {
+    name: "supported_device_types_api"
+    is_exported: true
+    namespace: "media_audio"
+    description: "Surface new API method AudioManager.getSupportedDeviceTypes()"
+    bug: "307537538"
+}
+
+flag {
     name: "unify_absolute_volume_management"
     namespace: "media_audio"
     description: "Unify absolute volume management in AudioService for A2DP, LEA, SCO, ASHA"
@@ -362,21 +414,4 @@ flag {
     bug: "296232417"
     is_fixed_read_only: true
 }
-
-flag {
-    name: "register_volume_callback_api_hardening"
-    namespace: "media_audio"
-    description:
-            "Add modify audio settings privilege permission to un/register volume group "
-            "callback APIs"
-    bug: "402502314"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "support_per_phone_account_ringtone"
-    namespace: "telecom"
-    description: "Support setting ringtone separately for each PhoneAccountHandle"
-    bug: "118735436"
-    is_exported: true
-}
+# go/keep-sorted end

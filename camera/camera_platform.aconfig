@@ -19,6 +19,14 @@ flag {
 
 flag {
     namespace: "camera_platform"
+    name: "device_removed_callback"
+    is_exported: true
+    description: "Notify clients when camera devices are no longer present"
+    bug: "442831091"
+}
+
+flag {
+    namespace: "camera_platform"
     name: "concert_mode"
     is_exported: true
     description: "Introduces a new concert mode camera extension type"
@@ -39,6 +47,14 @@ flag {
     is_exported: true
     description: "Flash brightness level control in manual flash mode"
     bug: "238348881"
+}
+
+flag {
+    namespace: "camera_platform"
+    name: "vendor_defined_camera_extensions"
+    is_exported: true
+    description: "Enable vendors to define and implement device specific camera extension modes"
+    bug: "419869310"
 }
 
 flag {
@@ -214,6 +230,17 @@ flag {
 
 flag {
     namespace: "camera_platform"
+    name: "seamless_transitions"
+    is_exported: true
+    description: "Enable clients to add and remove deferred surfaces during capture sessions"
+    bug: "329909911"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}
+
+flag {
+    namespace: "camera_platform"
     name: "surface_format_fix"
     description: "Consider format overrides for RGB output formats"
     bug: "424865503"
@@ -260,4 +287,22 @@ flag {
     metadata {
         purpose: PURPOSE_FEATURE
     }
+}
+
+flag {
+    namespace: "camera_platform"
+    name: "cap_mandatory_preview_size_to_all_displays"
+    description: "Adjust mandatory stream combination preview size limit"
+    bug: "420675242"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "camera_platform"
+    is_exported: true
+    name: "logical_multi_camera_additional_results"
+    description: "Add additional metadata info to the logical camera result"
+    bug: "359944765"
 }

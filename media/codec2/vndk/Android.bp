@@ -113,7 +113,6 @@ cc_library {
         "libfmq",
         "libgralloctypes",
         "libhidlbase",
-        "libion",
         "liblog",
         "libnativewindow",
         "libstagefright_foundation",
@@ -125,11 +124,23 @@ cc_library {
 
     static_libs: [
         "android.media.swcodec.flags-aconfig-cc",
+        // original was shared, but it's small and we're carrying forward
+        // this legacy copy solely for our needs, not to support other users
+        "libion_legacy",
     ],
 
     cflags: [
         "-Werror",
         "-Wall",
+    ],
+
+    // when we stopped referencing libion, the build broke. some device-specific makefiles
+    // were referencing the library in a way that confused the build system.
+    // Rather than go change all of those device configuration files, we'll continue to
+    // have the media stack say "yes, please build libion" even though we aren't going to
+    // use that copy of the library.
+    required: [
+        "libion",
     ],
 }
 
@@ -143,7 +154,7 @@ cc_defaults {
 
     static_libs: [
         "liblog",
-        "libion",
+        "libion_legacy",
         "libfmq",
         "libbase",
         "libutils",

@@ -16,6 +16,8 @@
 
 #define LOG_TAG "CameraServiceWatchdog"
 
+#include <perfetto/tracing.h>
+
 #include "CameraServiceWatchdog.h"
 #include "com_android_internal_camera_flags.h"
 #include "android/set_abort_message.h"
@@ -25,6 +27,8 @@
 namespace android {
 
 namespace flags = com::android::internal::camera::flags;
+Mutex CameraServiceWatchdog::mLastPerfettoTriggerLock;
+time_t CameraServiceWatchdog::mLastPerfettoTriggerMs = 0;
 
 bool CameraServiceWatchdog::threadLoop()
 {
@@ -53,6 +57,17 @@ bool CameraServiceWatchdog::threadLoop()
                         getpid(), currentThreadId, mClientPid);
                 mCameraServiceProxyWrapper->notifyWatchdog(mClientPid, mIsNativePid);
             } else if (mTidMap[currentThreadId].cycles >= mMaxCycles) {
+                // Activate a remote Perfetto trace
+                time_t now = time(nullptr);
+                int64_t since_last_trigger = getPerfettoTriggerElapsedTimeMs(now);
+                if (since_last_trigger >= kSecondsToTriggerAgain) {
+                    if (perfetto::Tracing::IsInitialized()) {
+                        std::vector<std::string> labels{
+                            "android.cameraservice.watchdog-time-out"};
+                        perfetto::Tracing::ActivateTriggers(labels, /*ttl_ms=*/0);
+                        setPerfettoTriggerTimeMs(now);
+                    }
+                }
                 std::string abortMessage = getAbortMessage(mTidMap[currentThreadId].functionName);
                 android_set_abort_message(abortMessage.c_str());
                 ALOGW("CameraServiceWatchdog triggering abort for pid: %d tid: %d", getpid(),
@@ -130,6 +145,18 @@ void CameraServiceWatchdog::start(uint32_t tid, const char* functionName)
         mPause = false;
         mWatchdogCondition.signal();
     }
+}
+
+int64_t CameraServiceWatchdog::getPerfettoTriggerElapsedTimeMs(time_t now) {
+    AutoMutex _l(mLastPerfettoTriggerLock);
+    int64_t since_last_trigger =
+        static_cast<int64_t>(difftime(now, mLastPerfettoTriggerMs));
+    return since_last_trigger;
+}
+
+void CameraServiceWatchdog::setPerfettoTriggerTimeMs(time_t now) {
+    AutoMutex _l(mLastPerfettoTriggerLock);
+    mLastPerfettoTriggerMs = now;
 }
 
 }   // namespace android

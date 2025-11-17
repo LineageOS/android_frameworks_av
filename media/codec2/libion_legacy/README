@@ -1,0 +1,15 @@
+2025/11/13
+
+This is a snapshot of the libion library from system/memory/libion
+as of 2025/8, before that library was declared deprecated and the
+functionality turned into NOPs.
+
+While libion is no longer supported on newly released devices, it is
+required for medias mainline modules -- which are required to function
+on devices back to Android S. And those devices do still use libion for
+their shared memory.
+
+We have renamed the library "libion_legacy" to avoid any confusion while the
+original no-longer-functional libion library is present in the build tree.
+We also have limited the visibility of this legacy library so that it will not
+be used by other components outside of the media stack.

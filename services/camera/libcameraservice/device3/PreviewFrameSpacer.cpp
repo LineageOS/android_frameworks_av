@@ -33,9 +33,11 @@ namespace android {
 
 namespace camera3 {
 
-PreviewFrameSpacer::PreviewFrameSpacer(wp<Camera3OutputStream> parent, sp<Surface> consumer) :
+PreviewFrameSpacer::PreviewFrameSpacer(wp<Camera3OutputStream> parent, sp<Surface> consumer,
+        ssize_t surfaceId) :
         mParent(parent),
-        mConsumer(consumer) {
+        mConsumer(consumer),
+        mSurfaceId(surfaceId) {
 }
 
 PreviewFrameSpacer::~PreviewFrameSpacer() {
@@ -109,7 +111,11 @@ void PreviewFrameSpacer::queueBufferToClientLocked(
         return;
     }
 
-    parent->setTransform(bufferHolder.transform);
+    if (flags::seamless_transitions()) {
+        parent->setTransform(bufferHolder.transform, mSurfaceId);
+    } else {
+        parent->setTransform(bufferHolder.transform);
+    }
 
     status_t res = native_window_set_buffers_timestamp(mConsumer.get(), bufferHolder.timestamp);
     if (res != OK) {

@@ -79,6 +79,14 @@ flag {
 }
 
 flag {
+  name: "opus_inproc_software_decoder"
+  is_exported: false
+  namespace: "codec_fwk"
+  description: "Enable in-process opus software decoder"
+  bug: "460549366"
+}
+
+flag {
   name: "rust_aac_software_decoder"
   is_exported: false
   namespace: "codec_fwk"

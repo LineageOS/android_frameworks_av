@@ -153,17 +153,6 @@ MultiAccessUnitHelper::~MultiAccessUnitHelper() {
     mFrameHolder.clear();
 }
 
-bool MultiAccessUnitHelper::isEnabledOnPlatform() {
-    bool result = com::android::media::codec::flags::provider_->large_audio_frame();
-    if (!result) {
-        return false;
-    }
-    //TODO: remove this before launch
-    result = ::android::base::GetBoolProperty("debug.media.c2.large.audio.frame", true);
-    LOG(DEBUG) << "MultiAccessUnitHelper " << (result ? "enabled" : "disabled");
-    return result;
-}
-
 bool MultiAccessUnitHelper::tryReconfigure(const std::unique_ptr<C2Param> &param) {
     C2LargeFrame::output *lfp = C2LargeFrame::output::From(param.get());
     if (lfp == nullptr) {

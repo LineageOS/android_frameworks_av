@@ -198,6 +198,10 @@ public:
 
     virtual binder::Status isPrimaryClient(/*out*/bool* isPrimary) override;
 
+    virtual binder::Status updateOutputConfigurations(
+            const std::vector<int32_t>& streamIds,
+            const std::vector<OutputConfiguration>& configurations) override;
+
     // Locked versions of beginConfigure(), createStreams(), deleteStreams() and endConfigure().
     // These methods expect mBinderSerializationLock lock to be held by the caller.
     binder::Status beginConfigureLocked() ;
@@ -345,6 +349,11 @@ private:
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
     bool enforceRequestPermissions(CameraMetadata& metadata);
+
+    // Update an output configuration
+    binder::Status updateOutputConfigurationLocked(int streamId,
+            const hardware::camera2::params::OutputConfiguration &outputConfiguration,
+            bool replaceSurface = false, int64_t* lastFrameNumber = nullptr);
 
     // Create an output stream with surface deferred for future.
     binder::Status createDeferredSurfaceStreamLocked(

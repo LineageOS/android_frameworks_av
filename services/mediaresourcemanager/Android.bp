@@ -10,14 +10,14 @@ package {
 filegroup {
     name: "resourcemanager_aidl",
     srcs: [
+        "aidl/android/media/ClientConfigParcel.aidl",
+        "aidl/android/media/ClientInfoParcel.aidl",
         "aidl/android/media/IResourceManagerClient.aidl",
         "aidl/android/media/IResourceManagerService.aidl",
-        "aidl/android/media/MediaResourceType.aidl",
-        "aidl/android/media/MediaResourceSubType.aidl",
         "aidl/android/media/MediaResourceParcel.aidl",
         "aidl/android/media/MediaResourcePolicyParcel.aidl",
-        "aidl/android/media/ClientInfoParcel.aidl",
-        "aidl/android/media/ClientConfigParcel.aidl",
+        "aidl/android/media/MediaResourceSubType.aidl",
+        "aidl/android/media/MediaResourceType.aidl",
     ],
     path: "aidl",
 }
@@ -29,8 +29,8 @@ filegroup {
         "aidl/android/media/IResourceObserverService.aidl",
         "aidl/android/media/MediaObservableEvent.aidl",
         "aidl/android/media/MediaObservableFilter.aidl",
-        "aidl/android/media/MediaObservableType.aidl",
         "aidl/android/media/MediaObservableParcel.aidl",
+        "aidl/android/media/MediaObservableType.aidl",
     ],
     path: "aidl",
 }
@@ -80,8 +80,8 @@ cc_library {
         "ResourceManagerMetrics.cpp",
         "ResourceManagerService.cpp",
         "ResourceManagerServiceNew.cpp",
-        "ResourceObserverService.cpp",
         "ResourceManagerServiceUtils.cpp",
+        "ResourceObserverService.cpp",
         "ResourceTracker.cpp",
         "ServiceLog.cpp",
         "UidObserver.cpp",
@@ -91,39 +91,41 @@ cc_library {
     ],
 
     shared_libs: [
-        "libmedia",
-        "libmediautils",
+        "aconfig_mediacodec_flags_c_lib",
+        "libaconfig_storage_read_api_cc",
+        "libactivitymanager_aidl",
         "libbinder",
         "libbinder_ndk",
-        "libutils",
         "liblog",
-        "libstats_media_metrics",
-        "libstatspull",
-        "libstatssocket",
+        "libmedia",
+        "libmediautils",
         "libprotobuf-cpp-lite",
-        "libactivitymanager_aidl",
-        "libaconfig_storage_read_api_cc",
-        "aconfig_mediacodec_flags_c_lib",
+        "libstats_media_metrics",
+        "libstatssocket",
+        "libutils",
     ],
 
     static_libs: [
         "android.media.codec-aconfig-cc",
-        "resourceobserver_aidl_interface-V1-ndk",
         "libplatformprotos",
+        "resourceobserver_aidl_interface-V1-ndk",
     ],
 
     include_dirs: ["frameworks/av/include"],
 
+    header_libs: [
+        "libstatspull_headers",
+    ],
+
     cflags: [
-        "-Werror",
         "-Wall",
+        "-Werror",
     ],
 
     export_include_dirs: ["."],
 
     export_shared_lib_headers: [
         "libstats_media_metrics",
-        "libstatspull",
         "libstatssocket",
     ],
 }

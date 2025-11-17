@@ -43,6 +43,12 @@ public:
         virtual void onDecryptError(const std::list<sp<AMessage>>& errorMsg) = 0;
     };
 
+    // For HDCP error retry, the below configuration will wait for about
+    // mHdcpretryCnt * mHdcpretryIntervalUs until declaring failure
+    // for ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION error
+    static constexpr uint32_t kMaxHdcpDecryptRetryCount = 6;
+    static constexpr uint32_t kRetryHdcpDecryptDelayUs = 1000000;
+
     // Ideally we should be returning the output of the decryption in
     // onDecryptComple() calback and let the next module take over the
     // rest of the processing. In the current state, the next step will
@@ -51,9 +57,12 @@ public:
     // In order to prevent thread hop to just do that, we have created
     // a dependency on BufferChannel here to queue the buffer to the codec
     // immediately after decryption.
-    CryptoAsync(std::weak_ptr<BufferChannelBase> bufferChannel)
+    CryptoAsync(std::weak_ptr<BufferChannelBase> bufferChannel, bool retryHdcpFailure)
         :mState(kCryptoAsyncActive) {
         mBufferChannel = std::move(bufferChannel);
+        if (retryHdcpFailure) {
+            mRetryHdcpFailure.emplace(0, 0, 0);
+        }
     }
 
     // Destructor
@@ -73,6 +82,8 @@ public:
     // in this looper stops and in-fact., there is a need to clear (call stop())
     // for the queue to become operational again. Also acts like a rest.
     void stop(std::list<sp<AMessage>> * const buffers = nullptr);
+
+    const sp<AMessage> getMetrics() const;
 
     // Describes two actions for decrypt();
     // kActionDecrypt - decrypts the buffer and queues to codec
@@ -108,6 +119,8 @@ protected:
         kWhatDecrypt         = 1,
         // used with stop()
         kWhatStop            = 2,
+        // get metrics
+        kWhatGetMetrics      = 3,
         // place holder
         kWhatDoNothing       = 10
     };
@@ -144,6 +157,10 @@ private:
     Mutexed<std::list<sp<AMessage>>> mPendingBuffers;
 
     std::weak_ptr<BufferChannelBase> mBufferChannel;
+
+    // HDCP tuple<currentRetryCounter, retrySuccessCounter, retryFailureCounter>
+    std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> mRetryHdcpFailure;
+
 };
 
 }  // namespace android

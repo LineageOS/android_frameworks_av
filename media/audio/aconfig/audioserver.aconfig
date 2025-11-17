@@ -5,6 +5,7 @@
 package: "com.android.media.audioserver"
 container: "system"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
     name: "cap_engine_preferred_device_improvement"
     namespace: "media_audio"
@@ -14,8 +15,6 @@ flag {
         "switching behavior."
     bug: "436398891"
 }
-
-# shipped 24Q3
 
 flag {
     name: "effect_chain_callback_improve"
@@ -62,3 +61,4 @@ flag {
     description: "Remove the output stream suspend state and control mechanism"
     bug: "409706525"
 }
+# go/keep-sorted end
