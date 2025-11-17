@@ -23,7 +23,7 @@
 #include <codec2/aidl/ComponentInterface.h>
 #include <codec2/aidl/ComponentStore.h>
 #include <codec2/aidl/ParamTypes.h>
-#ifdef WITH_C2_INPUT_SURFACE
+#ifndef NO_C2_INPUT_SURFACE
 #include <codec2/aidl/inputsurface/InputSurface.h>
 #endif
 
@@ -339,7 +339,7 @@ ScopedAStatus ComponentStore::listComponents(
 
 ScopedAStatus ComponentStore::createInputSurface(
         std::shared_ptr<IInputSurface> *inputSurface) {
-#ifndef WITH_C2_INPUT_SURFACE
+#ifdef NO_C2_INPUT_SURFACE
     (void)inputSurface;
     return ScopedAStatus::fromServiceSpecificError(Status::OMITTED);
 #else

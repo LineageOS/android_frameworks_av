@@ -23,7 +23,7 @@
     -->
     <hal format="aidl" updatable-via-apex="com.android.media.swcodec">
         <name>android.hardware.media.c2</name>
-        <version>2</version>
+        <version>1</version>
         <fqname>IComponentStore/software</fqname>
     </hal>
 </manifest>

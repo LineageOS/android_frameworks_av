@@ -132,17 +132,6 @@ TEST_P(Codec2VideoEncSurfaceAidlTest, UnitTest) {
     ANativeWindow* nativeWindow = inputSurface->getNativeWindow();
     ASSERT_NE(nativeWindow, nullptr);
 
-    // test notifiesInputBufferDoneToClient() API
-    bool inputBufferDone = false;
-    err = connection->notifiesInputBufferDoneToClient(&inputBufferDone);
-    if (err == C2_OMITTED) {
-        ALOGI("InputSurfaceConnection::notifiesInputBufferDoneToClient is not supported");
-    } else {
-        ASSERT_EQ(err, C2_OK);
-        ALOGI("InputSurfaceConnection::notifiesInputBufferDoneToClient returned: %s",
-              inputBufferDone ? "True" : "False");
-    }
-
     // test signalEos API
     ASSERT_EQ(connection->signalEos(), C2_OK);
 
