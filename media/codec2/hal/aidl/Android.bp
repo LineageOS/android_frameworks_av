@@ -26,7 +26,7 @@ cc_library {
         "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool@2.0",
         "android.hardware.media.bufferpool2-V2-ndk",
-        "android.hardware.media.c2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbinder_ndk",
         "libbase",
         "libcodec2",
@@ -48,7 +48,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
-        "android.hardware.media.c2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2",
         "libcodec2_hal_common",
     ],
@@ -88,7 +88,7 @@ cc_library {
     shared_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool2-V2-ndk",
-        "android.hardware.media.c2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcodec2",
@@ -131,17 +131,21 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
-        "android.hardware.media.c2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2",
         "libstagefright_bufferpool@2.0.1",
         "libui",
     ],
+
+    cflags: [
+        "-DNO_C2_INPUT_SURFACE",
+    ],
 }
 
-// DO NOT DEPEND OR USE THIS
-// This is supposed to be used internal only.
-cc_defaults {
-    name: "libcodec2-aidl-common-defaults",
+// DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-aidl-defaults instead
+cc_library {
+    name: "libcodec2_aidl",
     min_sdk_version: "30",
     vendor_available: true,
     apex_available: [
@@ -163,6 +167,11 @@ cc_defaults {
         "InputBufferManager.cpp",
         "InputSink.cpp",
         "ParamTypes.cpp",
+        "inputsurface/FrameDropper.cpp",
+        "inputsurface/FrameQueueThread.cpp",
+        "inputsurface/InputSurface.cpp",
+        "inputsurface/InputSurfaceConnection.cpp",
+        "inputsurface/InputSurfaceSource.cpp",
     ],
 
     header_libs: [
@@ -172,6 +181,7 @@ cc_defaults {
     shared_libs: [
         "android.hardware.common-V2-ndk",
         "android.hardware.media.bufferpool2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbase",
         "libbinder_ndk",
         "libcodec2",
@@ -182,6 +192,7 @@ cc_defaults {
         "libhidlbase",
         "liblog",
         "libnativewindow",
+        "libmediandk",
         "libsfplugin_ccodec_utils",
         "libstagefright_aidl_bufferpool2",
         "libstagefright_bufferpool@2.0.1",
@@ -194,111 +205,32 @@ cc_defaults {
         "libaidlcommonsupport",
     ],
 
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libcodec2_hidl_plugin_stub",
+            ],
+            shared_libs: [
+                "libcodec2_hidl_plugin",
+            ],
+        },
+        apex: {
+            exclude_shared_libs: [
+                "libcodec2_hidl_plugin_stub",
+                "libcodec2_hidl_plugin",
+            ],
+        },
+    },
+
     export_include_dirs: [
         "include",
     ],
 
     export_shared_lib_headers: [
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2",
         "libstagefright_bufferpool@2.0.1",
         "libui",
-    ],
-}
-
-// DO NOT DEPEND ON THIS DIRECTLY
-// use libcodec2-aidl-V2-defaults instead.
-// Note: libcodec2_aidl_V2 uses up-to-date version of hal interface.
-cc_library {
-    name: "libcodec2_aidl_V2",
-
-    defaults: [
-        "libcodec2-aidl-common-defaults",
-    ],
-
-    srcs: [
-        "inputsurface/FrameDropper.cpp",
-        "inputsurface/FrameQueueThread.cpp",
-        "inputsurface/InputSurface.cpp",
-        "inputsurface/InputSurfaceConnection.cpp",
-        "inputsurface/InputSurfaceSource.cpp",
-    ],
-
-
-    shared_libs: [
-        "libmediandk",
-        "android.hardware.media.c2-V2-ndk",
-    ],
-
-    target: {
-        vendor: {
-            exclude_shared_libs: [
-                "libcodec2_hidl_plugin_stub",
-            ],
-            shared_libs: [
-                "libcodec2_hidl_plugin",
-            ],
-        },
-        apex: {
-            exclude_shared_libs: [
-                "libcodec2_hidl_plugin_stub",
-                "libcodec2_hidl_plugin",
-            ],
-        },
-    },
-
-    export_shared_lib_headers: [
-        "android.hardware.media.c2-V2-ndk",
-    ],
-
-    cflags: [
-        "-DWITH_C2_INPUT_SURFACE",
-    ],
-}
-
-// DO NOT DEPEND ON THIS DIRECTLY
-// Use libcodec2-aidl-defaults instead.
-// Note: libcodec2_aidl uses old version of hal interface.
-cc_library {
-    name: "libcodec2_aidl",
-
-    defaults: [
-        "libcodec2-aidl-common-defaults",
-    ],
-
-    shared_libs: [
-        "android.hardware.media.c2-V1-ndk",
-    ],
-
-    target: {
-        vendor: {
-            srcs: [
-                "inputsurface/FrameDropper.cpp",
-                "inputsurface/FrameQueueThread.cpp",
-                "inputsurface/InputSurface.cpp",
-                "inputsurface/InputSurfaceConnection.cpp",
-                "inputsurface/InputSurfaceSource.cpp",
-            ],
-            exclude_shared_libs: [
-                "libcodec2_hidl_plugin_stub",
-            ],
-            shared_libs: [
-                "libcodec2_hidl_plugin",
-                "libmediandk",
-            ],
-            cflags: [
-                "-DWITH_C2_INPUT_SURFACE",
-            ],
-        },
-        apex: {
-            exclude_shared_libs: [
-                "libcodec2_hidl_plugin_stub",
-                "libcodec2_hidl_plugin",
-            ],
-        },
-    },
-
-    export_shared_lib_headers: [
-        "android.hardware.media.c2-V1-ndk",
     ],
 }
 
@@ -306,25 +238,20 @@ cc_library {
 cc_defaults {
     name: "libcodec2-aidl-noisurface-defaults",
     min_sdk_version: "30",
-    defaults: [
-        "libcodec2-impl-defaults",
-    ],
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
-        "android.hardware.media.c2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libbinder_ndk",
         "libcodec2_aidl_noisurface",
     ],
 }
 
 // public dependency for Codec 2.0 HAL service implementations
-// media.c2 hal interface ver 1 (old)
 cc_defaults {
     name: "libcodec2-aidl-defaults",
     min_sdk_version: "30",
-    defaults: [
-        "libcodec2-impl-defaults",
-    ],
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
         "android.hardware.media.c2-V1-ndk",
@@ -333,32 +260,13 @@ cc_defaults {
     ],
 }
 
-// public dependency for Codec 2.0 HAL service implementations
-// media.c2 hal interface ver 2 (current)
-cc_defaults {
-    name: "libcodec2-aidl-V2-defaults",
-    min_sdk_version: "30",
-    defaults: [
-        "libcodec2-impl-defaults",
-    ],
-
-    shared_libs: [
-        "android.hardware.media.c2-V2-ndk",
-        "libbinder_ndk",
-        "libcodec2_aidl_V2",
-    ],
-}
-
-
 // public dependency for Codec 2.0 HAL client
 cc_defaults {
     name: "libcodec2-aidl-client-defaults",
-    defaults: [
-        "libcodec2-impl-defaults",
-    ],
+    defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
-        "android.hardware.media.c2-V2-ndk",
+        "android.hardware.media.c2-V1-ndk",
         "libcodec2_aidl_client",
     ],
 }
@@ -370,7 +278,7 @@ cc_fuzz {
         "fuzzer.cpp",
     ],
     defaults: [
-        "libcodec2-aidl-V2-defaults",
+        "libcodec2-aidl-defaults",
         "service_fuzzer_defaults",
         "libcodec2-runtime-libs",
     ],

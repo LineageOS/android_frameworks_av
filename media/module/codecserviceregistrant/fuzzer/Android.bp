@@ -34,7 +34,7 @@ cc_fuzz {
         "libmedia_headers",
     ],
     defaults: [
-        "libcodec2-aidl-V2-defaults",
+        "libcodec2-aidl-defaults",
         "libcodec2-hidl-defaults",
     ],
     fuzz_config: {

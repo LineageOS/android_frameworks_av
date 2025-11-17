@@ -215,9 +215,6 @@ c2_status_t GetC2Status(const ::ndk::ScopedAStatus &transStatus, const char *met
             c2_status_t status = static_cast<c2_status_t>(transStatus.getServiceSpecificError());
             LOG(DEBUG) << method << " -- call failed: " << status << ".";
             return status;
-        } else if (transStatus.getExceptionCode() == EX_UNSUPPORTED_OPERATION) {
-            LOG(DEBUG) << method << " -- call failed: EX_UNSUPPORTED_OPERATION.";
-            return C2_OMITTED;
         } else {
             LOG(ERROR) << method << " -- transaction failed.";
             return C2_TRANSACTION_FAILED;
@@ -4041,17 +4038,6 @@ c2_status_t Codec2Client::InputSurfaceConnection::signalEos() {
     }
     ::ndk::ScopedAStatus transResult = mBase->signalEndOfStream();
     return GetC2Status(transResult, "InputSurfaceConnection::signalEndOfStream");
-}
-
-c2_status_t Codec2Client::InputSurfaceConnection::notifiesInputBufferDoneToClient(
-        bool* inputBufferDone) {
-    if (!mBase) {
-        LOG(ERROR)
-                << "InputSurfaceConnection:notifiesInputBufferDoneToClient failed, no valid base";
-        return C2_CORRUPTED;
-    }
-    ::ndk::ScopedAStatus transResult = mBase->notifiesInputBufferDoneToClient(inputBufferDone);
-    return GetC2Status(transResult, "InputSurfaceConnection::notifiesInputBufferDoneToClient");
 }
 
 }  // namespace android
