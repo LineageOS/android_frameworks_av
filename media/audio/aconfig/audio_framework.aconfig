@@ -53,6 +53,13 @@ flag {
 }
 
 flag {
+    name: "ble_peripheral_devices"
+    namespace: "media_audio"
+    description: "Add devices for BLE peripheral mode"
+    bug: "423053144"
+}
+
+flag {
     name: "bt_audio_disconnect_api"
     namespace: "media_audio"
     description: "Add API to notify audio for SCO disconnection under AMSCO."
