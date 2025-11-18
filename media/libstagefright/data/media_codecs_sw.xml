@@ -78,6 +78,17 @@
             <Limit name="bitrate" range="6000-510000" />
             <Attribute name="software-codec" />
         </MediaCodec>
+        <MediaCodec name="c2.android.inproc.opus.decoder" type="audio/opus">
+            <!-- This codec has the following restrictions:
+              * The OS version must be C or later.
+              * The device ABI must be arm64-v8a.
+              * The process must be 64-bit.
+              Otherwise the decoder will not appear in the list of codecs. -->
+            <Limit name="channel-count" max="8" />
+            <Limit name="sample-rate" ranges="8000,12000,16000,24000,48000" />
+            <Limit name="bitrate" range="6000-510000" />
+            <Attribute name="software-codec" />
+        </MediaCodec>
         <MediaCodec name="c2.android.raw.decoder" type="audio/raw">
             <Alias name="OMX.google.raw.decoder" />
             <Limit name="channel-count" max="12" />
