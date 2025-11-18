@@ -59,6 +59,7 @@ import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioStreamType;
 import android.media.audio.common.AudioUsage;
 import android.media.audio.common.AudioUuid;
+import android.media.audio.common.FlushFromFrameSupport;
 import android.media.audio.common.Int;
 
 import com.android.media.permission.INativePermissionController;
@@ -522,4 +523,12 @@ interface IAudioPolicyService {
      * Enable hardening independent of flag or exemption state
      */
      void setEnableHardening(boolean shouldEnable);
+
+    /**
+     * Returns how flushFromFrame is supported when the playback is created with given
+     * audio config and audio attributes.
+     */
+    FlushFromFrameSupport getFlushFromFrameSupport(
+            in AudioConfigBase config, in AudioAttributes attributes,
+            int /* Bitmask, indexed by AudioOutputFlags */ flags);
 }

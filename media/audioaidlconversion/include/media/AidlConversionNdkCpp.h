@@ -25,12 +25,16 @@
 #include <aidl/android/media/audio/common/AudioMMapPolicyType.h>
 #include <aidl/android/media/audio/common/AudioMode.h>
 #include <aidl/android/media/audio/common/AudioPort.h>
+#include <aidl/android/media/audio/common/AudioPortConfig.h>
+#include <aidl/android/media/audio/common/FlushFromFrameSupport.h>
 #include <android/media/audio/common/AudioFormatDescription.h>
 #include <android/media/audio/common/AudioHalEngineConfig.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/audio/common/AudioMode.h>
 #include <android/media/audio/common/AudioPort.h>
+#include <android/media/audio/common/AudioPortConfig.h>
+#include <android/media/audio/common/FlushFromFrameSupport.h>
 #include <media/AidlConversionUtil.h>
 
 namespace android {
@@ -47,6 +51,8 @@ DECLARE_CONVERTERS(android::media::audio::common, AudioMMapPolicyInfo);
 DECLARE_CONVERTERS(android::media::audio::common, AudioMMapPolicyType);
 DECLARE_CONVERTERS(android::media::audio::common, AudioMode);
 DECLARE_CONVERTERS(android::media::audio::common, AudioPort);
+DECLARE_CONVERTERS(android::media::audio::common, AudioPortConfig);
+DECLARE_CONVERTERS(android::media::audio::common, FlushFromFrameSupport);
 
 #undef DECLARE_CONVERTERS
 

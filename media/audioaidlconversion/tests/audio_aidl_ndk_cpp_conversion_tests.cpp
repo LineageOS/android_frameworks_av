@@ -134,3 +134,12 @@ TEST(AudioPortRoundTripTest, Ndk2Cpp2Ndk) {
     ASSERT_TRUE(convBack.ok());
     EXPECT_EQ(initial, convBack.value());
 }
+
+TEST(AudioPortConfigRoundTripTest, Ndk2Cpp2Ndk) {
+    const AudioPortConfig initial;
+    auto conv = ndk2cpp_AudioPortConfig(initial);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = cpp2ndk_AudioPortConfig(conv.value());
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}

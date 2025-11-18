@@ -34,6 +34,8 @@ namespace android {
 
 using media::audio::common::AudioMMapPolicyInfo;
 using media::audio::common::AudioMMapPolicyType;
+using media::audio::common::AudioPortConfig;
+using media::audio::common::FlushFromFrameSupport;
 
 // ----------------------------------------------------------------------------
 
@@ -206,6 +208,11 @@ status_t AudioHwDevice::getAudioMixPort(const struct audio_port_v7 *devicePort,
                                         struct audio_port_v7 *mixPort,
                                         int32_t mixPortHalId) const {
     return mHwDevice->getAudioMixPort(devicePort, mixPort, mixPortHalId);
+}
+
+status_t AudioHwDevice::getFlushFromFrameSupport(
+        const AudioPortConfig &config, FlushFromFrameSupport *support) const {
+    return mHwDevice->getFlushFromFrameSupport(config, support);
 }
 
 

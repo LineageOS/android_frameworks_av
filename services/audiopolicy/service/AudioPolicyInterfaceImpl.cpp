@@ -79,6 +79,7 @@ using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
 using media::audio::common::AudioUuid;
+using media::audio::common::FlushFromFrameSupport;
 using media::audio::common::Int;
 using media::permission::isSystemUsage;
 
@@ -3000,6 +3001,25 @@ Status AudioPolicyService::getMmapPolicyForDevice(
 Status AudioPolicyService::setEnableHardening(bool shouldEnable) {
     mShouldEnableHardening.store(shouldEnable);
     return Status::ok();
+}
+
+Status AudioPolicyService::getFlushFromFrameSupport(const AudioConfigBase& configAidl,
+                                                    const AudioAttributes& attrAidl,
+                                                    int32_t flagsAidl,
+                                                    FlushFromFrameSupport* _aidl_return) {
+    const audio_config_base_t config = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioConfigBase_audio_config_base_t(configAidl, false /*isInput*/));
+    const audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributes_audio_attributes_t(attrAidl));
+    const audio_output_flags_t flags = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_audio_output_flags_t_mask(flagsAidl));
+
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    audio_utils::lock_guard _l(mMutex);
+    return binderStatusFromStatusT(
+            mAudioPolicyManager->getFlushFromFrameSupport(config, attr, flags, _aidl_return));
 }
 
 } // namespace android
