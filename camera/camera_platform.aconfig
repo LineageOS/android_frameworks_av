@@ -281,6 +281,17 @@ flag {
 
 flag {
     namespace: "camera_platform"
+    name: "new_dynamic_range_profiles"
+    is_exported: true
+    description: "Add support for new AGTM dynamic range profile"
+    bug: "455903743"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}
+
+flag {
+    namespace: "camera_platform"
     name: "gralloc_additional_options"
     description: "Add additionalOptions gralloc flag for camera buffers"
     bug: "410091316"

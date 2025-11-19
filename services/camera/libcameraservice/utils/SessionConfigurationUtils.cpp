@@ -28,6 +28,7 @@
 #include "aidl/android/hardware/graphics/common/Dataspace.h"
 #include "api2/JpegRCompositeStream.h"
 #include "binder/Status.h"
+#include "com_android_internal_camera_flags.h"
 #include "common/CameraDeviceBase.h"
 #include "common/HalConversionsTemplated.h"
 #include "device3/Camera3OutputStream.h"
@@ -293,6 +294,33 @@ bool isDynamicRangeProfileSupported(int64_t dynamicRangeProfile, const CameraMet
 
             return false;
         default:
+            if (flags::new_dynamic_range_profiles()) {
+                switch (dynamicRangeProfile) {
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_PO_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_PO_AGTM:
+                        entry = staticInfo.find(
+                                ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP);
+                        for (size_t i = 0; i < entry.count; i += 3) {
+                            if (dynamicRangeProfile == entry.data.i64[i]) {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    default:
+                        return false;
+                }
+            }
             return false;
     }
 
@@ -311,6 +339,20 @@ bool is10bitDynamicRangeProfile(int64_t dynamicRangeProfile) {
         case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO:
             return true;
         default:
+            if (flags::new_dynamic_range_profiles()) {
+                switch (dynamicRangeProfile) {
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_AGTM:
+                    case ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO_AGTM:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
             return false;
     }
 }
