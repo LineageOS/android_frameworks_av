@@ -157,27 +157,16 @@ void Camera3Stream::setFormatOverride(bool formatOverridden) {
     mFormatOverridden = formatOverridden;
 }
 
-const std::vector<AHardwareBufferLongOptions>& Camera3Stream::getAdditionalOptions() const {
-    return mAdditionalOptions.mOptions;
-}
-
-void Camera3Stream::AdditionalOptionsWrapper::initialize(
-        const std::vector<GrallocExtendableType>& additionalOptions) {
-    mNames.clear();
-    mOptions.clear();
-
-    // Reserve mAdditionalOptionNames to avoid reallocation.
-    mNames.reserve(additionalOptions.size());
-    for (size_t i = 0; i < additionalOptions.size(); i++) {
-        mNames.push_back(additionalOptions[i].name);
-        mOptions.push_back(
-            {.name = mNames[i].c_str(), .value = additionalOptions[i].value});
-    }
+const std::vector<gui::AdditionalOptions>& Camera3Stream::getAdditionalOptions() const {
+    return mAdditionalOptions;
 }
 
 void Camera3Stream::setAdditionalOptions(const std::vector<GrallocExtendableType>&
                                             additionalOptions) {
-    mAdditionalOptions.initialize(additionalOptions);
+    mAdditionalOptions.reserve(additionalOptions.size());
+    for (const auto& option: additionalOptions) {
+        mAdditionalOptions.emplace_back(option.name, option.value);
+    }
 }
 
 bool Camera3Stream::isFormatOverridden() const {
