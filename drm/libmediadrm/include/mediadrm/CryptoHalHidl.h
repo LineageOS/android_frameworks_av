@@ -66,6 +66,11 @@ struct CryptoHalHidl : public ICrypto {
             const ::DestinationBuffer &destination,
             AString *errorDetailMsg);
 
+    virtual DrmStatus getKeyHandle(const uint8_t key[16], CryptoPlugin::Mode mode,
+                                   size_t sourceSize, size_t offset,
+                                   const CryptoPlugin::SubSample* subSamples, size_t numSubSamples,
+                                   Vector<uint8_t>& keyHandle);
+
     virtual int32_t setHeap(const sp<HidlMemory>& heap) {
         return setHeapBase(heap);
     }
