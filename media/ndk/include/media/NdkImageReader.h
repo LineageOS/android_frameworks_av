@@ -591,6 +591,8 @@ media_status_t AImageReader_setDefaultBufferSize(
  *
  * @param reader the image reader of interest.
  * @param dataSpace specifies default buffer dataspace of the image reader.
+ *                  This must be one of the ADATASPACE_* enum values defined in
+ *                  {@link ADataSpace}.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
@@ -609,6 +611,8 @@ media_status_t AImageReader_setDefaultBufferDataSpace(
  *
  * @param reader the image reader of interest.
  * @param format specifies default AHardwareBuffer_Format of the image reader.
+ *               This must be one of the AHARDWAREBUFFER_FORMAT_* enum values defined
+ *               in {@link hardware_buffer.h}.
  *
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
