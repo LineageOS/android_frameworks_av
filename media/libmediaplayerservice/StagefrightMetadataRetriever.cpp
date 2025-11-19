@@ -19,6 +19,8 @@
 
 #include <inttypes.h>
 
+#include <android_media_codec.h>
+
 #include <utils/Log.h>
 #include <cutils/properties.h>
 
@@ -371,8 +373,56 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
         return NULL;
     }
 
+    sp<AMessage> format = new AMessage;
+    status_t err = convertMetaDataToMessage(trackMeta, &format);
+    if (err != OK) {
+        ALOGE("getFrameInternal: convertMetaDataToMessage() failed, unable to extract frame");
+        return NULL;
+    }
+
+    const char *mime;
+    if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
+        ALOGE("video track has no mime information.");
+        return NULL;
+    }
+
+    uint32_t bitDepth = 0;
+    if (::android::media::codec::provider_->mediametadataretriever_10_bit_support()) {
+        bitDepth = 8;
+        if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+            int32_t profile;
+            if (format->findInt32("profile", &profile)) {
+                if (HEVCProfileMain10 == profile || HEVCProfileMain10HDR10 == profile ||
+                        HEVCProfileMain10HDR10Plus == profile) {
+                      bitDepth = 10;
+                }
+            }
+        } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
+            int32_t profile;
+            if (format->findInt32("profile", &profile)) {
+                if (AV1ProfileMain10 == profile || AV1ProfileMain10HDR10 == profile ||
+                        AV1ProfileMain10HDR10Plus == profile) {
+                      bitDepth = 10;
+                }
+            }
+        } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_VP9)) {
+            int32_t profile;
+            if (format->findInt32("profile", &profile)) {
+                if (VP9Profile2 == profile ||
+                        VP9Profile2HDR == profile ||
+                        VP9Profile2HDR10Plus == profile ||
+                        VP9Profile3 == profile ||
+                        VP9Profile3HDR == profile ||
+                        VP9Profile3HDR10Plus == profile) {
+                      bitDepth = 10;
+                }
+            }
+        }
+    }
+
     if (metaOnly) {
-        return FrameDecoder::getMetadataOnly(trackMeta, colorFormat);
+        return FrameDecoder::getMetadataOnly(
+                trackMeta, colorFormat, false /* thumbnail */, bitDepth);
     }
 
     sp<IMediaSource> source = mExtractor->getTrack(i);
@@ -390,21 +440,9 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
         mAlbumArt = MediaAlbumArt::fromData(dataSize, data);
     }
 
-    const char *mime;
-    if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
-        ALOGE("video track has no mime information.");
-        return NULL;
-    }
-
     bool preferhw = property_get_bool(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
-    sp<AMessage> format = new AMessage;
-    status_t err = convertMetaDataToMessage(trackMeta, &format);
-    if (err != OK) {
-        ALOGE("getFrameInternal: convertMetaDataToMessage() failed, unable to extract frame");
-        return NULL;
-    }
 
     Vector<AString> matchingCodecs;
     MediaCodecList::findMatchingCodecs(
@@ -417,6 +455,7 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
         sp<VideoFrameDecoder> decoder = new VideoFrameDecoder(componentName, trackMeta, source);
+
         if (decoder->init(timeUs, option, colorFormat) == OK) {
             sp<IMemory> frame = decoder->extractFrame();
             if (frame != nullptr) {
