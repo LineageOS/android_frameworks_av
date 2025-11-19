@@ -413,6 +413,14 @@ flag {
     bug: "393657380"
 }
 
+flag {
+    name: "vibration_sound_usage"
+    namespace: "media_audio"
+    description: "Support new AudioAttribute usage for vibration sound"
+    bug: "411481053"
+    is_exported: true
+}
+
 # TODO remove
 flag {
     name: "volume_ringer_api_hardening"
