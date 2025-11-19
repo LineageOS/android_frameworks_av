@@ -69,6 +69,14 @@ flag {
 }
 
 flag {
+    name: "codec_provenance_api"
+    namespace: "media_audio"
+    description: "Add API to specify the original codec for an audio track."
+    bug: "447704057"
+    # is_exported: true
+}
+
+flag {
     name: "concurrent_audio_record_bypass_permission"
     namespace: "media_audio"
     description:
