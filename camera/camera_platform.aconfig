@@ -315,7 +315,7 @@ flag {
     is_exported: true
     name: "logical_multi_camera_additional_results"
     description: "Add additional metadata info to the logical camera result"
-    bug: "359944765"
+    bug: "447619057"
 }
 
 flag {
