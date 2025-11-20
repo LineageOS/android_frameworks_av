@@ -2159,12 +2159,12 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHold
         mRequestThread->clearOutputs(streamId, removedSurfaceIds, lastFrameNumber);
         mRequestThread->signalPipelineDrain({streamId});
         mInterface->clearUnusedBufferCaches(streamId);
-        // Pause unlocked buffer requests
-        if (mUseHalBufManager) {
-            mRequestBufferInterfaceLock.lock();
-        } else {
-            mRequestThread->setPaused(true);
-        }
+        // It is critical to ensure that the following stream update operation
+        // doesn't run in parallel with either the request thread trying to
+        // acquire a buffer or the CameraHal trying to do same via request
+        // buffer callback. For context, within regular output streams the internal
+        // 'mLock' is temporarily released when de-queuing buffers.
+        mRequestBufferInterfaceLock.lock();
     } else {
         for (const auto &it : removedSurfaceIds) {
             if (mRequestThread->isOutputSurfacePending(streamId, it)) {
@@ -2186,11 +2186,7 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHold
     }
     // Resume buffer requests
     if (modifyRequests) {
-        if (mUseHalBufManager) {
-            mRequestBufferInterfaceLock.unlock();
-        } else {
-            mRequestThread->setPaused(false);
-        }
+        mRequestBufferInterfaceLock.unlock();
     }
 
     if (res != OK) {
@@ -4378,6 +4374,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 // buffers are requested.
                 outputStream->markUnpreparable();
             } else {
+                std::lock_guard<std::mutex> l(parent->mRequestBufferInterfaceLock);
                 res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
                         waitDuration,
                         captureRequest->mOutputSurfaces[streamId]);

@@ -1546,7 +1546,8 @@ class Camera3Device :
     bool mUseHalBufManager = false;
     std::set<int32_t > mHalBufManagedStreamIds;
     bool mSessionHalBufManager = false;
-    // Lock to ensure requestStreamBuffers() callbacks are serialized
+    // Lock to ensure requestStreamBuffers() callbacks and request thread buffer allocations
+    // are serialized along with output surface updates
     std::mutex mRequestBufferInterfaceLock;
 
     // The state machine to control when requestStreamBuffers should allow
