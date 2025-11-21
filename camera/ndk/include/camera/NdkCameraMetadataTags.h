@@ -1913,7 +1913,8 @@ typedef enum acamera_metadata_tag {
      * <p>Some camera devices support additional digital sensitivity boosting in the
      * camera processing pipeline after sensor RAW image is captured.
      * Such a boost will be applied to YUV/JPEG format output images but will not
-     * have effect on RAW output formats like RAW_SENSOR, RAW10, RAW12 or RAW_OPAQUE.</p>
+     * have effect on RAW output formats like RAW_SENSOR, RAW10, RAW12, RAW14
+     * or RAW_OPAQUE.</p>
      * <p>This key will be <code>null</code> for devices that do not support any RAW format
      * outputs. For devices that do support RAW format outputs, this key will always
      * present, and if a device does not support post RAW sensitivity boost, it will
@@ -3826,7 +3827,8 @@ typedef enum acamera_metadata_tag {
      * <ul>
      * <li>Processed (but stalling): any non-RAW format with a stallDurations &gt; 0.
      *   Typically {@link AIMAGE_FORMAT_JPEG JPEG format}.</li>
-     * <li>Raw formats: {@link AIMAGE_FORMAT_RAW16 RAW_SENSOR}, {@link AIMAGE_FORMAT_RAW10 RAW10}, or
+     * <li>Raw formats: {@link AIMAGE_FORMAT_RAW16 RAW_SENSOR},
+     *   {@link AIMAGE_FORMAT_RAW10 RAW10}, or
      *   {@link AIMAGE_FORMAT_RAW12 RAW12}.</li>
      * <li>Processed (but not-stalling): any non-RAW format without a stall duration.  Typically
      *   {@link AIMAGE_FORMAT_YUV_420_888 YUV_420_888},
@@ -5921,8 +5923,8 @@ typedef enum acamera_metadata_tag {
      * by lens geometric distortion correction.</p>
      * <p>In general, application should always refer to active array size for controls like
      * metering regions or crop region. Two exceptions are when the application is dealing with
-     * RAW image buffers (RAW_SENSOR, RAW10, RAW12 etc), or when application explicitly set
-     * ACAMERA_DISTORTION_CORRECTION_MODE to OFF. In these cases, application should refer
+     * RAW image buffers (RAW_SENSOR, RAW10, RAW12, RAW14 etc), or when application explicitly
+     * set ACAMERA_DISTORTION_CORRECTION_MODE to OFF. In these cases, application should refer
      * to ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE.</p>
      * <p>The data representation is <code>int[4]</code>, which maps to <code>(left, top, width, height)</code>.</p>
      *

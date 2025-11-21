@@ -36,11 +36,13 @@
 #include "device3/aidl/AidlCamera3Device.h"
 #include "device3/hidl/HidlCamera3Device.h"
 #include "system/graphics-base-v1.1.h"
+#include <aidl/android/hardware/graphics/common/PixelFormat.h>
 
 using android::camera3::OutputStreamInfo;
 using android::camera3::OutputStreamInfo;
 using android::hardware::camera2::ICameraDeviceUser;
 using aidl::android::hardware::camera::device::RequestTemplate;
+using AidlPixelFormat = aidl::android::hardware::graphics::common::PixelFormat;
 
 namespace android {
 namespace camera3 {
@@ -434,6 +436,7 @@ bool isPublicFormat(int32_t format)
         case HAL_PIXEL_FORMAT_RAW16:
         case HAL_PIXEL_FORMAT_RAW10:
         case HAL_PIXEL_FORMAT_RAW12:
+        case static_cast<int32_t>(AidlPixelFormat::RAW14):
         case HAL_PIXEL_FORMAT_RAW_OPAQUE:
         case HAL_PIXEL_FORMAT_BLOB:
         case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
