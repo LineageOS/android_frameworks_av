@@ -6895,6 +6895,12 @@ status_t AudioPolicyManager::getSpatializerOutput(const audio_config_base_t *mix
             mSpatializerOutput = desc;
             ALOGV("%s reusing current spatializer output %d", __func__, desc->mIoHandle);
         } else {
+            if (isOutputOnlyAvailableRouteToSomeDevice(desc)
+                    && !desc->routesToAllDevices(devices)) {
+                // If the output is only available to some devices and it is not the selected
+                // device, do not close it.
+                continue;
+            }
             ALOGV("%s closing spatializerOutput output %d to match channel mask %#x"
                     " and devices %s", __func__, desc->mIoHandle,
                     configPtr != nullptr ? configPtr->channel_mask : 0,
