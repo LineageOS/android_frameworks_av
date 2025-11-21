@@ -324,6 +324,9 @@ public:
      *                     and direct or offloaded tracks, this parameter is ignored.
      * selectedDeviceId:   Selected device id of the app which initially requested the AudioTrack
      *                     to open with a specific device.
+     * codecProvenance:    Media type for the original codec (Atmos, IAMF), which is preserved
+     *                     even when the AudioTrack format is PCM. The provenance is used later
+     *                     for selecting the best spatial renderer.
      * threadCanCallJava:  Not present in parameter list, and so is fixed at false.
      */
 
@@ -343,7 +346,8 @@ public:
                                     const audio_attributes_t* pAttributes = nullptr,
                                     bool doNotReconnect = false,
                                     float maxRequiredSpeed = 1.0f,
-                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+                                    const std::string& codecProvenance = "");
 
     /* Creates an audio track and registers it with AudioFlinger.
      * With this constructor, the track is configured for static buffer mode.
@@ -419,7 +423,8 @@ public:
                             const audio_attributes_t* pAttributes = nullptr,
                             bool doNotReconnect = false,
                             float maxRequiredSpeed = 1.0f,
-                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
+                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+                            const std::string& codecProvenance = "");
 
             struct SetParams {
                 audio_stream_type_t streamType;
@@ -441,6 +446,7 @@ public:
                 bool doNotReconnect;
                 float maxRequiredSpeed;
                 audio_port_handle_t selectedDeviceId;
+                std::string codecProvenance;
             };
         private:
             // Note: Consumes parameters
@@ -449,7 +455,8 @@ public:
                           s.flags, std::move(s.callback), s.notificationFrames,
                           std::move(s.sharedBuffer), s.threadCanCallJava, s.sessionId,
                           s.transferType, s.offloadInfo, std::move(s.attributionSource),
-                          s.pAttributes, s.doNotReconnect, s.maxRequiredSpeed, s.selectedDeviceId);
+                          s.pAttributes, s.doNotReconnect, s.maxRequiredSpeed, s.selectedDeviceId,
+                          s.codecProvenance);
                         }
             void       onFirstRef() override;
         public:
@@ -1289,6 +1296,7 @@ public:
     audio_stream_type_t     mStreamType = AUDIO_STREAM_DEFAULT;
     uint32_t                mChannelCount;
     audio_channel_mask_t    mChannelMask;
+    std::string             mCodecProvenance;
     sp<IMemory>             mSharedBuffer;
     transfer_type           mTransfer;
     audio_offload_info_t    mOffloadInfoCopy;
