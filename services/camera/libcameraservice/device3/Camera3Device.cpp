@@ -6187,10 +6187,7 @@ void Camera3Device::overrideStreamUseCaseLocked() {
 status_t Camera3Device::deriveAndSetTransformLocked(
         Camera3OutputStreamInterface& stream, int mirrorMode, int surfaceId) {
     int transform = -1;
-    bool enableTransformInverseDisplay = true;
-    if (wm_flags::enable_camera_compat_for_desktop_windowing()) {
-        enableTransformInverseDisplay &= mCompatInfo.shouldAllowTransformInverseDisplay();
-    }
+    bool enableTransformInverseDisplay = mCompatInfo.shouldAllowTransformInverseDisplay();
     int res = CameraUtils::getRotationTransform(mDeviceInfo, mirrorMode,
             enableTransformInverseDisplay, &transform);
     if (res != OK) {
