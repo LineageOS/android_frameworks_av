@@ -43,11 +43,10 @@ public:
         virtual void onDecryptError(const std::list<sp<AMessage>>& errorMsg) = 0;
     };
 
-    // For HDCP error retry, the below configuration will wait for about
-    // mHdcpretryCnt * mHdcpretryIntervalUs until declaring failure
-    // for ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION error
-    static constexpr uint32_t kMaxHdcpDecryptRetryCount = 6;
-    static constexpr uint32_t kRetryHdcpDecryptDelayUs = 1000000;
+    // For HDCP error retry, the below configuration specifies the retry
+    // interval (currently 1s), max time for retry(in secs) is specified
+    // using sys.prop 'ro.media.codec.retry_decrypt_for_hdcp_failure_secs'.
+    static constexpr uint32_t kRetryHdcpDecryptDelayUs = 1000000u;
 
     // Ideally we should be returning the output of the decryption in
     // onDecryptComple() calback and let the next module take over the
@@ -57,10 +56,12 @@ public:
     // In order to prevent thread hop to just do that, we have created
     // a dependency on BufferChannel here to queue the buffer to the codec
     // immediately after decryption.
-    CryptoAsync(std::weak_ptr<BufferChannelBase> bufferChannel, bool retryHdcpFailure)
-        :mState(kCryptoAsyncActive) {
+    CryptoAsync(std::weak_ptr<BufferChannelBase> bufferChannel,
+            uint32_t maxHdcpDecryptRetryInSecs = 0)
+        :mState(kCryptoAsyncActive),
+        mMaxHdcpDecryptRetryInSecs(maxHdcpDecryptRetryInSecs) {
         mBufferChannel = std::move(bufferChannel);
-        if (retryHdcpFailure) {
+        if (mMaxHdcpDecryptRetryInSecs > 0) {
             mRetryHdcpFailure.emplace(0, 0, 0);
         }
     }
@@ -158,6 +159,9 @@ private:
 
     std::weak_ptr<BufferChannelBase> mBufferChannel;
 
+    // max time in sec for retry during hdcp failure
+    // specified by sys.prop 'ro.media.codec.retry_decrypt_for_hdcp_failure_secs'
+    uint32_t mMaxHdcpDecryptRetryInSecs;
     // HDCP tuple<currentRetryCounter, retrySuccessCounter, retryFailureCounter>
     std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> mRetryHdcpFailure;
 
