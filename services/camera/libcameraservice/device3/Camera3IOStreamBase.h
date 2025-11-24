@@ -112,6 +112,8 @@ class Camera3IOStreamBase :
 
     virtual status_t getEndpointUsage(uint64_t *usage) = 0;
 
+    virtual nsecs_t getTimestampOffset() const { return 0; }
+
     status_t getBufferPreconditionCheckLocked() const;
     status_t returnBufferPreconditionCheckLocked() const;
 

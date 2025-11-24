@@ -569,6 +569,9 @@ class Camera3Stream :
     virtual size_t   getCachedOutputBufferCountLocked() const = 0;
     virtual size_t   getMaxCachedOutputBuffersLocked() const = 0;
 
+    // Get the timestamp offset from CaptureResult timestamp to buffer timestamp
+    virtual nsecs_t getTimestampOffset() const = 0;
+
     // Get the usage flags for the other endpoint, or return
     // INVALID_OPERATION if they cannot be obtained.
     virtual status_t getEndpointUsage(uint64_t *usage) = 0;

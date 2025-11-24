@@ -20,4 +20,6 @@ package android.hardware.camera2.impl;
 parcelable MultiResConcurrentReadersStartInfo {
     int groupId;
     int[] streamIds;
+    /* Subtract this when deriving timestamp for concurrent readers callback */
+    long timestampOffset;
 }

@@ -236,6 +236,7 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual android_dataspace getOriginalDataSpace() const = 0;
     virtual int getMaxHalBuffers() const = 0;
     virtual int getMaxTotalBuffers() const = 0;
+    virtual nsecs_t getTimestampOffset() const = 0;
 
     /**
      * Offline processing

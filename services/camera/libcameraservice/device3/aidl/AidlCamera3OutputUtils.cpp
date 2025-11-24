@@ -112,6 +112,7 @@ void notify(CaptureOutputStates& states,
         }
             break;
         case Tag::shutter: {
+            uint32_t frameNumber = msg.get<Tag::shutter>().frameNumber;
             uint64_t readout_timestamp =
                     hasReadoutTimestamp ? msg.get<Tag::shutter>().readoutTimestamp : 0LL;
             std::vector<MultiResConcurrentReadersStartInfo> multi_res_concurrent_readers_msg;
@@ -121,10 +122,23 @@ void notify(CaptureOutputStates& states,
                     MultiResConcurrentReadersStartInfo si{};
                     si.groupId = streamGroupState.groupId;
                     si.streamIds = streamGroupState.activeStreamIds;
+                    if (si.streamIds.size() == 0) {
+                        ALOGE("%s: Frame %d: activeStreamIds size must be at least 1!",
+                                __FUNCTION__, frameNumber);
+                        return;
+                    }
+                    sp<Camera3StreamInterface> stream =
+                            states.outputStreams.get(si.streamIds[0]);
+                    if (stream == nullptr) {
+                        ALOGE("%s: Frame %d: Invalid output stream id %d", __FUNCTION__,
+                                frameNumber, si.streamIds[0]);
+                        return;
+                    }
+                    si.timestampOffset = stream->getTimestampOffset();
                     multi_res_concurrent_readers_msg.push_back(si);
                 }
             }
-            m = camera_shutter_msg_t{(uint32_t)msg.get<Tag::shutter>().frameNumber,
+            m = camera_shutter_msg_t{frameNumber,
                     (uint64_t)msg.get<Tag::shutter>().timestamp,
                     hasReadoutTimestamp, readout_timestamp,
                     multi_res_concurrent_readers_msg};
