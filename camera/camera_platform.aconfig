@@ -281,6 +281,17 @@ flag {
 
 flag {
     namespace: "camera_platform"
+    name: "new_dynamic_range_profiles"
+    is_exported: true
+    description: "Add support for new AGTM dynamic range profile"
+    bug: "455903743"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}
+
+flag {
+    namespace: "camera_platform"
     name: "gralloc_additional_options"
     description: "Add additionalOptions gralloc flag for camera buffers"
     bug: "410091316"
@@ -304,5 +315,15 @@ flag {
     is_exported: true
     name: "logical_multi_camera_additional_results"
     description: "Add additional metadata info to the logical camera result"
-    bug: "359944765"
+    bug: "447619057"
+}
+
+flag {
+    namespace: "camera_platform"
+    name: "camera_warm_up"
+    description: "Send hint to camera HAL to warm up pipelines"
+    bug: "382543313"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
 }

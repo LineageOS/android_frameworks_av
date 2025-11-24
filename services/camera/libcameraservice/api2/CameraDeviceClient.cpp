@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "system/camera_metadata.h"
 #define LOG_TAG "CameraDeviceClient"
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 #ifdef LOG_NNDEBUG
@@ -488,7 +489,7 @@ binder::Status CameraDeviceClient::submitRequestList(
         SurfaceMap surfaceMap;
         Vector<int32_t> outputStreamIds;
         std::vector<std::string> requestedPhysicalIds;
-        int64_t dynamicProfileBitmap = 0;
+        uint64_t dynamicProfileBitmap = 0;
         if (request.mSurfaceList.size() > 0) {
             for (const sp<Surface>& surface : request.mSurfaceList) {
                 if (surface == 0) continue;
@@ -555,8 +556,22 @@ binder::Status CameraDeviceClient::submitRequestList(
 
         if (dynamicProfileBitmap !=
                     ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD) {
-            for (int i = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
-                    i < ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_MAX; i <<= 1) {
+
+            auto currentMax = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_MAX;
+            if (flags::new_dynamic_range_profiles()) {
+                if ((dynamicProfileBitmap & currentMax) != 0) {
+                    ALOGE("%s: Camera %s: Tried to submit a request with a surface that"
+                          " includes the unsupported PUBLIC_MAX dynamic range profile"
+                          " 0x%" PRIx64 "!",
+                          __FUNCTION__, mCameraIdStr.c_str(), dynamicProfileBitmap);
+                    return STATUS_ERROR(
+                            CameraService::ERROR_ILLEGAL_ARGUMENT,
+                            "Request targets the unsupported PUBLIC_MAX dynamic range profile");
+                }
+                currentMax = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_MAX_312;
+            }
+            for (uint64_t i = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
+                    i < currentMax; i <<= 1) {
                 if ((dynamicProfileBitmap & i) == 0) {
                     continue;
                 }
@@ -577,7 +592,7 @@ binder::Status CameraDeviceClient::submitRequestList(
                     }
                 } else {
                     ALOGE("%s: Camera %s: Tried to submit a request with a surface that"
-                            " references unsupported dynamic range profile 0x%x!",
+                            " references unsupported dynamic range profile 0x%" PRIx64 "!",
                             __FUNCTION__, mCameraIdStr.c_str(), i);
                     return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                             "Request targets 10-bit Surface with unsupported dynamic range"

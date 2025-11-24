@@ -156,6 +156,12 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
                         AUDIO_FLAG_NONE, ""},
                       {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_SPEAKER_CLEANUP,
                         AUDIO_SOURCE_DEFAULT,
+                        AUDIO_FLAG_NONE, ""},
+                      {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_NOTIFICATION_VIBRATION,
+                        AUDIO_SOURCE_DEFAULT,
+                        AUDIO_FLAG_NONE, ""},
+                      {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_RINGTONE_VIBRATION,
+                        AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""}
                   }
             }

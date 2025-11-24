@@ -79,6 +79,11 @@ struct ICrypto : public RefBase {
             const CryptoPlugin::SubSample * /*subSamples*/, size_t /*numSubSamples*/,
             const drm::V1_0::DestinationBuffer &/*destination*/, AString * /*errorDetailMsg*/) = 0;
 
+    virtual DrmStatus getKeyHandle(const uint8_t /*key*/[16], CryptoPlugin::Mode /*mode*/,
+                                   const size_t source_size, size_t /*offset*/,
+                                   const CryptoPlugin::SubSample* /*subSamples*/,
+                                   size_t /*numSubSamples*/, Vector<uint8_t>& keyHandle) = 0;
+
     /**
      * Declare the heap that the shared memory source buffers passed
      * to decrypt will be allocated from. Returns a sequence number

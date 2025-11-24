@@ -757,6 +757,11 @@ aaudio_result_t AudioStreamInternalPlay::setPlaybackParameters_l(
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
 
+    if (rate.mFallbackMode == AUDIO_TIMESTRETCH_FALLBACK_DEFAULT) {
+        // Unspecified by client, system determines behavior, set to `FAIL`.
+        rate.mFallbackMode = AUDIO_TIMESTRETCH_FALLBACK_FAIL;
+    }
+
     const aaudio_result_t result = mServiceInterface.setPlaybackParameters(
             mServiceStreamHandleInfo, rate);
     if (result == AAUDIO_OK) {

@@ -313,6 +313,10 @@ struct TestAidlCameraDevice : public aidl::android::hardware::camera::device::Bn
         ::aidl::android::hardware::camera::device::CameraMetadata*) override {
         return ndk::ScopedAStatus::ok();
     }
+
+    ::ndk::ScopedAStatus warmUp() override {
+        return ndk::ScopedAStatus::ok();
+    }
 };
 
 /**

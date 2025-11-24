@@ -39,6 +39,7 @@ using ::aidl::android::hardware::drm::Uuid;
 using ::aidl::android::hardware::drm::SecurityLevel;
 using NativeHandleAidlCommon = ::aidl::android::hardware::common::NativeHandle;
 using ::aidl::android::hardware::drm::DecryptArgs;
+using ::aidl::android::hardware::drm::KeyHandleResult;
 
 using ::android::sp;
 using ::android::DrmUtils::statusAidlToDrmStatus;
@@ -52,6 +53,7 @@ using ::android::hardware::Return;
 using ::android::hardware::Void;
 
 using ::aidl::android::hardware::drm::Uuid;
+
 // -------Hidl interface related-----------------
 // TODO: replace before removing hidl interface
 
@@ -71,6 +73,27 @@ static std::vector<Byte> toStdVec(const Vector<uint8_t>& vector) {
 }
 
 // -------Hidl interface related-----------------
+
+bool convertCryptoMode(CryptoPlugin::Mode mode, Mode* aMode) {
+    switch (mode) {
+        case CryptoPlugin::kMode_Unencrypted:
+            *aMode = Mode::UNENCRYPTED;
+            return true;
+        case CryptoPlugin::kMode_AES_CTR:
+            *aMode = Mode::AES_CTR;
+            return true;
+        case CryptoPlugin::kMode_AES_WV:
+            *aMode = Mode::AES_CBC_CTS;
+            return true;
+        case CryptoPlugin::kMode_AES_CBC:
+            *aMode = Mode::AES_CBC;
+            return true;
+    }
+
+    ALOGE("Unknown crypto mode: %d", static_cast<int>(mode));
+    return false;
+}
+
 // TODO: replace before removing hidl interface
 status_t CryptoHalAidl::checkSharedBuffer(const SharedBufferHidl& buffer) {
     int32_t seqNum = static_cast<int32_t>(buffer.bufferId);
@@ -283,21 +306,8 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     }
 
     Mode aMode;
-    switch (mode) {
-        case CryptoPlugin::kMode_Unencrypted:
-            aMode = Mode::UNENCRYPTED;
-            break;
-        case CryptoPlugin::kMode_AES_CTR:
-            aMode = Mode::AES_CTR;
-            break;
-        case CryptoPlugin::kMode_AES_WV:
-            aMode = Mode::AES_CBC_CTS;
-            break;
-        case CryptoPlugin::kMode_AES_CBC:
-            aMode = Mode::AES_CBC;
-            break;
-        default:
-            return UNKNOWN_ERROR;
+    if (!convertCryptoMode(mode, &aMode)) {
+        return UNKNOWN_ERROR;
     }
 
     Pattern aPattern;
@@ -363,6 +373,70 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     }
 
     return result;
+}
+
+DrmStatus CryptoHalAidl::getKeyHandle(const uint8_t keyId[16], CryptoPlugin::Mode mode,
+                                      size_t sourceSize, size_t offset,
+                                      const CryptoPlugin::SubSample* subSamples,
+                                      size_t numSubSamples, Vector<uint8_t>& keyHandle) {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mInitCheck != OK) {
+        return mInitCheck;
+    }
+
+    Mode aMode;
+    if (!convertCryptoMode(mode, &aMode)) {
+        return UNKNOWN_ERROR;
+    }
+
+    // Validate subsample integrity against the source buffer size.
+    size_t totalSampleSize = 0;
+    bool hasEncryptedData = false;
+    for (size_t i = 0; i < numSubSamples; ++i) {
+        size_t currentSubSampleSize;
+        if (__builtin_add_overflow(subSamples[i].mNumBytesOfClearData,
+                                   subSamples[i].mNumBytesOfEncryptedData, &currentSubSampleSize) ||
+            __builtin_add_overflow(totalSampleSize, currentSubSampleSize, &totalSampleSize)) {
+            return DrmStatus(BAD_VALUE, "Subsample sizes overflow.");
+        }
+        if (subSamples[i].mNumBytesOfEncryptedData > 0) {
+            hasEncryptedData = true;
+        }
+    }
+
+    if (totalSampleSize > sourceSize) {
+        ALOGE("getKeyHandle validation failed: sample size (%zu) > buffer size (%lu)",
+              totalSampleSize, static_cast<unsigned long>(sourceSize));
+        return DrmStatus(BAD_VALUE, "Sample size larger than source buffer size.");
+    }
+
+    if (!hasEncryptedData) {
+        // Return empty key handle for full clear sample.
+        keyHandle.clear();
+        return DrmStatus(OK);
+    }
+
+    // Validate memory offset.
+    size_t totalSrcSize = offset;
+    if (__builtin_add_overflow(totalSrcSize, sourceSize, &totalSrcSize)) {
+        return DrmStatus(BAD_VALUE, "source buffer size overflow");
+    }
+    mLock.unlock();
+
+    std::vector<uint8_t> keyIdAidl(toStdVec(keyId, 16));
+
+    KeyHandleResult result;
+    ::ndk::ScopedAStatus statusAidl = mPlugin->getKeyHandle(keyIdAidl, aMode, &result);
+
+    status_t err = statusAidlToDrmStatus(statusAidl);
+    if (err != OK) {
+        ALOGE("Failed on getKeyHandle. Detailed error: %s", statusAidl.getMessage());
+        return err;
+    }
+
+    keyHandle = toVector(result.keyHandle);
+    return DrmStatus(OK);
 }
 
 int32_t CryptoHalAidl::setHeap(const sp<HidlMemory>& heap) {

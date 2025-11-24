@@ -9,6 +9,14 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
+    name: "ambisonics_support_api"
+    namespace: "media_audio"
+    description: "Add API support for ambisonics audio."
+    bug: "446025781"
+    # is_exported: true
+}
+
+flag {
     name: "amsco_available_api"
     namespace: "media_audio"
     description: "Reflag API checking AMSCO availability to separate from implementation"
@@ -53,6 +61,13 @@ flag {
 }
 
 flag {
+    name: "ble_peripheral_devices"
+    namespace: "media_audio"
+    description: "Add devices for BLE peripheral mode"
+    bug: "423053144"
+}
+
+flag {
     name: "bt_audio_disconnect_api"
     namespace: "media_audio"
     description: "Add API to notify audio for SCO disconnection under AMSCO."
@@ -65,6 +80,14 @@ flag {
     namespace: "media_audio"
     description: "Expose BT device categories to mainline modules"
     bug: "460462975"
+    # is_exported: true
+}
+
+flag {
+    name: "codec_provenance_api"
+    namespace: "media_audio"
+    description: "Add API to specify the original codec for an audio track."
+    bug: "447704057"
     # is_exported: true
 }
 
@@ -404,6 +427,14 @@ flag {
     description: "Unify absolute volume management in AudioService for A2DP, LEA, SCO, ASHA"
     is_exported: true
     bug: "393657380"
+}
+
+flag {
+    name: "vibration_sound_usage"
+    namespace: "media_audio"
+    description: "Support new AudioAttribute usage for vibration sound"
+    bug: "411481053"
+    is_exported: true
 }
 
 # TODO remove

@@ -90,6 +90,16 @@ ssize_t CryptoHal::decrypt(const uint8_t key[16], const uint8_t iv[16], CryptoPl
                                    numSubSamples, destination, errorDetailMsg);
 }
 
+DrmStatus CryptoHal::getKeyHandle(const uint8_t key[16], CryptoPlugin::Mode mode, size_t sourceSize,
+                                  size_t offset, const CryptoPlugin::SubSample* subSamples,
+                                  size_t numSubSamples, Vector<uint8_t>& keyHandle) {
+    if (mCryptoHalAidl->initCheck() == OK)
+        return mCryptoHalAidl->getKeyHandle(key, mode, sourceSize, offset, subSamples,
+                                            numSubSamples, keyHandle);
+    return mCryptoHalHidl->getKeyHandle(key, mode, sourceSize, offset, subSamples, numSubSamples,
+                                        keyHandle);
+}
+
 int32_t CryptoHal::setHeap(const sp<HidlMemory>& heap) {
     // This requires plugin to be created.
     if (mCryptoHalAidl->initCheck() == OK) return mCryptoHalAidl->setHeap(heap);

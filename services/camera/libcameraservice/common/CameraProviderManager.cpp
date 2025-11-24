@@ -3566,6 +3566,16 @@ CameraProviderManager::getConcurrentCameraIds() const {
     return deviceIdCombinations;
 }
 
+status_t CameraProviderManager::warmUp(const std::string &id) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo != nullptr) {
+        return deviceInfo->warmUp();
+    }
+
+    return NAME_NOT_FOUND;
+}
+
 // Checks if the containing vector of sets has any set that contains all of the
 // camera ids in cameraIdsAndSessionConfigs.
 static bool checkIfSetContainsAll(

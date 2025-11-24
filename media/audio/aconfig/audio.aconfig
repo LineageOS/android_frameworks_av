@@ -29,13 +29,6 @@ flag {
 }
 
 flag {
-    name: "as_device_connection_failure"
-    namespace: "media_audio"
-    description: "AudioService handles device connection failures."
-    bug: "326597760"
-}
-
-flag {
     name: "audio_eraser_effect"
     namespace: "media_audio"
     description: "Enable audio eraser effect"
@@ -47,6 +40,13 @@ flag {
     namespace: "media_audio"
     description: "Remove any usages of AUDIO_STREAM_BLUETOOTH_SCO from the audioserver."
     bug: "441152611"
+}
+
+flag {
+    name: "camera_shutter_sound"
+    namespace: "media_audio"
+    description: "Manage camera sound depending on locale and sim"
+    bug: "440483480"
 }
 
 flag {

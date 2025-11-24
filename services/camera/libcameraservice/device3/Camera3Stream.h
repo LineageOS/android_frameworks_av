@@ -176,7 +176,7 @@ class Camera3Stream :
     uint64_t           getUsage() const;
     void               setUsage(uint64_t usage);
     void               setFormatOverride(bool formatOverridden);
-    const std::vector<AHardwareBufferLongOptions>& getAdditionalOptions() const;
+    const std::vector<gui::AdditionalOptions>& getAdditionalOptions() const;
     void               setAdditionalOptions(const std::vector<GrallocExtendableType>&
                                             additionalOptions);
     bool               isFormatOverridden() const;
@@ -647,16 +647,7 @@ class Camera3Stream :
     bool mDeviceTimeBaseIsRealtime;
     int mTimestampBase;
 
-    // Keep track of the gralloc additionalOptions
-    struct AdditionalOptionsWrapper {
-        // Note: These 2 vectors must be kept in sync because mOptions
-        // keep raw const char pointers to mNames.
-        std::vector<std::string> mNames;
-        std::vector<AHardwareBufferLongOptions> mOptions;
-
-        void initialize(const std::vector<GrallocExtendableType>& options);
-    };
-    AdditionalOptionsWrapper mAdditionalOptions;
+    std::vector<gui::AdditionalOptions> mAdditionalOptions;
 }; // class Camera3Stream
 
 }; // namespace camera3
