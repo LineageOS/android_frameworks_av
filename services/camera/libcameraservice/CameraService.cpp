@@ -6107,9 +6107,6 @@ void CameraService::updateOpenCloseStatus(const std::string& cameraId, bool open
     if (state == nullptr) {
         ALOGW("%s: Could not update the status for %s, no such device exists", __FUNCTION__,
                 cameraId.c_str());
-        if (!flags::on_camera_closed_at_hal_crash()) {
-            return;
-        }
     } else {
         if (open) {
             if (flags::camera_multi_client() && sharedMode) {
