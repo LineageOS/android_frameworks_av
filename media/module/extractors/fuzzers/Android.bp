@@ -229,6 +229,11 @@ cc_fuzz {
         "mpeg2_extractor_fuzzer.cpp",
     ],
 
+    static_libs: [
+        "android.media.extractor.flags-aconfig-cc",
+        "libaconfig_storage_read_api_cc",
+    ],
+
     cflags: [
         "-DMPEG2PS",
     ],
@@ -242,6 +247,11 @@ cc_fuzz {
 
     srcs: [
         "mpeg2_extractor_fuzzer.cpp",
+    ],
+
+    static_libs: [
+        "android.media.extractor.flags-aconfig-cc",
+        "libaconfig_storage_read_api_cc",
     ],
 
     dictionary: "mpeg2ts_extractor_fuzzer.dict",

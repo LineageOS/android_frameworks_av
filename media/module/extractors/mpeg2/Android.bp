@@ -62,6 +62,8 @@ cc_library {
         "android.hidl.memory@1.0",
         "android.hidl.token@1.0",
         "android.hidl.token@1.0-utils",
+        "android.media.extractor.flags-aconfig-cc",
+        "libaconfig_storage_read_api_cc",
         "libcutils",
         "libhidlbase",
         "libhidlmemory",

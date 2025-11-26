@@ -36,6 +36,8 @@ cc_test {
     ],
 
     static_libs: [
+        "android.media.extractor.flags-aconfig-cc",
+        "libaconfig_storage_read_api_cc",
         "libdatasource",
         "libstagefright",
         "libstagefright_webm",
