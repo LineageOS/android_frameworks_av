@@ -82,6 +82,8 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceInMap() {
         {"AUDIO_DEVICE_IN_BLE_HEADSET",            1LL << 29},
         {"AUDIO_DEVICE_IN_HDMI_EARC",              1LL << 30},
         {"AUDIO_DEVICE_IN_BLE_HEARING_AID",        1LL << 31},
+        {"AUDIO_DEVICE_IN_BLE_CENTRAL",            1LL << 32},
+        {"AUDIO_DEVICE_IN_BLE_CENTRAL_BROADCAST",  1LL << 33},
     };
     return map;
 }
@@ -134,6 +136,7 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
         {"AUDIO_DEVICE_OUT_BLE_BROADCAST",             1LL << 34},
         // T values above
         {"AUDIO_DEVICE_OUT_BLE_HEARING_AID",           1LL << 35},
+        {"AUDIO_DEVICE_OUT_BLE_CENTRAL",               1LL << 36},
     };
     return map;
 }
@@ -179,6 +182,7 @@ const std::unordered_map<std::string, int32_t>& getAudioDeviceOutCompactMap() {
         {"ble_speaker", AUDIO_DEVICE_OUT_BLE_SPEAKER},
         {"ble_broadcast", AUDIO_DEVICE_OUT_BLE_BROADCAST},
         {"ble_hearing_aid", AUDIO_DEVICE_OUT_BLE_HEARING_AID},
+        {"ble_central", AUDIO_DEVICE_OUT_BLE_CENTRAL},
     };
     return map;
 }
