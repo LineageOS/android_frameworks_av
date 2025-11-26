@@ -696,6 +696,14 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
         }
     }
 
+    if (flags::camera_device_type_api()) {
+        res = addDeviceTypeTag(mCameraCharacteristics);
+        if (OK != res) {
+            ALOGE("%s: Unable to add device type tag: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+        }
+    }
+
     camera_metadata_entry flashAvailable =
             mCameraCharacteristics.find(ANDROID_FLASH_INFO_AVAILABLE);
     if (flashAvailable.count == 1 &&
@@ -811,6 +819,14 @@ HidlProviderInfo::HidlDeviceInfo3::HidlDeviceInfo3(
                 if (OK != res) {
                     ALOGE("%s: Unable to add COLOR_CORRECTION_AVAILABLE_MODES tag: %s (%d)",
                             __FUNCTION__, strerror(-res), res);
+                }
+            }
+
+            if (flags::camera_device_type_api()) {
+                res = addDeviceTypeTag(mPhysicalCameraCharacteristics[id]);
+                if (OK != res) {
+                    ALOGE("%s: Unable to add device type tag: %s (%d)",
+                        __FUNCTION__, strerror(-res), res);
                 }
             }
         }

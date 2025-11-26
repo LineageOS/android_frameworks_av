@@ -185,6 +185,32 @@ status_t fixupManualFlashStrengthControlTags(CameraMetadata& resultMetadata) {
     return res;
 }
 
+status_t fixupDeviceTypeTag(const CameraMetadata& staticInfo, CameraMetadata& resultMetadata) {
+    status_t res = OK;
+    if (!resultMetadata.exists(ANDROID_INFO_DEVICE_TYPE)) {
+        uint8_t deviceType = ANDROID_INFO_DEVICE_TYPE_BUILT_IN;
+        camera_metadata_ro_entry_t entry = staticInfo.find(ANDROID_INFO_DEVICE_TYPE);
+        if (entry.count > 0) {
+            deviceType = entry.data.u8[0];
+        } else {
+            auto levelEntry = staticInfo.find(ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL);
+            bool isExternalLevel = levelEntry.count > 0 &&
+                levelEntry.data.u8[0] == ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL;
+            if (isExternalLevel) {
+                deviceType = ANDROID_INFO_DEVICE_TYPE_EXTERNAL;
+            }
+        }
+
+        res = resultMetadata.update(ANDROID_INFO_DEVICE_TYPE, &deviceType, 1);
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_INFO_DEVICE_TYPE: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+    return res;
+}
+
 void correctMeteringRegions(camera_metadata_t *meta) {
     if (meta == nullptr) return;
 
@@ -448,6 +474,13 @@ void sendCaptureResult(
     if (res != OK) {
         SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
             "Failed to set autoframing defaults in result metadata: %s (%d)",
+                strerror(-res), res);
+        return;
+    }
+    res = fixupDeviceTypeTag(states.deviceInfo, captureResult.mMetadata);
+    if (res != OK) {
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Failed to set device type in result metadata: %s (%d)",
                 strerror(-res), res);
         return;
     }
