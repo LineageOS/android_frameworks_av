@@ -3206,40 +3206,27 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraInfo(
     }
 
     *portraitRotation = 0;
-    if (wm_flags::camera_compat_landscape_camera_support()) {
-        if (compatInfo.shouldOverrideSensorOrientation()) {
-            if (info->facing == hardware::CAMERA_FACING_FRONT) {
-                info->orientation = (360 + info->orientation - 90) % 360;
-            } else {
-                info->orientation = (360 + info->orientation + 90) % 360;
-            }
+    // TODO(b/432651608): checking info->orientation is needed when a static
+    //  CameraManager#sLandscapeToPortrait override is used. Find a way to performantly check camera
+    //  orientation before requesting static rotate and crop.
+    //  Note: this doesn't impact dynamic camera compat request from WM, as WM takes into the
+    //  account camera's orientation before requesting rotate and crop.
+    if (compatInfo.shouldRotateAndCrop() && compatInfo.shouldOverrideSensorOrientation()
+        && (info->orientation == 0 || info->orientation == 180)) {
+        *portraitRotation = 90;
+        if (info->facing == hardware::CAMERA_FACING_FRONT) {
+            info->orientation = (360 + info->orientation - 90) % 360;
+        } else {
+            info->orientation = (360 + info->orientation + 90) % 360;
         }
-
-        if (compatInfo.shouldRotateAndCrop()) {
-            int rotateAndCropDegrees = ui::toRotationInt(compatInfo.getRotateAndCropRotation()
-                    .value()) * 90;
-            *portraitRotation = info->facing == hardware::CAMERA_FACING_BACK
-                    ? rotateAndCropDegrees
-                    : 360 - rotateAndCropDegrees;
-        }
-    } else {
-        if (compatInfo.shouldRotateAndCrop() && compatInfo.shouldOverrideSensorOrientation()
-            && (info->orientation == 0 || info->orientation == 180)) {
-            *portraitRotation = 90;
-            if (info->facing == hardware::CAMERA_FACING_FRONT) {
-                info->orientation = (360 + info->orientation - 90) % 360;
-            } else {
-                info->orientation = (360 + info->orientation + 90) % 360;
-            }
-        } else if (compatInfo.shouldRotateAndCrop() && !compatInfo.shouldOverrideSensorOrientation()
-                && (info->orientation == 90 || info->orientation == 270)) {
-            // Check device rotation: display rotation will be sandboxed, therefore rotate-and-crop
-            // needs to take display rotation into account.
-            int rotateAndCropDegrees = ui::toRotationInt(
-                    compatInfo.getRotateAndCropRotation().value()) * 90;
-            *portraitRotation = info->facing == hardware::CAMERA_FACING_BACK ? rotateAndCropDegrees
-                    : 360 - rotateAndCropDegrees;
-        }
+    } else if (compatInfo.shouldRotateAndCrop() && !compatInfo.shouldOverrideSensorOrientation()
+            && (info->orientation == 90 || info->orientation == 270)) {
+        // Check device rotation: display rotation will be sandboxed, therefore rotate-and-crop
+        // needs to take display rotation into account.
+        int rotateAndCropDegrees = ui::toRotationInt(
+                compatInfo.getRotateAndCropRotation().value()) * 90;
+        *portraitRotation = info->facing == hardware::CAMERA_FACING_BACK ? rotateAndCropDegrees
+                : 360 - rotateAndCropDegrees;
     }
 
     return OK;
