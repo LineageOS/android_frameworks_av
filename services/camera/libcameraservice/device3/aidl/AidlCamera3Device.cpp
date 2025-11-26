@@ -362,6 +362,8 @@ status_t AidlCamera3Device::initialize(sp<CameraProviderManager> manager,
                 readoutSupported.data.u8[0] == ANDROID_SENSOR_READOUT_TIMESTAMP_HARDWARE;
     }
 
+    mHasMultiResConcurrentReadersField = (deviceVersion >= CAMERA_DEVICE_API_VERSION_1_4);
+
     return initializeCommonLocked(manager);
 }
 
@@ -479,7 +481,8 @@ int32_t AidlCamera3Device::getCaptureResultFMQSize() {
         mCompatInfo, mActivePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
-        camera3::notify(states, msg, mSensorReadoutTimestampSupported);
+        camera3::notify(states, msg, mSensorReadoutTimestampSupported,
+                        mHasMultiResConcurrentReadersField);
     }
     return ::ndk::ScopedAStatus::ok();
 
@@ -978,6 +981,8 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
             dst.physicalCameraId = src->physical_camera_id;
         }
         dst.groupId = cam3stream->getHalStreamGroupId();
+        dst.concurrentGroup = (cam3stream->getMultiResMode()
+                == OutputConfiguration::MULTI_RES_ON_CONCURRENT);
         dst.sensorPixelModesUsed.resize(src->sensor_pixel_modes_used.size());
         size_t j = 0;
         for (int mode : src->sensor_pixel_modes_used) {

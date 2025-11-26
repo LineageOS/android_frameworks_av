@@ -1229,6 +1229,7 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                 r.resultExtras.hasReadoutTimestamp = true;
                 r.resultExtras.readoutTimestamp = msg.readout_timestamp;
             }
+            r.resultExtras.multiResConcurrentReadersStart = msg.multi_res_concurrent_readers_msg;
             if (r.minExpectedDuration != states.minFrameDuration ||
                     r.isFixedFps != states.isFixedFps) {
                 for (size_t i = 0; i < states.outputStreams.size(); i++) {
@@ -1421,20 +1422,14 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
     }
 }
 
-void notify(CaptureOutputStates& states, const camera_notify_msg *msg) {
-    switch (msg->type) {
-        case CAMERA_MSG_ERROR: {
-            notifyError(states, msg->message.error);
-            break;
-        }
-        case CAMERA_MSG_SHUTTER: {
-            notifyShutter(states, msg->message.shutter);
-            break;
-        }
-        default:
-            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
-                "Unknown notify message from HAL: %d",
-                    msg->type);
+void notify(CaptureOutputStates& states, const camera_notify_msg_t *msg) {
+    if (std::holds_alternative<camera_error_msg_t>(*msg)) {
+        notifyError(states, get<camera_error_msg_t>(*msg));
+     } else if (std::holds_alternative<camera_shutter_msg_t>(*msg)) {
+        notifyShutter(states, get<camera_shutter_msg_t>(*msg));
+     } else {
+        SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+            "Unknown notify message from HAL");
     }
 }
 

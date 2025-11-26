@@ -52,7 +52,9 @@ struct StreamInfo {
     uint64_t combinedUsage;
     size_t totalBufferCount;
     bool isConfigured;
-    bool isMultiRes;
+    int multiResMode;
+    std::vector<GraphicBufferAllocator::AdditionalOptions> additionalOptions;
+
     explicit StreamInfo(int id = CAMERA3_STREAM_ID_INVALID,
             int setId = CAMERA3_STREAM_SET_ID_INVALID,
             uint32_t w = 0,
@@ -62,7 +64,8 @@ struct StreamInfo {
             uint64_t usage = 0,
             size_t bufferCount = 0,
             bool configured = false,
-            bool multiRes = false) :
+            int multiRMode = OutputConfiguration::MULTI_RES_OFF,
+            const std::vector<gui::AdditionalOptions>& options = {}) :
                 streamId(id),
                 streamSetId(setId),
                 width(w),
@@ -72,7 +75,11 @@ struct StreamInfo {
                 combinedUsage(usage),
                 totalBufferCount(bufferCount),
                 isConfigured(configured),
-                isMultiRes(multiRes) {}
+                multiResMode(multiRMode) {
+              for (const auto& option : options) {
+                additionalOptions.push_back({.name = option.name.c_str(), .value = option.value});
+              }
+            }
 };
 
 /**
@@ -92,7 +99,8 @@ class Camera3OutputStream :
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID,
+            int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
@@ -111,7 +119,8 @@ class Camera3OutputStream :
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID,
+            int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
@@ -129,7 +138,8 @@ class Camera3OutputStream :
             camera_stream_rotation_t rotation, nsecs_t timestampOffset,
             const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID,
+            int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,
@@ -285,7 +295,8 @@ class Camera3OutputStream :
             const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed, IPCTransport transport,
             uint64_t consumerUsage = 0, nsecs_t timestampOffset = 0,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID,
+            int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             int64_t dynamicProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
             int64_t streamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT,
             bool deviceTimeBaseIsRealtime = false,

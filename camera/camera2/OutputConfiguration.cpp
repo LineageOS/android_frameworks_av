@@ -73,8 +73,8 @@ std::string OutputConfiguration::getPhysicalCameraId() const {
     return mPhysicalCameraId;
 }
 
-bool OutputConfiguration::isMultiResolution() const {
-    return mIsMultiResolution;
+int OutputConfiguration::getMultiResMode() const {
+    return mMultiResMode;
 }
 
 const std::vector<int32_t> &OutputConfiguration::getSensorPixelModesUsed() const {
@@ -155,7 +155,7 @@ OutputConfiguration::OutputConfiguration() :
         mHeight(0),
         mIsDeferred(false),
         mIsShared(false),
-        mIsMultiResolution(false),
+        mMultiResMode(MULTI_RES_OFF),
         mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
         mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED),
         mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
@@ -178,7 +178,7 @@ OutputConfiguration::OutputConfiguration(int surfaceType, int width, int height,
         mIsDeferred(false),
         mIsShared(false),
         mPhysicalCameraId(physicalCamId),
-        mIsMultiResolution(false),
+        mMultiResMode(MULTI_RES_OFF),
         mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
         mColorSpace(colorSpace),
         mStreamUseCase(streamusecase),
@@ -261,9 +261,9 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     parcel->readString16(&physicalCameraId);
     mPhysicalCameraId = toStdString(physicalCameraId);
 
-    int isMultiResolution = 0;
-    if ((err = parcel->readInt32(&isMultiResolution)) != OK) {
-        ALOGE("%s: Failed to read surface isMultiResolution flag from parcel", __FUNCTION__);
+    int multiResMode = 0;
+    if ((err = parcel->readInt32(&multiResMode)) != OK) {
+        ALOGE("%s: Failed to read surface multiResMode from parcel", __FUNCTION__);
         return err;
     }
 
@@ -338,7 +338,7 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mHeight = height;
     mIsDeferred = isDeferred != 0;
     mIsShared = isShared != 0;
-    mIsMultiResolution = isMultiResolution != 0;
+    mMultiResMode = multiResMode;
     mStreamUseCase = streamUseCase;
     mTimestampBase = timestampBase;
     mMirrorMode = mirrorMode;
@@ -368,11 +368,11 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mUsage = usage;
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
-          " physicalCameraId = %s, isMultiResolution = %d, streamUseCase = %" PRId64
+          " physicalCameraId = %s, multiResMode = %d, streamUseCase = %" PRId64
           ", timestampBase = %d, mirrorMode = %d, useReadoutTimestamp = %d, format = %d, "
           "dataspace = %d, usage = %" PRId64,
           __FUNCTION__, mRotation, mSurfaceSetID, mSurfaceType,
-          mPhysicalCameraId.c_str(), mIsMultiResolution, mStreamUseCase, timestampBase,
+          mPhysicalCameraId.c_str(), mMultiResMode, mStreamUseCase, timestampBase,
           mMirrorMode, mUseReadoutTimestamp, mFormat, mDataspace, mUsage);
 
     return err;
@@ -423,7 +423,7 @@ OutputConfiguration::OutputConfiguration(ParcelableSurfaceType& surface, int rot
     mIsDeferred = false;
     mIsShared = isShared;
     mPhysicalCameraId = physicalId;
-    mIsMultiResolution = false;
+    mMultiResMode = MULTI_RES_OFF;
     mDynamicRangeProfile = ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD;
     mColorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED;
     mStreamUseCase = ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT;
@@ -443,7 +443,7 @@ OutputConfiguration::OutputConfiguration(
     int width, int height, bool isShared, int format, int dataSpace)
   : mSurfaces(surfaces), mRotation(rotation), mSurfaceSetID(surfaceSetID),
     mSurfaceType(surfaceType), mWidth(width), mHeight(height), mIsDeferred(false),
-    mIsShared(isShared), mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false),
+    mIsShared(isShared), mPhysicalCameraId(physicalCameraId), mMultiResMode(MULTI_RES_OFF),
     mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
     mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED),
     mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
@@ -496,7 +496,7 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     err = parcel->writeString16(physicalCameraId);
     if (err != OK) return err;
 
-    err = parcel->writeInt32(mIsMultiResolution ? 1 : 0);
+    err = parcel->writeInt32(mMultiResMode);
     if (err != OK) return err;
 
     err = parcel->writeParcelableVector(mSensorPixelModesUsed);

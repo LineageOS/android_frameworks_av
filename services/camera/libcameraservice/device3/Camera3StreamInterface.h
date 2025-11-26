@@ -210,9 +210,9 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual int      getStreamSetId() const = 0;
 
     /**
-     * Is this stream part of a multi-resolution stream set
+     * Get the multi-resolution stream set mode: OFF, ON, or ON_CONCURRENT
      */
-    virtual bool     isMultiResolution() const = 0;
+    virtual int     getMultiResMode() const = 0;
 
     /**
      * Get the HAL stream group id for a multi-resolution stream set

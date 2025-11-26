@@ -80,7 +80,7 @@ namespace camera3 {
 
     void notify(CaptureOutputStates& states,
             const aidl::android::hardware::camera::device::NotifyMsg& msg,
-            bool hasReadoutTimestamp);
+            bool hasReadoutTimestamp, bool hasMultiResConcurrentReadersField);
 
     void requestStreamBuffers(RequestBufferStates& states,
         const std::vector<aidl::android::hardware::camera::device::BufferRequest>& bufReqs,

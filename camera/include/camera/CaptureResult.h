@@ -21,6 +21,7 @@
 #include <binder/Parcelable.h>
 #include <camera/CameraMetadata.h>
 #include <android/hardware/camera2/CameraMetadataInfo.h>
+#include <android/hardware/camera2/impl/MultiResConcurrentReadersStartInfo.h>
 
 namespace android {
 
@@ -114,6 +115,12 @@ struct CaptureResultExtras : public android::Parcelable {
      * offset due to sensor crop).
      */
     int64_t readoutTimestamp;
+
+    /**
+     * MultiResolution outputs' concurrent reader start info describing
+     * groupIds and each group's concurrent readers' stream ids.
+     */
+    std::vector<MultiResConcurrentReadersStartInfo> multiResConcurrentReadersStart;
 
     /**
      * Constructor initializes object as invalid by setting requestId to be -1.

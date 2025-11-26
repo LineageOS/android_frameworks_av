@@ -108,6 +108,7 @@ std::map<int, std::vector<camera_metadata_tag>> static_api_level_to_keys{
         } },
       {37, {
           ANDROID_INFO_DEVICE_TYPE,
+          ANDROID_SCALER_CONCURRENT_MULTI_RESOLUTION_FORMATS,
         } },
 };
 

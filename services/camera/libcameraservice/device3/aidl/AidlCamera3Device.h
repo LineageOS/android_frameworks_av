@@ -296,6 +296,9 @@ class AidlCamera3Device :
     // Whether the HAL supports reporting sensor readout timestamp
     bool mSensorReadoutTimestampSupported = true;
 
+    // Whether the HAL version supports the MultiResolutionConcurrentReaders field
+    bool mHasMultiResConcurrentReadersField = false;
+
 }; // class AidlCamera3Device
 
 }; // namespace android

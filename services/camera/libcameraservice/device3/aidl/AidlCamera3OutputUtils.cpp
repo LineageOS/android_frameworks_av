@@ -51,6 +51,7 @@
 
 using namespace android::camera3;
 using namespace android::hardware::camera;
+using android::hardware::camera2::impl::MultiResConcurrentReadersStartInfo;
 
 namespace android {
 namespace camera3 {
@@ -70,52 +71,64 @@ void processOneCaptureResultLocked(
 
 void notify(CaptureOutputStates& states,
             const aidl::android::hardware::camera::device::NotifyMsg& msg,
-            bool hasReadoutTimestamp) {
+            bool hasReadoutTimestamp, bool hasMultiResConcurrentReadersField) {
 
     using ErrorCode = aidl::android::hardware::camera::device::ErrorCode;
     using Tag = aidl::android::hardware::camera::device::NotifyMsg::Tag;
 
     ATRACE_CALL();
-    camera_notify_msg m;
+    camera_notify_msg_t m;
 
     switch (msg.getTag()) {
-        case Tag::error:
-            m.type = CAMERA_MSG_ERROR;
-            m.message.error.frame_number = msg.get<Tag::error>().frameNumber;
+        case Tag::error: {
+            uint32_t frameNumber = msg.get<Tag::error>().frameNumber;
+            camera_stream_t *error_stream = nullptr;
             if (msg.get<Tag::error>().errorStreamId >= 0) {
                 sp<Camera3StreamInterface> stream =
                         states.outputStreams.get(msg.get<Tag::error>().errorStreamId);
                 if (stream == nullptr) {
                     ALOGE("%s: Frame %d: Invalid error stream id %d", __FUNCTION__,
-                            m.message.error.frame_number, msg.get<Tag::error>().errorStreamId);
+                            frameNumber, msg.get<Tag::error>().errorStreamId);
                     return;
                 }
-                m.message.error.error_stream = stream->asHalStream();
-            } else {
-                m.message.error.error_stream = nullptr;
+                error_stream = stream->asHalStream();
             }
+            int error_code = CAMERA_MSG_NUM_ERRORS;
             switch (msg.get<Tag::error>().errorCode) {
                 case ErrorCode::ERROR_DEVICE:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_DEVICE;
+                    error_code = CAMERA_MSG_ERROR_DEVICE;
                     break;
                 case ErrorCode::ERROR_REQUEST:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_REQUEST;
+                    error_code = CAMERA_MSG_ERROR_REQUEST;
                     break;
                 case ErrorCode::ERROR_RESULT:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_RESULT;
+                    error_code = CAMERA_MSG_ERROR_RESULT;
                     break;
                 case ErrorCode::ERROR_BUFFER:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_BUFFER;
+                    error_code = CAMERA_MSG_ERROR_BUFFER;
                     break;
             }
+            m = camera_error_msg_t{frameNumber, error_stream, error_code};
+        }
             break;
-        case Tag::shutter:
-            m.type = CAMERA_MSG_SHUTTER;
-            m.message.shutter.frame_number = msg.get<Tag::shutter>().frameNumber;
-            m.message.shutter.timestamp = msg.get<Tag::shutter>().timestamp;
-            m.message.shutter.readout_timestamp_valid = hasReadoutTimestamp;
-            m.message.shutter.readout_timestamp =
+        case Tag::shutter: {
+            uint64_t readout_timestamp =
                     hasReadoutTimestamp ? msg.get<Tag::shutter>().readoutTimestamp : 0LL;
+            std::vector<MultiResConcurrentReadersStartInfo> multi_res_concurrent_readers_msg;
+            if (flags::multi_resolution_concurrent_readers() && hasMultiResConcurrentReadersField) {
+                for (const auto& streamGroupState :
+                        msg.get<Tag::shutter>().streamGroupState) {
+                    MultiResConcurrentReadersStartInfo si{};
+                    si.groupId = streamGroupState.groupId;
+                    si.streamIds = streamGroupState.activeStreamIds;
+                    multi_res_concurrent_readers_msg.push_back(si);
+                }
+            }
+            m = camera_shutter_msg_t{(uint32_t)msg.get<Tag::shutter>().frameNumber,
+                    (uint64_t)msg.get<Tag::shutter>().timestamp,
+                    hasReadoutTimestamp, readout_timestamp,
+                    multi_res_concurrent_readers_msg};
+        }
             break;
     }
     notify(states, &m);

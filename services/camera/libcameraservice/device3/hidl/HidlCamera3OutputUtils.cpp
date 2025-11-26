@@ -66,44 +66,45 @@ void notify(CaptureOutputStates& states,
     using android::hardware::camera::device::V3_2::ErrorCode;
 
     ATRACE_CALL();
-    camera_notify_msg m;
+    camera_notify_msg_t m;
     switch (msg.type) {
-        case MsgType::ERROR:
-            m.type = CAMERA_MSG_ERROR;
-            m.message.error.frame_number = msg.msg.error.frameNumber;
+        case MsgType::ERROR: {
+            camera_stream_t *error_stream = nullptr;
             if (msg.msg.error.errorStreamId >= 0) {
                 sp<Camera3StreamInterface> stream =
                         states.outputStreams.get(msg.msg.error.errorStreamId);
                 if (stream == nullptr) {
                     ALOGE("%s: Frame %d: Invalid error stream id %d", __FUNCTION__,
-                            m.message.error.frame_number, msg.msg.error.errorStreamId);
+                            msg.msg.error.frameNumber, msg.msg.error.errorStreamId);
                     return;
                 }
-                m.message.error.error_stream = stream->asHalStream();
-            } else {
-                m.message.error.error_stream = nullptr;
+                error_stream = stream->asHalStream();
             }
+            int error_code = CAMERA_MSG_NUM_ERRORS;
             switch (msg.msg.error.errorCode) {
                 case ErrorCode::ERROR_DEVICE:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_DEVICE;
+                    error_code = CAMERA_MSG_ERROR_DEVICE;
                     break;
                 case ErrorCode::ERROR_REQUEST:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_REQUEST;
+                    error_code = CAMERA_MSG_ERROR_REQUEST;
                     break;
                 case ErrorCode::ERROR_RESULT:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_RESULT;
+                    error_code = CAMERA_MSG_ERROR_RESULT;
                     break;
                 case ErrorCode::ERROR_BUFFER:
-                    m.message.error.error_code = CAMERA_MSG_ERROR_BUFFER;
+                    error_code = CAMERA_MSG_ERROR_BUFFER;
                     break;
             }
+            m = camera_error_msg_t{msg.msg.error.frameNumber,
+                    error_stream, error_code};
+        }
             break;
-        case MsgType::SHUTTER:
-            m.type = CAMERA_MSG_SHUTTER;
-            m.message.shutter.frame_number = msg.msg.shutter.frameNumber;
-            m.message.shutter.timestamp = msg.msg.shutter.timestamp;
-            m.message.shutter.readout_timestamp_valid = false;
-            m.message.shutter.readout_timestamp = 0LL;
+        case MsgType::SHUTTER: {
+            m = camera_shutter_msg_t{msg.msg.shutter.frameNumber,
+                    msg.msg.shutter.timestamp,
+                    false /*readout_timestamp_valid*/,
+                    0LL /*readout_timestamp*/, {}};
+        }
             break;
     }
     notify(states, &m);

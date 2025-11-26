@@ -335,6 +335,16 @@ flag {
      description: "Add APIs for camera devices to report their type, such as internal or remote"
      bug: "447688067"
      metadata {
+         purpose: PURPOSE_FEATURE
+    }
+}
+
+flag {
+    namespace: "camera_platform"
+    name: "multi_resolution_concurrent_readers"
+    description: "Support concurrent readers in multi-resolution outputs"
+    bug: "410091316"
+    metadata {
         purpose: PURPOSE_FEATURE
     }
 }

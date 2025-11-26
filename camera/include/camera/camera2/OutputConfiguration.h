@@ -64,6 +64,11 @@ public:
         MIRROR_MODE_H = 2,
         MIRROR_MODE_V = 3,
     };
+    enum MultiResolutionModeType {
+        MULTI_RES_OFF = 0,
+        MULTI_RES_ON = 1,
+        MULTI_RES_ON_CONCURRENT = 2,
+    };
 
     const std::vector<ParcelableSurfaceType>& getSurfaces() const;
     int                        getRotation() const;
@@ -76,7 +81,7 @@ public:
     bool                       isDeferred() const;
     bool                       isShared() const;
     std::string                getPhysicalCameraId() const;
-    bool                       isMultiResolution() const;
+    int                        getMultiResMode() const;
     int64_t                    getStreamUseCase() const;
     int                        getTimestampBase() const;
     int                        getMirrorMode(ParcelableSurfaceType surface) const;
@@ -132,7 +137,7 @@ public:
                 mIsShared == other.mIsShared &&
                 surfacesEqual(other) &&
                 mPhysicalCameraId == other.mPhysicalCameraId &&
-                mIsMultiResolution == other.mIsMultiResolution &&
+                mMultiResMode == other.mMultiResMode &&
                 sensorPixelModesUsedEqual(other) &&
                 mDynamicRangeProfile == other.mDynamicRangeProfile &&
                 mColorSpace == other.mColorSpace &&
@@ -174,8 +179,8 @@ public:
         if (mPhysicalCameraId != other.mPhysicalCameraId) {
             return mPhysicalCameraId < other.mPhysicalCameraId;
         }
-        if (mIsMultiResolution != other.mIsMultiResolution) {
-            return mIsMultiResolution < other.mIsMultiResolution;
+        if (mMultiResMode != other.mMultiResMode) {
+            return mMultiResMode < other.mMultiResMode;
         }
         if (!sensorPixelModesUsedEqual(other)) {
             return sensorPixelModesUsedLessThan(other);
@@ -237,7 +242,7 @@ public:
                 mIsDeferred == other.mIsDeferred &&
                 mIsShared == other.mIsShared &&
                 mPhysicalCameraId == other.mPhysicalCameraId &&
-                mIsMultiResolution == other.mIsMultiResolution &&
+                mMultiResMode == other.mMultiResMode &&
                 sensorPixelModesUsedEqual(other) &&
                 mDynamicRangeProfile == other.mDynamicRangeProfile &&
                 mColorSpace == other.mColorSpace &&
@@ -262,7 +267,7 @@ private:
     bool                       mIsDeferred;
     bool                       mIsShared;
     std::string                mPhysicalCameraId;
-    bool                       mIsMultiResolution;
+    int                        mMultiResMode;
     std::vector<int32_t>       mSensorPixelModesUsed;
     int64_t                    mDynamicRangeProfile;
     int32_t                    mColorSpace;

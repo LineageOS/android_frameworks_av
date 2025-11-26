@@ -199,6 +199,7 @@ filegroup {
         "aidl/android/hardware/camera2/ICameraInjectionSession.aidl",
         "aidl/android/hardware/camera2/ICameraOfflineSession.aidl",
         "aidl/android/hardware/camera2/CameraMetadataInfo.aidl",
+        "aidl/android/hardware/camera2/impl/MultiResConcurrentReadersStartInfo.aidl",
         "aidl/android/hardware/camera2/utils/OutputAndInputStreamIds.aidl",
         "aidl/android/hardware/camera2/utils/SessionConfigurationAndStreamIds.aidl",
     ],

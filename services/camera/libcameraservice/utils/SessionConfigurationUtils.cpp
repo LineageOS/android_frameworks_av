@@ -490,10 +490,11 @@ binder::Status createConfiguredSurface(
         OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         const OutputConfiguration &outputConfiguration,
         sp<Surface> &out_surface, const sp<SurfaceType>& surface,
-        const std::string &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
+        const std::string &logicalCameraId, const CameraMetadata &deviceInfo,
+        const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed, int64_t dynamicRangeProfile,
         int64_t streamUseCase, int timestampBase, int mirrorMode,
-        int32_t colorSpace, bool respectSurfaceSize) {
+        int32_t colorSpace, bool respectSurfaceSize, int32_t multiResMode) {
     // bufferProducer must be non-null
     if ( flagtools::isSurfaceTypeValid(surface) == false ) {
         std::string msg = fmt::sprintf("Camera %s: Surface is NULL", logicalCameraId.c_str());
@@ -635,6 +636,13 @@ binder::Status createConfiguredSurface(
                 logicalCameraId.c_str(), mirrorMode);
         ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+
+    if (flags::multi_resolution_concurrent_readers()) {
+        binder::Status res = checkMultiResMode(format, multiResMode, deviceInfo);
+        if (!res.isOk()) {
+            return res;
+        }
     }
 
     if (!isStreamInfoValid) {
@@ -875,7 +883,9 @@ binder::Status convertToHALStreamCombination(
 
         size_t numSurfaces = surfaces.size();
         bool isStreamInfoValid = false;
-        int32_t groupId = it.isMultiResolution() ? it.getSurfaceSetID() : -1;
+        int32_t multiResMode = it.getMultiResMode();
+        int32_t groupId = multiResMode != OutputConfiguration::MULTI_RES_OFF ?
+                it.getSurfaceSetID() : -1;
         OutputStreamInfo streamInfo;
 
         res = checkSurfaceType(numSurfaces, deferredConsumer, it.getSurfaceType(),
@@ -955,9 +965,10 @@ binder::Status convertToHALStreamCombination(
             sp<Surface> surface;
             res = createConfiguredSurface(streamInfo, isStreamInfoValid, it, surface,
                                     flagtools::convertParcelableSurfaceTypeToSurface(surface_type),
-                                    logicalCameraId,  metadataChosen, sensorPixelModesUsed,
-                                    dynamicRangeProfile, streamUseCase, timestampBase, mirrorMode,
-                                    colorSpace, /*respectSurfaceSize*/ true);
+                                    logicalCameraId,  deviceInfo, metadataChosen,
+                                    sensorPixelModesUsed, dynamicRangeProfile, streamUseCase,
+                                    timestampBase, mirrorMode, colorSpace,
+                                    /*respectSurfaceSize*/ true, multiResMode);
 
             if (!res.isOk()) return res;
 
@@ -1002,6 +1013,38 @@ binder::Status checkPhysicalCameraId(
         physicalCameraId) == physicalCameraIds.end()) {
         std::string msg = fmt::sprintf("Camera %s: Camera doesn't support physicalCameraId %s.",
                 logicalCameraId.c_str(), physicalCameraId.c_str());
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+    return binder::Status::ok();
+}
+
+binder::Status checkMultiResMode(
+        int format, int32_t multiResMode, const CameraMetadata &staticInfo) {
+    if (multiResMode == OutputConfiguration::MULTI_RES_OFF) {
+        return binder::Status::ok();
+    }
+
+    // The device doesn't support multi-resolution outputs
+    camera_metadata_ro_entry_t entry =
+            staticInfo.find(ANDROID_SCALER_MULTI_RESOLUTION_STREAM_SUPPORTED);
+    if (entry.count == 0 ||
+            entry.data.u8[0] == ANDROID_SCALER_MULTI_RESOLUTION_STREAM_SUPPORTED_FALSE) {
+        std::string msg = "Camera device doesn't support multi-resolution outputs!";
+        ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
+    }
+    if (multiResMode == OutputConfiguration::MULTI_RES_ON) {
+        return binder::Status::ok();
+    }
+
+    // The device doesn't support concurrent multi-resolution outputs
+    entry = staticInfo.find(ANDROID_SCALER_CONCURRENT_MULTI_RESOLUTION_FORMATS);
+    if (entry.count == 0 || std::find(entry.data.i32,
+            entry.data.i32 + entry.count, format) == entry.data.i32 + entry.count) {
+        std::string msg = fmt::sprintf(
+                "Camera device doesn't support concurrent multi-resolution outputs for format %d!",
+                format);
         ALOGE("%s: %s", __FUNCTION__, msg.c_str());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
     }

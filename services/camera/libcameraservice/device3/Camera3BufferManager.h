@@ -177,7 +177,7 @@ public:
                               bool isMultiRes, size_t count, bool released);
 
     /**
-     * This method notifiers the manager that a buffer is freed from the buffer queue, usually
+     * This method notifies the manager that a buffer is freed from the buffer queue, usually
      * because onBufferReleased signals the caller to free a buffer via the shouldFreeBuffer flag.
      */
     void notifyBufferRemoved(int streamId, int streamSetId, bool isMultiRes);
@@ -273,6 +273,13 @@ private:
         size_t maxAllowedBufferCount;
 
         /**
+         * Whether this stream set allows concurrent outputs from underlying streams.
+         * When this is set, the maxAllowedBufferCount will be sum of all streams, rather than
+         * the maximum of all streams.
+         */
+        bool allowConcurrent;
+
+        /**
          * The stream info for all streams in this set
          */
         InfoMap streamInfoMap;
@@ -297,6 +304,7 @@ private:
         StreamSet() {
             allocatedBufferWaterMark = 0;
             maxAllowedBufferCount = 0;
+            allowConcurrent = false;
         }
     };
 

@@ -178,7 +178,8 @@ status_t AidlCamera3OfflineSession::initialize(wp<NotificationListener> listener
         CameraCompatibilityInfo(), activePhysicalId}, mResultMetadataQueue
     };
     for (const auto& msg : msgs) {
-        camera3::notify(states, msg, mSensorReadoutTimestampSupported);
+        camera3::notify(states, msg, mSensorReadoutTimestampSupported,
+                        /*hasMultiResConcurrentReadersField*/ false);
     }
     return ::ndk::ScopedAStatus::ok();
 }
