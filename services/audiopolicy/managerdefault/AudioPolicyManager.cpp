@@ -2594,9 +2594,8 @@ status_t AudioPolicyManager::startOutput(
             *volume = 1.f;
             *muted = false;
         } else {
-            *volume = Volume::DbToAmpl(
-                    outputDesc->getCurVolume(toVolumeSource(attr)));
-            *muted = outputDesc->isMutedByGroup(toVolumeSource(attr));
+            *volume = outputDesc->getVolumeAmpl(client->volumeSource());
+            *muted = outputDesc->isMutedByGroup(client->volumeSource());
         }
     }
 
