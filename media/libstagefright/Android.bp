@@ -393,7 +393,7 @@ cc_library {
         "-Wno-error=deprecated-declarations",
         "-Wno-multichar",
     ] + select(soong_config_variable("stagefright", "target_disable_thumbnail_block_model"), {
-        any @ value: ["-DDISABLE_BLOCK_MODEL"],
+        true: ["-DDISABLE_BLOCK_MODEL"],
         default: [],
     }),
 
