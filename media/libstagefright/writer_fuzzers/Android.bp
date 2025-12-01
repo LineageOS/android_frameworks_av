@@ -36,6 +36,7 @@ cc_defaults {
         "include",
     ],
     static_libs: [
+        "android.media.extractor.flags-aconfig-cc",
         "com.android.media.flags.editing-aconfig-cc",
         "liblog",
         "libstagefright",

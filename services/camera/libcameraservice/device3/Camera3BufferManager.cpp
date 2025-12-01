@@ -43,7 +43,8 @@ status_t Camera3BufferManager::registerStream(wp<Camera3OutputStream>& stream,
     ATRACE_CALL();
 
     int streamId = streamInfo.streamId;
-    StreamSetKey streamSetKey = {streamInfo.streamSetId, streamInfo.isMultiRes};
+    bool isMultiResolution = (streamInfo.multiResMode != OutputConfiguration::MULTI_RES_OFF);
+    StreamSetKey streamSetKey = {streamInfo.streamSetId, isMultiResolution};
 
     if (streamId == CAMERA3_STREAM_ID_INVALID ||
             streamSetKey.id == CAMERA3_STREAM_SET_ID_INVALID) {
@@ -75,12 +76,15 @@ status_t Camera3BufferManager::registerStream(wp<Camera3OutputStream>& stream,
 
     Mutex::Autolock l(mLock);
 
+    bool streamAllowConcurrent =
+            (streamInfo.multiResMode == OutputConfiguration::MULTI_RES_ON_CONCURRENT);
     // Check if this stream was registered with different stream set ID, if so, error out.
     for (size_t i = 0; i < mStreamSetMap.size(); i++) {
         ssize_t streamIdx = mStreamSetMap[i].streamInfoMap.indexOfKey(streamId);
         if (streamIdx != NAME_NOT_FOUND &&
-            mStreamSetMap[i].streamInfoMap[streamIdx].streamSetId != streamInfo.streamSetId &&
-            mStreamSetMap[i].streamInfoMap[streamIdx].isMultiRes != streamInfo.isMultiRes) {
+            (mStreamSetMap[i].streamInfoMap[streamIdx].streamSetId != streamInfo.streamSetId ||
+            mStreamSetMap[i].streamInfoMap[streamIdx].multiResMode != streamInfo.multiResMode ||
+            mStreamSetMap[i].allowConcurrent != streamAllowConcurrent)) {
             ALOGE("%s: It is illegal to register the same stream id with different stream set",
                     __FUNCTION__);
             return BAD_VALUE;
@@ -94,6 +98,7 @@ status_t Camera3BufferManager::registerStream(wp<Camera3OutputStream>& stream,
                 __FUNCTION__, streamSetKey.id, streamSetKey.isMultiRes);
         // Create stream info map, then add to mStreamsetMap.
         StreamSet newStreamSet;
+        newStreamSet.allowConcurrent = streamAllowConcurrent;
         setIdx = mStreamSetMap.add(streamSetKey, newStreamSet);
     }
     // Update stream set map and water mark.
@@ -109,10 +114,12 @@ status_t Camera3BufferManager::registerStream(wp<Camera3OutputStream>& stream,
     currentStreamSet.attachedBufferCountMap.add(streamId, 0);
     mStreamMap.add(streamId, stream);
 
-    // The max allowed buffer count should be the max of buffer count of each stream inside a stream
-    // set.
-    if (streamInfo.totalBufferCount > currentStreamSet.maxAllowedBufferCount) {
-       currentStreamSet.maxAllowedBufferCount = streamInfo.totalBufferCount;
+    if (currentStreamSet.allowConcurrent) {
+        currentStreamSet.maxAllowedBufferCount += streamInfo.totalBufferCount;
+    } else if (streamInfo.totalBufferCount > currentStreamSet.maxAllowedBufferCount) {
+        // The max allowed buffer count should be the max of buffer count of each stream
+        // inside a stream set.
+        currentStreamSet.maxAllowedBufferCount = streamInfo.totalBufferCount;
     }
 
     return OK;
@@ -144,7 +151,9 @@ status_t Camera3BufferManager::unregisterStream(int streamId, int streamSetId, b
     infoMap.removeItem(streamId);
     currentSet.maxAllowedBufferCount = 0;
     for (size_t i = 0; i < infoMap.size(); i++) {
-        if (infoMap[i].totalBufferCount > currentSet.maxAllowedBufferCount) {
+        if (currentSet.allowConcurrent) {
+            currentSet.maxAllowedBufferCount += infoMap[i].totalBufferCount;
+        } else if (infoMap[i].totalBufferCount > currentSet.maxAllowedBufferCount) {
             currentSet.maxAllowedBufferCount = infoMap[i].totalBufferCount;
         }
     }
@@ -287,10 +296,17 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
         const StreamInfo& info = streamSet.streamInfoMap.valueFor(streamId);
         GraphicBufferEntry buffer;
         buffer.fenceFd = -1;
-        buffer.graphicBuffer = new GraphicBuffer(
-                info.width, info.height, PixelFormat(info.format), info.combinedUsage,
-                std::string("Camera3BufferManager pid [") +
-                        std::to_string(getpid()) + "]");
+        GraphicBufferAllocator::AllocationRequest allocRequest = {
+                .importBuffer = true,
+                .width = info.width,
+                .height = info.height,
+                .format = PixelFormat(info.format),
+                .layerCount = 1,
+                .usage = info.combinedUsage,
+                .requestorName = std::string("Camera3BufferManager pid [") +
+                        std::to_string(getpid()) + "]",
+                .extras = info.additionalOptions};
+        buffer.graphicBuffer = new GraphicBuffer(allocRequest);
         status_t res = buffer.graphicBuffer->initCheck();
 
         ALOGV("%s: allocating a new graphic buffer (%dx%d, format 0x%x) %p with handle %p",

@@ -184,7 +184,7 @@ class Camera3Device :
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, bool isMultiResolution = false,
+            bool isShared = false, int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             uint64_t consumerUsage = 0,
             int64_t dynamicRangeProfile =
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
@@ -202,7 +202,7 @@ class Camera3Device :
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, bool isMultiResolution = false,
+            bool isShared = false, int multiResMode = OutputConfiguration::MULTI_RES_OFF,
             uint64_t consumerUsage = 0,
             int64_t dynamicRangeProfile =
             ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD,
@@ -1546,7 +1546,8 @@ class Camera3Device :
     bool mUseHalBufManager = false;
     std::set<int32_t > mHalBufManagedStreamIds;
     bool mSessionHalBufManager = false;
-    // Lock to ensure requestStreamBuffers() callbacks are serialized
+    // Lock to ensure requestStreamBuffers() callbacks and request thread buffer allocations
+    // are serialized along with output surface updates
     std::mutex mRequestBufferInterfaceLock;
 
     // The state machine to control when requestStreamBuffers should allow

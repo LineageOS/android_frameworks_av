@@ -4971,6 +4971,21 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_SCALER_RAW_CROP_REGION =                            // int32[4]
             ACAMERA_SCALER_START + 27,
+    /**
+     * <p>The MultiResolutionImageReader formats supporting concurrent readers.</p>
+     *
+     * <p>Type: int32[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>Among all of the MultiResolutionImageReader formats this camera device supports,
+     * this list contains the formats that support concurrent reader outputs.</p>
+     */
+    ACAMERA_SCALER_CONCURRENT_MULTI_RESOLUTION_FORMATS =        // int32[n]
+            ACAMERA_SCALER_START + 28,
     ACAMERA_SCALER_END,
 
     /**
@@ -7271,6 +7286,42 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_INFO_DEVICE_STATE_ORIENTATIONS =                    // int64[2*n]
             ACAMERA_INFO_START + 3,
+    /**
+     * <p>A classification of the underlying hardware and source of image data for this
+     * camera device, or for a specific camera output frame.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_info_device_type_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>Historically, camera devices listed by the camera2 API could be assumed to be built-in
+     * cameras on the Android device, or in the case of the <code>EXTERNAL</code>
+     * <code>ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL</code>, USB webcams.</p>
+     * <p>However, it is increasingly possible for camera devices to not be restricted to
+     * device-internal sensors and processing pipelines. Such devices can provide a wide range
+     * of useful capabilities to applications, but may also not be suitable for all camera use
+     * cases.</p>
+     * <p>This key provides a basic classification of the type of camera this camera ID
+     * represents, so that applications may decide on the appropriate level of trust to extend
+     * to the image data produced by it.</p>
+     * <p>Note that in some cases, it is possible for the user to swap the definition of a camera
+     * ID to a different one, such as when connecting a remote camera to act as the front
+     * camera of the device. This is normally transparent to the camera-using application to
+     * minimize user friction, but applications that care about this possibility should always
+     * verify the value of this key in the
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html">CameraCharacteristics</a> before opening
+     * a camera, instead of caching it, and should also watch the value of this key in
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CaptureResult.html">CaptureResults</a> as well, since it may
+     * change mid-session.</p>
+     *
+     * @see ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL
+     */
+    ACAMERA_INFO_DEVICE_TYPE =                                  // byte (acamera_metadata_enum_android_info_device_type_t)
+            ACAMERA_INFO_START + 6,
     ACAMERA_INFO_END,
 
     /**
@@ -11812,6 +11863,50 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
     ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL                   = 4,
 
 } acamera_metadata_enum_android_info_supported_hardware_level_t;
+
+// ACAMERA_INFO_DEVICE_TYPE
+typedef enum acamera_metadata_enum_acamera_info_device_type {
+    /**
+     * <p>This camera device is physically a part of this Android device, and the data produced
+     * is always within the device's control before it reaches the application requesting it.</p>
+     */
+    ACAMERA_INFO_DEVICE_TYPE_BUILT_IN                                = 0,
+
+    /**
+     * <p>This camera device is not permanently connected to this Android device.  It may be
+     * connected by a wired connection, such as a USB webcam, or it might be connected
+     * wirelessly, such as via WiFi or other communication mechanism.</p>
+     * <p>The provenance of the image data from the external camera cannot be guaranteed, since it
+     * is produced by hardware that is not controlled by this Android device.</p>
+     * <p>Note that an <code>EXTERNAL</code> <code>ACAMERA_INFO_DEVICE_TYPE</code> does not mean the
+     * <code>ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL</code> must be <code>EXTERNAL</code>. A basic USB webcam would
+     * likely have an <code>EXTERNAL</code> hardware level, but more sophisticated remote camera systems
+     * may have more capabilities than that, and be listed with a <code>LIMITED</code> or better
+     * hardware level.</p>
+     *
+     * @see ACAMERA_INFO_DEVICE_TYPE
+     * @see ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL
+     */
+    ACAMERA_INFO_DEVICE_TYPE_EXTERNAL                                = 1,
+
+    /**
+     * <p>This camera device produces purely virtual images, though they may be based on the
+     * output of a real hardware camera in some cases. For example, a virtual reality headset
+     * may have a virtual camera as the front-facing camera, producing a virtual avatar to
+     * represent the user, which is animated based on sensors on the headset.</p>
+     * <p>The image data should not be assumed to be real.</p>
+     */
+    ACAMERA_INFO_DEVICE_TYPE_VIRTUAL                                 = 2,
+
+    /**
+     * <p>This camera device has an unknown classification.</p>
+     * <p>This value will be used when new device classifications need to be added in future
+     * Android versions, so that applications targeting older SDK levels do not have to
+     * handle unknown enumeration values.</p>
+     */
+    ACAMERA_INFO_DEVICE_TYPE_UNKNOWN                                 = 3,
+
+} acamera_metadata_enum_android_info_device_type_t;
 
 
 // ACAMERA_BLACK_LEVEL_LOCK

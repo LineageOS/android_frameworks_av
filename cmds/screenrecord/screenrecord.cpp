@@ -390,7 +390,12 @@ static status_t prepareVirtualDisplay(
     if (err != NO_ERROR) {
         return err;
     }
-    *mirrorRoot = SurfaceComposerClient::getDefault()->mirrorLayerStack(displayId);
+    // Use `mirrorDisplay` instead of `mirrorLayerStack` when the physical display ID is set
+    // from the command line. `mirrorDisplay` mirrors the display and it is not affected by
+    // changes in the display layer stack.
+    *mirrorRoot = (gPhysicalDisplayId.has_value()) ?
+            (SurfaceComposerClient::getDefault()->mirrorDisplay(displayId)) :
+            (SurfaceComposerClient::getDefault()->mirrorLayerStack(displayId));
     if (*mirrorRoot == nullptr) {
         ALOGE("Failed to create a mirror for screenrecord");
         return UNKNOWN_ERROR;

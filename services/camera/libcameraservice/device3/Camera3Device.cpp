@@ -1071,7 +1071,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const std::string& physicalCameraId,
             const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
+            std::vector<int> *surfaceIds, int streamSetId, bool isShared, int multiResMode,
             uint64_t consumerUsage, int64_t dynamicRangeProfile, int64_t streamUseCase,
             int timestampBase, int mirrorMode, int32_t colorSpace, bool useReadoutTimestamp) {
     ATRACE_CALL();
@@ -1086,7 +1086,7 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
 
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
             format, dataSpace, rotation, id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
-            streamSetId, isShared, isMultiResolution, consumerUsage, dynamicRangeProfile,
+            streamSetId, isShared, multiResMode, consumerUsage, dynamicRangeProfile,
             streamUseCase, timestampBase, colorSpace, useReadoutTimestamp);
 }
 
@@ -1095,7 +1095,7 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
         const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
+        std::vector<int> *surfaceIds, int streamSetId, bool isShared, int multiResMode,
         uint64_t consumerUsage, int64_t dynamicRangeProfile, int64_t streamUseCase,
         int timestampBase, int32_t colorSpace, bool useReadoutTimestamp) {
     ATRACE_CALL();
@@ -1104,13 +1104,12 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
     Mutex::Autolock l(mLock);
     ALOGV("Camera %s: Creating new stream %d: %d x %d, format %d, dataspace %d rotation %d"
-            " consumer usage %" PRIu64 ", isShared %d, physicalCameraId %s, isMultiResolution %d"
+            " consumer usage %" PRIu64 ", isShared %d, physicalCameraId %s, multiResMode %d"
             " dynamicRangeProfile 0x%" PRIx64 ", streamUseCase %" PRId64 ", timestampBase %d,"
             " colorSpace %d, useReadoutTimestamp %d",
             mId.c_str(), mNextStreamId, width, height, format, dataSpace, rotation,
-            consumerUsage, isShared, physicalCameraId.c_str(), isMultiResolution,
-            dynamicRangeProfile, streamUseCase, timestampBase, colorSpace,
-            useReadoutTimestamp);
+            consumerUsage, isShared, physicalCameraId.c_str(), multiResMode,
+            dynamicRangeProfile, streamUseCase, timestampBase, colorSpace, useReadoutTimestamp);
 
     status_t res;
     bool wasActive = false;
@@ -1179,7 +1178,7 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0].mSurface,
                 width, height, blobBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, transport, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                multiResMode, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
                 timestampBase, consumers[0].mMirrorMode, colorSpace, useReadoutTimestamp);
     } else if (format == HAL_PIXEL_FORMAT_RAW_OPAQUE) {
         bool maxResolution =
@@ -1195,7 +1194,7 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0].mSurface,
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, transport, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                multiResMode, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
                 timestampBase, consumers[0].mMirrorMode, colorSpace, useReadoutTimestamp);
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
@@ -1207,13 +1206,13 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, transport, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                multiResMode, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
                 timestampBase, colorSpace, useReadoutTimestamp);
     } else {
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0].mSurface,
                 width, height, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, transport, streamSetId,
-                isMultiResolution, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
+                multiResMode, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
                 timestampBase, consumers[0].mMirrorMode, colorSpace, useReadoutTimestamp);
     }
 
@@ -2159,12 +2158,12 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHold
         mRequestThread->clearOutputs(streamId, removedSurfaceIds, lastFrameNumber);
         mRequestThread->signalPipelineDrain({streamId});
         mInterface->clearUnusedBufferCaches(streamId);
-        // Pause unlocked buffer requests
-        if (mUseHalBufManager) {
-            mRequestBufferInterfaceLock.lock();
-        } else {
-            mRequestThread->setPaused(true);
-        }
+        // It is critical to ensure that the following stream update operation
+        // doesn't run in parallel with either the request thread trying to
+        // acquire a buffer or the CameraHal trying to do same via request
+        // buffer callback. For context, within regular output streams the internal
+        // 'mLock' is temporarily released when de-queuing buffers.
+        mRequestBufferInterfaceLock.lock();
     } else {
         for (const auto &it : removedSurfaceIds) {
             if (mRequestThread->isOutputSurfacePending(streamId, it)) {
@@ -2186,11 +2185,7 @@ status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHold
     }
     // Resume buffer requests
     if (modifyRequests) {
-        if (mUseHalBufManager) {
-            mRequestBufferInterfaceLock.unlock();
-        } else {
-            mRequestThread->setPaused(false);
-        }
+        mRequestBufferInterfaceLock.unlock();
     }
 
     if (res != OK) {
@@ -2663,7 +2658,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
             }
         }
 
-        if (mOutputStreams[i]->isMultiResolution()) {
+        if (mOutputStreams[i]->getMultiResMode() != OutputConfiguration::MULTI_RES_OFF) {
             int32_t streamGroupId = mOutputStreams[i]->getHalStreamGroupId();
             const std::string &physicalCameraId = mOutputStreams[i]->getPhysicalCameraId();
             mGroupIdPhysicalCameraMap[streamGroupId].insert(physicalCameraId);
@@ -4378,6 +4373,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 // buffers are requested.
                 outputStream->markUnpreparable();
             } else {
+                std::lock_guard<std::mutex> l(parent->mRequestBufferInterfaceLock);
                 res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
                         waitDuration,
                         captureRequest->mOutputSurfaces[streamId]);

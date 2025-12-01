@@ -58,7 +58,7 @@ Camera3Stream::Camera3Stream(int id,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
         const std::string& physicalCameraId,
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
-        int setId, bool isMultiResolution, int64_t dynamicRangeProfile,
+        int setId, int multiResMode, int64_t dynamicRangeProfile,
         int64_t streamUseCase, bool deviceTimeBaseIsRealtime, int timestampBase,
         int32_t colorSpace) :
     camera_stream(),
@@ -85,7 +85,7 @@ Camera3Stream::Camera3Stream(int id,
     mOriginalDataSpace(dataSpace),
     mPhysicalCameraId(physicalCameraId),
     mLastTimestamp(0),
-    mIsMultiResolution(isMultiResolution),
+    mMultiResMode(multiResMode),
     mDeviceTimeBaseIsRealtime(deviceTimeBaseIsRealtime),
     mTimestampBase(timestampBase) {
 
@@ -118,11 +118,15 @@ int Camera3Stream::getStreamSetId() const {
 }
 
 int Camera3Stream::getHalStreamGroupId() const {
-    return mIsMultiResolution ? mSetId : -1;
+    return isMultiResolution() ? mSetId : -1;
 }
 
 bool Camera3Stream::isMultiResolution() const {
-    return mIsMultiResolution;
+    return mMultiResMode != OutputConfiguration::MULTI_RES_OFF;
+}
+
+int Camera3Stream::getMultiResMode() const {
+    return mMultiResMode;
 }
 
 uint32_t Camera3Stream::getWidth() const {

@@ -110,10 +110,11 @@ binder::Status createConfiguredSurface(
         camera3::OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         const OutputConfiguration &outputConfiguration,
         sp<Surface> &out_surface, const sp<SurfaceType>& surface,
-        const std::string &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
+        const std::string &logicalCameraId, const CameraMetadata& deviceInfo,
+        const CameraMetadata &physicalCameraMetadata,
         const std::vector<int32_t> &sensorPixelModesUsed,  int64_t dynamicRangeProfile,
         int64_t streamUseCase, int timestampBase, int mirrorMode,
-        int32_t colorSpace, bool respectSurfaceSize);
+        int32_t colorSpace, bool respectSurfaceSize, int32_t multiResMode);
 
 //check if format is 10-bit output compatible
 bool is10bitCompatibleFormat(int32_t format, android_dataspace_t dataSpace);
@@ -142,6 +143,9 @@ void mapStreamInfo(const OutputStreamInfo &streamInfo,
 binder::Status checkPhysicalCameraId(
 const std::vector<std::string> &physicalCameraIds, const std::string &physicalCameraId,
 const std::string &logicalCameraId);
+
+binder::Status checkMultiResMode(int format, int32_t multiResMode,
+        const CameraMetadata &staticInfo);
 
 binder::Status checkSurfaceType(size_t numBufferProducers,
         bool deferredConsumer, int surfaceType, bool isConfigurationComplete);

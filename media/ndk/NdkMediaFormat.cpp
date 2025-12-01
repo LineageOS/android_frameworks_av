@@ -405,6 +405,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_CSD_1 = "csd-1";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_2 = "csd-2";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_AVC = "csd-avc";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_HEVC = "csd-hevc";
+EXPORT const char* AMEDIAFORMAT_KEY_CSD_VVC = "csd-vvc";
 EXPORT const char* AMEDIAFORMAT_KEY_D263 = "d263";
 EXPORT const char* AMEDIAFORMAT_KEY_DATE = "date";
 EXPORT const char* AMEDIAFORMAT_KEY_DISCNUMBER = "discnum";

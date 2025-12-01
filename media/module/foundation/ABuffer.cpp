@@ -56,6 +56,17 @@ sp<ABuffer> ABuffer::CreateAsCopy(const void *data, size_t capacity)
     return res;
 }
 
+// static
+std::unique_ptr<ABuffer> ABuffer::CreateAsUniqueCopy(const void *data, size_t capacity)
+{
+    std::unique_ptr<ABuffer> res = std::make_unique<ABuffer>(capacity);
+    if (res == NULL || res->base() == NULL) {
+        return NULL;
+    }
+    memcpy(res->data(), data, capacity);
+    return res;
+}
+
 ABuffer::~ABuffer() {
     if (mOwnsData) {
         if (mData != NULL) {
