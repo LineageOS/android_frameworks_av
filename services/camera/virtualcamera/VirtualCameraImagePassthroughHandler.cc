@@ -32,16 +32,12 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <vector>
 
 #include "VirtualCameraCaptureRequest.h"
-#include "VirtualCameraImageHandler.h"
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/companion/virtualcamera/Format.h"
-#include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureResult.h"
 #include "aidl/android/hardware/camera/device/Stream.h"
-#include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "android/binder_auto_utils.h"
 #include "util/JpegUtil.h"
 #include "util/Util.h"

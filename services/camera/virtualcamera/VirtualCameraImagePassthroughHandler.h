@@ -25,7 +25,6 @@
 
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 #include <future>
 #include <memory>
@@ -35,10 +34,8 @@
 #include "VirtualCameraImageHandler.h"
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/companion/virtualcamera/Format.h"
-#include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureResult.h"
 #include "aidl/android/hardware/camera/device/Stream.h"
-#include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "android/binder_auto_utils.h"
 #include "util/Util.h"
 

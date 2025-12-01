@@ -48,11 +48,9 @@
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
 #include "android-base/thread_annotations.h"
 #include "android/binder_auto_utils.h"
-#include "android/hardware_buffer.h"
 #include "system/camera_metadata.h"
 #include "ui/GraphicBuffer.h"
 #include "util/Util.h"
-#include "utils/Errors.h"
 
 namespace android {
 namespace companion {

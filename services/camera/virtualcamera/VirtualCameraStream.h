@@ -16,11 +16,9 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERASTREAM_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERASTREAM_H
 
-#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <tuple>
 #include <unordered_map>
 
 #include "EGL/egl.h"
