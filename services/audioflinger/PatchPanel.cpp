@@ -418,6 +418,7 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
 
             // For endpoint patches, we do not need to re-evaluate the device effect state
             // if the same HAL patch is reused (see calls to mAfPatchPanelCallback below)
+            audio_patch_handle_t reusedHandle{AUDIO_PATCH_HANDLE_NONE};
             if (endpointPatch) {
                 for (auto& p : mPatches) {
                     // end point patches are skipped so we do not compare against this patch
@@ -425,6 +426,7 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
                             newPatch.mAudioPatch, p.second.mAudioPatch)) {
                         ALOGV("%s() Sw Bridge endpoint reusing halHandle=%d", __func__,
                               p.second.mHalHandle);
+                        reusedHandle = p.first;
                         halHandle = p.second.mHalHandle;
                         reuseExistingHalPatch = true;
                         break;
@@ -437,6 +439,10 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
             mAfPatchPanelCallback->mutex().lock();
             if (status == NO_ERROR) {
                 newPatch.setThread(thread);
+
+                if (reusedHandle != AUDIO_PATCH_HANDLE_NONE) {
+                    erasePatch(reusedHandle, reuseExistingHalPatch);
+                }
             }
 
             // remove stale audio patch with same output as source if any
