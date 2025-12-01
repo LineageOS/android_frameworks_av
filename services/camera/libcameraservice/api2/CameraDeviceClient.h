@@ -376,6 +376,12 @@ private:
     // Surface only
     status_t getSurfaceKey(sp<Surface> surface, SurfaceKey* out) const;
 
+    void updateCompositeOutputsLocked(int streamId, SurfaceKey surfaceKey,
+            const sp<CompositeStream>& compositeStream, bool deferredCompositeStream,
+            bool noNewOutputs);
+    void findCompositeStream(int streamId, sp<CompositeStream> *compositeStream /*out*/,
+            bool *deferredStream /*out*/);
+
     bool matchSharedStreamingRequest(int reqId);
     bool matchSharedCaptureRequest(int reqId);
     void markClientActive();

@@ -76,6 +76,15 @@ public:
         return INVALID_OPERATION;
     }
 
+    // Update output surface of composite stream
+    virtual status_t updateStream(int /*streamId*/,
+                                  const std::vector<SurfaceHolder>& /*newSurfaces*/,
+                                  KeyedVector<sp<Surface>, size_t> * /*outputMap*/,
+                                  int64_t* /*lastFrameNumber*/) {
+        // subclasses should implement this method
+        return INVALID_OPERATION;
+    }
+
     // Insert the internal composite stream id in the user capture request.
     virtual status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap,
             Vector<int32_t>* /*out*/outputStreamIds, int32_t* /*out*/currentStreamId) = 0;

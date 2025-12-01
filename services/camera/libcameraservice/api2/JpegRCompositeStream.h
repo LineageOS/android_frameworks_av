@@ -64,6 +64,8 @@ public:
     int getStreamId() override { return mP010StreamId; }
     status_t setConsumerSurfaces(int /*streamId*/, const std::vector<SurfaceHolder>& /*consumers*/,
                                  std::vector<int>* /*surfaceIds out*/) override;
+    status_t updateStream(int streamId, const std::vector<SurfaceHolder>& newSurfaces,
+            KeyedVector<sp<Surface>, size_t> * outputMap, int64_t* lastFrameNumber) override;
 
     // CpuConsumer listener implementation
     void onFrameAvailable(const BufferItem& item) override;

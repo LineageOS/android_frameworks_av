@@ -1759,8 +1759,17 @@ binder::Status CameraDeviceClient::updateOutputConfigurationLocked(int streamId,
     }
 
     KeyedVector<sp<Surface>, size_t> outputMap;
-    auto ret = mDevice->updateStream(streamId, newOutputs, streamInfos, removedSurfaceIds,
-            replaceEnabled, &outputMap, lastFrameNumber);
+    sp<CompositeStream> compositeStream = nullptr;
+    bool deferredCompositeStream = false;
+    findCompositeStream(streamId, &compositeStream, &deferredCompositeStream);
+
+    status_t ret;
+    if (compositeStream.get() == nullptr) {
+        ret = mDevice->updateStream(streamId, newOutputs, streamInfos, removedSurfaceIds,
+                replaceEnabled, &outputMap, lastFrameNumber);
+    } else {
+        ret = compositeStream->updateStream(streamId, newOutputs, &outputMap, lastFrameNumber);
+    }
     if (ret != OK) {
         switch (ret) {
             case NAME_NOT_FOUND:
@@ -1781,8 +1790,8 @@ binder::Status CameraDeviceClient::updateOutputConfigurationLocked(int streamId,
             mStreamMap.removeItem(it);
         }
 
+        SurfaceKey surfaceKey;
         for (size_t i = 0; i < outputMap.size(); i++) {
-            SurfaceKey surfaceKey;
             status_t ret = getSurfaceKey(outputMap.keyAt(i), &surfaceKey);
             if(ret != OK) {
                 ALOGE("%s: Camera %s: Could not get the SurfaceKey", __FUNCTION__,
@@ -1794,12 +1803,72 @@ binder::Status CameraDeviceClient::updateOutputConfigurationLocked(int streamId,
         }
 
         mConfiguredOutputs.replaceValueFor(streamId, outputConfiguration);
+        updateCompositeOutputsLocked(streamId, surfaceKey, compositeStream,
+                deferredCompositeStream, newOutputs.empty());
+
 
         ALOGV("%s: Camera %s: Successful stream ID %d update",
                   __FUNCTION__, mCameraIdStr.c_str(), streamId);
     }
 
     return res;
+}
+
+void CameraDeviceClient::findCompositeStream(int streamId,
+        sp<CompositeStream> *compositeStream /*out*/, bool *deferredStream /*out*/) {
+    if (compositeStream == nullptr || deferredStream == nullptr) {
+        return;
+    }
+
+    if (flags::seamless_transitions()) {
+        Mutex::Autolock compLock(mCompositeLock);
+        for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+            if (streamId == mCompositeStreamMap.valueAt(i)->getStreamId()) {
+                *compositeStream = mCompositeStreamMap.valueAt(i);
+                break;
+            }
+        }
+        if (compositeStream->get() == nullptr) {
+            auto it = mDeferredCompositeMap.find(streamId);
+            if (it != mDeferredCompositeMap.end()) {
+                *compositeStream = it->second;
+                *deferredStream = true;
+            }
+        }
+    }
+}
+
+void CameraDeviceClient::updateCompositeOutputsLocked(int streamId, SurfaceKey surfaceKey,
+        const sp<CompositeStream>& compositeStream,
+        bool deferredCompositeStream, bool noNewOutputs) {
+    if (compositeStream.get() != nullptr) {
+        Mutex::Autolock compLock(mCompositeLock);
+        if (deferredCompositeStream) {
+            if (!noNewOutputs) {
+                auto it = std::find(mDeferredStreams.begin(), mDeferredStreams.end(), streamId);
+                if (it != mDeferredStreams.end()) {
+                    mDeferredStreams.erase(it);
+                }
+                mStreamInfoMap[streamId].finalized = true;
+                mDeferredCompositeMap.erase(streamId);
+                mCompositeStreamMap.add(surfaceKey, compositeStream);
+            }
+        } else {
+            for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+                if (streamId == mCompositeStreamMap.valueAt(i)->getStreamId()) {
+                    mCompositeStreamMap.removeItemsAt(i, 1);
+                    break;
+                }
+            }
+            if (noNewOutputs)  {
+                mDeferredStreams.add(streamId);
+                mStreamInfoMap[streamId].finalized = false;
+                mDeferredCompositeMap.emplace(streamId, compositeStream);
+            } else {
+                mCompositeStreamMap.add(surfaceKey, compositeStream);
+            }
+        }
+    }
 }
 
 // Create a request object from a template.
@@ -3098,16 +3167,6 @@ binder::Status CameraDeviceClient::updateOutputConfigurations(
                     " not supported!", mCameraIdStr.c_str());
             ALOGE("%s: %s", __FUNCTION__, msg.c_str());
             return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
-        }
-
-        size_t compositeIdx = 0;
-        for (; compositeIdx < mCompositeStreamMap.size(); compositeIdx++) {
-            if (streamIds[i] == mCompositeStreamMap.valueAt(compositeIdx)->getStreamId()) {
-                std::string msg = fmt::sprintf("Camera %s: Composite stream updates are"
-                        " not supported!", mCameraIdStr.c_str());
-                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
-            }
         }
     }
 

@@ -256,6 +256,7 @@ int64_t DepthCompositeStream::getNextFailingInputLocked(int64_t *currentTs /*ino
 status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &inputFrame) {
     status_t res;
     sp<ANativeWindow> outputANW = mOutputSurface;
+    sp<Surface> currentOutput = mOutputSurface;
     ANativeWindowBuffer *anb;
     int fenceFd;
     void *dstBuffer;
@@ -314,14 +315,18 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     if (res != OK) {
         ALOGE("%s: Error trying to lock output buffer fence: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
-        outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
+        mMutex.unlock();
+        outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
+        mMutex.lock();
         return res;
     }
 
     if ((gb->getWidth() < finalJpegBufferSize) || (gb->getHeight() != 1)) {
         ALOGE("%s: Blob buffer size mismatch, expected %dx%d received %zux%u", __FUNCTION__,
                 gb->getWidth(), gb->getHeight(), finalJpegBufferSize, 1U);
-        outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
+        mMutex.unlock();
+        outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
+        mMutex.lock();
         return BAD_VALUE;
     }
 
@@ -371,23 +376,30 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         }
     }
 
+    // Release the composite stream mutex as to avoid blocking incoming
+    // requests for too long during extensive processing
+    mMutex.unlock();
+
     size_t actualJpegSize = 0;
     res = processDepthPhotoFrame(depthPhoto, finalJpegBufferSize, dstBuffer, &actualJpegSize);
     if (res != 0) {
         ALOGE("%s: Depth photo processing failed: %s (%d)", __FUNCTION__, strerror(-res), res);
-        outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
+        outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
+        mMutex.lock();
         return res;
     }
 
     size_t finalJpegSize = actualJpegSize + sizeof(CameraBlob);
     if (finalJpegSize > finalJpegBufferSize) {
         ALOGE("%s: Final jpeg buffer not large enough for the jpeg blob header", __FUNCTION__);
-        outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
+        outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
+        mMutex.lock();
         return NO_MEMORY;
     }
 
-    res = native_window_set_buffers_timestamp(mOutputSurface.get(), ts);
+    res = native_window_set_buffers_timestamp(currentOutput.get(), ts);
     if (res != OK) {
+        mMutex.lock();
         ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)", __FUNCTION__,
                 getStreamId(), strerror(-res), res);
         return res;
@@ -399,7 +411,13 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     CameraBlob *blob = reinterpret_cast<CameraBlob*> (header);
     blob->blobId = CameraBlobId::JPEG;
     blob->blobSizeBytes = actualJpegSize;
-    outputANW->queueBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
+    res = outputANW->queueBuffer(currentOutput.get(), anb, /*fence*/ -1);
+    mMutex.lock();
+    if ((res != NO_ERROR) || (currentOutput != mOutputSurface)) {
+        ALOGE("%s: Output surface update during dynamic Depth processing!", __FUNCTION__);
+        outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
+        return INVALID_OPERATION;
+    }
 
     return res;
 }
@@ -444,47 +462,44 @@ bool DepthCompositeStream::threadLoop() {
     int64_t currentTs = INT64_MAX;
     bool newInputAvailable = false;
 
-    {
-        Mutex::Autolock l(mMutex);
+    Mutex::Autolock l(mMutex);
 
-        if (mErrorState) {
-            // In case we landed in error state, return any pending buffers and
-            // halt all further processing.
-            compilePendingInputLocked();
-            releaseInputFramesLocked(currentTs);
-            return false;
-        }
+    if (mErrorState) {
+        // In case we landed in error state, return any pending buffers and
+        // halt all further processing.
+        compilePendingInputLocked();
+        releaseInputFramesLocked(currentTs);
+        return false;
+    }
 
-        while (!newInputAvailable) {
-            compilePendingInputLocked();
-            newInputAvailable = getNextReadyInputLocked(&currentTs);
-            if (!newInputAvailable) {
-                auto failingFrameNumber = getNextFailingInputLocked(&currentTs);
-                if (failingFrameNumber >= 0) {
-                    // We cannot erase 'mPendingInputFrames[currentTs]' at this point because it is
-                    // possible for two internal stream buffers to fail. In such scenario the
-                    // composite stream should notify the client about a stream buffer error only
-                    // once and this information is kept within 'errorNotified'.
-                    // Any present failed input frames will be removed on a subsequent call to
-                    // 'releaseInputFramesLocked()'.
-                    releaseInputFrameLocked(&mPendingInputFrames[currentTs]);
-                    currentTs = INT64_MAX;
-                }
+    while (!newInputAvailable) {
+        compilePendingInputLocked();
+        newInputAvailable = getNextReadyInputLocked(&currentTs);
+        if (!newInputAvailable) {
+            auto failingFrameNumber = getNextFailingInputLocked(&currentTs);
+            if (failingFrameNumber >= 0) {
+                // We cannot erase 'mPendingInputFrames[currentTs]' at this point because it is
+                // possible for two internal stream buffers to fail. In such scenario the
+                // composite stream should notify the client about a stream buffer error only
+                // once and this information is kept within 'errorNotified'.
+                // Any present failed input frames will be removed on a subsequent call to
+                // 'releaseInputFramesLocked()'.
+                releaseInputFrameLocked(&mPendingInputFrames[currentTs]);
+                currentTs = INT64_MAX;
+            }
 
-                auto ret = mInputReadyCondition.waitRelative(mMutex, kWaitDuration);
-                if (ret == TIMED_OUT) {
-                    return true;
-                } else if (ret != OK) {
-                    ALOGE("%s: Timed wait on condition failed: %s (%d)", __FUNCTION__,
-                            strerror(-ret), ret);
-                    return false;
-                }
+            auto ret = mInputReadyCondition.waitRelative(mMutex, kWaitDuration);
+            if (ret == TIMED_OUT) {
+                return true;
+            } else if (ret != OK) {
+                ALOGE("%s: Timed wait on condition failed: %s (%d)", __FUNCTION__,
+                        strerror(-ret), ret);
+                return false;
             }
         }
     }
 
     auto res = processInputFrame(currentTs, mPendingInputFrames[currentTs]);
-    Mutex::Autolock l(mMutex);
     if (res != OK) {
         ALOGE("%s: Failed processing frame with timestamp: %" PRIu64 ": %s (%d)", __FUNCTION__,
                 currentTs, strerror(-res), res);
@@ -692,6 +707,95 @@ status_t DepthCompositeStream::createInternalStreams(
     return ret;
 }
 
+status_t DepthCompositeStream::updateStream(int streamId,
+        const std::vector<SurfaceHolder>& newSurfaces, KeyedVector<sp<Surface>, size_t> * outputMap,
+        int64_t* lastFrameNumber) {
+
+    if (newSurfaces.size() > 1) {
+        ALOGE("%s: Multiple output surfaces are not supported!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (outputMap == nullptr) {
+        return BAD_VALUE;
+    }
+
+    if (lastFrameNumber == nullptr) {
+        return BAD_VALUE;
+    }
+
+    if (streamId != getStreamId()) {
+        ALOGE("%s: Unexpected streamId: %d vs. expected: %d", __FUNCTION__, streamId,
+              getStreamId());
+        return BAD_VALUE;
+    }
+
+    if ((newSurfaces.empty() && mOutputSurface.get() == nullptr) ||
+            (newSurfaces.size() >= 1 && (newSurfaces[0].mSurface == mOutputSurface))) {
+        // Trivial case, the client doesn't request any changes to the current output
+        outputMap->add(mOutputSurface, mBlobSurfaceId);
+        return OK;
+    }
+
+    sp<CameraDeviceBase> device = mDevice.promote();
+    if (!device.get()) {
+        ALOGE("%s: Invalid camera device!", __FUNCTION__);
+        return NO_INIT;
+    }
+
+    if (mBlobSurface.get() != nullptr) {
+        KeyedVector<sp<Surface>, size_t> outMap;
+        auto res = device->updateInternalStream(mBlobStreamId, mBlobSurfaceId, &outMap,
+                lastFrameNumber);
+        if (res != OK) {
+            ALOGE("%s: Unable to update internal Jpeg stream!", __FUNCTION__);
+            return res;
+        }
+
+        mBlobSurfaceId = outMap.valueAt(0);
+    }
+
+    if (mDepthSurface.get() != nullptr) {
+        KeyedVector<sp<Surface>, size_t> outMap;
+        int64_t lastFrame = -1;
+        auto res = device->updateInternalStream(mDepthStreamId, mDepthSurfaceId, &outMap,
+                &lastFrame);
+        if (res != OK) {
+            ALOGE("%s: Unable to update internal Depth stream!", __FUNCTION__);
+            return res;
+        }
+
+        mDepthSurfaceId = outMap.valueAt(0);
+    }
+
+    Mutex::Autolock l(mMutex);
+    if (mOutputSurface.get() != nullptr) {
+        for (auto &inputFrame : mPendingInputFrames) {
+            inputFrame.second.error = true;
+        }
+
+        auto res = mOutputSurface->disconnect(NATIVE_WINDOW_API_CAMERA);
+        if (res != OK) {
+            ALOGE("%s: Unable to disconnect to native window for stream %d",
+                    __FUNCTION__, mBlobStreamId);
+            return res;
+        }
+
+        mOutputSurface = nullptr;
+    }
+
+    if (!newSurfaces.empty()) {
+        mOutputSurface = newSurfaces[0].mSurface;
+    }
+
+    status_t res = configureStream();
+    if (res == NO_ERROR && (mOutputSurface.get() != nullptr)) {
+        outputMap->add(mOutputSurface, mBlobSurfaceId);
+    }
+
+    return res;
+}
+
 status_t DepthCompositeStream::setConsumerSurfaces(int streamId,
                                                    const std::vector<SurfaceHolder>& consumers,
                                                    std::vector<int>* surfaceIds /*out*/) {
@@ -725,14 +829,16 @@ status_t DepthCompositeStream::setConsumerSurfaces(int streamId,
 }
 
 status_t DepthCompositeStream::configureStream() {
-    if (isRunning()) {
-        // Processing thread is already running, nothing more to do.
-        return NO_ERROR;
+    if (!flags::seamless_transitions()) {
+        if (isRunning()) {
+            // Processing thread is already running, nothing more to do.
+            return NO_ERROR;
+        }
     }
 
     if (mOutputSurface.get() == nullptr) {
         if (flags::seamless_transitions()) {
-            return OK;
+            return NO_ERROR;
         } else {
             ALOGE("%s: No valid output surface set!", __FUNCTION__);
             return NO_INIT;
@@ -779,6 +885,10 @@ status_t DepthCompositeStream::configureStream() {
                     anwConsumer, maxProducerBuffers + maxConsumerBuffers)) != OK) {
         ALOGE("%s: Unable to set buffer count for stream %d", __FUNCTION__, mBlobStreamId);
         return res;
+    }
+
+    if (flags::seamless_transitions() && isRunning()) {
+        return NO_ERROR;
     }
 
     run("DepthCompositeStreamProc");

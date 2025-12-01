@@ -255,6 +255,9 @@ class Camera3OutputStream :
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
+    virtual status_t updateInternalStream(
+            KeyedVector<sp<Surface>, size_t> * /*outputMap out*/) override;
+
     /**
      * Set the batch size for buffer operations. The output stream will request
      * buffers from buffer queue on a batch basis. Currently only video streams

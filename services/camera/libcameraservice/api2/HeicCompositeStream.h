@@ -67,6 +67,9 @@ public:
     status_t setConsumerSurfaces(int streamId, const std::vector<SurfaceHolder>& consumers,
                                  std::vector<int>* surfaceIds /*out*/) override;
 
+    status_t updateStream(int streamId, const std::vector<SurfaceHolder>& newSurfaces,
+            KeyedVector<sp<Surface>, size_t> * outputMap, int64_t* lastFrameNumber) override;
+
     status_t deleteInternalStreams() override;
 
     status_t configureStream() override;
@@ -189,6 +192,8 @@ private:
         std::vector<CodecInputBufferInfo>  codecInputBuffers, gainmapCodecInputBuffers;
 
         bool                      error;     // Main input image buffer error
+        bool                      outputUpdated; // Output surface switched during processing
+        sp<Surface>               currentSurface; // Output surface for this capture request
         bool                      exifError; // Exif/APP_SEGMENT buffer error
         int64_t                   timestamp;
         int32_t                   requestId;
@@ -213,6 +218,7 @@ private:
             : orientation(0),
               quality(kDefaultJpegQuality),
               error(false),
+              outputUpdated(false),
               exifError(false),
               timestamp(-1),
               requestId(-1),

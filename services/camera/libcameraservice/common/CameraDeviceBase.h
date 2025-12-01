@@ -497,6 +497,13 @@ class CameraDeviceBase : public virtual FrameProducer {
             int64_t *lastFrameNumber = nullptr /*out*/) = 0;
 
     /**
+     * Update the surface id of a given internal stream.
+     */
+    virtual status_t updateInternalStream(int streamId, size_t surfaceId,
+            KeyedVector<sp<Surface>, size_t> *outputMap/*out*/,
+            int64_t *lastFrameNumber = nullptr /*out*/) = 0;
+
+    /**
      * Drop buffers for stream of streamId if dropping is true. If dropping is false, do not
      * drop buffers for stream of streamId.
      */
