@@ -17,6 +17,7 @@
 #define LOG_TAG "UtilTest"
 
 #include <android_companion_virtualdevice_flags.h>
+#include <flag_macros.h>
 #include <sys/types.h>
 
 #include <array>
@@ -49,11 +50,13 @@ using ::testing::Optional;
 using ::testing::VariantWith;
 
 const std::array<Format, 5> kImageFormats = {
-    Format::UNKNOWN, Format::RGBA_8888, Format::YUV_420_888,
-    Format::JPEG,    Format::HEIC,
+    Format::UNKNOWN, Format::RGBA_8888, Format::YUV_420_888, Format::JPEG,
+    Format::HEIC,
 };
 
-TEST(UtilTests, validateSupportedInputImageFormats) {
+class UtilTest : public ::testing::Test {};
+
+TEST_F(UtilTest, validateSupportedInputImageFormats) {
   for (Format f : kImageFormats) {
     switch (f) {
       case Format::UNKNOWN:
@@ -74,7 +77,63 @@ TEST(UtilTests, validateSupportedInputImageFormats) {
   }
 }
 
-TEST(UtilTests, isBlobFormatTest) {
+TEST_F(UtilTest, IsFormatSupportedForInput_ReturnsTrueForValidNonBlobFormats) {
+  // Test supported non-blob formats with valid parameters.
+  EXPECT_TRUE(isFormatSupportedForInput(1920, 1080, Format::YUV_420_888, 30));
+  EXPECT_TRUE(isFormatSupportedForInput(1280, 720, Format::RGBA_8888, 60));
+}
+
+TEST_F(UtilTest, IsFormatSupportedForInput_ReturnsFalseForInvalidWidth) {
+  EXPECT_FALSE(isFormatSupportedForInput(0, 1080, Format::YUV_420_888, 30));
+  EXPECT_FALSE(isFormatSupportedForInput(-1, 1080, Format::YUV_420_888, 30));
+}
+
+TEST_F(UtilTest, IsFormatSupportedForInput_ReturnsFalseForInvalidHeight) {
+  EXPECT_FALSE(isFormatSupportedForInput(1920, 0, Format::YUV_420_888, 30));
+  EXPECT_FALSE(isFormatSupportedForInput(1920, -1, Format::YUV_420_888, 30));
+}
+
+TEST_F(UtilTest, IsFormatSupportedForInput_ReturnsFalseForInvalidFps) {
+  EXPECT_FALSE(isFormatSupportedForInput(1920, 1080, Format::YUV_420_888, 0));
+  EXPECT_FALSE(isFormatSupportedForInput(1920, 1080, Format::YUV_420_888, -10));
+  EXPECT_FALSE(isFormatSupportedForInput(1920, 1080, Format::YUV_420_888, 61));
+}
+
+TEST_F(UtilTest, IsFormatSupportedForInput_ReturnsFalseForUnknownFormat) {
+  EXPECT_FALSE(isFormatSupportedForInput(1920, 1080, Format::UNKNOWN, 30));
+}
+
+TEST_F_WITH_FLAGS(
+    UtilTest, IsFormatSupportedForInput_BlobFormatSupportedWhenFlagEnabled,
+    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(
+        android::companion::virtualdevice::flags, virtual_camera_direct_blob_transfer))) {
+  EXPECT_TRUE(isFormatSupportedForInput(800, 600, Format::JPEG, 30));
+  EXPECT_TRUE(isFormatSupportedForInput(1024, 768, Format::HEIC, 30));
+}
+
+TEST_F_WITH_FLAGS(
+    UtilTest, IsFormatSupportedForInput_BlobFormatUnsupportedWhenFlagDisabled,
+    REQUIRES_FLAGS_DISABLED(ACONFIG_FLAG(
+        android::companion::virtualdevice::flags, virtual_camera_direct_blob_transfer))) {
+  EXPECT_FALSE(isFormatSupportedForInput(800, 600, Format::JPEG, 30));
+  EXPECT_FALSE(isFormatSupportedForInput(1024, 768, Format::HEIC, 30));
+}
+
+TEST_F(
+    UtilTest,
+    IsFormatSupportedForInput_ReturnsFalseForBlobFormatsWithInvalidParameters) {
+  // Blob formats with invalid parameters should always be unsupported,
+  // regardless of the feature flag.
+  // Invalid width with JPEG format.
+  EXPECT_FALSE(isFormatSupportedForInput(0, 600, Format::JPEG, 30));
+  // Invalid height with JPEG format.
+  EXPECT_FALSE(isFormatSupportedForInput(800, 0, Format::JPEG, 30));
+  // Invalid fps with JPEG format.
+  EXPECT_FALSE(isFormatSupportedForInput(800, 600, Format::JPEG, 0));
+  EXPECT_FALSE(isFormatSupportedForInput(800, 600, Format::JPEG, 61));
+}
+
+TEST_F(UtilTest, isBlobFormatTest) {
   for (Format f : kImageFormats) {
     switch (f) {
       case Format::UNKNOWN:
@@ -93,7 +152,7 @@ TEST(UtilTests, isBlobFormatTest) {
   }
 }
 
-TEST(UtilTests, isBlobStreamConfigTest) {
+TEST_F(UtilTest, isBlobStreamConfigTest) {
   Stream stream;
 
   // Check supported BLOB types
@@ -124,7 +183,7 @@ TEST(UtilTests, isBlobStreamConfigTest) {
   EXPECT_FALSE(isBlobStreamConfig(stream));
 }
 
-TEST(UtilTests, areMatchingBlobTypesTest) {
+TEST_F(UtilTest, areMatchingBlobTypesTest) {
   Stream halStream;
   SupportedStreamConfiguration inputConfig;
 
@@ -177,7 +236,7 @@ TEST(UtilTests, areMatchingBlobTypesTest) {
   EXPECT_FALSE(areMatchingBlobTypes(halStream, inputConfig));
 }
 
-TEST(UtilTests, areMatchingBlobFormatsTest) {
+TEST_F(UtilTest, areMatchingBlobFormatsTest) {
   EXPECT_TRUE(areMatchingBlobTypes(Format::HEIC, Format::HEIC));
   EXPECT_TRUE(areMatchingBlobTypes(Format::JPEG, Format::JPEG));
 
@@ -191,7 +250,7 @@ TEST(UtilTests, areMatchingBlobFormatsTest) {
   EXPECT_FALSE(areMatchingBlobTypes(Format::HEIC, Format::UNKNOWN));
 }
 
-TEST(UtilTests, areDifferentBlobFormatsTest) {
+TEST_F(UtilTest, areDifferentBlobFormatsTest) {
   EXPECT_TRUE(areDifferentBlobTypes(Format::HEIC, Format::JPEG));
 
   EXPECT_FALSE(areDifferentBlobTypes(Format::HEIC, Format::HEIC));
