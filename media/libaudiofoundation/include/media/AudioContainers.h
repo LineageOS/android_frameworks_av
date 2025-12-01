@@ -60,7 +60,7 @@ static std::vector<T> Intersection(const std::set<T>& a, const std::set<T>& b) {
 }
 
 template<typename T>
-static std::set<T> SetIntersection(const std::set<T>& a, const std::set<T> b) {
+static std::set<T> SetIntersection(const std::set<T>& a, const std::set<T>& b) {
     std::set<T> intersection;
     std::set_intersection(a.begin(), a.end(),
                           b.begin(), b.end(),
