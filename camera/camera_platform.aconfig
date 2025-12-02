@@ -241,26 +241,6 @@ flag {
 
 flag {
     namespace: "camera_platform"
-    name: "surface_format_fix"
-    description: "Consider format overrides for RGB output formats"
-    bug: "424865503"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "camera_platform"
-    name: "on_camera_closed_at_hal_crash"
-    description: "Fix the missing onCameraClosed callback if HAL crashes"
-    bug: "420864931"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "camera_platform"
     name: "fix_managed_profiles_receiver"
     description: "Adds a BC receiver for the proper parent user on CameraProxyService"
     bug: "442009819"
