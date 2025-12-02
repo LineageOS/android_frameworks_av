@@ -186,6 +186,7 @@ status_t fixupManualFlashStrengthControlTags(CameraMetadata& resultMetadata) {
 }
 
 status_t fixupDeviceTypeTag(const CameraMetadata& staticInfo, CameraMetadata& resultMetadata) {
+    if (!flags::camera_device_type_api()) return OK;
     status_t res = OK;
     if (!resultMetadata.exists(ANDROID_INFO_DEVICE_TYPE)) {
         uint8_t deviceType = ANDROID_INFO_DEVICE_TYPE_BUILT_IN;
@@ -469,7 +470,7 @@ void sendCaptureResult(
         }
     }
 
-    // Fix up autoframing metadata
+    // Fix up autoframing and device type metadata
     res = fixupAutoframingTags(captureResult.mMetadata);
     if (res != OK) {
         SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
@@ -481,7 +482,7 @@ void sendCaptureResult(
     if (res != OK) {
         SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
             "Failed to set device type in result metadata: %s (%d)",
-                strerror(-res), res);
+            strerror(-res), res);
         return;
     }
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
@@ -491,6 +492,14 @@ void sendCaptureResult(
             SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
                 "Failed to set autoframing defaults in physical result metadata: %s (%d)",
                     strerror(-res), res);
+            return;
+        }
+        res = fixupDeviceTypeTag(states.deviceInfo, physicalMetadata.mCameraMetadataInfo.
+            get<CameraMetadataInfo::metadata>());
+        if (res != OK) {
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "Failed to set device type in physical result metadata: %s (%d)",
+                strerror(-res), res);
             return;
         }
     }

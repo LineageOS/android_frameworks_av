@@ -3144,8 +3144,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addAvailableKeyIfMiss
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDeviceTypeTag(CameraMetadata& c) {
+    if (!flags::camera_device_type_api()) return OK;
     status_t res = OK;
-
     auto entry = c.find(ANDROID_INFO_DEVICE_TYPE);
     if (entry.count == 0) {
         auto levelEntry = c.find(ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL);
