@@ -95,6 +95,7 @@ class StreamContextAidl {
     bool hasClipTransitionSupport() const { return mHasClipTransitionSupport; }
     void updateMmapBufferDescriptor(
             ::aidl::android::hardware::audio::core::MmapBufferDescriptor&& desc) {
+        mBufferSizeFrames = desc.sharedMemory.size / mFrameSizeBytes;
         mMmapBufferDescriptor = std::move(desc); }
 
   private:
