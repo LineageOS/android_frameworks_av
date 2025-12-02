@@ -148,7 +148,7 @@ status_t CryptoAsync::decryptAndQueue(sp<AMessage> & msg) {
         if (err == ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION) {
             std::get<0>(mRetryHdcpFailure.value())++;
             bool shouldPost = false;
-            if (std::get<0>(mRetryHdcpFailure.value()) <= CryptoAsync::kMaxHdcpDecryptRetryCount) {
+            if (std::get<0>(mRetryHdcpFailure.value()) <= mMaxHdcpDecryptRetryInSecs) {
                 err = OK;
                 // always called from the looper.
                 {

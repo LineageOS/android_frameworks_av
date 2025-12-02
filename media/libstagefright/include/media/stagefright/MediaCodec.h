@@ -798,6 +798,8 @@ private:
 
     sp<BatteryChecker> mBatteryChecker;
 
+    // property specified max hdcp failure retry time(in secs)
+    uint32_t mMaxHdcpDecryptRetryInSecs;
     // HDCP tuple<currentRetryCounter, retrySuccessCounter, retryFailureCounter>
     std::optional<std::tuple<uint32_t, uint32_t, uint32_t>> mRetryHdcpFailure;
     std::list<sp<AMessage>> mInputBufferRetryQueue;
