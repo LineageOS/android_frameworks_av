@@ -824,8 +824,7 @@ bool ResourceTracker::isCallingPriorityHigher(int callingPid, int pid) {
     return (callingPidPriority < priority);
 }
 
-void ResourceTracker::getMediaResourceUsageReport(
-        std::vector<MediaResourceParcel>* resources) const {
+std::vector<MediaResourceParcel> ResourceTracker::getMediaResourceUsageReport() const {
     // Summing up resource usage by its type.
     std::map<MediaResourceType, MediaResourceParcel> resourceUsageMap;
 
@@ -850,11 +849,13 @@ void ResourceTracker::getMediaResourceUsageReport(
         }
     }
 
-    resources->reserve(resourceUsageMap.size());
-    for (const auto& pair : resourceUsageMap) {
-        resources->push_back(pair.second);
+    std::vector<MediaResourceParcel> resources;
+    resources.reserve(resourceUsageMap.size());
+    for (const auto& [type, parcel] : resourceUsageMap) {
+        resources.push_back(parcel);
     }
 
+    return resources;
 }
 
 } // namespace android

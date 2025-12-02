@@ -69,11 +69,14 @@ public:
      * Checks if the system has enough of the specified list of resources.
      *
      * @param[in] resourcesNeeded The list of resources required.
+     * @param[out] resourcesAvailable If provided, upon return this will be
+     *             cleared and filled with the available system resources.
      *
      * @return true if resources are likely available, false otherwise.
      */
     bool checkResourceAvailability(
-            const std::vector<MediaResourceParcel>& resourcesNeeded) const override;
+            const std::vector<MediaResourceParcel>& resourcesNeeded,
+            std::vector<MediaResourceParcel>* resourcesAvailable) const override;
 
     /**
      * Get a list of currently available resources.

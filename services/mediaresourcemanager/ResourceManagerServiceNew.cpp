@@ -265,8 +265,10 @@ Status ResourceManagerServiceNew::getMediaResourceUsageReport(
         return Status::fromStatus(INVALID_OPERATION);
     }
 
-    std::scoped_lock lock{mLock};
-    mResourceTracker->getMediaResourceUsageReport(resources);
+    {
+        std::scoped_lock lock{mLock};
+        *resources = mResourceTracker->getMediaResourceUsageReport();
+    }
 
     return Status::ok();
 }
@@ -281,8 +283,9 @@ Status ResourceManagerServiceNew::registerSystemResource(
 }
 
 inline bool ResourceManagerServiceNew::checkResourceAvailability_l(
-    const std::vector<MediaResourceParcel>& resourcesNeeded) const {
-    return mResourceModel->checkResourceAvailability(resourcesNeeded);
+    const std::vector<MediaResourceParcel>& resourcesNeeded,
+    std::vector<MediaResourceParcel>* resourcesAvailable) const {
+    return mResourceModel->checkResourceAvailability(resourcesNeeded, resourcesAvailable);
 }
 
 Status ResourceManagerServiceNew::checkResourceAvailability(
@@ -290,7 +293,7 @@ Status ResourceManagerServiceNew::checkResourceAvailability(
         bool* _aidl_return) {
     if (IsCodecAvailabilityMetricsFeatureOn() && _aidl_return) {
         std::scoped_lock lock{mLock};
-        *_aidl_return = checkResourceAvailability_l(resourcesNeeded);
+        *_aidl_return = checkResourceAvailability_l(resourcesNeeded, nullptr);
     }
     return Status::ok();
 }
@@ -328,7 +331,7 @@ void ResourceManagerServiceNew::logResourceAvailability(
             // No system resources. So nothing to do.
             return;
         }
-        bool available = checkResourceAvailability_l(systemResources);
+        bool available = checkResourceAvailability_l(systemResources, nullptr);
         mResourceManagerMetrics->pushResourceStatusAtom(clientInfo, isCodecStarted, available);
     }
 }
