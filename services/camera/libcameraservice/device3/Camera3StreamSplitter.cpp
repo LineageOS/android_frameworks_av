@@ -361,7 +361,6 @@ status_t Camera3StreamSplitter::outputBufferLocked(const sp<Surface>& output,
     status_t res;
 
     uint64_t bufferId = bufferItem.mGraphicBuffer->getId();
-    const BufferTracker& tracker = *(mBuffers[bufferId]);
 
     if (mOutputSurfaces[surfaceId] != nullptr) {
         sp<ANativeWindow> anw = mOutputSurfaces[surfaceId];
