@@ -530,8 +530,6 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
             const std::list<std::unique_ptr<C2Work>>& workList);
 
     c2_status_t initApexHandler(
-            ApexCodec_ComponentStore *store,
-            const C2String &name,
             const std::shared_ptr<Listener> &listener,
             const std::shared_ptr<Component> &comp);
 

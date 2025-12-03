@@ -19,7 +19,6 @@
 #include <utils/Log.h>
 
 #include <span>
-#include <sys/mman.h>
 
 #include <android-base/hex.h>
 #include <android_media_codec.h>
@@ -152,19 +151,6 @@ std::shared_ptr<C2Component::Traits> C2ApexOpusDec::MakeTraits() {
 #else
         return nullptr;
 #endif
-}
-
-
-// static
-void *C2ApexOpusDec::Map(void *addr, size_t size, int prot, int flags, int fd, off_t offset) {
-    // TODO
-    return ::mmap(addr, size, prot, flags, fd, offset);
-}
-
-// static
-int C2ApexOpusDec::Unmap(void *addr, size_t size) {
-    // TODO
-    return ::munmap(addr, size);
 }
 
 void C2ApexOpusDec::initDecoderStates() {

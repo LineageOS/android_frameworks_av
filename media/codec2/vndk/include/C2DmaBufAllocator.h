@@ -18,7 +18,6 @@
 #define STAGEFRIGHT_CODEC2_ALLOCATOR_BUF_H_
 
 #include <BufferAllocator/BufferAllocator.h>
-#include <C2AllocatorCommon.h>
 #include <C2Buffer.h>
 #include <sys/stat.h>  // stat
 
@@ -94,11 +93,6 @@ class C2DmaBufAllocator : public C2Allocator {
         }
         return (cached_result == 1);
     };
-
-    static c2_status_t Map(
-            const std::shared_ptr<C2LinearAllocation> &allocation,
-            size_t offset, size_t size, C2MemoryUsage usage, C2Fence* fence, void** addr,
-            C2LinearMapFn mapFn, C2LinearUnmapFn unmapFn);
 
    private:
     c2_status_t mInit;

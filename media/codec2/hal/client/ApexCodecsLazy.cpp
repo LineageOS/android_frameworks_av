@@ -20,7 +20,6 @@
 
 #include <mutex>
 
-#include <sys/mman.h>
 #include <dlfcn.h>
 
 #include <android-base/no_destructor.h>
@@ -61,8 +60,6 @@ enum MethodIndex {
     k_ApexCodec_Configurable_querySupportedParams,
     k_ApexCodec_Configurable_querySupportedValues,
     k_ApexCodec_GetComponentStore,
-    k_ApexCodec_GetMapFn,
-    k_ApexCodec_GetUnmapFn,
     k_ApexCodec_ParamDescriptors_destroy,
     k_ApexCodec_ParamDescriptors_getDescriptor,
     k_ApexCodec_ParamDescriptors_getIndices,
@@ -153,8 +150,6 @@ private:
         BIND_SYMBOL(ApexCodec_Configurable_querySupportedParams);
         BIND_SYMBOL(ApexCodec_Configurable_querySupportedValues);
         BIND_SYMBOL(ApexCodec_GetComponentStore);
-        BIND_SYMBOL(ApexCodec_GetMapFn);
-        BIND_SYMBOL(ApexCodec_GetUnmapFn);
         BIND_SYMBOL(ApexCodec_ParamDescriptors_destroy);
         BIND_SYMBOL(ApexCodec_ParamDescriptors_getDescriptor);
         BIND_SYMBOL(ApexCodec_ParamDescriptors_getIndices);
@@ -345,16 +340,6 @@ ApexCodec_Status ApexCodec_Component_process(
         size_t *produced) {
     INVOKE_METHOD(ApexCodec_Component_process, APEXCODEC_STATUS_OMITTED,
                   comp, input, output, consumed, produced);
-}
-
-ApexCodec_MapFn ApexCodec_GetMapFn(
-        ApexCodec_ComponentStore *store, const char *name) {
-    INVOKE_METHOD(ApexCodec_GetMapFn, ::mmap, store, name);
-}
-
-ApexCodec_UnmapFn ApexCodec_GetUnmapFn(
-        ApexCodec_ComponentStore *store, const char *name) {
-    INVOKE_METHOD(ApexCodec_GetUnmapFn, ::munmap, store, name);
 }
 
 ApexCodec_Status ApexCodec_Configurable_config(

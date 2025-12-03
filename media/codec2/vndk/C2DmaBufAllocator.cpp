@@ -18,7 +18,6 @@
 #define LOG_TAG "C2DmaBufAllocator"
 
 #include <BufferAllocator/BufferAllocator.h>
-#include <C2BlockInternal.h>
 #include <C2Buffer.h>
 #include <C2Debug.h>
 #include <C2DmaBufAllocator.h>
@@ -88,6 +87,18 @@ struct C2HandleBuf : public C2Handle {
     const static C2Handle cHeader;
 };
 
+const C2Handle C2HandleBuf::cHeader = {
+        C2HandleBuf::version, C2HandleBuf::numFds, C2HandleBuf::numInts, {}};
+
+// static
+bool C2HandleBuf::IsValid(const C2Handle* const o) {
+    if (!o || memcmp(o, &cHeader, sizeof(cHeader))) {
+        return false;
+    }
+    const C2HandleBuf* other = static_cast<const C2HandleBuf*>(o);
+    return other->mInts.mMagic == kMagic;
+}
+
 /* =========================== DMABUF ALLOCATION =========================== */
 class C2DmaBufAllocation : public C2LinearAllocation {
    public:
@@ -99,6 +110,8 @@ class C2DmaBufAllocation : public C2LinearAllocation {
     virtual const C2Handle* handle() const override;
     virtual id_t getAllocatorId() const override;
     virtual bool equals(const std::shared_ptr<C2LinearAllocation>& other) const override;
+
+    // internal methods
 
     /**
       * Constructs an allocation via a new allocation.
@@ -126,8 +139,20 @@ class C2DmaBufAllocation : public C2LinearAllocation {
 
    protected:
     virtual c2_status_t mapInternal(size_t mapSize, size_t mapOffset, size_t alignmentBytes,
-                                    int prot, int flags, void** base, void** addr,
-                                    C2LinearMapFn mapFn);
+                                    int prot, int flags, void** base, void** addr) {
+        c2_status_t err = C2_OK;
+        *base = mmap(nullptr, mapSize, prot, flags, mHandle.bufferFd(), mapOffset);
+        ALOGV("mmap(size = %zu, prot = %d, flags = %d, mapFd = %d, offset = %zu) "
+              "returned (%d)",
+              mapSize, prot, flags, mHandle.bufferFd(), mapOffset, errno);
+        if (*base == MAP_FAILED) {
+            *base = *addr = nullptr;
+            err = c2_map_errno<EINVAL>(errno);
+        } else {
+            *addr = (uint8_t*)*base + alignmentBytes;
+        }
+        return err;
+    }
 
     C2Allocator::id_t mId;
     C2HandleBuf mHandle;
@@ -136,41 +161,15 @@ class C2DmaBufAllocation : public C2LinearAllocation {
         void* addr;
         size_t alignmentBytes;
         size_t size;
-        C2LinearUnmapFn unmapFn;
     };
     Mutexed<std::list<Mapping>> mMappings;
-
-   private:
-    c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence* fence,
-                    void** addr /* nonnull */, C2LinearMapFn mapFn,
-                    C2LinearUnmapFn unmapFn);
-
-    friend class C2DmaBufAllocator;
 
     // TODO: we could make this encapsulate shared_ptr and copiable
     C2_DO_NOT_COPY(C2DmaBufAllocation);
 };
 
-const C2Handle C2HandleBuf::cHeader = {
-        C2HandleBuf::version, C2HandleBuf::numFds, C2HandleBuf::numInts, {}};
-
-// static
-bool C2HandleBuf::IsValid(const C2Handle* const o) {
-    if (!o || memcmp(o, &cHeader, sizeof(cHeader))) {
-        return false;
-    }
-    const C2HandleBuf* other = static_cast<const C2HandleBuf*>(o);
-    return other->mInts.mMagic == kMagic;
-}
-
 c2_status_t C2DmaBufAllocation::map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence* fence,
                                     void** addr) {
-    return map(offset, size, usage, fence, addr, ::mmap, ::munmap);
-}
-
-c2_status_t C2DmaBufAllocation::map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence* fence,
-                                    void** addr, C2LinearMapFn mapFn,
-                                    C2LinearUnmapFn unmapFn) {
     static const size_t kPageSize = getpagesize();
     (void)fence;  // TODO: wait for fence
     *addr = nullptr;
@@ -197,10 +196,10 @@ c2_status_t C2DmaBufAllocation::map(size_t offset, size_t size, C2MemoryUsage us
     size_t alignmentBytes = offset % kPageSize;
     size_t mapOffset = offset - alignmentBytes;
     size_t mapSize = size + alignmentBytes;
-    Mapping map = {nullptr, alignmentBytes, mapSize, unmapFn};
+    Mapping map = {nullptr, alignmentBytes, mapSize};
 
     c2_status_t err =
-            mapInternal(mapSize, mapOffset, alignmentBytes, prot, flags, &(map.addr), addr, mapFn);
+            mapInternal(mapSize, mapOffset, alignmentBytes, prot, flags, &(map.addr), addr);
     if (map.addr) {
         mMappings.lock()->push_back(map);
     }
@@ -218,12 +217,9 @@ c2_status_t C2DmaBufAllocation::unmap(void* addr, size_t size, C2Fence* fence) {
             size + it->alignmentBytes != it->size) {
             continue;
         }
-        if (!it->unmapFn) {
-            it->unmapFn = ::munmap;
-        }
-        int err = it->unmapFn(it->addr, it->size);
+        int err = munmap(it->addr, it->size);
         if (err != 0) {
-            ALOGD("unmap failed");
+            ALOGD("munmap failed");
             return c2_map_errno<EINVAL>(errno);
         }
         if (fence) {
@@ -295,27 +291,6 @@ C2DmaBufAllocation::C2DmaBufAllocation(size_t size, int shareFd, C2Allocator::id
     mHandle = C2HandleBuf(shareFd, size);
     mId = id;
     mInit = c2_status_t(c2_map_errno<ENOMEM, EACCES, EINVAL>(0));
-}
-
-c2_status_t C2DmaBufAllocation::mapInternal(size_t mapSize, size_t mapOffset,
-                                            size_t alignmentBytes, int prot, int flags,
-                                            void** base, void** addr,
-                                            C2LinearMapFn mapFn) {
-    c2_status_t err = C2_OK;
-    if (!mapFn) {
-        mapFn = ::mmap;
-    }
-    *base = mapFn(nullptr, mapSize, prot, flags, mHandle.bufferFd(), mapOffset);
-    ALOGV("mmap(size = %zu, prot = %d, flags = %d, mapFd = %d, offset = %zu) "
-          "returned (%d)",
-          mapSize, prot, flags, mHandle.bufferFd(), mapOffset, errno);
-    if (*base == MAP_FAILED) {
-        *base = *addr = nullptr;
-        err = c2_map_errno<EINVAL>(errno);
-    } else {
-        *addr = (uint8_t*)*base + alignmentBytes;
-    }
-    return err;
 }
 
 /* =========================== DMABUF ALLOCATOR =========================== */
@@ -464,19 +439,6 @@ c2_status_t C2DmaBufAllocator::priorLinearAllocation(
 // static
 bool C2DmaBufAllocator::CheckHandle(const C2Handle* const o) {
     return C2HandleBuf::IsValid(o);
-}
-
-// static
-c2_status_t C2DmaBufAllocator::Map(
-        const std::shared_ptr<C2LinearAllocation> &allocation,
-        size_t offset, size_t size, C2MemoryUsage usage, C2Fence* fence, void** addr,
-        C2LinearMapFn mapFn, C2LinearUnmapFn unmapFn) {
-    if (!allocation || !CheckHandle(allocation->handle())) {
-        return C2_BAD_VALUE;
-    }
-    std::shared_ptr<C2DmaBufAllocation> alloc =
-        static_pointer_cast<C2DmaBufAllocation>(allocation);
-    return alloc->map(offset, size, usage, fence, addr, mapFn, unmapFn);
 }
 
 }  // namespace android
