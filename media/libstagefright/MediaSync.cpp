@@ -19,15 +19,16 @@
 #include <inttypes.h>
 
 #include <com_android_graphics_libgui_flags.h>
+#include <gui/Flags.h> // Remove with WB_MEDIA_MIGRATION
 
+#include <gui/BufferQueue.h>
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
 #include <gui/BufferItemConsumer.h>
 #include <gui/Surface.h>
 #else
 #include <gui/IGraphicBufferConsumer.h>
-#endif
-#include <gui/BufferQueue.h>
 #include <gui/IGraphicBufferProducer.h>
+#endif
 
 #include <media/AudioTrack.h>
 #include <media/stagefright/MediaClock.h>
@@ -97,7 +98,7 @@ MediaSync::~MediaSync() {
     }
 }
 
-status_t MediaSync::setSurface(const sp<IGraphicBufferProducer> &output) {
+status_t MediaSync::setSurface(const sp<MediaSurfaceType> &output) {
     Mutex::Autolock lock(mMutex);
 
     if (output == mOutput) {
@@ -126,14 +127,17 @@ status_t MediaSync::setSurface(const sp<IGraphicBufferProducer> &output) {
 
         // Try to connect to new output surface. If failed, current output surface will not
         // be changed.
-        IGraphicBufferProducer::QueueBufferOutput queueBufferOutput;
         sp<OutputListener> listener(new OutputListener(this, output));
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+        IInterface::asBinder(output->getIGraphicBufferProducer())->linkToDeath(listener);
+        status_t status = output->connect(NATIVE_WINDOW_API_MEDIA, listener);
+#else
+        IGraphicBufferProducer::QueueBufferOutput queueBufferOutput;
         IInterface::asBinder(output)->linkToDeath(listener);
-        status_t status =
-            output->connect(listener,
-                            NATIVE_WINDOW_API_MEDIA,
-                            true /* producerControlledByApp */,
-                            &queueBufferOutput);
+        status_t status = output->connect(listener, NATIVE_WINDOW_API_MEDIA,
+                                          true /* producerControlledByApp */, &queueBufferOutput);
+#endif
+
         if (status != NO_ERROR) {
             ALOGE("setSurface: failed to connect (%d)", status);
             return status;
@@ -199,9 +203,8 @@ status_t MediaSync::setAudioTrack(const sp<AudioTrack> &audioTrack) {
     return OK;
 }
 
-status_t MediaSync::createInputSurface(
-        sp<IGraphicBufferProducer> *outBufferProducer) {
-    if (outBufferProducer == NULL) {
+status_t MediaSync::createInputSurface(sp<MediaSurfaceType> *outSurface) {
+    if (outSurface == NULL) {
         return BAD_VALUE;
     }
 
@@ -245,7 +248,7 @@ status_t MediaSync::createInputSurface(
     mUsageFlagsFromOutput = usageFlags;
     mInput = newInput;
     mListener = listener;
-    *outBufferProducer = surface->getIGraphicBufferProducer();
+    *outSurface = surface;
     return OK;
 #else
     sp<IGraphicBufferProducer> bufferProducer;
@@ -261,7 +264,7 @@ status_t MediaSync::createInputSurface(
         mUsageFlagsFromOutput = 0;
         mOutput->query(NATIVE_WINDOW_CONSUMER_USAGE_BITS, &mUsageFlagsFromOutput);
         bufferConsumer->setConsumerUsageBits(mUsageFlagsFromOutput);
-        *outBufferProducer = bufferProducer;
+        *outSurface = mediaflagtools::igbpToSurfaceType(bufferProducer);
         mInput = bufferConsumer;
 
         // set undequeued buffer count
@@ -717,6 +720,22 @@ void MediaSync::onFrameAvailableFromInput() {
 }
 
 void MediaSync::renderOneBufferItem_l(const BufferItem &bufferItem) {
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+    mOutput->setBuffersTimestamp(bufferItem.mIsAutoTimestamp ?
+            NATIVE_WINDOW_TIMESTAMP_AUTO : bufferItem.mTimestamp);
+    mOutput->setBuffersDataSpace(static_cast<ui::Dataspace>(bufferItem.mDataSpace));
+    mOutput->setCrop(&bufferItem.mCrop);
+    mOutput->setScalingMode(static_cast<int32_t>(bufferItem.mScalingMode));
+    mOutput->setBuffersTransform(bufferItem.mTransform);
+    mOutput->setGenerationNumber(bufferItem.mGraphicBuffer->getGenerationNumber());
+
+    status_t status = mOutput->attachBuffer(bufferItem.mGraphicBuffer.get());
+    ALOGE_IF(status != NO_ERROR, "attaching buffer to output failed (%d)", status);
+    if (status == NO_ERROR) {
+        status = mOutput->queueBuffer(bufferItem.mGraphicBuffer, bufferItem.mFence);
+        ALOGE_IF(status != NO_ERROR, "queueing buffer to output failed (%d)", status);
+    }
+#else
     IGraphicBufferProducer::QueueBufferInput queueInput(
             bufferItem.mTimestamp,
             bufferItem.mIsAutoTimestamp,
@@ -736,6 +755,7 @@ void MediaSync::renderOneBufferItem_l(const BufferItem &bufferItem) {
         status = mOutput->queueBuffer(slot, queueInput, &queueOutput);
         ALOGE_IF(status != NO_ERROR, "queueing buffer to output failed (%d)", status);
     }
+#endif
 
     if (status != NO_ERROR) {
         returnBufferToInput_l(bufferItem.mGraphicBuffer, bufferItem.mFence);
@@ -761,7 +781,7 @@ void MediaSync::renderOneBufferItem_l(const BufferItem &bufferItem) {
     ALOGV("queued buffer %#llx to output", (long long)bufferItem.mGraphicBuffer->getId());
 }
 
-void MediaSync::onBufferReleasedByOutput(sp<IGraphicBufferProducer> &output) {
+void MediaSync::onBufferReleasedByOutput(sp<MediaSurfaceType> &output) {
     Mutex::Autolock lock(mMutex);
 
     if (output != mOutput) {
@@ -906,7 +926,7 @@ void MediaSync::InputListener::binderDied(const wp<IBinder> &/* who */) {
 #endif
 
 MediaSync::OutputListener::OutputListener(const sp<MediaSync> &sync,
-        const sp<IGraphicBufferProducer> &output)
+        const sp<MediaSurfaceType> &output)
       : mSync(sync),
         mOutput(output) {}
 

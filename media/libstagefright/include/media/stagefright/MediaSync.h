@@ -18,6 +18,7 @@
 #define MEDIA_SYNC_H
 
 #include <com_android_graphics_libgui_flags.h>
+#include <gui/Flags.h> // Remove with MediaSurfaceType
 
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
 #include <gui/BufferItemConsumer.h>
@@ -25,6 +26,7 @@
 #include <gui/IConsumerListener.h>
 #endif
 #include <gui/IProducerListener.h>
+#include <gui/Surface.h>
 
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
@@ -84,7 +86,7 @@ public:
 
     // Called when MediaSync is used to render video. It should be called
     // before createInputSurface().
-    status_t setSurface(const sp<IGraphicBufferProducer> &output);
+    status_t setSurface(const sp<MediaSurfaceType> &output);
 
     // Called when audio track is used as media clock source. It should be
     // called before updateQueuedAudioData().
@@ -94,7 +96,7 @@ public:
     // on which the client should render video frames. Those video frames will
     // be internally directed to output surface for rendering at appropriate
     // time.
-    status_t createInputSurface(sp<IGraphicBufferProducer> *outBufferProducer);
+    status_t createInputSurface(sp<MediaSurfaceType> *outSurface);
 
     // Update just-rendered audio data size and the presentation timestamp of
     // the first frame of that audio data. It should be called immediately
@@ -180,12 +182,17 @@ private:
         sp<MediaSync> mSync;
     };
 
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
     // This is a thin wrapper class that lets us listen to
-    // IProducerListener::onBufferReleased from mOutput.
+    // SurfaceListener::onBufferReleased from mOutput.
+    class OutputListener : public StubSurfaceListener,
+                           public IBinder::DeathRecipient {
+#else
     class OutputListener : public BnProducerListener,
                            public IBinder::DeathRecipient {
+#endif
     public:
-        OutputListener(const sp<MediaSync> &sync, const sp<IGraphicBufferProducer> &output);
+        OutputListener(const sp<MediaSync> &sync, const sp<MediaSurfaceType> &output);
         virtual ~OutputListener();
 
         // From IProducerListener
@@ -196,7 +203,7 @@ private:
 
     private:
         sp<MediaSync> mSync;
-        sp<IGraphicBufferProducer> mOutput;
+        sp<MediaSurfaceType> mOutput;
     };
 
     // mIsAbandoned is set to true when the input or output dies.
@@ -213,7 +220,7 @@ private:
 #else
     sp<IGraphicBufferConsumer> mInput;
 #endif
-    sp<IGraphicBufferProducer> mOutput;
+    sp<MediaSurfaceType> mOutput;
     int mUsageFlagsFromOutput;
     uint32_t mMaxAcquiredBufferCount; // max acquired buffer count
     bool mReturnPendingInputFrame;    // set while we are pending before acquiring an input frame
@@ -269,11 +276,11 @@ private:
     // Send |bufferItem| to the output for rendering.
     void renderOneBufferItem_l(const BufferItem &bufferItem);
 
-    // This implements the onBufferReleased callback from IProducerListener.
+    // This implements the onBufferReleased callback from SurfaceListener.
     // It gets called from an OutputListener.
     // During this callback, we detach the buffer from the output, and release
     // it to the input. A blocked onFrameAvailable call will be allowed to proceed.
-    void onBufferReleasedByOutput(sp<IGraphicBufferProducer> &output);
+    void onBufferReleasedByOutput(sp<MediaSurfaceType> &output);
 
     // Return |buffer| back to the input.
     void returnBufferToInput_l(const sp<GraphicBuffer> &buffer, const sp<Fence> &fence);
