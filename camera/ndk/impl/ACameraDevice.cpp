@@ -720,7 +720,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         }
         // Surface sharing cannot be enabled when a camera has been opened
         // in shared mode.
-        if (flags::camera_multi_client() && mSharedMode && outConfig.mIsShared) {
+        if (mSharedMode && outConfig.mIsShared) {
             return ACAMERA_ERROR_INVALID_PARAMETER;
         }
         ParcelableSurfaceType pSurface = flagtools::convertSurfaceTypeToParcelable(surface);
@@ -751,7 +751,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
 
     // If device is opened in shared mode, there can be multiple clients accessing the
     // camera device. So do not wait for idle if the device is opened in shared mode.
-    if ((!flags::camera_multi_client()) || (!mSharedMode)) {
+    if (!mSharedMode) {
         ret = waitUntilIdleLocked();
         if (ret != ACAMERA_OK) {
             ALOGE("Camera device %s wait until idle failed, ret %d", getId(), ret);
@@ -1112,9 +1112,6 @@ void CameraDevice::CallbackHandler::onMessageReceived(
 
         case kWhatClientSharedAccessPriorityChanged:
         {
-            if (!flags::camera_multi_client()) {
-                break;
-            }
             ACameraDevice* dev;
             found = msg->findPointer(kDeviceKey, (void**) &dev);
             if (!found || dev == nullptr) {
@@ -1764,9 +1761,6 @@ binder::Status
 CameraDevice::ServiceCallback::onClientSharedAccessPriorityChanged(bool primaryClient) {
     ALOGV("onClientSharedAccessPriorityChanged received. primaryClient = %d", primaryClient);
     binder::Status ret = binder::Status::ok();
-    if (!flags::camera_multi_client()) {
-        return ret;
-    }
     sp<CameraDevice> dev = mDevice.promote();
     if (dev == nullptr) {
         return ret; // device has been closed
