@@ -86,6 +86,10 @@ apex {
     manifest: "manifest.json",
     defaults: ["com.android.media-defaults"],
     prebuilts: ["current_sdkinfo"],
+    licenses: [
+        "frameworks_av_license",
+        "opensourcerequest",
+    ],
 }
 
 linker_config {
@@ -250,6 +254,10 @@ apex {
     name: "com.android.media.swcodec",
     manifest: "manifest_codec.json",
     defaults: ["com.android.media.swcodec-defaults"],
+    licenses: [
+        "frameworks_av_license",
+        "opensourcerequest",
+    ],
 }
 
 apex_key {
