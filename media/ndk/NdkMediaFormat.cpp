@@ -428,6 +428,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT = "haptic-channel-count
 EXPORT const char* AMEDIAFORMAT_KEY_HDR_STATIC_INFO = "hdr-static-info";
 EXPORT const char* AMEDIAFORMAT_KEY_HDR10_PLUS_INFO = "hdr10-plus-info";
 EXPORT const char* AMEDIAFORMAT_KEY_HEIGHT = "height";
+EXPORT const char* AMEDIAFORMAT_KEY_HORIZONTAL_FLIP = "horizontal-flip";
 EXPORT const char* AMEDIAFORMAT_KEY_ICC_PROFILE = "icc-profile";
 EXPORT const char* AMEDIAFORMAT_KEY_IMPORTANCE = "importance";
 EXPORT const char* AMEDIAFORMAT_KEY_INTRA_REFRESH_PERIOD = "intra-refresh-period";
