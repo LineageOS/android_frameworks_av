@@ -207,15 +207,6 @@ flag {
 }
 
 flag {
-    name: "guard_stream_volume_apis"
-    namespace: "media_audio"
-    description:
-        "Guards getStreamVolume and getStreamMaxVolume APIs with permission."
-    bug: "417787833"
-    is_exported: true
-}
-
-flag {
     name: "hardening_permission_api"
     is_exported: true
     namespace: "media_audio"
