@@ -1115,8 +1115,17 @@ status_t StreamOutHalAidl::setVolume(float left, float right) {
 status_t StreamOutHalAidl::selectPresentation(int presentationId, int programId) {
     TIME_CHECK();
     if (!mStream) return NO_INIT;
-    return statusTFromBinderStatus(
-            serializeCall(mStream, &Stream::selectPresentation, presentationId, programId));
+    if (getAidlInterfaceVersion() <= kAidlVersion3) {
+        // selectPresentation was not used by AudioTrack on <= Android 16 (AIDL v3 launch devices)
+        // and lower. For backwards compatibility, use setParameters which was used.
+        AudioParameter parameters;
+        parameters.addInt(String8(AudioParameter::keyPresentationId), presentationId);
+        parameters.addInt(String8(AudioParameter::keyProgramId), programId);
+        return setParameters(parameters.toString());
+    } else {
+        return statusTFromBinderStatus(
+                serializeCall(mStream, &Stream::selectPresentation, presentationId, programId));
+    }
 }
 
 status_t StreamOutHalAidl::write(const void *buffer, size_t bytes, size_t *written) {

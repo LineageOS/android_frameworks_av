@@ -2985,14 +2985,9 @@ status_t AudioTrack::setParameters(const String8& keyValuePairs)
 status_t AudioTrack::selectPresentation(int presentationId, int programId)
 {
     AutoMutex lock(mLock);
-    AudioParameter param = AudioParameter();
-    param.addInt(String8(AudioParameter::keyPresentationId), presentationId);
-    param.addInt(String8(AudioParameter::keyProgramId), programId);
-    ALOGV("%s(%d): PresentationId/ProgramId[%s]",
-            __func__, mPortId, param.toString().c_str());
-
+    ALOGV("%s(%d): PresentationId:%d ProgramId:%d", __func__, mPortId, presentationId, programId);
     status_t status;
-    mAudioTrack->setParameters(param.toString().c_str(), &status);
+    mAudioTrack->selectPresentation(presentationId, programId, &status);
     return status;
 }
 
