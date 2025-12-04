@@ -70,7 +70,6 @@ cc_binary {
     header_libs: [
         "libmediametrics_headers",
         "libstagefright_headers",
-        "camera_headers",
     ],
 
     shared_libs: [
@@ -79,6 +78,7 @@ cc_binary {
         "liblog",
         "libutils",
         "libbinder",
+        "libcamera_client",
         "libstagefright_foundation",
         "libdatasource",
         "libaudioclient",

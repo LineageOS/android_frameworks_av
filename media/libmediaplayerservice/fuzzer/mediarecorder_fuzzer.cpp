@@ -153,8 +153,11 @@ class TestCamera : public ICamera {
     };
     status_t setVideoBufferMode(int32_t /*videoBufferMode*/) override { return 0; };
     status_t setVideoTarget(const sp<SurfaceType> & /*target*/) override { return 0; };
-    status_t setAudioRestriction(int32_t /*mode*/) override { return 0; };
-    int32_t getGlobalAudioRestriction() override { return 0; };
+    status_t setAudioRestriction(
+            hardware::camera2::ICameraDeviceUser::AudioRestriction /*mode*/) override { return 0; };
+    hardware::camera2::ICameraDeviceUser::AudioRestriction getGlobalAudioRestriction() override {
+        return hardware::camera2::ICameraDeviceUser::AudioRestriction::NONE;
+    };
     IBinder *onAsBinder() override { return reinterpret_cast<IBinder *>(this); };
 };
 

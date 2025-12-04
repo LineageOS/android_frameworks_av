@@ -157,6 +157,10 @@ public:
 
     // notify CameraServiceProxy that watchdog is to be triggered
     void notifyWatchdog(pid_t clientPid, bool isNativePid);
+
+    // notify CameraServiceProxy about sound/vibration/light muting state.
+    void notifyCameraDistractionRestriction(
+            hardware::camera2::ICameraDeviceUser::AudioRestriction mode);
 };
 
 } // android

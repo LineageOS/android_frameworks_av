@@ -211,19 +211,19 @@ public:
         }
     }
 
-    status_t setAudioRestriction(int32_t mode) {
+    status_t setAudioRestriction(camera2::ICameraDeviceUser::AudioRestriction mode) {
         Parcel data, reply;
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
-        data.writeInt32(mode);
+        data.writeInt32(static_cast<int32_t>(mode));
         remote()->transact(SET_AUDIO_RESTRICTION, data, &reply);
         return reply.readInt32();
     }
 
-    int32_t getGlobalAudioRestriction() {
+    camera2::ICameraDeviceUser::AudioRestriction getGlobalAudioRestriction() {
         Parcel data, reply;
         data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
         remote()->transact(GET_GLOBAL_AUDIO_RESTRICTION, data, &reply);
-        return reply.readInt32();
+        return static_cast<camera2::ICameraDeviceUser::AudioRestriction>(reply.readInt32());
     }
 
     status_t setVideoBufferMode(int32_t videoBufferMode)
@@ -584,13 +584,14 @@ status_t BnCamera::onTransact(
 #endif
         case SET_AUDIO_RESTRICTION: {
             CHECK_INTERFACE(ICamera, data, reply);
-            int32_t mode = data.readInt32();
+            auto mode = static_cast<camera2::ICameraDeviceUser::AudioRestriction>(
+                data.readInt32());
             reply->writeInt32(setAudioRestriction(mode));
             return NO_ERROR;
         } break;
         case GET_GLOBAL_AUDIO_RESTRICTION: {
             CHECK_INTERFACE(ICamera, data, reply);
-            reply->writeInt32(getGlobalAudioRestriction());
+            reply->writeInt32(static_cast<int32_t>(getGlobalAudioRestriction()));
             return NO_ERROR;
         } break;
         default:

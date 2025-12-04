@@ -169,8 +169,9 @@ public:
 
             sp<ICameraRecordingProxy> getRecordingProxy();
 
-            status_t     setAudioRestriction(int32_t mode);
-            int32_t      getGlobalAudioRestriction();
+            status_t    setAudioRestriction(
+                                hardware::camera2::ICameraDeviceUser::AudioRestriction mode);
+            hardware::camera2::ICameraDeviceUser::AudioRestriction getGlobalAudioRestriction();
 
     // ICameraClient interface
     virtual void        notifyCallback(int32_t msgType, int32_t ext, int32_t ext2);

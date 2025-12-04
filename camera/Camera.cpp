@@ -276,17 +276,18 @@ status_t Camera::setPreviewCallbackTarget(const sp<SurfaceType>& target) {
     return c->setPreviewCallbackTarget(target);
 }
 
-status_t Camera::setAudioRestriction(int32_t mode)
+status_t Camera::setAudioRestriction(
+        android::hardware::camera2::ICameraDeviceUser::AudioRestriction mode)
 {
     sp <::android::hardware::ICamera> c = mCamera;
     if (c == 0) return NO_INIT;
     return c->setAudioRestriction(mode);
 }
 
-int32_t Camera::getGlobalAudioRestriction()
+android::hardware::camera2::ICameraDeviceUser::AudioRestriction Camera::getGlobalAudioRestriction()
 {
     sp <::android::hardware::ICamera> c = mCamera;
-    if (c == 0) return NO_INIT;
+    if (c == 0) return android::hardware::camera2::ICameraDeviceUser::AudioRestriction::NONE;
     return c->getGlobalAudioRestriction();
 }
 

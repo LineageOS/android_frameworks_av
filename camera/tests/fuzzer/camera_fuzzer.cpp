@@ -303,7 +303,8 @@ void CameraFuzzer::invokeCamera() {
                 [&]() { mCamera->getRecordingProxy(); },
                 [&]() {
                     int32_t mode = mFDP->ConsumeIntegral<int32_t>();
-                    mCamera->setAudioRestriction(mode);
+                    auto arMode = static_cast<camera2::ICameraDeviceUser::AudioRestriction>(mode);
+                    mCamera->setAudioRestriction(arMode);
                 },
                 [&]() { mCamera->getGlobalAudioRestriction(); },
                 [&]() { mCamera->recordingEnabled(); },

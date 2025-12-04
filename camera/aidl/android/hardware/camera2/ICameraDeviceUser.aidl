@@ -208,9 +208,12 @@ interface ICameraDeviceUser
 
     // Keep in sync with public API in
     // frameworks/base/core/java/android/hardware/camera2/CameraDevice.java
-    const int AUDIO_RESTRICTION_NONE = 0;
-    const int AUDIO_RESTRICTION_VIBRATION = 1;
-    const int AUDIO_RESTRICTION_VIBRATION_SOUND = 3;
+    @Backing(type="int")
+    enum AudioRestriction {
+        NONE = 0,
+        VIBRATION = 1,
+        VIBRATION_SOUND = 3
+    }
 
     /**
       * Set audio restriction mode for this camera device.
@@ -218,14 +221,14 @@ interface ICameraDeviceUser
       * @param mode the audio restriction mode ID as above
       *
       */
-    void setCameraAudioRestriction(int mode);
+    void setCameraAudioRestriction(AudioRestriction mode);
 
     /**
       * Get global audio restriction mode for all camera clients.
       *
       * @return the currently applied system-wide audio restriction mode
       */
-    int getGlobalAudioRestriction();
+    AudioRestriction getGlobalAudioRestriction();
 
     /**
      * Offline processing main entry point

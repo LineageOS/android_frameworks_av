@@ -98,6 +98,7 @@ cc_defaults {
         "com.android.window.flags.window-aconfig_flags_c_lib",
         "media_permission-aidl-cpp",
         "process_info_service_aidl-cpp",
+        "lights_flags_cc_lib",
     ],
 
     static_libs: [

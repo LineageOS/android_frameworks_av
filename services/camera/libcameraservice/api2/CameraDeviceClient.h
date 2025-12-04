@@ -181,14 +181,14 @@ public:
     virtual binder::Status finalizeOutputConfigurations(int32_t streamId,
             const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
 
-    virtual binder::Status setCameraAudioRestriction(int32_t mode) override;
+    virtual binder::Status setCameraAudioRestriction(AudioRestriction mode) override;
 
     virtual binder::Status getCaptureResultMetadataQueue(
           android::hardware::common::fmq::MQDescriptor<
           int8_t, android::hardware::common::fmq::SynchronizedReadWrite>*
           aidl_return) override;
 
-    virtual binder::Status getGlobalAudioRestriction(/*out*/int32_t* outMode) override;
+    virtual binder::Status getGlobalAudioRestriction(/*out*/AudioRestriction* outMode) override;
 
     virtual binder::Status switchToOffline(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,

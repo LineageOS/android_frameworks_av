@@ -81,8 +81,10 @@ public:
     virtual void            notifyError(int32_t errorCode,
                                         const CaptureResultExtras& resultExtras);
     virtual status_t        setVideoTarget(const sp<SurfaceType>& target);
-    virtual status_t        setAudioRestriction(int mode);
-    virtual int32_t         getGlobalAudioRestriction();
+    virtual status_t        setAudioRestriction(
+                                    hardware::camera2::ICameraDeviceUser::AudioRestriction mode);
+    virtual hardware::camera2::ICameraDeviceUser::AudioRestriction
+                            getGlobalAudioRestriction();
     virtual status_t        setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal = false);
     virtual status_t        setAutoframingOverride(uint8_t autoframingMode);
 

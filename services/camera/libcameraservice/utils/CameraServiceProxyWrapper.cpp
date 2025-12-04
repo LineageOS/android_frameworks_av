@@ -569,4 +569,20 @@ void CameraServiceProxyWrapper::notifyWatchdog(pid_t clientPid, bool isNativePid
     }
 }
 
+void CameraServiceProxyWrapper::notifyCameraDistractionRestriction(
+        hardware::camera2::ICameraDeviceUser::AudioRestriction mode) {
+    sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
+    if (proxyBinder == nullptr) {
+        ALOGW("%s: ICameraServiceProxy is null!", __FUNCTION__);
+        return;
+    }
+
+    auto status = proxyBinder->notifyCameraDistractionRestriction(mode);
+    if (!status.isOk()) {
+        ALOGE("%s: Failed calling notifyCameraDistrctionRestriction: %s", __FUNCTION__,
+                status.exceptionMessage().c_str());
+    }
+}
+
+
 }  // namespace android

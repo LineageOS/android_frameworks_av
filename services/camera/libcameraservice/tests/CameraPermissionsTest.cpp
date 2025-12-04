@@ -35,6 +35,7 @@
 using namespace android;
 using namespace android::hardware::camera;
 using android::hardware::camera2::CameraMetadataInfo;
+using android::hardware::camera2::ICameraDeviceUser;
 
 // Empty service listener.
 class TestCameraServiceListener : public hardware::BnCameraServiceListener {
@@ -174,6 +175,11 @@ public:
 
     virtual binder::Status notifyWatchdog(int pid, bool isNative) override {
         return mCameraServiceProxy->notifyWatchdog(pid, isNative);
+    }
+
+    virtual binder::Status notifyCameraDistractionRestriction(
+            ICameraDeviceUser::AudioRestriction mode) {
+        return mCameraServiceProxy->notifyCameraDistractionRestriction(mode);
     }
 
     void setCameraDisabled(bool cameraDisabled) {
