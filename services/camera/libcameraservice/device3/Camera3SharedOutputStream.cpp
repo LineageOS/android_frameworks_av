@@ -279,9 +279,12 @@ status_t Camera3SharedOutputStream::configureQueueLocked() {
     }
 
     // Set buffer transform for all configured surfaces
+    size_t index = 0;
     for (const auto& surfaceUniqueId : mSurfaceUniqueIds) {
         const sp<Surface>& surface = surfaceUniqueId.mSurfaceHolder.mSurface;
-        int surfaceId = surfaceUniqueId.mId;
+        // Note: The surfaceId we pass out to StreamSplitter is the index of
+        // mSurfaceUniqueIds, not the uniqueId.
+        int surfaceId = index++;
         int32_t transform = surfaceUniqueId.mTransform;
         if (transform == -1 || surface == nullptr) {
             continue;
