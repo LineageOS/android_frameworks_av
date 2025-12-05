@@ -279,7 +279,7 @@ flag {
   name: "temporal_layer_encoding"
   namespace: "codec_fwk"
   description: "Feature flag for temporal layer encoding"
-  bug: "379746567"
+  bug: "432558680"
 }
 
 flag {
