@@ -48,7 +48,6 @@ prebuilt_etc {
 cc_library_shared {
     name: "liberaser",
     srcs: [
-        ":effectCommonFile",
         "Classifier.cpp",
         "Eraser.cpp",
         "EraserContext.cpp",
