@@ -592,15 +592,44 @@ void ResourceManagerMetrics::pushReclaimAtom(const ClientInfoParcel& clientInfo,
     }
 }
 
+inline void fillResourceVectors(
+        const std::vector<MediaResourceParcel>& resources,
+        std::vector<int32_t>& ids,
+        std::vector<int32_t>& values,
+        size_t maxElements = kMaxElements) {
+
+    ids.clear();
+    values.clear();
+    ids.reserve(resources.size());
+    values.reserve(resources.size());
+
+    // To limit the number of resources added to the metric atom, use this
+    // counter. Once this exceeds maxElements, end the loop.
+    size_t items = 1;
+    for (const auto& res : resources) {
+        ids.push_back(static_cast<int32_t>(res.type));
+        values.push_back(res.value);
+        if (++items > maxElements) {
+            break;
+        }
+    }
+}
+
 void ResourceManagerMetrics::pushResourceStatusAtom(
         const ClientInfoParcel& clientInfo,
         bool isCodecStarted,
         bool isResourcesAvailable,
         bool doesResourceTrackingMatch,
-        const std::string& resourcesAvailableInfo,
-        const std::string& resourcesInRequestInfo) {
-    (void)resourcesAvailableInfo;
-    (void)resourcesInRequestInfo;
+        const std::vector<MediaResourceParcel>& resourcesAvailable,
+        const std::vector<MediaResourceParcel>& resourcesInRequest) {
+
+    // Log resource info as two parallel vectors 2.
+    std::vector<int32_t> availableResIDs;
+    std::vector<int32_t> availableResValues;
+    std::vector<int32_t> inRequestResIDs;
+    std::vector<int32_t> inRequestResValues;
+    fillResourceVectors(resourcesAvailable, availableResIDs, availableResValues);
+    fillResourceVectors(resourcesInRequest, inRequestResIDs, inRequestResValues);
 
     // Track these metrics.
     ++mTotalResourceTrackedEvents;
@@ -608,9 +637,6 @@ void ResourceManagerMetrics::pushResourceStatusAtom(
         ++mTotalSuccessfulResourceTracking;
     }
 
-    // TODO: Extend this Atom to add:
-    // - Currently available resources: resourcesAvailableInfo
-    // - Resource in request (to add or reclaim): resourcesInRequestInfo
     int result = stats_write(
         MEDIA_CODEC_RESOURCE_TRACKED,
         clientInfo.id,
@@ -618,7 +644,9 @@ void ResourceManagerMetrics::pushResourceStatusAtom(
         isResourcesAvailable,
         mTotalResourceTrackedEvents,
         mTotalSuccessfulResourceTracking,
-        clientInfo.name.c_str());
+        clientInfo.name.c_str(),
+        availableResIDs, availableResValues,
+        inRequestResIDs, inRequestResValues);
 
     std::ostringstream logMsg;
     logMsg << "MEDIA_CODEC_RESOURCE_TRACKED Atom Pushed with"
