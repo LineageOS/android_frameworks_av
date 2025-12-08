@@ -437,8 +437,10 @@ status_t StreamOutHalHidl::setVolume(float left, float right) {
     return processReturn("setVolume", mStream->setVolume(left, right));
 }
 
-#if MAJOR_VERSION == 2
 status_t StreamOutHalHidl::selectPresentation(int presentationId, int programId) {
+    // Do not use selectPresentation as AudioTrack client was not updated during <= Android 16 to
+    // use this method, but used setParameters only. Retain backwards compatibility (some HIDL HALs
+    // may not implement selectPresentation).
     TIME_CHECK();
     if (mStream == 0) return NO_INIT;
     std::vector<ParameterValue> parameters;
@@ -448,14 +450,6 @@ status_t StreamOutHalHidl::selectPresentation(int presentationId, int programId)
     parametersToHal(hidl_vec<ParameterValue>(parameters), &halParameters);
     return setParameters(halParameters);
 }
-#elif MAJOR_VERSION >= 4
-status_t StreamOutHalHidl::selectPresentation(int presentationId, int programId) {
-    TIME_CHECK();
-    if (mStream == 0) return NO_INIT;
-    return processReturn("selectPresentation",
-            mStream->selectPresentation(presentationId, programId));
-}
-#endif
 
 status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *written) {
     // TIME_CHECK();  // TODO(b/243839867) reenable only when optimized.

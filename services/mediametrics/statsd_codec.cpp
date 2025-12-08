@@ -30,6 +30,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <android_media_codec.h>
+
 #include <stats_media_metrics.h>
 #include <stats_event.h>
 
@@ -666,6 +668,22 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
         metrics_proto.set_pixel_format(pixelFormat);
     }
     AStatsEvent_writeInt64(event, pixelFormat);
+
+    if (android::media::codec::provider_->retry_decrypt_for_hdcp_failure()) {
+        int32_t retryHdcpSuccessCount = -1;
+        if (item->getInt32(
+                "android.media.mediacodec.retry-hdcp-success-count", &retryHdcpSuccessCount)) {
+            metrics_proto.set_retry_hdcp_success_count(retryHdcpSuccessCount);
+        }
+        AStatsEvent_writeInt32(event, retryHdcpSuccessCount);
+
+        int32_t retryHdcpFailureCount = -1;
+        if (item->getInt32(
+                "android.media.mediacodec.retry-hdcp-failure-count", &retryHdcpFailureCount)) {
+            metrics_proto.set_retry_hdcp_failure_count(retryHdcpFailureCount);
+        }
+        AStatsEvent_writeInt32(event, retryHdcpFailureCount);
+    }
 
     int64_t firstRenderTimeUs = -1;
     item->getInt64("android.media.mediacodec.first-render-time-us", &firstRenderTimeUs);

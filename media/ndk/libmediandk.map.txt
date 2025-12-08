@@ -115,7 +115,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_CSD_2; # var introduced=28
     AMEDIAFORMAT_KEY_CSD_AVC; # var introduced=29
     AMEDIAFORMAT_KEY_CSD_HEVC; # var introduced=29
-    AMEDIAFORMAT_KEY_CSD_VVC; # var introduced=37
+    AMEDIAFORMAT_KEY_CSD_VVC; # var introduced=37 llndk systemapi
     AMEDIAFORMAT_KEY_D263; # var introduced=29
     AMEDIAFORMAT_KEY_DATE; # var introduced=29
     AMEDIAFORMAT_KEY_DISCNUMBER; # var introduced=29

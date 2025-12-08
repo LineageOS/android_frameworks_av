@@ -80,7 +80,6 @@ cc_library_shared {
     name: "libdynamicsprocessingaidl",
 
     srcs: [
-        ":effectCommonFile",
         "aidl/DynamicsProcessing.cpp",
         "aidl/DynamicsProcessingContext.cpp",
     ],

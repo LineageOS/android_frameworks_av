@@ -262,13 +262,14 @@ AudioTrack::AudioTrack(
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed,
-        audio_port_handle_t selectedDeviceId)
+        audio_port_handle_t selectedDeviceId,
+        const std::string& codecProvenance)
 {
     mSetParams = std::make_unique<SetParams>(
         streamType, sampleRate, format, channelMask, frameCount, flags, callback,
         notificationFrames, nullptr /*sharedBuffer*/, false /*threadCanCallJava*/,
         sessionId, transferType, offloadInfo, attributionSource, pAttributes,
-        doNotReconnect, maxRequiredSpeed, selectedDeviceId);
+        doNotReconnect, maxRequiredSpeed, selectedDeviceId, codecProvenance);
 }
 
 AudioTrack::AudioTrack(
@@ -294,7 +295,8 @@ AudioTrack::AudioTrack(
             new SetParams{streamType, sampleRate, format, channelMask, 0 /*frameCount*/, flags,
                           callback, notificationFrames, sharedBuffer, false /*threadCanCallJava*/,
                           sessionId, transferType, offloadInfo, attributionSource, pAttributes,
-                          doNotReconnect, maxRequiredSpeed, AUDIO_PORT_HANDLE_NONE}};
+                          doNotReconnect, maxRequiredSpeed, AUDIO_PORT_HANDLE_NONE,
+                          "" /*codecProvenance*/}};
 }
 
 void AudioTrack::onFirstRef() {
@@ -377,7 +379,8 @@ status_t AudioTrack::set(
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed,
-        audio_port_handle_t selectedDeviceId)
+        audio_port_handle_t selectedDeviceId,
+        const std::string& codecProvenance)
 {
     LOG_ALWAYS_FATAL_IF(mInitialized, "%s: should not be called twice", __func__);
     mInitialized = true;
@@ -413,6 +416,7 @@ status_t AudioTrack::set(
     mOriginalSampleRate = sampleRate;
     mAttributes = pAttributes != nullptr ? *pAttributes : AUDIO_ATTRIBUTES_INITIALIZER;
     mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
+    mCodecProvenance = codecProvenance;
 
     // update format and flags before storing them in mFormat, mOrigFlags and mFlags
     if (pAttributes != NULL) {
@@ -2985,14 +2989,9 @@ status_t AudioTrack::setParameters(const String8& keyValuePairs)
 status_t AudioTrack::selectPresentation(int presentationId, int programId)
 {
     AutoMutex lock(mLock);
-    AudioParameter param = AudioParameter();
-    param.addInt(String8(AudioParameter::keyPresentationId), presentationId);
-    param.addInt(String8(AudioParameter::keyProgramId), programId);
-    ALOGV("%s(%d): PresentationId/ProgramId[%s]",
-            __func__, mPortId, param.toString().c_str());
-
+    ALOGV("%s(%d): PresentationId:%d ProgramId:%d", __func__, mPortId, presentationId, programId);
     status_t status;
-    mAudioTrack->setParameters(param.toString().c_str(), &status);
+    mAudioTrack->selectPresentation(presentationId, programId, &status);
     return status;
 }
 
@@ -3483,8 +3482,8 @@ status_t AudioTrack::dump(int fd, const Vector<String16>& args __unused) const
     result.appendFormat("  stream type(%d), left - right volume(%f, %f)\n",
                             mStreamType,
                         mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
-    result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u)\n",
-                  mFormat, mChannelMask, mChannelCount);
+    result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u), codec(%s)\n",
+                  mFormat, mChannelMask, mChannelCount, mCodecProvenance.c_str());
     result.appendFormat("  sample rate(%u), original sample rate(%u), speed(%f)\n",
                   mSampleRate, mOriginalSampleRate, mPlaybackRate.mSpeed);
     result.appendFormat("  frame count(%zu), req. frame count(%zu)\n",

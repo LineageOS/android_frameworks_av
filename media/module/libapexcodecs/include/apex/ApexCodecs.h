@@ -17,7 +17,6 @@
 #pragma once
 
 #include <sys/cdefs.h>
-#include <sys/types.h>
 #include <errno.h>
 #include <stdint.h>
 
@@ -240,61 +239,6 @@ ApexCodec_Status ApexCodec_Component_flush(
  */
 ApexCodec_Status ApexCodec_Component_reset(
         ApexCodec_Component *_Nonnull comp) __INTRODUCED_IN(36);
-
-/**
- * Function pointer to memory mapping. Follows the signature of mmap.
- */
-typedef void *_Nullable(*_Nullable ApexCodec_MapFn)(
-        void *_Nullable addr, size_t length, int prot, int flags, int fd, off_t offset);
-/**
- * Function pointer to memory unmapping. Follows the signature of munmap.
- */
-typedef int (*_Nullable ApexCodec_UnmapFn)(void *_Nullable addr, size_t length);
-
-/**
- * Get a function pointer to a function that can map shared memory into the
- * calling process's address space.
- *
- * This is used by the framework to handle memory buffers when codecs are running
- * under sandboxing mechanisms such as LFI (Lightweight Fault Isolation).
- * In such cases, the mapping needs to have an address in the specific sandboxed
- * region for the sandboxed library to access the pointer.
- *
- * The returned function pointer has a signature and behavior similar to mmap().
- * On error, it returns MAP_FAILED (-1) and sets errno to indicate the error.
- *
- * The lifetime of the mapping is managed by the framework. A buffer mapped
- * using the returned function should be unmapped using the function returned by
- * ApexCodec_GetUnmapFn() once the buffer is no longer in use (e.g., after it
- * has been processed and returned by the component).
- *
- * \param store the component store
- * \param componentName the name of the component
- * \return a function pointer for mapping memory, or nullptr if not available.
- */
-ApexCodec_MapFn ApexCodec_GetMapFn(
-        ApexCodec_ComponentStore *_Nonnull store,
-        const char *_Nonnull componentName) __INTRODUCED_IN(37);
-
-/**
- * Get a function pointer to a function that can unmap shared memory from the
- * calling process's address space.
- *
- * This is used by the framework to release memory mappings that were created
- * using the function returned by ApexCodec_GetMapFn(). This is necessary when
- * codecs are running in an in-process sandboxed environment.
- *
- * The returned function pointer has a signature and behavior similar to munmap().
- * The |addr| and |length| parameters must correspond to a mapping previously
- * created by the map function.
- *
- * \param store the component store
- * \param componentName the name of the component
- * \return a function pointer for unmapping memory, or nullptr if not available.
- */
-ApexCodec_UnmapFn ApexCodec_GetUnmapFn(
-        ApexCodec_ComponentStore *_Nonnull store,
-        const char *_Nonnull componentName) __INTRODUCED_IN(37);
 
 /**
  * An opaque struct that represents a configurable part of the component.

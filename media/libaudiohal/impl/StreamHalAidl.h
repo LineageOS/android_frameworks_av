@@ -95,6 +95,7 @@ class StreamContextAidl {
     bool hasClipTransitionSupport() const { return mHasClipTransitionSupport; }
     void updateMmapBufferDescriptor(
             ::aidl::android::hardware::audio::core::MmapBufferDescriptor&& desc) {
+        mBufferSizeFrames = desc.sharedMemory.size / mFrameSizeBytes;
         mMmapBufferDescriptor = std::move(desc); }
 
   private:
@@ -303,6 +304,8 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
 
     status_t parseAndGetVendorParameters(const AudioParameter& parameterKeys, String8* values);
     status_t parseAndSetVendorParameters(const AudioParameter& parameters);
+
+    int32_t getAidlInterfaceVersion() const { return mAidlInterfaceVersion; }
 
     const bool mIsInput;
     const audio_config_base_t mConfig;

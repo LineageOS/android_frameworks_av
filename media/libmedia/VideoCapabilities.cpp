@@ -1020,8 +1020,8 @@ void VideoCapabilities::updateLimits() {
             mBlockCountRange.lower() * (int64_t)mFrameRateRange.lower(),
             mBlockCountRange.upper() * (int64_t)mFrameRateRange.upper());
     mFrameRateRange = mFrameRateRange.intersect(
-            (int32_t)(mBlocksPerSecondRange.lower()
-                    / mBlockCountRange.upper()),
+            (int32_t)std::ceil(mBlocksPerSecondRange.lower()
+                    / (double)mBlockCountRange.upper()),
             (int32_t)(mBlocksPerSecondRange.upper()
                     / (double)mBlockCountRange.lower()));
 }

@@ -26,7 +26,6 @@
 #include <C2PlatformSupport.h>
 
 #include <android_media_codec.h>
-#include <android/fdsan.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <ui/Fence.h>
 #include <ui/GraphicBuffer.h>
@@ -59,14 +58,11 @@ public:
     ~QueueThread() override = default;
     void queue(
             const std::shared_ptr<Codec2Client::Component> &comp,
-            int fenceFd,
-            std::unique_ptr<C2Work> &&work,
-            android::base::unique_fd &&fd0,
-            android::base::unique_fd &&fd1) {
+            android::base::unique_fd &&fence,
+            std::unique_ptr<C2Work> &&work) {
         Mutexed<Jobs>::Locked jobs(mJobs);
         auto it = jobs->queues.try_emplace(comp, comp).first;
-        it->second.workList.emplace_back(
-                std::move(work), fenceFd, std::move(fd0), std::move(fd1));
+        it->second.workList.emplace_back(std::move(work), std::move(fence));
         jobs->cond.broadcast();
     }
 
@@ -113,13 +109,10 @@ protected:
                     continue;
                 }
                 std::list<std::unique_ptr<C2Work>> items;
-                std::vector<int> fenceFds;
-                std::vector<android::base::unique_fd> uniqueFds;
+                std::list<android::base::unique_fd> fences;
                 while (!queue.workList.empty()) {
                     items.push_back(std::move(queue.workList.front().work));
-                    fenceFds.push_back(queue.workList.front().fenceFd);
-                    uniqueFds.push_back(std::move(queue.workList.front().fd0));
-                    uniqueFds.push_back(std::move(queue.workList.front().fd1));
+                    fences.push_back(std::move(queue.workList.front().fence));
                     queue.workList.pop_front();
                 }
                 for (const std::unique_ptr<C2Param> &param : jobs->configUpdate) {
@@ -127,15 +120,13 @@ protected:
                 }
 
                 jobs.unlock();
-                for (int fenceFd : fenceFds) {
-                    sp<Fence> fence(new Fence(fenceFd));
+                while(!fences.empty()) {
+                    sp<Fence> fence(new Fence(fences.front().release()));
                     fence->waitForever(LOG_TAG);
+                    fences.pop_front();
                 }
                 queue.lastQueuedTimestampNs = nowNs;
                 comp->queue(&items);
-                for (android::base::unique_fd &ufd : uniqueFds) {
-                    (void)ufd.release();
-                }
                 jobs.lock();
 
                 it = jobs->queues.upper_bound(comp);
@@ -154,22 +145,11 @@ protected:
 
 private:
     struct WorkFence {
-        WorkFence(std::unique_ptr<C2Work> &&w, int fd) : work(std::move(w)), fenceFd(fd) {}
-
-        WorkFence(
-                std::unique_ptr<C2Work> &&w,
-                int fd,
-                android::base::unique_fd &&uniqueFd0,
-                android::base::unique_fd &&uniqueFd1)
-            : work(std::move(w)),
-              fenceFd(fd),
-              fd0(std::move(uniqueFd0)),
-              fd1(std::move(uniqueFd1)) {}
+        WorkFence(std::unique_ptr<C2Work> &&w, android::base::unique_fd &&uniqueFence)
+            : work(std::move(w)), fence(std::move(uniqueFence)) {}
 
         std::unique_ptr<C2Work> work;
-        int fenceFd;
-        android::base::unique_fd fd0;
-        android::base::unique_fd fd1;
+        android::base::unique_fd fence;
     };
     struct Queue {
         Queue(const std::shared_ptr<Codec2Client::Component> &comp)
@@ -195,7 +175,6 @@ C2NodeImpl::C2NodeImpl(const std::shared_ptr<Codec2Client::Component> &comp, boo
     : mComp(comp), mFrameIndex(0), mWidth(0), mHeight(0), mUsage(0),
       mAdjustTimestampGapUs(0), mFirstInputFrame(true),
       mQueueThread(new QueueThread), mAidlHal(aidl) {
-    android_fdsan_set_error_level(ANDROID_FDSAN_ERROR_LEVEL_WARN_ALWAYS);
     mQueueThread->run("C2NodeImpl", PRIORITY_AUDIO);
 
     android_dataspace ds = HAL_DATASPACE_UNKNOWN;
@@ -209,7 +188,6 @@ C2NodeImpl::~C2NodeImpl() {
 
 status_t C2NodeImpl::freeNode() {
     mComp.reset();
-    android_fdsan_set_error_level(ANDROID_FDSAN_ERROR_LEVEL_WARN_ONCE);
     return mQueueThread->requestExitAndWait();
 }
 
@@ -283,6 +261,7 @@ status_t C2NodeImpl::setAidlInputSurface(
 status_t C2NodeImpl::submitBuffer(
         uint32_t buffer, const sp<GraphicBuffer> &graphicBuffer,
         uint32_t flags, int64_t timestamp, int fenceFd) {
+    android::base::unique_fd fence(fenceFd); // fenceFd is owned here
     std::shared_ptr<Codec2Client::Component> comp = mComp.lock();
     if (!comp) {
         return NO_INIT;
@@ -292,7 +271,6 @@ status_t C2NodeImpl::submitBuffer(
             ? C2FrameData::FLAG_END_OF_STREAM : 0;
     std::shared_ptr<C2GraphicBlock> block;
 
-    android::base::unique_fd fd0, fd1;
     C2Handle *handle = nullptr;
     if (graphicBuffer) {
         std::shared_ptr<C2GraphicAllocation> alloc;
@@ -303,19 +281,8 @@ status_t C2NodeImpl::submitBuffer(
                 graphicBuffer->format,
                 graphicBuffer->usage,
                 graphicBuffer->stride);
-        if (handle != nullptr) {
-            // unique_fd takes ownership of the fds, we'll get warning if these
-            // fds get closed by somebody else. Onwership will be released before
-            // we return, so that the fds get closed as usually when this function
-            // goes out of scope (when both items and block are gone).
-            native_handle_t *nativeHandle = reinterpret_cast<native_handle_t*>(handle);
-            fd0.reset(nativeHandle->numFds > 0 ? nativeHandle->data[0] : -1);
-            fd1.reset(nativeHandle->numFds > 1 ? nativeHandle->data[1] : -1);
-        }
         c2_status_t err = mAllocator->priorGraphicAllocation(handle, &alloc);
         if (err != OK) {
-            (void)fd0.release();
-            (void)fd1.release();
             native_handle_close(handle);
             native_handle_delete(handle);
             return UNKNOWN_ERROR;
@@ -378,7 +345,7 @@ status_t C2NodeImpl::submitBuffer(
         Mutexed<BuffersTracker>::Locked buffers(mBuffersTracker);
         buffers->mIdsInUse.emplace(work->input.ordinal.frameIndex.peeku(), buffer);
     }
-    mQueueThread->queue(comp, fenceFd, std::move(work), std::move(fd0), std::move(fd1));
+    mQueueThread->queue(comp, std::move(fence), std::move(work));
 
     return OK;
 }

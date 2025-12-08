@@ -19,6 +19,7 @@ package android.hardware;
 import android.hardware.CameraFeatureCombinationStats;
 import android.hardware.CameraSessionStats;
 import android.hardware.CameraExtensionSessionStats;
+import android.hardware.camera2.ICameraDeviceUser;
 
 /**
  * Binder interface for the camera service proxy running in system_server.
@@ -69,4 +70,11 @@ interface ICameraServiceProxy
      * Notify a cameraserver watchdog.
      */
     oneway void notifyWatchdog(int /* pid_t */ pid, boolean isNative);
+
+    /**
+     * Notify about sound/vibration/light muting state. Will be
+     * invoked when camera-using applications call CameraDevice.setAudioRestrction
+     * and subsequently when they close active camera sessions for cleanup.
+     */
+    oneway void notifyCameraDistractionRestriction(ICameraDeviceUser.AudioRestriction mode);
 }

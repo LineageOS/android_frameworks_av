@@ -21,7 +21,7 @@ flag {
     namespace: "media_audio"
     description: "Reflag API checking AMSCO availability to separate from implementation"
     bug: "460462656"
-    # is_exported: true
+    is_exported: true
 }
 
 flag {
@@ -88,7 +88,7 @@ flag {
     namespace: "media_audio"
     description: "Add API to specify the original codec for an audio track."
     bug: "447704057"
-    # is_exported: true
+    is_exported: true
 }
 
 flag {

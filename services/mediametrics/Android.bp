@@ -56,7 +56,7 @@ tidy_errors = [
 
     // Remove some pedantic stylistic requirements.
     "-google-readability-casting", // C++ casts not always necessary and may be verbose
-    "-google-readability-todo",    // do not require TODO(info)
+    "-google-readability-todo", // do not require TODO(info)
 
     "-bugprone-unhandled-self-assignment", // found in TimeMachine.h
     "-bugprone-suspicious-string-compare", // found in TimeMachine.h
@@ -93,7 +93,7 @@ cc_defaults {
     tidy_checks: tidy_errors,
     tidy_checks_as_errors: tidy_errors,
     tidy_flags: [
-      "-format-style=file",
+        "-format-style=file",
     ],
 }
 
@@ -159,6 +159,7 @@ cc_library {
     },
 
     shared_libs: [
+        "android.media.codec-aconfig-cc",
         "libaudioutils",
         "libbase", // android logging
         "libbinder",

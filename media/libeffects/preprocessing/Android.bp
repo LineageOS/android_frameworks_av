@@ -64,7 +64,6 @@ cc_library {
 cc_library_shared {
     name: "libpreprocessingaidl",
     srcs: [
-        ":effectCommonFile",
         "aidl/EffectPreProcessing.cpp",
         "aidl/PreProcessingContext.cpp",
     ],

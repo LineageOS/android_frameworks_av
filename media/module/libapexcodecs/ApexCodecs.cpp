@@ -33,8 +33,6 @@
 #include <apex/ApexCodecsImpl.h>
 #include <apex/ApexCodecsParam.h>
 
-#include <sys/mman.h>
-
 using ::android::apexcodecs::ApexComponentIntf;
 using ::android::apexcodecs::ApexComponentStoreIntf;
 using ::android::apexcodecs::ApexConfigurableIntf;
@@ -153,6 +151,7 @@ struct ApexCodec_Component {
         return mComponent->process(input, output, consumed, produced);
     }
 
+
 private:
     std::unique_ptr<ApexComponentIntf> mComponent;
     std::unique_ptr<ApexCodec_Configurable> mConfigurable;
@@ -198,14 +197,6 @@ struct ApexCodec_ComponentStore {
             return nullptr;
         }
         return mStore->getParamReflector();
-    }
-
-    ApexCodec_MapFn getMapFn(const char *name) const {
-        return mStore->getMapFn(name);
-    }
-
-    ApexCodec_UnmapFn getUnmapFn(const char *name) const {
-        return mStore->getUnmapFn(name);
     }
 
 private:
@@ -276,24 +267,6 @@ ApexCodec_Status ApexCodec_Component_reset(ApexCodec_Component *comp) {
         return APEXCODEC_STATUS_BAD_VALUE;
     }
     return comp->reset();
-}
-
-ApexCodec_MapFn ApexCodec_GetMapFn(
-        ApexCodec_ComponentStore *_Nonnull store,
-        const char *_Nonnull componentName) {
-    if (store == nullptr || componentName == nullptr) {
-        return ::mmap;
-    }
-    return store->getMapFn(componentName);
-}
-
-ApexCodec_UnmapFn ApexCodec_GetUnmapFn(
-        ApexCodec_ComponentStore *_Nonnull store,
-        const char *_Nonnull componentName) {
-    if (store == nullptr || componentName == nullptr) {
-        return ::munmap;
-    }
-    return store->getUnmapFn(componentName);
 }
 
 ApexCodec_Configurable *ApexCodec_Component_getConfigurable(

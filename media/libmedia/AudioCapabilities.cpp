@@ -26,6 +26,25 @@
 
 namespace android {
 
+// Merges one sorted vector into another without duplicates.
+static std::vector<int32_t> MergeSortedVectorsAndRemoveDuplicates(std::vector<int32_t> &one,
+        std::vector<int32_t> &another) {
+    std::set<int32_t> res;
+    res.insert(one.begin(), one.end());
+    res.insert(another.begin(), another.end());
+    return std::vector<int32_t>(res.begin(), res.end());
+}
+
+static std::vector<Range<int32_t>> ConvertDiscreateSampleRatesToRanges(
+        std::vector<int32_t> &rates) {
+    std::vector<Range<int32_t>> sampleRateRanges;
+    std::sort(rates.begin(), rates.end());
+    for (int32_t rate : rates) {
+        sampleRateRanges.push_back(Range<int32_t>(rate, rate));
+    }
+    return sampleRateRanges;
+}
+
 const Range<int32_t>& AudioCapabilities::getBitrateRange() const {
     return mBitrateRange;
 }
@@ -86,7 +105,7 @@ void AudioCapabilities::init(std::string mediaType, std::vector<ProfileLevel> pr
 }
 
 void AudioCapabilities::initWithPlatformLimits() {
-    mBitrateRange = Range<int32_t>(0, INT32_MAX);
+    mBitrateRange = Range<int32_t>(1, INT32_MAX);
     mInputChannelRanges.push_back(Range<int32_t>(1, MAX_INPUT_CHANNEL_COUNT));
 
     const int32_t minSampleRate = base::GetIntProperty("ro.mediacodec.min_sample_rate", 7350);
@@ -149,9 +168,9 @@ void AudioCapabilities::limitSampleRates(std::vector<Range<int32_t>> rateRanges)
 
 void AudioCapabilities::applyLevelLimits() {
     std::vector<int32_t> sampleRates;
-    std::optional<Range<int32_t>> sampleRateRange;
+    std::vector<Range<int32_t>> sampleRateRanges;
     std::optional<Range<int32_t>> bitRates;
-    int32_t maxChannels = MAX_INPUT_CHANNEL_COUNT;
+    int32_t maxChannels = 1;
 
     // const char *mediaType = mMediaType.c_str();
     if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_MPEG)) {
@@ -180,18 +199,18 @@ void AudioCapabilities::applyLevelLimits() {
         maxChannels = 48;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_VORBIS)) {
         bitRates = Range<int32_t>(32000, 500000);
-        sampleRateRange = Range<int32_t>(8000, 192000);
+        sampleRateRanges = { Range<int32_t>(8000, 192000) };
         maxChannels = 255;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_OPUS)) {
         bitRates = Range<int32_t>(6000, 510000);
         sampleRates = { 8000, 12000, 16000, 24000, 48000 };
         maxChannels = 255;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_RAW)) {
-        sampleRateRange = Range<int32_t>(1, 192000);
+        sampleRateRanges = { Range<int32_t>(1, 192000) };
         bitRates = Range<int32_t>(1, 10000000);
         maxChannels = MAX_NUM_CHANNELS;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_FLAC)) {
-        sampleRateRange = Range<int32_t>(1, 655350);
+        sampleRateRanges = { Range<int32_t>(1, 655350) };
         // lossless codec, so bitrate is ignored
         maxChannels = 255;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_G711_ALAW)
@@ -199,6 +218,7 @@ void AudioCapabilities::applyLevelLimits() {
         sampleRates = { 8000 };
         bitRates = Range<int32_t>(64000, 64000);
         // platform allows multiple channels for this format
+        maxChannels = MAX_INPUT_CHANNEL_COUNT;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_MSGSM)) {
         sampleRates = { 8000 };
         bitRates = Range<int32_t>(13000, 13000);
@@ -221,68 +241,82 @@ void AudioCapabilities::applyLevelLimits() {
         maxChannels = 6;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_DTS_HD)) {
         for (ProfileLevel profileLevel: mProfileLevels) {
+            std::vector<int32_t> SR;
+            Range<int32_t> BR;
             switch (profileLevel.mProfile) {
                 case DTS_HDProfileLBR:
-                    sampleRates = { 22050, 24000, 44100, 48000 };
-                    bitRates = Range<int32_t>(32000, 768000);
+                    SR = { 22050, 24000, 44100, 48000 };
+                    BR = Range<int32_t>(32000, 768000);
                     break;
                 case DTS_HDProfileHRA:
                 case DTS_HDProfileMA:
-                    sampleRates = { 44100, 48000, 88200, 96000, 176400, 192000 };
-                    bitRates = Range<int32_t>(96000, 24500000);
+                    SR = { 44100, 48000, 88200, 96000, 176400, 192000 };
+                    BR = Range<int32_t>(96000, 24500000);
                     break;
                 default:
                     ALOGW("Unrecognized profile %d for %s", profileLevel.mProfile,
                             mMediaType.c_str());
                     mError |= ERROR_CAPABILITIES_UNRECOGNIZED;
-                    sampleRates = { 44100, 48000, 88200, 96000, 176400, 192000 };
-                    bitRates = Range<int32_t>(96000, 24500000);
+                    SR = { 44100, 48000, 88200, 96000, 176400, 192000 };
+                    BR = Range<int32_t>(96000, 24500000);
             }
+            sampleRates = MergeSortedVectorsAndRemoveDuplicates(sampleRates, SR);
+            bitRates = bitRates ? bitRates.value().extend(BR) : BR;
         }
         maxChannels = 8;
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_DTS_UHD)) {
         for (ProfileLevel profileLevel: mProfileLevels) {
+            std::vector<int32_t> SR;
+            Range<int32_t> BR;
+            int32_t MC = 0;
             switch (profileLevel.mProfile) {
                 case DTS_UHDProfileP2:
-                    sampleRates = { 48000 };
-                    bitRates = Range<int32_t>(96000, 768000);
-                    maxChannels = 10;
+                    SR = { 48000 };
+                    BR = Range<int32_t>(96000, 768000);
+                    MC = 10;
                     break;
                 case DTS_UHDProfileP1:
-                    sampleRates = { 44100, 48000, 88200, 96000, 176400, 192000 };
-                    bitRates = Range<int32_t>(96000, 24500000);
-                    maxChannels = 32;
+                    SR = { 44100, 48000, 88200, 96000, 176400, 192000 };
+                    BR = Range<int32_t>(96000, 24500000);
+                    MC = 32;
                     break;
                 default:
                     ALOGW("Unrecognized profile %d for %s", profileLevel.mProfile,
                             mMediaType.c_str());
                     mError |= ERROR_CAPABILITIES_UNRECOGNIZED;
-                    sampleRates = { 44100, 48000, 88200, 96000, 176400, 192000 };
-                    bitRates = Range<int32_t>(96000, 24500000);
-                    maxChannels = 32;
+                    SR = { 44100, 48000, 88200, 96000, 176400, 192000 };
+                    BR = Range<int32_t>(96000, 24500000);
+                    MC = 32;
             }
+            sampleRates = MergeSortedVectorsAndRemoveDuplicates(sampleRates, SR);
+            bitRates = bitRates ? bitRates.value().extend(BR) : BR;
+            maxChannels = std::max(MC, maxChannels);
         }
     } else if (base::EqualsIgnoreCase(mMediaType, MIMETYPE_AUDIO_IAMF)) {
         for (ProfileLevel profileLevel : mProfileLevels) {
+            std::vector<int32_t> SR;
+            std::vector<Range<int32_t>> SRR;
+            Range<int32_t> BR;
+            int32_t MC = 0;
             auto iamfEncoding = profileLevel.mProfile & 0xff;
             auto iamfProfile = profileLevel.mProfile & (0xff << 16);
             switch (iamfProfile) {
                 case IAMF_PROFILE_SIMPLE:
                     // Per the IAMF spec, the Simple profile can have only one Audio Element and 16
                     // input channels.
-                    maxChannels = 16;
+                    MC = 16;
                     break;
                 case IAMF_PROFILE_BASE:
                     // The Base profile can have up to 18 input channels.
-                    maxChannels = 18;
+                    MC = 18;
                     break;
                 case IAMF_PROFILE_BASE_ENHANCED:
                     // The Base Enhanced profile can have up to 28 input channels.
-                    maxChannels = 28;
+                    MC = 28;
                     break;
                 default:
                     // Set maxChannels to the max known for unknown profiles.
-                    maxChannels = 28;
+                    MC = 28;
                     ALOGW("Unrecognized IAMF profile %d for %s", iamfProfile, mMediaType.c_str());
                     mError |= ERROR_CAPABILITIES_UNRECOGNIZED;
             }
@@ -290,40 +324,50 @@ void AudioCapabilities::applyLevelLimits() {
             // FLAC, and Opus these numbers match their numbers above.
             switch (iamfEncoding) {
                 case IAMF_CODEC_OPUS:
-                    sampleRates = {48000};
-                    bitRates = Range<int32_t>(6000, 128000 * maxChannels);
+                    SR = {48000};
+                    SRR = ConvertDiscreateSampleRatesToRanges(SR);
+                    BR = Range<int32_t>(6000, 128000 * MC);
                     break;
                 case IAMF_CODEC_AAC:
-                    sampleRates = {7350,  8000,  11025, 12000, 16000, 22050, 24000,
+                    SR = {7350,  8000,  11025, 12000, 16000, 22050, 24000,
                                    32000, 44100, 48000, 64000, 88200, 96000};
-                    bitRates = Range<int32_t>(6000, 128000 * maxChannels);
+                    SRR = ConvertDiscreateSampleRatesToRanges(SR);
+                    BR = Range<int32_t>(6000, 128000 * MC);
                     break;
                 case IAMF_CODEC_FLAC:
-                    sampleRateRange = Range<int32_t>(1, 655350);
+                    SRR = { Range<int32_t>(1, 655350) };
                     // Lossless, bitrate range ignored.  Possibly as wide as
                     // Range<int32_t>(1, 21000000).
+                    BR = Range<int32_t>(1, 21000000);
                     break;
                 case IAMF_CODEC_PCM:
                     // PCM is limited by the IAMF spec to the following.
-                    sampleRates = {16000, 32000, 44100, 48000, 96000};
+                    SR = {16000, 32000, 44100, 48000, 96000};
+                    SRR = ConvertDiscreateSampleRatesToRanges(SR);
                     // Lossless, no bitrate range.
+                    BR = Range<int32_t>(1, 21000000);
                     break;
                 default:
                     ALOGW("Unrecognized encoding %d for %s", iamfEncoding, mMediaType.c_str());
                     mError |= ERROR_CAPABILITIES_UNRECOGNIZED;
             }
+            sampleRateRanges = unionSortedDistinctRanges(sampleRateRanges, SRR);
+            bitRates = BR.empty() ? bitRates
+                                  : bitRates ? bitRates.value().extend(BR)
+                                             : BR;
+            maxChannels = std::max(MC, maxChannels);
         }
     } else {
         ALOGW("Unsupported mediaType %s", mMediaType.c_str());
+        maxChannels = MAX_INPUT_CHANNEL_COUNT;
         mError |= ERROR_CAPABILITIES_UNSUPPORTED;
     }
 
     // restrict ranges
     if (!sampleRates.empty()) {
         limitSampleRates(sampleRates);
-    } else if (sampleRateRange) {
-        std::vector<Range<int32_t>> rateRanges = { sampleRateRange.value() };
-        limitSampleRates(rateRanges);
+    } else if (!sampleRateRanges.empty()) {
+        limitSampleRates(sampleRateRanges);
     }
 
     Range<int32_t> channelRange = Range<int32_t>(1, maxChannels);

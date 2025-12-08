@@ -617,10 +617,6 @@ status_t AudioFlinger::openMmapStreamImpl(bool isOutput,
         }
     }
     if (ret != NO_ERROR) {
-        if (!isOutput) {
-            audio_utils::lock_guard _l(mutex());
-            setHasAlreadyCaptured_l(adjAttributionSource.uid);
-        }
         return ret;
     }
 
@@ -641,6 +637,10 @@ status_t AudioFlinger::openMmapStreamImpl(bool isOutput,
         config->channel_mask = thread->channelMask();
         config->format = thread->format();
         interface = IAfMmapThread::createMmapStreamInterfaceAdapter(thread);
+
+        if (!isOutput) {
+            setHasAlreadyCaptured_l(adjAttributionSource.uid);
+        }
     } else {
         l.unlock();
         if (isOutput) {

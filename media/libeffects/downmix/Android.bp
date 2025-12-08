@@ -52,7 +52,6 @@ cc_library {
 cc_library_shared {
     name: "libdownmixaidl",
     srcs: [
-        ":effectCommonFile",
         "aidl/DownmixContext.cpp",
         "aidl/EffectDownmix.cpp",
     ],

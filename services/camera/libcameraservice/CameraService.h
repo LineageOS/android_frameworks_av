@@ -417,16 +417,19 @@ public:
 
         // set audio restriction from client
         // Will call into camera service and hold mServiceLock
-        virtual status_t setAudioRestriction(int32_t mode);
+        virtual status_t setAudioRestriction(
+                hardware::camera2::ICameraDeviceUser::AudioRestriction mode);
 
         // Get current global audio restriction setting
         // Will call into camera service and hold mServiceLock
-        virtual int32_t getServiceAudioRestriction() const;
+        virtual hardware::camera2::ICameraDeviceUser::AudioRestriction getServiceAudioRestriction()
+                const;
 
         // Get current audio restriction setting for this client
-        virtual int32_t getAudioRestriction() const;
+        virtual hardware::camera2::ICameraDeviceUser::AudioRestriction getAudioRestriction() const;
 
-        static bool isValidAudioRestriction(int32_t mode);
+        static bool isValidAudioRestriction(
+                hardware::camera2::ICameraDeviceUser::AudioRestriction mode);
 
         // Override rotate-and-crop AUTO behavior
         virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop, bool fromHal = false) = 0;
@@ -504,7 +507,8 @@ public:
         bool                            mIsPrimaryClient;
 
         mutable Mutex                   mAudioRestrictionLock;
-        int32_t                         mAudioRestriction;
+        hardware::camera2::ICameraDeviceUser::AudioRestriction
+                                        mAudioRestriction;
 
         // - The app-side Binder interface to receive callbacks from us
         sp<IBinder>                     mRemoteBinder; // immutable after constructor
@@ -687,8 +691,8 @@ public:
 
     }; // class CameraClientManager
 
-    int32_t updateAudioRestriction();
-    int32_t updateAudioRestrictionLocked();
+    hardware::camera2::ICameraDeviceUser::AudioRestriction updateAudioRestriction();
+    hardware::camera2::ICameraDeviceUser::AudioRestriction updateAudioRestrictionLocked();
 
     /**
      * Returns true if the given client is the only client in the active clients list for a given
@@ -1576,7 +1580,7 @@ private:
     AppOpsManager mAppOps;
 
     // Aggreated audio restriction mode for all camera clients
-    int32_t mAudioRestriction;
+    hardware::camera2::ICameraDeviceUser::AudioRestriction mAudioRestriction;
 
     // Current override cmd rotate-and-crop mode; AUTO means no override
     uint8_t mOverrideRotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;

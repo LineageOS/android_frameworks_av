@@ -282,7 +282,7 @@ data_sources: { \
 
     frames=$((time * -sample_rate / 1000))
     abstime=$((time * -1))
-    configuration+=" -es out_perf powersave --ei buffer_capacity $frames"
+    configuration+=" --es out_perf powersave --ei buffer_capacity $frames"
     echo "(deep buffer): testing $duration seconds  buffer: $frames frames $abstime ms"
 
   else
