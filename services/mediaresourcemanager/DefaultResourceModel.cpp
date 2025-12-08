@@ -156,8 +156,8 @@ void DefaultResourceModel::registerSystemResource(
 
 std::vector<MediaResourceParcel> DefaultResourceModel::getAvailableResources() const {
     // Step#1: Get current resource usage = Sum{resources used by the active codecs}
-    std::vector<MediaResourceParcel> currentResourceUsage;
-    mResourceTracker->getMediaResourceUsageReport(&currentResourceUsage);
+    std::vector<MediaResourceParcel> currentResourceUsage =
+            mResourceTracker->getMediaResourceUsageReport();
 
     std::vector<MediaResourceParcel> currentSystemResourceUsage;
     currentSystemResourceUsage.reserve(currentResourceUsage.size());
@@ -174,13 +174,18 @@ std::vector<MediaResourceParcel> DefaultResourceModel::getAvailableResources() c
 }
 
 bool DefaultResourceModel::checkResourceAvailability(
-        const std::vector<MediaResourceParcel>& resourcesNeeded) const {
+        const std::vector<MediaResourceParcel>& resourcesNeeded,
+        std::vector<MediaResourceParcel>* resourcesAvailable) const {
     // Step#1: Get available resources.
     std::vector<MediaResourceParcel> availableResources = getAvailableResources();
 
     // Step#2: Check whether {Current available resources} >= {resources needed}
     std::vector<MediaResourceParcel> diffResources = calculateResourceDifference(
             availableResources, resourcesNeeded);
+
+    if (resourcesAvailable) {
+        *resourcesAvailable = std::move(availableResources);
+    }
 
     // Step#3: If any of the resource has negative value, that means we don't have enough
     // resources.

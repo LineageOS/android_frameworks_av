@@ -291,6 +291,23 @@ void notifyResourceGranted(
         int pid,
         const std::vector<::aidl::android::media::MediaResourceParcel>& resources);
 
+/**
+ * Converts vector of MediaResourceParcel into string with list of (ID, Value) pair.
+ * The converted string format is as below:
+ * { [ID_1 : Value_1] [ID_2 : Value_2] ... [ID_n : Value_n]}
+ * eg. { [4096 : 92] [4097 : 127] [4098 : 118] [4099 : 114] [4100 : 87] }
+ *
+ * And also to limit the size of the converted string, it only includes first
+ * "maxElements" from the input vector.
+ * This limit is enforces to ensure that the size of the string format has a limit.
+ * For example: Since this can be passed to Metric Atom, which should be less than 4KB.
+ * Also, this is logged through ALOGX too.
+ */
+constexpr size_t kMaxElements = 50;
+
+std::string toString(const std::vector<::aidl::android::media::MediaResourceParcel>& resources,
+                     size_t maxElements = kMaxElements);
+
 } // namespace android
 
 #endif //ANDROID_MEDIA_RESOURCEMANAGERSERVICEUTILS_H_

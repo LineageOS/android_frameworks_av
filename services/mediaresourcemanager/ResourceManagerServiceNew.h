@@ -135,7 +135,7 @@ private:
 
     // Get the client for given pid and the clientId from the map
     std::shared_ptr<IResourceManagerClient> getClient_l(
-        int pid, const int64_t& clientId) const override;
+            int pid, const int64_t& clientId) const override;
 
     // Remove the client for given pid and the clientId from the map
     bool removeClient_l(int pid, const int64_t& clientId) override;
@@ -145,7 +145,8 @@ private:
 
     // Check whether there are enough resources.
     inline bool checkResourceAvailability_l(
-        const std::vector<MediaResourceParcel>& resourcesNeeded) const;
+            const std::vector<MediaResourceParcel>& resourcesNeeded,
+            std::vector<MediaResourceParcel>* resourcesAvailable) const;
 
     // log OEM/HAL resource availability status in comparison with the required resources.
     void logResourceAvailability(const ClientInfoParcel& clientInfo,
