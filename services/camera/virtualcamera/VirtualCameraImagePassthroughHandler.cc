@@ -175,7 +175,9 @@ bool VirtualCameraImagePassthroughHandler::waitForInputFrame(
         std::chrono::duration_cast<std::chrono::seconds>(timeoutNs).count();
     timeout.tv_usec =
         std::chrono::duration_cast<std::chrono::microseconds>(timeoutNs).count() -
-        std::chrono::microseconds{timeout.tv_sec}.count();
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::seconds{timeout.tv_sec})
+            .count();
     int fileDescriptorCeiling = syncFence + 1;
     int result = select(fileDescriptorCeiling, &fileDescriptors, nullptr,
                         nullptr, &timeout);
