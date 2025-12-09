@@ -20,7 +20,7 @@
 
 namespace android::frameworks::cameraservice::utils {
 
-DeathPipe::DeathPipe(IBinder* parent, const ::ndk::SpAIBinder& binder):
+DeathPipe::DeathPipe(const wp<IBinder>& parent, const ::ndk::SpAIBinder& binder):
       mParent(parent), mAIBinder(binder) {
     mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
             AIBinder_DeathRecipient_new(DeathPipe::onDeathCallback));
@@ -36,8 +36,8 @@ status_t DeathPipe::linkToDeath(const sp<IBinder::DeathRecipient>& recipient,
 
     // Create and immortalize an obituary before linking it to death.
     // The created Obituary can now only be garbage collected if it is unlinked from death
-    std::shared_ptr<Obituary> obituary = std::make_shared<Obituary>(recipient, cookie,
-                                                                    flags, /* who= */ mParent);
+    std::shared_ptr<Obituary> obituary =
+            std::make_shared<Obituary>(recipient, cookie, flags, /* who= */ mParent);
     obituary->immortalize();
 
     // Ensure that "cookie" is a pointer to an immortal obituary.
@@ -58,8 +58,8 @@ status_t DeathPipe::unlinkToDeath(const wp<IBinder::DeathRecipient>& recipient,
                                   wp<IBinder::DeathRecipient>* outRecipient) {
     std::lock_guard<std::mutex> _l(mLock);
     // Temporary Obituary for checking equality
-    std::shared_ptr<Obituary> inObituary = std::make_shared<Obituary>(recipient, cookie,
-                                                                      flags, mParent);
+    std::shared_ptr<Obituary> inObituary =
+            std::make_shared<Obituary>(recipient, cookie, flags, /* who= */ mParent);
     for (auto it = mObituaries.begin(); it != mObituaries.end(); it++) {
         if ((*inObituary) == (**it)) {
             if (outRecipient != nullptr) {
@@ -96,4 +96,4 @@ void DeathPipe::onUnlinkedCallback(void* cookie) {
     obituary->clear();
 }
 
-} // namespace android::frameworks::cameraservice::utils
+}  // namespace android::frameworks::cameraservice::utils
