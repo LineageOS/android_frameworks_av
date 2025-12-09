@@ -174,7 +174,10 @@ public:
     // Construct and push Resource Status Atom.
     void pushResourceStatusAtom(const ClientInfoParcel& clientInfo,
                                 bool isCodecStarted,
-                                bool isResourcesAvailable);
+                                bool isResourcesAvailable,
+                                bool doesResourceTrackingMatch,
+                                const std::string& resourcesAvailableInfo,
+                                const std::string& resourcesInRequestInfo);
 
     // Add this pid/uid set to monitor for the process termination state.
     void addPid(int pid, uid_t uid = 0);

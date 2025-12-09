@@ -31,6 +31,10 @@ namespace android {
 
 class ResourceManagerServiceTest : public ResourceManagerServiceTestBase {
 private:
+    // Limit the loop to maximum of 20 attempts.
+    const int kMaxAttempts = 20;
+
+private:
     static MediaResource createSecureVideoCodecResource(int amount = 1) {
         return MediaResource(MediaResource::Type::kSecureCodec,
             MediaResource::SubType::kHwVideoCodec, amount);
@@ -2185,7 +2189,7 @@ public:
     }
 
     // Add a client with hw resources to RM.
-    void addClientWithHwResources(const std::shared_ptr<IResourceManagerClient>& client,
+    bool addClientWithHwResources(const std::shared_ptr<IResourceManagerClient>& client,
                                   const ClientInfoParcel& clientInfo) {
         // Add it as a non-secure codec first.
         std::vector<MediaResourceParcel> resources;
@@ -2194,8 +2198,15 @@ public:
 
         // Add 5 types of HW resources of random count (10 - 20)
         resources = getHwResources(5, sHwResourceType, 10, 20);
-        // Try until it's successfully added.
-        while (!tryAddingResources(clientInfo, resources));
+        // Try until it's successfully added OR max attempts
+        int maxAttempts = kMaxAttempts;
+        while (maxAttempts-- > 0 ) {
+            if (tryAddingResources(clientInfo, resources)) {
+                break;
+            }
+        }
+
+        return (maxAttempts >= 0);
     }
 
     // Track and validate the available system resources.
@@ -2243,14 +2254,12 @@ public:
         std::vector<MediaResourceParcel> currentResourceUsage; // Current resource usage.
         std::vector<MediaResourceParcel> reclaimResources; // resource to reclaim
 
-        // Limit the loop to maximum of 20 attempts.
-        const int kMaxAttempt = 20;
         int loopCount = 0;
         int failedMatches = 0;
         int lastMatches = 0;
         bool addedResourcesToAllClients = false;
 
-        for (size_t clientIndex = 0; loopCount < kMaxAttempt; ++loopCount) {
+        for (size_t clientIndex = 0; loopCount < kMaxAttempts; ++loopCount) {
             const ClientInfoParcel& clientInfo = clientInfos[clientIndex];
             // Gets 5 types of HW resources of random count (10 - 20)
             resourcesToAdd = getHwResources(5, sHwResourceType, 10, 20);
@@ -2342,7 +2351,10 @@ public:
             int reclaimedClientIndex = 0;
             for (auto& client : lowPriPidClients) {
                 if (toTestClient(client)->checkIfReclaimedAndReset()) {
-                    addClientWithHwResources(client, clientInfos[reclaimedClientIndex]);
+                    if (!addClientWithHwResources(client, clientInfos[reclaimedClientIndex])) {
+                        GTEST_SKIP() << "Failed to add HW resources. So, skipping this test";
+                        return;
+                    }
                     // Now that we have added resources, update the last match count.
                     mService->getResourceTrackingDetails(&events, &matches);
                     lastMatches = matches;
@@ -2366,7 +2378,7 @@ public:
         bool exceededSystemResourceLimit = false;
         mService->getResourceTrackingDetails(&events, &matches);
         int expectedMatches = matches;
-        for (size_t clientIndex = 0; loopCount < kMaxAttempt; ++loopCount) {
+        for (size_t clientIndex = 0; loopCount < kMaxAttempts; ++loopCount) {
             const ClientInfoParcel& clientInfo = clientInfos[clientIndex];
             // Gets 5 types of HW resources of random count (50 - 100)
             resourcesToAdd = getHwResources(5, sHwResourceType, 50, 100);

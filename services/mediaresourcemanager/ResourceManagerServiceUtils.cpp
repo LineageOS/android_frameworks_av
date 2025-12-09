@@ -249,6 +249,7 @@ std::vector<MediaResourceParcel> calculateResourceDifference(
     for (const MediaResourceParcel& res : resourcesWhat) {
         // If the resource exists, subtract the amount.
         // If the resource is new (unique to resourcesWhat), a negative value will be inserted.
+        differenceMap[res.type].type = res.type;
         differenceMap[res.type].value -= res.value;
     }
 
@@ -367,6 +368,24 @@ void notifyResourceGranted(int pid, const std::vector<MediaResourceParcel>& reso
             }
         }
     }
+}
+
+std::string toString(const std::vector<MediaResourceParcel>& resources, size_t maxElements) {
+    std::ostringstream logMsg;
+    // To track number of resources are being converted to string.
+    // Once this exceeds maxElements, we stop Stringifying to limit the size of the output.
+    size_t items = 1;
+
+    logMsg << "{";
+    for (const MediaResourceParcel& res : resources) {
+        logMsg << " [" << static_cast<int>(res.type) << " : " << res.value << "]";
+        if (++items > maxElements) {
+            break;
+        }
+    }
+    logMsg << " }";
+
+    return logMsg.str();
 }
 
 } // namespace android

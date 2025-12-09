@@ -216,7 +216,7 @@ public:
     }
 
     // For each MediaResourceType, get amount of resource being used at the moment.
-    void getMediaResourceUsageReport(std::vector<MediaResourceParcel>* resources) const;
+    std::vector<MediaResourceParcel> getMediaResourceUsageReport() const;
 
 private:
     // Get ResourceInfos associated with the given process.

@@ -265,8 +265,10 @@ Status ResourceManagerServiceNew::getMediaResourceUsageReport(
         return Status::fromStatus(INVALID_OPERATION);
     }
 
-    std::scoped_lock lock{mLock};
-    mResourceTracker->getMediaResourceUsageReport(resources);
+    {
+        std::scoped_lock lock{mLock};
+        *resources = mResourceTracker->getMediaResourceUsageReport();
+    }
 
     return Status::ok();
 }
@@ -281,8 +283,9 @@ Status ResourceManagerServiceNew::registerSystemResource(
 }
 
 inline bool ResourceManagerServiceNew::checkResourceAvailability_l(
-    const std::vector<MediaResourceParcel>& resourcesNeeded) const {
-    return mResourceModel->checkResourceAvailability(resourcesNeeded);
+    const std::vector<MediaResourceParcel>& resourcesNeeded,
+    std::vector<MediaResourceParcel>* resourcesAvailable) const {
+    return mResourceModel->checkResourceAvailability(resourcesNeeded, resourcesAvailable);
 }
 
 Status ResourceManagerServiceNew::checkResourceAvailability(
@@ -290,7 +293,7 @@ Status ResourceManagerServiceNew::checkResourceAvailability(
         bool* _aidl_return) {
     if (IsCodecAvailabilityMetricsFeatureOn() && _aidl_return) {
         std::scoped_lock lock{mLock};
-        *_aidl_return = checkResourceAvailability_l(resourcesNeeded);
+        *_aidl_return = checkResourceAvailability_l(resourcesNeeded, nullptr);
     }
     return Status::ok();
 }
@@ -328,8 +331,34 @@ void ResourceManagerServiceNew::logResourceAvailability(
             // No system resources. So nothing to do.
             return;
         }
-        bool available = checkResourceAvailability_l(systemResources);
-        mResourceManagerMetrics->pushResourceStatusAtom(clientInfo, isCodecStarted, available);
+        std::vector<MediaResourceParcel> resourcesAvailable;
+        bool available = checkResourceAvailability_l(systemResources, &resourcesAvailable);
+        // If the codec has started, we expect resource to be available.
+        // If the codec failed to start, we expect resource to be unavailable.
+        bool doesResourceTrackingMatch = (isCodecStarted == available);
+        std::string resourcesAvailableInfo;
+        std::string resourcesInRequestInfo;
+        if (!doesResourceTrackingMatch) {
+            // Log this info only when we see mismatch in resource tracking.
+            resourcesAvailableInfo = toString(resourcesAvailable);
+            resourcesInRequestInfo = toString(systemResources);
+            String8 log = String8::format(
+                    "ResourceTracking mismatched for [%lld: %s] codec "
+                    "while %s "
+                    "Available System Resources: %s "
+                    "Resources In Request: %s",
+                    (long long) clientInfo.id, clientInfo.name.c_str(),
+                    isCodecStarted ? "starting" : "reclaiming",
+                    resourcesAvailableInfo.c_str(),
+                    resourcesInRequestInfo.c_str());
+            mServiceLog->add(log);
+            ALOGE("%s: %s", __func__, log.c_str());
+        }
+
+        mResourceManagerMetrics->pushResourceStatusAtom(clientInfo, isCodecStarted, available,
+                                                        doesResourceTrackingMatch,
+                                                        resourcesAvailableInfo,
+                                                        resourcesInRequestInfo);
     }
 }
 
