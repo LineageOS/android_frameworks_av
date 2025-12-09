@@ -72,8 +72,9 @@ static const std::unordered_map<int, std::string> gProductStrategyMap = {
                        TRANSMITTED_THROUGH_SPEAKER),
         STRATEGY_ENTRY(AudioProductStrategyType::ACCESSIBILITY, ACCESSIBILITY),
         STRATEGY_ENTRY(AudioProductStrategyType::SYS_RESERVED_REROUTING, REROUTING),
-        STRATEGY_ENTRY(AudioProductStrategyType::SYS_RESERVED_CALL_ASSISTANT, CALL_ASSISTANT),
-        STRATEGY_ENTRY(10, PATCH), //TODO b/416445424: define in AudioProductStrategyType.aidl
+        STRATEGY_ENTRY(AudioProductStrategyType::CALL_ASSISTANT, CALL_ASSISTANT),
+        STRATEGY_ENTRY(AudioProductStrategyType::SYS_RESERVED_PATCH, PATCH),
+        STRATEGY_ENTRY(AudioProductStrategyType::ASSISTANT, ASSISTANT),
     };
 #undef STRATEGY_ENTRY
 
