@@ -88,6 +88,9 @@ class AidlCameraDeviceCallbacks : public UBnCameraDeviceCallbacks {
         mCaptureResultMetadataQueue = std::move(metadataQueue);
     }
 
+  protected:
+    void onFirstRef() override;
+
  private:
     // Wrapper struct so that parameters to onResultReceived callback may be
     // sent through an AMessage.
@@ -106,14 +109,15 @@ class AidlCameraDeviceCallbacks : public UBnCameraDeviceCallbacks {
     };
 
     struct CallbackHandler : public AHandler {
-        public:
-            void onMessageReceived(const sp<AMessage> &msg) override;
-            CallbackHandler(AidlCameraDeviceCallbacks *converter, int vndkVersion) :
-                    mConverter(converter), mVndkVersion(vndkVersion) { }
-        private:
-            void processResultMessage(sp<ResultWrapper> &resultWrapper);
-            wp<AidlCameraDeviceCallbacks> mConverter = nullptr;
-            int mVndkVersion = -1;
+      public:
+        void onMessageReceived(const sp<AMessage>& msg) override;
+        CallbackHandler(wp<AidlCameraDeviceCallbacks> converter, int vndkVersion)
+            : mConverter(converter), mVndkVersion(vndkVersion) {}
+
+      private:
+        void processResultMessage(sp<ResultWrapper>& resultWrapper);
+        wp<AidlCameraDeviceCallbacks> mConverter = nullptr;
+        int mVndkVersion = -1;
     };
 
     void convertResultMetadataToAidl(const camera_metadata * src, SCaptureMetadataInfo * dst);
@@ -123,7 +127,6 @@ class AidlCameraDeviceCallbacks : public UBnCameraDeviceCallbacks {
 
     static const char *kResultKey;
 
-  private:
     std::shared_ptr<SICameraDeviceCallback> mBase;
     std::shared_ptr<CaptureResultMetadataQueue> mCaptureResultMetadataQueue = nullptr;
     sp<CallbackHandler> mHandler = nullptr;
@@ -131,7 +134,7 @@ class AidlCameraDeviceCallbacks : public UBnCameraDeviceCallbacks {
 
     // Pipes death subscription from current NDK interface to VNDK mBase.
     // Should consume calls to linkToDeath and unlinkToDeath.
-    DeathPipe mDeathPipe;
+    std::unique_ptr<DeathPipe> mDeathPipe = nullptr;
 };
 
 } // namespace android::frameworks::cameraservice::device::implementation

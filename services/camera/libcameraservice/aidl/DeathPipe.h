@@ -29,9 +29,10 @@ namespace android::frameworks::cameraservice::utils {
  * This is a helper class to pipe death notifications from  VNDK {@code AIBinder} to
  * S/NDK {@code IBinder}.
  *
- * To use this class, create a DeathPipe member object as a field of NDK interface
- * implementation, and forward functions {@code BBinder::linkToDeath} and
- * {@code BBinder::unlinkToDeath} to corresponding DeathPipe functions.
+ * To use this class, create a std::unique_ptr<DeathPipe> member object as a field of
+ * NDK interface implementation, initialize it in {@code onFirstRef()}, and forward the functions
+ * {@code BBinder::linkToDeath} and {@code BBinder::unlinkToDeath} to corresponding DeathPipe
+ * functions.
  */
 class DeathPipe {
   public:
@@ -40,7 +41,7 @@ class DeathPipe {
      *               object
      * @param binder the VNDK Binder object which DeathPipe with subscribe to.
      */
-    explicit DeathPipe(IBinder* parent, const ::ndk::SpAIBinder& binder);
+    explicit DeathPipe(const wp<IBinder>& parent, const ::ndk::SpAIBinder& binder);
     ~DeathPipe();
 
     status_t linkToDeath(const sp<IBinder::DeathRecipient>& recipient, void* cookie,
@@ -74,10 +75,9 @@ class DeathPipe {
         // garbage collected until Obituary::clear is called.
         std::shared_ptr<Obituary> mSelfPtr;
 
-        Obituary(const wp<IBinder::DeathRecipient>& recipient, void* cookie,
-                 uint32_t flags, IBinder* who) :
-              recipient(recipient), cookie(cookie), flags(flags),
-              who(who), mSelfPtr(nullptr) {}
+        Obituary(const wp<IBinder::DeathRecipient>& recipient, void* cookie, uint32_t flags,
+                 const wp<IBinder>& who)
+            : recipient(recipient), cookie(cookie), flags(flags), who(who), mSelfPtr(nullptr) {}
 
         // Function to be called when the VNDK Binder dies. Pipes the notification to the relevant
         // NDK recipient if it still exists
@@ -108,7 +108,8 @@ class DeathPipe {
     };
 
     // Parent to which the cameraservice wants to subscribe to for death notification
-    IBinder* mParent;
+    // Do not use directly. Use getParentWpLocked() instead.
+    wp<IBinder> mParent;
 
     // VNDK Binder object to which the death notification will be bound to. If it dies,
     // cameraservice will be notified as if mParent died.
@@ -122,7 +123,6 @@ class DeathPipe {
     std::mutex mLock;
     // List of all obituaries created by DeathPipe, used to unlink death subscription
     std::list<std::shared_ptr<Obituary>> mObituaries;
-
 };
 
 } // namespace android::frameworks::cameraservice::utils
