@@ -91,7 +91,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
              }
          },
     },
-    {"STRATEGY_ASSISTANT", 11, //TODO b/429390420: define in AudioProductStrategyType.aidl,
+    {"STRATEGY_ASSISTANT", static_cast<int>(AudioProductStrategyType::ASSISTANT),
         AudioProductStrategy::DEFAULT_ZONE_ID,
         {
             {AUDIO_STREAM_ASSISTANT, "AUDIO_STREAM_ASSISTANT",
@@ -135,7 +135,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          },
     },
     {"STRATEGY_CALL_ASSISTANT",
-         static_cast<int>(AudioProductStrategyType::SYS_RESERVED_CALL_ASSISTANT),
+         static_cast<int>(AudioProductStrategyType::CALL_ASSISTANT),
          AudioProductStrategy::DEFAULT_ZONE_ID,
          {
              {AUDIO_STREAM_CALL_ASSISTANT, "AUDIO_STREAM_CALL_ASSISTANT",
@@ -183,7 +183,7 @@ const engineConfig::ProductStrategies gOrderedSystemStrategies = {
          }
      },
     },
-    {"STRATEGY_PATCH", 10, //TODO b/416445424: define in AudioProductStrategyType.aidl
+    {"STRATEGY_PATCH", static_cast<int>(AudioProductStrategyType::SYS_RESERVED_PATCH),
      AudioProductStrategy::DEFAULT_ZONE_ID,
      {
          {AUDIO_STREAM_PATCH, "AUDIO_STREAM_PATCH",
