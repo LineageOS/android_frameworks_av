@@ -765,6 +765,11 @@ aaudio_result_t AudioStreamInternalPlay::setPlaybackParameters_l(
     const aaudio_result_t result = mServiceInterface.setPlaybackParameters(
             mServiceStreamHandleInfo, rate);
     if (result == AAUDIO_OK) {
+        if (mPlaybackParameters.speed != parameters->speed) {
+            // The playback speed has changed, need to wake up the callback thread to avoid
+            // the HAL consume faster and causing underrun.
+            wakeupCallbackThread_l();
+        }
         mPlaybackParameters = *parameters;
         // The playback speed is guaranteed to be greater than 0 by `isAudioPlaybackRateValid`.
         mClockModel.setPlaybackSpeed(mPlaybackParameters.speed);
