@@ -845,6 +845,9 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             {// Note: not in the IANA registry.
              AUDIO_FORMAT_IAMF_BASE_ENHANCED_PCM, make_AudioFormatDescription(
                     std::string(::android::MEDIA_MIMETYPE_AUDIO_IAMF) + ".base_enhanced.pcm")},
+            {// Note: not in the IANA registry.
+             AUDIO_FORMAT_APTX_ADAPTIVE_PLUS,
+             make_AudioFormatDescription("audio/vnd.qcom.aptx.plus")},
     }};
     return pairs;
 }
