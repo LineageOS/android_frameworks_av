@@ -33,10 +33,10 @@ using namespace android;
 
 AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem* buffer,
         int64_t timestamp, int32_t width, int32_t height, int32_t numPlanes,
-        android_dataspace dataspace) :
+        android_dataspace dataspace, AImageCropRect cropRect) :
         mReader(reader), mFormat(format), mUsage(usage), mBuffer(buffer), mLockedBuffer(nullptr),
         mTimestamp(timestamp), mWidth(width), mHeight(height), mNumPlanes(numPlanes),
-        mHalDataSpace(dataspace) {
+        mHalDataSpace(dataspace), mCropRect(cropRect) {
     LOG_FATAL_IF(reader == nullptr, "AImageReader shouldn't be null while creating AImage");
 }
 
@@ -170,6 +170,19 @@ AImage::getDataSpace(android_dataspace* dataSpace) const {
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
     *dataSpace = mHalDataSpace;
+    return AMEDIA_OK;
+}
+
+media_status_t
+AImage::getCropRect(AImageCropRect* cropRect) const {
+    if (cropRect == nullptr) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    if (isClosed()) {
+        ALOGE("%s: image %p has been closed!", __FUNCTION__, this);
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
+    *cropRect = mCropRect;
     return AMEDIA_OK;
 }
 
@@ -739,22 +752,7 @@ media_status_t AImage_getCropRect(const AImage* image, /*out*/AImageCropRect* re
                 __FUNCTION__, image, rect);
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
-    // For now AImage only supports camera outputs where cropRect is always full window
-    int32_t width = -1;
-    media_status_t ret = image->getWidth(&width);
-    if (ret != AMEDIA_OK) {
-        return ret;
-    }
-    int32_t height = -1;
-    ret = image->getHeight(&height);
-    if (ret != AMEDIA_OK) {
-        return ret;
-    }
-    rect->left = 0;
-    rect->top = 0;
-    rect->right = width;
-    rect->bottom = height;
-    return AMEDIA_OK;
+    return image->getCropRect(rect);
 }
 
 EXPORT
