@@ -24,6 +24,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <system/camera_metadata.h>
 #include <system/graphics.h>
+#include <aidl/android/hardware/graphics/common/PixelFormat.h>
 
 #include <set>
 #include <string>
@@ -31,6 +32,7 @@
 #include <vector>
 
 using tinyxml2::XMLElement;
+using AidlPixelFormat = aidl::android::hardware::graphics::common::PixelFormat;
 namespace android {
 
 enum ErrorCode : uint8_t {
@@ -110,6 +112,7 @@ inline const std::set<int64_t> VALID_FORMATS = {
         HAL_PIXEL_FORMAT_RAW_OPAQUE,
         HAL_PIXEL_FORMAT_RAW10,
         HAL_PIXEL_FORMAT_RAW12,
+        static_cast<int64_t>(AidlPixelFormat::RAW14),
         HAL_PIXEL_FORMAT_RGBA_1010102,
         HAL_PIXEL_FORMAT_Y8,
         HAL_PIXEL_FORMAT_Y16,

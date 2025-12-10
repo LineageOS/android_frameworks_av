@@ -20,6 +20,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <system/camera_metadata.h>
 #include <system/graphics.h>
+#include <aidl/android/hardware/graphics/common/PixelFormat.h>
 
 #include <gtest/gtest.h>
 #include "../config/SharedSessionConfigUtils.h"
@@ -27,6 +28,7 @@
 
 using namespace android;
 using namespace tinyxml2;
+using AidlPixelFormat = aidl::android::hardware::graphics::common::PixelFormat;
 
 // Helper function to create an XML element with text
 XMLElement* CreateXMLElement(XMLDocument& doc, const char* elementName, const char* text) {
@@ -453,6 +455,8 @@ TEST(SharedSessionConfigUtilsTest, GetFormatFromXmlTest) {
             {std::to_string(HAL_PIXEL_FORMAT_RAW_OPAQUE), HAL_PIXEL_FORMAT_RAW_OPAQUE},
             {std::to_string(HAL_PIXEL_FORMAT_RAW10), HAL_PIXEL_FORMAT_RAW10},
             {std::to_string(HAL_PIXEL_FORMAT_RAW12), HAL_PIXEL_FORMAT_RAW12},
+            {std::to_string(static_cast<int64_t>(AidlPixelFormat::RAW14)),
+                static_cast<int64_t>(AidlPixelFormat::RAW14)},
             {std::to_string(HAL_PIXEL_FORMAT_RGBA_1010102), HAL_PIXEL_FORMAT_RGBA_1010102},
             {std::to_string(HAL_PIXEL_FORMAT_Y8), HAL_PIXEL_FORMAT_Y8},
             {std::to_string(HAL_PIXEL_FORMAT_Y16), HAL_PIXEL_FORMAT_Y16},

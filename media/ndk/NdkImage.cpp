@@ -26,9 +26,10 @@
 #include <private/android/AHardwareBufferHelpers.h>
 #include <ui/PublicFormat.h>
 #include <utils/Log.h>
+#include <aidl/android/hardware/graphics/common/PixelFormat.h>
 
 using namespace android;
-
+using AidlPixelFormat = aidl::android::hardware::graphics::common::PixelFormat;
 #define ALIGN(x, mask) ( ((x) + (mask) - 1) & ~((mask) - 1) )
 
 AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem* buffer,
@@ -294,9 +295,10 @@ AImage::getPlanePixelStride(int planeIdx, /*out*/int32_t* pixelStride) const {
         case HAL_PIXEL_FORMAT_BLOB:
         case HAL_PIXEL_FORMAT_RAW10:
         case HAL_PIXEL_FORMAT_RAW12:
+        case static_cast<int>(AidlPixelFormat::RAW14):
         case HAL_PIXEL_FORMAT_RAW_OPAQUE:
-            // Blob is used for JPEG data, RAW10 and RAW12 is used for 10-bit and 12-bit raw data,
-            // those are single plane data without pixel stride defined
+            // Blob is used for JPEG data, RAW10, RAW12 and RAW14 are used for 10-bit, 12-bit and
+            // 14-bit raw data, those are single plane data without pixel stride defined
             return AMEDIA_ERROR_UNSUPPORTED;
         default:
             ALOGE("Pixel format: 0x%x is unsupported", fmt);
@@ -349,7 +351,9 @@ AImage::getPlaneRowStride(int planeIdx, /*out*/int32_t* rowStride) const {
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_RAW10:
         case HAL_PIXEL_FORMAT_RAW12:
-            // RAW10 and RAW12 are used for 10-bit and 12-bit raw data, they are single plane
+        case static_cast<int>(AidlPixelFormat::RAW14):
+            // RAW10, RAW12 and RAW14 are used for 10-bit, 12-bit and 14-bit raw data, they are
+            // single plane
             *rowStride = mLockedBuffer->stride;
             return AMEDIA_OK;
         case HAL_PIXEL_FORMAT_Y8:
@@ -617,6 +621,24 @@ AImage::getPlaneData(int planeIdx,/*out*/uint8_t** data, /*out*/int* dataLength)
             if (mLockedBuffer->stride < (mLockedBuffer->width * 12 / 8)) {
                 ALOGE("stride (%d) should be at least %d",
                         mLockedBuffer->stride, mLockedBuffer->width * 12 / 8);
+                return AMEDIA_ERROR_UNKNOWN;
+            }
+            pData = mLockedBuffer->data;
+            dataSize = mLockedBuffer->stride * mLockedBuffer->height;
+            break;
+        case static_cast<int>(AidlPixelFormat::RAW14):
+            // Single plane 10bpp bayer data.
+            if (mLockedBuffer->width % 4) {
+                ALOGE("Width is not multiple of 4 %d", mLockedBuffer->width);
+                return AMEDIA_ERROR_UNKNOWN;
+            }
+            if (mLockedBuffer->height % 2) {
+                ALOGE("Height is not multiple of 2 %d", mLockedBuffer->height);
+                return AMEDIA_ERROR_UNKNOWN;
+            }
+            if (mLockedBuffer->stride < (mLockedBuffer->width * 14 / 8)) {
+                ALOGE("stride (%d) should be at least %d",
+                        mLockedBuffer->stride, mLockedBuffer->width * 14 / 8);
                 return AMEDIA_ERROR_UNKNOWN;
             }
             pData = mLockedBuffer->data;

@@ -63,6 +63,7 @@
 #include <com_android_internal_camera_flags.h>
 #include <com_android_window_flags.h>
 #include <statslog_framework.h>
+#include <aidl/android/hardware/graphics/common/PixelFormat.h>
 
 #include "CameraService.h"
 #include "FwkOnlyMetadataTags.h"
@@ -87,6 +88,7 @@ using namespace android::camera3;
 using namespace android::camera3::SessionConfigurationUtils;
 using namespace android::hardware::camera;
 using namespace android::hardware::cameraservice::utils::conversion::aidl;
+using AidlPixelFormat = aidl::android::hardware::graphics::common::PixelFormat;
 
 namespace flags = com::android::internal::camera::flags;
 namespace wm_flags = com::android::window::flags;
@@ -6106,6 +6108,7 @@ void Camera3Device::overrideStreamUseCaseLocked() {
                     case HAL_PIXEL_FORMAT_RAW16:
                     case HAL_PIXEL_FORMAT_RAW10:
                     case HAL_PIXEL_FORMAT_RAW12:
+                    case static_cast<int>(AidlPixelFormat::RAW14):
                         return 3;
                     case HAL_PIXEL_FORMAT_YCBCR_420_888:
                         return 2;

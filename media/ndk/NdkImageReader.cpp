@@ -72,6 +72,7 @@ AImageReader::isSupportedFormatAndUsage(int32_t format, uint64_t usage) {
         case AIMAGE_FORMAT_RAW_PRIVATE:
         case AIMAGE_FORMAT_RAW10:
         case AIMAGE_FORMAT_RAW12:
+        case AIMAGE_FORMAT_RAW14:
         case AIMAGE_FORMAT_DEPTH16:
         case AIMAGE_FORMAT_DEPTH_POINT_CLOUD:
         case AIMAGE_FORMAT_Y8:
@@ -105,6 +106,7 @@ AImageReader::getNumPlanesForFormat(int32_t format) {
         case AIMAGE_FORMAT_RAW_PRIVATE:
         case AIMAGE_FORMAT_RAW10:
         case AIMAGE_FORMAT_RAW12:
+        case AIMAGE_FORMAT_RAW14:
         case AIMAGE_FORMAT_DEPTH16:
         case AIMAGE_FORMAT_DEPTH_POINT_CLOUD:
         case AIMAGE_FORMAT_Y8:
