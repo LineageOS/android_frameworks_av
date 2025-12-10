@@ -119,6 +119,14 @@ void SourceClientDescriptor::setHwOutput(const sp<HwAudioOutputDescriptor>& hwOu
     mHwOutput = hwOutput;
 }
 
+std::variant<audio_port_handle_t, sp<DeviceDescriptor>> SourceClientDescriptor::portForVolume()
+        const {
+    if (!mUseSwBridge && mSrcDevice->hasGainController(true)) {
+        return mSrcDevice;
+    }
+    return mSrcDevice->getId();
+}
+
 void SourceClientDescriptor::dump(String8 *dst, int spaces) const
 {
     TrackClientDescriptor::dump(dst, spaces);

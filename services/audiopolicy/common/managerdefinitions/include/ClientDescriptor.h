@@ -65,6 +65,20 @@ public:
     virtual bool isInternal() const { return false; }
     virtual bool isCallRx() const { return false; }
     virtual bool isCallTx() const { return false; }
+    /**
+     * @brief portForVolume
+     * @return either a port ID of a sp<DeviceDescriptor>:
+     * For a client descriptor corresponding to an AudioTrack (software volume):
+     *   the AudioTrack port ID
+     * For a client descriptor corresponding to an AudioSource with a software patch
+     *   the source device port ID
+     * For a client descriptor corresponding to an AudioSource with a hardware patch
+     * and a source device with a gain controller (hardware volume):
+     *   the source device descriptor
+     */
+    virtual std::variant<audio_port_handle_t, sp<DeviceDescriptor>> portForVolume() const {
+        return mPortId;
+    }
     audio_port_handle_t portId() const { return mPortId; }
     uid_t uid() const { return mUid; }
     audio_session_t session() const { return mSessionId; };
@@ -275,6 +289,7 @@ public:
     bool isInternal() const override { return mIsInternal; }
     bool isCallRx() const override { return mIsCallRx; }
     bool isCallTx() const override { return mIsCallTx; }
+    std::variant<audio_port_handle_t, sp<DeviceDescriptor>> portForVolume() const override;
 
     using ClientDescriptor::dump;
     void dump(String8 *dst, int spaces) const override;

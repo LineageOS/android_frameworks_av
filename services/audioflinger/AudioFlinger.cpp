@@ -3920,6 +3920,7 @@ void AudioFlinger::updateSecondaryOutputsForTrack_l(
                                                        patchRecord->buffer(),
                                                        patchRecord->bufferSize(),
                                                        outputFlags,
+                                                       AUDIO_PORT_HANDLE_NONE,
                                                        0ns /* timeout */,
                                                        frameCountToBeReady,
                                                        playbackRate.mSpeed);

@@ -656,6 +656,7 @@ status_t PatchPanel::Patch::createConnections_l(const sp<IAfPatchPanel>& panel)
                                            tempRecordTrack->buffer(),
                                            tempRecordTrack->bufferSize(),
                                            outputFlags,
+                                           mAudioPatch.sources[0].id,
                                            {} /*timeout*/,
                                            frameCountToBeReady,
                                            1.0f /*speed*/);
