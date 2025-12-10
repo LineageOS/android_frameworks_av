@@ -160,8 +160,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
 
         C2SecureModeTuning secureModeTuning{};
         mComponent->query({&secureModeTuning}, {}, C2_MAY_BLOCK, nullptr);
-        if (secureModeTuning.value == C2Config::SM_READ_PROTECTED ||
-            secureModeTuning.value == C2Config::SM_READ_PROTECTED_WITH_ENCRYPTED) {
+        if (secureModeTuning.value != C2Config::SM_UNPROTECTED) {
             mDisableTest = true;
         }
 

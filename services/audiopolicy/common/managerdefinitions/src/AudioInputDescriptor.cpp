@@ -530,7 +530,7 @@ void AudioInputDescriptor::setDevice(const sp<DeviceDescriptor> &device) {
             .format = mFormat
     };
     if (!mDevice->setPreferredConfig(&config)) {
-        ALOGE("%s failed to set preferred config for device %s",
+        ALOGW("%s failed to set preferred config for device %s",
               __func__, device->toString().c_str());
     }
 }

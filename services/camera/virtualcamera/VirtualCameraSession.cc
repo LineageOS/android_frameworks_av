@@ -299,6 +299,16 @@ std::optional<SupportedStreamConfiguration> pickInputConfigurationForStreams(
     return bestConfig;
   }
 
+  // Filter out BLOB input formats since a direct "passthrough" transfer cannot
+  // be established. Past this point, only unencoded inputs can be used, e.g.
+  // i420
+  std::vector<SupportedStreamConfiguration> nonBlobInputConfigs;
+  std::copy_if(supportedInputConfigs.begin(), supportedInputConfigs.end(),
+               std::back_inserter(nonBlobInputConfigs),
+               [](const SupportedStreamConfiguration& config) {
+                 return !isBlobFormat(config.imageFormat);
+               });
+
   Stream maxResolutionStream = getHighestResolutionStream(requestedStreams);
   Resolution maxResolution = resolutionFromStream(maxResolutionStream);
 
@@ -317,7 +327,7 @@ std::optional<SupportedStreamConfiguration> pickInputConfigurationForStreams(
     return pixelCountDiffA < pixelCountDiffB;
   };
 
-  for (const SupportedStreamConfiguration& inputConfig : supportedInputConfigs) {
+  for (const SupportedStreamConfiguration& inputConfig : nonBlobInputConfigs) {
     Resolution inputConfigResolution = resolutionFromInputConfig(inputConfig);
     if (inputConfigResolution < maxResolution ||
         !isApproximatellySameAspectRatio(inputConfigResolution, maxResolution)) {
