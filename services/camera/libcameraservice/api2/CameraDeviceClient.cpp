@@ -3160,16 +3160,6 @@ binder::Status CameraDeviceClient::updateOutputConfigurations(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
     }
 
-    // The current implementation doesn't support composite and shared stream updates
-    for (size_t i = 0; i < streamIds.size(); i++) {
-        if (configurations[i].isShared()) {
-            std::string msg = fmt::sprintf("Camera %s: Shared stream updates are"
-                    " not supported!", mCameraIdStr.c_str());
-            ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
-        }
-    }
-
     for (size_t i = 0; i < streamIds.size(); i++) {
         int64_t lastRepeatingFrameNumber = -1;
         ret = updateOutputConfigurationLocked(streamIds[i], configurations[i],

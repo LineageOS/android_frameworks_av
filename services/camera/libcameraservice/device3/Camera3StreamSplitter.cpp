@@ -361,7 +361,6 @@ status_t Camera3StreamSplitter::outputBufferLocked(const sp<Surface>& output,
     status_t res;
 
     uint64_t bufferId = bufferItem.mGraphicBuffer->getId();
-    const BufferTracker& tracker = *(mBuffers[bufferId]);
 
     if (mOutputSurfaces[surfaceId] != nullptr) {
         sp<ANativeWindow> anw = mOutputSurfaces[surfaceId];
@@ -501,6 +500,12 @@ void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /*item*/) {
     ATRACE_CALL();
     Mutex::Autolock lock(mMutex);
 
+    if (mOutputSurfaces.empty()) {
+        SP_LOGE("%s: No output surfaces attached to splitter!", __FUNCTION__);
+        mOnFrameAvailableRes.store(INVALID_OPERATION);
+        return;
+    }
+
     // Acquire and detach the buffer from the input
     BufferItem bufferItem;
     status_t res = mBufferItemConsumer->acquireBuffer(&bufferItem, /* presentWhen */ 0);
@@ -515,6 +520,10 @@ void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /*item*/) {
     if (mBuffers.find(bufferId) == mBuffers.end()) {
         SP_LOGE("%s: Acquired buffer doesn't exist in attached buffer map",
                 __FUNCTION__);
+        res = mBufferItemConsumer->releaseBuffer(bufferItem);
+        if (res != NO_ERROR) {
+            SP_LOGE("%s: Failed to return acquired buffer to input queue!", __FUNCTION__);
+        }
         mOnFrameAvailableRes.store(INVALID_OPERATION);
         return;
     }

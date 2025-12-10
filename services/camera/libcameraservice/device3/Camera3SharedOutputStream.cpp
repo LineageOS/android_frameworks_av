@@ -18,11 +18,14 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <com_android_internal_camera_flags.h>
 #include <utils/Trace.h>
 
 #include "Flags.h"
 
 #include "Camera3SharedOutputStream.h"
+
+namespace flags = com::android::internal::camera::flags;
 
 namespace android {
 
@@ -429,6 +432,17 @@ status_t Camera3SharedOutputStream::updateStream(const std::vector<SurfaceHolder
     if ((outputMap == nullptr) || (outputInfo.size() != outputSurfaces.size()) ||
             (outputSurfaces.size() > kMaxOutputs)) {
         return BAD_VALUE;
+    }
+
+    if (flags::seamless_transitions()) {
+        if (mState == STATE_IN_CONFIG) {
+            ret = configureQueueLocked();
+            ALOGE("%s: Stream configuration ret: %d", __FUNCTION__, ret);
+            if (ret != OK) {
+                return ret;
+            }
+            mState = STATE_CONFIGURED;
+        }
     }
 
     uint64_t usage;
