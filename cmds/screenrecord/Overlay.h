@@ -22,6 +22,7 @@
 #include "EglWindow.h"
 
 #include <gui/BufferQueue.h>
+#include <gui/Surface.h>
 #include <gui/GLConsumer.h>
 #include <utils/Thread.h>
 
@@ -61,8 +62,7 @@ public:
   //
   // Returns a reference to the producer side of a new BufferQueue that will
   // be used by the virtual display.
-  status_t start(const sp<IGraphicBufferProducer>& outputSurface,
-                 sp<IGraphicBufferProducer>* pBufferProducer);
+  status_t start(const sp<Surface>& outputSurface, sp<Surface>* pSurface);
 
   // Stops the thread and releases resources.  It's okay to call this even
   // if start() was never called.
@@ -70,7 +70,7 @@ public:
 
   // This creates an EGL context and window surface, draws some informative
   // text on it, swaps the buffer, and then tears the whole thing down.
-  static status_t drawInfoPage(const sp<IGraphicBufferProducer>& outputSurface);
+  static status_t drawInfoPage(const sp<Surface>& outputSurface);
 
 private:
     Overlay(const Overlay&);
@@ -139,11 +139,11 @@ private:
 
     // The surface we send our output to, i.e. the video encoder's input
     // surface.
-    sp<IGraphicBufferProducer> mOutputSurface;
+    sp<Surface> mOutputSurface;
 
-    // Producer side of queue, passed into the virtual display.
+    // Surface passed into the virtual display.
     // The consumer end feeds into our GLConsumer.
-    sp<IGraphicBufferProducer> mProducer;
+    sp<Surface> mSurface;
 
     // This receives frames from the virtual display and makes them available
     // as an external texture.

@@ -21,6 +21,7 @@
 #include "EglWindow.h"
 
 #include <gui/BufferQueue.h>
+#include <gui/Surface.h>
 #include <gui/GLConsumer.h>
 #include <utils/Mutex.h>
 
@@ -39,7 +40,7 @@ public:
   // Create an "input surface", similar in purpose to a MediaCodec input
   // surface, that the virtual display can send buffers to.  Also configures
   // EGL with a pbuffer surface on the current thread.
-  status_t createInputSurface(int width, int height, sp<IGraphicBufferProducer>* pBufferProducer);
+  status_t createInputSurface(int width, int height, sp<Surface>* pSurface);
 
   // Copy one from input to output.  If no frame is available, this will wait up to the
   // specified number of microseconds.
