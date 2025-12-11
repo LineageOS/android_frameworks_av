@@ -85,6 +85,13 @@ flag {
 }
 
 flag {
+  name: "dynamic_blank_buffers"
+  namespace: "codec_fwk"
+  description: "Feature flag for dynamic blank buffers"
+  bug: "460833647"
+}
+
+flag {
   name: "dynamic_color_aspects"
   is_exported: true
   namespace: "codec_fwk"

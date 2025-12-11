@@ -328,3 +328,13 @@ flag {
         purpose: PURPOSE_FEATURE
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "camera_raw14_format"
+    description: "Add new RAW14 image format"
+    bug: "446724373"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}

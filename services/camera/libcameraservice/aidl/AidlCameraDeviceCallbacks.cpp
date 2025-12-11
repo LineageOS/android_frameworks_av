@@ -20,6 +20,7 @@
 #include <aidl/AidlUtils.h>
 #include <aidl/android/frameworks/cameraservice/common/Status.h>
 #include <hidl/Utils.h>
+#include <log/log.h>
 #include <utility>
 
 namespace android::frameworks::cameraservice::device::implementation {
@@ -50,14 +51,14 @@ bool AidlCameraDeviceCallbacks::initializeLooper(int vndkVersion) {
         ALOGE("Unable to start camera device callback looper");
         return false;
     }
-    mHandler = new CallbackHandler(this, vndkVersion);
+    mHandler = new CallbackHandler(wp<AidlCameraDeviceCallbacks>::fromExisting(this), vndkVersion);
     mCbLooper->registerHandler(mHandler);
     return true;
 }
 
 AidlCameraDeviceCallbacks::AidlCameraDeviceCallbacks(
         const std::shared_ptr<SICameraDeviceCallback>& base):
-      mBase(base), mDeathPipe(this, base->asBinder()) {}
+      mBase(base) {}
 
 AidlCameraDeviceCallbacks::~AidlCameraDeviceCallbacks() {
     if (mCbLooper != nullptr) {
@@ -215,15 +216,28 @@ binder::Status AidlCameraDeviceCallbacks::onRequestQueueEmpty() {
     return binder::Status::ok();
 }
 
-status_t AidlCameraDeviceCallbacks::linkToDeath(const sp<DeathRecipient>& recipient,
-                                                void* cookie, uint32_t flags) {
-    return mDeathPipe.linkToDeath(recipient, cookie, flags);
+status_t AidlCameraDeviceCallbacks::linkToDeath(const sp<DeathRecipient>& recipient, void* cookie,
+                                                uint32_t flags) {
+    LOG_ALWAYS_FATAL_IF(mDeathPipe == nullptr,
+                        "%s: mDeathPipe is null. This object should be managed by an sp but "
+                        "onFirstRef() was not called.",
+                        __FUNCTION__);
+    return mDeathPipe->linkToDeath(recipient, cookie, flags);
 }
-status_t AidlCameraDeviceCallbacks::unlinkToDeath(const wp<DeathRecipient>& recipient,
-                                                  void* cookie,
+
+status_t AidlCameraDeviceCallbacks::unlinkToDeath(const wp<DeathRecipient>& recipient, void* cookie,
                                                   uint32_t flags,
                                                   wp<DeathRecipient>* outRecipient) {
-    return mDeathPipe.unlinkToDeath(recipient, cookie, flags, outRecipient);
+    LOG_ALWAYS_FATAL_IF(mDeathPipe == nullptr,
+                        "%s: mDeathPipe is null. This object should be managed by an sp but "
+                        "onFirstRef() was not called.",
+                        __FUNCTION__);
+    return mDeathPipe->unlinkToDeath(recipient, cookie, flags, outRecipient);
+}
+
+void AidlCameraDeviceCallbacks::onFirstRef() {
+    mDeathPipe = std::make_unique<DeathPipe>(wp<AidlCameraDeviceCallbacks>::fromExisting(this),
+                                             mBase->asBinder());
 }
 
 } // namespace android::frameworks::cameraservice::device::implementation
