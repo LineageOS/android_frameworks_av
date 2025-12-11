@@ -37,7 +37,7 @@ namespace virtualcamera {
 namespace {
 
 // Maximal number of buffers producer can dequeue without blocking.
-constexpr int kBufferProducerMaxDequeueBufferCount = 64;
+constexpr int kBufferProducerMaxDequeueBufferCount = 4;
 
 }  // namespace
 
@@ -84,6 +84,9 @@ EglSurfaceTexture::~EglSurfaceTexture() {
   if (mTextureId != 0) {
     glDeleteTextures(1, &mTextureId);
   }
+  mGlConsumer->abandon();
+  mGlConsumer.clear();
+  mSurface.clear();
 }
 
 sp<Surface> EglSurfaceTexture::getSurface() {
