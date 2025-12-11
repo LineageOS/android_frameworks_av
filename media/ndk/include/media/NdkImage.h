@@ -465,15 +465,15 @@ enum AIMAGE_FORMATS {
      * <td align="center">P0[ 6]</td>
      * </tr>
      * <tr>
-     <td align="center">Byte 1:</td>
-     <td align="center">P1[13]</td>
-     <td align="center">P1[12]</td>
-     <td align="center">P1[11]</td>
-     <td align="center">P1[10]</td>
-     <td align="center">P1[ 9]</td>
-     <td align="center">P1[ 8]</td>
-     <td align="center">P1[ 7]</td>
-     <td align="center">P1[ 6]</td>
+     * <td align="center">Byte 1:</td>
+     * <td align="center">P1[13]</td>
+     * <td align="center">P1[12]</td>
+     * <td align="center">P1[11]</td>
+     * <td align="center">P1[10]</td>
+     * <td align="center">P1[ 9]</td>
+     * <td align="center">P1[ 8]</td>
+     * <td align="center">P1[ 7]</td>
+     * <td align="center">P1[ 6]</td>
      * </tr>
      * <tr>
      * <td align="center">Byte 2:</td>
