@@ -182,7 +182,7 @@ status_t EffectsFactoryHalAidl::createEffect(const effect_uuid_t* uuid, int32_t 
 
     AudioUuid aidlUuid =
             VALUE_OR_RETURN_STATUS(::aidl::android::legacy2aidl_audio_uuid_t_AudioUuid(*uuid));
-    if (!com_android_media_audio_audio_eraser_effect() && isAudioEraser(aidlUuid)) {
+    if (isAudioEraser(aidlUuid)) {
         ALOGE("%s Audio eraser effect not supported yet", __func__);
         return BAD_VALUE;
     }
@@ -383,15 +383,11 @@ bool EffectsFactoryHalAidl::isAudioEraser(const AudioUuid& uuid) {
 }
 
 void EffectsFactoryHalAidl::filterHalDescriptors(std::vector<Descriptor>& descs) {
-    if (!com_android_media_audio_audio_eraser_effect()) {
-        descs.erase(std::remove_if(descs.begin(), descs.end(),
-                                   [](const Descriptor& desc) {
-                                       return isAudioEraser(desc.common.id.type);
-                                   }),
-                    descs.end());
-    }
-
-    return;
+    descs.erase(std::remove_if(descs.begin(), descs.end(),
+                                [](const Descriptor& desc) {
+                                    return isAudioEraser(desc.common.id.type);
+                                }),
+                descs.end());
 }
 
 } // namespace effect
