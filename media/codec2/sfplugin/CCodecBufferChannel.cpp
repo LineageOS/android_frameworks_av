@@ -160,11 +160,37 @@ std::shared_ptr<C2Info> generateC2EncryptionInfo(CryptoPlugin::Mode mode,
         return nullptr;
     }
 
-    std::vector<C2EncryptionSubsampleStruct> c2Subsamples(numSubSamples);
+    // CCodecBufferChannel doesn't support multiple IVs and keys currently.
+    constexpr uint16_t kSoleKeyIx = 0;
+    std::vector<C2EncryptionSubsampleStruct> c2Subsamples;
+    c2Subsamples.reserve(numSubSamples);
     for (size_t i = 0; i < numSubSamples; i++) {
-        c2Subsamples[i].vector = 0;
-        c2Subsamples[i].clear = subSamples[i].mNumBytesOfClearData;
-        c2Subsamples[i].ciphered = subSamples[i].mNumBytesOfEncryptedData;
+        if (subSamples[i].mNumBytesOfClearData > std::numeric_limits<uint16_t>::max()) {
+            // The app gives a subsample whose clear value is beyond 16 bits value.
+            // Since C2EncryptionSubsampleStruct's clear is uint16_t, we represent
+            // the subsample with two C2EncryptionSubsampleStruct. This utilizes
+            // the Codec2 API specification that, when `vector` is more than the
+            // number of initialization vectors or keys, the
+            // C2EncryptionSubsampleStruct represents the clear content.
+            c2Subsamples.push_back(C2EncryptionSubsampleStruct{
+                    .vector = kSoleKeyIx + 1,
+                    .clear = 0,
+                    .ciphered = subSamples[i].mNumBytesOfClearData,
+            });
+            if (subSamples[i].mNumBytesOfEncryptedData > 0) {
+                c2Subsamples.push_back(C2EncryptionSubsampleStruct{
+                        .vector = kSoleKeyIx,
+                        .clear = 0,
+                        .ciphered = subSamples[i].mNumBytesOfEncryptedData,
+                });
+            }
+        } else {
+            c2Subsamples.push_back(C2EncryptionSubsampleStruct{
+                    .vector = kSoleKeyIx,
+                    .clear = static_cast<uint16_t>(subSamples[i].mNumBytesOfClearData),
+                    .ciphered = subSamples[i].mNumBytesOfEncryptedData,
+            });
+        }
     }
 
     return C2StreamEncryptionInfo::input::AllocShared(c2Subsamples.size(), 0, scheme, c2Pattern,
