@@ -329,7 +329,7 @@ void VirtualCameraRenderThread::threadLoop() {
   }
 
   mImageHandler.reset();
-
+  mInputSurfaceFuture.get()->destroy();
   ALOGV("Render thread exiting");
 }
 
