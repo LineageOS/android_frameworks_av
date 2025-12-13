@@ -87,11 +87,12 @@ struct OutputBufferQueue {
     // via shared memory between HAL and framework, Update # of max dequeued buffer
     // and synchronize.
     void updateMaxDequeueBufferCount(int maxDequeueBufferCount);
+    // TODO: make this as a private class
+    class SurfaceWrapper;
 
 private:
-
     std::mutex mMutex;
-    sp<IGraphicBufferProducer> mIgbp;
+    std::shared_ptr<SurfaceWrapper> mSurface;
     uint32_t mGeneration;
     uint64_t mBqId;
     int32_t mMaxDequeueBufferCount;
