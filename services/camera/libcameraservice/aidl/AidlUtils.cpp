@@ -23,6 +23,7 @@
 #include <aidl/VndkVersionMetadataTags.h>
 #include <aidlcommonsupport/NativeHandle.h>
 #include <camera/StringUtils.h>
+#include <com_android_internal_camera_flags.h>
 #include <device3/Camera3StreamInterface.h>
 #include <gui/Flags.h>  // remove with WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
@@ -36,6 +37,8 @@ namespace android::hardware::cameraservice::utils::conversion::aidl {
 using aimg::AImageReader_getHGBPFromHandle;
 using hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
 using CameraMetadataInfo = android::hardware::camera2::CameraMetadataInfo;
+
+namespace flags = com::android::internal::camera::flags;
 
 // Note: existing data in dst will be gone. Caller still owns the memory of src
 void cloneToAidl(const camera_metadata_t* src, SCameraMetadata* dst) {
@@ -390,6 +393,9 @@ status_t filterVndkKeys(int vndkVersion, CameraMetadata &metadata, bool isStatic
             }
         }
         it++;
+    }
+    if (!isStatic && flags::camera_device_type_api()) {
+        metadata.erase(ANDROID_INFO_DEVICE_TYPE);
     }
     return OK;
 }
