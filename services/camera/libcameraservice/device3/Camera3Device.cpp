@@ -3013,7 +3013,8 @@ void Camera3Device::setErrorStateLockedV(int32_t errorState, const char *fmt, va
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t minExpectedDuration, nsecs_t maxExpectedDuration,
-        bool isFixedFps, const std::set<std::set<std::string>>& physicalCameraIds,
+        bool isFixedFps, const std::set<std::string>& physicalCameraIds,
+        std::map<int, MultiResInflightRequest>&& requestedMultiResPhysicalIds,
         bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto, bool autoframingAuto,
         const std::set<std::string>& cameraIdsWithZoom, bool useZoomRatio,
         const SurfaceMap& outputSurfaces, nsecs_t requestTimeNs,
@@ -3024,8 +3025,9 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
             hasAppCallback, minExpectedDuration, maxExpectedDuration, isFixedFps, physicalCameraIds,
-            isStillCapture, isZslCapture, rotateAndCropAuto, autoframingAuto, cameraIdsWithZoom,
-            requestTimeNs, useZoomRatio, outputSurfaces, transform));
+            std::move(requestedMultiResPhysicalIds), isStillCapture, isZslCapture,
+            rotateAndCropAuto, autoframingAuto, cameraIdsWithZoom, requestTimeNs, useZoomRatio,
+            outputSurfaces, transform));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -4329,7 +4331,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         outputBuffers->insertAt(camera_stream_buffer_t(), 0,
                 captureRequest->mOutputStreams.size());
         halRequest->output_buffers = outputBuffers->array();
-        std::set<std::set<std::string>> requestedPhysicalCameras;
+        std::set<std::string> requestedPhysicalCameras;
+        std::map<int, MultiResInflightRequest> requestedMultiResPhysicalCameras;
 
         sp<Camera3Device> parent = mParent.promote();
         if (parent == NULL) {
@@ -4448,9 +4451,13 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             const std::string &physicalCameraId = outputStream->getPhysicalCameraId();
             int32_t streamGroupId = outputStream->getHalStreamGroupId();
             if (streamGroupId != -1 && mGroupIdPhysicalCameraMap.count(streamGroupId) == 1) {
-                requestedPhysicalCameras.insert(mGroupIdPhysicalCameraMap[streamGroupId]);
+                bool isConcurrent = (outputStream->getMultiResMode()
+                        == OutputConfiguration::MULTI_RES_ON_CONCURRENT);
+                requestedMultiResPhysicalCameras.emplace(streamGroupId,
+                        MultiResInflightRequest{mGroupIdPhysicalCameraMap[streamGroupId],
+                        isConcurrent});
             } else if (!physicalCameraId.empty()) {
-                requestedPhysicalCameras.insert(std::set<std::string>({physicalCameraId}));
+                requestedPhysicalCameras.insert(physicalCameraId);
             }
             halRequest->num_output_buffers++;
         }
@@ -4509,7 +4516,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 expectedDurationInfo.minDuration,
                 expectedDurationInfo.maxDuration,
                 expectedDurationInfo.isFixedFps,
-                requestedPhysicalCameras, isStillCapture, isZslCapture,
+                requestedPhysicalCameras, std::move(requestedMultiResPhysicalCameras),
+                isStillCapture, isZslCapture,
                 captureRequest->mRotateAndCropAuto, captureRequest->mAutoframingAuto,
                 mPrevCameraIdsWithZoom, useZoomRatio,
                 surfaceMap, captureRequest->mRequestTimeNs, transformMap);
