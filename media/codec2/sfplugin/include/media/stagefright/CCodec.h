@@ -116,7 +116,7 @@ private:
     void start();
     void stop(bool pushBlankBuffer);
     void flush();
-    void release(bool sendCallback, bool pushBlankBuffer);
+    void release(bool sendCallback, bool pushBlankBuffer, sp<ALooper> codecLooper);
 
     /**
      * Creates an input surface for the current device configuration compatible with CCodec.
@@ -209,6 +209,8 @@ private:
 
     Mutexed<std::unique_ptr<CCodecConfig>> mConfig;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mWorkDoneQueue;
+
+    bool mReleaseCompleted;
 
     sp<AMessage> mMetrics;
     std::unique_ptr<CCodecResources> mCodecResources;
