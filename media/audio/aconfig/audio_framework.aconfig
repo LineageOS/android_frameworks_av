@@ -182,13 +182,7 @@ flag {
     name: "focus_freeze_test_api"
     is_exported: true
     namespace: "media_audio"
-    description: "\
- AudioManager audio focus test APIs:\
- AudioManager.enterAudioFocusFreezeForTest(java.util.List)\
- AudioManager.exitAudioFocusFreezeForTest()\
- AudioManager.getFocusDuckedUidsForTest()\
- AudioManager.getFocusFadeOutDurationForTest()\
- AudioManager.getFocusUnmuteDelayAfterFadeOutForTest()"
+    description: "AudioManager audio focus test APIs:"
     bug: "301713440"
 }
 
@@ -238,6 +232,14 @@ flag {
 }
 
 flag {
+    name: "hearing_aid_compatibility"
+    is_exported: false
+    namespace: "media_audio"
+    description: "query and control Hearing Air Compatibility"
+    bug: "443740527"
+}
+
+flag {
     name: "iamf_definitions_api"
     is_exported: true
     namespace: "media_audio"
@@ -256,11 +258,8 @@ flag {
     name: "loudness_configurator_api"
     is_exported: true
     namespace: "media_audio"
-    description: "\
-Enable the API for providing loudness metadata and CTA-2075 \
-support."
+    description: "Enable the API for providing loudness metadata and CTA-2075 support."
     bug: "298463873"
-    is_exported: true
 }
 
 flag {
@@ -352,9 +351,7 @@ flag {
     name: "sco_managed_by_audio"
     is_exported: true
     namespace: "media_audio"
-    description: "\
-Enable new implementation of headset profile device connection and\
-SCO audio activation."
+    description: "Enable new implementation of headset profile device connection and SCO audio activation"
     bug: "265057196"
 }
 
