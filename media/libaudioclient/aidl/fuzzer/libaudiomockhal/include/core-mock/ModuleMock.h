@@ -119,10 +119,6 @@ class ModuleMock : public BnModule {
     ndk::ScopedAStatus prepareToDisconnectExternalDevice(int32_t) override {
         return ndk::ScopedAStatus::ok();
     }
-    ndk::ScopedAStatus getFlushFromFrameSupport(const AudioPortConfig& /*config*/,
-                                                FlushFromFrameSupport* /*support*/) {
-        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
-    }
 
     AudioPortExt createDeviceExt(AudioDeviceType devType, int32_t flags);
     AudioPort createPort(int32_t id, const std::string& name, int32_t flags, bool isInput,
