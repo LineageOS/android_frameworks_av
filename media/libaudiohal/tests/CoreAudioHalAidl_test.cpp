@@ -62,7 +62,6 @@ using ::aidl::android::media::audio::common::AudioPortExt;
 using ::aidl::android::media::audio::common::AudioPortMixExt;
 using ::aidl::android::media::audio::common::AudioProfile;
 using ::aidl::android::media::audio::common::AudioSource;
-using ::aidl::android::media::audio::common::FlushFromFrameSupport;
 using ::aidl::android::media::audio::common::PcmType;
 
 class VendorParameterMock {
@@ -937,11 +936,6 @@ class ModuleMock : public ::aidl::android::hardware::audio::core::BnModule,
         }
         *port = &(*portIt);
         return ndk::ScopedAStatus::ok();
-    }
-
-    ndk::ScopedAStatus getFlushFromFrameSupport(const AudioPortConfig& /*config*/,
-                                                FlushFromFrameSupport* /*support*/) {
-        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
     }
 
     Configuration mConfig;
