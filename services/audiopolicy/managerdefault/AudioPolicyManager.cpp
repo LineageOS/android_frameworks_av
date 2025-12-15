@@ -7819,10 +7819,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
                     || client->isInvalid()) {
                 continue;
             }
-            if (!desc->routesToAllDevices(newDevices)) {
-                invalidatedOutputs.push_back(desc);
-                break;
-            }
+            DeviceVector devices = newDevices;
             sp<AudioPolicyMix> primaryMix;
             status_t status = mPolicyMixes.getOutputForAttr(client->attributes(), client->config(),
                     client->uid(), client->session(), client->flags(), mAvailableOutputDevices,
@@ -7836,6 +7833,16 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
                     invalidatedOutputs.push_back(desc);
                     break;
                 }
+                // If policy mix is active, update the devices from it before checking route.
+                sp<DeviceDescriptor> device =
+                        mPolicyMixes.getDeviceAndMixForOutput(desc, mAvailableOutputDevices);
+                if (device != nullptr) {
+                    devices = DeviceVector(device);
+                }
+            }
+            if (!desc->routesToAllDevices(devices)) {
+                invalidatedOutputs.push_back(desc);
+                break;
             }
         }
     }
