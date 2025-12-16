@@ -336,12 +336,10 @@ void ResourceManagerServiceNew::logResourceAvailability(
         // If the codec has started, we expect resource to be available.
         // If the codec failed to start, we expect resource to be unavailable.
         bool doesResourceTrackingMatch = (isCodecStarted == available);
-        std::string resourcesAvailableInfo;
-        std::string resourcesInRequestInfo;
         if (!doesResourceTrackingMatch) {
             // Log this info only when we see mismatch in resource tracking.
-            resourcesAvailableInfo = toString(resourcesAvailable);
-            resourcesInRequestInfo = toString(systemResources);
+            std::string resourcesAvailableInfo = toString(resourcesAvailable);
+            std::string resourcesInRequestInfo = toString(systemResources);
             String8 log = String8::format(
                     "ResourceTracking mismatched for [%lld: %s] codec "
                     "while %s "
@@ -357,8 +355,8 @@ void ResourceManagerServiceNew::logResourceAvailability(
 
         mResourceManagerMetrics->pushResourceStatusAtom(clientInfo, isCodecStarted, available,
                                                         doesResourceTrackingMatch,
-                                                        resourcesAvailableInfo,
-                                                        resourcesInRequestInfo);
+                                                        resourcesAvailable,
+                                                        systemResources);
     }
 }
 
