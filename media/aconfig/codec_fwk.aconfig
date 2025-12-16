@@ -107,6 +107,13 @@ flag {
 }
 
 flag {
+  name: "fixing_hdr"
+  namespace: "codec_fwk"
+  description: "Feature flag for fixing HDR support"
+  bug: "465509354"
+}
+
+flag {
   name: "flip_support"
   namespace: "codec_fwk"
   description: "Support flip for MediaCodec"
