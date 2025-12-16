@@ -67,10 +67,8 @@ void TagMonitor::parseTagsToMonitor(std::string tagNames) {
     ssize_t idx = tagNames.find("3a");
     if (idx != -1) {
         ssize_t end = tagNames.find(",", idx);
-        tagNames = tagNames.substr(0, idx) + k3aTags;
-        if (end != -1) {
-            tagNames += tagNames.substr(end);
-        }
+        std::string rest = end != -1 ? tagNames.substr(end) : "";
+        tagNames = tagNames.substr(0, idx) + k3aTags + rest;
     }
 
     sp<VendorTagDescriptor> vTags =
