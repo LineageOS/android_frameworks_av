@@ -69,6 +69,7 @@ cc_library {
     ] + select(release_flag("RELEASE_APEX_CODECS"), {
         true: [
             "C2ApexOpusDec.cpp",
+            "C2ApexAacDec.cpp",
         ],
         default: [],
     }),
@@ -86,13 +87,22 @@ cc_library {
     }),
 
     cflags: select(release_flag("RELEASE_APEX_CODECS"), {
-        true: ["-DENABLE_APEX_CODECS"],
+        true: [
+            "-DENABLE_APEX_CODECS",
+            "-Wno-unused-function",
+        ],
         default: [],
     }),
 
     static_libs: [
         "android.media.codec-aconfig-cc",
-    ],
+    ] + select(release_flag("RELEASE_APEX_CODECS"), {
+        true: [
+            "libaac",
+            "libaac_ffi",
+        ],
+        default: [],
+    }),
 
     visibility: [
         ":__subpackages__",
@@ -115,6 +125,7 @@ cc_library {
     ] + select(release_flag("RELEASE_APEX_CODECS"), {
         true: [
             "C2ApexOpusDec.cpp",
+            "C2ApexAacDec.cpp",
         ],
         default: [],
     }),
@@ -132,13 +143,22 @@ cc_library {
     }),
 
     cflags: select(release_flag("RELEASE_APEX_CODECS"), {
-        true: ["-DENABLE_APEX_CODECS"],
+        true: [
+            "-DENABLE_APEX_CODECS",
+            "-Wno-unused-function",
+        ],
         default: [],
     }),
 
     static_libs: [
         "android.media.codec-aconfig-cc",
-    ],
+    ] + select(release_flag("RELEASE_APEX_CODECS"), {
+        true: [
+            "libaac",
+            "libaac_ffi",
+        ],
+        default: [],
+    }),
 
     min_sdk_version: "apex_inherit",
     version_script: "libcom.android.media.swcodec.apexcodecs.map.txt",
