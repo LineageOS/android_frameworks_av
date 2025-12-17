@@ -20,6 +20,7 @@
 
 #include <sstream>
 
+#include <com_android_internal_camera_flags.h>
 #include <gui/ISurfaceComposer.h>
 #include <private/gui/ComposerService.h>
 #include <utils/Log.h>
@@ -27,6 +28,8 @@
 #include <camera/StringUtils.h>
 #include "utils/CameraTraces.h"
 #include "Camera3BufferManager.h"
+
+namespace flags = com::android::internal::camera::flags;
 
 namespace android {
 
@@ -81,13 +84,22 @@ status_t Camera3BufferManager::registerStream(wp<Camera3OutputStream>& stream,
     // Check if this stream was registered with different stream set ID, if so, error out.
     for (size_t i = 0; i < mStreamSetMap.size(); i++) {
         ssize_t streamIdx = mStreamSetMap[i].streamInfoMap.indexOfKey(streamId);
-        if (streamIdx != NAME_NOT_FOUND &&
-            (mStreamSetMap[i].streamInfoMap[streamIdx].streamSetId != streamInfo.streamSetId ||
-            mStreamSetMap[i].streamInfoMap[streamIdx].multiResMode != streamInfo.multiResMode ||
-            mStreamSetMap[i].allowConcurrent != streamAllowConcurrent)) {
-            ALOGE("%s: It is illegal to register the same stream id with different stream set",
-                    __FUNCTION__);
-            return BAD_VALUE;
+        if (streamIdx != NAME_NOT_FOUND) {
+            if (mStreamSetMap[i].streamInfoMap[streamIdx].streamSetId != streamInfo.streamSetId ||
+                    mStreamSetMap[i].streamInfoMap[streamIdx].multiResMode
+                            != streamInfo.multiResMode ||
+                    mStreamSetMap[i].allowConcurrent != streamAllowConcurrent) {
+                ALOGE("%s: It is illegal to register the same stream id with different stream set",
+                        __FUNCTION__);
+                return BAD_VALUE;
+            }
+            if (flags::multi_resolution_concurrent_readers() && isMultiResolution &&
+                    (mStreamSetMap[i].multiResUseReadoutTimestamp != streamInfo.useReadoutTimestamp
+                    || mStreamSetMap[i].multiResTimestampBase != streamInfo.timestampBase)) {
+                ALOGE("%s: It is illegal to register the multi-resolution streams with different "
+                        "timestamp bases or different exposure/readout selections", __FUNCTION__);
+                return BAD_VALUE;
+            }
         }
     }
     // Check if there is an existing stream set registered; if not, create one; otherwise, add this
@@ -99,6 +111,10 @@ status_t Camera3BufferManager::registerStream(wp<Camera3OutputStream>& stream,
         // Create stream info map, then add to mStreamsetMap.
         StreamSet newStreamSet;
         newStreamSet.allowConcurrent = streamAllowConcurrent;
+        if (isMultiResolution) {
+            newStreamSet.multiResUseReadoutTimestamp = streamInfo.useReadoutTimestamp;
+            newStreamSet.multiResTimestampBase = streamInfo.timestampBase;
+        }
         setIdx = mStreamSetMap.add(streamSetKey, newStreamSet);
     }
     // Update stream set map and water mark.

@@ -855,7 +855,8 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
         StreamInfo streamInfo(
                 getId(), getStreamSetId(), width, height, getFormat(), getDataSpace(),
                 mUsage | consumerUsage, mTotalBufferCount,
-                /*isConfigured*/true, getMultiResMode(), getAdditionalOptions());
+                /*isConfigured*/true, getMultiResMode(), getAdditionalOptions(),
+                mUseReadoutTime, getTimestampBase());
         wp<Camera3OutputStream> weakThis(this);
         res = mBufferManager->registerStream(weakThis,
                 streamInfo);
