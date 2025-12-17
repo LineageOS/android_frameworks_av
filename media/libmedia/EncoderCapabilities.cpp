@@ -52,6 +52,10 @@ bool EncoderCapabilities::isBitrateModeSupported(int mode) {
     return false;
 }
 
+const std::vector<const char*>& EncoderCapabilities::getSupportedLayeringSchemasPointers() {
+    return mLayeringSchemaPointerArray;
+}
+
 // static
 std::shared_ptr<EncoderCapabilities> EncoderCapabilities::Create(std::string mediaType,
         std::vector<ProfileLevel> profLevs, const sp<AMessage> &format) {
@@ -67,6 +71,8 @@ void EncoderCapabilities::init(std::string mediaType, std::vector<ProfileLevel> 
     mProfileLevels = profLevs;
     mComplexityRange = Range(0, 0);
     mQualityRange = Range(0, 0);
+    mLayeringSchemaPointerArray.clear();
+    mLayeringSchemas.clear();
     mBitControl = (1 << BITRATE_MODE_VBR);
 
     applyLevelLimits();
@@ -100,6 +106,17 @@ void EncoderCapabilities::parseFromInfo(const sp<AMessage> &format) {
                 = Range<int32_t>::Parse(std::string(qualityRangeAStr.c_str()));
         mQualityRange = qualityRangeOpt.value_or(mQualityRange);
     }
+    AString supportedLayeringSchemasAsStr;
+    if (format->findString("ts-schemas", &supportedLayeringSchemasAsStr)) {
+        if (supportedLayeringSchemasAsStr.size() > 0) {
+            mLayeringSchemaPointerArray.clear();
+            mLayeringSchemas = base::Split(std::string(supportedLayeringSchemasAsStr.c_str()), ";");
+            for (const std::string& schema : mLayeringSchemas) {
+                mLayeringSchemaPointerArray.push_back(schema.c_str());
+            }
+        }
+    }
+
     AString bitrateModesAStr;
     if (format->findString("feature-bitrate-modes", &bitrateModesAStr)) {
         mBitControl = 0;

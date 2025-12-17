@@ -18,6 +18,9 @@
 
 #define ENCODER_CAPABILITIES_H_
 
+#include <string>
+#include <vector>
+
 #include <media/CodecCapabilitiesUtils.h>
 #include <media/stagefright/foundation/AMessage.h>
 
@@ -61,6 +64,15 @@ struct EncoderCapabilities {
      */
     bool isBitrateModeSupported(int mode);
 
+    /**
+     * Query the supported layers schemas. Returns an array of null-terminated C-style strings,
+     * or an empty array if supported layers schema is unknown.
+     *
+     * Note: This method returns pointers to internal data and is intended for use by the NDK API
+     * to return these pointers verbatim to the caller.
+     */
+    const std::vector<const char*>& getSupportedLayeringSchemasPointers();
+
     /** @hide */
     static std::shared_ptr<EncoderCapabilities> Create(std::string mediaType,
             std::vector<ProfileLevel> profLevs, const sp<AMessage> &format);
@@ -85,6 +97,8 @@ private:
 
     Range<int> mQualityRange;
     Range<int> mComplexityRange;
+    std::vector<std::string> mLayeringSchemas;
+    std::vector<const char*> mLayeringSchemaPointerArray;
     int mBitControl;
     int mDefaultComplexity;
     int mDefaultQuality;
@@ -97,9 +111,9 @@ private:
     void applyLevelLimits();
     void parseFromInfo(const sp<AMessage> &format);
     bool supports(std::optional<int> complexity, std::optional<int> quality,
-            std::optional<int> profile);
+                  std::optional<int> profile);
 };
 
 }  // namespace android
 
-#endif // ENCODER_CAPABILITIES_H_
+#endif  // ENCODER_CAPABILITIES_H_
