@@ -1161,6 +1161,14 @@ audio_format_t AudioTrack::getHalFormat() const
     return mAfFormat;
 }
 
+int64_t AudioTrack::getWrittenFramesCount() const
+{
+    // TODO: b/461686562 - Adjust to the return value of a successful flushFromFrame() call.
+    AutoMutex lock(mLock);
+    if (mSharedBuffer) return 0; // Static tracks (i.e. with shared buffer) return 0.
+    return mStreamingFramesWritten;
+}
+
 status_t AudioTrack::setDualMonoMode(audio_dual_mono_mode_t mode)
 {
     AutoMutex lock(mLock);
@@ -2315,7 +2323,9 @@ ssize_t AudioTrack::write(const void* buffer, size_t userSize, bool blocking)
     }
 
     if (written > 0) {
-        mFramesWritten += written / mFrameSize;
+        const size_t frames = written / mFrameSize;
+        mFramesWritten += frames;
+        mStreamingFramesWritten += frames;
 
         if (mTransfer == TRANSFER_SYNC_NOTIF_CALLBACK) {
             const sp<AudioTrackThread> t = mAudioTrackThread;
@@ -2640,6 +2650,7 @@ nsecs_t AudioTrack::processAudioBuffer()
                 if (writtenFrames > 0) {
                     AutoMutex lock(mLock);
                     mFramesWritten += writtenFrames;
+                    mStreamingFramesWritten += writtenFrames;
                 }
                 // FIXME bug 25195759
                 return 1000000;
@@ -2790,6 +2801,7 @@ nsecs_t AudioTrack::processAudioBuffer()
     if (writtenFrames > 0) {
         AutoMutex lock(mLock);
         mFramesWritten += writtenFrames;
+        mStreamingFramesWritten += writtenFrames;
     }
     mRemainingFrames = notificationFrames;
     mRetryOnPartialBuffer = true;

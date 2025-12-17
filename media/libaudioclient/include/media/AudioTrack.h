@@ -511,6 +511,16 @@ public:
      */
             status_t    getBufferDurationInUs(int64_t *duration);
 
+    /* Returns the number of frames written to an AudioTrack in streaming mode.
+     *
+     * This value increments with each successful write.
+     * It is not reset on pause, or flush, or stop.  However
+     * it will be set to the value of a successful flushFromFrame().
+     *
+     * A static AudioTrack returns 0.
+     */
+    int64_t getWrittenFramesCount() const;
+
     /* Set the effective size of audio buffer that an application writes to.
      * This is used to determine the amount of available room in the buffer,
      * which determines when a write will block.
@@ -1415,6 +1425,13 @@ public:
     int64_t                 mFramesWrittenAtRestore; // Frames written at restore point (or frames
                                                     // delivered for static tracks).
                                                     // -1 indicates no previous restore point.
+
+    // Similar to mFramesWritten, mStreamingFramesWritten represents the total frames written
+    // to the buffer, but is not reset to 0 on flush() or stop (to start).
+    // However, it is set to the successful return position from flushFromFrame().
+    //
+    // See methods getWrittenFramesCount() and flushFromFrame().
+    int64_t mStreamingFramesWritten = 0;
 
     audio_output_flags_t    mFlags;                 // same as mOrigFlags, except for bits that may
                                                     // be denied by client or server, such as
