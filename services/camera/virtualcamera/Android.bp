@@ -45,6 +45,11 @@ cc_defaults {
         "-Wformat",
         "-Wthread-safety",
     ],
+    product_variables: {
+        debuggable: {
+            cflags: ["-DLOG_NDEBUG=0"],
+        },
+    },
 }
 
 cc_library_static {
