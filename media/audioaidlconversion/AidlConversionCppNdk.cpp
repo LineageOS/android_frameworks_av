@@ -512,8 +512,12 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
             {
                 AUDIO_DEVICE_IN_ECHO_REFERENCE, make_AudioDeviceDescription(
                         AudioDeviceType::IN_ECHO_REFERENCE)
-            }
-        }};
+            },
+            {
+                AUDIO_DEVICE_IN_BLE_CENTRAL_BROADCAST, make_AudioDeviceDescription(
+                        AudioDeviceType::IN_CENTRAL_BROADCAST_DEVICE,
+                        GET_DEVICE_DESC_CONNECTION(BT_LE))
+            }       }};
         append_AudioDeviceDescription(pairs,
                 AUDIO_DEVICE_IN_DEFAULT, AUDIO_DEVICE_OUT_DEFAULT,
                 AudioDeviceType::IN_DEFAULT, AudioDeviceType::OUT_DEFAULT);
@@ -595,7 +599,10 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
                 AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
                 AudioDeviceType::IN_SUBMIX, AudioDeviceType::OUT_SUBMIX,
                 GET_DEVICE_DESC_CONNECTION(VIRTUAL));
-
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_BLE_CENTRAL, AUDIO_DEVICE_OUT_BLE_CENTRAL,
+                AudioDeviceType::IN_CENTRAL_DEVICE, AudioDeviceType::OUT_CENTRAL_DEVICE,
+                GET_DEVICE_DESC_CONNECTION(BT_LE));
         return pairs;
     }();
     return pairs;

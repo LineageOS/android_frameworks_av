@@ -87,6 +87,7 @@ class AudioPowerUsage {
         OUTPUT_BLE_SPEAKER = 0x20000001u,
         OUTPUT_BLE_BROADCAST = 0x20000002u,
         OUTPUT_BLE_HEARING_AID = 0x20000004u,
+        OUTPUT_BLE_CENTRAL = 0x20000008u,
         // Input Devices
         INPUT_DEVICE_BIT = 0x40000000,
         INPUT_COMMUNICATION = 0x80000001u,
@@ -118,6 +119,8 @@ class AudioPowerUsage {
         INPUT_ECHO_REFERENCE = 0x90000000u,
         INPUT_BLE_HEADSET = 0xA0000000u,
         INPUT_BLE_HEARING_AID = 0xA0000001u,
+        INPUT_BLE_CENTRAL = 0xA0000002u,
+        INPUT_BLE_CENTRAL_BROADCAST = 0xA0000004u,
     };
 
     static bool deviceFromString(const std::string& device_string, int32_t& device);
