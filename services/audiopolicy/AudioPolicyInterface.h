@@ -22,6 +22,7 @@
 #include <android/media/audio/common/AudioConfigBase.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android/media/audio/common/FlushFromFrameSupport.h>
 #include <android/media/GetInputForAttrResponse.h>
 #include <android/content/AttributionSourceState.h>
 #include <error/BinderResult.h>
@@ -531,6 +532,12 @@ public:
     virtual status_t getMmapPolicyForDevice(
             media::audio::common::AudioMMapPolicyType policyType,
             media::audio::common::AudioMMapPolicyInfo *policyInfo) = 0;
+
+    virtual status_t getFlushFromFrameSupport(
+            const audio_config_base_t& config,
+            const audio_attributes_t& attr,
+            audio_output_flags_t flags,
+            media::audio::common::FlushFromFrameSupport* support) const = 0;
 };
 
 // Audio Policy client Interface
@@ -726,6 +733,11 @@ public:
 
     virtual error::BinderResult<bool> checkPermissionForInput(const AttributionSourceState& attr,
                                                               const PermissionReqs& req) = 0;
+
+    virtual status_t getFlushFromFrameSupport(
+            audio_module_handle_t module,
+            const media::audio::common::AudioPortConfig& config,
+            media::audio::common::FlushFromFrameSupport* support) const = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager

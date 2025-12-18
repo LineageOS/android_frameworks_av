@@ -1230,7 +1230,7 @@ sp<IOProfile> AudioPolicyManager::getProfileForOutput(
                                                    audio_format_t format,
                                                    audio_channel_mask_t channelMask,
                                                    audio_output_flags_t flags,
-                                                   bool directOnly)
+                                                   bool directOnly) const
 {
     flags = getRelevantFlags(flags, directOnly);
 
@@ -1239,7 +1239,7 @@ sp<IOProfile> AudioPolicyManager::getProfileForOutput(
 }
 
 audio_output_flags_t AudioPolicyManager::getRelevantFlags (
-                                            audio_output_flags_t flags, bool directOnly) {
+                                            audio_output_flags_t flags, bool directOnly) const {
     if (directOnly) {
          // only retain flags that will drive the direct output profile selection
          // if explicitly requested
@@ -1258,7 +1258,7 @@ sp<IOProfile> AudioPolicyManager::searchCompatibleProfileHwModules (
                                         audio_format_t format,
                                         audio_channel_mask_t channelMask,
                                         audio_output_flags_t flags,
-                                        bool directOnly) {
+                                        bool directOnly) const {
     sp<IOProfile> directOnlyProfile = nullptr;
     sp<IOProfile> compressOffloadProfile = nullptr;
     sp<IOProfile> profile = nullptr;
@@ -9824,6 +9824,48 @@ status_t AudioPolicyManager::updateMmapPolicyInfos(AudioMMapPolicyType policyTyp
     mMmapPolicyByDeviceType.emplace(policyType, mmapPolicyByDeviceType);
     mMmapPolicyInfos.emplace(policyType, policyInfos);
     return NO_ERROR;
+}
+
+status_t AudioPolicyManager::getFlushFromFrameSupport(
+        const audio_config_base_t& config,
+        const audio_attributes_t& attr,
+        audio_output_flags_t flags,
+        media::audio::common::FlushFromFrameSupport* support) const {
+    if (support == nullptr) {
+        // This must not happen as the framework should not pass in invalid pointer.
+        // Adding an extra track to avoid crash.
+        return BAD_VALUE;
+    }
+    // Currently, the `flushFromFrame` can only be supported by the PCM offload playback.
+    if (!audio_is_linear_pcm(config.format) ||
+        (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == AUDIO_OUTPUT_FLAG_NONE) {
+        *support = media::audio::common::FlushFromFrameSupport::UNSUPPORTED;
+        return NO_ERROR;
+    }
+    auto outputDevices = mEngine->getOutputDevicesForAttributes(
+            attr, nullptr /*preferredDevice*/, false);
+    auto profile = getProfileForOutput(
+            outputDevices, config.sample_rate, config.format, config.channel_mask,
+            flags, true /*directOnly*/);
+    if (profile == nullptr) {
+        *support = media::audio::common::FlushFromFrameSupport::UNSUPPORTED;
+        return NO_ERROR;
+    }
+
+    if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) != AUDIO_OUTPUT_FLAG_NONE) {
+        // For MMAP PCM offload, flushFromFrame is supported by the framework.
+        *support = media::audio::common::FlushFromFrameSupport::SUPPORTED;
+        return NO_ERROR;
+    }
+    // TODO: b/461579162 - consider if it can use the mmap offload as backend.
+
+    media::audio::common::AudioPortConfig portConfig;
+    portConfig.format = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_format_t_AudioFormatDescription(config.format));
+    portConfig.flags = AudioIoFlags::make<AudioIoFlags::Tag::output>(
+            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_t_int32_t_mask(flags)));
+    return mpClientInterface->getFlushFromFrameSupport(
+            profile->getModuleHandle(), portConfig, support);
 }
 
 } // namespace android

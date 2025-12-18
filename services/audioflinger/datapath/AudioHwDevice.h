@@ -23,6 +23,8 @@
 
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android/media/audio/common/AudioPortConfig.h>
+#include <android/media/audio/common/FlushFromFrameSupport.h>
 #include <media/audiohal/DeviceHalInterface.h>
 #include <utils/Errors.h>
 #include <system/audio.h>
@@ -118,6 +120,10 @@ public:
     [[nodiscard]] status_t getAudioMixPort(const struct audio_port_v7 *devicePort,
                                            struct audio_port_v7 *mixPort,
                                            int32_t mixPortHalId) const;
+
+    [[nodiscard]] status_t getFlushFromFrameSupport(
+            const media::audio::common::AudioPortConfig& config,
+            media::audio::common::FlushFromFrameSupport* support) const;
 
 private:
     const audio_module_handle_t mHandle;

@@ -59,6 +59,7 @@ using aidl::android::media::audio::common::AudioPortConfig;
 using aidl::android::media::audio::common::AudioPortExt;
 using aidl::android::media::audio::common::AudioSource;
 using aidl::android::media::audio::common::Float;
+using aidl::android::media::audio::common::FlushFromFrameSupport;
 using aidl::android::media::audio::common::Int;
 using aidl::android::media::audio::common::MicrophoneDynamicInfo;
 using aidl::android::media::audio::common::MicrophoneInfo;
@@ -937,6 +938,29 @@ status_t DeviceHalAidl::getAudioMixPort(const struct audio_port_v7 *devicePort,
             mixPort->role, mixPort->type)) == ::aidl::android::AudioPortDirection::INPUT;
     *mixPort = VALUE_OR_RETURN_STATUS(::aidl::android::aidl2legacy_AudioPort_audio_port_v7(
             port, isInput));
+    return OK;
+}
+
+status_t DeviceHalAidl::getFlushFromFrameSupport(
+        const media::audio::common::AudioPortConfig& config,
+        media::audio::common::FlushFromFrameSupport* support) const {
+    AUGMENT_LOG(D);
+    TIME_CHECK();
+    RETURN_IF_MODULE_NOT_INIT(NO_INIT);
+
+    if (support == nullptr) {
+        AUGMENT_LOG(E, "support parameter is null");
+        return BAD_VALUE;
+    }
+
+    AudioPortConfig ndkConfig = VALUE_OR_RETURN_STATUS(cpp2ndk_AudioPortConfig(config));
+    FlushFromFrameSupport ndkSupport = FlushFromFrameSupport::UNSUPPORTED;
+    {
+        std::lock_guard l(mLock);
+        RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+                mModule->getFlushFromFrameSupport(ndkConfig, &ndkSupport)));
+    }
+    *support = VALUE_OR_RETURN_STATUS(ndk2cpp_FlushFromFrameSupport(ndkSupport));
     return OK;
 }
 

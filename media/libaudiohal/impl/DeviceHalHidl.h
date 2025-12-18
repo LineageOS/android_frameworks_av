@@ -154,6 +154,13 @@ class DeviceHalHidl : public DeviceHalInterface, public CoreConversionHelperHidl
                              struct audio_port_v7* mixPort,
                              int32_t mixPortHalId) override;
 
+    status_t getFlushFromFrameSupport(
+            const media::audio::common::AudioPortConfig& /*config*/,
+            media::audio::common::FlushFromFrameSupport* /*support*/) const override {
+        // `flushFromFrame` is only supported on AIDL HAL.
+        return INVALID_OPERATION;
+    }
+
   private:
     friend class DevicesFactoryHalHidl;
     sp<::android::hardware::audio::CPP_VERSION::IDevice> mDevice;

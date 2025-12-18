@@ -126,6 +126,32 @@ public:
             std::vector<media::audio::common::AudioMMapPolicyInfo>* /*policyInfos*/) override {
         return INVALID_OPERATION;
     }
+
+    status_t getFlushFromFrameSupport(
+            audio_module_handle_t /*module*/,
+            const media::audio::common::AudioPortConfig& config,
+            media::audio::common::FlushFromFrameSupport *support) const override {
+        if (!config.flags.has_value() || !config.format.has_value()) {
+            *support = media::audio::common::FlushFromFrameSupport::UNSUPPORTED;
+            return BAD_VALUE;
+        }
+
+        // Just report pcm 16 bit offload as supported.
+        const bool isPcm16Bit =
+                config.format.value().type == media::audio::common::AudioFormatType::PCM &&
+                config.format.value().pcm == media::audio::common::PcmType::INT_16_BIT;
+        const bool isOffload =
+                config.flags.value().getTag() == media::audio::common::AudioIoFlags::Tag::output &&
+                (config.flags.value().get<media::audio::common::AudioIoFlags::Tag::output>() &
+                        (1 << static_cast<int32_t>(
+                                media::audio::common::AudioOutputFlags::COMPRESS_OFFLOAD))) != 0;
+
+        *support = isPcm16Bit && isOffload
+                ? media::audio::common::FlushFromFrameSupport::SUPPORTED
+                : media::audio::common::FlushFromFrameSupport::UNSUPPORTED;
+        return NO_ERROR;
+    }
+
     error::BinderResult<bool> checkPermissionForInput(const AttributionSourceState& /* attr */,
                                                               const PermissionReqs& /* req */) {
         return true;

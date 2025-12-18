@@ -38,6 +38,7 @@ using media::audio::common::AudioMMapPolicyType;
 using media::audio::common::AudioMode;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUuid;
+using media::audio::common::FlushFromFrameSupport;
 
 #define MAX_ITEMS_PER_LIST 1024
 
@@ -903,6 +904,13 @@ status_t AudioFlingerClientAdapter::resetReferencesForTest() {
     return OK;
 }
 
+status_t AudioFlingerClientAdapter::getFlushFromFrameSupport(
+        int module, const media::audio::common::AudioPortConfig& config,
+        FlushFromFrameSupport* support) {
+    return statusTFromBinderStatus(mDelegate->getFlushFromFrameSupport(
+            module, config, support));
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
@@ -1455,6 +1463,13 @@ Status AudioFlingerServerAdapter::setTracksInternalMute(
 
 Status AudioFlingerServerAdapter::resetReferencesForTest() {
     RETURN_BINDER_IF_ERROR(mDelegate->resetReferencesForTest());
+    return Status::ok();
+}
+
+Status AudioFlingerServerAdapter::getFlushFromFrameSupport(
+        int module, const media::audio::common::AudioPortConfig& config,
+        FlushFromFrameSupport* _aidl_return) {
+    RETURN_BINDER_IF_ERROR(mDelegate->getFlushFromFrameSupport(module, config, _aidl_return));
     return Status::ok();
 }
 
