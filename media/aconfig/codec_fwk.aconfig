@@ -107,10 +107,24 @@ flag {
 }
 
 flag {
+  name: "fixing_hdr"
+  namespace: "codec_fwk"
+  description: "Feature flag for fixing HDR support"
+  bug: "465509354"
+}
+
+flag {
   name: "flip_support"
   namespace: "codec_fwk"
   description: "Support flip for MediaCodec"
   bug: "395095742"
+}
+
+flag {
+  name: "format_400_444_support"
+  namespace: "codec_fwk"
+  description: "Feature flag for pixel format 4:0:0 and 4:4:4 support."
+  bug: "465510587"
 }
 
 flag {
@@ -291,6 +305,7 @@ flag {
 
 flag {
   name: "temporal_layer_encoding"
+  is_exported: true
   namespace: "codec_fwk"
   description: "Feature flag for temporal layer encoding"
   bug: "432558680"

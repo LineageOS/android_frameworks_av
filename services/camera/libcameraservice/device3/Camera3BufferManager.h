@@ -280,6 +280,17 @@ private:
         bool allowConcurrent;
 
         /**
+         * Whether this stream set for MultiResolution output uses readout timestamp.
+         * Not applicable for non-MultiResolution outputs.
+         */
+        bool multiResUseReadoutTimestamp;
+
+        /**
+         * The timestamp base for this MultiResolution stream set.
+         */
+        int multiResTimestampBase;
+
+        /**
          * The stream info for all streams in this set
          */
         InfoMap streamInfoMap;
@@ -305,6 +316,8 @@ private:
             allocatedBufferWaterMark = 0;
             maxAllowedBufferCount = 0;
             allowConcurrent = false;
+            multiResUseReadoutTimestamp = false;
+            multiResTimestampBase = -1;
         }
     };
 

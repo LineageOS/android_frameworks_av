@@ -131,7 +131,6 @@ public:
             return C2_CORRUPTED;
         }
 
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_PLATFORM_API_IMPROVEMENTS)
         {
             native_window_set_usage(mSurface.get(), usage);
             native_window_set_buffers_format(mSurface.get(), format);
@@ -147,28 +146,7 @@ public:
             *pBuf = AHardwareBuffer_from_GraphicBuffer(gb.get());
             AHardwareBuffer_acquire(*pBuf);
         }
-#else
-        // NOTE: This should be obsolete from 25Q2.
-        {
-            sp<IGraphicBufferProducer> producer = mSurface->getIGraphicBufferProducer();
-            int slot;
-            ::android::status_t res = producer->dequeueBuffer(
-                    &slot, fence, width, height, format, usage, nullptr, nullptr);
-            if (res < 0) {
-                ALOGE("Producer::dequeueBuffer failed from PlaceHolderSurface %d", res);
-                return C2_CORRUPTED;
-            }
-            sp<GraphicBuffer> gb;
-            res = producer->requestBuffer(slot, &gb);
-            if (res != ::android::OK) {
-                ALOGE("Producer::requestBuffer failed from PlaceHolderSurface %d", res);
-                return C2_CORRUPTED;
-            }
-            (void)producer->detachBuffer(slot);
-            *pBuf = AHardwareBuffer_from_GraphicBuffer(gb.get());
-            AHardwareBuffer_acquire(*pBuf);
-        }
-#endif
+
         return C2_OK;
     }
 

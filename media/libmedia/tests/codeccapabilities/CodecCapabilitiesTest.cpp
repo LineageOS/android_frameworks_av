@@ -465,6 +465,9 @@ protected:
         details->setString("quality-range", "0-100");
         details->setString("quality-scale", "linear");
         details->setString("size-range", "64x64-3840x2176");
+        details->setString("ts-schemas",
+                           "android.generic.2+0;android.generic.3+1;webrtc.vp8.2-layer;"
+                           "webrtc.svc.l1t2;webrtc.svc.l1t3");
 
         std::vector<ProfileLevel> profileLevel{
             ProfileLevel(1, 2097152),
@@ -496,4 +499,17 @@ TEST_F(EncoderCapsHevcTest, EncoderCaps_HEVC_SupportedBitrateMode) {
     EXPECT_TRUE(encoderCaps->isBitrateModeSupported(BITRATE_MODE_VBR));
     EXPECT_TRUE(encoderCaps->isBitrateModeSupported(BITRATE_MODE_CQ));
     EXPECT_TRUE(encoderCaps->isBitrateModeSupported(BITRATE_MODE_CBR_FD));
+}
+
+TEST_F(EncoderCapsHevcTest, EncoderCaps_HEVC_SupportedLayeringSchemas) {
+    const std::set<std::string> expectedSchemas = {
+            "android.generic.2+0", "android.generic.3+1", "webrtc.vp8.2-layer",
+            "webrtc.svc.l1t2",     "webrtc.svc.l1t3",
+    };
+    const std::vector<const char*> schemas = encoderCaps->getSupportedLayeringSchemasPointers();
+    std::set<std::string> actualSchemas;
+    for (const auto& schema : schemas) {
+        actualSchemas.insert(std::string(schema));
+    }
+    EXPECT_EQ(actualSchemas, expectedSchemas);
 }

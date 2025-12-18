@@ -526,6 +526,22 @@ int32_t ACodecEncoderCapabilities_isBitrateModeSupported(
     return encoderCaps->mEncoderCaps->isBitrateModeSupported(mode);
 }
 
+EXPORT
+media_status_t ACodecEncoderCapabilities_getSupportedLayeringSchemas(
+        const ACodecEncoderCapabilities *encoderCaps,
+        const char* const* *outSupportedLayeringSchemaArrayPtr, size_t *outCount) {
+    if (encoderCaps == nullptr || outSupportedLayeringSchemaArrayPtr == nullptr ||
+        outCount == nullptr) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    const std::vector<const char*>& schemas =
+            encoderCaps->mEncoderCaps->getSupportedLayeringSchemasPointers();
+    *outSupportedLayeringSchemaArrayPtr = schemas.data();
+    *outCount = schemas.size();
+    return AMEDIA_OK;
+}
+
 // Feature Names
 
 extern const char* AMediaCodecInfo_FEATURE_AdaptivePlayback     = "adaptive-playback";
@@ -544,5 +560,4 @@ extern const char* AMediaCodecInfo_FEATURE_HlgEditing           = "hlg-editing";
 extern const char* AMediaCodecInfo_FEATURE_DynamicColorAspects  = "dynamic-color-aspects";
 extern const char* AMediaCodecInfo_FEATURE_Roi                  = "region-of-interest";
 extern const char* AMediaCodecInfo_FEATURE_DetachedSurface      = "detached-surface";
-
 }

@@ -27,6 +27,7 @@
 #ifdef ENABLE_APEX_CODECS
 #include <util/C2InterfaceHelper.h>
 #include "C2ApexOpusDec.h"
+#include "C2ApexAacDec.h"
 #endif
 
 namespace android::apexcodecs {
@@ -68,8 +69,6 @@ private:
         (*codecs)[Codec::COMPONENT_NAME] = ComponentDesc{
             Codec::MakeTraits(),
             Codec::Create,
-            Codec::Map,
-            Codec::Unmap,
         };
     }
 
@@ -77,6 +76,9 @@ private:
         std::map<std::string, ComponentDesc> codecs;
         if (android::media::swcodec::flags::opus_inproc_software_decoder()) {
             AddCodec<C2ApexOpusDec>(&codecs);
+        }
+        if (android::media::swcodec::flags::rust_aac_software_decoder()) {
+            AddCodec<C2ApexAacDec>(&codecs);
         }
         std::erase_if(codecs, [](const auto &pair) {
             return pair.second.traits == nullptr;

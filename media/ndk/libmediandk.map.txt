@@ -9,6 +9,7 @@ LIBMEDIANDK {
     ACodecAudioCapabilities_isSampleRateSupported; # introduced=36
     ACodecEncoderCapabilities_getComplexityRange; # introduced=36
     ACodecEncoderCapabilities_getQualityRange; # introduced=36
+    ACodecEncoderCapabilities_getSupportedLayeringSchemas; # introduced=37
     ACodecEncoderCapabilities_isBitrateModeSupported; # introduced=36
     ACodecPerformancePoint_create; # introduced=36
     ACodecPerformancePoint_covers; # introduced=36
