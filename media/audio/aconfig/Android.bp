@@ -162,10 +162,12 @@ java_aconfig_library {
     apex_available: [
         "com.android.bt",
         "com.android.permission",
+        "com.android.telephonycore",
     ],
     visibility: [
         "//packages/modules/Bluetooth:__subpackages__",
         "//packages/modules/Permission:__subpackages__",
+        "//packages/modules/Telephony/telecom/service",
     ],
 }
 
