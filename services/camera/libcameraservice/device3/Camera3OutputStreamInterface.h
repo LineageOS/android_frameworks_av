@@ -87,6 +87,11 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/) = 0;
 
     /**
+     * Update the internal stream output surface ids.
+     */
+    virtual status_t updateInternalStream(KeyedVector<sp<Surface>, size_t> *outputMap/*out*/) = 0;
+
+    /**
      * Query the surface mirror mode.
      */
     virtual int getMirrorMode() const = 0;

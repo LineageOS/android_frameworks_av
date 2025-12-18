@@ -164,12 +164,14 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mState = STATE_ERROR;
     }
 
-    // Validation check for the consumer usage flag.
-    if ((consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) == 0 &&
-            (consumerUsage & GraphicBuffer::USAGE_HW_COMPOSER) == 0) {
-        ALOGE("%s: Deferred consumer usage flag is illegal %" PRIu64 "!",
-              __FUNCTION__, consumerUsage);
-        mState = STATE_ERROR;
+    if (!flags::seamless_transitions()) {
+        // Validation check for the consumer usage flag.
+        if ((consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) == 0 &&
+                (consumerUsage & GraphicBuffer::USAGE_HW_COMPOSER) == 0) {
+            ALOGE("%s: Deferred consumer usage flag is illegal %" PRIu64 "!",
+                  __FUNCTION__, consumerUsage);
+            mState = STATE_ERROR;
+        }
     }
 
     bool needsReleaseNotify = setId > CAMERA3_STREAM_SET_ID_INVALID;
@@ -1180,6 +1182,35 @@ ssize_t Camera3OutputStream::getSurfaceId(const sp<Surface> &surface) {
     }
 
     return 0;
+}
+
+status_t Camera3OutputStream::updateInternalStream(
+        KeyedVector<sp<Surface>, size_t> * outputMap /*out*/) {
+    if (!flags::seamless_transitions()) {
+        ALOGE("%s: this method is not supported!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    if (isBlockedByPrepare()) {
+        ALOGE("%s: Stream update is blocked by an ongoing prepare operation!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    if (outputMap == nullptr) {
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock l(mLock);
+
+    if (mConsumer.get() == nullptr) {
+        ALOGE("%s: Stream update on deferred output!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    mCurrentSurfaceId++;
+    outputMap->add(mConsumer, mCurrentSurfaceId);
+
+    return OK;
 }
 
 status_t Camera3OutputStream::updateStream(const std::vector<SurfaceHolder> &outputSurfaces,

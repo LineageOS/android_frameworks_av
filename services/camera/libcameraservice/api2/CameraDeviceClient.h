@@ -22,8 +22,10 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
-#include <unordered_map>
 #include <gui/Flags.h>  // remove with WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
+#include <stop_token>
+#include <string>
+#include <unordered_map>
 
 #include <fmq/AidlMessageQueueCpp.h>
 
@@ -374,6 +376,12 @@ private:
     // Surface only
     status_t getSurfaceKey(sp<Surface> surface, SurfaceKey* out) const;
 
+    void updateCompositeOutputsLocked(int streamId, SurfaceKey surfaceKey,
+            const sp<CompositeStream>& compositeStream, bool deferredCompositeStream,
+            bool noNewOutputs);
+    void findCompositeStream(int streamId, sp<CompositeStream> *compositeStream /*out*/,
+            bool *deferredStream /*out*/);
+
     bool matchSharedStreamingRequest(int reqId);
     bool matchSharedCaptureRequest(int reqId);
     void markClientActive();
@@ -426,9 +434,12 @@ private:
     // set of high resolution camera id (logical / physical)
     std::unordered_set<std::string> mHighResolutionSensors;
 
-    // Synchronize access to 'mCompositeStreamMap'
+    // Synchronize access to 'mCompositeStreamMap' and 'mDeferredCompositeMap'
     Mutex mCompositeLock;
     KeyedVector<SurfaceKey, sp<CompositeStream>> mCompositeStreamMap;
+
+    // Map stream ids to deferred composite streams
+    std::unordered_map<int, sp<CompositeStream>> mDeferredCompositeMap;
 
     sp<CameraProviderManager> mProviderManager;
 

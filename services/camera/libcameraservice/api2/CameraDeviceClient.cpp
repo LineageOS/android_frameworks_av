@@ -1339,13 +1339,14 @@ binder::Status CameraDeviceClient::createStreamLocked(
             } else {
                 compositeStream = new camera3::JpegRCompositeStream(mDevice, getRemoteCallback());
             }
-            err = compositeStream->createStream(surfaceHolders, deferredConsumer, streamInfo.width,
-                streamInfo.height, streamInfo.format,
-                static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
-                &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
-                outputConfiguration.getSurfaceSetID(), isShared, multiResMode,
-                streamInfo.colorSpace, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase,
-                useReadoutTimestamp);
+            err = compositeStream->createStream(
+                    surfaceHolders, deferredConsumer, streamInfo.width, streamInfo.height,
+                    streamInfo.format,
+                    static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
+                    &streamId, physicalCameraId, streamInfo.sensorPixelModesUsed, &surfaceIds,
+                    outputConfiguration.getSurfaceSetID(), isShared, multiResMode,
+                    streamInfo.colorSpace, streamInfo.dynamicRangeProfile, streamInfo.streamUseCase,
+                    useReadoutTimestamp, outputConfiguration.getDataspace());
             if (err == OK) {
                 Mutex::Autolock l(mCompositeLock);
                 SurfaceKey surfaceKey;
@@ -1437,13 +1438,25 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     width = outputConfiguration.getWidth();
     height = outputConfiguration.getHeight();
     surfaceType = outputConfiguration.getSurfaceType();
-    format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
-    dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
+    if (flags::seamless_transitions()) {
+        format = outputConfiguration.getFormat();
+        dataSpace = static_cast<android_dataspace_t>(outputConfiguration.getDataspace());
+    } else {
+        format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+        dataSpace = android_dataspace_t::HAL_DATASPACE_UNKNOWN;
+    }
     colorSpace = ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED;
     // Hardcode consumer usage flags: SurfaceView--0x900, SurfaceTexture--0x100.
     consumerUsage = GraphicBuffer::USAGE_HW_TEXTURE;
     if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
         consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
+    } else if (flags::seamless_transitions() &&
+            (surfaceType == OutputConfiguration::SURFACE_TYPE_IMAGE_READER)) {
+        consumerUsage = outputConfiguration.getUsage();
+    } else if (flags::seamless_transitions() &&
+            (surfaceType == OutputConfiguration::SURFACE_TYPE_MEDIA_RECORDER ||
+             surfaceType == OutputConfiguration::SURFACE_TYPE_MEDIA_CODEC)) {
+        consumerUsage = GraphicBuffer::USAGE_HW_VIDEO_ENCODER;
     }
     int streamId = camera3::CAMERA3_STREAM_ID_INVALID;
     std::vector<SurfaceHolder> noSurface;
@@ -1462,48 +1475,79 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
                 "sensor pixel modes used not valid for deferred stream");
     }
 
-    err = mDevice->createStream(noSurface, /*hasDeferredConsumer*/true, width,
-            height, format, dataSpace,
-            static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
-            &streamId, physicalCameraId,
-            overriddenSensorPixelModesUsed,
-            &surfaceIds,
-            outputConfiguration.getSurfaceSetID(), isShared,
-            outputConfiguration.getMultiResMode(), consumerUsage,
-            outputConfiguration.getDynamicRangeProfile(),
-            outputConfiguration.getStreamUseCase(),
-            outputConfiguration.useReadoutTimestamp());
+    bool isDepthCompositeStream =
+            camera3::DepthCompositeStream::isDepthCompositeStreamOutput(outputConfiguration);
+    bool isHeicCompositeStream = camera3::HeicCompositeStream::isHeicCompositeStreamOutput(
+            outputConfiguration, mDevice->isCompositeHeicDisabled(),
+            mDevice->isCompositeHeicUltraHDRDisabled());
+    bool isJpegRCompositeStream =
+        camera3::JpegRCompositeStream::isJpegRCompositeStreamOutput(outputConfiguration) &&
+        !mDevice->isCompositeJpegRDisabled();
+    if (flags::seamless_transitions() && (isDepthCompositeStream || isHeicCompositeStream ||
+                isJpegRCompositeStream)) {
+        sp<CompositeStream> compositeStream;
+        if (isDepthCompositeStream) {
+            compositeStream = new camera3::DepthCompositeStream(mDevice, getRemoteCallback());
+        } else if (isHeicCompositeStream) {
+            compositeStream = new camera3::HeicCompositeStream(mDevice, getRemoteCallback());
+        } else {
+            compositeStream = new camera3::JpegRCompositeStream(mDevice, getRemoteCallback());
+        }
+        err = compositeStream->createStream(
+                noSurface, true /*deferredConsumer*/, width, height, format,
+                static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()), &streamId,
+                physicalCameraId, overriddenSensorPixelModesUsed, &surfaceIds,
+                outputConfiguration.getSurfaceSetID(), isShared,
+                outputConfiguration.getMultiResMode(), colorSpace,
+                outputConfiguration.getDynamicRangeProfile(),
+                outputConfiguration.getStreamUseCase(), outputConfiguration.useReadoutTimestamp(),
+                outputConfiguration.getDataspace());
+        if (err == OK) {
+            Mutex::Autolock l(mCompositeLock);
+            mDeferredCompositeMap.emplace(compositeStream->getStreamId(), compositeStream);
+        }
+    } else {
+        err = mDevice->createStream(
+                noSurface, /*hasDeferredConsumer*/ true, width, height, format, dataSpace,
+                static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()), &streamId,
+                physicalCameraId, overriddenSensorPixelModesUsed, &surfaceIds,
+                outputConfiguration.getSurfaceSetID(), isShared,
+                outputConfiguration.getMultiResMode(), consumerUsage,
+                outputConfiguration.getDynamicRangeProfile(),
+                outputConfiguration.getStreamUseCase(), outputConfiguration.useReadoutTimestamp());
+    }
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
-                "Camera %s: Error creating output stream (%d x %d, fmt %x, dataSpace %x): %s (%d)",
-                mCameraIdStr.c_str(), width, height, format, static_cast<int>(dataSpace),
-                strerror(-err), err);
+                               "Camera %s: Error creating output stream (%d x %d, fmt %x, "
+                               "dataSpace %x): %s (%d)",
+                               mCameraIdStr.c_str(), width, height, format,
+                               static_cast<int>(dataSpace), strerror(-err), err);
     } else {
         // Can not add streamId to mStreamMap here, as the surface is deferred. Add it to
         // a separate list to track. Once the deferred surface is set, this id will be
         // relocated to mStreamMap.
         mDeferredStreams.push_back(streamId);
-        mStreamInfoMap.emplace(std::piecewise_construct, std::forward_as_tuple(streamId),
+        mStreamInfoMap.emplace(
+                std::piecewise_construct, std::forward_as_tuple(streamId),
                 std::forward_as_tuple(width, height, format, dataSpace, consumerUsage,
-                        overriddenSensorPixelModesUsed,
-                        outputConfiguration.getDynamicRangeProfile(),
-                        outputConfiguration.getStreamUseCase(),
-                        outputConfiguration.getTimestampBase(),
-                        colorSpace));
+                                      overriddenSensorPixelModesUsed,
+                                      outputConfiguration.getDynamicRangeProfile(),
+                                      outputConfiguration.getStreamUseCase(),
+                                      outputConfiguration.getTimestampBase(), colorSpace));
 
         ALOGV("%s: Camera %s: Successfully created a new stream ID %d for a deferred surface"
-                " (%d x %d) stream with format 0x%x.",
+              " (%d x %d) stream with format 0x%x.",
               __FUNCTION__, mCameraIdStr.c_str(), streamId, width, height, format);
 
         *newStreamId = streamId;
         // Fill in mHighResolutionCameraIdToStreamIdSet
         // Only needed for high resolution sensors
-        if (mHighResolutionSensors.find(cameraIdUsed) !=
-                mHighResolutionSensors.end()) {
+        if (mHighResolutionSensors.find(cameraIdUsed) != mHighResolutionSensors.end()) {
             mHighResolutionCameraIdToStreamIdSet[cameraIdUsed].insert(streamId);
         }
     }
+
     return res;
 }
 
@@ -1715,8 +1759,17 @@ binder::Status CameraDeviceClient::updateOutputConfigurationLocked(int streamId,
     }
 
     KeyedVector<sp<Surface>, size_t> outputMap;
-    auto ret = mDevice->updateStream(streamId, newOutputs, streamInfos, removedSurfaceIds,
-            replaceEnabled, &outputMap, lastFrameNumber);
+    sp<CompositeStream> compositeStream = nullptr;
+    bool deferredCompositeStream = false;
+    findCompositeStream(streamId, &compositeStream, &deferredCompositeStream);
+
+    status_t ret;
+    if (compositeStream.get() == nullptr) {
+        ret = mDevice->updateStream(streamId, newOutputs, streamInfos, removedSurfaceIds,
+                replaceEnabled, &outputMap, lastFrameNumber);
+    } else {
+        ret = compositeStream->updateStream(streamId, newOutputs, &outputMap, lastFrameNumber);
+    }
     if (ret != OK) {
         switch (ret) {
             case NAME_NOT_FOUND:
@@ -1737,8 +1790,8 @@ binder::Status CameraDeviceClient::updateOutputConfigurationLocked(int streamId,
             mStreamMap.removeItem(it);
         }
 
+        SurfaceKey surfaceKey;
         for (size_t i = 0; i < outputMap.size(); i++) {
-            SurfaceKey surfaceKey;
             status_t ret = getSurfaceKey(outputMap.keyAt(i), &surfaceKey);
             if(ret != OK) {
                 ALOGE("%s: Camera %s: Could not get the SurfaceKey", __FUNCTION__,
@@ -1750,12 +1803,72 @@ binder::Status CameraDeviceClient::updateOutputConfigurationLocked(int streamId,
         }
 
         mConfiguredOutputs.replaceValueFor(streamId, outputConfiguration);
+        updateCompositeOutputsLocked(streamId, surfaceKey, compositeStream,
+                deferredCompositeStream, newOutputs.empty());
+
 
         ALOGV("%s: Camera %s: Successful stream ID %d update",
                   __FUNCTION__, mCameraIdStr.c_str(), streamId);
     }
 
     return res;
+}
+
+void CameraDeviceClient::findCompositeStream(int streamId,
+        sp<CompositeStream> *compositeStream /*out*/, bool *deferredStream /*out*/) {
+    if (compositeStream == nullptr || deferredStream == nullptr) {
+        return;
+    }
+
+    if (flags::seamless_transitions()) {
+        Mutex::Autolock compLock(mCompositeLock);
+        for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+            if (streamId == mCompositeStreamMap.valueAt(i)->getStreamId()) {
+                *compositeStream = mCompositeStreamMap.valueAt(i);
+                break;
+            }
+        }
+        if (compositeStream->get() == nullptr) {
+            auto it = mDeferredCompositeMap.find(streamId);
+            if (it != mDeferredCompositeMap.end()) {
+                *compositeStream = it->second;
+                *deferredStream = true;
+            }
+        }
+    }
+}
+
+void CameraDeviceClient::updateCompositeOutputsLocked(int streamId, SurfaceKey surfaceKey,
+        const sp<CompositeStream>& compositeStream,
+        bool deferredCompositeStream, bool noNewOutputs) {
+    if (compositeStream.get() != nullptr) {
+        Mutex::Autolock compLock(mCompositeLock);
+        if (deferredCompositeStream) {
+            if (!noNewOutputs) {
+                auto it = std::find(mDeferredStreams.begin(), mDeferredStreams.end(), streamId);
+                if (it != mDeferredStreams.end()) {
+                    mDeferredStreams.erase(it);
+                }
+                mStreamInfoMap[streamId].finalized = true;
+                mDeferredCompositeMap.erase(streamId);
+                mCompositeStreamMap.add(surfaceKey, compositeStream);
+            }
+        } else {
+            for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+                if (streamId == mCompositeStreamMap.valueAt(i)->getStreamId()) {
+                    mCompositeStreamMap.removeItemsAt(i, 1);
+                    break;
+                }
+            }
+            if (noNewOutputs)  {
+                mDeferredStreams.add(streamId);
+                mStreamInfoMap[streamId].finalized = false;
+                mDeferredCompositeMap.emplace(streamId, compositeStream);
+            } else {
+                mCompositeStreamMap.add(surfaceKey, compositeStream);
+            }
+        }
+    }
 }
 
 // Create a request object from a template.
@@ -2123,16 +2236,29 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
     // Finish the deferred stream configuration with the surface.
     status_t err;
     std::vector<int> consumerSurfaceIds;
-    err = mDevice->setConsumerSurfaces(streamId, consumerSurfaceHolders, &consumerSurfaceIds);
+    sp<CompositeStream> compositeStream;
+    if (flags::seamless_transitions()) {
+        Mutex::Autolock compLock(mCompositeLock);
+        auto it = mDeferredCompositeMap.find(streamId);
+        if (it != mDeferredCompositeMap.end()) {
+            compositeStream = it->second;
+        }
+    }
+    if (compositeStream.get() != nullptr) {
+        err = compositeStream->setConsumerSurfaces(streamId, consumerSurfaceHolders,
+                                                   &consumerSurfaceIds);
+    } else {
+        err = mDevice->setConsumerSurfaces(streamId, consumerSurfaceHolders, &consumerSurfaceIds);
+    }
     if (err == OK) {
+        SurfaceKey surfaceKey;
         for (size_t i = 0; i < consumerSurfaceHolders.size(); i++) {
-            SurfaceKey surfaceKey;
             status_t ret = getSurfaceKey(consumerSurfaceHolders[i].mSurface, &surfaceKey);
-            if(ret != OK) {
+            if (ret != OK) {
                 ALOGE("%s: Camera %s: Could not get the SurfaceKey", __FUNCTION__,
-                     mCameraIdStr.c_str());
+                    mCameraIdStr.c_str());
                 return STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION,
-                     "Could not get the SurfaceKey");
+                                    "Could not get the SurfaceKey");
             }
 #if WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
             ALOGV("%s: mStreamMap add surface_key %" PRIu64 " streamId %d, surfaceId %d",
@@ -2148,6 +2274,12 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
         }
         mStreamInfoMap[streamId].finalized = true;
         mConfiguredOutputs.replaceValueFor(streamId, outputConfiguration);
+
+        if (compositeStream.get() != nullptr) {
+            Mutex::Autolock compLock(mCompositeLock);
+            mDeferredCompositeMap.erase(streamId);
+            mCompositeStreamMap.add(surfaceKey, compositeStream);
+        }
     } else if (err == NO_INIT) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
                 "Camera %s: Deferred surface is invalid: %s (%d)",
@@ -3028,26 +3160,6 @@ binder::Status CameraDeviceClient::updateOutputConfigurations(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
     }
 
-    // The current implementation doesn't support composite and shared stream updates
-    for (size_t i = 0; i < streamIds.size(); i++) {
-        if (configurations[i].isShared()) {
-            std::string msg = fmt::sprintf("Camera %s: Shared stream updates are"
-                    " not supported!", mCameraIdStr.c_str());
-            ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
-        }
-
-        size_t compositeIdx = 0;
-        for (; compositeIdx < mCompositeStreamMap.size(); compositeIdx++) {
-            if (streamIds[i] == mCompositeStreamMap.valueAt(compositeIdx)->getStreamId()) {
-                std::string msg = fmt::sprintf("Camera %s: Composite stream updates are"
-                        " not supported!", mCameraIdStr.c_str());
-                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-                return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
-            }
-        }
-    }
-
     for (size_t i = 0; i < streamIds.size(); i++) {
         int64_t lastRepeatingFrameNumber = -1;
         ret = updateOutputConfigurationLocked(streamIds[i], configurations[i],
@@ -3067,4 +3179,4 @@ binder::Status CameraDeviceClient::updateOutputConfigurations(
     return ret;
 }
 
-} // namespace android
+}  // namespace android
