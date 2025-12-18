@@ -1854,6 +1854,7 @@ status_t HeicCompositeStream::processCompletedInputFrame(int64_t frameNumber,
         return OK;
     }
     sp<ANativeWindow> outputANW = mOutputSurface;
+    sp<Surface> currentOutput = mOutputSurface;
 
     // Copy the content of the file to memory.
     sp<GraphicBuffer> gb = GraphicBuffer::from(inputFrame.anb);
@@ -1900,11 +1901,11 @@ status_t HeicCompositeStream::processCompletedInputFrame(int64_t frameNumber,
     }
 
     mMutex.unlock();
-    res = outputANW->queueBuffer(inputFrame.currentSurface.get(), inputFrame.anb, /*fence*/ -1);
+    res = outputANW->queueBuffer(currentOutput.get(), inputFrame.anb, /*fence*/ -1);
     mMutex.lock();
-    if (inputFrame.currentSurface != mOutputSurface) {
+    if (currentOutput != mOutputSurface) {
         ALOGE("%s: Output surface update during HEIC processing!", __FUNCTION__);
-        outputANW->cancelBuffer(inputFrame.currentSurface.get(), inputFrame.anb, /*fence*/ -1);
+        outputANW->cancelBuffer(currentOutput.get(), inputFrame.anb, /*fence*/ -1);
         res = INVALID_OPERATION;
     } else if (res != OK) {
         ALOGE("%s: Failed to queueBuffer to Heic stream: %s (%d)", __FUNCTION__,
