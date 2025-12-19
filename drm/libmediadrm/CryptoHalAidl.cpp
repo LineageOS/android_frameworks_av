@@ -411,10 +411,9 @@ DrmStatus CryptoHalAidl::getKeyHandle(const uint8_t keyId[16], CryptoPlugin::Mod
         return DrmStatus(BAD_VALUE, "Sample size larger than source buffer size.");
     }
 
-    if (!hasEncryptedData) {
-        // Return empty key handle for full clear sample.
-        keyHandle.clear();
-        return DrmStatus(OK);
+    if (hasEncryptedData && mode == CryptoPlugin::kMode_Unencrypted) {
+        // Invalid data.
+        return DrmStatus(BAD_VALUE, "data is encrypted but mode is unencrypted");
     }
 
     // Validate memory offset.
