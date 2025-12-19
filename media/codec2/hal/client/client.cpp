@@ -23,8 +23,10 @@
 #include <android_media_codec.h>
 
 #include <codec2/aidl/GraphicBufferAllocator.h>
+#include <codec2/aidl/LegacyGraphicBufferAllocator.h>
 #include <codec2/common/HalSelection.h>
 #include <codec2/hidl/client.h>
+#include <com_android_graphics_libgui_flags.h>
 
 #include <C2BufferPriv.h>
 #include <C2Component.h>
@@ -112,8 +114,13 @@ using H2BGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
         V2_0::utils::H2BGraphicBufferProducer;
 using ::android::hardware::media::c2::V1_2::SurfaceSyncObj;
 
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
 using AidlGraphicBufferAllocator = ::aidl::android::hardware::media::c2::
         implementation::GraphicBufferAllocator;
+#else
+using AidlGraphicBufferAllocator =
+        ::aidl::android::hardware::media::c2::implementation::LegacyGraphicBufferAllocator;
+#endif
 
 namespace bufferpool2_aidl = ::aidl::android::hardware::media::bufferpool2;
 namespace bufferpool_hidl = ::android::hardware::media::bufferpool::V2_0;
@@ -2096,8 +2103,13 @@ public:
             mCurrentInterface.reset();
         }
         // TODO: integrate initial value with CCodec/CCodecBufferChannel
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
         mCurrent =
                 AidlGraphicBufferAllocator::CreateGraphicBufferAllocator(3 /* maxDequeueCount */);
+#else
+        mCurrent = AidlGraphicBufferAllocator::CreateLegacyGraphicBufferAllocator(
+                3 /* maxDequeueCount */);
+#endif
         mCurrentInterface = std::make_shared<C2IgbaInterfaceImpl>(
                 c2_aidl::IGraphicBufferAllocator::fromBinder(mCurrent->asBinder()));
         ALOGD("GraphicBufferAllocator created");

@@ -26,6 +26,8 @@ cc_library {
         "ApexCodecsLazy.cpp",
         "GraphicBufferAllocator.cpp",
         "GraphicsTracker.cpp",
+        "LegacyGraphicBufferAllocator.cpp",
+        "LegacyGraphicsTracker.cpp",
         "client.cpp",
         "output.cpp",
     ],
