@@ -1745,7 +1745,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, GetFlushFromFrameSupport) {
     const audio_output_flags_t offloadFlags = static_cast<audio_output_flags_t>(
             AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_NON_BLOCKING);
     const audio_output_flags_t mmapOffloadFlags = static_cast<audio_output_flags_t>(
-            AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
+            AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
 
     FlushFromFrameSupport support = FlushFromFrameSupport::UNSUPPORTED;
     // Current routing is on speaker, which doesn't support offload, should return unsupported.
