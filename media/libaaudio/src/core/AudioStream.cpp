@@ -22,8 +22,10 @@
 // go/keep-sorted start
 #include <aaudio/AAudio.h>
 #include <android-base/strings.h>
+#include <android/media/audio/common/FlushFromFrameSupport.h>
 #include <com_android_media_audioserver.h>
 #include <core/AudioStreamBuilder.h>
+#include <media/AudioSystem.h>
 #include <media/MediaMetricsItem.h>
 #include <utility/AudioClock.h>
 #include <utility/AudioGlobal.h>
@@ -39,6 +41,8 @@
 // go/keep-sorted end
 
 namespace aaudio {
+
+using android::media::audio::common::FlushFromFrameSupport;
 
 // Sequential number assigned to streams solely for debugging purposes.
 static aaudio_stream_id_t AAudio_getNextStreamId() {
@@ -777,6 +781,65 @@ android::status_t AudioStream::MyPlayerBase::playerSetVolume() {
 
 void AudioStream::MyPlayerBase::destroy() {
     unregisterWithAudioManager();
+}
+
+namespace {
+
+bool isPcmOffloadRequest(const AAudioStreamOpenRequest& request) {
+    return request.getDirection() == AAUDIO_DIRECTION_OUTPUT &&
+            request.getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED &&
+            audio_is_linear_pcm(request.getFormat());
+}
+
+} // namespace
+
+// static
+AAudio_FlushFromFrameSupport AudioStream::getFlushFromFrameSupport(
+        const AAudioStreamOpenRequest& request) {
+    if (request.validate() != AAUDIO_OK || !isPcmOffloadRequest(request)) {
+        return AAUDIO_FLUSH_FROM_FRAME_UNSUPPORTED;
+    }
+
+    const audio_config_base_t config = {
+            .sample_rate = static_cast<uint32_t>(request.getSampleRate()),
+            .channel_mask = AAudio_getChannelMaskForOpen(request.getChannelMask(),
+                                                         request.getSamplesPerFrame(),
+                                                         false /*isInput*/),
+            .format = request.getFormat()
+    };
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.usage = AAudioConvert_usageToInternal(request.getUsage());
+    attr.content_type = AAudioConvert_contentTypeToInternal(request.getContentType());
+    FlushFromFrameSupport support = FlushFromFrameSupport::UNSUPPORTED;
+    if (AudioGlobal_getMMapPolicy() != AAUDIO_POLICY_NEVER &&
+        AudioGlobal_getPlatformMMapPolicy() != AAUDIO_POLICY_NEVER) {
+        // It is possible to go via mmap path, query if the flush from support on mmap path.
+        if (auto status = android::AudioSystem::getFlushFromFrameSupport(config, attr,
+                static_cast<audio_output_flags_t>(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
+                                                  AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD), &support);
+            status == android::NO_ERROR && support == FlushFromFrameSupport::SUPPORTED) {
+            return AAUDIO_FLUSH_FROM_FRAME_SUPPORTED;
+        } else {
+            ALOGW("%s, failed to query flush from frame support on mmap path, error=%d",
+                  __func__, status);
+        }
+    } else {
+        ALOGD("%s, cannot use mmap path as global policy=%d, platform policy=%d",
+              __func__, AudioGlobal_getMMapPolicy(), AudioGlobal_getPlatformMMapPolicy());
+    }
+    // The stream cannot be opened in mmap path, it will only be opened in classical path.
+    // Check if flushFromFrame is supported or not on classical path.
+    support = FlushFromFrameSupport::UNSUPPORTED;
+    if (auto status = android::AudioSystem::getFlushFromFrameSupport(config, attr,
+            static_cast<audio_output_flags_t>(AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
+                                              AUDIO_OUTPUT_FLAG_NON_BLOCKING), &support);
+        status == android::NO_ERROR && support == FlushFromFrameSupport::SUPPORTED) {
+        return AAUDIO_FLUSH_FROM_FRAME_SUPPORTED;
+    } else {
+        ALOGW("%s, failed to query flush from frame support on classical path, error=%d",
+              __func__, status);
+    }
+    return AAUDIO_FLUSH_FROM_FRAME_UNSUPPORTED;
 }
 
 }  // namespace aaudio

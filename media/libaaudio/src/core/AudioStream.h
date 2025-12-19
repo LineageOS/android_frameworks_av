@@ -62,6 +62,9 @@ public:
 
     virtual ~AudioStream();
 
+    static AAudio_FlushFromFrameSupport getFlushFromFrameSupport(
+            const AAudioStreamOpenRequest& request);
+
 protected:
 
     /**

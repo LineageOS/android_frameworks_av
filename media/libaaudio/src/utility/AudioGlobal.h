@@ -49,6 +49,9 @@ aaudio_policy_t AudioGlobal_getPlatformMMapPolicy(
 aaudio_policy_t AudioGlobal_getPlatformMMapExclusivePolicy(
         AAudio_DeviceType device, aaudio_direction_t direction);
 
+// Get the device aaudio policy.
+aaudio_policy_t AudioGlobal_getPlatformMMapPolicy();
+
 } // namespace aaudio
 
 #endif  // AAUDIO_AUDIOGLOBAL_H
