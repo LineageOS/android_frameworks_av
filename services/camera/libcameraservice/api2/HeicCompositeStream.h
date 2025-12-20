@@ -50,13 +50,25 @@ public:
     static bool isHeicCompositeStreamInfo(const OutputStreamInfo& streamInfo,
                                           bool isCompositeHeicDisabled,
                                           bool isCompositeHeicUltraHDRDisabled);
+    static bool isHeicCompositeStreamOutput(const OutputConfiguration& output,
+                                      bool isCompositeHeicDisabled,
+                                      bool isCompositeHeicUltraHDRDisabled);
 
     status_t createInternalStreams(const std::vector<SurfaceHolder>& consumers,
-            bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            std::vector<int> *surfaceIds, int streamSetId, bool isShared, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) override;
+                                   bool hasDeferredConsumer, uint32_t width, uint32_t height,
+                                   int format, camera_stream_rotation_t rotation, int* id,
+                                   const std::string& physicalCameraId,
+                                   const std::unordered_set<int32_t>& sensorPixelModesUsed,
+                                   std::vector<int>* surfaceIds, int streamSetId, bool isShared,
+                                   int32_t colorSpace, int64_t dynamicProfile,
+                                   int64_t streamUseCase, bool useReadoutTimestamp,
+                                   int dataspace) override;
+
+    status_t setConsumerSurfaces(int streamId, const std::vector<SurfaceHolder>& consumers,
+                                 std::vector<int>* surfaceIds /*out*/) override;
+
+    status_t updateStream(int streamId, const std::vector<SurfaceHolder>& newSurfaces,
+            KeyedVector<sp<Surface>, size_t> * outputMap, int64_t* lastFrameNumber) override;
 
     status_t deleteInternalStreams() override;
 
@@ -180,6 +192,8 @@ private:
         std::vector<CodecInputBufferInfo>  codecInputBuffers, gainmapCodecInputBuffers;
 
         bool                      error;     // Main input image buffer error
+        bool                      outputUpdated; // Output surface switched during processing
+        sp<Surface>               currentSurface; // Output surface for this capture request
         bool                      exifError; // Exif/APP_SEGMENT buffer error
         int64_t                   timestamp;
         int32_t                   requestId;
@@ -204,6 +218,7 @@ private:
             : orientation(0),
               quality(kDefaultJpegQuality),
               error(false),
+              outputUpdated(false),
               exifError(false),
               timestamp(-1),
               requestId(-1),

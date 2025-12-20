@@ -2141,6 +2141,28 @@ status_t Camera3Device::setConsumerSurfaces(int streamId,
     return OK;
 }
 
+status_t Camera3Device::updateInternalStream(int streamId, size_t surfaceId,
+        KeyedVector<sp<Surface>, size_t> *outputMap/*out*/,
+        int64_t *lastFrameNumber /*out*/) {
+    if (!flags::seamless_transitions()) {
+        return INVALID_OPERATION;
+    }
+
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    sp<Camera3OutputStreamInterface> stream = mOutputStreams.get(streamId);
+    if (stream == nullptr) {
+        CLOGE("Stream %d is unknown", streamId);
+        return BAD_VALUE;
+    }
+
+    mRequestThread->clearOutputs(streamId, {surfaceId}, lastFrameNumber);
+    mRequestThread->signalPipelineDrain({streamId});
+
+    return stream->updateInternalStream(outputMap);
+}
+
 status_t Camera3Device::updateStream(int streamId, const std::vector<SurfaceHolder> &newSurfaces,
         const std::vector<OutputStreamInfo> &outputInfo,
         const std::vector<size_t> &removedSurfaceIds,

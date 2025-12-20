@@ -44,21 +44,28 @@ public:
 
     static bool isJpegRCompositeStream(const sp<Surface> &surface);
     static bool isJpegRCompositeStreamInfo(const OutputStreamInfo& streamInfo);
+    static bool isJpegRCompositeStreamOutput(const OutputConfiguration& output);
 
     // CompositeStream overrides
     status_t createInternalStreams(const std::vector<SurfaceHolder>& consumers,
-            bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            camera_stream_rotation_t rotation, int *id, const std::string& physicalCameraId,
-            const std::unordered_set<int32_t> &sensorPixelModesUsed,
-            std::vector<int> *surfaceIds,
-            int streamSetId, bool isShared, int32_t colorSpace,
-            int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) override;
+                                   bool hasDeferredConsumer, uint32_t width, uint32_t height,
+                                   int format, camera_stream_rotation_t rotation, int* id,
+                                   const std::string& physicalCameraId,
+                                   const std::unordered_set<int32_t>& sensorPixelModesUsed,
+                                   std::vector<int>* surfaceIds, int streamSetId, bool isShared,
+                                   int32_t colorSpace, int64_t dynamicProfile,
+                                   int64_t streamUseCase, bool useReadoutTimestamp,
+                                   int dataspace) override;
     status_t deleteInternalStreams() override;
     status_t configureStream() override;
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
             int32_t* /*out*/currentStreamId) override;
     status_t insertCompositeStreamIds(std::vector<int32_t>* compositeStreamIds /*out*/) override;
     int getStreamId() override { return mP010StreamId; }
+    status_t setConsumerSurfaces(int /*streamId*/, const std::vector<SurfaceHolder>& /*consumers*/,
+                                 std::vector<int>* /*surfaceIds out*/) override;
+    status_t updateStream(int streamId, const std::vector<SurfaceHolder>& newSurfaces,
+            KeyedVector<sp<Surface>, size_t> * outputMap, int64_t* lastFrameNumber) override;
 
     // CpuConsumer listener implementation
     void onFrameAvailable(const BufferItem& item) override;

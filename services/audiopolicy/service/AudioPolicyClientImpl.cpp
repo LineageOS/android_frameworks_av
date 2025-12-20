@@ -383,4 +383,18 @@ status_t AudioPolicyService::AudioPolicyClient::getMmapPolicyInfos(
     return af->getMmapPolicyInfos(policyType, policyInfos);
 }
 
+status_t AudioPolicyService::AudioPolicyClient::getFlushFromFrameSupport(
+        audio_module_handle_t module,
+        const media::audio::common::AudioPortConfig& config,
+        media::audio::common::FlushFromFrameSupport* support) const {
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+
+    int aidlModule = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
+
+    return af->getFlushFromFrameSupport(aidlModule, config, support);
+}
+
 } // namespace android

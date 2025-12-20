@@ -147,6 +147,8 @@ GENERATE_CONVERTERS(android::media::audio::common, AudioMMapPolicyInfo);
 GENERATE_ENUM_CONVERTERS(android::media::audio::common, AudioMMapPolicyType);
 GENERATE_ENUM_CONVERTERS(android::media::audio::common, AudioMode);
 GENERATE_CONVERTERS(android::media::audio::common, AudioPort);
+GENERATE_CONVERTERS(android::media::audio::common, AudioPortConfig);
+GENERATE_ENUM_CONVERTERS(android::media::audio::common, FlushFromFrameSupport);
 
 namespace {
 

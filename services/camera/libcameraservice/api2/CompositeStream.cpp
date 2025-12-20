@@ -21,6 +21,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
+#include "com_android_internal_camera_flags.h"
 #include "common/CameraDeviceBase.h"
 #include "CameraDeviceClient.h"
 #include "CompositeStream.h"
@@ -50,11 +51,13 @@ status_t CompositeStream::createStream(const std::vector<SurfaceHolder>& consume
         const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> * surfaceIds,
         int streamSetId, bool isShared, int multiResMode, int32_t colorSpace,
-        int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp) {
-    if (hasDeferredConsumer) {
-        ALOGE("%s: Deferred consumers not supported in case of composite streams!",
-                __FUNCTION__);
-        return BAD_VALUE;
+        int64_t dynamicProfile, int64_t streamUseCase, bool useReadoutTimestamp, int dataspace) {
+    if (!flags::seamless_transitions()) {
+        if (hasDeferredConsumer) {
+            ALOGE("%s: Deferred consumers not supported in case of composite streams!",
+                  __FUNCTION__);
+            return BAD_VALUE;
+        }
     }
 
     if (streamSetId != camera3::CAMERA3_STREAM_ID_INVALID) {
@@ -76,8 +79,9 @@ status_t CompositeStream::createStream(const std::vector<SurfaceHolder>& consume
     }
 
     return createInternalStreams(consumers, hasDeferredConsumer, width, height, format, rotation,
-            id, physicalCameraId, sensorPixelModesUsed, surfaceIds, streamSetId, isShared,
-            colorSpace, dynamicProfile, streamUseCase, useReadoutTimestamp);
+                                 id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
+                                 streamSetId, isShared, colorSpace, dynamicProfile, streamUseCase,
+                                 useReadoutTimestamp, dataspace);
 }
 
 status_t CompositeStream::deleteStream() {

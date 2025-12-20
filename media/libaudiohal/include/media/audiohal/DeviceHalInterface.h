@@ -21,6 +21,8 @@
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/audio/common/AudioMode.h>
 #include <android/media/audio/common/AudioPort.h>
+#include <android/media/audio/common/AudioPortConfig.h>
+#include <android/media/audio/common/FlushFromFrameSupport.h>
 #include <android/media/AudioRoute.h>
 #include <error/Result.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -170,6 +172,10 @@ class DeviceHalInterface : public virtual RefBase
     virtual status_t getAudioMixPort(const struct audio_port_v7* devicePort,
                                      struct audio_port_v7* mixPort,
                                      int32_t mixPortHalId) = 0;
+
+    virtual status_t getFlushFromFrameSupport(
+            const media::audio::common::AudioPortConfig& config,
+            media::audio::common::FlushFromFrameSupport* support) const = 0;
 
   protected:
     // Subclasses can not be constructed directly by clients.

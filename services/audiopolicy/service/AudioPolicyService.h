@@ -354,6 +354,12 @@ public:
 
     binder::Status setEnableHardening(bool shouldEnable) override;
 
+    binder::Status getFlushFromFrameSupport(
+            const AudioConfigBase& config,
+            const AudioAttributes& attributes,
+            int32_t flags,
+            android::media::audio::common::FlushFromFrameSupport* _aidl_return) override;
+
     status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
 
     // -- IAudioPolicyLocal methods
@@ -980,6 +986,11 @@ private:
 
         error::BinderResult<bool> checkPermissionForInput(const AttributionSourceState& attr,
                 const PermissionReqs& req) override;
+
+        status_t getFlushFromFrameSupport(
+                audio_module_handle_t module,
+                const media::audio::common::AudioPortConfig& config,
+                media::audio::common::FlushFromFrameSupport* support) const override;
 
      private:
         AudioPolicyService *mAudioPolicyService;

@@ -41,6 +41,7 @@
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <android/media/audio/common/AudioPort.h>
+#include <android/media/audio/common/FlushFromFrameSupport.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -759,6 +760,11 @@ public:
 
     static status_t getAudioPolicyConfig(media::AudioPolicyConfig *config);
 
+    static status_t getFlushFromFrameSupport(
+            const audio_config_base_t& config,
+            const audio_attributes_t& attr,
+            audio_output_flags_t flags,
+            android::media::audio::common::FlushFromFrameSupport* support);
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
     public:

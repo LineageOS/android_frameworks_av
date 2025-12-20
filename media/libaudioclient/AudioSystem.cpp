@@ -63,6 +63,7 @@ using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
 using media::audio::common::AudioVolumeGroupChangeEvent;
+using media::audio::common::FlushFromFrameSupport;
 using media::audio::common::Int;
 
 std::mutex AudioSystem::gMutex;
@@ -3022,6 +3023,29 @@ status_t AudioSystem::getMmapPolicyForDevice(AudioMMapPolicyType policyType,
     policyInfo->device.type = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     return statusTFromBinderStatus(aps->getMmapPolicyForDevice(policyType, policyInfo));
+}
+
+status_t AudioSystem::getFlushFromFrameSupport(const audio_config_base_t& config,
+                                               const audio_attributes_t& attr,
+                                               audio_output_flags_t flags,
+                                               FlushFromFrameSupport* support) {
+    if (support == nullptr) {
+        return BAD_VALUE;
+    }
+
+    const sp<IAudioPolicyService> aps = get_audio_policy_service();
+    if (aps == nullptr) {
+        return NO_INIT;
+    }
+
+    AudioConfigBase configAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_base_t_AudioConfigBase(config, false /*isInput*/));
+    media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_attributes_t_AudioAttributes(attr));
+    int32_t flagsAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
+    return statusTFromBinderStatus(aps->getFlushFromFrameSupport(
+            configAidl, attrAidl, flagsAidl, support));
 }
 
 // ---------------------------------------------------------------------------

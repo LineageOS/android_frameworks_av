@@ -53,6 +53,7 @@ using namespace android;
 using testing::UnorderedElementsAre;
 using testing::IsEmpty;
 using android::content::AttributionSourceState;
+using media::audio::common::FlushFromFrameSupport;
 
 namespace {
 
@@ -1717,6 +1718,69 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, SystemEnforcement) {
     EXPECT_EQ(2, outputDesc->devices().size());
     EXPECT_NE(nullptr, outputDesc->devices().getDeviceFromId(usbPortId));
     EXPECT_NE(nullptr, outputDesc->devices().getDeviceFromId(speakerPortId));
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, GetFlushFromFrameSupport) {
+    audio_attributes_t mediaAttr = AUDIO_ATTRIBUTES_INITIALIZER;
+    mediaAttr.usage = AUDIO_USAGE_MEDIA;
+    const audio_config_base_t pcm16Bit = {
+            .sample_rate = k48000SamplingRate,
+            .channel_mask = AUDIO_CHANNEL_OUT_STEREO,
+            .format = AUDIO_FORMAT_PCM_16_BIT,
+    };
+    const audio_config_base_t pcm32Bit = {
+            .sample_rate = k48000SamplingRate,
+            .channel_mask = AUDIO_CHANNEL_OUT_STEREO,
+            .format = AUDIO_FORMAT_PCM_32_BIT,
+    };
+    const audio_config_base_t mp3 = {
+            .sample_rate = k48000SamplingRate,
+            .channel_mask = AUDIO_CHANNEL_OUT_STEREO,
+            .format = AUDIO_FORMAT_MP3,
+    };
+    const audio_output_flags_t offloadFlags = static_cast<audio_output_flags_t>(
+            AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_NON_BLOCKING);
+    const audio_output_flags_t mmapOffloadFlags = static_cast<audio_output_flags_t>(
+            AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
+
+    FlushFromFrameSupport support = FlushFromFrameSupport::UNSUPPORTED;
+    // Current routing is on speaker, which doesn't support offload, should return unsupported.
+    for (const auto& config : {pcm16Bit, pcm32Bit, mp3}) {
+        for (const auto flags : {offloadFlags, mmapOffloadFlags}) {
+            support = FlushFromFrameSupport::SUPPORTED;
+            EXPECT_EQ(NO_ERROR,
+                      mManager->getFlushFromFrameSupport(config, mediaAttr, flags, &support));
+            EXPECT_EQ(FlushFromFrameSupport::UNSUPPORTED, support);
+        }
+    }
+
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+
+    // Pcm 16 bit is currently supported for flushFromFrame.
+    for (const auto flags : {offloadFlags, mmapOffloadFlags}) {
+        support = FlushFromFrameSupport::UNSUPPORTED;
+        EXPECT_EQ(NO_ERROR,
+                  mManager->getFlushFromFrameSupport(pcm16Bit, mediaAttr, flags, &support));
+        EXPECT_EQ(FlushFromFrameSupport::SUPPORTED, support);
+    }
+
+    // For MP3 and PCM32 bit, flushFromFrame is not supported.
+    for (const auto& config : {pcm32Bit, mp3}) {
+        for (const auto flags : {offloadFlags, mmapOffloadFlags}) {
+            support = FlushFromFrameSupport::SUPPORTED;
+            EXPECT_EQ(NO_ERROR,
+                      mManager->getFlushFromFrameSupport(config, mediaAttr, flags, &support));
+            EXPECT_EQ(FlushFromFrameSupport::UNSUPPORTED, support);
+        }
+    }
 
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,

@@ -275,6 +275,11 @@ private:
             const std::vector<media::TrackInternalMuteInfo>& tracksInternalMute) final
             EXCLUDES_AudioFlinger_Mutex;
 
+    status_t getFlushFromFrameSupport(
+            int module,
+            const media::audio::common::AudioPortConfig& config,
+            media::audio::common::FlushFromFrameSupport* support) final EXCLUDES_AudioFlinger_Mutex;
+
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
             const std::function<status_t()>& delegate) final EXCLUDES_AudioFlinger_Mutex;
 
