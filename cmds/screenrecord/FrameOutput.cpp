@@ -45,8 +45,7 @@ inline void FrameOutput::setValueLE(uint8_t* buf, uint32_t value) {
     buf[3] = (uint8_t) (value >> 24);
 }
 
-status_t FrameOutput::createInputSurface(int width, int height,
-        sp<IGraphicBufferProducer>* pBufferProducer) {
+status_t FrameOutput::createInputSurface(int width, int height, sp<Surface>* pSurface) {
     status_t err;
 
     err = mEglWindow.createPbuffer(width, height);
@@ -76,17 +75,16 @@ status_t FrameOutput::createInputSurface(int width, int height,
     std::tie(mGlConsumer, surface) =
             GLConsumer::create(mExtTextureName, GL_TEXTURE_EXTERNAL_OES, /*useFenceSync=*/true,
                                /*isControlledByApp=*/false);
-    auto producer = surface->getIGraphicBufferProducer();
     mGlConsumer->setName(String8("virtual display"));
     mGlConsumer->setDefaultBufferSize(width, height);
-    producer->setMaxDequeuedBufferCount(4);
+    surface->setMaxDequeuedBufferCount(4);
     mGlConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_TEXTURE);
 
     mGlConsumer->setFrameAvailableListener(this);
 
     mPixelBuf = new uint8_t[width * height * kGlBytesPerPixel];
 
-    *pBufferProducer = producer;
+    *pSurface = surface;
 
     ALOGD("FrameOutput::createInputSurface OK");
     return NO_ERROR;

@@ -61,8 +61,7 @@ const char* Overlay::kPropertyNames[] = {
                             "%s: Called off of Overlay thread!", __FUNCTION__); \
     }
 
-status_t Overlay::start(const sp<IGraphicBufferProducer>& outputSurface,
-        sp<IGraphicBufferProducer>* pBufferProducer) {
+status_t Overlay::start(const sp<Surface>& outputSurface, sp<Surface>* pSurface) {
     ALOGV("Overlay::start");
     auto lock = std::unique_lock(mMutex);
 
@@ -88,7 +87,7 @@ status_t Overlay::start(const sp<IGraphicBufferProducer>& outputSurface,
     assert(mState == RUNNING);
 
     ALOGV("Overlay::start successful");
-    *pBufferProducer = mProducer;
+    *pSurface = mSurface;
     return NO_ERROR;
 }
 
@@ -189,14 +188,12 @@ status_t Overlay::setup() {
         return UNKNOWN_ERROR;
     }
 
-    sp<Surface> surface;
-    std::tie(mGlConsumer, surface) =
+    std::tie(mGlConsumer, mSurface) =
             GLConsumer::create(mExtTextureName, GL_TEXTURE_EXTERNAL_OES, /*useFenceSync=*/true,
                                /*isControlledByApp=*/false);
-    mProducer = surface->getIGraphicBufferProducer();
     mGlConsumer->setName(String8("virtual display"));
     mGlConsumer->setDefaultBufferSize(width, height);
-    mProducer->setMaxDequeuedBufferCount(4);
+    mSurface->setMaxDequeuedBufferCount(4);
     mGlConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_TEXTURE);
 
     mGlConsumer->setFrameAvailableListener(this);
@@ -211,7 +208,7 @@ void Overlay::release() {
 
     mOutputSurface.clear();
     mGlConsumer.clear();
-    mProducer.clear();
+    mSurface.clear();
 
     mTexProgram.release();
     mExtTexProgram.release();
@@ -293,8 +290,7 @@ void Overlay::onFrameAvailable(const BufferItem& /* item */) {
 }
 
 
-/*static*/ status_t Overlay::drawInfoPage(
-        const sp<IGraphicBufferProducer>& outputSurface) {
+/*static*/ status_t Overlay::drawInfoPage(const sp<Surface>& outputSurface) {
     status_t err;
 
     EglWindow window;

@@ -18,6 +18,7 @@
 #define SCREENRECORD_EGL_WINDOW_H
 
 #include <gui/BufferQueue.h>
+#include <gui/Surface.h>
 #include <utils/Errors.h>
 
 #include <EGL/egl.h>
@@ -42,7 +43,7 @@ public:
     ~EglWindow() { eglRelease(); }
 
     // Creates an EGL window for the supplied surface.
-    status_t createWindow(const sp<IGraphicBufferProducer>& surface);
+    status_t createWindow(const sp<Surface>& surface);
 
     // Creates an EGL pbuffer surface.
     status_t createPbuffer(int width, int height);
