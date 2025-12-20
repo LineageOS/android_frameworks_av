@@ -33,7 +33,7 @@
 using namespace android;
 
 
-status_t EglWindow::createWindow(const sp<IGraphicBufferProducer>& surface) {
+status_t EglWindow::createWindow(const sp<Surface>& surface) {
     if (mEglSurface != EGL_NO_SURFACE) {
         ALOGE("surface already created");
         return UNKNOWN_ERROR;
@@ -48,7 +48,7 @@ status_t EglWindow::createWindow(const sp<IGraphicBufferProducer>& surface) {
     surface->query(NATIVE_WINDOW_HEIGHT, &mHeight);
 
     // Output side (EGL surface to draw on).
-    sp<ANativeWindow> anw = new Surface(surface);
+    sp<ANativeWindow> anw = surface;
     mEglSurface = eglCreateWindowSurface(mEglDisplay, mEglConfig, anw.get(),
             NULL);
     if (mEglSurface == EGL_NO_SURFACE) {
