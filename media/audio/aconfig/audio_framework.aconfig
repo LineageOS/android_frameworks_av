@@ -65,6 +65,7 @@ flag {
     namespace: "media_audio"
     description: "Add devices for BLE peripheral mode"
     bug: "423053144"
+    is_exported: true
 }
 
 flag {
