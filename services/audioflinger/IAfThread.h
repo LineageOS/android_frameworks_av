@@ -205,10 +205,6 @@ public:
             EXCLUDES_ThreadBase_Mutex = 0;
     virtual status_t sendReleaseAudioPatchConfigEvent(audio_patch_handle_t handle)
             EXCLUDES_ThreadBase_Mutex = 0;
-    virtual status_t sendUpdateOutDeviceConfigEvent(
-            const DeviceDescriptorBaseVector& outDevices) EXCLUDES_ThreadBase_Mutex = 0;
-    virtual void sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs)
-            REQUIRES(mutex()) = 0;
     virtual void sendCheckOutputStageEffectsEvent() EXCLUDES_ThreadBase_Mutex = 0;
     virtual void sendCheckOutputStageEffectsEvent_l()
             REQUIRES(mutex()) = 0;
@@ -623,6 +619,8 @@ public:
             REQUIRES(audio_utils::AudioFlinger_Mutex) EXCLUDES_ThreadBase_Mutex = 0;
     virtual void destroyTrack_l(const sp<IAfRecordTrack>& track) REQUIRES(mutex()) = 0;
     virtual void removeTrack_l(const sp<IAfRecordTrack>& track) REQUIRES(mutex()) = 0;
+    virtual void sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs)
+            REQUIRES(mutex()) = 0;
 
     virtual status_t start(
             IAfRecordTrack* recordTrack, AudioSystem::sync_event_t event,

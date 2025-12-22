@@ -355,9 +355,6 @@ public:
             audio_patch_handle_t* handle) final EXCLUDES_ThreadBase_Mutex;
     status_t sendReleaseAudioPatchConfigEvent(audio_patch_handle_t handle) final
             EXCLUDES_ThreadBase_Mutex;
-    status_t sendUpdateOutDeviceConfigEvent(
-            const DeviceDescriptorBaseVector& outDevices) final EXCLUDES_ThreadBase_Mutex;
-    void sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs) final REQUIRES(mutex());
     void sendCheckOutputStageEffectsEvent() final EXCLUDES_ThreadBase_Mutex;
     void sendCheckOutputStageEffectsEvent_l() final REQUIRES(mutex());
     void sendHalLatencyModesChangedEvent_l() final REQUIRES(mutex());
@@ -2073,6 +2070,8 @@ public:
     // no addTrack_l ?
     void destroyTrack_l(const sp<IAfRecordTrack>& track) final REQUIRES(mutex());
     void removeTrack_l(const sp<IAfRecordTrack>& track) final REQUIRES(mutex());
+
+    void sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs) final REQUIRES(mutex());
 
     // Thread virtuals
     bool threadLoop() final REQUIRES(ThreadBase_ThreadLoop) EXCLUDES_ThreadBase_Mutex;

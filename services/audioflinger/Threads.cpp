@@ -816,26 +816,6 @@ status_t ThreadBase::sendReleaseAudioPatchConfigEvent(
     return sendConfigEvent_l(configEvent);
 }
 
-status_t ThreadBase::sendUpdateOutDeviceConfigEvent(
-        const DeviceDescriptorBaseVector& outDevices)
-{
-    if (type() != RECORD) {
-        // The update out device operation is only for record thread.
-        return INVALID_OPERATION;
-    }
-    audio_utils::lock_guard _l(mutex());
-    sp<ConfigEvent> configEvent = (ConfigEvent *)new UpdateOutDevicesConfigEvent(outDevices);
-    return sendConfigEvent_l(configEvent);
-}
-
-void ThreadBase::sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs)
-{
-    ALOG_ASSERT(type() == RECORD, "sendResizeBufferConfigEvent_l() called on non record thread");
-    sp<ConfigEvent> configEvent =
-            (ConfigEvent *)new ResizeBufferConfigEvent(maxSharedAudioHistoryMs);
-    sendConfigEvent_l(configEvent);
-}
-
 void ThreadBase::sendCheckOutputStageEffectsEvent()
 {
     audio_utils::lock_guard _l(mutex());
@@ -1070,7 +1050,7 @@ void ThreadBase::dumpBase_l(int fd, const Vector<String16>& /* args */)
     dprintf(fd, "  HAL buffer size: %zu bytes\n", mBufferSize);
     dprintf(fd, "  Channel count: %u\n", mChannelCount);
     dprintf(fd, "  Channel mask: 0x%08x (%s)\n", mChannelMask,
-            channelMaskToString(mChannelMask, mType != RECORD).c_str());
+            channelMaskToString(mChannelMask, mIsOut).c_str());
     dprintf(fd, "  Processing format: 0x%x (%s)\n", mFormat,
             IAfThreadBase::formatToString(mFormat).c_str());
     dprintf(fd, "  Processing frame size: %zu bytes\n", mFrameSize);
@@ -1096,6 +1076,7 @@ void ThreadBase::dumpBase_l(int fd, const Vector<String16>& /* args */)
 
     // Dump timestamp statistics for the Thread types that support it.
     if (mType == RECORD
+            || mType == DIRECT_RECORD
             || mType == MIXER
             || mType == DUPLICATING
             || mType == DIRECT
@@ -1406,7 +1387,7 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking
         mutex().lock();
     }
 
-    if (mType != RECORD) {
+    if (mIsOut) {
         // suspend all effects in AUDIO_SESSION_OUTPUT_MIX when enabling any effect on
         // another session. This gives the priority to well behaved effect control panels
         // and applications not using global effects.
@@ -9510,6 +9491,13 @@ void RecordThread::removeTrack_l(const sp<IAfRecordTrack>& track)
         ALOG_ASSERT(!mFastTrackAvail);
         mFastTrackAvail = true;
     }
+}
+
+void RecordThread::sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs)
+{
+    sp<ConfigEvent> configEvent =
+            (ConfigEvent *)new ResizeBufferConfigEvent(maxSharedAudioHistoryMs);
+    sendConfigEvent_l(configEvent);
 }
 
 void RecordThread::dumpInternals_l(int fd, const Vector<String16>& /* args */)
