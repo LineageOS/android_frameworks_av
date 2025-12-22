@@ -97,7 +97,8 @@ public:
                                 size_t frameCountToBeReady = SIZE_MAX,
                                 float speed = 1.0f,
                                 bool isSpatialized = false,
-                                bool isBitPerfect = false);
+            bool isBitPerfect = false) REQUIRES(
+            audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
     ~Track() override;
     status_t initCheck() const final;
     void appendDumpHeader(String8& result) const final;

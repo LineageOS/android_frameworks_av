@@ -7724,7 +7724,8 @@ void OffloadThread::flushHw_l()
 sp<IAfDuplicatingThread> IAfDuplicatingThread::create(
         const sp<IAfThreadCallback>& afThreadCallback,
         IAfPlaybackThread* mainThread, audio_io_handle_t id, bool systemReady) {
-    return sp<DuplicatingThread>::make(afThreadCallback, mainThread, id, systemReady);
+    // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
+    return new DuplicatingThread(afThreadCallback, mainThread, id, systemReady);
 }
 
 DuplicatingThread::DuplicatingThread(const sp<IAfThreadCallback>& afThreadCallback,

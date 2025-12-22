@@ -859,7 +859,8 @@ sp<IAfTrack> IAfTrack::create(
         float speed,
         bool isSpatialized,
         bool isBitPerfect) {
-    return sp<Track>::make(thread,
+    // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
+    return new Track(thread,
             client,
             streamType,
             attr,
@@ -2930,7 +2931,8 @@ sp<IAfRecordTrack> IAfRecordTrack::create(IAfRecordThread* thread,
         audio_port_handle_t portId,
         int32_t startFrames)
 {
-    return sp<RecordTrack>::make(
+    // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
+    return new RecordTrack(
         thread,
         client,
         attr,

@@ -1964,7 +1964,8 @@ class DuplicatingThread : public MixerThread, public IAfDuplicatingThread {
 public:
     DuplicatingThread(const sp<IAfThreadCallback>& afThreadCallback,
             IAfPlaybackThread* mainThread,
-                      audio_io_handle_t id, bool systemReady);
+            audio_io_handle_t id, bool systemReady)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) EXCLUDES_ThreadBase_Mutex;
     ~DuplicatingThread() override;
 
     sp<IAfDuplicatingThread> asIAfDuplicatingThread() final {
@@ -1972,7 +1973,8 @@ public:
     }
 
     // Thread virtuals
-    void addOutputTrack(IAfPlaybackThread* thread) final EXCLUDES_ThreadBase_Mutex;
+    void addOutputTrack(IAfPlaybackThread* thread) final
+            REQUIRES(audio_utils::AudioFlinger_Mutex) EXCLUDES_ThreadBase_Mutex;
     void removeOutputTrack(IAfPlaybackThread* thread) final EXCLUDES_ThreadBase_Mutex;
     uint32_t waitTimeMs() const final { return mWaitTimeMs; }
 
