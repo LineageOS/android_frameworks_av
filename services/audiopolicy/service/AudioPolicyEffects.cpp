@@ -26,6 +26,7 @@
 #include <media/EffectsConfig.h>
 #include <system/audio.h>
 #include <system/audio_effects/audio_effects_conf.h>
+#include <system/audio_effects/audio_effects_utils.h>
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
 #include <cutils/config_utils.h>
@@ -190,6 +191,8 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
                          audio_stream_type_t stream,
                          audio_session_t audioSession)
 {
+    using android::effect::utils::operator==;
+
     status_t status = NO_ERROR;
 
     audio_utils::lock_guard _l(mMutex);
@@ -213,11 +216,24 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
 
     ALOGV("addOutputSessionEffects(): session: %d, refCount: %d",
           audioSession, procDesc->mRefCount);
-    if (procDesc->mRefCount == 1) {
+
+    // If we see a short count in effects for the session, we create any missing ones.
+    const size_t procDescSize = procDesc->mEffects.size();
+    if (const std::shared_ptr<EffectDescVector>& effects = it->second;
+        procDescSize < (*effects).size()) {
         // make sure effects are associated to audio server even if we are executing a binder call
         int64_t token = IPCThreadState::self()->clearCallingIdentity();
-        const std::shared_ptr<EffectDescVector>& effects = it->second;
         for (const std::shared_ptr<EffectDesc>& effect : *effects) {
+            // since the effects vector is small, we do a linear search here.
+            bool found = false;
+            for (const auto& existingEffect : procDesc->mEffects) {
+                if (existingEffect->descriptor().uuid == effect->mUuid) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) continue;
+
             AttributionSourceState attributionSource;
             attributionSource.packageName = "android";
             attributionSource.token = sp<BBinder>::make();
@@ -233,10 +249,10 @@ status_t AudioPolicyEffects::addOutputSessionEffects(audio_io_handle_t output,
             }
             ALOGV("addOutputSessionEffects(): added Fx %s on session: %d for stream: %d",
                   effect->mName.c_str(), audioSession, (int32_t)stream);
+            fx->setEnabled(true);
             procDesc->mEffects.push_back(std::move(fx));
         }
 
-        procDesc->setProcessorEnabled(true);
         IPCThreadState::self()->restoreCallingIdentity(token);
     }
     return status;
