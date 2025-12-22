@@ -518,7 +518,9 @@ public:
                                                                     *  as soon as possible to have
                                                                     *  the lowest possible latency
                                                                     *  even if it might glitch. */
-                                   float speed = 1.0f);
+            float speed = 1.0f) REQUIRES(
+            audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
+
     ~PatchTrack() override;
 
     size_t framesReady() const final;

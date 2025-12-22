@@ -646,7 +646,10 @@ status_t PatchPanel::Patch::createConnections_l(const sp<IAfPatchPanel>& panel)
     // Disable this behavior for FM Tuner source if no fast capture/mixer available.
     const bool isFmBridge = mAudioPatch.sources[0].ext.device.type == AUDIO_DEVICE_IN_FM_TUNER;
     const size_t frameCountToBeReady = isFmBridge && !usePassthruPatchRecord ? frameCount / 4 : 1;
-    sp<IAfPatchTrack> tempPatchTrack = IAfPatchTrack::create(
+    sp<IAfPatchTrack> tempPatchTrack;
+    {
+        audio_utils::lock_guard l{mPlayback.thread()->mutex()};
+        tempPatchTrack = IAfPatchTrack::create(
                                            mPlayback.thread().get(),
                                            streamType,
                                            sampleRate,
@@ -659,6 +662,7 @@ status_t PatchPanel::Patch::createConnections_l(const sp<IAfPatchPanel>& panel)
                                            {} /*timeout*/,
                                            frameCountToBeReady,
                                            1.0f /*speed*/);
+    }
     status = mPlayback.checkTrack(tempPatchTrack.get());
     if (status != NO_ERROR) {
         return status;

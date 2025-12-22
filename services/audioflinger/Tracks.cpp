@@ -2632,7 +2632,8 @@ sp<IAfPatchTrack> IAfPatchTrack::create(
                                          *  even if it might glitch. */
         float speed)
 {
-    return sp<PatchTrack>::make(
+    // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
+    return new PatchTrack(
             playbackThread,
             streamType,
             sampleRate,
