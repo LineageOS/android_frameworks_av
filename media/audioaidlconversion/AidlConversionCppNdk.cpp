@@ -962,6 +962,26 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
             return unexpected(BAD_VALUE);
         case Tag::voiceMask:
             return convert(aidl, mVoice, __func__, "voice");
+        case Tag::acnMask: {
+            using Ambisonics = AudioChannelLayout::Ambisonics;
+            if (const auto& acn = aidl.get<Tag::acnMask>();
+                    acn.channelCount >= Ambisonics::MIN_CHANNEL_COUNT &&
+                    acn.channelCount <= Ambisonics::MAX_CHANNEL_COUNT) {
+                audio_channel_mask_t mask = audio_channel_mask_from_representation_and_bits(
+                        AUDIO_CHANNEL_REPRESENTATION_ACN, acn.channelCount);
+                if (acn.layout == AudioChannelLayout::Ambisonics::SourceLayout::HORIZONTAL) {
+                    mask = (audio_channel_mask_t)(mask | AUDIO_ACN_HORIZONTAL);
+                }
+                if (audio_acn_channel_mask_is_supported(mask)) {
+                    return mask;
+                }
+                ALOGE("%s: acnMask %s is not supported", __func__, aidl.toString().c_str());
+                return unexpected(BAD_VALUE);
+            } else {
+                ALOGE("%s: invalid channel count in %s", __func__, aidl.toString().c_str());
+                return unexpected(BAD_VALUE);
+            }
+        }
     }
     ALOGE("%s: unexpected tag value %d", __func__, static_cast<int>(aidl.getTag()));
     return unexpected(BAD_VALUE);
@@ -1043,6 +1063,19 @@ ConversionResult<AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChann
                     __func__, legacy);
         }
         return unexpected(BAD_VALUE);
+    } else if (repr == AUDIO_CHANNEL_REPRESENTATION_ACN) {
+        if (audio_channel_mask_is_valid(legacy) && audio_acn_channel_mask_is_supported(legacy)) {
+            AudioChannelLayout::Ambisonics acnMask;
+            acnMask.channelCount = static_cast<int32_t>(legacy & AUDIO_ACN_CHANNEL_COUNT_MASK);
+            acnMask.layout = (legacy & AUDIO_ACN_HORIZONTAL) == AUDIO_ACN_HORIZONTAL ?
+                    AudioChannelLayout::Ambisonics::SourceLayout::HORIZONTAL :
+                    AudioChannelLayout::Ambisonics::SourceLayout::FULL_SPHERE;
+            return AudioChannelLayout::make<Tag::acnMask>(acnMask);
+        } else {
+            ALOGE("%s: legacy audio_channel_mask_t value 0x%x is invalid or unsupported",
+                    __func__, legacy);
+            return unexpected(BAD_VALUE);
+        }
     }
 
     ALOGE("%s: unknown representation %d in audio_channel_mask_t value 0x%x",
