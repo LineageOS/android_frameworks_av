@@ -175,13 +175,6 @@ flag {
 }
 
 flag {
-    name: "update_preferred_devices_for_strategy"
-    namespace: "media_audio"
-    description: "Use AudioDeviceInventory cache for getPreferredDevicesForStrategy"
-    bug: "417481226"
-}
-
-flag {
     name: "volume_refactoring"
     namespace: "media_audio"
     description: "Refactor the audio volume internal architecture logic"
