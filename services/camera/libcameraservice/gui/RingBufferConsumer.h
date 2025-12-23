@@ -61,9 +61,7 @@ class RingBufferConsumer
   public:
     typedef ConsumerBase::FrameAvailableListener FrameAvailableListener;
 
-#if not WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
     void onFirstRef() override;
-#endif
 
     enum { INVALID_BUFFER_SLOT = BufferQueue::INVALID_BUFFER_SLOT };
     enum { NO_BUFFER_AVAILABLE = BufferQueue::NO_BUFFER_AVAILABLE };

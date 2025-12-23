@@ -53,6 +53,10 @@ RingBufferConsumer::RingBufferConsumer(uint64_t consumerUsage, int bufferCount)
 RingBufferConsumer::~RingBufferConsumer() {
 }
 
+void RingBufferConsumer::onFirstRef() {
+    mBufferItemConsumer->setFrameAvailableListener(this);
+}
+
 void RingBufferConsumer::setName(const std::string& name) {
     String8 name8(name.c_str());
     mBufferItemConsumer->setName(name8);
