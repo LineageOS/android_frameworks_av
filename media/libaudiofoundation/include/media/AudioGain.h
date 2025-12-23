@@ -91,14 +91,17 @@ legacy2aidl_AudioGain(const sp<AudioGain>& legacy);
 class AudioGains : public std::vector<sp<AudioGain>>
 {
 public:
-    bool canUseForVolume() const
-    {
+    bool canUseForVolume() const {
+        return gainForVolume() != nullptr;
+    }
+
+    sp<AudioGain> gainForVolume() const {
         for (const auto &gain: *this) {
             if (gain->canUseForVolume()) {
-                return true;
+                return gain;
             }
         }
-        return false;
+        return nullptr;
     }
 
     int32_t add(const sp<AudioGain>& gain)

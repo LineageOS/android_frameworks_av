@@ -593,9 +593,13 @@ void SwAudioOutputDescriptor::setSwMute(
                 devicePort->hasGainController(true /*canUseForVolume*/)) {
                 ALOGV("%s: output: %d, vs: %d, muted: %d, active vs count: %zu", __func__,
                       mIoHandle, vs, mutedByGroup, getActiveVolumeSources().size());
-                mClientInterface->setPortsVolume(
-                        getPortsForVolumeSource(vs), Volume::DbToAmpl(0), mutedByGroup,
-                        mIoHandle, delayMs);
+                std::pair<std::vector<audio_port_handle_t>, DeviceVector> portsForVolume =
+                        getPortsForVolumeSource(vs);
+                if (!portsForVolume.first.empty()) {
+                    mClientInterface->setPortsVolume(
+                            portsForVolume.first, Volume::DbToAmpl(0), mutedByGroup,
+                            mIoHandle, delayMs);
+                }
                 return;
             }
         }
@@ -617,6 +621,10 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb, bool mutedByGroup,
     if (streams.empty()) {
         streams.push_back(AUDIO_STREAM_MUSIC);
     }
+
+    std::pair<std::vector<audio_port_handle_t>, DeviceVector> portsForVolume =
+            getPortsForVolumeSource(vs);
+
     for (const auto& devicePort : devices()) {
         // APM loops on all group, so filter on active group to set the port gain,
         // let the other groups set the sw volume as per legacy
@@ -627,46 +635,81 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb, bool mutedByGroup,
             // @todo: here we might be in trouble if the SwOutput has several active clients with
             // different Volume Source (or if we allow several curves within same volume group)
 
-            float volumeAmpl = Volume::DbToAmpl(0);
-            ALOGV("%s: output: %d, vs: %d, active vs count: %zu", __func__,
-                  mIoHandle, vs, getActiveVolumeSources().size());
-            mClientInterface->setPortsVolume(
-                    getPortsForVolumeSource(vs), volumeAmpl, mutedByGroup, mIoHandle, delayMs);
+            ALOGV("%s: output: %d, vs: %d, active vs count: %zu",
+                      __func__, mIoHandle, vs, getActiveVolumeSources().size());
 
-            AudioGains gains = devicePort->getGains();
-            int gainMinValueInMb = gains[0]->getMinValueInMb();
-            int gainMaxValueInMb = gains[0]->getMaxValueInMb();
-            int gainStepValueInMb = gains[0]->getStepValueInMb();
-            int gainValueMb = ((volumeDb * 100)/ gainStepValueInMb) * gainStepValueInMb;
-            gainValueMb = std::max(gainMinValueInMb, std::min(gainValueMb, gainMaxValueInMb));
-
-            audio_port_config config = {};
-            devicePort->toAudioPortConfig(&config);
-            config.config_mask = AUDIO_PORT_CONFIG_GAIN;
-            config.gain.mode = gains[0]->getMode();
-            config.gain.values[0] = gainValueMb;
-            return mClientInterface->setAudioPortConfig(&config, 0) == NO_ERROR;
+            if (!portsForVolume.first.empty()) {
+                float volumeAmpl = Volume::DbToAmpl(0);
+                mClientInterface->setPortsVolume(
+                        portsForVolume.first, volumeAmpl, mutedByGroup, mIoHandle, delayMs);
+            }
+            setHwGains(volumeDb, DeviceVector(devicePort));
+            return true;
         }
     }
 
-    float volumeAmpl = Volume::DbToAmpl(getCurVolume(vs));
     ALOGV("%s output %d for volumeSource %d, volume %f, mutedByGroup %d, delay %d active=%d",
           __func__, mIoHandle, vs, volumeDb, mutedByGroup, delayMs, isActive(vs));
-    mClientInterface->setPortsVolume(getPortsForVolumeSource(vs), volumeAmpl, mutedByGroup,
-                                     mIoHandle, delayMs);
+
+    if (!portsForVolume.first.empty()) {
+        float volumeAmpl = Volume::DbToAmpl(getCurVolume(vs));
+        mClientInterface->setPortsVolume(portsForVolume.first, volumeAmpl, mutedByGroup,
+                                         mIoHandle, delayMs);
+    }
+    setHwGains(volumeDb, portsForVolume.second);
     return true;
 }
 
-std::vector<audio_port_handle_t> SwAudioOutputDescriptor::getPortsForVolumeSource(
-        const VolumeSource& vs)
-{
-    std::vector<audio_port_handle_t> portsForVolumeSource;
-    for (const auto& client : getClientIterable()) {
-        if (client->volumeSource() == vs) {
-            portsForVolumeSource.push_back(client->portId());
+status_t SwAudioOutputDescriptor::setHwGains(float volumeDb, DeviceVector devices) {
+    status_t status = NO_ERROR;
+
+    for (auto device : devices) {
+        sp<AudioGain> gainForvolume = device->getGains().gainForVolume();
+        if (gainForvolume == nullptr) {
+            continue;
+        }
+
+        int gainMinValueInMb = gainForvolume->getMinValueInMb();
+        int gainMaxValueInMb = gainForvolume->getMaxValueInMb();
+        int gainStepValueInMb = gainForvolume->getStepValueInMb();
+        int gainValueMb = ((volumeDb * 100)/ gainStepValueInMb) * gainStepValueInMb;
+        gainValueMb = std::max(gainMinValueInMb, std::min(gainValueMb, gainMaxValueInMb));
+
+        audio_port_config config = {};
+        device->toAudioPortConfig(&config);
+        config.config_mask = AUDIO_PORT_CONFIG_GAIN;
+        gainForvolume->getDefaultConfig(&config.gain);
+        config.gain.values[0] = gainValueMb;
+        status_t lStatus = mClientInterface->setAudioPortConfig(&config, 0) == NO_ERROR;
+        if (lStatus != NO_ERROR) {
+            status = lStatus;
         }
     }
-    return portsForVolumeSource;
+
+    return status;
+}
+
+std::pair<std::vector<audio_port_handle_t>, DeviceVector>
+        SwAudioOutputDescriptor::getPortsForVolumeSource(const VolumeSource& vs)
+{
+    std::vector<audio_port_handle_t> swVolumePortIds;
+    DeviceVector hwVolumePorts;
+    for (const auto& client : getClientIterable()) {
+        if (client->volumeSource() == vs) {
+            std::variant<audio_port_handle_t, sp<DeviceDescriptor>> volumePort =
+                    client->portForVolume();
+            if (volumePort.index() == 0) {
+                swVolumePortIds.push_back(std::get<0>(volumePort));
+            } else if (volumePort.index() == 1) {
+                hwVolumePorts.add(std::get<1>(volumePort));
+            } else {
+                LOG_ALWAYS_FATAL("%s: neither SW nor HW volume port for client %d on output %d",
+                                 __func__, client->portId(), mIoHandle);
+           }
+        }
+    }
+    return std::pair<std::vector<audio_port_handle_t>, DeviceVector>
+            (swVolumePortIds, hwVolumePorts);
 }
 
 status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,

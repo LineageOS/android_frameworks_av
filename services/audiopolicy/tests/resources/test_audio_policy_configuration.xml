@@ -19,10 +19,11 @@
 
     <modules>
         <!-- Primary module -->
-        <module name="primary" halVersion="2.0">
+        <module name="primary" halVersion="3.0">
             <attachedDevices>
                 <item>Speaker</item>
                 <item>Built-In Mic</item>
+                <item>Built-In Mic With Gain</item>
             </attachedDevices>
             <defaultOutputDevice>Speaker</defaultOutputDevice>
             <mixPorts>
@@ -92,6 +93,13 @@
                 </devicePort>
                 <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
                 </devicePort>
+                <devicePort tagName="Built-In Mic With Gain" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source"
+                    address="mic_with_gain">
+                    <gains>
+                        <gain name="" useForVolume="true" mode="AUDIO_GAIN_MODE_JOINT"
+                            minValueMB="-6000" maxValueMB="0" defaultValueMB="0" stepValueMB="100" />
+                    </gains>
+                </devicePort>
                 <devicePort tagName="Hdmi" type="AUDIO_DEVICE_OUT_HDMI" role="sink"
                             encodedFormats="AUDIO_FORMAT_AC3">
                 </devicePort>
@@ -115,11 +123,11 @@
             </devicePorts>
             <routes>
                 <route type="mix" sink="Speaker"
-                       sources="primary output,voip_rx"/>
+                       sources="primary output,voip_rx,Built-In Mic With Gain"/>
                 <route type="mix" sink="primary input"
-                       sources="Built-In Mic,Hdmi-In Mic,USB Device In"/>
+                       sources="Built-In Mic,Hdmi-In Mic,USB Device In,Built-In Mic With Gain"/>
                 <route type="mix" sink="voip_tx"
-                       sources="Built-In Mic,USB Device In"/>
+                       sources="Built-In Mic,USB Device In,Built-In Mic With Gain"/>
                 <route type="mix" sink="Hdmi"
                        sources="primary output"/>
                 <route type="mix" sink="BT SCO"
