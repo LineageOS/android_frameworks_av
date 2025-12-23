@@ -43,7 +43,8 @@ public:
                                 audio_input_flags_t flags,
                                 track_type type,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
-                                int32_t startFrames = -1);
+            int32_t startFrames = -1) REQUIRES(
+            audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
     ~RecordTrack() override;
     status_t initCheck() const final;
 

@@ -587,9 +587,11 @@ class IAfDuplicatingThread : public virtual IAfPlaybackThread {
 public:
     static sp<IAfDuplicatingThread> create(
             const sp<IAfThreadCallback>& afThreadCallback, IAfPlaybackThread* mainThread,
-            audio_io_handle_t id, bool systemReady);
+            audio_io_handle_t id, bool systemReady)
+            REQUIRES(audio_utils::AudioFlinger_Mutex) EXCLUDES_ThreadBase_Mutex;
 
-    virtual void addOutputTrack(IAfPlaybackThread* thread) EXCLUDES_ThreadBase_Mutex = 0;
+    virtual void addOutputTrack(IAfPlaybackThread* thread) EXCLUDES_ThreadBase_Mutex
+            REQUIRES(audio_utils::AudioFlinger_Mutex) EXCLUDES_ThreadBase_Mutex = 0;
     virtual uint32_t waitTimeMs() const = 0;
     virtual void removeOutputTrack(IAfPlaybackThread* thread) EXCLUDES_ThreadBase_Mutex = 0;
 };
