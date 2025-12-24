@@ -54,6 +54,8 @@ namespace {
     constexpr float DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS = 0.25;
     constexpr float DRC_DEFAULT_MOBILE_ENC_LEVEL = 0.25;
     constexpr int32_t MAX_CHANNEL_COUNT = 8;
+    constexpr size_t MAX_SAMPLES_PER_FRAME = 4096;
+    constexpr size_t TMP_BUFFER_COUNT = MAX_SAMPLES_PER_FRAME * MAX_CHANNEL_COUNT;
     constexpr char PROP_DRC_OVERRIDE_REF_LEVEL[] = "aac_drc_reference_level";
     constexpr char PROP_DRC_OVERRIDE_CUT[] = "aac_drc_cut";
     constexpr char PROP_DRC_OVERRIDE_BOOST[] = "aac_drc_boost";
@@ -439,6 +441,8 @@ ApexCodec_Status C2ApexAacDec::flush() {
     ALOGV("flush");
     mOutputDelayRingBufferReadPos = mOutputDelayRingBufferWritePos;
     mOutputDelayRingBufferFilled = 0;
+    mPendingFrameInfos.clear();
+    mRingBufferFrameInfos.clear();
     mEndOfInput = false;
     mEndOfOutput = false;
     mSignalledError = false;
@@ -451,6 +455,8 @@ ApexCodec_Status C2ApexAacDec::reset() {
         aacDecoder_Close(mAACDecoder);
         mAACDecoder = nullptr;
     }
+    mPendingFrameInfos.clear();
+    mRingBufferFrameInfos.clear();
     mSignalledError = false;
     mEndOfInput = false;
     mEndOfOutput = false;
@@ -506,6 +512,7 @@ ApexCodec_Status C2ApexAacDec::process(
             }
             *consumed = inBuffer.size;
         } else {
+            mPendingFrameInfos.push_back({frameIndex, timestamp, 0});
             size_t offset = 0;
             size_t size = inBuffer.size;
             ALOGV("process loop: offset=%zu, size=%zu", offset, size);
@@ -572,12 +579,12 @@ ApexCodec_Status C2ApexAacDec::process(
                         size = 0;
                         break;
                     }
-                    float tmpOutBuffer[2048 * MAX_CHANNEL_COUNT];
+                    float tmpOutBuffer[TMP_BUFFER_COUNT];
                     StreamInfo stream_info = CAacDecoderStreamInfo_default();
                     OutputInfo output_info = CAacDecoderOutputInfo_default();
                     ALOGV("Calling aacDecoder_Decode");
                     decoderErr = aacDecoder_Decode(mAACDecoder, tmpOutBuffer,
-                                                   2048 * MAX_CHANNEL_COUNT,
+                                                   TMP_BUFFER_COUNT,
                                                    &output_info, &stream_info, NULL);
                     ALOGV("aacDecoder_Decode returned 0x%4.4x", decoderErr);
                     ALOGV("stream_info: numElements=%u, pcmChOrder=%d, aacSampleRate=%u, "
@@ -596,25 +603,41 @@ ApexCodec_Status C2ApexAacDec::process(
                           output_info.output_loudness);
                     if (decoderErr == AAC_DEC_NOT_ENOUGH_BITS) break;
                     if (IS_OUTPUT_VALID(decoderErr)) mOutputInfo = output_info;
+                    size_t generatedSamples =
+                            mOutputInfo.frame_size * mOutputInfo.num_channels;
+                    if (generatedSamples > std::size(tmpOutBuffer)) {
+                        ALOGE("too many samples output: %zu", generatedSamples);
+                        mSignalledError = true;
+                        return APEXCODEC_STATUS_CORRUPTED;
+                    }
                     if (decoderErr == AAC_DEC_OK) {
-                        if (!outputDelayRingBufferPutSamples(tmpOutBuffer,
-                                mOutputInfo.frame_size * mOutputInfo.num_channels)) {
+                        if (!outputDelayRingBufferPutSamples(tmpOutBuffer, generatedSamples)) {
                             ALOGE("outputDelayRingBufferPutSamples failed");
                             mSignalledError = true;
                             return APEXCODEC_STATUS_CORRUPTED;
                         }
+                        if (!mPendingFrameInfos.empty()) {
+                            FrameInfo info = mPendingFrameInfos.front();
+                            mPendingFrameInfos.pop_front();
+                            info.numSamples = generatedSamples;
+                            mRingBufferFrameInfos.push_back(info);
+                        }
                     } else {
                         ALOGW("aacDecoder_Decode returned error 0x%4.4x, outputting silence",
                                 decoderErr);
-                        size_t numOutBytes = mOutputInfo.frame_size * sizeof(float)
-                                * mOutputInfo.num_channels;
+                        size_t numOutBytes = generatedSamples * sizeof(float);
                         ALOGV("numOutBytes: %zu", numOutBytes);
                         memset(tmpOutBuffer, 0, numOutBytes);
-                        if (!outputDelayRingBufferPutSamples(tmpOutBuffer,
-                                mOutputInfo.frame_size * mOutputInfo.num_channels)) {
+                        if (!outputDelayRingBufferPutSamples(tmpOutBuffer, generatedSamples)) {
                             ALOGE("outputDelayRingBufferPutSamples failed for silence");
                             mSignalledError = true;
                             return APEXCODEC_STATUS_CORRUPTED;
+                        }
+                        if (!mPendingFrameInfos.empty()) {
+                            FrameInfo info = mPendingFrameInfos.front();
+                            mPendingFrameInfos.pop_front();
+                            info.numSamples = generatedSamples;
+                            mRingBufferFrameInfos.push_back(info);
                         }
                         ALOGE("Interrupting the codec and updating params");
                         aacDecoder_Clear(mAACDecoder);
@@ -670,6 +693,11 @@ ApexCodec_Status C2ApexAacDec::process(
         if ((size_t)numSamples * sizeof(float) > outLinearBuffer.size) {
             numSamples = outLinearBuffer.size / sizeof(float);
         }
+        if (!mRingBufferFrameInfos.empty()) {
+            if (numSamples > mRingBufferFrameInfos.front().numSamples) {
+                numSamples = mRingBufferFrameInfos.front().numSamples;
+            }
+        }
         ALOGV("producing %d samples", numSamples);
         if (outputDelayRingBufferGetSamples(
                 reinterpret_cast<float*>(outLinearBuffer.data), numSamples) != numSamples) {
@@ -679,7 +707,19 @@ ApexCodec_Status C2ApexAacDec::process(
         }
         *produced = numSamples * sizeof(float);
         ALOGV("produced: %zu", *produced);
-        output->setBufferInfo((ApexCodec_BufferFlags)0, frameIndex, timestamp);
+        if (!mRingBufferFrameInfos.empty()) {
+            FrameInfo& info = mRingBufferFrameInfos.front();
+            info.numSamples -= numSamples;
+            if (info.numSamples == 0) {
+                mRingBufferFrameInfos.pop_front();
+                output->setBufferInfo((ApexCodec_BufferFlags)0, info.frameIndex, info.timestamp);
+            } else {
+                output->setBufferInfo((ApexCodec_BufferFlags)APEXCODEC_FLAG_INCOMPLETE,
+                        info.frameIndex, info.timestamp);
+            }
+        } else {
+            output->setBufferInfo((ApexCodec_BufferFlags)0, frameIndex, timestamp);
+        }
     }
     // If the app using the codec has signaled APEXCODEC_FLAG_END_OF_STREAM and the output buffer
     // is empty, signal that the output buffer is empty.
@@ -720,7 +760,7 @@ ApexCodec_Status C2ApexAacDec::initDecoder() {
     ALOGV("aacDecoder_Open successful");
     mOutputInfo = CAacDecoderOutputInfo_default();
     mOutputDelayCompensated = 0;
-    mOutputDelayRingBufferSize = 2048 * MAX_CHANNEL_COUNT * kNumDelayBlocksMax;
+    mOutputDelayRingBufferSize = TMP_BUFFER_COUNT * kNumDelayBlocksMax;
     mOutputDelayRingBuffer.reset(new float[mOutputDelayRingBufferSize]);
     mOutputDelayRingBufferWritePos = 0;
     mOutputDelayRingBufferReadPos = 0;
@@ -769,11 +809,11 @@ bool C2ApexAacDec::isConfigured() const {
 void C2ApexAacDec::drainDecoder() {
     ALOGV("drainDecoder");
     while (true) {
-        float tmpOutBuffer[2048 * MAX_CHANNEL_COUNT];
+        float tmpOutBuffer[TMP_BUFFER_COUNT];
         AAC_DECODER_ERROR decoderErr =
             aacDecoder_Drain(mAACDecoder,
                              tmpOutBuffer,
-                             2048 * MAX_CHANNEL_COUNT,
+                             TMP_BUFFER_COUNT,
                              &mOutputInfo);
         if (decoderErr != AAC_DEC_OK) {
             ALOGV("aacDecoder_Drain finished with error 0x%4.4x", decoderErr);
@@ -784,8 +824,19 @@ void C2ApexAacDec::drainDecoder() {
             ALOGV("aacDecoder_Drain produced 0 samples, stopping");
             break;
         }
+        if (tmpOutBufferSamples > std::size(tmpOutBuffer)) {
+            mSignalledError = true;
+            ALOGE("Drained too many samples: %d", tmpOutBufferSamples);
+            tmpOutBufferSamples = std::size(tmpOutBuffer);
+        }
         ALOGV("draining %d samples", tmpOutBufferSamples);
         outputDelayRingBufferPutSamples(tmpOutBuffer, tmpOutBufferSamples);
+        if (!mPendingFrameInfos.empty()) {
+            FrameInfo info = mPendingFrameInfos.front();
+            mPendingFrameInfos.pop_front();
+            info.numSamples = tmpOutBufferSamples;
+            mRingBufferFrameInfos.push_back(info);
+        }
     }
 }
 
