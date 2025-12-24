@@ -513,6 +513,7 @@ public:
                                    void *buffer,
                                    size_t bufferSize,
                                    audio_output_flags_t flags,
+                                   audio_port_handle_t portId,
                                    const Timeout& timeout = {},
                                    size_t frameCountToBeReady = 1, /** Default behaviour is to start
                                                                     *  as soon as possible to have

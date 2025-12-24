@@ -422,6 +422,26 @@ public:
                            bool force,
                            bool isVoiceVolSrc = false);
 
+    /**
+     * @brief get the sw volume to be applied in AudioFlinger for the given volume source.
+     * If using HwVolume, it returns the full scale volume.
+     * @param volumeSource to be considered
+     */
+    float getVolumeAmpl(VolumeSource volumeSource) const;
+
+    /**
+     * @brief If the output is routed to a single device and this device implements a
+     * hardware gain controller, returns this device descriptor else returns nullptr.
+     * @param deviceTypes to be considered.
+     */
+    sp<DeviceDescriptor> getRoutedDeviceForHwVolumeFromTypes(
+            const DeviceTypeSet& deviceTypes) const;
+
+    /**
+     * @brief check if the output is routed to a single device supporting the HW volume.
+     */
+    bool useHwVolumeForRoutedDevices() const;
+
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual void toAudioPort(struct audio_port_v7 *port) const;
@@ -553,12 +573,19 @@ public:
 
     virtual std::string info() const override;
 
+    status_t setHwGains(float volumeDb, DeviceVector devices);
+
     /**
      * Finds all ports matching the given volume source.
      * @param vs to be considered
-     * @return vector of ports following the given volume source.
+     * @return a pair of vectors:
+     *    - 1) port ID for client descriptors (AudioTrack or source device for AudioSource) when
+     *    volume is applied in software
+     *    - 2) DeviceDescriptors when volume is applied by a gain controller in the source device of
+     *    a hardware audio source.
      */
-    std::vector<audio_port_handle_t> getPortsForVolumeSource(const VolumeSource& vs);
+    std::pair<std::vector<audio_port_handle_t>, DeviceVector> getPortsForVolumeSource(
+            const VolumeSource& vs);
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
     audio_io_handle_t mIoHandle;           // output handle

@@ -979,6 +979,17 @@ protected:
     void SetUpManagerConfig() override;
     virtual std::string getConfigFile() { return sDefaultConfig; }
 
+    sp<DeviceDescriptor> getDefaultMic() {
+        auto devices = mManager->getAvailableInputDevices();
+        for (auto device : devices) {
+            if (device->type() == AUDIO_DEVICE_IN_BUILTIN_MIC
+                    && device->address().compare("mic_with_gain") != 0) {
+                return device;
+            }
+        }
+        return nullptr;
+    }
+
     static const std::string sExecutableDir;
     static const std::string sDefaultConfig;
 };
@@ -1342,13 +1353,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, UpdateConfigFromInexactProfi
     const std::string expectedIOProfile = "primary input";
 
     auto devices = mManager->getAvailableInputDevices();
-    sp<DeviceDescriptor> mic = nullptr;
-    for (auto device : devices) {
-        if (device->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-            mic = device;
-            break;
-        }
-    }
+    sp<DeviceDescriptor> mic = getDefaultMic();
     EXPECT_NE(nullptr, mic);
 
     audio_format_t requestedFormat = AUDIO_FORMAT_PCM_16_BIT;
@@ -1370,13 +1375,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, UpdateConfigFromExactProfile
     const std::string expectedIOProfile = "mixport_fast_input";
 
     auto devices = mManager->getAvailableInputDevices();
-    sp<DeviceDescriptor> mic = nullptr;
-    for (auto device : devices) {
-        if (device->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-            mic = device;
-            break;
-        }
-    }
+    sp<DeviceDescriptor> mic = getDefaultMic();
     EXPECT_NE(nullptr, mic);
 
     audio_format_t requestedFormat = AUDIO_FORMAT_PCM_16_BIT;
@@ -1399,13 +1398,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, MatchesMoreInputFlagsWhenPos
     const std::string expectedIOProfile = "mixport_fast_input";
 
     auto devices = mManager->getAvailableInputDevices();
-    sp<DeviceDescriptor> mic = nullptr;
-    for (auto device : devices) {
-        if (device->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-            mic = device;
-        break;
-        }
-    }
+    sp<DeviceDescriptor> mic = getDefaultMic();
     EXPECT_NE(nullptr, mic);
 
     audio_format_t requestedFormat = AUDIO_FORMAT_PCM_24_BIT_PACKED;
@@ -1492,6 +1485,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, SelectMMapOffloadOnlyWhenReq
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));
 }
+
 
 TEST_F_WITH_FLAGS(AudioPolicyManagerTestWithConfigurationFile,
                   MMapOffloadMutuallyExclusive,
@@ -5691,6 +5685,163 @@ TEST_F_WITH_FLAGS(
                 kUsbOutHsType, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                 usbAddrs[i].c_str(), "", AUDIO_FORMAT_DEFAULT));
     }
+}
+
+class AudioPolicyManagerTestHwAudioSource : public AudioPolicyManagerTestVolumeGroupID {
+
+protected:
+
+    void SetUp() override;
+    void TearDown() override;
+
+    void init();
+    audio_port_handle_t startSource(sp<DeviceDescriptor> sourceDevice);
+
+    sp<DeviceDescriptor> mMicDevice = nullptr;
+    sp<DeviceDescriptor> mMicDeviceWithGain = nullptr;
+    audio_attributes_t mMediaAttr;
+    volume_group_t mMediaVg;
+};
+
+void AudioPolicyManagerTestHwAudioSource::SetUp() {
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestVolumeGroupID::SetUp());
+    init();
+}
+
+void AudioPolicyManagerTestHwAudioSource::TearDown() {
+    mClient->resetPortVolumes();
+    mClient->resetPortConfigurations();
+    ASSERT_NO_FATAL_FAILURE(AudioPolicyManagerTestVolumeGroupID::TearDown());
+}
+
+void AudioPolicyManagerTestHwAudioSource::init() {
+    auto devices = mManager->getAvailableInputDevices();
+
+    for (auto device : devices) {
+        if (device->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
+            if (device->address().compare("mic_with_gain") == 0) {
+                mMicDeviceWithGain = device;
+            } else {
+                mMicDevice = device;
+            }
+
+            if (mMicDevice != nullptr && mMicDeviceWithGain != nullptr) {
+                break;
+            }
+        }
+    }
+
+    ALOGI("%s: mMicDevice %s mMicDeviceWithGain %s",
+          __func__, mMicDevice == nullptr ? "none" : mMicDevice->toString().c_str(),
+          mMicDeviceWithGain == nullptr ? "none" : mMicDeviceWithGain->toString().c_str());
+
+    EXPECT_NE(nullptr, mMicDevice);
+    EXPECT_NE(nullptr, mMicDeviceWithGain);
+
+
+    mMediaAttr = AUDIO_ATTRIBUTES_INITIALIZER;
+    mMediaAttr.usage = AUDIO_USAGE_MEDIA;
+    mMediaAttr.source = AUDIO_SOURCE_INVALID;
+
+    status_t status = mManager->getVolumeGroupFromAudioAttributes(
+            mMediaAttr, mMediaVg, true /*fallbackOnDefault*/);
+
+    EXPECT_EQ(status, NO_ERROR);
+}
+
+audio_port_handle_t AudioPolicyManagerTestHwAudioSource::startSource(
+        sp<DeviceDescriptor> sourceDevice) {
+
+    struct audio_port_config micConfig;
+    sourceDevice->toAudioPortConfig(&micConfig);
+    audio_port_handle_t sourceId;
+
+    status_t status = mManager->startAudioSource(&micConfig,
+                                              &mMediaAttr,
+                                              &sourceId,
+                                              1234 /*uid*/);
+
+    EXPECT_EQ(status, OK);
+    EXPECT_NE(sourceId, AUDIO_PORT_HANDLE_NONE);
+    return sourceId;
+}
+
+TEST_F(AudioPolicyManagerTestHwAudioSource, StartSource) {
+
+
+    audio_port_handle_t sourceId = startSource(mMicDevice);
+
+    const struct audio_patch *lastPatch = mClient->getLastAddedPatch();
+
+    ASSERT_EQ(mMicDevice->getId(), lastPatch->sources[0].id);
+
+    mManager->stopAudioSource(sourceId);
+}
+
+TEST_F(AudioPolicyManagerTestHwAudioSource, SoftwareVolume) {
+    int maxIndex;
+    status_t status = mManager->getMaxVolumeIndexForGroup(mMediaVg, maxIndex);
+    EXPECT_EQ(status, NO_ERROR);
+
+    int minIndex;
+    status = mManager->getMinVolumeIndexForGroup(mMediaVg, minIndex);
+    EXPECT_EQ(status, NO_ERROR);
+
+    EXPECT_GT(maxIndex, minIndex);
+
+    audio_port_handle_t sourceId = startSource(mMicDevice);
+
+    const struct audio_patch *lastPatch = mClient->getLastAddedPatch();
+
+    audio_devices_t mediaDeviceType = lastPatch->sinks[0].ext.device.type;
+
+    status = mManager->setVolumeIndexForGroup(mMediaVg, minIndex, false /*muted*/, mediaDeviceType);
+    EXPECT_EQ(status, NO_ERROR);
+
+    mClient->resetPortVolumes();
+
+    status = mManager->setVolumeIndexForGroup(mMediaVg, maxIndex, false /*muted*/, mediaDeviceType);
+    EXPECT_EQ(status, NO_ERROR);
+
+    float volume = mClient->getPortVolume(mMicDevice->getId());
+
+    ASSERT_NE(-1., volume);
+
+    mManager->stopAudioSource(sourceId);
+}
+
+TEST_F(AudioPolicyManagerTestHwAudioSource, HardwareVolume) {
+    int maxIndex;
+    status_t status = mManager->getMaxVolumeIndexForGroup(mMediaVg, maxIndex);
+    EXPECT_EQ(status, NO_ERROR);
+
+    int minIndex;
+    status = mManager->getMinVolumeIndexForGroup(mMediaVg, minIndex);
+    EXPECT_EQ(status, NO_ERROR);
+
+    EXPECT_GT(maxIndex, minIndex);
+
+    audio_port_handle_t sourceId = startSource(mMicDeviceWithGain);
+
+    const struct audio_patch *lastPatch = mClient->getLastAddedPatch();
+
+    audio_devices_t mediaDeviceType = lastPatch->sinks[0].ext.device.type;
+
+    status = mManager->setVolumeIndexForGroup(mMediaVg, minIndex, false /*muted*/, mediaDeviceType);
+    EXPECT_EQ(status, NO_ERROR);
+
+    mClient->resetPortConfigurations();
+
+    status = mManager->setVolumeIndexForGroup(mMediaVg, maxIndex, false /*muted*/, mediaDeviceType);
+    EXPECT_EQ(status, NO_ERROR);
+
+    struct audio_port_config *config = mClient->getPortConfiguration(mMicDeviceWithGain->getId());
+
+    ASSERT_NE(nullptr, config);
+
+    ASSERT_NE(0, (config->config_mask & AUDIO_PORT_CONFIG_GAIN));
+
+    mManager->stopAudioSource(sourceId);
 }
 
 int main(int argc, char** argv) {

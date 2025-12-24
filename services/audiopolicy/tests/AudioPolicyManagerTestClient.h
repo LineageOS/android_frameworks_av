@@ -174,6 +174,39 @@ public:
         return NO_ERROR;
     }
 
+    status_t setPortsVolume(const std::vector<audio_port_handle_t> & ports, float volume,
+                            bool /*muted*/, audio_io_handle_t /*output*/,
+                            int /*delayMs*/) override {
+        for (auto port : ports) {
+            mPortVolumes.insert_or_assign(port, volume);
+        }
+        return OK;
+    }
+
+    float getPortVolume(audio_port_handle_t portId) const {
+        auto it = mPortVolumes.find(portId);
+        return it == mPortVolumes.end() ? -1. : it->second;
+    }
+
+    void resetPortVolumes() {
+        mPortVolumes.clear();
+    }
+
+    status_t setAudioPortConfig(const struct audio_port_config* config,
+                                int /*delayMs*/) override {
+        mPortConfigurations.insert_or_assign(config->id, *config);
+        return OK;
+    }
+
+    struct audio_port_config *getPortConfiguration(audio_port_handle_t portId) {
+        auto it = mPortConfigurations.find(portId);
+        return it == mPortConfigurations.end() ? nullptr : &(it->second);
+    }
+
+    void resetPortConfigurations() {
+        mPortConfigurations.clear();
+    }
+
     // Helper methods for tests
     size_t getActivePatchesCount() const { return mActivePatches.size(); }
 
@@ -390,6 +423,8 @@ private:
     std::set<audio_channel_mask_t> mSupportedChannelMasks;
     std::map<audio_port_handle_t, bool> mTracksInternalMute;
     std::set<audio_io_handle_t> mOpenedInputs;
+    std::map<audio_port_handle_t, float> mPortVolumes;
+    std::map<audio_port_handle_t, struct audio_port_config> mPortConfigurations;
     size_t mOpenInputCallsCount = 0;
     size_t mCloseInputCallsCount = 0;
     std::map<audio_io_handle_t, audio_output_flags_t> mOpenedOutputs;

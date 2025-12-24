@@ -117,14 +117,6 @@ flag {
 }
 
 flag {
-    name: "replace_stream_bt_sco"
-    namespace: "media_audio"
-    description:
-        "Replace internally STREAM_BLUETOOTH_SCO with STREAM_VOICE_CALL"
-    bug: "345024266"
-}
-
-flag {
     name: "ring_my_car"
     namespace: "media_audio"
     description:
@@ -180,13 +172,6 @@ flag {
     namespace: "media_audio"
     description: "By default STREAM_ASSISTANT is not aliased to STREAM_MUSIC"
     bug: "442485761"
-}
-
-flag {
-    name: "update_preferred_devices_for_strategy"
-    namespace: "media_audio"
-    description: "Use AudioDeviceInventory cache for getPreferredDevicesForStrategy"
-    bug: "417481226"
 }
 
 flag {
