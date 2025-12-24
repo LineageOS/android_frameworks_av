@@ -492,7 +492,7 @@ status_t StreamHalAidl::getLatency(uint32_t *latency) {
     if (!mStream) return NO_INIT;
     StreamDescriptor::Reply reply;
     RETURN_STATUS_IF_ERROR(updateCountersIfNeeded(&reply));
-    *latency = std::clamp(std::max<int32_t>(0, reply.latencyMs), 1, 3000);
+    *latency = std::clamp(std::max<int32_t>(0, reply.latencyMs), 1, 5000);
     AUGMENT_LOG_IF(W, reply.latencyMs != static_cast<int32_t>(*latency),
                    "Suspicious latency value reported by HAL: %d, clamped to %u", reply.latencyMs,
                    *latency);
