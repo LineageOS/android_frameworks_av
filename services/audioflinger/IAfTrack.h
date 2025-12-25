@@ -479,7 +479,8 @@ public:
             size_t frameCountToBeReady = SIZE_MAX,
             float speed = 1.0f,
             bool isSpatialized = false,
-            bool isBitPerfect = false);
+            bool isBitPerfect = false) REQUIRES(
+            audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
 
     static constexpr std::string_view getLogHeader() {
         using namespace std::literals;
@@ -642,7 +643,8 @@ public:
             IAfPlaybackThread* playbackThread,
             IAfDuplicatingThread* sourceThread, uint32_t sampleRate,
             audio_format_t format, audio_channel_mask_t channelMask, size_t frameCount,
-            const AttributionSourceState& attributionSource);
+            const AttributionSourceState& attributionSource) REQUIRES(
+            audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
 
     sp<IAfOutputTrack> asIAfOutputTrack() final { return this; }
 
@@ -712,7 +714,8 @@ public:
             audio_input_flags_t flags,
             track_type type,
             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
-            int32_t startFrames = -1);
+            int32_t startFrames = -1) REQUIRES(
+            audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
 
     static constexpr std::string_view getLogHeader() {
         using namespace std::literals;
@@ -800,7 +803,8 @@ public:
                                              *  as soon as possible to have
                                              *  the lowest possible latency
                                              *  even if it might glitch. */
-            float speed = 1.0f);
+            float speed = 1.0f) REQUIRES(
+            audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
 
     sp<IAfPatchTrack> asIAfPatchTrack() final { return this; }
 

@@ -859,7 +859,8 @@ sp<IAfTrack> IAfTrack::create(
         float speed,
         bool isSpatialized,
         bool isBitPerfect) {
-    return sp<Track>::make(thread,
+    // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
+    return new Track(thread,
             client,
             streamType,
             attr,
@@ -2633,7 +2634,8 @@ sp<IAfPatchTrack> IAfPatchTrack::create(
                                          *  even if it might glitch. */
         float speed)
 {
-    return sp<PatchTrack>::make(
+    // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
+    return new PatchTrack(
             playbackThread,
             streamType,
             sampleRate,
@@ -2933,7 +2935,8 @@ sp<IAfRecordTrack> IAfRecordTrack::create(IAfRecordThread* thread,
         audio_port_handle_t portId,
         int32_t startFrames)
 {
-    return sp<RecordTrack>::make(
+    // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
+    return new RecordTrack(
         thread,
         client,
         attr,
