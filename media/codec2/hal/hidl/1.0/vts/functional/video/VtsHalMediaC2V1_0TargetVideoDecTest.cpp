@@ -214,6 +214,10 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                                              .front()
                                              .map()
                                              .get();
+        if (output.error() != C2_OK) {
+            FAIL() << "graphic view map err = " << output.error();
+        }
+
         uint8_t* yPlane = const_cast<uint8_t*>(output.data()[C2PlanarLayout::PLANE_Y]);
         uint8_t* uPlane = const_cast<uint8_t*>(output.data()[C2PlanarLayout::PLANE_U]);
         uint8_t* vPlane = const_cast<uint8_t*>(output.data()[C2PlanarLayout::PLANE_V]);
@@ -257,6 +261,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         return;
     }
     bool configPixelFormat(uint32_t format);
+    bool configOutputBufferUsage(uint32_t usage);
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -633,6 +638,21 @@ bool Codec2VideoDecHidlTestBase::configPixelFormat(uint32_t format) {
     return false;
 }
 
+// Config output buffer usage
+bool Codec2VideoDecHidlTestBase::configOutputBufferUsage(uint32_t usage) {
+    std::vector<std::unique_ptr<C2SettingResult>> failures;
+    C2StreamUsageTuning::output bufferUsage(0u, usage);
+
+    std::vector<C2Param*> configParam{&bufferUsage};
+    c2_status_t status = mComponent->config(configParam, C2_DONT_BLOCK, &failures);
+    if (status == C2_OK && failures.size() == 0u) {
+        return true;
+    }
+    // do not print er message for now as most components may not yet support this setting
+    ALOGV("config output buffer usage failed");
+    return false;
+}
+
 class Codec2VideoDecDecodeTest : public Codec2VideoDecHidlTestBase,
                                  public ::testing::WithParamInterface<DecodeTestParameters> {
     void getParams() {
@@ -657,12 +677,22 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
 
     // Disable md5 checks as tunneled codecs doesn't populate output buffers in C2Work
     mMd5Enable = !mIsTunneledCodec;
+    // Disable md5 checks if reference checksum is not present
     if (!mChksumFile.compare(sResourceDir)) mMd5Enable = false;
+    // Disable md5 checks if decoder is configured in surface mode
+    if (surfMode != surfaceMode_t::NO_SURFACE) mMd5Enable = false;
 
     uint32_t format = HAL_PIXEL_FORMAT_YCBCR_420_888;
     if (!configPixelFormat(format)) {
         std::cout << "[   WARN   ] Test Skipped PixelFormat not configured\n";
         return;
+    }
+
+    // Nudge components to provide output buffers with CPU_READ access for checksum validation.
+    // Result of this request is intentionally ignored as components may not be subscribed to index
+    // 'kParamIndexUsage' and by default could be providing buffers with CPU_READ access.
+    if (mMd5Enable) {
+        (void)configOutputBufferUsage(C2MemoryUsage::CPU_READ);
     }
 
     mFlushedIndices.clear();
