@@ -284,6 +284,10 @@ bool ResourceTracker::removeResource(const ClientInfoParcel& clientInfo, bool va
     }
 
     infos.erase(foundClient);
+    if (infos.empty()) {
+        // Remove this from the Process Resource Map.
+        mMap.erase(found);
+    }
     return true;
 }
 
@@ -320,6 +324,10 @@ bool ResourceTracker::removeClient(int pid, const int64_t& clientId) {
     }
 
     infos.erase(foundClient);
+    if (infos.empty()) {
+        // Remove this from the Process Resource Map.
+        mMap.erase(found);
+    }
     return true;
 }
 
