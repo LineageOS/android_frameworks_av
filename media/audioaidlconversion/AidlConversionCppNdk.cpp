@@ -964,12 +964,16 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
             return convert(aidl, mVoice, __func__, "voice");
         case Tag::acnMask: {
             using Ambisonics = AudioChannelLayout::Ambisonics;
-            if (const auto& acn = aidl.get<Tag::acnMask>();
-                    acn.channelCount >= Ambisonics::MIN_CHANNEL_COUNT &&
-                    acn.channelCount <= Ambisonics::MAX_CHANNEL_COUNT) {
+            const auto& acn = aidl.get<Tag::acnMask>();
+            if (int32_t channelCount = acn & AudioChannelLayout::ACN_CHANNEL_COUNT_BIT_MASK;
+                    channelCount >= Ambisonics::MIN_CHANNEL_COUNT &&
+                    channelCount <= Ambisonics::MAX_CHANNEL_COUNT) {
                 audio_channel_mask_t mask = audio_channel_mask_from_representation_and_bits(
-                        AUDIO_CHANNEL_REPRESENTATION_ACN, acn.channelCount);
-                if (acn.layout == AudioChannelLayout::Ambisonics::SourceLayout::HORIZONTAL) {
+                        AUDIO_CHANNEL_REPRESENTATION_ACN, channelCount);
+                const int32_t layout = (acn & AudioChannelLayout::ACN_SOURCE_LAYOUT_BIT_MASK)
+                        >> AudioChannelLayout::ACN_SOURCE_LAYOUT_BIT_SHIFT;
+                if (layout == static_cast<int32_t>(
+                                AudioChannelLayout::Ambisonics::SourceLayout::HORIZONTAL)) {
                     mask = (audio_channel_mask_t)(mask | AUDIO_ACN_HORIZONTAL);
                 }
                 if (audio_acn_channel_mask_is_supported(mask)) {
@@ -1064,13 +1068,20 @@ ConversionResult<AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChann
         }
         return unexpected(BAD_VALUE);
     } else if (repr == AUDIO_CHANNEL_REPRESENTATION_ACN) {
+        using SourceLayout = AudioChannelLayout::Ambisonics::SourceLayout;
         if (audio_channel_mask_is_valid(legacy) && audio_acn_channel_mask_is_supported(legacy)) {
-            AudioChannelLayout::Ambisonics acnMask;
-            acnMask.channelCount = static_cast<int32_t>(legacy & AUDIO_ACN_CHANNEL_COUNT_MASK);
-            acnMask.layout = (legacy & AUDIO_ACN_HORIZONTAL) == AUDIO_ACN_HORIZONTAL ?
-                    AudioChannelLayout::Ambisonics::SourceLayout::HORIZONTAL :
-                    AudioChannelLayout::Ambisonics::SourceLayout::FULL_SPHERE;
-            return AudioChannelLayout::make<Tag::acnMask>(acnMask);
+            const int32_t channelCount = static_cast<int32_t>(
+                    legacy & AUDIO_ACN_CHANNEL_COUNT_MASK);
+            if ((channelCount & AudioChannelLayout::ACN_CHANNEL_COUNT_BIT_MASK) != channelCount) {
+                ALOGE("%s: legacy audio_channel_mask_t channel count %d is not supported",
+                        __func__, channelCount);
+                return unexpected(BAD_VALUE);
+            }
+            const int32_t layout = static_cast<int32_t>(
+                    (legacy & AUDIO_ACN_HORIZONTAL) == AUDIO_ACN_HORIZONTAL ?
+                    SourceLayout::HORIZONTAL : SourceLayout::FULL_SPHERE)
+                    << AudioChannelLayout::ACN_SOURCE_LAYOUT_BIT_SHIFT;
+            return AudioChannelLayout::make<Tag::acnMask>(channelCount | layout);
         } else {
             ALOGE("%s: legacy audio_channel_mask_t value 0x%x is invalid or unsupported",
                     __func__, legacy);

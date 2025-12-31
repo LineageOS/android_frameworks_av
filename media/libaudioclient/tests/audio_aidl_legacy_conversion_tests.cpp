@@ -124,18 +124,21 @@ AudioChannelLayout make_ACL_VoiceCall() {
             AudioChannelLayout::VOICE_CALL_MONO);
 }
 
+AudioChannelLayout make_ACL_Acn(AudioChannelLayout::Ambisonics::SourceLayout layout,
+                                int channelCount) {
+    return AudioChannelLayout::make<AudioChannelLayout::Tag::acnMask>(
+            ((static_cast<int32_t>(layout) << AudioChannelLayout::ACN_SOURCE_LAYOUT_BIT_SHIFT) &
+             AudioChannelLayout::ACN_SOURCE_LAYOUT_BIT_MASK) |
+            (channelCount & AudioChannelLayout::ACN_CHANNEL_COUNT_BIT_MASK));
+}
+
 AudioChannelLayout make_ACL_FullSphereAcn(int order) {
-    AudioChannelLayout::Ambisonics acnMask;
-    acnMask.layout = AudioChannelLayout::Ambisonics::SourceLayout::FULL_SPHERE;
-    acnMask.channelCount = (order + 1) * (order + 1);
-    return AudioChannelLayout::make<AudioChannelLayout::Tag::acnMask>(acnMask);
+    return make_ACL_Acn(AudioChannelLayout::Ambisonics::SourceLayout::FULL_SPHERE,
+                        (order + 1) * (order + 1));
 }
 
 AudioChannelLayout make_ACL_HorizontalAcn(int order) {
-    AudioChannelLayout::Ambisonics acnMask;
-    acnMask.layout = AudioChannelLayout::Ambisonics::SourceLayout::HORIZONTAL;
-    acnMask.channelCount = 2 * order + 1;
-    return AudioChannelLayout::make<AudioChannelLayout::Tag::acnMask>(acnMask);
+    return make_ACL_Acn(AudioChannelLayout::Ambisonics::SourceLayout::HORIZONTAL, 2 * order + 1);
 }
 
 AudioDeviceDescription make_AudioDeviceDescription(AudioDeviceType type,
