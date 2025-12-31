@@ -276,6 +276,10 @@ Format VirtualCameraRenderThread::getImageFormat() const {
   return mImageFormat;
 }
 
+const Resolution& VirtualCameraRenderThread::getInputResolution() const {
+  return mInputSurfaceSize;
+}
+
 RenderThreadTask VirtualCameraRenderThread::dequeueTask() {
   std::unique_lock<std::mutex> lock(mLock);
   // Clang's thread safety analysis doesn't perform alias analysis,

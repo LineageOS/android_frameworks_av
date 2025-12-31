@@ -131,6 +131,9 @@ class VirtualCameraRenderThread {
   // Returns image format of the input surface
   ::aidl::android::companion::virtualcamera::Format getImageFormat() const;
 
+  // Returns resolution of the input stream
+  const Resolution& getInputResolution() const;
+
  private:
   RenderThreadTask dequeueTask() EXCLUDES(mLock);
 
