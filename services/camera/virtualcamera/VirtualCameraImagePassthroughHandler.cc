@@ -67,8 +67,6 @@ constexpr int kHardwareBufferUsageFlags = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
                                           AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
 constexpr int kImageFrameCount = 10;
 
-constexpr int kErrorMessageSize = 256;
-
 const int kSurfaceSizeWidth = kMaxJpegSize + sizeof(CameraBlob);
 constexpr int kSurfaceSizeHeight = 1;
 
@@ -138,70 +136,92 @@ VirtualCameraImagePassthroughHandler::VirtualCameraImagePassthroughHandler(
     : mSessionContext{sessionContext},
       mImageFormat{imageFormat},
       mOnFrameAvailable{std::move(frameReadyCallback)},
+      mFrameAvailablePromiseSignalled{false},
       mIsFirstFrameDrawn{false},
       mInputSurface{std::move(inputSurface)},
       mImageReader{std::move(imageReader)} {
+  resetFrameAvailableSignalingMechanism();
 }
 
 VirtualCameraImagePassthroughHandler::~VirtualCameraImagePassthroughHandler() {
+  // Clear current ImageReader callback. This ensures that the internal
+  // ImageReader thread cannot access VirtualCameraImagePassthroughHandler
+  // member variables during the destruction sequence.
+  AImageReader_ImageListener imagelistener{
+      .context = nullptr,
+      .onImageAvailable = nullptr,
+  };
+
+  if (AImageReader_setImageListener(mImageReader.get(), &imagelistener) !=
+      AMEDIA_OK) {
+    ALOGE("%s: Failed to clear image listener", __func__);
+  }
+
+  mImageReader.reset();
+
+  {
+    std::lock_guard<std::mutex> criticalSection{mFrameAvailableCallbackMutex};
+
+    // Signal mFrameAvailablePromise but indicate that a new frame has not
+    // arrived. It is possible that a call to waitForFrame() is currently
+    // blocked and fulfilling the promise will allow that routine to make
+    // progress.
+    if (!mFrameAvailablePromiseSignalled) {
+      mFrameAvailablePromise->set_value(false);
+    }
+
+    mFrameAvailableFuture.reset();
+    mFrameAvailablePromise.reset();
+  }
 }
 
 bool VirtualCameraImagePassthroughHandler::waitForInputFrame(
     const std::chrono::nanoseconds timeoutNs) {
+  // Attempt to obtain image in non-blocking mode
   AImage* image = nullptr;
-  int syncFence = 0;
-  media_status_t result = AImageReader_acquireLatestImageAsync(
-      mImageReader.get(), &image, &syncFence);
+  int syncFd = 0;
+  media_status_t acquireImageResult =
+      AImageReader_acquireLatestImageAsync(mImageReader.get(), &image, &syncFd);
 
-  if (result != AMEDIA_OK) {
-    if (result != AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE) {
-      ALOGE(
-          "%s: failure in AImageReader_acquireLatestImageAsync(): error=%d, "
-          "syncFence=%d",
-          __func__, (int)result, syncFence);
+  if (acquireImageResult == AMEDIA_OK) {
+    // A sync fd of -1 indicates frame is available now
+    if (syncFd == -1) {
+      ALOGV("%s: Received new image", __func__);
+      mCurrentImage = ScopedAImage{image};
+      mIsFirstFrameDrawn = true;
+
+      // New frame has been acquired. Reset now spent promise/future
+      // to facilitate signaling of next frame
+      resetFrameAvailableSignalingMechanism();
+      return true;
+
+    } else {
+      // Ignore sync fd if it refers to valid file descriptor. This is because
+      // we rely on the promise/future signaling mechanism rather than file
+      // descriptors. The Android graphics system makes valid sync fds available
+      // only under certain conditions, specifically those involving HW
+      // rendering pathways. The Virtual Camera module must handle cases in
+      // which the CPU is the producer, therefore we ignore the file descriptor
+      // approach altogether and rely on an alternative signaling mechanism that
+      // works for both HW- and SW-based producer paradigms.
+      ALOGW("%s: Unexpectedly received valid sync fd (%d). Discarding...",
+            __func__, syncFd);
+      close(syncFd);
     }
+
+  } else if (acquireImageResult != AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE) {
+    ALOGE("%s: failure in AImageReader_acquireLatestImageAsync(): error=%d",
+          __func__, (int)acquireImageResult);
     return false;
   }
 
-  // A sync fence of -1 indicates that an Image is available to be consumed
-  // immediately. Otherwise, it is necessary to wait on the fence for the next
-  // Image to arrive
-  if (syncFence != -1) {
-    fd_set fileDescriptors;
-    struct timeval timeout;
-    FD_ZERO(&fileDescriptors);
-    FD_SET(syncFence, &fileDescriptors);
-    timeout.tv_sec =
-        std::chrono::duration_cast<std::chrono::seconds>(timeoutNs).count();
-    timeout.tv_usec =
-        std::chrono::duration_cast<std::chrono::microseconds>(timeoutNs).count() -
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::seconds{timeout.tv_sec})
-            .count();
-    int fileDescriptorCeiling = syncFence + 1;
-    int result = select(fileDescriptorCeiling, &fileDescriptors, nullptr,
-                        nullptr, &timeout);
-
-    if (result == 0) {
-      ALOGD("%s: Timed out waiting for new frame", __func__);
-      return false;
-    } else if (result < 0) {
-      char errorStr[kErrorMessageSize];
-      if (strerror_r(errno, errorStr, kErrorMessageSize) == 0) {
-        ALOGE("%s: Error when waiting for sync fence to be ready: %s", __func__,
-              errorStr);
-      } else {
-        ALOGE("%s: Error when waiting for sync fence to be ready: unknown",
-              __func__);
-      }
-      return false;
-    }
+  if (mFrameAvailableFuture->wait_for(timeoutNs) != std::future_status::ready) {
+    ALOGE("%s: timed out after %llu ns waiting for frame arrival", __func__,
+          timeoutNs.count());
+    return false;
   }
 
-  ALOGV("%s: Received new image", __func__);
-  mCurrentImage = ScopedAImage{image};
-  mIsFirstFrameDrawn = true;
-  return true;
+  return mFrameAvailableFuture->get();
 }
 
 void VirtualCameraImagePassthroughHandler::updateTexture() {
@@ -291,7 +311,31 @@ ndk::ScopedAStatus VirtualCameraImagePassthroughHandler::fillOutputBuffer(
 }
 
 void VirtualCameraImagePassthroughHandler::onFrameAvailable() {
+  {
+    std::lock_guard<std::mutex> criticalSection{mFrameAvailableCallbackMutex};
+
+    // Signal the future corresponding to mFrameAvailablePromise to indicate
+    // that new frame has arrived. It is possible that a call to waitForFrame()
+    // is in progress and is currently blocked waiting for this signal.
+    // Fulfilling mFrameAvailablePromise unblocks waitForFrame() and allows
+    // it to make progress. Only issue a new signal if the current instance of
+    // mFrameAvailablePromise has not already been fulfilled.
+    if (!mFrameAvailablePromiseSignalled) {
+      mFrameAvailablePromiseSignalled = true;
+      mFrameAvailablePromise->set_value(true);
+    }
+  }
+
   mOnFrameAvailable();
+}
+
+void VirtualCameraImagePassthroughHandler::resetFrameAvailableSignalingMechanism() {
+  std::lock_guard<std::mutex> criticalSection{mFrameAvailableCallbackMutex};
+
+  mFrameAvailablePromiseSignalled = false;
+  mFrameAvailablePromise = std::make_unique<std::promise<bool>>();
+  mFrameAvailableFuture = std::make_unique<std::future<bool>>();
+  *mFrameAvailableFuture = mFrameAvailablePromise->get_future();
 }
 
 }  // namespace virtualcamera

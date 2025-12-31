@@ -27,7 +27,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <memory>
+#include <mutex>
 
 #include "VirtualCameraCaptureRequest.h"
 #include "VirtualCameraImageHandler.h"
@@ -82,9 +84,16 @@ class VirtualCameraImagePassthroughHandler : public VirtualCameraImageHandler {
   void onFrameAvailable();
 
  private:
+  void resetFrameAvailableSignalingMechanism();
+
   VirtualCameraSessionContext& mSessionContext;
   ::aidl::android::companion::virtualcamera::Format mImageFormat;
   std::function<void(void)> mOnFrameAvailable;
+
+  std::mutex mFrameAvailableCallbackMutex;
+  bool mFrameAvailablePromiseSignalled;
+  std::unique_ptr<std::promise<bool>> mFrameAvailablePromise;
+  std::unique_ptr<std::future<bool>> mFrameAvailableFuture;
 
   bool mIsFirstFrameDrawn;
 
