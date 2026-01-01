@@ -1269,7 +1269,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
                 pipelineRoom = SIZE_MAX;
             }
             if (pipelineRoom <= input->buffers->numClientBuffers()) {
-                ALOGV("pipelineRoom(%zu) is <= numClientBuffers(%zu). "
+                ALOGI("pipelineRoom(%zu) is <= numClientBuffers(%zu). "
                     "Not signalling any more buffers to client",
                     pipelineRoom, input->buffers->numClientBuffers());
                 break;
