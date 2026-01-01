@@ -1252,9 +1252,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
         return;
     }
     size_t numActiveSlots = 0;
-    size_t pipelineRoom = 0;
-    size_t numInputBuffersAvailable = 0;
-    while (!mPipelineWatcher.lock()->pipelineFull(&pipelineRoom)) {
+    while (!mPipelineWatcher.lock()->pipelineFull()) {
         sp<MediaCodecBuffer> inBuffer;
         size_t index;
         {
@@ -1262,11 +1260,6 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
             numActiveSlots = input->buffers->numActiveSlots();
             if (numActiveSlots >= input->numSlots) {
                 break;
-            }
-
-            // Control the inputs based on pipelineRoom only for HW decoder
-            if (!mIsHWDecoder) {
-                pipelineRoom = SIZE_MAX;
             }
             if (!input->buffers->requestNewBuffer(&index, &inBuffer)) {
                 ALOGV("[%s] no new buffer available", mName);
@@ -1282,11 +1275,6 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
 
         ALOGV("[%s] new input index = %zu [%p]", mName, index, inBuffer.get());
         mCallback->onInputBufferAvailable(index, inBuffer);
-        if (++numInputBuffersAvailable >= pipelineRoom) {
-            ALOGV("[%s] pipeline will overflow after %zu queueInputBuffer", mName,
-                    numInputBuffersAvailable);
-            break;
-        }
     }
     ALOGV("[%s] # active slots after feedInputBufferIfAvailable = %zu", mName, numActiveSlots);
 }
