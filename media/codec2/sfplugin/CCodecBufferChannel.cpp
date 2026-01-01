@@ -347,7 +347,7 @@ void CCodecBufferChannel::setComponent(
     std::atomic_store(&mComponent, component);
     mComponentName = component->getName() + StringPrintf("#%d", int(uintptr_t(component.get()) % 997));
     mName = mComponentName.c_str();
-    std::regex pattern{"c2\\.(mtk|qti)\\..*\\.decoder.*"};
+    std::regex pattern{"c2\\.qti\\..*\\.decoder.*"};
     mIsHWDecoder = std::regex_match(mComponentName, pattern);
 }
 
