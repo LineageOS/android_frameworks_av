@@ -333,6 +333,7 @@ flag {
 flag {
     namespace: "camera_platform"
     name: "camera_raw14_format"
+    is_exported: true
     description: "Add new RAW14 image format"
     bug: "446724373"
     metadata {
