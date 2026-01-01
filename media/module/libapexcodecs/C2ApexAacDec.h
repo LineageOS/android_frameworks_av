@@ -17,6 +17,7 @@
 #ifndef ANDROID_C2_APEX_AAC_DEC_H_
 #define ANDROID_C2_APEX_AAC_DEC_H_
 
+#include <deque>
 #include <list>
 #include <memory>
 #include <vector>
@@ -114,6 +115,14 @@ private:
     int32_t outputDelayRingBufferSamplesAvailable();
     // Returns the amount of space (in samples) left in the ring buffer for writing.
     int32_t outputDelayRingBufferSpaceLeft();
+
+    struct FrameInfo {
+        uint64_t frameIndex;
+        uint64_t timestamp;
+        size_t numSamples;
+    };
+    std::deque<FrameInfo> mPendingFrameInfos;
+    std::deque<FrameInfo> mRingBufferFrameInfos;
 
     C2_DO_NOT_COPY(C2ApexAacDec);
 };
