@@ -107,13 +107,11 @@ public:
     void flush();
 
     /**
-     * \param   pipelineRoom   additional work items that pipeline can take
-     *                         before getting full.
      * \return  true  if pipeline does not need more work items to proceed
      *                smoothly, considering delays and smoothness factor;
      *          false otherwise.
      */
-    bool pipelineFull(size_t *pipelineRoom = nullptr) const;
+    bool pipelineFull() const;
 
     /**
      * Return elapsed processing time of a work item, nth from the longest
