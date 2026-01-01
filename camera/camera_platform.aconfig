@@ -322,6 +322,7 @@ flag {
 flag {
     namespace: "camera_platform"
     name: "multi_resolution_concurrent_readers"
+    is_exported: true
     description: "Support concurrent readers in multi-resolution outputs"
     bug: "447659256"
     metadata {
