@@ -339,3 +339,13 @@ flag {
         purpose: PURPOSE_FEATURE
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "reset_listener_after_adopt_shell_permission"
+    description: "Update listener permission after the app adopts shell permission"
+    bug: "456033877"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
