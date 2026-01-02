@@ -2143,6 +2143,7 @@ status_t CCodecBufferChannel::start(
                     output->surface->getIGraphicBufferProducer() : nullptr;
             if (outputSurface) {
                 (void)SurfaceCallbackHandler::GetInstance();
+                output->surface->setDequeueTimeout(kDequeueTimeoutNs);
                 output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
             }
             outputGeneration = output->generation;
