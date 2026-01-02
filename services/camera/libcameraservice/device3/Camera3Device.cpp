@@ -3461,10 +3461,10 @@ bool Camera3Device::RequestThread::containsSurfaceIds(int streamId,
     for (const auto& surfaceId : surfaceIds) {
         if (std::find(reqSurfacesIds.begin(), reqSurfacesIds.end(), surfaceId) !=
                 reqSurfacesIds.end()) {
-            break;
+            return true;
         }
     }
-    return true;
+    return false;
 }
 
 bool Camera3Device::RequestThread::clearOutputList(int streamId,
