@@ -30,6 +30,7 @@ LIBAAUDIO {
     AAudioStreamBuilder_setIsContentSpatialized;   # introduced=32
     AAudioStreamBuilder_setPresentationEndCallback; #introduced=36
     AAudioStreamBuilder_setPartialDataCallback; # introduced=37
+    AAudioStreamBuilder_setRoutingChangedCallback; # introduced=37
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
     AAudioStream_close;

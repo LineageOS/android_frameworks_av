@@ -83,6 +83,16 @@ public:
         return this;
     }
 
+    AudioStreamBuilder* setRoutingChangedCallbackProc(AAudioStream_routingChangedCallback proc) {
+        mRoutingChangedCallbackProc = proc;
+        return this;
+    }
+
+    AudioStreamBuilder* setRoutingChangedCallbackUserData(void *userData) {
+        mRoutingChangedCallbackUserData = userData;
+        return this;
+    }
+
     AudioStreamBuilder* setFramesPerDataCallback(int32_t sizeInFrames) {
         mFramesPerDataCallback = sizeInFrames;
         return this;

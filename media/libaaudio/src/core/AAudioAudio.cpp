@@ -289,6 +289,15 @@ AAUDIO_API void AAudioStreamBuilder_setPresentationEndCallback(AAudioStreamBuild
                  ->setPresentationEndCallbackUserData(userData);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setRoutingChangedCallback(
+        AAudioStreamBuilder* builder,
+        AAudioStream_routingChangedCallback callback,
+        void* userData) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setRoutingChangedCallbackProc(callback)
+                 ->setRoutingChangedCallbackUserData(userData);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setFramesPerDataCallback(AAudioStreamBuilder* builder,
                                                 int32_t frames)
 {

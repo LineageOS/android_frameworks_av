@@ -72,6 +72,14 @@ public:
         return mPresentationEndCallbackUserData;
     }
 
+    AAudioStream_routingChangedCallback getRoutingChangedCallbackProc() const {
+        return mRoutingChangedCallbackProc;
+    }
+
+    void* getRoutingChangedCallbackUserData() const {
+        return mRoutingChangedCallbackUserData;
+    }
+
     int32_t getFramesPerDataCallback() const {
         return mFramesPerDataCallback;
     }
@@ -97,6 +105,9 @@ protected:
 
     AAudioStream_presentationEndCallback mPresentationEndCallbackProc = nullptr;
     void* mPresentationEndCallbackUserData = nullptr;
+
+    AAudioStream_routingChangedCallback mRoutingChangedCallbackProc = nullptr;
+    void* mRoutingChangedCallbackUserData = nullptr;
 
     privacy_sensitive_t mPrivacySensitiveReq = PRIVACY_SENSITIVE_DEFAULT;
 };

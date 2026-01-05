@@ -130,6 +130,11 @@ aaudio_result_t AudioStream::open(const AAudioStreamOpenRequest& openRequest)
     mErrorCallbackUserData = openRequest.getErrorCallbackUserData();
     setPresentationEndCallbackUserData(openRequest.getPresentationEndCallbackUserData());
     setPresentationEndCallbackProc(openRequest.getPresentationEndCallbackProc());
+    mRoutingChangedCallbackProc = openRequest.getRoutingChangedCallbackProc();
+    if (mRoutingChangedCallbackProc != nullptr) {
+        mRoutingChangedCallbackUserData = openRequest.getRoutingChangedCallbackUserData();
+        mEventExecutor.emplace();
+    }
 
     return AAUDIO_OK;
 }
@@ -220,6 +225,7 @@ aaudio_result_t AudioStream::systemStart() {
         mPlayerBase->baseUpdateDeviceIds(getDeviceIds());
         // We only call this for logging in "dumpsys audio". So ignore return code.
         (void) mPlayerBase->startWithStatus(getDeviceIds());
+        maybeSignalRoutingChangedCallback();
     }
     return result;
 }
@@ -390,6 +396,9 @@ aaudio_result_t AudioStream::safeReleaseCloseInternal() {
 void AudioStream::close_l() {
     // Releasing the stream will set the state to CLOSING.
     assert(getState() == AAUDIO_STREAM_STATE_CLOSING);
+    if (mEventExecutor.has_value()) {
+        mEventExecutor->shutdown(true /*dropTasks*/);
+    }
     // setState() prevents a transition from CLOSING to any state other than CLOSED.
     // State is checked by destructor.
     setState(AAUDIO_STREAM_STATE_CLOSED);
@@ -626,6 +635,33 @@ void AudioStream::maybeCallErrorCallback(aaudio_result_t result) {
             ALOGW("%s() error callback already running!", __func__);
         }
     }
+}
+
+void AudioStream::maybeSignalRoutingChangedCallback() {
+    if (getRoutingChangedCallback() == nullptr) {
+        return;
+    }
+    assert(mEventExecutor.has_value());
+    android::wp<AudioStream> weakThis = android::wp<AudioStream>::fromExisting(this);
+    mEventExecutor->enqueue(android::mediautils::Runnable{[weakThis]() {
+        auto strongThis = weakThis.promote();
+        if (strongThis == nullptr) {
+            return;
+        }
+        auto routingChangedCallback = strongThis->getRoutingChangedCallback();
+        if (routingChangedCallback == nullptr) {
+            return;
+        }
+        auto deviceIds = strongThis->getDeviceIds();
+        ALOGW_IF(deviceIds.empty(),
+                 "maybeSignalRoutingChangedCallback: skip routing callback because the routed "
+                 "device ids are empty.");
+        std::invoke(routingChangedCallback,
+                    (AAudioStream *)strongThis.get(),
+                    strongThis->getRoutingChangedCallbackUserData(),
+                    deviceIds.data(),
+                    deviceIds.size());
+    }});
 }
 
 // Is this running on the same thread as a callback?

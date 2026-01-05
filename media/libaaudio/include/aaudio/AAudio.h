@@ -1880,6 +1880,49 @@ AAUDIO_API void AAudioStreamBuilder_setPresentationEndCallback(
         void* _Nullable userData) __INTRODUCED_IN(36);
 
 /**
+ * Prototype for the routing changed function that is passed to
+ * {@link AAudioStreamBuilder_setRoutingChangedCallback}.
+ *
+ * This will be called when the routed devices of the stream are changed.
+ * The callback will return a list of current routed device ids. The ids
+ * could be obtained from the Java AudioManager. AudioManager.getDevices()
+ * returns an array of {@link AudioDeviceInfo}, which contains a getId() method.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream().
+ * @param userData the same address that was passed to
+ *                 {@link AAudioStreamBuilder_setRoutingChangedCallback}.
+ * @param deviceIds a pointer to a list of current routed device ids.
+ * @param numDevices the number of current routed devices.
+ */
+typedef void (*AAudioStream_routingChangedCallback)(AAudioStream* _Nonnull stream,
+                                                    void* _Nullable userData,
+                                                    const int32_t* _Nonnull deviceIds,
+                                                    int32_t numDevices);
+
+/**
+ * Request that AAudio call this function when the routed devices for the stream are changed.
+ * This may happen when the stream is started or there is any event, such as plugging a peripheral
+ * devices, that affects the routed devices happens.
+ *
+ * The callback function will not be called after AAudioStream_close() is called or the stream
+ * is disconnected.
+ *
+ * The routing changed callback will be called from a dedicated thread owned by audio framework.
+ *
+ * Available since API level 37.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder().
+ * @param callback pointer to a function that will be called when routed devices for the
+ *                 stream are changed.
+ * @param userData pointer to an application data structure that will be passed
+ *                 to the callback functions.
+ */
+AAUDIO_API void AAudioStreamBuilder_setRoutingChangedCallback(
+        AAudioStreamBuilder* _Nonnull builder,
+        AAudioStream_routingChangedCallback _Nonnull callback,
+        void* _Nullable userData) __INTRODUCED_IN(37);
+
+/**
  * Open a stream based on the options in the StreamBuilder.
  *
  * AAudioStream_close() must be called when finished with the stream to recover
