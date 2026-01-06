@@ -1152,9 +1152,23 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
         return BAD_VALUE;
     }
 
-    if (hasDeferredConsumer && format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
-        ALOGE("Deferred consumer stream creation only support IMPLEMENTATION_DEFINED format");
-        return BAD_VALUE;
+    if (!flags::seamless_transitions()) {
+        if (hasDeferredConsumer && format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+            ALOGE("Deferred consumer stream creation only support IMPLEMENTATION_DEFINED format");
+            return BAD_VALUE;
+        }
+    }
+
+    sp<Surface> outputSurface = nullptr;
+    int mirrorMode = OutputConfiguration::MIRROR_MODE_AUTO;
+    if (!flags::seamless_transitions()) {
+        outputSurface = consumers[0].mSurface;
+        mirrorMode = consumers[0].mMirrorMode;
+    } else {
+        if (!hasDeferredConsumer) {
+            outputSurface = consumers[0].mSurface;
+            mirrorMode = consumers[0].mMirrorMode;
+        }
     }
 
     IPCTransport transport = getTransportType();
@@ -1177,11 +1191,11 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
                 return BAD_VALUE;
             }
         }
-        newStream = new Camera3OutputStream(mNextStreamId, consumers[0].mSurface,
+        newStream = new Camera3OutputStream(mNextStreamId, outputSurface,
                 width, height, blobBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, transport, streamSetId,
                 multiResMode, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
-                timestampBase, consumers[0].mMirrorMode, colorSpace, useReadoutTimestamp);
+                timestampBase, mirrorMode, colorSpace, useReadoutTimestamp);
     } else if (format == HAL_PIXEL_FORMAT_RAW_OPAQUE) {
         bool maxResolution =
                 sensorPixelModesUsed.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
@@ -1193,11 +1207,11 @@ status_t Camera3Device::createStream(const std::vector<SurfaceHolder>& consumers
             "Invalid RAW opaque buffer size %zd", rawOpaqueBufferSize);
             return BAD_VALUE;
         }
-        newStream = new Camera3OutputStream(mNextStreamId, consumers[0].mSurface,
+        newStream = new Camera3OutputStream(mNextStreamId, outputSurface,
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
                 mTimestampOffset, physicalCameraId, sensorPixelModesUsed, transport, streamSetId,
                 multiResMode, dynamicRangeProfile, streamUseCase, mDeviceTimeBaseIsRealtime,
-                timestampBase, consumers[0].mMirrorMode, colorSpace, useReadoutTimestamp);
+                timestampBase, mirrorMode, colorSpace, useReadoutTimestamp);
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
                 width, height, format, consumerUsage, dataSpace, rotation,
@@ -3461,10 +3475,10 @@ bool Camera3Device::RequestThread::containsSurfaceIds(int streamId,
     for (const auto& surfaceId : surfaceIds) {
         if (std::find(reqSurfacesIds.begin(), reqSurfacesIds.end(), surfaceId) !=
                 reqSurfacesIds.end()) {
-            break;
+            return true;
         }
     }
-    return true;
+    return false;
 }
 
 bool Camera3Device::RequestThread::clearOutputList(int streamId,

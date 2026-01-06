@@ -122,9 +122,11 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mState = STATE_ERROR;
     }
 
-    if (mConsumer == NULL) {
-        ALOGE("%s: Consumer is NULL!", __FUNCTION__);
-        mState = STATE_ERROR;
+    if (!flags::seamless_transitions()) {
+        if (mConsumer == NULL) {
+            ALOGE("%s: Consumer is NULL!", __FUNCTION__);
+            mState = STATE_ERROR;
+        }
     }
 
     bool needsReleaseNotify = setId > CAMERA3_STREAM_SET_ID_INVALID;
@@ -157,14 +159,14 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mMirrorMode(OutputConfiguration::MIRROR_MODE_AUTO),
         mDequeueBufferLatency(kDequeueLatencyBinSize),
         mIPCTransport(transport) {
-    // Deferred consumer only support preview surface format now.
-    if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
-        ALOGE("%s: Deferred consumer only supports IMPLEMENTATION_DEFINED format now!",
-                __FUNCTION__);
-        mState = STATE_ERROR;
-    }
-
     if (!flags::seamless_transitions()) {
+        // Deferred consumer only support preview surface format now.
+        if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+            ALOGE("%s: Deferred consumer only supports IMPLEMENTATION_DEFINED format now!",
+                    __FUNCTION__);
+            mState = STATE_ERROR;
+        }
+
         // Validation check for the consumer usage flag.
         if ((consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) == 0 &&
                 (consumerUsage & GraphicBuffer::USAGE_HW_COMPOSER) == 0) {
