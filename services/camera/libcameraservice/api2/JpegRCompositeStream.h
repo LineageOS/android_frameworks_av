@@ -98,7 +98,7 @@ private:
             requestTimeNs(-1) { }
     };
 
-    status_t processInputFrame(nsecs_t ts, const InputFrame &inputFrame);
+    status_t processInputFrame(nsecs_t ts, const InputFrame &inputFrame, sp<Surface> currentOutput);
 
     // Buffer/Results handling
     void compilePendingInputLocked();

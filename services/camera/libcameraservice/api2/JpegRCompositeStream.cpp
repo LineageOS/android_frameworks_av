@@ -238,13 +238,17 @@ int64_t JpegRCompositeStream::getNextFailingInputLocked(int64_t *currentTs /*ino
     return ret;
 }
 
-status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &inputFrame) {
+status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &inputFrame,
+        sp<Surface> currentOutput) {
     status_t res;
-    sp<ANativeWindow> outputANW = mOutputSurface;
-    sp<Surface> currentOutput = mOutputSurface;
+    sp<ANativeWindow> outputANW = currentOutput;
     ANativeWindowBuffer *anb;
     int fenceFd;
     void *dstBuffer;
+
+    if (currentOutput == nullptr) {
+        return INVALID_OPERATION;
+    }
 
     size_t maxJpegRBufferSize = 0;
     if (mMaxJpegBufferSize > 0) {
@@ -267,14 +271,14 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         jpegQuality = entry.data.u8[0];
     }
 
-    if ((res = native_window_set_buffers_dimensions(mOutputSurface.get(), maxJpegRBufferSize, 1))
+    if ((res = native_window_set_buffers_dimensions(currentOutput.get(), maxJpegRBufferSize, 1))
             != OK) {
         ALOGE("%s: Unable to configure stream buffer dimensions"
                 " %zux%u for stream %d", __FUNCTION__, maxJpegRBufferSize, 1U, mP010StreamId);
         return res;
     }
 
-    res = outputANW->dequeueBuffer(mOutputSurface.get(), &anb, &fenceFd);
+    res = outputANW->dequeueBuffer(currentOutput.get(), &anb, &fenceFd);
     if (res != OK) {
         ALOGE("%s: Error retrieving output buffer: %s (%d)", __FUNCTION__, strerror(-res),
                 res);
@@ -287,18 +291,14 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     if (res != OK) {
         ALOGE("%s: Error trying to lock output buffer fence: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
-        mMutex.unlock();
         outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
-        mMutex.lock();
         return res;
     }
 
     if ((gb->getWidth() < maxJpegRBufferSize) || (gb->getHeight() != 1)) {
         ALOGE("%s: Blob buffer size mismatch, expected %zux%u received %dx%d", __FUNCTION__,
                 maxJpegRBufferSize, 1, gb->getWidth(), gb->getHeight());
-        mMutex.unlock();
         outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
-        mMutex.lock();
         return BAD_VALUE;
     }
 
@@ -328,10 +328,6 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         default:
             transferFunction = ultrahdr::ultrahdr_transfer_function::ULTRAHDR_TF_HLG;
     }
-
-    // Release the composite stream mutex as to avoid blocking incoming
-    // requests for too long during extensive processing
-    mMutex.unlock();
 
     if (mSupportInternalJpeg) {
         ultrahdr::jpegr_compressed_struct jpeg;
@@ -374,7 +370,6 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     }
 
     if (res != OK) {
-        mMutex.lock();
         ALOGE("%s: Error trying to encode JPEG/R: %s (%d)", __FUNCTION__, strerror(-res), res);
         return res;
     }
@@ -385,13 +380,11 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     if (finalJpegRSize > maxJpegRBufferSize) {
         ALOGE("%s: Final jpeg buffer not large enough for the jpeg blob header", __FUNCTION__);
         outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
-        mMutex.lock();
         return NO_MEMORY;
     }
 
     res = native_window_set_buffers_timestamp(currentOutput.get(), ts);
     if (res != OK) {
-        mMutex.lock();
         ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)", __FUNCTION__,
                 getStreamId(), strerror(-res), res);
         return res;
@@ -415,8 +408,7 @@ status_t JpegRCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     }
     res = outputANW->queueBuffer(currentOutput.get(), anb, /*fence*/ -1);
 
-    mMutex.lock();
-    if ((res != NO_ERROR) || (currentOutput != mOutputSurface)) {
+    if (res != NO_ERROR) {
         ALOGE("%s: Output surface update during JPEG/R processing!", __FUNCTION__);
         outputANW->cancelBuffer(currentOutput.get(), anb, /*fence*/ -1);
         return INVALID_OPERATION;
@@ -467,44 +459,49 @@ bool JpegRCompositeStream::threadLoop() {
     int64_t currentTs = INT64_MAX;
     bool newInputAvailable = false;
 
-    Mutex::Autolock l(mMutex);
+    sp<Surface> currentOutput;
+    {
+        Mutex::Autolock l(mMutex);
 
-    if (mErrorState) {
-        // In case we landed in error state, return any pending buffers and
-        // halt all further processing.
-        compilePendingInputLocked();
-        releaseInputFramesLocked(currentTs);
-        return false;
-    }
+        if (mErrorState) {
+            // In case we landed in error state, return any pending buffers and
+            // halt all further processing.
+            compilePendingInputLocked();
+            releaseInputFramesLocked(currentTs);
+            return false;
+        }
 
-    while (!newInputAvailable) {
-        compilePendingInputLocked();
-        newInputAvailable = getNextReadyInputLocked(&currentTs);
-        if (!newInputAvailable) {
-            auto failingFrameNumber = getNextFailingInputLocked(&currentTs);
-            if (failingFrameNumber >= 0) {
-                // We cannot erase 'mPendingInputFrames[currentTs]' at this point because it is
-                // possible for two internal stream buffers to fail. In such scenario the
-                // composite stream should notify the client about a stream buffer error only
-                // once and this information is kept within 'errorNotified'.
-                // Any present failed input frames will be removed on a subsequent call to
-                // 'releaseInputFramesLocked()'.
-                releaseInputFrameLocked(&mPendingInputFrames[currentTs]);
-                currentTs = INT64_MAX;
-            }
+        while (!newInputAvailable) {
+            compilePendingInputLocked();
+            newInputAvailable = getNextReadyInputLocked(&currentTs);
+            if (!newInputAvailable) {
+                auto failingFrameNumber = getNextFailingInputLocked(&currentTs);
+                if (failingFrameNumber >= 0) {
+                    // We cannot erase 'mPendingInputFrames[currentTs]' at this point because it is
+                    // possible for two internal stream buffers to fail. In such scenario the
+                    // composite stream should notify the client about a stream buffer error only
+                    // once and this information is kept within 'errorNotified'.
+                    // Any present failed input frames will be removed on a subsequent call to
+                    // 'releaseInputFramesLocked()'.
+                    releaseInputFrameLocked(&mPendingInputFrames[currentTs]);
+                    currentTs = INT64_MAX;
+                }
 
-            auto ret = mInputReadyCondition.waitRelative(mMutex, kWaitDuration);
-            if (ret == TIMED_OUT) {
-                return true;
-            } else if (ret != OK) {
-                ALOGE("%s: Timed wait on condition failed: %s (%d)", __FUNCTION__,
-                        strerror(-ret), ret);
-                return false;
+                auto ret = mInputReadyCondition.waitRelative(mMutex, kWaitDuration);
+                if (ret == TIMED_OUT) {
+                    return true;
+                } else if (ret != OK) {
+                    ALOGE("%s: Timed wait on condition failed: %s (%d)", __FUNCTION__,
+                            strerror(-ret), ret);
+                    return false;
+                }
             }
         }
+        currentOutput = mOutputSurface;
     }
 
-    auto res = processInputFrame(currentTs, mPendingInputFrames[currentTs]);
+    auto res = processInputFrame(currentTs, mPendingInputFrames[currentTs], currentOutput);
+    Mutex::Autolock l(mMutex);
     if (res != OK) {
         ALOGE("%s: Failed processing frame with timestamp: %" PRIu64 ": %s (%d)", __FUNCTION__,
                 currentTs, strerror(-res), res);

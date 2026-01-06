@@ -119,7 +119,7 @@ private:
             size_t maxJpegSize, uint8_t jpegQuality,
             std::vector<std::unique_ptr<Item>>* items /*out*/);
     std::unique_ptr<ImagingModel> getImagingModel();
-    status_t processInputFrame(nsecs_t ts, const InputFrame &inputFrame);
+    status_t processInputFrame(nsecs_t ts, const InputFrame &inputFrame, sp<Surface> currentOutput);
 
     // Buffer/Results handling
     void compilePendingInputLocked();
