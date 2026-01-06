@@ -338,5 +338,6 @@ flag {
   namespace: "codec_fwk"
   description: "Feature flag for xHE-AAC encoder APIs"
   bug: "449005879"
+  is_exported: true
 }
 # go/keep-sorted end
