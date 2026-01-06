@@ -76,7 +76,7 @@ public:
     /**
      * Constant forward iterator to this class.  Implements an std:forward_iterator.
      */
-    class const_iterator : public std::iterator<std::forward_iterator_tag, T> {
+    class const_iterator {
     public:
         const_iterator(const T* ptr, size_t size, size_t pos, size_t ctr);
 
