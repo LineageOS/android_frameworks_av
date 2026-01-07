@@ -339,4 +339,11 @@ flag {
   bug: "426238242"
   is_exported: true
 }
+
+flag {
+  name: "xhe_aac_encoder"
+  namespace: "codec_fwk"
+  description: "Feature flag for xHE-AAC encoder APIs"
+  bug: "449005879"
+}
 # go/keep-sorted end
