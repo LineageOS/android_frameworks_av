@@ -282,16 +282,6 @@ flag {
 
 flag {
     namespace: "camera_platform"
-    name: "cap_mandatory_preview_size_to_all_displays"
-    description: "Adjust mandatory stream combination preview size limit"
-    bug: "420675242"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "camera_platform"
     is_exported: true
     name: "logical_multi_camera_additional_results"
     description: "Add additional metadata info to the logical camera result"
