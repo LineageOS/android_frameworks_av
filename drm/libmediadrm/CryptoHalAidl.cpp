@@ -385,6 +385,11 @@ DrmStatus CryptoHalAidl::getKeyHandle(const uint8_t keyId[16], CryptoPlugin::Mod
         return mInitCheck;
     }
 
+    int32_t version = 0;
+    if (mPlugin->getInterfaceVersion(&version).isOk() && version < 2) {
+        return DrmStatus(ERROR_UNSUPPORTED, "getKeyHandle is not supported by the HAL");
+    }
+
     Mode aMode;
     if (!convertCryptoMode(mode, &aMode)) {
         return UNKNOWN_ERROR;
