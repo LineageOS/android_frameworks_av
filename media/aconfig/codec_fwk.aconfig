@@ -175,6 +175,13 @@ flag {
 }
 
 flag {
+  name: "internal_block_pool"
+  namespace: "codec_fwk"
+  description: "Feature flag for internal block pool support"
+  bug: "447658020"
+}
+
+flag {
   name: "mediametadataretriever_10_bit_support"
   namespace: "codec_fwk"
   description: "Enable MediaMetadataRetriever to extract 10-bit frames from 10-bit sources."
