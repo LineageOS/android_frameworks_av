@@ -421,6 +421,13 @@ void CCodecConfig::initializeStandardParams() {
             C2_PARAMKEY_OUTPUT_LARGE_FRAME, "threshold-size")
         .limitTo(D::AUDIO & D::OUTPUT));
 
+    // Flip
+    if (android::media::codec::provider_->flip_support()) {
+        add(ConfigMapper(KEY_HORIZONTAL_FLIP, C2_PARAMKEY_VUI_ROTATION, "flip")
+            .limitTo((D::VIDEO | D::IMAGE) & D::CODED));
+        add(ConfigMapper(KEY_HORIZONTAL_FLIP, C2_PARAMKEY_ROTATION, "flip")
+            .limitTo((D::VIDEO | D::IMAGE) & D::RAW));
+    }
     // Rotation
     // Note: SDK rotation is clock-wise, while C2 rotation is counter-clock-wise
     add(ConfigMapper(KEY_ROTATION, C2_PARAMKEY_VUI_ROTATION, "value")
