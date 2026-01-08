@@ -36,6 +36,7 @@ flag {
     namespace: "media_audio"
     description: "Enable multi-zone audio support in audio product strategies."
     bug: "316643994"
+    is_exported: true
 }
 
 flag {

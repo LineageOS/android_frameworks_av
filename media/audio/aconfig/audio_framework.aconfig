@@ -58,6 +58,7 @@ flag {
     namespace: "media_audio"
     description: "Add BLE hearing aid device category"
     bug: "443740527"
+    is_exported: true
 }
 
 flag {
@@ -293,6 +294,7 @@ flag {
             "callback APIs"
     bug: "402502314"
     is_fixed_read_only: true
+    is_exported: true
 }
 
 flag {
@@ -308,6 +310,7 @@ flag{
     namespace: "media_audio"
     description: "System APIs for ringtone vibration utils."
     bug: "399265235"
+    is_exported: true
 }
 
 flag {
@@ -353,6 +356,7 @@ flag {
     description: "360 Reality Audio MPEG-H 3D Format"
     is_fixed_read_only: true
     bug: "238402306"
+    is_exported: true
 }
 
 flag {
