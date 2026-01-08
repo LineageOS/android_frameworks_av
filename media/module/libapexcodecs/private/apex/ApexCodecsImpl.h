@@ -234,6 +234,8 @@ public:
     virtual std::vector<std::shared_ptr<const C2Component::Traits>> listComponents() const = 0;
     virtual std::unique_ptr<ApexComponentIntf> createComponent(const char *name) = 0;
     virtual std::shared_ptr<C2ParamReflector> getParamReflector() const = 0;
+    virtual ApexCodec_MapFn getMapFn(const char *componentName) const = 0;
+    virtual ApexCodec_UnmapFn getUnmapFn(const char *componentName) const = 0;
 };
 
 }  // namespace android

@@ -20,14 +20,16 @@
 
 #include <ranges>
 
+#include <sys/mman.h>
+
 #include <android-base/no_destructor.h>
 #include <android_media_swcodec_flags.h>
 #include <apex/ApexCodecsImpl.h>
 
 #ifdef ENABLE_APEX_CODECS
 #include <util/C2InterfaceHelper.h>
-#include "C2ApexOpusDec.h"
 #include "C2ApexAacDec.h"
+#include "C2ApexOpusDec.h"
 #endif
 
 namespace android::apexcodecs {
@@ -40,6 +42,8 @@ struct ComponentDesc {
     std::shared_ptr<const C2Component::Traits> traits;
     std::function<std::unique_ptr<ApexComponentIntf>(
             const std::shared_ptr<C2ReflectorHelper>&)> createComponentFn;
+    ApexCodec_MapFn mapFn;
+    ApexCodec_UnmapFn unmapFn;
 };
 
 class StoreImpl {
@@ -60,6 +64,21 @@ public:
         return mCodecs.at(name).createComponentFn(reflector);
     }
 
+    ApexCodec_MapFn getMapFn(const char *name) const {
+        if (mCodecs.count(name) == 0) {
+            return ::mmap;
+        }
+        return mCodecs.at(name).mapFn;
+    }
+
+
+    ApexCodec_UnmapFn getUnmapFn(const char *name) const {
+        if (mCodecs.count(name) == 0) {
+            return ::munmap;
+        }
+        return mCodecs.at(name).unmapFn;
+    }
+
 private:
     template <typename Codec>
     static void AddCodec(std::map<std::string, ComponentDesc> *codecs) {
@@ -69,6 +88,8 @@ private:
         (*codecs)[Codec::COMPONENT_NAME] = ComponentDesc{
             Codec::MakeTraits(),
             Codec::Create,
+            Codec::Map,
+            Codec::Unmap,
         };
     }
 
@@ -105,6 +126,12 @@ public:
     std::shared_ptr<C2ParamReflector> getParamReflector() const override {
         return mReflector;
     }
+    ApexCodec_MapFn getMapFn(const char *name) const override {
+        return mImpl.getMapFn(name);
+    }
+    ApexCodec_UnmapFn getUnmapFn(const char *name) const override {
+        return mImpl.getUnmapFn(name);
+    }
 
 private:
     StoreImpl mImpl;
@@ -125,6 +152,12 @@ public:
     }
     std::shared_ptr<C2ParamReflector> getParamReflector() const override {
         return nullptr;
+    }
+    ApexCodec_MapFn getMapFn(const char *) const override {
+        return ::mmap;
+    }
+    ApexCodec_UnmapFn getUnmapFn(const char *) const override {
+        return ::munmap;
     }
 };
 

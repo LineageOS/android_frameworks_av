@@ -141,7 +141,7 @@ public:
                 })})
                 .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
                 .build());
-	    addParameter(
+        addParameter(
                 DefineParam(mAacFormat, C2_PARAMKEY_AAC_PACKAGING)
                 .withDefault(new C2StreamAacFormatInfo::input(0u, C2Config::AAC_PACKAGING_RAW))
                 .withFields({C2F(mAacFormat, value).oneOf({
@@ -416,6 +416,7 @@ std::unique_ptr<ApexComponentIntf> C2ApexAacDec::Create(
     return std::make_unique<C2ApexAacDec>(std::make_shared<IntfImpl>(helper));
 }
 
+// static
 std::shared_ptr<C2Component::Traits> C2ApexAacDec::MakeTraits() {
 #ifdef ENABLE_APEX_CODECS
     ALOGV("MakeTraits");
@@ -430,6 +431,16 @@ std::shared_ptr<C2Component::Traits> C2ApexAacDec::MakeTraits() {
 #else
     return nullptr;
 #endif
+}
+
+// static
+void *C2ApexAacDec::Map(void *addr, size_t size, int prot, int flags, int fd, off_t offset) {
+    return ::mmap(addr, size, prot, flags, fd, offset);
+}
+
+// static
+int C2ApexAacDec::Unmap(void *addr, size_t size) {
+    return ::munmap(addr, size);
 }
 
 ApexCodec_Status C2ApexAacDec::start() {
