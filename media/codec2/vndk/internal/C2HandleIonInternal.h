@@ -39,6 +39,8 @@ struct C2HandleIon : public C2Handle {
                 | size_t(uint64_t(unsigned(mInts.mSizeHi)) << 32);
     }
 
+    static bool IsUsed();
+
 protected:
     struct {
         int mBuffer; // shared ion buffer
