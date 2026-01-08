@@ -203,7 +203,6 @@ cc_library {
     export_include_dirs: ["."],
     shared_libs: [
         "libaaudio_internal_utils",
-        "libaudioclient",
         "libbinder",
         "libmediametrics",
     ],
@@ -239,10 +238,8 @@ cc_library {
     shared_libs: [
         "framework-permission-aidl-cpp",
         "libaaudio_internal_core",
-        "libaaudio_internal_fifo",
         "libaaudio_internal_utils",
         "libaudio_aidl_conversion_common_cpp",
-        "libaudioclient",
         "libaudiofoundation",
         "libaudioutils",
         "libbinder",
