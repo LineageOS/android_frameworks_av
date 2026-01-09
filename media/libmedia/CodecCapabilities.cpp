@@ -78,6 +78,7 @@ static const std::set<std::pair<std::string, AMessage::Type>> VIDEO_LEVEL_CRITIC
     { KEY_WIDTH, AMessage::kTypeInt32 },
     { KEY_HEIGHT, AMessage::kTypeInt32 },
     { KEY_FRAME_RATE, AMessage::kTypeInt32 },
+    { KEY_FRAME_RATE, AMessage::kTypeFloat },
     { KEY_BIT_RATE, AMessage::kTypeInt32 },
     { KEY_MIME, AMessage::kTypeString }
 };
@@ -209,14 +210,23 @@ bool CodecCapabilities::isFormatSupported(const sp<AMessage> &format) const {
                     switch (key.second) {
                         case AMessage::kTypeInt32: {
                             int32_t value;
-                            format->findInt32(key.first.c_str(), &value);
-                            levelCriticalFormat->setInt32(key.first.c_str(), value);
+                            if (format->findInt32(key.first.c_str(), &value)) {
+                                levelCriticalFormat->setInt32(key.first.c_str(), value);
+                            }
                             break;
                         }
                         case AMessage::kTypeString: {
                             AString value;
-                            format->findString(key.first.c_str(), &value);
-                            levelCriticalFormat->setString(key.first.c_str(), value);
+                            if (format->findString(key.first.c_str(), &value)) {
+                                levelCriticalFormat->setString(key.first.c_str(), value);
+                            }
+                            break;
+                        }
+                        case AMessage::kTypeFloat: {
+                            float value;
+                            if (format->findFloat(key.first.c_str(), &value)) {
+                                levelCriticalFormat->setFloat(key.first.c_str(), value);
+                            }
                             break;
                         }
                         default:

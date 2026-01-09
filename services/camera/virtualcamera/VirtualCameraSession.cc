@@ -202,27 +202,6 @@ Resolution resolutionFromInputConfig(
   return Resolution(inputConfig.width, inputConfig.height);
 }
 
-std::optional<Resolution> resolutionFromSurface(const sp<Surface> surface) {
-  Resolution res{0, 0};
-  if (surface == nullptr) {
-    ALOGE("%s: Cannot get resolution from null surface", __func__);
-    return std::nullopt;
-  }
-
-  int status = surface->query(NATIVE_WINDOW_WIDTH, &res.width);
-  if (status != NO_ERROR) {
-    ALOGE("%s: Failed to get width from surface", __func__);
-    return std::nullopt;
-  }
-
-  status = surface->query(NATIVE_WINDOW_HEIGHT, &res.height);
-  if (status != NO_ERROR) {
-    ALOGE("%s: Failed to get height from surface", __func__);
-    return std::nullopt;
-  }
-  return res;
-}
-
 // Search stream configurations from Camera2 and Virtual Camera Owner for a
 // matching pair that enables a direct blob transfer.
 //
@@ -485,10 +464,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       // if it differs, we need to discard the current surface and
       // reinitialize the render thread.
 
-      std::optional<Resolution> currentInputResolution =
-          resolutionFromSurface(mRenderThread->getInputSurface());
-      if (currentInputResolution.has_value() &&
-          *currentInputResolution == resolutionFromInputConfig(*inputConfig)) {
+      Resolution currentInputResolution = mRenderThread->getInputResolution();
+      if (currentInputResolution == resolutionFromInputConfig(*inputConfig)) {
         // BLOB types must match (if applicable), otherwise the existing surface
         // cannot be reused and must be regenerated
         if ((isBlobFormat(mRenderThread->getImageFormat()) ||
@@ -503,8 +480,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
           ALOGI(
               "%s: Newly configured set of streams matches existing client "
               "surface (%dx%d)",
-              __func__, currentInputResolution->width,
-              currentInputResolution->height);
+              __func__, currentInputResolution.width,
+              currentInputResolution.height);
           return ndk::ScopedAStatus::ok();
         }
       }
@@ -516,9 +493,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       ALOGV(
           "%s: Newly requested output streams are not suitable for "
           "pre-existing surface (%dx%d), creating new surface (%dx%d)",
-          __func__, currentInputResolution->width,
-          currentInputResolution->height, inputConfig->width,
-          inputConfig->height);
+          __func__, currentInputResolution.width, currentInputResolution.height,
+          inputConfig->width, inputConfig->height);
 
       mRenderThread->flush();
       // defer the stop of the render thread outside of the lock

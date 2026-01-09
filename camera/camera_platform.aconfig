@@ -340,3 +340,14 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "output_configuration_get_usage"
+    is_exported: true
+    description: "Unhide the getUsage function in OutputConfiguration"
+    bug: "473886000"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}

@@ -860,9 +860,14 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
       return false;
     }
 
-    if (stream.rotation != StreamRotation::ROTATION_0 ||
-        !isSupportedOutputFormat(stream.format)) {
-      ALOGV("Unsupported output stream type");
+    if (stream.rotation != StreamRotation::ROTATION_0) {
+      ALOGW("%s: Rotation is not supported", __func__);
+      return false;
+    }
+
+    if (!isSupportedOutputFormat(stream.format)) {
+      ALOGW("Unsupported output stream format:%s stream:%s ",
+            toString(stream.format).c_str(), stream.toString().c_str());
       return false;
     }
 
@@ -901,7 +906,7 @@ bool VirtualCameraDevice::isStreamCombinationSupported(
     if (std::none_of(mSupportedInputConfigurations.begin(),
                      mSupportedInputConfigurations.end(),
                      matchesSupportedInputConfig)) {
-      ALOGV("Requested config doesn't match any supported input config");
+      ALOGW("Requested config doesn't match any supported input config");
       return false;
     }
   }

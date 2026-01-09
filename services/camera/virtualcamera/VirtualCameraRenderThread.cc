@@ -97,6 +97,9 @@ static constexpr std::chrono::nanoseconds kMaxWaitFirstFrame = 15s;
 // The number of nanoseconds to wait for a frame for use cases where frame
 // duplication is not an option.
 static constexpr std::chrono::nanoseconds kMaxWaitNoDuplication = 60s;
+// The factor by which the frame wait time interval is adjusted in order to
+// accommodate for producer variance
+static constexpr double kWaitFrameRelaxationCoefficient = 1.5;
 
 static constexpr double kOneSecondInNanos = 1e9;
 
@@ -152,7 +155,8 @@ std::chrono::nanoseconds getMaxFrameDuration(
   // If it's not the first frame and the request specify a FPS, return the minFps
   if (isFirstFrameDrawn && requestSettings.fpsRange.has_value()) {
     return std::chrono::nanoseconds(static_cast<uint64_t>(
-        kOneSecondInNanos / std::max(1, requestSettings.fpsRange->minFps)));
+        kWaitFrameRelaxationCoefficient * kOneSecondInNanos /
+        std::max(1, requestSettings.fpsRange->minFps)));
   }
 
   // If the request does not specify a FPS and we should not duplicate frames,
@@ -169,7 +173,8 @@ std::chrono::nanoseconds getMaxFrameDuration(
 
   // In all other cases we wait for the duration of kMinFps
   return std::chrono::nanoseconds(
-      static_cast<uint64_t>(kOneSecondInNanos / VirtualCameraDevice::kMinFps));
+      static_cast<uint64_t>(kWaitFrameRelaxationCoefficient *
+                            kOneSecondInNanos / VirtualCameraDevice::kMinFps));
 }
 
 // Translate a frame duration into a fps value with triple decimal precision
@@ -274,6 +279,10 @@ sp<Surface> VirtualCameraRenderThread::getInputSurface() {
 
 Format VirtualCameraRenderThread::getImageFormat() const {
   return mImageFormat;
+}
+
+const Resolution& VirtualCameraRenderThread::getInputResolution() const {
+  return mInputSurfaceSize;
 }
 
 RenderThreadTask VirtualCameraRenderThread::dequeueTask() {
