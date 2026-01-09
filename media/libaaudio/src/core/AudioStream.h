@@ -27,6 +27,7 @@
 #include <media/AudioSystem.h>
 #include <media/PlayerBase.h>
 #include <media/VolumeShaper.h>
+#include <mediautils/SingleThreadExecutor.h>
 #include <utility/AAudioUtilities.h>
 #include <utility/MonotonicCounter.h>
 #include <utils/StrongPointer.h>
@@ -456,6 +457,15 @@ public:
      */
     virtual bool collidesWithCallback() const;
 
+    AAudioStream_routingChangedCallback getRoutingChangedCallback() const {
+        return mRoutingChangedCallbackProc;
+    }
+    void* getRoutingChangedCallbackUserData() const {
+        return mRoutingChangedCallbackUserData;
+    }
+
+    void maybeSignalRoutingChangedCallback();
+
     // Implement AudioDeviceCallback
     void onAudioDeviceUpdate(audio_io_handle_t audioIo [[maybe_unused]],
             const android::DeviceIdVector& deviceIds [[maybe_unused]]) override {};
@@ -808,6 +818,8 @@ protected:
 
     const android::sp<MyPlayerBase>   mPlayerBase;
 
+    std::optional<android::mediautils::SingleThreadExecutor> mEventExecutor;
+
 private:
 
     /**
@@ -876,6 +888,9 @@ private:
     AAudioStream_errorCallback  mErrorCallbackProc = nullptr;
     void                       *mErrorCallbackUserData = nullptr;
     std::atomic<pid_t>          mErrorCallbackThread{CALLBACK_THREAD_NONE};
+
+    AAudioStream_routingChangedCallback mRoutingChangedCallbackProc = nullptr;
+    void                               *mRoutingChangedCallbackUserData = nullptr;
 
     // background thread ----------------------------------
     // Use mHasThread to prevent joining twice, which has undefined behavior.

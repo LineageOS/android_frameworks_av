@@ -305,4 +305,8 @@ void AudioStreamLegacy::onAudioDeviceUpdate(audio_io_handle_t /* audioIo */,
         }
     }
     setDeviceIds(deviceIds);
+    if (!isDisconnected() && getState() != AAUDIO_STREAM_STATE_CLOSING &&
+        getState() != AAUDIO_STREAM_STATE_CLOSED) {
+        maybeSignalRoutingChangedCallback();
+    }
 }
