@@ -246,6 +246,7 @@ aidl2legacy_AudioMix(const media::AudioMix& aidl) {
     legacy.mVoiceCommunicationCaptureAllowed = aidl.voiceCommunicationCaptureAllowed;
     legacy.mToken = aidl.mToken;
     legacy.mVirtualDeviceId = aidl.mVirtualDeviceId;
+    legacy.mInjectSilenceOnStarve = aidl.mInjectSilenceOnStarve;
     return legacy;
 }
 
@@ -271,6 +272,7 @@ legacy2aidl_AudioMix(const AudioMix& legacy) {
     aidl.voiceCommunicationCaptureAllowed = legacy.mVoiceCommunicationCaptureAllowed;
     aidl.mToken = legacy.mToken;
     aidl.mVirtualDeviceId = legacy.mVirtualDeviceId;
+    aidl.mInjectSilenceOnStarve = legacy.mInjectSilenceOnStarve;
     return aidl;
 }
 

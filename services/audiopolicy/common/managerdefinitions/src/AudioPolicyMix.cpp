@@ -146,6 +146,8 @@ void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
 
     dst->appendFormat("%*s- virtual device id: %d\n", spaces, "", mVirtualDeviceId);
 
+    dst->appendFormat("%*s- inject silence on starve: %d\n", spaces, "", mInjectSilenceOnStarve);
+
     dst->appendFormat("%*s- output: %d\n", spaces, "",
             mOutput == nullptr ? 0 : mOutput->mIoHandle);
 
@@ -207,8 +209,9 @@ status_t AudioPolicyMixCollection::registerMix(const AudioMix& mix,
     }
     sp<AudioPolicyMix> policyMix = sp<AudioPolicyMix>::make(mix);
     add(policyMix);
-    ALOGD("registerMix(): adding mix for dev=0x%x addr=%s",
-            policyMix->mDeviceType, policyMix->mDeviceAddress.c_str());
+    ALOGD("registerMix(): adding mix for dev=0x%x addr=%s injectSilenceOnStarve=%d",
+            policyMix->mDeviceType, policyMix->mDeviceAddress.c_str(),
+            policyMix->mInjectSilenceOnStarve);
 
     if (desc != nullptr) {
         desc->mPolicyMix = policyMix;

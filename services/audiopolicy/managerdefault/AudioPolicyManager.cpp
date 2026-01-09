@@ -2819,14 +2819,26 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
     }
 
     // Automatically enable the remote submix input when output is started on a re routing mix
-    // of type MIX_TYPE_RECORDERS
+    // of type MIX_TYPE_RECORDERS if not already connected
     if (isSingleDeviceType(devices.types(), &audio_is_remote_submix_device) &&
-        policyMix != NULL && policyMix->mMixType == MIX_TYPE_RECORDERS) {
-        setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                                    address,
-                                    "remote-submix",
-                                    AUDIO_FORMAT_DEFAULT);
+        policyMix != nullptr && policyMix->mMixType == MIX_TYPE_RECORDERS) {
+        // input devices for remote submix mixes with inject silence on starve are expected to be
+        // already connected from the mix registration
+        if (policyMix->mInjectSilenceOnStarve) {
+            ALOGV("%s: Skipping input device connect for policy mix with inject silence on starve",
+                  __func__);
+            if (getDeviceConnectionState(AUDIO_DEVICE_IN_REMOTE_SUBMIX, address) !=
+                AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
+                ALOGE("%s: Input device connect is not connected for policy mix with"
+                      " inject silence on starve", __func__);
+            }
+        } else {
+            setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+                                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                                        address,
+                                        "remote-submix",
+                                        AUDIO_FORMAT_DEFAULT);
+        }
     }
 
     checkLeBroadcastRoutes(wasLeUnicastActive, outputDesc, *delayMs);
@@ -2940,16 +2952,24 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
     if (outputDesc->getActivityCount(clientVolSrc) > 0) {
         if (outputDesc->getActivityCount(clientVolSrc) == 1) {
             // Automatically disable the remote submix input when output is stopped on a
-            // re routing mix of type MIX_TYPE_RECORDERS
+            // re routing mix of type MIX_TYPE_RECORDERS and not injecting silence on starve
             sp<AudioPolicyMix> policyMix = outputDesc->mPolicyMix.promote();
             if (isSingleDeviceType(
                     outputDesc->devices().types(), &audio_is_remote_submix_device) &&
                 policyMix != nullptr &&
                 policyMix->mMixType == MIX_TYPE_RECORDERS) {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                            policyMix->mDeviceAddress,
-                                            "remote-submix", AUDIO_FORMAT_DEFAULT);
+                    // keep the remote submix device alive if injecting silence on starvation
+                    // until the policy mix is unregistered
+                    if (!policyMix->mInjectSilenceOnStarve) {
+                        setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+                                                    AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                    policyMix->mDeviceAddress,
+                                                    "remote-submix", AUDIO_FORMAT_DEFAULT);
+                    } else {
+                        ALOGV("%s: Skipping AUDIO_DEVICE_IN_REMOTE_SUBMIX disconnect for mix"
+                              " with inject silence on starve at stopSource, address %s",
+                              __func__, policyMix->mDeviceAddress.c_str());
+                    }
             }
         }
         bool forceDeviceUpdate = false;
@@ -4312,7 +4332,7 @@ bool AudioPolicyManager::isSourceActive(audio_source_t source) const
 // appropriate profile and the corresponding input or output stream is opened.
 //
 // When capture starts, getInputForAttr() will:
-//  - 1 look for a mix matching the address passed in attribtutes tags if any
+//  - 1 look for a mix matching the address passed in attributes tags if any
 //  - 2 if none found, getDeviceForInputSource() will:
 //     - 2.1 look for a mix matching the attributes source
 //     - 2.2 if none found, default to device selection by policy rules
@@ -4321,7 +4341,7 @@ bool AudioPolicyManager::isSourceActive(audio_source_t source) const
 // after AudioTracks are invalidated
 //
 // When playback starts, getOutputForAttr() will:
-//  - 1 look for a mix matching the address passed in attribtutes tags if any
+//  - 1 look for a mix matching the address passed in attributes tags if any
 //  - 2 if none found, look for a mix matching the attributes usage
 //  - 3 if none found, default to device and output selection by policy rules.
 
@@ -4396,6 +4416,30 @@ status_t AudioPolicyManager::registerPolicyMixes(const std::vector<AudioMix>& mi
                 ALOGE("Failed to set remote submix device available, type %u, address %s",
                         mix.mDeviceType, address.c_str());
                 break;
+            }
+
+            // for mixes with silence injection on starve,
+            // connect also the device at the other end when the policy is registered
+            if (deviceTypeToMakeAvailable == AUDIO_DEVICE_OUT_REMOTE_SUBMIX &&
+                mix.mInjectSilenceOnStarve) {
+                ALOGV("%s: Connect AUDIO_DEVICE_IN_REMOTE_SUBMIX for mix with silence on starve"
+                      " and address %s", __func__, address.c_str());
+                if ((res = setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                        address.c_str(),
+                        "remote-submix",
+                        AUDIO_FORMAT_DEFAULT)) != NO_ERROR) {
+                    // the inject on starve requires both OUT and IN devices available
+                    // cleanup the OUT device since the IN can't be connected
+                    setDeviceConnectionStateInt(deviceTypeToMakeAvailable,
+                                                AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                address.c_str(),
+                                                "remote-submix",
+                                                AUDIO_FORMAT_DEFAULT);
+                    ALOGE("%s: Failed to set input remote submix device available with address %s",
+                          __func__, address.c_str());
+                    break;
+                }
             }
         } else if ((mix.mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
             String8 address = mix.mDeviceAddress;

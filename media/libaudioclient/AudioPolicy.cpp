@@ -95,6 +95,7 @@ status_t AudioMix::readFromParcel(Parcel *parcel)
     mCbFlags = (uint32_t)parcel->readInt32();
     mAllowPrivilegedMediaPlaybackCapture = parcel->readBool();
     mVoiceCommunicationCaptureAllowed = parcel->readBool();
+    mInjectSilenceOnStarve = parcel->readBool();
     size_t size = (size_t)parcel->readInt32();
     if (size > MAX_CRITERIA_PER_MIX) {
         size = MAX_CRITERIA_PER_MIX;
@@ -121,6 +122,7 @@ status_t AudioMix::writeToParcel(Parcel *parcel) const
     parcel->writeInt32(mCbFlags);
     parcel->writeBool(mAllowPrivilegedMediaPlaybackCapture);
     parcel->writeBool(mVoiceCommunicationCaptureAllowed);
+    parcel->writeBool(mInjectSilenceOnStarve);
     size_t size = mCriteria.size();
     if (size > MAX_CRITERIA_PER_MIX) {
         size = MAX_CRITERIA_PER_MIX;
