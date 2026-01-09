@@ -310,6 +310,12 @@ aaudio_result_t AudioStreamInternal::configureDataInformation(int32_t callbackFr
         }
         if (mCallbackFrames == AAUDIO_UNSPECIFIED) {
             mCallbackFrames = getFramesPerBurst();
+            if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+                mCallbackFrames = std::max(mCallbackFrames, std::min(
+                        getMinOffloadCallbackProcessingPeriodMs() *
+                                getDeviceSampleRate() / 1'000,  // should not overflow
+                        getBufferCapacity() / 2));
+            }
         }
 
         const int32_t callbackBufferSize = mCallbackFrames * getBytesPerFrame();

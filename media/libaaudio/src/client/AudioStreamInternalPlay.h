@@ -129,6 +129,10 @@ protected:
                getDeviceBufferSize() > getDeviceSampleRate();
     }
 
+    int32_t getMinOffloadCallbackProcessingPeriodMs() const final {
+        return kOffloadFlushFromSafeMarginMs;
+    }
+
     aaudio_result_t setPlaybackParameters_l(const AAudioPlaybackParameters* parameters)
             REQUIRES(mStreamMutex) final;
     aaudio_result_t getPlaybackParameters_l(AAudioPlaybackParameters* parameters)
