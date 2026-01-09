@@ -424,30 +424,78 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     return framesWritten;
 }
 
+aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(
+        const void* buffer, int32_t numFrames) {
+    if (getSampleRate() == getDeviceSampleRate()) {
+        return writeNowWithConversionMatchedSampleRate(buffer, numFrames);
+    } else {
+        return writeNowWithConversionFull(buffer, numFrames);
+    }
+}
 
-aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buffer,
-                                                            int32_t numFrames) {
+aaudio_result_t AudioStreamInternalPlay::writeNowWithConversionMatchedSampleRate(
+        const void* buffer, int32_t numFrames) {
     WrappingBuffer wrappingBuffer;
-    uint8_t *byteBuffer = (uint8_t *) buffer;
-    int32_t framesLeftInByteBuffer = numFrames;
-
+    auto byteBuffer = static_cast<const uint8_t*>(buffer);
     mAudioEndpoint->getEmptyFramesAvailable(&wrappingBuffer);
 
+    if (getSampleRate() != getDeviceSampleRate()) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+
+    int32_t framesLeft = numFrames;
+    // Write data in one or two parts.
+    int partIndex = 0;
+    while (framesLeft > 0 && partIndex < WrappingBuffer::SIZE) {
+        int32_t framesToWrite = framesLeft;
+        int32_t framesAvailable = wrappingBuffer.numFrames[partIndex];
+        if (framesAvailable > 0) {
+            if (framesToWrite > framesAvailable) {
+                framesToWrite = framesAvailable;
+            }
+
+            int32_t numBytes = getBytesPerFrame() * framesToWrite;
+
+            mFlowGraph.process(byteBuffer,
+                               framesToWrite,
+                               wrappingBuffer.data[partIndex],
+                               framesToWrite);
+
+            byteBuffer += numBytes;
+            framesLeft -= framesToWrite;
+        } else {
+            break;
+        }
+        partIndex++;
+    }
+    int32_t framesWritten = numFrames - framesLeft;
+    mAudioEndpoint->advanceWriteIndex(framesWritten);
+
+    return framesWritten;
+}
+
+aaudio_result_t AudioStreamInternalPlay::writeNowWithConversionFull(
+        const void* buffer, int32_t numFrames) {
+    WrappingBuffer wrappingBuffer;
+    auto byteBuffer = static_cast<const uint8_t*>(buffer);
+    mAudioEndpoint->getEmptyFramesAvailable(&wrappingBuffer);
+
+    int32_t framesLeftInByteBuffer = numFrames;
     // Write data in one or two parts.
     int partIndex = 0;
     int framesWrittenToAudioEndpoint = 0;
     while (framesLeftInByteBuffer > 0 && partIndex < WrappingBuffer::SIZE) {
         int32_t framesAvailableInWrappingBuffer = wrappingBuffer.numFrames[partIndex];
-        uint8_t *currentWrappingBuffer = (uint8_t *) wrappingBuffer.data[partIndex];
+        auto currentWrappingBuffer = static_cast<uint8_t*>(wrappingBuffer.data[partIndex]);
 
         if (framesAvailableInWrappingBuffer > 0) {
             // Pull data from the flowgraph in case there is residual data.
             const int32_t framesActuallyWrittenToWrappingBuffer = mFlowGraph.pull(
-                (void*) currentWrappingBuffer,
-                framesAvailableInWrappingBuffer);
+                    currentWrappingBuffer,
+                    framesAvailableInWrappingBuffer);
 
             const int32_t numBytesActuallyWrittenToWrappingBuffer =
-                framesActuallyWrittenToWrappingBuffer * getBytesPerDeviceFrame();
+                    framesActuallyWrittenToWrappingBuffer * getBytesPerDeviceFrame();
             currentWrappingBuffer += numBytesActuallyWrittenToWrappingBuffer;
             framesAvailableInWrappingBuffer -= framesActuallyWrittenToWrappingBuffer;
             framesWrittenToAudioEndpoint += framesActuallyWrittenToWrappingBuffer;
@@ -460,7 +508,7 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
         // The return value of mFlowGraph.process is the number of frames actually pulled.
         while (framesAvailableInWrappingBuffer > 0 && framesLeftInByteBuffer > 0) {
             int32_t framesToWriteFromByteBuffer = std::min(flowgraph::kDefaultBufferSize,
-                    framesLeftInByteBuffer);
+                                                           framesLeftInByteBuffer);
             // If the wrapping buffer is running low, write one frame at a time.
             if (framesAvailableInWrappingBuffer < flowgraph::kDefaultBufferSize) {
                 framesToWriteFromByteBuffer = 1;
@@ -469,15 +517,15 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
             const int32_t numBytesToWriteFromByteBuffer = getBytesPerFrame() *
                     framesToWriteFromByteBuffer;
 
-            //ALOGD("%s() framesLeftInByteBuffer %d, framesAvailableInWrappingBuffer %d"
+            //ALOGD("%s() framesLeftInByteBuffer %d, framesAvailableInWrappingBuffer %d, "
             //      "framesToWriteFromByteBuffer %d, numBytesToWriteFromByteBuffer %d"
             //      , __func__, framesLeftInByteBuffer, framesAvailableInWrappingBuffer,
             //      framesToWriteFromByteBuffer, numBytesToWriteFromByteBuffer);
 
             const int32_t framesActuallyWrittenToWrappingBuffer = mFlowGraph.process(
-                    (void *)byteBuffer,
+                    byteBuffer,
                     framesToWriteFromByteBuffer,
-                    (void *)currentWrappingBuffer,
+                    currentWrappingBuffer,
                     framesAvailableInWrappingBuffer);
 
             byteBuffer += numBytesToWriteFromByteBuffer;
@@ -488,19 +536,23 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
             framesAvailableInWrappingBuffer -= framesActuallyWrittenToWrappingBuffer;
             framesWrittenToAudioEndpoint += framesActuallyWrittenToWrappingBuffer;
 
-            //ALOGD("%s() numBytesActuallyWrittenToWrappingBuffer %d, framesLeftInByteBuffer %d"
-            //      "framesActuallyWrittenToWrappingBuffer %d, numBytesToWriteFromByteBuffer %d"
+            //ALOGD("%s() numBytesActuallyWrittenToWrappingBuffer %d, "
+            //      "framesLeftInByteBuffer %d, "
+            //      "framesActuallyWrittenToWrappingBuffer %d, "
+            //      "numBytesToWriteFromByteBuffer %d, "
             //      "framesWrittenToAudioEndpoint %d"
-            //      , __func__, numBytesActuallyWrittenToWrappingBuffer, framesLeftInByteBuffer,
-            //      framesActuallyWrittenToWrappingBuffer, numBytesToWriteFromByteBuffer,
+            //      , __func__, numBytesActuallyWrittenToWrappingBuffer,
+            //      framesLeftInByteBuffer,
+            //      framesActuallyWrittenToWrappingBuffer,
+            //      numBytesToWriteFromByteBuffer,
             //      framesWrittenToAudioEndpoint);
         }
         partIndex++;
     }
-    //ALOGD("%s() framesWrittenToAudioEndpoint %d, numFrames %d"
-    //              "framesLeftInByteBuffer %d"
-    //              , __func__, framesWrittenToAudioEndpoint, numFrames,
-    //              framesLeftInByteBuffer);
+    //ALOGD("%s() framesWrittenToAudioEndpoint %d, numFrames %d, "
+    //      "framesLeftInByteBuffer %d"
+    //      , __func__, framesWrittenToAudioEndpoint, numFrames,
+    //      framesLeftInByteBuffer);
 
     // The audio endpoint should reference the number of frames written to the wrapping buffer.
     mAudioEndpoint->advanceWriteIndex(framesWrittenToAudioEndpoint);
