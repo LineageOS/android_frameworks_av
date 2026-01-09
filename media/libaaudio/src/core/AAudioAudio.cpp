@@ -81,6 +81,12 @@ static AudioStreamBuilder *convertAAudioBuilderToStreamBuilder(AAudioStreamBuild
     return (AudioStreamBuilder*) builder;
 }
 
+AAUDIO_API AAudio_FlushFromFrameSupport AAudio_getFlushFromFrameSupport(
+        const AAudioStreamBuilder* builder) {
+    const AudioStreamBuilder* streamBuilder = reinterpret_cast<const AudioStreamBuilder*>(builder);
+    return AudioStream::getFlushFromFrameSupport(*streamBuilder);
+}
+
 AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** builder)
 {
     AudioStreamBuilder *audioStreamBuilder =  new(std::nothrow) AudioStreamBuilder();

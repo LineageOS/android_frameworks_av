@@ -20,6 +20,7 @@
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 #include <android/media/audio/common/AudioDevice.h>
+#include <android/media/audio/common/AudioMMapPolicy.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
 #include <media/AidlConversionCppNdk.h>
@@ -34,6 +35,7 @@
 namespace aaudio {
 
 using android::media::audio::common::AudioDevice;
+using android::media::audio::common::AudioMMapPolicy;
 using android::media::audio::common::AudioMMapPolicyInfo;
 using android::media::audio::common::AudioMMapPolicyType;
 
@@ -200,5 +202,21 @@ aaudio_policy_t AudioGlobal_getPlatformMMapExclusivePolicy(
 }
 
 #undef AAUDIO_CASE_ENUM
+
+aaudio_policy_t AudioGlobal_getPlatformMMapPolicy() {
+    static aaudio_policy_t gDeviceAAudioPolicy = AAUDIO_UNSPECIFIED;
+    if (gDeviceAAudioPolicy != AAUDIO_UNSPECIFIED) {
+        // This value is not changeable. Just return the value if it is already known
+        // from previous query.
+        return gDeviceAAudioPolicy;
+    }
+
+    std::vector<AudioMMapPolicyInfo> policyInfos;
+    if (android::status_t status = android::AudioSystem::getMmapPolicyInfos(
+                AudioMMapPolicyType::DEFAULT, &policyInfos); status == android::NO_ERROR) {
+        gDeviceAAudioPolicy = AAudio_getAAudioPolicy(policyInfos, AudioMMapPolicy::NEVER);
+    } // else leave the policy as unspecified as it fails to query the aaudio policy from server.
+    return gDeviceAAudioPolicy;
+}
 
 }  // namespace aaudio

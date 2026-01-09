@@ -1103,6 +1103,22 @@ typedef enum AAudio_DeviceType : int32_t {
     AAUDIO_DEVICE_DOCK_ANALOG = 31
 } AAudio_DeviceType;
 
+/**
+ * The constants for the levels of flush from frame support.
+ */
+typedef enum AAudio_FlushFromFrameSupport : int32_t {
+    /**
+     * Constant value to indicate {@link AAudioStream_flushFromFrame}
+     * is not supported.
+     */
+    AAUDIO_FLUSH_FROM_FRAME_UNSUPPORTED = 0,
+    /**
+     * Constant flag value to indicate {@link AAudioStream_flushFromFrame}
+     * is supported.
+     */
+    AAUDIO_FLUSH_FROM_FRAME_SUPPORTED = 1 << 0,
+} AAudio_FlushFromFrameSupport;
+
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
 
@@ -1139,6 +1155,26 @@ AAUDIO_API const char * _Nonnull AAudio_convertResultToText(aaudio_result_t retu
  */
 AAUDIO_API const char * _Nonnull AAudio_convertStreamStateToText(aaudio_stream_state_t state)
         __INTRODUCED_IN(26);
+
+/**
+ * Returns a bit mask representing the current feature support for
+ * {@link AAudioStream_flushFromFrame} for the AudioStream that would
+ * be created with the given AAudioStreamBuilder.
+ *
+ * @param builder pointer to the AAudioStreamBuilder that is going to be used to
+ *                create an AudioStream. {@link AAudioStream_flushFromFrame} is
+ *                only supported for offload playback. In that case, the performance
+ *                mode must be {@link AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED}.
+ *                The format, channel mask and sample rate must be set to construct
+ *                a valid builder to open an offload stream.
+ * @return a bitmask representing the {@link AAudioStream_flushFromFrame}
+ *         support. If {@link AAudioStream_flushFromFrame} is not supported,
+ *         {@link AAUDIO_FLUSH_FROM_FRAME_UNSUPPORTED} is returned. If
+ *         {@link AAudioStream_flushFromFrame} is supported, a bitmask
+ *         containing {@link AAUDIO_FLUSH_FROM_FRAME_SUPPORTED} is returned.
+ */
+AAUDIO_API AAudio_FlushFromFrameSupport AAudio_getFlushFromFrameSupport(
+        const AAudioStreamBuilder* _Nonnull builder) __INTRODUCED_IN(37);
 
 // ============================================================
 // StreamBuilder
@@ -2711,7 +2747,8 @@ AAUDIO_API aaudio_result_t AAudioStream_setOffloadEndOfStream(AAudioStream* _Non
 
 /**
  * The values are defined to be used for the accuracy requirement when calling
- * {@link AAudioStream_flushFromFrame}.
+ * {@link Constant value to indicate {@link #flushWrittenFramesFromPosition(long, int)}
+     * is not supported.}.
  */
 typedef enum AAudio_FlushFromAccuracy : int32_t {
     /**
@@ -2732,7 +2769,9 @@ typedef enum AAudio_FlushFromAccuracy : int32_t {
  * data will be written from the returned position.
  *
  * This method will only work when the performance mode is
- * {@link AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED}.
+ * {@link AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED}. Call
+ * {@link AAudio_getFlushFromFrameSupport} to know if this method is supported or not before
+ * opening the stream.
  *
  * The requested position must not be negative or greater than the written frames. The current
  * written position can be known by querying {@link AAudioStream_getFramesWritten}.
