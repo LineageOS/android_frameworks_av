@@ -81,6 +81,12 @@ static AudioStreamBuilder *convertAAudioBuilderToStreamBuilder(AAudioStreamBuild
     return (AudioStreamBuilder*) builder;
 }
 
+AAUDIO_API AAudio_FlushFromFrameSupport AAudio_getFlushFromFrameSupport(
+        const AAudioStreamBuilder* builder) {
+    const AudioStreamBuilder* streamBuilder = reinterpret_cast<const AudioStreamBuilder*>(builder);
+    return AudioStream::getFlushFromFrameSupport(*streamBuilder);
+}
+
 AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** builder)
 {
     AudioStreamBuilder *audioStreamBuilder =  new(std::nothrow) AudioStreamBuilder();
@@ -287,6 +293,15 @@ AAUDIO_API void AAudioStreamBuilder_setPresentationEndCallback(AAudioStreamBuild
     }
     streamBuilder->setPresentationEndCallbackProc(callback)
                  ->setPresentationEndCallbackUserData(userData);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setRoutingChangedCallback(
+        AAudioStreamBuilder* builder,
+        AAudioStream_routingChangedCallback callback,
+        void* userData) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setRoutingChangedCallbackProc(callback)
+                 ->setRoutingChangedCallbackUserData(userData);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setFramesPerDataCallback(AAudioStreamBuilder* builder,

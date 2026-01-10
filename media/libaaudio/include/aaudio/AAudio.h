@@ -1103,6 +1103,22 @@ typedef enum AAudio_DeviceType : int32_t {
     AAUDIO_DEVICE_DOCK_ANALOG = 31
 } AAudio_DeviceType;
 
+/**
+ * The constants for the levels of flush from frame support.
+ */
+typedef enum AAudio_FlushFromFrameSupport : int32_t {
+    /**
+     * Constant value to indicate {@link AAudioStream_flushFromFrame}
+     * is not supported.
+     */
+    AAUDIO_FLUSH_FROM_FRAME_UNSUPPORTED = 0,
+    /**
+     * Constant flag value to indicate {@link AAudioStream_flushFromFrame}
+     * is supported.
+     */
+    AAUDIO_FLUSH_FROM_FRAME_SUPPORTED = 1 << 0,
+} AAudio_FlushFromFrameSupport;
+
 typedef struct AAudioStreamStruct         AAudioStream;
 typedef struct AAudioStreamBuilderStruct  AAudioStreamBuilder;
 
@@ -1139,6 +1155,26 @@ AAUDIO_API const char * _Nonnull AAudio_convertResultToText(aaudio_result_t retu
  */
 AAUDIO_API const char * _Nonnull AAudio_convertStreamStateToText(aaudio_stream_state_t state)
         __INTRODUCED_IN(26);
+
+/**
+ * Returns a bit mask representing the current feature support for
+ * {@link AAudioStream_flushFromFrame} for the AudioStream that would
+ * be created with the given AAudioStreamBuilder.
+ *
+ * @param builder pointer to the AAudioStreamBuilder that is going to be used to
+ *                create an AudioStream. {@link AAudioStream_flushFromFrame} is
+ *                only supported for offload playback. In that case, the performance
+ *                mode must be {@link AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED}.
+ *                The format, channel mask and sample rate must be set to construct
+ *                a valid builder to open an offload stream.
+ * @return a bitmask representing the {@link AAudioStream_flushFromFrame}
+ *         support. If {@link AAudioStream_flushFromFrame} is not supported,
+ *         {@link AAUDIO_FLUSH_FROM_FRAME_UNSUPPORTED} is returned. If
+ *         {@link AAudioStream_flushFromFrame} is supported, a bitmask
+ *         containing {@link AAUDIO_FLUSH_FROM_FRAME_SUPPORTED} is returned.
+ */
+AAUDIO_API AAudio_FlushFromFrameSupport AAudio_getFlushFromFrameSupport(
+        const AAudioStreamBuilder* _Nonnull builder) __INTRODUCED_IN(37);
 
 // ============================================================
 // StreamBuilder
@@ -1878,6 +1914,49 @@ AAUDIO_API void AAudioStreamBuilder_setPresentationEndCallback(
         AAudioStreamBuilder* _Nonnull builder,
         AAudioStream_presentationEndCallback _Nonnull callback,
         void* _Nullable userData) __INTRODUCED_IN(36);
+
+/**
+ * Prototype for the routing changed function that is passed to
+ * {@link AAudioStreamBuilder_setRoutingChangedCallback}.
+ *
+ * This will be called when the routed devices of the stream are changed.
+ * The callback will return a list of current routed device ids. The ids
+ * could be obtained from the Java AudioManager. AudioManager.getDevices()
+ * returns an array of {@link AudioDeviceInfo}, which contains a getId() method.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream().
+ * @param userData the same address that was passed to
+ *                 {@link AAudioStreamBuilder_setRoutingChangedCallback}.
+ * @param deviceIds a pointer to a list of current routed device ids.
+ * @param numDevices the number of current routed devices.
+ */
+typedef void (*AAudioStream_routingChangedCallback)(AAudioStream* _Nonnull stream,
+                                                    void* _Nullable userData,
+                                                    const int32_t* _Nonnull deviceIds,
+                                                    int32_t numDevices);
+
+/**
+ * Request that AAudio call this function when the routed devices for the stream are changed.
+ * This may happen when the stream is started or there is any event, such as plugging a peripheral
+ * devices, that affects the routed devices happens.
+ *
+ * The callback function will not be called after AAudioStream_close() is called or the stream
+ * is disconnected.
+ *
+ * The routing changed callback will be called from a dedicated thread owned by audio framework.
+ *
+ * Available since API level 37.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder().
+ * @param callback pointer to a function that will be called when routed devices for the
+ *                 stream are changed.
+ * @param userData pointer to an application data structure that will be passed
+ *                 to the callback functions.
+ */
+AAUDIO_API void AAudioStreamBuilder_setRoutingChangedCallback(
+        AAudioStreamBuilder* _Nonnull builder,
+        AAudioStream_routingChangedCallback _Nonnull callback,
+        void* _Nullable userData) __INTRODUCED_IN(37);
 
 /**
  * Open a stream based on the options in the StreamBuilder.
@@ -2668,7 +2747,8 @@ AAUDIO_API aaudio_result_t AAudioStream_setOffloadEndOfStream(AAudioStream* _Non
 
 /**
  * The values are defined to be used for the accuracy requirement when calling
- * {@link AAudioStream_flushFromFrame}.
+ * {@link Constant value to indicate {@link #flushWrittenFramesFromPosition(long, int)}
+     * is not supported.}.
  */
 typedef enum AAudio_FlushFromAccuracy : int32_t {
     /**
@@ -2689,7 +2769,9 @@ typedef enum AAudio_FlushFromAccuracy : int32_t {
  * data will be written from the returned position.
  *
  * This method will only work when the performance mode is
- * {@link AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED}.
+ * {@link AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED}. Call
+ * {@link AAudio_getFlushFromFrameSupport} to know if this method is supported or not before
+ * opening the stream.
  *
  * The requested position must not be negative or greater than the written frames. The current
  * written position can be known by querying {@link AAudioStream_getFramesWritten}.

@@ -5,6 +5,7 @@ LIBAAUDIO {
     AAudio_createStreamBuilder;
     AAudio_getMMapPolicy;
     AAudio_setMMapPolicy;
+    AAudio_getFlushFromFrameSupport; # introduced=37
     AAudioStreamBuilder_setPerformanceMode;
     AAudioStreamBuilder_setDeviceId;
     AAudioStreamBuilder_setDataCallback;
@@ -30,6 +31,7 @@ LIBAAUDIO {
     AAudioStreamBuilder_setIsContentSpatialized;   # introduced=32
     AAudioStreamBuilder_setPresentationEndCallback; #introduced=36
     AAudioStreamBuilder_setPartialDataCallback; # introduced=37
+    AAudioStreamBuilder_setRoutingChangedCallback; # introduced=37
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
     AAudioStream_close;
