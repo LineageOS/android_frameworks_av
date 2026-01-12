@@ -279,51 +279,57 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
                 }
                 audio_devices_t device = patch->sources[0].ext.device.type;
                 String8 address = String8(patch->sources[0].ext.device.address);
-                audio_config_t config = AUDIO_CONFIG_INITIALIZER;
-                // open input stream with source device audio properties if provided or
-                // default to peer output stream properties otherwise.
-                if (patch->sources[0].config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
-                    config.sample_rate = patch->sources[0].sample_rate;
-                } else {
-                    config.sample_rate = newPatch.mPlayback.thread()->sampleRate();
-                }
-                if (patch->sources[0].config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
-                    config.channel_mask = patch->sources[0].channel_mask;
-                } else {
-                    config.channel_mask = audio_channel_in_mask_from_count(
-                            newPatch.mPlayback.thread()->channelCount());
-                }
-                if (patch->sources[0].config_mask & AUDIO_PORT_CONFIG_FORMAT) {
-                    config.format = patch->sources[0].format;
-                } else {
-                    config.format = newPatch.mPlayback.thread()->format();
-                }
-                audio_input_flags_t flags =
-                        patch->sources[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
-                        patch->sources[0].flags.input : AUDIO_INPUT_FLAG_NONE;
-                audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
-                audio_source_t source = AUDIO_SOURCE_MIC;
-                // For telephony patches, propagate voice communication use case to record side
-                if (patch->num_sources == 2
-                        && patch->sources[1].ext.mix.usecase.stream
-                                == AUDIO_STREAM_VOICE_CALL) {
-                    source = AUDIO_SOURCE_VOICE_COMMUNICATION;
-                }
-                const sp<IAfThreadBase> thread = mAfPatchPanelCallback->openInput_l(srcModule,
-                                                                    &input,
-                                                                    &config,
-                                                                    device,
-                                                                    address,
-                                                                    source,
-                                                                    flags,
-                                                                    outputDevice,
-                                                                    outputDeviceAddress,
-                                                                    0 /*mixPortHalId*/);
-                ALOGV("mAfPatchPanelCallback->openInput_l() returned %p inChannelMask %08x",
-                      thread.get(), config.channel_mask);
-                if (thread == 0) {
-                    status = NO_MEMORY;
-                    goto exit;
+
+                sp<IAfThreadBase> thread =
+                        mAfPatchPanelCallback->getRecordThreadForDevice_l(device, address);
+
+                if (thread == nullptr) {
+                    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+                    // open input stream with source device audio properties if provided or
+                    // default to peer output stream properties otherwise.
+                    if (patch->sources[0].config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
+                        config.sample_rate = patch->sources[0].sample_rate;
+                    } else {
+                        config.sample_rate = newPatch.mPlayback.thread()->sampleRate();
+                    }
+                    if (patch->sources[0].config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
+                        config.channel_mask = patch->sources[0].channel_mask;
+                    } else {
+                        config.channel_mask = audio_channel_in_mask_from_count(
+                                newPatch.mPlayback.thread()->channelCount());
+                    }
+                    if (patch->sources[0].config_mask & AUDIO_PORT_CONFIG_FORMAT) {
+                        config.format = patch->sources[0].format;
+                    } else {
+                        config.format = newPatch.mPlayback.thread()->format();
+                    }
+                    audio_input_flags_t flags =
+                            patch->sources[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
+                            patch->sources[0].flags.input : AUDIO_INPUT_FLAG_NONE;
+                    audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
+                    audio_source_t source = AUDIO_SOURCE_MIC;
+                    // For telephony patches, propagate voice communication use case to record side
+                    if (patch->num_sources == 2
+                            && patch->sources[1].ext.mix.usecase.stream
+                                    == AUDIO_STREAM_VOICE_CALL) {
+                        source = AUDIO_SOURCE_VOICE_COMMUNICATION;
+                    }
+                    thread = mAfPatchPanelCallback->openInput_l(srcModule,
+                                                                        &input,
+                                                                        &config,
+                                                                        device,
+                                                                        address,
+                                                                        source,
+                                                                        flags,
+                                                                        outputDevice,
+                                                                        outputDeviceAddress,
+                                                                        0 /*mixPortHalId*/);
+                    ALOGV("mAfPatchPanelCallback->openInput_l() returned %p inChannelMask %08x",
+                          thread.get(), config.channel_mask);
+                    if (thread == 0) {
+                        status = NO_MEMORY;
+                        goto exit;
+                    }
                 }
                 newPatch.mRecord.setThread(thread->asIAfRecordThread().get());
                 status = newPatch.createConnections_l(this);
