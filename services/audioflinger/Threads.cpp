@@ -2351,10 +2351,14 @@ void PlaybackThread::onFirstRef()
         // discouraged, see comments in system/core/libutils/include/utils/RefBase.h.
         // Even if a function takes a weak pointer, it is possible that it will
         // need to convert it to a strong pointer down the line.
-        if (mOutput->flags & AUDIO_OUTPUT_FLAG_NON_BLOCKING &&
-                mOutput->stream->setCallback(this) == OK) {
-            mUseAsyncWrite = true;
+        if (mOutput->flags & AUDIO_OUTPUT_FLAG_NON_BLOCKING) {
             mCallbackThread = sp<AsyncCallbackThread>::make(this);
+            mUseAsyncWrite = true;
+            if (mOutput->stream->setCallback(this) != OK) {
+                ALOGE("%s: Failed to add async callback", __func__);
+                mCallbackThread.clear();
+                mUseAsyncWrite = false;
+            }
         }
 
         if (mOutput->stream->setEventCallback(this) != OK) {
