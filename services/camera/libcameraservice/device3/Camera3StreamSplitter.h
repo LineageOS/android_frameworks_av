@@ -159,7 +159,7 @@ private:
         void onBufferReleased() override;
         bool needsReleaseNotify() override { return true; };
         void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>&) override {}
-        void onBufferDetached(int /*slot*/) override {}
+        void onBufferDetached(uint64_t /*bufferId*/) override {}
 
         void onRemoteDied() override;
 

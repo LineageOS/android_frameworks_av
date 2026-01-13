@@ -211,7 +211,7 @@ class Camera3OutputStream :
             virtual void onBufferReleased();
             virtual bool needsReleaseNotify() { return mNeedsReleaseNotify; }
             virtual void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>& buffers);
-            virtual void onBufferDetached(int /*slot*/) override {};
+            virtual void onBufferDetached(uint64_t /*bufferId*/) override {};
 
         private:
             wp<Camera3OutputStream> mParent;

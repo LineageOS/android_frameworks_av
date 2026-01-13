@@ -90,7 +90,7 @@ class ZslProcessor :
         virtual void onBufferReleased() override;
         virtual void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>& /* buffers */)
             override {}
-        virtual void onBufferDetached(int /* slot */) override {}
+        virtual void onBufferDetached(uint64_t /* bufferId */) override {}
         virtual bool needsReleaseNotify() override { return true; }
 
     private:
