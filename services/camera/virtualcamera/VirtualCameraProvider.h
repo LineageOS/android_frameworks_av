@@ -17,13 +17,11 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERAPROVIDER_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERAPROVIDER_H
 
-#include <atomic>
 #include <map>
 #include <memory>
 #include <mutex>
 
 #include "VirtualCameraDevice.h"
-#include "aidl/android/companion/virtualcamera/BnVirtualCameraCallback.h"
 #include "aidl/android/hardware/camera/common/VendorTagSection.h"
 #include "aidl/android/hardware/camera/device/ICameraDevice.h"
 #include "aidl/android/hardware/camera/provider/BnCameraProvider.h"

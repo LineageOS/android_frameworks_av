@@ -929,8 +929,19 @@ ndk::ScopedAStatus VirtualCameraDevice::open(
     std::shared_ptr<ICameraDeviceSession>* _aidl_return) {
   ALOGV("%s", __func__);
 
-  *_aidl_return = ndk::SharedRefBase::make<VirtualCameraSession>(
-      sharedFromThis(), in_callback, mVirtualCameraClientCallback);
+  {
+    std::lock_guard<std::mutex> lock(mSessionLock);
+    auto currentSession = mSession.lock();
+    if (currentSession != nullptr) {
+      return cameraStatus(Status::CAMERA_IN_USE);
+    }
+
+    auto session = ndk::SharedRefBase::make<VirtualCameraSession>(
+        sharedFromThis(), in_callback, mVirtualCameraClientCallback);
+    *_aidl_return = session;
+
+    mSession = session;
+  }
 
   if (virtualdevice::flags::virtual_camera_on_open()) {
     if (mVirtualCameraClientCallback != nullptr) {
@@ -1014,6 +1025,19 @@ std::shared_ptr<VirtualCameraDevice> VirtualCameraDevice::sharedFromThis() {
   // std::enable_shared_from_this. This is recommended replacement for
   // shared_from_this() per documentation in binder_interface_utils.h.
   return ref<VirtualCameraDevice>();
+}
+
+void VirtualCameraDevice::closeSession() {
+  ALOGV("Close all sessions");
+  std::shared_ptr<VirtualCameraSession> session;
+  {
+    std::lock_guard<std::mutex> lock(mSessionLock);
+    session = mSession.lock();
+    mSession.reset();
+  }
+  if (session != nullptr) {
+    session->close();
+  }
 }
 
 }  // namespace virtualcamera

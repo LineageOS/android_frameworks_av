@@ -51,8 +51,8 @@ class VirtualCameraSessionContext {
       const ::aidl::android::hardware::camera::device::Stream& stream)
       EXCLUDES(mLock);
 
-  // Close all streams and free all associated buffers.
-  void closeAllStreams() EXCLUDES(mLock);
+  // Clears all streams and free all associated buffers.
+  void clearStreams() EXCLUDES(mLock);
 
   // Remove no longer needed buffers.
   void removeBufferCaches(

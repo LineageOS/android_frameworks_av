@@ -24,12 +24,15 @@
 #include "aidl/android/companion/virtualcamera/SupportedStreamConfiguration.h"
 #include "aidl/android/companion/virtualcamera/VirtualCameraConfiguration.h"
 #include "aidl/android/hardware/camera/device/BnCameraDevice.h"
+#include "android-base/thread_annotations.h"
 #include "system/camera_metadata.h"
 #include "util/Util.h"
 
 namespace android {
 namespace companion {
 namespace virtualcamera {
+
+class VirtualCameraSession;
 
 // Representation of single virtual camera device, implements
 // ICameraDevice AIDL to expose camera to camera framework.
@@ -117,6 +120,8 @@ class VirtualCameraDevice
   // Allocate and return next id for input stream (input surface).
   int allocateInputStreamId();
 
+  void closeSession();
+
   // Maximal number of RAW streams - virtual camera doesn't support RAW streams.
   static constexpr int32_t kMaxNumberOfRawStreams = 0;
 
@@ -168,6 +173,8 @@ class VirtualCameraDevice
   std::atomic_int mNextInputStreamId;
 
   const bool mIsMultiInputStreamEnabled;
+  std::mutex mSessionLock;
+  std::weak_ptr<VirtualCameraSession> mSession GUARDED_BY(mSessionLock);
 };
 
 }  // namespace virtualcamera

@@ -401,17 +401,21 @@ ndk::ScopedAStatus VirtualCameraSession::close() {
       }
 
       if (mVirtualCameraClientCallback != nullptr) {
+        ALOGV("Calling onStreamClosed for %d", mCurrentInputStreamId);
         mVirtualCameraClientCallback->onStreamClosed(mCurrentInputStreamId);
       }
       mCurrentInputStreamId = kInvalidStreamId;
     }
+
     // stop the render thread outside of the lock
     if (renderThread != nullptr) {
       renderThread->stop();  // this does a blocking join() in destructor
+    } else {
+      ALOGI("Trying to close a session with no render thread");
     }
   }
 
-  mSessionContext.closeAllStreams();
+  mSessionContext.clearStreams();
   return ndk::ScopedAStatus::ok();
 }
 
@@ -441,8 +445,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
 
   if (!virtualCamera->isStreamCombinationSupported(in_requestedConfiguration)) {
     ALOGE(
-        "%s: Requested stream configuration is not supported, closing existing "
-        "session",
+        "%s: Requested stream configuration is not supported, closing "
+        "existing session",
         __func__);
     close();
     return cameraStatus(Status::ILLEGAL_ARGUMENT);
@@ -473,8 +477,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
         streams, virtualCamera->getInputConfigs());
     if (!inputConfig.has_value()) {
       ALOGE(
-          "%s: Failed to pick any input configuration for stream configuration "
-          "request: %s",
+          "%s: Failed to pick any input configuration for stream "
+          "configuration request: %s",
           __func__, in_requestedConfiguration.toString().c_str());
       return cameraStatus(Status::ILLEGAL_ARGUMENT);
     }
@@ -489,8 +493,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
 
       Resolution currentInputResolution = mRenderThread->getInputResolution();
       if (currentInputResolution == resolutionFromInputConfig(*inputConfig)) {
-        // BLOB types must match (if applicable), otherwise the existing surface
-        // cannot be reused and must be regenerated
+        // BLOB types must match (if applicable), otherwise the existing
+        // surface cannot be reused and must be regenerated
         if ((isBlobFormat(mRenderThread->getImageFormat()) ||
              isBlobFormat(inputConfig->imageFormat)) &&
             mRenderThread->getImageFormat() != inputConfig->imageFormat) {
@@ -565,7 +569,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
         inputConfig->width, inputConfig->height, inputConfig->imageFormat);
   }
 
-  // stop the render thread outside of the lock since it does a join() in its destructor
+  // stop the render thread outside of the lock since it does a join() in its
+  // destructor
   if (renderThread != nullptr) {
     renderThread->stop();
   }
