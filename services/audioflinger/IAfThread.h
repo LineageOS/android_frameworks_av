@@ -511,7 +511,8 @@ public:
             const sp<media::IAudioTrackCallback>& callback,
             bool isSpatialized,
             bool isBitPerfect,
-            audio_output_flags_t* afTrackFlags)
+            audio_output_flags_t* afTrackFlags,
+            const std::string& codecProvenance)
             REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
     virtual status_t addTrack_l(const sp<IAfTrack>& track) REQUIRES(mutex()) = 0;

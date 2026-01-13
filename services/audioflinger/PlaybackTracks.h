@@ -97,7 +97,8 @@ public:
                                 size_t frameCountToBeReady = SIZE_MAX,
                                 float speed = 1.0f,
                                 bool isSpatialized = false,
-            bool isBitPerfect = false) REQUIRES(
+                                bool isBitPerfect = false,
+                                const std::string& codecProvenance = {}) REQUIRES(
             audio_utils::AudioFlinger_Mutex, audio_utils::ThreadBase_Mutex);
     ~Track() override;
     status_t initCheck() const final;

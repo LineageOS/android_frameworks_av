@@ -103,7 +103,8 @@ TrackBase::TrackBase(
             const alloc_type alloc,
             track_type type,
             audio_port_handle_t portId,
-            std::string metricsId)
+            std::string metricsId,
+            const std::string& codecProvenance)
     :
         mThread(thread),
         mAllocType(alloc),
@@ -118,6 +119,7 @@ TrackBase::TrackBase(
         mChannelCount(isOut ?
                 audio_channel_count_from_out_mask(channelMask) :
                 audio_channel_count_from_in_mask(channelMask)),
+        mCodecProvenance(codecProvenance),
         mFrameSize(audio_bytes_per_frame(mChannelCount, format)),
         mFrameCount(frameCount),
         mSessionId(sessionId),
@@ -858,7 +860,8 @@ sp<IAfTrack> IAfTrack::create(
         size_t frameCountToBeReady,
         float speed,
         bool isSpatialized,
-        bool isBitPerfect) {
+        bool isBitPerfect,
+        const std::string& codecProvenance) {
     // Note: sp<>::make does not propagate thread safety analysis, so use "new" here.
     return new Track(thread,
             client,
@@ -880,7 +883,8 @@ sp<IAfTrack> IAfTrack::create(
             frameCountToBeReady,
             speed,
             isSpatialized,
-            isBitPerfect);
+            isBitPerfect,
+            codecProvenance);
 }
 
 // Track constructor must be called with AudioFlinger::mLock and ThreadBase::mLock held
@@ -905,7 +909,8 @@ Track::Track(
             size_t frameCountToBeReady,
             float speed,
             bool isSpatialized,
-            bool isBitPerfect)
+            bool isBitPerfect,
+            const std::string& codecProvenance)
     :
     AfPlaybackCommon(*this, *thread,
                      attr, attributionSource, thread->isOffloadOrMmap(), type != TYPE_PATCH),
@@ -921,7 +926,8 @@ Track::Track(
                   (type == TYPE_PATCH) ? ( buffer == NULL ? ALLOC_LOCAL : ALLOC_NONE) : ALLOC_CBLK,
                   type,
                   portId,
-                  std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) + std::to_string(portId)),
+                  std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) + std::to_string(portId),
+                  codecProvenance),
     mFillingStatus(FS_INVALID),
     // mRetryCount initialized later when needed
     mSharedBuffer(sharedBuffer),
@@ -1835,6 +1841,13 @@ void Track::copyMetadataTo(MetadataInserter& backInserter) const
     }
     strncpy(metadata.tags, tagStr.c_str(), AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
     metadata.tags[AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1] = '\0';
+    if (mCodecProvenance.size() >= AUDIO_ATTRIBUTES_CODEC_PROVENANCE_MAX_SIZE) {
+        ALOGW("%s: mCodecProvenance truncated, size %zu >= %d", __func__,
+              mCodecProvenance.size(), AUDIO_ATTRIBUTES_CODEC_PROVENANCE_MAX_SIZE);
+    }
+    strncpy(metadata.codec_provenance, mCodecProvenance.c_str(),
+            AUDIO_ATTRIBUTES_CODEC_PROVENANCE_MAX_SIZE);
+    metadata.codec_provenance[AUDIO_ATTRIBUTES_CODEC_PROVENANCE_MAX_SIZE - 1] = '\0';
     *backInserter++ = metadata;
 }
 
