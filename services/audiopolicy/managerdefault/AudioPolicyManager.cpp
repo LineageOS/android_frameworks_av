@@ -9099,6 +9099,8 @@ bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa)
     case AUDIO_USAGE_VEHICLE_STATUS:
     case AUDIO_USAGE_ANNOUNCEMENT:
     case AUDIO_USAGE_SPEAKER_CLEANUP:
+    case AUDIO_USAGE_NOTIFICATION_VIBRATION:
+    case AUDIO_USAGE_RINGTONE_VIBRATION:
         break;
     default:
         return false;
