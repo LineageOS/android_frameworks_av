@@ -4016,6 +4016,58 @@ TEST_F(AudioPolicyManagerPhoneTest, HangupReevaluatesAndRestoresDevice) {
     EXPECT_EQ(normalDevice, initialDevice);
 }
 
+TEST_F(AudioPolicyManagerPhoneTest, VibrationUsagesMapToTtsStrategy) {
+    const std::map<audio_usage_t, audio_stream_type_t> vibrationUsageToStream = {
+            {AUDIO_USAGE_NOTIFICATION_VIBRATION, AUDIO_STREAM_TTS},
+            {AUDIO_USAGE_RINGTONE_VIBRATION, AUDIO_STREAM_TTS}};
+
+    for (const auto& [usage, expectedStream] : vibrationUsageToStream) {
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.usage = usage;
+
+        audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
+        audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+        audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
+        audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+        DeviceIdVector selectedDeviceIds;
+        std::vector<audio_io_handle_t> secondaryOutputs;
+        AudioPolicyInterface::output_type_t outputType;
+        bool isSpatialized;
+        bool isBitPerfect;
+        audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+        config.sample_rate = k48000SamplingRate;
+        config.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+        config.format = AUDIO_FORMAT_PCM_16_BIT;
+
+        // 2. Query the manager for an output.
+        // This invokes the Engine to perform usage -> strategy -> stream mapping.
+        ASSERT_EQ(OK, mManager->getOutputForAttr(&attr, &output, AUDIO_SESSION_NONE, &stream,
+                                                 createAttributionSourceState(0), &config, &flags,
+                                                 &selectedDeviceIds, &portId, &secondaryOutputs,
+                                                 &outputType, &isSpatialized, &isBitPerfect))
+                << "getOutputForAttr failed for usage: " << usage;
+
+        // 3. Verify Mapping Correctness:
+        EXPECT_EQ(expectedStream, stream) << "Usage " << usage << " should map to stream "
+                                          << expectedStream << " per custom strategies XML.";
+
+        // 4. Verify Output Routing:
+        EXPECT_NO_FATAL_FAILURE(verifyMixPortNameAndFlags(output, "primary output"));
+
+        // 5. Verify output device should be the built-in speaker.
+        auto availableDevices = mManager->getAvailableOutputDevices();
+        ASSERT_FALSE(selectedDeviceIds.empty()) << "No device selected for usage: " << usage;
+        auto selectedDevice = availableDevices.getDeviceFromId(selectedDeviceIds[0]);
+        ASSERT_NE(nullptr, selectedDevice);
+        EXPECT_EQ(AUDIO_DEVICE_OUT_SPEAKER, selectedDevice->type())
+                << "Vibration sounds must be restricted to built-in speakers via "
+                << "STRATEGY_TRANSMITTED_THROUGH_SPEAKER.";
+
+        // 5. Clean up
+        mManager->releaseOutput(portId);
+    }
+}
+
 enum {
     MIX_PORT_ATTR_EXPECTED_NAME_PARAMETER,
     MIX_PORT_ATTR_EXPECTED_NAME_WITH_DBFM_PARAMETER,
