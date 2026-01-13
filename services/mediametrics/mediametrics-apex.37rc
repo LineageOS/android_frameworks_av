@@ -1,0 +1,23 @@
+#
+# this is for starting mediametrics when hosted in an apex module, not in the framework.
+# -- we only do this on sdk >= 36 devices (Android 16+). These are the first devices where
+#    we've moved this functionality to the module. This simplifies the parsing on earlier
+#    devices.
+#
+# -- the service name is deliberately chosen to be the same as the one that is started
+#    from the framework. We rely on init's behavior where it ignores any redefinition
+#    of a service unless the original definition is marked 'updatable'.
+#
+# This gives us the "start if not present in the framework" behavior we want.
+#
+# To highlight for the casual observer who might think we've made a mistake:
+# -- we KNOW that this duplicates the service defined in /system/etc/mediametrics.rc
+# -- this is INTENTIONAL.
+#
+
+service mediametrics /apex/com.android.media/bin/mediametrics
+    class main
+    user media
+    group media
+    ioprio rt 4
+    task_profiles ProcessCapacityHigh HighPerformance

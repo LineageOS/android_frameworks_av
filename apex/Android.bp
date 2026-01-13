@@ -44,7 +44,14 @@ apex_defaults {
             // Transcoding service only run with primary ABI.
             binaries: [
                 "mediatranscoding",
-            ],
+            ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+                true: [
+                    "mediametrics",
+                ],
+                default: [
+                    // in build/make/target/product/base_system
+                ],
+            }),
         },
     },
     // JNI
@@ -60,7 +67,13 @@ apex_defaults {
         "crash_dump.policy",
         "mediaextractor.policy",
         "media-linker-config",
-    ],
+    ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+        true: [
+            "com.android.media-mediametrics-apex.37rc",
+        ],
+        default: [],
+    }),
+
     key: "com.android.media.key",
     certificate: ":com.android.media.certificate",
 

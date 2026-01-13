@@ -1,4 +1,4 @@
-// Media Statistics service
+// MediaMetrics service
 //
 
 package {
@@ -103,27 +103,63 @@ cc_binary {
         "mediametrics_flags_defaults",
     ],
 
+    cflags: select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+        // we manage some of the differences with #ifdefs
+        true: ["-DMETRICS_IN_MODULE"],
+        default: [],
+    }),
+
     srcs: [
         "main_mediametrics.cpp",
     ],
-
     shared_libs: [
-        "libbinder",
+        "libandroid#31", // for APermissionManager, sdk>=31
         "liblog",
-        "libmediametricsservice",
-        "libmediautils",
         "libutils",
-        "mediametricsservice-aidl-cpp",
-        "packagemanager_aidl-cpp",
-    ],
+        "libmediametricsservice",
+    ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+        true: [
+            "libbinder_ndk",
+            // don't have in-module version of LimitProcessMemory
+            "mediametricsservice-aidl-ndk",
+        ],
+        default: [
+            "libbinder",
+            "libmediautils", // LimitProcessMemory
+            "mediametricsservice-aidl-cpp",
+        ],
+    }),
+
     header_libs: [
         "libaudioutils_headers",
         "libmediametrics_headers",
     ],
 
-    init_rc: [
-        "mediametrics.rc",
+    // within the library, we use "xxx.h"
+    local_include_dirs: [
+        "include/mediametricsservice",
     ],
+
+    init_rc: select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+        true: [
+            // through mediametrics-apex.37rc in frameworks/av/apex/Android.bp
+        ],
+        default: ["mediametrics.rc"],
+    }),
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+
+    min_sdk_version: "31",
+}
+
+prebuilt_etc {
+    name: "com.android.media-mediametrics-apex.37rc",
+    src: "mediametrics-apex.37rc",
+    filename: "mediametrics-apex.37rc",
+    installable: false,
 }
 
 cc_library {
@@ -131,6 +167,11 @@ cc_library {
     defaults: [
         "mediametrics_flags_defaults",
     ],
+
+    cflags: select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+        true: ["-DMETRICS_IN_MODULE"],
+        default: [],
+    }),
 
     srcs: [
         "AudioAnalytics.cpp",
@@ -160,24 +201,31 @@ cc_library {
 
     shared_libs: [
         "android.media.codec-aconfig-cc",
-        "libaudioutils",
         "libbase", // android logging
-        "libbinder",
         "libcutils",
         "liblog",
         "libmedia_helper",
-        "libmediametrics",
-        "libmediautils",
-        "libmemunreachable",
         "libprotobuf-cpp-lite",
         "libstagefright_foundation",
         "libstats_media_metrics",
         "libstatspull",
         "libstatssocket",
         "libutils",
-        "mediametricsservice-aidl-cpp",
-        "packagemanager_aidl-cpp",
-    ],
+    ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+        true: [
+            "libbinder_ndk",
+            "libmediametrics_module",
+            "mediametricsservice-aidl-ndk",
+        ],
+        default: [
+            "libaudioutils",
+            "libbinder",
+            "libmediametrics",
+            "libmediautils",
+            "libmemunreachable",
+            "mediametricsservice-aidl-cpp",
+        ],
+    }),
 
     export_shared_lib_headers: [
         "libstats_media_metrics",
@@ -197,25 +245,51 @@ cc_library {
 
     static_libs: [
         "libmediametrics_allowlist",
-        "libplatformprotos",
+        "mediametrics-protos-lite",
+    ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
+        true: [
+            "libaudioutils_stringutils",
+            "libutils",
+        ],
+        default: [],
+    }),
+    whole_static_libs: [
     ],
 
     header_libs: [
-        "libaaudio_headers",
+        "libaaudio_headers-module",
         "libaudioutils_headers",
     ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "29",
 }
 
 cc_library {
     name: "libstats_media_metrics",
-    generated_sources: ["stats_media_metrics.cpp"],
-    generated_headers: ["stats_media_metrics.h"],
-    export_generated_headers: ["stats_media_metrics.h"],
+    generated_sources: [
+        "stats_media_metrics.cpp",
+    ],
+    generated_headers: [
+        "stats_media_metrics.h",
+    ],
+    export_generated_headers: [
+        "stats_media_metrics.h",
+    ],
+    static_libs: [
+        "libprotobuf-cpp-lite",
+    ],
     shared_libs: [
-        "libcutils",
         "libstatspull",
         "libstatssocket",
     ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "29",
 }
 
 genrule {
@@ -234,4 +308,33 @@ genrule {
     out: [
         "stats_media_metrics.cpp",
     ],
+}
+
+filegroup {
+    name: "mediametrics-proto-srcs",
+    srcs: [
+        // defined over in frameworks/proto_logging/stats/message/mediametrics/
+        ":srcs_mediametrics_protos",
+    ],
+}
+
+// and the proto definitions...
+cc_library_static {
+    name: "mediametrics-protos-lite",
+    host_supported: true,
+    proto: {
+        export_proto_headers: true,
+        type: "lite",
+    },
+    srcs: [
+        ":srcs_mediametrics_protos",
+    ],
+    static_libs: [
+        "libprotobuf-cpp-lite",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "30",
 }

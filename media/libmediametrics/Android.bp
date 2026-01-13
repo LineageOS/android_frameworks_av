@@ -10,6 +10,14 @@ package {
 cc_library_headers {
     name: "libmediametrics_headers",
     export_include_dirs: ["include"],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    sdk_version: "29",
+    min_sdk_version: "29",
 }
 
 cc_library {
@@ -20,6 +28,7 @@ cc_library {
         "ItemSerialize-Parcel.cpp",
         "MediaMetrics.cpp",
         "MediaMetricsItem.cpp",
+        "Submit.cpp",
     ],
 
     shared_libs: [
@@ -71,6 +80,64 @@ cc_library {
     ],
 }
 
+// Variant of libmediametrics usable from mainline module
+
+cc_library {
+    name: "libmediametrics_module",
+
+    srcs: [
+        "ItemSerialize-ByteString.cpp",
+        "MediaMetrics.cpp",
+        "MediaMetricsItem.cpp",
+        "Submit-module.cpp",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "libcutils",
+        "liblog",
+        "mediametricsservice-aidl-ndk",
+    ],
+    static_libs: [
+        "libutils",
+    ],
+
+    export_include_dirs: ["include"],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+        "-Wthread-safety",
+        "-Wunreachable-code",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+        ],
+        cfi: true,
+    },
+
+    visibility: [
+        "//cts/tests/tests/nativemedia/mediametrics",
+        "//frameworks/av:__subpackages__",
+        "//frameworks/base/apex/media/framework",
+        "//frameworks/base/core/jni",
+        "//frameworks/base/media/jni",
+        "//packages/modules/Media/apex/framework",
+    ],
+
+    apex_available: [
+        // NOT for platform use "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+}
+
 aidl_interface {
     name: "mediametricsservice-aidl",
     unstable: true,
@@ -82,9 +149,19 @@ aidl_interface {
     double_loadable: true,
     backend: {
         cpp: {
+            enabled: true,
             apex_available: [
                 "//apex_available:platform",
             ],
+        },
+        ndk: {
+            enabled: true,
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+                "test_com.android.media",
+            ],
+            min_sdk_version: "29",
         },
     },
 }
