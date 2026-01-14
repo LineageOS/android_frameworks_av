@@ -26,6 +26,7 @@
 #include <C2BqBufferPriv.h>
 #include <C2Component.h>
 #include <C2Config.h>
+#include <C2HandleIonInternal.h>
 #include <C2IgbaBufferPriv.h>
 #include <C2IgbaInterface.h>
 #include <C2PlatformStorePluginLoader.h>
@@ -1439,6 +1440,10 @@ std::shared_ptr<C2ComponentStore> GetCodec2PlatformComponentStore() {
         platformStore = store;
     }
     return store;
+}
+
+bool C2HandleIon::IsUsed() {
+    return using_ion();
 }
 
 // For testing only
