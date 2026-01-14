@@ -115,6 +115,12 @@ private:
     int32_t outputDelayRingBufferSamplesAvailable();
     // Returns the amount of space (in samples) left in the ring buffer for writing.
     int32_t outputDelayRingBufferSpaceLeft();
+    // Helper to output samples from the ring buffer to the output buffer.
+    ApexCodec_Status outputFromRingBuffer(
+            ApexCodec_Buffer* output,
+            size_t* produced,
+            uint64_t frameIndex,
+            uint64_t timestamp);
 
     struct FrameInfo {
         uint64_t frameIndex;
