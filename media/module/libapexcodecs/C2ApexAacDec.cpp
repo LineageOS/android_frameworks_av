@@ -487,6 +487,14 @@ ApexCodec_Status C2ApexAacDec::process(
         ALOGV("process input: flags=%x, frameIndex=%" PRIu64 ","
                 "timestamp=%" PRIu64, inFlags, frameIndex, timestamp);
     }
+
+    int numSamples = outputDelayRingBufferSamplesAvailable();
+    ALOGV("numSamples available: %d", numSamples);
+    if (numSamples > 0 && output) {
+        ApexCodec_Status status = outputFromRingBuffer(output, produced, frameIndex, timestamp);
+        return status;
+    }
+
     ApexCodec_LinearBuffer inBuffer;
     // Decode data from the input buffer and place it in the ring buffer.
     if (!mEndOfInput && input &&
@@ -572,6 +580,7 @@ ApexCodec_Status C2ApexAacDec::process(
                 ALOGV("inBufferUsedLength=%u, size=%zu, offset=%zu",
                         inBufferUsedLength, size, offset);
                 AAC_DECODER_ERROR decoderErr;
+                bool didDecode = false;
                 do {
                     if (outputDelayRingBufferSpaceLeft() <
                             (mOutputInfo.frame_size * mOutputInfo.num_channels)) {
@@ -611,6 +620,7 @@ ApexCodec_Status C2ApexAacDec::process(
                         return APEXCODEC_STATUS_CORRUPTED;
                     }
                     if (decoderErr == AAC_DEC_OK) {
+                        didDecode = true;
                         if (!outputDelayRingBufferPutSamples(tmpOutBuffer, generatedSamples)) {
                             ALOGE("outputDelayRingBufferPutSamples failed");
                             mSignalledError = true;
@@ -670,6 +680,12 @@ ApexCodec_Status C2ApexAacDec::process(
                         output->setOwnedConfigUpdates(std::move(configUpdate));
                     }
                 } while (decoderErr == AAC_DEC_OK);
+
+                if (size > 0 && inBufferUsedLength == 0 &&
+                        decoderErr == AAC_DEC_NOT_ENOUGH_BITS && !didDecode) {
+                    ALOGW("aacDecoder_Fill consumed 0 bytes and decoder needs more bits, stopping");
+                    break;
+                }
             }
             *consumed = offset;
         }
@@ -681,44 +697,13 @@ ApexCodec_Status C2ApexAacDec::process(
     if (mEndOfInput) {
         drainDecoder();
     }
-    int numSamples = outputDelayRingBufferSamplesAvailable();
+    numSamples = outputDelayRingBufferSamplesAvailable();
     ALOGV("numSamples available: %d", numSamples);
     // Add data from the ring buffer to the output buffer.
     if (numSamples > 0 && output) {
-        ApexCodec_LinearBuffer outLinearBuffer;
-        if (output->getLinearBuffer(&outLinearBuffer) != APEXCODEC_STATUS_OK) {
-            ALOGE("output->getLinearBuffer failed");
-            return APEXCODEC_STATUS_BAD_VALUE;
-        }
-        if ((size_t)numSamples * sizeof(float) > outLinearBuffer.size) {
-            numSamples = outLinearBuffer.size / sizeof(float);
-        }
-        if (!mRingBufferFrameInfos.empty()) {
-            if (numSamples > mRingBufferFrameInfos.front().numSamples) {
-                numSamples = mRingBufferFrameInfos.front().numSamples;
-            }
-        }
-        ALOGV("producing %d samples", numSamples);
-        if (outputDelayRingBufferGetSamples(
-                reinterpret_cast<float*>(outLinearBuffer.data), numSamples) != numSamples) {
-            ALOGE("outputDelayRingBufferGetSamples failed");
-            mSignalledError = true;
-            return APEXCODEC_STATUS_CORRUPTED;
-        }
-        *produced = numSamples * sizeof(float);
-        ALOGV("produced: %zu", *produced);
-        if (!mRingBufferFrameInfos.empty()) {
-            FrameInfo& info = mRingBufferFrameInfos.front();
-            info.numSamples -= numSamples;
-            if (info.numSamples == 0) {
-                mRingBufferFrameInfos.pop_front();
-                output->setBufferInfo((ApexCodec_BufferFlags)0, info.frameIndex, info.timestamp);
-            } else {
-                output->setBufferInfo((ApexCodec_BufferFlags)APEXCODEC_FLAG_INCOMPLETE,
-                        info.frameIndex, info.timestamp);
-            }
-        } else {
-            output->setBufferInfo((ApexCodec_BufferFlags)0, frameIndex, timestamp);
+        ApexCodec_Status status = outputFromRingBuffer(output, produced, frameIndex, timestamp);
+        if (status != APEXCODEC_STATUS_OK) {
+            return status;
         }
     }
     // If the app using the codec has signaled APEXCODEC_FLAG_END_OF_STREAM and the output buffer
@@ -743,6 +728,54 @@ ApexCodec_Status C2ApexAacDec::process(
         }
     }
     ALOGV("consumed: %zu", *consumed);
+    return APEXCODEC_STATUS_OK;
+}
+
+ApexCodec_Status C2ApexAacDec::outputFromRingBuffer(
+        ApexCodec_Buffer* output,
+        size_t* produced,
+        uint64_t frameIndex,
+        uint64_t timestamp) {
+    int numSamples = outputDelayRingBufferSamplesAvailable();
+    if (numSamples > 0 && output) {
+        ApexCodec_LinearBuffer outLinearBuffer;
+        if (output->getLinearBuffer(&outLinearBuffer) != APEXCODEC_STATUS_OK) {
+            ALOGE("output->getLinearBuffer failed");
+            return APEXCODEC_STATUS_BAD_VALUE;
+        }
+        int samplesToOutput = numSamples;
+        if ((size_t)samplesToOutput * sizeof(float) > outLinearBuffer.size) {
+            samplesToOutput = outLinearBuffer.size / sizeof(float);
+        }
+        if (!mRingBufferFrameInfos.empty()) {
+            if (samplesToOutput > mRingBufferFrameInfos.front().numSamples) {
+                samplesToOutput = mRingBufferFrameInfos.front().numSamples;
+            }
+        }
+        ALOGV("producing %d samples", samplesToOutput);
+        if (outputDelayRingBufferGetSamples(
+                reinterpret_cast<float*>(outLinearBuffer.data), samplesToOutput)
+                != samplesToOutput) {
+            ALOGE("outputDelayRingBufferGetSamples failed");
+            mSignalledError = true;
+            return APEXCODEC_STATUS_CORRUPTED;
+        }
+        *produced = samplesToOutput * sizeof(float);
+        ALOGV("produced: %zu", *produced);
+        if (!mRingBufferFrameInfos.empty()) {
+            FrameInfo& info = mRingBufferFrameInfos.front();
+            info.numSamples -= samplesToOutput;
+            if (info.numSamples == 0) {
+                mRingBufferFrameInfos.pop_front();
+                output->setBufferInfo((ApexCodec_BufferFlags)0, info.frameIndex, info.timestamp);
+            } else {
+                output->setBufferInfo((ApexCodec_BufferFlags)APEXCODEC_FLAG_INCOMPLETE,
+                                      info.frameIndex, info.timestamp);
+            }
+        } else {
+            output->setBufferInfo((ApexCodec_BufferFlags)0, frameIndex, timestamp);
+        }
+    }
     return APEXCODEC_STATUS_OK;
 }
 
