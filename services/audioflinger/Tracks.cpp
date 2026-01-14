@@ -28,6 +28,7 @@
 #include "IAfThread.h"
 #include "ResamplerBufferProvider.h"
 
+#include <android/media/IAudioPolicyService.h>
 #include <audio_utils/StringUtils.h>
 #include <audio_utils/minifloat.h>
 #include <com_android_media_audio.h>
@@ -65,8 +66,6 @@
 #else
 #define ALOGVV(a...) do { } while(0)
 #endif
-
-namespace audioserver_flags = com::android::media::audioserver;
 
 namespace android {
 
@@ -3695,14 +3694,21 @@ void PassthruPatchRecord::releaseBuffer(
     buffer->raw = nullptr;
 }
 
+#undef LOG_TAG
+#define LOG_TAG "AF::AfPlaybackCommon"
+
 // ----------------------------------------------------------------------------
 // AfPlaybackCommon
 
 static AfPlaybackCommon::EnforcementLevel getOpControlEnforcementLevel(audio_usage_t usage,
         IAfThreadCallback& cb) {
     using enum AfPlaybackCommon::EnforcementLevel;
-    if (cb.isHardeningOverrideEnabled()) {
+    using enum media::IAudioPolicyService::HardeningOverride;
+    const auto overrided = cb.getHardeningOverride();
+    if (overrided == ENABLE) {
         return FULL;
+    } else if (overrided == DISABLE) {
+        return NONE;
     }
     if (usage == AUDIO_USAGE_VIRTUAL_SOURCE || media::permission::isSystemUsage(usage)) {
         return NONE;

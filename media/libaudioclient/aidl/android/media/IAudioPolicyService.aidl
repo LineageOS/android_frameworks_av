@@ -519,10 +519,16 @@ interface IAudioPolicyService {
     // AudioPolicyService.cpp AudioPolicyService::onTransact()
     // AudioPolicyService.cpp IAUDIOPOLICYSERVICE_BINDER_METHOD_MACRO_LIST
 
+    enum HardeningOverride {
+        DEFAULT = 0,
+        DISABLE = 1,
+        ENABLE = 2,
+    }
+
     /**
      * Enable hardening independent of flag or exemption state
      */
-     void setEnableHardening(boolean shouldEnable);
+     void setHardeningOverride(in HardeningOverride hardeningOverride);
 
     /**
      * Returns how flushFromFrame is supported when the playback is created with given

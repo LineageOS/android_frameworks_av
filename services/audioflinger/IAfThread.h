@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <android/media/IAudioPolicyService.h>
 #include <android/media/IAudioTrackCallback.h>
 #include <android/media/IEffectClient.h>
 #include <android/media/audio/common/AudioPlaybackRate.h>
@@ -125,7 +126,7 @@ public:
     virtual const ::com::android::media::permission::IPermissionProvider&
             getPermissionProvider() = 0;
 
-    virtual bool isHardeningOverrideEnabled() const = 0;
+    virtual media::IAudioPolicyService::HardeningOverride getHardeningOverride() const = 0;
 
     virtual bool hasAlreadyCaptured(uid_t uid) const = 0;
 };
