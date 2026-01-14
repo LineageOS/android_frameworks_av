@@ -24,7 +24,6 @@
 #include <binder/Status.h>
 #include <media/AudioContainers.h>
 #include <media/AudioResamplerPublic.h>
-#include <media/AudioSystem.h>
 #include <media/PlayerBase.h>
 #include <media/VolumeShaper.h>
 #include <mediautils/SingleThreadExecutor.h>
@@ -55,8 +54,7 @@ constexpr pid_t        CALLBACK_THREAD_NONE = 0;
 /**
  * AAudio audio stream.
  */
-// By extending AudioDeviceCallback, we also inherit from RefBase.
-class AudioStream : public android::AudioSystem::AudioDeviceCallback {
+class AudioStream : public virtual android::RefBase {
 public:
 
     AudioStream();
@@ -468,10 +466,6 @@ public:
     }
 
     void maybeSignalRoutingChangedCallback();
-
-    // Implement AudioDeviceCallback
-    void onAudioDeviceUpdate(audio_io_handle_t audioIo [[maybe_unused]],
-            const android::DeviceIdVector& deviceIds [[maybe_unused]]) override {};
 
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.

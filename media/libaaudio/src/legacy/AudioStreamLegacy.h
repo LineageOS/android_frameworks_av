@@ -60,7 +60,8 @@ typedef int32_t aaudio_callback_operation_t;
 class AudioStreamLegacy : public AudioStream,
                           public FixedBlockProcessor,
                           protected android::AudioTrack::IAudioTrackCallback,
-                          protected android::AudioRecord::IAudioRecordCallback {
+                          protected android::AudioRecord::IAudioRecordCallback,
+                          public android::AudioSystem::AudioDeviceCallback {
 public:
     AudioStreamLegacy();
 
