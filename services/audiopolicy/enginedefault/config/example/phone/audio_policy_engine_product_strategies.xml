@@ -98,6 +98,8 @@
     <ProductStrategy name="STRATEGY_TRANSMITTED_THROUGH_SPEAKER">
         <AttributesGroup streamType="AUDIO_STREAM_TTS" volumeGroup="tts">
             <Attributes> <Flags value="AUDIO_FLAG_BEACON"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_VIBRATION"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_RINGTONE_VIBRATION"/> </Attributes>
         </AttributesGroup>
     </ProductStrategy>
 

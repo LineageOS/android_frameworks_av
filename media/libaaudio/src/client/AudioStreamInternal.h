@@ -183,6 +183,8 @@ protected:
 
     aaudio_result_t startCallback_l() REQUIRES(mStreamMutex);
 
+    virtual int32_t getMinOffloadCallbackProcessingPeriodMs() const { return 0; }
+
     virtual bool mayNeedToDrain() const { return false; }
 
     virtual void onWakeUp_l(android::audio_utils::TimerQueue::handle_t handle [[maybe_unused]])

@@ -129,6 +129,10 @@ protected:
                getDeviceBufferSize() > getDeviceSampleRate();
     }
 
+    int32_t getMinOffloadCallbackProcessingPeriodMs() const final {
+        return kOffloadFlushFromSafeMarginMs;
+    }
+
     aaudio_result_t setPlaybackParameters_l(const AAudioPlaybackParameters* parameters)
             REQUIRES(mStreamMutex) final;
     aaudio_result_t getPlaybackParameters_l(AAudioPlaybackParameters* parameters)
@@ -138,13 +142,19 @@ protected:
 
 private:
     /*
-     * Asynchronous write with data conversion.
+     * Asynchronous write with potental data conversion.
      * @param buffer
      * @param numFrames
      * @return frames written or negative error
      */
-    aaudio_result_t writeNowWithConversion(const void *buffer,
-                                           int32_t numFrames);
+    // General dispatch method, finds the best method to use below.
+    aaudio_result_t writeNowWithConversion(const void* buffer, int32_t numFrames);
+
+    // Optimized for matched sample rate.
+    aaudio_result_t writeNowWithConversionMatchedSampleRate(const void* buffer, int32_t numFrames);
+
+    // Full conversion method, may be slower than optimized variants above.
+    aaudio_result_t writeNowWithConversionFull(const void* buffer, int32_t numFrames);
 
     bool shouldStopStream() EXCLUDES(mStreamMutex);
     void maybeCallPresentationEndCallback();

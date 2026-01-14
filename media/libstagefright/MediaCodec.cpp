@@ -1681,7 +1681,11 @@ MediaCodec::MediaCodec(
 }
 
 MediaCodec::~MediaCodec() {
-    CHECK_EQ(mState, UNINITIALIZED);
+    if (mState != UNINITIALIZED) {
+        ALOGI("Codec must have been in UNINITIALIZED state, but is in an invalid state %s",
+              stateString(mState).c_str());
+        return;
+    }
     mResourceManagerProxy->removeClient();
 
     flushMediametrics();  // this deletes mMetricsHandle
@@ -4785,7 +4789,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                               mState, stateString(mState).c_str());
                         break;
                     }
-                    CHECK_EQ(mState, INITIALIZING);
+                    if (mState != INITIALIZING) {
+                        ALOGI("Codec must have been in INITIALIZING state, "
+                              "but is in an invalid state %s",
+                              stateString(mState).c_str());
+                        break;
+                    }
                     setState(INITIALIZED);
                     mFlags |= kFlagIsComponentAllocated;
 
@@ -4837,14 +4846,20 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case kWhatComponentConfigured:
                 {
-                    if (mState == RELEASING || mState == UNINITIALIZED || mState == INITIALIZED) {
+                    if (mState == RELEASING || mState == UNINITIALIZED ||
+                        mState == INITIALIZING || mState == INITIALIZED) {
                         // In case a kWhatError or kWhatRelease message came in and replied,
                         // we log a warning and ignore.
                         ALOGW("configure interrupted by error or release, current state %d/%s",
                               mState, stateString(mState).c_str());
                         break;
                     }
-                    CHECK_EQ(mState, CONFIGURING);
+                    if (mState != CONFIGURING) {
+                        ALOGI("Codec must have been in CONFIGURING state, "
+                              "but is in an invalid state %s",
+                              stateString(mState).c_str());
+                        break;
+                    }
 
                     // reset input surface flag
                     mHaveInputSurface = false;
@@ -5013,15 +5028,20 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case kWhatStartCompleted:
                 {
-                    if (mState == RELEASING || mState == UNINITIALIZED) {
-                        // In case a kWhatRelease message came in and replied,
+                    if (mState == RELEASING || mState == INITIALIZING || mState == UNINITIALIZED) {
+                        // In case a kWhatError or kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("start interrupted by release, current state %d/%s",
+                        ALOGI("start interrupted by error or release, current state %d/%s",
                               mState, stateString(mState).c_str());
                         break;
                     }
 
-                    CHECK_EQ(mState, STARTING);
+                    if (mState != STARTING) {
+                        ALOGI("Codec must have been in STARTING state, "
+                              "but is in an invalid state %s",
+                              stateString(mState).c_str());
+                        break;
+                    }
 
                     // Add the codec resources upon start.
                     std::vector<MediaResourceParcel> resources;
