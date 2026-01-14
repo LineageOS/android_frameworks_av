@@ -1847,6 +1847,7 @@ status_t AudioTrack::createTrack_l()
     input.selectedDeviceId = mSelectedDeviceId;
     input.sessionId = mSessionId;
     input.audioTrackCallback = mAudioTrackCallback;
+    input.codecProvenance = mCodecProvenance;
 
     media::CreateTrackResponse response;
     auto aidlInput = input.toAidl();

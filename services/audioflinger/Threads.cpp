@@ -2487,7 +2487,8 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
         const sp<media::IAudioTrackCallback>& callback,
         bool isSpatialized,
         bool isBitPerfect,
-        audio_output_flags_t *afTrackFlags)
+        audio_output_flags_t *afTrackFlags,
+        const std::string& codecProvenance)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -2816,7 +2817,7 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
                           sessionId, creatorPid, attributionSource, trackFlags,
                           IAfTrackBase::TYPE_DEFAULT, portId, SIZE_MAX /*frameCountToBeReady*/,
-                          speed, isSpatialized, isBitPerfect);
+                          speed, isSpatialized, isBitPerfect, codecProvenance);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
