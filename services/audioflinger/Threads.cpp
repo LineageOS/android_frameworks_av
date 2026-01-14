@@ -11353,6 +11353,13 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent
         volume = 0;
     }
 
+    const auto amn = mAfThreadCallback->getAudioManagerNative();
+    for (const auto& track : mActiveMmapTracksView) {
+        if (amn) {
+            track->maybeLogPlaybackHardening(*amn);
+        }
+    }
+
     if (volume != mHalVolFloat) {
         // Convert volumes from float to 8.24
         uint32_t vol = (uint32_t)(volume * (1 << 24));
@@ -11383,7 +11390,6 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent
                 }
             }
         }
-        const auto amn = mAfThreadCallback->getAudioManagerNative();
         for (const auto& track : mActiveMmapTracksView) {
             track->setMetadataHasChanged();
             if (amn) {
@@ -11397,8 +11403,6 @@ NO_THREAD_SAFETY_ANALYSIS // access of track->processMuteEvent
                                    false /*muteFromVolumeShaper*/,
                                    track->getPortMute(),
                                    shouldMutePlaybackHardening});
-
-                track->maybeLogPlaybackHardening(*amn);
             }
         }
     }
