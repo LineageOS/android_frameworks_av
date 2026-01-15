@@ -425,7 +425,7 @@ private:
 
     const ::com::android::media::permission::IPermissionProvider& getPermissionProvider() final;
 
-    bool isHardeningOverrideEnabled() const final;
+    media::IAudioPolicyService::HardeningOverride getHardeningOverride() const final;
 
     bool hasAlreadyCaptured(uid_t uid) const final {
         const std::lock_guard _l(mCapturingClientsMutex);

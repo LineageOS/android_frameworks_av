@@ -352,7 +352,7 @@ public:
             AudioMMapPolicyType policyType,
             AudioMMapPolicyInfo* policyInfo) override;
 
-    binder::Status setEnableHardening(bool shouldEnable) override;
+    binder::Status setHardeningOverride(HardeningOverride hardeningOverride) override;
 
     binder::Status getFlushFromFrameSupport(
             const AudioConfigBase& config,
@@ -364,7 +364,7 @@ public:
 
     // -- IAudioPolicyLocal methods
     const IPermissionProvider& getPermissionProvider() const override;
-    bool isHardeningOverrideEnabled() const override { return mShouldEnableHardening.load(); };
+    HardeningOverride getHardeningOverride() const override { return mHardeningOverride.load(); };
 
     // IBinder::DeathRecipient
     virtual     void        binderDied(const wp<IBinder>& who);
@@ -1170,7 +1170,8 @@ private:
     DestroyAudioPolicyManagerInstance mDestroyAudioPolicyManager;
     std::unique_ptr<media::UsecaseValidator> mUsecaseValidator;
     const sp<NativePermissionController> mPermissionController;
-    std::atomic<bool> mShouldEnableHardening;
+    std::atomic<IAudioPolicyService::HardeningOverride> mHardeningOverride{
+            IAudioPolicyService::HardeningOverride::DEFAULT};
 };
 
 } // namespace android
