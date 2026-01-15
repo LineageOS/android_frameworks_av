@@ -194,16 +194,17 @@ public:
          * Set the volume index for a given volume group and device.
          *
          * @param groupId the volume group id
+         * @param uid to consider
          * @param index the volume index to set
          * @param muted state of the volume group
          * @param device the device to set the volume index for
          * @return NO_ERROR if the call is successful, otherwise an error code
          */
-        virtual status_t setVolumeIndexForGroup(volume_group_t groupId, int index,
+        virtual status_t setVolumeIndexForGroup(volume_group_t groupId, uid_t uid, int index,
                 bool muted, audio_devices_t device);
 
         /**
-         * Get the volume index for a given volume group and device.
+         * Get the volume index for a given volume group.
          *
          * @param groupId the volume group id
          * @param index the volume index to get
@@ -290,15 +291,15 @@ public:
          *    (from the default Engine::getOutputDevicesForAttributes() implementation).
          *
          * @param attributes to be considered
+         * @param uid to be considered
+         * @param forVolume  true if the devices are to be associated with current device volume.
          * @param devices    an AudioDeviceTypeAddrVector container passed in that
          *                   will be filled on success.
-         * @param forVolume  true if the devices are to be associated with current device volume.
          * @return           NO_ERROR on success.
          */
         virtual status_t getDevicesForAttributes(
-                const audio_attributes_t &attributes,
-                AudioDeviceTypeAddrVector *devices,
-                bool forVolume);
+                const audio_attributes_t &attributes, uid_t uid, bool forVolume,
+                AudioDeviceTypeAddrVector *devices);
 
         virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc = NULL);
         virtual status_t registerEffect(const effect_descriptor_t *desc,
@@ -498,10 +499,12 @@ public:
         virtual status_t releaseSpatializerOutput(audio_io_handle_t output);
 
         virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                                             uid_t uid,
                                                              const audio_config_t *config);
 
         virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
-                                                         AudioProfileVector& audioProfiles);
+                                                        uid_t uid,
+                                                        AudioProfileVector& audioProfiles);
 
         status_t getSupportedMixerAttributes(
                 audio_port_handle_t portId,
@@ -1463,9 +1466,25 @@ private:
         // Filters only the relevant flags for getProfileForOutput
         audio_output_flags_t getRelevantFlags (audio_output_flags_t flags, bool directOnly) const;
 
-        status_t getDevicesForAttributes(const audio_attributes_t &attr,
+        status_t getDevicesForAttributesInternal(const audio_attributes_t &attr, uid_t uid,
                                          DeviceVector &devices,
-                                         bool forVolume);
+                                         const sp<DeviceDescriptor> &preferredDevice = nullptr,
+                                         bool forVolume = false, bool fromCache = false);
+
+        /**
+         * Get the devices expected to be routed for given attributes and UID.
+         * It takes first dynamic mixes into account (if FLAG_MULTI_ZONE_AUDIO is enabled), then
+         * rely on engine device selection.
+         * @param attr to be considered
+         * @param uid to be considered
+         * @param preferredDevice non null if preferred device shall be considered
+         * @param forVolume if true, the request is specific to device selection from volume
+         * @param fromCache if set, the engine selection will be taken from current cache
+         * @return one or more devices matching the given attributes and uid.
+         */
+        DeviceVector getOutputDevicesForAttributes(const audio_attributes_t &attr, uid_t uid,
+                const sp<DeviceDescriptor> &preferredDevice = nullptr, bool forVolume = false,
+                bool fromCache = false);
 
         // A helper method used by getDevicesForAttributes to retrieve input devices when
         // capture preset is available in the given audio attributes parameter.
