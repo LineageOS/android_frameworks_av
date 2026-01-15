@@ -230,17 +230,8 @@ engineConfig::ParsingResult EngineBase::processParsingResult(
     };
     auto addSupportedAttributesToGroup = [](auto &group, auto &volumeGroup, auto &strategy) {
         for (const auto &attr : group.attributesVect) {
-            auto attributes = std::move(attr);
-            // For volume management audio source must strictly be AUDIO_SOURCE_INVALID for output
-            // device selection
-            if (attr.source != AUDIO_SOURCE_INVALID) {
-                ALOGW("%s: Resetting audio source for volume group %d from %s to %s.",
-                      __func__, volumeGroup->getId(), toString(attr.source).c_str(),
-                      toString(AUDIO_SOURCE_INVALID).c_str());
-                attributes.source = AUDIO_SOURCE_INVALID;
-            }
-            strategy->addAttributes({volumeGroup->getId(), group.stream, attributes});
-            volumeGroup->addSupportedAttributes(attributes);
+            strategy->addAttributes({volumeGroup->getId(), group.stream, attr});
+            volumeGroup->addSupportedAttributes(attr);
         }
     };
     auto checkStreamForGroups = [](auto streamType, const auto &volumeGroups) {

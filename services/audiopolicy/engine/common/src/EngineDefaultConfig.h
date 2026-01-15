@@ -36,12 +36,12 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          {
              {AUDIO_STREAM_VOICE_CALL, "AUDIO_STREAM_VOICE_CALL",
                 {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_VOICE_COMMUNICATION,
-                    AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""}},
+                    AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}},
              },
              // TODO(b/441152611): this will be filtered out with audio_stream_bt_sco_cleanup,
              //   remove once the flag is rolled out
              {AUDIO_STREAM_BLUETOOTH_SCO, "AUDIO_STREAM_BLUETOOTH_SCO",
-                     {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_INVALID,
+                     {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
                               AUDIO_FLAG_SCO,""}},
              }
          },
@@ -51,10 +51,10 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          {
              {AUDIO_STREAM_RING, "AUDIO_STREAM_RING",
                 {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE,
-                    AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""}}
+                    AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}}
              },
              {AUDIO_STREAM_ALARM, "AUDIO_STREAM_ALARM",
-                {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_ALARM, AUDIO_SOURCE_INVALID,
+                {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_ALARM, AUDIO_SOURCE_DEFAULT,
                     AUDIO_FLAG_NONE, ""}},
              }
          },
@@ -63,7 +63,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          AudioProductStrategy::DEFAULT_ZONE_ID,
          {
              {AUDIO_STREAM_ENFORCED_AUDIBLE, "AUDIO_STREAM_ENFORCED_AUDIBLE",
-                {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_INVALID,
+                {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
                     AUDIO_FLAG_AUDIBILITY_ENFORCED, ""}}
              }
          },
@@ -73,7 +73,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          {
              {AUDIO_STREAM_ACCESSIBILITY, "AUDIO_STREAM_ACCESSIBILITY",
                 {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY,
-                    AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""}}
+                    AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}}
              }
          },
     },
@@ -83,10 +83,10 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          {
              {AUDIO_STREAM_NOTIFICATION, "AUDIO_STREAM_NOTIFICATION",
                   {
-                      {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_NOTIFICATION, AUDIO_SOURCE_INVALID,
+                      {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_NOTIFICATION, AUDIO_SOURCE_DEFAULT,
                        AUDIO_FLAG_NONE, ""},
                       {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_NOTIFICATION_EVENT,
-                       AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""}
+                       AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}
                   }
              }
          },
@@ -97,7 +97,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
             {AUDIO_STREAM_ASSISTANT, "AUDIO_STREAM_ASSISTANT",
                 {
                     {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_ASSISTANT,
-                        AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""}
+                        AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}
                 }
             }
         }
@@ -107,19 +107,19 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
         {
             {AUDIO_STREAM_MUSIC, "AUDIO_STREAM_MUSIC",
                 {
-                    {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_MEDIA, AUDIO_SOURCE_INVALID,
+                    {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_MEDIA, AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""},
-                    {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_GAME, AUDIO_SOURCE_INVALID,
+                    {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_GAME, AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""},
                     {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE,
-                        AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""},
-                    {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_INVALID,
+                        AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""},
+                    {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""}
                 },
             },
             {AUDIO_STREAM_SYSTEM, "AUDIO_STREAM_SYSTEM",
                         {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_ASSISTANCE_SONIFICATION,
-                                 AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""}}
+                                 AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}}
             }
         },
     },
@@ -129,7 +129,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
              {AUDIO_STREAM_DTMF, "AUDIO_STREAM_DTMF",
                  {
                       {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING,
-                       AUDIO_SOURCE_INVALID, AUDIO_FLAG_NONE, ""}
+                       AUDIO_SOURCE_DEFAULT, AUDIO_FLAG_NONE, ""}
                  }
              }
          },
@@ -139,7 +139,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          AudioProductStrategy::DEFAULT_ZONE_ID,
          {
              {AUDIO_STREAM_CALL_ASSISTANT, "AUDIO_STREAM_CALL_ASSISTANT",
-                {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_CALL_ASSISTANT, AUDIO_SOURCE_INVALID,
+                {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_CALL_ASSISTANT, AUDIO_SOURCE_DEFAULT,
                 AUDIO_FLAG_NONE, ""}}
              }
          },
@@ -150,18 +150,18 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
         {
             {AUDIO_STREAM_TTS, "AUDIO_STREAM_TTS",
                   {
-                      {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_INVALID,
+                      {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_BEACON, ""},
-                      {AUDIO_CONTENT_TYPE_ULTRASOUND, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_INVALID,
+                      {AUDIO_CONTENT_TYPE_ULTRASOUND, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""},
                       {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_SPEAKER_CLEANUP,
-                        AUDIO_SOURCE_INVALID,
+                        AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""},
                       {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_NOTIFICATION_VIBRATION,
-                        AUDIO_SOURCE_INVALID,
+                        AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""},
                       {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_RINGTONE_VIBRATION,
-                        AUDIO_SOURCE_INVALID,
+                        AUDIO_SOURCE_DEFAULT,
                         AUDIO_FLAG_NONE, ""}
                   }
             }
@@ -178,7 +178,7 @@ const engineConfig::ProductStrategies gOrderedSystemStrategies = {
      AudioProductStrategy::DEFAULT_ZONE_ID,
      {
          {AUDIO_STREAM_REROUTING, "AUDIO_STREAM_REROUTING",
-          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_VIRTUAL_SOURCE, AUDIO_SOURCE_INVALID,
+          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_VIRTUAL_SOURCE, AUDIO_SOURCE_DEFAULT,
             AUDIO_FLAG_NONE, AUDIO_TAG_APM_RESERVED_INTERNAL}}
          }
      },
@@ -187,7 +187,7 @@ const engineConfig::ProductStrategies gOrderedSystemStrategies = {
      AudioProductStrategy::DEFAULT_ZONE_ID,
      {
          {AUDIO_STREAM_PATCH, "AUDIO_STREAM_PATCH",
-          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_INVALID,
+          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT,
             AUDIO_FLAG_NONE, AUDIO_TAG_APM_RESERVED_INTERNAL}}
          }
      },
