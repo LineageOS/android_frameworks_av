@@ -727,7 +727,9 @@ ApexCodec_Status C2ApexAacDec::process(
                 if (*produced > 0) {
                     uint64_t outFrameIndex, outTimestamp;
                     output->getBufferInfo(&outFlags, &outFrameIndex, &outTimestamp);
-                    ALOGD("outFrameIndex=%lu, outTimestamp=%lu", outFrameIndex, outTimestamp);
+                    ALOGD("outFrameIndex=%lu, outTimestamp=%lu",
+                          (unsigned long)outFrameIndex,
+                          (unsigned long)outTimestamp);
                     outFlags = (ApexCodec_BufferFlags)(outFlags | APEXCODEC_FLAG_END_OF_STREAM);
                     output->setBufferInfo(outFlags, outFrameIndex, outTimestamp);
                 } else {
