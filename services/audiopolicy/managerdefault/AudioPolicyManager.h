@@ -452,11 +452,22 @@ public:
             return mEngine->listAudioProductStrategies(strategies);
         }
 
+        virtual status_t setProductStrategiesZoneIdForUserId(userid_t userId, int zoneId)
+        {
+            return mEngine->setProductStrategiesZoneIdForUserId(userId, zoneId);
+        }
+
+        virtual status_t resetProductStrategiesZoneIdForUserId(userid_t userId)
+        {
+            return mEngine->resetProductStrategiesZoneIdForUserId(userId);
+        }
+
         virtual status_t getProductStrategyFromAudioAttributes(
                 const audio_attributes_t &aa, product_strategy_t &productStrategy,
                 bool fallbackOnDefault)
         {
-            productStrategy = mEngine->getProductStrategyForAttributes(aa, fallbackOnDefault);
+            productStrategy = mEngine->getProductStrategyForAttributes(aa, /* uid */ 0,
+                    fallbackOnDefault);
             return (fallbackOnDefault && productStrategy == PRODUCT_STRATEGY_NONE) ?
                     BAD_VALUE : NO_ERROR;
         }
@@ -818,30 +829,30 @@ protected:
         void updateInputRouting();
 
         /**
-         * @brief checkOutputForAttributes checks and if necessary changes outputs used for the
+         * @brief checkOutputForStrategy checks and if necessary changes outputs used for the
          * given audio attributes.
          * must be called every time a condition that affects the output choice for a given
          * attributes changes: connected device, phone state, force use...
          * Must be called before updateDevicesAndOutputs()
-         * @param attr to be considered
+         * @param psId strategy id to be considered
          */
-        void checkOutputForAttributes(const audio_attributes_t &attr);
+        void checkOutputForStrategy(const product_strategy_t psId);
 
         /**
-         * @brief checkAudioSourceForAttributes checks if any AudioSource following the same routing
-         * as the given audio attributes is not routed and try to connect it.
-         * It must be called once checkOutputForAttributes has been called for orphans AudioSource,
+         * @brief checkAudioSourceForStrategy checks if any AudioSource following the same routing
+         * as the given strategy is not routed and try to connect it.
+         * It must be called once checkOutputForStrategy has been called for orphans AudioSource,
          * aka AudioSource not attached to any Audio Output (e.g. AudioSource connected to direct
          * Output which has been disconnected (and output closed) due to sink device unavailable).
-         * @param attr to be considered
+         * @param psId strategy id to be considered
          */
-        void checkAudioSourceForAttributes(const audio_attributes_t &attr);
+        void checkAudioSourceForStrategy(const product_strategy_t psId);
 
         bool followsSameRouting(const audio_attributes_t &lAttr,
                                 const audio_attributes_t &rAttr) const;
 
         /**
-         * @brief checkOutputForAllStrategies Same as @see checkOutputForAttributes()
+         * @brief checkOutputForAllStrategies Same as @see checkOutputForStrategy()
          *      but for a all product strategies in order of priority
          */
         void checkOutputForAllStrategies();
@@ -1509,6 +1520,8 @@ private:
         std::map<media::audio::common::AudioMMapPolicyType,
                 const std::map<media::audio::common::AudioDeviceDescription,
                          media::audio::common::AudioMMapPolicy>> mMmapPolicyByDeviceType;
+
+        uid_t enforceUid(uid_t uid);
 };
 
 };
