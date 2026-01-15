@@ -174,7 +174,7 @@ aaudio_result_t AudioStreamTrack::open(const AAudioStreamOpenRequest& openReques
         config.sample_rate = getSampleRate();
         audio_direct_mode_t directMode = AUDIO_DIRECT_NOT_SUPPORTED;
         if (status_t status = AudioSystem::getDirectPlaybackSupport(
-                &attributes, AttributionSourceState().uid, &config, &directMode);
+                &attributes, &config, &directMode);
             status != NO_ERROR) {
             ALOGE("%s, failed to query direct support, error=%d", __func__, status);
             return status;

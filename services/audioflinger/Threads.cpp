@@ -2106,12 +2106,12 @@ NO_THREAD_SAFETY_ANALYSIS
     item->selfrecord();
 }
 
-product_strategy_t ThreadBase::getStrategyForStream(audio_stream_type_t stream, uid_t uid) const
+product_strategy_t ThreadBase::getStrategyForStream(audio_stream_type_t stream) const
 {
     if (!mAfThreadCallback->isAudioPolicyReady()) {
         return PRODUCT_STRATEGY_NONE;
     }
-    return AudioSystem::getStrategyForStream(stream, uid);
+    return AudioSystem::getStrategyForStream(stream);
 }
 
 // startMelComputation_l() must be called with AudioFlinger::mutex() held
@@ -2785,11 +2785,10 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
         // all tracks in same audio session must share the same routing strategy otherwise
         // conflicts will happen when tracks are moved from one output to another by audio policy
         // manager
-        uid_t uid =  static_cast<uid_t>(attributionSource.uid);
-        product_strategy_t strategy = getStrategyForStream(streamType, uid);
+        product_strategy_t strategy = getStrategyForStream(streamType);
         for (const auto& t : mPlaybackTracksView) {
             if (t != 0 && t->isExternalTrack()) {
-                product_strategy_t actual = getStrategyForStream(t->streamType(), uid);
+                product_strategy_t actual = getStrategyForStream(t->streamType());
                 if (sessionId == t->sessionId() && strategy != actual) {
                     ALOGE("createTrack_l() mismatched strategy; expected %u but found %u",
                             strategy, actual);
@@ -2836,8 +2835,9 @@ sp<IAfTrack> PlaybackThread::createTrack_l(
 
         sp<IAfEffectChain> chain = getEffectChain_l(sessionId);
         if (chain != 0) {
+            ALOGV("createTrack_l() setting main buffer %p", chain->inBuffer());
             track->setMainBuffer(chain->inBuffer());
-            chain->setStrategy(getStrategyForStream(track->streamType(), uid));
+            chain->setStrategy(getStrategyForStream(track->streamType()));
             chain->incTrackCnt();
         }
 
@@ -3473,18 +3473,19 @@ status_t PlaybackThread::getRenderPosition(
     }
 }
 
-product_strategy_t PlaybackThread::getStrategyForSession_l(audio_session_t sessionId) const {
+product_strategy_t PlaybackThread::getStrategyForSession_l(audio_session_t sessionId) const
+{
     // session AUDIO_SESSION_OUTPUT_MIX is placed in same strategy as MUSIC stream so that
     // it is moved to correct output by audio policy manager when A2DP is connected or disconnected
     if (sessionId == AUDIO_SESSION_OUTPUT_MIX) {
-        return getStrategyForStream(AUDIO_STREAM_MUSIC, /* uid= */ 0);
+        return getStrategyForStream(AUDIO_STREAM_MUSIC);
     }
     for (const auto& track : mPlaybackTracksView) {
         if (sessionId == track->sessionId() && !track->isInvalid()) {
-            return getStrategyForStream(track->streamType(), track->uid());
+            return getStrategyForStream(track->streamType());
         }
     }
-    return getStrategyForStream(AUDIO_STREAM_MUSIC, /* uid= */ 0);
+    return getStrategyForStream(AUDIO_STREAM_MUSIC);
 }
 
 AudioStreamOut* PlaybackThread::clearOutput_l()
@@ -10673,7 +10674,7 @@ status_t MmapThread::start(const AudioClient& client,
     mActiveTracks.add(track);
     sp<IAfEffectChain> chain = getEffectChain_l(mSessionId);
     if (chain != 0) {
-        chain->setStrategy(getStrategyForStream(streamType_l(), track->uid()));
+        chain->setStrategy(getStrategyForStream(streamType_l()));
         chain->incTrackCnt();
         chain->incActiveTrackCnt();
     }

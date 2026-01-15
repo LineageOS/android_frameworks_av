@@ -65,15 +65,9 @@ public:
     status_t setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
                                       audio_policy_dev_state_t state) override;
 
-    DeviceVector getOutputDevicesForAttributes(
-            const audio_attributes_t &attributes, uid_t uid = 0,
-            const sp<DeviceDescriptor> &preferredDevice = nullptr,
-            bool fromCache = false) const override;
-
-    DeviceVector getOutputDevicesForStrategy(
-            product_strategy_t strategy,
-            const sp<DeviceDescriptor> &preferredDevice = nullptr,
-            bool fromCache = false) const override;
+    DeviceVector getOutputDevicesForAttributes(const audio_attributes_t &attr,
+                                               const sp<DeviceDescriptor> &preferedDevice = nullptr,
+                                               bool fromCache = false) const override;
 
     DeviceVector getOutputDevicesForStream(audio_stream_type_t stream,
                                            bool fromCache = false) const override;

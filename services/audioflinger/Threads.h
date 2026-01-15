@@ -644,7 +644,7 @@ protected:
                             }
 public:
 // TODO(b/291317898) organize with publics
-   product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid) const;
+                product_strategy_t getStrategyForStream(audio_stream_type_t stream) const;
 protected:
 
     virtual void onHalLatencyModesChanged_l() REQUIRES(mutex()) {}

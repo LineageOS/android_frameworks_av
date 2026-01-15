@@ -149,6 +149,10 @@ interface IAudioPolicyService {
 
     int getMinVolumeIndexForAttributes(in AudioAttributes attr);
 
+    void setVolumeIndexForGroup(int groupId, in AudioDeviceDescription device, int index,
+                                   boolean muted);
+
+    int getVolumeIndexForGroup(int groupId, in AudioDeviceDescription device);
 
     int getMaxVolumeIndexForGroup(int groupId);
 
@@ -158,30 +162,9 @@ interface IAudioPolicyService {
 
     void setMinVolumeIndexForGroup(int groupId, int minIndex);
 
-    /**
-     * Set the volume for the given group id, device and index. UID is given as the attenuation
-     * depends on the device. Routing rules may be registered for a given UID / User ID. Thus,
-     * AudioPolicy will re-check the device for which the attenuation shall be taken.
-     * TODO (b/434866735) merge per attribute/per stream API into this API
-     */
-    void setVolumeIndexForGroup(int groupId, int uid, in AudioDeviceDescription device,
-                                int index, boolean muted);
+    int /* product_strategy_t */ getStrategyForStream(AudioStreamType stream);
 
-    /**
-     * TODO (b/434866735) merge per attribute/per stream API into this API and add the Min / Max
-     * getter API.
-     */
-    int getVolumeIndexForGroup(int /* volume_group_id */ groupId,
-                               in AudioDeviceDescription device);
-
-    int /* product_strategy_t */ getStrategyForStream(AudioStreamType stream, int uid);
-
-    /**
-     * Requests the devices that would be used for routing (if forVolume is false) or for volume
-     * operations for the given attributes and UID (as routing rules may be registered on
-     * UID / User ID)
-     */
-    AudioDevice[] getDevicesForAttributes(in AudioAttributes attr, int uid, boolean forVolume);
+    AudioDevice[] getDevicesForAttributes(in AudioAttributes attr, boolean forVolume);
 
     int /* audio_io_handle_t */ getOutputForEffect(in EffectDescriptor desc);
 
@@ -381,9 +364,6 @@ interface IAudioPolicyService {
     AudioAttributes getAttributesForStreamType(in AudioStreamType stream);
     AudioStreamType getStreamTypeForAttributes(in AudioAttributes attributes);
     AudioProductStrategy[] listAudioProductStrategies();
-    void setProductStrategiesZoneIdForUserId(int /* userid_t */ userId, int zoneId);
-    void resetProductStrategiesZoneIdForUserId(int /* userid_t */ userId);
-
     int /* product_strategy_t */ getProductStrategyFromAudioAttributes(
             in AudioAttributes aa, boolean fallbackOnDefault);
 
@@ -454,18 +434,16 @@ interface IAudioPolicyService {
                              in AudioDevice[] devices);
 
     /**
-     * Query how the direct playback is currently supported on the device routed for the given
-     * attributes and UID (as routing rules may be registered on UID / User ID)
+     * Query how the direct playback is currently supported on the device.
      */
-    AudioDirectMode getDirectPlaybackSupport(in AudioAttributes attr, int uid,
-                    in AudioConfig config);
+    AudioDirectMode getDirectPlaybackSupport(in AudioAttributes attr,
+                                              in AudioConfig config);
 
     /**
      * Query audio profiles available for direct playback on the current output device(s)
-     * for the specified audio attributes and UID (as routing rules may be registered on
-     * UID / User ID).
+     * for the specified audio attributes.
      */
-    AudioProfile[] getDirectProfilesForAttributes(in AudioAttributes attr, int uid);
+    AudioProfile[] getDirectProfilesForAttributes(in AudioAttributes attr);
 
     /**
      * Return a list of AudioMixerAttributes that can be used to set preferred mixer attributes
@@ -504,8 +482,7 @@ interface IAudioPolicyService {
      */
     @nullable AudioMixerAttributesInternal getPreferredMixerAttributes(
             in AudioAttributes attr,
-            int /* audio_port_handle_t */ portId,
-            int /* uid_t */ uid);
+            int /* audio_port_handle_t */ portId);
 
     /**
      * Clear preferred mixer attributes for a given device on a given audio attributes that
@@ -552,6 +529,6 @@ interface IAudioPolicyService {
      * audio config and audio attributes.
      */
     FlushFromFrameSupport getFlushFromFrameSupport(
-            in AudioConfigBase config, in AudioAttributes attributes, int uid,
+            in AudioConfigBase config, in AudioAttributes attributes,
             int /* Bitmask, indexed by AudioOutputFlags */ flags);
 }

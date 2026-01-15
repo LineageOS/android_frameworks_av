@@ -194,17 +194,16 @@ public:
          * Set the volume index for a given volume group and device.
          *
          * @param groupId the volume group id
-         * @param uid to consider
          * @param index the volume index to set
          * @param muted state of the volume group
          * @param device the device to set the volume index for
          * @return NO_ERROR if the call is successful, otherwise an error code
          */
-        virtual status_t setVolumeIndexForGroup(volume_group_t groupId, uid_t uid, int index,
+        virtual status_t setVolumeIndexForGroup(volume_group_t groupId, int index,
                 bool muted, audio_devices_t device);
 
         /**
-         * Get the volume index for a given volume group.
+         * Get the volume index for a given volume group and device.
          *
          * @param groupId the volume group id
          * @param index the volume index to get
@@ -259,15 +258,14 @@ public:
                                 const DeviceTypeSet& deviceTypes) const;
 
         // return the strategy corresponding to a given stream type
-        virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid)
+        virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream)
         {
-            return streamToStrategy(stream, uid);
+            return streamToStrategy(stream);
         }
-
-        product_strategy_t streamToStrategy(audio_stream_type_t stream, uid_t uid = 0) const
+        product_strategy_t streamToStrategy(audio_stream_type_t stream) const
         {
             auto attributes = mEngine->getAttributesForStreamType(stream);
-            return mEngine->getProductStrategyForAttributes(attributes, uid);
+            return mEngine->getProductStrategyForAttributes(attributes);
         }
 
         /**
@@ -292,15 +290,15 @@ public:
          *    (from the default Engine::getOutputDevicesForAttributes() implementation).
          *
          * @param attributes to be considered
-         * @param uid to be considered
-         * @param forVolume  true if the devices are to be associated with current device volume.
          * @param devices    an AudioDeviceTypeAddrVector container passed in that
          *                   will be filled on success.
+         * @param forVolume  true if the devices are to be associated with current device volume.
          * @return           NO_ERROR on success.
          */
         virtual status_t getDevicesForAttributes(
-                const audio_attributes_t &attributes, uid_t uid, bool forVolume,
-                AudioDeviceTypeAddrVector *devices);
+                const audio_attributes_t &attributes,
+                AudioDeviceTypeAddrVector *devices,
+                bool forVolume);
 
         virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc = NULL);
         virtual status_t registerEffect(const effect_descriptor_t *desc,
@@ -454,22 +452,11 @@ public:
             return mEngine->listAudioProductStrategies(strategies);
         }
 
-        virtual status_t setProductStrategiesZoneIdForUserId(userid_t userId, int zoneId)
-        {
-            return mEngine->setProductStrategiesZoneIdForUserId(userId, zoneId);
-        }
-
-        virtual status_t resetProductStrategiesZoneIdForUserId(userid_t userId)
-        {
-            return mEngine->resetProductStrategiesZoneIdForUserId(userId);
-        }
-
         virtual status_t getProductStrategyFromAudioAttributes(
                 const audio_attributes_t &aa, product_strategy_t &productStrategy,
                 bool fallbackOnDefault)
         {
-            productStrategy = mEngine->getProductStrategyForAttributes(aa, /* uid */ 0,
-                    fallbackOnDefault);
+            productStrategy = mEngine->getProductStrategyForAttributes(aa, fallbackOnDefault);
             return (fallbackOnDefault && productStrategy == PRODUCT_STRATEGY_NONE) ?
                     BAD_VALUE : NO_ERROR;
         }
@@ -500,12 +487,10 @@ public:
         virtual status_t releaseSpatializerOutput(audio_io_handle_t output);
 
         virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr,
-                                                             uid_t uid,
                                                              const audio_config_t *config);
 
         virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
-                                                        uid_t uid,
-                                                        AudioProfileVector& audioProfiles);
+                                                         AudioProfileVector& audioProfiles);
 
         status_t getSupportedMixerAttributes(
                 audio_port_handle_t portId,
@@ -517,7 +502,6 @@ public:
                 const audio_mixer_attributes_t* mixerAttributes) override;
         status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
                                              audio_port_handle_t portId,
-                                             uid_t uid,
                                              audio_mixer_attributes_t* mixerAttributes) override;
         status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
                                                audio_port_handle_t portId,
@@ -537,7 +521,6 @@ public:
         status_t getFlushFromFrameSupport(
                 const audio_config_base_t& config,
                 const audio_attributes_t& attr,
-                uid_t uid,
                 audio_output_flags_t flags,
                 media::audio::common::FlushFromFrameSupport* support) const override;
 
@@ -604,10 +587,10 @@ protected:
          * fallbackOnDefault is set or none.
          */
         VolumeSource toVolumeSource(
-            const audio_attributes_t &attributes, uid_t uid, bool fallbackOnDefault = true) const
+            const audio_attributes_t &attributes, bool fallbackOnDefault = true) const
         {
             return toVolumeSource(mEngine->getVolumeGroupForAttributes(
-                attributes, uid, fallbackOnDefault));
+                attributes, fallbackOnDefault));
         }
         VolumeSource toVolumeSource(
             audio_stream_type_t stream, bool fallbackOnDefault = true) const
@@ -835,30 +818,30 @@ protected:
         void updateInputRouting();
 
         /**
-         * @brief checkOutputForStrategy checks and if necessary changes outputs used for the
+         * @brief checkOutputForAttributes checks and if necessary changes outputs used for the
          * given audio attributes.
          * must be called every time a condition that affects the output choice for a given
          * attributes changes: connected device, phone state, force use...
          * Must be called before updateDevicesAndOutputs()
-         * @param psId strategy id to be considered
+         * @param attr to be considered
          */
-        void checkOutputForStrategy(const product_strategy_t psId);
+        void checkOutputForAttributes(const audio_attributes_t &attr);
 
         /**
-         * @brief checkAudioSourceForStrategy checks if any AudioSource following the same routing
-         * as the given strategy is not routed and try to connect it.
-         * It must be called once checkOutputForStrategy has been called for orphans AudioSource,
+         * @brief checkAudioSourceForAttributes checks if any AudioSource following the same routing
+         * as the given audio attributes is not routed and try to connect it.
+         * It must be called once checkOutputForAttributes has been called for orphans AudioSource,
          * aka AudioSource not attached to any Audio Output (e.g. AudioSource connected to direct
          * Output which has been disconnected (and output closed) due to sink device unavailable).
-         * @param psId strategy id to be considered
+         * @param attr to be considered
          */
-        void checkAudioSourceForStrategy(const product_strategy_t psId);
+        void checkAudioSourceForAttributes(const audio_attributes_t &attr);
 
-        bool followsSameRouting(uid_t luid, const audio_attributes_t &lAttr,
-                                uid_t ruid, const audio_attributes_t &rAttr) const;
+        bool followsSameRouting(const audio_attributes_t &lAttr,
+                                const audio_attributes_t &rAttr) const;
 
         /**
-         * @brief checkOutputForAllStrategies Same as @see checkOutputForStrategy()
+         * @brief checkOutputForAllStrategies Same as @see checkOutputForAttributes()
          *      but for a all product strategies in order of priority
          */
         void checkOutputForAllStrategies();
@@ -1221,7 +1204,7 @@ private:
 
         // updates device caching and output for streams that can influence the
         //    routing of notifications
-        void handleNotificationRoutingForStream(audio_stream_type_t stream, uid_t uid);
+        void handleNotificationRoutingForStream(audio_stream_type_t stream);
         uint32_t curAudioPortGeneration() const { return mAudioPortGeneration; }
         // internal method, get audio_attributes_t from either a source audio_attributes_t
         // or audio_stream_type_t, respectively.
@@ -1469,25 +1452,9 @@ private:
         // Filters only the relevant flags for getProfileForOutput
         audio_output_flags_t getRelevantFlags (audio_output_flags_t flags, bool directOnly) const;
 
-        status_t getDevicesForAttributesInternal(const audio_attributes_t &attr, uid_t uid,
+        status_t getDevicesForAttributes(const audio_attributes_t &attr,
                                          DeviceVector &devices,
-                                         const sp<DeviceDescriptor> &preferredDevice = nullptr,
-                                         bool forVolume = false, bool fromCache = false);
-
-        /**
-         * Get the devices expected to be routed for given attributes and UID.
-         * It takes first dynamic mixes into account (if FLAG_MULTI_ZONE_AUDIO is enabled), then
-         * rely on engine device selection.
-         * @param attr to be considered
-         * @param uid to be considered
-         * @param preferredDevice non null if preferred device shall be considered
-         * @param forVolume if true, the request is specific to device selection from volume
-         * @param fromCache if set, the engine selection will be taken from current cache
-         * @return one or more devices matching the given attributes and uid.
-         */
-        DeviceVector getOutputDevicesForAttributes(const audio_attributes_t &attr, uid_t uid,
-                const sp<DeviceDescriptor> &preferredDevice = nullptr, bool forVolume = false,
-                bool fromCache = false);
+                                         bool forVolume);
 
         // A helper method used by getDevicesForAttributes to retrieve input devices when
         // capture preset is available in the given audio attributes parameter.
@@ -1542,8 +1509,6 @@ private:
         std::map<media::audio::common::AudioMMapPolicyType,
                 const std::map<media::audio::common::AudioDeviceDescription,
                          media::audio::common::AudioMMapPolicy>> mMmapPolicyByDeviceType;
-
-        uid_t enforceUid(uid_t uid);
 };
 
 };

@@ -50,16 +50,9 @@ private:
     status_t setForceUse(audio_policy_force_use_t usage,
                          audio_policy_forced_cfg_t config) override;
 
-    DeviceVector getOutputDevicesForAttributes(
-            const audio_attributes_t &attributes,
-            uid_t uid __unused,
-            const sp<DeviceDescriptor> &preferredDevice = nullptr,
-            bool fromCache = false) const override;
-
-    DeviceVector getOutputDevicesForStrategy(
-            product_strategy_t strategy,
-            const sp<DeviceDescriptor> &preferredDevice = nullptr,
-            bool fromCache = false) const override;
+    DeviceVector getOutputDevicesForAttributes(const audio_attributes_t &attr,
+                                               const sp<DeviceDescriptor> &preferedDevice = nullptr,
+                                               bool fromCache = false) const override;
 
     DeviceVector getOutputDevicesForStream(audio_stream_type_t stream,
                                            bool fromCache = false) const override;

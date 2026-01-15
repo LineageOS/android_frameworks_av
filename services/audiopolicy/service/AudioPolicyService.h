@@ -155,19 +155,19 @@ public:
                                                   int32_t* _aidl_return) override;
     binder::Status getMinVolumeIndexForAttributes(const AudioAttributes& attr,
                                                   int32_t* _aidl_return) override;
+    binder::Status setVolumeIndexForGroup(int32_t groupId, const AudioDeviceDescription& device,
+            int32_t index, bool muted) override;
+    binder::Status getVolumeIndexForGroup(int32_t groupId, const AudioDeviceDescription& device,
+        int32_t* _aidl_return) override;
     binder::Status getMaxVolumeIndexForGroup(int32_t groupId, int32_t* _aidl_return) override;
     binder::Status setMaxVolumeIndexForGroup(int32_t groupId, int32_t index) override;
     binder::Status getMinVolumeIndexForGroup(int32_t groupId, int32_t* _aidl_return) override;
     binder::Status setMinVolumeIndexForGroup(int32_t groupId, int32_t index) override;
-
-    binder::Status setVolumeIndexForGroup(int32_t groupId, int32_t uid,
-            const AudioDeviceDescription& device, int32_t index, bool muted) override;
-    binder::Status getVolumeIndexForGroup(int32_t groupId, const AudioDeviceDescription& device,
-            int32_t* _aidl_return) override;
-    binder::Status getStrategyForStream(AudioStreamType stream, int32_t uid,
+    binder::Status getStrategyForStream(AudioStreamType stream,
                                         int32_t* _aidl_return) override;
     binder::Status getDevicesForAttributes(const AudioAttributes& attr,
-            int32_t uid, bool forVolume, std::vector<AudioDevice>* _aidl_return) override;
+                                           bool forVolume,
+                                           std::vector<AudioDevice>* _aidl_return) override;
     binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
                                       int32_t* _aidl_return) override;
     binder::Status registerEffect(const media::EffectDescriptor& desc, int32_t io, int32_t strategy,
@@ -268,8 +268,6 @@ public:
             const AudioAttributes& aa,
             bool fallbackOnDefault,
             int32_t* _aidl_return) override;
-    binder::Status setProductStrategiesZoneIdForUserId(int32_t userId, int32_t zoneId) override;
-    binder::Status resetProductStrategiesZoneIdForUserId(int32_t userId) override;
     binder::Status listAudioVolumeGroups(
             std::vector<media::AudioVolumeGroup>* _aidl_return) override;
     binder::Status getVolumeGroupFromAudioAttributes(
@@ -318,13 +316,14 @@ public:
             const std::optional<AudioConfig>& config,
             const std::vector<AudioDevice>& devices,
             bool* _aidl_return) override;
-    binder::Status getDirectPlaybackSupport(
-            const AudioAttributes& attr, int32_t uid,
-            const AudioConfig& config, media::AudioDirectMode* _aidl_return) override;
 
-    binder::Status getDirectProfilesForAttributes(
-            const AudioAttributes& attr, int32_t uid,
-            std::vector<media::audio::common::AudioProfile>* _aidl_return) override;
+    binder::Status getDirectPlaybackSupport(const AudioAttributes& attr,
+                                            const AudioConfig& config,
+                                            media::AudioDirectMode* _aidl_return) override;
+
+    binder::Status getDirectProfilesForAttributes(const AudioAttributes& attr,
+                        std::vector<media::audio::common::AudioProfile>* _aidl_return) override;
+
     binder::Status getSupportedMixerAttributes(
             int32_t portId,
             std::vector<media::AudioMixerAttributesInternal>* _aidl_return) override;
@@ -336,7 +335,6 @@ public:
     binder::Status getPreferredMixerAttributes(
             const AudioAttributes& attr,
             int32_t portId,
-            int32_t uid,
             std::optional<media::AudioMixerAttributesInternal>* _aidl_return) override;
     binder::Status clearPreferredMixerAttributes(const AudioAttributes& attr,
                                                  int32_t portId,
@@ -359,7 +357,6 @@ public:
     binder::Status getFlushFromFrameSupport(
             const AudioConfigBase& config,
             const AudioAttributes& attributes,
-            int32_t uid,
             int32_t flags,
             android::media::audio::common::FlushFromFrameSupport* _aidl_return) override;
 

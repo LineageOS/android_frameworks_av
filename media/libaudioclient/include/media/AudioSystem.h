@@ -411,25 +411,19 @@ public:
     static status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
 
     /**
-     * Set the volume index for a given volume group, uid and device.
-     * <p>Notes:
-     * -UID is given since routing rules may be added for either a UID or User ID, inferring
-     * a different device on which the volume shall be set. As AudioPolicy will recompute the
-     * affected device regardless of device given by caller, it is necessary to provide the UID).
-     * -Managing volume per UID does not really make sense, User ID is highly recommended.
+     * Set the volume index for a given volume group and device.
      *
      * @param groupId the volume group id
-     * @param uid the uid of the client
      * @param index the volume index to set
      * @param muted state of the volume group
      * @param device the device to set the volume index for
      * @return NO_ERROR if the call is successful, otherwise an error code
      */
-    static status_t setVolumeIndexForGroup(volume_group_t groupId, uid_t uid, int index,
+    static status_t setVolumeIndexForGroup(volume_group_t groupId, int index,
             bool muted, audio_devices_t device);
 
     /**
-     * Get the volume index for a given volume group.
+     * Get the volume index for a given volume group and device.
      *
      * @param groupId the volume group id
      * @param index the volume index to get
@@ -438,7 +432,6 @@ public:
      */
     static status_t getVolumeIndexForGroup(volume_group_t groupId, int &index,
             audio_devices_t device);
-
     /**
      * Get the maximum volume index for a given volume group
      *
@@ -475,20 +468,10 @@ public:
      */
     static status_t setMinVolumeIndexForGroup(volume_group_t groupId, int index);
 
-    static product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid);
-
-    /**
-     * Get the devices for the given audio attributes and uid.
-     * Note: UID is given since routing rules may have been added for either a UID or User ID.
-     *
-     * @param[in] aa the requested audio attributes
-     * @param[in] uid the uid of the client
-     * @param[in] forVolume true if the devices are for volume
-     * @param[out] devices the devices for the given audio attributes
-     * @return if the call is successful or not
-     */
-    static status_t getDevicesForAttributes(const audio_attributes_t &aa, uid_t uid, bool forVolume,
-            AudioDeviceTypeAddrVector *devices);
+    static product_strategy_t getStrategyForStream(audio_stream_type_t stream);
+    static status_t getDevicesForAttributes(const audio_attributes_t &aa,
+                                            AudioDeviceTypeAddrVector *devices,
+                                            bool forVolume);
 
     static audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc);
     static status_t registerEffect(const effect_descriptor_t *desc,
@@ -618,9 +601,6 @@ public:
     static bool     isUltrasoundSupported();
 
     static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
-    static status_t setProductStrategiesZoneIdForUserId(userid_t userId, int zoneId);
-    static status_t resetProductStrategiesZoneIdForUserId(userid_t userId);
-
     static status_t getProductStrategyFromAudioAttributes(
             const audio_attributes_t &aa, product_strategy_t &productStrategy,
             bool fallbackOnDefault = true);
@@ -731,31 +711,27 @@ public:
 
     /**
      * Query how the direct playback is currently supported on the device.
-     * Note: UID is given since routing rules may have been added for either a UID or User ID.
-     *
      * @param attr audio attributes describing the playback use case
-     * @param uid the uid of the client
      * @param config audio configuration for the playback
      * @param directMode out: a set of flags describing how the direct playback is currently
      *        supported on the device
      * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
      *         in case of error.
      */
-    static status_t getDirectPlaybackSupport(const audio_attributes_t *attr, uid_t uid,
-            const audio_config_t *config, audio_direct_mode_t *directMode);
+    static status_t getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                             const audio_config_t *config,
+                                             audio_direct_mode_t *directMode);
+
 
     /**
      * Query which direct audio profiles are available for the specified audio attributes.
-     * Note: UID is given since routing rules may have been added for either a UID or User ID.
-     *
      * @param attr audio attributes describing the playback use case
-     * @param uid the uid of the client
      * @param audioProfiles out: a vector of audio profiles
      * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
      *         in case of error.
      */
-    static status_t getDirectProfilesForAttributes(const audio_attributes_t* attr, uid_t uid,
-            std::vector<audio_profile>* audioProfiles);
+    static status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
+                                            std::vector<audio_profile>* audioProfiles);
 
     static status_t setRequestedLatencyMode(
             audio_io_handle_t output, audio_latency_mode_t mode);
@@ -776,7 +752,7 @@ public:
                                                 uid_t uid,
                                                 const audio_mixer_attributes_t *mixerAttr);
     static status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
-                                                audio_port_handle_t portId, uid_t uid,
+                                                audio_port_handle_t portId,
                                                 std::optional<audio_mixer_attributes_t>* mixerAttr);
     static status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
                                                   audio_port_handle_t portId,
