@@ -1719,8 +1719,15 @@ sp<AMessage> CCodecConfig::getFormatForDomain(const ReflectedParamUpdater::Dict&
         sp<ABuffer> data;
         if (msg->findInt32(typeKey.c_str(), &type)
                 && msg->findBuffer(dataKey.c_str(), &data)) {
-            if (type == HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
-                msg->setBuffer(KEY_HDR10_PLUS_INFO, data);
+            std::string hdrKey;
+            if (android::media::codec::provider_->agtm_metadata()
+                    && type == HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_50) {
+                hdrKey = KEY_HDR_ECLIPSA_VIDEO_INFO;
+            } else if (type == HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
+                hdrKey = KEY_HDR10_PLUS_INFO;
+            }
+            if (!hdrKey.empty()) {
+                msg->setBuffer(hdrKey.c_str(), data);
                 msg->removeEntryAt(msg->findEntryByName(typeKey.c_str()));
                 msg->removeEntryAt(msg->findEntryByName(dataKey.c_str()));
             }
@@ -2008,12 +2015,18 @@ ReflectedParamUpdater::Dict CCodecConfig::getReflectedFormat(const sp<AMessage>&
             }
         }
 
+        uint32_t hdrKey = 0;
         sp<ABuffer> hdrDynamicInfo;
-        if (params->findBuffer(KEY_HDR10_PLUS_INFO, &hdrDynamicInfo)) {
+        if (android::media::codec::provider_->agtm_metadata()
+                && params->findBuffer(KEY_HDR_ECLIPSA_VIDEO_INFO, &hdrDynamicInfo)) {
+            hdrKey = HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_50;
+        } else if (params->findBuffer(KEY_HDR10_PLUS_INFO, &hdrDynamicInfo)) {
+            hdrKey = HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40;
+        }
+        if (hdrKey != 0) {
             for (const std::string &prefix : { C2_PARAMKEY_INPUT_HDR_DYNAMIC_INFO,
-                                               C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO }) {
-                params->setInt32((prefix + ".type").c_str(),
-                                 HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40);
+                                            C2_PARAMKEY_OUTPUT_HDR_DYNAMIC_INFO }) {
+                params->setInt32((prefix + ".type").c_str(), hdrKey);
                 params->setBuffer((prefix + ".data").c_str(), hdrDynamicInfo);
             }
         }

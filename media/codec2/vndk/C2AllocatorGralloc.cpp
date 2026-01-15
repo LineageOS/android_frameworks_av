@@ -1164,15 +1164,15 @@ c2_status_t SetMetadataToGralloc4Handle(
     }
     if (dynamicInfo && *dynamicInfo && dynamicInfo->flexCount() > 0) {
         ALOGV("Setting dynamic HDR info as gralloc metadata");
+        std::optional<std::vector<uint8_t>> t35 = std::vector<uint8_t>();
+        t35->resize(dynamicInfo->flexCount());
+        memcpy(t35->data(), dynamicInfo->m.data, dynamicInfo->flexCount());
         if (dynamicInfo->m.type_ == C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
-            std::optional<std::vector<uint8_t>> smpte2094_40 = std::vector<uint8_t>();
-            smpte2094_40->resize(dynamicInfo->flexCount());
-            memcpy(smpte2094_40->data(), dynamicInfo->m.data, dynamicInfo->flexCount());
-
-            status = mapper.setSmpte2094_40(buffer.get(), smpte2094_40);
-            if (status != OK) {
-                err = C2_CORRUPTED;
-            }
+            status = mapper.setSmpte2094_40(buffer.get(), t35);
+            err = status == OK ? err : C2_CORRUPTED;
+        } else if (dynamicInfo->m.type_ == C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_50) {
+            status = mapper.setSmpte2094_50(buffer.get(), t35);
+            err = status == OK ? err : C2_CORRUPTED;
         } else {
             err = C2_BAD_VALUE;
         }
