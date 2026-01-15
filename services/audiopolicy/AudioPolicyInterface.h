@@ -237,27 +237,19 @@ public:
                                                     int &index) = 0;
 
     /**
-     * Set the volume index for a given volume group, uid and device.
-     * <p>Notes:
-     * -By convention, specifying AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME means
-     *      setting volume for all devices.
-     * -UID is given since routing rules may be added for either a UID or User ID, inferring
-     * a different device on which the volume shall be set. As AudioPolicy will recompute the
-     * affected device regardless of device given by caller, it is necessary to provide the UID).
-     * -Managing volume per UID does not really make sense, User ID is highly recommended.
-     *
-     * @param groupId the volume group id
-     * @param uid the uid of the client
-     * @param index the volume index to set
-     * @param muted state of the volume group
-     * @param device the device to set the volume index for
-     * @return NO_ERROR if the call is successful, otherwise an error code
-     */
-    virtual status_t setVolumeIndexForGroup(volume_group_t groupId, uid_t uid, int index,
+    * Set the volume index for a given volume group and device.
+    *
+    * @param groupId the volume group id
+    * @param index the volume index to set
+    * @param muted state of the volume group
+    * @param device the device to set the volume index for
+    * @return NO_ERROR if the call is successful, otherwise an error code
+    */
+    virtual status_t setVolumeIndexForGroup(volume_group_t groupId, int index,
             bool muted, audio_devices_t device) = 0;
 
     /**
-     * Get the volume index for a given volume group.
+     * Get the volume index for a given volume group and device.
      *
      * @param groupId the volume group id
      * @param index the volume index to get
@@ -306,18 +298,10 @@ public:
     // return the strategy corresponding to a given stream type
     virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) = 0;
 
-    /**
-     * retrieves the list of enabled output devices for the given audio attributes.
-     *
-     * @param[in] attr to consider
-     * @param[in] uid to consider
-     * @param[in] forVolume true if the request is to manage volume.
-     * @param[out] devices
-     * @return
-     */
-    virtual status_t getDevicesForAttributes(const audio_attributes_t &attr, uid_t uid,
-                                             bool forVolume,
-                                             AudioDeviceTypeAddrVector *devices) = 0;
+    // retrieves the list of enabled output devices for the given audio attributes
+    virtual status_t getDevicesForAttributes(const audio_attributes_t &attr,
+                                             AudioDeviceTypeAddrVector *devices,
+                                             bool forVolume) = 0;
 
     // Audio effect management
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc) = 0;
@@ -517,27 +501,17 @@ public:
     /**
      * Query how the direct playback is currently supported on the device.
      * @param attr audio attributes describing the playback use case
-     * @param uid the uid of the client
      * @param config audio configuration for the playback
      * @param directMode out: a set of flags describing how the direct playback is currently
      *        supported on the device
      * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
      *         in case of error.
      */
-    virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr, uid_t uid,
-            const audio_config_t *config) = 0;
+    virtual audio_direct_mode_t getDirectPlaybackSupport(const audio_attributes_t *attr,
+                                                         const audio_config_t *config) = 0;
 
-    /**
-     * Query which direct audio profiles are available for the specified audio attributes.
-     * Note: UID is given since routing rules may have been added for either a UID or User ID.
-     *
-     * @param attr audio attributes describing the playback use case
-     * @param uid the uid of the client
-     * @param audioProfiles out: a vector of audio profiles
-     * @return NO_ERROR in case of success, DEAD_OBJECT, NO_INIT, BAD_VALUE, PERMISSION_DENIED
-     *         in case of error.
-     */
-    virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr, uid_t uid,
+    // retrieves the list of available direct audio profiles for the given audio attributes
+    virtual status_t getDirectProfilesForAttributes(const audio_attributes_t* attr,
                                                     AudioProfileVector& audioProfiles) = 0;
 
     virtual status_t getSupportedMixerAttributes(

@@ -20,7 +20,6 @@
 
 #define LOG_TAG "AudioSystemTest"
 
-#include <flag_macros.h>
 #include <gtest/gtest.h>
 #include <log/log.h>
 #include <media/AidlConversionCppNdk.h>
@@ -61,7 +60,6 @@ class AudioSystemTest : public ::testing::Test {
     void SetUp() override {
         mAF = AudioSystem::get_audio_flinger();
         ASSERT_NE(mAF, nullptr) << "Permission denied";
-        mUid = getuid();
     }
 
     void TearDown() override {
@@ -80,14 +78,11 @@ class AudioSystemTest : public ::testing::Test {
     void createPlaybackSession(void);
     void createRecordSession(void);
 
-    int getZoneForVolumeGroup(volume_group_t vg);
-
     sp<IAudioFlinger> mAF;
     sp<AudioPlayback> mPlayback;
     sp<OnAudioDeviceUpdateNotifier> mCbPlayback;
     sp<AudioCapture> mCapture;
     sp<OnAudioDeviceUpdateNotifier> mCbRecord;
-    uid_t mUid;
 };
 
 void AudioSystemTest::createPlaybackSession(void) {
@@ -116,23 +111,6 @@ void AudioSystemTest::createRecordSession(void) {
     EXPECT_EQ(OK, mCapture->getAudioRecordHandle()->addAudioDeviceCallback(mCbRecord));
     EXPECT_EQ(OK, mCapture->start()) << "record creation failed";
     EXPECT_EQ(OK, mCbRecord->waitForAudioDeviceCb());
-}
-
-int AudioSystemTest::getZoneForVolumeGroup(volume_group_t vg) {
-    AudioProductStrategyVector strategies;
-    EXPECT_EQ(OK, AudioSystem::listAudioProductStrategies(strategies));
-    int zoneId = -1;
-    for (const auto& strategy : strategies) {
-        for (const auto& group : strategy.getVolumeGroupAttributes()) {
-            if (group.getGroupId() == vg) {
-                zoneId = strategy.getZoneId();
-                break;
-            }
-        }
-    }
-    int defaultZoneId = AudioProductStrategy::DEFAULT_ZONE_ID;
-    EXPECT_GE(zoneId, defaultZoneId) << "Could not find zone id for volume group " << vg;
-    return zoneId;
 }
 
 // UNIT TESTS
@@ -368,12 +346,10 @@ TEST_F(AudioSystemTest, GetDirectProfilesForAttributes) {
     audio_attributes_t attributes = AUDIO_ATTRIBUTES_INITIALIZER;
     attributes.usage = AUDIO_USAGE_MEDIA;
     attributes.content_type = AUDIO_CONTENT_TYPE_MUSIC;
-    EXPECT_EQ(BAD_VALUE, AudioSystem::getDirectProfilesForAttributes(nullptr, mUid, nullptr));
-    EXPECT_EQ(BAD_VALUE,
-              AudioSystem::getDirectProfilesForAttributes(nullptr, mUid, &audioProfiles));
-    EXPECT_EQ(BAD_VALUE, AudioSystem::getDirectProfilesForAttributes(&attributes, mUid, nullptr));
-    EXPECT_EQ(NO_ERROR,
-              AudioSystem::getDirectProfilesForAttributes(&attributes, mUid, &audioProfiles));
+    EXPECT_EQ(BAD_VALUE, AudioSystem::getDirectProfilesForAttributes(nullptr, nullptr));
+    EXPECT_EQ(BAD_VALUE, AudioSystem::getDirectProfilesForAttributes(nullptr, &audioProfiles));
+    EXPECT_EQ(BAD_VALUE, AudioSystem::getDirectProfilesForAttributes(&attributes, nullptr));
+    EXPECT_EQ(NO_ERROR, AudioSystem::getDirectProfilesForAttributes(&attributes, &audioProfiles));
 }
 
 bool isPublicStrategy(const AudioProductStrategy& strategy) {
@@ -461,9 +437,7 @@ TEST_F(AudioSystemTest, DevicesForRoleAndStrategy) {
     }
 }
 
-TEST_F_WITH_FLAGS(AudioSystemTest, VolumeIndexForAttributesWithoutZones,
-                  REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::media::audiopolicy,
-                                                      multi_zone_audio))) {
+TEST_F(AudioSystemTest, VolumeIndexForAttributes) {
     std::optional<audio_port_v7> speakerPort = audio_port_v7{};
     if (getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, AUDIO_DEVICE_OUT_SPEAKER,
                             "", *speakerPort) != OK) {
@@ -495,48 +469,15 @@ TEST_F_WITH_FLAGS(AudioSystemTest, VolumeIndexForAttributesWithoutZones,
     }
 }
 
-TEST_F_WITH_FLAGS(AudioSystemTest, VolumeIndexForAttributes,
-                  REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::media::audiopolicy,
-                                                      multi_zone_audio))) {
+TEST_F(AudioSystemTest, IndexForVolumeGroup) {
+    if (!audio_flags::volume_group_management_update()) {
+        GTEST_SKIP() << "RequiresFlagsEnabled volume_group_management_update";
+    }
     std::optional<audio_port_v7> speakerPort = audio_port_v7{};
     if (getPortByAttributes(AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, AUDIO_DEVICE_OUT_SPEAKER,
                             "", *speakerPort) != OK) {
-        speakerPort.reset();
+        GTEST_SKIP() << "Requires out speaker device";
     }
-    AudioVolumeGroupVector groups;
-    ASSERT_EQ(OK, AudioSystem::listAudioVolumeGroups(groups));
-    for (const auto& group : groups) {
-        if (group.getAudioAttributes().empty()) continue;
-        const audio_attributes_t attr = group.getAudioAttributes()[0];
-        if (attr == AUDIO_ATTRIBUTES_INITIALIZER) continue;
-        audio_stream_type_t streamType;
-        AudioSystem::getStreamTypeForAttributes(attr, streamType);
-        if (streamType >= AUDIO_STREAM_PUBLIC_CNT) continue;
-        int zoneId = getZoneForVolumeGroup(group.getId());
-        if (zoneId != AudioProductStrategy::DEFAULT_ZONE_ID) continue;
-
-        volume_group_t vg;
-        EXPECT_EQ(OK, AudioSystem::getVolumeGroupFromAudioAttributes(attr, vg));
-        EXPECT_EQ(group.getId(), vg);
-
-        if (speakerPort.has_value()) {
-            int index;
-            EXPECT_EQ(OK, AudioSystem::getVolumeIndexForAttributes(attr, index,
-                                                                   speakerPort->ext.device.type));
-            int indexTest;
-            EXPECT_EQ(OK, AudioSystem::getStreamVolumeIndex(streamType, &indexTest,
-                                                            speakerPort->ext.device.type));
-            EXPECT_EQ(index, indexTest);
-        }
-    }
-}
-
-/**
- * @RequiresFlagsEnabled("android.media.audiopolicy.volume_group_management_update")
- */
-TEST_F_WITH_FLAGS(AudioSystemTest, VolumeIndexForVolumeGroup,
-                  REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::media::audiopolicy,
-                                                      volume_group_management_update))) {
     AudioVolumeGroupVector groups;
     EXPECT_EQ(OK, AudioSystem::listAudioVolumeGroups(groups));
     for (const auto& group : groups) {
@@ -579,16 +520,6 @@ TEST_F(AudioSystemTest, MinMaxIndexForVolumeGroup) {
         EXPECT_TRUE(minIndex < maxIndex)
             << "Group " << group.getName() << " min["
             << minIndex << "] is not less than max [" << maxIndex << "]";
-
-        if (streamType >= AUDIO_STREAM_PUBLIC_CNT) continue;
-
-        int index;
-        EXPECT_EQ(OK, AudioSystem::getVolumeIndexForGroup(vg, index, AUDIO_DEVICE_OUT_SPEAKER));
-
-        int indexTest;
-        EXPECT_EQ(OK, AudioSystem::getStreamVolumeIndex(streamType, &indexTest,
-                                                        AUDIO_DEVICE_OUT_SPEAKER));
-        EXPECT_EQ(index, indexTest);
     }
 }
 
