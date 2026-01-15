@@ -44,6 +44,65 @@ using HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::
 using B2HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::
         V2_0::utils::B2HGraphicBufferProducer;
 
+// SurfaceWrapper for Graphics object
+// Make Graphics opaque to Codec2Client
+class OutputBufferQueue::SurfaceWrapper {
+public:
+    SurfaceWrapper(const sp<IGraphicBufferProducer>& igbp) : mIgbp(igbp) {
+        sp<HGraphicBufferProducer> hgbp =
+                mIgbp->getHalInterface<HGraphicBufferProducer>();
+        mHgbp = hgbp ? hgbp : new B2HGraphicBufferProducer(mIgbp);
+    }
+
+    status_t attachBuffer(int *outSlot, const sp<GraphicBuffer>& buffer) {
+        if (!mIgbp) {
+            return UNKNOWN_ERROR;
+        }
+        return mIgbp->attachBuffer(outSlot, buffer);
+    }
+
+    status_t getConsumerUsage(uint64_t *outUsage) {
+        if (!mIgbp) {
+            return UNKNOWN_ERROR;
+        }
+        return mIgbp->getConsumerUsage(outUsage);
+    }
+
+    status_t queueBuffer(int slot, const BnGraphicBufferProducer::QueueBufferInput& input,
+            BnGraphicBufferProducer::QueueBufferOutput* output) {
+        if (!mIgbp) {
+            return UNKNOWN_ERROR;
+        }
+        return mIgbp->queueBuffer(slot, input, output);
+    }
+
+    status_t cancelBuffer(int slot, const sp<Fence>& fence) {
+        if (!mIgbp) {
+            return UNKNOWN_ERROR;
+        }
+        return mIgbp->cancelBuffer(slot, fence);
+    }
+
+    void getFrameTimestamps(FrameEventHistoryDelta* outDelta) {
+        if (!mIgbp) {
+            return;
+        }
+        mIgbp->getFrameTimestamps(outDelta);
+    }
+
+    sp<HGraphicBufferProducer> getHgbp() {
+        if (!mIgbp) {
+            return nullptr;
+        }
+        return mHgbp;
+    }
+
+private:
+    sp<IGraphicBufferProducer> mIgbp;
+    sp<HGraphicBufferProducer> mHgbp;
+};
+
+
 namespace /* unnamed */ {
 
 // Create a GraphicBuffer object from a graphic block.
@@ -98,19 +157,12 @@ void forEachBlock(const std::list<std::unique_ptr<C2Work>>& workList,
     }
 }
 
-sp<HGraphicBufferProducer> getHgbp(const sp<IGraphicBufferProducer>& igbp) {
-    sp<HGraphicBufferProducer> hgbp =
-            igbp->getHalInterface<HGraphicBufferProducer>();
-    return hgbp ? hgbp :
-            new B2HGraphicBufferProducer(igbp);
-}
-
 status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
-                             const sp<IGraphicBufferProducer>& igbp,
+                             const std::shared_ptr<OutputBufferQueue::SurfaceWrapper>& surface,
                              uint32_t generation,
                              int32_t* bqSlot,
                              std::shared_ptr<C2SurfaceSyncMemory> syncMem) {
-    if (!igbp) {
+    if (!surface) {
         LOG(WARNING) << "attachToBufferQueue -- null producer.";
         return NO_INIT;
     }
@@ -143,14 +195,14 @@ status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
         }
         syncVar->notifyDequeuedLocked();
         syncVar->unlock();
-        result = igbp->attachBuffer(bqSlot, graphicBuffer);
+        result = surface->attachBuffer(bqSlot, graphicBuffer);
         if (result != OK) {
             syncVar->lock();
             syncVar->notifyQueuedLocked();
             syncVar->unlock();
         }
     } else {
-        result = igbp->attachBuffer(bqSlot, graphicBuffer);
+        result = surface->attachBuffer(bqSlot, graphicBuffer);
     }
     if (result != OK) {
         LOG(WARNING) << "attachToBufferQueue -- attachBuffer failed: "
@@ -186,14 +238,18 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
                                   int maxDequeueBufferCount,
                                   std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj) {
     uint64_t consumerUsage = 0;
-    if (igbp && igbp->getConsumerUsage(&consumerUsage) != OK) {
+    std::shared_ptr<SurfaceWrapper> surface;
+    if (igbp) {
+        surface = std::make_shared<SurfaceWrapper>(igbp);
+    }
+    if (surface && surface->getConsumerUsage(&consumerUsage) != OK) {
         ALOGW("failed to get consumer usage");
     }
 
     // TODO : Abstract creation process into C2SurfaceSyncMemory class.
     // use C2LinearBlock instead ashmem.
     std::shared_ptr<C2SurfaceSyncMemory> syncMem;
-    if (syncObj && igbp) {
+    if (syncObj && surface) {
         bool mapped = false;
         int memFd = ashmem_create_region("C2SurfaceMem", sizeof(C2SyncVariables));
         size_t memSize = memFd < 0 ? 0 : ashmem_get_size_region(memFd);
@@ -257,13 +313,13 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
         }
         C2SyncVariables *newSync = mSyncMem ? mSyncMem->mem() : nullptr;
 
-        mIgbp = igbp;
+        mSurface = surface;
         mGeneration = generation;
         mBqId = bqId;
         mOwner = std::make_shared<int>(0);
         mConsumerAttachCount = std::make_shared<int>(0);
         mMaxDequeueBufferCount = maxDequeueBufferCount;
-        if (igbp == nullptr) {
+        if (surface == nullptr) {
             return false;
         }
         for (int i = 0; i < BufferQueueDefs::NUM_BUFFER_SLOTS; ++i) {
@@ -295,16 +351,16 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             }
             mBuffers[i]->setGenerationNumber(generation);
 
-            status_t result = igbp->attachBuffer(&bqSlot, mBuffers[i]);
+            status_t result = surface->attachBuffer(&bqSlot, mBuffers[i]);
             if (result != OK) {
                 continue;
             }
             bool attach =
                     _C2BlockFactory::EndAttachBlockToBufferQueue(
-                            data, mOwner, getHgbp(mIgbp), mSyncMem,
+                            data, mOwner, mSurface->getHgbp(), mSyncMem,
                             generation, bqId, bqSlot);
             if (!attach) {
-                igbp->cancelBuffer(bqSlot, Fence::NO_FENCE);
+                surface->cancelBuffer(bqSlot, Fence::NO_FENCE);
                 continue;
             }
             buffers[bqSlot] = mBuffers[i];
@@ -353,7 +409,7 @@ void OutputBufferQueue::stop() {
         // basically configuring null surface
         oldMem = mSyncMem;
         mSyncMem.reset();
-        mIgbp.clear();
+        mSurface.reset();
         mGeneration = 0;
         mBqId = 0;
     }
@@ -371,7 +427,7 @@ bool OutputBufferQueue::registerBuffer(const C2ConstGraphicBlock& block) {
     }
     std::scoped_lock<std::mutex> l(mMutex);
 
-    if (!mIgbp || mStopped) {
+    if (!mSurface || mStopped) {
         return false;
     }
 
@@ -390,7 +446,7 @@ bool OutputBufferQueue::registerBuffer(const C2ConstGraphicBlock& block) {
                      << ", bqSlot " << oldSlot
                      << ", generation " << mGeneration
                      << ".";
-        _C2BlockFactory::HoldBlockFromBufferQueue(data, mOwner, getHgbp(mIgbp), mSyncMem);
+        _C2BlockFactory::HoldBlockFromBufferQueue(data, mOwner, mSurface->getHgbp(), mSyncMem);
         mPoolDatas[oldSlot] = data;
         mBuffers[oldSlot] = createGraphicBuffer(block);
         mBuffers[oldSlot]->setGenerationNumber(mGeneration);
@@ -419,7 +475,7 @@ status_t OutputBufferQueue::outputBuffer(
         std::shared_ptr<C2SurfaceSyncMemory> syncMem;
         mMutex.lock();
         bool stopped = mStopped;
-        sp<IGraphicBufferProducer> outputIgbp = mIgbp;
+        std::shared_ptr<SurfaceWrapper> surface = mSurface;
         uint32_t outputGeneration = mGeneration;
         syncMem = mSyncMem;
         mMutex.unlock();
@@ -430,7 +486,7 @@ status_t OutputBufferQueue::outputBuffer(
         }
 
         status_t status = attachToBufferQueue(
-                block, outputIgbp, outputGeneration, &bqSlot, syncMem);
+                block, surface, outputGeneration, &bqSlot, syncMem);
 
         if (status != OK) {
             LOG(WARNING) << "outputBuffer -- attaching failed.";
@@ -439,7 +495,7 @@ status_t OutputBufferQueue::outputBuffer(
 
         auto syncVar = syncMem ? syncMem->mem() : nullptr;
         if(syncVar) {
-            status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+            status = surface->queueBuffer(static_cast<int>(bqSlot),
                                          input, output);
             if (status == OK) {
                 if (output->bufferReplaced) {
@@ -449,7 +505,7 @@ status_t OutputBufferQueue::outputBuffer(
                 }
             }
         } else {
-            status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+            status = surface->queueBuffer(static_cast<int>(bqSlot),
                                          input, output);
         }
         if (status != OK) {
@@ -464,7 +520,7 @@ status_t OutputBufferQueue::outputBuffer(
     std::shared_ptr<C2SurfaceSyncMemory> syncMem;
     mMutex.lock();
     bool stopped = mStopped;
-    sp<IGraphicBufferProducer> outputIgbp = mIgbp;
+    std::shared_ptr<SurfaceWrapper> surface = mSurface;
     uint32_t outputGeneration = mGeneration;
     uint64_t outputBqId = mBqId;
     syncMem = mSyncMem;
@@ -475,7 +531,7 @@ status_t OutputBufferQueue::outputBuffer(
         return DEAD_OBJECT;
     }
 
-    if (!outputIgbp) {
+    if (!surface) {
         LOG(VERBOSE) << "outputBuffer -- output surface is null.";
         return NO_INIT;
     }
@@ -496,7 +552,7 @@ status_t OutputBufferQueue::outputBuffer(
     auto syncVar = syncMem ? syncMem->mem() : nullptr;
     status_t status = OK;
     if (syncVar) {
-        status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+        status = surface->queueBuffer(static_cast<int>(bqSlot),
                                                   input, output);
         if (status == OK) {
             if (output->bufferReplaced) {
@@ -506,7 +562,7 @@ status_t OutputBufferQueue::outputBuffer(
             }
         }
     } else {
-        status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+        status = surface->queueBuffer(static_cast<int>(bqSlot),
                                                   input, output);
     }
 
@@ -521,7 +577,7 @@ status_t OutputBufferQueue::outputBuffer(
 
 void OutputBufferQueue::onBufferReleased(uint32_t generation) {
     std::shared_ptr<C2SurfaceSyncMemory> syncMem;
-    sp<IGraphicBufferProducer> outputIgbp;
+    std::shared_ptr<SurfaceWrapper> surface;
     uint32_t outputGeneration = 0;
     std::shared_ptr<int> consumerAttachCount;
     {
@@ -529,13 +585,13 @@ void OutputBufferQueue::onBufferReleased(uint32_t generation) {
         if (mStopped) {
             return;
         }
-        outputIgbp = mIgbp;
+        surface = mSurface;
         outputGeneration = mGeneration;
         consumerAttachCount = mConsumerAttachCount;
         syncMem = mSyncMem;
     }
 
-    if (outputIgbp && generation == outputGeneration) {
+    if (surface && generation == outputGeneration) {
         auto syncVar = syncMem ? syncMem->mem() : nullptr;
         if (syncVar) {
             syncVar->lock();
@@ -551,7 +607,7 @@ void OutputBufferQueue::onBufferReleased(uint32_t generation) {
 
 void OutputBufferQueue::onBufferAttached(uint32_t generation) {
     std::shared_ptr<C2SurfaceSyncMemory> syncMem;
-    sp<IGraphicBufferProducer> outputIgbp;
+    std::shared_ptr<SurfaceWrapper> surface;
     uint32_t outputGeneration = 0;
     std::shared_ptr<int> consumerAttachCount;
     {
@@ -559,13 +615,13 @@ void OutputBufferQueue::onBufferAttached(uint32_t generation) {
         if (mStopped) {
             return;
         }
-        outputIgbp = mIgbp;
+        surface = mSurface;
         outputGeneration = mGeneration;
         consumerAttachCount = mConsumerAttachCount;
         syncMem = mSyncMem;
     }
 
-    if (outputIgbp && generation == outputGeneration) {
+    if (surface && generation == outputGeneration) {
         auto syncVar = syncMem ? syncMem->mem() : nullptr;
         if (syncVar) {
             syncVar->lock();
@@ -578,8 +634,8 @@ void OutputBufferQueue::onBufferAttached(uint32_t generation) {
 }
 
 void OutputBufferQueue::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
-    if (mIgbp) {
-        mIgbp->getFrameTimestamps(delta);
+    if (mSurface) {
+        mSurface->getFrameTimestamps(delta);
     }
 }
 
