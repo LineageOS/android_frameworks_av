@@ -36,3 +36,9 @@ LIBAPEXCODECS_36 { # introduced=36
   local:
     *;
 };
+
+LIBAPEXCODECS_37 { # introduced=37
+  global:
+    ApexCodec_GetMapFn; # apex
+    ApexCodec_GetUnmapFn; # apex
+};

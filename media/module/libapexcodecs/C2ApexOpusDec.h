@@ -46,6 +46,8 @@ public:
     static std::unique_ptr<ApexComponentIntf> Create(
             const std::shared_ptr<C2ReflectorHelper> &helper);
     static std::shared_ptr<C2Component::Traits> MakeTraits();
+    static void *Map(void *addr, size_t size, int prot, int flags, int fd, off_t offset);
+    static int Unmap(void *addr, size_t size);
 
     ApexCodec_Status start() override;
     ApexCodec_Status flush() override;

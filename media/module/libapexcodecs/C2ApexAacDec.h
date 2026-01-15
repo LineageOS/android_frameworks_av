@@ -47,6 +47,8 @@ public:
     static std::unique_ptr<::android::apexcodecs::ApexComponentIntf> Create(
             const std::shared_ptr<C2ReflectorHelper>& helper);
     static std::shared_ptr<C2Component::Traits> MakeTraits();
+    static void *Map(void *addr, size_t size, int prot, int flags, int fd, off_t offset);
+    static int Unmap(void *addr, size_t size);
 
     // From ApexComponentIntf
     ApexCodec_Status start() override;
@@ -115,6 +117,12 @@ private:
     int32_t outputDelayRingBufferSamplesAvailable();
     // Returns the amount of space (in samples) left in the ring buffer for writing.
     int32_t outputDelayRingBufferSpaceLeft();
+    // Helper to output samples from the ring buffer to the output buffer.
+    ApexCodec_Status outputFromRingBuffer(
+            ApexCodec_Buffer* output,
+            size_t* produced,
+            uint64_t frameIndex,
+            uint64_t timestamp);
 
     struct FrameInfo {
         uint64_t frameIndex;

@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.CancellationException;
@@ -45,6 +46,7 @@ import java.util.concurrent.ExecutionException;
 import com.android.media.benchmark.library.IBufferXfer;
 import com.android.media.benchmark.library.Muxer;
 import com.android.media.benchmark.library.BlockModelDecoder.LinearBlockWrapper;
+import com.android.media.benchmark.library.FrameProducer;
 
 public class Encoder implements IBufferXfer.IConsumer {
     // Change in AUDIO_ENCODE_DEFAULT_MAX_INPUT_SIZE should also be taken to
@@ -97,6 +99,9 @@ public class Encoder implements IBufferXfer.IConsumer {
 
     // Need a thread to make sure that this works independently
     private final ExecutorService mScheduler = Executors.newFixedThreadPool(1);
+
+    private final LinkedBlockingQueue<Integer> mInputIndexQueue = new LinkedBlockingQueue<>();
+    private boolean mFrameProducerMode = false;
 
     /* success for encoder */
     public static final int ENCODE_SUCCESS = 0;
@@ -777,6 +782,83 @@ public class Encoder implements IBufferXfer.IConsumer {
         return ENCODE_SUCCESS;
     }
 
+    /**
+     * Encodes the given raw input file using FrameProducer, which loads the raw frames into RAM,
+     * then feeds them to the encoder using QueueRequest.
+     *
+     * @param codecName Will create the encoder with codecName
+     * @param encodeFormat Format of the output data
+     * @param mime For creating encode format
+     * @param frameRate Frame rate of the input file
+     * @param inputStream Input stream of the raw file
+     * @param numFramesToLoad Number of frames to load into RAM
+     * @param loopTime Time to loop the input file
+     * @return ENCODE_SUCCESS if encode was successful, ENCODE_ENCODER_ERROR for fail,
+     *     ENCODE_CREATE_ERROR for encoder not created
+     * @throws IOException If the codec cannot be created
+     */
+    public int encodeWithFrameProducer(
+            String codecName,
+            MediaFormat encodeFormat,
+            String mime,
+            int frameRate,
+            FileInputStream inputStream,
+            int numFramesToLoad,
+            double loopTime)
+            throws IOException, InterruptedException {
+        mInputBufferSize = inputStream.getChannel().size();
+        mFrameRate = frameRate;
+        mFrameProducerMode = true;
+        mInputIndexQueue.clear();
+
+        if (mCodec == null) {
+            int status = createCodec(codecName, mime);
+            if (status != ENCODE_SUCCESS) return status;
+        }
+
+        if (mOutputStream != null) {
+            mMuxer = new Muxer();
+        }
+
+        int status = configureCodec(encodeFormat, true, MediaCodec.CONFIGURE_FLAG_USE_BLOCK_MODEL);
+        if (status != ENCODE_SUCCESS) return status;
+
+        mCodec.start();
+        mStats.setStartTime();
+
+        int width = encodeFormat.getInteger(MediaFormat.KEY_WIDTH);
+        int height = encodeFormat.getInteger(MediaFormat.KEY_HEIGHT);
+        int inputFormat = encodeFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT);
+
+        FrameProducer producer =
+                new FrameProducer(mCodec, mInputIndexQueue, width, height, mFrameRate, inputFormat);
+
+        try {
+            producer.loadFrames(inputStream, numFramesToLoad);
+
+            int numFramesToFeed = (int) (loopTime * frameRate);
+            ExecutorService producerExecutor = producer.encodeFrames(numFramesToFeed);
+
+            synchronized (mLock) {
+                while (!mSawOutputEOS && !mSignalledError) {
+                    mLock.wait();
+                }
+            }
+            producerExecutor.awaitTermination(10, TimeUnit.SECONDS);
+            if (mSignalledError) return ENCODE_ENCODER_ERROR;
+        } finally {
+            mFrameProducerMode = false;
+            producer.release();
+        }
+
+        if (mMuxer != null && mTrackIndex != -1) {
+            mMuxer.deInitMuxer();
+            mMuxer.resetMuxer();
+        }
+
+        return ENCODE_SUCCESS;
+    }
+
     private void onOutputsAvailable(MediaCodec mediaCodec, int outputBufferId,
                                    ArrayDeque<MediaCodec.BufferInfo> infos) {
         if (mSawOutputEOS || outputBufferId < 0) {
@@ -910,6 +992,10 @@ public class Encoder implements IBufferXfer.IConsumer {
     }
 
     private void onInputAvailable(MediaCodec mediaCodec, int inputBufferId) throws IOException {
+        if (mFrameProducerMode) {
+            mInputIndexQueue.offer(inputBufferId);
+            return;
+        }
         if (mSawInputEOS || inputBufferId < 0 || this.mUseSurface) {
             if (mSawInputEOS) {
                 Log.i(TAG, "Saw input EOS");
