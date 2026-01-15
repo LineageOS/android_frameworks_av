@@ -36,6 +36,10 @@ filegroup {
 cc_defaults {
     name: "libmediaplayerservice_defaults",
 
+    defaults: [
+        "libaudioclient_client",
+    ],
+
     srcs: [
         ":libmediaplayerservice_sources",
     ],
@@ -44,11 +48,9 @@ cc_defaults {
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
         "av-types-aidl-cpp",
-        "framework-permission-aidl-cpp",
         "libaconfig_storage_read_api_cc",
         "libactivitymanager_aidl",
         "libandroid_net",
-        "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libbase",

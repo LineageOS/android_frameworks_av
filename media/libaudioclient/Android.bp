@@ -94,8 +94,51 @@ cc_library {
     header_libs: ["libaudioclient_headers"],
 }
 
+cc_defaults {
+    name: "libaudiobase_client_defaults",
+    defaults: [
+        "latest_android_media_audio_common_types_cpp_shared",
+    ],
+    shared_libs: [
+        "audioclient-types-aidl-cpp",
+        "audioflinger-aidl-cpp",
+        "av-types-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libaudio_aidl_conversion_common_cpp",
+        "libaudioclient_aidl_conversion",
+        "libaudiofoundation",
+        "libaudiomanager",
+        "libaudioutils",
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libmediautils",
+        "libshmemcompat",
+        "libutils",
+    ],
+    header_libs: [
+        "libaudioclient_headers",
+        "libmedia_headers",
+    ],
+    export_header_lib_headers: [
+        "libaudioclient_headers",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libnbaio/include_mono/",
+    ],
+    local_include_dirs: [
+        "aidl",
+        "include/media",
+    ],
+}
+
 cc_library {
-    name: "libaudioclient",
+    name: "libaudiobase",
+
+    defaults: [
+        "libaudiobase_client_defaults",
+    ],
 
     aidl: {
         export_aidl_headers: true,
@@ -108,90 +151,76 @@ cc_library {
     srcs: [
         // AIDL files for audioclient interfaces
         // The headers for these interfaces will be available to any modules that
-        // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
+        // include libaudiobase, at the path "aidl/package/path/BnFoo.h"
         ":libaudioclient_aidl",
 
-        "AudioEffect.cpp",
-        "AudioRecord.cpp",
         "AudioSystem.cpp",
-        "AudioTrack.cpp",
         "AudioTrackShared.cpp",
         "IAudioFlinger.cpp",
         "MmapStreamInterface.cpp",
         "PlayerBase.cpp",
-        "RecordingActivityTracker.cpp",
-        "ToneGenerator.cpp",
-        "TrackPlayerBase.cpp",
     ],
-    defaults: [
-        "latest_android_media_audio_common_types_cpp_shared",
-    ],
+
     shared_libs: [
         "android.media.audiopolicy-aconfig-cc",
-        "audioclient-types-aidl-cpp",
-        "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
         "audiopolicy-types-aidl-cpp",
-        "av-types-aidl-cpp",
         "capture_state_listener-aidl-cpp",
-        "com.android.media.audioclient-aconfig-cc",
-        "framework-permission-aidl-cpp",
-        "libaudio_aidl_conversion_common_cpp",
-        "libaudioclient_aidl_conversion",
-        "libaudiofoundation",
-        "libaudiomanager",
         "libaudiopolicy",
-        "libaudioutils",
-        "libbinder",
-        "libcutils",
-        "libdl",
-        "liblog",
-        "libmedia_helper",
-        "libmediametrics",
-        "libmediautils",
-        "libnblog",
-        "libprocessgroup",
-        "libshmemcompat",
-        "libutils",
-        "packagemanager_aidl-cpp",
-        "spatializer-aidl-cpp",
-        "volumegroupcallback-aidl-cpp",
     ],
     export_shared_lib_headers: [
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libbinder",
+        "libmediautils",
+    ],
+}
+
+cc_library {
+    name: "libaudioclient",
+
+    srcs: [
+        "AudioEffect.cpp",
+        "AudioRecord.cpp",
+        "AudioTrack.cpp",
+        "RecordingActivityTracker.cpp",
+        "ToneGenerator.cpp",
+        "TrackPlayerBase.cpp",
+    ],
+    defaults: [
+        "libaudiobase_client_defaults",
+    ],
+    shared_libs: [
+        "com.android.media.audioclient-aconfig-cc",
+        "libaudiobase",
+        "libdl",
+        "libmedia_helper",
+        "libmediametrics",
+        "libnblog",
+        "libprocessgroup",
+    ],
+    export_shared_lib_headers: [
+        "audioflinger-aidl-cpp",
+        "framework-permission-aidl-cpp",
+        "libaudiobase",
+        "libbinder",
         "libmediametrics",
         "libmediautils",
-        "spatializer-aidl-cpp",
-        "volumegroupcallback-aidl-cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libnbaio/include_mono/",
-    ],
-    local_include_dirs: [
-        "aidl",
-        "include/media",
-    ],
     header_libs: [
-        "libaudioclient_headers",
         "libaudioutils_headers",
         "libbase_headers",
-        "libmedia_headers",
     ],
-    export_header_lib_headers: ["libaudioclient_headers"],
     export_static_lib_headers: [
         "effect-aidl-cpp",
-        "shared-file-region-aidl-cpp",
     ],
 
     static_libs: [
         "effect-aidl-cpp",
         // for memory heap analysis
         "libc_malloc_debug_backtrace",
-        "shared-file-region-aidl-cpp",
     ],
     cflags: [
         "-Wall",
@@ -207,6 +236,15 @@ cc_library {
     },
 }
 
+cc_defaults {
+    name: "libaudioclient_client",
+    shared_libs: [
+        "framework-permission-aidl-cpp",
+        "libaudiobase",
+        "libaudioclient",
+    ],
+}
+
 cc_library {
     name: "libaudioclient_aidl_conversion",
     srcs: ["AidlConversion.cpp"],
@@ -216,6 +254,7 @@ cc_library {
     ],
     static_libs: [
         "libaudio_aidl_conversion_common_cpp",
+        "shared-file-region-aidl-cpp",
     ],
     export_include_dirs: ["include"],
     header_libs: [
@@ -229,6 +268,9 @@ cc_library {
     export_shared_lib_headers: [
         "audioclient-types-aidl-cpp",
         "av-types-aidl-cpp",
+    ],
+    export_static_lib_headers: [
+        "shared-file-region-aidl-cpp",
     ],
     defaults: [
         "audio_aidl_conversion_common_default",

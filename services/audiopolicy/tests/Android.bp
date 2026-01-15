@@ -14,6 +14,7 @@ cc_test {
     defaults: [
         "aconfig_lib_cc_shared_link.defaults",
         "latest_android_media_audio_common_types_cpp_static",
+        "libaudioclient_client",
     ],
 
     include_dirs: [
@@ -22,8 +23,6 @@ cc_test {
 
     shared_libs: [
         "audiopolicy-aidl-cpp",
-        "framework-permission-aidl-cpp",
-        "libaudioclient",
         "libaudiofoundation",
         "libaudiopolicy",
         "libaudiopolicymanagerdefault",
@@ -92,7 +91,7 @@ cc_test {
     shared_libs: [
         "audioclient-types-aidl-cpp",
         "libaconfig_storage_read_api_cc",
-        "libaudioclient",
+        "libaudiobase",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libaudiopolicycomponents",
@@ -135,7 +134,7 @@ cc_test {
     require_root: true,
 
     shared_libs: [
-        "libaudioclient",
+        "libaudiobase",
         "libaudiofoundation",
         "libcutils",
         "liblog",

@@ -42,7 +42,7 @@ cc_fuzz {
         "audioclient-types-aidl-cpp",
         "com.android.media.aaudio-aconfig-cc",
         "framework-permission-aidl-cpp",
-        "libaudioclient",
+        "libaudiobase",
         "libaudioclient_aidl_conversion",
         "libaudioflinger",
         "libaudiofoundation",

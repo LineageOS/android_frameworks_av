@@ -46,7 +46,6 @@ cc_binary {
         "libdatasource",
         "libaudioclient",
         "android.hardware.media.omx@1.0",
-        "framework-permission-aidl-cpp",
     ],
 
     static_libs: ["framework-permission-aidl-cpp"],
@@ -82,7 +81,6 @@ cc_binary {
         "libstagefright_foundation",
         "libdatasource",
         "libaudioclient",
-        "framework-permission-aidl-cpp",
     ],
 
     cflags: [
@@ -111,7 +109,6 @@ cc_binary {
         "libbinder",
         "libstagefright_foundation",
         "libaudioclient",
-        "framework-permission-aidl-cpp",
     ],
 
     cflags: [
@@ -141,7 +138,6 @@ cc_binary {
         "libbinder",
         "libstagefright_foundation",
         "libaudioclient",
-        "framework-permission-aidl-cpp",
     ],
 
     cflags: [

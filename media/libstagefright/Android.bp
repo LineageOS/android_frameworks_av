@@ -229,6 +229,10 @@ cc_library_shared {
 cc_library {
     name: "libstagefright",
 
+    defaults: [
+        "libaudioclient_client",
+    ],
+
     srcs: [
         "AACWriter.cpp",
         "ACodec.cpp",
@@ -286,9 +290,7 @@ cc_library {
         "android.hardware.drm@1.0",
         "android.hardware.media.omx@1.0",
         "android.hidl.allocator@1.0",
-        "framework-permission-aidl-cpp",
         "libaconfig_storage_read_api_cc",
-        "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libaudioutils",
