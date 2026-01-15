@@ -415,6 +415,13 @@ flag {
 }
 
 flag {
+    name: "tv_volume_key_batching_during_long_press"
+    namespace: "media_audio"
+    description: "Allow batching volume keys on TV during long presses"
+    bug: "469499166"
+}
+
+flag {
     name: "unify_absolute_volume_management"
     namespace: "media_audio"
     description: "Unify absolute volume management in AudioService for A2DP, LEA, SCO, ASHA"
