@@ -46,6 +46,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
+#include <chrono>
 #include <linux/futex.h>
 #include <math.h>
 #include <sys/syscall.h>
@@ -3739,9 +3740,10 @@ AfPlaybackCommon::AfPlaybackCommon(IAfTrackBase& self, IAfThreadBase& thread,
                                    bool shouldPlaybackHarden)
     : mSelf(self),
       mEnforcementLevel(getOpControlEnforcementLevel(attr.usage, *thread.afThreadCallback())) {
-    ALOGI("creating track with enforcement level %d", mEnforcementLevel);
-    using AppOpsManager::OP_CONTROL_AUDIO_PARTIAL;
+    ALOGI("creating track with enforcement level %d shouldHarden %d", mEnforcementLevel,
+              shouldPlaybackHarden);
     using AppOpsManager::OP_CONTROL_AUDIO;
+    using AppOpsManager::OP_CONTROL_AUDIO_PARTIAL;
     using media::permission::Ops;
     using media::permission::skipOpsForUid;
     using media::permission::ValidatedAttributionSourceState;
@@ -3759,6 +3761,7 @@ AfPlaybackCommon::AfPlaybackCommon(IAfTrackBase& self, IAfThreadBase& thread,
                     mHasOpControlPartial.store(isPermitted, std::memory_order_release);
                     if (isOffloadOrMmap) {
                         mExecutor->enqueue(mediautils::Runnable{[thread_wp]() {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(40));
                             auto thread = thread_wp.promote();
                             if (thread != nullptr) {
                                 audio_utils::lock_guard l {thread->mutex()};
@@ -3776,6 +3779,7 @@ AfPlaybackCommon::AfPlaybackCommon(IAfTrackBase& self, IAfThreadBase& thread,
                     mHasOpControlFull.store(isPermitted, std::memory_order_release);
                     if (isOffloadOrMmap) {
                         mExecutor->enqueue(mediautils::Runnable{[thread_wp]() {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(40));
                             auto thread = thread_wp.promote();
                             if (thread != nullptr) {
                                 audio_utils::lock_guard l {thread->mutex()};
