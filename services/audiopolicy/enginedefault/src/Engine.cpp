@@ -803,14 +803,16 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
                                     outputs);
 }
 
-DeviceVector Engine::getOutputDevicesForStrategy(product_strategy_t strategy,
-        const sp<DeviceDescriptor> &preferredDevice, bool fromCache) const
+DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &attributes,
+                                                   const sp<DeviceDescriptor> &preferredDevice,
+                                                   bool fromCache) const
 {
-    // First check for explicit routing device
+    // First check for explict routing device
     if (preferredDevice != nullptr) {
         ALOGV("%s explicit Routing on device %s", __func__, preferredDevice->toString().c_str());
         return DeviceVector(preferredDevice);
     }
+    product_strategy_t strategy = getProductStrategyForAttributes(attributes);
     const DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     //
@@ -827,24 +829,10 @@ DeviceVector Engine::getOutputDevicesForStrategy(product_strategy_t strategy,
     return fromCache? mDevicesForStrategies.at(strategy) : getDevicesForProductStrategy(strategy);
 }
 
-DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &attributes,
-                                                   uid_t uid __unused,
-                                                   const sp<DeviceDescriptor> &preferredDevice,
-                                                   bool fromCache) const
-{
-    // First check for explicit routing device
-    if (preferredDevice != nullptr) {
-        ALOGV("%s explicit Routing on device %s", __func__, preferredDevice->toString().c_str());
-        return DeviceVector(preferredDevice);
-    }
-    product_strategy_t strategy = getProductStrategyForAttributes(attributes);
-    return getOutputDevicesForStrategy(strategy, preferredDevice, fromCache);
-}
-
 DeviceVector Engine::getOutputDevicesForStream(audio_stream_type_t stream, bool fromCache) const
 {
     auto attributes = getAttributesForStreamType(stream);
-    return getOutputDevicesForAttributes(attributes, /* uid */ 0, nullptr, fromCache);
+    return getOutputDevicesForAttributes(attributes, nullptr, fromCache);
 }
 
 sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_t &attr,

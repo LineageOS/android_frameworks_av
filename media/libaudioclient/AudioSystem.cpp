@@ -42,8 +42,6 @@
 #include <android/media/AudioMixerAttributesInternal.h>
 #include <android/media/audio/common/AudioVolumeGroupChangeEvent.h>
 
-#include <android_media_audiopolicy.h>
-
 // ----------------------------------------------------------------------------
 
 namespace audio_flags = android::media::audiopolicy;
@@ -2532,28 +2530,6 @@ status_t AudioSystem::getStreamTypeForAttributes(const audio_attributes_t &attri
             aidl2legacy_AudioStreamType_audio_stream_type_t(streamAidl));
 
     return OK;
-}
-
-status_t AudioSystem::setProductStrategiesZoneIdForUserId(userid_t userId, int zoneId) {
-    if (!audio_flags::multi_zone_audio()) {
-        return INVALID_OPERATION;
-    }
-    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
-    if (aps == nullptr) return PERMISSION_DENIED;
-    int32_t userIdAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_userid_t_int32_t(userId));
-    int32_t zoneIdAidl = VALUE_OR_RETURN_STATUS(convertReinterpret<int32_t>(zoneId));
-    return statusTFromBinderStatus(aps->setProductStrategiesZoneIdForUserId(
-            userIdAidl, zoneIdAidl));
-}
-
-status_t AudioSystem::resetProductStrategiesZoneIdForUserId(userid_t userId) {
-    if (!audio_flags::multi_zone_audio()) {
-        return INVALID_OPERATION;
-    }
-    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
-    if (aps == nullptr) return PERMISSION_DENIED;
-    int32_t userIdAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_userid_t_int32_t(userId));
-    return statusTFromBinderStatus(aps->resetProductStrategiesZoneIdForUserId(userIdAidl));
 }
 
 status_t AudioSystem::getProductStrategyFromAudioAttributes(const audio_attributes_t& aa,

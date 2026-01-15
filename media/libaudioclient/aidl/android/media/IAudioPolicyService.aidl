@@ -364,9 +364,6 @@ interface IAudioPolicyService {
     AudioAttributes getAttributesForStreamType(in AudioStreamType stream);
     AudioStreamType getStreamTypeForAttributes(in AudioAttributes attributes);
     AudioProductStrategy[] listAudioProductStrategies();
-    void setProductStrategiesZoneIdForUserId(int /* userid_t */ userId, int zoneId);
-    void resetProductStrategiesZoneIdForUserId(int /* userid_t */ userId);
-
     int /* product_strategy_t */ getProductStrategyFromAudioAttributes(
             in AudioAttributes aa, boolean fallbackOnDefault);
 

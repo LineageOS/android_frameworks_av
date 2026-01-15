@@ -44,8 +44,6 @@ namespace audio_flags = android::media::audiopolicy;
 
 #define MAX_ITEMS_PER_LIST 1024
 
-namespace audio_flags = android::media::audiopolicy;
-
 namespace android {
 using binder::Status;
 using aidl_utils::binderStatusFromStatusT;
@@ -2545,34 +2543,6 @@ Status AudioPolicyService::listAudioProductStrategies(
                     strategies,
                     legacy2aidl_AudioProductStrategy));
     return Status::ok();
-}
-
-Status AudioPolicyService::setProductStrategiesZoneIdForUserId(
-        int32_t userIdAidl, int32_t zoneIdAidl) {
-    userid_t userId = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_userid_t(userIdAidl));
-    int zoneId = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int>(zoneIdAidl));
-    if (!audio_flags::multi_zone_audio()) {
-        return binderStatusFromStatusT(INVALID_OPERATION);
-    }
-    if (mAudioPolicyManager == NULL) {
-        return binderStatusFromStatusT(NO_INIT);
-    }
-    AutoCallerClear acc;
-    return binderStatusFromStatusT(mAudioPolicyManager->setProductStrategiesZoneIdForUserId(
-            userId, zoneId));
-}
-
-Status AudioPolicyService::resetProductStrategiesZoneIdForUserId(int32_t userIdAidl) {
-    userid_t userId = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_userid_t(userIdAidl));
-    if (!audio_flags::multi_zone_audio()) {
-        return binderStatusFromStatusT(INVALID_OPERATION);
-    }
-    if (mAudioPolicyManager == NULL) {
-        return binderStatusFromStatusT(NO_INIT);
-    }
-    AutoCallerClear acc;
-    return binderStatusFromStatusT(
-            mAudioPolicyManager->resetProductStrategiesZoneIdForUserId(userId));
 }
 
 Status AudioPolicyService::getProductStrategyFromAudioAttributes(

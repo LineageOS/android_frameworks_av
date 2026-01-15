@@ -159,8 +159,6 @@ BINDER_METHOD_ENTRY(isHotwordStreamSupported) \
 BINDER_METHOD_ENTRY(getAttributesForStreamType) \
 BINDER_METHOD_ENTRY(getStreamTypeForAttributes) \
 BINDER_METHOD_ENTRY(listAudioProductStrategies) \
-BINDER_METHOD_ENTRY(setProductStrategiesZoneIdForUserId) \
-BINDER_METHOD_ENTRY(resetProductStrategiesZoneIdForUserId) \
 BINDER_METHOD_ENTRY(getProductStrategyFromAudioAttributes) \
 BINDER_METHOD_ENTRY(listAudioVolumeGroups) \
 BINDER_METHOD_ENTRY(getVolumeGroupFromAudioAttributes) \
@@ -1437,9 +1435,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_getSpatializer:
         case TRANSACTION_setPreferredMixerAttributes:
         case TRANSACTION_clearPreferredMixerAttributes:
-        case TRANSACTION_getRegisteredPolicyMixes:
-        case TRANSACTION_setProductStrategiesZoneIdForUserId:
-        case TRANSACTION_resetProductStrategiesZoneIdForUserId: {
+        case TRANSACTION_getRegisteredPolicyMixes: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
