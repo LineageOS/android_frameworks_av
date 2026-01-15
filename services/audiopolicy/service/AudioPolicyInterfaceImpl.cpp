@@ -44,6 +44,8 @@ namespace audio_flags = android::media::audiopolicy;
 
 #define MAX_ITEMS_PER_LIST 1024
 
+namespace audio_flags = android::media::audiopolicy;
+
 namespace android {
 using binder::Status;
 using aidl_utils::binderStatusFromStatusT;
@@ -1374,11 +1376,13 @@ Status AudioPolicyService::getMaxVolumeIndexForAttributes(
     return Status::ok();
 }
 
-Status AudioPolicyService::setVolumeIndexForGroup(int32_t groupIdAidl,
-        const AudioDeviceDescription& deviceAidl, int32_t indexAidl, bool muted) {
+Status AudioPolicyService::setVolumeIndexForGroup(int32_t groupIdAidl, int32_t uidAidl,
+                                                 const AudioDeviceDescription& deviceAidl,
+                                                 int32_t indexAidl, bool muted) {
     volume_group_t groupId = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_volume_group_t(groupIdAidl));
-    int index = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int>(indexAidl));
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
+    int index = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(indexAidl));
     audio_devices_t device = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioDeviceDescription_audio_devices_t(deviceAidl));
 
@@ -1388,7 +1392,7 @@ Status AudioPolicyService::setVolumeIndexForGroup(int32_t groupIdAidl,
     audio_utils::lock_guard _l(mMutex);
     AutoCallerClear acc;
     return binderStatusFromStatusT(
-            mAudioPolicyManager->setVolumeIndexForGroup(groupId, index, muted, device));
+            mAudioPolicyManager->setVolumeIndexForGroup(groupId, uid, index, muted, device));
 }
 
 Status AudioPolicyService::getVolumeIndexForGroup(
@@ -1464,7 +1468,7 @@ Status AudioPolicyService::setMaxVolumeIndexForGroup(int32_t groupIdAidl, int32_
     return binderStatusFromStatusT(mAudioPolicyManager->setMaxVolumeIndexForGroup(groupId, index));
 }
 
-Status AudioPolicyService::getStrategyForStream(AudioStreamType streamAidl,
+Status AudioPolicyService::getStrategyForStream(AudioStreamType streamAidl, int32_t uidAidl,
                                                 int32_t* _aidl_return) {
     audio_stream_type_t stream = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioStreamType_audio_stream_type_t(streamAidl));
@@ -1479,21 +1483,23 @@ Status AudioPolicyService::getStrategyForStream(AudioStreamType streamAidl,
     }
 
     // DO NOT LOCK, may be called from AudioFlinger with lock held, reaching deadlock
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
     AutoCallerClear acc;
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             legacy2aidl_product_strategy_t_int32_t(
-                    mAudioPolicyManager->getStrategyForStream(stream)));
+                    mAudioPolicyManager->getStrategyForStream(stream, uid)));
     return Status::ok();
 }
 
 Status AudioPolicyService::getDevicesForAttributes(
-        const media::audio::common::AudioAttributes& attrAidl,
+        const media::audio::common::AudioAttributes& attrAidl, int32_t uidAidl,
         bool forVolume,
         std::vector<AudioDevice>* _aidl_return)
-{
-    audio_attributes_t aa = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioAttributes_audio_attributes_t(attrAidl));
-    AudioDeviceTypeAddrVector devices;
+    {
+        audio_attributes_t aa = VALUE_OR_RETURN_BINDER_STATUS(
+                        aidl2legacy_AudioAttributes_audio_attributes_t(attrAidl));
+        AudioDeviceTypeAddrVector devices;
+        uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
 
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
@@ -1501,10 +1507,10 @@ Status AudioPolicyService::getDevicesForAttributes(
     audio_utils::lock_guard _l(mMutex);
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->getDevicesForAttributes(aa, &devices, forVolume)));
+            mAudioPolicyManager->getDevicesForAttributes(aa, uid, forVolume, &devices)));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             convertContainer<std::vector<AudioDevice>>(devices,
-                                                       legacy2aidl_AudioDeviceTypeAddress));
+                    legacy2aidl_AudioDeviceTypeAddress));
     return Status::ok();
 }
 
@@ -2545,6 +2551,34 @@ Status AudioPolicyService::listAudioProductStrategies(
     return Status::ok();
 }
 
+Status AudioPolicyService::setProductStrategiesZoneIdForUserId(
+        int32_t userIdAidl, int32_t zoneIdAidl) {
+    userid_t userId = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_userid_t(userIdAidl));
+    int zoneId = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int>(zoneIdAidl));
+    if (!audio_flags::multi_zone_audio()) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
+    if (mAudioPolicyManager == NULL) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    AutoCallerClear acc;
+    return binderStatusFromStatusT(mAudioPolicyManager->setProductStrategiesZoneIdForUserId(
+            userId, zoneId));
+}
+
+Status AudioPolicyService::resetProductStrategiesZoneIdForUserId(int32_t userIdAidl) {
+    userid_t userId = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_userid_t(userIdAidl));
+    if (!audio_flags::multi_zone_audio()) {
+        return binderStatusFromStatusT(INVALID_OPERATION);
+    }
+    if (mAudioPolicyManager == NULL) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    AutoCallerClear acc;
+    return binderStatusFromStatusT(
+            mAudioPolicyManager->resetProductStrategiesZoneIdForUserId(userId));
+}
+
 Status AudioPolicyService::getProductStrategyFromAudioAttributes(
         const media::audio::common::AudioAttributes& aaAidl,
         bool fallbackOnDefault, int32_t* _aidl_return) {
@@ -2848,7 +2882,7 @@ Status AudioPolicyService::canBeSpatialized(
 }
 
 Status AudioPolicyService::getDirectPlaybackSupport(
-        const media::audio::common::AudioAttributes &attrAidl,
+        const media::audio::common::AudioAttributes &attrAidl, int32_t uidAidl,
         const AudioConfig &configAidl,
         media::AudioDirectMode *_aidl_return) {
     if (mAudioPolicyManager == nullptr) {
@@ -2859,28 +2893,30 @@ Status AudioPolicyService::getDirectPlaybackSupport(
     }
     audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioAttributes_audio_attributes_t(attrAidl));
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
     audio_config_t config = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioConfig_audio_config_t(configAidl, false /*isInput*/));
     audio_utils::lock_guard _l(mMutex);
     *_aidl_return = static_cast<media::AudioDirectMode>(
             VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_direct_mode_t_int32_t_mask(
-                    mAudioPolicyManager->getDirectPlaybackSupport(&attr, &config))));
+                    mAudioPolicyManager->getDirectPlaybackSupport(&attr, uid, &config))));
     return Status::ok();
 }
 
 Status AudioPolicyService::getDirectProfilesForAttributes(
-                                const media::audio::common::AudioAttributes& attrAidl,
-                                std::vector<media::audio::common::AudioProfile>* _aidl_return) {
+        const media::audio::common::AudioAttributes& attrAidl, int32_t uidAidl,
+        std::vector<media::audio::common::AudioProfile>* _aidl_return) {
    if (mAudioPolicyManager == nullptr) {
         return binderStatusFromStatusT(NO_INIT);
     }
     audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioAttributes_audio_attributes_t(attrAidl));
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
     AudioProfileVector audioProfiles;
 
     audio_utils::lock_guard _l(mMutex);
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            mAudioPolicyManager->getDirectProfilesForAttributes(&attr, audioProfiles)));
+            mAudioPolicyManager->getDirectProfilesForAttributes(&attr, uid, audioProfiles)));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             convertContainer<std::vector<media::audio::common::AudioProfile>>(
                 audioProfiles, legacy2aidl_AudioProfile_common, false /*isInput*/));
@@ -2934,6 +2970,7 @@ Status AudioPolicyService::setPreferredMixerAttributes(
 Status AudioPolicyService::getPreferredMixerAttributes(
         const media::audio::common::AudioAttributes& attrAidl,
         int32_t portIdAidl,
+        int32_t uidAidl,
         std::optional<media::AudioMixerAttributesInternal>* _aidl_return) {
     if (mAudioPolicyManager == nullptr) {
         return binderStatusFromStatusT(NO_INIT);
@@ -2946,9 +2983,10 @@ Status AudioPolicyService::getPreferredMixerAttributes(
 
     audio_utils::lock_guard _l(mMutex);
     audio_mixer_attributes_t mixerAttr = AUDIO_MIXER_ATTRIBUTES_INITIALIZER;
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
     RETURN_IF_BINDER_ERROR(
             binderStatusFromStatusT(mAudioPolicyManager->getPreferredMixerAttributes(
-                    &attr, portId, &mixerAttr)));
+                    &attr, portId, uid, &mixerAttr)));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
             legacy2aidl_audio_mixer_attributes_t_AudioMixerAttributesInternal(mixerAttr));
     return Status::ok();
@@ -3005,12 +3043,14 @@ Status AudioPolicyService::setEnableHardening(bool shouldEnable) {
 
 Status AudioPolicyService::getFlushFromFrameSupport(const AudioConfigBase& configAidl,
                                                     const AudioAttributes& attrAidl,
+                                                    int32_t uid,
                                                     int32_t flagsAidl,
                                                     FlushFromFrameSupport* _aidl_return) {
     const audio_config_base_t config = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioConfigBase_audio_config_base_t(configAidl, false /*isInput*/));
     const audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioAttributes_audio_attributes_t(attrAidl));
+    const uid_t legacyUid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uid));
     const audio_output_flags_t flags = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_output_flags_t_mask(flagsAidl));
 
@@ -3019,7 +3059,8 @@ Status AudioPolicyService::getFlushFromFrameSupport(const AudioConfigBase& confi
     }
     audio_utils::lock_guard _l(mMutex);
     return binderStatusFromStatusT(
-            mAudioPolicyManager->getFlushFromFrameSupport(config, attr, flags, _aidl_return));
+            mAudioPolicyManager->getFlushFromFrameSupport(config, attr, legacyUid, flags,
+                                                          _aidl_return));
 }
 
 } // namespace android

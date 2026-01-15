@@ -195,6 +195,14 @@ ConversionResult<int32_t> legacy2aidl_uid_t_int32_t(uid_t legacy) {
     return convertReinterpret<int32_t>(legacy);
 }
 
+ConversionResult<userid_t> aidl2legacy_int32_t_userid_t(int32_t aidl) {
+    return convertReinterpret<userid_t>(aidl);
+}
+
+ConversionResult<int32_t> legacy2aidl_userid_t_int32_t(userid_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
 ConversionResult<String16> aidl2legacy_string_view_String16(std::string_view aidl) {
     return String16(aidl.data(), aidl.size());
 }

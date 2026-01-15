@@ -2247,7 +2247,7 @@ EffectChain::EffectChain(const sp<IAfThreadBase>& thread, audio_session_t sessio
       mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread, afThreadCallback))
 {
     if (thread != nullptr) {
-        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
+        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC, /* uid= */ 0);
         mMaxTailBuffers =
             ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
                 thread->frameCount();
@@ -3071,7 +3071,7 @@ bool EffectChain::isNonOffloadableEnabled_l() const
 void EffectChain::setThread(const sp<IAfThreadBase>& thread)
 {
     if (thread != nullptr) {
-        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
+        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC, /* uid= */ 0);
         mMaxTailBuffers =
             ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
                 thread->frameCount();
