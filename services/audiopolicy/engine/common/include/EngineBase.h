@@ -74,8 +74,6 @@ public:
 
     status_t resetProductStrategiesZoneIdForUserId(userid_t userId) override;
 
-    userid_t getUserIdForProductStrategy(product_strategy_t strategy) const override;
-
     VolumeCurves *getVolumeCurvesForAttributes(const audio_attributes_t &attr) const override;
 
     VolumeCurves *getVolumeCurvesForStreamType(audio_stream_type_t stream) const override;
@@ -91,8 +89,8 @@ public:
     VolumeGroupVector getVolumeGroups() const override;
     audio_attributes_t getAttributesForVolumeGroup(
             volume_group_t group, bool fallbackOnDefault = true) const override;
-    volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr,
-            uid_t uid, bool fallbackOnDefault = true) const override;
+    volume_group_t getVolumeGroupForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const override;
 
     volume_group_t getVolumeGroupForStreamType(
             audio_stream_type_t stream, bool fallbackOnDefault = true) const override;

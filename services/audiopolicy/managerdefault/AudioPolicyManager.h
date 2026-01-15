@@ -259,15 +259,14 @@ public:
                                 const DeviceTypeSet& deviceTypes) const;
 
         // return the strategy corresponding to a given stream type
-        virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid)
+        virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream)
         {
-            return streamToStrategy(stream, uid);
+            return streamToStrategy(stream);
         }
-
-        product_strategy_t streamToStrategy(audio_stream_type_t stream, uid_t uid = 0) const
+        product_strategy_t streamToStrategy(audio_stream_type_t stream) const
         {
             auto attributes = mEngine->getAttributesForStreamType(stream);
-            return mEngine->getProductStrategyForAttributes(attributes, uid);
+            return mEngine->getProductStrategyForAttributes(attributes);
         }
 
         /**
@@ -517,7 +516,6 @@ public:
                 const audio_mixer_attributes_t* mixerAttributes) override;
         status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
                                              audio_port_handle_t portId,
-                                             uid_t uid,
                                              audio_mixer_attributes_t* mixerAttributes) override;
         status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
                                                audio_port_handle_t portId,
@@ -537,7 +535,6 @@ public:
         status_t getFlushFromFrameSupport(
                 const audio_config_base_t& config,
                 const audio_attributes_t& attr,
-                uid_t uid,
                 audio_output_flags_t flags,
                 media::audio::common::FlushFromFrameSupport* support) const override;
 
@@ -604,10 +601,10 @@ protected:
          * fallbackOnDefault is set or none.
          */
         VolumeSource toVolumeSource(
-            const audio_attributes_t &attributes, uid_t uid, bool fallbackOnDefault = true) const
+            const audio_attributes_t &attributes, bool fallbackOnDefault = true) const
         {
             return toVolumeSource(mEngine->getVolumeGroupForAttributes(
-                attributes, uid, fallbackOnDefault));
+                attributes, fallbackOnDefault));
         }
         VolumeSource toVolumeSource(
             audio_stream_type_t stream, bool fallbackOnDefault = true) const
@@ -854,8 +851,8 @@ protected:
          */
         void checkAudioSourceForStrategy(const product_strategy_t psId);
 
-        bool followsSameRouting(uid_t luid, const audio_attributes_t &lAttr,
-                                uid_t ruid, const audio_attributes_t &rAttr) const;
+        bool followsSameRouting(const audio_attributes_t &lAttr,
+                                const audio_attributes_t &rAttr) const;
 
         /**
          * @brief checkOutputForAllStrategies Same as @see checkOutputForStrategy()
@@ -1221,7 +1218,7 @@ private:
 
         // updates device caching and output for streams that can influence the
         //    routing of notifications
-        void handleNotificationRoutingForStream(audio_stream_type_t stream, uid_t uid);
+        void handleNotificationRoutingForStream(audio_stream_type_t stream);
         uint32_t curAudioPortGeneration() const { return mAudioPortGeneration; }
         // internal method, get audio_attributes_t from either a source audio_attributes_t
         // or audio_stream_type_t, respectively.

@@ -164,7 +164,7 @@ public:
             const AudioDeviceDescription& device, int32_t index, bool muted) override;
     binder::Status getVolumeIndexForGroup(int32_t groupId, const AudioDeviceDescription& device,
             int32_t* _aidl_return) override;
-    binder::Status getStrategyForStream(AudioStreamType stream, int32_t uid,
+    binder::Status getStrategyForStream(AudioStreamType stream,
                                         int32_t* _aidl_return) override;
     binder::Status getDevicesForAttributes(const AudioAttributes& attr,
             int32_t uid, bool forVolume, std::vector<AudioDevice>* _aidl_return) override;
@@ -336,7 +336,6 @@ public:
     binder::Status getPreferredMixerAttributes(
             const AudioAttributes& attr,
             int32_t portId,
-            int32_t uid,
             std::optional<media::AudioMixerAttributesInternal>* _aidl_return) override;
     binder::Status clearPreferredMixerAttributes(const AudioAttributes& attr,
                                                  int32_t portId,
@@ -359,7 +358,6 @@ public:
     binder::Status getFlushFromFrameSupport(
             const AudioConfigBase& config,
             const AudioAttributes& attributes,
-            int32_t uid,
             int32_t flags,
             android::media::audio::common::FlushFromFrameSupport* _aidl_return) override;
 

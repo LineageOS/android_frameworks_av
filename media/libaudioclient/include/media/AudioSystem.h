@@ -475,7 +475,7 @@ public:
      */
     static status_t setMinVolumeIndexForGroup(volume_group_t groupId, int index);
 
-    static product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid);
+    static product_strategy_t getStrategyForStream(audio_stream_type_t stream);
 
     /**
      * Get the devices for the given audio attributes and uid.
@@ -776,7 +776,7 @@ public:
                                                 uid_t uid,
                                                 const audio_mixer_attributes_t *mixerAttr);
     static status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
-                                                audio_port_handle_t portId, uid_t uid,
+                                                audio_port_handle_t portId,
                                                 std::optional<audio_mixer_attributes_t>* mixerAttr);
     static status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
                                                   audio_port_handle_t portId,

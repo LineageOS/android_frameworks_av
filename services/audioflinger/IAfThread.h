@@ -387,7 +387,7 @@ public:
     virtual void stopMelComputation_l()
             REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
 
-    virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid) const
+    virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) const
             EXCLUDES_AUDIO_ALL = 0;
 
     virtual void setEffectSuspended_l(

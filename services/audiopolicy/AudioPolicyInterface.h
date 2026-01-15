@@ -304,7 +304,7 @@ public:
     virtual status_t setMinVolumeIndexForGroup(volume_group_t groupId, int index) = 0;
 
     // return the strategy corresponding to a given stream type
-    virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid) = 0;
+    virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) = 0;
 
     /**
      * retrieves the list of enabled output devices for the given audio attributes.
@@ -549,7 +549,6 @@ public:
             const audio_mixer_attributes_t* mixerAttributes) = 0;
     virtual status_t getPreferredMixerAttributes(const audio_attributes_t* attr,
                                                  audio_port_handle_t portId,
-                                                 uid_t uid,
                                                  audio_mixer_attributes_t* mixerAttributes) = 0;
     virtual status_t clearPreferredMixerAttributes(const audio_attributes_t* attr,
                                                    audio_port_handle_t portId,
@@ -565,7 +564,6 @@ public:
     virtual status_t getFlushFromFrameSupport(
             const audio_config_base_t& config,
             const audio_attributes_t& attr,
-            uid_t uid,
             audio_output_flags_t flags,
             media::audio::common::FlushFromFrameSupport* support) const = 0;
 };
