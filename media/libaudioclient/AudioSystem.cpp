@@ -19,14 +19,15 @@
 
 #include <utils/Log.h>
 
-#include <android/media/IAudioPolicyService.h>
 #include <android/media/AudioMixUpdate.h>
 #include <android/media/BnCaptureStateListener.h>
+#include <android/media/IAudioPolicyService.h>
 #include <android_media_audiopolicy.h>
+#include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
-#include <binder/IPCThreadState.h>
 #include <cutils/properties.h>
+#include <math.h>
 #include <media/AidlConversion.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
@@ -34,13 +35,12 @@
 #include <media/PolicyAidlConversion.h>
 #include <media/TypeConverter.h>
 #include <mediautils/ServiceSingleton.h>
-#include <math.h>
 #include <private/android_filesystem_config.h>
 
-#include <system/audio.h>
-#include <android/media/GetInputForAttrResponse.h>
 #include <android/media/AudioMixerAttributesInternal.h>
+#include <android/media/GetInputForAttrResponse.h>
 #include <android/media/audio/common/AudioVolumeGroupChangeEvent.h>
+#include <system/audio.h>
 
 #include <android_media_audiopolicy.h>
 
@@ -1120,11 +1120,9 @@ public:
     }
 
     // called to determine error on nullptr service return.
-    static constexpr status_t getError() {
-        return DEAD_OBJECT;
-    }
-private:
+    static constexpr status_t getError() { return DEAD_OBJECT; }
 
+  private:
     static inline constinit std::mutex mMutex;
     static inline constinit sp<AudioSystem::AudioPolicyServiceClient> mClient GUARDED_BY(mMutex);
     static inline constinit sp<IAudioPolicyService> mService GUARDED_BY(mMutex);
@@ -1698,16 +1696,17 @@ status_t AudioSystem::setMinVolumeIndexForGroup(volume_group_t groupId, int inde
     return statusTFromBinderStatus(aps->setMinVolumeIndexForGroup(groupIdAidl, indexAidl));
 }
 
-product_strategy_t AudioSystem::getStrategyForStream(audio_stream_type_t stream) {
+product_strategy_t AudioSystem::getStrategyForStream(audio_stream_type_t stream, uid_t uid) {
     const sp<IAudioPolicyService> aps = get_audio_policy_service();
     if (aps == nullptr) return PRODUCT_STRATEGY_NONE;
 
     auto result = [&]() -> ConversionResult<product_strategy_t> {
         AudioStreamType streamAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
+        int32_t uidAidl = VALUE_OR_RETURN(legacy2aidl_uid_t_int32_t(uid));
         int32_t resultAidl;
         RETURN_IF_ERROR(statusTFromBinderStatus(
-                aps->getStrategyForStream(streamAidl, &resultAidl)));
+                aps->getStrategyForStream(streamAidl, uidAidl, &resultAidl)));
         return aidl2legacy_int32_t_product_strategy_t(resultAidl);
     }();
     return result.value_or(PRODUCT_STRATEGY_NONE);
@@ -3009,6 +3008,7 @@ status_t AudioSystem::setPreferredMixerAttributes(const audio_attributes_t *attr
 status_t AudioSystem::getPreferredMixerAttributes(
         const audio_attributes_t *attr,
         audio_port_handle_t portId,
+        uid_t uid,
         std::optional<audio_mixer_attributes_t> *mixerAttr) {
     const sp<IAudioPolicyService> aps = get_audio_policy_service();
     if (aps == nullptr) return AudioPolicyServiceTraits::getError();
@@ -3016,9 +3016,10 @@ status_t AudioSystem::getPreferredMixerAttributes(
     media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
     int32_t portIdAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(portId));
+    int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
     std::optional<media::AudioMixerAttributesInternal> _aidlReturn;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getPreferredMixerAttributes(attrAidl, portIdAidl, &_aidlReturn)));
+            aps->getPreferredMixerAttributes(attrAidl, portIdAidl, uidAidl, &_aidlReturn)));
 
     if (_aidlReturn.has_value()) {
          *mixerAttr = VALUE_OR_RETURN_STATUS(
@@ -3042,8 +3043,7 @@ status_t AudioSystem::clearPreferredMixerAttributes(const audio_attributes_t *at
             aps->clearPreferredMixerAttributes(attrAidl, portIdAidl, uidAidl));
 }
 
-status_t AudioSystem::getMmapPolicyForDevice(AudioMMapPolicyType policyType,
-                                             audio_devices_t device,
+status_t AudioSystem::getMmapPolicyForDevice(AudioMMapPolicyType policyType, audio_devices_t device,
                                              AudioMMapPolicyInfo *policyInfo) {
     const sp<IAudioPolicyService> aps = get_audio_policy_service();
     if (aps == nullptr) {
@@ -3071,10 +3071,11 @@ status_t AudioSystem::getFlushFromFrameSupport(const audio_config_base_t& config
             legacy2aidl_audio_config_base_t_AudioConfigBase(config, false /*isInput*/));
     media::audio::common::AudioAttributes attrAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_attributes_t_AudioAttributes(attr));
+    int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(getuid()));
     int32_t flagsAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
     return statusTFromBinderStatus(aps->getFlushFromFrameSupport(
-            configAidl, attrAidl, flagsAidl, support));
+            configAidl, attrAidl, uidAidl, flagsAidl, support));
 }
 
 // ---------------------------------------------------------------------------
