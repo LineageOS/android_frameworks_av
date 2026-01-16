@@ -59,6 +59,10 @@ struct OutputBufferQueue {
     // perform anymore.
     void stop();
 
+    // Return a HGraphicBufferProducer for the configured surface. If the surface
+    // is not configured, return nullptr.
+    sp<::android::hardware::graphics::bufferqueue::V2_0::IGraphicBufferProducer> getHgbp() const;
+
     // Render a graphic block to current surface.
     status_t outputBuffer(
             const C2ConstGraphicBlock& block,

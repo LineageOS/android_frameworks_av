@@ -3684,25 +3684,17 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         return ret ? C2_OK : C2_CORRUPTED;
     }
     uint64_t bqId = 0;
-    sp<IGraphicBufferProducer> nullIgbp;
-    sp<HGraphicBufferProducer2> nullHgbp;
-
-    sp<HGraphicBufferProducer2> igbp = surface ?
-            surface->getHalInterface<HGraphicBufferProducer2>() : nullHgbp;
-    if (surface && !igbp) {
-        igbp = new B2HGraphicBufferProducer2(surface);
-    }
 
     std::scoped_lock lock(mOutputMutex);
     std::shared_ptr<SurfaceSyncObj> syncObj;
 
     if (!surface) {
-        mOutputBufferQueue->configure(nullIgbp, generation, 0, maxDequeueCount, nullptr);
+        mOutputBufferQueue->configure(nullptr, generation, 0, maxDequeueCount, nullptr);
     } else if (surface->getUniqueId(&bqId) != OK) {
         LOG(ERROR) << "setOutputSurface -- "
                    "cannot obtain bufferqueue id.";
         bqId = 0;
-        mOutputBufferQueue->configure(nullIgbp, generation, 0, maxDequeueCount, nullptr);
+        mOutputBufferQueue->configure(nullptr, generation, 0, maxDequeueCount, nullptr);
     } else {
         mOutputBufferQueue->configure(surface, generation, bqId, maxDequeueCount,
                                       mHidlBase1_2 ? &syncObj : nullptr);
@@ -3712,13 +3704,11 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     ALOGD("setOutputSurface -- generation=%u consumer usage=%#llx%s",
           generation, (long long)consumerUsage, syncObj ? " sync" : "");
 
-    Return<c2_hidl::Status> transStatus = syncObj ?
-            mHidlBase1_2->setOutputSurfaceWithSyncObj(
-                    static_cast<uint64_t>(blockPoolId),
-                    bqId == 0 ? nullHgbp : igbp, *syncObj) :
-            mHidlBase1_0->setOutputSurface(
-                    static_cast<uint64_t>(blockPoolId),
-                    bqId == 0 ? nullHgbp : igbp);
+    sp<HGraphicBufferProducer2> hgbp = bqId == 0 ? nullptr : mOutputBufferQueue->getHgbp();
+    Return<c2_hidl::Status> transStatus =
+            syncObj ? mHidlBase1_2->setOutputSurfaceWithSyncObj(static_cast<uint64_t>(blockPoolId),
+                                                                hgbp, *syncObj)
+                    : mHidlBase1_0->setOutputSurface(static_cast<uint64_t>(blockPoolId), hgbp);
 
     mOutputBufferQueue->expireOldWaiters();
 
