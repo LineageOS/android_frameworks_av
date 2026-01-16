@@ -99,7 +99,8 @@ private:
             AddCodec<C2ApexOpusDec>(&codecs);
         }
         if (android::media::swcodec::flags::rust_aac_software_decoder()) {
-            AddCodec<C2ApexAacDec>(&codecs);
+            // FIXME
+            // AddCodec<C2ApexAacDec>(&codecs);
         }
         std::erase_if(codecs, [](const auto &pair) {
             return pair.second.traits == nullptr;
