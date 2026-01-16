@@ -23,6 +23,8 @@
 #include <numeric>
 #include <sys/mman.h>
 
+#include <algorithm>
+
 #include <cutils/properties.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
@@ -135,9 +137,9 @@ public:
                 .build());
         addParameter(
                 DefineParam(mPcmEncodingInfo, C2_PARAMKEY_PCM_ENCODING)
-                .withDefault(new C2StreamPcmEncodingInfo::output(0u, C2Config::PCM_FLOAT))
+                .withDefault(new C2StreamPcmEncodingInfo::output(0u, C2Config::PCM_16))
                 .withFields({C2F(mPcmEncodingInfo, value).oneOf({
-                     C2Config::PCM_FLOAT
+                     C2Config::PCM_16, C2Config::PCM_FLOAT
                 })})
                 .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
                 .build());
@@ -757,9 +759,11 @@ ApexCodec_Status C2ApexAacDec::outputFromRingBuffer(
             ALOGE("output->getLinearBuffer failed");
             return APEXCODEC_STATUS_BAD_VALUE;
         }
+        int32_t pcmEncoding = mIntf->getPcmEncodingInfo();
+        size_t sampleSize = (pcmEncoding == C2Config::PCM_16) ? sizeof(int16_t) : sizeof(float);
         int samplesToOutput = numSamples;
-        if ((size_t)samplesToOutput * sizeof(float) > outLinearBuffer.size) {
-            samplesToOutput = outLinearBuffer.size / sizeof(float);
+        if ((size_t)samplesToOutput * sampleSize > outLinearBuffer.size) {
+            samplesToOutput = outLinearBuffer.size / sampleSize;
         }
         if (!mRingBufferFrameInfos.empty()) {
             if (samplesToOutput > mRingBufferFrameInfos.front().numSamples) {
@@ -767,14 +771,30 @@ ApexCodec_Status C2ApexAacDec::outputFromRingBuffer(
             }
         }
         ALOGV("producing %d samples", samplesToOutput);
-        if (outputDelayRingBufferGetSamples(
-                reinterpret_cast<float*>(outLinearBuffer.data), samplesToOutput)
-                != samplesToOutput) {
-            ALOGE("outputDelayRingBufferGetSamples failed");
-            mSignalledError = true;
-            return APEXCODEC_STATUS_CORRUPTED;
+        if (pcmEncoding == C2Config::PCM_16) {
+            std::unique_ptr<float[]> float_buffer(new float[samplesToOutput]);
+            if (outputDelayRingBufferGetSamples(float_buffer.get(), samplesToOutput)
+                    != samplesToOutput) {
+                ALOGE("outputDelayRingBufferGetSamples failed");
+                mSignalledError = true;
+                return APEXCODEC_STATUS_CORRUPTED;
+            }
+            int16_t *outPtr = reinterpret_cast<int16_t*>(outLinearBuffer.data);
+            for (int i = 0; i < samplesToOutput; ++i) {
+                float val = float_buffer[i] * 32767.f;
+                val = std::max(-32768.f, std::min(32767.f, val));
+                outPtr[i] = static_cast<int16_t>(roundf(val));
+            }
+        } else { // PCM_FLOAT
+            if (outputDelayRingBufferGetSamples(
+                        reinterpret_cast<float*>(outLinearBuffer.data), samplesToOutput)
+                    != samplesToOutput) {
+                ALOGE("outputDelayRingBufferGetSamples failed");
+                mSignalledError = true;
+                return APEXCODEC_STATUS_CORRUPTED;
+            }
         }
-        *produced = samplesToOutput * sizeof(float);
+        *produced = samplesToOutput * sampleSize;
         ALOGV("produced: %zu", *produced);
         if (!mRingBufferFrameInfos.empty()) {
             FrameInfo& info = mRingBufferFrameInfos.front();
