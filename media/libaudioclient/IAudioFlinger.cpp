@@ -72,6 +72,7 @@ ConversionResult<media::CreateTrackRequest> IAudioFlinger::CreateTrackInput::toA
     aidl.selectedDeviceId = VALUE_OR_RETURN(
             legacy2aidl_audio_port_handle_t_int32_t(selectedDeviceId));
     aidl.sessionId = VALUE_OR_RETURN(legacy2aidl_audio_session_t_int32_t(sessionId));
+    aidl.codecProvenance = codecProvenance;
     return aidl;
 }
 
@@ -95,6 +96,7 @@ IAudioFlinger::CreateTrackInput::fromAidl(const media::CreateTrackRequest& aidl)
     legacy.selectedDeviceId = VALUE_OR_RETURN(
             aidl2legacy_int32_t_audio_port_handle_t(aidl.selectedDeviceId));
     legacy.sessionId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_session_t(aidl.sessionId));
+    legacy.codecProvenance = aidl.codecProvenance;
     return legacy;
 }
 

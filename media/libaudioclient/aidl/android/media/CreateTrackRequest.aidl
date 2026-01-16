@@ -45,4 +45,5 @@ parcelable CreateTrackRequest {
     /** Interpreted as audio_port_handle_t. */
     int selectedDeviceId;
     int sessionId;
+    @utf8InCpp String codecProvenance;
 }

@@ -1116,6 +1116,11 @@ status_t convertMetaDataToMessage(
         msg->setString("language", lang);
     }
 
+    int32_t programNumber;
+    if (meta->findInt32(kKeyProgramNumber, &programNumber)) {
+        msg->setInt32("program-number", programNumber);
+    }
+
     if (!strncasecmp("video/", mime, 6) ||
             !strncasecmp("image/", mime, 6)) {
         int32_t width, height;
@@ -2096,6 +2101,11 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     int32_t isBackgroundMode;
     if (msg->findInt32("android._background-mode", &isBackgroundMode) && isBackgroundMode != 0) {
         meta->setInt32(isBackgroundMode, 1);
+    }
+
+    int32_t programNumber;
+    if (msg->findInt32("program-number", &programNumber)) {
+        meta->setInt32(kKeyProgramNumber, programNumber);
     }
 
     int32_t avgBitrate = 0;

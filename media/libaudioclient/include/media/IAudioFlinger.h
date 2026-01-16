@@ -94,6 +94,7 @@ public:
         size_t notificationFrameCount;
         audio_port_handle_t selectedDeviceId;
         audio_session_t sessionId;
+        std::string codecProvenance;
 
         ConversionResult<media::CreateTrackRequest> toAidl() const;
         static ConversionResult<CreateTrackInput> fromAidl(const media::CreateTrackRequest& aidl);

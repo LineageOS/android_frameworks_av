@@ -2103,6 +2103,7 @@ constexpr char C2_PARAMKEY_OUTPUT_HDR10_PLUS_INFO[] = "output.hdr10-plus-info"; 
 C2ENUM(C2Config::hdr_dynamic_metadata_type_t, uint32_t,
     HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_10,  ///< SMPTE ST 2094-10
     HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40,  ///< SMPTE ST 2094-40
+    HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_50,  ///< SMPTE ST 2094-50
 )
 
 struct C2HdrDynamicMetadataStruct {
