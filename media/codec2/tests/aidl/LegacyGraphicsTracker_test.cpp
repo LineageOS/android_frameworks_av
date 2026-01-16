@@ -842,7 +842,6 @@ TEST_F(LegacyGraphicsTrackerTest, DirectAllocationTest) {
         // Buffer should be already removed from tracking by render()
         ASSERT_EQ(maxDequeueCount, mTracker->getCurDequeueable());
         ASSERT_EQ(C2_NOT_FOUND, mTracker->deallocate(bid, Fence::NO_FENCE));
-
         AHardwareBuffer_release(buf);
     }
 }
@@ -898,7 +897,6 @@ TEST_F(LegacyGraphicsTrackerTest, DoubleDeallocateTest) {
 
         ASSERT_EQ(C2_OK, mTracker->deallocate(bid, Fence::NO_FENCE));
         ASSERT_EQ(C2_NOT_FOUND, mTracker->deallocate(bid, Fence::NO_FENCE));  // Double free
-
         AHardwareBuffer_release(buf);
     }
 }
@@ -939,12 +937,10 @@ TEST_F(LegacyGraphicsTrackerTest, WaitableFdSignalingTest) {
 
     AHardwareBuffer *buf1, *buf2;
     sp<Fence> fence;
-
     // Allocate all available buffers
     if (__builtin_available(android __ANDROID_API_T__, *)) {
         ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf1, &fence));
         ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf2, &fence));
-
         struct pollfd pfd;
         pfd.fd = pipeFd;
         pfd.events = POLLIN;
@@ -955,7 +951,6 @@ TEST_F(LegacyGraphicsTrackerTest, WaitableFdSignalingTest) {
         uint64_t bid;
         AHardwareBuffer_getId(buf1, &bid);
         mTracker->deallocate(bid, Fence::NO_FENCE);
-
         // Now FD SHOULD be readable
         ret = poll(&pfd, 1, 1000);
         ASSERT_GT(ret, 0);
