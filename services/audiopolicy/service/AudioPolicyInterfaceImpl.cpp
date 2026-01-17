@@ -2998,8 +2998,8 @@ Status AudioPolicyService::getMmapPolicyForDevice(
             mAudioPolicyManager->getMmapPolicyForDevice(policyType, policyInfo));
 }
 
-Status AudioPolicyService::setEnableHardening(bool shouldEnable) {
-    mShouldEnableHardening.store(shouldEnable);
+Status AudioPolicyService::setHardeningOverride(HardeningOverride hardeningOverride) {
+    mHardeningOverride.store(hardeningOverride);
     return Status::ok();
 }
 

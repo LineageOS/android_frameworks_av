@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <android/media/IAudioPolicyService.h>
 #include <media/IPermissionProvider.h>
 #include <utils/RefBase.h>
 
@@ -26,7 +27,7 @@ class IAudioPolicyServiceLocal : public virtual RefBase {
     virtual const ::com::android::media::permission::IPermissionProvider&
     getPermissionProvider() const = 0;
 
-    virtual bool isHardeningOverrideEnabled() const = 0;
+    virtual IAudioPolicyService::HardeningOverride getHardeningOverride() const = 0;
 
     virtual ~IAudioPolicyServiceLocal() = default;
 };

@@ -537,7 +537,8 @@ ApexCodec_Status C2ApexAacDec::process(
             ALOGV("process loop: offset=%zu, size=%zu", offset, size);
             while (size > 0) {
                 uint8_t* inPtr = const_cast<uint8_t *>(inBuffer.data + offset);
-                uint32_t inBufferLength = size;
+                uint32_t inBufferLength = std::min(
+                       size, static_cast<size_t>(std::numeric_limits<uint32_t>::max()));
                 uint32_t bytesValid = inBufferLength;
                 ALOGV("inPtr=%p, inBufferLength=%u, bytesValid=%u",
                         inPtr, inBufferLength, bytesValid);
@@ -727,7 +728,9 @@ ApexCodec_Status C2ApexAacDec::process(
                 if (*produced > 0) {
                     uint64_t outFrameIndex, outTimestamp;
                     output->getBufferInfo(&outFlags, &outFrameIndex, &outTimestamp);
-                    ALOGD("outFrameIndex=%lu, outTimestamp=%lu", outFrameIndex, outTimestamp);
+                    ALOGD("outFrameIndex=%lu, outTimestamp=%lu",
+                          (unsigned long)outFrameIndex,
+                          (unsigned long)outTimestamp);
                     outFlags = (ApexCodec_BufferFlags)(outFlags | APEXCODEC_FLAG_END_OF_STREAM);
                     output->setBufferInfo(outFlags, outFrameIndex, outTimestamp);
                 } else {
