@@ -196,6 +196,7 @@ cc_library {
     ],
 
     static_libs: [
+        "libmediametrics_allowlist",
         "libplatformprotos",
     ],
 

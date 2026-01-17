@@ -2055,6 +2055,7 @@ status_t AudioTrack::createTrack_l()
         .set(AMEDIAMETRICS_PROP_ENCODING, toString(mFormat).c_str())
         .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
         .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mFrameCount)
+        .set(AMEDIAMETRICS_PROP_CODECPROVENANCE, mCodecProvenance.c_str())
         // the following are NOT immutable
         .set(AMEDIAMETRICS_PROP_VOLUME_LEFT, (double)mVolume[AUDIO_INTERLEAVE_LEFT])
         .set(AMEDIAMETRICS_PROP_VOLUME_RIGHT, (double)mVolume[AUDIO_INTERLEAVE_RIGHT])

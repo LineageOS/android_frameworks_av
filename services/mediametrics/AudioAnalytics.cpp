@@ -24,6 +24,7 @@
 #include <aaudio/AAudio.h>        // error codes
 #include <audio_utils/clock.h>    // clock conversions
 #include <cutils/properties.h>
+#include <mediametrics_allowlist.h>
 #include <stats_media_metrics.h>             // statsd
 #include <system/audio.h>
 
@@ -173,6 +174,7 @@ static constexpr const char * const AudioTrackDeviceUsageFields[] = {
     "caller",
     "traits",
     "log_session_id",
+    "codec_provenance",
 };
 
 static constexpr const char * const AudioRecordStatusFields[] {
@@ -1045,6 +1047,10 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         std::string logSessionId;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_LOGSESSIONID, &logSessionId);
+        // Android 17
+        std::string codecProvenance;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_CODECPROVENANCE, &codecProvenance);
 
         const auto callerNameForStats =
                 types::lookup<types::CALLER_NAME, short_enum_type_t>(callerName);
@@ -1084,7 +1090,8 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << ") traits:" << traits << "(" << traitsForStats
               << ") usage:" << usage << "(" << usageForStats
               << ") logSessionId:" << logSessionId << "(" << logSessionIdForStats
-              << ")";
+              << ") codecProvenance:" << codecProvenance
+              ;
         if (clientCalled // only log if client app called AudioTracks
                 && mAudioAnalytics.mDeliverStatistics) {
             const auto [ result, str ] = sendToStatsd(AudioTrackDeviceUsageFields,
@@ -1109,6 +1116,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , ENUM_EXTRACT(callerNameForStats)
                     , ENUM_EXTRACT(traitsForStats)
                     , logSessionIdForStats.c_str()
+                    , audio::getFilteredAudioMediaType(codecProvenance)
                     );
             ALOGV("%s: statsd %s", __func__, str.c_str());
             mAudioAnalytics.mStatsdLog->log(
