@@ -2655,16 +2655,14 @@ std::shared_ptr<C2ParamReflector> Codec2Client::getParamReflector() {
             addStructDescriptor((C2ComponentDomainSetting *)nullptr);
             addStructDescriptor((C2ComponentAttributesSetting *)nullptr);
             addStructDescriptor((C2ComponentTimeStretchTuning *)nullptr);
+            addStructDescriptor((C2StreamProfileLevelInfo *)nullptr);
             addStructDescriptor((C2PortMediaTypeSetting *)nullptr);
             addStructDescriptor((C2StreamBufferTypeSetting *)nullptr);
             addStructDescriptor((C2PortRequestedDelayTuning *)nullptr);
             addStructDescriptor((C2StreamMaxReferenceAgeTuning *)nullptr);
             addStructDescriptor((C2StreamMaxReferenceCountTuning *)nullptr);
             addStructDescriptor((C2MaxPrivateBufferCountTuning *)nullptr);
-            addStructDescriptor((C2MaxPrivateBufferCountTuning *)nullptr);
             addStructDescriptor((C2PortStreamCountTuning *)nullptr);
-            addStructDescriptor((C2SubscribedParamIndicesTuning *)nullptr);
-            addStructDescriptor((C2SubscribedParamIndicesTuning *)nullptr);
             addStructDescriptor((C2SubscribedParamIndicesTuning *)nullptr);
             addStructDescriptor((C2PortAllocatorsTuning *)nullptr);
             addStructDescriptor((C2PortBlockPoolsTuning *)nullptr);
@@ -2677,6 +2675,18 @@ std::shared_ptr<C2ParamReflector> Codec2Client::getParamReflector() {
             addStructDescriptor((C2StreamMaxChannelCountInfo *)nullptr);
             addStructDescriptor((C2StreamChannelMaskInfo *)nullptr);
             addStructDescriptor((C2StreamPcmEncodingInfo *)nullptr);
+            addStructDescriptor((C2StreamAacPackagingInfo *)nullptr);
+            addStructDescriptor((C2StreamAacSbrModeTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcCompressionModeTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcTargetReferenceLevelTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcEncodedTargetLevelTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcBoostFactorTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcAttenuationFactorTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcEffectTypeTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcAlbumModeTuning *)nullptr);
+            addStructDescriptor((C2StreamDrcOutputLoudnessTuning *)nullptr);
+            addStructDescriptor((C2StreamAudioFrameSizeInfo *)nullptr);
+            addStructDescriptor((C2AudioPresentationIdTuning *)nullptr);
         }
     };
     if (mApexBase) {
