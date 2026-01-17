@@ -47,6 +47,14 @@ flag {
 }
 
 flag {
+    name: "audio_policy_builders_api"
+    namespace: "media_audio"
+    description: "Expand the creation APIs for AudioTrack source and AudioRecord sink with Builders"
+    bug: "416965224"
+    is_exported: true
+}
+
+flag {
     name: "auto_public_volume_api_hardening"
     namespace: "media_audio"
     description: "On AAOS, make volume and ringer SDK APIs in AudioManager no-ops."
