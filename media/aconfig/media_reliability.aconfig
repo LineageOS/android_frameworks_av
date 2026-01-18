@@ -1,0 +1,12 @@
+# Media Metrics AConfig flags
+
+package: "android.media.metrics"
+container: "system"
+
+flag {
+  name: "enable_extended_bundle_metrics"
+  description: "Enable bundle metrics reporting for the various media sessions spawned from the MediaMetricsManager"
+  bug: "475299844"
+  namespace: "media_reliability"
+  is_exported: true
+}

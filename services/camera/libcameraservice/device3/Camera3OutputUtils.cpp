@@ -641,17 +641,31 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx,
     states.inflightIntf.checkInflightMapLengthLocked();
 }
 
-// Erase the subset of physicalCameraIds that contains id
-bool erasePhysicalCameraIdSet(
-        std::set<std::set<std::string>>& physicalCameraIds, const std::string& id) {
-    bool found = false;
-    for (auto iter = physicalCameraIds.begin(); iter != physicalCameraIds.end(); iter++) {
-        if (iter->count(id) == 1) {
-            physicalCameraIds.erase(iter);
-            found = true;
-            break;
+// Erase the physical camera Id from the expected set which included:
+// - Explicitly requested physical camera Ids,
+// - Concurrent MultiResolutionImageReader physical camera Ids, and
+// - Non-concurrent multi-resolution readers physical camera Ids
+bool erasePhysicalCameraIdFromExpectedSet(
+        std::set<std::string>& physicalCameraIds,
+        std::map<int, MultiResInflightRequest>& requestedMultiResPhysicalIds,
+        const std::string& id) {
+    // Remove from requested physical Ids. This includes both the explicitly
+    // requested physical Id, and the concurrent multi-resolution output
+    // physical camera Ids notified by HAL.
+    bool found = physicalCameraIds.erase(id);
+
+    // Remove physical Ids from the requested non-concurrent multi-resolution
+    auto it = requestedMultiResPhysicalIds.begin();
+    while (it != requestedMultiResPhysicalIds.end()) {
+        bool readerContainsId = it->second.physicalCameraIds.erase(id);
+        if (readerContainsId) {
+            it = requestedMultiResPhysicalIds.erase(it);
+        } else {
+            ++it;
         }
+        found |= readerContainsId;
     }
+
     return found;
 }
 
@@ -679,27 +693,6 @@ const std::set<std::string>& getCameraIdsWithZoomLocked(
 
     const InFlightRequest &r = inflightMap.valueFor(overridingFrameNumber);
     return r.cameraIdsWithZoom;
-}
-
-size_t getExpectedPhysicalMetadataCount(
-        const std::set<std::set<std::string>>& requestedPhysicalIds,
-        const std::string& activePhysicalCameraId) {
-    std::set<std::string> expectedPhysicalIdsWithMetadata;
-    for (const auto& requestedId : requestedPhysicalIds) {
-        if (requestedId.size() == 1) {
-            // RequestedId is a single physical camera Id
-            expectedPhysicalIdsWithMetadata.insert(*requestedId.begin());
-        } else {
-           // For multi-resolution ImageReader where RequestedId contains a set
-           // of physical camera Ids, the expected physical camera
-           // Id is the active physical camera Id.
-           if (requestedId.contains(activePhysicalCameraId)) {
-               expectedPhysicalIdsWithMetadata.insert(activePhysicalCameraId);
-           }
-        }
-    }
-
-    return expectedPhysicalIdsWithMetadata.size();
 }
 
 void recalculateTransform(const CameraMetadata& staticInfo,
@@ -860,9 +853,6 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
 
         // Did we get the (final) result metadata for this capture?
         if (result->result != NULL && !isPartialResult) {
-            size_t expectedPhysicalCameraMetadataCount =
-                    getExpectedPhysicalMetadataCount(request.physicalCameraIds,
-                                                     states.activePhysicalId);
             bool logicalMultiCameraAdditionalResults = false;
             camera_metadata_ro_entry entry;
             if (flags::logical_multi_camera_additional_results()) {
@@ -876,12 +866,11 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                         logicalMultiCameraAdditionalResults);
                 }
             }
-            if (!logicalMultiCameraAdditionalResults
-                && expectedPhysicalCameraMetadataCount != result->num_physcam_metadata) {
+            if (result->num_physcam_metadata < request.physicalCameraIds.size()) {
                 SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
-                    "Expected physical Camera metadata count %d not equal to actual count %d",
-                        expectedPhysicalCameraMetadataCount, result->num_physcam_metadata);
-                return;
+                        "Not enough total result for frame %d: %d (expect at least %d)",
+                        frameNumber, result->num_physcam_metadata,
+                        request.physicalCameraIds.size());
             }
             if (request.haveResultMetadata) {
                 SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
@@ -893,13 +882,20 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
                 for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
                     const std::string physicalId = result->physcam_ids[i];
                     bool validPhysicalCameraMetadata =
-                            erasePhysicalCameraIdSet(request.physicalCameraIds, physicalId);
+                            erasePhysicalCameraIdFromExpectedSet(request.physicalCameraIds,
+                                    request.requestedMultiResPhysicalIds, physicalId);
                     if (!validPhysicalCameraMetadata) {
                         SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
                             "Unexpected total result for frame %d camera %s",
                                 frameNumber, physicalId.c_str());
                         return;
                     }
+                }
+                if (request.requestedMultiResPhysicalIds.size() > 0) {
+                    SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                            "Missing physical result metadata for frame %d for non-concurrent "
+                            "MultiRes reader", frameNumber);
+                    return;
                 }
             }
             if (states.usePartialResult &&
@@ -1183,6 +1179,74 @@ void collectAndRemovePendingOutputBuffers(bool useHalBufManager,
     }
 }
 
+// Inflight lock is held
+void updateInflightRequestForConcurrentReadersLocked(
+        CaptureOutputStates& states,
+        /*out*/ InFlightRequest& r,
+        const camera_shutter_msg_t& msg) {
+    size_t extraBuffers = 0;
+    for (const auto& concurrentReaderStart : msg.multi_res_concurrent_readers_msg) {
+        // Check validity of multi-resolution readers message.
+        size_t numConcurrentStreams = concurrentReaderStart.streamIds.size();
+        if (numConcurrentStreams == 0) {
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                "MultiResolutionConcurrentReader output streamIds empty! Expected "
+                    "at least 1 for frame %d.", msg.frame_number);
+            return;
+        }
+
+        int groupId = concurrentReaderStart.groupId;
+        for (auto streamId : concurrentReaderStart.streamIds) {
+            auto outputStream = states.outputStreams.get(streamId);
+            if (outputStream == nullptr) {
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "MultiResolutionConcurrentReader output stream id %d not valid!",
+                    streamId);
+                return;
+            }
+            if (outputStream->getStreamSetId() != concurrentReaderStart.groupId) {
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                        "MultiResolutionConcurrentReader stream_id %d not in groupId %d",
+                        streamId, concurrentReaderStart.groupId);
+                return;
+            }
+            if (!r.requestedMultiResPhysicalIds.contains(groupId)) {
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                        "MultiResolutionConcurrentReader groupId %d was not requested",
+                        groupId);
+                return;
+            }
+            if (!r.requestedMultiResPhysicalIds[groupId].enableConcurrency) {
+                SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                        "MultiResolutionConcurrentReader groupId %d concurrency not enabled!",
+                        groupId);
+                return;
+            }
+
+            const std::string& physicalCameraId = outputStream->getPhysicalCameraId();
+            if (physicalCameraId.size() > 0) {
+                r.physicalCameraIds.insert(physicalCameraId);
+            }
+        }
+
+        r.requestedMultiResPhysicalIds.erase(groupId);
+        extraBuffers += numConcurrentStreams - 1;
+    }
+
+    // Make sure all concurrent MultiRes group Ids are received.
+    for (const auto& [groupId, multiResRequest]: r.requestedMultiResPhysicalIds) {
+        if (multiResRequest.enableConcurrency) {
+            SET_ERR(CAMERA_HAL_CALLBACK_ERROR,
+                    "MultiResolutionConcurrentReader StreamGroupState not available "
+                    "for group %d!", groupId);
+            return;
+        }
+    }
+
+    r.numBuffersLeft += extraBuffers;
+    r.resultExtras.multiResConcurrentReadersStart = msg.multi_res_concurrent_readers_msg;
+}
+
 void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg) {
     ATRACE_CALL();
     ssize_t idx;
@@ -1238,7 +1302,9 @@ void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg)
                 r.resultExtras.hasReadoutTimestamp = true;
                 r.resultExtras.readoutTimestamp = msg.readout_timestamp;
             }
-            r.resultExtras.multiResConcurrentReadersStart = msg.multi_res_concurrent_readers_msg;
+
+            updateInflightRequestForConcurrentReadersLocked(states, r, msg);
+
             if (r.minExpectedDuration != states.minFrameDuration ||
                     r.isFixedFps != states.isFixedFps) {
                 for (size_t i = 0; i < states.outputStreams.size(); i++) {
@@ -1366,7 +1432,10 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
                             errorCode) {
                         if (physicalCameraId.size() > 0) {
                             bool validPhysicalCameraId =
-                                    erasePhysicalCameraIdSet(r.physicalCameraIds, physicalCameraId);
+                                    erasePhysicalCameraIdFromExpectedSet(
+                                            r.physicalCameraIds,
+                                            r.requestedMultiResPhysicalIds,
+                                            physicalCameraId);
                             if (!validPhysicalCameraId) {
                                 ALOGE("%s: Reported result failure for physical camera device: %s "
                                         " which is not part of the respective request!",
