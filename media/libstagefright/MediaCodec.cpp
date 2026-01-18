@@ -1364,7 +1364,7 @@ sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
         return NULL;
     }
 
-    return new PersistentSurface(surface, bufferSource);
+    return new PersistentSurface(mediaflagtools::igbpToSurfaceType(igbp), bufferSource);
 }
 
 /**
