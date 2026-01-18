@@ -90,3 +90,27 @@ cc_aconfig_library {
     double_loadable: true,
     aconfig_declarations: "aconfig_mediarecorder_flags",
 }
+
+aconfig_declarations {
+    name: "aconfig_media_reliability_flags",
+    package: "android.media.metrics",
+    container: "system",
+    exportable: true,
+    srcs: ["media_reliability.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.media.reliability-aconfig-java",
+    aconfig_declarations: "aconfig_media_reliability_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    host_supported: true,
+    mode: "exported",
+}
+
+cc_aconfig_library {
+    name: "android.media.reliability-aconfig-cc",
+    min_sdk_version: "30",
+    vendor_available: true,
+    double_loadable: true,
+    aconfig_declarations: "aconfig_media_reliability_flags",
+}
