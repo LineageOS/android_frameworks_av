@@ -363,8 +363,7 @@ VirtualCameraSession::VirtualCameraSession(
   }
 
  std::shared_ptr<VirtualCameraDevice> virtualCamera = mCameraDevice.lock();
- if (flags::virtual_camera_metadata() && virtualCamera != nullptr &&
-    virtualCamera->isPerFrameCameraMetadataEnabled()) {
+ if (virtualCamera != nullptr && virtualCamera->isPerFrameCameraMetadataEnabled()) {
    // create a capture result consumer shared reference and set it in the
    // session context.
    mSessionContext.setCaptureResultConsumer(
@@ -520,8 +519,7 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
 
   // The onConfigureSession is oneway async, just informs the VD owner of
   // the session params
-  if (flags::virtual_camera_metadata() &&
-      mVirtualCameraClientCallback != nullptr) {
+  if (mVirtualCameraClientCallback != nullptr) {
     VirtualCameraMetadata sessionParamsMetadata;
     status_t ret = convertDeviceToVirtualCameraMetadata(
         in_requestedConfiguration.sessionParams, sessionParamsMetadata);
@@ -751,8 +749,7 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
     }
 
     std::optional<VirtualCameraMetadata> captureRequestSettings;
-    if (flags::virtual_camera_metadata() &&
-        virtualCamera->isPerFrameCameraMetadataEnabled()) {
+    if (virtualCamera->isPerFrameCameraMetadataEnabled()) {
       VirtualCameraMetadata virtualCameraMetadata;
       // Send the settings of the CaptureRequest as VirtualCameraMetadata
       status_t ret = convertDeviceToVirtualCameraMetadata(
@@ -768,10 +765,8 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
     if (!status.isOk()) {
       ALOGE(
           "Failed to invoke onProcessCaptureRequest client callback for frame "
-          "%d. Flag virtual_camera_metadata enabled: %s. "
-          "PerFrameCameraMetadataEnabled %s.",
+          "%d. PerFrameCameraMetadataEnabled %s.",
           request.frameNumber,
-          flags::virtual_camera_metadata() ? "true" : "false",
           virtualCamera->isPerFrameCameraMetadataEnabled() ? "true" : "false");
     }
   }
