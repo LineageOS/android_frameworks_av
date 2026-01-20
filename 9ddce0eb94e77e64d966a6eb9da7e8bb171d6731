@@ -34,6 +34,23 @@
       "parentUuid": "510c2cee_b6022c74",
       "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ab731e4a_f166903d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-01-20T17:16:23Z",
+      "side": 1,
+      "message": "Luca asked for hold for now to see if we can get this fixed upstream.",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
