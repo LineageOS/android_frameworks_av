@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <vector>
 
 #include "VirtualCameraCaptureResultConsumer.h"
 #include "VirtualCameraStream.h"
@@ -34,9 +35,15 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
+constexpr int kInvalidStreamId = -1;
+
 // Encapsulates set of streams belonging to the same camera session.
 class VirtualCameraSessionContext {
  public:
+  VirtualCameraSessionContext(bool isMultiInputStreamEnabled);
+
+  ~VirtualCameraSessionContext() = default;
+
   // (Re)initialize the stream.
   //
   // Returns true if the stream is initialized for the first time.
@@ -101,6 +108,28 @@ class VirtualCameraSessionContext {
   // The caller takes ownership of the returned pointer.
   const camera_metadata_t* getCaptureResultMetadataForTimestamp(int64_t timestamp)
       EXCLUDES(mLock);
+  std::atomic<uint64_t> mLastNotifiedFrameNumber;
+
+  int getInputStreamIdForOutputStreamId(int streamId) const EXCLUDES(mLock);
+
+  void enqueueFrame(int frameId) EXCLUDES(mLock);
+
+  bool dequeueFrame(int frameId) EXCLUDES(mLock);
+
+  // Update the list of open input and output streams
+  // and returns the set of streams no more in use after the call to this method
+  std::set<int> updateOpenStreams(const std::map<int, int> outputToInputStreamMap)
+      EXCLUDES(mLock);
+
+  // Check whether the provided inputStreamId is used in the current session
+  bool isInputStreamUsed(int inputStremId) const EXCLUDES(mLock);
+
+  // Returns a set of all currently used input stream ids.
+  std::set<int> getUsedInputStreamIds() const EXCLUDES(mLock);
+
+  bool isMultiInputStreamEnabled() const {
+    return mIsMultiInputStreamEnabled;
+  }
 
  private:
   mutable std::mutex mLock;
@@ -108,8 +137,13 @@ class VirtualCameraSessionContext {
   std::map<int, std::unique_ptr<VirtualCameraStream>> mStreams GUARDED_BY(mLock);
   // The capture result consumer.
   // This can be null if per frame metadata is not enabled.
-  std::shared_ptr<VirtualCameraCaptureResultConsumer>
-      mCaptureResultConsumer GUARDED_BY(mLock);
+  std::shared_ptr<VirtualCameraCaptureResultConsumer> mCaptureResultConsumer
+      GUARDED_BY(mLock);
+  std::set<int> mFrameQueue GUARDED_BY(mLock);
+
+  std::map<int, int> mOutputToInputStreamMap GUARDED_BY(mLock);
+
+  const bool mIsMultiInputStreamEnabled;
 };
 
 }  // namespace virtualcamera
