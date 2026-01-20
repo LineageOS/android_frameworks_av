@@ -103,11 +103,11 @@ class MockCameraDeviceCallback : public BnCameraDeviceCallback {
 class VirtualCameraRenderThreadTest : public ::testing::Test {
  public:
   void SetUp() override {
-    mSessionContext = std::make_unique<VirtualCameraSessionContext>(false);
+    mSessionContext = std::make_unique<VirtualCameraSessionContext>();
     mMockCameraDeviceCallback =
         ndk::SharedRefBase::make<MockCameraDeviceCallback>();
     mRenderThread = std::make_unique<VirtualCameraRenderThread>(
-        *mSessionContext, kInvalidStreamId, kImageFormat, kInputResolution,
+        *mSessionContext, kImageFormat, kInputResolution,
         /*reportedSensorSize*/ kInputResolution, mMockCameraDeviceCallback);
   }
 

@@ -20,7 +20,6 @@
 
 #include <android_companion_virtualdevice_flags.h>
 
-#include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -188,24 +187,18 @@ double nanosToFps(std::chrono::nanoseconds frameDuration) {
 }  // namespace
 
 VirtualCameraRenderThread::VirtualCameraRenderThread(
-    VirtualCameraSessionContext& sessionContext, int inputSurfaceIndex,
-    Format imageFormat, const Resolution inputSurfaceSize,
-    const Resolution reportedSensorSize,
+    VirtualCameraSessionContext& sessionContext, Format imageFormat,
+    const Resolution inputSurfaceSize, const Resolution reportedSensorSize,
     std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback)
     : mCameraDeviceCallback(cameraDeviceCallback),
       mImageFormat{imageFormat},
       mInputSurfaceSize(inputSurfaceSize),
       mReportedSensorSize(reportedSensorSize),
-      mInputSurfaceIndex(inputSurfaceIndex),
       mSessionContext(sessionContext),
       mInputSurfaceFuture(mInputSurfacePromise.get_future()) {
-  ALOGV("Creation of VirtualCameraRenderThread with inputSurfaceSize: %dx%d",
-        inputSurfaceSize.width, inputSurfaceSize.height);
 }
 
 VirtualCameraRenderThread::~VirtualCameraRenderThread() {
-  ALOGV("Destruction of VirtualCameraRenderThread %dx%d",
-        mInputSurfaceSize.width, mInputSurfaceSize.height);
   stop();
   if (mThread.joinable()) {
     mThread.join();
@@ -239,30 +232,29 @@ void VirtualCameraRenderThread::requestTextureUpdate() {
   // If queue is not empty, we don't need to set the mTextureUpdateRequested
   // flag, since the texture will be updated during ProcessCaptureRequestTask
   // processing anyway.
-  if (mCaptureRequestQueue.empty()) {
+  if (mQueue.empty()) {
     mTextureUpdateRequested = true;
-    mTaskReadyCondVar.notify_one();
+    mCondVar.notify_one();
   }
 }
 
 void VirtualCameraRenderThread::enqueueTask(
     std::unique_ptr<ProcessCaptureRequestTask> task) {
   std::lock_guard<std::mutex> lock(mLock);
-  // When enqueuing process capture request task, clear the
-  // mTextureUpdateRequested flag. If this flag is set, the texture was not
-  // yet updated and it will be updated when processing
-  // ProcessCaptureRequestTask anyway.
+  // When enqueving process capture request task, clear the
+  // mTextureUpdateRequested flag. If this flag is set, the texture was not yet
+  // updated and it will be updated when processing ProcessCaptureRequestTask
+  // anyway.
   mTextureUpdateRequested = false;
-  mCaptureRequestQueue.emplace_back(std::move(task));
-  mTaskReadyCondVar.notify_one();
+  mQueue.emplace_back(std::move(task));
+  mCondVar.notify_one();
 }
 
 void VirtualCameraRenderThread::flush() {
   std::lock_guard<std::mutex> lock(mLock);
-  while (!mCaptureRequestQueue.empty()) {
-    std::unique_ptr<ProcessCaptureRequestTask> task =
-        std::move(mCaptureRequestQueue.front());
-    mCaptureRequestQueue.pop_front();
+  while (!mQueue.empty()) {
+    std::unique_ptr<ProcessCaptureRequestTask> task = std::move(mQueue.front());
+    mQueue.pop_front();
     flushCaptureRequest(*task);
   }
 }
@@ -274,11 +266,10 @@ bool VirtualCameraRenderThread::start() {
 }
 
 void VirtualCameraRenderThread::stop() {
-  ALOGV("Stopping render thread with inputSurfaceIndex:%d", mInputSurfaceIndex);
   {
     std::lock_guard<std::mutex> lock(mLock);
     mPendingExit = true;
-    mTaskReadyCondVar.notify_one();
+    mCondVar.notify_one();
   }
 }
 
@@ -303,33 +294,28 @@ RenderThreadTask VirtualCameraRenderThread::dequeueTask() {
   // the lock is held in this scope, which is true, since it's only
   // released during waiting inside mCondVar.wait calls.
   ScopedLockAssertion lockAssertion(mLock);
-  ALOGV("%s inputSurfaceIndex:%d, waiting on mTaskReadyCondVar", __func__,
-        mInputSurfaceIndex);
-  mTaskReadyCondVar.wait(lock, [this]() REQUIRES(mLock) {
-    ALOGV("dequeueTask inputSurfaceIndex:%d, notified mTaskReadyCondVar",
-          mInputSurfaceIndex);
-    return mPendingExit || mTextureUpdateRequested ||
-           !mCaptureRequestQueue.empty();
+
+  mCondVar.wait(lock, [this]() REQUIRES(mLock) {
+    return mPendingExit || mTextureUpdateRequested || !mQueue.empty();
   });
   if (mPendingExit) {
-    ALOGV("Exiting due to pending exit. Return null RenderThreadTask");
     // Render thread task with null task signals render thread to terminate.
     return RenderThreadTask(nullptr);
   }
   if (mTextureUpdateRequested) {
     // If mTextureUpdateRequested, it's guaranteed the queue is empty, return
-    // kUpdateTextureTask to signal we want render thread to update the
-    // texture (consume buffer from the queue).
+    // kUpdateTextureTask to signal we want render thread to update the texture
+    // (consume buffer from the queue).
     mTextureUpdateRequested = false;
     return RenderThreadTask(kUpdateTextureTask);
   }
-  RenderThreadTask task(std::move(mCaptureRequestQueue.front()));
-  mCaptureRequestQueue.pop_front();
+  RenderThreadTask task(std::move(mQueue.front()));
+  mQueue.pop_front();
   return task;
 }
 
 void VirtualCameraRenderThread::threadLoop() {
-  ALOGV("Render thread starting with inputSurfaceIndex:%d", mInputSurfaceIndex);
+  ALOGV("Render thread starting");
 
   if (!initializeImageHandler()) {
     ALOGE("%s: Failed to initialize frame consumer", __func__);
@@ -342,7 +328,7 @@ void VirtualCameraRenderThread::threadLoop() {
   while (RenderThreadTask task = dequeueTask()) {
     std::visit(
         overloaded{[this](const std::unique_ptr<ProcessCaptureRequestTask>& t) {
-                     processCaptureRequest(*t);
+                     processTask(*t);
                    },
                    [this](const UpdateTextureTask&) {
                      ALOGV("Idle update of the texture");
@@ -353,14 +339,13 @@ void VirtualCameraRenderThread::threadLoop() {
 
   mImageHandler.reset();
   mInputSurfaceFuture.get()->destroy();
-  ALOGV("Render thread exiting. inputSurfaceIndex:%d", mInputSurfaceIndex);
+  ALOGV("Render thread exiting");
 }
 
-void VirtualCameraRenderThread::processCaptureRequest(
+void VirtualCameraRenderThread::processTask(
     const ProcessCaptureRequestTask& request) {
-  ALOGV("%s inputSurfaceIndex:%d, Request frame number: %d, capture intent %d",
-        __func__, mInputSurfaceIndex, request.getFrameNumber(),
-        request.getRequestSettings().captureIntent);
+  ALOGV("%s Request frame number: %d, capture intent %d", __func__,
+        request.getFrameNumber(), request.getRequestSettings().captureIntent);
   std::chrono::nanoseconds deviceTime =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now().time_since_epoch());
@@ -454,48 +439,23 @@ void VirtualCameraRenderThread::processCaptureRequest(
         captureTimestamp.count());
   }
 
-  std::unique_ptr<::aidl::android::hardware::camera::device::CameraMetadata>
-      cameraMetadata;
-
   const camera_metadata_t* customMetadata =
       mSessionContext.getCaptureResultMetadataForTimestamp(
           captureTimestamp.count());
-  // Partial metadata submitted must not include any metadata key returned
-  // in a previous partial result for a given frame. Each new partial result
-  // for that frame must also set a distinct partialResult value.
-  bool isFirstTimeFrameProcessed = true;
-  if (mSessionContext.isMultiInputStreamEnabled()) {
-    // We only send the metadata if it is the first result we send for that
-    // request
-    isFirstTimeFrameProcessed =
-        mSessionContext.dequeueFrame(request.getFrameNumber());
-  }
 
-  if (isFirstTimeFrameProcessed) {
-    cameraMetadata = createCaptureResultMetadata(
-        captureTimestamp, request.getRequestSettings(), mReportedSensorSize,
-        customMetadata);
-  } else {
-    cameraMetadata = std::make_unique<CameraMetadata>();
-  }
+  std::unique_ptr<CaptureResult> captureResult = createCaptureResult(
+      request.getFrameNumber(),
+      createCaptureResultMetadata(
+          captureTimestamp, request.getRequestSettings(), mReportedSensorSize,
+          customMetadata));
 
-  ALOGV(
-      "%s: (inputSurfaceIndex:%d) About to send capture result with metadata, "
-      "frameId:%d "
-      "metadataSize:%zu, isFirstTimeFrameProcessed:%s",
-      __func__, mInputSurfaceIndex, request.getFrameNumber(),
-      cameraMetadata->metadata.size(),
-      isFirstTimeFrameProcessed ? "true" : "false");
-
-  std::unique_ptr<CaptureResult> captureResult =
-      createCaptureResult(request.getFrameNumber(), std::move(cameraMetadata));
   if (customMetadata != nullptr) {
     free_camera_metadata(const_cast<camera_metadata_t*>(customMetadata));
   }
+
   renderOutputBuffers(request, *captureResult);
 
-  auto status = notifyShutter(request, *captureResult, captureTimestamp,
-                              isFirstTimeFrameProcessed);
+  auto status = notifyShutter(request, *captureResult, captureTimestamp);
   if (!status.isOk()) {
     ALOGE("%s: notify call failed: %s", __func__,
           status.getDescription().c_str());
@@ -586,30 +546,17 @@ std::unique_ptr<CaptureResult> VirtualCameraRenderThread::createCaptureResult(
 void VirtualCameraRenderThread::renderOutputBuffers(
     const ProcessCaptureRequestTask& request, CaptureResult& captureResult) {
   const std::vector<CaptureRequestBuffer>& buffers = request.getBuffers();
+  captureResult.outputBuffers.resize(buffers.size());
 
   for (int i = 0; i < buffers.size(); ++i) {
     const CaptureRequestBuffer& reqBuffer = buffers[i];
-
-    if (mSessionContext.isMultiInputStreamEnabled() &&
-        mSessionContext.getInputStreamIdForOutputStreamId(
-            reqBuffer.getStreamId()) != mInputSurfaceIndex) {
-      // Only render the buffer corresponding to the input stream of this
-      // thread. Other buffers will be filled by the other threads.
-      ALOGV("%s : (inputSurfaceIndex:%d) skipping buffer %" PRId32
-            " for stream id %" PRId32,
-            __func__, mInputSurfaceIndex, reqBuffer.getBufferId(),
-            reqBuffer.getStreamId());
-
-      continue;
-    }
-    StreamBuffer& resBuffer = captureResult.outputBuffers.emplace_back();
+    StreamBuffer& resBuffer = captureResult.outputBuffers[i];
     resBuffer.streamId = reqBuffer.getStreamId();
     resBuffer.bufferId = reqBuffer.getBufferId();
     resBuffer.status = BufferStatus::OK;
 
-    ALOGV("%s : (inputSurfaceIndex:%d) rendering buffer %" PRId64
-          " for stream id %" PRId32,
-          __func__, mInputSurfaceIndex, resBuffer.bufferId, resBuffer.streamId);
+    ALOGV("%s : rendering buffer %" PRId64 " for stream id %" PRId32, __func__,
+          resBuffer.bufferId, resBuffer.streamId);
 
     const std::optional<Stream> streamConfig =
         mSessionContext.getStreamConfig(reqBuffer.getStreamId());
@@ -648,32 +595,13 @@ void VirtualCameraRenderThread::renderOutputBuffers(
 
 ::ndk::ScopedAStatus VirtualCameraRenderThread::notifyShutter(
     const ProcessCaptureRequestTask& request, const CaptureResult& captureResult,
-    std::chrono::nanoseconds captureTimestamp, bool isFirstTimeFrameProcessed) {
-  std::vector<NotifyMsg> notifyMsgs;
-
-  if (isFirstTimeFrameProcessed) {
-    // We must only notify the shutter once.
-    mSessionContext.mLastNotifiedFrameNumber.store(request.getFrameNumber());
-    notifyMsgs.push_back(
-        createShutterNotifyMsg(request.getFrameNumber(), captureTimestamp));
-  }
+    std::chrono::nanoseconds captureTimestamp) {
+  std::vector<NotifyMsg> notifyMsgs{
+      createShutterNotifyMsg(request.getFrameNumber(), captureTimestamp)};
   for (const StreamBuffer& resBuffer : captureResult.outputBuffers) {
     if (resBuffer.status != BufferStatus::OK) {
       notifyMsgs.push_back(
           createErrorNotifyMsg(request.getFrameNumber(), resBuffer.streamId));
-    }
-  }
-
-  // log notifyMsgs
-  for (const NotifyMsg& msg : notifyMsgs) {
-    if (msg.getTag() == NotifyMsg::Tag::shutter) {
-      ALOGV("%s: Notifying shutter for frame %d", __func__,
-            msg.get<NotifyMsg::Tag::shutter>().frameNumber);
-    } else if (msg.getTag() == NotifyMsg::Tag::error) {
-      ALOGE("%s: Notifying error for frame %d, stream %d, code %d", __func__,
-            msg.get<NotifyMsg::Tag::error>().frameNumber,
-            msg.get<NotifyMsg::Tag::error>().errorStreamId,
-            static_cast<int>(msg.get<NotifyMsg::Tag::error>().errorCode));
     }
   }
 
@@ -686,10 +614,6 @@ void VirtualCameraRenderThread::renderOutputBuffers(
       captureResults;
   captureResults.push_back(std::move(*captureResult));
 
-  // processCaptureResult() may be invoked multiple times by the HAL in
-  // response to a single capture request. This allows, for example, the
-  // metadata and low-resolution buffers to be returned in one call, and
-  // post-processed JPEG buffers in a later call,
   ::ndk::ScopedAStatus status =
       mCameraDeviceCallback->processCaptureResult(captureResults);
   if (!status.isOk()) {
@@ -698,10 +622,7 @@ void VirtualCameraRenderThread::renderOutputBuffers(
     return status;
   }
 
-  ALOGV(
-      "%s: (inputSurfaceIndex:%d) Successfully called processCaptureResult "
-      "frameNumber:%d",
-      __func__, mInputSurfaceIndex, captureResult->frameNumber);
+  ALOGV("%s: Successfully called processCaptureResult", __func__);
   return status;
 }
 
