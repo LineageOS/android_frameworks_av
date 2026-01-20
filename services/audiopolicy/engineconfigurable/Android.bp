@@ -46,6 +46,7 @@ cc_library_shared {
         "libaudiopolicyengineconfigurable_pfwwrapper",
     ],
     shared_libs: [
+        "android.media.audiopolicy-aconfig-cc",
         "com.android.media.audioserver-aconfig-cc",
         "libaudio_aidl_conversion_common_cpp",
         "libaudiofoundation",

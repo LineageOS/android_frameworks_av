@@ -133,6 +133,7 @@ cc_defaults {
         "libaudiofoundation",
         "libaudiomanager",
         "libaudiopolicy",
+        "libflagtest",
     ],
     cflags: [
         "-Wthread-safety",
