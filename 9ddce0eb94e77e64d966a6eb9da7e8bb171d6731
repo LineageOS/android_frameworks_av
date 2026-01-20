@@ -107,6 +107,23 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "527bcd06_30fb3461",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 518,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2026-01-20T18:02:53Z",
+      "side": 1,
+      "message": "If you make changes you might as well wrap to 100 chars here and below",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "9c5efc25_1e4002e5",
         "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
         "patchSetId": 2
