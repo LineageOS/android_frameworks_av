@@ -17,6 +17,13 @@ flag {
 }
 
 flag {
+    name: "capture_offloaded_audio"
+    namespace: "media_audio"
+    description: "Supports capturing audio which are playing in PCM offload or MMAP."
+    bug: "460856210"
+}
+
+flag {
     name: "effect_chain_callback_improve"
     namespace: "media_audio"
     description: "Improve effect chain callback mutex logic."

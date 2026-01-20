@@ -948,11 +948,8 @@ TEST_F(VirtualCameraSessionInputChoiceTest,
 
 // Virtual Camera Session With Metadata Tests
 
-TEST_F_WITH_FLAGS(VirtualCameraSessionWithMetadata,
-                  onProcessCaptureRequestMetadataTriggersClientCallback,
-                  REQUIRES_FLAGS_ENABLED(
-                      ACONFIG_FLAG(android::companion::virtualdevice::flags,
-                                   virtual_camera_metadata))) {
+TEST_F(VirtualCameraSessionWithMetadata,
+       onProcessCaptureRequestMetadataTriggersClientCallback) {
   auto virtualCameraSession =
       createMetadataSession(true /* perFrameMetadataEnabled */);
 
@@ -1020,11 +1017,9 @@ TEST_F_WITH_FLAGS(VirtualCameraSessionWithMetadata,
                   .isOk());
 }
 
-TEST_F_WITH_FLAGS(
+TEST_F(
     VirtualCameraSessionWithMetadata,
-    onProcessCaptureRequestMetadataTriggersClientCallbackNoPerFrameMetadata,
-    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
-                                        virtual_camera_metadata))) {
+    onProcessCaptureRequestMetadataTriggersClientCallbackNoPerFrameMetadata) {
   auto virtualCameraSession =
       createMetadataSession(false /* perFrameMetadataEnabled */);
 
@@ -1071,11 +1066,9 @@ TEST_F_WITH_FLAGS(
   EXPECT_THAT(aidlReturn, Eq(requests.size()));
 }
 
-TEST_F_WITH_FLAGS(
+TEST_F(
     VirtualCameraSessionWithMetadata,
-    onProcessCaptureRequestMetadataWithCharacteristicsTriggersClientCallback,
-    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
-                                        virtual_camera_metadata))) {
+    onProcessCaptureRequestMetadataWithCharacteristicsTriggersClientCallback) {
   auto virtualCameraSession = createMetadataSessionWithCharacteristics(
       true /* perFrameMetadataEnabled */);
 
@@ -1144,11 +1137,9 @@ TEST_F_WITH_FLAGS(
                   .isOk());
 }
 
-TEST_F_WITH_FLAGS(
+TEST_F(
     VirtualCameraSessionWithMetadata,
-    onProcessCaptureRequestMetadataWithCharacteristicsTriggersClientCallbackNoPerFrameMetadata,
-    REQUIRES_FLAGS_ENABLED(ACONFIG_FLAG(android::companion::virtualdevice::flags,
-                                        virtual_camera_metadata))) {
+    onProcessCaptureRequestMetadataWithCharacteristicsTriggersClientCallbackNoPerFrameMetadata) {
   auto virtualCameraSession = createMetadataSessionWithCharacteristics(
       false /* perFrameMetadataEnabled */);
 

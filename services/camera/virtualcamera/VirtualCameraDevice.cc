@@ -745,13 +745,8 @@ VirtualCameraDevice::VirtualCameraDevice(
     : mCameraId(cameraId),
       mVirtualCameraClientCallback(configuration.virtualCameraCallback),
       mSupportedInputConfigurations(configuration.supportedStreamConfigs),
-      mPerFrameCameraMetadataEnabled(
-          flags::virtual_camera_metadata()
-              ? configuration.perFrameCameraMetadataEnabled
-              : false),
-      mConfigCameraCharacteristics(flags::virtual_camera_metadata()
-                                       ? configuration.cameraCharacteristics
-                                       : std::nullopt) {
+      mPerFrameCameraMetadataEnabled(configuration.perFrameCameraMetadataEnabled),
+      mConfigCameraCharacteristics(configuration.cameraCharacteristics) {
   std::optional<AidlCameraMetadata> metadata = initCameraCharacteristics(
       mSupportedInputConfigurations, configuration.sensorOrientation,
       configuration.lensFacing, mConfigCameraCharacteristics, deviceId);
