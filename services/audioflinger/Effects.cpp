@@ -2338,10 +2338,10 @@ void EffectChain::clearInputBuffer_l()
     if (mInBuffer == NULL) {
         return;
     }
-    const size_t frameSize = audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT)
-            * mEffectCallback->inChannelCount(mEffects[0]->id());
 
-    memset(mInBuffer->audioBuffer()->raw, 0, mEffectCallback->frameCount() * frameSize);
+    // Clear the entire buffer as the logic to determine the
+    // input size (e.g. due to spatialization) may have changed.
+    memset(mInBuffer->audioBuffer()->raw, 0, mInBuffer->getSize());
     mInBuffer->commit();
 }
 
