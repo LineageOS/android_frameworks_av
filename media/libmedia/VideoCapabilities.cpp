@@ -1610,6 +1610,12 @@ void VideoCapabilities::applyLevelLimits() {
                 case HEVCProfileMain10HDR10:
                 case HEVCProfileMain10HDR10Plus:
                     break;
+                case HEVCProfileMain400:
+                case HEVCProfileMain444:
+                    if (android::media::codec::format_400_444_support()) {
+                        break;
+                    }
+                    [[fallthrough]];
                 default:
                     ALOGW("Unrecognized profile %d for %s", profileLevel.mProfile, mediaType);
                     errors |= ERROR_CAPABILITIES_UNRECOGNIZED;
