@@ -20,7 +20,6 @@
 #include <memory>
 
 #include "EGL/egl.h"
-#include "system/window.h"
 
 namespace android {
 namespace companion {

@@ -22,7 +22,6 @@
 #include <chrono>
 
 #include "VirtualCameraCaptureRequest.h"
-#include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureResult.h"
 #include "aidl/android/hardware/camera/device/Stream.h"
 
