@@ -832,21 +832,22 @@ void MediaSync::returnBufferToInput_l(
     mBuffersFromInput.removeItemsAt(ix);
 
     // Attach and release the buffer back to the input.
-    int consumerSlot;
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
     status_t status = mInput->attachBuffer(oldBuffer);
-#else
-    status_t status = mInput->attachBuffer(&consumerSlot, oldBuffer);
-#endif
     ALOGE_IF(status != NO_ERROR, "attaching buffer to input failed (%d)", status);
     if (status == NO_ERROR) {
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
         mInput->releaseBuffer(oldBuffer, fence);
-#else
-        status = mInput->releaseBuffer(consumerSlot, 0 /* frameNumber */, fence);
-#endif
         ALOGE_IF(status != NO_ERROR, "releasing buffer to input failed (%d)", status);
     }
+#else
+    int consumerSlot;
+    status_t status = mInput->attachBuffer(&consumerSlot, oldBuffer);
+    ALOGE_IF(status != NO_ERROR, "attaching buffer to input failed (%d)", status);
+    if (status == NO_ERROR) {
+        status = mInput->releaseBuffer(consumerSlot, 0 /* frameNumber */, fence);
+        ALOGE_IF(status != NO_ERROR, "releasing buffer to input failed (%d)", status);
+    }
+#endif
 
     // Notify any waiting onFrameAvailable calls.
     --mNumOutstandingBuffers;
