@@ -51,6 +51,86 @@
       "message": "Luca asked for hold for now to see if we can get this fixed upstream.",
       "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c638bde4_0e39ce2e",
+        "filename": "camera/CameraMetadata.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2026-01-20T17:33:30Z",
+      "side": 1,
+      "message": "zap changes in this file",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f58a8ea8_0ec53d8e",
+        "filename": "camera/include/camera/CameraMetadata.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2026-01-20T17:33:30Z",
+      "side": 1,
+      "message": "zap",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9c5efc25_1e4002e5",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 527,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2026-01-20T17:33:30Z",
+      "side": 1,
+      "message": "```suggestion\n    ssize_t jpegDebugSize \u003d 0;\n\n    sp\u003cVendorTagDescriptorCache\u003e vtCache \u003d VendorTagDescriptorCache::getGlobalVendorTagCache();\n    sp\u003cVendorTagDescriptor\u003e vTags \u003d nullptr;\n    if (vtCache.get() !\u003d nullptr) {\n        vtCache-\u003egetVendorTagDescriptor(info.getVendorId(), \u0026vTags);\n    }\n\n    uint32_t tag;\n    status_t res \u003d CameraMetadata::getTagFromName(\"org.quic.camera.jpegdebugdata.size\", vTags.get(), \u0026tag);\n    if (res \u003d\u003d OK) {\n        camera_metadata_ro_entry entry \u003d info.find(tag);\n        if (entry.count \u003e 0) {\n            ssize_t jpegDebugSize \u003d entry.data.i32[0];\n            ALOGE(\"%s: Camera %s: Jpeg debug data size %zd\", __FUNCTION__, mId.c_str(), jpegDebugSize);\n        }\n    }\n```",
+      "range": {
+        "startLine": 505,
+        "startChar": 0,
+        "endLine": 527,
+        "endChar": 5
+      },
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "1d1ee6f3_8bcbf22a",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 537,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2026-01-20T17:33:30Z",
+      "side": 1,
+      "message": "move this right below inside the // Calculate",
+      "range": {
+        "startLine": 537,
+        "startChar": 0,
+        "endLine": 537,
+        "endChar": 67
+      },
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
