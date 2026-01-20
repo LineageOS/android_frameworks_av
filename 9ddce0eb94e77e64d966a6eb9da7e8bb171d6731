@@ -16,6 +16,24 @@
       "message": "Did some OEM forgot to disable debug metadata?\nOh well, I could see it happening lmao",
       "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e8ae729c_6d58ede3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30766
+      },
+      "writtenOn": "2026-01-20T16:48:29Z",
+      "side": 1,
+      "message": "Yea I seem to need this for Xiaomi 8750",
+      "parentUuid": "510c2cee_b6022c74",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
