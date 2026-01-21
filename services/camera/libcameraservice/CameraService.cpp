@@ -4293,6 +4293,7 @@ CameraService::BasicClient::BasicClient(
       mDisconnected(false),
       mUidIsTrusted(false),
       mCompatInfo(compatInfo), mSharedMode(sharedMode),
+      mIsPrimaryClient(false),
       mAudioRestriction(ICameraDeviceUser::AudioRestriction::NONE),
       mRemoteBinder(remoteCallback),
       mCameraOpen(false),
