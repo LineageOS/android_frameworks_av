@@ -212,7 +212,7 @@ status_t ParameterManagerWrapper::setPhoneState(audio_mode_t mode)
     ISelectionCriterionInterface *criterion = getElement<ISelectionCriterionInterface>(
             capEngineConfig::gPhoneStateCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__,
+        ALOGW("%s: no criterion found for %s", __FUNCTION__,
               capEngineConfig::gPhoneStateCriterionName);
         return BAD_VALUE;
     }
@@ -233,7 +233,7 @@ audio_mode_t ParameterManagerWrapper::getPhoneState() const
     const ISelectionCriterionInterface *criterion = getElement<ISelectionCriterionInterface>(
             capEngineConfig::gPhoneStateCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __func__, capEngineConfig::gPhoneStateCriterionName);
+        ALOGD("%s: no criterion found for %s", __func__, capEngineConfig::gPhoneStateCriterionName);
         return AUDIO_MODE_NORMAL;
     }
     return static_cast<audio_mode_t>(criterion->getCriterionState());
@@ -253,7 +253,7 @@ status_t ParameterManagerWrapper::setForceUse(audio_policy_force_use_t usage,
     ISelectionCriterionInterface *criterion = getElement<ISelectionCriterionInterface>(
             capEngineConfig::gForceUseCriterionTag[usage], mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __func__,
+        ALOGW("%s: no criterion found for %s", __func__,
               capEngineConfig::gForceUseCriterionTag[usage]);
         return BAD_VALUE;
     }
@@ -278,7 +278,7 @@ audio_policy_forced_cfg_t ParameterManagerWrapper::getForceUse(audio_policy_forc
     const ISelectionCriterionInterface *criterion = getElement<ISelectionCriterionInterface>(
             capEngineConfig::gForceUseCriterionTag[usage], mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __func__,
+        ALOGD("%s: no criterion found for %s", __func__,
               capEngineConfig::gForceUseCriterionTag[usage]);
         return AUDIO_POLICY_FORCE_NONE;
     }
@@ -309,7 +309,7 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(
             getElement<ISelectionCriterionInterface>(criterionName, mPolicyCriteria);
 
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __func__, criterionName.c_str());
+        ALOGW("%s: no criterion found for %s", __func__, criterionName.c_str());
         return DEAD_OBJECT;
     }
 
