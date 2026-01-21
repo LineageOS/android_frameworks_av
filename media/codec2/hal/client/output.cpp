@@ -419,6 +419,11 @@ void OutputBufferQueue::stop() {
     }
 }
 
+sp<HGraphicBufferProducer> OutputBufferQueue::getHgbp() const {
+    ALOGE_IF(!mSurface, "getHgbp() called on stopped OutputBufferQueue");
+    return mSurface ? mSurface->getHgbp() : nullptr;
+}
+
 bool OutputBufferQueue::registerBuffer(const C2ConstGraphicBlock& block) {
     std::shared_ptr<_C2BlockPoolData> data =
             _C2BlockFactory::GetGraphicBlockPoolData(block);
