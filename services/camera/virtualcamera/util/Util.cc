@@ -19,14 +19,11 @@
 #include <android_companion_virtualdevice_flags.h>
 #include <unistd.h>
 
-#include <algorithm>
-#include <array>
 #include <cstdint>
 #include <memory>
 
 #include "EglUtil.h"
 #include "android/hardware_buffer.h"
-#include "jpeglib.h"
 #include "ui/GraphicBuffer.h"
 #include "utils/Errors.h"
 

@@ -34,7 +34,12 @@
 #include "aidl/android/companion/virtualcamera/Format.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/ICameraDeviceCallback.h"
-#include "android/binder_auto_utils.h"
+#include "gui/Surface.h"
+#include "ui/PixelFormat.h"
+#include "util/EglDisplayContext.h"
+#include "util/EglFramebuffer.h"
+#include "util/EglProgram.h"
+#include "util/EglSurfaceTexture.h"
 #include "util/Util.h"
 
 namespace android {
@@ -68,12 +73,14 @@ class ProcessCaptureRequestTask {
 
 struct UpdateTextureTask {};
 
+// Variant holding either a ProcessCaptureRequestTask or UpdateTextureTask
+// used to mix both type of task in the rendering queue
 struct RenderThreadTask
     : public std::variant<std::unique_ptr<ProcessCaptureRequestTask>,
                           UpdateTextureTask> {
   // Allow implicit conversion to bool.
   //
-  // Returns false, if the RenderThreadTask consist of null
+  // Returns false, if the RenderThreadTask consists of a null
   // ProcessCaptureRequestTask, which signals that the thread should terminate.
   operator bool() const {
     const bool isExitSignal =
@@ -91,14 +98,14 @@ class VirtualCameraRenderThread {
   // Create VirtualCameraRenderThread instance:
   // * sessionContext - VirtualCameraSessionContext reference for shared access
   // to mapped buffers.
+  // * inputSurfaceIndex - index of the input surface.
   // * imageFormat - image format of the input surface
   // * inputSurfaceSize - requested size of input surface.
   // * reportedSensorSize - reported static sensor size of virtual camera.
   // * cameraDeviceCallback - callback for corresponding camera instance
-  // * testMode - when set to true, test pattern is rendered to input surface
   // before each capture request is processed to simulate client input.
   VirtualCameraRenderThread(
-      VirtualCameraSessionContext& sessionContext,
+      VirtualCameraSessionContext& sessionContext, int inputSurfaceIndex,
       ::aidl::android::companion::virtualcamera::Format imageFormat,
       Resolution inputSurfaceSize, Resolution reportedSensorSize,
       std::shared_ptr<
@@ -141,7 +148,7 @@ class VirtualCameraRenderThread {
   void threadLoop();
 
   // Process single capture request task (always called on render thread).
-  void processTask(const ProcessCaptureRequestTask& captureRequestTask);
+  void processCaptureRequest(const ProcessCaptureRequestTask& captureRequestTask);
 
   // Flush single capture request task returning the error status immediately.
   void flushCaptureRequest(const ProcessCaptureRequestTask& captureRequestTask);
@@ -172,10 +179,13 @@ class VirtualCameraRenderThread {
       ::aidl::android::hardware::camera::device::CaptureResult& captureResult);
 
   // Notify a shutter event for all the buffers in this request.
+  //
+  // isFrameProcessed: if true, that frame has already been processed once, so
+  // shutter should not be notified, only buffer errors.
   ::ndk::ScopedAStatus notifyShutter(
       const ProcessCaptureRequestTask& request,
       const ::aidl::android::hardware::camera::device::CaptureResult& captureResult,
-      std::chrono::nanoseconds captureTimestamp);
+      std::chrono::nanoseconds captureTimestamp, bool isFrameProcessed);
 
   // Notify a timeout error for this request. The capture result still needs to
   // be submitted after this call.
@@ -199,6 +209,7 @@ class VirtualCameraRenderThread {
   const ::aidl::android::companion::virtualcamera::Format mImageFormat;
   const Resolution mInputSurfaceSize;
   const Resolution mReportedSensorSize;
+  const int mInputSurfaceIndex;
 
   VirtualCameraSessionContext& mSessionContext;
 
@@ -206,8 +217,10 @@ class VirtualCameraRenderThread {
 
   // Blocking queue implementation.
   std::mutex mLock;
-  std::deque<std::unique_ptr<ProcessCaptureRequestTask>> mQueue GUARDED_BY(mLock);
-  std::condition_variable mCondVar;
+
+  std::deque<std::unique_ptr<ProcessCaptureRequestTask>> mCaptureRequestQueue
+      GUARDED_BY(mLock);
+  std::condition_variable mTaskReadyCondVar;
   volatile bool GUARDED_BY(mLock) mTextureUpdateRequested = false;
   volatile bool GUARDED_BY(mLock) mPendingExit = false;
 

@@ -19,6 +19,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaProfiles"
 
+#include <android_media_codec.h>
+
 #include <stdlib.h>
 #include <utils/misc.h>
 #include <utils/Log.h>
@@ -319,6 +321,12 @@ MediaProfiles::detectAdvancedVideoProfile(
         switch (profile) {
         case HEVCProfileMain:
             return true;
+        case HEVCProfileMain444:
+            if (android::media::codec::format_400_444_support()) {
+                *chroma = CHROMA_SUBSAMPLING_YUV_444;
+                return true;
+            }
+            return false; // not supported
         case HEVCProfileMain10:
             *bitDepth = 10;
             // returning false here as this could be an HLG stream
@@ -331,6 +339,7 @@ MediaProfiles::detectAdvancedVideoProfile(
             *bitDepth = 10;
             *hdr = HDR_FORMAT_HDR10PLUS;
             return true;
+        case HEVCProfileMain400: // never supported for capture
         default:
             return false;
         }

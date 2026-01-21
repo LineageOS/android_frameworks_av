@@ -19,8 +19,6 @@
 
 #include <string>
 
-#include "sys/types.h"
-
 namespace android {
 namespace companion {
 namespace virtualcamera {
