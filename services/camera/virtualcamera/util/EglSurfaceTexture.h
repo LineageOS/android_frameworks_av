@@ -80,7 +80,7 @@ class EglSurfaceTexture {
 
   // Retrieves the timestamp associated with the texture image
   // set by the most recent call to updateTexture.
-  std::chrono::nanoseconds getTimestamp() const;
+  std::chrono::nanoseconds getTimestamp();
 
   // Returns true is a frame has ever been drawn on this surface.
   bool isFirstFrameDrawn();
