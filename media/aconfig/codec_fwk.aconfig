@@ -13,6 +13,13 @@ flag {
 }
 
 flag {
+  name: "ahardware_buffer_fetch_flag"
+  namespace: "codec_fwk"
+  description: "Feature flag to enabling ahardwarebuffer graphic buffer fetch"
+  bug: "456253311"
+}
+
+flag {
   name: "aidl_hal_input_surface"
   is_exported: true
   namespace: "codec_fwk"
