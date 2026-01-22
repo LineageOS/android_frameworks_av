@@ -16,6 +16,23 @@
       "message": "I\u0027m happy with this smaller footprint, thanks!",
       "revId": "8e3f0f52e04d2498296c6e550f4b0b832229a1ed",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "baa79864_21a0deec",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 486,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2026-01-22T18:00:49Z",
+      "side": 1,
+      "message": "Missed the 100 chars here",
+      "revId": "8e3f0f52e04d2498296c6e550f4b0b832229a1ed",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ],
   "submitRequirementResults": [
