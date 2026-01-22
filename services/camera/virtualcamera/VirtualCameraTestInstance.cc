@@ -158,7 +158,7 @@ ScopedAStatus VirtualCameraTestInstance::onStreamConfigured(
 ScopedAStatus VirtualCameraTestInstance::onProcessCaptureRequest(
     const int32_t /*streamId*/, const int32_t /*frameId*/,
     const std::optional<VirtualCameraMetadata>& /*in_captureRequestSettings*/) {
-  return ndk::ScopedAStatus();
+  return ScopedAStatus::ok();
 }
 
 ScopedAStatus VirtualCameraTestInstance::onStreamClosed(const int32_t streamId) {

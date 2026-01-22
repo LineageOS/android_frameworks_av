@@ -116,8 +116,8 @@ struct CustomDeleter {
 // Converts camera AIDL status to ndk::ScopedAStatus
 inline ndk::ScopedAStatus cameraStatus(
     const ::aidl::android::hardware::camera::common::Status status) {
-  return ndk::ScopedAStatus::fromServiceSpecificError(
-      static_cast<int32_t>(status));
+  return ndk::ScopedAStatus::fromServiceSpecificErrorWithMessage(
+      static_cast<int32_t>(status), toString(status).c_str());
 }
 
 // Import Fence from AIDL NativeHandle.

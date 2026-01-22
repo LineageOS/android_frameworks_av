@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "android_companion_virtualdevice_flags.h"
+
 #define LOG_TAG "VirtualCamera"
 
 #include <android/binder_stability.h>
