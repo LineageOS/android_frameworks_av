@@ -126,8 +126,8 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
     ignored_values = ['CNT', 'MAX', 'ALL', 'NONE']
 
     criteria_pattern = re.compile(
-        r"\s*V\((?P<type>(?:"+'|'.join(component_type_mapping_table.keys()) + "))_" \
-        r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*,\s*" \
+        r"\s*V\((?P<type>(?:"+'|'.join(component_type_mapping_table.keys()) + r"))_" \
+        r"(?P<literal>(?!" + '|'.join(ignored_values) + r")\w*)\s*,\s*" \
         r"(?:AUDIO_DEVICE_BIT_IN \| )?(?P<values>(?:0[xX])[0-9a-fA-F]+|[0-9]+)")
 
     logging.info("Checking Android Header file {}".format(androidaudiobaseheaderFile))
