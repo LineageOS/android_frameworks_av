@@ -167,7 +167,9 @@ StreamHalAidl::StreamHalAidl(std::string_view className, bool isInput, const aud
         } else {
             VendorParameter createMmapBuffer{.id = kCreateMmapBuffer};
             mSupportsCreateMmapBuffer =
-                    mStream->setVendorParameters({createMmapBuffer}, false).isOk();
+                    serializeCall(mStream, &Stream::setVendorParameters,
+                                  std::vector<VendorParameter>{createMmapBuffer}, false)
+                            .isOk();
         }
     } else {
         AUGMENT_LOG(E, "failed to retrieve stream interface version: %s", status.getMessage());
