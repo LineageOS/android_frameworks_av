@@ -88,6 +88,24 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "ffa52876_2d37f365",
+        "filename": "camera/CameraMetadata.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30766
+      },
+      "writtenOn": "2026-01-22T11:19:18Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "c638bde4_0e39ce2e",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "f58a8ea8_0ec53d8e",
@@ -105,6 +123,24 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "ab1e2644_c5faf26d",
+        "filename": "camera/include/camera/CameraMetadata.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 30766
+      },
+      "writtenOn": "2026-01-22T11:19:18Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "f58a8ea8_0ec53d8e",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "527bcd06_30fb3461",
@@ -118,6 +154,24 @@
       "writtenOn": "2026-01-20T18:02:53Z",
       "side": 1,
       "message": "If you make changes you might as well wrap to 100 chars here and below",
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fed2ba35_64f3c201",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 518,
+      "author": {
+        "id": 30766
+      },
+      "writtenOn": "2026-01-22T11:19:18Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "527bcd06_30fb3461",
       "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
@@ -145,6 +199,30 @@
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "ffae6218_efed4a22",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 527,
+      "author": {
+        "id": 30766
+      },
+      "writtenOn": "2026-01-22T11:19:18Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9c5efc25_1e4002e5",
+      "range": {
+        "startLine": 505,
+        "startChar": 0,
+        "endLine": 527,
+        "endChar": 5
+      },
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "1d1ee6f3_8bcbf22a",
@@ -158,6 +236,30 @@
       "writtenOn": "2026-01-20T17:33:30Z",
       "side": 1,
       "message": "move this right below inside the // Calculate",
+      "range": {
+        "startLine": 537,
+        "startChar": 0,
+        "endLine": 537,
+        "endChar": 67
+      },
+      "revId": "9ddce0eb94e77e64d966a6eb9da7e8bb171d6731",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fd01a6f1_eb6f1e81",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 537,
+      "author": {
+        "id": 30766
+      },
+      "writtenOn": "2026-01-22T11:19:18Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "1d1ee6f3_8bcbf22a",
       "range": {
         "startLine": 537,
         "startChar": 0,
