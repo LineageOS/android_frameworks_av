@@ -205,8 +205,8 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile, androidaudiocommonbasehead
     multi_bit_inputdevice_shift = 32
 
     criteria_pattern = re.compile(
-        r"\s*V\((?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
-        r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*,\s*" \
+        r"\s*V\((?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + r"))_" \
+        r"(?P<literal>(?!" + '|'.join(ignored_values) + r")\w*)\s*,\s*" \
         r"(?:AUDIO_DEVICE_BIT_IN \| )?(?P<values>(?:0[xX])?[0-9a-fA-F]+|[0-9]+)")
 
     logging.info("Checking Android Header file {}".format(androidaudiobaseheaderFile))
@@ -285,8 +285,8 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile, androidaudiocommonbasehead
     logging.info("Checking Android Common Header file {}".format(androidaudiocommonbaseheaderFile))
 
     criteria_pattern = re.compile(
-        r"\s*(?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
-        r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*=\s*" \
+        r"\s*(?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + r"))_" \
+        r"(?P<literal>(?!" + '|'.join(ignored_values) + r")\w*)\s*=\s*" \
         r"(?:AUDIO_DEVICE_BIT_IN \| )?(?P<values>(?:0[xX])?[0-9a-fA-F]+|[0-9]+)")
 
     for line_number, line in enumerate(androidaudiocommonbaseheaderFile):
