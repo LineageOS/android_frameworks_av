@@ -951,7 +951,16 @@ status_t MPEG4Writer::start(MetaData *param) {
      */
     int32_t fileSizeBits = fpathconf(mFd, _PC_FILESIZEBITS);
     ALOGD("fpathconf _PC_FILESIZEBITS:%" PRId32, fileSizeBits);
-    fileSizeBits = std::min(fileSizeBits, 52 /* cap it below 4 peta bytes */);
+
+    if (fileSizeBits < 0) {
+        ALOGW("fpathconf(%d) failed with err: %s. Defaulting to 4GB.", mFd, strerror(errno));
+        // Fallback to 32-bit (4GB) limit to prevent data corruption on FAT32 if the
+        // filesystem capabilities cannot be determined.
+        fileSizeBits = 32;
+    } else {
+        fileSizeBits = std::min(fileSizeBits, 52 /* cap it below 4 peta bytes */);
+    }
+
     int64_t maxFileSizeBytes = ((int64_t)1 << fileSizeBits) - 1;
     if (mMaxFileSizeLimitBytes > maxFileSizeBytes) {
         mMaxFileSizeLimitBytes = maxFileSizeBytes;
