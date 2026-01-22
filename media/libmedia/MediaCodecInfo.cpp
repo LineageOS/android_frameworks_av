@@ -18,6 +18,8 @@
 #define LOG_TAG "MediaCodecInfo"
 #include <utils/Log.h>
 
+#include <android_media_codec.h>
+
 #include <media/MediaCodecInfo.h>
 
 #include <media/stagefright/foundation/ADebug.h>
@@ -192,6 +194,15 @@ const char *MediaCodecInfo::getHalName() const {
 
 const char *MediaCodecInfo::getOwnerName() const {
     return mOwner.c_str();
+}
+
+int MediaCodecInfo::getSecurityModel() const {
+    if (android::media::codec::provider_->in_process_sw_codec_lfi()) {
+        if (mOwner == "codec2::__ApexCodecs__") {
+            return SECURITY_MODEL_MEMORY_SAFE;
+        }
+    }
+    return SECURITY_MODEL_SANDBOXED;
 }
 
 // static
