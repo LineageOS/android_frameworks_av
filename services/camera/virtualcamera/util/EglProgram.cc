@@ -15,7 +15,6 @@
  */
 
 // #define LOG_NDEBUG 0
-#include <format>
 #define LOG_TAG "EglProgram"
 #include "EglProgram.h"
 
@@ -320,9 +319,6 @@ bool EglTextureProgram::draw(GLuint textureId,
   // Configure texture for the shader.
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureId);
-  if (checkEglError(std::format("glBindTexture %d", textureId).c_str())) {
-    return false;
-  }
   glUniform1i(mTextureHandle, 0);
 
   // Draw triangle strip forming a square filling the viewport.

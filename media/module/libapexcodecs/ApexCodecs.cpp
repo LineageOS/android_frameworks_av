@@ -621,8 +621,9 @@ public:
             return C2Value::NO_INIT;
         }
 
+        size_t offset = _C2ParamInspector::GetOffset(field) - sizeof(C2Param);
         for (const C2FieldDescriptor &fieldDesc : *desc) {
-            if (_C2ParamInspector::GetOffset(fieldDesc) == _C2ParamInspector::GetOffset(field)) {
+            if (_C2ParamInspector::GetOffset(fieldDesc) == offset) {
                 if (_C2ParamInspector::GetSize(fieldDesc) != _C2ParamInspector::GetSize(field)) {
                     // Size doesn't match.
                     return C2Value::NO_INIT;
@@ -878,7 +879,7 @@ ApexCodec_Status ApexCodec_Configurable::querySupportedValues(
     for (size_t i = 0; i < numQueries; ++i) {
         C2Param::Index index = queries[i].index;
         uint32_t offset = queries[i].offset;
-        uint32_t size = findSize(index, offset);
+        uint32_t size = findSize(index, offset - sizeof(C2Param));
         c2Fields.push_back(_C2ParamInspector::CreateParamField(index, offset, size));
         c2Queries.emplace_back(c2Fields.back(),
                                (C2FieldSupportedValuesQuery::type_t)queries[i].type);

@@ -30,7 +30,6 @@
 #include <mutex>
 
 #include "EglUtil.h"
-#include "android_companion_virtualdevice_flags.h"
 
 namespace android {
 namespace companion {
@@ -125,7 +124,7 @@ bool EglSurfaceTexture::waitForNextFrame(const std::chrono::nanoseconds timeout)
   });
 }
 
-std::chrono::nanoseconds EglSurfaceTexture::getTimestamp() const {
+std::chrono::nanoseconds EglSurfaceTexture::getTimestamp() {
   return std::chrono::nanoseconds(mGlConsumer->getTimestamp());
 }
 

@@ -103,10 +103,6 @@ class VirtualCameraDevice
     return mPerFrameCameraMetadataEnabled;
   }
 
-  bool isMultiInputStreamEnabled() const {
-    return mIsMultiInputStreamEnabled;
-  }
-
   const std::vector<
       aidl::android::companion::virtualcamera::SupportedStreamConfiguration>&
   getInputConfigs() const;
@@ -165,9 +161,8 @@ class VirtualCameraDevice
   const bool mPerFrameCameraMetadataEnabled;
   std::optional<::aidl::android::companion::virtualcamera::VirtualCameraMetadata>
       mConfigCameraCharacteristics;
-  std::atomic_int mNextInputStreamId;
 
-  const bool mIsMultiInputStreamEnabled;
+  std::atomic_int mNextInputStreamId;
 };
 
 }  // namespace virtualcamera

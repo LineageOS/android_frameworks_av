@@ -26,6 +26,7 @@
 #include "EngineDefaultConfig.h"
 #include <TypeConverter.h>
 #include <com_android_media_audio.h>
+#include <cutils/multiuser.h>
 
 namespace android {
 namespace audio_policy {
@@ -87,9 +88,12 @@ status_t EngineBase::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc
 }
 
 product_strategy_t EngineBase::getProductStrategyForAttributes(
-        const audio_attributes_t &attr, bool fallbackOnDefault) const
+        const audio_attributes_t &attr, uid_t uid, bool fallbackOnDefault) const
 {
-    return mProductStrategies.getProductStrategyForAttributes(attr, fallbackOnDefault);
+    int zone = getZoneIdForUserId(multiuser_get_user_id(uid));
+    product_strategy_t strategy = mProductStrategies.getProductStrategyForAttributes(attr,
+        zone, fallbackOnDefault);
+    return strategy;
 }
 
 audio_stream_type_t EngineBase::getStreamTypeForAttributes(const audio_attributes_t &attr) const
@@ -228,8 +232,17 @@ engineConfig::ParsingResult EngineBase::processParsingResult(
     };
     auto addSupportedAttributesToGroup = [](auto &group, auto &volumeGroup, auto &strategy) {
         for (const auto &attr : group.attributesVect) {
-            strategy->addAttributes({volumeGroup->getId(), group.stream, attr});
-            volumeGroup->addSupportedAttributes(attr);
+            auto attributes = std::move(attr);
+            // For volume management audio source must strictly be AUDIO_SOURCE_INVALID for output
+            // device selection
+            if (attributes.source != AUDIO_SOURCE_INVALID) {
+                ALOGW("%s: Resetting audio source for volume group %d from %s to %s.",
+                      __func__, volumeGroup->getId(), toString(attributes.source).c_str(),
+                      toString(AUDIO_SOURCE_INVALID).c_str());
+                attributes.source = AUDIO_SOURCE_INVALID;
+            }
+            strategy->addAttributes({volumeGroup->getId(), group.stream, attributes});
+            volumeGroup->addSupportedAttributes(attributes);
         }
     };
     auto checkStreamForGroups = [](auto streamType, const auto &volumeGroups) {
@@ -412,6 +425,47 @@ status_t EngineBase::listAudioProductStrategies(AudioProductStrategyVector &stra
     return NO_ERROR;
 }
 
+status_t EngineBase::setProductStrategiesZoneIdForUserId(userid_t userId, int zoneId)
+{
+    mUserIdZoneCriteria.emplace(userId, zoneId);
+    return NO_ERROR;
+}
+
+status_t EngineBase::resetProductStrategiesZoneIdForUserId(userid_t userId)
+{
+    mUserIdZoneCriteria.erase(userId);
+    return NO_ERROR;
+}
+
+userid_t EngineBase::getUserIdForProductStrategy(product_strategy_t strategy) const {
+    int zoneId = AudioProductStrategy::DEFAULT_ZONE_ID;
+    for (const auto& strategyPair : mProductStrategies) {
+        if (strategyPair.second->getId() == strategy) {
+            zoneId = strategyPair.second->getZoneId();
+            break;
+        }
+    }
+    if (zoneId == AudioProductStrategy::DEFAULT_ZONE_ID) {
+        return 0;
+    }
+    for (auto userIdPair : mUserIdZoneCriteria) {
+        if (userIdPair.second == zoneId) {
+            return userIdPair.first;
+        }
+    }
+    return 0;
+}
+
+int EngineBase::getZoneIdForUserId(userid_t userId) const
+{
+    if (userId > 0 && !mUserIdZoneCriteria.empty()) {
+        if (const auto &it = mUserIdZoneCriteria.find(userId); it != mUserIdZoneCriteria.end()) {
+            return it->second;
+        }
+    }
+    return AudioProductStrategy::DEFAULT_ZONE_ID;
+}
+
 VolumeCurves *EngineBase::getVolumeCurvesForAttributes(const audio_attributes_t &attr) const
 {
     volume_group_t volGr = mProductStrategies.getVolumeGroupForAttributes(attr);
@@ -463,9 +517,10 @@ VolumeGroupVector EngineBase::getVolumeGroups() const
 }
 
 volume_group_t EngineBase::getVolumeGroupForAttributes(
-        const audio_attributes_t &attr, bool fallbackOnDefault) const
+        const audio_attributes_t &attr, uid_t uid, bool fallbackOnDefault) const
 {
-    return mProductStrategies.getVolumeGroupForAttributes(attr, fallbackOnDefault);
+    int zoneId = getZoneIdForUserId(multiuser_get_user_id(uid));
+    return mProductStrategies.getVolumeGroupForAttributes(attr, zoneId, fallbackOnDefault);
 }
 
 audio_attributes_t EngineBase::getAttributesForVolumeGroup(
@@ -481,7 +536,8 @@ audio_attributes_t EngineBase::getAttributesForVolumeGroup(
 volume_group_t EngineBase::getVolumeGroupForStreamType(
         audio_stream_type_t stream, bool fallbackOnDefault) const
 {
-    return mProductStrategies.getVolumeGroupForStreamType(stream, fallbackOnDefault);
+    return mProductStrategies.getVolumeGroupForStreamType(stream,
+            AudioProductStrategy::DEFAULT_ZONE_ID, fallbackOnDefault);
 }
 
 status_t EngineBase::listAudioVolumeGroups(AudioVolumeGroupVector &groups) const
@@ -978,6 +1034,12 @@ void EngineBase::dump(String8 *dst) const
     dumpProductStrategyDevicesRoleMap(mProductStrategyDeviceRoleMap, dst, 2);
     dumpCapturePresetDevicesRoleMap(dst, 2);
     mVolumeGroups.dump(dst, 2);
+    dst->appendFormat("\n%*smUserIdZoneCriteria:", 2, "");
+    for (const auto &criterion : mUserIdZoneCriteria) {
+        dst->appendFormat("\n%*sUser Id (%d) ZoneId(%d)", 2 + 2, "",
+                          criterion.first, criterion.second);
+    }
+    dst->appendFormat("\n");
 }
 
 } // namespace audio_policy

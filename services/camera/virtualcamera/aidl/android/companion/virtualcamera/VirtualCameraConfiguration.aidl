@@ -34,5 +34,4 @@ parcelable VirtualCameraConfiguration {
     LensFacing lensFacing;
     boolean perFrameCameraMetadataEnabled;
     @nullable VirtualCameraMetadata cameraCharacteristics;
-    boolean isMultiInputStreamEnabled;
 }

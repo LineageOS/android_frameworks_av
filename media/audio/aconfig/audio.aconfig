@@ -133,13 +133,6 @@ flag {
 }
 
 flag {
-    name: "spatializer_offload"
-    namespace: "media_audio"
-    description: "Enable spatializer offload"
-    bug: "307842941"
-}
-
-flag {
     name: "spatializer_upmix"
     namespace: "media_audio"
     description: "Enable spatializer upmix"

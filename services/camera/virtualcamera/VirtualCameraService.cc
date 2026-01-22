@@ -18,8 +18,6 @@
 #define LOG_TAG "VirtualCameraService"
 #include "VirtualCameraService.h"
 
-#include <android_companion_virtualdevice_flags.h>
-
 #include <algorithm>
 #include <array>
 #include <cinttypes>
@@ -59,8 +57,6 @@ using ::aidl::android::companion::virtualcamera::LensFacing;
 using ::aidl::android::companion::virtualcamera::SensorOrientation;
 using ::aidl::android::companion::virtualcamera::SupportedStreamConfiguration;
 using ::aidl::android::companion::virtualcamera::VirtualCameraConfiguration;
-
-namespace flags = ::android::companion::virtualdevice::flags;
 
 namespace {
 
@@ -147,16 +143,6 @@ ndk::ScopedAStatus validateConfiguration(
     }
   }
 
-  if (configuration.isMultiInputStreamEnabled &&
-      !flags::camera_multiple_input_streams()) {
-    ALOGE(
-        "%s: Try to setup a multi stream camera without enabling the "
-        "camera_multiple_input_streams flag",
-        __func__);
-    return ndk::ScopedAStatus::fromServiceSpecificError(
-        Status::EX_ILLEGAL_ARGUMENT);
-  }
-
   return ndk::ScopedAStatus::ok();
 }
 
@@ -227,10 +213,10 @@ ndk::ScopedAStatus verifyRequiredEglExtensions() {
       ALOGE("%s not supported", eglExtension);
       return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
           EX_UNSUPPORTED_OPERATION,
-          fmt::format("Cannot create virtual camera, because required EGL "
-                      "extension {} "
-                      "is not supported on this system",
-                      eglExtension)
+          fmt::format(
+              "Cannot create virtual camera, because required EGL extension {} "
+              "is not supported on this system",
+              eglExtension)
               .c_str());
     }
   }

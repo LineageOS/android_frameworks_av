@@ -2247,7 +2247,7 @@ EffectChain::EffectChain(const sp<IAfThreadBase>& thread, audio_session_t sessio
       mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread, afThreadCallback))
 {
     if (thread != nullptr) {
-        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
+        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC, /* uid= */ 0);
         mMaxTailBuffers =
             ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
                 thread->frameCount();
@@ -2338,10 +2338,10 @@ void EffectChain::clearInputBuffer_l()
     if (mInBuffer == NULL) {
         return;
     }
-    const size_t frameSize = audio_bytes_per_sample(AUDIO_FORMAT_PCM_FLOAT)
-            * mEffectCallback->inChannelCount(mEffects[0]->id());
 
-    memset(mInBuffer->audioBuffer()->raw, 0, mEffectCallback->frameCount() * frameSize);
+    // Clear the entire buffer as the logic to determine the
+    // input size (e.g. due to spatialization) may have changed.
+    memset(mInBuffer->audioBuffer()->raw, 0, mInBuffer->getSize());
     mInBuffer->commit();
 }
 
@@ -3071,7 +3071,7 @@ bool EffectChain::isNonOffloadableEnabled_l() const
 void EffectChain::setThread(const sp<IAfThreadBase>& thread)
 {
     if (thread != nullptr) {
-        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC);
+        mStrategy = thread->getStrategyForStream(AUDIO_STREAM_MUSIC, /* uid= */ 0);
         mMaxTailBuffers =
             ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
                 thread->frameCount();
