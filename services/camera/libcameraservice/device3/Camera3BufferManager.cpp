@@ -542,7 +542,9 @@ bool Camera3BufferManager::checkIfStreamRegisteredLocked(int streamId,
     }
 
     size_t bufferWaterMark = mStreamSetMap[setIdx].maxAllowedBufferCount;
-    if (bufferWaterMark == 0 || bufferWaterMark > kMaxBufferCount) {
+    size_t maxWaterMark = mStreamSetMap[setIdx].allowConcurrent
+            ? kMaxBufferCount * mStreamSetMap[setIdx].streamInfoMap.size() : kMaxBufferCount;
+    if (bufferWaterMark == 0 || bufferWaterMark > maxWaterMark) {
         ALOGW("%s: stream %d with stream set %d(%d) is not registered correctly to stream set map,"
                 " as the water mark (%zu) is wrong!",
                 __FUNCTION__, streamId, streamSetKey.id, streamSetKey.isMultiRes,
