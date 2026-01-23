@@ -1265,6 +1265,20 @@ inline constexpr int32_t INFO_OUTPUT_FORMAT_CHANGED  = -2;
 inline constexpr int32_t INFO_TRY_AGAIN_LATER        = -1;
 inline constexpr int32_t VIDEO_SCALING_MODE_SCALE_TO_FIT               = 1;
 inline constexpr int32_t VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING = 2;
+
+inline constexpr int32_t SECURITY_MODEL_SANDBOXED = 0;
+inline constexpr int32_t SECURITY_MODEL_MEMORY_SAFE = 1;
+inline constexpr int32_t SECURITY_MODEL_TRUSTED_CONTENT_ONLY = 2;
+
+inline static const char *asString_SecurityModel(int32_t i, const char *def = "??") {
+    switch (i) {
+        case SECURITY_MODEL_SANDBOXED:            return "Sandboxed";
+        case SECURITY_MODEL_MEMORY_SAFE:          return "MemorySafe";
+        case SECURITY_MODEL_TRUSTED_CONTENT_ONLY: return "TrustedContentOnly";
+        default:                                  return def;
+    }
+}
+
 inline constexpr char PARAMETER_KEY_OFFSET_TIME[] = "time-offset-us";
 inline constexpr char PARAMETER_KEY_REQUEST_SYNC_FRAME[] = "request-sync";
 inline constexpr char PARAMETER_KEY_SUSPEND[] = "drop-input-frames";

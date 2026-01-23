@@ -220,6 +220,13 @@ struct MediaCodecInfo : public RefBase {
     const char *getOwnerName() const;
 
     /**
+     * Return the security model of the codec.
+     *
+     * See the definition of SECURITY_MODEL_ constants in MediaCodecInfo.java
+     */
+    int getSecurityModel() const;
+
+    /**
      * Returns the rank of the component.
      *
      * Technically this is defined to be per media type, but that makes ordering the MediaCodecList

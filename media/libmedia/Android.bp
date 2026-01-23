@@ -315,6 +315,7 @@ cc_library_shared {
 
     shared_libs: [
         "android.hardware.media.omx@1.0",
+        "libaconfig_storage_read_api_cc",
         "libbinder",
         "liblog",
         "libmedia_codeclist_capabilities",
