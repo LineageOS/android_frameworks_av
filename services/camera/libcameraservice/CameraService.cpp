@@ -3346,18 +3346,30 @@ void CameraService::updateSharedClientAccessPriorities(std::vector<int> sharedCl
     if (err != OK) {
         return;
     }
+
+    std::map<int, std::pair<int, int>> pidToPriority;
     for (size_t i = 0; i < sharedClientPids.size(); i++) {
-        auto clientDescriptorPtr = mActiveClientManager.getSharedClient(sharedClientPids[i]);
-        if (clientDescriptorPtr == nullptr) {
+        pidToPriority[sharedClientPids[i]] = {scores[i], states[i]};
+    }
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& clientDescriptorPtr : clients) {
+        if ((clientDescriptorPtr == nullptr) || !clientDescriptorPtr->getSharedMode()) {
             continue;
         }
-        const auto& clientPriority = clientDescriptorPtr->getPriority();
-        int score = clientPriority.getScore();
-        int state = clientPriority.getState();
-        if ((score != scores[i])  || (state != states[i])){
-            clientDescriptorPtr->setPriority(resource_policy::ClientPriority(scores[i], states[i],
-                    false, 0));
-            notifySharedClientPrioritiesChanged(clientDescriptorPtr->getKey());
+
+        int pid = clientDescriptorPtr->getOwnerId();
+        auto it = pidToPriority.find(pid);
+        if (it != pidToPriority.end()) {
+            int newScore = it->second.first;
+            int newState = it->second.second;
+            const auto& currentPriority = clientDescriptorPtr->getPriority();
+
+            if (currentPriority.getScore() != newScore || currentPriority.getState() != newState) {
+                clientDescriptorPtr->setPriority(resource_policy::ClientPriority(
+                        newScore, newState, false, 0));
+                notifySharedClientPrioritiesChanged(clientDescriptorPtr->getKey());
+            }
         }
     }
 }
