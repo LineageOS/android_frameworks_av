@@ -16,6 +16,7 @@
 
 // #define LOG_NDEBUG 0
 #define LOG_TAG "VirtualCameraSession"
+
 #include "VirtualCameraSession.h"
 
 #include <android_companion_virtualdevice_flags.h>
@@ -25,10 +26,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <numeric>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "VirtualCameraCaptureResultConsumer.h"
@@ -84,7 +87,6 @@ using ::android::base::unique_fd;
 namespace {
 
 using namespace std::chrono_literals;
-
 namespace flags = ::android::companion::virtualdevice::flags;
 
 // Size of request/result metadata fast message queue.
@@ -93,8 +95,6 @@ constexpr size_t kMetadataMsgQueueSize = 0;
 
 // Maximum number of buffers to use per single stream.
 constexpr size_t kMaxStreamBuffers = 2;
-
-constexpr int kInvalidStreamId = -1;
 
 camera_metadata_enum_android_control_capture_intent_t requestTemplateToIntent(
     const RequestTemplate type) {
@@ -318,6 +318,7 @@ std::optional<SupportedStreamConfiguration> pickInputConfigurationForStreams(
     if (!bestConfig.has_value() ||
         isBetterInputConfig(inputConfig, bestConfig.value())) {
       bestConfig = inputConfig;
+      ALOGV("Current Best Config %s", bestConfig.value().toString().c_str());
     }
   }
 
@@ -349,50 +350,65 @@ VirtualCameraSession::VirtualCameraSession(
     : mCameraDevice(cameraDevice),
       mCameraDeviceCallback(cameraDeviceCallback),
       mVirtualCameraClientCallback(virtualCameraClientCallback),
+      mSessionContext(cameraDevice->isMultiInputStreamEnabled()),
       mCurrentInputStreamId(kInvalidStreamId) {
   mRequestMetadataQueue = std::make_unique<RequestMetadataQueue>(
       kMetadataMsgQueueSize, false /* non blocking */);
   if (!mRequestMetadataQueue->isValid()) {
-    ALOGE("%s: invalid request fmq", __func__);
+    ALOGW("%s: invalid request fmq", __func__);
   }
 
   mResultMetadataQueue = std::make_shared<ResultMetadataQueue>(
       kMetadataMsgQueueSize, false /* non blocking */);
   if (!mResultMetadataQueue->isValid()) {
-    ALOGE("%s: invalid result fmq", __func__);
+    ALOGW("%s: invalid result fmq", __func__);
   }
 
- std::shared_ptr<VirtualCameraDevice> virtualCamera = mCameraDevice.lock();
- if (virtualCamera != nullptr && virtualCamera->isPerFrameCameraMetadataEnabled()) {
-   // create a capture result consumer shared reference and set it in the
-   // session context.
-   mSessionContext.setCaptureResultConsumer(
-       ndk::SharedRefBase::make<VirtualCameraCaptureResultConsumer>());
+  std::shared_ptr<VirtualCameraDevice> virtualCamera = mCameraDevice.lock();
+  if (virtualCamera != nullptr &&
+      virtualCamera->isPerFrameCameraMetadataEnabled()) {
+    // create a capture result consumer shared reference and set it in the
+    // session context.
+    mSessionContext.setCaptureResultConsumer(
+        ndk::SharedRefBase::make<VirtualCameraCaptureResultConsumer>());
   }
 }
 
 ndk::ScopedAStatus VirtualCameraSession::close() {
   ALOGV("%s", __func__);
-  std::unique_ptr<VirtualCameraRenderThread> renderThread;
-  {
-    std::lock_guard<std::mutex> lock(mLock);
 
-    if (mRenderThread != nullptr) {
-      mRenderThread->flush();
-      // defer the stop of the render thread outside of the lock
-      renderThread = std::move(mRenderThread);
-      mRenderThread = nullptr;
+  if (mSessionContext.isMultiInputStreamEnabled()) {
+    std::set<int> staleStream =
+        mSessionContext.updateOpenStreams(std::map<int, int>());
+
+    for (int streamId : staleStream) {
+      ALOGV(
+          "VirtualCameraSession::close: closing input stream for thread id %d",
+          streamId);
+      mVirtualCameraClientCallback->onStreamClosed(streamId);
+    }
+
+    closeUnusedRenderThreads();
+  } else {
+    std::unique_ptr<VirtualCameraRenderThread> renderThread;
+    {
+      std::lock_guard<std::mutex> lock(mLock);
+      if (mRenderThread != nullptr) {
+        mRenderThread->flush();
+        // defer the stop of the render thread outside of the lock
+        renderThread = std::move(mRenderThread);
+        mRenderThread = nullptr;
+      }
 
       if (mVirtualCameraClientCallback != nullptr) {
         mVirtualCameraClientCallback->onStreamClosed(mCurrentInputStreamId);
       }
       mCurrentInputStreamId = kInvalidStreamId;
     }
-  }
-
-  // stop the render thread outside of the lock
-  if (renderThread != nullptr) {
-    renderThread->stop();  // this does a blocking join() in destructor
+    // stop the render thread outside of the lock
+    if (renderThread != nullptr) {
+      renderThread->stop();  // this does a blocking join() in destructor
+    }
   }
 
   mSessionContext.closeAllStreams();
@@ -418,8 +434,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
   mSessionContext.removeStreamsNotInStreamConfiguration(
       in_requestedConfiguration);
 
-  auto& streams = in_requestedConfiguration.streams;
-  auto& halStreams = *_aidl_return;
+  const std::vector<Stream>& streams = in_requestedConfiguration.streams;
+  std::vector<HalStream>& halStreams = *_aidl_return;
   halStreams.clear();
   halStreams.resize(in_requestedConfiguration.streams.size());
 
@@ -441,10 +457,18 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
     for (int i = 0; i < in_requestedConfiguration.streams.size(); ++i) {
       halStreams[i] = getHalStream(streams[i]);
       if (mSessionContext.initializeStream(streams[i])) {
-        ALOGV("Configured new stream: %s", streams[i].toString().c_str());
+        ALOGV("Configured new output stream: %s", streams[i].toString().c_str());
       }
     }
+  }
 
+  // Multi Stream configuration
+  if (mSessionContext.isMultiInputStreamEnabled()) {
+    ALOGV("Multi input streams configuration");
+    configureMultiStream(virtualCamera, in_requestedConfiguration, &halStreams);
+  } else {
+    ALOGV("Single input stream configuration");
+    std::lock_guard<std::mutex> lock(mLock);
     inputConfig = pickInputConfigurationForStreams(
         streams, virtualCamera->getInputConfigs());
     if (!inputConfig.has_value()) {
@@ -498,10 +522,11 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       mRenderThread->flush();
       // defer the stop of the render thread outside of the lock
       renderThread = std::move(mRenderThread);
+      mRenderThread = nullptr;
     }
 
     mRenderThread = std::make_unique<VirtualCameraRenderThread>(
-        mSessionContext, inputConfig->imageFormat,
+        mSessionContext, inputConfig->index, inputConfig->imageFormat,
         resolutionFromInputConfig(*inputConfig),
         virtualCamera->getMaxInputResolution(), mCameraDeviceCallback);
 
@@ -512,10 +537,10 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
 
     inputSurface = mRenderThread->getInputSurface();
     inputStreamId = mCurrentInputStreamId =
-        flags::virtual_camera_stable_stream_id()
+        flags::virtual_camera_stable_stream_id() || true  // b/475805468
             ? inputConfig->index
             : virtualCamera->allocateInputStreamId();
-  }
+  }  // end single stream config
 
   // The onConfigureSession is oneway async, just informs the VD owner of
   // the session params
@@ -527,8 +552,8 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
       ALOGE("Failed to convert device to virtual session parameters!");
     }
 
-    mVirtualCameraClientCallback->onConfigureSession(sessionParamsMetadata,
-                                                     mSessionContext.getCaptureResultConsumer());
+    mVirtualCameraClientCallback->onConfigureSession(
+        sessionParamsMetadata, mSessionContext.getCaptureResultConsumer());
   }
 
   if (mVirtualCameraClientCallback != nullptr && inputSurface != nullptr) {
@@ -548,6 +573,110 @@ ndk::ScopedAStatus VirtualCameraSession::configureStreams(
   return ndk::ScopedAStatus::ok();
 }
 
+ndk::ScopedAStatus VirtualCameraSession::configureMultiStream(
+    const std::shared_ptr<VirtualCameraDevice> virtualCamera,
+    const StreamConfiguration& requestedConfiguration,
+    std::vector<HalStream>* halStreams) {
+  (void)halStreams;
+
+  std::map<int, int> outputToInputStreamMap;
+
+  // If a currently-active stream is not included in streamList, the HAL may
+  // safely remove any references to that stream. It must not be reused in a
+  // later configureStreams() call by the framework, and all the gralloc
+  // buffers for it must be freed after the configureStreams() call returns.
+
+  // Check if we have an input surface with the desired resolution
+  for (auto& stream : requestedConfiguration.streams) {
+    std::optional<SupportedStreamConfiguration> inputConfig =
+        pickInputConfigurationForStreams(std::vector<Stream>{stream},
+                                         virtualCamera->getInputConfigs());
+
+    ALOGV("configureMultiStream: inputConfig: %s",
+          inputConfig->toString().c_str());
+
+    if (inputConfig.has_value()) {
+      // The virtual camera owner declared an input stream matching the
+      // requested output stream
+      std::lock_guard<std::mutex> lock(mLock);
+
+      // Let's check if we already started a thread to read from this input surface
+      if (!mRenderThreads.contains(inputConfig->index)) {
+        createRenderThread(*virtualCamera, *inputConfig);
+      }
+
+      outputToInputStreamMap[stream.id] = inputConfig->index;
+
+      VirtualCameraRenderThread* renderThread =
+          mRenderThreads[inputConfig->index].get();
+
+      renderThread->flush();
+    } else {
+      ALOGE("No input configuration found for %dx%d:%d", inputConfig->width,
+            inputConfig->height, static_cast<int32_t>(inputConfig->imageFormat));
+    }
+  }
+
+  // We pass the list of streams we have just opened or that we want
+  // to keep open, and we get the list of streams we need to close.
+  std::set<int> staleInputStreams =
+      mSessionContext.updateOpenStreams(outputToInputStreamMap);
+
+  for (int streamId : staleInputStreams) {
+    ALOGV("configureMultiStream: closing input stream for thread id %d",
+          streamId);
+    mVirtualCameraClientCallback->onStreamClosed(streamId);
+  }
+
+  // Now that the streams are closed, we can close the renderThread that were
+  // using the closed streams
+  closeUnusedRenderThreads();
+
+  return ndk::ScopedAStatus::ok();
+}
+
+void VirtualCameraSession::createRenderThread(
+    VirtualCameraDevice& virtualCamera,
+    SupportedStreamConfiguration& inputConfig) {
+  ALOGV("Creating new thread for inputConfig index: %d", inputConfig.index);
+  std::unique_ptr<VirtualCameraRenderThread> newThread =
+      std::make_unique<VirtualCameraRenderThread>(
+          mSessionContext, inputConfig.index, inputConfig.imageFormat,
+          resolutionFromInputConfig(inputConfig),
+          virtualCamera.getMaxInputResolution(), mCameraDeviceCallback);
+  newThread->start();
+
+  if (mVirtualCameraClientCallback != nullptr) {
+    ALOGV("calling onStreamConfigured for inputConfig: %s",
+          inputConfig.toString().c_str());
+
+    mVirtualCameraClientCallback->onStreamConfigured(
+        inputConfig.index,
+        aidl::android::view::Surface(newThread->getInputSurface().get()),
+        inputConfig.width, inputConfig.height, inputConfig.imageFormat);
+  }
+  mRenderThreads[inputConfig.index] = std::move(newThread);
+}
+
+void VirtualCameraSession::closeUnusedRenderThreads() {
+  // Remove render threads that are no longer needed
+  std::lock_guard<std::mutex> lock(mLock);
+  const std::set<int> usedInputStreamIds =
+      mSessionContext.getUsedInputStreamIds();
+  auto it = mRenderThreads.begin();
+  while (it != mRenderThreads.end()) {
+    auto& [streamId, renderThread] = *it;
+    if (usedInputStreamIds.find(streamId) == usedInputStreamIds.end()) {
+      ALOGV("Closing thread for input stream %d", streamId);
+      renderThread->flush();
+      renderThread->stop();
+      it = mRenderThreads.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
 ndk::ScopedAStatus VirtualCameraSession::constructDefaultRequestSettings(
     RequestTemplate in_type, CameraMetadata* _aidl_return) {
   ALOGV("%s: type %d", __func__, static_cast<int32_t>(in_type));
@@ -555,8 +684,8 @@ ndk::ScopedAStatus VirtualCameraSession::constructDefaultRequestSettings(
   std::shared_ptr<VirtualCameraDevice> camera = mCameraDevice.lock();
   if (camera == nullptr) {
     ALOGW(
-        "%s: constructDefaultRequestSettings called on already unregistered "
-        "camera",
+        "%s: constructDefaultRequestSettings called on already "
+        "unregistered camera",
         __func__);
     return cameraStatus(Status::CAMERA_DISCONNECTED);
   }
@@ -626,7 +755,6 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
     const std::vector<CaptureRequest>& in_requests,
     const std::vector<BufferCache>& in_cachesToRemove, int32_t* _aidl_return) {
   ALOGV("%s: request count: %zu", __func__, in_requests.size());
-
   if (!in_cachesToRemove.empty()) {
     mSessionContext.removeBufferCaches(in_cachesToRemove);
   }
@@ -634,6 +762,9 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
   for (const auto& captureRequest : in_requests) {
     auto status = processCaptureRequest(captureRequest);
     if (!status.isOk()) {
+      ALOGE("%s failed to process request frameNumber:%d status:%s %s",
+            __func__, captureRequest.frameNumber,
+            status.getDescription().c_str(), status.getMessage());
       return status;
     }
   }
@@ -687,17 +818,18 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
   std::shared_ptr<ICameraDeviceCallback> cameraCallback = nullptr;
   RequestSettings requestSettings;
   int currentInputStreamId;
+  std::set<int> inputStreamIds;
   {
     std::lock_guard<std::mutex> lock(mLock);
 
-    // If metadata is empty, last received metadata applies, if it's non-empty
-    // update it.
+    // If metadata is empty, last received metadata applies, if it's
+    // non-empty update it.
     if (!request.settings.metadata.empty()) {
       mCurrentRequestMetadata = request.settings;
     }
 
-    // We don't have any metadata for this request - this means we received none
-    // in first request, this is an error state.
+    // We don't have any metadata for this request - this means we received
+    // none in first request, this is an error state.
     if (mCurrentRequestMetadata.metadata.empty()) {
       return cameraStatus(Status::ILLEGAL_ARGUMENT);
     }
@@ -730,15 +862,42 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
 
   {
     std::lock_guard<std::mutex> lock(mLock);
-    if (mRenderThread == nullptr) {
-      ALOGE(
-          "%s: processCaptureRequest (frameNumber %d)called before configure "
-          "(render thread not initialized)",
-          __func__, request.frameNumber);
-      return cameraStatus(Status::INTERNAL_ERROR);
+    if (!mSessionContext.isMultiInputStreamEnabled()) {
+      if (mRenderThread == nullptr) {
+        ALOGE(
+            "%s: processCaptureRequest (frameNumber %d) called before "
+            "configure "
+            "(render thread not initialized)",
+            __func__, request.frameNumber);
+        return cameraStatus(Status::INTERNAL_ERROR);
+      }
+      mRenderThread->enqueueTask(std::make_unique<ProcessCaptureRequestTask>(
+          request.frameNumber, taskBuffers, requestSettings));
+    } else {
+      mSessionContext.enqueueFrame(request.frameNumber);
+
+      // Map from inputStreamId to the buffers that should be filled by it.
+      std::map<int, std::vector<CaptureRequestBuffer>> inputStreamToBuffersMap;
+      for (const StreamBuffer& streamBuffer : request.outputBuffers) {
+        int inputStreamId = mSessionContext.getInputStreamIdForOutputStreamId(
+            streamBuffer.streamId);
+        if (inputStreamId == kInvalidStreamId) {
+          return cameraStatus(Status::ILLEGAL_ARGUMENT);
+        }
+        inputStreamToBuffersMap[inputStreamId].emplace_back(
+            streamBuffer.streamId, streamBuffer.bufferId,
+            importFence(streamBuffer.acquireFence));
+        inputStreamIds.insert(inputStreamId);
+      }
+
+      for (auto& [inputStreamId, buffers] : inputStreamToBuffersMap) {
+        ALOGV("%s, adding render task for renderThread:%d", __func__,
+              inputStreamId);
+        mRenderThreads[inputStreamId]->enqueueTask(
+            std::make_unique<ProcessCaptureRequestTask>(
+                request.frameNumber, buffers, requestSettings));
+      }
     }
-    mRenderThread->enqueueTask(std::make_unique<ProcessCaptureRequestTask>(
-        request.frameNumber, taskBuffers, requestSettings));
   }
 
   if (mVirtualCameraClientCallback != nullptr) {
@@ -755,19 +914,42 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
       status_t ret = convertDeviceToVirtualCameraMetadata(
           request.settings, virtualCameraMetadata);
       if (ret != OK) {
-        ALOGE("Failed to convert device to virtual capture request settings!");
+        ALOGE(
+            "Failed to convert device to virtual capture request "
+            "settings!");
       }
       captureRequestSettings = virtualCameraMetadata;
     }
-    ndk::ScopedAStatus status =
-        mVirtualCameraClientCallback->onProcessCaptureRequest(
-            currentInputStreamId, request.frameNumber, captureRequestSettings);
-    if (!status.isOk()) {
-      ALOGE(
-          "Failed to invoke onProcessCaptureRequest client callback for frame "
-          "%d. PerFrameCameraMetadataEnabled %s.",
-          request.frameNumber,
-          virtualCamera->isPerFrameCameraMetadataEnabled() ? "true" : "false");
+
+    if (!mSessionContext.isMultiInputStreamEnabled()) {
+      ndk::ScopedAStatus status =
+          mVirtualCameraClientCallback->onProcessCaptureRequest(
+              currentInputStreamId, request.frameNumber, captureRequestSettings);
+      if (!status.isOk()) {
+        ALOGE(
+            "Failed to invoke onProcessCaptureRequest client callback for "
+            "frame:%d currentInputStreamId:%d. Flag virtual_camera_metadata "
+            "enabled:%s. "
+            "PerFrameCameraMetadataEnabled:%s. (error status:%s)",
+            request.frameNumber, currentInputStreamId,
+            flags::virtual_camera_metadata() ? "true" : "false",
+            virtualCamera->isPerFrameCameraMetadataEnabled() ? "true" : "false",
+            status.getDescription().c_str());
+      }
+    } else {
+      for (int streamId : inputStreamIds) {
+        ndk::ScopedAStatus status =
+            mVirtualCameraClientCallback->onProcessCaptureRequest(
+                streamId, request.frameNumber, captureRequestSettings);
+        if (!status.isOk()) {
+          ALOGE(
+              "Failed to invoke onProcessCaptureRequest client callback "
+              "for stream:%d, frame:%d. PerFrameCameraMetadataEnabled:%s.",
+              streamId, request.frameNumber,
+              virtualCamera->isPerFrameCameraMetadataEnabled() ? "enabled"
+                                                               : "disabled");
+        }
+      }
     }
   }
 

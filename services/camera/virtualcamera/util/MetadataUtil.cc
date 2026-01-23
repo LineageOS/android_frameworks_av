@@ -24,11 +24,11 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <variant>
 #include <vector>
-#include <set>
 
 #include "CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
@@ -761,16 +761,16 @@ MetadataBuilder& MetadataBuilder::setCustomMetadata(
     mCustomMetadata = nullptr;
   }
 
-  // only validate and add custom metadata if not null
-  if (customMetadata != nullptr) {
-    int ret = validate_camera_metadata_structure(customMetadata, /*size*/ NULL);
-    if (ret == OK) {
-      mCustomMetadata = clone_camera_metadata(customMetadata);
-    } else {
-      ALOGE("%s: Validate custom metadata failed with status: %d", __func__,
-            ret);
-      mCustomMetadata = nullptr;
-    }
+  if (customMetadata == nullptr) {
+    mCustomMetadata = nullptr;
+    return *this;
+  }
+  int ret = validate_camera_metadata_structure(customMetadata, /*size*/ NULL);
+  if (ret == OK) {
+    mCustomMetadata = clone_camera_metadata(customMetadata);
+  } else {
+    ALOGE("%s: Validate custom metadata failed with status: %d", __func__, ret);
+    mCustomMetadata = nullptr;
   }
   return *this;
 }

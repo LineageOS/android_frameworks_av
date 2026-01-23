@@ -98,7 +98,6 @@ public final class PlaybackPowerActivity extends Activity {
 
     private MediaItem createMediaItem() {
         Intent intent = getIntent();
-        Uri uri = intent.getData();
         MediaItem.Builder builder = new MediaItem.Builder().setUri(intent.getData());
         @Nullable String drmSchemeExtra = intent.getStringExtra(DRM_SCHEME_EXTRA);
         if (drmSchemeExtra != null) {
