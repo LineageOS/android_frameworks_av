@@ -90,6 +90,8 @@ namespace {
 
 constexpr size_t kSmoothnessFactor = 4;
 
+constexpr uint32_t kSourceMemoryMapSize = 16;
+
 // This is for keeping IGBP's buffer dropping logic in legacy mode other
 // than making it non-blocking. Do not change this value.
 const static size_t kDequeueTimeoutNs = 0;
@@ -361,9 +363,9 @@ CCodecBufferChannel::Input::Input() : extraBuffers("extra") {}
 
 // CCodecBufferChannel
 
-CCodecBufferChannel::CCodecBufferChannel(
-        const std::shared_ptr<CCodecCallback>& callback)
+CCodecBufferChannel::CCodecBufferChannel(const std::shared_ptr<CCodecCallback>& callback)
     : mHeapSeqNum(-1),
+      mSourceMemoryMap(kSourceMemoryMapSize),
       mCCodecCallback(callback),
       mFrameIndex(0u),
       mFirstValidFrameIndex(0u),
@@ -706,6 +708,18 @@ int32_t CCodecBufferChannel::getHeapSeqNum(const sp<HidlMemory> &memory) {
     return heapSeqNum;
 }
 
+sp<android::hidl::memory::V1_0::IMemory> CCodecBufferChannel::getSourceIMemory(
+        const sp<hardware::HidlMemory>& memory) {
+    if (mSourceMemoryMap.contains(memory)) {
+        return mSourceMemoryMap.get(memory);
+    }
+    sp<android::hidl::memory::V1_0::IMemory> im = hardware::mapMemory(*memory);
+    if (im) {
+        mSourceMemoryMap.put(memory, im);
+    }
+    return im;
+}
+
 typedef WrapperObject<std::vector<AccessUnitInfo>> BufferInfosWrapper;
 typedef WrapperObject<std::vector<std::unique_ptr<CodecCryptoInfo>>> CryptoInfosWrapper;
 status_t CCodecBufferChannel::attachEncryptedBuffers(
@@ -927,13 +941,10 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
             Vector<uint8_t> keyHandle;
             const DrmStatus drmStatus = mCrypto->getKeyHandle(key, mode, size, offset, subSamples,
                                                               numSubSamples, keyHandle);
-
             const status_t status = drmStatus;
             if (status != OK) {
                 ALOGE("[%s] attachEncryptedBuffer: getKeyHandle failed: status = %d, "
-                      "message = "
-                      "%s",
-                      mName, status, drmStatus.getErrorMessage().c_str());
+                      "message = %s", mName, status, drmStatus.getErrorMessage().c_str());
                 return status;
             }
             std::shared_ptr<C2StreamEncryptionKeyInfo::input> c2KeyHandle =
@@ -1049,8 +1060,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
             return UNKNOWN_ERROR;
         }
         if (mSendEncryptionKeyHandle) {
-            const hardware::hidl_memory& hm = *memory;
-            sp<android::hidl::memory::V1_0::IMemory> im = hardware::mapMemory(hm);
+            sp<android::hidl::memory::V1_0::IMemory> im = getSourceIMemory(memory);
             if (!im) {
                 ALOGE("Failed to map hidl_memory");
                 return UNKNOWN_ERROR;
@@ -1073,8 +1083,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     }
 
     if (mSendEncryptedInfoBuffer) {
-        const hardware::hidl_memory& hm = *memory;
-        sp<android::hidl::memory::V1_0::IMemory> im = hardware::mapMemory(hm);
+        sp<android::hidl::memory::V1_0::IMemory> im = getSourceIMemory(memory);
         if (!im) {
             ALOGE("Failed to map hidl_memory");
             return UNKNOWN_ERROR;
@@ -1083,6 +1092,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
             ALOGE("Mapped memory is null");
             return UNKNOWN_ERROR;
         }
+
         std::span<const uint8_t> inputBuffer(
                 static_cast<uint8_t*>(static_cast<void*>(im->getPointer())) + offset, size);
         std::shared_ptr<C2LinearBlock> encryptedBlock;
@@ -2548,6 +2558,7 @@ void CCodecBufferChannel::stop() {
     mSync.stop();
     mFirstValidFrameIndex = mFrameIndex.load(std::memory_order_relaxed);
     mInfoBuffers.clear();
+    mSourceMemoryMap.clear();
 }
 
 void CCodecBufferChannel::stopUseOutputSurface(bool pushBlankBuffer) {
@@ -2593,6 +2604,7 @@ void CCodecBufferChannel::reset() {
 
 void CCodecBufferChannel::release() {
     mInfoBuffers.clear();
+    mSourceMemoryMap.clear();
     std::shared_ptr<Codec2Client::Component> nullComp;
     std::atomic_store(&mComponent, nullComp);
     mInputAllocator.reset();
