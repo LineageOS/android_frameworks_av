@@ -351,3 +351,14 @@ flag {
         purpose: PURPOSE_FEATURE
     }
 }
+
+flag {
+    namespace: "camera_platform"
+    name: "output_configuration_get_physical_camera_id"
+    is_exported: true
+    description: "Unhide the getPhysicalCameraId function in OutputConfiguration"
+    bug: "474383302"
+    metadata {
+        purpose: PURPOSE_FEATURE
+    }
+}

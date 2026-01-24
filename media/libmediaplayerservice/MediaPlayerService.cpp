@@ -359,6 +359,9 @@ static void dumpCodecDetails(int fd, const sp<IMediaCodecList> &codecList, bool 
 
                 snprintf(buffer, SIZE - 1, "    owner: \"%s\"\n", info->getOwnerName());
                 result.append(buffer);
+                snprintf(buffer, SIZE - 1, "    security model: %s\n",
+                         asString_SecurityModel(info->getSecurityModel()));
+                result.append(buffer);
                 snprintf(buffer, SIZE - 1, "    hal name: \"%s\"\n", info->getHalName());
                 result.append(buffer);
                 snprintf(buffer, SIZE - 1, "    rank: %u\n", info->getRank());
