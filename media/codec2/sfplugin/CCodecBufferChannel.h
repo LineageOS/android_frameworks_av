@@ -22,6 +22,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <span>
 
 #include <C2Buffer.h>
 #include <C2Component.h>
@@ -328,6 +329,10 @@ private:
                             int64_t mediaTimeUs, int64_t desiredRenderTimeNs);
     void processRenderedFrames(const FrameEventHistoryDelta& delta);
     int64_t getRenderTimeNs(const TrackedFrame& frame);
+    bool fetchAndCopyEncryptedInfoBuffer(
+            const std::span<const uint8_t> input,
+            std::shared_ptr<C2LinearBlock> *encryptedBlock,
+            size_t *blockSize);
 
     QueueSync mSync;
     sp<MemoryDealer> mDealer;

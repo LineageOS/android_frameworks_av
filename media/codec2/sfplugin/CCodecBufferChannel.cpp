@@ -23,10 +23,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <list>
 #include <numeric>
 #include <thread>
-#include <chrono>
 
 #include <android_media_codec.h>
 #include <android_media_tv_flags.h>
@@ -831,6 +831,45 @@ status_t CCodecBufferChannel::attachEncryptedBuffers(
     return OK;
 }
 
+bool CCodecBufferChannel::fetchAndCopyEncryptedInfoBuffer(const std::span<const uint8_t> input,
+                                                          std::shared_ptr<C2LinearBlock> *block,
+                                                          size_t *blockSize) {
+    CHECK(mSendEncryptedInfoBuffer);
+    static const C2MemoryUsage kDefaultReadWriteUsage{
+        C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+    constexpr int kAllocGranule0 = 1024 * 64;
+    constexpr int kAllocGranule1 = 1024 * 1024;
+
+    std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
+
+    // round up encrypted sizes to limit fragmentation and encourage buffer reuse
+    if (input.size() <= kAllocGranule1) {
+        *blockSize = align(input.size(), kAllocGranule0);
+    } else {
+        *blockSize = align(input.size(), kAllocGranule1);
+    }
+
+    c2_status_t blockRes = pool->fetchLinearBlock(*blockSize, kDefaultReadWriteUsage, block);
+    if (blockRes != C2_OK) {
+        ALOGE("Failed to fetch linear block: %s", asString(blockRes));
+        return false;
+    }
+
+    C2WriteView view = (*block)->map().get();
+    if (view.error() != C2_OK) {
+        ALOGE("Failed to map block: %s", asString(view.error()));
+        return false;
+    }
+    if (view.size() != *blockSize) {
+        ALOGE("Mapped block size mismatch: expected %zu, got %zu", *blockSize,
+              static_cast<size_t>(view.size()));
+        return false;
+    }
+
+    memcpy(view.data(), input.data(), input.size());
+    return true;
+}
+
 status_t CCodecBufferChannel::attachEncryptedBuffer(
         const sp<hardware::HidlMemory> &memory,
         bool secure,
@@ -1056,40 +1095,15 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
 
     std::shared_ptr<C2LinearBlock> block;
     std::vector<std::shared_ptr<C2Info>> c2Infos;
-    size_t allocSize = buffer->size();
     size_t bufferSize = 0;
-    c2_status_t blockRes = C2_OK;
-    bool copied = false;
     {
         ScopedTrace trace(ATRACE_TAG, android::base::StringPrintf(
                 "CCodecBufferChannel::decrypt(%s)", mName).c_str());
         if (mSendEncryptedInfoBuffer) {
-            static const C2MemoryUsage kDefaultReadWriteUsage{
-                C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
-            constexpr int kAllocGranule0 = 1024 * 64;
-            constexpr int kAllocGranule1 = 1024 * 1024;
-            std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
-            // round up encrypted sizes to limit fragmentation and encourage buffer reuse
-            if (allocSize <= kAllocGranule1) {
-                bufferSize = align(allocSize, kAllocGranule0);
-            } else {
-                bufferSize = align(allocSize, kAllocGranule1);
+            std::span<const uint8_t> inputBuffer(buffer->data(), buffer->size());
+            if (!fetchAndCopyEncryptedInfoBuffer(inputBuffer, &block, &bufferSize)) {
+                return UNKNOWN_ERROR;
             }
-            blockRes = pool->fetchLinearBlock(
-                    bufferSize, kDefaultReadWriteUsage, &block);
-
-            if (blockRes == C2_OK) {
-                C2WriteView view = block->map().get();
-                if (view.error() == C2_OK && view.size() == bufferSize) {
-                    copied = true;
-                    // TODO: only copy clear sections
-                    memcpy(view.data(), buffer->data(), allocSize);
-                }
-            }
-        }
-
-        if (!copied) {
-            block.reset();
         }
 
         ssize_t result = -1;
@@ -1277,40 +1291,16 @@ status_t CCodecBufferChannel::queueSecureInputBuffers(
     sp<EncryptedLinearBlockBuffer> encryptedBuffer((EncryptedLinearBlockBuffer *)buffer.get());
 
     std::shared_ptr<C2LinearBlock> block;
-    size_t allocSize = buffer->size();
     size_t bufferSize = 0;
-    c2_status_t blockRes = C2_OK;
-    bool copied = false;
     ScopedTrace trace(ATRACE_TAG, android::base::StringPrintf(
             "CCodecBufferChannel::decrypt(%s)", mName).c_str());
     if (mSendEncryptedInfoBuffer) {
-        static const C2MemoryUsage kDefaultReadWriteUsage{
-            C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
-        constexpr int kAllocGranule0 = 1024 * 64;
-        constexpr int kAllocGranule1 = 1024 * 1024;
-        std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
-        // round up encrypted sizes to limit fragmentation and encourage buffer reuse
-        if (allocSize <= kAllocGranule1) {
-            bufferSize = align(allocSize, kAllocGranule0);
-        } else {
-            bufferSize = align(allocSize, kAllocGranule1);
-        }
-        blockRes = pool->fetchLinearBlock(
-                bufferSize, kDefaultReadWriteUsage, &block);
-
-        if (blockRes == C2_OK) {
-            C2WriteView view = block->map().get();
-            if (view.error() == C2_OK && view.size() == bufferSize) {
-                copied = true;
-                // TODO: only copy clear sections
-                memcpy(view.data(), buffer->data(), allocSize);
-            }
+        std::span<const uint8_t> inputBuffer(buffer->data(), buffer->size());
+        if (!fetchAndCopyEncryptedInfoBuffer(inputBuffer, &block, &bufferSize)) {
+            return UNKNOWN_ERROR;
         }
     }
 
-    if (!copied) {
-        block.reset();
-    }
     // size of cryptoInfo and accessUnitInfo should be the same?
     ssize_t result = -1;
     size_t srcOffset = 0;
