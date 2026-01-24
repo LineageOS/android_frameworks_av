@@ -1510,10 +1510,10 @@ public:
         mCondition.notify_all();
     }
 
-    void stop() {
+    c2_status_t stop() {
         std::unique_lock<std::mutex> l(mMutex);
         if (mStopped) {
-            return;
+            return C2_BAD_STATE;
         }
         mStopped = true;
         mCondition.notify_all();
@@ -1521,6 +1521,7 @@ public:
         if (mThread.joinable()) {
             mThread.join();
         }
+        return C2_OK;
     }
 
     void flush(std::list<std::unique_ptr<C2Work>>* const flushedWork) {
@@ -3546,8 +3547,7 @@ c2_status_t Codec2Client::Component::start() {
 
 c2_status_t Codec2Client::Component::stop() {
     if (mApexBase) {
-        mApexHandler->stop();
-        return C2_OK;
+        return mApexHandler->stop();
     }
     if (mAidlBase) {
         std::shared_ptr<AidlGraphicBufferAllocator> gba =

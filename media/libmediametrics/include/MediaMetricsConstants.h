@@ -127,6 +127,7 @@
 #define AMEDIAMETRICS_PROP_CHANNELMASKS   "channelMasks"   // string with channelMask values
                                                            // separated by |.
 #define AMEDIAMETRICS_PROP_CLOSEDCOUNT   "closedCount"    // int32 (MIDI)
+#define AMEDIAMETRICS_PROP_CODECPROVENANCE "codecProvenance"  // string media type (AudioTrack)
 #define AMEDIAMETRICS_PROP_CONTENTTYPE    "contentType"    // string attributes (AudioTrack)
 #define AMEDIAMETRICS_PROP_CUMULATIVETIMENS "cumulativeTimeNs" // int64_t playback/record time
                                                            // since start
