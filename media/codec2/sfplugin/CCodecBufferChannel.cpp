@@ -916,8 +916,8 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
         if (mSendEncryptionKeyHandle) {
             CHECK(secure);
             Vector<uint8_t> keyHandle;
-            const DrmStatus drmStatus = mCrypto->getKeyHandle(key, mode, memory->size(), 0,
-                                                              subSamples, numSubSamples, keyHandle);
+            const DrmStatus drmStatus = mCrypto->getKeyHandle(key, mode, size, offset, subSamples,
+                                                              numSubSamples, keyHandle);
 
             const status_t status = drmStatus;
             if (status != OK) {
@@ -942,11 +942,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
             }
 
             // Fill the result to the sum of subsamples which is the used memory size.
-            result = 0;
-            for (size_t i = 0; i < numSubSamples; i++) {
-                result +=
-                        subSamples[i].mNumBytesOfClearData + subSamples[i].mNumBytesOfEncryptedData;
-            }
+            result = size;
         } else {
             int32_t heapSeqNum = getHeapSeqNum(memory);
             hardware::drm::V1_0::SharedBuffer src{(uint32_t)heapSeqNum, offset, size};
