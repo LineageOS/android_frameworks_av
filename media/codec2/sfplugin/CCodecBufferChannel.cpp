@@ -896,17 +896,26 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     }
     std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
     std::shared_ptr<C2LinearBlock> block;
+    int32_t blockSize = kLinearBufferSize;
+    {
+        sp<AMessage> inputFormat = mInput.lock()->buffers->dupFormat();
+        if (inputFormat) {
+            (void)inputFormat->findInt32(KEY_MAX_INPUT_SIZE, &blockSize);
+            if ((size_t)blockSize > kMaxLinearBufferSize) {
+                blockSize = kMaxLinearBufferSize;
+            }
+        }
+    }
+
     c2_status_t err = pool->fetchLinearBlock(
-            size,
-            secure ? kSecureUsage : kDefaultReadWriteUsage,
-            &block);
+            blockSize, secure ? kSecureUsage : kDefaultReadWriteUsage, &block);
     if (err != C2_OK) {
         ALOGI("[%s] attachEncryptedBuffer: fetchLinearBlock failed: size = %zu (%s) err = %d",
-              mName, size, secure ? "secure" : "non-secure", err);
+              mName, (size_t)blockSize, secure ? "secure" : "non-secure", err);
         return NO_MEMORY;
     }
     if (!secure) {
-        ensureDecryptDestination(size);
+        ensureDecryptDestination(blockSize);
     }
 
     std::vector<std::shared_ptr<C2Info>> c2Infos;
@@ -1062,6 +1071,32 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
         ALOGI("[%s] attachEncryptedBuffer: buffer copy failed", mName);
         return -ENOSYS;
     }
+
+    if (mSendEncryptedInfoBuffer) {
+        const hardware::hidl_memory& hm = *memory;
+        sp<android::hidl::memory::V1_0::IMemory> im = hardware::mapMemory(hm);
+        if (!im) {
+            ALOGE("Failed to map hidl_memory");
+            return UNKNOWN_ERROR;
+        }
+        if (im->getPointer() == nullptr) {
+            ALOGE("Mapped memory is null");
+            return UNKNOWN_ERROR;
+        }
+        std::span<const uint8_t> inputBuffer(
+                static_cast<uint8_t*>(static_cast<void*>(im->getPointer())) + offset, size);
+        std::shared_ptr<C2LinearBlock> encryptedBlock;
+        size_t encryptedBufferSize = 0;
+        if (!fetchAndCopyEncryptedInfoBuffer(inputBuffer, &encryptedBlock, &encryptedBufferSize)) {
+            return UNKNOWN_ERROR;
+        }
+
+        buffer->meta()->setObject(
+                "encrypted-block",
+                new WrapperObject<std::shared_ptr<C2LinearBlock>>{encryptedBlock});
+        buffer->meta()->setSize("encrypted-block-size", encryptedBufferSize);
+    }
+
     return OK;
 }
 
@@ -1071,7 +1106,20 @@ status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffe
         ALOGD("[%s] No more buffers should be queued at current state.", mName);
         return -ENOSYS;
     }
-    return queueInputBufferInternal(buffer);
+
+    // The encryptedBlock might be set in meta in attachEncryptedBuffer().
+    std::shared_ptr<C2LinearBlock> encryptedBlock;
+    size_t encryptedBlockSize = 0;
+    sp<RefBase> obj;
+    if (buffer->meta()->findObject("encrypted-block", &obj)) {
+        encryptedBlock =
+                static_cast<WrapperObject<std::shared_ptr<C2LinearBlock>>*>(obj.get())->value;
+        buffer->meta()->findSize("encrypted-block-size", &encryptedBlockSize);
+        // Remove entries so they are not carried over to next buffer.
+        buffer->meta()->removeEntryByName("encrypted-block");
+        buffer->meta()->removeEntryByName("encrypted-block-size");
+    }
+    return queueInputBufferInternal(buffer, encryptedBlock, {}, encryptedBlockSize);
 }
 
 status_t CCodecBufferChannel::queueSecureInputBuffer(
