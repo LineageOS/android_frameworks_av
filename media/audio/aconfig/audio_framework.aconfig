@@ -90,7 +90,7 @@ flag {
     namespace: "media_audio"
     description: "Expose BT device categories to mainline modules"
     bug: "460462975"
-    # is_exported: true
+    is_exported: true
 }
 
 flag {
