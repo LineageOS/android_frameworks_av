@@ -4682,7 +4682,9 @@ status_t AudioPolicyManager::setDevicesRoleForStrategy(product_strategy_t strate
     ALOGV("%s() strategy=%d role=%d %s", __func__, strategy, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
+    if (!areAllDevicesSupported(
+            devices, audio_is_output_device, __func__, false /*matchAddress*/)) {
+        ALOGE("%s, failed due to not all devices are supported", __func__);
         return BAD_VALUE;
     }
     status_t status = mEngine->setDevicesRoleForStrategy(strategy, role, devices);
@@ -4777,6 +4779,7 @@ AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t strategy,
 
     if (!areAllDevicesSupported(
             devices, audio_is_output_device, __func__, /*matchAddress*/false)) {
+        ALOGE("%s, failed due to not all devices are supported", __func__);
         return BAD_VALUE;
     }
     status_t status = mEngine->removeDevicesRoleForStrategy(strategy, role, devices);
@@ -4842,7 +4845,9 @@ status_t AudioPolicyManager::setDevicesRoleForCapturePreset(
     ALOGV("%s() audioSource=%d role=%d %s", __func__, audioSource, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
+    if (!areAllDevicesSupported(
+            devices, audio_call_is_input_device, __func__, false /*matchAddress*/)) {
+        ALOGE("%s, failed due to not all devices are supported", __func__);
         return BAD_VALUE;
     }
     status_t status = mEngine->setDevicesRoleForCapturePreset(audioSource, role, devices);
@@ -4862,7 +4867,9 @@ status_t AudioPolicyManager::addDevicesRoleForCapturePreset(
     ALOGV("%s() audioSource=%d role=%d %s", __func__, audioSource, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
+    if (!areAllDevicesSupported(
+            devices, audio_call_is_input_device, __func__, false /*matchAddress*/)) {
+        ALOGE("%s, failed due to not all devices are supported", __func__);
         return BAD_VALUE;
     }
     status_t status = mEngine->addDevicesRoleForCapturePreset(audioSource, role, devices);
@@ -4885,6 +4892,7 @@ status_t AudioPolicyManager::removeDevicesRoleForCapturePreset(
 
     if (!areAllDevicesSupported(
             devices, audio_call_is_input_device, __func__, /*matchAddress*/false)) {
+        ALOGE("%s, failed due to not all devices are supported", __func__);
         return BAD_VALUE;
     }
 
