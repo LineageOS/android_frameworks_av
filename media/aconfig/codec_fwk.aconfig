@@ -273,6 +273,13 @@ flag {
 }
 
 flag {
+  name: "reuse_graphic_import_and_mapping"
+  namespace: "codec_fwk"
+  description: "Cache and reuse graphic import and address mapping for better performance"
+  bug: "479258399"
+}
+
+flag {
   name: "reuse_linear_mapping"
   namespace: "codec_fwk"
   description: "Cache and reuse linear(1D) address mapping for better performance"
