@@ -8961,10 +8961,20 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     outputDesc->setVolume(volumeDb, muted, volumeSource, curves.getStreamTypes(),
             deviceTypes, delayMs, force, isVoiceVolSrc);
 
+
     if (outputDesc == mPrimaryOutput && (isVoiceVolSrc || isBtScoVolSrc)) {
-        bool voiceVolumeManagedByHost = !isBtScoVolSrc &&
-                !isSingleDeviceType(deviceTypes, audio_is_ble_out_device);
-        setVoiceVolume(index, curves, voiceVolumeManagedByHost, delayMs);
+        bool callRxConnectedToDevice = true;
+        if (mCallRxSourceClient != nullptr && mCallRxSourceClient->isConnected()) {
+            callRxConnectedToDevice =
+                    Volume::getDeviceForVolume({mCallRxSourceClient->sinkDevice()->type()}) ==
+                                  Volume::getDeviceForVolume(deviceTypes);
+        }
+        if (callRxConnectedToDevice) {
+            bool voiceVolumeManagedByHost = !isBtScoVolSrc &&
+                                            !isSingleDeviceType(deviceTypes,
+                                                                audio_is_ble_out_device);
+            setVoiceVolume(index, curves, voiceVolumeManagedByHost, delayMs);
+        }
     }
     return NO_ERROR;
 }

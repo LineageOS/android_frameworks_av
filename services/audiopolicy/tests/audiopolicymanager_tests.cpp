@@ -4819,6 +4819,7 @@ TEST_F(AudioPolicyManagerTestAbsoluteVolume, SetVolumeIndexForVoiceCallAttribute
 
     // setVoiceVolume is sent with actual value if no sco/ble device is connected
     EXPECT_GT(1.f, mVolumeCheckerClient->getLastVoiceVolume());
+    EXPECT_GT(1.f, mVolumeCheckerClient->getLastPortVolume(mOutputPortId));
 }
 
 TEST_F(AudioPolicyManagerTestAbsoluteVolume, SetVolumeIndexForVoiceCallAttributesOnSco) {
@@ -4850,6 +4851,7 @@ TEST_F(AudioPolicyManagerTestAbsoluteVolume, SetVolumeIndexForVoiceCallAttribute
                                                               AUDIO_DEVICE_OUT_BLUETOOTH_SCO));
 
     EXPECT_EQ(1.f, mVolumeCheckerClient->getLastVoiceVolume());
+    EXPECT_EQ(1.f, mVolumeCheckerClient->getLastPortVolume(mOutputPortId));
 
     EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_BLUETOOTH_SCO,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
