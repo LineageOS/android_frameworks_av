@@ -928,11 +928,9 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
       if (!status.isOk()) {
         ALOGE(
             "Failed to invoke onProcessCaptureRequest client callback for "
-            "frame:%d currentInputStreamId:%d. Flag virtual_camera_metadata "
-            "enabled:%s. "
+            "frame:%d currentInputStreamId:%d."
             "PerFrameCameraMetadataEnabled:%s. (error status:%s)",
             request.frameNumber, currentInputStreamId,
-            flags::virtual_camera_metadata() ? "true" : "false",
             virtualCamera->isPerFrameCameraMetadataEnabled() ? "true" : "false",
             status.getDescription().c_str());
       }
