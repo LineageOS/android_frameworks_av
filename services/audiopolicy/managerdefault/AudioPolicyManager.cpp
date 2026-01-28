@@ -928,7 +928,6 @@ void AudioPolicyManager::connectTelephonyRxAudioSource(uint32_t delayMs)
     status_t status = startAudioSourceInternal(&source, &aa, &portId, 0 /*uid*/,
                                        true /*internal*/, true /*isCallRx*/, delayMs);
     ALOGE_IF(status != OK, "%s: failed to start audio source (%d)", __func__, status);
-    mCallRxSourceClient = mAudioSources.valueFor(portId);
     ALOGV_IF(mCallRxSourceClient != nullptr, "%s portd ID %d between source %s and sink %s",
         __func__, portId, mCallRxSourceClient->srcDevice()->toString().c_str(),
         mCallRxSourceClient->sinkDevice()->toString().c_str());
@@ -6344,10 +6343,18 @@ status_t AudioPolicyManager::startAudioSourceInternal(const struct audio_port_co
                                    mEngine->getProductStrategyForAttributes(*attributes, uid),
                                    toVolumeSource(*attributes, uid), internal, isCallRx, false);
 
+    // The Call RX source mCallRxSourceClient must be set before calling connectAudioSource() so
+    // that volume updates triggered by startSource() work.
+    if (isCallRx) {
+        mCallRxSourceClient = sourceDesc;
+    }
     status_t status = connectAudioSource(sourceDesc, delayMs);
     if (status == NO_ERROR) {
         mAudioSources.add(*portId, sourceDesc);
+    } else if (isCallRx) {
+        mCallRxSourceClient.clear();
     }
+
     return status;
 }
 
@@ -8962,13 +8969,18 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
             deviceTypes, delayMs, force, isVoiceVolSrc);
 
 
-    if (outputDesc == mPrimaryOutput && (isVoiceVolSrc || isBtScoVolSrc)) {
-        bool callRxConnectedToDevice = true;
-        if (mCallRxSourceClient != nullptr && mCallRxSourceClient->isConnected()) {
+    if ((isVoiceVolSrc || isBtScoVolSrc)) {
+
+
+
+        bool callRxConnectedToDevice = outputDesc == mPrimaryOutput;
+        if (mCallRxSourceClient != nullptr && mCallRxSourceClient->isConnected()
+               && mCallRxSourceClient->swOutput().promote() == outputDesc) {
             callRxConnectedToDevice =
                     Volume::getDeviceForVolume({mCallRxSourceClient->sinkDevice()->type()}) ==
                                   Volume::getDeviceForVolume(deviceTypes);
         }
+
         if (callRxConnectedToDevice) {
             bool voiceVolumeManagedByHost = !isBtScoVolSrc &&
                                             !isSingleDeviceType(deviceTypes,
