@@ -80,6 +80,8 @@ const std::string AttributionAndPermissionUtils::sCameraSendSystemEventsPermissi
         "android.permission.CAMERA_SEND_SYSTEM_EVENTS");
 const std::string AttributionAndPermissionUtils::sCameraOpenCloseListenerPermission(
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
+const std::string AttributionAndPermissionUtils::sCameraWarmUpPermission(
+        "android.permission.WARM_UP_CAMERA");
 const std::string AttributionAndPermissionUtils::sCameraInjectExternalCameraPermission(
         "android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
 
@@ -353,6 +355,12 @@ bool AttributionAndPermissionUtils::hasPermissionsForCameraPrivacyAllowlist(
 bool AttributionAndPermissionUtils::hasPermissionsForOpenCloseListener(
         const AttributionSourceState& attributionSource) {
     return checkPermissionForPreflight(std::string(), sCameraOpenCloseListenerPermission,
+                                       attributionSource, std::string(), AppOpsManager::OP_NONE);
+}
+
+bool AttributionAndPermissionUtils::hasPermissionsForCameraWarmUp(
+        const AttributionSourceState& attributionSource) {
+    return checkPermissionForPreflight(std::string(), sCameraWarmUpPermission,
                                        attributionSource, std::string(), AppOpsManager::OP_NONE);
 }
 

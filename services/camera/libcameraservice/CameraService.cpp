@@ -1122,11 +1122,11 @@ Status CameraService::warmUp(const std::string &unresolvedCameraId,
             const AttributionSourceState& clientAttribution,
             int32_t devicePolicy) {
     ATRACE_CALL();
-
-    if (!callerHasSystemUid()) {
-        ALOGE("%s: Caller uid %d not system uid, permission denied", __FUNCTION__, getCallingUid());
+    if (!hasPermissionsForCameraWarmUp(getCallingPid(), getCallingUid())) {
+        ALOGE("%s: Caller uid %d pid %d doesn't have warm up permissions, denied",
+                __FUNCTION__, getCallingUid(), getCallingPid());
         return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
-                "%s: Caller with uid %d not system uid, permission denied",
+                "%s: Caller with uid %d doesn't have CAMERA_WARMUP permissions, permission denied",
                 __FUNCTION__, getCallingUid());
     }
     Mutex::Autolock l(mServiceLock);
@@ -1139,7 +1139,6 @@ Status CameraService::warmUp(const std::string &unresolvedCameraId,
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.c_str());
     }
     std::string cameraId = cameraIdOptional.value();
-
     ALOGV("%s", __FUNCTION__);
     if (!mInitialized) {
         ALOGE("%s: Camera HAL not initialized", __FUNCTION__);
@@ -5070,7 +5069,9 @@ bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, const std::string &c
             // some polling which should happen pretty rarely anyway as the race is hard
             // to hit.
             active = mActiveUids.find(uid) != mActiveUids.end();
-            if (!active) active = am.isUidActive(uid, toString16(callingPackage));
+            if (!active) {
+                active = am.isUidActive(uid, toString16(callingPackage));
+            }
             if (active) {
                 break;
             }

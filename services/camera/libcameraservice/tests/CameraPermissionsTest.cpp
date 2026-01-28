@@ -351,3 +351,21 @@ TEST_F(CameraPermissionsTest, TestConflictingOomScoreOffset) {
                 " service specific error code " << status.serviceSpecificErrorCode();
     }
 }
+
+TEST_F(CameraPermissionsTest, TestWarmUpPermissionEnforcement) {
+    const std::string cameraId = "0"; // Example camera ID
+
+    // Attempt to call warmUp.
+    // The test process runs as shell, which does not have the
+    // CAMERA_WARMUP signature permission. This call is expected to fail.
+    AttributionSourceState clientAttribution;
+    clientAttribution.deviceId = kDefaultDeviceId;
+    clientAttribution.uid = android::CameraService::USE_CALLING_UID;
+    auto status = sCameraService->warmUp(cameraId, clientAttribution, 0/*devicePolicy*/);
+
+    // Check if the call failed due to a security exception.
+    ASSERT_FALSE(status.isOk());
+    ASSERT_EQ(status.serviceSpecificErrorCode(), hardware::ICameraService::ERROR_PERMISSION_DENIED)
+        << "warmUp should fail with ERROR_PERMISSION_DENIED when called without "
+        << "CAMERA_WARMUP permission. Status: " << status.toString8().c_str();
+}
