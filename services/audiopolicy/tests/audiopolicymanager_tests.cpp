@@ -16,6 +16,7 @@
 
 #include <cstring>
 #include <memory>
+#include <set>
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -1779,6 +1780,55 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, GetFlushFromFrameSupport) {
             EXPECT_EQ(FlushFromFrameSupport::UNSUPPORTED, support);
         }
     }
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
+                                                           AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                           "", "", AUDIO_FORMAT_DEFAULT));
+}
+
+TEST_F(AudioPolicyManagerTestWithConfigurationFile, DeviceRoleForStrategy) {
+    // Connect a peripheral device.
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    const std::string usbAddress = "card=1;device=0";
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            usbAddress.c_str(), "", AUDIO_FORMAT_DEFAULT));
+
+    const auto mediaStrategy = mManager->getStrategyForStream(AUDIO_STREAM_MUSIC, 0);
+
+    // Set device role for strategy with a USB device with another address.
+    const std::string usbAddress2 = "card=2;device=0";
+    AudioDeviceTypeAddr usb1(AUDIO_DEVICE_OUT_USB_DEVICE, usbAddress);
+    AudioDeviceTypeAddr usb2(AUDIO_DEVICE_OUT_USB_DEVICE, usbAddress2);
+    AudioDeviceTypeAddrVector devicesRoleForStrategy = {usb1, usb2};
+    ASSERT_EQ(NO_ERROR, mManager->setDevicesRoleForStrategy(
+            mediaStrategy, DEVICE_ROLE_PREFERRED, devicesRoleForStrategy));
+
+    AudioDeviceTypeAddrVector devices;
+    ASSERT_EQ(NO_ERROR, mManager->getDevicesForRoleAndStrategy(
+            mediaStrategy, DEVICE_ROLE_PREFERRED, devices));
+    const std::set<AudioDeviceTypeAddr> expectedDevices(
+            devicesRoleForStrategy.begin(), devicesRoleForStrategy.end());
+    const std::set<AudioDeviceTypeAddr> actualDevices(devices.begin(), devices.end());
+    ASSERT_EQ(expectedDevices, actualDevices);
+
+    // Remove device role for strategy.
+    AudioDeviceTypeAddrVector devicesToRemove = {usb2};
+    ASSERT_EQ(NO_ERROR, mManager->removeDevicesRoleForStrategy(
+            mediaStrategy, DEVICE_ROLE_PREFERRED, devicesToRemove));
+    const std::set<AudioDeviceTypeAddr> expectedDevicesAfterRemove{usb1};
+    devices.clear();
+    ASSERT_EQ(NO_ERROR, mManager->getDevicesForRoleAndStrategy(
+            mediaStrategy, DEVICE_ROLE_PREFERRED, devices));
+    const std::set<AudioDeviceTypeAddr> actualDevicesAfterRemove(devices.begin(), devices.end());
+    ASSERT_EQ(expectedDevicesAfterRemove, actualDevicesAfterRemove);
+
+    // Clear device role for strategy.
+    ASSERT_EQ(NO_ERROR, mManager->clearDevicesRoleForStrategy(
+            mediaStrategy, DEVICE_ROLE_PREFERRED));
+    ASSERT_EQ(NAME_NOT_FOUND, mManager->getDevicesForRoleAndStrategy(
+            mediaStrategy, DEVICE_ROLE_PREFERRED, devices));
 
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
@@ -4819,6 +4869,7 @@ TEST_F(AudioPolicyManagerTestAbsoluteVolume, SetVolumeIndexForVoiceCallAttribute
 
     // setVoiceVolume is sent with actual value if no sco/ble device is connected
     EXPECT_GT(1.f, mVolumeCheckerClient->getLastVoiceVolume());
+    EXPECT_GT(1.f, mVolumeCheckerClient->getLastPortVolume(mOutputPortId));
 }
 
 TEST_F(AudioPolicyManagerTestAbsoluteVolume, SetVolumeIndexForVoiceCallAttributesOnSco) {
@@ -4850,6 +4901,7 @@ TEST_F(AudioPolicyManagerTestAbsoluteVolume, SetVolumeIndexForVoiceCallAttribute
                                                               AUDIO_DEVICE_OUT_BLUETOOTH_SCO));
 
     EXPECT_EQ(1.f, mVolumeCheckerClient->getLastVoiceVolume());
+    EXPECT_EQ(1.f, mVolumeCheckerClient->getLastPortVolume(mOutputPortId));
 
     EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_BLUETOOTH_SCO,
                                                            AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
