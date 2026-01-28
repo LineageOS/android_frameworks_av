@@ -311,7 +311,7 @@ template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::detachDevice() {
     if (mDevice == 0) return;
     if (flags::camera_multi_client() && TClientBase::mSharedMode) {
-        mDevice->disconnectClient(TClientBase::getClientCallingPid());
+        mDevice->disconnectClient(mInitialClientPid);
     } else {
         mDevice->disconnect();
     }
