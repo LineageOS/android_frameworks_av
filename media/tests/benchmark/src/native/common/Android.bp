@@ -33,7 +33,6 @@ cc_library_static {
     srcs: [
         "BenchmarkCommon.cpp",
         "Stats.cpp",
-        "utils/Timers.cpp",
     ],
 
     export_include_dirs: ["."],
@@ -78,7 +77,6 @@ cc_library_static {
         "BenchmarkC2Common.cpp",
         "BenchmarkCommon.cpp",
         "Stats.cpp",
-        "utils/Timers.cpp",
     ],
 
     export_include_dirs: ["."],

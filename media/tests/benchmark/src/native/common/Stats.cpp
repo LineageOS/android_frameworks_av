@@ -47,15 +47,15 @@ void Stats::dumpStatistics(const string& operation, const string& inputReference
         return uploadMetrics(operation, inputReference, durationUs, componentName,
                               mode);
     }
-    nsecs_t totalTimeTakenNs = getTotalTime();
-    nsecs_t timeTakenPerSec = (totalTimeTakenNs * 1000000) / durationUs;
-    nsecs_t timeToFirstFrameNs = *mOutputTimer.begin() - mStartTimeNs;
+    int64_t totalTimeTakenNs = getTotalTime();
+    int64_t timeTakenPerSec = (totalTimeTakenNs * 1000000) / durationUs;
+    int64_t timeToFirstFrameNs = *mOutputTimer.begin() - mStartTimeNs;
     int32_t size = std::accumulate(mFrameSizes.begin(), mFrameSizes.end(), 0);
     // get min and max output intervals.
-    nsecs_t intervalNs;
-    nsecs_t minTimeTakenNs = INT64_MAX;
-    nsecs_t maxTimeTakenNs = 0;
-    nsecs_t prevIntervalNs = mStartTimeNs;
+    int64_t intervalNs;
+    int64_t minTimeTakenNs = INT64_MAX;
+    int64_t maxTimeTakenNs = 0;
+    int64_t prevIntervalNs = mStartTimeNs;
     for (int32_t idx = 0; idx < mOutputTimer.size() - 1; idx++) {
         intervalNs = mOutputTimer.at(idx) - prevIntervalNs;
         prevIntervalNs = mOutputTimer.at(idx);
@@ -67,7 +67,7 @@ void Stats::dumpStatistics(const string& operation, const string& inputReference
     int64_t dataSize = size;
     int64_t bytesPerSec = ((int64_t)dataSize * 1000000000) / totalTimeTakenNs;
     string rowData = "";
-    rowData.append(to_string(systemTime(CLOCK_MONOTONIC)) + ", ");
+    rowData.append(to_string(getCurTime()) + ", ");
     rowData.append(inputReference + ", ");
     rowData.append(operation + ", ");
     rowData.append(componentName + ", ");
@@ -119,14 +119,14 @@ void Stats::uploadMetrics(const string& operation, const string& inputReference,
         ALOGE("No output produced");
         return;
     }
-    nsecs_t totalTimeTakenNs = getTotalTime();
-    nsecs_t timeToFirstFrameNs = *mOutputTimer.begin() - mStartTimeNs;
+    int64_t totalTimeTakenNs = getTotalTime();
+    int64_t timeToFirstFrameNs = *mOutputTimer.begin() - mStartTimeNs;
     int32_t size = std::accumulate(mFrameSizes.begin(), mFrameSizes.end(), 0);
     // get min and max output intervals.
-    nsecs_t intervalNs;
-    nsecs_t minTimeTakenNs = INT64_MAX;
-    nsecs_t maxTimeTakenNs = 0;
-    nsecs_t prevIntervalNs = mStartTimeNs;
+    int64_t intervalNs;
+    int64_t minTimeTakenNs = INT64_MAX;
+    int64_t maxTimeTakenNs = 0;
+    int64_t prevIntervalNs = mStartTimeNs;
     for (int32_t idx = 0; idx < mOutputTimer.size() - 1; idx++) {
         intervalNs = mOutputTimer.at(idx) - prevIntervalNs;
         prevIntervalNs = mOutputTimer.at(idx);

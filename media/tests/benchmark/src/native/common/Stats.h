@@ -41,11 +41,9 @@
 
 #include <sys/time.h>
 #include <algorithm>
+#include <chrono>
 #include <numeric>
 #include <vector>
-
-// Include local copy of Timers taken from system/core/libutils
-#include "utils/Timers.h"
 
 using namespace std;
 
@@ -61,27 +59,31 @@ class Stats {
     }
 
   private:
-    nsecs_t mInitTimeNs;
-    nsecs_t mDeInitTimeNs;
-    nsecs_t mStartTimeNs;
+    int64_t mInitTimeNs;
+    int64_t mDeInitTimeNs;
+    int64_t mStartTimeNs;
     std::vector<int32_t> mFrameSizes;
-    std::vector<nsecs_t> mInputTimer;
-    std::vector<nsecs_t> mOutputTimer;
+    std::vector<int64_t> mInputTimer;
+    std::vector<int64_t> mOutputTimer;
 
   public:
-    nsecs_t getCurTime() { return systemTime(CLOCK_MONOTONIC); }
+    int64_t getCurTime() {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       std::chrono::steady_clock::now().time_since_epoch())
+                .count();
+    }
 
-    void setInitTime(nsecs_t initTime) { mInitTimeNs = initTime; }
+    void setInitTime(int64_t initTime) { mInitTimeNs = initTime; }
 
-    void setDeInitTime(nsecs_t deInitTime) { mDeInitTimeNs = deInitTime; }
+    void setDeInitTime(int64_t deInitTime) { mDeInitTimeNs = deInitTime; }
 
-    void setStartTime() { mStartTimeNs = systemTime(CLOCK_MONOTONIC); }
+    void setStartTime() { mStartTimeNs = getCurTime(); }
 
     void addFrameSize(int32_t size) { mFrameSizes.push_back(size); }
 
-    void addInputTime() { mInputTimer.push_back(systemTime(CLOCK_MONOTONIC)); }
+    void addInputTime() { mInputTimer.push_back(getCurTime()); }
 
-    void addOutputTime() { mOutputTimer.push_back(systemTime(CLOCK_MONOTONIC)); }
+    void addOutputTime() { mOutputTimer.push_back(getCurTime()); }
 
     void reset() {
         if (!mFrameSizes.empty()) mFrameSizes.clear();
@@ -89,15 +91,15 @@ class Stats {
         if (!mOutputTimer.empty()) mOutputTimer.clear();
     }
 
-    std::vector<nsecs_t> getOutputTimer() { return mOutputTimer; }
+    std::vector<int64_t> getOutputTimer() { return mOutputTimer; }
 
-    nsecs_t getInitTime() { return mInitTimeNs; }
+    int64_t getInitTime() { return mInitTimeNs; }
 
-    nsecs_t getDeInitTime() { return mDeInitTimeNs; }
+    int64_t getDeInitTime() { return mDeInitTimeNs; }
 
-    nsecs_t getTimeDiff(nsecs_t sTime, nsecs_t eTime) { return (eTime - sTime); }
+    int64_t getTimeDiff(int64_t sTime, int64_t eTime) { return (eTime - sTime); }
 
-    nsecs_t getTotalTime() {
+    int64_t getTotalTime() {
         if (mOutputTimer.empty()) return -1;
         return (*(mOutputTimer.end() - 1) - mStartTimeNs);
     }
