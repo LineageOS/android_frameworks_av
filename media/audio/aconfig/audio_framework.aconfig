@@ -213,7 +213,7 @@ flag {
     namespace: "media_audio"
     description: "Flag for fusing telecom route/mode changes into a single api surface"
     bug: "458830736"
-    # is_exported: true
+    is_exported: true
 }
 
 flag {
