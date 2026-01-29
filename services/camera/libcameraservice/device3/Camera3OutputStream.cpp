@@ -850,8 +850,10 @@ status_t Camera3OutputStream::configureConsumerQueueLocked(bool allowPreviewResp
      * Also Camera3BufferManager does not support display/texture streams as they have its own
      * buffer management logic.
      */
+    bool isAsyncStreams = (camera_stream::format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED
+            && (isConsumedByHWComposer() || isConsumedByHWTexture()));
     if (mBufferManager != 0 && mSetId > CAMERA3_STREAM_SET_ID_INVALID &&
-            !(isConsumedByHWComposer() || isConsumedByHWTexture())) {
+            (isMultiResolution() || !isAsyncStreams)) {
         uint64_t consumerUsage = 0;
         getEndpointUsage(&consumerUsage);
         uint32_t width = (mMaxSize == 0) ? getWidth() : mMaxSize;
