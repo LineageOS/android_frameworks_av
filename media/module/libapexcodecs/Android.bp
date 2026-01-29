@@ -124,7 +124,6 @@ cc_library {
         "ApexCodecsStoreImpl.cpp",
     ] + select(release_flag("RELEASE_APEX_CODECS"), {
         true: [
-            "C2ApexOpusDec.cpp",
             "C2ApexAacDec.cpp",
         ],
         default: [],
@@ -136,7 +135,6 @@ cc_library {
             "libcodec2_soft_common",
             "libcodec2_vndk",
             "liblog", // for ALOG
-            "libopus",
             "libstagefright_foundation", // for ColorUtils and MIME
         ],
         default: [],
@@ -159,6 +157,23 @@ cc_library {
         ],
         default: [],
     }),
+
+    arch: {
+        arm64: {
+            static_libs: select(release_flag("RELEASE_APEX_CODECS"), {
+                true: [
+                    "libopus",
+                ],
+                default: [],
+            }),
+            srcs: select(release_flag("RELEASE_APEX_CODECS"), {
+                true: [
+                    "C2ApexOpusDec.cpp",
+                ],
+                default: [],
+            }),
+        },
+    },
 
     min_sdk_version: "apex_inherit",
     version_script: "libcom.android.media.swcodec.apexcodecs.map.txt",
