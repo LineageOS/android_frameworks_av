@@ -1154,8 +1154,11 @@ sp<Codec2Buffer> EncryptedLinearInputBuffers::Alloc(
 }
 
 sp<Codec2Buffer> EncryptedLinearInputBuffers::createNewBuffer() {
-    // TODO: android_2020
-    return nullptr;
+    // We have BufferPool recycling the blocks, but we will use this class
+    // to recycle the IMemory based on the weak_ptr<C2LinearBlock> in Entry.
+    // In non-array mode, the allocation is still not unlimited and it can
+    // fail if the allocation exceeds the slots initialized for IMemory.
+    return Alloc(mPool, mFormat, mUsage, mMemoryVector);
 }
 
 // GraphicMetadataInputBuffers
