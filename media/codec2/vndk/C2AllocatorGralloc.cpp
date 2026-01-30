@@ -18,7 +18,9 @@
 #define LOG_TAG "C2AllocatorGralloc"
 #include <utils/Log.h>
 
+#include <memory>
 #include <mutex>
+#include <optional>
 
 #include <android_media_codec.h>
 #ifdef __ANDROID_APEX__
@@ -34,11 +36,14 @@
 #include <gralloctypes/Gralloc4.h>
 #include <hardware/gralloc.h>
 #include <media/stagefright/foundation/ColorUtils.h>
+#include <vndk/hardware_buffer.h>
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/GraphicBufferMapper.h>
 #include <ui/Rect.h>
 
 #include <C2AllocatorGralloc.h>
+#include <C2AllocatorGrallocSupport.h>
+#include <C2BlockInternal.h>
 #include <C2Buffer.h>
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
@@ -1101,18 +1106,16 @@ c2_status_t GetHdrMetadataFromGralloc4Handle(
     return err;
 }
 
-c2_status_t SetMetadataToGralloc4Handle(
+namespace {
+
+c2_status_t _setMetadataToGralloc4HandleImpl(
         android_dataspace_t dataSpace,
         const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
         const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
-        const C2Handle *const handle) {
+        buffer_handle_t bufferHandle) {
     c2_status_t err = C2_OK;
     GraphicBufferMapper& mapper = GraphicBufferMapper::get();
-    GrallocBuffer buffer(handle);
-    if (!buffer) {
-        // Gralloc4 not supported; nothing to do
-        return err;
-    }
+
     // Use V0 dataspaces for Gralloc4+
 #ifdef __ANDROID_APEX__
     if (android::media::swcodec::flags::provider_->dataspace_v0_gralloc4()) {
@@ -1123,7 +1126,7 @@ c2_status_t SetMetadataToGralloc4Handle(
         ColorUtils::convertDataSpaceToV0(dataSpace);
     }
 #endif
-    status_t status = mapper.setDataspace(buffer.get(), static_cast<ui::Dataspace>(dataSpace));
+    status_t status = mapper.setDataspace(bufferHandle, static_cast<ui::Dataspace>(dataSpace));
     if (status != OK) {
        err = C2_CORRUPTED;
     }
@@ -1146,7 +1149,7 @@ c2_status_t SetMetadataToGralloc4Handle(
                 && 0.0 <= smpte2086->whitePoint.x && smpte2086->whitePoint.x <= 1.0
                 && 0.0 <= smpte2086->whitePoint.y && smpte2086->whitePoint.y <= 1.0
                 && 0.0 <= smpte2086->maxLuminance && 0.0 <= smpte2086->minLuminance) {
-            status = mapper.setSmpte2086(buffer.get(), smpte2086);
+            status = mapper.setSmpte2086(bufferHandle, smpte2086);
             if (status != OK) {
                 err = C2_CORRUPTED;
             }
@@ -1156,7 +1159,7 @@ c2_status_t SetMetadataToGralloc4Handle(
             staticInfo->maxFall,
         };
         if (0.0 <= cta861_3->maxContentLightLevel && 0.0 <= cta861_3->maxFrameAverageLightLevel) {
-            status = mapper.setCta861_3(buffer.get(), cta861_3);
+            status = mapper.setCta861_3(bufferHandle, cta861_3);
             if (status != OK) {
                 err = C2_CORRUPTED;
             }
@@ -1168,10 +1171,10 @@ c2_status_t SetMetadataToGralloc4Handle(
         t35->resize(dynamicInfo->flexCount());
         memcpy(t35->data(), dynamicInfo->m.data, dynamicInfo->flexCount());
         if (dynamicInfo->m.type_ == C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
-            status = mapper.setSmpte2094_40(buffer.get(), t35);
+            status = mapper.setSmpte2094_40(bufferHandle, t35);
             err = status == OK ? err : C2_CORRUPTED;
         } else if (dynamicInfo->m.type_ == C2Config::HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_50) {
-            status = mapper.setSmpte2094_50(buffer.get(), t35);
+            status = mapper.setSmpte2094_50(bufferHandle, t35);
             err = status == OK ? err : C2_CORRUPTED;
         } else {
             err = C2_BAD_VALUE;
@@ -1179,6 +1182,46 @@ c2_status_t SetMetadataToGralloc4Handle(
     }
 
     return err;
+}
+
+}  // namespace
+
+c2_status_t SetMetadataToGralloc4Handle(
+        android_dataspace_t dataSpace,
+        const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
+        const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
+        const C2Handle *const handle) {
+    GrallocBuffer buffer(handle);
+    if (!buffer) {
+        // Gralloc4 not supported; nothing to do
+        return C2_OK;
+    }
+    return _setMetadataToGralloc4HandleImpl(dataSpace, staticInfo, dynamicInfo, buffer.get());
+}
+
+c2_status_t SetMetadataToGralloc4Handle(
+        android_dataspace_t dataSpace,
+        const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
+        const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
+        const C2ConstGraphicBlock &block) {
+    if (android::media::codec::provider_->ahardware_buffer_fetch_flag()) {
+        AHardwareBuffer *ahwb = nullptr;
+        std::shared_ptr<const _C2BlockPoolData> poolData =
+                _C2BlockFactory::GetGraphicBlockPoolData(block);
+        if (_C2BlockFactory::GetAHardwareBuffer(poolData, &ahwb) && ahwb) {
+            // AHardwareBuffer_getNativeHandle returns a const handle, but the IMapper
+            // functions take a non-const handle.
+            buffer_handle_t unownedBuffer = const_cast<native_handle_t*>(
+                    AHardwareBuffer_getNativeHandle(ahwb));
+            if (unownedBuffer) {
+                return _setMetadataToGralloc4HandleImpl(
+                        dataSpace, staticInfo, dynamicInfo, unownedBuffer);
+            }
+        }
+    }
+
+    // Fallback to old path
+    return SetMetadataToGralloc4Handle(dataSpace, staticInfo, dynamicInfo, block.handle());
 }
 
 

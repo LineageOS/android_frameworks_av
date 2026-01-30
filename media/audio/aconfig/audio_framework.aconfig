@@ -13,7 +13,7 @@ flag {
     namespace: "media_audio"
     description: "Add API support for ambisonics audio."
     bug: "446025781"
-    # is_exported: true
+    is_exported: true
 }
 
 flag {

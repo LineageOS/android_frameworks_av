@@ -123,6 +123,7 @@ cc_library {
     ],
 
     static_libs: [
+        "android.media.codec-aconfig-cc",
         "android.media.swcodec.flags-aconfig-cc",
         // original was shared, but it's small and we're carrying forward
         // this legacy copy solely for our needs, not to support other users
