@@ -1722,7 +1722,7 @@ sp<AMessage> CCodecConfig::getFormatForDomain(const ReflectedParamUpdater::Dict&
             std::string hdrKey;
             if (android::media::codec::provider_->agtm_metadata()
                     && type == HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_50) {
-                hdrKey = KEY_HDR_ECLIPSA_VIDEO_INFO;
+                hdrKey = KEY_HDR_ST2094_50_INFO;
             } else if (type == HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40) {
                 hdrKey = KEY_HDR10_PLUS_INFO;
             }
@@ -2018,7 +2018,7 @@ ReflectedParamUpdater::Dict CCodecConfig::getReflectedFormat(const sp<AMessage>&
         uint32_t hdrKey = 0;
         sp<ABuffer> hdrDynamicInfo;
         if (android::media::codec::provider_->agtm_metadata()
-                && params->findBuffer(KEY_HDR_ECLIPSA_VIDEO_INFO, &hdrDynamicInfo)) {
+                && params->findBuffer(KEY_HDR_ST2094_50_INFO, &hdrDynamicInfo)) {
             hdrKey = HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_50;
         } else if (params->findBuffer(KEY_HDR10_PLUS_INFO, &hdrDynamicInfo)) {
             hdrKey = HDR_DYNAMIC_METADATA_TYPE_SMPTE_2094_40;
