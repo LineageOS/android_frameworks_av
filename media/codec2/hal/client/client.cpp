@@ -1655,6 +1655,7 @@ private:
                 bool ownedByClient = false;
                 ApexCodec_LinearBuffer outputConfigUpdates;
                 std::vector<C2Param*> outputConfigUpdatePtrs;
+                ApexCodec_BufferFlags outputFlags;
 
                 ApexCodec_Status status = ApexCodec_Component_process(
                         mApexComponent, input, output, &consumed, &produced);
@@ -1706,7 +1707,6 @@ private:
                 }
                 LOG(VERBOSE) << "handleWork -- produced " << produced << " bytes";
                 if (ApexCodec_Buffer_getType(output) == APEXCODEC_BUFFER_TYPE_LINEAR) {
-                    ApexCodec_BufferFlags outputFlags;
                     uint64_t outputFrameIndex;
                     uint64_t outputTimestampUs;
                     ApexCodec_Status status = ApexCodec_Buffer_getBufferInfo(
@@ -1789,7 +1789,13 @@ private:
                         inputBuffer.data += consumed;
                         inputBuffer.size -= consumed;
                         if (inputBuffer.size == 0) {
-                            inputDrained = true;
+                            if ((flags & APEXCODEC_FLAG_END_OF_STREAM)
+                                    && !(outputFlags & APEXCODEC_FLAG_END_OF_STREAM)) {
+                                LOG(ERROR) << "handleWork -- not draining input buffer"
+                                           << "because EOS is not set in output";
+                            } else {
+                                inputDrained = true;
+                            }
                         }
                     }
                 } else if (inputType == APEXCODEC_BUFFER_TYPE_GRAPHIC) {
