@@ -40,5 +40,5 @@ flag {
     name: "extractor_mp4_enable_hevc_400_444"
     namespace: "media_solutions"
     description: "Enable HEVC 4:0:0 and 4:4:4 profiles support in MP4 extractor."
-    bug: "465510587"
+    bug: "480160880"
 }
