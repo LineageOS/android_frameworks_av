@@ -1186,6 +1186,11 @@ ssize_t Camera3OutputStream::getSurfaceId(const sp<Surface> &surface) {
     return 0;
 }
 
+ssize_t Camera3OutputStream::getCurrentSurfaceId() const {
+    Mutex::Autolock l(mLock);
+    return mCurrentSurfaceId;
+}
+
 status_t Camera3OutputStream::updateInternalStream(
         KeyedVector<sp<Surface>, size_t> * outputMap /*out*/) {
     if (!flags::seamless_transitions()) {

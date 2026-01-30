@@ -87,6 +87,11 @@ class Camera3FakeStream :
      */
     virtual ssize_t getSurfaceId(const sp<Surface> &/*surface*/) { return 0; }
 
+    /**
+     * Query the current surface id.
+     */
+    virtual ssize_t getCurrentSurfaceId() const override { return 0; }
+
     virtual int getMirrorMode() const override { return  OutputConfiguration::MIRROR_MODE_AUTO; };
 
     virtual status_t getUniqueSurfaceIds(const std::vector<size_t>&,

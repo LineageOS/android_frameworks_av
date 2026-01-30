@@ -67,6 +67,11 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
     virtual ssize_t getSurfaceId(const sp<Surface> &surface) = 0;
 
     /**
+     * Query the current surface id.
+     */
+    virtual ssize_t getCurrentSurfaceId() const = 0;
+
+    /**
      * Query the unique surface IDs of current surfaceIds.
      * When passing unique surface IDs in returnBuffer(), if the
      * surfaceId has been removed from the stream, the output corresponding to
