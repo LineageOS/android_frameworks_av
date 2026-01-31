@@ -1284,8 +1284,7 @@ sp<IOProfile> AudioPolicyManager::searchCompatibleProfileHwModules (
              if (!curProfile->devicesSupportEncodedFormats(devices.types())) {
                  continue;
              }
-             if (com_android_media_audioserver_mmap_pcm_offload_support() &&
-                 hwModule->isAnyMutuallyExclusiveProfileOpened(curProfile)) {
+             if (hwModule->isAnyMutuallyExclusiveProfileOpened(curProfile)) {
                  ALOGD("%s ignore %s as there is a mutually exclusive profile active",
                        __func__, curProfile->getName().c_str());
                  continue;
@@ -7080,22 +7079,20 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
         }
         mHwModules.push_back(hwModule);
 
-        if (com_android_media_audioserver_mmap_pcm_offload_support()) {
-            if (property_get_bool("ro.audio.mmap_offload_exclusive", false /*default_value*/)) {
-                // When `ro.audio.mmap_offload_exclusive` is set to true,
-                // mmap offload and classical offload is mutually exclusive.
-                hwModule->updateMutuallyExclusiveOutputProfiles(
-                        AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,
-                        AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
-            }
-            if (property_get_bool("ro.audio.mmap_low_latency_offload_exclusive",
-                                  false /*default_value*/)) {
-                // When `ro.audio.mmap_low_latency_offload_exclusive` is set to true,
-                // mmap offload and mmap low latency is mutually exclusive.
-                hwModule->updateMutuallyExclusiveOutputProfiles(
-                        AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,
-                        AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
-            }
+        if (property_get_bool("ro.audio.mmap_offload_exclusive", false /*default_value*/)) {
+            // When `ro.audio.mmap_offload_exclusive` is set to true,
+            // mmap offload and classical offload is mutually exclusive.
+            hwModule->updateMutuallyExclusiveOutputProfiles(
+                    AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,
+                    AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD);
+        }
+        if (property_get_bool("ro.audio.mmap_low_latency_offload_exclusive",
+                              false /*default_value*/)) {
+            // When `ro.audio.mmap_low_latency_offload_exclusive` is set to true,
+            // mmap offload and mmap low latency is mutually exclusive.
+            hwModule->updateMutuallyExclusiveOutputProfiles(
+                    AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,
+                    AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
         }
 
         // open all output streams needed to access attached devices.

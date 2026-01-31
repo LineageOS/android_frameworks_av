@@ -799,27 +799,18 @@ AAUDIO_API aaudio_result_t AAudioStream_setOffloadEndOfStream(AAudioStream* stre
 
 AAUDIO_API aaudio_result_t AAudioStream_flushFromFrame(
         AAudioStream* stream, AAudio_FlushFromAccuracy accuracy, int64_t* inOutPosition) {
-    if (!com::android::media::audioserver::mmap_pcm_offload_support()) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->flushFromFrame(accuracy, inOutPosition);
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_setPlaybackParameters(
         AAudioStream* stream, const AAudioPlaybackParameters* parameters) {
-    if (!com::android::media::audioserver::mmap_pcm_offload_support()) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
     AudioStream* audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->setPlaybackParameters(parameters);
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_getPlaybackParameters(
         AAudioStream* stream, AAudioPlaybackParameters* outParameters) {
-    if (!com::android::media::audioserver::mmap_pcm_offload_support()) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
     AudioStream* audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getPlaybackParameters(outParameters);
 }
