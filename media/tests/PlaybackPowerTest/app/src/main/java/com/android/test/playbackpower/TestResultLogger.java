@@ -32,7 +32,7 @@ import org.json.JSONObject;
  */
 /* package */ final class TestResultLogger {
 
-    private static final String TAG = "PlaybackPower";
+    private static final String TAG = "PlaybackPowerApp";
 
     private final ExecutorService mBackgroundExecutor;
     private final File mResultFile;
