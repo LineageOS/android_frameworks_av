@@ -2140,7 +2140,14 @@ status_t CCodecBufferChannel::start(
                 input->buffers.reset(new EncryptedLinearInputBuffers(
                         secure, mDealer, mCrypto, mHeapSeqNum, (size_t)capacity,
                         numInputSlots, mName));
-                forceArrayMode = true;
+                // Certain ".secure" codecs have incorrect assumption about
+                // ArrayMode behaviour and we workaround the violation by keeping
+                // it here.
+                // For non ".secure" codecs with or without crypto, BufferPools
+                // can be used for input memory management. In all the cases
+                // non ArrayMode is used and the lifecycle and reuse will be
+                // managed by BufferPool.
+                forceArrayMode = secure;
             } else {
                 input->buffers.reset(new LinearInputBuffers(mName));
             }

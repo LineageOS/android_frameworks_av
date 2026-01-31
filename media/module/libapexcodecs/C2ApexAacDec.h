@@ -21,6 +21,7 @@
 #include <list>
 #include <memory>
 #include <vector>
+#include <queue>
 
 #include <SimpleC2Interface.h>
 #include <apex/ApexCodecsImpl.h>
@@ -82,55 +83,29 @@ private:
     HANDLE_AACDECODER mAACDecoder;
     // Holds information about the output audio stream from the decoder.
     OutputInfo mOutputInfo;
-    // A flag to indicate if this is the first buffer being processed.
-    bool mIsFirst;
-    // A counter for the number of input buffers received.
-    size_t mInputBufferCount;
-    // A counter for the number of output buffers produced.
-    size_t mOutputBufferCount;
+    // A flag to indicate if this is the first input buffer being processed.
+    bool mIsFirstInput;
+    // A flag to indicate if this is the first output buffer being processed.
+    bool mIsFirstOutput;
     // A flag to indicate if an error has occurred.
     bool mSignalledError;
-    // The delay introduced by the output port.
-    size_t mOutputPortDelay;
 
     // A flag to indicate that the end of the input stream has been reached.
     bool mEndOfInput;
     // A flag to indicate that the end of the output stream has been reached.
     bool mEndOfOutput;
-    // The number of samples that have been compensated for output delay.
-    int32_t mOutputDelayCompensated;
-    // The size of the ring buffer used for output delay compensation.
-    int32_t mOutputDelayRingBufferSize;
-    // The ring buffer itself, used to manage output delay.
-    std::unique_ptr<float[]> mOutputDelayRingBuffer;
-    // The write position in the ring buffer.
-    int32_t mOutputDelayRingBufferWritePos;
-    // The read position in the ring buffer.
-    int32_t mOutputDelayRingBufferReadPos;
-    // The number of samples currently in the ring buffer.
-    int32_t mOutputDelayRingBufferFilled;
-    // Puts a given number of samples into the ring buffer.
-    bool outputDelayRingBufferPutSamples(float *samples, int numSamples);
-    // Gets a given number of samples from the ring buffer.
-    int32_t outputDelayRingBufferGetSamples(float *samples, int numSamples);
-    // Returns the number of samples currently available to be read from the ring buffer.
-    int32_t outputDelayRingBufferSamplesAvailable();
-    // Returns the amount of space (in samples) left in the ring buffer for writing.
-    int32_t outputDelayRingBufferSpaceLeft();
-    // Helper to output samples from the ring buffer to the output buffer.
-    ApexCodec_Status outputFromRingBuffer(
-            ApexCodec_Buffer* output,
-            size_t* produced,
-            uint64_t frameIndex,
-            uint64_t timestamp);
-
-    struct FrameInfo {
-        uint64_t frameIndex;
-        uint64_t timestamp;
-        size_t numSamples;
-    };
-    std::deque<FrameInfo> mPendingFrameInfos;
-    std::deque<FrameInfo> mRingBufferFrameInfos;
+    // The current timestamp for the output buffer.
+    uint64_t mCurrentTimestampUs;
+    // The current frame index for the output buffer.
+    uint64_t mCurrentFrameIndex;
+    // The number of samples to discard from the beginning of the output.
+    int32_t mSamplesToDiscard;
+    // The buffer to hold the leftover samples from the previous output.
+    std::vector<float> mLeftoverBuffer;
+    // The number of leftover samples from the previous output.
+    size_t mLeftoverSamples;
+    // The queue to hold the timestamps of the pending input buffers.
+    std::queue<std::pair<uint64_t, uint64_t>> mPendingTimestamps;
 
     C2_DO_NOT_COPY(C2ApexAacDec);
 };

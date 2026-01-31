@@ -24,6 +24,9 @@ import android.os.Bundle;
 import android.os.Trace;
 import android.util.Log;
 
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
@@ -56,6 +59,14 @@ public final class PlaybackPowerActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_playback_power);
         mPlayerView = findViewById(R.id.player_view);
+
+        // Hide system bars so the playback is full-screen.
+        WindowInsetsControllerCompat windowInsetsControllerCompat =
+            WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        windowInsetsControllerCompat.setSystemBarsBehavior(
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        );
+        windowInsetsControllerCompat.hide(WindowInsetsCompat.Type.systemBars());
     }
 
     @Override

@@ -6828,7 +6828,7 @@ bool AudioPolicyManager::checkHapticCompatibilityOnSpatializerOutput(
 }
 
 void AudioPolicyManager::checkVirtualizerClientRoutes() {
-    std::set<audio_stream_type_t> streamsToInvalidate;
+    PortHandleVector clientsToInvalidate;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         const sp<SwAudioOutputDescriptor>& desc = mOutputs[i];
         for (const sp<TrackClientDescriptor>& client : desc->getClientIterable()) {
@@ -6839,12 +6839,13 @@ void AudioPolicyManager::checkVirtualizerClientRoutes() {
             audio_config_t config = audio_config_initializer(&clientConfig);
             if (desc != mSpatializerOutput
                     && canBeSpatializedInt(&attr, &config, devicesTypeAddress)) {
-                streamsToInvalidate.insert(client->stream());
+                clientsToInvalidate.push_back(client->portId());
             }
         }
     }
-
-    invalidateStreams(StreamTypeVector(streamsToInvalidate.begin(), streamsToInvalidate.end()));
+    if (!clientsToInvalidate.empty()) {
+        mpClientInterface->invalidateTracks(clientsToInvalidate);
+    }
 }
 
 

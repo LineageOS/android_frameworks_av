@@ -26,10 +26,12 @@ android_app {
     target_sdk_version: "36",
     min_sdk_version: "28",
     static_libs: [
+        "androidx.annotation_annotation",
+        "androidx.appcompat_appcompat",
+        "androidx.core_core",
         "androidx.media3.media3-common",
         "androidx.media3.media3-exoplayer",
         "androidx.media3.media3-exoplayer-dash",
         "androidx.media3.media3-ui",
-        "androidx.annotation_annotation",
     ],
 }
