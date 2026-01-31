@@ -7,13 +7,6 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
-    name: "new_data_callback"
-    namespace: "media_audio"
-    description: "New data callback in AAudio."
-    bug: "406332239"
-}
-
-flag {
     name: "offload_support"
     namespace: "media_audio"
     description: "Enable offload support in AAudio."

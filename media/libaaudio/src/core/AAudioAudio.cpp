@@ -22,7 +22,6 @@
 #include <aaudio/AAudioTesting.h>
 #include <binding/AAudioCommon.h>
 #include <client/AudioStreamInternal.h>
-#include <com_android_media_aaudio.h>
 #include <com_android_media_audioserver.h>
 #include <core/AudioStream.h>
 #include <core/AudioStreamBuilder.h>
@@ -267,9 +266,6 @@ AAUDIO_API aaudio_result_t AAudioStreamBuilder_setPartialDataCallback(
         AAudioStream_partialDataCallback callback,
         void *userData)
 {
-    if (!com::android::media::aaudio::new_data_callback()) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setPartialDataCallbackProc(callback)
                  ->setDataCallbackUserData(userData);
