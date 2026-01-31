@@ -1274,6 +1274,7 @@ C2PlatformComponentStore::C2PlatformComponentStore()
     // TODO: move this also into a .so so it can be updated
     emplace("libcodec2_soft_aacdec.so");
     emplace("libcodec2_soft_aacenc.so");
+    emplace("libcodec2_soft_xheaacenc.so");
     emplace("libcodec2_soft_amrnbdec.so");
     emplace("libcodec2_soft_amrnbenc.so");
     emplace("libcodec2_soft_amrwbdec.so");
