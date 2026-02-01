@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 #include <media/stagefright/foundation/base64.h>
 #include <binder/IPCThreadState.h>
+#include <android/binder_ibinder.h>
 
 #include <cstdint>
 #include <inttypes.h>
@@ -185,6 +186,19 @@ std::vector<uint8_t> base64DecodeNoPad(std::string& str) {
 }
 } // namespace
 
+static int32_t getClientUid() {
+    int32_t uid;
+
+#ifdef METRICS_IN_MODULE
+    // XXX: see if we can always use this side, simplifying the code
+    uid = AIBinder_getCallingUid();
+#else
+    uid = IPCThreadState::self()->getCallingUid();
+#endif
+
+    return uid;
+}
+
 // |out| and its contents are memory-managed by statsd.
 bool statsd_mediadrm_puller(
         const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out,
@@ -246,7 +260,7 @@ bool statsd_mediadrm_created(const std::shared_ptr<const mediametrics::Item>& it
     int64_t uuid_msb = -1;
     if (!item->getInt64("uuid_msb", &uuid_msb)) return false;
     const int32_t scheme = MediaDrmStatsdHelper::findDrmScheme(uuid_msb, uuid_lsb);
-    const int32_t uid = IPCThreadState::self()->getCallingUid();
+    const int32_t uid = getClientUid();
     int32_t frontend = 0;
     if (!item->getInt32("frontend", &frontend)) return false;
 
@@ -281,7 +295,7 @@ bool statsd_mediadrm_session_opened(const std::shared_ptr<const mediametrics::It
     const int32_t scheme = MediaDrmStatsdHelper::findDrmScheme(uuid_msb, uuid_lsb);
     std::string object_nonce = "";
     if (!item->getString("object_nonce", &object_nonce)) return false;
-    const int32_t uid = IPCThreadState::self()->getCallingUid();
+    const int32_t uid = getClientUid();
     int32_t frontend = 0;
     if (!item->getInt32("frontend", &frontend)) return false;
     int32_t requested_security_level = 0;
@@ -323,7 +337,7 @@ bool statsd_mediadrm_errored(const std::shared_ptr<const mediametrics::Item>& it
     int64_t uuid_msb = -1;
     if (!item->getInt64("uuid_msb", &uuid_msb)) return false;
     const int32_t scheme = MediaDrmStatsdHelper::findDrmScheme(uuid_msb, uuid_lsb);
-    const int32_t uid = IPCThreadState::self()->getCallingUid();
+    const int32_t uid = getClientUid();
     int32_t frontend = 0;
     if (!item->getInt32("frontend", &frontend)) return false;
     std::string object_nonce = "";
