@@ -46,6 +46,7 @@ cc_aconfig_library {
     double_loadable: true,
     apex_available: [
         "//apex_available:platform",
+        "com.android.media",
         "com.android.media.swcodec",
     ],
     aconfig_declarations: "aconfig_codec_fwk_flags",
