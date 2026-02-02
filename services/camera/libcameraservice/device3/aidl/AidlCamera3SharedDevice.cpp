@@ -140,7 +140,8 @@ status_t AidlCamera3SharedDevice::initialize(sp<CameraProviderManager> manager,
 }
 
 status_t AidlCamera3SharedDevice::disconnectClient(int clientPid) {
-    Mutex::Autolock l(mSharedDeviceLock);
+    Mutex::Autolock l1(sSharedClientsLock);
+    Mutex::Autolock l2(mSharedDeviceLock);
     if (sClientsPid[mId].erase(clientPid) == 0) {
         ALOGW("%s: Camera %s: Client %d is not connected to shared device", __FUNCTION__,
                 mId.c_str(), clientPid);
