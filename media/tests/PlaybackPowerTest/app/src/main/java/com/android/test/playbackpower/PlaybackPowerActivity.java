@@ -46,8 +46,6 @@ import java.util.UUID;
 /** Activity with a video player that can be used to measure playback power. */
 public final class PlaybackPowerActivity extends Activity {
 
-    private static final String TAG = "PlaybackPower";
-
     /** Default duration to play the video for, in seconds. */
     private static final int DEFAULT_DURATION_SEC = 50;
     /** Interval between sampling the coulomb counter, in seconds. */
@@ -99,8 +97,8 @@ public final class PlaybackPowerActivity extends Activity {
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
+    public void onResume() {
+        super.onResume();
         if (mIsFinished) {
             // The app returned to the foreground after previously ending, so do nothing.
             return;
@@ -111,8 +109,8 @@ public final class PlaybackPowerActivity extends Activity {
     }
 
     @Override
-    public void onStop() {
-        super.onStop();
+    public void onPause() {
+        super.onPause();
         mPlayerView.onPause();
         if (mIsTestPlaybackRunning) {
             handleFailure("Test playback was interrupted");
