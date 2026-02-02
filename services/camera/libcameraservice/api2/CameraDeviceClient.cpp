@@ -2773,25 +2773,6 @@ void CameraDeviceClient::detachDevice() {
                     camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID, /*listener*/this);
     }
 
-    if (flags::camera_multi_client() && mSharedMode) {
-        for (auto streamInfo : mStreamInfoMap) {
-            int streamToDelete = streamInfo.first;
-            std::vector<size_t> removedSurfaceIds;
-            for (size_t i = 0; i < mStreamMap.size(); ++i) {
-                if (streamToDelete == mStreamMap.valueAt(i).streamId()) {
-                    removedSurfaceIds.push_back(mStreamMap.valueAt(i).surfaceId());
-                }
-            }
-            status_t err = mDevice->removeSharedSurfaces(streamToDelete, removedSurfaceIds);
-            if (err != OK) {
-                std::string msg = fmt::sprintf("Camera %s: Unexpected error %s (%d) when removing"
-                        "shared surfaces from stream %d", mCameraIdStr.c_str(), strerror(-err),
-                        err, streamToDelete);
-                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
-            }
-        }
-    }
-
     if (!flags::camera_multi_client() || !mSharedMode ||
             (mSharedMode && sCameraService->isOnlyClient(this))){
         ALOGV("Camera %s: Stopping processors", mCameraIdStr.c_str());
@@ -2827,6 +2808,25 @@ void CameraDeviceClient::detachDevice() {
                 }
             }
             mCompositeStreamMap.clear();
+        }
+    }
+
+    if (flags::camera_multi_client() && mSharedMode) {
+        for (auto streamInfo : mStreamInfoMap) {
+            int streamToDelete = streamInfo.first;
+            std::vector<size_t> removedSurfaceIds;
+            for (size_t i = 0; i < mStreamMap.size(); ++i) {
+                if (streamToDelete == mStreamMap.valueAt(i).streamId()) {
+                    removedSurfaceIds.push_back(mStreamMap.valueAt(i).surfaceId());
+                }
+            }
+            status_t err = mDevice->removeSharedSurfaces(streamToDelete, removedSurfaceIds);
+            if (err != OK) {
+                std::string msg = fmt::sprintf("Camera %s: Unexpected error %s (%d) when removing"
+                        "shared surfaces from stream %d", mCameraIdStr.c_str(), strerror(-err),
+                        err, streamToDelete);
+                ALOGE("%s: %s", __FUNCTION__, msg.c_str());
+            }
         }
     }
 
