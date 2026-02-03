@@ -718,9 +718,6 @@ std::string AudioStream::getTagsAsString() const {
 
 aaudio_result_t AudioStream::flushFromFrame(AAudio_FlushFromAccuracy accuracy, int64_t* position) {
     ALOGD("%s(%d, %jd)", __func__, accuracy, *position);
-    if (!com_android_media_audioserver_mmap_pcm_offload_support()) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
     if (getDirection() != AAUDIO_DIRECTION_OUTPUT ||
         getPerformanceMode() != AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED ||
         (accuracy != AAUDIO_FLUSH_FROM_ACCURACY_UNDEFINED &&
@@ -741,9 +738,6 @@ aaudio_result_t AudioStream::flushFromFrame(AAudio_FlushFromAccuracy accuracy, i
 aaudio_result_t AudioStream::setPlaybackParameters(const AAudioPlaybackParameters* parameters) {
     ALOGD("%s, fallbackMode=%d, stretchMode=%d, pitch=%f, speed=%f", __func__,
           parameters->fallbackMode, parameters->stretchMode, parameters->pitch, parameters->speed);
-    if (!com_android_media_audioserver_mmap_pcm_offload_support()) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
     if (getDirection() != AAUDIO_DIRECTION_OUTPUT) {
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
@@ -752,9 +746,6 @@ aaudio_result_t AudioStream::setPlaybackParameters(const AAudioPlaybackParameter
 }
 
 aaudio_result_t AudioStream::getPlaybackParameters(AAudioPlaybackParameters* parameters) {
-    if (!com_android_media_audioserver_mmap_pcm_offload_support()) {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
-    }
     if (getDirection() != AAUDIO_DIRECTION_OUTPUT) {
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
