@@ -475,13 +475,20 @@ status_t Camera3SharedOutputStream::updateStream(const std::vector<SurfaceHolder
         if (mStreamSplitter != nullptr) {
             ret = mStreamSplitter->removeOutput(it);
             if (ret != OK) {
-                ALOGE("%s: failed with error code %d", __FUNCTION__, ret);
-                status_t res = revertPartialUpdateLocked(removedSurfaces, *outputMap);
-                if (res != OK) {
-                    return res;
+                // EPIPE (Broken pipe) can happen if the surface is already disconnected.
+                // We should treat this as success for the purpose of removal.
+                if (ret == -EPIPE) {
+                    ALOGW("%s: Ignoring error %d while removing output surface %zu",
+                            __FUNCTION__, ret, it);
+                    ret = OK;
+                } else {
+                    ALOGE("%s: failed with error code %d", __FUNCTION__, ret);
+                    status_t res = revertPartialUpdateLocked(removedSurfaces, *outputMap);
+                    if (res != OK) {
+                        return res;
+                    }
+                    return ret;
                 }
-                return ret;
-
             }
         }
         removedSurfaces.add(it, mSurfaceUniqueIds[it].mSurfaceHolder);

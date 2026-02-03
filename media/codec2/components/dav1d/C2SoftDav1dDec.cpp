@@ -33,6 +33,24 @@
 
 namespace android {
 
+namespace {
+
+bool IsHDR10PlusItutT35Payload(const Dav1dITUTT35* itut_t35) {
+  // Specified in https://aomediacodec.github.io/av1-hdr10plus/#hdr10plus-metadata
+  return itut_t35 != nullptr &&
+         // itu_t_t35_country_code == 0xB5
+         itut_t35->country_code == 0xB5 &&
+         itut_t35->payload_size >= 5 &&
+         // itu_t_t35_terminal_provider_code == 0x003C
+         itut_t35->payload[0] == 0x00 && itut_t35->payload[1] == 0x3C &&
+         // itu_t_t35_terminal_provider_oriented_code == 0x0001
+         itut_t35->payload[2] == 0x00 && itut_t35->payload[3] == 0x01 &&
+         // application_identifier == 0x04
+         itut_t35->payload[4] == 0x04;
+}
+
+}  // namespace
+
 // The number of threads used for the dav1d decoder.
 static const int NUM_THREADS_DAV1D_DEFAULT = 0;
 static const char NUM_THREADS_DAV1D_PROPERTY[] = "debug.dav1d.numthreads";
@@ -847,41 +865,47 @@ void C2SoftDav1dDec::getHDRStaticParams(const Dav1dPicture* picture,
 
 void C2SoftDav1dDec::getHDR10PlusInfoData(const Dav1dPicture* picture,
                                           const std::unique_ptr<C2Work>& work) {
-    if (picture != nullptr) {
-        if (picture->itut_t35 != nullptr) {
-            std::vector<uint8_t> payload;
-            size_t payloadSize = picture->itut_t35->payload_size;
-            if (payloadSize > 0) {
-                payload.push_back(picture->itut_t35->country_code);
-                if (picture->itut_t35->country_code == 0xFF) {
-                    payload.push_back(picture->itut_t35->country_code_extension_byte);
-                }
-                payload.insert(payload.end(), picture->itut_t35->payload,
-                               picture->itut_t35->payload + picture->itut_t35->payload_size);
-            }
-
-            std::unique_ptr<C2StreamHdr10PlusInfo::output> hdr10PlusInfo =
-                    C2StreamHdr10PlusInfo::output::AllocUnique(payload.size());
-            if (!hdr10PlusInfo) {
-                ALOGE("Hdr10PlusInfo allocation failed");
-                mSignalledError = true;
-                work->result = C2_NO_MEMORY;
-                return;
-            }
-            memcpy(hdr10PlusInfo->m.value, payload.data(), payload.size());
-
-            // ALOGD("Received a hdr10PlusInfo from picture->itut_t32
-            // (payload_size=%ld,country_code=%d) at mOutputBufferIndex=%d.",
-            // picture->itut_t35->payload_size,
-            // picture->itut_t35->country_code,
-            // mOutputBufferIndex);
-
-            // config if hdr10Plus info has changed
-            if (nullptr == mHdr10PlusInfo || !(*hdr10PlusInfo == *mHdr10PlusInfo)) {
-                mHdr10PlusInfo = std::move(hdr10PlusInfo);
-                work->worklets.front()->output.configUpdate.push_back(std::move(mHdr10PlusInfo));
-            }
+    if (picture == nullptr) {
+        return;
+    }
+    for (size_t i = 0; i < picture->n_itut_t35; ++i) {
+        if (!IsHDR10PlusItutT35Payload(&picture->itut_t35[i])) {
+            continue;
         }
+        std::vector<uint8_t> payload;
+        size_t payloadSize = picture->itut_t35[i].payload_size;
+        if (payloadSize > 0) {
+            payload.push_back(picture->itut_t35[i].country_code);
+            if (picture->itut_t35[i].country_code == 0xFF) {
+                payload.push_back(picture->itut_t35[i].country_code_extension_byte);
+            }
+            payload.insert(payload.end(), picture->itut_t35[i].payload,
+                           picture->itut_t35[i].payload + picture->itut_t35[i].payload_size);
+        }
+
+        std::unique_ptr<C2StreamHdr10PlusInfo::output> hdr10PlusInfo =
+                C2StreamHdr10PlusInfo::output::AllocUnique(payload.size());
+        if (!hdr10PlusInfo) {
+            ALOGE("Hdr10PlusInfo allocation failed");
+            mSignalledError = true;
+            work->result = C2_NO_MEMORY;
+            return;
+        }
+        memcpy(hdr10PlusInfo->m.value, payload.data(), payload.size());
+
+        // ALOGD("Received a hdr10PlusInfo from picture->itut_t32
+        // (payload_size=%ld,country_code=%d) at mOutputBufferIndex=%d.",
+        // picture->itut_t35->payload_size,
+        // picture->itut_t35->country_code,
+        // mOutputBufferIndex);
+
+        // config if hdr10Plus info has changed
+        if (nullptr == mHdr10PlusInfo || !(*hdr10PlusInfo == *mHdr10PlusInfo)) {
+            mHdr10PlusInfo = std::move(hdr10PlusInfo);
+            work->worklets.front()->output.configUpdate.push_back(std::move(mHdr10PlusInfo));
+        }
+        // An HDR10+ payload was found for this frame, ignore the rest.
+        break;
     }
 }
 

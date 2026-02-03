@@ -46,10 +46,6 @@ import java.util.UUID;
 /** Activity with a video player that can be used to measure playback power. */
 public final class PlaybackPowerActivity extends Activity {
 
-    private static final String TAG = "PlaybackPower";
-
-    /** Default delay before starting playback, in seconds. */
-    private static final int DEFAULT_START_DELAY_SEC = 5;
     /** Default duration to play the video for, in seconds. */
     private static final int DEFAULT_DURATION_SEC = 50;
     /** Interval between sampling the coulomb counter, in seconds. */
@@ -59,7 +55,6 @@ public final class PlaybackPowerActivity extends Activity {
 
     private static final String EXTRA_DRM_SCHEME = "drm_scheme";
     private static final String EXTRA_DRM_LICENSE_URI = "drm_license_uri";
-    private static final String EXTRA_START_DELAY_SEC = "start_delay_sec";
     private static final String EXTRA_DURATION_SEC = "duration_sec";
     private static final String EXTRA_LOG_FILE_NAME = "log_file_name";
 
@@ -70,9 +65,11 @@ public final class PlaybackPowerActivity extends Activity {
 
     private BatteryManager mBatteryManager;
     private PowerManager mPowerManager;
+
+    private boolean mIsTestPlaybackRunning;
+    private boolean mIsFinished;
     private BroadcastReceiver mPowerReceiver;
     private Runnable mSampleBatteryRunnable;
-
     private TestResultLogger mTestResultLogger;
 
     @Override
@@ -100,20 +97,29 @@ public final class PlaybackPowerActivity extends Activity {
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
+    public void onResume() {
+        super.onResume();
+        if (mIsFinished) {
+            // The app returned to the foreground after previously ending, so do nothing.
+            return;
+        }
         mPlayerView.onResume();
-
         preparePlayer();
-        scheduleTestPlayback();
+        startPowerConnectionMonitoring();
     }
 
     @Override
-    public void onStop() {
-        super.onStop();
+    public void onPause() {
+        super.onPause();
         mPlayerView.onPause();
-        mPlayerView.setPlayer(null);
-        stopTestPlayback();
+        if (mIsTestPlaybackRunning) {
+            handleFailure("Test playback was interrupted");
+        } else if (!mIsFinished) {
+            handleFailure("Stopped without running test playback");
+        } else {
+            releasePlayer();
+            stopPowerConnectionMonitoring();
+        }
     }
 
     private void preparePlayer() {
@@ -153,20 +159,60 @@ public final class PlaybackPowerActivity extends Activity {
         mPlayer.prepare();
     }
 
-    private void scheduleTestPlayback() {
-        // Wait for the specified start delay, then play for the specified duration.
-        long startDelayMs =
-                getIntent().getIntExtra(EXTRA_START_DELAY_SEC, DEFAULT_START_DELAY_SEC) * 1000L;
-        long durationMs =
-                getIntent().getIntExtra(EXTRA_DURATION_SEC, DEFAULT_DURATION_SEC) * 1000L;
-        mHandler.postDelayed(this::startTestPlayback, startDelayMs);
-        mHandler.postDelayed(() -> {
-            stopTestPlayback();
-            handleSuccess();
-        }, (startDelayMs + durationMs));
+    private void startPowerConnectionMonitoring() {
+        // Monitor for connection, disconnection and power saver mode changes.
+        mPowerReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (mIsFinished) {
+                    return;
+                }
+                String action = intent.getAction();
+                if (PowerManager.ACTION_POWER_SAVE_MODE_CHANGED.equals(action)) {
+                    if (mPowerManager.isPowerSaveMode()) {
+                        handleInPowerSaverMode();
+                    }
+                } else if (Intent.ACTION_POWER_CONNECTED.equals(action)) {
+                    handlePowerConnected();
+                } else if (Intent.ACTION_POWER_DISCONNECTED.equals(action)) {
+                    handlePowerDisconnected();
+                }
+            }
+        };
+
+        // Check the current status.
+        IntentFilter powerIntentFilter = new IntentFilter();
+        powerIntentFilter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+        powerIntentFilter.addAction(Intent.ACTION_POWER_DISCONNECTED);
+        powerIntentFilter.addAction(Intent.ACTION_POWER_CONNECTED);
+        registerReceiver(mPowerReceiver, powerIntentFilter);
+        IntentFilter batteryChangedIntentFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(/* receiver= */ null, batteryChangedIntentFilter);
+        boolean isPowerConnected = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) != 0;
+        if (mPowerManager.isPowerSaveMode()) {
+            handleInPowerSaverMode();
+        } else if (!isPowerConnected) {
+            handlePowerDisconnected();
+        }
+    }
+
+    private void handleInPowerSaverMode() {
+        handleFailure("Device is in power saver mode");
+    }
+
+    private void handlePowerDisconnected() {
+        if (!mIsTestPlaybackRunning) {
+            startTestPlayback();
+        }
+    }
+
+    private void handlePowerConnected() {
+        handleFailure("Power connected");
     }
 
     private void startTestPlayback() {
+        mIsTestPlaybackRunning = true;
+
         mPlayer.play();
         mTestResultLogger.logPlaybackStarted();
 
@@ -179,49 +225,29 @@ public final class PlaybackPowerActivity extends Activity {
         };
         mHandler.post(mSampleBatteryRunnable);
 
-        startPowerConnectionMonitoring();
+        // Schedule the end of the test playback.
+        long durationMs = getIntent().getIntExtra(EXTRA_DURATION_SEC, DEFAULT_DURATION_SEC) * 1000L;
+        mHandler.postDelayed(this::handleSuccess, durationMs);
     }
 
-    private void startPowerConnectionMonitoring() {
-        // Fail on power connection or power saver mode activation, which would invalidate the test.
-        mPowerReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                String action = intent.getAction();
-                if (PowerManager.ACTION_POWER_SAVE_MODE_CHANGED.equals(action)) {
-                    if (mPowerManager.isPowerSaveMode()) {
-                        handleFailure("Entered power saver mode");
-                    }
-                } else if (Intent.ACTION_POWER_CONNECTED.equals(action)) {
-                    handleFailure("Power connected (via power broadcast)");
-                }
-            }
-        };
-        IntentFilter powerIntentFilter = new IntentFilter();
-        powerIntentFilter.addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
-        powerIntentFilter.addAction(Intent.ACTION_POWER_CONNECTED);
-        registerReceiver(mPowerReceiver, powerIntentFilter);
+    private void handleSuccess() {
+        mTestResultLogger.logSuccess();
+        stopTestPlayback();
+    }
 
-        // Check the battery intent to see if we already have power connected.
-        IntentFilter batteryChangedIntentFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(/* receiver= */ null, batteryChangedIntentFilter);
-        int pluggedStatus = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
-        if (pluggedStatus == BatteryManager.BATTERY_PLUGGED_AC
-                || pluggedStatus == BatteryManager.BATTERY_PLUGGED_USB) {
-            handleFailure("Power connected (via battery intent)");
-        }
+    private void handleFailure(String errorMessage) {
+        // Show a toast with the error for now, to make it easier to debug issues eg. with USB.
+        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
+        mTestResultLogger.logFailure(errorMessage);
+        stopTestPlayback();
     }
 
     private void stopTestPlayback() {
-        stopPowerConnectionMonitoring();
-
-        if (mPlayer != null) {
-            mPlayer.release();
-            mPlayer = null;
-        }
-
-        // We don't want any more callbacks on the main thread (including battery sampling).
+        mIsFinished = true;
+        mIsTestPlaybackRunning = false;
         mHandler.removeCallbacksAndMessages(/* token= */ null);
+        stopPowerConnectionMonitoring();
+        releasePlayer();
     }
 
     private void stopPowerConnectionMonitoring() {
@@ -231,16 +257,12 @@ public final class PlaybackPowerActivity extends Activity {
         }
     }
 
-    private void handleFailure(String errorMessage) {
-        // Show a toast with the error for now, to make it easier to debug issues eg. with USB.
-        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
-
-        stopTestPlayback();
-        mTestResultLogger.logFailure(errorMessage);
-    }
-
-    private void handleSuccess() {
-        mTestResultLogger.logSuccess();
+    private void releasePlayer() {
+        mPlayerView.setPlayer(null);
+        if (mPlayer != null) {
+            mPlayer.release();
+            mPlayer = null;
+        }
     }
 
 }
