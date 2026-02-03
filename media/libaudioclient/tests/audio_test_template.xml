@@ -24,6 +24,7 @@
         <option name="push-file" key="bbb_1ch_8kHz_s16le.raw" value="/data/local/tmp/bbb_1ch_8kHz_s16le.raw" />
         <option name="push-file" key="bbb_2ch_24kHz_s16le.raw" value="/data/local/tmp/bbb_2ch_24kHz_s16le.raw" />
         <option name="push-file" key="sine960hz_48000_3s.ape" value="/data/local/tmp/sine960hz_48000_3s.ape" />
+        <option name="push-file" key="sine960hz_48000_3s_id3v1.mp3" value="/data/local/tmp/sine960hz_48000_3s_id3v1.mp3" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >

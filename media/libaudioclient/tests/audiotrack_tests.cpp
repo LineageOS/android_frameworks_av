@@ -189,40 +189,44 @@ class AudioTrackOffloadTest : public ::testing::Test {
             std::this_thread::sleep_for(std::chrono::milliseconds(750));
         }
     }
-    bool halSupportsClipTransition() const;
+    bool halSupportsOffload(audio_offload_info_t* info, std::string* resource = nullptr) const;
     void testPlayback(bool testDrainPause, sp<AudioPlayback>* outPlayback = nullptr);
 };
 
-bool AudioTrackOffloadTest::halSupportsClipTransition() const {
-    // TODO: Check for the HAL type (HIDL/AIDL) and version. HIDL and AIDL V4 should also
-    //       support this.
-    AudioParameter param;
-    param.addKey(String8(AudioParameter::keyClipTransitionSupport));
-    String8 values = AudioSystem::getParameters(AUDIO_IO_HANDLE_NONE, param.keysToString());
-    LOG(DEBUG) << __func__ << ": values \"" << values << "\"";
-    return !values.empty();
+bool AudioTrackOffloadTest::halSupportsOffload(audio_offload_info_t* info,
+                                               std::string* resource) const {
+    *info = AUDIO_INFO_INITIALIZER;
+    info->sample_rate = 48000;
+    info->channel_mask = AUDIO_CHANNEL_OUT_STEREO;
+    info->format = AUDIO_FORMAT_MP3;
+    info->stream_type = AUDIO_STREAM_MUSIC;
+    info->bit_rate = 236256;
+    info->duration_us = 120 * 1000000;  // 120 sec to ensure the offloading choice
+    if (resource) *resource = "/data/local/tmp/sine960hz_48000_3s_id3v1.mp3";
+    return AudioSystem::getOffloadSupport(*info) != AUDIO_OFFLOAD_NOT_SUPPORTED;
 }
 
 void AudioTrackOffloadTest::testPlayback(bool testDrainPause, sp<AudioPlayback>* outPlayback) {
-    audio_offload_info_t info = AUDIO_INFO_INITIALIZER;
-    info.sample_rate = 48000;
-    info.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
-    info.format = AUDIO_FORMAT_APE;
-    info.stream_type = AUDIO_STREAM_MUSIC;
-    info.bit_rate = 236256;
-    info.duration_us = 120 * 1000000;  // 120 sec to ensure the offloading choice
+    audio_offload_info_t info;
+    std::string resource;
 
-    if (AUDIO_OFFLOAD_NOT_SUPPORTED == AudioSystem::getOffloadSupport(info)) {
+    if (!halSupportsOffload(&info, &resource)) {
         GTEST_SKIP() << "offload playback is not supported for "
                      << audio_format_to_string(info.format);
     }
     auto ap = sp<AudioPlayback>::make(info.sample_rate, info.format, info.channel_mask,
                                       AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD, AUDIO_SESSION_NONE,
                                       AudioTrack::TRANSFER_OBTAIN, nullptr, &info);
-    ASSERT_EQ(OK, ap->loadResource("/data/local/tmp/sine960hz_48000_3s.ape"))
-            << "unable to open the media file";
+    ASSERT_EQ(OK, ap->loadResource(resource.c_str())) << "unable to open the media file";
     ASSERT_EQ(OK, ap->create()) << "track creation failed";
-    ASSERT_EQ(OK, ap->start()) << "audio track start failed";
+    status_t status = OK;
+    // Starting offload track may fail if the audio flinger hasn't yet cleared the I/O thread.
+    for (int retries = 0; retries < 3; ++retries) {
+        if ((status = ap->start()) == OK) break;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        LOG(INFO) << __func__ << ": Will retry starting track, previous status: " << status;
+    }
+    ASSERT_EQ(OK, status) << "audio track start failed";
     LOG(INFO) << __func__ << ": Started track";
     EXPECT_EQ(OK, ap->onProcess());
     LOG(INFO) << __func__ << ": onProcess done";
@@ -251,18 +255,15 @@ TEST_F(AudioTrackOffloadTest, Completion) {
 }
 
 TEST_F(AudioTrackOffloadTest, DrainPause) {
-    if (!halSupportsClipTransition()) {
-        // TODO: In theory, this should also work w/o having the proper clip transition
-        //       support, but as a fact it was not. Need to figure out why.
-        GTEST_SKIP() << "Proper indication of clip transition is not supported";
-    }
     testPlayback(true /*testDrainPause*/);
 }
 
 // Similar to AudioTrackOffloadTest.testMultipleAudioTrackOffloadPreemption
 TEST_F(AudioTrackOffloadTest, ClipPreemption) {
-    if (!halSupportsClipTransition()) {
-        GTEST_SKIP() << "Proper indication of clip transition is not supported";
+    audio_offload_info_t info;
+    if (!halSupportsOffload(&info)) {
+        GTEST_SKIP() << "offload playback is not supported for "
+                     << audio_format_to_string(info.format);
     }
     sp<AudioPlayback> trackOne, trackTwo;
     {
