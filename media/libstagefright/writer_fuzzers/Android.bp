@@ -60,7 +60,7 @@ cc_defaults {
     ],
     fuzz_config: {
         cc: [
-            "android-media-fuzzing-reports@google.com",
+            "android-media-editing@google.com",
         ],
         componentid: 155276,
         hotlists: [
