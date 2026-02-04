@@ -20,6 +20,7 @@
 #include <deque>
 #include <future>
 #include <mutex>
+#include <queue>
 #include <unordered_map>
 
 #include <android-base/thread_annotations.h>
