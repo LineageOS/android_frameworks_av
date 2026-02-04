@@ -512,7 +512,7 @@ status_t MediaMetricsService::ldump(int fd, const Vector<String16>& args)
         }
 #ifndef METRICS_IN_MODULE
         else if (unreachableOption == args[i]) {
-            // unreachable = true;
+            unreachable = true;
         }
 #endif
     }

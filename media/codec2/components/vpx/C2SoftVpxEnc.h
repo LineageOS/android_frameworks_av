@@ -106,7 +106,8 @@ struct C2SoftVpxEnc : public SimpleC2Component {
      virtual vpx_codec_err_t setCodecSpecificControls() = 0;
 
      // Get current encode flags.
-     virtual vpx_enc_frame_flags_t getEncodeFlags();
+     virtual void fillTemporalLayerFlagsAndGetLayerIndex(vpx_enc_frame_flags_t &flags,
+                                                         int  &temporalLayerId);
 
      enum TemporalReferences {
          // For 1 layer case: reference all (last, golden, and alt ref), but only
@@ -182,14 +183,11 @@ struct C2SoftVpxEnc : public SimpleC2Component {
      // Temporal layer bitrare ratio in percentage
      float_t mTemporalLayerBitrateRatio[MAXTEMPORALLAYERS];
 
-     // Temporal pattern type
-     TemporalPatternType mTemporalPatternType;
-
      // Temporal pattern length
      size_t mTemporalPatternLength;
 
      // Temporal pattern current index
-     size_t mTemporalPatternIdx;
+     size_t mTemporalFrameIndex;
 
      // Frame type temporal pattern
      TemporalReferences mTemporalPattern[kMaxTemporalPattern];
@@ -247,12 +245,12 @@ class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::input> &oldMe,
                           C2P<C2StreamPictureSizeInfo::input> &me);
 
-    static C2R ProfileLevelSetter(bool mayBlock, C2P<C2StreamProfileLevelInfo::output>& me,
-                                  const C2P<C2StreamPictureSizeInfo::input>& size,
-                                  const C2P<C2StreamFrameRateInfo::output>& frameRate,
-                                  const C2P<C2StreamBitrateInfo::output>& bitrate);
+    static C2R ProfileLevelSetter(bool mayBlock, C2P<C2StreamProfileLevelInfo::output> &me,
+                                  const C2P<C2StreamPictureSizeInfo::input> &size,
+                                  const C2P<C2StreamFrameRateInfo::output> &frameRate,
+                                  const C2P<C2StreamBitrateInfo::output> &bitrate);
 
-    static C2R LayeringSetter(bool mayBlock, C2P<C2StreamTemporalLayeringTuning::output>& me);
+    static C2R LayeringSetter(bool mayBlock, C2P<C2StreamTemporalLayeringTuning::output> &me);
 
     static C2R PictureQuantizationSetter(bool mayBlock,
                                          C2P<C2StreamPictureQuantizationTuning::output> &me);
@@ -289,6 +287,7 @@ class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamTemporalLayeringTuning::output> mLayering;
+    std::shared_ptr<C2StreamLayeringSchemeTuning::output> mLayeringScheme;
     std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;

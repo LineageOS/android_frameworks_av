@@ -1491,11 +1491,8 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, SelectMMapOffloadOnlyWhenReq
 }
 
 
-TEST_F_WITH_FLAGS(AudioPolicyManagerTestWithConfigurationFile,
-                  MMapOffloadMutuallyExclusive,
-                  REQUIRES_FLAGS_ENABLED(
-                          ACONFIG_FLAG(com::android::media::audioserver,
-                                       mmap_pcm_offload_support))) {
+TEST_F(AudioPolicyManagerTestWithConfigurationFile,
+       MMapOffloadMutuallyExclusive) {
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));

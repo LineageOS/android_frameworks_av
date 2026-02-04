@@ -186,7 +186,8 @@ status_t AudioPlayback::fillBuffer() {
     size_t bytesAvailable = mMemCapacity - mBytesUsedSoFar;
     while (bytesAvailable > 0) {
         AudioTrack::Buffer trackBuffer;
-        trackBuffer.frameCount = mTrack->frameCount() * 2;
+        const size_t framesNeeded = (bytesAvailable + mTrack->frameSize() - 1) / mTrack->frameSize();
+        trackBuffer.frameCount = std::min(mTrack->frameCount() * 2, framesNeeded);
         status_t status = mTrack->obtainBuffer(&trackBuffer, 1, &nonContig);
         if (OK == status) {
             size_t bytesToCopy = std::min(bytesAvailable, trackBuffer.size());

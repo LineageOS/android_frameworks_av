@@ -140,7 +140,8 @@ cc_defaults {
     ],
     data: [
         "bbb*.raw",
-        "sine960hz_48000_3s.ape",
+        "sine960hz_48000_3s.ape", // Unused in CI but can be helpful for local testing
+        "sine960hz_48000_3s_id3v1.mp3",
     ],
     srcs: [
         "audio_test_utils.cpp",

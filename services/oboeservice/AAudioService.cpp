@@ -123,11 +123,6 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
         AIDL_RETURN(AAUDIO_ERROR_ILLEGAL_ARGUMENT);
     }
     if (performanceMode == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED &&
-        !com_android_media_audioserver_mmap_pcm_offload_support()) {
-        ALOGD("%s denied mmap offload due to flag is not enabled", __func__);
-        AIDL_RETURN(AAUDIO_ERROR_ILLEGAL_ARGUMENT);
-    }
-    if (performanceMode == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED &&
             (sharingMode != AAUDIO_SHARING_MODE_EXCLUSIVE || !sharingModeMatchRequired)) {
         ALOGE("%s mmap offload must be exclusive", __func__);
         AIDL_RETURN(AAUDIO_ERROR_ILLEGAL_ARGUMENT);
