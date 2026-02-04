@@ -26,8 +26,6 @@
 #include <C2Debug.h>
 #include "C2SoftVpxEnc.h"
 
-#include <sstream>
-
 #ifndef INT32_MAX
 #define INT32_MAX   2147483647
 #endif
@@ -39,58 +37,6 @@
 #define VPX_QP_DEFAULT_MAX VPX_QP_MAX
 
 namespace android {
-
-namespace {
-bool getBitrateRatios(const size_t numTemporalLayers,
-                      const std::shared_ptr<C2StreamTemporalLayeringTuning::output> &layering,
-                      std::vector<float> &bitrateRatios) {
-    CHECK(layering);
-    CHECK_NE(numTemporalLayers, 0);
-    if (layering->flexCount() > numTemporalLayers) {
-        ALOGE("Invalid bitrate ratios configurations, mLayering->flexCount()=%zu, "
-              "mTemporalLayers=%zu",
-              layering->flexCount(), numTemporalLayers);
-        return false;
-    }
-    CHECK_LE(numTemporalLayers, 3);
-
-    bitrateRatios.resize(numTemporalLayers);
-    if (layering->flexCount() > 0) {
-        size_t configuredBitrates = std::min(layering->flexCount(), numTemporalLayers);
-        // Fill the configured bitrate ratios.
-        for (size_t i = 0; i < configuredBitrates; ++i) {
-            bitrateRatios[i] = layering->m.bitrateRatios[i];
-        }
-
-        // Fill the bitrate ratios for missing layers.
-        const size_t nonFilledLayers = numTemporalLayers - layering->flexCount();
-        if (nonFilledLayers > 0) {
-            if (nonFilledLayers == 1) {
-                bitrateRatios[numTemporalLayers - 1] = 1;
-            } else if (nonFilledLayers == 2) {
-                // This is the case that the number of temporal layers is 3 and the only
-                // single bitrate is given. As the number of T2 frames is as twice as T1, the
-                // twice bits is set to T2.
-                CHECK_EQ(numTemporalLayers, 3);
-                bitrateRatios[1] = bitrateRatios[0] + (1 - bitrateRatios[0]) / 3.0;
-                bitrateRatios[2] = 1;
-            }
-        }
-    } else {
-        // No bitrate ratios is configured. Fill the standard bitrate ratios.
-        const std::vector<float> kBasicBitrateRatios[] = {
-                {1.0},
-                {0.6, 1.0},             // = {60%, 40%}
-                {0.4, 0.6, 1.0},        // = {40%, 20%, 40%}
-                {0.25, 0.4, 0.6, 1.0},  // = {25%, 15%, 20%, 20%}
-        };
-        bitrateRatios = kBasicBitrateRatios[numTemporalLayers - 1];
-    }
-
-    return true;
-}
-
-}  // namespace
 
 C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
     : SimpleInterface<void>::BaseParams(
@@ -151,24 +97,11 @@ C2SoftVpxEnc::IntfImpl::IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helpe
                 Setter<decltype(*mFrameRate)>::StrictValueWithNoDeps)
             .build());
 
-    addParameter(DefineParam(mLayeringScheme, C2_PARAMKEY_LAYERING_SCHEME)
-                         .withDefault(new C2StreamLayeringSchemeTuning::output(
-                                 0u, C2Config::LS_UNSPECIFIED))
-                         .withFields({
-                                 C2F(mLayeringScheme, value)
-                                         .oneOf({
-                                                 C2Config::LS_UNSPECIFIED,
-                                                 C2Config::LS_WEBRTC,
-                                         }),
-                         })
-                         .withSetter(Setter<decltype(*mLayeringScheme)>::StrictValueWithNoDeps)
-                         .build());
-
     addParameter(
         DefineParam(mLayering, C2_PARAMKEY_TEMPORAL_LAYERING)
             .withDefault(C2StreamTemporalLayeringTuning::output::AllocShared(0u, 0, 0, 0))
             .withFields({
-                C2F(mLayering, m.layerCount).inRange(0, MAXTEMPORALLAYERS),
+                C2F(mLayering, m.layerCount).inRange(0, 4),
                 C2F(mLayering, m.bLayerCount).inRange(0, 0),
                 C2F(mLayering, m.bitrateRatios).inRange(0., 1.)
             })
@@ -315,10 +248,10 @@ C2R C2SoftVpxEnc::IntfImpl::SizeSetter(bool mayBlock,
 }
 
 C2R C2SoftVpxEnc::IntfImpl::ProfileLevelSetter(bool mayBlock,
-                                               C2P<C2StreamProfileLevelInfo::output> &me,
-                                               const C2P<C2StreamPictureSizeInfo::input> &size,
-                                               const C2P<C2StreamFrameRateInfo::output> &frameRate,
-                                               const C2P<C2StreamBitrateInfo::output> &bitrate) {
+                                               C2P<C2StreamProfileLevelInfo::output>& me,
+                                               const C2P<C2StreamPictureSizeInfo::input>& size,
+                                               const C2P<C2StreamFrameRateInfo::output>& frameRate,
+                                               const C2P<C2StreamBitrateInfo::output>& bitrate) {
     (void)mayBlock;
 #ifdef VP9
     if (!me.F(me.v.profile).supportsAtAll(me.v.profile)) {
@@ -396,28 +329,20 @@ C2R C2SoftVpxEnc::IntfImpl::ProfileLevelSetter(bool mayBlock,
     return C2R::Ok();
 }
 
-C2R C2SoftVpxEnc::IntfImpl::LayeringSetter(
-        bool mayBlock, C2P<C2StreamTemporalLayeringTuning::output> &me) {
+C2R C2SoftVpxEnc::IntfImpl::LayeringSetter(bool mayBlock,
+                                           C2P<C2StreamTemporalLayeringTuning::output>& me) {
     (void)mayBlock;
     C2R res = C2R::Ok();
-
-    if (me.v.m.layerCount > MAXTEMPORALLAYERS) {
-        me.set().m.layerCount = MAXTEMPORALLAYERS;
+    if (me.v.m.layerCount > 4) {
+        me.set().m.layerCount = 4;
     }
     me.set().m.bLayerCount = 0;
-    std::stringstream ss;
     // ensure ratios are monotonic and clamped between 0 and 1
     for (size_t ix = 0; ix < me.v.flexCount(); ++ix) {
         me.set().m.bitrateRatios[ix] = c2_clamp(
             ix > 0 ? me.v.m.bitrateRatios[ix - 1] : 0, me.v.m.bitrateRatios[ix], 1.);
-        ss << me.v.m.bitrateRatios[ix];
-        if (ix < me.v.flexCount() - 1) {
-            ss << ", ";
-        }
     }
-
-    ALOGD("setting temporal layering %u + %u, bitrateRatios: {%s}", me.v.m.layerCount,
-          me.v.m.bLayerCount, ss.str().c_str());
+    ALOGI("setting temporal layering %u + %u", me.v.m.layerCount, me.v.m.bLayerCount);
     return res;
 }
 
@@ -535,12 +460,17 @@ C2SoftVpxEnc::C2SoftVpxEnc(const char* name, c2_node_id_t id,
       mMinQuantizer(0),
       mMaxQuantizer(0),
       mTemporalLayers(0),
+      mTemporalPatternType(VPXTemporalLayerPatternNone),
       mTemporalPatternLength(0),
-      mTemporalFrameIndex(0),
+      mTemporalPatternIdx(0),
       mLastTimestamp(0x7FFFFFFFFFFFFFFFull),
       mSignalledOutputEos(false),
       mHeaderGenerated(false),
-      mSignalledError(false) {}
+      mSignalledError(false) {
+    for (int i = 0; i < MAXTEMPORALLAYERS; i++) {
+        mTemporalLayerBitrateRatio[i] = 1.0f;
+    }
+}
 
 C2SoftVpxEnc::~C2SoftVpxEnc() {
     onRelease();
@@ -694,6 +624,7 @@ status_t C2SoftVpxEnc::initEncoder() {
             mCodecConfiguration->ts_rate_decimator[0] = 1;
             mCodecConfiguration->ts_periodicity = 1;
             mCodecConfiguration->ts_layer_id[0] = 0;
+            mTemporalPattern[0] = kTemporalUpdateLastRefAll;
             mTemporalPatternLength = 1;
             break;
         case 2:
@@ -711,6 +642,7 @@ status_t C2SoftVpxEnc::initEncoder() {
             mTemporalPattern[5] = kTemporalUpdateGoldenRefAltRef;
             mTemporalPattern[6] = kTemporalUpdateLastRefAltRef;
             mTemporalPattern[7] = kTemporalUpdateNone;
+            mTemporalLayerBitrateRatio[0] = mLayering->m.bitrateRatios[0];
             mTemporalPatternLength = 8;
             break;
         case 3:
@@ -731,26 +663,20 @@ status_t C2SoftVpxEnc::initEncoder() {
             mTemporalPattern[5] = kTemporalUpdateNone;
             mTemporalPattern[6] = kTemporalUpdateGoldenRefAltRef;
             mTemporalPattern[7] = kTemporalUpdateNone;
+            mTemporalLayerBitrateRatio[0] = mLayering->m.bitrateRatios[0];
+            mTemporalLayerBitrateRatio[1] = mLayering->m.bitrateRatios[1];
             mTemporalPatternLength = 8;
             break;
         default:
             ALOGE("Wrong number of temporal layers %zu", mTemporalLayers);
             goto CleanUp;
     }
-
-    if (mTemporalLayers > 0) {
-        std::vector<float> bitrateRatios;
-        if (!getBitrateRatios(mTemporalLayers, mLayering, bitrateRatios)) {
-            ALOGE("Failed to get bitrate ratios from C2StreamTemporalLayeringTuning");
-            goto CleanUp;
-        }
-        CHECK_EQ(bitrateRatios.size(), mCodecConfiguration->ts_number_layers);
-        for (size_t i = 0; i < mCodecConfiguration->ts_number_layers; i++) {
-            mCodecConfiguration->ts_target_bitrate[i] =
-                    mCodecConfiguration->rc_target_bitrate * bitrateRatios[i];
-        }
+    // Set bitrate values for each layer
+    for (size_t i = 0; i < mCodecConfiguration->ts_number_layers; i++) {
+        mCodecConfiguration->ts_target_bitrate[i] =
+            mCodecConfiguration->rc_target_bitrate *
+            mTemporalLayerBitrateRatio[i];
     }
-
     if (mIntf->getSyncFramePeriod() >= 0) {
         mCodecConfiguration->kf_max_dist = mIntf->getSyncFramePeriod();
         mCodecConfiguration->kf_min_dist = mIntf->getSyncFramePeriod();
@@ -828,19 +754,11 @@ CleanUp:
     return result;
 }
 
-void C2SoftVpxEnc::fillTemporalLayerFlagsAndGetLayerIndex(
-        vpx_enc_frame_flags_t &flags, int &temporalLayerIndex) {
+vpx_enc_frame_flags_t C2SoftVpxEnc::getEncodeFlags() {
+    vpx_enc_frame_flags_t flags = 0;
     if (mTemporalPatternLength > 0) {
-      if (flags & VPX_EFLAG_FORCE_KF) {
-          temporalLayerIndex = 0;
-          mTemporalFrameIndex = 1;  // The frame index of keyframe is 0, so 1 for the next frame.
-          return;
-      }
-      temporalLayerIndex =
-              mCodecConfiguration
-                      ->ts_layer_id[mTemporalFrameIndex % mCodecConfiguration->ts_periodicity];
-      int patternIdx = mTemporalFrameIndex % mTemporalPatternLength;
-      mTemporalFrameIndex++;
+      int patternIdx = mTemporalPatternIdx % mTemporalPatternLength;
+      mTemporalPatternIdx++;
       switch (mTemporalPattern[patternIdx]) {
           case kTemporalUpdateLast:
               flags |= VP8_EFLAG_NO_UPD_GF;
@@ -904,6 +822,7 @@ void C2SoftVpxEnc::fillTemporalLayerFlagsAndGetLayerIndex(
               break;
       }
     }
+    return flags;
 }
 
 // TODO: add support for YUV input color formats
@@ -1062,15 +981,12 @@ void C2SoftVpxEnc::process(
             return;
     }
 
-    vpx_enc_frame_flags_t vpxFlags = 0;
-    int temporalLayerIndex = 0;
+    vpx_enc_frame_flags_t flags = getEncodeFlags();
     // handle dynamic config parameters
     {
         IntfImpl::Lock lock = mIntf->lock();
         std::shared_ptr<C2StreamIntraRefreshTuning::output> intraRefresh = mIntf->getIntraRefresh_l();
         std::shared_ptr<C2StreamBitrateInfo::output> bitrate = mIntf->getBitrate_l();
-        std::shared_ptr<C2StreamTemporalLayeringTuning::output> layering =
-                mIntf->getTemporalLayers_l();
         std::shared_ptr<C2StreamRequestSyncFrameTuning::output> requestSync = mIntf->getRequestSync_l();
         lock.unlock();
 
@@ -1087,43 +1003,15 @@ void C2SoftVpxEnc::process(
                 std::vector<std::unique_ptr<C2SettingResult>> failures;
                 mIntf->config({ &clearSync }, C2_MAY_BLOCK, &failures);
                 ALOGV("Got sync request");
-                vpxFlags |= VPX_EFLAG_FORCE_KF;
+                flags |= VPX_EFLAG_FORCE_KF;
             }
             mRequestSync = requestSync;
         }
-        fillTemporalLayerFlagsAndGetLayerIndex(vpxFlags, temporalLayerIndex);
 
-        if (bitrate != mBitrate || layering != mLayering) {
+        if (bitrate != mBitrate) {
             mBitrate = bitrate;
             mCodecConfiguration->rc_target_bitrate =
                 (mBitrate->value + 500) / 1000;
-
-            if (layering->m.layerCount == mTemporalLayers && mTemporalLayers > 0) {
-                // The dynamic change on the number of temporal layers is not supported.
-                // Only the bitrate layering change is supported.
-                CHECK_EQ(mTemporalLayers, mCodecConfiguration->ts_number_layers);
-                mLayering = layering;
-                std::vector<float> bitrateRatios;
-                if (getBitrateRatios(mTemporalLayers, mLayering, bitrateRatios)) {
-                    CHECK_EQ(bitrateRatios.size(), mCodecConfiguration->ts_number_layers);
-                    std::stringstream ss;
-                    for (size_t i = 0; i < bitrateRatios.size(); i++) {
-                        const float bitrateRatio = bitrateRatios[i];
-                        mCodecConfiguration->ts_target_bitrate[i] =
-                                mCodecConfiguration->rc_target_bitrate * bitrateRatio;
-                        ss << bitrateRatio;
-                        if (i < mCodecConfiguration->ts_number_layers - 1) {
-                            ss << ",";
-                        }
-                    }
-                    ALOGD("Update bitrate ratios: => %s", ss.str().c_str());
-                } else {
-                    // This is the case that too many bitrate layers is configured, which should
-                    // not happen.
-                    ALOGW("Skip bitrate ratio updates because of the invalid request");
-                }
-            }
-
             vpx_codec_err_t res = vpx_codec_enc_config_set(mCodecContext,
                                                            mCodecConfiguration);
             if (res != VPX_CODEC_OK) {
@@ -1150,8 +1038,10 @@ void C2SoftVpxEnc::process(
     }
     mLastTimestamp = inputTimeStamp;
 
-    vpx_codec_err_t codec_return = vpx_codec_encode(mCodecContext, &raw_frame, inputTimeStamp,
-                                                    frameDuration, vpxFlags, VPX_DL_REALTIME);
+    vpx_codec_err_t codec_return = vpx_codec_encode(mCodecContext, &raw_frame,
+                                                    inputTimeStamp,
+                                                    frameDuration, flags,
+                                                    VPX_DL_REALTIME);
     if (codec_return != VPX_CODEC_OK) {
         ALOGE("vpx encoder failed to encode frame");
         mSignalledError = true;
@@ -1192,19 +1082,9 @@ void C2SoftVpxEnc::process(
             work->worklets.front()->output.buffers.clear();
             std::shared_ptr<C2Buffer> buffer =
                 createLinearBuffer(block, 0, encoded_packet->data.frame.sz);
-            const bool isKeyFrame = encoded_packet->data.frame.flags & VPX_FRAME_IS_KEY;
-            if (isKeyFrame) {
+            if (encoded_packet->data.frame.flags & VPX_FRAME_IS_KEY) {
                 buffer->setInfo(std::make_shared<C2StreamPictureTypeMaskInfo::output>(
                         0u /* stream id */, C2Config::SYNC_FRAME));
-            }
-            if (mTemporalLayers > 1) {
-                if (isKeyFrame) {
-                    mTemporalFrameIndex = 1;
-                    temporalLayerIndex = 0;
-                }
-                buffer->setInfo(std::make_shared<C2StreamLayerIndexInfo::output>(
-                        0u /* stream id */, temporalLayerIndex));
-                ALOGV("Set temporal layer index: %d", temporalLayerIndex);
             }
             work->worklets.front()->output.buffers.push_back(buffer);
             work->worklets.front()->output.ordinal = work->input.ordinal;
