@@ -3716,48 +3716,80 @@ void PassthruPatchRecord::releaseBuffer(
 // ----------------------------------------------------------------------------
 // AfPlaybackCommon
 
-static AfPlaybackCommon::EnforcementLevel getOpControlEnforcementLevel(audio_usage_t usage,
-        IAfThreadCallback& cb) {
-    using enum AfPlaybackCommon::EnforcementLevel;
+using ::com::android::media::audio::hardening_usage;
+
+static std::pair<AfPlaybackCommon::EnforcementLevel,
+                 media::IAudioManagerNative::HardeningExemptionReason>
+getHardeningDecision(audio_usage_t usage, IAfThreadCallback& cb, uid_t uid) {
+    using EnforcementLevel = AfPlaybackCommon::EnforcementLevel;
     using enum media::IAudioPolicyService::HardeningOverride;
+    using enum media::IAudioManagerNative::HardeningExemptionReason;
+
+    using com::android::media::permission::PermissionEnum;
+
     const auto overrided = cb.getHardeningOverride();
     if (overrided == ENABLE) {
-        return FULL;
+        return {EnforcementLevel::FULL, NONE};
     } else if (overrided == DISABLE) {
-        return NONE;
+        return {EnforcementLevel::NONE, OVERRIDE};
     }
     if (usage == AUDIO_USAGE_VIRTUAL_SOURCE || media::permission::isSystemUsage(usage)) {
-        return NONE;
+        return {EnforcementLevel::NONE, SYSTEM_USAGE};
     }
+
+    const auto& pp = cb.getPermissionProvider();
+    if (pp.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, uid) ||
+        pp.checkPermission(PermissionEnum::MODIFY_PHONE_STATE, uid)) {
+        return {EnforcementLevel::NONE, PRIVILEGED_APP};
+    }
+
     if (hardening_strict()) {
-        // TODO (b/407607395)
-        if (usage == AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY || usage == AUDIO_USAGE_ALARM) {
-            return PARTIAL;
+        if (hardening_usage()) {
+            if (usage == AUDIO_USAGE_ALARM) {
+                if (pp.checkPermission(PermissionEnum::SCHEDULE_EXACT_ALARM, uid) ||
+                    pp.checkPermission(PermissionEnum::USE_EXACT_ALARM, uid)) {
+                    return {EnforcementLevel::PARTIAL, ALARM};
+                }
+            }
+        } else {
+            if (usage == AUDIO_USAGE_ALARM) {
+                return {EnforcementLevel::PARTIAL, ALARM};
+            }
+            if (usage == AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY) {
+                return {EnforcementLevel::PARTIAL, SYSTEM_USAGE};
+            }
         }
-        return FULL;
+        return {EnforcementLevel::FULL, NONE};
     } else if (hardening_partial()) {
-        return PARTIAL;
+        return {EnforcementLevel::PARTIAL, FLAG_DISABLED};
     } else {
-        return NONE;
+        return {EnforcementLevel::NONE, FLAG_DISABLED};
     }
 }
 
 AfPlaybackCommon::AfPlaybackCommon(IAfTrackBase& self, IAfThreadBase& thread,
                                    const audio_attributes_t& attr,
                                    const AttributionSourceState& attributionSource,
-                                   bool isOffloadOrMmap,
-                                   bool shouldPlaybackHarden)
-    : mSelf(self),
-      mEnforcementLevel(getOpControlEnforcementLevel(attr.usage, *thread.afThreadCallback())) {
-    ALOGI("creating track with enforcement level %d shouldHarden %d", mEnforcementLevel,
-              shouldPlaybackHarden);
+                                   bool isOffloadOrMmap, bool shouldPlaybackHarden)
+    : mSelf(self) {
+
+    std::tie(mEnforcementLevel, mExemptionReason) =
+            getHardeningDecision(attr.usage, *thread.afThreadCallback(),
+                                 VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid)));
+
+    ALOGI("%s: creating track with enforcement level %d reason %s shouldHarden %d",
+            __func__,
+            mEnforcementLevel,
+            toString(mExemptionReason).c_str(),
+            shouldPlaybackHarden);
+
     using AppOpsManager::OP_CONTROL_AUDIO;
     using AppOpsManager::OP_CONTROL_AUDIO_PARTIAL;
     using media::permission::Ops;
     using media::permission::skipOpsForUid;
     using media::permission::ValidatedAttributionSourceState;
 
-    // Don't bother for trusted uids
+    // Don't bother for trusted uids or tracks used for internal redirection
     if (!skipOpsForUid(attributionSource.uid) && shouldPlaybackHarden) {
         if (isOffloadOrMmap) {
             mExecutor.emplace();
@@ -3804,20 +3836,21 @@ AfPlaybackCommon::AfPlaybackCommon(IAfTrackBase& self, IAfThreadBase& thread,
 void AfPlaybackCommon::maybeLogPlaybackHardening(media::IAudioManagerNative& am) const {
     using media::IAudioManagerNative::HardeningType::PARTIAL;
     using media::IAudioManagerNative::HardeningType::FULL;
+
     // The op state deviates from if the track is actually muted if the playback was exempted for
     // some compat reason.
     // The state could have technically TOCTOU, but this is for metrics and that is very unlikely
     if (!hasOpControlPartial()) {
         if (!mPlaybackHardeningLogged.exchange(true, std::memory_order_acq_rel)) {
             am.playbackHardeningEvent(mSelf.uid(), PARTIAL,
-                                      /* bypassed= */
-                                      !isPlaybackRestrictedControl());
+                    /* bypassed= */
+                    !isPlaybackRestrictedControl(), mExemptionReason, mSelf.attributes().usage);
         }
     } else if (!hasOpControlFull()) {
         if (!mPlaybackHardeningLogged.exchange(true, std::memory_order_acq_rel)) {
             am.playbackHardeningEvent(mSelf.uid(), FULL,
-                                      /* bypassed= */
-                                      !isPlaybackRestrictedControl());
+                     /* bypassed= */
+                     !isPlaybackRestrictedControl(), mExemptionReason, mSelf.attributes().usage);
         }
     }
 }
