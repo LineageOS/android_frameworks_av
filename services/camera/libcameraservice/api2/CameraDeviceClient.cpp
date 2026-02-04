@@ -2865,7 +2865,7 @@ std::vector<PhysicalCaptureResultInfo> CameraDeviceClient::convertToFMQ(
     ALOGVV("%s E", __FUNCTION__);
     for (const auto &srcPhysicalResult : physicalResults) {
         size_t fmqSize = 0;
-        if (!mIsVendorClient && flags::fmq_metadata()) {
+        if (!mIsVendorClient) {
             fmqSize = writeResultMetadataIntoResultQueue(
                     srcPhysicalResult.mCameraMetadataInfo.get<CameraMetadataInfo::metadata>());
         }
@@ -2951,7 +2951,7 @@ void CameraDeviceClient::onResultAvailable(const CaptureResult& result) {
         size_t fmqMetadataSize = 0;
         // Vendor clients need to modify metadata and also this call is in process
         // before going through FMQ to vendor clients. So don't use FMQ here.
-        if (!mIsVendorClient && flags::fmq_metadata()) {
+        if (!mIsVendorClient) {
             fmqMetadataSize = writeResultMetadataIntoResultQueue(mutableResult.mMetadata);
         }
         hardware::camera2::impl::CameraMetadataNative resultMetadata;
