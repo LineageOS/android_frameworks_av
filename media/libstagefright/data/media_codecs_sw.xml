@@ -305,6 +305,15 @@
             <Limit name="bitrate" range="8000-960000" />
             <Attribute name="software-codec" />
         </MediaCodec>
+        <MediaCodec name="c2.android.xheaac.encoder" type="audio/mp4a-latm" rank="255">
+            <Limit name="channel-count" max="2" />
+            <Limit name="sample-rate" ranges="16000,22050,24000,32000,44100,48000" />
+            <!-- also may support 64000, 88200  and 96000 Hz -->
+            <Limit name="bitrate" range="12000-320000" />
+            <Limit name="quality" range="0-6"  default="3" />
+            <Feature name="bitrate-modes" value="CBR,VBR" />
+            <Attribute name="software-codec" />
+        </MediaCodec>
         <MediaCodec name="c2.android.amrnb.encoder" type="audio/3gpp">
             <Alias name="OMX.google.amrnb.encoder" />
             <Limit name="channel-count" max="1" />
