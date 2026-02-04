@@ -79,6 +79,16 @@ flag {
 }
 
 flag {
+    name: "hardening_bfgs"
+    namespace: "media_audio"
+    description: "Flag for bfgs capability constraint"
+    bug: "475914478"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "hardening_partial"
     is_exported: true
     namespace: "media_audio"
@@ -99,6 +109,16 @@ flag {
     namespace: "media_audio"
     description: "Flag for strict enforcement (deny access) of hardening"
     bug: "376480814"
+}
+
+flag {
+    name: "hardening_usage"
+    namespace: "media_audio"
+    description: "Flag for usage validation"
+    bug: "451793120"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
