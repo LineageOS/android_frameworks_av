@@ -1132,7 +1132,8 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         DeviceVector newDevices = getNewOutputDevices(desc, false /*fromCache*/);
         if (state != AUDIO_MODE_IN_CALL || (desc != mPrimaryOutput && !isTelephonyRxOrTx(desc))) {
-            bool forceRouting = !newDevices.isEmpty();
+            bool forceRouting = !newDevices.isEmpty() ||
+                desc->devices().containsDeviceWithType(AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET);
             setOutputDevices(__func__, desc, newDevices, forceRouting, 0 /*delayMs*/, nullptr,
                              true /*requiresMuteCheck*/, !forceRouting /*requiresVolumeCheck*/);
         }
