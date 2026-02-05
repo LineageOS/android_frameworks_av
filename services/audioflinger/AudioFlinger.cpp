@@ -1723,6 +1723,18 @@ void AudioFlinger::updateDownStreamPatches_l(const struct audio_patch *patch,
     }
 }
 
+IAfRecordThread* AudioFlinger::getRecordThreadForDevice_l(audio_devices_t deviceType,
+                                            const String8& address) const {
+    AudioDeviceTypeAddr ada(deviceType, address.c_str());
+
+    const auto& it = std::find_if(mRecordThreads.begin(), mRecordThreads.end(),
+            [ada](const auto& iter) {
+                return ada.equals(iter.second->inDeviceTypeAddr());
+            });
+
+    return (it != mRecordThreads.end()) ? it->second.get() : nullptr;
+}
+
 // Filter reserved keys from setParameters() before forwarding to audio HAL or acting upon.
 // Some keys are used for audio routing and audio path configuration and should be reserved for use
 // by audio policy and audio flinger for functional, privacy and security reasons.
