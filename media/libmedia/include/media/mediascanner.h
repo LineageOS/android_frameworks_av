@@ -36,7 +36,7 @@ enum MediaScanResult {
     // This file or directory was scanned successfully.
     MEDIA_SCAN_RESULT_OK,
     // This file or directory was skipped because it was not found, could
-    // not be opened, was of an unsupported type, or was malfored in some way.
+    // not be opened, was of an unsupported type, or was malformed in some way.
     MEDIA_SCAN_RESULT_SKIPPED,
     // The scan should be aborted due to a fatal error such as out of memory
     // or an exception.
@@ -88,17 +88,12 @@ protected:
 private:
     // current locale (like "ja_JP"), created/destroyed with strdup()/free()
     char *mLocale;
-    char *mSkipList;
-    int *mSkipIndex;
 
     MediaScanResult doProcessDirectory(
             char *path, int pathRemaining, MediaScannerClient &client, bool noMedia);
     MediaScanResult doProcessDirectoryEntry(
             char *path, int pathRemaining, MediaScannerClient &client, bool noMedia,
             struct dirent* entry, char* fileSpot);
-    void loadSkipList();
-    bool shouldSkipDirectory(char *path);
-
 
     MediaScanner(const MediaScanner &);
     MediaScanner &operator=(const MediaScanner &);
