@@ -83,7 +83,8 @@ public final class PlaybackPowerActivity extends Activity {
         if (fileName == null) {
             fileName = DEFAULT_LOG_FILE_NAME;
         }
-        mTestResultLogger = new TestResultLogger(new File(getCacheDir(), fileName));
+        mTestResultLogger = new TestResultLogger(
+                new File(getExternalFilesDir(/* type= */ null), fileName));
         mBatteryManager = getSystemService(BatteryManager.class);
         mPowerManager = getSystemService(PowerManager.class);
 
