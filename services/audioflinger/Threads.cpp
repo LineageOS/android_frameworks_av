@@ -996,6 +996,10 @@ String8 channelMaskToString(audio_channel_mask_t mask, bool output) {
     case AUDIO_CHANNEL_REPRESENTATION_INDEX:
         s.appendFormat("index mask, bits:%#x", audio_channel_mask_get_bits(mask));
         return s;
+    case AUDIO_CHANNEL_REPRESENTATION_ACN:
+        s.appendFormat("ACN mask, %s channels:%d", audio_acn_mask_is_horizontal(mask) ? "H" : "F",
+            audio_channel_count_from_acn_mask(mask));
+        return s;
     default:
         s.appendFormat("unknown mask, representation:%d  bits:%#x",
                 representation, audio_channel_mask_get_bits(mask));
