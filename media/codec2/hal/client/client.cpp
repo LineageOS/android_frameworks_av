@@ -2555,6 +2555,7 @@ std::vector<C2Component::Traits> Codec2Client::_listComponents(
                 trait.domain    = (C2Component::domain_t)apexTraits->domain;
                 trait.kind      = (C2Component::kind_t)apexTraits->kind;
                 trait.owner     = serviceName;
+                trait.rank      = 16;
             }
             *success = true;
         } else {
