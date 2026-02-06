@@ -33,7 +33,7 @@ using ::android::companion::virtualcamera::VirtualCameraService;
 namespace {
 // Multiple virtual cameras can be created and closed rapidly when recreating a VirtualDevice.
 // The Binder Thread pool should be large enough to handle this.
-const int HWBINDER_THREAD_COUNT = 16;
+const int HWBINDER_THREAD_COUNT = 6;
 
 constexpr char kVirtualCameraServiceName[] = "virtual_camera";
 }  // namespace
@@ -42,6 +42,7 @@ int main() {
   ALOGI("virtual_camera service is starting.");
 
   ABinderProcess_setThreadPoolMaxThreadCount(HWBINDER_THREAD_COUNT);
+  ABinderProcess_startThreadPool();
 
   std::shared_ptr<VirtualCameraProvider> defaultProvider =
       ndk::SharedRefBase::make<VirtualCameraProvider>();
