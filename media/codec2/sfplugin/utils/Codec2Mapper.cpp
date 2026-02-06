@@ -460,6 +460,7 @@ ALookup<C2Config::level_t, int32_t> sVvcLevels = {
     { C2Config::LEVEL_VVC_MAIN_6_0,    VVCMainTierLevel60 },
     { C2Config::LEVEL_VVC_MAIN_6_1,    VVCMainTierLevel61 },
     { C2Config::LEVEL_VVC_MAIN_6_2,    VVCMainTierLevel62 },
+    { C2Config::LEVEL_VVC_MAIN_6_3,    VVCMainTierLevel63 },
 
     { C2Config::LEVEL_VVC_HIGH_4_0,    VVCHighTierLevel40 },
     { C2Config::LEVEL_VVC_HIGH_4_1,    VVCHighTierLevel41 },
@@ -469,6 +470,7 @@ ALookup<C2Config::level_t, int32_t> sVvcLevels = {
     { C2Config::LEVEL_VVC_HIGH_6_0,    VVCHighTierLevel60 },
     { C2Config::LEVEL_VVC_HIGH_6_1,    VVCHighTierLevel61 },
     { C2Config::LEVEL_VVC_HIGH_6_2,    VVCHighTierLevel62 },
+    { C2Config::LEVEL_VVC_HIGH_6_3,    VVCHighTierLevel63 },
 };
 
 ALookup<C2Config::profile_t, int32_t> sVvcProfiles = {

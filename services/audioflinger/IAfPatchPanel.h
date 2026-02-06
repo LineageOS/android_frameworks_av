@@ -97,6 +97,9 @@ public:
             REQUIRES(mutex()) = 0;
     virtual void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices)
             REQUIRES(mutex()) = 0;
+    virtual IAfRecordThread* getRecordThreadForDevice_l(audio_devices_t deviceType,
+                                                const String8& address) const
+            REQUIRES(mutex()) = 0;
 };
 
 class IAfPatchPanel : public virtual RefBase {

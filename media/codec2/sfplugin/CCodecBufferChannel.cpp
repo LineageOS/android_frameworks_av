@@ -2165,6 +2165,8 @@ status_t CCodecBufferChannel::start(
         }
     }
 
+    bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
+
     if (outputFormat != nullptr) {
         sp<IGraphicBufferProducer> outputSurface;
         uint32_t outputGeneration;
@@ -2183,7 +2185,6 @@ status_t CCodecBufferChannel::start(
             outputGeneration = output->generation;
         }
 
-        bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
         C2BlockPool::local_id_t outputPoolId_;
         C2BlockPool::local_id_t prevOutputPoolId;
 
@@ -2380,6 +2381,106 @@ status_t CCodecBufferChannel::start(
         mTunneled = (tunneled != 0);
     }
 
+    // internal block pool
+    if (android::media::codec::provider_->internal_block_pool()) {
+        // Save the previous private output pool IDs to clean up later.
+        std::vector<PrivateBlockPool> prevPrivateBlockPools;
+        mBlockPools.lock()->privateBlockPools.swap(prevPrivateBlockPools);
+
+        // query if C2PrivateBlockPoolsTuning is supported.
+        std::vector<std::unique_ptr<C2Param>> poolsParams;
+        err = std::atomic_load(&mComponent)->query({ },
+                                { C2PrivateBlockPoolsTuning::PARAM_TYPE },
+                                C2_DONT_BLOCK,
+                                &poolsParams);
+        // create internal block pool if supported.
+        if (err == C2_OK && poolsParams.size() == 1) {
+            Mutexed<BlockPools>::Locked pools(mBlockPools);
+
+            // query C2PrivateAllocatorsTuning from component,
+            // or use default allocator if unsuccessful.
+            std::vector<std::unique_ptr<C2Param>> params;
+            err = std::atomic_load(&mComponent)->query({ },
+                                    { C2PrivateAllocatorsTuning::PARAM_TYPE },
+                                    C2_DONT_BLOCK,
+                                    &params);
+            if (err == C2_OK && params.size() == 1) {
+                C2PrivateAllocatorsTuning *allocators =
+                        C2PrivateAllocatorsTuning::From(params[0].get());
+                if (allocators) {
+                    for (int i = 0; i < allocators->flexCount(); i++) {
+                        std::shared_ptr<C2Allocator> allocator;
+                        // verify allocator IDs and resolve default allocator
+                        allocatorStore->fetchAllocator(allocators->m.values[i], &allocator);
+                        C2Allocator::id_t allocatorId;
+                        if (allocator) {
+                            allocatorId = allocator->getId();
+                        } else {
+                            // use default allocator ID.
+                            allocatorId = (graphic) ? C2PlatformAllocatorStore::GRALLOC
+                                                    : preferredLinearId;
+                            ALOGD("[%s] component requested invalid internal allocator ID %u",
+                                    mName, allocators->m.values[i]);
+                        }
+                        pools->privateBlockPools.push_back({
+                            allocatorId,
+                            // Default block pool
+                            graphic ? C2BlockPool::BASIC_GRAPHIC : C2BlockPool::BASIC_LINEAR,
+                            nullptr
+                        });
+                    }
+                }
+            }
+
+            std::vector<C2BlockPool::local_id_t> privatePoolIds;
+            for (PrivateBlockPool &privatePool : pools->privateBlockPools) {
+                C2Allocator::id_t allocatorId = privatePool.allocatorId;
+                C2BlockPool::local_id_t poolId;
+                std::shared_ptr<Codec2Client::Configurable> poolIntf;
+                if ((poolMask >> allocatorId) & 1) {
+                    err = std::atomic_load(&mComponent)->createBlockPool(
+                            allocatorId, &poolId, &poolIntf);
+                } else {
+                    err = C2_NOT_FOUND;
+                }
+                if (err == C2_OK) {
+                    privatePool.poolId = poolId;
+                    privatePool.poolIntf = poolIntf;
+                    ALOGI("[%s] Created internal output block pool with allocatorID %u "
+                            "=> poolID %llu - %s",
+                            mName, allocatorId,
+                            (unsigned long long)poolId,
+                            asString(err));
+                }
+                privatePoolIds.push_back(privatePool.poolId);
+            }
+
+            // Configure output block pool ID as parameter C2PrivateBlockPoolsTuning to component.
+            std::unique_ptr<C2PrivateBlockPoolsTuning> privatePoolIdsTuning =
+                    C2PrivateBlockPoolsTuning::AllocUnique(privatePoolIds);
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            err = std::atomic_load(&mComponent)->config(
+                    { privatePoolIdsTuning.get() }, C2_MAY_BLOCK, &failures);
+            ALOGD("[%s] Configured internal block pool ids %llu => %s",
+                    mName, (unsigned long long)privatePoolIdsTuning->m.values[0],
+                    asString(err));
+        }
+
+        // Clean up previous internal block pool if it is the same as the current one.
+        std::for_each(prevPrivateBlockPools.begin(), prevPrivateBlockPools.end(),
+                [this](PrivateBlockPool &prevPrivatePool) {
+            if (prevPrivatePool.poolId != C2BlockPool::BASIC_LINEAR
+                    && prevPrivatePool.poolId != C2BlockPool::BASIC_GRAPHIC) {
+                c2_status_t err = std::atomic_load(&mComponent)->destroyBlockPool(
+                        prevPrivatePool.poolId);
+                if (err != C2_OK) {
+                    ALOGW("Failed to clean up previous internal block pool %llu - %s (%d)\n",
+                            (unsigned long long) prevPrivatePool.poolId, asString(err), err);
+                }
+            }
+        });
+    }
+
     // Set up pipeline control. This has to be done after mInputBuffers and
     // mOutputBuffers are initialized to make sure that lingering callbacks
     // about buffers from the previous generation do not interfere with the
@@ -2567,6 +2668,9 @@ void CCodecBufferChannel::release() {
         Mutexed<BlockPools>::Locked blockPools{mBlockPools};
         blockPools->inputPool.reset();
         blockPools->outputPoolIntf.reset();
+        std::for_each(blockPools->privateBlockPools.begin(),
+                      blockPools->privateBlockPools.end(),
+                      [](PrivateBlockPool &pool) { pool.poolIntf.reset(); });
     }
     setCrypto(nullptr);
     setDescrambler(nullptr);

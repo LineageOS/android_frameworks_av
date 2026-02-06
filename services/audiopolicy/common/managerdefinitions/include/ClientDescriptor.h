@@ -41,6 +41,7 @@ class AudioPolicyMix;
 class DeviceDescriptor;
 class HwAudioOutputDescriptor;
 class SwAudioOutputDescriptor;
+class SourceClientDescriptor;
 
 class ClientDescriptor: public RefBase
 {
@@ -154,6 +155,14 @@ public:
         return mPrimaryMix.unsafe_get() && !mPrimaryMix.promote();
     }
 
+    void setPrimaryMix(sp<AudioPolicyMix> primaryMix)  {
+        mPrimaryMix = primaryMix;
+    }
+
+    void clearPrimaryMix()  {
+        mPrimaryMix.clear();
+    }
+
     void setActive(bool active) override
     {
         int delta = active ? 1 : -1;
@@ -199,13 +208,17 @@ public:
         return mIsSpatialized;
     }
 
+    virtual sp<SourceClientDescriptor> asSourceClient() {
+        return {};
+    }
+
 private:
     const audio_stream_type_t mStream;
     const product_strategy_t mStrategy;
     const VolumeSource mVolumeSource;
     const audio_output_flags_t mFlags;
     std::vector<wp<SwAudioOutputDescriptor>> mSecondaryOutputs;
-    const wp<AudioPolicyMix> mPrimaryMix;
+    wp<AudioPolicyMix> mPrimaryMix;
     /**
      * required for duplicating thread, prevent from removing active client from an output
      * involved in a duplication.
@@ -291,6 +304,26 @@ public:
     bool isCallTx() const override { return mIsCallTx; }
     std::variant<audio_port_handle_t, sp<DeviceDescriptor>> portForVolume() const override;
 
+    void addSecondaryPatch(audio_patch_handle_t patchHandle, wp<SwAudioOutputDescriptor> output) {
+        mSecondaryPatches.emplace(patchHandle, output);
+    };
+
+    void removeSecondaryPatch(audio_patch_handle_t patchHandle) {
+        mSecondaryPatches.erase(patchHandle);
+    };
+
+    const std::map<audio_patch_handle_t, wp<SwAudioOutputDescriptor>>& getSecondaryPatches() const {
+        return mSecondaryPatches;
+    };
+
+    void clearSecondaryPatches() {
+        return mSecondaryPatches.clear();
+    };
+
+    sp<SourceClientDescriptor> asSourceClient() final {
+        return this;
+    }
+
     using ClientDescriptor::dump;
     void dump(String8 *dst, int spaces) const override;
 
@@ -323,6 +356,8 @@ public:
     bool mIsInternal = false;
     bool mIsCallRx = false;
     bool mIsCallTx = false;
+
+    std::map<audio_patch_handle_t, wp<SwAudioOutputDescriptor>> mSecondaryPatches;
 };
 
 class SourceClientCollection :

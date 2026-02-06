@@ -1132,7 +1132,8 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         DeviceVector newDevices = getNewOutputDevices(desc, false /*fromCache*/);
         if (state != AUDIO_MODE_IN_CALL || (desc != mPrimaryOutput && !isTelephonyRxOrTx(desc))) {
-            bool forceRouting = !newDevices.isEmpty();
+            bool forceRouting = !newDevices.isEmpty() ||
+                desc->devices().containsDeviceWithType(AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET);
             setOutputDevices(__func__, desc, newDevices, forceRouting, 0 /*delayMs*/, nullptr,
                              true /*requiresMuteCheck*/, !forceRouting /*requiresVolumeCheck*/);
         }
@@ -5700,7 +5701,8 @@ FailurePatchAdded:
 status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *patch,
                                                       audio_patch_handle_t *handle,
                                                       uid_t uid, uint32_t delayMs,
-                                                      const sp<SourceClientDescriptor>& sourceDesc)
+                                                      const sp<SourceClientDescriptor>& sourceDesc,
+                                                      bool secondarySourcePatch)
 {
     ALOGV("%s num sources %d num sinks %d", __func__, patch->num_sources, patch->num_sinks);
     sp<AudioPatch> patchDesc;
@@ -5914,10 +5916,19 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                     output_type_t outputType;
                     bool isSpatialized;
                     bool isBitPerfect;
-                    getOutputForAttrInt(&resultAttr, &output, AUDIO_SESSION_NONE, &attributes,
-                                        &stream, sourceDesc->uid(), &config, &flags,
-                                        &selectedDeviceIds, &isRequestedDeviceForExclusiveUse,
-                                        nullptr, &outputType, &isSpatialized, &isBitPerfect);
+                    if (!secondarySourcePatch) {
+                        getOutputForAttrInt(&resultAttr, &output, AUDIO_SESSION_NONE,
+                                            &attributes, &stream, sourceDesc->uid(),
+                                            &config, &flags, &selectedDeviceIds,
+                                            &isRequestedDeviceForExclusiveUse,nullptr,
+                                            &outputType, &isSpatialized, &isBitPerfect);
+                    } else {
+                        output = getOutputForDevices(DeviceVector(sinkDevice),
+                                                     AUDIO_SESSION_NONE, &attributes, &config,
+                                                     &flags, &isSpatialized, nullptr,
+                                                     false);
+                    }
+
                     if (output == AUDIO_IO_HANDLE_NONE) {
                         ALOGV("%s no output for device %s",
                               __FUNCTION__, sinkDevice->toString().c_str());
@@ -5929,7 +5940,9 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                         return INVALID_OPERATION;
                     }
                     bool closeOutput = outputDesc->mDirectOpenCount != 0;
-                    sourceDesc->setSwOutput(outputDesc, closeOutput);
+                    if (!secondarySourcePatch) {
+                        sourceDesc->setSwOutput(outputDesc, closeOutput);
+                    }
                 } else {
                     // Same for "raw patches" aka created from createAudioPatch API
                     std::set<audio_io_handle_t> outputs =
@@ -5948,7 +5961,9 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                               __func__, sinkDevice->toString().c_str());
                         return INVALID_OPERATION;
                     }
-                    sourceDesc->setSwOutput(outputDesc, /* closeOutput= */ false);
+                    if (!secondarySourcePatch) {
+                        sourceDesc->setSwOutput(outputDesc, /* closeOutput= */ false);
+                    }
                 }
                 // create a software bridge in PatchPanel if:
                 // - source and sink devices are on different HW modules OR
@@ -5965,7 +5980,9 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                     if (patch->num_sinks > 1) {
                         return INVALID_OPERATION;
                     }
-                    sourceDesc->setUseSwBridge();
+                    if (!secondarySourcePatch) {
+                        sourceDesc->setUseSwBridge();
+                    }
                     if (outputDesc != nullptr) {
                         audio_port_config srcMixPortConfig = {};
                         outputDesc->toAudioPortConfig(&srcMixPortConfig, nullptr);
@@ -6081,15 +6098,17 @@ status_t AudioPolicyManager::releaseAudioPatchInternal(audio_patch_handle_t hand
             patchHandle = outputDesc->getPatchHandle();
             // While using a HwBridge, force reconsidering device only if not reusing an existing
             // output and no more activity on output (will force to close).
-            const bool force = sourceDesc->canCloseOutput() && !outputDesc->isActive();
+            const bool force = sourceDesc != nullptr
+                    && sourceDesc->canCloseOutput() && !outputDesc->isActive();
             // APM pattern is to have always outputs opened / patch realized for reachable devices.
             // Update device may result to NONE (empty), coupled with force, it releases the patch.
             // Reconsider device only for cases:
             //      1 / Active Output
             //      2 / Inactive Output previously hosting HwBridge
             //      3 / Inactive Output previously hosting SwBridge that can be closed.
-            bool updateDevice = outputDesc->isActive() || !sourceDesc->useSwBridge() ||
-                    sourceDesc->canCloseOutput();
+            bool updateDevice = outputDesc->isActive()
+                    || (sourceDesc != nullptr && (!sourceDesc->useSwBridge() ||
+                        sourceDesc->canCloseOutput()));
             setOutputDevices(__func__, outputDesc,
                              updateDevice ? getNewOutputDevices(outputDesc, true /*fromCache*/) :
                                             outputDesc->devices(),
@@ -6379,16 +6398,85 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
                 sourceDesc->srcDevice()->type(),
                 String8(sourceDesc->srcDevice()->address().c_str()),
                 AUDIO_FORMAT_DEFAULT);
-    DeviceVector sinkDevices = getOutputDevicesForAttributes(attributes, sourceDesc->uid());
-    ALOG_ASSERT(!sinkDevices.isEmpty(), "connectAudioSource(): no device found for attributes");
-    sp<DeviceDescriptor> sinkDevice = sinkDevices.itemAt(0);
+
+    sp<DeviceDescriptor> sinkDevice = nullptr;
+
+    sp<AudioPolicyMix> primaryMix;
+    std::vector<sp<AudioPolicyMix>> secondaryMixes;
+    bool usePrimaryOutputFromPolicyMixes = false;
+    status_t status = mPolicyMixes.getOutputForAttr(sourceDesc->attributes(), sourceDesc->config(),
+            sourceDesc->uid(), sourceDesc->session(), sourceDesc->flags(), mAvailableOutputDevices,
+            mAvailableOutputDevices.getDeviceFromId(sourceDesc->preferredDeviceId()),
+            primaryMix, &secondaryMixes, usePrimaryOutputFromPolicyMixes);
+    if (status != OK) {
+        return status;
+    }
+
+    if (!secondaryMixes.empty()
+        && (!audio_is_linear_pcm(sourceDesc->config().format) ||
+            sourceDesc->flags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)) {
+        ALOGD("%s: rejecting request as secondary mixes only support pcm", __func__);
+        return BAD_VALUE;
+    }
+
+    if (usePrimaryOutputFromPolicyMixes) {
+        sp<DeviceDescriptor> policyMixDevice =
+                mAvailableOutputDevices.getDevice(primaryMix->mDeviceType,
+                                                  primaryMix->mDeviceAddress,
+                                                  AUDIO_FORMAT_DEFAULT);
+        sp<SwAudioOutputDescriptor> primaryMixOutputDesc = primaryMix->getOutput();
+        if (primaryMixOutputDesc != nullptr) {
+            primaryMixOutputDesc->mPolicyMix = primaryMix;
+        } else {
+            if (policyMixDevice != nullptr) {
+                return INVALID_OPERATION;
+            }
+        }
+        sinkDevice= policyMixDevice;
+        sourceDesc->setPrimaryMix(primaryMix);
+    }
+
+    if (sinkDevice == nullptr) {
+        DeviceVector sinkDevices = getOutputDevicesForAttributes(attributes, sourceDesc->uid());
+        sinkDevice = sinkDevices.itemAt(0);
+    }
+    ALOG_ASSERT(sinkDevice != nullptr, "connectAudioSource(): no device found for attributes");
 
     PatchBuilder patchBuilder;
     patchBuilder.addSink(sinkDevice).addSource(srcDevice);
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
 
-    return connectAudioSourceToSink(
+    status = connectAudioSourceToSink(
                 sourceDesc, sinkDevice, patchBuilder.patch(), handle, mUidCached, delayMs);
+
+    if (status != OK) {
+        return status;
+    }
+    std::vector<wp<SwAudioOutputDescriptor>> weakSecondaryOutputDescs;
+    for (auto &secondaryMix : secondaryMixes) {
+        sp<SwAudioOutputDescriptor> outputDesc = secondaryMix->getOutput();
+        if (outputDesc == nullptr || outputDesc->mIoHandle == AUDIO_IO_HANDLE_NONE) {
+            continue;
+        }
+        PatchBuilder patchBuilder;
+        patchBuilder.addSource(srcDevice);
+        for (auto device : outputDesc->devices()) {
+            patchBuilder.addSink(device);
+        }
+        audio_patch_handle_t handle;
+        status_t result = createAudioPatchInternal(
+                patchBuilder.patch(), &handle, mUidCached, delayMs, sourceDesc, true);
+        if (result == OK) {
+            weakSecondaryOutputDescs.push_back(outputDesc);
+            sourceDesc->addSecondaryPatch(handle,outputDesc);
+        } else {
+            ALOGW("%s: cannot create secondary patch for devices %s",
+                  __func__, outputDesc->devices().toString().c_str());
+        }
+    }
+    sourceDesc->setSecondaryOutputs(std::move(weakSecondaryOutputDescs));
+
+    return status;
 }
 
 status_t AudioPolicyManager::stopAudioSource(audio_port_handle_t portId)
@@ -6732,6 +6820,14 @@ status_t AudioPolicyManager::disconnectAudioSource(const sp<SourceClientDescript
     }
     status_t status = releaseAudioPatchInternal(sourceDesc->getPatchHandle(), 0, sourceDesc);
     sourceDesc->disconnect();
+
+    for (auto &patch : sourceDesc->getSecondaryPatches()) {
+        releaseAudioPatchInternal(patch.first, 0, nullptr);
+    }
+    sourceDesc->setSecondaryOutputs({});
+    sourceDesc->clearSecondaryPatches();
+    sourceDesc->clearPrimaryMix();
+
     return status;
 }
 
@@ -7990,26 +8086,92 @@ void AudioPolicyManager::checkSecondaryOutputs() {
                 // When it failed to query secondary output, only invalidate the client that is not
                 // MMAP. The reason is that MMAP stream will not support secondary output.
                 clientsToInvalidate.push_back(client->portId());
-            } else if (!std::equal(
+                continue;
+            }
+            if (std::equal(
                     client->getSecondaryOutputs().begin(),
                     client->getSecondaryOutputs().end(),
                     secondaryDescs.begin(), secondaryDescs.end())) {
-                if (client->flags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
-                        || !audio_is_linear_pcm(client->config().format)) {
-                    // If the format is not PCM, the tracks should be invalidated to get correct
-                    // behavior when the secondary output is changed.
-                    clientsToInvalidate.push_back(client->portId());
-                } else {
-                    std::vector<wp<SwAudioOutputDescriptor>> weakSecondaryDescs;
-                    std::vector<audio_io_handle_t> secondaryOutputIds;
-                    for (const auto &secondaryDesc: secondaryDescs) {
-                        secondaryOutputIds.push_back(secondaryDesc->mIoHandle);
-                        weakSecondaryDescs.push_back(secondaryDesc);
-                    }
-                    trackSecondaryOutputs.emplace(client->portId(), secondaryOutputIds);
-                    client->setSecondaryOutputs(std::move(weakSecondaryDescs));
-                }
+                continue;
             }
+            if (client->flags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
+                    || !audio_is_linear_pcm(client->config().format)) {
+                // If the format is not PCM, the tracks should be invalidated to get correct
+                // behavior when the secondary output is changed.
+                clientsToInvalidate.push_back(client->portId());
+                continue;
+            }
+
+            std::vector<wp<SwAudioOutputDescriptor>> weakSecondaryOutputs;
+
+            if (auto srcClient = client->asSourceClient() ; srcClient != nullptr) {
+                // Connect new secondary patches
+                for (const auto &mixSecondaryOutput : secondaryDescs) {
+                    weakSecondaryOutputs.push_back(mixSecondaryOutput);
+
+                    bool found = false;
+                    for (const auto &output: srcClient->getSecondaryOutputs()) {
+                        if (const auto &clientSecondaryOutput = output.promote();
+                                clientSecondaryOutput != nullptr
+                                && clientSecondaryOutput->mIoHandle ==
+                                   mixSecondaryOutput->mIoHandle) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        PatchBuilder patchBuilder;
+                        patchBuilder.addSource(srcClient->srcDevice());
+                        for (auto device : mixSecondaryOutput->devices()) {
+                            patchBuilder.addSink(device);
+                        }
+                        audio_patch_handle_t handle;
+                        status_t stat = createAudioPatchInternal(
+                                patchBuilder.patch(), &handle, mUidCached, 0, srcClient, true);
+                        if (stat == OK) {
+                            srcClient->addSecondaryPatch(handle, mixSecondaryOutput);
+                        } else {
+                            ALOGW("%s: Failed to create secondary patch for client %d, status %d",
+                                  __func__, srcClient->portId(), stat);
+                        }
+                    }
+                }
+                // Release removed secondary patches
+                std::vector<audio_patch_handle_t> patchesToRelease;
+                for (const auto &secondaryPatch: srcClient->getSecondaryPatches()) {
+                    const auto &clientSecondaryOutput = secondaryPatch.second.promote();
+                    if (clientSecondaryOutput == nullptr) {
+                        patchesToRelease.push_back(secondaryPatch.first);
+                        continue;
+                    }
+                    bool found = false;
+                    for (const auto &mixSecondaryOutput : secondaryDescs) {
+                        if (mixSecondaryOutput->mIoHandle ==
+                                clientSecondaryOutput->mIoHandle) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        patchesToRelease.push_back(secondaryPatch.first);
+                    }
+                }
+                for (auto patch : patchesToRelease) {
+                    status_t stat = releaseAudioPatchInternal(patch, 0, nullptr);
+                    ALOGW_IF(stat != OK,
+                             "%s: Failed to release secondary patch for client %d, status %d",
+                             __func__, srcClient->portId(), stat);
+                    srcClient->removeSecondaryPatch(patch);
+                }
+            } else {
+                std::vector<audio_io_handle_t> secondaryOutputIds;
+                for (const auto &mixSecondaryOutput : secondaryDescs) {
+                    weakSecondaryOutputs.push_back(mixSecondaryOutput);
+                    secondaryOutputIds.push_back(mixSecondaryOutput->mIoHandle);
+                }
+                trackSecondaryOutputs.emplace(client->portId(), secondaryOutputIds);
+            }
+            client->setSecondaryOutputs(std::move(weakSecondaryOutputs));
         }
     }
     if (!trackSecondaryOutputs.empty()) {

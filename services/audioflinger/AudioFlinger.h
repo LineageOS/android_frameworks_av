@@ -364,6 +364,10 @@ private:
     void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices) final
             REQUIRES(mutex());
 
+    IAfRecordThread* getRecordThreadForDevice_l(audio_devices_t deviceType,
+                                                const String8& address) const final
+            REQUIRES(mutex());
+
     // ---- end of IAfPatchPanelCallback interface
 
     // ----- begin IAfThreadCallback interface
