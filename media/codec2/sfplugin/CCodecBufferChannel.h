@@ -388,19 +388,12 @@ private:
     Mutexed<OutputSurface> mOutputSurface;
     int mRenderingDepth;
 
-    struct PrivateBlockPool {
-        C2Allocator::id_t allocatorId;
-        C2BlockPool::local_id_t poolId;
-        std::shared_ptr<Codec2Client::Configurable> poolIntf;
-    };
-
     struct BlockPools {
         C2Allocator::id_t inputAllocatorId;
         std::shared_ptr<C2BlockPool> inputPool;
         C2Allocator::id_t outputAllocatorId;
         C2BlockPool::local_id_t outputPoolId;
         std::shared_ptr<Codec2Client::Configurable> outputPoolIntf;
-        std::vector<PrivateBlockPool> privateBlockPools;
     };
     Mutexed<BlockPools> mBlockPools;
 
