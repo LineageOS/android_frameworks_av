@@ -37,6 +37,7 @@
 #include <util/C2InterfaceHelper.h>
 
 #include "C2ApexAacDec.h"
+#include "DrcPresModeWrapRustAac.h"
 #include "private/apex/ApexCodecsImpl.h"
 
 namespace android {
@@ -46,15 +47,14 @@ using ::android::apexcodecs::ApexConfigurableImpl;
 using ::android::apexcodecs::ApexConfigurableIntf;
 
 namespace {
-    constexpr float DRC_DEFAULT_MOBILE_REF_LEVEL = -16.0;
-    constexpr float DRC_DEFAULT_MOBILE_DRC_CUT = 1.0;
-    constexpr float DRC_DEFAULT_MOBILE_DRC_BOOST = 1.0;
-    constexpr C2Config::drc_compression_mode_t DRC_DEFAULT_MOBILE_DRC_HEAVY
-            = C2Config::DRC_COMPRESSION_HEAVY;
+    constexpr int32_t DRC_DEFAULT_MOBILE_REF_LEVEL = 64;
+    constexpr int32_t DRC_DEFAULT_MOBILE_DRC_CUT = 127;
+    constexpr int32_t DRC_DEFAULT_MOBILE_DRC_BOOST = 127;
+    constexpr int32_t DRC_DEFAULT_MOBILE_DRC_HEAVY = 1;
     constexpr int32_t DRC_DEFAULT_MOBILE_DRC_EFFECT = 3;
     constexpr int32_t DRC_DEFAULT_MOBILE_DRC_ALBUM = 0;
     constexpr float DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS = 0.25;
-    constexpr float DRC_DEFAULT_MOBILE_ENC_LEVEL = 0.25;
+    constexpr int32_t DRC_DEFAULT_MOBILE_ENC_LEVEL = -1;
     constexpr int32_t MAX_CHANNEL_COUNT = 8;
     constexpr size_t MAX_SAMPLES_PER_FRAME = 4096;
     constexpr size_t TMP_BUFFER_COUNT = MAX_SAMPLES_PER_FRAME * MAX_CHANNEL_COUNT;
@@ -175,10 +175,15 @@ public:
                 })
                 .calculatedAs(MaxInputSizeSetter, mAacFormat, mChannelCount)
                 .build());
+        C2Config::drc_compression_mode_t defaultDrcCompressionMode =
+                property_get_int32(PROP_DRC_OVERRIDE_HEAVY,
+                                   DRC_DEFAULT_MOBILE_DRC_HEAVY) == 1
+                        ? C2Config::DRC_COMPRESSION_HEAVY
+                        : C2Config::DRC_COMPRESSION_LIGHT;
         addParameter(
                 DefineParam(mDrcCompressMode, C2_PARAMKEY_DRC_COMPRESSION_MODE)
                 .withDefault(new C2StreamDrcCompressionModeTuning::input(
-                        0u, C2Config::DRC_COMPRESSION_HEAVY))
+                        0u, defaultDrcCompressionMode))
                 .withFields({
                     C2F(mDrcCompressMode, value).oneOf({
                             C2Config::DRC_COMPRESSION_ODM_DEFAULT,
@@ -188,38 +193,57 @@ public:
                 })
                 .withSetter(Setter<decltype(*mDrcCompressMode)>::StrictValueWithNoDeps)
                 .build());
+
+        float defaultDrcTargetRefLevel = -0.25 * property_get_int32(
+                PROP_DRC_OVERRIDE_REF_LEVEL,
+                DRC_DEFAULT_MOBILE_REF_LEVEL);
         addParameter(
                 DefineParam(mDrcTargetRefLevel, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL)
                 .withDefault(new C2StreamDrcTargetReferenceLevelTuning::input(
-                        0u, DRC_DEFAULT_MOBILE_REF_LEVEL))
+                        0u, defaultDrcTargetRefLevel))
                 .withFields({C2F(mDrcTargetRefLevel, value).inRange(-31.75, 0.25)})
                 .withSetter(Setter<decltype(*mDrcTargetRefLevel)>::StrictValueWithNoDeps)
                 .build());
+
+        float defaultDrcEncTargetLevel = -0.25 * property_get_int32(
+                PROP_DRC_OVERRIDE_ENC_LEVEL,
+                DRC_DEFAULT_MOBILE_ENC_LEVEL);
         addParameter(
                 DefineParam(mDrcEncTargetLevel, C2_PARAMKEY_DRC_ENCODED_TARGET_LEVEL)
                 .withDefault(new C2StreamDrcEncodedTargetLevelTuning::input(
-                        0u, DRC_DEFAULT_MOBILE_ENC_LEVEL))
+                        0u, defaultDrcEncTargetLevel))
                 .withFields({C2F(mDrcEncTargetLevel, value).inRange(-31.75, 0.25)})
                 .withSetter(Setter<decltype(*mDrcEncTargetLevel)>::StrictValueWithNoDeps)
                 .build());
+
+        float defaultDrcBoostFactor = property_get_int32(
+                PROP_DRC_OVERRIDE_BOOST,
+                DRC_DEFAULT_MOBILE_DRC_BOOST) / 127.;
         addParameter(
                 DefineParam(mDrcBoostFactor, C2_PARAMKEY_DRC_BOOST_FACTOR)
                 .withDefault(new C2StreamDrcBoostFactorTuning::input(
-                        0u, DRC_DEFAULT_MOBILE_DRC_BOOST))
+                        0u, defaultDrcBoostFactor))
                 .withFields({C2F(mDrcBoostFactor, value).inRange(0, 1.)})
                 .withSetter(Setter<decltype(*mDrcBoostFactor)>::StrictValueWithNoDeps)
                 .build());
+
+        float defaultDrcAttenuationFactor = property_get_int32(
+                PROP_DRC_OVERRIDE_CUT,
+                DRC_DEFAULT_MOBILE_DRC_CUT) / 127.;
         addParameter(
                 DefineParam(mDrcAttenuationFactor, C2_PARAMKEY_DRC_ATTENUATION_FACTOR)
                 .withDefault(new C2StreamDrcAttenuationFactorTuning::input(
-                        0u, DRC_DEFAULT_MOBILE_DRC_CUT))
+                        0u, defaultDrcAttenuationFactor))
                 .withFields({C2F(mDrcAttenuationFactor, value).inRange(0, 1.)})
                 .withSetter(Setter<decltype(*mDrcAttenuationFactor)>::StrictValueWithNoDeps)
                 .build());
+        C2Config::drc_effect_type_t defaultDrcEffectType =
+                (C2Config::drc_effect_type_t)property_get_int32(
+                        PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
         addParameter(
                 DefineParam(mDrcEffectType, C2_PARAMKEY_DRC_EFFECT_TYPE)
                 .withDefault(new C2StreamDrcEffectTypeTuning::input(
-                        0u, C2Config::DRC_EFFECT_LIMITED_PLAYBACK_RANGE))
+                        0u, defaultDrcEffectType))
                 .withFields({
                     C2F(mDrcEffectType, value).oneOf({
                             C2Config::DRC_EFFECT_ODM_DEFAULT,
@@ -393,7 +417,8 @@ C2ApexAacDec::C2ApexAacDec(const std::shared_ptr<IntfImpl> &intfImpl)
         mCurrentTimestampUs(0),
         mCurrentFrameIndex(0),
         mSamplesToDiscard(0),
-        mLeftoverSamples(0) {
+        mLeftoverSamples(0),
+        mDeviceApiLevel(android_get_device_api_level()) {
     mLeftoverBuffer.resize(TMP_BUFFER_COUNT);
     ALOGV("C2ApexAacDec created");
 }
@@ -449,8 +474,8 @@ ApexCodec_Status C2ApexAacDec::flush() {
     ALOGV("flush");
     if (mAACDecoder) {
         if (aacDecoder_Clear(mAACDecoder) != AAC_DEC_OK) {
-            ALOGE("aacDecoder_Clear failed, re-initializing");
-            return reset();
+            ALOGE("aacDecoder_Clear failed");
+            return APEXCODEC_STATUS_CORRUPTED;
         }
         mEndOfInput = false;
         mEndOfOutput = false;
@@ -458,7 +483,7 @@ ApexCodec_Status C2ApexAacDec::flush() {
                 mLeftoverSamples, mPendingTimestamps.size());
         mLeftoverSamples = 0;
         mPendingTimestamps = {};
-        mLeftoverBuffer.clear();
+        mLeftoverBuffer.resize(TMP_BUFFER_COUNT);
         mIsFirstInput = true;
         mIsFirstOutput = true;
     }
@@ -478,14 +503,16 @@ ApexCodec_Status C2ApexAacDec::reset() {
     ALOGV("reset: clearing leftover %zu samples and %zu pending timestamps",
             mLeftoverSamples, mPendingTimestamps.size());
     mLeftoverSamples = 0;
-    mLeftoverBuffer.clear();
+    mLeftoverBuffer.resize(TMP_BUFFER_COUNT);
     mPendingTimestamps = {};
     mIsFirstInput = true;
     mIsFirstOutput = true;
     mCurrentTimestampUs = 0;
     mCurrentFrameIndex = 0;
     mOutputInfo = CAacDecoderOutputInfo_default();
-    return initDecoder();
+    mStreamInfo = CAacDecoderStreamInfo_default();
+    mMetadataInfo = CAacDecoderMetadataInfo_default();
+    return APEXCODEC_STATUS_OK;
 }
 
 std::unique_ptr<ApexConfigurableIntf> C2ApexAacDec::getConfigurable() {
@@ -506,8 +533,45 @@ ApexCodec_Status C2ApexAacDec::process(
     }
     *consumed = 0;
     *produced = 0;
+
+    ApexCodec_LinearBuffer configUpdates;
+    if (input) {
+        ApexCodec_LinearBuffer configUpdates;
+        bool ownedByClient;
+        if (input->getConfigUpdates(&configUpdates, &ownedByClient) == APEXCODEC_STATUS_OK &&
+                configUpdates.size > 0) {
+            ALOGV("configUpdates.size: %zu", configUpdates.size);
+            std::vector<C2Param *> c2Params;
+            uint8_t *data = configUpdates.data;
+            size_t size = configUpdates.size;
+            constexpr size_t PARAMS_ALIGNMENT = 8;
+            while (size > 0) {
+                ALOGV("configUpdates size: %zu", size);
+                size_t paramSize = ((C2Param *)data)->size();
+                if (paramSize > size || paramSize == 0) {
+                    mSignalledError = true;
+                    return APEXCODEC_STATUS_CORRUPTED;
+                }
+                c2Params.emplace_back(C2Param::From(data, paramSize));
+                data += align(paramSize, PARAMS_ALIGNMENT);
+                size -= align(paramSize, PARAMS_ALIGNMENT);
+            }
+            if (!c2Params.empty()) {
+                ALOGV("config: %zu params", c2Params.size());
+                std::vector<std::unique_ptr<C2SettingResult>> failures;
+                (void)mIntf->config(c2Params, C2_MAY_BLOCK, &failures);
+                ALOGV("config done");
+            }
+        }
+    }
+
     ApexCodec_BufferFlags inFlags = (ApexCodec_BufferFlags)0;
     uint64_t frameIndex = 0, timestamp = 0;
+
+    uint32_t prevSampleRate = mOutputInfo.sampling_rate;
+    uint8_t prevNumChannels = mOutputInfo.num_channels;
+    int16_t prevOutLoudness = mOutputInfo.output_loudness;
+    AUDIO_OBJECT_TYPE prevExtAot = mStreamInfo.extAot;
 
     ApexCodec_LinearBuffer outLinearBuffer;
     if (output->getLinearBuffer(&outLinearBuffer) != APEXCODEC_STATUS_OK) {
@@ -532,7 +596,7 @@ ApexCodec_Status C2ApexAacDec::process(
     ApexCodec_LinearBuffer inBuffer;
     AAC_DECODER_ERROR decoderErr = AAC_DEC_OK;
     OutputInfo output_info = CAacDecoderOutputInfo_default();
-    float tmpOutBuffer[TMP_BUFFER_COUNT];
+    std::vector<float> tmpOutBuffer(TMP_BUFFER_COUNT);
     bool decoded = false;
     bool codecConfig = (inFlags & APEXCODEC_FLAG_CODEC_CONFIG) != 0;
     ALOGV("codecConfig: %d", codecConfig);
@@ -600,11 +664,15 @@ ApexCodec_Status C2ApexAacDec::process(
             }
             aacDecoder_Fill(mAACDecoder, inPtr, inBufferLength, &bytesValid);
             offset = inBufferLength - bytesValid;
-            StreamInfo stream_info = CAacDecoderStreamInfo_default();
-            decoderErr = aacDecoder_Decode(mAACDecoder, tmpOutBuffer,
+
+            mDrcWrap.submitStreamData(&mStreamInfo, &mOutputInfo, &mMetadataInfo);
+            updateParams();
+            mDrcWrap.update();
+
+            decoderErr = aacDecoder_Decode(mAACDecoder, tmpOutBuffer.data(),
                                             TMP_BUFFER_COUNT,
-                                            &output_info, &stream_info,
-                                            NULL);
+                                            &mOutputInfo, &mStreamInfo,
+                                            &mMetadataInfo);
             decoded = true;
             *consumed = offset;
 
@@ -615,9 +683,9 @@ ApexCodec_Status C2ApexAacDec::process(
     } else if (!mIsFirstInput && !mEndOfOutput && !mPendingTimestamps.empty()) {
         ALOGV("draining");
         decoderErr = aacDecoder_Drain(
-                mAACDecoder, tmpOutBuffer, TMP_BUFFER_COUNT, &output_info);
+                mAACDecoder, tmpOutBuffer.data(), TMP_BUFFER_COUNT, &mOutputInfo);
         ALOGV("Drained %zu samples from decoder, status = %d",
-              (size_t)output_info.frame_size * output_info.num_channels, decoderErr);
+              (size_t)mOutputInfo.frame_size * mOutputInfo.num_channels, decoderErr);
         decoded = true;
     } else {
         ALOGV("no input, no output, no pending timestamps");
@@ -626,21 +694,22 @@ ApexCodec_Status C2ApexAacDec::process(
     if (decoded) {
         if (decoderErr != AAC_DEC_NOT_ENOUGH_BITS) {
             size_t generatedSamples = 0;
-            uint32_t prevSampleRate = mOutputInfo.sampling_rate;
-            uint8_t prevNumChannels = mOutputInfo.num_channels;
-            int16_t prevOutLoudness = mOutputInfo.output_loudness;
+            // SBR and PS are dual rate systems, so the sample rate is doubled.
+            if (prevExtAot == AOT_SBR || prevExtAot == AOT_PS) {
+                prevSampleRate *= 2;
+            }
 
             if (IS_OUTPUT_VALID(decoderErr)) {
                 if (mIsFirstOutput) {
-                    mSamplesToDiscard = output_info.output_delay * output_info.num_channels;
+                    mSamplesToDiscard = mOutputInfo.output_delay * mOutputInfo.num_channels;
 
-                    ALOGV("output_info.output_delay: %d", output_info.output_delay);
+                    ALOGV("mOutputInfo.output_delay: %d", mOutputInfo.output_delay);
                     mIsFirstOutput = false;
                     size_t delayInFrames = 0;
-                    if (output_info.frame_size > 0) {
+                    if (mOutputInfo.frame_size > 0) {
                         delayInFrames =
-                                (output_info.output_delay + output_info.frame_size - 1)
-                                / output_info.frame_size;
+                                (mOutputInfo.output_delay + mOutputInfo.frame_size - 1)
+                                / mOutputInfo.frame_size;
                     }
                     if (delayInFrames > 0) {
                         C2PortActualDelayTuning::output opd(delayInFrames);
@@ -649,10 +718,9 @@ ApexCodec_Status C2ApexAacDec::process(
                         output->setOwnedConfigUpdates(std::move(configUpdate));
                     }
                 }
-                mOutputInfo = output_info;
                 generatedSamples = mOutputInfo.frame_size * mOutputInfo.num_channels;
             }
-            if (generatedSamples > std::size(tmpOutBuffer)) {
+            if (generatedSamples > tmpOutBuffer.size()) {
                 ALOGE("too many samples output: %zu", generatedSamples);
                 mSignalledError = true;
                 return APEXCODEC_STATUS_CORRUPTED;
@@ -689,7 +757,7 @@ ApexCodec_Status C2ApexAacDec::process(
                 ALOGV("mLeftoverSamples: %zu -> %zu (added %zu)",
                         mLeftoverSamples, mLeftoverSamples + generatedSamples, generatedSamples);
                 memcpy(mLeftoverBuffer.data() + mLeftoverSamples,
-                       tmpOutBuffer + outOffsetSamples,
+                       tmpOutBuffer.data() + outOffsetSamples,
                        generatedSamples * sizeof(float));
                 mLeftoverSamples += generatedSamples;
             }
@@ -738,13 +806,18 @@ ApexCodec_Status C2ApexAacDec::process(
 
             ALOGV("produced: %zu", *produced);
             std::vector<uint8_t> configUpdate;
-            if (isConfigured() && (mOutputInfo.sampling_rate != prevSampleRate
+            uint32_t currentSampleRate = mOutputInfo.sampling_rate;
+            // SBR and PS are dual rate systems, so the sample rate is doubled.
+            if (mStreamInfo.extAot == AOT_SBR || mStreamInfo.extAot == AOT_PS) {
+                currentSampleRate *= 2;
+            }
+            if (isConfigured() && (currentSampleRate != prevSampleRate
                     || mOutputInfo.num_channels != prevNumChannels)) {
                 ALOGD("config changed: sampleRate %d->%d, channels %d->%d",
-                        prevSampleRate, mOutputInfo.sampling_rate, prevNumChannels,
+                        prevSampleRate, currentSampleRate, prevNumChannels,
                         mOutputInfo.num_channels);
                 C2StreamSampleRateInfo::output sampleRateInfo(
-                        0u, mOutputInfo.sampling_rate);
+                        0u, currentSampleRate);
                 C2StreamChannelCountInfo::output channelCountInfo(
                         0u, mOutputInfo.num_channels);
                 C2StreamChannelMaskInfo::output channelMaskInfo(
@@ -759,6 +832,49 @@ ApexCodec_Status C2ApexAacDec::process(
                         (float)(mOutputInfo.output_loudness * -0.25));
                 AppendParamsToVector(&configUpdate, &drcOutLoudness);
             }
+
+            C2StreamDrcAttenuationFactorTuning::input currentAttenuationFactor(
+                    0u, (C2FloatValue)(mIntf->getDrcAttenuationFactor() / 127.));
+            AppendParamsToVector(&configUpdate, &currentAttenuationFactor);
+
+            C2StreamDrcBoostFactorTuning::input currentBoostFactor(
+                    0u, (C2FloatValue)(mIntf->getDrcBoostFactor() / 127.));
+            AppendParamsToVector(&configUpdate, &currentBoostFactor);
+
+            if (mDeviceApiLevel < 31 /* __ANDROID_API_S__ */) {
+                // We used to report DRC compression mode in the output format
+                // in Q and R, but stopped doing that in S
+                C2StreamDrcCompressionModeTuning::input currentCompressMode(
+                        0u, (C2Config::drc_compression_mode_t)mIntf->getDrcCompressMode());
+                AppendParamsToVector(&configUpdate, &currentCompressMode);
+            }
+
+            C2StreamDrcEncodedTargetLevelTuning::input currentEncodedTargetLevel(
+                    0u, (C2FloatValue)(mIntf->getDrcEncTargetLevel() * -0.25));
+            AppendParamsToVector(&configUpdate, &currentEncodedTargetLevel);
+
+            C2StreamDrcAlbumModeTuning::input currentAlbumMode(
+                    0u, (C2Config::drc_album_mode_t)mIntf->getDrcAlbumMode());
+            AppendParamsToVector(&configUpdate, &currentAlbumMode);
+
+            C2StreamDrcTargetReferenceLevelTuning::input currentTargetRefLevel(
+                    0u, (float)(mIntf->getDrcTargetRefLevel() * -0.25));
+            AppendParamsToVector(&configUpdate, &currentTargetRefLevel);
+
+            C2StreamDrcEffectTypeTuning::input currentEffectType(
+                    0u, (C2Config::drc_effect_type_t)mIntf->getDrcEffectType());
+            AppendParamsToVector(&configUpdate, &currentEffectType);
+
+            C2StreamMaxChannelCountInfo::input currentMaxChannelCnt(0u,
+                                                                    mIntf->getMaxChannelCount());
+            AppendParamsToVector(&configUpdate, &currentMaxChannelCnt);
+
+            ALOGV("DRC params: %d, %d, %d, %d, %d, %d, %d, %d",
+                    mIntf->getDrcTargetRefLevel(), mIntf->getDrcAttenuationFactor(),
+                    mIntf->getDrcBoostFactor(), mIntf->getDrcCompressMode(),
+                    mIntf->getDrcEncTargetLevel(), mIntf->getDrcEffectType(),
+                    mIntf->getDrcAlbumMode(), mIntf->getMaxChannelCount());
+
             if (!configUpdate.empty()) {
                 output->setOwnedConfigUpdates(std::move(configUpdate));
             }
@@ -811,8 +927,13 @@ ApexCodec_Status C2ApexAacDec::initDecoder() {
         ALOGE("aacDecoder_Open failed");
         return APEXCODEC_STATUS_CORRUPTED;
     }
-    ALOGV("aacDecoder_Open successful");
     mOutputInfo = CAacDecoderOutputInfo_default();
+    mStreamInfo = CAacDecoderStreamInfo_default();
+    mMetadataInfo = CAacDecoderMetadataInfo_default();
+    mDrcWrap.setDecoderHandle(mAACDecoder);
+    mDrcWrap.submitStreamData(&mStreamInfo, &mOutputInfo, &mMetadataInfo);
+
+    ALOGV("aacDecoder_Open successful");
     updateParams();
     return APEXCODEC_STATUS_OK;
 }
@@ -821,31 +942,35 @@ void C2ApexAacDec::updateParams() {
     ALOGV("updateParams");
     int32_t targetRefLevel = mIntf->getDrcTargetRefLevel();
     ALOGV("  drc-ref-level: %d", targetRefLevel);
-    aacDecoder_SetParam(mAACDecoder, AAC_DRC_REFERENCE_LEVEL, targetRefLevel);
+    mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_TARGET, (unsigned)targetRefLevel);
+
     int32_t attenuationFactor = mIntf->getDrcAttenuationFactor();
     ALOGV("  drc-attenuation-factor: %d", attenuationFactor);
-    aacDecoder_SetParam(mAACDecoder, AAC_DRC_ATTENUATION_FACTOR, attenuationFactor);
+    mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_ATT_FACTOR, (unsigned)attenuationFactor);
+
     int32_t boostFactor = mIntf->getDrcBoostFactor();
     ALOGV("  drc-boost-factor: %d", boostFactor);
-    aacDecoder_SetParam(mAACDecoder, AAC_DRC_BOOST_FACTOR, boostFactor);
+    mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_BOOST_FACTOR, (unsigned)boostFactor);
+
     int32_t compressMode = mIntf->getDrcCompressMode();
     ALOGV("  drc-compress-mode: %d", compressMode);
-    aacDecoder_SetParam(mAACDecoder, AAC_DRC_HEAVY_COMPRESSION, compressMode);
+    mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_HEAVY, (unsigned)compressMode);
+
     int32_t encTargetLevel = mIntf->getDrcEncTargetLevel();
     ALOGV("  drc-enc-target-level: %d", encTargetLevel);
-    aacDecoder_SetParam(mAACDecoder, AAC_DRC_ENC_TARGET_LEVEL, encTargetLevel);
+    mDrcWrap.setParam(DRC_PRES_MODE_WRAP_ENCODER_TARGET, (unsigned)encTargetLevel);
+
     int32_t effectType = mIntf->getDrcEffectType();
     ALOGV("  drc-effect-type: %d", effectType);
     aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_SET_EFFECT, effectType);
+
     int32_t albumMode = mIntf->getDrcAlbumMode();
     ALOGV("  drc-album-mode: %d", albumMode);
     aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_ALBUM_MODE, albumMode);
+
     u_int32_t maxChannelCount = mIntf->getMaxChannelCount();
     ALOGV("  max-channel-count: %u", maxChannelCount);
     aacDecoder_SetParam(mAACDecoder, AAC_PCM_MAX_OUTPUT_CHANNELS, maxChannelCount);
-    int32_t defaultPresentationMode = AAC_DRC_PARAMETER_HANDLING_DISABLED;
-    ALOGV("  drc-presentation-mode: %d", defaultPresentationMode);
-    aacDecoder_SetParam(mAACDecoder, AAC_DRC_DEFAULT_PRESENTATION_MODE, defaultPresentationMode);
 }
 
 bool C2ApexAacDec::isConfigured() const {

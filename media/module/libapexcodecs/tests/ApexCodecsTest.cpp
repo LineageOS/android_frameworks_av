@@ -229,7 +229,7 @@ TEST(ApexCodecsTest, BufferSetGetConfigUpdatesTest) {
               APEXCODEC_STATUS_OK);
     ASSERT_EQ(configUpdates.data, configData);
     ASSERT_EQ(configUpdates.size, 20);
-    ASSERT_EQ(ownedByClient, false);
+    ASSERT_EQ(ownedByClient, true);
 
     ASSERT_EQ(ApexCodec_Buffer_setConfigUpdates(buffer.get(), &configUpdates),
               APEXCODEC_STATUS_BAD_STATE);
