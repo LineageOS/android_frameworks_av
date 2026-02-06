@@ -113,12 +113,12 @@ cc_binary {
         "main_mediametrics.cpp",
     ],
     shared_libs: [
-        "libandroid#31", // for APermissionManager, sdk>=31
         "liblog",
         "libutils",
         "libmediametricsservice",
     ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
         true: [
+            "libandroid#31", // for APermissionManager, sdk>=31
             "libbinder_ndk",
             // don't have in-module version of LimitProcessMemory
             "mediametricsservice-aidl-ndk",
