@@ -238,7 +238,8 @@ bool mediametrics::Item::selfrecord() {
         free(str);
     }
     if (status != NO_ERROR) {
-        ALOGW("%s: failed to record: %s", __func__, this->toString().c_str());
+        ALOGW("%s: failed to record: (%d) %s", __func__,
+              status,  this->toString().c_str());
         return false;
     }
     return true;
