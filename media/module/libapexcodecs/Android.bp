@@ -70,6 +70,7 @@ cc_library {
         true: [
             "C2ApexOpusDec.cpp",
             "C2ApexAacDec.cpp",
+            "DrcPresModeWrapRustAac.cpp",
         ],
         default: [],
     }),
@@ -82,6 +83,7 @@ cc_library {
             "liblog", // for ALOG
             "libopus",
             "libstagefright_foundation", // for ColorUtils and MIME
+            "libcutils", // for <cutils/properties.h>
         ],
         default: [],
     }),
@@ -125,6 +127,7 @@ cc_library {
     ] + select(release_flag("RELEASE_APEX_CODECS"), {
         true: [
             "C2ApexAacDec.cpp",
+            "DrcPresModeWrapRustAac.cpp",
         ],
         default: [],
     }),
@@ -136,6 +139,7 @@ cc_library {
             "libcodec2_vndk",
             "liblog", // for ALOG
             "libstagefright_foundation", // for ColorUtils and MIME
+            "libcutils", // for <cutils/properties.h>
         ],
         default: [],
     }),

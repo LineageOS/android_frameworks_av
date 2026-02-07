@@ -26,6 +26,8 @@
 #include <SimpleC2Interface.h>
 #include <apex/ApexCodecsImpl.h>
 
+#include "DrcPresModeWrapRustAac.h"
+
 extern "C" {
     #include "aacdecoder_lib.h"
     #include "aacdec_errorcodes.h"
@@ -66,7 +68,6 @@ private:
     ApexCodec_Status initDecoder();
     void updateParams();
     bool isConfigured() const;
-    void drainDecoder();
     uint32_t maskFromCount(uint32_t channelCount);
 
     template <typename... Args>
@@ -83,6 +84,10 @@ private:
     HANDLE_AACDECODER mAACDecoder;
     // Holds information about the output audio stream from the decoder.
     OutputInfo mOutputInfo;
+    StreamInfo mStreamInfo;
+    MetadataInfo mMetadataInfo;
+    // DRC wrapper
+    DrcPresModeWrapRustAac mDrcWrap;
     // A flag to indicate if this is the first input buffer being processed.
     bool mIsFirstInput;
     // A flag to indicate if this is the first output buffer being processed.
@@ -106,6 +111,8 @@ private:
     size_t mLeftoverSamples;
     // The queue to hold the timestamps of the pending input buffers.
     std::queue<std::pair<uint64_t, uint64_t>> mPendingTimestamps;
+    // The device API level.
+    const int32_t mDeviceApiLevel;
 
     C2_DO_NOT_COPY(C2ApexAacDec);
 };

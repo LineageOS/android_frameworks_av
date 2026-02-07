@@ -41,13 +41,9 @@
 
 namespace android::mediametrics {
 
-#define DEBUG_SERVICEACCESS     0
+#define DEBUG_SERVICEACCESS     1
 #define DEBUG_API               0
 #define DEBUG_ALLOCATIONS       0
-
-// after this many failed attempts, we stop trying [from this process] and just say that
-// the service is off.
-#define SVC_TRIES               2
 
 
 // monitor health of our connection to the metrics service
@@ -59,9 +55,8 @@ class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
 };
 
 static std::mutex sServiceMutex;
-static sp<MediaMetricsDeathNotifier> sNotifier;
-static sp<media::IMediaMetricsService> sMediaMetricsService;
-static int sRemainingBindAttempts = SVC_TRIES;
+static sp<MediaMetricsDeathNotifier> sNotifier GUARDED_BY(sServiceMutex);
+static sp<media::IMediaMetricsService> sMediaMetricsService GUARDED_BY(sServiceMutex);
 
 static
 sp<media::IMediaMetricsService> getService() {
@@ -73,18 +68,12 @@ sp<media::IMediaMetricsService> getService() {
         return nullptr;
     }
     std::lock_guard _l(sServiceMutex);
-    // think of remainingBindAttempts as telling us whether service == nullptr because
-    // (1) we haven't tried to initialize it yet
-    // (2) we've tried to initialize it, but failed.
-    if (sMediaMetricsService == nullptr && sRemainingBindAttempts > 0) {
+    if (sMediaMetricsService == nullptr) {
         const char *badness = "";
         sp<IServiceManager> sm = defaultServiceManager();
         if (sm != nullptr) {
-                        // checkService() is non-blocking
-                                // fear is that this might spin through our SVC_TRIES count
-                                // in a busy wait situation....
-                        // waitForService() waits forever.
-                        // deprecated getService() waited up to 5 seconds.
+            // checkService() is non-blocking, opening us for some busy-waiting
+            // if the caller keeps retrying.
             sp<IBinder> binder = sm->checkService(String16(servicename));
             if (binder != nullptr) {
                 sMediaMetricsService = interface_cast<media::IMediaMetricsService>(binder);
@@ -97,10 +86,7 @@ sp<media::IMediaMetricsService> getService() {
             badness = "No Service Manager access";
         }
         if (sMediaMetricsService == nullptr) {
-            if (sRemainingBindAttempts > 0) {
-                sRemainingBindAttempts--;
-            }
-            ALOGD_IF(DEBUG_SERVICEACCESS, "%s: unable to bind to service %s: %s",
+            ALOGW_IF(DEBUG_SERVICEACCESS, "%s: unable to bind to service %s: %s",
                     __func__, servicename, badness);
         }
     }
@@ -110,7 +96,6 @@ sp<media::IMediaMetricsService> getService() {
 // static
 void BaseItem::dropInstance() {
     std::lock_guard  _l(sServiceMutex);
-    sRemainingBindAttempts = SVC_TRIES;
     sMediaMetricsService = nullptr;
 }
 

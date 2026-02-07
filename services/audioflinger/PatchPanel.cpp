@@ -270,7 +270,8 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
                                                             &flags,
                                                             attributes,
                                                             0 /*mixPortHalId*/);
-                    ALOGV("mAfPatchPanelCallback->openOutput_l() returned %p", thread.get());
+                    ALOGV("%s, mAfPatchPanelCallback->openOutput_l() returned %p",
+                          __func__, thread.get());
                     if (thread == 0) {
                         status = NO_MEMORY;
                         goto exit;
@@ -282,7 +283,7 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
 
                 sp<IAfThreadBase> thread =
                         mAfPatchPanelCallback->getRecordThreadForDevice_l(device, address);
-
+                bool closeThread = false;
                 if (thread == nullptr) {
                     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
                     // open input stream with source device audio properties if provided or
@@ -324,14 +325,15 @@ status_t PatchPanel::createAudioPatch_l(const struct audio_patch* patch,
                                                                         outputDevice,
                                                                         outputDeviceAddress,
                                                                         0 /*mixPortHalId*/);
-                    ALOGV("mAfPatchPanelCallback->openInput_l() returned %p inChannelMask %08x",
-                          thread.get(), config.channel_mask);
+                    ALOGV("%s mAfPatchPanelCallback->openInput_l() returned %p inChannelMask %08x",
+                          __func__, thread.get(), config.channel_mask);
                     if (thread == 0) {
                         status = NO_MEMORY;
                         goto exit;
                     }
+                    closeThread = true;
                 }
-                newPatch.mRecord.setThread(thread->asIAfRecordThread().get());
+                newPatch.mRecord.setThread(thread->asIAfRecordThread().get(), closeThread);
                 status = newPatch.createConnections_l(this);
                 if (status != NO_ERROR) {
                     goto exit;

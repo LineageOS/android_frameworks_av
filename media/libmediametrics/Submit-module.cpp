@@ -51,13 +51,9 @@ typedef ::aidl::android::media::IMediaMetricsService metricsservice_t;
 
 namespace android::mediametrics {
 
-#define DEBUG_SERVICEACCESS     0
+#define DEBUG_SERVICEACCESS     1
 #define DEBUG_API               0
 #define DEBUG_ALLOCATIONS       0
-
-// after this many failed attempts, we stop trying [from this process] and just say that
-// the service is off.
-#define SVC_TRIES               2
 
 // monitor health of our connection to the metrics service
 
@@ -75,7 +71,7 @@ static void onBinderDied(void *cookie) {
 }
 
 static std::mutex sServiceMutex;
-static std::shared_ptr<metricsservice_t> sMediaMetricsService;
+static std::shared_ptr<metricsservice_t> sMediaMetricsService GUARDED_BY(sServiceMutex);
 
 static
 std::shared_ptr<metricsservice_t> getService() {
@@ -83,7 +79,7 @@ std::shared_ptr<metricsservice_t> getService() {
     static const bool enabled = BaseItem::isEnabled(); // singleton initialized
 
     if (enabled == false) {
-        ALOGD_IF(DEBUG_SERVICEACCESS, "disabled");
+        ALOGD_IF(DEBUG_SERVICEACCESS, "%s: disabled", __func__);
         return nullptr;
     }
     std::lock_guard _l(sServiceMutex);
@@ -94,6 +90,8 @@ std::shared_ptr<metricsservice_t> getService() {
         const char *badness = "";
 
         // checkService works as a replacement for getService()
+        // checkService() is non-blocking, opening us for some busy-waiting
+        // if the caller keeps retrying.
         ::ndk::SpAIBinder binder(AServiceManager_checkService(servicename));
 
         if (binder == nullptr)  {
@@ -110,7 +108,7 @@ std::shared_ptr<metricsservice_t> getService() {
         }
 
         if (sMediaMetricsService == nullptr) {
-            ALOGD_IF(DEBUG_SERVICEACCESS, "%s: unable to bind to service %s: %s",
+            ALOGW_IF(DEBUG_SERVICEACCESS, "%s: unable to bind to service %s: %s",
                     __func__, servicename, badness);
         }
     }
