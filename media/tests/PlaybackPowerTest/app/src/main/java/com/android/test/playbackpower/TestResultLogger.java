@@ -26,67 +26,98 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Logs and saves test results for playback power tests.
+ * Logs and saves test results for power tests.
  *
  * <p>All public methods must be called on the main thread.
  */
 /* package */ final class TestResultLogger {
 
-    private static final String TAG = "PlaybackPowerApp";
+    private static final int UNSET = -1;
 
+    private final String mLogTag;
     private final ExecutorService mBackgroundExecutor;
     private final File mResultFile;
     private final JSONObject mResult;
 
-    private long mInitialChargeCounter;
-    private long mChargeCounter;
+    private long mInitialChargeCounterTimeMs = UNSET;
+    private long mInitialChargeCounter = UNSET;
+    private long mChargeCounterTimeMs = UNSET;
+    private long mChargeCounter = UNSET;
+    private int mBatteryScale = UNSET;
 
-    public TestResultLogger(File resultFile) {
+    public TestResultLogger(String logTag, File resultFile) {
+        mLogTag = logTag;
         mResultFile = resultFile;
         mBackgroundExecutor = Executors.newSingleThreadExecutor();
         mResult = new JSONObject();
-        mInitialChargeCounter = -1;
     }
 
-    public void logPlaybackStarted() {
-        logEvent("playback_started");
+    public void logStarted() {
+        logEvent("started");
     }
 
-    public void logChargeCounter(long chargeCounter) {
-        if (mInitialChargeCounter == -1) {
+    public void logChargeCounter(long timeMs, long chargeCounter) {
+        if (mInitialChargeCounter == UNSET) {
+            mInitialChargeCounterTimeMs = timeMs;
             mInitialChargeCounter = chargeCounter;
+            logEvent(timeMs, "charge_counter_start", chargeCounter);
         }
+        mChargeCounterTimeMs = timeMs;
         mChargeCounter = chargeCounter;
-        logEvent("charge_counter", chargeCounter);
+        logEvent(timeMs, "charge_counter", chargeCounter);
+    }
+
+    public void logBatteryLevel(long timeMs, int level, int scale) {
+        logEvent(timeMs, "battery_level", level);
+        if (scale != mBatteryScale) {
+            // This shouldn't change during the test, but log at least once at the start.
+            mBatteryScale = scale;
+            logEvent(timeMs, "battery_scale", scale);
+        }
     }
 
     public void logSuccess() {
-        Log.i(TAG, "Succeeded");
-        logEvent("charge_counter_start", mInitialChargeCounter);
-        logEvent("charge_counter_end", mChargeCounter);
+        Log.i(mLogTag, "Succeeded");
+        if (mInitialChargeCounter != UNSET) {
+            logEvent(mChargeCounterTimeMs, "charge_counter_end", mChargeCounter);
+            long elapsedTimeSec = (mChargeCounterTimeMs - mInitialChargeCounterTimeMs) / 1000L;
+            long chargeCounterDifference = mInitialChargeCounter - mChargeCounter;
+            logEvent(
+                    mChargeCounterTimeMs,
+                    "charge_counter_summary",
+                    String.format(
+                            "-%d uAh in %dm%ds",
+                            chargeCounterDifference,
+                            elapsedTimeSec / 60,
+                            elapsedTimeSec % 60));
+        }
         logFinalStatusAndWriteResultAsync("success");
     }
 
     public void logFailure(String errorMessage) {
-        Log.e(TAG, "Failed: " + errorMessage);
-        logEvent("error", errorMessage);
+        Log.e(mLogTag, "Failed: " + errorMessage);
+        logEvent(SystemClock.elapsedRealtime(), "error", errorMessage);
         logFinalStatusAndWriteResultAsync("failure");
     }
 
     private void logEvent(String name) {
+        // SystemClock.elapsedRealtime is guaranteed to be monotonic and ticks during sleep.
         logEvent("event", name);
     }
 
     private void logEvent(String key, Object value) {
-        long timeMs = SystemClock.elapsedRealtime();
-        Log.i(TAG, String.format("Event at %.2f s: %s = %s", timeMs / 1000.0, key, value));
+        logEvent(SystemClock.elapsedRealtime(), key, value);
+    }
+
+    private void logEvent(long timeMs, String key, Object value) {
+        Log.i(mLogTag, String.format("Event at %.2f s: %s = %s", timeMs / 1000.0, key, value));
         try {
             JSONObject event = new JSONObject();
             event.put("timestamp_ms", timeMs);
             event.put(key, value);
             mResult.accumulate("events", event);
         } catch (JSONException e) {
-            Log.e(TAG, "Failed to log event: " + key, e);
+            Log.e(mLogTag, "Failed to log event: " + key, e);
         }
     }
 
@@ -94,13 +125,13 @@ import org.json.JSONObject;
         try {
             mResult.put("status", status);
         } catch (JSONException e) {
-            Log.e(TAG, "Failed to set status to " + status, e);
+            Log.e(mLogTag, "Failed to set status to " + status, e);
         }
         String resultString;
         try {
             resultString = mResult.toString(2);
         } catch (JSONException e) {
-            Log.e(TAG, "Failed to serialize results", e);
+            Log.e(mLogTag, "Failed to serialize results", e);
             return;
         }
 
@@ -108,9 +139,9 @@ import org.json.JSONObject;
         mBackgroundExecutor.execute(() -> {
             try (FileWriter writer = new FileWriter(mResultFile)) {
                 writer.write(resultString);
-                Log.i(TAG, "Wrote results to " + mResultFile.getAbsolutePath());
+                Log.i(mLogTag, "Wrote results to " + mResultFile.getAbsolutePath());
             } catch (IOException e) {
-                Log.e(TAG, "Failed to write result file", e);
+                Log.e(mLogTag, "Failed to write result file", e);
             }
         });
     }
