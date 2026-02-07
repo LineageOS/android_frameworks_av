@@ -26,6 +26,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.core.view.WindowCompat;
@@ -46,6 +47,8 @@ import java.util.UUID;
 /** Activity with a video player that can be used to measure playback power. */
 public final class PlaybackPowerActivity extends Activity {
 
+    private static final String TAG = "PlaybackPowerApp";
+
     /** Default duration to play the video for, in seconds. */
     private static final int DEFAULT_DURATION_SEC = 50;
     /** Interval between sampling the coulomb counter, in seconds. */
@@ -65,6 +68,7 @@ public final class PlaybackPowerActivity extends Activity {
 
     private BatteryManager mBatteryManager;
     private PowerManager mPowerManager;
+    private IntentFilter mBatteryChangedIntentFilter;
 
     private boolean mIsTestPlaybackRunning;
     private boolean mIsFinished;
@@ -79,14 +83,15 @@ public final class PlaybackPowerActivity extends Activity {
         mPlayerView = findViewById(R.id.player_view);
         mHandler = new Handler(Looper.getMainLooper());
 
-        String fileName = getIntent().getStringExtra(EXTRA_LOG_FILE_NAME);
+        @Nullable String fileName = getIntent().getStringExtra(EXTRA_LOG_FILE_NAME);
         if (fileName == null) {
             fileName = DEFAULT_LOG_FILE_NAME;
         }
         mTestResultLogger = new TestResultLogger(
-                new File(getExternalFilesDir(/* type= */ null), fileName));
+                /* logTag= */ TAG, new File(getExternalFilesDir(/* type= */ null), fileName));
         mBatteryManager = getSystemService(BatteryManager.class);
         mPowerManager = getSystemService(PowerManager.class);
+        mBatteryChangedIntentFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
 
         // Hide system bars so the playback is full-screen.
         WindowInsetsControllerCompat windowInsetsControllerCompat =
@@ -187,9 +192,9 @@ public final class PlaybackPowerActivity extends Activity {
         powerIntentFilter.addAction(Intent.ACTION_POWER_DISCONNECTED);
         powerIntentFilter.addAction(Intent.ACTION_POWER_CONNECTED);
         registerReceiver(mPowerReceiver, powerIntentFilter);
-        IntentFilter batteryChangedIntentFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = registerReceiver(/* receiver= */ null, batteryChangedIntentFilter);
-        boolean isPowerConnected = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) != 0;
+        @Nullable Intent batteryStatusIntent = getBatteryStatusIntent();
+        boolean isPowerConnected = batteryStatusIntent != null
+                && batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) != 0;
         if (mPowerManager.isPowerSaveMode()) {
             handleInPowerSaverMode();
         } else if (!isPowerConnected) {
@@ -215,13 +220,22 @@ public final class PlaybackPowerActivity extends Activity {
         mIsTestPlaybackRunning = true;
 
         mPlayer.play();
-        mTestResultLogger.logPlaybackStarted();
+        mTestResultLogger.logStarted();
 
         // Repeatedly sample and log the coulomb counter level on the main thread.
         mSampleBatteryRunnable = () -> {
+            long timeMs = SystemClock.elapsedRealtime();
             long chargeCounter =
                     mBatteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
-            mTestResultLogger.logChargeCounter(chargeCounter);
+            mTestResultLogger.logChargeCounter(timeMs, chargeCounter);
+            @Nullable Intent batteryStatusIntent = getBatteryStatusIntent();
+            if (batteryStatusIntent != null) {
+                int level = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int scale = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                if (level >= 0 && scale > 0) {
+                    mTestResultLogger.logBatteryLevel(timeMs, level, scale);
+                }
+            }
             mHandler.postDelayed(mSampleBatteryRunnable, BATTERY_SAMPLE_INTERVAL_SEC * 1000L);
         };
         mHandler.post(mSampleBatteryRunnable);
@@ -232,6 +246,8 @@ public final class PlaybackPowerActivity extends Activity {
     }
 
     private void handleSuccess() {
+        // Log a final coulomb counter sample and then stop the playback.
+        mSampleBatteryRunnable.run();
         mTestResultLogger.logSuccess();
         stopTestPlayback();
     }
@@ -264,6 +280,10 @@ public final class PlaybackPowerActivity extends Activity {
             mPlayer.release();
             mPlayer = null;
         }
+    }
+
+    @Nullable private Intent getBatteryStatusIntent() {
+        return registerReceiver(/* receiver= */ null, mBatteryChangedIntentFilter);
     }
 
 }
