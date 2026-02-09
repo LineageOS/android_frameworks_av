@@ -138,6 +138,12 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int currentSurfaceId = 0;
+    if ((err = parcel->readInt32(&currentSurfaceId)) != OK) {
+        ALOGE("%s: Failed to read current surface id from parcel", __FUNCTION__);
+        return err;
+    }
+
     mWidth = width;
     mHeight = height;
     mFormat = format;
@@ -147,6 +153,7 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
     mRequestCount = requestCount;
     mErrorCount = errorCount;
     mStartLatencyMs = startLatencyMs;
+    mCurrentSurfaceId = currentSurfaceId;
     mMaxHalBuffers = maxHalBuffers;
     mMaxAppBuffers = maxAppBuffers;
     mHistogramType = histogramType;
@@ -252,6 +259,12 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
         return err;
     }
 
+    if ((err = parcel->writeInt32(mCurrentSurfaceId)) != OK) {
+        ALOGE("%s: Failed to write stream current surface id!", __FUNCTION__);
+        return err;
+    }
+
+
     return OK;
 }
 
@@ -272,6 +285,7 @@ CameraSessionStats::CameraSessionStats() :
         mNewCameraState(CAMERA_STATE_CLOSED),
         mApiLevel(0),
         mIsNdk(false),
+        mSharedMode(false),
         mLatencyMs(-1),
         mLogId(0),
         mMaxPreviewFps(0),
@@ -287,13 +301,14 @@ CameraSessionStats::CameraSessionStats() :
 
 CameraSessionStats::CameraSessionStats(const std::string& cameraId,
         int facing, int newCameraState, const std::string& clientName,
-        int apiLevel, bool isNdk, int32_t latencyMs, int64_t logId) :
+        int apiLevel, bool isNdk, bool sharedMode, int32_t latencyMs, int64_t logId) :
                 mCameraId(cameraId),
                 mFacing(facing),
                 mNewCameraState(newCameraState),
                 mClientName(clientName),
                 mApiLevel(apiLevel),
                 mIsNdk(isNdk),
+                mSharedMode(sharedMode),
                 mLatencyMs(latencyMs),
                 mLogId(logId),
                 mMaxPreviewFps(0),
@@ -301,7 +316,7 @@ CameraSessionStats::CameraSessionStats(const std::string& cameraId,
                 mInternalReconfigure(0),
                 mRequestCount(0),
                 mResultErrorCount(0),
-                mDeviceError(0),
+                mDeviceError(false),
                 mVideoStabilizationMode(-1),
                 mSessionIndex(0),
                 mErrorState(0),
@@ -457,12 +472,19 @@ status_t CameraSessionStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    bool sharedMode;
+    if ((err = parcel->readBool(&sharedMode)) != OK) {
+        ALOGE("%s: Failed to read sharedMode flag from parcel", __FUNCTION__);
+        return err;
+    }
+
     mCameraId = toStdString(id);
     mFacing = facing;
     mNewCameraState = newCameraState;
     mClientName = toStdString(clientName);
     mApiLevel = apiLevel;
     mIsNdk = isNdk;
+    mSharedMode = sharedMode;
     mLatencyMs = latencyMs;
     mLogId = logId;
     mMaxPreviewFps = maxPreviewFps;
@@ -609,6 +631,11 @@ status_t CameraSessionStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = parcel->writeInt32(mMostRequestedFpsRange.second)) != OK) {
         ALOGE("%s: Failed to write frame rate range max info!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeBool(mSharedMode)) != OK) {
+        ALOGE("%s: Failed to write sharedMode flag!", __FUNCTION__);
         return err;
     }
 

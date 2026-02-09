@@ -51,9 +51,9 @@ private:
       public:
         CameraSessionStatsWrapper(const std::string& cameraId, int facing, int newCameraState,
                                   const std::string& clientName, int apiLevel, bool isNdk,
-                                  int32_t latencyMs, int64_t logId)
+                                  bool sharedMode, int32_t latencyMs, int64_t logId)
             : mSessionStats(cameraId, facing, newCameraState, clientName, apiLevel, isNdk,
-                            latencyMs, logId) {}
+                            sharedMode, latencyMs, logId) {}
 
         void onOpen(sp<hardware::ICameraServiceProxy>& proxyBinder);
         void onClose(sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs,
@@ -102,7 +102,7 @@ public:
     // Open
     void logOpen(const std::string& id, int facing,
             const std::string& clientPackageName, int apiLevel, bool isNdk,
-            int32_t latencyMs);
+            bool sharedMode, int32_t latencyMs);
 
     // Close
     void logClose(const std::string& id, int32_t latencyMs, bool deviceError, int32_t errorState);
