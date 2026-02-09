@@ -40,7 +40,9 @@ constexpr int kInvalidStreamId = -1;
 // Encapsulates set of streams belonging to the same camera session.
 class VirtualCameraSessionContext {
  public:
-  VirtualCameraSessionContext(bool isMultiInputStreamEnabled);
+  VirtualCameraSessionContext(
+      bool isMultiInputStreamEnabled,
+      std::function<void()> onFatalErrorCallback = nullptr);
 
   ~VirtualCameraSessionContext() = default;
 
@@ -131,6 +133,15 @@ class VirtualCameraSessionContext {
     return mIsMultiInputStreamEnabled;
   }
 
+  // Sets the session into a fatal error state.
+  // Returns true if the session was NOT already in a fatal error state.
+  bool setFatalError();
+
+  // Returns true if the session is in a fatal error state.
+  bool isInFatalError() const {
+    return mInFatalError.load();
+  }
+
  private:
   mutable std::mutex mLock;
   // streamId -> VirtualCameraStream mapping.
@@ -144,6 +155,8 @@ class VirtualCameraSessionContext {
   std::map<int, int> mOutputToInputStreamMap GUARDED_BY(mLock);
 
   const bool mIsMultiInputStreamEnabled;
+  std::atomic<bool> mInFatalError{false};
+  const std::function<void()> mOnFatalErrorCallback;
 };
 
 }  // namespace virtualcamera

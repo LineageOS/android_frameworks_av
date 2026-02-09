@@ -220,6 +220,9 @@ class VirtualCameraRenderThread {
   volatile bool GUARDED_BY(mLock) mTextureUpdateRequested = false;
   volatile bool GUARDED_BY(mLock) mPendingExit = false;
 
+  // Number of consecutive timeouts.
+  std::atomic<int> mWaitInputFrameTimeoutsCount{0};
+
   // Acquisition timestamp of last frame.
   std::atomic<uint64_t> mLastAcquisitionTimestampNanoseconds;
 

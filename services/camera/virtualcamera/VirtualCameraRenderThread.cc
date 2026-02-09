@@ -90,11 +90,13 @@ namespace flags = ::android::companion::virtualdevice::flags;
 
 static constexpr UpdateTextureTask kUpdateTextureTask;
 
-// The number of nanoseconds to wait for the first frame to be drawn on the
-// input surface
-static constexpr std::chrono::nanoseconds kMaxWaitFirstFrame = 15s;
-// The number of nanoseconds to wait for a frame.
-static constexpr std::chrono::nanoseconds kMaxWaitSubsequent = 60s;
+// The number of nanoseconds to wait for each individual capture request.
+static constexpr std::chrono::nanoseconds kWaitInputFrameTimeout = 4s;
+
+// Max number of consecutive timeouts before reporting a device error.
+// TODO(b/450609791): Simplify the timeout logic when we support owner error reports.
+static constexpr int kMaxTimeoutCountFirstFrame = 3;
+static constexpr int kMaxTimeoutCount = 2;
 
 NotifyMsg createShutterNotifyMsg(int frameNumber,
                                  std::chrono::nanoseconds timestamp) {
@@ -322,7 +324,7 @@ void VirtualCameraRenderThread::processCaptureRequest(
   const bool isFirstFrameDrawn = mImageHandler->isFirstFrameDrawn();
   ALOGV("First Frame Drawn: %s", isFirstFrameDrawn ? "Yes" : "No");
 
-  bool gotNewFrame = false, pendingExit = false;
+  bool pendingExit = false;
   {
     std::lock_guard<std::mutex> lock(mLock);
     pendingExit = mPendingExit;
@@ -333,21 +335,29 @@ void VirtualCameraRenderThread::processCaptureRequest(
     return;
   }
 
-  const std::chrono::nanoseconds waitTime =
-      std::max(0ns, maxFrameDuration - elapsedDuration);
-  ALOGV("maxFrameDuration %lld, elapsedDuration %lld, waitTime %lld",
-        maxFrameDuration.count(), elapsedDuration.count(), waitTime.count());
-  if (!mImageHandler->waitForInputFrame(waitTime)) {
+  if (!mImageHandler->waitForInputFrame(kWaitInputFrameTimeout)) {
+    mWaitInputFrameTimeoutsCount++;
+    const int maxTimeoutCount =
+        isFirstFrameDrawn ? kMaxTimeoutCount : kMaxTimeoutCountFirstFrame;
     ALOGW(
-        "%s: Timed out waiting for frame to be posted, after waiting for "
-        "%.3f s",
-        __func__, static_cast<uint64_t>(waitTime.count()) / kOneSecondInNanos);
-    std::unique_ptr<CaptureResult> captureResult =
-        createCaptureResult(request.getFrameNumber(), /* metadata = */ nullptr);
-    notifyTimeout(request, *captureResult);
-    submitCaptureResult(std::move(captureResult));
+        "Timed out waiting for frame to be posted, timeout counter %d out of "
+        "%d.",
+        mWaitInputFrameTimeoutsCount.load(), maxTimeoutCount);
+
+    completeCaptureRequestWithError(request);
+
+    if (mWaitInputFrameTimeoutsCount >= maxTimeoutCount) {
+      ALOGE("Fatal timeout reached (%d consecutive timeouts). Flushing.",
+            mWaitInputFrameTimeoutsCount.load());
+      // Signal fatal error to the session (triggers global flush and
+      // notification). We must not hold mLock here to avoid deadlocks.
+      mSessionContext.setFatalError();
+    }
     return;
   }
+
+  // A frame was successfully received, reset the timeout counter.
+  mWaitInputFrameTimeoutsCount = 0;
 
   // If the request has a maxFps, we throttle the rendering to make sure that
   // the requester receives the latest frame that was posted by the virtual
