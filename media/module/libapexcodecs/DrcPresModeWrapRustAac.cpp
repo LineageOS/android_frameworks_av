@@ -37,6 +37,10 @@ DrcPresModeWrapRustAac::DrcPresModeWrapRustAac()
     mStreamNrAACChan = 0;
     mStreamNrOutChan = 0;
 
+    mIsDownmix = false;
+    mIsMonoDownmix = false;
+    mIsStereoDownmix = false;
+
     /* Desired values (set by user). */
     /* Initialized to the same values as in the aac decoder */
     mDesTarget = -1;
