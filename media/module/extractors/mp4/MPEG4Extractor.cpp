@@ -5775,7 +5775,17 @@ MPEG4Source::MPEG4Source(
     } else if (mIsVVC) {
         void *data = NULL;
         size_t size = 0;
-        CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_0, &data, &size) && (data != NULL));
+// TODO(b/476115172) remove when the build bug is fixed
+#if defined(__riscv)
+        LOG_ALWAYS_FATAL("VVC support not available on RISCV platform");
+#else
+        if (__builtin_available(android 37, *)) {
+           CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_VVC, &data, &size)
+            && (data != NULL));
+        } else {
+            LOG_ALWAYS_FATAL("VVC support not available");
+        }
+#endif
 
         const uint8_t *ptr = (const uint8_t *)data;
 
