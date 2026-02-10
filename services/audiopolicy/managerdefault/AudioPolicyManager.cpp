@@ -2823,15 +2823,15 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
     // of type MIX_TYPE_RECORDERS if not already connected
     if (isSingleDeviceType(devices.types(), &audio_is_remote_submix_device) &&
         policyMix != nullptr && policyMix->mMixType == MIX_TYPE_RECORDERS) {
-        // input devices for remote submix mixes with inject silence on starve are expected to be
-        // already connected from the mix registration
-        if (policyMix->mInjectSilenceOnStarve) {
-            ALOGV("%s: Skipping input device connect for policy mix with inject silence on starve",
-                  __func__);
+        // input devices for remote submix persistent mixes are expected to be already connected
+        // from the mix registration
+        if (policyMix->mIsPersistent) {
+            ALOGV("%s: Skipping input device connect for persistent policy mix with address %s",
+                  __func__, address);
             if (getDeviceConnectionState(AUDIO_DEVICE_IN_REMOTE_SUBMIX, address) !=
                 AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
-                ALOGE("%s: Input device connect is not connected for policy mix with"
-                      " inject silence on starve", __func__);
+                ALOGE("%s: Input device connect is not connected for persistent policy mix",
+                      __func__);
             }
         } else {
             setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
@@ -2953,22 +2953,22 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
     if (outputDesc->getActivityCount(clientVolSrc) > 0) {
         if (outputDesc->getActivityCount(clientVolSrc) == 1) {
             // Automatically disable the remote submix input when output is stopped on a
-            // re routing mix of type MIX_TYPE_RECORDERS and not injecting silence on starve
+            // re routing non persistent mix of type MIX_TYPE_RECORDERS
             sp<AudioPolicyMix> policyMix = outputDesc->mPolicyMix.promote();
             if (isSingleDeviceType(
                     outputDesc->devices().types(), &audio_is_remote_submix_device) &&
                 policyMix != nullptr &&
                 policyMix->mMixType == MIX_TYPE_RECORDERS) {
-                    // keep the remote submix device alive if injecting silence on starvation
+                    // keep the remote submix device port connected for a persistent mix
                     // until the policy mix is unregistered
-                    if (!policyMix->mInjectSilenceOnStarve) {
+                    if (!policyMix->mIsPersistent) {
                         setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                                                     AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                     policyMix->mDeviceAddress,
                                                     "remote-submix", AUDIO_FORMAT_DEFAULT);
                     } else {
-                        ALOGV("%s: Skipping AUDIO_DEVICE_IN_REMOTE_SUBMIX disconnect for mix"
-                              " with inject silence on starve at stopSource, address %s",
+                        ALOGV("%s: Skipping AUDIO_DEVICE_IN_REMOTE_SUBMIX disconnect for"
+                             " persistent mix with address %s",
                               __func__, policyMix->mDeviceAddress.c_str());
                     }
             }
@@ -4419,19 +4419,18 @@ status_t AudioPolicyManager::registerPolicyMixes(const std::vector<AudioMix>& mi
                 break;
             }
 
-            // for mixes with silence injection on starve,
-            // connect also the device at the other end when the policy is registered
-            if (deviceTypeToMakeAvailable == AUDIO_DEVICE_OUT_REMOTE_SUBMIX &&
-                mix.mInjectSilenceOnStarve) {
-                ALOGV("%s: Connect AUDIO_DEVICE_IN_REMOTE_SUBMIX for mix with silence on starve"
-                      " and address %s", __func__, address.c_str());
+            // for persistent mixes, connect also the device at the other end when the policy
+            // is registered
+            if (deviceTypeToMakeAvailable == AUDIO_DEVICE_OUT_REMOTE_SUBMIX && mix.mIsPersistent) {
+                ALOGV("%s: Connect AUDIO_DEVICE_IN_REMOTE_SUBMIX for persistent mix"
+                      " with address %s", __func__, address.c_str());
                 if ((res = setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                         AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                         address.c_str(),
                         "remote-submix",
                         AUDIO_FORMAT_DEFAULT)) != NO_ERROR) {
-                    // the inject on starve requires both OUT and IN devices available
-                    // cleanup the OUT device since the IN can't be connected
+                    // the persistent mix requires both OUT and IN devices available
+                    // disconnect the OUT device since the IN device can't be connected
                     setDeviceConnectionStateInt(deviceTypeToMakeAvailable,
                                                 AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                 address.c_str(),

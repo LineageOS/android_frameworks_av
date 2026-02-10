@@ -134,8 +134,9 @@ public:
     bool            mAllowPrivilegedMediaPlaybackCapture = false;
     /** Indicates if the caller can capture voice communication output */
     bool            mVoiceCommunicationCaptureAllowed = false;
-    /** The AudioMix should be kept alive and output silence when no audio data is injected */
-    bool            mInjectSilenceOnStarve = false;
+    /** The AudioMix is persistent and will be kept alive to output silence even when no audio data
+     *  is provided */
+    bool            mIsPersistent = false;
 };
 
 
