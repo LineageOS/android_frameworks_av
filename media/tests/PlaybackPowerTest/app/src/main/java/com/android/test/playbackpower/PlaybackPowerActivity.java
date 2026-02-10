@@ -150,7 +150,7 @@ public final class PlaybackPowerActivity extends Activity {
         mPlayer.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(PlaybackException error) {
-                handleFailure("Player error: " + error);
+                handleFailure("Player error: " + error.toBundle().toString());
             }
         });
         mPlayer.addAnalyticsListener(new EventLogger());
