@@ -1297,6 +1297,9 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
         Mutexed<State>::Locked state(mState);
         state->set(RELEASED);
         state.unlock();
+        // TODO: Mapping c2_status_t to status_t could help with more descriptive error code here.
+        // mCallback->onError(toStatusT(status, C2_OPERATION_ComponentStore_createComponent),
+        //                    ACTION_CODE_FATAL);
         mCallback->onError((status == C2_NO_MEMORY ? NO_MEMORY : UNKNOWN_ERROR), ACTION_CODE_FATAL);
         state.lock();
         return;

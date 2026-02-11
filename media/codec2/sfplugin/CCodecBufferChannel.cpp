@@ -2696,7 +2696,12 @@ bool CCodecBufferChannel::handleWork(
         // C2_OK and C2_NOT_FOUND are the only results that we accept for processing
         // the config update.
         ALOGD("[%s] work failed to complete: %d", mName, work->result);
-        mCCodecCallback->onError(work->result, ACTION_CODE_FATAL);
+        // TODO: Mapping c2_status_t to status_t could help with more descriptive error code here.
+        // What should be the right operation for handleWork?
+        // status_t err = toStatusT(work->result, C2_OPERATION_NONE);
+        // mCCodecCallback->onError(err, ACTION_CODE_FATAL);
+        mCCodecCallback->onError((work->result == C2_NO_MEMORY ? NO_MEMORY : UNKNOWN_ERROR),
+                                  ACTION_CODE_FATAL);
         return false;
     }
 
