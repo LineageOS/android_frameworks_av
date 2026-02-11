@@ -43,6 +43,6 @@ parcelable AudioMix {
     IBinder mToken;
     /** Indicates the Id of the VirtualDevice this AudioMix was registered for */
     int mVirtualDeviceId;
-    /** The AudioMix should be kept alive and output silence when no audio data is injected */
-    boolean mInjectSilenceOnStarve;
+    /** The AudioMix is persistent and will be kept alive to output silence when no audio data is injected */
+    boolean mIsPersistent;
 }
