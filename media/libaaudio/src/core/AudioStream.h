@@ -597,7 +597,7 @@ protected:
             return android::NO_ERROR;
         }
 
-        android::status_t playerSetVolume() override;
+        android::status_t playerSetVolume() EXCLUDES(mSettingsMutex) override;
 
 #if AAUDIO_USE_VOLUME_SHAPER
         ::android::binder::Status applyVolumeShaper();

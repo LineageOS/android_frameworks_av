@@ -41,7 +41,7 @@ void TrackPlayerBase::init(const sp<AudioTrack>& pat,
     mAudioTrack.store(pat);
     if (pat != 0) {
         mCallbackHandle = callback;
-        mSelfAudioDeviceCallback = new SelfAudioDeviceCallback(*this);
+        mSelfAudioDeviceCallback = sp<SelfAudioDeviceCallback>::make(*this);
         pat->addAudioDeviceCallback(mSelfAudioDeviceCallback);
         pat->setPlayerIId(mPIId);  // set in PlayerBase::init().
     }
@@ -79,7 +79,7 @@ void TrackPlayerBase::doDestroy() {
 
 void TrackPlayerBase::setPlayerVolume(float vl, float vr) {
     {
-        Mutex::Autolock _l(mSettingsLock);
+        std::lock_guard _l(mSettingsMutex);
         mPlayerVolumeL = vl;
         mPlayerVolumeR = vr;
     }
@@ -122,8 +122,12 @@ status_t TrackPlayerBase::playerSetVolume() {
 status_t TrackPlayerBase::doSetVolume() {
     status_t status = NO_INIT;
     if (sp<AudioTrack> audioTrack = getAudioTrack(); audioTrack != 0) {
-        float tl = mPlayerVolumeL * mPanMultiplierL * mVolumeMultiplierL;
-        float tr = mPlayerVolumeR * mPanMultiplierR * mVolumeMultiplierR;
+        float tl, tr;
+        {
+            std::lock_guard _l(mSettingsMutex);
+            tl = mPlayerVolumeL * mPanMultiplierL * mVolumeMultiplierL;
+            tr = mPlayerVolumeR * mPanMultiplierR * mVolumeMultiplierR;
+        }
         audioTrack->setVolume(tl, tr);
         status = NO_ERROR;
     }

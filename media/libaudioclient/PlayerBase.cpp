@@ -83,13 +83,13 @@ void PlayerBase::servicePlayerEvent(player_state_t event, const DeviceIdVector& 
     if (mAudioManager != 0) {
         bool changed = false;
         {
-            Mutex::Autolock _l(mDeviceIdLock);
+            std::lock_guard _l(mDeviceIdMutex);
             changed = !areDeviceIdsEqual(deviceIds, mLastReportedDeviceIds);
             mLastReportedDeviceIds = deviceIds;
         }
 
         {
-            Mutex::Autolock _l(mPlayerStateLock);
+            std::lock_guard _l(mPlayerStateMutex);
             // PLAYER_UPDATE_DEVICE_ID is not saved as an actual state, instead it is used to update
             // device ID only.
             if ((event != PLAYER_UPDATE_DEVICE_ID) && (event != mLastReportedEvent)) {
@@ -156,7 +156,7 @@ binder::Status PlayerBase::start() {
     ALOGD("PlayerBase::start() from IPlayer");
     DeviceIdVector deviceIds;
     {
-        Mutex::Autolock _l(mDeviceIdLock);
+        std::lock_guard _l(mDeviceIdMutex);
         deviceIds = mLastReportedDeviceIds;
     }
     (void)startWithStatus(deviceIds);
@@ -179,7 +179,7 @@ binder::Status PlayerBase::stop() {
 binder::Status PlayerBase::setVolume(float vol) {
     ALOGD("PlayerBase::setVolume() from IPlayer");
     {
-        Mutex::Autolock _l(mSettingsLock);
+        std::lock_guard _l(mSettingsMutex);
         mVolumeMultiplierL = vol;
         mVolumeMultiplierR = vol;
     }
@@ -193,7 +193,7 @@ binder::Status PlayerBase::setVolume(float vol) {
 binder::Status PlayerBase::setPan(float pan) {
     ALOGD("PlayerBase::setPan() from IPlayer");
     {
-        Mutex::Autolock _l(mSettingsLock);
+        std::lock_guard _l(mSettingsMutex);
         pan = min(max(-1.0f, pan), 1.0f);
         if (pan >= 0.0f) {
             mPanMultiplierL = 1.0f - pan;

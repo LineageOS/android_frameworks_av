@@ -30,18 +30,18 @@ class PlayerBase : public ::android::media::BnPlayer
 {
 public:
     explicit PlayerBase();
-    virtual ~PlayerBase() override;
+    ~PlayerBase() override;
 
     virtual void destroy() = 0;
 
     //IPlayer implementation
-    virtual binder::Status start() override;
-    virtual binder::Status pause() override;
-    virtual binder::Status stop() override;
-    virtual binder::Status setVolume(float vol) override;
-    virtual binder::Status setPan(float pan) override;
-    virtual binder::Status setStartDelayMs(int32_t delayMs) override;
-    virtual binder::Status applyVolumeShaper(
+    binder::Status start() EXCLUDES(mDeviceIdMutex) override;
+    binder::Status pause() override;
+    binder::Status stop() override;
+    binder::Status setVolume(float vol) EXCLUDES(mSettingsMutex) override;
+    binder::Status setPan(float pan) EXCLUDES(mSettingsMutex) override;
+    binder::Status setStartDelayMs(int32_t delayMs) override;
+    binder::Status applyVolumeShaper(
             const media::VolumeShaperConfiguration& configuration,
             const media::VolumeShaperOperation& operation) override;
 
@@ -70,29 +70,32 @@ protected:
     virtual status_t playerSetVolume()  { return NO_ERROR; }
 
     // mutex for IPlayer volume and pan, and player-specific volume
-    Mutex mSettingsLock;
+    std::mutex mSettingsMutex;
 
     // volume multipliers coming from the IPlayer volume and pan controls
-    float mPanMultiplierL, mPanMultiplierR;
-    float mVolumeMultiplierL, mVolumeMultiplierR;
+    float mPanMultiplierL GUARDED_BY(mSettingsMutex);
+    float mPanMultiplierR GUARDED_BY(mSettingsMutex);
+    float mVolumeMultiplierL GUARDED_BY(mSettingsMutex);
+    float mVolumeMultiplierR GUARDED_BY(mSettingsMutex);
 
     // player interface ID, uniquely identifies the player in the system
     // effectively const after PlayerBase::init().
     audio_unique_id_t mPIId;
 private:
             // report events to AudioService
-            void servicePlayerEvent(player_state_t event, const DeviceIdVector& deviceIds);
+    void servicePlayerEvent(player_state_t event, const DeviceIdVector& deviceIds)
+            EXCLUDES(mDeviceIdMutex, mPlayerStateMutex);
             void serviceReleasePlayer();
 
     // native interface to AudioService
     android::sp<android::IAudioManager> mAudioManager;
 
     // Mutex for state reporting
-    Mutex mPlayerStateLock;
-    player_state_t mLastReportedEvent;
+    std::mutex mPlayerStateMutex;
+    player_state_t mLastReportedEvent GUARDED_BY(mPlayerStateMutex);
 
-    Mutex mDeviceIdLock;
-    DeviceIdVector mLastReportedDeviceIds GUARDED_BY(mDeviceIdLock);
+    std::mutex mDeviceIdMutex;
+    DeviceIdVector mLastReportedDeviceIds GUARDED_BY(mDeviceIdMutex);
 };
 
 } // namespace android
