@@ -57,7 +57,9 @@ namespace {
     constexpr int32_t DRC_DEFAULT_MOBILE_ENC_LEVEL = -1;
     constexpr int32_t MAX_CHANNEL_COUNT = 8;
     constexpr size_t MAX_SAMPLES_PER_FRAME = 4096;
-    constexpr size_t TMP_BUFFER_COUNT = MAX_SAMPLES_PER_FRAME * MAX_CHANNEL_COUNT;
+    constexpr size_t MAX_FRAMES_TO_DECODE_PER_PROCESS_CALL = 3;
+    constexpr size_t TMP_BUFFER_COUNT = MAX_SAMPLES_PER_FRAME * MAX_CHANNEL_COUNT
+                                       * MAX_FRAMES_TO_DECODE_PER_PROCESS_CALL;
     constexpr char PROP_DRC_OVERRIDE_REF_LEVEL[] = "aac_drc_reference_level";
     constexpr char PROP_DRC_OVERRIDE_CUT[] = "aac_drc_cut";
     constexpr char PROP_DRC_OVERRIDE_BOOST[] = "aac_drc_boost";
@@ -572,6 +574,10 @@ ApexCodec_Status C2ApexAacDec::process(
     uint8_t prevNumChannels = mOutputInfo.num_channels;
     int16_t prevOutLoudness = mOutputInfo.output_loudness;
     AUDIO_OBJECT_TYPE prevExtAot = mStreamInfo.extAot;
+    // SBR and PS are dual rate systems, so the sample rate is doubled.
+    if (prevExtAot == AOT_SBR || prevExtAot == AOT_PS) {
+        prevSampleRate *= 2;
+    }
 
     ApexCodec_LinearBuffer outLinearBuffer;
     if (output->getLinearBuffer(&outLinearBuffer) != APEXCODEC_STATUS_OK) {
@@ -622,6 +628,10 @@ ApexCodec_Status C2ApexAacDec::process(
             if (decoderErr != AAC_DEC_OK) {
                 ALOGE("aacDecoder_ConfigRaw decoderErr = 0x%4.4x", decoderErr);
                 mSignalledError = true;
+                ALOGV("codec config buffer size: %zu", inBuffer.size);
+                for (size_t i = 0; i < inBuffer.size; ++i) {
+                    ALOGV("codec config buffer data[%zu]: %02x", i, inBuffer.data[i]);
+                }
                 return APEXCODEC_STATUS_CORRUPTED;
             }
             *consumed = inBuffer.size;
@@ -692,12 +702,9 @@ ApexCodec_Status C2ApexAacDec::process(
     }
 
     if (decoded) {
-        if (decoderErr != AAC_DEC_NOT_ENOUGH_BITS) {
+        while (decoderErr != AAC_DEC_NOT_ENOUGH_BITS) {
+            ALOGV("decoded data");
             size_t generatedSamples = 0;
-            // SBR and PS are dual rate systems, so the sample rate is doubled.
-            if (prevExtAot == AOT_SBR || prevExtAot == AOT_PS) {
-                prevSampleRate *= 2;
-            }
 
             if (IS_OUTPUT_VALID(decoderErr)) {
                 if (mIsFirstOutput) {
@@ -725,16 +732,6 @@ ApexCodec_Status C2ApexAacDec::process(
                 mSignalledError = true;
                 return APEXCODEC_STATUS_CORRUPTED;
             }
-            int32_t pcmEncoding = mIntf->getPcmEncodingInfo();
-            size_t sampleSize = (pcmEncoding == C2Config::PCM_16)
-                    ? sizeof(int16_t) : sizeof(float);
-            if (*produced + generatedSamples * sampleSize > outLinearBuffer.size) {
-                ALOGE("output buffer overflow");
-                mSignalledError = true;
-                return APEXCODEC_STATUS_NO_MEMORY;
-            }
-            uint8_t *outPtr = outLinearBuffer.data + *produced;
-
             ALOGV("generatedSamples: %zu, mSamplesToDiscard: %d",
                     generatedSamples, mSamplesToDiscard);
 
@@ -762,7 +759,9 @@ ApexCodec_Status C2ApexAacDec::process(
                 mLeftoverSamples += generatedSamples;
             }
 
-            size_t frameSamples = mOutputInfo.frame_size * mOutputInfo.num_channels;
+            int32_t pcmEncoding = mIntf->getPcmEncodingInfo();
+            size_t frameSamples = isConfigured() ?
+                    (mOutputInfo.frame_size * mOutputInfo.num_channels) : 0;
             if (frameSamples > 0 && mLeftoverSamples >= frameSamples) {
                 ALOGV("have enough samples for a frame. frameSamples: %zu, mLeftoverSamples: %zu",
                         frameSamples, mLeftoverSamples);
@@ -775,6 +774,7 @@ ApexCodec_Status C2ApexAacDec::process(
                 }
 
                 uint8_t *outPtr = outLinearBuffer.data;
+                outPtr += *produced;
                 if (pcmEncoding == C2Config::PCM_16) {
                     int16_t* out = reinterpret_cast<int16_t*>(outPtr);
                     for (size_t i = 0; i < frameSamples; ++i) {
@@ -785,7 +785,7 @@ ApexCodec_Status C2ApexAacDec::process(
                 } else {
                     memcpy(outPtr, mLeftoverBuffer.data(), frameSamples * sampleSize);
                 }
-                *produced = frameSamples * sampleSize;
+                *produced += frameSamples * sampleSize;
 
                 memmove(mLeftoverBuffer.data(),
                         mLeftoverBuffer.data() + frameSamples,
@@ -794,14 +794,6 @@ ApexCodec_Status C2ApexAacDec::process(
                 ALOGV("consumed %zu samples for a frame, remaining leftover: %zu",
                         frameSamples, mLeftoverSamples);
                 ALOGV("pending timestamps size : %zu", mPendingTimestamps.size());
-
-                if (!mPendingTimestamps.empty()) {
-                    mCurrentTimestampUs = mPendingTimestamps.front().first;
-                    mCurrentFrameIndex = mPendingTimestamps.front().second;
-                    mPendingTimestamps.pop();
-                    ALOGV("popped timestamp %" PRIu64 " and frameIndex %" PRIu64,
-                            mCurrentTimestampUs, mCurrentFrameIndex);
-                }
             }
 
             ALOGV("produced: %zu", *produced);
@@ -878,6 +870,22 @@ ApexCodec_Status C2ApexAacDec::process(
             if (!configUpdate.empty()) {
                 output->setOwnedConfigUpdates(std::move(configUpdate));
             }
+            // Write output buffer info into temporary buffers as they will be empty if there
+            // is not enough data to decode a full frame.
+            OutputInfo tempOutputInfo;
+            StreamInfo tempStreamInfo;
+            MetadataInfo tempMetadataInfo;
+            decoderErr = aacDecoder_Decode(mAACDecoder, tmpOutBuffer.data(),
+                                            TMP_BUFFER_COUNT,
+                                            &tempOutputInfo, &tempStreamInfo,
+                                            &tempMetadataInfo);
+        }
+        if (*produced > 0 && !mPendingTimestamps.empty()) {
+            mCurrentTimestampUs = mPendingTimestamps.front().first;
+            mCurrentFrameIndex = mPendingTimestamps.front().second;
+            mPendingTimestamps.pop();
+            ALOGV("popped timestamp %" PRIu64 " and frameIndex %" PRIu64,
+                    mCurrentTimestampUs, mCurrentFrameIndex);
         }
     }
 
