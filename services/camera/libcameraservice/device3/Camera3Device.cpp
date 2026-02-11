@@ -2032,7 +2032,8 @@ void Camera3Device::notifyStatus(bool idle) {
                     stream->getMaxHalBuffers(),
                     stream->getMaxTotalBuffers() - stream->getMaxHalBuffers(),
                     stream->getDynamicRangeProfile(), streamUseCase,
-                    stream->getColorSpace());
+                    stream->getColorSpace(),
+                    stream->getCurrentSurfaceId());
             }
         }
     }

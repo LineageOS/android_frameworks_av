@@ -440,7 +440,7 @@ void CameraServiceProxyWrapper::logIdle(const std::string& id,
 
 void CameraServiceProxyWrapper::logOpen(const std::string& id, int facing,
             const std::string& clientPackageName, int effectiveApiLevel, bool isNdk,
-            int32_t latencyMs) {
+            bool sharedMode, int32_t latencyMs) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
@@ -460,13 +460,13 @@ void CameraServiceProxyWrapper::logOpen(const std::string& id, int facing,
 
         sessionStats = std::make_shared<CameraSessionStatsWrapper>(
                 id, facing, CameraSessionStats::CAMERA_STATE_OPEN, clientPackageName,
-                apiLevel, isNdk, latencyMs, logId);
+                apiLevel, isNdk, sharedMode, latencyMs, logId);
         mSessionStatsMap.emplace(id, sessionStats);
         ALOGV("%s: Adding id %s", __FUNCTION__, id.c_str());
     }
 
-    ALOGV("%s: id %s, facing %d, effectiveApiLevel %d, isNdk %d, latencyMs %d",
-            __FUNCTION__, id.c_str(), facing, effectiveApiLevel, isNdk, latencyMs);
+    ALOGV("%s: id %s, facing %d, effectiveApiLevel %d, isNdk %d, sharedMode %d, latencyMs %d",
+            __FUNCTION__, id.c_str(), facing, effectiveApiLevel, isNdk, sharedMode, latencyMs);
     sp<hardware::ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
     sessionStats->onOpen(proxyBinder);
 }

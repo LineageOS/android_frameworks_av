@@ -58,7 +58,6 @@ cc_defaults {
         "libcamera_metadata",
         "libfmq",
         "libgui",
-        "libguiflags",
         "libhardware",
         "libhidlbase",
         "libimage_io",

@@ -2852,7 +2852,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
 
     int32_t openLatencyMs = ns2ms(systemTime() - openTimeNs);
     mCameraServiceProxyWrapper->logOpen(cameraId, facing, clientPackageName,
-            effectiveApiLevel, isNonSystemNdk, openLatencyMs);
+            effectiveApiLevel, isNonSystemNdk, sharedMode, openLatencyMs);
 
     {
         Mutex::Autolock lock(mInjectionParametersLock);
