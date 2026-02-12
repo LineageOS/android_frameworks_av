@@ -2828,11 +2828,9 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
         if (policyMix->mIsPersistent) {
             ALOGV("%s: Skipping input device connect for persistent policy mix with address %s",
                   __func__, address);
-            if (getDeviceConnectionState(AUDIO_DEVICE_IN_REMOTE_SUBMIX, address) !=
-                AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
-                ALOGE("%s: Input device connect is not connected for persistent policy mix",
-                      __func__);
-            }
+            ALOGE_IF(getDeviceConnectionState(AUDIO_DEVICE_IN_REMOTE_SUBMIX, address) !=
+                     AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                     "%s: Input device is not connected for persistent policy mix", __func__);
         } else {
             setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                                         AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
@@ -3633,9 +3631,20 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId)
                 address = policyMix->mDeviceAddress;
             }
             if (address != "") {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                // output devices for remote submix persistent mixes are expected to be already
+                // connected from the mix registration
+                if (policyMix != nullptr && policyMix->mIsPersistent) {
+                    ALOGV("%s: Skipping output device connect for persistent policy mix "
+                          "with address %s", __func__, address.c_str());
+                    ALOGE_IF(getDeviceConnectionState(AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address) !=
+                             AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                             "%s: Output device is not connected for persistent policy mix",
+                             __func__);
+                } else {
+                    setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
                         AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                         address, "remote-submix", AUDIO_FORMAT_DEFAULT);
+                }
             }
         }
     } else if (status != NO_ERROR) {
@@ -3683,7 +3692,7 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
         }
 
         // automatically disable the remote submix output when input is stopped if not
-        // used by a policy mix of type MIX_TYPE_RECORDERS
+        // used by a policy mix of type MIX_TYPE_RECORDERS nor is persistent
         if (audio_is_remote_submix_device(inputDesc->getDeviceType())) {
             String8 address = String8("");
             if (policyMix == nullptr) {
@@ -3692,9 +3701,14 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
                 address = policyMix->mDeviceAddress;
             }
             if (address != "") {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                                         AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                         address, "remote-submix", AUDIO_FORMAT_DEFAULT);
+                if (policyMix != nullptr && policyMix->mIsPersistent) {
+                    ALOGV("%s: Skipping output device disconnect for persistent policy mix"
+                          " with address %s", __func__, address.c_str());
+                } else {
+                    setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                                                AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                address, "remote-submix", AUDIO_FORMAT_DEFAULT);
+                }
             }
         }
         resetInputDevice(input);
@@ -4345,6 +4359,8 @@ bool AudioPolicyManager::isSourceActive(audio_source_t source) const
 //  - 1 look for a mix matching the address passed in attributes tags if any
 //  - 2 if none found, look for a mix matching the attributes usage
 //  - 3 if none found, default to device and output selection by policy rules.
+//
+// For persistent mixes both input and output devices are connected at registration
 
 status_t AudioPolicyManager::registerPolicyMixes(const std::vector<AudioMix>& mixes)
 {
@@ -4421,23 +4437,23 @@ status_t AudioPolicyManager::registerPolicyMixes(const std::vector<AudioMix>& mi
 
             // for persistent mixes, connect also the device at the other end when the policy
             // is registered
-            if (deviceTypeToMakeAvailable == AUDIO_DEVICE_OUT_REMOTE_SUBMIX && mix.mIsPersistent) {
-                ALOGV("%s: Connect AUDIO_DEVICE_IN_REMOTE_SUBMIX for persistent mix"
-                      " with address %s", __func__, address.c_str());
-                if ((res = setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+            if (mix.mIsPersistent) {
+                ALOGV("%s: Connect pair device for persistent mix with address %s",
+                      __func__, address.c_str());
+                if ((res = setDeviceConnectionStateInt(mix.mDeviceType,
                         AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                         address.c_str(),
                         "remote-submix",
                         AUDIO_FORMAT_DEFAULT)) != NO_ERROR) {
-                    // the persistent mix requires both OUT and IN devices available
-                    // disconnect the OUT device since the IN device can't be connected
+                    // the persistent mix requires both input and output devices available
+                    // disconnect the first connected device if the seconds can't be also connected
                     setDeviceConnectionStateInt(deviceTypeToMakeAvailable,
                                                 AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                 address.c_str(),
                                                 "remote-submix",
                                                 AUDIO_FORMAT_DEFAULT);
-                    ALOGE("%s: Failed to set input remote submix device available with address %s",
-                          __func__, address.c_str());
+                    ALOGE("%s: Failed to connect pair remote submix device for persistent mix"
+                          " with address %s", __func__, address.c_str());
                     break;
                 }
             }
