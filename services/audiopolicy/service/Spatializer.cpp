@@ -1179,8 +1179,20 @@ bool Spatializer::containsImmersiveChannelMask(
 }
 
 bool Spatializer::shouldUseHeadTracking_l() const {
-    // Headtracking only available on immersive channel masks.
-    return containsImmersiveChannelMask(mActiveTracksMasks);
+    // Headtracking only available on immersive channel masks or
+    // stereo if enabled by sys prop.
+    if (containsImmersiveChannelMask(mActiveTracksMasks)) {
+        return true;
+    }
+    if (!property_get_bool("ro.audio.stereo_head_tracking_enabled", false)) {
+        return false;
+    }
+    for (auto channelMask : mActiveTracksMasks) {
+        if (audio_channel_mask_contains_stereo(channelMask)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Spatializer::checkEngineState_l() {
