@@ -34,6 +34,8 @@
 
 #include "AudioAnalytics.h"
 
+#include <media/MediaMetricsInternal.h>
+
 namespace android {
 
 class MediaMetricsService :
@@ -48,9 +50,9 @@ public:
     ~MediaMetricsService() override;
 
 #ifdef METRICS_IN_MODULE
-    ::ndk::ScopedAStatus submitBuffer(const std::vector<uint8_t>& buffer) override;
+    ::ndk::ScopedAStatus submitStructuredItem(const StructuredItem& p) override;
 #else
-    binder::Status submitBuffer(const std::vector<uint8_t>& buffer) override;
+    binder::Status submitStructuredItem(const StructuredItem& p) override;
 #endif
 
     /**
@@ -60,11 +62,9 @@ public:
      * \return status failure, which is negative on binder transaction failure.
      *         As the transaction is one-way, remote failures will not be reported.
      */
-    status_t submit(mediametrics::Item *item);
-    status_t submitBuffer(const char *buffer, size_t length);
+    status_t submitInternal(std::shared_ptr<mediametrics::Item>& item);
 
 #ifdef METRICS_IN_MODULE
-    // binder_status_t dump(int fd, const char** args, uint32_t argc);
     status_t dump(int fd, const char** args, uint32_t argc);
 #else
     status_t dump(int fd, const Vector<String16>& args) override;
@@ -90,16 +90,11 @@ public:
      */
     static std::pair<std::string, int64_t> getSanitizedPackageNameAndVersionCode(uid_t uid);
 
-protected:
-
-    // Internal call where release is true if ownership of item is transferred
-    // to the service (that is, the service will eventually delete the item).
-    status_t submitInternal(mediametrics::Item *item, bool release);
-
 private:
     void processExpirations();
     // input validation after arrival from client
-    static bool isContentValid(const mediametrics::Item *item, bool isTrusted);
+    static bool isContentValid(const std::shared_ptr<mediametrics::Item>& item,
+                               bool isTrusted);
     bool isRateLimited(mediametrics::Item *) const;
     void saveItem(const std::shared_ptr<const mediametrics::Item>& item);
 

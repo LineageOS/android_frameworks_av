@@ -113,7 +113,7 @@ cc_defaults {
         "libmediautils",
         "libprocessgroup",
         "libshmemcompat",
-        "mediametricsservice-aidl-cpp",
+        "mediametricsservice-aidl-V1-cpp",
         "packagemanager_aidl-cpp",
         "shared-file-region-aidl-cpp",
     ],

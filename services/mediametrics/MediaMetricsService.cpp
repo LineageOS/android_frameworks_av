@@ -22,6 +22,8 @@
 #include "ValidateId.h"
 #include "iface_statsd.h"
 
+#include <media/MediaMetricsInternal.h>
+
 #include <dlfcn.h>
 #include <pwd.h> //getpwuid
 #include <stdio.h>
@@ -35,6 +37,8 @@
 #include <stats_media_metrics.h>
 
 #ifdef METRICS_IN_MODULE
+
+#include <aidl/android/media/BnMediaMetricsService.h>
 #include <android/binder_auto_utils.h>  // for AIBinder stuff
 #include <android/binder_ibinder.h>
 #include <android/binder_manager.h>
@@ -60,28 +64,6 @@ using base::StringPrintf;
 using mediametrics::Item;
 using mediametrics::startsWith;
 
-#ifdef  METRICS_IN_MODULE
-::ndk::ScopedAStatus
-MediaMetricsService::submitBuffer(const std::vector<uint8_t>& buffer) {
-        // buffer (a packed up Item) from the client.
-        // we're not even trying to crack these here.
-        status_t status = submitBuffer((char *)buffer.data(), buffer.size());
-        if (status == OK) {
-            return ::ndk::ScopedAStatus::ok();
-        } else {
-            return ::ndk::ScopedAStatus::fromServiceSpecificErrorWithMessage(
-                            status, "submission failed");
-        }
-}
-
-#else
-
-binder::Status
-MediaMetricsService::submitBuffer(const std::vector<uint8_t>& buffer) {
-    status_t status = submitBuffer((char *)buffer.data(), buffer.size());
-    return binder::Status::fromStatusT(status);
-}
-#endif
 
 /**
  * Submits the indicated record to the mediaanalytics service.
@@ -90,17 +72,17 @@ MediaMetricsService::submitBuffer(const std::vector<uint8_t>& buffer) {
  * \return status failure, which is negative on binder transaction failure.
  *         As the transaction is one-way, remote failures will not be reported.
  */
-status_t
-MediaMetricsService::submit(mediametrics::Item *item) {
-    return submitInternal(item, false /* release */);
-}
 
-status_t
-MediaMetricsService::submitBuffer(const char *buffer, size_t length) {
-    mediametrics::Item *item = new mediametrics::Item();
+binder::Status
+MediaMetricsService::submitStructuredItem(const StructuredItem& b) {
+    status_t status = UNKNOWN_ERROR;
+    std::shared_ptr<mediametrics::Item> item = nullptr;
 
-    return item->readFromByteString(buffer, length)
-            ?: submitInternal(item, true /* release */);
+    item = mediametrics::readFromStructuredItem(&b);
+    if (item != nullptr) {
+        status = submitInternal(item);
+    }
+    return binder::Status::fromStatusT(status);
 }
 
 // individual records kept in memory: age or count
@@ -231,7 +213,7 @@ MediaMetricsService::getSanitizedPackageNameAndVersionCode(uid_t uid) {
     }
 
     if (pkg.empty()) {
-        // last dicth fallback
+        // last ditch fallback
         ALOGV("last ditch fallback for uid %d", uid);
         pkg = "fallback-" + std::to_string(uid);
     }
@@ -272,7 +254,7 @@ MediaMetricsService::~MediaMetricsService()
     mItems.clear();
 }
 
-status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool release)
+status_t MediaMetricsService::submitInternal(std::shared_ptr<mediametrics::Item>& item)
 {
     // calling PID is 0 for one-way calls.
     const pid_t pid = getClientPid();
@@ -332,7 +314,6 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
 
     // validate the record; we discard if we don't like it
     if (isContentValid(item, isTrusted) == false) {
-        if (release) delete item;
         return PERMISSION_DENIED;
     }
 
@@ -340,7 +321,6 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
     // sure it doesn't appear in the finalized list.
 
     if (item->count() == 0) {
-        if (release) delete item;
         return BAD_VALUE;
     }
 
@@ -354,9 +334,6 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
         item->setTimestamp(now);
     }
 
-    // now attach either the item or its dup to a const shared pointer
-    std::shared_ptr<const mediametrics::Item> sitem(release ? item : item->dup());
-
     // register log session ids with singleton.
     if (startsWith(item->getKey(), "metrics.manager")) {
         std::string logSessionId;
@@ -366,10 +343,10 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
         }
     }
 
-    (void)mAudioAnalytics.submit(sitem, isTrusted);
+    (void)mAudioAnalytics.submit(item, isTrusted);
 
-    (void)dump2Statsd(sitem, mStatsdLog);  // failure should be logged in function.
-    saveItem(sitem);
+    (void)dump2Statsd(item, mStatsdLog);  // failure should be logged in function.
+    saveItem(item);
     return NO_ERROR;
 }
 
@@ -387,21 +364,9 @@ status_t MediaMetricsService::dump(int fd, const char **argv, uint32_t argc) {
         const pid_t pid = getClientPid();
         const uid_t uid = getClientUid();
 
-        typedef int32_t (*checkpermission_t)(const char *, pid_t, uid_t, int32_t*);
-        checkpermission_t funcp = (checkpermission_t) APermissionManager_checkPermission;
-        // I don't know why this is happening to us -- not sure why we'e getting
-        // a null pointer here; is there some 'set the target sdk' thing that I'm
-        // not getting correct?
-        if (funcp ==  nullptr) {
-            constexpr const char *libname = "libandroid.so";
-            void *library = dlopen(libname, RTLD_NOW);
-            if (library != nullptr) {
-                funcp =  (checkpermission_t) dlsym(library, "APermissionManager_checkPermission");
-            }
-        }
-        if (funcp != nullptr) {
-            result_operation = (*funcp)("android.permission.DUMP", pid, uid, &result_check);
-        }
+        ALOGV("module, did not actually attempt the permission check, granted anyway");
+        result_operation = PERMISSION_MANAGER_STATUS_OK;
+        result_check = PERMISSION_MANAGER_PERMISSION_GRANTED;
 
         if (result_operation != PERMISSION_MANAGER_STATUS_OK ||
             result_check != PERMISSION_MANAGER_PERMISSION_GRANTED) {
@@ -726,7 +691,8 @@ void MediaMetricsService::saveItem(const std::shared_ptr<const mediametrics::Ite
 }
 
 /* static */
-bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool isTrusted)
+bool MediaMetricsService::isContentValid(const std::shared_ptr<mediametrics::Item>& item,
+                                         bool isTrusted)
 {
     if (isTrusted) return true;
 

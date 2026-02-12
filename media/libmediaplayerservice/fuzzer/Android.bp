@@ -106,7 +106,7 @@ cc_fuzz {
         "libfakeservicemanager",
         "libresourcemanagerservice",
         "libmediametricsservice",
-        "mediametricsservice-aidl-cpp",
+        "mediametricsservice-aidl-V1-cpp",
         "libcameraservice",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.provider@2.4",

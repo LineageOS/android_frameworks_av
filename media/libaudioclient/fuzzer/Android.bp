@@ -66,7 +66,7 @@ cc_fuzz {
         "libmediautils",
         "libutils",
         "libxml2",
-        "mediametricsservice-aidl-cpp",
+        "mediametricsservice-aidl-V1-cpp",
     ],
     header_libs: [
         "libaudiofoundation_headers",

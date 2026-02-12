@@ -52,7 +52,7 @@ cc_defaults {
         "libstatspull",
         "libstatssocket",
         "libutils",
-        "mediametricsservice-aidl-cpp",
+        "mediametricsservice-aidl-V1-cpp",
         "packagemanager_aidl-cpp",
     ],
 

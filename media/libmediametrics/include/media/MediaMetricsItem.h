@@ -269,7 +269,12 @@ class BaseItem {
 public:
     // are we collecting metrics data
     static bool isEnabled();
-    // submits a raw buffer directly to the MediaMetrics service - this is highly optimized.
+
+    // submits a raw buffer directly to the MediaMetrics service
+    // this was once highly optimized, but the interface changed to a "Structured Item"
+    // so this involves a format change before it goes to the MediaMetrics service.
+    //
+    // everything else gets to the service via selfrecord() and its internals.
     static status_t submitBuffer(const char *buffer, size_t len);
 
 protected:
@@ -1096,9 +1101,12 @@ public:
     status_t writeToByteString(char **bufferptr, size_t *length) const;
     status_t readFromByteString(const char *bufferptr, size_t length);
 
+    // the StructuredItem manipulation is separate from this class so
+    // that we don't require that all users have access to the internals
+    // of that StructuredItem AIDL.
 
-        std::string toString() const;
-        const char *toCString();
+    std::string toString() const;
+    const char *toCString();
 
     /**
      * Returns true if the item has a property with a target value.

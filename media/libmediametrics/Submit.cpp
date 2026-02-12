@@ -33,7 +33,10 @@
 #include <android/media/IMediaMetricsService.h>
 #include <binder/IServiceManager.h>
 #include <media/MediaMetricsItem.h>
+#include <media/MediaMetricsInternal.h>
 #include <private/android_filesystem_config.h>
+
+#include <android/media/metrics/StructuredItem.h>
 
 // Max per-property string size before truncation in toString().
 // Do not make too large, as this is used for dumpsys purposes.
@@ -46,117 +49,75 @@ namespace android::mediametrics {
 #define DEBUG_ALLOCATIONS       0
 
 
-// monitor health of our connection to the metrics service
-class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
-        virtual void binderDied(const wp<IBinder> &) {
-            ALOGW("Reacquire service connection on next request");
-            BaseItem::dropInstance();
-        }
-};
+/* Item::selfrecord()
+ *
+ * this allows the particular MediaMetricsItem to log itself.
+ * The routine converts to the AIDL-ready format and sends to the service.
+ */
 
-static std::mutex sServiceMutex;
-static sp<MediaMetricsDeathNotifier> sNotifier GUARDED_BY(sServiceMutex);
-static sp<media::IMediaMetricsService> sMediaMetricsService GUARDED_BY(sServiceMutex);
+bool mediametrics::Item::selfrecord() {
+    bool success = true;
+    ALOGD_IF(DEBUG_API, "%s: delivering %s", __func__, this->toString().c_str());
 
-static
-sp<media::IMediaMetricsService> getService() {
-    static constexpr const char *servicename = "media.metrics";
-    static const bool enabled = BaseItem::isEnabled(); // singleton initialized
+    // Do we have the service available?
+    sp<IMediaMetricsService> svc = getService();
+    if (svc == nullptr) return false;
 
-    if (enabled == false) {
-        ALOGD_IF(DEBUG_SERVICEACCESS, "%s: disabled", __func__);
-        return nullptr;
+    // get it ready to go
+    std::shared_ptr<StructuredItem> pstruct = writeItemToStructured(*this);
+    if (pstruct == nullptr) return false;
+
+    ::android::status_t status = NO_ERROR;
+#ifdef  METRICS_IN_MODULE
+    ::ndk::ScopedAStatus AStatus;
+    AStatus = svc->submitStructuredItem(*pstruct);
+    status = AStatus.getStatus();
+#else
+    status = svc->submitStructuredItem(*pstruct).transactionError();
+#endif
+
+    if (status != NO_ERROR) {
+        ALOGW("%s: failed to record: (%d) %s", __func__,
+              status,  this->toString().c_str());
+        success = false;
     }
-    std::lock_guard _l(sServiceMutex);
-    if (sMediaMetricsService == nullptr) {
-        const char *badness = "";
-        sp<IServiceManager> sm = defaultServiceManager();
-        if (sm != nullptr) {
-            // checkService() is non-blocking, opening us for some busy-waiting
-            // if the caller keeps retrying.
-            sp<IBinder> binder = sm->checkService(String16(servicename));
-            if (binder != nullptr) {
-                sMediaMetricsService = interface_cast<media::IMediaMetricsService>(binder);
-                sNotifier = new MediaMetricsDeathNotifier();
-                binder->linkToDeath(sNotifier);
-            } else {
-                badness = "did not find service";
-            }
-        } else {
-            badness = "No Service Manager access";
-        }
-        if (sMediaMetricsService == nullptr) {
-            ALOGW_IF(DEBUG_SERVICEACCESS, "%s: unable to bind to service %s: %s",
-                    __func__, servicename, badness);
-        }
-    }
-    return sMediaMetricsService;
+    return success;
 }
 
-// static
-void BaseItem::dropInstance() {
-    std::lock_guard  _l(sServiceMutex);
-    sMediaMetricsService = nullptr;
-}
-
+// used solely by audio analytics, which saves up a bunch of records (as Buffers) and then
+// later decides which ones to submit. This allows that subsystem to continue to use
+// the space-efficient bytebuffer construct, but we then convert at submit() time so
+// it has an appropriate representation to go across the service call.
+//
+// The bytebuffer representation in the audio analytics was formerly efficient because
+// there was no necessary extra processing when those records are submitted; we have
+// to do the conversion because the interface's level of abstraction had to change for
+// the move to stable aidl.
+//
 // static
 status_t BaseItem::submitBuffer(const char *buffer, size_t size) {
     ALOGD_IF(DEBUG_API, "%s: delivering %zu bytes", __func__, size);
 
-    // Validate size
+    // Validate parameters
+    if (buffer == nullptr) return BAD_VALUE;
     if (size > std::numeric_limits<int32_t>::max()) return BAD_VALUE;
 
     // Do we have the service available?
-    sp<media::IMediaMetricsService> svc = getService();
+    sp<IMediaMetricsService> svc = getService();
     if (svc == nullptr) return NO_INIT;
 
     ::android::status_t status = NO_ERROR;
-    if constexpr (/* DISABLES CODE */ (false)) {
-        // THIS PATH IS FOR REFERENCE ONLY.
-        // It is compiled so that any changes to IMediaMetricsService::submitBuffer()
-        // will lead here.  If this code is changed, the else branch must
-        // be changed as well.
-        //
-        // Use the AIDL calling interface - this is a bit slower as a byte vector must be
-        // constructed. As the call is one-way, the only a transaction error occurs.
-        status = svc->submitBuffer({buffer, buffer + size}).transactionError();
-    } else {
-        // Use the Binder calling interface - this direct implementation avoids
-        // malloc/copy/free for the vector and reduces the overhead for logging.
-        // We based this off of the AIDL generated file:
-        // out/soong/.intermediates/frameworks/av/media/libmediametrics/
-        //  mediametricsservice-aidl-unstable-cpp-source/gen/android/media/IMediaMetricsService.cpp
-        //
-        // TODO: Create an AIDL C++ back end optimized form of vector writing.
-        ::android::Parcel _aidl_data;
-        ::android::Parcel _aidl_reply; // we don't care about this as it is one-way.
-
-        status = _aidl_data.writeInterfaceToken(svc->getInterfaceDescriptor());
-        if (status != ::android::OK) goto _aidl_error;
-
-        status = _aidl_data.writeInt32(static_cast<int32_t>(size));
-        if (status != ::android::OK) goto _aidl_error;
-
-        status = _aidl_data.write(buffer, static_cast<int32_t>(size));
-        if (status != ::android::OK) goto _aidl_error;
-
-        status = ::android::IInterface::asBinder(svc)->transact(
-                ::android::media::BnMediaMetricsService::TRANSACTION_submitBuffer,
-                _aidl_data, &_aidl_reply, ::android::IBinder::FLAG_ONEWAY);
-
-        // AIDL permits setting a default implementation for additional functionality.
-        // See go/aog/713984. This is not used here.
-        // if (status == ::android::UNKNOWN_TRANSACTION
-        //         && ::android::media::IMediaMetricsService::getDefaultImpl()) {
-        //     status = ::android::media::IMediaMetricsService::getDefaultImpl()
-        //             ->submitBuffer(immutableByteVectorFromBuffer(buffer, size))
-        //             .transactionError();
-        // }
+    mediametrics::Item *item = mediametrics::Item::create();
+    status = item->readFromByteString(buffer, size);
+    if (status == NO_ERROR) {
+        if (!item->selfrecord()) {
+            status = FAILED_TRANSACTION;
+        }
     }
+    delete item;
 
     if (status == NO_ERROR) return NO_ERROR;
 
-    _aidl_error:
     ALOGW("%s: failed(%d) to record: %zu bytes", __func__, status, size);
     return status;
 }

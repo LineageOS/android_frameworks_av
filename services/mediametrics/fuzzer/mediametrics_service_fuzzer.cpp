@@ -165,7 +165,7 @@ void MediaMetricsServiceFuzzer::invokeStartsWith() {
 
 void MediaMetricsServiceFuzzer::invokeInstantiate() {
     auto item = CreateItem();
-    mMediaMetricsService->submit(item.get());
+    mMediaMetricsService->submitInternal(item);
 }
 
 void MediaMetricsServiceFuzzer::invokePackageInstallerCheck() {
