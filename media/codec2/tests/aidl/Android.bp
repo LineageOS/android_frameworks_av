@@ -38,6 +38,7 @@ cc_test {
 
     srcs: [
         "GraphicsTracker_test.cpp",
+        "LegacyGraphicsTracker_test.cpp",
     ],
 
     shared_libs: [
