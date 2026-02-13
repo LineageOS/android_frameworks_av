@@ -351,6 +351,7 @@ cc_library {
 
     defaults: [
         "latest_android_media_audio_common_types_cpp_shared",
+        "libaudioclient_client",
     ],
 
     srcs: [
@@ -410,10 +411,8 @@ cc_library {
         "libbinder",
         "libbinder_ndk",
         //"libsonivox",
-        "framework-permission-aidl-cpp",
         "libaconfig_storage_read_api_cc",
         "libandroidicu",
-        "libaudioclient",
         "libaudiofoundation",
         "libcamera_client",
         "libcutils",

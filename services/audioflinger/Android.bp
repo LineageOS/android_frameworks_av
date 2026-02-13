@@ -154,6 +154,7 @@ cc_defaults {
         "com.android.media.audioserver-aconfig-cc",
         "effect-aidl-cpp",
         "libactivitymanager_aidl",
+        "libaudiobase",
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudioflinger_datapath",

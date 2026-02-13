@@ -32,6 +32,7 @@ cc_defaults {
         "framework-permission-aidl-cpp",
         "libPlatformProperties",
         "libactivitymanager_aidl",
+        "libaudiobase",
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
