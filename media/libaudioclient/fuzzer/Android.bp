@@ -28,6 +28,7 @@ cc_fuzz {
     name: "audioflinger_fuzzer",
     defaults: [
         "latest_android_media_audio_common_types_cpp_shared",
+        "libaudioclient_client",
     ],
     srcs: [
         "audioflinger_fuzzer.cpp",
@@ -55,13 +56,10 @@ cc_fuzz {
         "audiopolicy-types-aidl-cpp",
         "av-types-aidl-cpp",
         "capture_state_listener-aidl-cpp",
-        "framework-permission-aidl-cpp",
-        "libaudio_aidl_conversion_common_cpp",
         "libaudioclient_aidl_conversion",
         "libaudioflinger",
         "libaudiofoundation",
         "libaudiomanager",
-        "libaudiopolicy",
         "libaudioutils",
         "libbinder",
         "libdl",

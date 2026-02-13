@@ -800,8 +800,13 @@ android::status_t AudioStream::MyPlayerBase::playerSetVolume() {
         audioStream = mParent.promote();
     }
     if (audioStream) {
+        float volume;
+        {
+            std::lock_guard lg(mSettingsMutex);
+            volume = mVolumeMultiplierL;
+        }
         // No pan and only left volume is taken into account from IPLayer interface
-        audioStream->setDuckAndMuteVolume(mVolumeMultiplierL  /* mPanMultiplierL */);
+        audioStream->setDuckAndMuteVolume(volume /* mPanMultiplierL */);
     }
     return android::NO_ERROR;
 }

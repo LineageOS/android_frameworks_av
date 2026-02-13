@@ -27,34 +27,34 @@ class TrackPlayerBase : public PlayerBase
 {
 public:
     explicit TrackPlayerBase();
-    virtual ~TrackPlayerBase();
+    ~TrackPlayerBase() override;
 
     void init(const sp<AudioTrack>& pat, const sp<AudioTrack::IAudioTrackCallback>& callback,
               player_type_t playerType, audio_usage_t usage, audio_session_t sessionId);
-    virtual void destroy();
+    void destroy() override;
 
     //IPlayer implementation
-    virtual binder::Status applyVolumeShaper(
+    binder::Status applyVolumeShaper(
             const media::VolumeShaperConfiguration& configuration,
-            const media::VolumeShaperOperation& operation);
+            const media::VolumeShaperOperation& operation) override;
 
     sp<AudioTrack> getAudioTrack() { return mAudioTrack.load(); }
 
     void clearAudioTrack() { mAudioTrack.store(nullptr); }
 
-    void setPlayerVolume(float vl, float vr);
+    void setPlayerVolume(float vl, float vr) EXCLUDES(mSettingsMutex);
 
 protected:
 
     //PlayerBase virtuals
-    virtual status_t playerStart();
-    virtual status_t playerPause();
-    virtual status_t playerStop();
-    virtual status_t playerSetVolume();
+    status_t playerStart() override;
+    status_t playerPause() override;
+    status_t playerStop() override;
+    status_t playerSetVolume() override;
 
 private:
             void doDestroy();
-            status_t doSetVolume();
+    status_t doSetVolume() EXCLUDES(mSettingsMutex);
 
             class SelfAudioDeviceCallback : public AudioSystem::AudioDeviceCallback {
             public:
@@ -67,9 +67,10 @@ private:
             };
 
     // volume coming from the player volume API
-    float mPlayerVolumeL, mPlayerVolumeR;
-    sp<AudioTrack::IAudioTrackCallback> mCallbackHandle;
-    sp<SelfAudioDeviceCallback> mSelfAudioDeviceCallback;
+    float mPlayerVolumeL GUARDED_BY(mSettingsMutex);
+    float mPlayerVolumeR GUARDED_BY(mSettingsMutex);
+    sp<AudioTrack::IAudioTrackCallback> mCallbackHandle;   // set in init()
+    sp<SelfAudioDeviceCallback> mSelfAudioDeviceCallback;  // set in init() cleared in doDestroy()
     mediautils::atomic_sp<AudioTrack> mAudioTrack;
 };
 

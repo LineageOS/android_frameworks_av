@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//#define LOG_NDEBUG 0
-#define LOG_TAG "GraphicsTracker_test"
+// #define LOG_NDEBUG 0
+#define LOG_TAG "LegacyGraphicsTracker_test"
 #include <poll.h>
 #include <unistd.h>
 
@@ -22,7 +22,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
-#include <codec2/aidl/GraphicsTracker.h>
+#include <codec2/aidl/LegacyGraphicsTracker.h>
 #include <gtest/gtest.h>
 #include <gui/BufferItemConsumer.h>
 #include <gui/BufferQueue.h>
@@ -36,11 +36,11 @@
 #include <C2FenceFactory.h>
 
 #include <atomic>
-#include <memory>
 #include <iostream>
+#include <memory>
 #include <thread>
 
-using ::aidl::android::hardware::media::c2::implementation::GraphicsTracker;
+using ::aidl::android::hardware::media::c2::implementation::LegacyGraphicsTracker;
 using ::android::BufferItem;
 using ::android::BufferItemConsumer;
 using ::android::BufferQueue;
@@ -66,8 +66,8 @@ struct BqStatistics {
     void log() {
         ALOGD("Dequeued: %d, Queued: %d, Blocked: %d, "
               "Dropped: %d, Discarded %d, Released %d",
-              (int)mDequeued, (int)mQueued, (int)mBlocked,
-              (int)mDropped, (int)mDiscarded, (int)mReleased);
+              (int)mDequeued, (int)mQueued, (int)mBlocked, (int)mDropped, (int)mDiscarded,
+              (int)mReleased);
     }
 
     void clear() {
@@ -87,7 +87,7 @@ struct DummyConsumerListener : public BufferItemConsumer::FrameAvailableListener
 struct TestConsumerListener : public BufferItemConsumer::FrameAvailableListener {
     TestConsumerListener(const sp<BufferItemConsumer>& consumer) : mConsumer(consumer) {}
     void onFrameAvailable(const BufferItem&) override {
-        constexpr static int kRenderDelayUs = 1000000/30; // 30fps
+        constexpr static int kRenderDelayUs = 1000000 / 30;  // 30fps
         BufferItem buffer;
         // consume buffer
         sp<BufferItemConsumer> consumer = mConsumer.promote();
@@ -101,10 +101,9 @@ struct TestConsumerListener : public BufferItemConsumer::FrameAvailableListener 
 };
 
 struct TestProducerListener : public android::BnProducerListener {
-    TestProducerListener(std::shared_ptr<GraphicsTracker> tracker,
-                         std::shared_ptr<BqStatistics> &stat,
-                         uint32_t generation) : BnProducerListener(),
-        mTracker(tracker), mStat(stat), mGeneration(generation) {}
+    TestProducerListener(std::shared_ptr<LegacyGraphicsTracker> tracker,
+                         std::shared_ptr<BqStatistics>& stat, uint32_t generation)
+        : BnProducerListener(), mTracker(tracker), mStat(stat), mGeneration(generation) {}
     virtual void onBufferReleased() override {
         auto tracker = mTracker.lock();
         if (tracker) {
@@ -115,18 +114,17 @@ struct TestProducerListener : public android::BnProducerListener {
     virtual bool needsReleaseNotify() override { return true; }
     virtual void onBuffersDiscarded(const std::vector<int32_t>&) override {}
 
-    std::weak_ptr<GraphicsTracker> mTracker;
+    std::weak_ptr<LegacyGraphicsTracker> mTracker;
     std::shared_ptr<BqStatistics> mStat;
     uint32_t mGeneration;
 };
 
 struct Frame {
-    AHardwareBuffer *buffer_;
+    AHardwareBuffer* buffer_;
     sp<Fence> fence_;
 
     Frame() : buffer_{nullptr}, fence_{nullptr} {}
-    Frame(AHardwareBuffer *buffer, sp<Fence> fence)
-            : buffer_(buffer), fence_(fence) {}
+    Frame(AHardwareBuffer* buffer, sp<Fence> fence) : buffer_(buffer), fence_(fence) {}
     ~Frame() {
         if (buffer_) {
             AHardwareBuffer_release(buffer_);
@@ -143,7 +141,7 @@ struct FrameQueue {
 
     FrameQueue() : mStopped{false}, mDrain{false} {}
 
-    bool queueItem(AHardwareBuffer *buffer, sp<Fence> fence) {
+    bool queueItem(AHardwareBuffer* buffer, sp<Fence> fence) {
         std::shared_ptr<Frame> frame = std::make_shared<Frame>(buffer, fence);
         if (mStopped) {
             return false;
@@ -174,8 +172,8 @@ struct FrameQueue {
         }
     }
 
-    bool waitItem(std::shared_ptr<Frame> *frame) {
-        while(true) {
+    bool waitItem(std::shared_ptr<Frame>* frame) {
+        while (true) {
             std::unique_lock<std::mutex> l(mMutex);
             if (!mDrain && mStopped) {
                 // stop without consuming the queue.
@@ -194,13 +192,13 @@ struct FrameQueue {
     }
 };
 
-} // namespace anonymous
+}  // namespace
 
-class GraphicsTrackerTest : public ::testing::Test {
-public:
+class LegacyGraphicsTrackerTest : public ::testing::Test {
+  public:
     const uint64_t kTestUsageFlag = GRALLOC_USAGE_SW_WRITE_OFTEN;
 
-    void queueBuffer(FrameQueue *queue) {
+    void queueBuffer(FrameQueue* queue) {
         while (true) {
             std::shared_ptr<Frame> frame;
             if (!queue->waitItem(&frame)) {
@@ -208,8 +206,7 @@ public:
             }
             uint64_t bid;
             if (__builtin_available(android __ANDROID_API_T__, *)) {
-                if (AHardwareBuffer_getId(frame->buffer_, &bid) !=
-                        android::NO_ERROR) {
+                if (AHardwareBuffer_getId(frame->buffer_, &bid) != android::NO_ERROR) {
                     break;
                 }
             } else {
@@ -230,13 +227,10 @@ public:
                 continue;
             }
             IGraphicBufferProducer::QueueBufferInput input(
-                    0, false,
-                    HAL_DATASPACE_UNKNOWN, android::Rect(0, 0, 1, 1),
+                    0, false, HAL_DATASPACE_UNKNOWN, android::Rect(0, 0, 1, 1),
                     NATIVE_WINDOW_SCALING_MODE_FREEZE, 0, Fence::NO_FENCE);
             IGraphicBufferProducer::QueueBufferOutput output{};
-            c2_status_t res = mTracker->render(
-                    blk->share(C2Rect(1, 1), C2Fence()),
-                    input, &output);
+            c2_status_t res = mTracker->render(blk->share(C2Rect(1, 1), C2Fence()), input, &output);
             if (res != C2_OK) {
                 mTracker->deallocate(bid, Fence::NO_FENCE);
                 mBqStat->mDiscarded++;
@@ -254,37 +248,37 @@ public:
         mTracker->stop();
     }
 
-protected:
-  bool init(int maxDequeueCount, bool controlledByApp = true) {
-      mTracker = GraphicsTracker::CreateGraphicsTracker(maxDequeueCount);
-      if (!mTracker) {
-          return false;
-      }
-      sp<Surface> surface;
-      std::tie(mConsumer, surface) = BufferItemConsumer::create(
-              kTestUsageFlag, BufferItemConsumer::DEFAULT_MAX_BUFFERS, controlledByApp);
-      mProducer = surface->getIGraphicBufferProducer();
+  protected:
+    bool init(int maxDequeueCount, bool controlledByApp = true) {
+        mTracker = LegacyGraphicsTracker::CreateLegacyGraphicsTracker(maxDequeueCount);
+        if (!mTracker) {
+            return false;
+        }
+        sp<Surface> surface;
+        std::tie(mConsumer, surface) = BufferItemConsumer::create(
+                kTestUsageFlag, BufferItemConsumer::DEFAULT_MAX_BUFFERS, controlledByApp);
+        mProducer = surface->getIGraphicBufferProducer();
 
-      return true;
-  }
-  bool configure(sp<IProducerListener> producerListener,
-                 sp<BufferItemConsumer::FrameAvailableListener> consumerListener,
-                 int maxAcquiredCount = 1) {
-      mConsumerListener = consumerListener;
-      mConsumer->setFrameAvailableListener(mConsumerListener);
-      if (mConsumer->setMaxAcquiredBufferCount(maxAcquiredCount) != ::android::NO_ERROR) {
-          return false;
-      }
-      IGraphicBufferProducer::QueueBufferOutput qbo{};
-      if (mProducer->connect(producerListener, NATIVE_WINDOW_API_MEDIA, true, &qbo) !=
-          ::android::NO_ERROR) {
-          return false;
-      }
-      if (mProducer->setDequeueTimeout(0) != ::android::NO_ERROR) {
-          return false;
-      }
-      return true;
-  }
+        return true;
+    }
+    bool configure(sp<IProducerListener> producerListener,
+                   sp<BufferItemConsumer::FrameAvailableListener> consumerListener,
+                   int maxAcquiredCount = 1) {
+        mConsumerListener = consumerListener;
+        mConsumer->setFrameAvailableListener(mConsumerListener);
+        if (mConsumer->setMaxAcquiredBufferCount(maxAcquiredCount) != ::android::NO_ERROR) {
+            return false;
+        }
+        IGraphicBufferProducer::QueueBufferOutput qbo{};
+        if (mProducer->connect(producerListener, NATIVE_WINDOW_API_MEDIA, true, &qbo) !=
+            ::android::NO_ERROR) {
+            return false;
+        }
+        if (mProducer->setDequeueTimeout(0) != ::android::NO_ERROR) {
+            return false;
+        }
+        return true;
+    }
 
     virtual void TearDown() override {
         mBqStat->log();
@@ -301,16 +295,15 @@ protected:
         mConsumer.clear();
     }
 
-protected:
+  protected:
     std::shared_ptr<BqStatistics> mBqStat = std::make_shared<BqStatistics>();
     sp<IGraphicBufferProducer> mProducer;
     sp<BufferItemConsumer> mConsumer;
     sp<BufferItemConsumer::FrameAvailableListener> mConsumerListener;
-    std::shared_ptr<GraphicsTracker> mTracker;
+    std::shared_ptr<LegacyGraphicsTracker> mTracker;
 };
 
-
-TEST_F(GraphicsTrackerTest, AllocateAndBlockedTest) {
+TEST_F(LegacyGraphicsTrackerTest, AllocateAndBlockedTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
 
@@ -323,7 +316,7 @@ TEST_F(GraphicsTrackerTest, AllocateAndBlockedTest) {
     ASSERT_EQ(C2_OK, ret);
     ASSERT_EQ(maxDequeueCount, mTracker->getCurDequeueable());
 
-    AHardwareBuffer *buf;
+    AHardwareBuffer* buf;
     sp<Fence> fence;
     uint64_t bid;
 
@@ -350,7 +343,7 @@ TEST_F(GraphicsTrackerTest, AllocateAndBlockedTest) {
     ASSERT_EQ(0, mTracker->getCurDequeueable());
 }
 
-TEST_F(GraphicsTrackerTest, AllocateAndDeallocateTest) {
+TEST_F(LegacyGraphicsTrackerTest, AllocateAndDeallocateTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
 
@@ -363,7 +356,7 @@ TEST_F(GraphicsTrackerTest, AllocateAndDeallocateTest) {
     ASSERT_EQ(C2_OK, ret);
 
     ASSERT_EQ(maxDequeueCount, mTracker->getCurDequeueable());
-    AHardwareBuffer *buf;
+    AHardwareBuffer* buf;
     sp<Fence> fence;
     uint64_t bid;
     std::vector<uint64_t> bids;
@@ -393,7 +386,7 @@ TEST_F(GraphicsTrackerTest, AllocateAndDeallocateTest) {
     }
 }
 
-TEST_F(GraphicsTrackerTest, DropAndReleaseTest) {
+TEST_F(LegacyGraphicsTrackerTest, DropAndReleaseTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
 
@@ -408,7 +401,7 @@ TEST_F(GraphicsTrackerTest, DropAndReleaseTest) {
     ASSERT_EQ(maxDequeueCount, mTracker->getCurDequeueable());
 
     FrameQueue frameQueue;
-    std::thread queueThread(&GraphicsTrackerTest::queueBuffer, this, &frameQueue);
+    std::thread queueThread(&LegacyGraphicsTrackerTest::queueBuffer, this, &frameQueue);
     AHardwareBuffer *buf1, *buf2;
     sp<Fence> fence1, fence2;
 
@@ -446,7 +439,7 @@ TEST_F(GraphicsTrackerTest, DropAndReleaseTest) {
     ASSERT_EQ(1, mBqStat->mDropped);
 }
 
-TEST_F(GraphicsTrackerTest, RenderTest) {
+TEST_F(LegacyGraphicsTrackerTest, RenderTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
     const int maxNumAlloc = 20;
@@ -464,14 +457,13 @@ TEST_F(GraphicsTrackerTest, RenderTest) {
     ASSERT_EQ(C2_OK, mTracker->getWaitableFd(&waitFd));
     C2Fence waitFence = _C2FenceFactory::CreatePipeFence(waitFd);
 
-
     FrameQueue frameQueue;
-    std::thread queueThread(&GraphicsTrackerTest::queueBuffer, this, &frameQueue);
+    std::thread queueThread(&LegacyGraphicsTrackerTest::queueBuffer, this, &frameQueue);
 
     int numAlloc = 0;
 
     while (numAlloc < maxNumAlloc) {
-        AHardwareBuffer *buf;
+        AHardwareBuffer* buf;
         sp<Fence> fence;
         c2_status_t ret = mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence);
         if (ret == C2_BLOCKING) {
@@ -508,7 +500,7 @@ TEST_F(GraphicsTrackerTest, RenderTest) {
     ASSERT_EQ(mBqStat->mDequeued, mBqStat->mReleased + mBqStat->mDropped);
 }
 
-TEST_F(GraphicsTrackerTest, StopAndWaitTest) {
+TEST_F(LegacyGraphicsTrackerTest, StopAndWaitTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 2;
 
@@ -539,7 +531,7 @@ TEST_F(GraphicsTrackerTest, StopAndWaitTest) {
     ASSERT_EQ(0, mTracker->getCurDequeueable());
     ASSERT_EQ(C2_TIMED_OUT, waitFence.wait(3000000000));
 
-    std::thread stopThread(&GraphicsTrackerTest::stopTrackerAfterUs, this, 500000);
+    std::thread stopThread(&LegacyGraphicsTrackerTest::stopTrackerAfterUs, this, 500000);
     ASSERT_EQ(C2_BAD_STATE, waitFence.wait(3000000000));
 
     if (stopThread.joinable()) {
@@ -547,7 +539,7 @@ TEST_F(GraphicsTrackerTest, StopAndWaitTest) {
     }
 }
 
-TEST_F(GraphicsTrackerTest, SurfaceChangeTest) {
+TEST_F(LegacyGraphicsTrackerTest, SurfaceChangeTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
 
@@ -569,24 +561,23 @@ TEST_F(GraphicsTrackerTest, SurfaceChangeTest) {
     ASSERT_EQ(C2_OK, mTracker->getWaitableFd(&waitFd));
     C2Fence waitFence = _C2FenceFactory::CreatePipeFence(waitFd);
 
-    AHardwareBuffer *bufs[maxNumAlloc];
+    AHardwareBuffer* bufs[maxNumAlloc];
     sp<Fence> fences[maxNumAlloc];
 
     FrameQueue frameQueue;
-    std::thread queueThread(&GraphicsTrackerTest::queueBuffer, this, &frameQueue);
+    std::thread queueThread(&LegacyGraphicsTrackerTest::queueBuffer, this, &frameQueue);
     int numAlloc = 0;
 
     for (int i = 0; i < firstPassRender; ++i) {
-        ASSERT_EQ(C2_OK, mTracker->allocate(
-                0, 0, 0, kTestUsageFlag, &bufs[i], &fences[i]));
+        ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &bufs[i], &fences[i]));
         mBqStat->mDequeued++;
         numAlloc++;
         ASSERT_EQ(true, frameQueue.queueItem(bufs[i], fences[i]));
     }
 
     while (numAlloc < firstPassAlloc) {
-        c2_status_t ret = mTracker->allocate(
-                0, 0, 0, kTestUsageFlag, &bufs[numAlloc], &fences[numAlloc]);
+        c2_status_t ret =
+                mTracker->allocate(0, 0, 0, kTestUsageFlag, &bufs[numAlloc], &fences[numAlloc]);
         if (ret == C2_BLOCKING) {
             mBqStat->mBlocked++;
             c2_status_t waitRes = waitFence.wait(3000000000);
@@ -628,12 +619,12 @@ TEST_F(GraphicsTrackerTest, SurfaceChangeTest) {
     oldProducer.clear();
     oldConsumer.clear();
 
-    for (int i = firstPassRender ; i < firstPassAlloc; ++i) {
+    for (int i = firstPassRender; i < firstPassAlloc; ++i) {
         ASSERT_EQ(true, frameQueue.queueItem(bufs[i], fences[i]));
     }
 
     while (numAlloc < maxNumAlloc) {
-        AHardwareBuffer *buf;
+        AHardwareBuffer* buf;
         sp<Fence> fence;
         c2_status_t ret = mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence);
         if (ret == C2_BLOCKING) {
@@ -673,20 +664,18 @@ TEST_F(GraphicsTrackerTest, SurfaceChangeTest) {
     ASSERT_EQ(maxDequeueCount, mTracker->getCurDequeueable());
 
     for (int i = 0; i < maxDequeueCount; ++i) {
-        AHardwareBuffer *buf;
+        AHardwareBuffer* buf;
         sp<Fence> fence;
 
-        ASSERT_EQ(C2_OK, mTracker->allocate(
-                0, 0, 0, kTestUsageFlag, &buf, &fence));
+        ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
         AHardwareBuffer_release(buf);
         mBqStat->mDequeued++;
         numAlloc++;
     }
-    ASSERT_EQ(C2_BLOCKING, mTracker->allocate(
-            0, 0, 0, kTestUsageFlag, &bufs[0], &fences[0]));
+    ASSERT_EQ(C2_BLOCKING, mTracker->allocate(0, 0, 0, kTestUsageFlag, &bufs[0], &fences[0]));
 }
 
-TEST_F(GraphicsTrackerTest, maxDequeueIncreaseTest) {
+TEST_F(LegacyGraphicsTrackerTest, maxDequeueIncreaseTest) {
     uint32_t generation = 1;
     int maxDequeueCount = 10;
     int dequeueIncrease = 4;
@@ -704,13 +693,13 @@ TEST_F(GraphicsTrackerTest, maxDequeueIncreaseTest) {
     ASSERT_EQ(C2_OK, mTracker->getWaitableFd(&waitFd));
     C2Fence waitFence = _C2FenceFactory::CreatePipeFence(waitFd);
 
-    AHardwareBuffer *buf;
+    AHardwareBuffer* buf;
     sp<Fence> fence;
     uint64_t bids[maxDequeueCount];
     if (__builtin_available(android __ANDROID_API_T__, *)) {
         for (int i = 0; i < maxDequeueCount; ++i) {
             ASSERT_EQ(C2_OK, waitFence.wait(1000000000));
-            ASSERT_EQ(C2_OK, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+            ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
             ASSERT_EQ(OK, AHardwareBuffer_getId(buf, &bids[i]));
             AHardwareBuffer_release(buf);
             mBqStat->mDequeued++;
@@ -720,7 +709,7 @@ TEST_F(GraphicsTrackerTest, maxDequeueIncreaseTest) {
         GTEST_SKIP();
     }
     ASSERT_EQ(C2_TIMED_OUT, waitFence.wait(1000000000));
-    ASSERT_EQ(C2_BLOCKING, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+    ASSERT_EQ(C2_BLOCKING, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
 
     ASSERT_EQ(C2_OK, mTracker->deallocate(bids[0], Fence::NO_FENCE));
     mBqStat->mDiscarded++;
@@ -729,13 +718,13 @@ TEST_F(GraphicsTrackerTest, maxDequeueIncreaseTest) {
     ASSERT_EQ(C2_OK, mTracker->configureMaxDequeueCount(maxDequeueCount));
     for (int i = 0; i < dequeueIncrease + 1; ++i) {
         ASSERT_EQ(C2_OK, waitFence.wait(1000000000));
-        ASSERT_EQ(C2_OK, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+        ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
         AHardwareBuffer_release(buf);
         mBqStat->mDequeued++;
         numAlloc++;
     }
     ASSERT_EQ(C2_TIMED_OUT, waitFence.wait(1000000000));
-    ASSERT_EQ(C2_BLOCKING, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+    ASSERT_EQ(C2_BLOCKING, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
 
     ASSERT_EQ(C2_OK, mTracker->deallocate(bids[1], Fence::NO_FENCE));
     mBqStat->mDiscarded++;
@@ -744,16 +733,16 @@ TEST_F(GraphicsTrackerTest, maxDequeueIncreaseTest) {
     ASSERT_EQ(C2_OK, mTracker->configureMaxDequeueCount(maxDequeueCount));
     for (int i = 0; i < dequeueIncrease + 1; ++i) {
         ASSERT_EQ(C2_OK, waitFence.wait(1000000000));
-        ASSERT_EQ(C2_OK, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+        ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
         AHardwareBuffer_release(buf);
         mBqStat->mDequeued++;
         numAlloc++;
     }
     ASSERT_EQ(C2_TIMED_OUT, waitFence.wait(1000000000));
-    ASSERT_EQ(C2_BLOCKING, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+    ASSERT_EQ(C2_BLOCKING, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
 }
 
-TEST_F(GraphicsTrackerTest, maxDequeueDecreaseTest) {
+TEST_F(LegacyGraphicsTrackerTest, maxDequeueDecreaseTest) {
     uint32_t generation = 1;
     int maxDequeueCount = 12;
     int dequeueDecrease = 4;
@@ -771,13 +760,13 @@ TEST_F(GraphicsTrackerTest, maxDequeueDecreaseTest) {
     ASSERT_EQ(C2_OK, mTracker->getWaitableFd(&waitFd));
     C2Fence waitFence = _C2FenceFactory::CreatePipeFence(waitFd);
 
-    AHardwareBuffer *buf;
+    AHardwareBuffer* buf;
     sp<Fence> fence;
     uint64_t bids[maxDequeueCount];
     if (__builtin_available(android __ANDROID_API_T__, *)) {
         for (int i = 0; i < maxDequeueCount; ++i) {
             ASSERT_EQ(C2_OK, waitFence.wait(1000000000));
-            ASSERT_EQ(C2_OK, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+            ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
             ASSERT_EQ(OK, AHardwareBuffer_getId(buf, &bids[i]));
             AHardwareBuffer_release(buf);
             mBqStat->mDequeued++;
@@ -787,19 +776,19 @@ TEST_F(GraphicsTrackerTest, maxDequeueDecreaseTest) {
         GTEST_SKIP();
     }
     ASSERT_EQ(C2_TIMED_OUT, waitFence.wait(1000000000));
-    ASSERT_EQ(C2_BLOCKING, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+    ASSERT_EQ(C2_BLOCKING, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
 
     int discardIdx = 0;
     maxDequeueCount -= dequeueDecrease;
     ASSERT_EQ(C2_OK, mTracker->configureMaxDequeueCount(maxDequeueCount));
     for (int i = 0; i < dequeueDecrease + 1; ++i) {
         ASSERT_EQ(C2_TIMED_OUT, waitFence.wait(1000000000));
-        ASSERT_EQ(C2_BLOCKING, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+        ASSERT_EQ(C2_BLOCKING, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
         ASSERT_EQ(C2_OK, mTracker->deallocate(bids[discardIdx++], Fence::NO_FENCE));
         mBqStat->mDiscarded++;
     }
     ASSERT_EQ(C2_OK, waitFence.wait(1000000000));
-    ASSERT_EQ(C2_OK, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+    ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
     mBqStat->mDequeued++;
 
     ASSERT_EQ(C2_OK, mTracker->deallocate(bids[discardIdx++], Fence::NO_FENCE));
@@ -811,18 +800,18 @@ TEST_F(GraphicsTrackerTest, maxDequeueDecreaseTest) {
     ASSERT_EQ(C2_OK, mTracker->configureMaxDequeueCount(maxDequeueCount));
     for (int i = 0; i < dequeueDecrease - 1; ++i) {
         ASSERT_EQ(C2_TIMED_OUT, waitFence.wait(1000000000));
-        ASSERT_EQ(C2_BLOCKING, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+        ASSERT_EQ(C2_BLOCKING, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
         ASSERT_EQ(C2_OK, mTracker->deallocate(bids[discardIdx++], Fence::NO_FENCE));
         mBqStat->mDiscarded++;
     }
     ASSERT_EQ(C2_OK, waitFence.wait(1000000000));
-    ASSERT_EQ(C2_OK, mTracker->allocate( 0, 0, 0, kTestUsageFlag, &buf, &fence));
+    ASSERT_EQ(C2_OK, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
     mBqStat->mDequeued++;
 }
 
-TEST_F(GraphicsTrackerTest, DirectAllocationTest) {
+TEST_F(LegacyGraphicsTrackerTest, DirectAllocationTest) {
     int maxDequeueCount = 10;
-    mTracker = GraphicsTracker::CreateGraphicsTracker(maxDequeueCount);
+    mTracker = LegacyGraphicsTracker::CreateLegacyGraphicsTracker(maxDequeueCount);
     ASSERT_NE(nullptr, mTracker);
 
     // Configure with null IGBP for direct allocation
@@ -858,7 +847,7 @@ TEST_F(GraphicsTrackerTest, DirectAllocationTest) {
     }
 }
 
-TEST_F(GraphicsTrackerTest, ConfigureSameGenerationTest) {
+TEST_F(LegacyGraphicsTrackerTest, ConfigureSameGenerationTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
     ASSERT_TRUE(init(maxDequeueCount));
@@ -870,7 +859,7 @@ TEST_F(GraphicsTrackerTest, ConfigureSameGenerationTest) {
     ASSERT_EQ(C2_BAD_VALUE, mTracker->configureGraphics(mProducer, generation));
 }
 
-TEST_F(GraphicsTrackerTest, MaxDequeueBoundsTest) {
+TEST_F(LegacyGraphicsTrackerTest, MaxDequeueBoundsTest) {
     const int maxDequeueCount = 10;
     ASSERT_TRUE(init(maxDequeueCount));
 
@@ -880,7 +869,7 @@ TEST_F(GraphicsTrackerTest, MaxDequeueBoundsTest) {
     ASSERT_EQ(C2_OK, mTracker->configureMaxDequeueCount(5));                         // Valid
 }
 
-TEST_F(GraphicsTrackerTest, DeallocateInvalidIdTest) {
+TEST_F(LegacyGraphicsTrackerTest, DeallocateInvalidIdTest) {
     const int maxDequeueCount = 10;
     ASSERT_TRUE(init(maxDequeueCount));
     ASSERT_TRUE(
@@ -891,7 +880,7 @@ TEST_F(GraphicsTrackerTest, DeallocateInvalidIdTest) {
     ASSERT_EQ(C2_NOT_FOUND, mTracker->deallocate(invalidId, Fence::NO_FENCE));
 }
 
-TEST_F(GraphicsTrackerTest, DoubleDeallocateTest) {
+TEST_F(LegacyGraphicsTrackerTest, DoubleDeallocateTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
     ASSERT_TRUE(init(maxDequeueCount));
@@ -914,7 +903,7 @@ TEST_F(GraphicsTrackerTest, DoubleDeallocateTest) {
     }
 }
 
-TEST_F(GraphicsTrackerTest, OnRequestStopTest) {
+TEST_F(LegacyGraphicsTrackerTest, OnRequestStopTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
     ASSERT_TRUE(init(maxDequeueCount));
@@ -935,7 +924,7 @@ TEST_F(GraphicsTrackerTest, OnRequestStopTest) {
     }
 }
 
-TEST_F(GraphicsTrackerTest, WaitableFdSignalingTest) {
+TEST_F(LegacyGraphicsTrackerTest, WaitableFdSignalingTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 2;  // Small count to easily exhaust
     ASSERT_TRUE(init(maxDequeueCount));
@@ -978,9 +967,9 @@ TEST_F(GraphicsTrackerTest, WaitableFdSignalingTest) {
     close(pipeFd);
 }
 
-TEST_F(GraphicsTrackerTest, StopIdempotencyTest) {
+TEST_F(LegacyGraphicsTrackerTest, StopIdempotencyTest) {
     int maxDequeueCount = 10;
-    mTracker = GraphicsTracker::CreateGraphicsTracker(maxDequeueCount);
+    mTracker = LegacyGraphicsTracker::CreateLegacyGraphicsTracker(maxDequeueCount);
     ASSERT_NE(nullptr, mTracker);
 
     mTracker->stop();
@@ -992,7 +981,7 @@ TEST_F(GraphicsTrackerTest, StopIdempotencyTest) {
     ASSERT_EQ(C2_BAD_STATE, mTracker->allocate(0, 0, 0, kTestUsageFlag, &buf, &fence));
 }
 
-TEST_F(GraphicsTrackerTest, PollForRenderedFramesTest) {
+TEST_F(LegacyGraphicsTrackerTest, PollForRenderedFramesTest) {
     uint32_t generation = 1;
     const int maxDequeueCount = 10;
     ASSERT_TRUE(init(maxDequeueCount));

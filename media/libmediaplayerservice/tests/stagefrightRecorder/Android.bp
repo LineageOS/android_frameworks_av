@@ -46,7 +46,6 @@ cc_test {
         "libaconfig_storage_read_api_cc",
         "libbase",
         "libandroid_net",
-        "libaudioclient",
         "libbinder",
         "libcamera_client",
         "libcodec2_client",

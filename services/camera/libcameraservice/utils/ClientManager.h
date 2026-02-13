@@ -561,7 +561,7 @@ ClientManager<KEY, VALUE, LISTENER>::wouldEvictLocked(
         bool curSharedMode = i->getSharedMode();
         bool conflicting;
         if (flags::camera_multi_client()) {
-            conflicting = (((!sharedMode || !curSharedMode) && curKey == key)
+            conflicting = (((!sharedMode || !curSharedMode || (owner == curOwner)) && curKey == key)
                     || i->isConflicting(key) || client->isConflicting(curKey));
         } else {
             conflicting = (curKey == key || i->isConflicting(key) ||

@@ -36,8 +36,8 @@ cc_defaults {
     ],
     shared_libs: [
         "camera_platform_flags_c_lib",
-        "framework-permission-aidl-cpp",
         "libaconfig_storage_read_api_cc",
+        "libaudiobase",
         "libbinder",
         "libbinder_ndk",
         "libcutils",
