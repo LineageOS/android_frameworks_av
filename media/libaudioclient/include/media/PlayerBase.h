@@ -69,6 +69,9 @@ protected:
     virtual status_t playerStop()  { return NO_ERROR; }
     virtual status_t playerSetVolume()  { return NO_ERROR; }
 
+    // native interface to AudioService
+    const sp<IAudioManager> mAudioManager;
+
     // mutex for IPlayer volume and pan, and player-specific volume
     std::mutex mSettingsMutex;
 
@@ -86,9 +89,6 @@ private:
     void servicePlayerEvent(player_state_t event, const DeviceIdVector& deviceIds)
             EXCLUDES(mDeviceIdMutex, mPlayerStateMutex);
             void serviceReleasePlayer();
-
-    // native interface to AudioService
-    android::sp<android::IAudioManager> mAudioManager;
 
     // Mutex for state reporting
     std::mutex mPlayerStateMutex;

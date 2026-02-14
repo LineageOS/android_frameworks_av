@@ -47,6 +47,9 @@ static std::vector<EncodeTestParameters> gEncodeTestParameters;
 using EncodeResolutionTestParameters = std::tuple<std::string, std::string, int32_t, int32_t>;
 static std::vector<EncodeResolutionTestParameters> gEncodeResolutionTestParameters;
 
+using EncodeTemporalLayerTestParameters = std::tuple<std::string, std::string, int32_t>;
+static std::vector<EncodeTemporalLayerTestParameters> gEncodeTemporalLayerTestParameters;
+
 namespace {
 
 class Codec2VideoEncHidlTestBase : public ::testing::Test {
@@ -100,6 +103,8 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
         mMaxHeight = 0;
         mMinWidth = INT32_MAX;
         mMinHeight = INT32_MAX;
+        mNumTemporalLayers = 0;
+        mTemporalLayerIndexCycleIndex = 0;
 
         ASSERT_EQ(getMaxMinResolutionSupported(), C2_OK);
         mWidth = std::max(std::min(mWidth, mMaxWidth), mMinWidth);
@@ -122,6 +127,36 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
             mComponent->release();
             mComponent = nullptr;
         }
+    }
+
+    bool isKeyFrame(const C2Buffer& buffer) const {
+        std::shared_ptr<const C2StreamPictureTypeMaskInfo::output> pictureTypeMaskInfo =
+                std::static_pointer_cast<const C2StreamPictureTypeMaskInfo::output>(
+                        buffer.getInfo(C2StreamPictureTypeMaskInfo::output::PARAM_TYPE));
+        return pictureTypeMaskInfo && (pictureTypeMaskInfo->value & C2Config::SYNC_FRAME);
+    }
+    void checkTemporalLayerIndex(const C2Buffer& buffer) {
+        ASSERT_TRUE(mNumTemporalLayers > 1);
+        ASSERT_TRUE(mNumTemporalLayers <= 3);
+        std::shared_ptr<const C2StreamLayerIndexInfo::output> layerIndexInfo =
+                std::static_pointer_cast<const C2StreamLayerIndexInfo::output>(
+                        buffer.getInfo(C2StreamLayerIndexInfo::output::PARAM_TYPE));
+        EXPECT_TRUE(layerIndexInfo);
+
+        if (isKeyFrame(buffer)) {
+            ALOGV("reset expected temporal layer index to 0 in keyframe");
+            mTemporalLayerIndexCycleIndex = 0;
+        }
+        constexpr size_t kTemporalLayerCycle = 4;
+        constexpr int32_t kExpectedTemporalIndices[][kTemporalLayerCycle] = {
+                {0, 1, 0, 1},  // for two temporal layers.
+                {0, 2, 1, 2},  // for three temporal layers.
+        };
+        const int32_t expectedTemporalIndex =
+                kExpectedTemporalIndices[mNumTemporalLayers - 2]
+                                        [mTemporalLayerIndexCycleIndex % kTemporalLayerCycle];
+        mTemporalLayerIndexCycleIndex++;
+        EXPECT_EQ(layerIndexInfo->value, expectedTemporalIndex);
     }
 
     // Get the test parameters from GetParam call.
@@ -180,6 +215,9 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
                                            .map()
                                            .get()
                                            .capacity();
+                    if (mNumTemporalLayers > 1) {
+                        checkTemporalLayerIndex(*work->worklets.front()->output.buffers[0]);
+                    }
                 }
                 workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
                          mEos, mCsd, mFramesReceived);
@@ -205,6 +243,8 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
     int32_t mMaxHeight;
     int32_t mMinWidth;
     int32_t mMinHeight;
+    int32_t mNumTemporalLayers;
+    int32_t mTemporalLayerIndexCycleIndex;
 
     std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
@@ -848,6 +888,176 @@ TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
     ASSERT_EQ(mComponent->reset(), C2_OK);
 }
 
+// TODO(b/444290591): Add test case to update for runtime adjustment of bitrate in temporal layers.
+class Codec2VideoEncTemporalLayerTest
+    : public Codec2VideoEncHidlTestBase,
+      public ::testing::WithParamInterface<EncodeTemporalLayerTestParameters> {
+    void getParams() {
+        mInstanceName = std::get<0>(GetParam());
+        mComponentName = std::get<1>(GetParam());
+    }
+
+  protected:
+    void setTemporalLayers(int numTemporalLayers, bool configureBitrateRatios) {
+        std::shared_ptr<C2StreamTemporalLayeringTuning::output> temporalLayering =
+                C2StreamTemporalLayeringTuning::output::AllocShared(
+                        /*flexCount=*/0u, /*stream id=*/0u, /*layerCount=*/numTemporalLayers,
+                        /*bLayerCount=*/0u);
+        std::shared_ptr<C2StreamLayeringSchemeTuning::output> layeringScheme =
+                std::make_shared<C2StreamLayeringSchemeTuning::output>(
+                        /*stream id=*/0u, C2Config::LS_WEBRTC);
+
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        c2_status_t status = mComponent->config({temporalLayering.get(), layeringScheme.get()},
+                                                C2_DONT_BLOCK, &failures);
+        if (status != C2_OK || failures.size() != 0) {
+            GTEST_SKIP() << "Failed to configure " << mComponentName << " with "
+                         << numTemporalLayers << " temporal layers and webrtc layering scheme";
+        }
+
+        std::vector<std::unique_ptr<C2Param>> params;
+        status = mComponent->query({},
+                                   {C2StreamLayeringSchemeTuning::output::PARAM_TYPE,
+                                    C2StreamTemporalLayeringTuning::output::PARAM_TYPE},
+                                   C2_DONT_BLOCK, &params);
+        ASSERT_EQ(status, C2_OK) << "Failed to query layering settings " << mComponentName;
+        ASSERT_GE(params.size(), 1u) << "Query returned insufficient params for " << mComponentName;
+
+        C2StreamLayeringSchemeTuning::output* scheme = nullptr;
+        C2StreamTemporalLayeringTuning::output* layering = nullptr;
+
+        for (const auto& param : params) {
+            if (!param) continue;
+            if (param->type() == C2StreamLayeringSchemeTuning::output::PARAM_TYPE) {
+                scheme = C2StreamLayeringSchemeTuning::output::From(param.get());
+            } else if (param->type() == C2StreamTemporalLayeringTuning::output::PARAM_TYPE) {
+                layering = C2StreamTemporalLayeringTuning::output::From(param.get());
+            }
+        }
+
+        ASSERT_NE(scheme, nullptr) << "Failed to query layering scheme for " << mComponentName;
+        ASSERT_EQ(scheme->value, C2Config::LS_WEBRTC)
+                << "Layering scheme mismatch: expected LS_WEBRTC (" << C2Config::LS_WEBRTC
+                << "), got " << scheme->value << " for " << mComponentName;
+
+        ASSERT_NE(layering, nullptr) << "Failed to query temporal layering for " << mComponentName;
+        ASSERT_EQ(layering->m.layerCount, numTemporalLayers)
+                << "Temporal layer count mismatch: expected " << numTemporalLayers << ", got "
+                << layering->m.layerCount << " for " << mComponentName;
+        ASSERT_EQ(layering->m.bLayerCount, 0u)
+                << "B-frame layer count mismatch: expected 0, got " << layering->m.bLayerCount
+                << " for " << mComponentName;
+
+        mNumTemporalLayers = numTemporalLayers;
+
+        if (!configureBitrateRatios) {
+            return;
+        }
+
+        temporalLayering = C2StreamTemporalLayeringTuning::output::AllocShared(
+                /*flexCount=*/numTemporalLayers - 1, /*stream id=*/0u,
+                /*layerCount=*/numTemporalLayers, /*bLayerCount=*/0u);
+        std::vector<float> bitrateRatios;
+        switch (numTemporalLayers) {
+            case 2:
+                bitrateRatios = {0.5};
+                break;
+            case 3:
+                bitrateRatios = {0.4, 0.7};
+                break;
+            default:
+                LOG(FATAL) << "Unsupported temporal layers: " << numTemporalLayers;
+                return;
+        }
+        for (size_t i = 0; i < numTemporalLayers - 1; ++i) {
+            temporalLayering->m.bitrateRatios[i] = bitrateRatios[i];
+        }
+
+        status = mComponent->config({temporalLayering.get()}, C2_DONT_BLOCK, &failures);
+        EXPECT_EQ(status, C2_OK);
+        EXPECT_TRUE(failures.empty());
+    }
+
+    void setKeyFrameInterval() {
+        // Set key frame interval explicitly to avoid all frame frames is key frame.
+        auto frameRate = std::make_shared<C2StreamFrameRateInfo::output>(
+                /*stream id=*/0u, /*frame rate=*/25);
+        auto keyFrameInterval = std::make_shared<C2StreamSyncFrameIntervalTuning::output>(
+                /*stream id=*/0u, /*interval*/ 1 * 1e6);
+
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        c2_status_t status = mComponent->config({frameRate.get(), keyFrameInterval.get()},
+                                                C2_DONT_BLOCK, &failures);
+        if (status != C2_OK || failures.size() != 0) {
+            GTEST_SKIP() << "Failed to configure " << mComponentName
+                         << " with frame rates and keyframe interval";
+        }
+    }
+};
+
+TEST_P(Codec2VideoEncTemporalLayerTest, Encode) {
+    if (mDisableTest) {
+        GTEST_SKIP() << "Test is disabled";
+    }
+
+    if (!setupConfigParam(mWidth, mHeight)) {
+        FAIL() << "Failed while configuring height and width for " << mComponentName;
+    }
+
+    setTemporalLayers(std::get<2>(GetParam()), false);
+    if (IsSkipped()) return;
+
+    setKeyFrameInterval();
+    if (IsSkipped()) return;
+
+    ASSERT_EQ(mComponent->start(), C2_OK);
+
+    std::ifstream eleStream;
+    eleStream.open(mInputFile, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mInputFile << " file not found";
+
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
+                                          1u, ENC_NUM_FRAMES, mWidth, mHeight, false, true));
+
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+
+    ASSERT_EQ(mEos, true);
+    ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mComponent->reset(), C2_OK);
+}
+
+TEST_P(Codec2VideoEncTemporalLayerTest, SetBitrateRatiosAndEncode) {
+    if (mDisableTest) {
+        GTEST_SKIP() << "Test is disabled";
+    }
+
+    if (!setupConfigParam(mWidth, mHeight)) {
+        FAIL() << "Failed while configuring height and width for " << mComponentName;
+    }
+
+    setTemporalLayers(std::get<2>(GetParam()), true);
+    if (IsSkipped()) return;
+
+    setKeyFrameInterval();
+    if (IsSkipped()) return;
+
+    ASSERT_EQ(mComponent->start(), C2_OK);
+
+    std::ifstream eleStream;
+    eleStream.open(mInputFile, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mInputFile << " file not found";
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
+                                          1u, ENC_NUM_FRAMES, mWidth, mHeight, false, true));
+
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+
+    ASSERT_EQ(mEos, true);
+    ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mComponent->reset(), C2_OK);
+}
+
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoEncHidlTest, testing::ValuesIn(gTestParameters),
                          PrintInstanceTupleNameToString<>);
 
@@ -858,6 +1068,10 @@ INSTANTIATE_TEST_SUITE_P(NonStdSizes, Codec2VideoEncResolutionTest,
 // EncodeTest with EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(EncodeTestwithEOS, Codec2VideoEncEncodeTest,
                          ::testing::ValuesIn(gEncodeTestParameters),
+                         PrintInstanceTupleNameToString<>);
+
+INSTANTIATE_TEST_SUITE_P(EncodeTemporalLayerTest, Codec2VideoEncTemporalLayerTest,
+                         ::testing::ValuesIn(gEncodeTemporalLayerTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
@@ -964,6 +1178,11 @@ int main(int argc, char** argv) {
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 852, 608));
         gEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 1400, 442));
+
+        gEncodeTemporalLayerTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 2));
+        gEncodeTemporalLayerTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 3));
     }
 
     ::testing::InitGoogleTest(&argc, argv);

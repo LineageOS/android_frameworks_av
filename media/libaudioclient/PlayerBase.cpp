@@ -26,22 +26,26 @@ using aidl_utils::binderStatusFromStatusT;
 using media::VolumeShaperConfiguration;
 using media::VolumeShaperOperation;
 
+static sp<IAudioManager> getAudioManager() {
+    // use checkService() to avoid blocking if audio service is not up yet
+    const sp<IBinder> binder = defaultServiceManager()->checkService(String16("audio"));
+    if (!binder) {
+        ALOGE("%s: cannot access IAudioManager", __func__);
+        return {};
+    } else {
+        return interface_cast<IAudioManager>(binder);
+    }
+}
+
 //--------------------------------------------------------------------------------------------------
 PlayerBase::PlayerBase() : BnPlayer(),
+    mAudioManager{getAudioManager()},
         mPanMultiplierL(1.0f), mPanMultiplierR(1.0f),
         mVolumeMultiplierL(1.0f), mVolumeMultiplierR(1.0f),
         mPIId(PLAYER_PIID_INVALID), mLastReportedEvent(PLAYER_STATE_UNKNOWN)
 {
     ALOGD("PlayerBase::PlayerBase()");
-    // use checkService() to avoid blocking if audio service is not up yet
-    sp<IBinder> binder = defaultServiceManager()->checkService(String16("audio"));
-    if (binder == 0) {
-        ALOGE("PlayerBase(): binding to audio service failed, service up?");
-    } else {
-        mAudioManager = interface_cast<IAudioManager>(binder);
-    }
 }
-
 
 PlayerBase::~PlayerBase() {
     ALOGD("PlayerBase::~PlayerBase()");
@@ -49,7 +53,7 @@ PlayerBase::~PlayerBase() {
 }
 
 void PlayerBase::init(player_type_t playerType, audio_usage_t usage, audio_session_t sessionId) {
-    if (mAudioManager == 0) {
+    if (!mAudioManager) {
                 ALOGE("AudioPlayer realize: no audio service, player will not be registered");
     } else {
         mPIId = mAudioManager->trackPlayer(playerType, usage, AUDIO_CONTENT_TYPE_UNKNOWN, this,
@@ -58,7 +62,7 @@ void PlayerBase::init(player_type_t playerType, audio_usage_t usage, audio_sessi
 }
 
 void PlayerBase::triggerPortIdUpdate(audio_port_handle_t portId) const {
-    if (mAudioManager == nullptr) {
+    if (!mAudioManager) {
         ALOGE("%s: no audio service, player %d will not update portId %d",
               __func__,
               mPIId,
@@ -73,14 +77,11 @@ void PlayerBase::triggerPortIdUpdate(audio_port_handle_t portId) const {
 
 void PlayerBase::baseDestroy() {
     serviceReleasePlayer();
-    if (mAudioManager != 0) {
-        mAudioManager.clear();
-    }
 }
 
 //------------------------------------------------------------------------------
 void PlayerBase::servicePlayerEvent(player_state_t event, const DeviceIdVector& deviceIds) {
-    if (mAudioManager != 0) {
+    if (mAudioManager) {
         bool changed = false;
         {
             std::lock_guard _l(mDeviceIdMutex);
@@ -104,7 +105,7 @@ void PlayerBase::servicePlayerEvent(player_state_t event, const DeviceIdVector& 
 }
 
 void PlayerBase::serviceReleasePlayer() {
-    if (mAudioManager != 0
+    if (mAudioManager
             && mPIId != PLAYER_PIID_INVALID) {
         mAudioManager->releasePlayer(mPIId);
     }
