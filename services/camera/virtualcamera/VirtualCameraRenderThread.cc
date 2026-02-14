@@ -377,16 +377,24 @@ void VirtualCameraRenderThread::processCaptureRequest(
           ? deviceTime - lastAcquisitionTimestamp
           : 0ns;
 
-  bool gotNewFrame = false;
   const std::chrono::nanoseconds waitTime =
       std::max(0ns, maxFrameDuration - elapsedDuration);
   ALOGV("maxFrameDuration %lld, elapsedDuration %lld, waitTime %lld",
         maxFrameDuration.count(), elapsedDuration.count(), waitTime.count());
+
+  bool gotNewFrame = false;
   if (waitTime > 0ns) {
-    // We can afford to wait for next frame.
-    // Note that if there's already new frame in the input Surface, the call
-    // below returns immediately.
-    gotNewFrame = mImageHandler->waitForInputFrame(waitTime);
+    bool pendingExit = false;
+    {
+      std::lock_guard<std::mutex> lock(mLock);
+      pendingExit = mPendingExit;
+    }
+    if (!pendingExit) {
+      // We can afford to wait for next frame.
+      // Note that if there's already new frame in the input Surface, the call
+      // below returns immediately.
+      gotNewFrame = mImageHandler->waitForInputFrame(waitTime);
+    }
   }
 
   if (!gotNewFrame) {

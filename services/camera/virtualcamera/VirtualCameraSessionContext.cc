@@ -49,7 +49,8 @@ bool VirtualCameraSessionContext::initializeStream(
   return newlyInserted;
 }
 
-void VirtualCameraSessionContext::closeAllStreams() {
+void VirtualCameraSessionContext::clearStreams() {
+  ALOGV("%s", __func__);
   std::lock_guard<std::mutex> lock(mLock);
   mStreams.clear();
 }
