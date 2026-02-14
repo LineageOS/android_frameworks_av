@@ -25,7 +25,7 @@ using namespace std;
 
 class HEVCUtilsTestEnvironment : public::testing::Environment {
   public:
-    HEVCUtilsTestEnvironment() : res("/data/local/tmp/") {}
+    HEVCUtilsTestEnvironment() : res("/data/local/tmp/HEVCUtilsUnitTest-1.0/") {}
 
     // Parses the command line arguments
     int initFromOptions(int argc, char **argv);
