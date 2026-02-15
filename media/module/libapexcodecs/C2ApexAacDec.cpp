@@ -639,41 +639,58 @@ ApexCodec_Status C2ApexAacDec::process(
             mPendingTimestamps.emplace(timestamp, frameIndex);
             size_t offset = 0;
             size_t size = inBuffer.size;
-            uint8_t* inPtr = const_cast<uint8_t *>(inBuffer.data);
-            uint32_t inBufferLength = size;
-            uint32_t bytesValid = inBufferLength;
-            if (mIntf->isAdts()) {
-                // ADTS parsing logic
-                ALOGV("ADTS input");
-                size_t adtsHeaderSize = 0;
-                const uint8_t *adtsHeader = inBuffer.data;
-                if (size < 7) {
-                    ALOGE("ADTS header too small: %zu", size);
-                    mSignalledError = true;
-                    return APEXCODEC_STATUS_CORRUPTED;
+            while (size > 0) {
+                uint8_t* inPtr = const_cast<uint8_t *>(inBuffer.data) + offset;
+                uint32_t inBufferLength = size;
+                uint32_t bytesValid = inBufferLength;
+                unsigned aac_frame_length = 0;
+                if (mIntf->isAdts()) {
+                    // ADTS parsing logic
+                    ALOGV("ADTS input");
+                    size_t adtsHeaderSize = 0;
+                    const uint8_t *adtsHeader = inBuffer.data + offset;
+                    if (size < 7) {
+                        ALOGV("ADTS header too small: %zu. Leftover", size);
+                        break;
+                    }
+                    bool protectionAbsent = (adtsHeader[1] & 1);
+                    aac_frame_length =
+                        ((adtsHeader[3] & 3) << 11) | (adtsHeader[4] << 3) | (adtsHeader[5] >> 5);
+                    ALOGV("protectionAbsent=%d, aac_frame_length=%u",
+                            protectionAbsent, aac_frame_length);
+                    if (size < aac_frame_length) {
+                        ALOGV("Incomplete ADTS frame: %zu < %u. Leftover", size, aac_frame_length);
+                        break;
+                    }
+                    adtsHeaderSize = (protectionAbsent ? 7 : 9);
+                    ALOGV("adtsHeaderSize: %zu", adtsHeaderSize);
+                    if (aac_frame_length < adtsHeaderSize) {
+                        ALOGE("ADTS frame length is smaller than header size");
+                        mSignalledError = true;
+                        return APEXCODEC_STATUS_CORRUPTED;
+                    }
+                    inPtr = const_cast<uint8_t *>(adtsHeader + adtsHeaderSize);
+                    inBufferLength = aac_frame_length - adtsHeaderSize;
                 }
-                bool protectionAbsent = (adtsHeader[1] & 1);
-                unsigned aac_frame_length =
-                    ((adtsHeader[3] & 3) << 11) | (adtsHeader[4] << 3) | (adtsHeader[5] >> 5);
-                ALOGV("protectionAbsent=%d, aac_frame_length=%u",
-                        protectionAbsent, aac_frame_length);
-                if (size < aac_frame_length) {
-                    ALOGE("Incomplete ADTS frame: %zu < %u", size, aac_frame_length);
-                    mSignalledError = true;
-                    return APEXCODEC_STATUS_CORRUPTED;
+                bytesValid = inBufferLength;
+                aacDecoder_Fill(mAACDecoder, inPtr, inBufferLength, &bytesValid);
+
+                size_t consumedInFill = inBufferLength - bytesValid;
+                if (mIntf->isAdts()) {
+                    offset += aac_frame_length;
+                    size -= aac_frame_length;
+                } else {
+                    offset += consumedInFill;
+                    size -= consumedInFill;
                 }
-                adtsHeaderSize = (protectionAbsent ? 7 : 9);
-                ALOGV("adtsHeaderSize: %zu", adtsHeaderSize);
-                if (aac_frame_length < adtsHeaderSize) {
-                    ALOGE("ADTS frame length is smaller than header size");
-                    mSignalledError = true;
-                    return APEXCODEC_STATUS_CORRUPTED;
+                if (consumedInFill != inBufferLength && !mIntf->isAdts()) {
+                    ALOGE("aacDecoder_Fill did not consume all data");
+                    break;
                 }
-                inPtr = const_cast<uint8_t *>(adtsHeader + adtsHeaderSize);
-                inBufferLength = aac_frame_length - adtsHeaderSize;
+                if (!mIntf->isAdts()) {
+                    break;
+                }
             }
-            aacDecoder_Fill(mAACDecoder, inPtr, inBufferLength, &bytesValid);
-            offset = inBufferLength - bytesValid;
 
             mDrcWrap.submitStreamData(&mStreamInfo, &mOutputInfo, &mMetadataInfo);
             updateParams();
@@ -685,12 +702,13 @@ ApexCodec_Status C2ApexAacDec::process(
                                             &mMetadataInfo);
             decoded = true;
             *consumed = offset;
+            ALOGV("consumed: %zu", *consumed);
 
             if (offset > 0) {
                 mIsFirstInput = false;
             }
         }
-    } else if (!mIsFirstInput && !mEndOfOutput && !mPendingTimestamps.empty()) {
+    } else if (mEndOfInput && !mEndOfOutput && !mPendingTimestamps.empty()) {
         ALOGV("draining");
         decoderErr = aacDecoder_Drain(
                 mAACDecoder, tmpOutBuffer.data(), TMP_BUFFER_COUNT, &mOutputInfo);
@@ -899,16 +917,23 @@ ApexCodec_Status C2ApexAacDec::process(
     if (*produced > 0) {
         bool eos = mEndOfOutput || (mEndOfInput && mPendingTimestamps.empty());
         if (eos) {
-            ALOGV("produced and emitting EOS with frameIndex: %" PRIu64, mCurrentFrameIndex);
-            output->setBufferInfo(APEXCODEC_FLAG_END_OF_STREAM,
-                    mCurrentFrameIndex, mCurrentTimestampUs);
+            if (mCurrentFrameIndex == frameIndex) {
+                ALOGV("produced and emitting EOS with frameIndex: %" PRIu64, mCurrentFrameIndex);
+                output->setBufferInfo(APEXCODEC_FLAG_END_OF_STREAM,
+                        mCurrentFrameIndex, mCurrentTimestampUs);
+            } else {
+                ALOGV("emitting second to last buffer with frameIndex: %"
+                        PRIu64, mCurrentFrameIndex);
+                output->setBufferInfo((ApexCodec_BufferFlags)0,
+                        mCurrentFrameIndex, mCurrentTimestampUs);
+            }
             mEndOfOutput = true;
         } else {
             ALOGV("emitting buffer with frameIndex: %" PRIu64, mCurrentFrameIndex);
             output->setBufferInfo((ApexCodec_BufferFlags)0,
                     mCurrentFrameIndex, mCurrentTimestampUs);
         }
-    } else if (mEndOfInput && mPendingTimestamps.empty() && !mEndOfOutput) {
+    } else if (mEndOfInput && mPendingTimestamps.empty()) {
         ALOGV("emitting EOS with frameIndex: %" PRIu64, frameIndex);
         output->setBufferInfo(APEXCODEC_FLAG_END_OF_STREAM,
                 frameIndex, timestamp);
