@@ -22,14 +22,18 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <span>
 
 #include <C2Buffer.h>
 #include <C2Component.h>
 #include <Codec2Mapper.h>
 
+#include <android/hidl/memory/1.0/IMemory.h>
 #include <codec2/hidl/client.h>
-#include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/CodecBase.h>
+#include <media/stagefright/foundation/Mutexed.h>
+#include <utils/LruCache.h>
+#include <utils/TypeHelpers.h>
 
 #include "CCodecBuffers.h"
 #include "FrameReassembler.h"
@@ -39,6 +43,11 @@
 namespace android {
 
 class MemoryDealer;
+
+template <>
+inline hash_t hash_type<sp<hardware::HidlMemory>>(const sp<hardware::HidlMemory>& mem) {
+    return hash_type(mem.get());
+}
 
 class CCodecCallback {
 public:
@@ -322,18 +331,25 @@ private:
     void sendOutputBuffers();
     void ensureDecryptDestination(size_t size);
     int32_t getHeapSeqNum(const sp<hardware::HidlMemory> &memory);
+    sp<android::hidl::memory::V1_0::IMemory> getSourceIMemory(
+            const sp<hardware::HidlMemory>& memory);
 
     void initializeFrameTrackingFor(ANativeWindow * window);
     void trackReleasedFrame(const IGraphicBufferProducer::QueueBufferOutput& qbo,
                             int64_t mediaTimeUs, int64_t desiredRenderTimeNs);
     void processRenderedFrames(const FrameEventHistoryDelta& delta);
     int64_t getRenderTimeNs(const TrackedFrame& frame);
+    bool fetchAndCopyEncryptedInfoBuffer(
+            const std::span<const uint8_t> input,
+            std::shared_ptr<C2LinearBlock> *encryptedBlock,
+            size_t *blockSize);
 
     QueueSync mSync;
     sp<MemoryDealer> mDealer;
     sp<IMemory> mDecryptDestination;
     int32_t mHeapSeqNum;
     std::map<wp<hardware::HidlMemory>, int32_t> mHeapSeqNumMap;
+    LruCache<sp<hardware::HidlMemory>, sp<android::hidl::memory::V1_0::IMemory>> mSourceMemoryMap;
 
     std::shared_ptr<Codec2Client::Component> mComponent;
     std::string mComponentName; ///< component name for debugging
