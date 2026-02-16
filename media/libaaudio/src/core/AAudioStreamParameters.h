@@ -223,6 +223,11 @@ public:
         mPerformanceMode = performanceMode;
     }
 
+    audio_port_handle_t getPortHandle() const { return mPortHandle; }
+    audio_io_handle_t getIoHandle() const { return mIoHandle; }
+    void setPortHandle(audio_port_handle_t portHandle) { mPortHandle = portHandle; }
+    void setIoHandle(audio_io_handle_t ioHandle) { mIoHandle = ioHandle; }
+
     /**
      * Copy variables defined in other AAudioStreamParameters instance to this one.
      * @param other
@@ -263,6 +268,9 @@ private:
     int                             mHardwareSampleRate   = AAUDIO_UNSPECIFIED;
     audio_format_t                  mHardwareAudioFormat  = AUDIO_FORMAT_DEFAULT;
     aaudio_performance_mode_t       mPerformanceMode      = AAUDIO_PERFORMANCE_MODE_NONE;
+
+    audio_port_handle_t mPortHandle = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t mIoHandle = AUDIO_IO_HANDLE_NONE;
 };
 
 } /* namespace aaudio */

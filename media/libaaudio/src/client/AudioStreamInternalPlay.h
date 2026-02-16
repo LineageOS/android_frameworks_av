@@ -92,6 +92,10 @@ public:
         mPresentationEndCallbackUserData = userData;
     }
 
+    void setUseDataAvailableCallback() {
+        mUseDataAvailableCallback = true;
+    }
+
 protected:
 
     void prepareBuffersForStart_l(StartType startType = DEFAULT) REQUIRES(mStreamMutex) final;
@@ -157,7 +161,7 @@ private:
     aaudio_result_t writeNowWithConversionFull(const void* buffer, int32_t numFrames);
 
     bool shouldStopStream() EXCLUDES(mStreamMutex);
-    void maybeCallPresentationEndCallback();
+    void maybeCallPresentationEndCallback_l() REQUIRES(mStreamMutex);
 
     void dropPresentationEndCallback_l() REQUIRES(mStreamMutex);
 
@@ -179,6 +183,7 @@ private:
     int32_t mOffloadFlushFromSafeMarginInFrames = 0;
     std::condition_variable mCallbackCV;
     bool mDraining GUARDED_BY(mStreamMutex){false};
+    DrainType mDrainType GUARDED_BY(mStreamMutex){DrainType::DRAIN_ALL_DATA};
     android::audio_utils::TimerQueue::handle_t mWakeUpHandle
             GUARDED_BY(mStreamMutex){android::audio_utils::TimerQueue::INVALID_HANDLE};
 
@@ -187,6 +192,15 @@ private:
     AAudioPlaybackParameters mPlaybackParameters = AAUDIO_PLAYBACK_PARAMETERS_DEFAULT;
 
     bool mPendingStop GUARDED_BY(mStreamMutex){false};
+
+    bool mUseDataAvailableCallback = false;
+    // The following two values will only be used if `mUseDataAvailableCallback` is true.
+    // When `mUseDataAvailableCallback` is true, the client won't provide data from data
+    // callback. Instead, it will call write. To avoid the callback thread keep spinning,
+    // the `mDrainingNanos` is set when drain is needed after a write. Then the data callback
+    // thread can use this value to drainStream and suspend.
+    int64_t mDrainingNanos GUARDED_BY(mStreamMutex){0};
+    bool mDrainingNanosValid GUARDED_BY(mStreamMutex){false};
 };
 
 } /* namespace aaudio */

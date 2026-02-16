@@ -221,6 +221,9 @@ aaudio_result_t AudioStreamInternal::open(const AAudioStreamOpenRequest& openReq
     setHardwareSampleRate(configurationOutput.getHardwareSampleRate());
     setHardwareFormat(configurationOutput.getHardwareFormat());
 
+    mPortId = configurationOutput.getPortHandle();
+    mIoHandle = configurationOutput.getIoHandle();
+
     result = mServiceInterface.getStreamDescription(mServiceStreamHandleInfo, mEndPointParcelable);
     if (result != AAUDIO_OK) {
         goto error;
