@@ -549,6 +549,19 @@ void HwModuleCollection::cleanUpForDevice(const sp<DeviceDescriptor> &device)
     }
 }
 
+sp<IOProfile> HwModuleCollection::getCompatibleProfile(uint32_t flags, bool isInput) const {
+    for (const auto& hwModule : *this) {
+        const auto profiles = isInput ? hwModule->getInputProfiles()
+                : hwModule->getOutputProfiles();
+        for (const auto& profile : profiles) {
+            if (profile->isCompatibleProfileForFlags(flags)) {
+                return profile;
+            }
+        }
+    }
+    return nullptr;
+}
+
 void HwModuleCollection::dump(String8 *dst) const
 {
     dst->appendFormat("\n Hardware modules (%zu):\n", size());

@@ -3088,6 +3088,19 @@ status_t AudioSystem::getFlushFromFrameSupport(const audio_config_base_t& config
             configAidl, attrAidl, uidAidl, flagsAidl, support));
 }
 
+status_t AudioSystem::useMmapForPcmOffload(bool* useMmapForPcmOffload) {
+    if (useMmapForPcmOffload == nullptr) {
+        return BAD_VALUE;
+    }
+
+    const sp<IAudioPolicyService> aps = get_audio_policy_service();
+    if (aps == nullptr) {
+        return NO_INIT;
+    }
+
+    return statusTFromBinderStatus(aps->useMmapForPcmOffload(useMmapForPcmOffload));
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(
