@@ -38,6 +38,8 @@ import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.util.Util;
+import androidx.media3.exoplayer.analytics.PlaybackStats;
+import androidx.media3.exoplayer.analytics.PlaybackStatsListener;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.util.EventLogger;
 import androidx.media3.ui.PlayerView;
@@ -65,6 +67,7 @@ public final class PlaybackPowerActivity extends Activity {
 
     private ExoPlayer mPlayer;
     private PlayerView mPlayerView;
+    private PlaybackStatsListener mPlaybackStatsListener;
 
     private BatteryManager mBatteryManager;
     private PowerManager mPowerManager;
@@ -153,13 +156,19 @@ public final class PlaybackPowerActivity extends Activity {
                 handleFailure("Player error: " + error.toBundle().toString());
             }
         });
+        // Keep playback stats for one playback, requested on-demand at the end of the test.
+        mPlaybackStatsListener =
+                new PlaybackStatsListener(/* keepHistory= */ false, /* callback= */ null);
         mPlayer.addAnalyticsListener(new EventLogger());
+        mPlayer.addAnalyticsListener(mPlaybackStatsListener);
         mPlayer.setAudioAttributes(AudioAttributes.DEFAULT, /* handleAudioFocus= */ true);
         mPlayer.setMediaItem(mediaItemBuilder.build());
         mPlayer.setRepeatMode(Player.REPEAT_MODE_ONE);
-        // Disable bitrate adaptation to give more repeatable results.
+        // Disable bitrate adaptation and force below 1080p for consistency and to avoid loading a
+        // very high bitrate stream.
         mPlayer.setTrackSelectionParameters(
                 new TrackSelectionParameters.Builder()
+                        .setMaxVideoSize(1919, 1079)
                         .setForceHighestSupportedBitrate(true)
                         .build());
         mPlayer.prepare();
@@ -248,7 +257,15 @@ public final class PlaybackPowerActivity extends Activity {
     private void handleSuccess() {
         // Log a final coulomb counter sample and then stop the playback.
         mSampleBatteryRunnable.run();
-        mTestResultLogger.logSuccess();
+        PlaybackStats playbackStats = mPlaybackStatsListener.getCombinedPlaybackStats();
+        String summaryMessage = String.format(
+            "played=%.2f s, wait=%.2f s, rebuffers=%d (%.2f s), errors=%d",
+                playbackStats.getTotalPlayTimeMs() / 1000.0,
+                playbackStats.getTotalWaitTimeMs() / 1000.0,
+                playbackStats.totalRebufferCount,
+                playbackStats.getTotalRebufferTimeMs() / 1000.0,
+                playbackStats.nonFatalErrorCount);
+        mTestResultLogger.logSuccess(summaryMessage);
         stopTestPlayback();
     }
 
