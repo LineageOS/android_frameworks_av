@@ -79,6 +79,16 @@ flag {
 }
 
 flag {
+    name: "filter_call_on_listener_hint"
+    namespace: "media_audio"
+    description: "Filter call on listener hint"
+    bug: "413631827"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "hardening_bfgs"
     namespace: "media_audio"
     description: "Flag for bfgs capability constraint"

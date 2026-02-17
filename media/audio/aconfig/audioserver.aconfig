@@ -47,6 +47,16 @@ flag {
 }
 
 flag {
+    name: "mmap_freezer_awareness"
+    namespace: "media_audio"
+    description: "MMAP freezer awareness"
+    bug: "477685932"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "optimize_call_routing"
     namespace: "media_audio"
     description:
