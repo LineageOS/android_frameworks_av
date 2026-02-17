@@ -88,11 +88,15 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         if (fdp.ConsumeBool()) {
             parcelCamStreamStats.writeInt32(currentSurfaceId);
         }
+        int32_t mrirMode = fdp.ConsumeIntegral<int32_t>();
+        if (fdp.ConsumeBool()) {
+            parcelCamStreamStats.writeInt32(mrirMode);
+        }
 
         cameraStreamStats = new CameraStreamStats(width, height, format, maxPreviewFps, dataSpace,
                                                   usage, maxHalBuffers, maxAppBuffers,
                                                   dynamicRangeProfile, streamUseCase, colorSpace,
-                                                  currentSurfaceId);
+                                                  currentSurfaceId, mrirMode);
     }
 
     parcelCamStreamStats.setDataPosition(0);
