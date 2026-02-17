@@ -336,6 +336,9 @@ void TrackBase::deferRestartIfDisabled()
             const auto actual = weakTrack.promote();
             if (actual) actual->restartIfDisabled();
         });
+    ALOGV("%s signal playback thread", __func__);
+    audio_utils::lock_guard _l(thread->mutex());
+    thread->broadcast_l();
 }
 
 void TrackBase::beginBatteryAttribution() {
