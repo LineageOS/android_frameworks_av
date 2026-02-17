@@ -648,6 +648,13 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 attrs |= MediaCodecInfo::kFlagIsEncoder;
             }
             if (trait.owner == "software") {
+                // software codec process does not have access to vendor drivers except
+                // for mapping gralloc buffers.
+                attrs |= MediaCodecInfo::kFlagIsSoftwareOnly;
+            } else if (trait.owner == "__ApexCodecs__") {
+                // APEX codecs run in-the app process that may have access to more vendor
+                // drivers. But all APEX codecs run in a memory-safe environment, so we
+                // can still declare them as software only
                 attrs |= MediaCodecInfo::kFlagIsSoftwareOnly;
             } else {
                 attrs |= MediaCodecInfo::kFlagIsVendor;
@@ -659,6 +666,8 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 }
             }
             codecInfo->setAttributes(attrs);
+            ALOGV("setting attributes %04X", attrs);
+
             if (!codec.rank.empty()) {
                 uint32_t xmlRank;
                 char dummy;
