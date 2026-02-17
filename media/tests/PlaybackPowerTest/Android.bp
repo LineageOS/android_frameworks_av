@@ -24,7 +24,7 @@ android_app {
     sdk_version: "current",
     // Allow installing on released devices, for testing.
     target_sdk_version: "36",
-    min_sdk_version: "28",
+    min_sdk_version: "33",
     static_libs: [
         "androidx.annotation_annotation",
         "androidx.appcompat_appcompat",
