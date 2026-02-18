@@ -427,34 +427,38 @@ public:
                             const std::string& codecProvenance = "");
 
             struct SetParams {
-                audio_stream_type_t streamType;
-                uint32_t sampleRate;
-                audio_format_t format;
-                audio_channel_mask_t channelMask;
-                size_t frameCount;
-                audio_output_flags_t flags;
-                wp<IAudioTrackCallback> callback;
-                int32_t notificationFrames;
-                sp<IMemory> sharedBuffer;
-                bool threadCanCallJava;
-                audio_session_t sessionId;
-                transfer_type transferType;
+                const audio_stream_type_t streamType [[clang::require_explicit_initialization]];
+                const uint32_t sampleRate [[clang::require_explicit_initialization]];
+                const audio_format_t format [[clang::require_explicit_initialization]];
+                const audio_channel_mask_t channelMask [[clang::require_explicit_initialization]];
+                const size_t frameCount = 0;
+                const audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
+                const wp<IAudioTrackCallback> callback = nullptr;
+                const int32_t notificationFrames = 0;
+                const sp<IMemory> sharedBuffer = nullptr;
+                const bool threadCanCallJava = false;
+                const audio_session_t sessionId = AUDIO_SESSION_ALLOCATE;
+                const transfer_type transferType = TRANSFER_DEFAULT;
                 // TODO don't take pointers here
-                const audio_offload_info_t *offloadInfo;
-                AttributionSourceState attributionSource;
-                const audio_attributes_t* pAttributes;
-                bool doNotReconnect;
-                float maxRequiredSpeed;
-                audio_port_handle_t selectedDeviceId;
-                std::string codecProvenance;
+                const audio_offload_info_t *offloadInfo = nullptr;
+                const AttributionSourceState attributionSource = {};
+                const audio_attributes_t* pAttributes = nullptr;
+                const bool doNotReconnect = false;
+                const float maxRequiredSpeed = 1.0f;
+                const audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+                const std::string codecProvenance = "";
             };
+
+            explicit AudioTrack(SetParams&& params);
+
         private:
             // Note: Consumes parameters
-            void        set(SetParams& s) {
+            template <typename U>
+            void set(U&& s) {
                 (void)set(s.streamType, s.sampleRate, s.format, s.channelMask, s.frameCount,
-                          s.flags, std::move(s.callback), s.notificationFrames,
-                          std::move(s.sharedBuffer), s.threadCanCallJava, s.sessionId,
-                          s.transferType, s.offloadInfo, std::move(s.attributionSource),
+                          s.flags, std::forward<U>(s).callback, s.notificationFrames,
+                          std::forward<U>(s).sharedBuffer, s.threadCanCallJava, s.sessionId,
+                          s.transferType, s.offloadInfo, std::forward<U>(s).attributionSource,
                           s.pAttributes, s.doNotReconnect, s.maxRequiredSpeed, s.selectedDeviceId,
                           s.codecProvenance);
                         }
