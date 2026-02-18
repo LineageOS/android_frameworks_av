@@ -13,6 +13,7 @@ cc_library {
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_signed-defaults",
         "libcodec2_soft_sanitize_cfi-defaults",
+        "no_bti",
     ],
 
     cflags: [
@@ -31,6 +32,7 @@ cc_library {
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_signed-defaults",
         "libcodec2_soft_sanitize_cfi-defaults",
+        "no_bti",
     ],
 
     srcs: ["C2SoftHevcEnc.cpp"],
