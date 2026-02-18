@@ -390,6 +390,8 @@ private:
             const std::vector<InstanceResourceInfo>& resources);
     void updateResourceUsage(const std::vector<InstanceResourceInfo>& oldResources,
                              const std::vector<InstanceResourceInfo>& newResources);
+    // Calculate the operating rate.
+    void findOperatingRate(const sp<AMessage> &format, uint32_t flags);
 
 private:
     enum State {
@@ -846,8 +848,22 @@ private:
     // Required resource info for this codec.
     Mutexed<std::vector<InstanceResourceInfo>> mRequiredResourceInfo;
 
-    // Default frame-rate.
-    float mFrameRate = 30.0;
+    // Source for operating rate.
+    enum OperatingRateSource {
+        DEFAULT = 0,        // Default operating rate source. The value is 30 for video codec.
+        FRAME_RATE = 1,     // fallback operating rate from frame rate for video codecs.
+        CAPTURE_RATE = 2,   // fallback operating rate from capture rate for video encoders.
+        SAMPLE_RATE = 3,    // fallback operating rate from sample rate for audio codecs.
+        OPERATING_RATE = 4, // from operating-rate itself.
+    };
+
+    struct OperatingRate {
+        OperatingRateSource mSource = DEFAULT;
+        // Default operating-rate as 30 fps for video codecs.
+        // For audio codecs, this will be updated either by the operating rate or sample rate.
+        float mValue = 30.0;
+    };
+    OperatingRate mOperatingRate;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaCodec);
 };

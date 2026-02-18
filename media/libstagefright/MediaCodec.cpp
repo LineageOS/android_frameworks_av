@@ -1372,43 +1372,15 @@ static bool getValueFor(const sp<AMessage>& msg,
 }
 
 /*
- * Use operating frame rate for per frame resource calculation as below:
- * - Check if operating-rate is available. If so, use it.
- * - If its encoder and if we have capture-rate, use that as frame rate.
- * - Else, check if frame-rate is available. If so, use it.
- * - Else, use the default value.
- *
- * NOTE: This function is called with format that could be:
- *   - format used to configure the codec
- *   - codec's input format
- *   - codec's output format
- *
- * Some of the key's may not be present in either input or output format or
- * both.
- * For example, "capture-rate", this is currently only used in configure format.
- *
- * For encoders, in rare cases, we would expect "operating-rate" to be set
- * for high-speed capture and it's only used during configuration.
+ * For audio codec, return sample-rate if available, else return the default value.
  */
-static float getOperatingFrameRate(const sp<AMessage>& format,
-                                   float defaultFrameRate,
-                                   bool isEncoder) {
-    float operatingRate = 0;
-    if (getValueFor(format, "operating-rate", &operatingRate)) {
-        // Use operating rate to convert per-frame resources into a whole.
-        return operatingRate;
+static float getSampleRateForAudio(const sp<AMessage>& format,
+                                   float defaultValue) {
+    int sampleRate = 0;
+    if (format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
+        return sampleRate;
     }
-
-    float captureRate = 0;
-    if (isEncoder && getValueFor(format, "capture-rate", &captureRate)) {
-        // Use capture rate to convert per-frame resources into a whole.
-        return captureRate;
-    }
-
-    // Otherwise use frame-rate (or fallback to the default framerate passed)
-    float frameRate = defaultFrameRate;
-    getValueFor(format, "frame-rate", &frameRate);
-    return frameRate;
+    return defaultValue;
 }
 
 inline MediaResourceParcel getMediaResourceParcel(const InstanceResourceInfo& resourceInfo) {
@@ -1496,7 +1468,7 @@ std::vector<InstanceResourceInfo> MediaCodec::computeDynamicResources(
             continue;
         }
         if (resource.mPerFrameCount != 0) {
-            uint64_t staticCount = resource.mPerFrameCount * mFrameRate;
+            uint64_t staticCount = resource.mPerFrameCount * mOperatingRate.mValue;
             // We are tracking everything as static count here. So set per frame count to 0.
             dynamicResources.emplace_back(resource.mName, staticCount, 0);
         }
@@ -2942,6 +2914,72 @@ status_t MediaCodec::configure(
     return configure(format, nativeWindow, crypto, NULL, flags);
 }
 
+/*
+ * Operating Rate is determined by KEY_OPERATING_RATE.
+ * And if not specified, the fallback is on:
+ *  - KEY_CAPTURE_RATE (video encoders)
+ *  - KEY_FRAME_RATE (video codecs)
+ *  - KEY_SAMPLE_RATE (audio codec - which is a mandatory param)
+ *  - Else use the default value, which is 30fps for video codecs.
+ *
+ * NOTE:
+ * - The implementation can update the KEY_FRAME_RATE through input/output formats.
+ *   But, we always give preference to the frame rate specified by the user, which means
+ *   KEY_FRAME_RATE can be updated by the user either through configure() or setParameter()
+ * - The implementation knows the correct KEY_SAMPLE_RATE, which it updates through
+ *   input/output formats.
+ *   So, whenever we get updates on input/output format for an audio codec and
+ *   if the operating rate was derived from KEY_SAMPLE_RATE, it needs to be updated.
+ *
+ * - Some of the key's may not be present in either input or output format or both.
+ *   For example, "capture-rate", this is currently only used in configure format.
+ *
+ * - For encoders, in rare cases, we would expect "operating-rate" to be set
+ *   for high-speed capture and it's only used during configuration.
+ *
+ * If the operating rate is not updateable through input/output format, this returns true.
+ * False, otherwise.
+ */
+void MediaCodec::findOperatingRate(const sp<AMessage> &format, uint32_t flags) {
+    // Look for Operating Rate in the configuration parameter.
+    float operatingRate = 0;
+    if (getValueFor(format, KEY_OPERATING_RATE, &operatingRate) && operatingRate > 0) {
+        mOperatingRate.mValue = operatingRate;
+        mOperatingRate.mSource = OPERATING_RATE;
+        return;
+    }
+
+    // Fallback operating rate.
+    if (mDomain == DOMAIN_VIDEO) {
+        bool isEncoder = (flags & CONFIGURE_FLAG_ENCODE);
+        // Use capture rate as operating for video encoders.
+        if (isEncoder) {
+            float captureRate = 0;
+            if (getValueFor(format, KEY_CAPTURE_RATE, &captureRate) && captureRate > 0) {
+                mOperatingRate.mValue = captureRate;
+                mOperatingRate.mSource = CAPTURE_RATE;
+                return;
+            }
+        }
+        // Otherwise use frame-rate as the operating rate.
+        float frameRate = 0;
+        if (getValueFor(format, KEY_FRAME_RATE, &frameRate) && frameRate > 0) {
+            mOperatingRate.mValue = frameRate;
+            mOperatingRate.mSource = FRAME_RATE;
+        }
+    } else if (mDomain == DOMAIN_AUDIO) {
+        // use sample-rate as the operating rate.
+        // NOTE: sample-rate is must for audio codecs.
+        int sampleRate = 0;
+        if (format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
+            mOperatingRate.mValue = sampleRate;
+            mOperatingRate.mSource = SAMPLE_RATE;
+        }
+    }
+
+    return;
+}
+
 status_t MediaCodec::configure(
         const sp<AMessage> &format,
         const sp<Surface> &surface,
@@ -2997,13 +3035,8 @@ status_t MediaCodec::configure(
 
     sp<AMessage> callback = mCallback;
 
-    if (mDomain == DOMAIN_VIDEO) {
-        // Use format to compute initial operating frame rate.
-        // After the successful configuration (and also possibly when output
-        // format change notification), this value will be recalculated.
-        bool isEncoder = (flags & CONFIGURE_FLAG_ENCODE);
-        mFrameRate = getOperatingFrameRate(format, mFrameRate, isEncoder);
-    }
+    // Look for Operating Rate in the configuration parameter.
+    findOperatingRate(format, flags);
 
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(mFlags & kFlagIsSecure,
@@ -4885,10 +4918,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mFlags |= kFlagUsesSoftwareRenderer;
                     }
 
-                    // Use input and output formats to get operating frame-rate.
-                    bool isEncoder = mFlags & kFlagIsEncoder;
-                    mFrameRate = getOperatingFrameRate(mInputFormat, mFrameRate, isEncoder);
-                    mFrameRate = getOperatingFrameRate(mOutputFormat, mFrameRate, isEncoder);
+                    // For the audio codec, if the operating rate was from sample-rate,
+                    // get the updated sample-rate if available.
+                    if (mOperatingRate.mSource == SAMPLE_RATE && mDomain == DOMAIN_AUDIO) {
+                        // Look for sample-rate in the output format.
+                        mOperatingRate.mValue = getSampleRateForAudio(mOutputFormat,
+                                                                      mOperatingRate.mValue);
+                    }
                     getRequiredSystemResources();
 
                     setState(CONFIGURED);
@@ -6750,15 +6786,13 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
 
     updateHdrMetrics(false /* isConfig */);
 
-    if (mDomain == DOMAIN_VIDEO) {
-        bool isEncoder = mFlags & kFlagIsEncoder;
-        // Since the output format has changed, see if we need to update
-        // operating frame-rate.
-        float frameRate = getOperatingFrameRate(mOutputFormat, mFrameRate, isEncoder);
-        // if the operating frame-rate has changed, we need to recalibrate the
-        // required system resources again and notify the caller.
-        if (frameRate != mFrameRate) {
-            mFrameRate = frameRate;
+    // For the audio codec, if the operating rate was from sample-rate,
+    // get the updated sample-rate if available.
+    if (mOperatingRate.mSource == SAMPLE_RATE && mDomain == DOMAIN_AUDIO) {
+        float sampleRate = getSampleRateForAudio(mOutputFormat, mOperatingRate.mValue);
+        // If it has been updated, we need to recalibrate the resource usage and notify the caller.
+        if (sampleRate != mOperatingRate.mValue) {
+            mOperatingRate.mValue = sampleRate;
             if (getRequiredSystemResources()) {
                 onRequiredResourcesChanged();
             }
@@ -7923,6 +7957,31 @@ void MediaCodec::postActivityNotificationIfPossible() {
 status_t MediaCodec::setParameters(const sp<AMessage> &params) {
     sp<AMessage> msg = new AMessage(kWhatSetParameters, this);
     msg->setMessage("params", params);
+
+    // Look for Operating Rate in the parameter.
+    float operatingRate = 0;
+    if (getValueFor(params, KEY_OPERATING_RATE, &operatingRate) && operatingRate > 0) {
+        mOperatingRate.mValue = operatingRate;
+        mOperatingRate.mSource = OPERATING_RATE;
+    } else if (mDomain == DOMAIN_VIDEO && mOperatingRate.mSource <= CAPTURE_RATE) {
+        bool isEncoder = (mFlags & kFlagIsEncoder);
+        if (isEncoder) {
+            float captureRate = 0;
+            if (getValueFor(params, KEY_CAPTURE_RATE, &captureRate) && captureRate > 0) {
+                mOperatingRate.mValue = captureRate;
+                mOperatingRate.mSource = CAPTURE_RATE;
+            }
+        }
+
+        if (mOperatingRate.mSource <= FRAME_RATE) {
+            // See if the user has set the frame-rate.
+            float frameRate = 0;
+            if (getValueFor(params, KEY_FRAME_RATE, &frameRate) && frameRate > 0) {
+                mOperatingRate.mValue = frameRate;
+                mOperatingRate.mSource = FRAME_RATE;
+            }
+        }
+    }
 
     sp<AMessage> response;
     return PostAndAwaitResponse(msg, &response);
