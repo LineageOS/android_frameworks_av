@@ -700,9 +700,13 @@ void PatchPanel::Patch::clearConnections_l(const sp<IAfPatchPanel>& panel)
             __func__, mRecord.handle(), mPlayback.handle());
     mRecord.stopTrack();
     mPlayback.stopTrack();
-    mRecord.clearTrackPeer(); // mRecord stop is synchronous. Break PeerProxy sp<> cycle.
     mRecord.closeConnections_l(panel);
     mPlayback.closeConnections_l(panel);
+    // Break PeerProxy sp<> cycle.
+    // Must be called after mRecord.closeConnections_l() to make sure the fast capture
+    // track if any is not active any more.
+    mRecord.clearTrackPeer();
+
 }
 
 status_t PatchPanel::Patch::getLatencyMs(double* latencyMs) const
