@@ -22,6 +22,7 @@
 #include <binder/Parcelable.h>
 
 #include <camera/CameraMetadata.h>
+#include <camera/camera2/OutputConfiguration.h>
 #include <android/hardware/CameraExtensionSessionStats.h>
 
 namespace android {
@@ -76,6 +77,9 @@ public:
     // Current surface ID for this stream
     int32_t mCurrentSurfaceId;
 
+    // MultiResolution output mode
+    int32_t mMultiResMode;
+
 
     CameraStreamStats() :
             mWidth(0), mHeight(0), mFormat(0), mMaxPreviewFps(0), mDataSpace(0), mUsage(0),
@@ -84,10 +88,10 @@ public:
             mDynamicRangeProfile(ANDROID_REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD),
             mStreamUseCase(ANDROID_SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT),
             mColorSpace(ANDROID_REQUEST_AVAILABLE_COLOR_SPACE_PROFILES_MAP_UNSPECIFIED),
-            mCurrentSurfaceId(0) {}
+            mCurrentSurfaceId(0), mMultiResMode(OutputConfiguration::MULTI_RES_OFF) {}
     CameraStreamStats(int width, int height, int format, float maxPreviewFps, int dataSpace,
             int64_t usage, int maxHalBuffers, int maxAppBuffers, int dynamicRangeProfile,
-            int streamUseCase, int32_t colorSpace, uint32_t currentSurfaceId)
+            int streamUseCase, int32_t colorSpace, uint32_t currentSurfaceId, int32_t multiResMode)
             : mWidth(width), mHeight(height), mFormat(format), mMaxPreviewFps(maxPreviewFps),
               mDataSpace(dataSpace), mUsage(usage), mRequestCount(0), mErrorCount(0),
               mStartLatencyMs(0), mMaxHalBuffers(maxHalBuffers),
@@ -96,7 +100,8 @@ public:
               mDynamicRangeProfile(dynamicRangeProfile),
               mStreamUseCase(streamUseCase),
               mColorSpace(colorSpace),
-              mCurrentSurfaceId(currentSurfaceId) {}
+              mCurrentSurfaceId(currentSurfaceId),
+              mMultiResMode(multiResMode) {}
 
     virtual status_t readFromParcel(const android::Parcel* parcel) override;
     virtual status_t writeToParcel(android::Parcel* parcel) const override;

@@ -116,7 +116,7 @@ import org.json.JSONObject;
             JSONObject event = new JSONObject();
             event.put("timestamp_ms", timeMs);
             event.put(key, value);
-            mResult.accumulate("events", event);
+            mResult.append("events", event);
         } catch (JSONException e) {
             Log.e(mLogTag, "Failed to log event: " + key, e);
         }

@@ -144,6 +144,12 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int32_t multiResMode = 0;
+    if ((err = parcel->readInt32(&multiResMode)) != OK) {
+        ALOGE("%s: Failed to read multiResolution mode from parcel", __FUNCTION__);
+        return err;
+    }
+
     mWidth = width;
     mHeight = height;
     mFormat = format;
@@ -162,6 +168,7 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
     mDynamicRangeProfile = dynamicRangeProfile;
     mStreamUseCase = streamUseCase;
     mColorSpace = colorSpace;
+    mMultiResMode = multiResMode;
 
     return OK;
 }
@@ -264,6 +271,10 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
         return err;
     }
 
+    if ((err = parcel->writeInt32(mMultiResMode)) != OK) {
+        ALOGE("%s: failed to write MultiResolution mode!", __FUNCTION__);
+        return err;
+    }
 
     return OK;
 }
