@@ -568,6 +568,8 @@ public:
             uid_t uid,
             audio_output_flags_t flags,
             media::audio::common::FlushFromFrameSupport* support) const = 0;
+
+    virtual status_t useMmapForPcmOffload(bool* result) = 0;
 };
 
 // Audio Policy client Interface

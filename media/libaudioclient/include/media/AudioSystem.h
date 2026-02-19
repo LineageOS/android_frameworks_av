@@ -789,6 +789,9 @@ public:
             const audio_attributes_t& attr,
             audio_output_flags_t flags,
             android::media::audio::common::FlushFromFrameSupport* support);
+
+    static status_t useMmapForPcmOffload(bool* useMmapForPcmOffload);
+
     // A listener for capture state changes.
     class CaptureStateListener : public virtual RefBase {
     public:
