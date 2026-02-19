@@ -117,6 +117,13 @@ class VirtualCameraSession
       const ::aidl::android::hardware::camera::device::CaptureRequest& request)
       EXCLUDES(mLock);
 
+  bool isInFatalError() const {
+    return mSessionContext.isInFatalError();
+  }
+
+  // Callback for fatal session errors.
+  void onSessionError();
+
   std::weak_ptr<VirtualCameraDevice> mCameraDevice;
 
   mutable std::mutex mLock;

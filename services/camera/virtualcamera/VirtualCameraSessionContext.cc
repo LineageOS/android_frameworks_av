@@ -33,8 +33,10 @@ using ::aidl::android::hardware::camera::device::StreamBuffer;
 using ::aidl::android::hardware::camera::device::StreamConfiguration;
 
 VirtualCameraSessionContext::VirtualCameraSessionContext(
-    const bool isMultiInputStreamEnabled)
-    : mIsMultiInputStreamEnabled(isMultiInputStreamEnabled) {
+    const bool isMultiInputStreamEnabled,
+    std::function<void()> onFatalErrorCallback)
+    : mIsMultiInputStreamEnabled(isMultiInputStreamEnabled),
+      mOnFatalErrorCallback(onFatalErrorCallback) {
 }
 
 bool VirtualCameraSessionContext::initializeStream(
@@ -256,6 +258,18 @@ std::set<int> VirtualCameraSessionContext::getUsedInputStreamIds() const {
     usedIds.insert(inputStreamId);
   }
   return usedIds;
+}
+
+bool VirtualCameraSessionContext::setFatalError() {
+  bool wasAlreadyFatal = mInFatalError.exchange(true);
+  if (wasAlreadyFatal) {
+    return false;
+  }
+
+  if (mOnFatalErrorCallback) {
+    mOnFatalErrorCallback();
+  }
+  return true;
 }
 
 }  // namespace virtualcamera
