@@ -10179,7 +10179,7 @@ status_t AudioPolicyManager::useMmapForPcmOffload(bool* result) {
 
     static constexpr uint32_t kClassicalOffloadFlags =
             (AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
-             AUDIO_OUTPUT_FLAG_NON_BLOCKING | AUDIO_OUTPUT_FLAG_DIRECT);
+             AUDIO_OUTPUT_FLAG_NON_BLOCKING);
 
     const sp<IOProfile> classicalOffloadProfile = mHwModules.getCompatibleProfile(
             kClassicalOffloadFlags, false /*isInput*/);
