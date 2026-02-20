@@ -91,12 +91,12 @@ status_t AidlConversionEq::setParameter(EffectParamReader& param) {
             }
             std::vector<Equalizer::BandLevel> bandLevels;
             for (int i = 0; i < num; i++) {
-                Equalizer::BandLevel level({.index = i});
-                if (OK != param.readFromValue((uint16_t*)&level.levelMb)) {
+                int16_t levelMb;
+                if (OK != param.readFromValue(&levelMb)) {
                     ALOGE("%s invalid param %s", __func__, param.toString().c_str());
                     return BAD_VALUE;
                 }
-                bandLevels.push_back(level);
+                bandLevels.push_back({.index = i, .levelMb = levelMb});
             }
             aidlParam = MAKE_SPECIFIC_PARAMETER(Equalizer, equalizer, bandLevels, bandLevels);
             break;
