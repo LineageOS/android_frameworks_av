@@ -299,6 +299,10 @@ AudioTrack::AudioTrack(
                           "" /*codecProvenance*/}};
 }
 
+AudioTrack::AudioTrack(SetParams&& params) {
+    set(std::move(params));
+}
+
 void AudioTrack::onFirstRef() {
     if (mSetParams) {
         set(*mSetParams);
