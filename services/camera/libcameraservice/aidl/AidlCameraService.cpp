@@ -145,9 +145,6 @@ ndk::ScopedAStatus AidlCameraService::connectDeviceV2(
         const std::shared_ptr<SICameraDeviceCallback>& in_callback,
         const std::string& in_cameraId, bool sharedMode,
         std::shared_ptr<SICameraDeviceUser>* _aidl_return) {
-      if (!flags::camera_multi_client()) {
-          return fromSStatus(SStatus::INVALID_OPERATION);
-      }
       return connectDeviceImpl(in_callback, in_cameraId, sharedMode, _aidl_return);
 }
 
