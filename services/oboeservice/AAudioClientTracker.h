@@ -81,7 +81,8 @@ private:
     /**
      * One per process.
      */
-    class NotificationClient : public IBinder::DeathRecipient {
+    class NotificationClient : public IBinder::DeathRecipient,
+                               public IBinder::FrozenStateChangeCallback  {
     public:
         NotificationClient(pid_t pid, const android::sp<IBinder>& binder);
         ~NotificationClient() override = default;
@@ -114,6 +115,8 @@ private:
 
         // IBinder::DeathRecipient
         void binderDied(const android::wp<IBinder>& who) override;
+        // IBinder::FrozenStateChangeCallback
+        void onStateChanged(const android::wp<IBinder>& who, State state) override;
 
     private:
         mutable std::mutex                              mLock;

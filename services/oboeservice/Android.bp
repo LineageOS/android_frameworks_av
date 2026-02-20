@@ -88,6 +88,7 @@ cc_defaults {
     shared_libs: [
         "aaudio-aidl-cpp",
         "com.android.media.aaudio-aconfig-cc",
+        "com.android.media.audioserver-aconfig-cc",
         "framework-permission-aidl-cpp",
         "libaaudio_internal_core",
         "libaaudio_internal_fifo",

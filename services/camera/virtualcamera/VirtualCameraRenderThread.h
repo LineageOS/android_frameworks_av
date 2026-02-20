@@ -150,8 +150,10 @@ class VirtualCameraRenderThread {
   // Process single capture request task (always called on render thread).
   void processCaptureRequest(const ProcessCaptureRequestTask& captureRequestTask);
 
-  // Flush single capture request task returning the error status immediately.
-  void flushCaptureRequest(const ProcessCaptureRequestTask& captureRequestTask);
+  // Complete the capture request with a recoverable error result.
+  // This is used for timeouts, early exits, and during session flushing.
+  void completeCaptureRequestWithError(
+      const ProcessCaptureRequestTask& captureRequestTask);
 
   // Throttle the current thread to ensure that we are not rendering faster than
   // the virtual camera maxFps.
@@ -159,12 +161,6 @@ class VirtualCameraRenderThread {
   // lastAcquisitionTimestamp: timestamp of the previous frame
   void throttleRendering(int maxFps,
                          std::chrono::nanoseconds lastAcquisitionTimestamp);
-
-  // Fetch the timestamp of the latest buffer from the EGL Surface
-  // timeSinceLastFrame: The elapsed time since the last captured frame.
-  // Return 0 if no timestamp has been associated to this surface by the producer.
-  std::chrono::nanoseconds getSurfaceTimestamp(
-      std::chrono::nanoseconds timeSinceLastFrame);
 
   // Build a default capture result object populating the metadata from the request.
   std::unique_ptr<::aidl::android::hardware::camera::device::CaptureResult>
@@ -224,9 +220,11 @@ class VirtualCameraRenderThread {
   volatile bool GUARDED_BY(mLock) mTextureUpdateRequested = false;
   volatile bool GUARDED_BY(mLock) mPendingExit = false;
 
+  // Number of consecutive timeouts.
+  std::atomic<int> mWaitInputFrameTimeoutsCount{0};
+
   // Acquisition timestamp of last frame.
   std::atomic<uint64_t> mLastAcquisitionTimestampNanoseconds;
-  std::atomic<uint64_t> mLastSurfaceTimestampNanoseconds;
 
   std::unique_ptr<VirtualCameraImageHandler> mImageHandler;
 

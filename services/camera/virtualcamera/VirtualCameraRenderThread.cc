@@ -90,17 +90,13 @@ namespace flags = ::android::companion::virtualdevice::flags;
 
 static constexpr UpdateTextureTask kUpdateTextureTask;
 
-// The number of nanoseconds to wait for the first frame to be drawn on the
-// input surface
-static constexpr std::chrono::nanoseconds kMaxWaitFirstFrame = 15s;
-// The number of nanoseconds to wait for a frame for use cases where frame
-// duplication is not an option.
-static constexpr std::chrono::nanoseconds kMaxWaitNoDuplication = 60s;
-// The factor by which the frame wait time interval is adjusted in order to
-// accommodate for producer variance
-static constexpr double kWaitFrameRelaxationCoefficient = 1.5;
+// The number of nanoseconds to wait for each individual capture request.
+static constexpr std::chrono::nanoseconds kWaitInputFrameTimeout = 4s;
 
-static constexpr double kOneSecondInNanos = 1e9;
+// Max number of consecutive timeouts before reporting a device error.
+// TODO(b/450609791): Simplify the timeout logic when we support owner error reports.
+static constexpr int kMaxTimeoutCountFirstFrame = 3;
+static constexpr int kMaxTimeoutCount = 2;
 
 NotifyMsg createShutterNotifyMsg(int frameNumber,
                                  std::chrono::nanoseconds timestamp) {
@@ -131,48 +127,6 @@ NotifyMsg createRequestErrorNotifyMsg(int frameNumber) {
                .errorStreamId = -1,
                .errorCode = ErrorCode::ERROR_REQUEST});
   return msg;
-}
-
-// By default, virtual camera will duplicate the last frame if the producer does
-// not post a new frame. When a frame is duplicated, the timestamp must still
-// increase to please the camera framework expectations. In some usecases, this
-// frame duplication is not wanted, like for motion tracking, where the
-// timestamp must match the graphic data.
-bool allowFrameDuplication(const RequestSettings& requestSettings) {
-  if (!flags::virtual_camera_no_frame_duplication()) {
-    return true;
-  }
-  if (requestSettings.captureIntent == ANDROID_CONTROL_CAPTURE_INTENT_PREVIEW) {
-    return true;
-  }
-
-  return false;
-}
-
-std::chrono::nanoseconds getMaxFrameDuration(
-    const RequestSettings& requestSettings, bool isFirstFrameDrawn) {
-  // If we should not duplicate frames, wait as much as we can.
-  if (!allowFrameDuplication(requestSettings)) {
-    return kMaxWaitNoDuplication;
-  }
-
-  // If it's not the first frame and the request specify a FPS, return the minFps
-  if (isFirstFrameDrawn && requestSettings.fpsRange.has_value()) {
-    return std::chrono::nanoseconds(static_cast<uint64_t>(
-        kWaitFrameRelaxationCoefficient * kOneSecondInNanos /
-        std::max(1, requestSettings.fpsRange->minFps)));
-  }
-
-  // If we can duplicate frame but nothing has been drawn on the suface yet, we
-  // allow ourselves to wait a bit longer
-  if (!isFirstFrameDrawn) {
-    return kMaxWaitFirstFrame;
-  }
-
-  // In all other cases we wait for the duration of kMinFps
-  return std::chrono::nanoseconds(
-      static_cast<uint64_t>(kWaitFrameRelaxationCoefficient *
-                            kOneSecondInNanos / VirtualCameraDevice::kMinFps));
 }
 
 // Translate a frame duration into a fps value with triple decimal precision
@@ -260,7 +214,7 @@ void VirtualCameraRenderThread::flush() {
     std::unique_ptr<ProcessCaptureRequestTask> task =
         std::move(mCaptureRequestQueue.front());
     mCaptureRequestQueue.pop_front();
-    flushCaptureRequest(*task);
+    completeCaptureRequestWithError(*task);
   }
 }
 
@@ -370,51 +324,40 @@ void VirtualCameraRenderThread::processCaptureRequest(
   const bool isFirstFrameDrawn = mImageHandler->isFirstFrameDrawn();
   ALOGV("First Frame Drawn: %s", isFirstFrameDrawn ? "Yes" : "No");
 
-  std::chrono::nanoseconds maxFrameDuration =
-      getMaxFrameDuration(request.getRequestSettings(), isFirstFrameDrawn);
-  std::chrono::nanoseconds elapsedDuration =
-      isFirstFrameDrawn && lastAcquisitionTimestamp > 0ns
-          ? deviceTime - lastAcquisitionTimestamp
-          : 0ns;
-
-  const std::chrono::nanoseconds waitTime =
-      std::max(0ns, maxFrameDuration - elapsedDuration);
-  ALOGV("maxFrameDuration %lld, elapsedDuration %lld, waitTime %lld",
-        maxFrameDuration.count(), elapsedDuration.count(), waitTime.count());
-
-  bool gotNewFrame = false;
-  if (waitTime > 0ns) {
-    bool pendingExit = false;
-    {
-      std::lock_guard<std::mutex> lock(mLock);
-      pendingExit = mPendingExit;
-    }
-    if (!pendingExit) {
-      // We can afford to wait for next frame.
-      // Note that if there's already new frame in the input Surface, the call
-      // below returns immediately.
-      gotNewFrame = mImageHandler->waitForInputFrame(waitTime);
-    }
+  bool pendingExit = false;
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    pendingExit = mPendingExit;
+  }
+  if (pendingExit) {
+    ALOGW("Render thread pending exit.");
+    completeCaptureRequestWithError(request);
+    return;
   }
 
-  if (!gotNewFrame) {
-    ALOGV(
-        "%s: No new frame received on input surface after waiting for "
-        "%.3f s",
-        __func__, static_cast<uint64_t>(waitTime.count()) / kOneSecondInNanos);
+  if (!mImageHandler->waitForInputFrame(kWaitInputFrameTimeout)) {
+    mWaitInputFrameTimeoutsCount++;
+    const int maxTimeoutCount =
+        isFirstFrameDrawn ? kMaxTimeoutCount : kMaxTimeoutCountFirstFrame;
+    ALOGW(
+        "Timed out waiting for frame to be posted, timeout counter %d out of "
+        "%d.",
+        mWaitInputFrameTimeoutsCount.load(), maxTimeoutCount);
 
-    if (!allowFrameDuplication(request.getRequestSettings()) ||
-        !mImageHandler->isFirstFrameDrawn()) {
-      // We don't have any input ever drawn. This is considered as an error
-      // case. Notify the framework of the failure and return early.
-      ALOGW("Timed out waiting for frame to be posted.");
-      std::unique_ptr<CaptureResult> captureResult = createCaptureResult(
-          request.getFrameNumber(), /* metadata = */ nullptr);
-      notifyTimeout(request, *captureResult);
-      submitCaptureResult(std::move(captureResult));
-      return;
+    completeCaptureRequestWithError(request);
+
+    if (mWaitInputFrameTimeoutsCount >= maxTimeoutCount) {
+      ALOGE("Fatal timeout reached (%d consecutive timeouts). Flushing.",
+            mWaitInputFrameTimeoutsCount.load());
+      // Signal fatal error to the session (triggers global flush and
+      // notification). We must not hold mLock here to avoid deadlocks.
+      mSessionContext.setFatalError();
     }
+    return;
   }
+
+  // A frame was successfully received, reset the timeout counter.
+  mWaitInputFrameTimeoutsCount = 0;
 
   // If the request has a maxFps, we throttle the rendering to make sure that
   // the requester receives the latest frame that was posted by the virtual
@@ -438,17 +381,12 @@ void VirtualCameraRenderThread::processCaptureRequest(
   deviceTime = std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 
-  elapsedDuration = isFirstFrameDrawn && lastAcquisitionTimestamp > 0ns
-                        ? deviceTime - lastAcquisitionTimestamp
-                        : 0ns;
-
   mLastAcquisitionTimestampNanoseconds.store(deviceTime.count(),
                                              std::memory_order_relaxed);
 
   std::chrono::nanoseconds captureTimestamp = deviceTime;
   if (flags::camera_timestamp_from_surface()) {
-    std::chrono::nanoseconds surfaceTimestamp =
-        getSurfaceTimestamp(elapsedDuration);
+    std::chrono::nanoseconds surfaceTimestamp = mImageHandler->getTimestamp();
     if (surfaceTimestamp.count() > 0) {
       captureTimestamp = surfaceTimestamp;
     }
@@ -550,28 +488,6 @@ void VirtualCameraRenderThread::throttleRendering(
           static_cast<uint64_t>(frameDuration.count()),
           nanosToFps(frameDuration), maxFps);
   }
-}
-
-std::chrono::nanoseconds VirtualCameraRenderThread::getSurfaceTimestamp(
-    std::chrono::nanoseconds timeSinceLastFrame) {
-  std::chrono::nanoseconds surfaceTimestamp = mImageHandler->getTimestamp();
-  uint64_t lastSurfaceTimestamp = mLastSurfaceTimestampNanoseconds.load();
-  if (lastSurfaceTimestamp > 0 &&
-      surfaceTimestamp.count() <= lastSurfaceTimestamp) {
-    // The timestamps were provided by the producer but we are
-    // repeating the last frame, so we increase the previous timestamp by
-    // the elapsed time since its capture, otherwise the camera framework
-    // will discard the frame.
-    surfaceTimestamp = std::chrono::nanoseconds(lastSurfaceTimestamp +
-                                                timeSinceLastFrame.count());
-    ALOGI(
-        "Surface's timestamp is stall. Artificially increasing the surface "
-        "timestamp by %lld",
-        timeSinceLastFrame.count());
-  }
-  mLastSurfaceTimestampNanoseconds.store(surfaceTimestamp.count(),
-                                         std::memory_order_relaxed);
-  return surfaceTimestamp;
 }
 
 std::unique_ptr<CaptureResult> VirtualCameraRenderThread::createCaptureResult(
@@ -710,7 +626,7 @@ void VirtualCameraRenderThread::renderOutputBuffers(
   return status;
 }
 
-void VirtualCameraRenderThread::flushCaptureRequest(
+void VirtualCameraRenderThread::completeCaptureRequestWithError(
     const ProcessCaptureRequestTask& request) {
   CaptureResult captureResult;
   captureResult.fmqResultSize = 0;
