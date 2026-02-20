@@ -10148,6 +10148,11 @@ status_t AudioPolicyManager::useMmapForPcmOffload(bool* result) {
         return BAD_VALUE;
     }
 
+    if (!android_media_audio_partial_flush_for_pcm_offload()) {
+        *result = false;
+        return NO_ERROR;
+    }
+
     if (mUseMmapForPcmOffload.has_value()) {
         *result = mUseMmapForPcmOffload.value();
         return NO_ERROR;
@@ -10157,54 +10162,50 @@ status_t AudioPolicyManager::useMmapForPcmOffload(bool* result) {
     // 1) persist.media.audio.prefer_mmap_pcm_offload is set and mmap pcm offload is available or
     // 2) persist.media.audio.prefer_mmap_pcm_offload is not set and mmap pcm offload has the same
     //    routing capabilities as the classical pcm offload.
-
-    static const std::string kPreferMmapPcmOffloadSysProp =
+    // Note during testing MMAP as backend for PCM offload, this is untrue as
+    // persist.media.audio.prefer_mmap_pcm_offload is default to false.
+    constexpr const char* preferMmapPcmOffloadSysProp =
             "persist.media.audio.prefer_mmap_pcm_offload";
-
-    // TODO: b/479291234, change default value to true when fully tested.
-    if (!property_get_bool(kPreferMmapPcmOffloadSysProp.c_str(),
-                           false /* default_value */)) {
-        ALOGD("%s: do not prefer mmap pcm offload as by %s is false",
-              __func__, kPreferMmapPcmOffloadSysProp.c_str());
-        *result = false;
-        mUseMmapForPcmOffload.emplace(*result);
-        return NO_ERROR;
-    }
-
-    static constexpr uint32_t kMmapOffloadFlags =
+    constexpr uint32_t mmapOffloadFlags =
             (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
              AUDIO_OUTPUT_FLAG_DIRECT);
-
-    const sp<IOProfile> mmapOffloadProfile =
-            mHwModules.getCompatibleProfile(kMmapOffloadFlags, false /*isInput*/);
-    if (mmapOffloadProfile == nullptr) {
-        // If MMAP offload is not supported, never use MMAP for PCM offload.
-        *result = false;
-        mUseMmapForPcmOffload.emplace(*result);
-        return NO_ERROR;
-    }
-
+    constexpr uint32_t classicalOffloadFlags =
+            (AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
+             AUDIO_OUTPUT_FLAG_NON_BLOCKING);
     char buf[PROPERTY_VALUE_MAX] = {};
-    if (property_get(kPreferMmapPcmOffloadSysProp.c_str(), buf, "") >= 1) {
+    *result = false;
+
+    // TODO: b/479291234, change default value to true when fully tested.
+    if (const auto mmapOffloadProfile = mHwModules.getCompatibleProfile(
+                mmapOffloadFlags, false /*isInput*/);
+            mmapOffloadProfile == nullptr) {
+        // If MMAP offload is not supported, never use MMAP for PCM offload via AudioTrack
+        ALOGD("%s: do not prefer mmap pcm offload as mmap pcm offload is not supported", __func__);
+        *result = false;
+    } else if (!property_get_bool(preferMmapPcmOffloadSysProp, false /* default_value */)) {
+        // If persist.media.audio.prefer_mmap_pcm_offload is false, never use MMAP for
+        // PCM offload via AudioTrack
+        ALOGD("%s: do not prefer mmap pcm offload as by %s is false",
+              __func__, preferMmapPcmOffloadSysProp);
+        *result = false;
+    } else if (property_get(preferMmapPcmOffloadSysProp, buf, "") >= 1) {
         // persist.media.audio.prefer_mmap_pcm_offload is set to true and mmap pcm offload is
         // supported. Always prefer MMAP PCM offload in this case.
         *result = true;
-        mUseMmapForPcmOffload.emplace(*result);
-        return NO_ERROR;
+    } else if (const auto classicalOffloadProfile = mHwModules.getCompatibleProfile(
+            classicalOffloadFlags, false /*isInput*/);
+            classicalOffloadProfile == nullptr) {
+        // Classical pcm offload is not supported and mmap pcm offload is supported. Prefer
+        // mmap pcm offload in this case.
+        *result = true;
+    } else {
+        // Prefer mmap offload if supported devices of mmap offload is a superset of classical
+        // offload so that there won't be a switch from mmap offload to classical offload when the
+        // routing is changed.
+        *result = mmapOffloadProfile->getSupportedDevices().containsAllDevices(
+                classicalOffloadProfile->getSupportedDevices());
     }
 
-    static constexpr uint32_t kClassicalOffloadFlags =
-            (AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
-             AUDIO_OUTPUT_FLAG_NON_BLOCKING);
-
-    const sp<IOProfile> classicalOffloadProfile = mHwModules.getCompatibleProfile(
-            kClassicalOffloadFlags, false /*isInput*/);
-    // Prefer mmap offload if supported devices of mmap offload is a superset of classical offload
-    // so that there won't be a switch from mmap offload to classical offload when the routing is
-    // changed.
-    *result = classicalOffloadProfile == nullptr ||
-            mmapOffloadProfile->getSupportedDevices().containsAllDevices(
-                    classicalOffloadProfile->getSupportedDevices());
     mUseMmapForPcmOffload.emplace(*result);
     return NO_ERROR;
 }
