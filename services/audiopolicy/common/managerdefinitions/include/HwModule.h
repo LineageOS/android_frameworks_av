@@ -214,6 +214,8 @@ public:
      */
     void cleanUpForDevice(const sp<DeviceDescriptor> &device);
 
+    sp<IOProfile> getCompatibleProfile(uint32_t flags, bool isInput) const;
+
     void dump(String8 *dst) const;
 };
 

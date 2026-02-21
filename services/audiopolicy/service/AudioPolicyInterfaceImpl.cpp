@@ -3063,4 +3063,13 @@ Status AudioPolicyService::getFlushFromFrameSupport(const AudioConfigBase& confi
                                                           _aidl_return));
 }
 
+Status AudioPolicyService::useMmapForPcmOffload(bool* _aidl_return) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    audio_utils::lock_guard _l(mMutex);
+    return binderStatusFromStatusT(
+            mAudioPolicyManager->useMmapForPcmOffload(_aidl_return));
+}
+
 } // namespace android

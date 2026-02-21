@@ -560,4 +560,9 @@ interface IAudioPolicyService {
     FlushFromFrameSupport getFlushFromFrameSupport(
             in AudioConfigBase config, in AudioAttributes attributes, int uid,
             int /* Bitmask, indexed by AudioOutputFlags */ flags);
+
+    /**
+     * Returns if mmap path is preferred for pcm offload playback.
+     */
+    boolean useMmapForPcmOffload();
 }

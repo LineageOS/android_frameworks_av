@@ -541,6 +541,8 @@ public:
                 audio_output_flags_t flags,
                 media::audio::common::FlushFromFrameSupport* support) const override;
 
+        status_t useMmapForPcmOffload(bool* result) override;
+
         status_t initialize();
 
 protected:
@@ -1159,6 +1161,8 @@ protected:
         // end point.
         sp<SourceClientDescriptor> mCallRxSourceClient;
         sp<SourceClientDescriptor> mCallTxSourceClient;
+
+        std::optional<bool> mUseMmapForPcmOffload;
 
         std::map<audio_port_handle_t,
                  std::map<product_strategy_t,
