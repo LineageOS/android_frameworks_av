@@ -264,14 +264,10 @@ int32_t ClientDescriptor<KEY, VALUE>::getOwnerId() const {
 
 template<class KEY, class VALUE>
 bool ClientDescriptor<KEY, VALUE>::isConflicting(const KEY& key) const {
-    if (flags::camera_multi_client()) {
-        // In shared mode, there can be more than one client using the camera.
-        // Hence, having more than one client with the same key is not considered as
-        // conflicting.
-        if (!mSharedMode && key == mKey) return true;
-    } else {
-        if (key == mKey) return true;
-    }
+    // In shared mode, there can be more than one client using the camera.
+    // Hence, having more than one client with the same key is not considered as
+    // conflicting.
+    if (!mSharedMode && key == mKey) return true;
     for (const auto& x : mConflicting) {
         if (key == x) return true;
     }
@@ -560,13 +556,9 @@ ClientManager<KEY, VALUE, LISTENER>::wouldEvictLocked(
         int32_t curOwner = i->getOwnerId();
         bool curSharedMode = i->getSharedMode();
         bool conflicting;
-        if (flags::camera_multi_client()) {
-            conflicting = (((!sharedMode || !curSharedMode || (owner == curOwner)) && curKey == key)
-                    || i->isConflicting(key) || client->isConflicting(curKey));
-        } else {
-            conflicting = (curKey == key || i->isConflicting(key) ||
-                    client->isConflicting(curKey));
-        }
+
+        conflicting = (((!sharedMode || !curSharedMode || (owner == curOwner)) && curKey == key)
+                || i->isConflicting(key) || client->isConflicting(curKey));
 
         if (!returnIncompatibleClients) {
             // Find evicted clients
@@ -694,11 +686,9 @@ template<class KEY, class VALUE, class LISTENER>
 std::shared_ptr<ClientDescriptor<KEY, VALUE>> ClientManager<KEY, VALUE, LISTENER>::getSharedClient(
         int pid) const {
     Mutex::Autolock lock(mLock);
-    if (flags::camera_multi_client()) {
-        for (const auto& i : mClients) {
-            if ((i->getOwnerId() == pid) && (i->getSharedMode())) {
-                return i;
-            }
+    for (const auto& i : mClients) {
+        if ((i->getOwnerId() == pid) && (i->getSharedMode())) {
+            return i;
         }
     }
     return std::shared_ptr<ClientDescriptor<KEY, VALUE>>(nullptr);
@@ -730,15 +720,13 @@ template<class KEY, class VALUE, class LISTENER>
 std::shared_ptr<ClientDescriptor<KEY, VALUE>> ClientManager<KEY, VALUE, LISTENER>::getPrimaryClient(
         const KEY& key) const {
     Mutex::Autolock lock(mLock);
-    if (flags::camera_multi_client()) {
-        for (const auto& i : mClients) {
-            bool sharedMode =  i->getSharedMode();
-            bool primaryClient;
-            status_t ret = i->getValue()->isPrimaryClient(&primaryClient);
-            if (ret == OK) {
-                if ((i->getKey() == key) && sharedMode && primaryClient) {
-                    return i;
-                }
+    for (const auto& i : mClients) {
+        bool sharedMode =  i->getSharedMode();
+        bool primaryClient;
+        status_t ret = i->getValue()->isPrimaryClient(&primaryClient);
+        if (ret == OK) {
+            if ((i->getKey() == key) && sharedMode && primaryClient) {
+                return i;
             }
         }
     }
@@ -762,19 +750,17 @@ std::vector<std::shared_ptr<ClientDescriptor<KEY, VALUE>>>
         ClientManager<KEY, VALUE, LISTENER>::removeAll(const KEY& key) {
     Mutex::Autolock lock(mLock);
     std::vector<std::shared_ptr<ClientDescriptor<KEY, VALUE>>> clients;
-    if (flags::camera_multi_client()) {
-        for (auto it = mClients.begin(); it != mClients.end();)
-        {
-            if ((*it)->getKey() == key) {
-                if (mListener != nullptr) mListener->onClientRemoved(**it);
-                clients.push_back(*it);
-                it = mClients.erase(it);
-            } else {
-                ++it;
-            }
+    for (auto it = mClients.begin(); it != mClients.end();)
+    {
+        if ((*it)->getKey() == key) {
+            if (mListener != nullptr) mListener->onClientRemoved(**it);
+            clients.push_back(*it);
+            it = mClients.erase(it);
+        } else {
+            ++it;
         }
-        mRemovedCondition.broadcast();
     }
+    mRemovedCondition.broadcast();
     return clients;
 }
 
