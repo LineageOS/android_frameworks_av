@@ -293,6 +293,8 @@ private:
     }
     void removeClient_l(pid_t pid) REQUIRES(clientMutex()) final;
     void removeNotificationClient(pid_t pid) final EXCLUDES_AudioFlinger_Mutex;
+    void onClientUnfrozen(pid_t pid) EXCLUDES_AudioFlinger_Mutex;
+    void onClientFrozen(pid_t pid) EXCLUDES_AudioFlinger_Mutex;
     status_t moveAuxEffectToIo(
             int effectId,
             const sp<IAfPlaybackThread>& dstThread,
@@ -504,7 +506,10 @@ private:
         std::make_shared<audio_utils::TimerQueue>(true /* alarm */)};
 
     // --- Notification Client ---
-    class NotificationClient : public IBinder::DeathRecipient {
+    class NotificationClient
+            : public IBinder::DeathRecipient
+            , public IBinder::FrozenStateChangeCallback
+    {
     public:
                             NotificationClient(const sp<AudioFlinger>& audioFlinger,
                                                 const sp<media::IAudioFlingerClient>& client,
@@ -518,6 +523,10 @@ private:
 
                 // IBinder::DeathRecipient
                 virtual     void        binderDied(const wp<IBinder>& who);
+        // IBinder::FrozenStateChangeCallback
+        void onStateChanged(const android::wp<IBinder>& who, State state) override;
+
+        bool isFrozen() const { return mFrozen; }
 
     private:
         DISALLOW_COPY_AND_ASSIGN(NotificationClient);
@@ -527,6 +536,7 @@ private:
         const uid_t             mUid;
         const sp<media::IAudioFlingerClient> mAudioFlingerClient;
         const std::unique_ptr<media::psh_utils::Token> mClientToken;
+        std::atomic<bool> mFrozen = false;
     };
 
     // Find io handle by session id.
