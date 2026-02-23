@@ -100,4 +100,7 @@ cc_test_host {
         "libbase", // StringAppendF
         "libheadtracking",
     ],
+    test_suites: [
+        "general-tests",
+    ],
 }
