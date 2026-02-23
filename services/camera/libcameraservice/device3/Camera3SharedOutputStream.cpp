@@ -304,9 +304,9 @@ status_t Camera3SharedOutputStream::configureQueueLocked() {
     return OK;
 }
 
-status_t Camera3SharedOutputStream::disconnectLocked() {
+status_t Camera3SharedOutputStream::disconnectLocked(bool force) {
     status_t res;
-    res = Camera3OutputStream::disconnectLocked();
+    res = Camera3OutputStream::disconnectLocked(force);
 
     if (mStreamSplitter != nullptr) {
         mStreamSplitter->disconnect();

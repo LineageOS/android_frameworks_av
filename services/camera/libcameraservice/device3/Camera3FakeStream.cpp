@@ -93,7 +93,7 @@ status_t Camera3FakeStream::configureQueueLocked() {
     return OK;
 }
 
-status_t Camera3FakeStream::disconnectLocked() {
+status_t Camera3FakeStream::disconnectLocked(bool /*force*/) {
     mState = (mState == STATE_IN_RECONFIG) ? STATE_IN_CONFIG
                                            : STATE_CONSTRUCTED;
     return OK;

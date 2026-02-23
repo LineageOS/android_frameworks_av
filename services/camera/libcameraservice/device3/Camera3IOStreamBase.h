@@ -120,7 +120,7 @@ class Camera3IOStreamBase :
     // State check only
     virtual status_t configureQueueLocked();
     // State checks only
-    virtual status_t disconnectLocked();
+    virtual status_t disconnectLocked(bool force = false);
 
     // Hand out the buffer to a native location,
     //   incrementing the internal refcount and dequeued buffer count

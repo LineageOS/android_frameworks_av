@@ -161,7 +161,7 @@ private:
 
     virtual status_t configureQueueLocked();
 
-    virtual status_t disconnectLocked();
+    virtual status_t disconnectLocked(bool force = false);
 
     virtual status_t getEndpointUsage(uint64_t *usage);
 

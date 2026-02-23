@@ -196,11 +196,11 @@ status_t Camera3InputStream::getInputSurfaceLocked(sp<Surface> *surface) {
     return OK;
 }
 
-status_t Camera3InputStream::disconnectLocked() {
+status_t Camera3InputStream::disconnectLocked(bool force) {
 
     status_t res;
 
-    if ((res = Camera3IOStreamBase::disconnectLocked()) != OK) {
+    if ((res = Camera3IOStreamBase::disconnectLocked(force)) != OK) {
         return res;
     }
 

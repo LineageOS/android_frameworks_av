@@ -547,7 +547,7 @@ class Camera3Stream :
     virtual status_t getInputSurfaceLocked(sp<Surface> *surface);
 
     // Can return -ENOTCONN when we are already disconnected (not an error)
-    virtual status_t disconnectLocked() = 0;
+    virtual status_t disconnectLocked(bool force = false) = 0;
 
     // Configure the buffer queue interface to the other end of the stream,
     // after the HAL has provided usage and max_buffers values. After this call,
