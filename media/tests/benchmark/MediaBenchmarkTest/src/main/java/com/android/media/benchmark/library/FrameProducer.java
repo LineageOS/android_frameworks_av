@@ -60,6 +60,9 @@ public class FrameProducer {
                 case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible:
                     mFormat = ImageFormat.YUV_420_888;
                     break;
+                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitABGR8888:
+                    mFormat = android.graphics.PixelFormat.RGBA_8888;
+                    break;
                 default:
                     throw new IllegalArgumentException("Unsupported format: " + codecFormat);
             }
@@ -241,6 +244,38 @@ public class FrameProducer {
                 }
             }
 
+            return true;
+        } else if (mPixelFormat.mFormat == android.graphics.PixelFormat.RGBA_8888) {
+            ByteBuffer buffer = planes[0].getBuffer();
+            int rowStride = planes[0].getRowStride();
+            int pixelStride = planes[0].getPixelStride();
+            int bytesPerPixel = 4;
+            int bytesPerRow = width * bytesPerPixel;
+            ByteBuffer rowData = ByteBuffer.allocate(bytesPerRow);
+
+            for (int row = 0; row < height; row++) {
+                rowData.clear();
+                if (channel.read(rowData) < bytesPerRow) {
+                    return false;
+                }
+                rowData.flip();
+
+                if (pixelStride == bytesPerPixel) {
+                    buffer.position(row * rowStride);
+                    buffer.put(rowData);
+                } else {
+                    byte[] rowBytes = rowData.array();
+                    int rowOffset = row * rowStride;
+                    for (int col = 0; col < width; col++) {
+                        int srcIdx = col * bytesPerPixel;
+                        int dstIdx = rowOffset + col * pixelStride;
+                        buffer.put(dstIdx, rowBytes[srcIdx]);
+                        buffer.put(dstIdx + 1, rowBytes[srcIdx + 1]);
+                        buffer.put(dstIdx + 2, rowBytes[srcIdx + 2]);
+                        buffer.put(dstIdx + 3, rowBytes[srcIdx + 3]);
+                    }
+                }
+            }
             return true;
         }
 
