@@ -80,8 +80,9 @@ cc_binary {
     ],
 }
 
-cc_test_host {
+cc_test {
     name: "libheadtracking-test",
+    host_supported: true,
     srcs: [
         "HeadTrackingProcessor-test.cpp",
         "ModeSelector-test.cpp",
@@ -99,5 +100,8 @@ cc_test_host {
         "libaudioutils",
         "libbase", // StringAppendF
         "libheadtracking",
+    ],
+    test_suites: [
+        "general-tests",
     ],
 }
