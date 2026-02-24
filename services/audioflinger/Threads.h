@@ -545,6 +545,10 @@ public:
     }
     mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kThreadBase_Mutex};
 
+    // Freeze handling, override on a thread basis.
+    void onClientUnfrozen(pid_t pid __unused) override EXCLUDES_ThreadBase_Mutex {}
+    void onClientFrozen(pid_t pid __unused) override EXCLUDES_ThreadBase_Mutex {}
+
     void onEffectEnable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
     void onEffectDisable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
 
