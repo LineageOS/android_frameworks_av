@@ -878,6 +878,8 @@ protected:
 
     ActiveTracks mActiveTracks GUARDED_BY(mutex()) {&mLocalLog};
 
+    sp<IAfTrackBase> getActiveTrackById_l(audio_port_handle_t portId) REQUIRES(mutex());
+
         // The Tracks class manages tracks added and removed from the Thread.
 
     class Tracks {
@@ -2324,10 +2326,13 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
             EXCLUDES_ThreadBase_Mutex;
     status_t getMmapPosition(struct audio_mmap_position* position) const override
             EXCLUDES_ThreadBase_Mutex;
-    status_t start(const AudioClient& client,
-                   const audio_attributes_t *attr,
-            audio_port_handle_t* handle) final EXCLUDES_ThreadBase_Mutex;
-    status_t stop(audio_port_handle_t handle) final EXCLUDES_ThreadBase_Mutex;
+    status_t createTrack(const AudioClient& client,
+                         const audio_attributes_t& attr,
+                         audio_port_handle_t* portId,
+                         audio_io_handle_t* ioHandle) final EXCLUDES_ThreadBase_Mutex;
+    status_t startTrack(audio_port_handle_t portId) final EXCLUDES_ThreadBase_Mutex;
+    status_t stopTrack(audio_port_handle_t portId) final EXCLUDES_ThreadBase_Mutex;
+    status_t releaseTrack(audio_port_handle_t portId) final EXCLUDES_ThreadBase_Mutex;
     status_t standby() final EXCLUDES_ThreadBase_Mutex;
     status_t getObservablePosition(uint64_t* position, int64_t* timeNanos) const
             EXCLUDES_ThreadBase_Mutex = 0;

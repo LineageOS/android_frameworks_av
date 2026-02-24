@@ -146,7 +146,7 @@ aaudio_result_t aaudio::AAudioServiceEndpointShared::stopSharingThread() {
 
 aaudio_result_t AAudioServiceEndpointShared::startStream(
         sp<AAudioServiceStreamBase> sharedStream,
-        audio_port_handle_t *clientHandle)
+        audio_port_handle_t clientHandle)
         NO_THREAD_SAFETY_ANALYSIS {
     aaudio_result_t result = AAUDIO_OK;
 
@@ -167,9 +167,7 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(
     }
 
     if (result == AAUDIO_OK) {
-        const audio_attributes_t attr = getAudioAttributesFrom(sharedStream.get());
-        result = getStreamInternal()->startClient(
-                sharedStream->getAudioClient(), &attr, clientHandle);
+        result = getStreamInternal()->startClient(clientHandle);
         if (result != AAUDIO_OK) {
             if (--mRunningStreamCount == 0) { // atomic
                 stopSharingThread();
@@ -191,6 +189,17 @@ aaudio_result_t AAudioServiceEndpointShared::stopStream(
         getStreamInternal()->systemStopFromApp();
     }
     return AAUDIO_OK;
+}
+
+aaudio_result_t AAudioServiceEndpointShared::createClient(const android::AudioClient& client,
+                                                          const audio_attributes_t& attr,
+                                                          audio_port_handle_t* clientHandle,
+                                                          audio_io_handle_t* ioHandle) {
+    return getStreamInternal()->createClient(client, attr, clientHandle, ioHandle);
+}
+
+aaudio_result_t AAudioServiceEndpointShared::releaseClient(audio_port_handle_t clientHandle) {
+    return getStreamInternal()->releaseClient(clientHandle);
 }
 
 // Get timestamp that was written by the real-time service thread, eg. mixer.

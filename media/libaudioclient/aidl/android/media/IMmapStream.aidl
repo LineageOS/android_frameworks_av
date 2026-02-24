@@ -68,24 +68,44 @@ interface IMmapStream {
      */
     MmapObservablePosition getObservablePosition();
 
-    /**
-     * Start a stream operating in mmap mode.
-     * createMmapBuffer() must be called before calling start()
-     *
-     * @param client a AudioClient struct describing the client starting on this stream.
-     * @param attr audio attributes provided by the client.
-     * @param portId to be used
-     * @return a unique handle for this instance. Used with stop().
-     */
-    int start(in AudioClient client, in @nullable AudioAttributes attr, in int portId);
+    parcelable MmapCreateTrackResponse {
+        /** Allocated port id for the track. */
+        int portId;
+        /** IO handle of the thread. */
+        int ioHandle;
+    }
 
     /**
-     * Stop a stream operating in mmap mode.
+     * Create a track for the client.
+     *
+     * @param client a AudioClient struct describing the client.
+     * @param attr audio attributes provided by the client.
+     * @return a MmapCreateTrackResponse struct with portId and ioHandle.
+     */
+    MmapCreateTrackResponse createTrack(in AudioClient client, in AudioAttributes attr);
+
+    /**
+     * Start a track operating in mmap mode.
+     * createMmapBuffer() must be called before calling start()
+     *
+     * @param portId unique port id allocated by createTrack().
+     */
+    void startTrack(in int portId);
+
+    /**
+     * Stop a track operating in mmap mode.
      * Must be called after start()
      *
-     * @param handle unique handle allocated by start().
+     * @param portId unique port id allocated by createTrack().
      */
-    void stop(in int handle);
+    void stopTrack(in int portHandle);
+
+    /**
+     * Release a track from the mmap stream.
+     *
+     * @param portId unique port id of the track to release.
+     */
+    void releaseTrack(in int portId);
 
     /**
      * Put a stream operating in mmap mode into standby.

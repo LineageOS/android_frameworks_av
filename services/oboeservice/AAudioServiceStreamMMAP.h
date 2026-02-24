@@ -52,11 +52,16 @@ public:
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override
             EXCLUDES(mUpMessageQueueLock);
 
-    aaudio_result_t startClient(const android::AudioClient& client,
-                                const audio_attributes_t *attr,
-                                audio_port_handle_t *clientHandle) override;
+    aaudio_result_t createClient(const android::AudioClient& client,
+                                 const audio_attributes_t& attr,
+                                 audio_port_handle_t* clientHandle,
+                                 audio_io_handle_t* ioHandle) override;
+
+    aaudio_result_t startClient(audio_port_handle_t clientHandle) override;
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle) override;
+
+    aaudio_result_t releaseClient(audio_port_handle_t clientHandle) override;
 
     const char *getTypeText() const override { return "MMAP"; }
 
@@ -98,9 +103,7 @@ protected:
      */
     aaudio_result_t startDevice_l() REQUIRES(mLock) override;
 
-    aaudio_result_t startClient_l(const android::AudioClient& client,
-                                  const audio_attributes_t *attr,
-                                  audio_port_handle_t *clientHandle) REQUIRES(mLock) override;
+    aaudio_result_t startClient_l(audio_port_handle_t clientHandle) REQUIRES(mLock) override;
 
     aaudio_result_t stopClient_l(audio_port_handle_t clientHandle) REQUIRES(mLock) override;
 

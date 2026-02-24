@@ -109,13 +109,20 @@ public:
             android::media::audio::common::AudioPlaybackRate* rateOut,
             int32_t* _aidl_return) override;
 
+    aaudio_result_t createClient(aaudio::aaudio_handle_t streamHandle,
+                                 const android::AudioClient& client,
+                                 const audio_attributes_t& attr,
+                                 audio_port_handle_t* clientHandle,
+                                 audio_io_handle_t* ioHandle);
+
     aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
-                                const android::AudioClient& client,
-                                const audio_attributes_t *attr,
-                                audio_port_handle_t *clientHandle);
+                                audio_port_handle_t clientHandle);
 
     aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
-                                       audio_port_handle_t clientHandle);
+                               audio_port_handle_t clientHandle);
+
+    aaudio_result_t releaseClient(aaudio::aaudio_handle_t streamHandle,
+                                  audio_port_handle_t clientHandle);
 
  // ===============================================================================
  // The following public methods are only called from the service and NOT by Binder.
@@ -139,16 +146,28 @@ private:
                 : aaudio::AAudioBinderAdapter(service, DEFAULT_AAUDIO_SERVICE_ID),
                   mService(service) {}
 
+        aaudio_result_t createClient(const aaudio::AAudioHandleInfo& streamHandleInfo,
+                                     const android::AudioClient& client,
+                                     const audio_attributes_t& attr,
+                                     audio_port_handle_t* clientHandle,
+                                     audio_io_handle_t* ioHandle) final {
+            return mService->createClient(
+                    streamHandleInfo.getHandle(), client, attr, clientHandle, ioHandle);
+        }
+
         aaudio_result_t startClient(const aaudio::AAudioHandleInfo& streamHandleInfo,
-                                    const android::AudioClient &client,
-                                    const audio_attributes_t *attr,
-                                    audio_port_handle_t *clientHandle) override {
-            return mService->startClient(streamHandleInfo.getHandle(), client, attr, clientHandle);
+                                    audio_port_handle_t clientHandle) override {
+            return mService->startClient(streamHandleInfo.getHandle(), clientHandle);
         }
 
         aaudio_result_t stopClient(const aaudio::AAudioHandleInfo& streamHandleInfo,
                                    audio_port_handle_t clientHandle) override {
             return mService->stopClient(streamHandleInfo.getHandle(), clientHandle);
+        }
+
+        aaudio_result_t releaseClient(const aaudio::AAudioHandleInfo& streamHandleInfo,
+                                      audio_port_handle_t clientHandle) final {
+            return mService->releaseClient(streamHandleInfo.getHandle(), clientHandle);
         }
 
     private:

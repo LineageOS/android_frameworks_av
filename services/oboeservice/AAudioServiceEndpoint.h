@@ -64,20 +64,31 @@ public:
             EXCLUDES(mLockStreams);
 
     virtual aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
-                                        audio_port_handle_t *clientHandle) = 0;
+                                        audio_port_handle_t clientHandle) = 0;
 
     virtual aaudio_result_t stopStream(android::sp<AAudioServiceStreamBase> stream,
                                        audio_port_handle_t clientHandle) = 0;
 
-    virtual aaudio_result_t startClient(const android::AudioClient& /*client*/,
-                                        const audio_attributes_t* /*attr*/,
-                                        audio_port_handle_t* /*clientHandle*/) {
+    virtual aaudio_result_t createClient(const android::AudioClient& /*client*/,
+                                         const audio_attributes_t& /*attr*/,
+                                         audio_port_handle_t* /*portHandlePtr*/,
+                                         audio_io_handle_t* /*ioHandlePtr*/) {
+        ALOGD("AAudioServiceEndpoint::createClient(...) AAUDIO_ERROR_UNAVAILABLE");
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t startClient(audio_port_handle_t /*clientHandle*/) {
         ALOGD("AAudioServiceEndpoint::startClient(...) AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
     virtual aaudio_result_t stopClient(audio_port_handle_t /*clientHandle*/) {
         ALOGD("AAudioServiceEndpoint::stopClient(...) AAUDIO_ERROR_UNAVAILABLE");
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t releaseClient(audio_port_handle_t /*clientHandle*/) {
+        ALOGD("AAudioServiceEndpoint::releaseClient(...) AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 

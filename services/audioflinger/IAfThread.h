@@ -701,10 +701,13 @@ public:
             EXCLUDES_ThreadBase_Mutex = 0;
     virtual status_t getMmapPosition(struct audio_mmap_position* position) const
             EXCLUDES_ThreadBase_Mutex = 0;
-    virtual status_t start(
-            const AudioClient& client, const audio_attributes_t* attr,
-            audio_port_handle_t* handle) EXCLUDES_ThreadBase_Mutex = 0;
-    virtual status_t stop(audio_port_handle_t handle) EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t createTrack(
+            const AudioClient& client, const audio_attributes_t& attr,
+            audio_port_handle_t* portId, audio_io_handle_t* ioHandle)
+            EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t startTrack(audio_port_handle_t portId) EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t stopTrack(audio_port_handle_t portId) EXCLUDES_ThreadBase_Mutex = 0;
+    virtual status_t releaseTrack(audio_port_handle_t portId) EXCLUDES_ThreadBase_Mutex = 0;
     virtual status_t standby() EXCLUDES_ThreadBase_Mutex = 0;
     virtual status_t getObservablePosition(uint64_t* position, int64_t* timeNanos) const
             EXCLUDES_ThreadBase_Mutex = 0;

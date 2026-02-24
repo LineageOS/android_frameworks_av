@@ -437,16 +437,27 @@ sp<AAudioServiceStreamBase> AAudioService::convertHandleToServiceStream(
     return serviceStream;
 }
 
-aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
-                                           const android::AudioClient& client,
-                                           const audio_attributes_t *attr,
-                                           audio_port_handle_t *clientHandle) {
+aaudio_result_t AAudioService::createClient(aaudio::aaudio_handle_t streamHandle,
+                                            const android::AudioClient& client,
+                                            const audio_attributes_t& attr,
+                                            audio_port_handle_t* clientHandle,
+                                            audio_io_handle_t* ioHandle) {
     const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
-    return serviceStream->startClient(client, attr, clientHandle);
+    return serviceStream->createClient(client, attr, clientHandle, ioHandle);
+}
+
+aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
+                                           audio_port_handle_t clientHandle) {
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    if (serviceStream.get() == nullptr) {
+        ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
+        return AAUDIO_ERROR_INVALID_HANDLE;
+    }
+    return serviceStream->startClient(clientHandle);
 }
 
 aaudio_result_t AAudioService::stopClient(aaudio_handle_t streamHandle,
@@ -457,6 +468,16 @@ aaudio_result_t AAudioService::stopClient(aaudio_handle_t streamHandle,
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
     return serviceStream->stopClient(portHandle);
+}
+
+aaudio_result_t AAudioService::releaseClient(aaudio::aaudio_handle_t streamHandle,
+                                             audio_port_handle_t clientHandle) {
+    const sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
+    if (serviceStream.get() == nullptr) {
+        ALOGW("%s(), invalid streamHandle = 0x%0x", __func__, streamHandle);
+        return AAUDIO_ERROR_INVALID_HANDLE;
+    }
+    return serviceStream->releaseClient(clientHandle);
 }
 
 // This is only called internally when AudioFlinger wants to tear down a stream.
