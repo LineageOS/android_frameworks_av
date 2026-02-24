@@ -120,7 +120,8 @@ class VirtualCameraDevice
   // Allocate and return next id for input stream (input surface).
   int allocateInputStreamId();
 
-  void closeSession();
+  // Closes the current camera session and notifies camera framework of device error
+  void closeSession(bool notifyError = false);
 
   // Maximal number of RAW streams - virtual camera doesn't support RAW streams.
   static constexpr int32_t kMaxNumberOfRawStreams = 0;

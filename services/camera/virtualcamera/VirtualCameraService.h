@@ -62,6 +62,11 @@ class VirtualCameraService
                                  std::string* _aidl_return) override
       EXCLUDES(mLock);
 
+  // Closes any open session for the camera corresponding to the given binder
+  // token and notifies the camera framework of device error
+  ndk::ScopedAStatus closeSession(const ::ndk::SpAIBinder& token) override
+      EXCLUDES(mLock);
+
   // Returns VirtualCameraDevice corresponding to binder token or nullptr if
   // there's no camera asociated with the token.
   std::shared_ptr<VirtualCameraDevice> getCamera(const ::ndk::SpAIBinder& token)
