@@ -30,6 +30,7 @@
 #include <afutils/FallibleLockGuard.h>
 #include <afutils/Vibrator.h>
 #include <android/media/BnMmapStream.h>
+#include <android/binder_to_string.h>
 #include <audio_utils/MelProcessor.h>
 #include <audio_utils/Metadata.h>
 #include <audio_utils/Time.h>
@@ -1752,6 +1753,17 @@ void ThreadBase::disconnectEffectHandle(IAfEffectHandle* handle,
             effect->checkSuspendOnEffectEnabled(false, false /*threadLocked*/);
         }
     }
+}
+
+std::vector<audio_port_handle_t> ThreadBase::invalidateTracksForPid_l(pid_t pid) {
+    std::vector<audio_port_handle_t> portIds;
+    for (const auto& t : mTracks) {
+        if (t->creatorPid() == pid && t->isExternalTrack()) {
+            t->invalidate();
+            portIds.push_back(t->portId());
+        }
+    }
+    return portIds;
 }
 
 void ThreadBase::onEffectEnable(const sp<IAfEffectModule>& effect) {
@@ -8380,6 +8392,30 @@ void RecordThread::preExit()
     }
     mActiveTracks.clear();
     mStartStopCV.notify_all();
+}
+
+void RecordThread::onClientFrozen(pid_t pid)
+{
+    if (!property_get_bool("persist.audio.record_freeze_invalidate", false)) {
+        return;
+    }
+    // We must delay the invalidation until after the freeze transition
+    // to prevent creating excessive client activity during transition.
+    static constexpr auto kFreezeDelay = std::chrono::milliseconds(100);
+    const auto wpThis = wp<RecordThread>::fromExisting(this);
+    getAsyncCommandThread().add(
+            std::string("RecordThread::onClientFrozen-").append(mThreadName),
+            [wpThis, pid]() {
+                const auto recordThread = wpThis.promote();
+                if (recordThread) {
+                    audio_utils::lock_guard lg(recordThread->mutex());
+                    const auto portIds = recordThread->invalidateTracksForPid_l(pid);
+                    ALOGD_IF(!portIds.empty(), "onClientFrozen(%d): "
+                            "portIds %s invalidated for frozen pid %d",
+                            recordThread->id(),
+                            internal::ToString(portIds).c_str(), pid);
+                }
+            }, kFreezeDelay);
 }
 
 bool RecordThread::threadLoop()
