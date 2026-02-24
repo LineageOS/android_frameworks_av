@@ -71,7 +71,6 @@ cc_defaults {
         "libmediaplayerservice",
         "libmediautils",
         "libnbaio",
-        "libnblog",
         "libpermission",
         "libpowermanager",
         "libsensorprivacy",

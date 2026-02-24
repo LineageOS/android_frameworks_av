@@ -50,10 +50,6 @@ const FastThreadState *FastCapture::poll()
     return mSQ.poll();
 }
 
-void FastCapture::setNBLogWriter(NBLog::Writer *logWriter __unused)
-{
-}
-
 void FastCapture::onIdle()
 {
     mPreIdle = *(const FastCaptureState *)mCurrent;

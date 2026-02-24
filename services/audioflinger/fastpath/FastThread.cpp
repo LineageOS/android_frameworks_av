@@ -28,7 +28,6 @@
 #include <utils/Trace.h>
 #include "FastThread.h"
 #include "FastThreadDumpState.h"
-#include <afutils/TypedLogger.h>
 
 #define FAST_DEFAULT_NS    999999999L   // ~1 sec: default time to sleep
 #define FAST_HOT_IDLE_NS     1000000L   // 1 ms: time to sleep while hot idling
@@ -46,9 +45,6 @@ FastThread::FastThread(const char *cycleMs, const char *loadUs) : Thread(false /
 
 bool FastThread::threadLoop()
 {
-    // LOGT now works even if tlNBLogWriter is nullptr, but we're considering changing that,
-    // so this initialization permits a future change to remove the check for nullptr.
-    aflog::setThreadWriter(mDummyNBLogWriter.get());
     for (;;) {
 
         // either nanosleep, sched_yield, or busy wait
@@ -88,10 +84,6 @@ bool FastThread::threadLoop()
 
             // As soon as possible of learning of a new dump area, start using it
             mDumpState = next->mDumpState != nullptr ? next->mDumpState : mDummyDumpState;
-            NBLog::Writer * const writer = next->mNBLogWriter != nullptr ?
-                    next->mNBLogWriter : mDummyNBLogWriter.get();
-            aflog::setThreadWriter(writer);
-            setNBLogWriter(writer); // This is used for debugging only
 
             // We want to always have a valid reference to the previous (non-idle) state.
             // However, the state queue only guarantees access to current and previous states.
@@ -226,9 +218,6 @@ bool FastThread::threadLoop()
                         mIsWarm = true;
                         mDumpState->mMeasuredWarmupTs = mMeasuredWarmupTs;
                         mDumpState->mWarmupCycles = mWarmupCycles;
-                        const double measuredWarmupMs = (mMeasuredWarmupTs.tv_sec * 1e3) +
-                                (mMeasuredWarmupTs.tv_nsec * 1e-6);
-                        LOG_WARMUP_TIME(measuredWarmupMs);
                     }
                 }
                 mSleepNs = -1;
@@ -239,7 +228,6 @@ bool FastThread::threadLoop()
                         ALOGV("underrun: time since last cycle %d.%03ld sec",
                                 (int) sec, nsec / 1000000L);
                         mDumpState->mUnderruns++;
-                        LOG_UNDERRUN(audio_utils_ns_from_timespec(&newTs));
                         mIgnoreNextOverrun = true;
                     } else if (nsec < mOverrunNs) {
                         if (mIgnoreNextOverrun) {
@@ -249,7 +237,6 @@ bool FastThread::threadLoop()
                             ALOGV("overrun: time since last cycle %d.%03ld sec",
                                     (int) sec, nsec / 1000000L);
                             mDumpState->mOverruns++;
-                            LOG_OVERRUN(audio_utils_ns_from_timespec(&newTs));
                         }
                         // This forces a minimum cycle time. It:
                         //  - compensates for an audio HAL with jitter due to sample rate conversion
@@ -310,7 +297,6 @@ bool FastThread::threadLoop()
                     // these stores #1, #2, #3 are not atomic with respect to each other,
                     // or with respect to store #4 below
                     mDumpState->mMonotonicNs[i] = monotonicNs;
-                    LOG_WORK_TIME(monotonicNs);
                     mDumpState->mLoadNs[i] = loadNs;
 #ifdef CPU_FREQUENCY_STATISTICS
                     mDumpState->mCpukHz[i] = kHz;

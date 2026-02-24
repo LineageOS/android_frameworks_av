@@ -2265,10 +2265,6 @@ private:
             // If a fast capture is present, the Pipe as IMemory, otherwise clear
             sp<IMemory>                         mPipeMemory;
 
-            // TODO: add comment and adjust size as needed
-            static const size_t                 kFastCaptureLogSize = 4 * 1024;
-            sp<NBLog::Writer>                   mFastCaptureNBLogWriter;
-
             bool                                mFastTrackAvail;    // true if fast track available
             // common state to all record threads
             std::atomic_bool                    mBtNrecSuspended;

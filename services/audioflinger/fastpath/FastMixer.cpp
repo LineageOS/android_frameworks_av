@@ -43,7 +43,6 @@
 #include <cutils/bitops.h>
 #include <media/AudioMixer.h>
 #include "FastMixer.h"
-#include <afutils/TypedLogger.h>
 
 namespace android {
 
@@ -89,10 +88,6 @@ FastMixerStateQueue* FastMixer::sq()
 const FastThreadState *FastMixer::poll()
 {
     return mSQ.poll();
-}
-
-void FastMixer::setNBLogWriter(NBLog::Writer *logWriter __unused)
-{
 }
 
 void FastMixer::onIdle()
@@ -247,11 +242,6 @@ void FastMixer::onStateChange()
             //       implementation; it would be better to have normal mixer allocate for us
             //       to avoid blocking here and to prevent possible priority inversion
             mMixer = new AudioMixer(frameCount, mSampleRate);
-            // FIXME See the other FIXME at FastMixer::setNBLogWriter()
-            NBLog::thread_params_t params;
-            params.frameCount = frameCount;
-            params.sampleRate = mSampleRate;
-            LOG_THREAD_PARAMS(params);
             const size_t mixerFrameSize = mSinkChannelCount
                     * audio_bytes_per_sample(mMixerBufferFormat);
             mMixerBufferSize = mixerFrameSize * frameCount;
@@ -327,26 +317,13 @@ void FastMixer::onStateChange()
 
 void FastMixer::onWork()
 {
-    // TODO: pass an ID parameter to indicate which time series we want to write to in NBLog.cpp
     // Or: pass both of these into a single call with a boolean
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
     FastMixerDumpState * const dumpState = (FastMixerDumpState *) mDumpState;
 
-    if (mIsWarm) {
-        // Logging timestamps for FastMixer is currently disabled to make memory room for logging
-        // other statistics in FastMixer.
-        // To re-enable, delete the #ifdef FASTMIXER_LOG_HIST_TS lines (and the #endif lines).
-#ifdef FASTMIXER_LOG_HIST_TS
-        LOG_HIST_TS();
-#endif
-        //ALOGD("Eric FastMixer::onWork() mIsWarm");
-    } else {
+    if (!mIsWarm) {
         dumpState->mTimestampVerifier.discontinuity(
             dumpState->mTimestampVerifier.DISCONTINUITY_MODE_CONTINUOUS);
-        // See comment in if block.
-#ifdef FASTMIXER_LOG_HIST_TS
-        LOG_AUDIO_STATE();
-#endif
     }
     const FastMixerState::Command command = mCommand;
     const size_t frameCount = current->mFrameCount;
@@ -513,7 +490,6 @@ void FastMixer::onWork()
                     const double latencyMs =
                             (double)mNativeFramesWrittenButNotPresented * 1000 / mSampleRate;
                     dumpState->mLatencyMs = latencyMs;
-                    LOG_LATENCY(latencyMs);
                 } else {
                     // HAL reported that more frames were presented than were written
                     mNativeFramesWrittenButNotPresented = 0;
