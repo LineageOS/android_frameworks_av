@@ -21,3 +21,6 @@ service mediametrics /apex/com.android.media/bin/mediametrics
     group media
     ioprio rt 4
     task_profiles ProcessCapacityHigh HighPerformance
+    # if this exists AND the one in system exists, run this one
+    # 2026/2/10: trying the experiment
+    override

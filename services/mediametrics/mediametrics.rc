@@ -4,5 +4,5 @@ service mediametrics /system/bin/mediametrics
     group media
     ioprio rt 4
     task_profiles ProcessCapacityHigh HighPerformance
-    # we expect to update this service via mainline
+    # we may update this from a module
     updatable
