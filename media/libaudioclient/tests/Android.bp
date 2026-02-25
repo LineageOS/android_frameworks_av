@@ -111,7 +111,6 @@ cc_defaults {
         "libmedia_helper",
         "libmediametrics",
         "libmediautils",
-        "libnblog",
         "libprocessgroup",
         "libshmemcompat",
         "mediametricsservice-aidl-cpp",

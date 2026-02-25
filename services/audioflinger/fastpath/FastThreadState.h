@@ -19,7 +19,6 @@
 #include <type_traits>
 #include "Configuration.h"
 #include <stdint.h>
-#include <media/nblog/NBLog.h>
 
 namespace android {
 
@@ -42,7 +41,6 @@ struct FastThreadState {
 
     // This might be a one-time configuration rather than per-state
     FastThreadDumpState* mDumpState = nullptr; // if non-NULL, then update dump state periodically
-    NBLog::Writer* mNBLogWriter = nullptr; // non-blocking logger
 
     // returns NULL if command belongs to a subclass
     static const char *commandToString(Command command);

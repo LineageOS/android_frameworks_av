@@ -40,7 +40,6 @@ cc_library {
         "BufLog.cpp",
         "NBAIO_Tee.cpp",
         "PropertyUtils.cpp",
-        "TypedLogger.cpp",
         "Vibrator.cpp",
     ],
 
@@ -53,7 +52,6 @@ cc_library {
         "libcutils", // property_get_int32
         "liblog",
         "libnbaio",
-        "libnblog",
         "libutils",
         "libvibrator",
     ],

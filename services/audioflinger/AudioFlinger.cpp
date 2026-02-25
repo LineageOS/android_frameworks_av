@@ -29,7 +29,6 @@
 #include <afutils/FallibleLockGuard.h>
 #include <afutils/NBAIO_Tee.h>
 #include <afutils/PropertyUtils.h>
-#include <afutils/TypedLogger.h>
 #include <android-base/errors.h>
 #include <android-base/stringprintf.h>
 #include <android/media/IAudioPolicyService.h>

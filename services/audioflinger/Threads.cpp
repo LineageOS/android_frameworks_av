@@ -28,7 +28,6 @@
 #include "ResamplerBufferProvider.h"
 
 #include <afutils/FallibleLockGuard.h>
-#include <afutils/TypedLogger.h>
 #include <afutils/Vibrator.h>
 #include <android/media/BnMmapStream.h>
 #include <audio_utils/MelProcessor.h>
@@ -3566,7 +3565,6 @@ void PlaybackThread::threadLoop_removeTracks(
 // shared by MIXER and DIRECT, overridden by DUPLICATING
 ssize_t PlaybackThread::threadLoop_write()
 {
-    LOG_HIST_TS();
     mInWrite = true;
     ssize_t bytesWritten;
     const size_t offset = mCurrentWriteLength - mBytesRemaining;
@@ -4117,7 +4115,6 @@ NO_THREAD_SAFETY_ANALYSIS  // manual locking of AudioFlinger
 
                     // This is where we go into standby
                     if (!mStandby) {
-                        LOG_AUDIO_STATE();
                         mThreadMetrics.logEndInterval();
                         mThreadSnapshot.onEnd();
                         setStandby_l();
@@ -4751,17 +4748,6 @@ void PlaybackThread::collectTimestamps_l()
             mLatencyMs.add(latencyMs);
         }
     }
-#if 0
-    // logFormat example
-    if (z % 100 == 0) {
-        timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        LOGT("This is an integer %d, this is a float %f, this is my "
-            "pid %p %% %s %t", 42, 3.14, "and this is a timestamp", ts);
-        LOGT("A deceptive null-terminated string %\0");
-    }
-    ++z;
-#endif
 }
 
 // removeTracks_l() must be called with ThreadBase::mutex() held
@@ -8173,7 +8159,6 @@ RecordThread::RecordThread(const sp<IAfThreadCallback>& afThreadCallback,
     // mPipeSource
     , mPipeFramesP2(0)
     // mPipeMemory
-    // mFastCaptureNBLogWriter
     , mFastTrackAvail(false)
     , mBtNrecSuspended(false)
 {

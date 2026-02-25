@@ -17,6 +17,8 @@
 #include <audio_utils/roundup.h>
 #include "FastThreadDumpState.h"
 
+#include <string.h>
+
 namespace android {
 
 FastThreadDumpState::FastThreadDumpState()
