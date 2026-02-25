@@ -54,6 +54,13 @@ class VirtualCameraImageHandler {
   virtual bool waitForInputFrame(const std::chrono::nanoseconds timeout) = 0;
 
   /**
+   * interruptWait()
+   *
+   * Interrupt any ongoing wait for an input frame.
+   */
+  virtual void interruptWait() = 0;
+
+  /**
    * updateTexture()
    *
    * Request input surface to fast-forward to most recent input frame.
