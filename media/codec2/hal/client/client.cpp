@@ -3193,8 +3193,9 @@ public:
 
     void unlinkToDeath(size_t seq, const std::shared_ptr<AidlBase> &base) {
         std::unique_lock lock(mMutex);
-        AIBinder_unlinkToDeath(base->asBinder().get(), mDeathRecipient.get(), (void *)seq);
-        mMap.erase(seq);
+        if (mMap.erase(seq) > 0) {
+            AIBinder_unlinkToDeath(base->asBinder().get(), mDeathRecipient.get(), (void *)seq);
+        }
     }
 
 private:

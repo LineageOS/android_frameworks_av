@@ -116,6 +116,7 @@ protected:
     static void OnBinderDied(void *cookie);
     static void OnBinderUnlinked(void *cookie);
     struct DeathContext;
+    std::mutex mDeathContextMutex;
     DeathContext *mDeathContext;
 };
 
