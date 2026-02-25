@@ -61,6 +61,7 @@ class VirtualCameraImageTransformingHandler : public VirtualCameraImageHandler {
   virtual ~VirtualCameraImageTransformingHandler();
 
   virtual bool waitForInputFrame(const std::chrono::nanoseconds timeout) override;
+  virtual void interruptWait() override;
   virtual void updateTexture() override;
   virtual std::chrono::nanoseconds getTimestamp() override;
   virtual bool isFirstFrameDrawn() override;
