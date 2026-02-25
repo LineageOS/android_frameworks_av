@@ -185,6 +185,8 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
         const aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
         serviceStream->setHandle(handle);
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
+        // Currently, port handle and io handle are not exposed when opening.
+        // TODO: b/479291234 - Need to expose the port handle and io handle when successfully open
         paramsOut.copyFrom(*serviceStream);
         *_paramsOut = std::move(paramsOut).parcelable();
         // Log open in MediaMetrics after we have the handle because we need the handle to

@@ -270,7 +270,7 @@ void AudioStreamInternalPlay::onFlushFromServer() {
 // Write the data, block if needed and timeoutMillis > 0
 aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFrames,
                                                int64_t timeoutNanoseconds) {
-    if (mayNeedToDrain() && !isDataCallbackSet()) {
+    if (mayNeedToDrain() && (!isDataCallbackSet() || mUseDataAvailableCallback)) {
         std::lock_guard _l(mStreamMutex);
         if (mDraining) {
             if (aaudio_result_t result = activateStream_l(); result != AAUDIO_OK) {
@@ -589,7 +589,8 @@ aaudio_result_t AudioStreamInternalPlay::setOffloadEndOfStream() {
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
     std::lock_guard<std::mutex> lock(mStreamMutex);
-    if (getState() != AAUDIO_STREAM_STATE_STARTED || mClockModel.isStarting()) {
+    if ((getState() != AAUDIO_STREAM_STATE_STARTED && getState() != AAUDIO_STREAM_STATE_STOPPING)
+        || mClockModel.isStarting()) {
         // If the stream is not running or there is not timestamp from the service side,
         // it is not possible to set offload end of stream.
         return AAUDIO_ERROR_INVALID_STATE;
@@ -600,7 +601,7 @@ aaudio_result_t AudioStreamInternalPlay::setOffloadEndOfStream() {
                 mAudioEndpoint->getDataWriteCounter() - getDeviceFramesPerBurst());
         if (android::elapsedRealtimeNano() >= mOffloadEosNanosBoottime) {
             ALOGD("%s no need to drain, all data is played", __func__);
-            maybeCallPresentationEndCallback();
+            maybeCallPresentationEndCallback_l();
             mOffloadEosPending = false;
         } else {
             // When clients set offload end of stream, they may not want to write more data
@@ -620,7 +621,7 @@ bool AudioStreamInternalPlay::shouldStopStream() {
     return !mOffloadEosPending;
 }
 
-void AudioStreamInternalPlay::maybeCallPresentationEndCallback() {
+void AudioStreamInternalPlay::maybeCallPresentationEndCallback_l() {
     if (mPresentationEndCallbackProc != nullptr) {
         pid_t expected = CALLBACK_THREAD_NONE;
         if (mPresentationEndCallbackThread.compare_exchange_strong(expected, gettid())) {
@@ -655,7 +656,18 @@ aaudio_result_t AudioStreamInternalPlay::requestStart_l() {
 }
 
 aaudio_result_t AudioStreamInternalPlay::requestStop_l() {
-    if (mDraining) {
+    if (mDraining && mDrainType == DrainType::DRAIN_ALL_DATA) {
+        mPendingStop = true;
+    } else if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        if (mDraining) {
+            activateStream_l();
+        }
+        // For offload stream, force draining all to avoid original drain allows soft wakeup.
+        int64_t offloadSafeMarginInFrames = mOffloadSafeMarginInFrames;
+        // Use BootTime for wakeup time as the device may have be suspended.
+        const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
+                mAudioEndpoint->getDataWriteCounter() - offloadSafeMarginInFrames);
+        drainStream_l(wakeUpNanosBootTime, DrainType::DRAIN_ALL_DATA);
         mPendingStop = true;
     }
     // When stop is called, the service will notify the HAL so that no more data will be consumed.
@@ -671,15 +683,16 @@ void AudioStreamInternalPlay::wakeupCallbackThread_l() {
             // presentation end callback.
             mOffloadEosPending = false;
             if (android::elapsedRealtimeNano() >= mOffloadEosNanosBoottime) {
-                maybeCallPresentationEndCallback();
+                maybeCallPresentationEndCallback_l();
             }
         }
         return;
     }
     mOffloadEosPending = false;
     mDraining = false;
+    mDrainingNanosValid = false;
     mStreamEndCV.notify_one();
-    mCallbackCV.notify_one();
+    mCallbackCV.notify_all();
 }
 
 aaudio_result_t AudioStreamInternalPlay::flushFromFrame_l(
@@ -748,9 +761,16 @@ aaudio_result_t AudioStreamInternalPlay::drainStream(DrainType drainType) {
         return ret;
     }
     mDraining = true;
+    mDrainType = drainType;
     if (isDataCallbackSet()) {
         const int64_t drainNanos = std::max(
                 (int64_t)0, wakeUpNanosBootTime - android::elapsedRealtimeNano());
+        if (mUseDataAvailableCallback) {
+            mDrainingNanos = drainNanos;
+            mDrainingNanosValid = true;
+            mCallbackCV.notify_all();
+            return AAUDIO_OK;
+        }
         mCallbackCV.wait_for(ul, std::chrono::nanoseconds(drainNanos),
                              [this]() REQUIRES(mStreamMutex) {
             return !mDraining;
@@ -886,15 +906,30 @@ void *AudioStreamInternalPlay::callbackLoop() {
                     return !mOffloadEosPending;
                 });
                 if (mOffloadEosPending || android::elapsedRealtimeNano() >= wakeUpNanosBootTime) {
-                    maybeCallPresentationEndCallback();
+                    maybeCallPresentationEndCallback_l();
                     mOffloadEosPending = false;
                 }
             }
         }
+        int64_t timeoutNanosForDataAvailableCB = 0;
+        if (mUseDataAvailableCallback) {
+            std::lock_guard _l(mStreamMutex);
+            mDrainingNanosValid = false;
+        }
         {
             std::lock_guard _endpointLock(mEndpointMutex);
             // Call application using the AAudio callback interface.
-            callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
+            if (mUseDataAvailableCallback) {
+                // For data available callback, it doesn't transfer any data. Instead,
+                // it signals a notification to client to call write for data transfer.
+                const int32_t fullFrames = mAudioEndpoint->getFullFramesAvailable();
+                timeoutNanosForDataAvailableCB =
+                        static_cast<int64_t>(fullFrames) * AAUDIO_NANOS_PER_SECOND
+                        / getSampleRate();
+                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), fullFrames);
+            } else {
+                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
+            }
         }
 
         if (callbackResult < 0) {
@@ -907,7 +942,8 @@ void *AudioStreamInternalPlay::callbackLoop() {
             result = systemStopInternal();
             break;
         } else if (callbackResult == 0 &&
-                getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+                getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED &&
+                !mUseDataAvailableCallback) {
             // This is offload playback and the client uses a partial data callback. Returning
             // 0 indicates the client may not be able to feed any data now. In that case, drain
             // most of the data before firing another data callback. If there are enough data,
@@ -932,16 +968,39 @@ void *AudioStreamInternalPlay::callbackLoop() {
             }
         }
 
-        // Write audio data to stream. This is a BLOCKING WRITE!
-        // Write data regardless of the callbackResult because we assume the data
-        // is valid even when the callback returns AAUDIO_CALLBACK_RESULT_STOP.
-        // Imagine a callback that is playing a large sound in menory.
-        // When it gets to the end of the sound it can partially fill
-        // the last buffer with the end of the sound, then zero pad the buffer, then return STOP.
-        // If the callback has no valid data then it should zero-fill the entire buffer.
-        result = write(mCallbackBuffer.get(), callbackResult, timeoutNanos);
-        if (result != callbackResult) {
-            break;
+        if (mUseDataAvailableCallback) {
+            // Data available callback mode doesn't transfer data from the callback. Wait until the
+            // client write enough data for draining.
+            {
+                android::audio_utils::unique_lock ul(mStreamMutex);
+                if (!mDrainingNanosValid) {
+                    mCallbackCV.wait_for(
+                            ul, std::chrono::nanoseconds(timeoutNanosForDataAvailableCB),
+                            [this]() REQUIRES(mStreamMutex) {
+                        return mDrainingNanosValid;
+                    });
+                }
+                if (mDrainingNanosValid) {
+                    mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mDrainingNanos),
+                                         [this]() REQUIRES(mStreamMutex) {
+                        return !mDraining;
+                    });
+                    ALOGW_IF(mDraining, "After waiting for drain, still draining");
+                    mDraining = false;
+                }
+            }
+        } else {
+            // Write audio data to stream. This is a BLOCKING WRITE!
+            // Write data regardless of the callbackResult because we assume the data
+            // is valid even when the callback returns AAUDIO_CALLBACK_RESULT_STOP.
+            // Imagine a callback that is playing a large sound in menory.
+            // When it gets to the end of the sound it can partially fill the last buffer
+            // with the end of the sound, then zero pad the buffer, then return STOP.
+            // If the callback has no valid data then it should zero-fill the entire buffer.
+            result = write(mCallbackBuffer.get(), callbackResult, timeoutNanos);
+            if (result != callbackResult) {
+                break;
+            }
         }
     }
 
@@ -971,6 +1030,9 @@ void AudioStreamInternalPlay::onWakeUp_l(android::audio_utils::TimerQueue::handl
         // When onWakeUp is called, it indicates drain completion. `mPendingStop` indicates the
         // client has called stop before. In that case, update state and positions to stopped state.
         setState(AAUDIO_STREAM_STATE_STOPPED);
+        if (mUseDataAvailableCallback) {
+            maybeCallPresentationEndCallback_l();
+        }
         if (mAudioEndpoint != nullptr) {
             const int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
             const int64_t nowNanos = AudioClock::getNanoseconds();
