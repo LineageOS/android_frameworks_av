@@ -1,8 +1,0 @@
-{
-  "presubmit": [
-    {
-      "name": "libheadtracking-test",
-      "host": true
-    }
-  ]
-}
