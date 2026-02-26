@@ -338,7 +338,15 @@ status_t surfaceConnectWithListener(
         const sp<Surface> &surface, sp<SurfaceListener> listener, const char *reason) {
     ALOGD("connecting to surface %p, reason %s", surface.get(), reason);
 
-    status_t err = surface->connect(NATIVE_WINDOW_API_MEDIA, listener);
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+    // Note that this should be relatively safe to do, since they Surface will clear the stored
+    // buffers. Only the AIDL path uses this, but the HIDL path will hold onto reference to the old
+    // buffer between subsequent dequeue calls.
+    const bool kReportBufferRemoval = true;
+#else
+    const bool kReportBufferRemoval = false;
+#endif
+    status_t err = surface->connect(NATIVE_WINDOW_API_MEDIA, listener, kReportBufferRemoval);
     ALOGE_IF(err != OK, "Failed to connect from surface %p, err %d", surface.get(), err);
 
     return err;

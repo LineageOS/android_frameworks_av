@@ -3946,6 +3946,18 @@ void Codec2Client::Component::onBufferAttachedToOutputSurface(
     mOutputBufferQueue->onBufferAttached(generation);
 }
 
+void Codec2Client::Component::onBufferDetachedFromOutputSurface(uint32_t generation,
+                                                                uint64_t bufferId) {
+    (void)generation;
+    (void)bufferId;
+}
+
+void Codec2Client::Component::onBuffersRemovedFromOutputSurface(
+        uint32_t generation, const std::vector<uint64_t>& removedBufferIds) {
+    (void)generation;
+    (void)removedBufferIds;
+}
+
 void Codec2Client::Component::holdIgbaBlocks(
         const std::list<std::unique_ptr<C2Work>>& workList) {
     if (!mAidlBase) {

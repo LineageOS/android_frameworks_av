@@ -546,6 +546,27 @@ public:
     };
 
     /**
+     * Notify buffers are detached from output surface.
+     *
+     * @param     generation    MediaCodec's surface specifier
+     * @param     bufferId      ID of the removed buffer
+     */
+    virtual void onBufferDetachedFromOutputSurface(uint32_t /*generation*/, uint64_t /*bufferId*/) {
+        // default: no-op
+    };
+
+    /**
+     * Notify buffers are removed from output surface.
+     *
+     * @param     generation    MediaCodec's surface specifier
+     * @param     bufferIds     IDs of the removed buffers
+     */
+    virtual void onBuffersRemovedFromOutputSurface(uint32_t /*generation*/,
+                                                   const std::vector<uint64_t>& /*bufferIds*/) {
+        // default: no-op
+    };
+
+    /**
      * Discard a buffer to the underlying CodecBase object.
      *
      * TODO: remove once this operation can be handled by just clearing the
