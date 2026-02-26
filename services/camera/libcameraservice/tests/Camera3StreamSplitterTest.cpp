@@ -79,7 +79,7 @@ class TestSurfaceListener : public SurfaceListener {
   public:
     virtual void onBufferReleased() override { mNumBuffersReleased++; }
     virtual bool needsReleaseNotify() { return true; }
-    virtual void onBufferDetached(int) override {}
+    virtual void onBufferDetached(uint64_t) override {}
     virtual void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>&) override {};
 
     uint32_t mNumBuffersReleased = 0;
