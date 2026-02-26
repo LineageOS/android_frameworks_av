@@ -64,7 +64,6 @@ cc_fuzz {
         "libbinder",
         "libdl",
         "libmediautils",
-        "libnblog",
         "libutils",
         "libxml2",
         "mediametricsservice-aidl-cpp",

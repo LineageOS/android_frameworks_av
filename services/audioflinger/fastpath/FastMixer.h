@@ -50,7 +50,6 @@ private:
 
     // callouts
     const FastThreadState *poll() override;
-    void setNBLogWriter(NBLog::Writer *logWriter) override;
     void onIdle() override;
     void onExit() override;
     bool isSubClassCommand(FastThreadState::Command command) override;

@@ -68,8 +68,6 @@
 #include "Codec2Mapper.h"
 #include "InputSurfaceWrapper.h"
 
-extern "C" android::PersistentSurface *CreateInputSurface();
-
 namespace android {
 
 using namespace std::chrono_literals;
@@ -2166,8 +2164,8 @@ sp<PersistentSurface> CCodec::CreateOmxInputSurface() {
     return nullptr;
 }
 
-sp<PersistentSurface> CCodec::CreateCompatibleInputSurface() {
-    sp<PersistentSurface> surface(CreateInputSurface());
+sp<PersistentSurface> CCodec::createCompatibleInputSurface() {
+    sp<PersistentSurface> surface(CreateInputSurface(mClient));
 
     if (surface == nullptr) {
         surface = CreateOmxInputSurface();
@@ -2189,7 +2187,7 @@ void CCodec::createInputSurface() {
         usage = config->mISConfig ? config->mISConfig->mUsage : 0;
     }
 
-    sp<PersistentSurface> persistentSurface = CreateCompatibleInputSurface();
+    sp<PersistentSurface> persistentSurface = createCompatibleInputSurface();
     PersistentSurface::SurfaceType surfaceType = persistentSurface->getType();
     if (surfaceType == PersistentSurface::TYPE_AIDLSOURCE) {
         ::ndk::SpAIBinder aidlTarget = persistentSurface->getAidlTarget();
@@ -3427,10 +3425,17 @@ void CCodec::initiateReleaseIfStuck() {
 }
 
 // static
-PersistentSurface *CCodec::CreateInputSurface() {
+PersistentSurface *CCodec::CreateInputSurface(const std::shared_ptr<Codec2Client> &client) {
     using namespace android;
-    std::shared_ptr<Codec2Client::InputSurface> inputSurface =
-            Codec2Client::CreateInputSurface();
+    std::shared_ptr<Codec2Client::InputSurface> inputSurface;
+    if (!client) {
+        inputSurface = Codec2Client::CreateInputSurface();
+    } else {
+        c2_status_t res = client->createInputSurface(&inputSurface);
+        if (res != C2_OK && res != C2_OMITTED) {
+            ALOGE("creating InputSurface from client failed %d", res);
+        }
+    }
     if (inputSurface) {
         ::ndk::SpAIBinder interface = inputSurface->getHalInterface();
         ANativeWindow *window = inputSurface->getNativeWindow();

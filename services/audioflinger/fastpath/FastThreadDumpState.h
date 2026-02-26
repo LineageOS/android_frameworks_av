@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "Configuration.h"
 #include "FastThreadState.h"
+
+#include <time.h>
+#include <type_traits>
 
 namespace android {
 

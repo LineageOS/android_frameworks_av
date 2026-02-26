@@ -176,7 +176,6 @@ cc_defaults {
         "libmediautils",
         "libmemunreachable",
         "libnbaio",
-        "libnblog",
         "libpermission",
         "libpowermanager",
         "libshmemcompat",

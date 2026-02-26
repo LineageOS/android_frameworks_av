@@ -34,7 +34,6 @@
 #include <media/DeviceDescriptorBase.h>
 #include <media/MmapStreamInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
-#include <media/nblog/NBLog.h>
 #include <timing/SyncEvent.h>
 #include <utils/RefBase.h>
 #include <vibrator/ExternalVibration.h>
@@ -370,6 +369,9 @@ public:
 
     virtual audio_utils::mutex& mutex() const
             RETURN_CAPABILITY(audio_utils::ThreadBase_Mutex) = 0;
+
+    virtual void onClientUnfrozen(pid_t pid) EXCLUDES_ThreadBase_Mutex = 0;
+    virtual void onClientFrozen(pid_t pid) EXCLUDES_ThreadBase_Mutex = 0;
 
     virtual void onEffectEnable(const sp<IAfEffectModule>& effect) EXCLUDES_ThreadBase_Mutex = 0;
     virtual void onEffectDisable(const sp<IAfEffectModule>& effect) EXCLUDES_ThreadBase_Mutex = 0;

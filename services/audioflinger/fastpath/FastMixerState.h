@@ -24,7 +24,6 @@
 #include <media/AudioMixer.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/nbaio/NBAIO.h>
-#include <media/nblog/NBLog.h>
 #include <vibrator/ExternalVibrationUtils.h>
 #include "FastThreadState.h"
 

@@ -317,6 +317,7 @@ protected:
     const bool      mIsOut;             // true for AudioTrack, false for AudioRecord
     const bool      mClientInServer;    // true for OutputTrack, false for AudioTrack & AudioRecord
     bool            mIsShutdown;        // latch set to true when shared memory corruption detected
+    bool mSkippedWake = false; // client wake was skipped, this can occur if client is frozen.
 
     // mUnreleased is the number frames remaining from most recent obtainBuffer(s).
     // Generally accessed by a single thread, but for Java offload,

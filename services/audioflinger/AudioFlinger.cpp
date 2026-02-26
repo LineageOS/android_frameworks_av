@@ -29,7 +29,6 @@
 #include <afutils/FallibleLockGuard.h>
 #include <afutils/NBAIO_Tee.h>
 #include <afutils/PropertyUtils.h>
-#include <afutils/TypedLogger.h>
 #include <android-base/errors.h>
 #include <android-base/stringprintf.h>
 #include <android/media/IAudioPolicyService.h>
@@ -2088,7 +2087,12 @@ void AudioFlinger::registerClient(const sp<media::IAudioFlingerClient>& client)
 
             mNotificationClients[pid] = notificationClient;
             sp<IBinder> binder = IInterface::asBinder(client);
-            binder->linkToDeath(notificationClient);
+            status_t status = binder->linkToDeath(notificationClient);
+            ALOGW_IF(status != NO_ERROR, "%s: linkToDeath returned %d",
+                    __func__, status);
+            status = binder->addFrozenStateChangeCallback(notificationClient);
+            ALOGW_IF(status != NO_ERROR, "%s: addFrozenStateChangeCallback returned %d",
+                    __func__, status);
         }
     }
 
@@ -2140,6 +2144,38 @@ void AudioFlinger::removeNotificationClient(pid_t pid)
     for (auto& effect : removedEffects) {
         effect->updatePolicyState();
     }
+}
+
+void AudioFlinger::onClientUnfrozen(pid_t pid)
+{
+    ALOGV("%s: pid:%d", __func__, pid);
+    audio_utils::lock_guard _l(mutex());
+
+    // template lambda to iterate over Threads.
+    auto unfreezeThreads = [pid](const auto& threads) {
+        for (const auto& [_, thread] : threads) {
+            thread->onClientUnfrozen(pid);
+        }
+    };
+    unfreezeThreads(mPlaybackThreads);
+    unfreezeThreads(mRecordThreads);
+    unfreezeThreads(mMmapThreads);
+}
+
+void AudioFlinger::onClientFrozen(pid_t pid)
+{
+    ALOGV("%s: pid:%d", __func__, pid);
+    audio_utils::lock_guard _l(mutex());
+
+    // template lambda to iterate over Threads.
+    auto freezeThreads = [pid](const auto& threads) {
+        for (const auto& [_, thread] : threads) {
+            thread->onClientFrozen(pid);
+        }
+    };
+    freezeThreads(mPlaybackThreads);
+    freezeThreads(mRecordThreads);
+    freezeThreads(mMmapThreads);
 }
 
 void AudioFlinger::ioConfigChanged(audio_io_config_event_t event,
@@ -2241,6 +2277,20 @@ void AudioFlinger::NotificationClient::binderDied(const wp<IBinder>& who __unuse
 {
     const auto keep = sp<NotificationClient>::fromExisting(this);
     mAudioFlinger->removeNotificationClient(mPid);
+}
+
+void AudioFlinger::NotificationClient::onStateChanged(
+        const android::wp<IBinder>& who __unused, State state)
+{
+    if (state == IBinder::FrozenStateChangeCallback::State::FROZEN) {
+        mFrozen = true;
+        mAudioFlinger->onClientFrozen(mPid);
+    } else if (state == IBinder::FrozenStateChangeCallback::State::UNFROZEN) {
+        mFrozen = false;
+        mAudioFlinger->onClientUnfrozen(mPid);
+    }
+    ALOGW("%s: pid:%d  uid:%d  state:%s",
+          __func__, mPid, mUid, (mFrozen ? "frozen" : "unfrozen"));
 }
 
 status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,

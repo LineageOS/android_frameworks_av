@@ -607,10 +607,6 @@ ApexCodec_Status C2ApexAacDec::process(
     bool codecConfig = (inFlags & APEXCODEC_FLAG_CODEC_CONFIG) != 0;
     ALOGV("codecConfig: %d", codecConfig);
 
-    if (inFlags & APEXCODEC_FLAG_END_OF_STREAM) {
-        mEndOfInput = true;
-    }
-
     if (!mEndOfInput && input &&
             input->getLinearBuffer(&inBuffer) == APEXCODEC_STATUS_OK &&
             inBuffer.size > 0) {
@@ -708,7 +704,8 @@ ApexCodec_Status C2ApexAacDec::process(
                 mIsFirstInput = false;
             }
         }
-    } else if (mEndOfInput && !mEndOfOutput && !mPendingTimestamps.empty()) {
+    } else if ((inFlags & APEXCODEC_FLAG_END_OF_STREAM) && !mEndOfOutput
+            && !mPendingTimestamps.empty()) {
         ALOGV("draining");
         decoderErr = aacDecoder_Drain(
                 mAACDecoder, tmpOutBuffer.data(), TMP_BUFFER_COUNT, &mOutputInfo);
@@ -719,10 +716,14 @@ ApexCodec_Status C2ApexAacDec::process(
         ALOGV("no input, no output, no pending timestamps");
     }
 
+    if (inFlags & APEXCODEC_FLAG_END_OF_STREAM) {
+        mEndOfInput = true;
+    }
+
+    size_t generatedSamples = 0;
     if (decoded) {
         while (decoderErr != AAC_DEC_NOT_ENOUGH_BITS) {
             ALOGV("decoded data");
-            size_t generatedSamples = 0;
 
             if (IS_OUTPUT_VALID(decoderErr)) {
                 if (mIsFirstOutput) {
@@ -785,7 +786,7 @@ ApexCodec_Status C2ApexAacDec::process(
                         frameSamples, mLeftoverSamples);
                 size_t sampleSize = (pcmEncoding == C2Config::PCM_16)
                         ? sizeof(int16_t) : sizeof(float);
-                if (frameSamples * sampleSize > outLinearBuffer.size) {
+                if (frameSamples * sampleSize > outLinearBuffer.size - *produced) {
                     ALOGE("output buffer too small for a frame");
                     mSignalledError = true;
                     return APEXCODEC_STATUS_NO_MEMORY;
@@ -941,7 +942,7 @@ ApexCodec_Status C2ApexAacDec::process(
     } else if (codecConfig) {
         ALOGV("emitting buffer with frameIndex: %" PRIu64, frameIndex);
         output->setBufferInfo((ApexCodec_BufferFlags)0, frameIndex, timestamp);
-    } else if (*consumed > 0) {
+    } else if (*consumed > 0 || generatedSamples > 0) {
         ALOGV("emitting incomplete buffer with frameIndex: %" PRIu64, frameIndex);
         output->setBufferInfo(APEXCODEC_FLAG_INCOMPLETE, frameIndex, timestamp);
     }

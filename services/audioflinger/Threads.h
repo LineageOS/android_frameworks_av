@@ -545,6 +545,10 @@ public:
     }
     mutable audio_utils::mutex mMutex{audio_utils::MutexOrder::kThreadBase_Mutex};
 
+    // Freeze handling, override on a thread basis.
+    void onClientUnfrozen(pid_t pid __unused) override EXCLUDES_ThreadBase_Mutex {}
+    void onClientFrozen(pid_t pid __unused) override EXCLUDES_ThreadBase_Mutex {}
+
     void onEffectEnable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
     void onEffectDisable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
 
@@ -2264,10 +2268,6 @@ private:
             size_t                              mPipeFramesP2;
             // If a fast capture is present, the Pipe as IMemory, otherwise clear
             sp<IMemory>                         mPipeMemory;
-
-            // TODO: add comment and adjust size as needed
-            static const size_t                 kFastCaptureLogSize = 4 * 1024;
-            sp<NBLog::Writer>                   mFastCaptureNBLogWriter;
 
             bool                                mFastTrackAvail;    // true if fast track available
             // common state to all record threads
