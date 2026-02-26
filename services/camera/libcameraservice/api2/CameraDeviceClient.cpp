@@ -1184,6 +1184,7 @@ binder::Status CameraDeviceClient::deleteStreamLocked(int streamId) {
                     break;
                 }
             }
+            mStreamInfoMap.erase(streamId);
         }
     }
 
@@ -1307,12 +1308,20 @@ binder::Status CameraDeviceClient::createStreamLocked(
         err = mDevice->getSharedStreamIds(streamInfo, streamIds);
         if (err == OK) {
             for (auto id: streamIds) {
-              if (!mStreamInfoMap.contains(id)) {
-                streamId = id;
-                break;
-              }
+                if (!mStreamInfoMap.contains(id)) {
+                    streamId = id;
+                    break;
+                }
+            }
+            if (streamId == camera3::CAMERA3_STREAM_ID_INVALID && !streamIds.empty()) {
+                streamId = streamIds[0];
+                ALOGI("%s: Camera %s: Reusing shared streamId %d already owned by this client",
+                        __FUNCTION__, mCameraIdStr.c_str(), streamId);
             }
             if (streamId == camera3::CAMERA3_STREAM_ID_INVALID) {
+                ALOGE("%s: Camera %s: No valid shared stream ID found in %zu candidates. "
+                        "OutputConfiguration isn't valid!",
+                        __FUNCTION__, mCameraIdStr.c_str(), streamIds.size());
                 return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                     "OutputConfiguration isn't valid!");
             }
