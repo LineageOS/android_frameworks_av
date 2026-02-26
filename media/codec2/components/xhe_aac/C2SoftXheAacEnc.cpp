@@ -812,6 +812,16 @@ extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
         return nullptr;
     }
 
+    int apiLevel = android_get_device_api_level();
+    bool isPreview = (android::base::GetIntProperty("ro.build.version.preview_sdk", 0) != 0);
+    if (isPreview) {
+        apiLevel++;
+    }
+    if (apiLevel < 37) {
+        ALOGV("xHE-AAC SW Codec is not supported on API level %d", apiLevel);
+        return nullptr;
+    }
+
     return new ::android::C2SoftXheAacEncFactory();
 }
 
